@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import { Hs256TokenService, ScryptPasswordHasher } from './adapters/crypto.ts';
+import { HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from './adapters/crypto.ts';
 
 const fastHasher = new ScryptPasswordHasher({ N: 2 ** 10 });
 const SECRET = 'segredo-de-teste-com-mais-de-32-caracteres';
@@ -119,4 +119,39 @@ test('token: lixo e papel inválido retornam undefined', () => {
 
 test('token: segredo curto é recusado na criação', () => {
   assert.throws(() => new Hs256TokenService({ secret: 'curto' }));
+});
+
+test('códigos: 6 dígitos com zeros à esquerda e sem viés óbvio', () => {
+  const codes = new HmacOneTimeCodes({ secret: SECRET });
+  const seen = new Set<string>();
+  let leadingZero = 0;
+  for (let i = 0; i < 2000; i += 1) {
+    const c = codes.generate();
+    assert.match(c, /^\d{6}$/);
+    seen.add(c);
+    if (c.startsWith('0')) leadingZero += 1;
+  }
+  assert.ok(seen.size > 1900, 'quase todos diferentes');
+  // 10% esperado de códigos começando com 0 (200 de 2000); margem larga para não ser frágil
+  assert.ok(leadingZero > 120 && leadingZero < 290, `começam com 0: ${leadingZero}`);
+});
+
+test('códigos: o hash depende do e-mail e do segredo, e a comparação confere', () => {
+  const codes = new HmacOneTimeCodes({ secret: SECRET });
+  const hash = codes.hash('ana@exemplo.com', '123456');
+  assert.ok(!hash.includes('123456'));
+  assert.equal(codes.matches('ana@exemplo.com', '123456', hash), true);
+  assert.equal(codes.matches('ana@exemplo.com', '123457', hash), false, 'código errado');
+  assert.equal(codes.matches('bia@exemplo.com', '123456', hash), false, 'e-mail diferente');
+  assert.equal(codes.matches('ana@exemplo.com', '123456', 'lixo'), false, 'hash malformado');
+  assert.equal(codes.matches('ana@exemplo.com', '123456', ''), false);
+
+  const other = new HmacOneTimeCodes({ secret: 'outro-segredo-com-mais-de-32-caracteres-x' });
+  assert.notEqual(other.hash('ana@exemplo.com', '123456'), hash, 'segredo diferente');
+});
+
+test('códigos: gerador injetado e segredo curto', () => {
+  const codes = new HmacOneTimeCodes({ secret: SECRET, generate: () => '000042' });
+  assert.equal(codes.generate(), '000042');
+  assert.throws(() => new HmacOneTimeCodes({ secret: 'curto' }));
 });

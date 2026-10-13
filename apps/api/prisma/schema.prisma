@@ -318,3 +318,20 @@ model Notification {
 
   @@index([userId, readAt, createdAt])
 }
+
+// Cadastro aguardando o código enviado por e-mail. A conta (User + Profile) só nasce na confirmação.
+// Guarda hashes: nunca a senha nem o código. Linhas expiradas devem ser limpas por uma rotina periódica.
+model PendingSignup {
+  email        String   @id // minúsculo
+  username     String
+  displayName  String
+  passwordHash String
+  codeHash     String
+  expiresAt    DateTime
+  attempts     Int      @default(0) // incrementar de forma atômica (attempts: { increment: 1 })
+  sendCount    Int      @default(1)
+  lastSentAt   DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([expiresAt])
+}

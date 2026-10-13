@@ -1,10 +1,12 @@
-import { Hs256TokenService, ScryptPasswordHasher } from '../adapters/crypto.ts';
+import { HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../adapters/crypto.ts';
 import { createCore } from '../index.ts';
 import type { AuthResult } from '../auth-service.ts';
 import {
   FakeClock,
+  FakeEmailSender,
   InMemoryBlockRepository,
   InMemoryFollowRepository,
+  InMemoryPendingSignupRepository,
   InMemoryUserRepository,
   SequentialIds,
 } from './in-memory.ts';
@@ -17,21 +19,23 @@ export function makeWorld() {
   const blocks = new InMemoryBlockRepository();
   const follows = new InMemoryFollowRepository(blocks);
   const users = new InMemoryUserRepository();
+  const pending = new InMemoryPendingSignupRepository();
+  const mailer = new FakeEmailSender();
   const clock = new FakeClock();
   const ids = new SequentialIds();
   const hasher = new ScryptPasswordHasher({ N: 2 ** 10 });
   const tokens = new Hs256TokenService({ secret: TEST_SECRET, nowMs: () => clock.now().getTime() });
-  const core = createCore({ users, follows, blocks, hasher, tokens, clock, ids });
+  // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
+  let codeCounter = 100000;
+  const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
+  const core = createCore({ users, follows, blocks, pending, mailer, codes, hasher, tokens, clock, ids });
 
-  /** Cria um usuário e devolve a sessão. */
+  /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string } = {}): Promise<AuthResult> {
     clock.tick(1000);
-    return core.auth.register({
-      email: extra.email ?? `${username}@exemplo.com`,
-      username,
-      displayName: extra.displayName ?? username,
-      password: PASSWORD,
-    });
+    const email = (extra.email ?? `${username}@exemplo.com`).toLowerCase();
+    await core.auth.startSignup({ email, username, displayName: extra.displayName ?? username, password: PASSWORD });
+    return core.auth.confirmSignup({ email, code: mailer.lastCodeFor(email) });
   }
 
   /** Cria vários usuários de uma vez e devolve os ids por username. */
@@ -41,5 +45,5 @@ export function makeWorld() {
     return out;
   }
 
-  return { core, users, follows, blocks, clock, ids, hasher, tokens, signUp, signUpMany };
+  return { core, users, follows, blocks, pending, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
 }

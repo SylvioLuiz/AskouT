@@ -1,7 +1,15 @@
 import { conflict } from '../errors.ts';
 import { evaluateFriendship } from '../friendship.ts';
-import type { BlockRepository, Clock, FollowRepository, IdGenerator, UserRepository } from '../ports.ts';
-import type { Direction, Follow, FollowStatus, Page, Profile, User } from '../types.ts';
+import type {
+  BlockRepository,
+  Clock,
+  EmailSender,
+  FollowRepository,
+  IdGenerator,
+  PendingSignupRepository,
+  UserRepository,
+} from '../ports.ts';
+import type { Direction, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -175,6 +183,52 @@ export class InMemoryFollowRepository implements FollowRepository {
     return [...this.rows.values()].filter(
       (f) => f.status === status && (direction === 'followers' ? f.followeeId === userId : f.followerId === userId),
     );
+  }
+}
+
+export class InMemoryPendingSignupRepository implements PendingSignupRepository {
+  readonly rows = new Map<string, PendingSignup>();
+
+  async find(email: string): Promise<PendingSignup | undefined> {
+    const p = this.rows.get(email);
+    return p ? { ...p } : undefined;
+  }
+
+  async save(pending: PendingSignup): Promise<void> {
+    this.rows.set(pending.email, { ...pending });
+  }
+
+  async delete(email: string): Promise<void> {
+    this.rows.delete(email);
+  }
+
+  async incrementAttempts(email: string): Promise<number | undefined> {
+    const p = this.rows.get(email);
+    if (!p) return undefined;
+    p.attempts += 1;
+    return p.attempts;
+  }
+}
+
+/** Guarda os e-mails "enviados" para os testes lerem o código. */
+export class FakeEmailSender implements EmailSender {
+  readonly sent: { to: string; code: string; expiresInMinutes: number }[] = [];
+  failNext = false;
+
+  async sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void> {
+    if (this.failNext) {
+      this.failNext = false;
+      throw new Error('falha simulada no envio de e-mail');
+    }
+    this.sent.push({ ...input });
+  }
+
+  lastCodeFor(email: string): string {
+    for (let i = this.sent.length - 1; i >= 0; i -= 1) {
+      const m = this.sent[i]!;
+      if (m.to === email) return m.code;
+    }
+    throw new Error(`nenhum e-mail enviado para ${email}`);
   }
 }
 

@@ -1,8 +1,14 @@
-export type ErrorCode = 'VALIDATION' | 'UNAUTHORIZED' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT';
+export type ErrorCode =
+  | 'VALIDATION'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'CONFLICT'
+  | 'RATE_LIMITED';
 
 /**
- * Erro de regra de negócio. A camada HTTP (futura) mapeia `code` para o status:
- * VALIDATION 400, UNAUTHORIZED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409.
+ * Erro de regra de negócio. A camada HTTP mapeia `code` para o status:
+ * VALIDATION 400, UNAUTHORIZED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, RATE_LIMITED 429.
  * `message` é seguro para exibir ao usuário; `details` mapeia campo -> motivo.
  */
 export class DomainError extends Error {
@@ -24,3 +30,10 @@ export const forbidden = (message: string) => new DomainError('FORBIDDEN', messa
 export const notFound = (message = 'Não encontrado') => new DomainError('NOT_FOUND', message);
 export const conflict = (message: string, details?: Record<string, string>) =>
   new DomainError('CONFLICT', message, details);
+/** `retryAfterSeconds`, quando conhecido, vai em details para a camada HTTP virar o cabeçalho Retry-After. */
+export const rateLimited = (message: string, retryAfterSeconds?: number) =>
+  new DomainError(
+    'RATE_LIMITED',
+    message,
+    retryAfterSeconds === undefined ? undefined : { retryAfterSeconds: String(Math.max(1, Math.ceil(retryAfterSeconds))) },
+  );

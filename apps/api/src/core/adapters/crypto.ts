@@ -1,5 +1,5 @@
-import { createHmac, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
-import type { PasswordHasher, TokenClaims, TokenService } from '../ports.ts';
+import { createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
+import type { OneTimeCodes, PasswordHasher, TokenClaims, TokenService } from '../ports.ts';
 import type { UserRole } from '../types.ts';
 
 /**
@@ -134,5 +134,46 @@ export class Hs256TokenService implements TokenService {
 
   private sign(input: string): string {
     return createHmac('sha256', this.secret).update(input).digest('base64url');
+  }
+}
+
+// ---------- Códigos de confirmação por e-mail ----------
+
+export interface HmacCodesOptions {
+  secret: string;
+  /** Gerador alternativo, só para testes. Em produção, usa `crypto.randomInt`. */
+  generate?: () => string;
+}
+
+/**
+ * Código de 6 dígitos (1 milhão de possibilidades): a segurança vem de validade curta,
+ * limite de tentativas e de reenvios (regras no AuthService), não do hash. O HMAC com
+ * segredo do servidor, amarrado ao e-mail, só evita que um vazamento do banco entregue
+ * os códigos em texto puro e que um código valha para outro e-mail.
+ */
+export class HmacOneTimeCodes implements OneTimeCodes {
+  private readonly secret: string;
+  private readonly generator: (() => string) | undefined;
+
+  constructor(options: HmacCodesOptions) {
+    if (typeof options.secret !== 'string' || options.secret.length < 32) {
+      throw new Error('O segredo dos códigos precisa ter ao menos 32 caracteres');
+    }
+    this.secret = options.secret;
+    this.generator = options.generate;
+  }
+
+  generate(): string {
+    return this.generator ? this.generator() : String(randomInt(0, 1_000_000)).padStart(6, '0');
+  }
+
+  hash(email: string, code: string): string {
+    return createHmac('sha256', this.secret).update(`signup-code:${email}:${code}`).digest('base64url');
+  }
+
+  matches(email: string, code: string, expectedHash: string): boolean {
+    const actual = Buffer.from(this.hash(email, code));
+    const expected = Buffer.from(expectedHash);
+    return actual.length === expected.length && timingSafeEqual(actual, expected);
   }
 }

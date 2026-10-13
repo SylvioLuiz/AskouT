@@ -27,6 +27,25 @@ export interface Follow {
   createdAt: Date;
 }
 
+/**
+ * Cadastro aguardando o código enviado por e-mail. A conta (User + Profile) só é
+ * criada depois da confirmação. Guarda o hash da senha, nunca a senha nem o código.
+ */
+export interface PendingSignup {
+  email: string; // chave; sempre minúsculo
+  username: string;
+  displayName: string;
+  passwordHash: string;
+  codeHash: string;
+  expiresAt: Date;
+  /** Tentativas erradas de código. */
+  attempts: number;
+  /** Códigos enviados nesta janela de cadastro. */
+  sendCount: number;
+  lastSentAt: Date;
+  createdAt: Date;
+}
+
 /** Dados de perfil que qualquer usuário autenticado pode ver em listas e buscas. */
 export interface PublicProfile {
   userId: string;

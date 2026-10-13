@@ -1,4 +1,4 @@
-import type { Direction, Follow, FollowStatus, Page, Profile, User, UserRole } from './types.ts';
+import type { Direction, Follow, FollowStatus, Page, PendingSignup, Profile, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -46,6 +46,33 @@ export interface BlockRepository {
   listRelatedIds(userId: string): Promise<string[]>;
 }
 
+export interface PendingSignupRepository {
+  find(email: string): Promise<PendingSignup | undefined>;
+  /** Insere ou substitui o cadastro pendente daquele e-mail. */
+  save(pending: PendingSignup): Promise<void>;
+  delete(email: string): Promise<void>;
+  /**
+   * Soma 1 às tentativas erradas de forma ATÔMICA e devolve o novo total
+   * (undefined se o cadastro não existir mais). Atômico para que tentativas
+   * simultâneas não furem o limite.
+   */
+  incrementAttempts(email: string): Promise<number | undefined>;
+}
+
+export interface EmailSender {
+  /** Falha com erro comum se o e-mail não puder ser enviado. */
+  sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void>;
+}
+
+export interface OneTimeCodes {
+  /** Código numérico de 6 dígitos, com zeros à esquerda. */
+  generate(): string;
+  /** Hash do código amarrado ao e-mail, para guardar no banco. */
+  hash(email: string, code: string): string;
+  /** Comparação em tempo constante. */
+  matches(email: string, code: string, expectedHash: string): boolean;
+}
+
 export interface PasswordHasher {
   hash(password: string): Promise<string>;
   verify(password: string, stored: string): Promise<boolean>;
@@ -74,6 +101,9 @@ export interface CoreDeps {
   users: UserRepository;
   follows: FollowRepository;
   blocks: BlockRepository;
+  pending: PendingSignupRepository;
+  mailer: EmailSender;
+  codes: OneTimeCodes;
   hasher: PasswordHasher;
   tokens: TokenService;
   clock: Clock;

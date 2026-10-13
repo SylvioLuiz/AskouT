@@ -16,7 +16,20 @@ export function createCore(deps: CoreDeps) {
 export type Core = ReturnType<typeof createCore>;
 
 export { AuthService } from './auth-service.ts';
-export type { AuthResult, LoginInput, RegisterInput, SessionUser } from './auth-service.ts';
+export {
+  CODE_TTL_MINUTES,
+  MAX_CODE_ATTEMPTS,
+  MAX_CODE_SENDS,
+  RESEND_COOLDOWN_SECONDS,
+} from './auth-service.ts';
+export type {
+  AuthResult,
+  ConfirmSignupInput,
+  LoginInput,
+  SessionUser,
+  SignupInput,
+  SignupStarted,
+} from './auth-service.ts';
 export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';
 export type { ConnectionsPage, FollowResult } from './follow-service.ts';
@@ -25,14 +38,17 @@ export type { ProfilePatch, ProfileView, RelationState } from './profile-service
 export { DomainError } from './errors.ts';
 export type { ErrorCode } from './errors.ts';
 export { evaluateFriendship } from './friendship.ts';
-export { Hs256TokenService, ScryptPasswordHasher } from './adapters/crypto.ts';
+export { HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from './adapters/crypto.ts';
 export type {
   BlockRepository,
   Clock,
   CoreDeps,
+  EmailSender,
   FollowRepository,
   IdGenerator,
+  OneTimeCodes,
   PasswordHasher,
+  PendingSignupRepository,
   TokenClaims,
   TokenService,
   UserRepository,
@@ -43,6 +59,7 @@ export type {
   Follow,
   FollowStatus,
   Page,
+  PendingSignup,
   Profile,
   PublicProfile,
   User,
