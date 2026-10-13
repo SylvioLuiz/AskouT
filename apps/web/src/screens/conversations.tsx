@@ -48,7 +48,7 @@ export function ConversationsScreen() {
           {items.map((c) => (
             <li key={c.id}>
               <Link to={`/conversas/${c.id}`} className={`convrow${c.unread > 0 ? ' convrow--unread' : ''}`}>
-                {c.other ? <Avatar profile={c.other} size={48} /> : <GroupAvatar name={c.name ?? 'Grupo'} size={48} />}
+                {c.other ? <Avatar profile={c.other} size={48} /> : <GroupAvatar name={c.name ?? 'Grupo'} size={48} imageUrl={c.imageUrl} />}
                 <span className="convrow__body">
                   <span className="convrow__top">
                     <span className="convrow__name">{c.other ? c.other.displayName : (c.name ?? 'Grupo')}</span>
@@ -222,6 +222,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           return (
             <div key={m.id} className="chat__item">
               {showDay ? <p className="chat__day">{day}</p> : null}
+              {m.kind === 'SYSTEM' ? <p className="chat__system">{m.body}</p> : (
               <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.kind !== 'TEXT' ? ' bubble--card' : ''}`}>
                 {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
                 {m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
@@ -233,6 +234,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 )}
                 <span className="bubble__time">{formatClock(m.createdAt)}</span>
               </div>
+              )}
             </div>
           );
         })}

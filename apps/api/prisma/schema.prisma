@@ -98,6 +98,7 @@ enum MessageKind {
   TEXT
   SUGGESTION
   MEETUP
+  SYSTEM
 }
 
 model User {

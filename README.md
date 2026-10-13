@@ -141,7 +141,11 @@ Na página de um evento, o botão **Criar encontro** (nome provisório; muda em 
 - Regras: só uma resposta por convite; não responde a encontro que já terminou; bloqueio impede convidar e aceitar; até 10 encontros criados por hora; no grupo só texto (sugestão de lugar do Flash continua só na conversa 1 a 1).
 - Rotas: `POST /meetups` (`{eventId, guestIds, name?}`), `GET /meetups/:id`, `POST /meetups/:id/respond` (`{action}`), `GET /conversations/:id/group`.
 - Passos na sua máquina: `git pull`, `npm run update` (migração `20261014210000_meetups_groups` e `006_meetup_constraints.sql`), `npm run dev:all -- --https`.
-- Ainda não existe: sair do grupo, remover/convidar pessoas depois, editar o encontro, trocar o nome ou a foto do grupo, aviso fora do app, mídia. Se alguém bloquear outro membro dentro de um grupo, os dois continuam vendo as mensagens um do outro (o bloqueio só vale na 1 a 1 e para convidar).
+- **Gerenciar o grupo** (tela de detalhes): qualquer membro pode **Sair do grupo** (sai também dos encontros dele; se era quem criou, o grupo passa para quem entrou primeiro). Só quem criou **muda o nome**, **troca/remove a foto** e **remove pessoas**. A foto é reduzida no celular (256 px, JPEG, até 40 KB) e guardada no próprio banco como imagem embutida; não há armazenamento de arquivos nem moderação de imagem ainda. Cada mudança vira um aviso cinza no chat ("Fulano saiu do grupo").
+- **Editar o encontro** (aba Eventos, só quem organiza, até ele acabar): mudar o nome, **convidar mais amigos** (quem já está no grupo não aparece; mais de 16 pessoas não) e **cancelar** (cartões e aba passam a mostrar "Cancelado").
+- **Bloqueio dentro do grupo:** se alguém bloqueia outro membro, os dois deixam de ver as mensagens e a presença um do outro naquele grupo (o resto do grupo continua normal).
+- Rotas novas: `POST /conversations/:id/leave`, `DELETE /conversations/:id/members/:userId`, `PUT /conversations/:id/group/name` (`{name}`), `PUT /conversations/:id/group/photo` (`{image: dataURL|null}`), `POST /meetups/:id/invite` (`{guestIds}`), `PATCH /meetups/:id` (`{title}`), `POST /meetups/:id/cancel`. Migração `20261014230000_group_management` e `007_group_constraints.sql` (rodam no `npm run update`).
+- Ainda não existe: aviso fora do app, mídia.
 
 ## Explorar
 

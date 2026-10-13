@@ -10,6 +10,8 @@ export const MESSAGE_MAX = 2000;
 export const MESSAGES_PER_MINUTE = 30;
 export const PAGE_DEFAULT = 50;
 export const PAGE_MAX = 100;
+export const GROUP_NAME_MAX = 60;
+export const GROUP_IMAGE_MAX_BYTES = 40 * 1024;
 
 // Tudo menos tab, nova linha e retorno de carro.
 // eslint-disable-next-line no-control-regex
@@ -44,6 +46,8 @@ export interface ConversationListItem {
   other: PublicProfile | null;
   /** Nome do grupo; nulo na conversa 1 a 1. */
   name: string | null;
+  /** Foto do grupo (data URL); nula na 1 a 1 ou sem foto. */
+  imageUrl: string | null;
   memberCount: number;
   lastMessage: MessageView | null;
   unread: number;
@@ -56,8 +60,11 @@ export interface ConversationView {
   type: 'DIRECT' | 'GROUP';
   other: PublicProfile | null;
   name: string | null;
+  imageUrl: string | null;
   memberCount: number;
   canSend: boolean;
+  /** Você é quem criou o grupo (pode renomear, trocar a foto e remover pessoas). */
+  isOwner: boolean;
   /** Relógio do servidor. */
   now: string;
   /** Em ordem cronológica. */
@@ -69,6 +76,8 @@ export interface GroupDetails {
   id: string;
   name: string;
   ownerId: string;
+  /** Foto do grupo (data URL) ou nula. */
+  imageUrl: string | null;
   members: { profile: PublicProfile; role: 'OWNER' | 'MEMBER' }[];
   meetups: MeetupView[];
   /** Fotos e vídeos ainda não existem no AskouT. */
@@ -154,6 +163,25 @@ export function parseSuggestion(value: unknown): SuggestionCard {
   };
 }
 
+const IMAGE_RE = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
+
+/** Aceita só jpeg/png/webp em base64, até 40 KB, conferindo os primeiros bytes (não confia no tipo declarado). */
+export function parseGroupImage(value: unknown): string {
+  const fail = () => validationError('Imagem inválida', { image: 'Use uma imagem JPEG, PNG ou WebP de até 40 KB' });
+  if (typeof value !== 'string' || value.length > 60_000) throw fail();
+  const match = IMAGE_RE.exec(value);
+  if (!match) throw fail();
+  const bytes = Buffer.from(match[2] as string, 'base64');
+  if (bytes.length === 0 || bytes.length > GROUP_IMAGE_MAX_BYTES) throw fail();
+  const type = match[1];
+  const ok =
+    (type === 'jpeg' && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) ||
+    (type === 'png' && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) ||
+    (type === 'webp' && bytes.subarray(0, 4).toString('latin1') === 'RIFF' && bytes.subarray(8, 12).toString('latin1') === 'WEBP');
+  if (!ok) throw fail();
+  return value;
+}
+
 export class ConversationService {
   private readonly deps: CoreDeps;
 
@@ -180,11 +208,8 @@ export class ConversationService {
 
   async list(actorId: string): Promise<ConversationListItem[]> {
     const { conversations, follows, blocks, users } = this.deps;
-    const [summaries, blocked, friends] = await Promise.all([
-      conversations.listForUser(actorId),
-      blocks.listRelatedIds(actorId),
-      follows.listFriendIds(actorId),
-    ]);
+    const blocked = await blocks.listRelatedIds(actorId);
+    const [summaries, friends] = await Promise.all([conversations.listForUser(actorId, blocked), follows.listFriendIds(actorId)]);
     const hidden = new Set(blocked);
     const rows = summaries
       .map((s) => ({ s, otherId: s.conversation.type === 'DIRECT' ? (s.participantIds.find((id) => id !== actorId) ?? null) : null }))
@@ -199,7 +224,8 @@ export class ConversationService {
         type: s.conversation.type,
         other: profile ? toPublicProfile(profile) : null,
         name: s.conversation.name,
-        memberCount: s.participantIds.length,
+        imageUrl: s.conversation.imageUrl,
+        memberCount: s.conversation.type === 'GROUP' ? s.participantIds.filter((id) => !hidden.has(id)).length : s.participantIds.length,
         lastMessage: s.lastMessage ? toMessageView(s.lastMessage, actorId) : null,
         unread: s.unread,
         canSend: s.conversation.type === 'GROUP' ? true : otherId !== null && friends.includes(otherId),
@@ -220,7 +246,9 @@ export class ConversationService {
       before = new Date(parsed);
     }
     const now = clock.now();
-    const page = await conversations.listMessages(conversationId, limit + 1, before);
+    // Em grupo, quem tem bloqueio com você (nos dois sentidos) some do chat, como na conversa 1 a 1.
+    const hiddenIds = conversation.type === 'GROUP' ? await this.deps.blocks.listRelatedIds(actorId) : [];
+    const page = await conversations.listMessages(conversationId, limit + 1, before, hiddenIds);
     const hasMore = page.length > limit;
     const items = hasMore ? page.slice(page.length - limit) : page;
     if (before === undefined) await conversations.markRead(conversationId, actorId, now);
@@ -238,7 +266,9 @@ export class ConversationService {
       type: conversation.type,
       other: other ? toPublicProfile(other) : null,
       name: conversation.name,
-      memberCount: memberIds.length,
+      imageUrl: conversation.imageUrl,
+      memberCount: memberIds.filter((id) => !hiddenIds.includes(id)).length,
+      isOwner: conversation.ownerId === actorId,
       canSend: isGroup ? true : otherId !== null && friends.includes(otherId),
       now: now.toISOString(),
       messages: items.map((m) =>
@@ -318,16 +348,89 @@ export class ConversationService {
   async group(actorId: string, conversationId: string): Promise<GroupDetails> {
     const { conversation, memberIds } = await this.access(actorId, conversationId);
     if (conversation.type !== 'GROUP' || conversation.name === null || conversation.ownerId === null) throw notFound('Grupo não encontrado');
-    const profiles = new Map((await this.deps.users.findProfilesByIds(memberIds)).map((p) => [p.userId, p] as const));
+    const hiddenIds = await this.deps.blocks.listRelatedIds(actorId);
+    const visibleIds = memberIds.filter((id) => !hiddenIds.includes(id));
+    const profiles = new Map((await this.deps.users.findProfilesByIds(visibleIds)).map((p) => [p.userId, p] as const));
     const ownerId = conversation.ownerId;
-    const members = memberIds
+    const members = visibleIds
       .flatMap((id) => {
         const p = profiles.get(id);
         return p ? [{ profile: toPublicProfile(p), role: id === ownerId ? ('OWNER' as const) : ('MEMBER' as const) }] : [];
       })
       .sort((a, b) => (a.role === b.role ? a.profile.displayName.localeCompare(b.profile.displayName, 'pt-BR') : a.role === 'OWNER' ? -1 : 1));
     const meetups = await buildMeetupViews(this.deps, actorId, await this.deps.meetups.listForConversation(conversationId));
-    return { id: conversationId, name: conversation.name, ownerId, members, meetups, mediaAvailable: false };
+    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl, members, meetups, mediaAvailable: false };
+  }
+
+  // ---------- Gestão do grupo ----------
+
+  /** Sai do grupo. Quem criou passa o grupo para quem entrou há mais tempo. */
+  async leave(actorId: string, conversationId: string): Promise<{ ok: true }> {
+    const { conversations, meetups, clock } = this.deps;
+    const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
+    const now = clock.now();
+    const name = await this.nameOf(actorId);
+    await this.postSystem(conversationId, actorId, `${name} saiu do grupo`, now);
+    await conversations.removeParticipant(conversationId, actorId);
+    await meetups.declineAllFor(conversationId, actorId, now);
+    if (conversation.ownerId === actorId) {
+      const next = memberIds.find((id) => id !== actorId);
+      if (next) await conversations.updateGroup(conversationId, { ownerId: next });
+    }
+    return { ok: true };
+  }
+
+  /** Só quem criou o grupo remove alguém. A pessoa fica fora dos encontros do grupo; pode ser convidada de novo. */
+  async removeMember(actorId: string, conversationId: string, targetId: unknown): Promise<{ ok: true }> {
+    const { conversations, meetups, clock } = this.deps;
+    const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
+    if (conversation.ownerId !== actorId) throw forbidden('Só quem criou o grupo pode remover pessoas');
+    if (typeof targetId !== 'string' || targetId.length > 64 || !memberIds.includes(targetId)) throw notFound('Essa pessoa não está no grupo');
+    if (targetId === actorId) throw validationError('Para sair do grupo, use "Sair do grupo"');
+    const now = clock.now();
+    await conversations.removeParticipant(conversationId, targetId);
+    await meetups.declineAllFor(conversationId, targetId, now);
+    await this.postSystem(conversationId, actorId, `${await this.nameOf(targetId)} foi removido(a) por ${await this.nameOf(actorId)}`, now);
+    return { ok: true };
+  }
+
+  async renameGroup(actorId: string, conversationId: string, rawName: unknown): Promise<{ name: string }> {
+    const { conversations, clock } = this.deps;
+    const { conversation } = await this.groupAccess(actorId, conversationId);
+    if (conversation.ownerId !== actorId) throw forbidden('Só quem criou o grupo pode trocar o nome');
+    if (typeof rawName !== 'string' || rawName.trim() === '' || Array.from(rawName.trim()).length > GROUP_NAME_MAX || CONTROL_CHARS_RE.test(rawName)) {
+      throw validationError('Nome inválido', { name: `Use de 1 a ${GROUP_NAME_MAX} caracteres` });
+    }
+    const name = rawName.trim();
+    await conversations.updateGroup(conversationId, { name });
+    await this.postSystem(conversationId, actorId, `${await this.nameOf(actorId)} mudou o nome do grupo para "${name}"`, clock.now());
+    return { name };
+  }
+
+  /** Troca ou remove (`null`) a foto do grupo. Só quem criou. A imagem chega já reduzida pelo app. */
+  async setGroupPhoto(actorId: string, conversationId: string, image: unknown): Promise<{ imageUrl: string | null }> {
+    const { conversations, clock } = this.deps;
+    const { conversation } = await this.groupAccess(actorId, conversationId);
+    if (conversation.ownerId !== actorId) throw forbidden('Só quem criou o grupo pode trocar a foto');
+    const imageUrl = image === null ? null : parseGroupImage(image);
+    await conversations.updateGroup(conversationId, { imageUrl });
+    await this.postSystem(conversationId, actorId, `${await this.nameOf(actorId)} ${imageUrl ? 'trocou' : 'removeu'} a foto do grupo`, clock.now());
+    return { imageUrl };
+  }
+
+  private async groupAccess(actorId: string, conversationId: string) {
+    const access = await this.access(actorId, conversationId);
+    if (access.conversation.type !== 'GROUP') throw notFound('Grupo não encontrado');
+    return access;
+  }
+
+  private async nameOf(userId: string): Promise<string> {
+    return (await this.deps.users.findProfilesByIds([userId]))[0]?.displayName ?? 'Alguém';
+  }
+
+  private async postSystem(conversationId: string, senderId: string, body: string, now: Date): Promise<void> {
+    const { conversations, ids } = this.deps;
+    await conversations.addMessage({ id: ids.next(), conversationId, senderId, kind: 'SYSTEM', body, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: now });
   }
 
   /** Posições das duas pessoas num encontro Flash ativo entre elas, ou null. Nunca sai daqui: só serve para as distâncias. */

@@ -110,14 +110,18 @@ export interface ConversationRepository {
   createGroup(input: { id: string; name: string; ownerId: string; now: Date }): Promise<ConversationRecord>;
   /** Idempotente: coloca a pessoa no grupo. */
   addParticipant(conversationId: string, userId: string, now: Date): Promise<void>;
+  /** Tira a pessoa do grupo (idempotente). Quem entrou primeiro vem primeiro em `participantIds`. */
+  removeParticipant(conversationId: string, userId: string): Promise<void>;
+  /** Muda nome, foto (nula apaga) e/ou dono do grupo. */
+  updateGroup(conversationId: string, patch: { name?: string; imageUrl?: string | null; ownerId?: string }): Promise<void>;
   /** Conversas do usuário, da mais recente para a mais antiga (por última mensagem, depois criação). */
-  listForUser(userId: string): Promise<ConversationSummaryRecord[]>;
+  listForUser(userId: string, hiddenSenderIds?: readonly string[]): Promise<ConversationSummaryRecord[]>;
   addMessage(message: MessageRecord): Promise<void>;
   findMessage(id: string): Promise<MessageRecord | undefined>;
   /** Grava a resposta ao cartão só se ainda não houver uma. Devolve false se já tinha. */
   setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean>;
   /** Mensagens em ordem cronológica. `before` pagina para trás (só as anteriores a esse instante). */
-  listMessages(conversationId: string, limit: number, before?: Date): Promise<MessageRecord[]>;
+  listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds?: readonly string[]): Promise<MessageRecord[]>;
   /** Marca como lida até `now` para `userId`. */
   markRead(conversationId: string, userId: string, now: Date): Promise<void>;
   /** Quantas mensagens `userId` enviou desde `since` (limite de envio). */
@@ -132,6 +136,12 @@ export interface MeetupRepository {
   listForConversation(conversationId: string): Promise<MeetupRecord[]>;
   /** Responde ao convite só se ainda estiver INVITED. Devolve false se já respondeu (ou não foi convidado). */
   respond(meetupId: string, userId: string, status: 'CONFIRMED' | 'DECLINED', at: Date): Promise<boolean>;
+  /** Muda o título e/ou o estado (cancelar). */
+  update(meetupId: string, patch: { title?: string; status?: 'ACTIVE' | 'CANCELLED' }): Promise<void>;
+  /** Convida (ou convida de novo quem recusou). Quem já confirmou ou está convidado fica como está. Devolve os que ficaram INVITED agora. */
+  invite(meetupId: string, userIds: string[]): Promise<string[]>;
+  /** Quem sai ou é removido do grupo deixa de constar nos encontros dele: CONFIRMED e INVITED viram DECLINED (menos quem organiza). */
+  declineAllFor(conversationId: string, userId: string, at: Date): Promise<void>;
   /** Quantos encontros a pessoa criou desde `since` (limite de criação). */
   countCreatedSince(userId: string, since: Date): Promise<number>;
 }

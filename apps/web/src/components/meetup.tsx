@@ -57,6 +57,7 @@ export function MeetupBubble({ meetup, nowIso, onUpdated }: { meetup: MeetupView
   }
 
   const status = statusLabel(meetup.myStatus);
+  const cancelled = meetup.status === 'CANCELLED';
   return (
     <div className="meetcard">
       <MeetupCover meetup={meetup} />
@@ -64,7 +65,9 @@ export function MeetupBubble({ meetup, nowIso, onUpdated }: { meetup: MeetupView
       <h3 className="meetcard__title">{meetup.title}</h3>
       <MeetupFacts meetup={meetup} now={now} />
       {meetup.isGroup && meetup.groupName ? <p className="meetcard__line">Grupo: {meetup.groupName}</p> : null}
-      {meetup.myStatus === 'INVITED' ? (
+      {cancelled ? (
+        <p className="sugcard__answer sugcard__answer--no" role="status">Encontro cancelado</p>
+      ) : meetup.myStatus === 'INVITED' ? (
         ended ? (
           <p className="sugcard__answer" role="status">Esse encontro já aconteceu</p>
         ) : (
@@ -94,19 +97,58 @@ export function MeetupBubble({ meetup, nowIso, onUpdated }: { meetup: MeetupView
   );
 }
 
+/** Lista de amigos para marcar. `exclude` esconde quem já está dentro. */
+export function FriendPicker({ picked, onToggle, exclude = [] }: { picked: string[]; onToggle: (userId: string) => void; exclude?: readonly string[] }) {
+  const friends = useAsync(() => api.friends(), []);
+  const [filter, setFilter] = useState('');
+  const available = useMemo(() => (friends.data ?? []).filter((f) => !exclude.includes(f.userId)), [friends.data, exclude]);
+  const visible = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    return available.filter((f) => q === '' || f.displayName.toLowerCase().includes(q) || f.username.toLowerCase().includes(q));
+  }, [available, filter]);
+
+  if (friends.loading) return <Loading />;
+  if (friends.error) return <ErrorState message={friends.error.message} onRetry={friends.reload} />;
+  if (available.length === 0) {
+    return (
+      <EmptyState title={exclude.length > 0 ? 'Nenhum amigo para convidar' : 'Você ainda não tem amigos no AskouT'}>
+        {exclude.length > 0 ? 'Todos os seus amigos já estão aqui.' : 'Amigos são quem você segue e que segue você de volta. Encontre pessoas no Explorar.'}
+      </EmptyState>
+    );
+  }
+  return (
+    <>
+      {available.length > 6 ? <Field label="Buscar amigo" value={filter} onChange={setFilter} /> : null}
+      <ul className="friendpick" aria-label="Amigos">
+        {visible.map((f) => {
+          const on = picked.includes(f.userId);
+          return (
+            <li key={f.userId}>
+              <button type="button" className="friendpick__row" aria-pressed={on} onClick={() => onToggle(f.userId)}>
+                <Avatar profile={f} size={40} />
+                <span className="friendpick__name">
+                  {f.displayName}
+                  <span className="friendpick__handle">@{f.username}</span>
+                </span>
+                <span className={`friendpick__check${on ? ' friendpick__check--on' : ''}`} aria-hidden="true">
+                  {on ? '✓' : ''}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </>
+  );
+}
+
 /** Folha para criar o encontro a partir de um evento: escolhe os amigos; com mais de um, nasce um grupo. */
 export function CreateMeetupSheet({ event, onClose }: { event: ExploreEvent; onClose: () => void }) {
   const friends = useAsync(() => api.friends(), []);
   const [picked, setPicked] = useState<string[]>([]);
   const [name, setName] = useState('');
-  const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
-
-  const visible = useMemo(() => {
-    const q = filter.trim().toLowerCase();
-    return (friends.data ?? []).filter((f) => q === '' || f.displayName.toLowerCase().includes(q) || f.username.toLowerCase().includes(q));
-  }, [friends.data, filter]);
 
   async function create() {
     setBusy(true);
@@ -126,33 +168,9 @@ export function CreateMeetupSheet({ event, onClose }: { event: ExploreEvent; onC
       <p className="muted meetsheet__intro">
         {event.title} · escolha quem convidar. Com uma pessoa, o convite vai para a conversa de vocês; com várias, cria um grupo e cada um entra ao aceitar.
       </p>
-      {friends.loading ? <Loading /> : null}
-      {friends.error ? <ErrorState message={friends.error.message} onRetry={friends.reload} /> : null}
-      {friends.data && friends.data.length === 0 ? (
-        <EmptyState title="Você ainda não tem amigos no AskouT">Amigos são quem você segue e que segue você de volta. Encontre pessoas no Explorar.</EmptyState>
-      ) : null}
+      <FriendPicker picked={picked} onToggle={(userId) => setPicked((cur) => toggleId(cur, userId))} />
       {friends.data && friends.data.length > 0 ? (
         <>
-          {friends.data.length > 6 ? <Field label="Buscar amigo" value={filter} onChange={setFilter} /> : null}
-          <ul className="friendpick" aria-label="Amigos">
-            {visible.map((f) => {
-              const on = picked.includes(f.userId);
-              return (
-                <li key={f.userId}>
-                  <button type="button" className="friendpick__row" aria-pressed={on} onClick={() => setPicked((cur) => toggleId(cur, f.userId))}>
-                    <Avatar profile={f} size={40} />
-                    <span className="friendpick__name">
-                      {f.displayName}
-                      <span className="friendpick__handle">@{f.username}</span>
-                    </span>
-                    <span className={`friendpick__check${on ? ' friendpick__check--on' : ''}`} aria-hidden="true">
-                      {on ? '✓' : ''}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
           {picked.length > 1 ? <Field label="Nome do grupo (opcional)" value={name} onChange={setName} maxLength={MEETUP_NAME_MAX} hint={`Se ficar vazio, usa "${event.title}".`} /> : null}
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full loading={busy} disabled={picked.length === 0} onClick={create}>
@@ -160,6 +178,59 @@ export function CreateMeetupSheet({ event, onClose }: { event: ExploreEvent; onC
           </Button>
         </>
       ) : null}
+    </Sheet>
+  );
+}
+
+/** Quem organiza: muda o nome, convida mais gente ou cancela o encontro. */
+export function ManageMeetupSheet({ meetup, excludeIds, onClose, onChanged }: { meetup: MeetupView; excludeIds: readonly string[]; onClose: () => void; onChanged: (m: MeetupView) => void }) {
+  const [title, setTitle] = useState(meetup.title);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [busy, setBusy] = useState<'rename' | 'invite' | 'cancel' | undefined>();
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+
+  async function run(kind: 'rename' | 'invite' | 'cancel', work: () => Promise<MeetupView>) {
+    setBusy(kind);
+    setProblem(undefined);
+    try {
+      onChanged(await work());
+      onClose();
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      setBusy(undefined);
+    }
+  }
+
+  return (
+    <Sheet title="Editar encontro" onClose={onClose}>
+      <Field label="Nome do encontro" value={title} onChange={setTitle} maxLength={120} />
+      <Button full loading={busy === 'rename'} disabled={title.trim() === '' || title.trim() === meetup.title} onClick={() => run('rename', () => api.renameMeetup(meetup.id, title.trim()))}>
+        Salvar nome
+      </Button>
+      {meetup.isGroup ? (
+        <>
+          <h3 className="results__h">Convidar mais gente</h3>
+          <FriendPicker picked={picked} onToggle={(userId) => setPicked((cur) => toggleId(cur, userId))} exclude={excludeIds} />
+          <Button full variant="secondary" loading={busy === 'invite'} disabled={picked.length === 0} onClick={() => run('invite', () => api.inviteMeetup(meetup.id, picked))}>
+            {picked.length > 1 ? `Convidar ${picked.length} pessoas` : 'Convidar'}
+          </Button>
+        </>
+      ) : null}
+      <h3 className="results__h">Cancelar</h3>
+      {confirmCancel ? (
+        <>
+          <p className="muted">Todos os convidados são avisados de que o encontro foi cancelado.</p>
+          <Button full variant="danger" loading={busy === 'cancel'} onClick={() => run('cancel', () => api.cancelMeetup(meetup.id))}>
+            Sim, cancelar o encontro
+          </Button>
+        </>
+      ) : (
+        <Button full variant="secondary" onClick={() => setConfirmCancel(true)}>
+          Cancelar encontro
+        </Button>
+      )}
+      {problem ? <p className="sugcard__problem">{problem}</p> : null}
     </Sheet>
   );
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
@@ -52,6 +52,31 @@ export class ConversationsController {
   @Get(':id/group')
   group(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.core.conversations.group(actor.userId, id);
+  }
+
+  /** Sair do grupo. */
+  @Post(':id/leave')
+  @HttpCode(200)
+  leave(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.conversations.leave(actor.userId, id);
+  }
+
+  /** Quem criou o grupo remove alguém. */
+  @Delete(':id/members/:userId')
+  removeMember(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Param('userId', new ParseUUIDPipe()) userId: string) {
+    return this.core.conversations.removeMember(actor.userId, id, userId);
+  }
+
+  @Put(':id/group/name')
+  renameGroup(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
+    return this.core.conversations.renameGroup(actor.userId, id, asBody(body).name);
+  }
+
+  /** `{image: "data:image/jpeg;base64,..."}` (até 40 KB) ou `{image: null}` para remover. */
+  @Put(':id/group/photo')
+  groupPhoto(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.conversations.setGroupPhoto(actor.userId, id, b.image === undefined ? 'ausente' : b.image);
   }
 
   @Post(':id/read')

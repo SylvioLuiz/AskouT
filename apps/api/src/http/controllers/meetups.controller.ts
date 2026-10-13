@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Patch, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
@@ -31,5 +31,24 @@ export class MeetupsController {
   @HttpCode(200)
   respond(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
     return this.core.meetups.respond(actor.userId, id, asBody(body).action);
+  }
+
+  /** Convida mais amigos para um encontro de grupo: `{guestIds}`. */
+  @Post(':id/invite')
+  @HttpCode(200)
+  invite(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
+    return this.core.meetups.invite(actor.userId, id, asBody(body).guestIds);
+  }
+
+  /** Quem organiza muda o nome: `{title}`. */
+  @Patch(':id')
+  rename(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
+    return this.core.meetups.rename(actor.userId, id, asBody(body).title);
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(200)
+  cancel(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.meetups.cancel(actor.userId, id);
   }
 }

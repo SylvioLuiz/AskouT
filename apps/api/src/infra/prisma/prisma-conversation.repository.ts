@@ -8,7 +8,7 @@ type MessageRow = {
   id: string;
   conversationId: string;
   senderId: string;
-  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP';
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM';
   body: string;
   suggestion: unknown;
   response: 'ACCEPTED' | 'DECLINED' | null;
@@ -30,7 +30,7 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   createdAt: r.createdAt,
 });
 
-type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; group: { name: string; ownerId: string } | null };
+type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; group: { name: string; ownerId: string; imageUrl: string | null } | null };
 
 const toConversation = (c: ConversationRow): ConversationRecord => ({
   id: c.id,
@@ -38,6 +38,7 @@ const toConversation = (c: ConversationRow): ConversationRecord => ({
   directKey: c.directKey,
   name: c.group?.name ?? null,
   ownerId: c.group?.ownerId ?? null,
+  imageUrl: c.group?.imageUrl ?? null,
   createdAt: c.createdAt,
 });
 
@@ -68,7 +69,7 @@ export class PrismaConversationRepository implements ConversationRepository {
           participants: { create: [{ userId: a }, { userId: b }] },
         },
       });
-      return { id, type: 'DIRECT', directKey, name: null, ownerId: null, createdAt: now };
+      return { id, type: 'DIRECT', directKey, name: null, ownerId: null, imageUrl: null, createdAt: now };
     } catch (error) {
       // Duas requisições criaram ao mesmo tempo: a segunda usa a conversa da primeira.
       if (uniqueViolationTargets(error) !== undefined) {
@@ -87,6 +88,13 @@ export class PrismaConversationRepository implements ConversationRepository {
 
   async participantIds(conversationId: string): Promise<string[] | undefined> {
     if (!isUuid(conversationId)) return undefined;
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
+    if (!conversation) return undefined;
+    if (conversation.groupId) {
+      // Grupo: quem entrou primeiro vem primeiro (o dono passa para o mais antigo quando o dono sai).
+      const members = await this.prisma.groupMember.findMany({ where: { groupId: conversation.groupId }, select: { userId: true }, orderBy: [{ joinedAt: 'asc' }, { userId: 'asc' }] });
+      return members.map((m) => m.userId);
+    }
     const rows = await this.prisma.conversationParticipant.findMany({ where: { conversationId }, select: { userId: true }, orderBy: { userId: 'asc' } });
     return rows.length > 0 ? rows.map((r) => r.userId) : undefined;
   }
@@ -103,7 +111,32 @@ export class PrismaConversationRepository implements ConversationRepository {
         conversation: { create: { id: input.id, type: 'GROUP', createdAt: input.now, participants: { create: [{ userId: input.ownerId }] } } },
       },
     });
-    return { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, createdAt: input.now };
+    return { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, createdAt: input.now };
+  }
+
+  async removeParticipant(conversationId: string, userId: string): Promise<void> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return;
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.conversationParticipant.deleteMany({ where: { conversationId, userId } });
+      if (conversation?.groupId) await tx.groupMember.deleteMany({ where: { groupId: conversation.groupId, userId } });
+    });
+  }
+
+  async updateGroup(conversationId: string, patch: { name?: string; imageUrl?: string | null; ownerId?: string }): Promise<void> {
+    if (!isUuid(conversationId)) return;
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
+    if (!conversation?.groupId) return;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.group.update({
+        where: { id: conversation.groupId as string },
+        data: { ...(patch.name !== undefined ? { name: patch.name } : {}), ...(patch.imageUrl !== undefined ? { imageUrl: patch.imageUrl } : {}), ...(patch.ownerId !== undefined ? { ownerId: patch.ownerId } : {}) },
+      });
+      if (patch.ownerId !== undefined) {
+        await tx.groupMember.updateMany({ where: { groupId: conversation.groupId as string, role: 'OWNER' }, data: { role: 'MEMBER' } });
+        await tx.groupMember.updateMany({ where: { groupId: conversation.groupId as string, userId: patch.ownerId }, data: { role: 'OWNER' } });
+      }
+    });
   }
 
   async addParticipant(conversationId: string, userId: string, now: Date): Promise<void> {
@@ -117,12 +150,12 @@ export class PrismaConversationRepository implements ConversationRepository {
     });
   }
 
-  async listForUser(userId: string): Promise<ConversationSummaryRecord[]> {
+  async listForUser(userId: string, hiddenSenderIds: readonly string[] = []): Promise<ConversationSummaryRecord[]> {
     if (!isUuid(userId)) return [];
     const mine = await this.prisma.conversationParticipant.findMany({
       where: { userId },
       include: {
-        conversation: { include: { group: true, participants: { select: { userId: true } }, messages: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1 } } },
+        conversation: { include: { group: true, participants: { select: { userId: true } }, messages: { where: hiddenSenderIds.length > 0 ? { senderId: { notIn: [...hiddenSenderIds] } } : {}, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1 } } },
       },
     });
     const out: ConversationSummaryRecord[] = [];
@@ -131,7 +164,7 @@ export class PrismaConversationRepository implements ConversationRepository {
       const ids = c.participants.map((x: { userId: string }) => x.userId).sort();
       if (c.type === 'DIRECT' && ids.length !== 2) continue;
       const unread = await this.prisma.message.count({
-        where: { conversationId: c.id, senderId: { not: userId }, ...(p.lastReadAt ? { createdAt: { gt: p.lastReadAt } } : {}) },
+        where: { conversationId: c.id, senderId: { notIn: [userId, ...hiddenSenderIds] }, ...(p.lastReadAt ? { createdAt: { gt: p.lastReadAt } } : {}) },
       });
       const last = c.messages[0];
       out.push({
@@ -174,10 +207,10 @@ export class PrismaConversationRepository implements ConversationRepository {
     return result.count > 0;
   }
 
-  async listMessages(conversationId: string, limit: number, before?: Date): Promise<MessageRecord[]> {
+  async listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds: readonly string[] = []): Promise<MessageRecord[]> {
     if (!isUuid(conversationId)) return [];
     const rows = await this.prisma.message.findMany({
-      where: { conversationId, ...(before ? { createdAt: { lt: before } } : {}) },
+      where: { conversationId, ...(before ? { createdAt: { lt: before } } : {}), ...(excludeSenderIds.length > 0 ? { senderId: { notIn: [...excludeSenderIds] } } : {}) },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit,
     });

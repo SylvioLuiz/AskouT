@@ -830,7 +830,7 @@ export function defineRepositoryContract(
         return { ana, bia, caio, e };
       };
       const meetup = (organizerId: string, conversationId: string, eventId: string, guests: string[]): MeetupRecord => ({
-        id: randomUUID(), organizerId, conversationId, eventId, title: 'Piquenique', startsAt: at(2 * H), endsAt: at(5 * H), createdAt: at(0),
+        id: randomUUID(), organizerId, conversationId, eventId, title: 'Piquenique', startsAt: at(2 * H), endsAt: at(5 * H), status: 'ACTIVE', createdAt: at(0),
         participants: [{ userId: organizerId, status: 'CONFIRMED', respondedAt: at(0) }, ...guests.map((userId) => ({ userId, status: 'INVITED' as const, respondedAt: null }))],
       });
 
@@ -893,6 +893,59 @@ export function defineRepositoryContract(
         assert.equal(got!.kind, 'MEETUP');
         assert.equal(got!.meetupId, m.id);
         assert.equal(got!.suggestion, null);
+      });
+
+      it('gestão do grupo: remover, mudar nome/foto/dono, ordem de entrada e mensagens sem certos remetentes', async () => {
+        const { ana, bia, caio } = await setup();
+        const g = await h.conversations.createGroup({ id: randomUUID(), name: 'G', ownerId: ana, now: at(1) });
+        await h.conversations.addParticipant(g.id, caio, at(2));
+        await h.conversations.addParticipant(g.id, bia, at(3));
+        assert.deepEqual(await h.conversations.participantIds(g.id), [ana, caio, bia], 'ordem de entrada');
+        await h.conversations.updateGroup(g.id, { name: 'Novo', imageUrl: 'data:image/jpeg;base64,/9j/4A==', ownerId: caio });
+        const got = (await h.conversations.findById(g.id))!;
+        assert.equal(got.name, 'Novo');
+        assert.equal(got.imageUrl, 'data:image/jpeg;base64,/9j/4A==');
+        assert.equal(got.ownerId, caio);
+        await h.conversations.updateGroup(g.id, { imageUrl: null });
+        assert.equal((await h.conversations.findById(g.id))!.imageUrl, null);
+        const msg = (senderId: string, body: string, s: number): MessageRecord => ({ id: randomUUID(), conversationId: g.id, senderId, kind: 'TEXT', body, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: at(s) });
+        await h.conversations.addMessage(msg(ana, 'a', 10));
+        await h.conversations.addMessage(msg(caio, 'c', 11));
+        await h.conversations.addMessage({ ...msg(caio, 'Caio saiu', 12), kind: 'SYSTEM' });
+        assert.deepEqual((await h.conversations.listMessages(g.id, 10)).map((m) => m.body), ['a', 'c', 'Caio saiu']);
+        assert.deepEqual((await h.conversations.listMessages(g.id, 10, undefined, [caio])).map((m) => m.body), ['a']);
+        const summary = (await h.conversations.listForUser(bia, [caio])).find((x) => x.conversation.id === g.id)!;
+        assert.equal(summary.lastMessage?.body, 'a');
+        assert.equal(summary.unread, 1);
+        assert.equal((await h.conversations.listForUser(bia)).find((x) => x.conversation.id === g.id)!.unread, 3);
+        await h.conversations.removeParticipant(g.id, caio);
+        await h.conversations.removeParticipant(g.id, caio);
+        assert.deepEqual(await h.conversations.participantIds(g.id), [ana, bia]);
+        assert.equal((await h.conversations.listForUser(caio)).length, 0);
+      });
+
+      it('encontro: convidar de novo, mudar título/estado e sair dos encontros do grupo', async () => {
+        const { ana, bia, caio, e } = await setup();
+        const g = await h.conversations.createGroup({ id: randomUUID(), name: 'G', ownerId: ana, now: at(1) });
+        const m = meetup(ana, g.id, e.id, [bia]);
+        await h.meetups.create(m);
+        await h.meetups.respond(m.id, bia, 'CONFIRMED', at(5));
+        assert.deepEqual(await h.meetups.invite(m.id, [bia, caio]), [caio], 'quem já confirmou fica como está');
+        await h.meetups.respond(m.id, caio, 'DECLINED', at(6));
+        assert.deepEqual(await h.meetups.invite(m.id, [caio]), [caio], 'quem recusou volta a ser convidado');
+        assert.equal((await h.meetups.find(m.id))!.participants.find((p) => p.userId === caio)!.status, 'INVITED');
+        await h.meetups.update(m.id, { title: 'Outro nome', status: 'CANCELLED' });
+        const after = (await h.meetups.find(m.id))!;
+        assert.equal(after.title, 'Outro nome');
+        assert.equal(after.status, 'CANCELLED');
+        await h.meetups.update(m.id, { status: 'ACTIVE' });
+        assert.equal((await h.meetups.find(m.id))!.status, 'ACTIVE');
+        await h.meetups.declineAllFor(g.id, bia, at(8));
+        await h.meetups.declineAllFor(g.id, ana, at(8));
+        const final = (await h.meetups.find(m.id))!;
+        assert.equal(final.participants.find((p) => p.userId === bia)!.status, 'DECLINED');
+        assert.equal(final.participants.find((p) => p.userId === ana)!.status, 'CONFIRMED', 'quem organiza continua');
+        assert.equal(final.participants.find((p) => p.userId === caio)!.status, 'INVITED');
       });
     });
   });

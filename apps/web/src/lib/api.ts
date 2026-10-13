@@ -206,11 +206,18 @@ export function createApi(deps: ApiDeps) {
     /** Endereço completo de um recurso da API (a foto do lugar), a partir do caminho que ela devolveu. */
     assetUrl: (path: string) => `${deps.baseUrl}${path}`,
     group: (conversationId: string) => request<GroupDetails>('GET', `/conversations/${id(conversationId)}/group`),
+    leaveGroup: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/leave`),
+    removeMember: (conversationId: string, userId: string) => request<{ ok: true }>('DELETE', `/conversations/${id(conversationId)}/members/${id(userId)}`),
+    renameGroup: (conversationId: string, name: string) => request<{ name: string }>('PUT', `/conversations/${id(conversationId)}/group/name`, { body: { name } }),
+    setGroupPhoto: (conversationId: string, image: string | null) => request<{ imageUrl: string | null }>('PUT', `/conversations/${id(conversationId)}/group/photo`, { body: { image } }),
     markRead: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/read`),
 
     // Encontros
     createMeetup: (input: { eventId: string; guestIds: string[]; name?: string }) => request<MeetupView>('POST', '/meetups', { body: input }),
     meetup: (meetupId: string) => request<MeetupView>('GET', `/meetups/${id(meetupId)}`),
+    inviteMeetup: (meetupId: string, guestIds: string[]) => request<MeetupView>('POST', `/meetups/${id(meetupId)}/invite`, { body: { guestIds } }),
+    renameMeetup: (meetupId: string, title: string) => request<MeetupView>('PATCH', `/meetups/${id(meetupId)}`, { body: { title } }),
+    cancelMeetup: (meetupId: string) => request<MeetupView>('POST', `/meetups/${id(meetupId)}/cancel`),
     respondMeetup: (meetupId: string, action: 'accept' | 'decline') => request<MeetupView>('POST', `/meetups/${id(meetupId)}/respond`, { body: { action } }),
 
     // Bloqueios

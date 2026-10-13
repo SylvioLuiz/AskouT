@@ -460,7 +460,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
   async getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord> {
     const directKey = a < b ? `${a}:${b}` : `${b}:${a}`;
     for (const c of this.conversations.values()) if (c.directKey === directKey) return { ...c };
-    const record: ConversationRecord = { id, type: 'DIRECT', directKey, name: null, ownerId: null, createdAt: now };
+    const record: ConversationRecord = { id, type: 'DIRECT', directKey, name: null, ownerId: null, imageUrl: null, createdAt: now };
     this.conversations.set(id, record);
     this.participants.set(id, new Map([[a, null], [b, null]]));
     return { ...record };
@@ -477,7 +477,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
   }
 
   async createGroup(input: { id: string; name: string; ownerId: string; now: Date }): Promise<ConversationRecord> {
-    const record: ConversationRecord = { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, createdAt: input.now };
+    const record: ConversationRecord = { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, createdAt: input.now };
     this.conversations.set(input.id, record);
     this.participants.set(input.id, new Map([[input.ownerId, null]]));
     return { ...record };
@@ -489,11 +489,23 @@ export class InMemoryConversationRepository implements ConversationRepository {
     void now;
   }
 
-  async listForUser(userId: string): Promise<ConversationSummaryRecord[]> {
+  async removeParticipant(conversationId: string, userId: string): Promise<void> {
+    this.participants.get(conversationId)?.delete(userId);
+  }
+
+  async updateGroup(conversationId: string, patch: { name?: string; imageUrl?: string | null; ownerId?: string }): Promise<void> {
+    const c = this.conversations.get(conversationId);
+    if (!c || c.type !== 'GROUP') return;
+    if (patch.name !== undefined) c.name = patch.name;
+    if (patch.imageUrl !== undefined) c.imageUrl = patch.imageUrl;
+    if (patch.ownerId !== undefined) c.ownerId = patch.ownerId;
+  }
+
+  async listForUser(userId: string, hiddenSenderIds: readonly string[] = []): Promise<ConversationSummaryRecord[]> {
     const out: ConversationSummaryRecord[] = [];
     for (const [id, p] of this.participants) {
       if (!p.has(userId)) continue;
-      const msgs = this.messages.filter((m) => m.conversationId === id);
+      const msgs = this.messages.filter((m) => m.conversationId === id && !hiddenSenderIds.includes(m.senderId));
       const lastRead = p.get(userId) ?? null;
       const unread = msgs.filter((m) => m.senderId !== userId && (lastRead === null || m.createdAt > lastRead)).length;
       out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [...p.keys()], lastMessage: msgs.at(-1) ?? null, unread });
@@ -519,8 +531,8 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return true;
   }
 
-  async listMessages(conversationId: string, limit: number, before?: Date): Promise<MessageRecord[]> {
-    const all = this.messages.filter((m) => m.conversationId === conversationId && (before === undefined || m.createdAt < before));
+  async listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds: readonly string[] = []): Promise<MessageRecord[]> {
+    const all = this.messages.filter((m) => m.conversationId === conversationId && (before === undefined || m.createdAt < before) && !excludeSenderIds.includes(m.senderId));
     return all.slice(Math.max(0, all.length - limit)).map((m) => ({ ...m }));
   }
 
@@ -563,6 +575,42 @@ export class InMemoryMeetupRepository implements MeetupRepository {
     p.status = status;
     p.respondedAt = at;
     return true;
+  }
+
+  async update(meetupId: string, patch: { title?: string; status?: 'ACTIVE' | 'CANCELLED' }): Promise<void> {
+    const m = this.meetups.get(meetupId);
+    if (!m) return;
+    if (patch.title !== undefined) m.title = patch.title;
+    if (patch.status !== undefined) m.status = patch.status;
+  }
+
+  async invite(meetupId: string, userIds: string[]): Promise<string[]> {
+    const m = this.meetups.get(meetupId);
+    if (!m) return [];
+    const done: string[] = [];
+    for (const userId of userIds) {
+      const p = m.participants.find((x) => x.userId === userId);
+      if (!p) {
+        m.participants.push({ userId, status: 'INVITED', respondedAt: null });
+        done.push(userId);
+      } else if (p.status === 'DECLINED') {
+        p.status = 'INVITED';
+        p.respondedAt = null;
+        done.push(userId);
+      }
+    }
+    return done;
+  }
+
+  async declineAllFor(conversationId: string, userId: string, at: Date): Promise<void> {
+    for (const m of this.meetups.values()) {
+      if (m.conversationId !== conversationId || m.organizerId === userId) continue;
+      const p = m.participants.find((x) => x.userId === userId);
+      if (p && p.status !== 'DECLINED') {
+        p.status = 'DECLINED';
+        p.respondedAt = at;
+      }
+    }
   }
 
   async countCreatedSince(userId: string, since: Date): Promise<number> {

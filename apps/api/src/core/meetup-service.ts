@@ -7,6 +7,9 @@ import type { MeetupRecord, MessageRecord } from './types.ts';
 export const MEETUP_MAX_GUESTS = 15;
 export const MEETUP_NAME_MAX = 60;
 export const MEETUPS_PER_HOUR = 10;
+export const MEETUP_TITLE_MAX = 120;
+/** Máximo de pessoas num encontro, contando quem organiza. */
+export const MEETUP_MAX_PEOPLE = MEETUP_MAX_GUESTS + 1;
 
 // eslint-disable-next-line no-control-regex
 const CONTROL_RE = /[\u0000-\u001f\u007f]/;
@@ -80,6 +83,7 @@ export class MeetupService {
       title,
       startsAt: found.event.startsAt,
       endsAt: found.event.endsAt,
+      status: 'ACTIVE',
       createdAt: now,
       participants: [{ userId: actorId, status: 'CONFIRMED', respondedAt: now }, ...guests.map((userId) => ({ userId, status: 'INVITED' as const, respondedAt: null }))],
     };
@@ -113,6 +117,82 @@ export class MeetupService {
     return view;
   }
 
+  /** Quem organiza (ou já confirmou) convida mais amigos para um encontro de grupo. Eles entram no grupo ao aceitar. */
+  async invite(actorId: string, meetupId: string, guestIdsRaw: unknown): Promise<MeetupView> {
+    const { meetups, conversations, follows, blocks, users, clock, ids } = this.deps;
+    const meetup = await this.visible(actorId, meetupId);
+    const me = meetup.participants.find((p) => p.userId === actorId);
+    if (!me || me.status !== 'CONFIRMED') throw forbidden('Só quem vai ao encontro pode convidar mais gente');
+    const now = clock.now();
+    if (meetup.status === 'CANCELLED') throw conflict('Esse encontro foi cancelado');
+    if (meetup.endsAt <= now) throw conflict('Esse encontro já aconteceu');
+    const conversation = await conversations.findById(meetup.conversationId);
+    if (conversation?.type !== 'GROUP') {
+      throw validationError('Esse encontro é só entre vocês dois. Crie um novo encontro com mais pessoas.', { guestIds: 'Encontro de duas pessoas' });
+    }
+    if (!Array.isArray(guestIdsRaw) || guestIdsRaw.length === 0) throw validationError('Escolha quem convidar', { guestIds: 'Escolha ao menos uma pessoa' });
+    const guests = [...new Set(guestIdsRaw)];
+    for (const g of guests) if (typeof g !== 'string' || g === '' || g.length > 64) throw validationError('Pessoa inválida', { guestIds: 'Pessoa inválida' });
+    const wanted = guests as string[];
+    const [friends, related] = await Promise.all([follows.listFriendIds(actorId), blocks.listRelatedIds(actorId)]);
+    const current = new Set(meetup.participants.filter((p) => p.status !== 'DECLINED').map((p) => p.userId));
+    const fresh = wanted.filter((g) => !current.has(g));
+    for (const g of fresh) {
+      if (related.includes(g)) throw notFound('Pessoa não encontrada');
+      if (!friends.includes(g)) throw forbidden('Só amigos podem ser convidados');
+    }
+    if (current.size + fresh.length > MEETUP_MAX_PEOPLE) throw validationError(`No máximo ${MEETUP_MAX_PEOPLE} pessoas no encontro`, { guestIds: `No máximo ${MEETUP_MAX_PEOPLE} pessoas` });
+    const invited = await meetups.invite(meetupId, fresh);
+    const actorName = (await users.findProfilesByIds([actorId]))[0]?.displayName ?? 'Alguém';
+    for (const g of invited) {
+      const direct = await conversations.getOrCreateDirect(actorId, g, ids.next(), now);
+      await conversations.addMessage({ id: ids.next(), conversationId: direct.id, senderId: actorId, kind: 'MEETUP', body: `Encontro: ${meetup.title}`, suggestion: null, response: null, respondedAt: null, meetupId, createdAt: now });
+      await conversations.markRead(direct.id, actorId, now);
+    }
+    if (invited.length > 0) {
+      const names = (await users.findProfilesByIds(invited)).map((p) => p.displayName);
+      await conversations.addMessage({ id: ids.next(), conversationId: meetup.conversationId, senderId: actorId, kind: 'SYSTEM', body: `${actorName} convidou ${names.join(', ')} para "${meetup.title}"`, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: now });
+    }
+    return this.get(actorId, meetupId);
+  }
+
+  /** Quem organiza muda o nome do encontro (data e local vêm do evento). */
+  async rename(actorId: string, meetupId: string, rawTitle: unknown): Promise<MeetupView> {
+    const meetup = await this.managed(actorId, meetupId);
+    if (typeof rawTitle !== 'string' || rawTitle.trim() === '' || CONTROL_RE.test(rawTitle) || Array.from(rawTitle.trim()).length > MEETUP_TITLE_MAX) {
+      throw validationError('Nome inválido', { title: `Use de 1 a ${MEETUP_TITLE_MAX} caracteres` });
+    }
+    const title = rawTitle.trim();
+    await this.deps.meetups.update(meetupId, { title });
+    await this.say(meetup, actorId, `${await this.nameOf(actorId)} mudou o nome do encontro para "${title}"`);
+    return this.get(actorId, meetupId);
+  }
+
+  /** Quem organiza cancela o encontro. Ninguém mais responde a ele. */
+  async cancel(actorId: string, meetupId: string): Promise<MeetupView> {
+    const meetup = await this.managed(actorId, meetupId);
+    await this.deps.meetups.update(meetupId, { status: 'CANCELLED' });
+    await this.say(meetup, actorId, `${await this.nameOf(actorId)} cancelou o encontro "${meetup.title}"`);
+    return this.get(actorId, meetupId);
+  }
+
+  private async managed(actorId: string, meetupId: string): Promise<MeetupRecord> {
+    const meetup = await this.visible(actorId, meetupId);
+    if (meetup.organizerId !== actorId) throw forbidden('Só quem organiza pode mudar o encontro');
+    if (meetup.status === 'CANCELLED') throw conflict('Esse encontro foi cancelado');
+    if (meetup.endsAt <= this.deps.clock.now()) throw conflict('Esse encontro já aconteceu');
+    return meetup;
+  }
+
+  private async nameOf(userId: string): Promise<string> {
+    return (await this.deps.users.findProfilesByIds([userId]))[0]?.displayName ?? 'Alguém';
+  }
+
+  private async say(meetup: MeetupRecord, senderId: string, body: string): Promise<void> {
+    const { conversations, ids, clock } = this.deps;
+    await conversations.addMessage({ id: ids.next(), conversationId: meetup.conversationId, senderId, kind: 'SYSTEM', body, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: clock.now() });
+  }
+
   /** Só quem organiza ou foi convidado vê o encontro. */
   async get(actorId: string, meetupId: string): Promise<MeetupView> {
     const meetup = await this.visible(actorId, meetupId);
@@ -129,6 +209,7 @@ export class MeetupService {
     const mine = meetup.participants.find((p) => p.userId === actorId);
     if (!mine || meetup.organizerId === actorId) throw forbidden('Quem organiza já participa do encontro');
     if (mine.status !== 'INVITED') throw conflict('Você já respondeu a esse convite');
+    if (meetup.status === 'CANCELLED') throw conflict('Esse encontro foi cancelado');
     const now = clock.now();
     if (meetup.endsAt <= now) throw conflict('Esse encontro já aconteceu');
     if (await blocks.existsEitherWay(actorId, meetup.organizerId)) throw notFound('Encontro não encontrado');

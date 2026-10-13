@@ -28,6 +28,10 @@ export interface MeetupView {
   confirmedCount: number;
   invitedCount: number;
   declinedCount: number;
+  /** CANCELLED: quem organizou cancelou. */
+  status: 'ACTIVE' | 'CANCELLED';
+  /** Você organiza e o encontro ainda pode mudar (não terminou nem foi cancelado). */
+  canManage: boolean;
   /** Seu papel no encontro; nulo se você não participa (só acontece na leitura de quem não foi convidado). */
   myStatus: 'ORGANIZER' | 'INVITED' | 'CONFIRMED' | 'DECLINED' | null;
 }
@@ -36,6 +40,7 @@ export interface MeetupView {
 export async function buildMeetupViews(deps: CoreDeps, actorId: string, records: MeetupRecord[]): Promise<MeetupView[]> {
   if (records.length === 0) return [];
   const { users, places, conversations } = deps;
+  const now = deps.clock.now();
   const organizerIds = [...new Set(records.map((r) => r.organizerId))];
   const profiles = new Map((await users.findProfilesByIds(organizerIds)).map((p) => [p.userId, p] as const));
   const conversationCache = new Map<string, Awaited<ReturnType<typeof conversations.findById>>>();
@@ -73,6 +78,8 @@ export async function buildMeetupViews(deps: CoreDeps, actorId: string, records:
       confirmedCount: count('CONFIRMED'),
       invitedCount: count('INVITED'),
       declinedCount: count('DECLINED'),
+      status: r.status,
+      canManage: r.organizerId === actorId && r.status === 'ACTIVE' && r.endsAt > now,
       myStatus: r.organizerId === actorId ? 'ORGANIZER' : (mine?.status ?? null),
     });
   }

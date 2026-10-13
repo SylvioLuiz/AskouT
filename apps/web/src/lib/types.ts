@@ -214,12 +214,16 @@ export interface MeetupView {
   invitedCount: number;
   declinedCount: number;
   myStatus: 'ORGANIZER' | 'INVITED' | 'CONFIRMED' | 'DECLINED' | null;
+  status: 'ACTIVE' | 'CANCELLED';
+  /** Quem organiza pode editar o nome, convidar e cancelar enquanto o encontro não acabou. */
+  canManage: boolean;
 }
 
 export interface GroupDetails {
   id: string;
   name: string;
   ownerId: string;
+  imageUrl: string | null;
   members: { profile: PublicProfile; role: 'OWNER' | 'MEMBER' }[];
   meetups: MeetupView[];
   mediaAvailable: false;
@@ -231,7 +235,7 @@ export interface ChatMessage {
   mine: boolean;
   /** Nome de quem enviou; só em grupo. */
   senderName: string | null;
-  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP';
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM';
   body: string;
   suggestion: SuggestionCard | null;
   /** Cartão do encontro (kind MEETUP). */
@@ -250,6 +254,7 @@ export interface ConversationItem {
   /** Na conversa 1 a 1, a outra pessoa; no grupo, nulo. */
   other: PublicProfile | null;
   name: string | null;
+  imageUrl: string | null;
   memberCount: number;
   lastMessage: ChatMessage | null;
   unread: number;
@@ -261,6 +266,8 @@ export interface ChatView {
   type: 'DIRECT' | 'GROUP';
   other: PublicProfile | null;
   name: string | null;
+  imageUrl: string | null;
+  isOwner: boolean;
   memberCount: number;
   canSend: boolean;
   /** Relógio do servidor. */

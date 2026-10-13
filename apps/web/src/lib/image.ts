@@ -1,0 +1,48 @@
+/** Maior lado da foto do grupo, em pixels. */
+export const GROUP_PHOTO_SIDE = 256;
+/** Limite que a API aceita para a imagem já decodificada (40 KB). */
+export const GROUP_PHOTO_MAX_BYTES = 40 * 1024;
+
+/** Tamanho final mantendo a proporção, sem ampliar. */
+export function fitWithin(width: number, height: number, max: number): { width: number; height: number } {
+  if (width <= 0 || height <= 0) return { width: 1, height: 1 };
+  const scale = Math.min(1, max / Math.max(width, height));
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
+
+/** Bytes de uma imagem em data URL base64. */
+export function dataUrlBytes(dataUrl: string): number {
+  const comma = dataUrl.indexOf(',');
+  const b64 = comma === -1 ? '' : dataUrl.slice(comma + 1);
+  const padding = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
+  return Math.floor((b64.length * 3) / 4) - padding;
+}
+
+/** Só mostra imagens que o próprio app gerou (data URL de imagem). */
+export function safeGroupImage(value: string | null | undefined): string | null {
+  return typeof value === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(value) ? value : null;
+}
+
+/** Reduz a foto escolhida para caber no limite da API. Lança Error com texto claro se não der. */
+export async function resizeGroupPhoto(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('Escolha um arquivo de imagem');
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error('Não foi possível ler essa imagem. Tente uma foto JPEG ou PNG.');
+  }
+  const { width, height } = fitWithin(bitmap.width, bitmap.height, GROUP_PHOTO_SIDE);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Seu navegador não conseguiu preparar a imagem');
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  for (const quality of [0.85, 0.7, 0.55, 0.4, 0.3]) {
+    const url = canvas.toDataURL('image/jpeg', quality);
+    if (url.startsWith('data:image/jpeg') && dataUrlBytes(url) <= GROUP_PHOTO_MAX_BYTES) return url;
+  }
+  throw new Error('A imagem ficou grande demais mesmo reduzida. Escolha outra.');
+}

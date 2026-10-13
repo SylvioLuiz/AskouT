@@ -138,7 +138,7 @@ export interface FlashPositionRecord {
 
 // ---------- Conversas ----------
 
-export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP';
+export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM';
 export type SuggestionResponse = 'ACCEPTED' | 'DECLINED';
 
 /**
@@ -151,6 +151,8 @@ export interface ConversationRecord {
   directKey: string | null;
   name: string | null;
   ownerId: string | null;
+  /** Foto do grupo como data URL (jpeg/png/webp, até 40 KB). Ainda não há armazenamento de arquivos. */
+  imageUrl: string | null;
   createdAt: Date;
 }
 
@@ -261,6 +263,7 @@ export interface MeetupRecord {
   title: string;
   startsAt: Date;
   endsAt: Date;
+  status: 'ACTIVE' | 'CANCELLED';
   createdAt: Date;
   participants: MeetupParticipantRecord[];
 }
