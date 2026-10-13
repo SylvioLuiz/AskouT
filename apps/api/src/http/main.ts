@@ -1,9 +1,14 @@
 import 'reflect-metadata';
+import { existsSync } from 'node:fs';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module.ts';
 import { AllExceptionsFilter } from './exception.filter.ts';
 import type { AppConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
+
+// Carrega o .env da pasta atual (o Node não faz isso sozinho). Variáveis já definidas no ambiente
+// têm prioridade, então em produção valem as do servidor.
+if (existsSync('.env')) process.loadEnvFile('.env');
 
 const app = await NestFactory.create(AppModule);
 const config = app.get<AppConfig>(CONFIG);
