@@ -75,6 +75,26 @@ Sem token: `POST /auth/signup`, `POST /auth/signup/resend`, `POST /auth/signup/c
 
 Erros: `{ "error": { "code", "message", "details?" } }` com status 400/401/403/404/409/429 (429 envia `Retry-After`). Erro inesperado vira 500 genérico, sem vazar detalhes.
 
+## App web (`apps/web`)
+
+React 19 + Vite 7 + TypeScript. Telas: entrar, criar conta (2 passos com código por e-mail), Home (amigos), Explorar (busca), Atividades (pedidos para seguir), perfil de outras pessoas (seguir, pedir, deixar de seguir, bloquear), Meu perfil (editar, privacidade), Amigos, Bloqueados. Conversas e Agenda aparecem como "em breve": ainda não existem no backend.
+
+Rodar (a API precisa estar de pé em `localhost:3000`, veja acima):
+
+```
+cd apps/web
+npm install
+npm run dev        # abre em http://localhost:5173 (o Vite encaminha /api para a API)
+npm test           # testes da camada de lógica (sem navegador)
+npm run typecheck
+```
+
+O código de confirmação do cadastro aparece no log da API (e-mail de desenvolvimento).
+
+Estado de verificação: a lógica foi testada (26 testes) e o app foi exercitado num navegador real contra o núcleo da API em memória (32 verificações, celular e desktop). **`npm run typecheck` e `npm run build` ainda não foram rodados** — o ambiente onde isto foi escrito não conseguia instalar `@types/react`; a primeira execução na sua máquina é a verificação de tipos de verdade.
+
+Não feito ainda: modo escuro, páginas de termos e privacidade (dependem de texto jurídico real), Home com feed, Agenda, Conversas.
+
 ## Núcleo da API (`apps/api/src/core`)
 
 Regras de negócio em TypeScript puro, sem framework e sem banco. O acesso a dados e a criptografia ficam atrás de interfaces (`ports.ts`), então NestJS e Prisma entram depois só como adaptadores, sem mexer nas regras.

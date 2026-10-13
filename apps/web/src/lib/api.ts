@@ -1,0 +1,130 @@
+import { errorFromResponse, networkError } from './errors.ts';
+import type {
+  AuthResult,
+  ConnectionsPage,
+  PageRequest,
+  Profile,
+  ProfilePatch,
+  ProfileView,
+  PublicProfile,
+  SessionUser,
+  SignupInput,
+  SignupStarted,
+} from './types.ts';
+
+/** O mínimo de `fetch` que o cliente usa (facilita testar sem navegador). */
+export type FetchLike = (
+  input: string,
+  init?: { method?: string; headers?: Record<string, string>; body?: string },
+) => Promise<{
+  ok: boolean;
+  status: number;
+  headers: { get(name: string): string | null };
+  json(): Promise<unknown>;
+}>;
+
+export interface ApiDeps {
+  baseUrl: string;
+  fetch: FetchLike;
+  getToken: () => string | undefined;
+  /** Chamado quando uma chamada autenticada recebe 401 (sessão expirada ou inválida). */
+  onUnauthorized: () => void;
+}
+
+interface RequestOptions {
+  body?: unknown;
+  /** Falso nas rotas públicas (cadastro e login): não envia o token. */
+  auth?: boolean;
+}
+
+function pageQuery(page: PageRequest | undefined): string {
+  const params: string[] = [];
+  if (page?.limit !== undefined) params.push(`limit=${page.limit}`);
+  if (page?.offset !== undefined) params.push(`offset=${page.offset}`);
+  return params.length > 0 ? `?${params.join('&')}` : '';
+}
+
+const id = encodeURIComponent;
+
+export function createApi(deps: ApiDeps) {
+  async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+    const useAuth = options.auth !== false;
+    const token = useAuth ? deps.getToken() : undefined;
+
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+    let body: string | undefined;
+    if (options.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(options.body);
+    }
+
+    let response;
+    try {
+      response = await deps.fetch(`${deps.baseUrl}${path}`, { method, headers, body });
+    } catch {
+      throw networkError();
+    }
+
+    let payload: unknown;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = undefined;
+    }
+
+    if (response.ok) return payload as T;
+
+    const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+    if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+    throw error;
+  }
+
+  return {
+    // Cadastro e sessão
+    startSignup: (input: SignupInput) => request<SignupStarted>('POST', '/auth/signup', { body: input, auth: false }),
+    resendSignupCode: (email: string) =>
+      request<SignupStarted>('POST', '/auth/signup/resend', { body: { email }, auth: false }),
+    confirmSignup: (email: string, code: string) =>
+      request<AuthResult>('POST', '/auth/signup/confirm', { body: { email, code }, auth: false }),
+    login: (identifier: string, password: string) =>
+      request<AuthResult>('POST', '/auth/login', { body: { identifier, password }, auth: false }),
+    me: () => request<SessionUser>('GET', '/auth/me'),
+
+    // Perfis
+    searchProfiles: (query: string, limit?: number) =>
+      request<PublicProfile[]>(
+        'GET',
+        `/profiles/search?q=${id(query)}${limit !== undefined ? `&limit=${limit}` : ''}`,
+      ),
+    getProfile: (username: string) => request<ProfileView>('GET', `/profiles/${id(username)}`),
+    updateProfile: (patch: ProfilePatch) => request<Profile>('PATCH', '/profiles/me', { body: patch }),
+    setPrivacy: (isPrivate: boolean) =>
+      request<{ isPrivate: boolean; acceptedPending: number }>('PATCH', '/profiles/me/privacy', {
+        body: { isPrivate },
+      }),
+
+    // Seguir
+    follow: (userId: string) =>
+      request<{ status: 'PENDING' | 'ACCEPTED'; isFriend: boolean }>('POST', `/users/${id(userId)}/follow`),
+    unfollow: (userId: string) => request<{ removed: boolean }>('DELETE', `/users/${id(userId)}/follow`),
+    followers: (userId: string, page?: PageRequest) =>
+      request<ConnectionsPage>('GET', `/users/${id(userId)}/followers${pageQuery(page)}`),
+    following: (userId: string, page?: PageRequest) =>
+      request<ConnectionsPage>('GET', `/users/${id(userId)}/following${pageQuery(page)}`),
+    followRequests: (page?: PageRequest) =>
+      request<ConnectionsPage>('GET', `/me/follow-requests${pageQuery(page)}`),
+    approveRequest: (userId: string) =>
+      request<{ isFriend: boolean }>('POST', `/me/follow-requests/${id(userId)}/approve`),
+    rejectRequest: (userId: string) => request<{ ok: true }>('POST', `/me/follow-requests/${id(userId)}/reject`),
+    removeFollower: (userId: string) => request<{ ok: true }>('DELETE', `/me/followers/${id(userId)}`),
+    friends: () => request<PublicProfile[]>('GET', '/me/friends'),
+
+    // Bloqueios
+    block: (userId: string) => request<{ ok: true }>('POST', `/users/${id(userId)}/block`),
+    unblock: (userId: string) => request<{ removed: boolean }>('DELETE', `/users/${id(userId)}/block`),
+    blocks: () => request<PublicProfile[]>('GET', '/me/blocks'),
+  };
+}
+
+export type Api = ReturnType<typeof createApi>;
