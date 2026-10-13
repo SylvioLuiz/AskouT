@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BoltIcon } from '../components/icons.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -15,11 +15,15 @@ import {
   geolocationMessage,
   minutesLeft,
 } from '../lib/flash.ts';
+import { initials } from '../lib/avatar.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { AvailableFriend, FlashInvite, FlashMatch, PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 
 const POLL_MS = 10_000;
+
+// O mapa (MapLibre) é pesado: só é baixado quando alguém abre um encontro.
+const MatchMap = lazy(() => import('../components/match-map.tsx'));
 
 type Feedback = { tone: 'ok' | 'error'; text: string } | undefined;
 
@@ -458,6 +462,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>();
   const share = useShareLocation(inviteId, match.reload);
+  const [mapFailed, setMapFailed] = useState(false);
 
   if (match.loading && !match.data && !match.error) return <Loading />;
   if (match.error && !match.data) {
@@ -530,6 +535,17 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
           </a>
         ) : null}
       </section>
+
+      {!mapFailed && (them || myPoint) ? (
+        <Suspense fallback={<div className="matchmap matchmap--loading" role="status">Carregando o mapa…</div>}>
+          <MatchMap
+            me={myPoint}
+            them={them ? { lat: them.lat, lng: them.lng, stale: them.stale } : undefined}
+            themInitials={initials(data.other.displayName, data.other.username)}
+            onFail={() => setMapFailed(true)}
+          />
+        </Suspense>
+      ) : null}
 
       <section className="sharebox" aria-label="Sua localização">
         {share.state.phase === 'sharing' ? (

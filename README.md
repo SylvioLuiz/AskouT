@@ -16,7 +16,7 @@ Menos tempo combinando. Mais tempo juntos.
 | Agenda: serviço de disponibilidade (`core/availability-service.ts`), repositório Prisma e rotas HTTP | **validado contra Postgres real**: 168 testes (20 de contrato Prisma) e teste de fumaça por HTTP com 45 verificações, sem falhas |
 | App web mobile-first (`apps/web`): conta, perfil, seguir, bloquear, Agenda, Encontrar melhor data | **verificado em navegador real** contra o núcleo em memória (celular 390 px). `typecheck`/`build` do Vite ainda a conferir na sua máquina |
 | Flash (disponível agora): núcleo, repositório Prisma, rotas HTTP e limpeza periódica | núcleo e rotas **testados em memória** (174 testes) e a tela **verificada em navegador de celular** (39 verificações). O repositório Prisma e a migração `flash` **ainda não foram executados em Postgres real**: dependem de você rodar os passos da seção "Flash" abaixo |
-| Flash: mapa com pins (MapLibre + OpenStreetMap) | **não iniciado** (etapa B). Hoje o encontro mostra a distância e um link "Abrir no mapa" |
+| Flash: mapa com pins (MapLibre + OpenStreetMap) | **escrito, não executado com a biblioteca real**: o componente foi exercitado só contra um dublê do `maplibre-gl` (ciclo de vida, 2 pins, enquadramento). Confirme na sua máquina com `npm install` + `npm run dev` |
 | Painéis de bares e admin, app nativo | **não iniciados** |
 
 Nada acima é simulado: o que consta como implementado roda e tem teste. O que consta como "escrito, não executado", "não iniciado" ou "não validado" não deve ser tratado como pronto. Sem banco, os testes em memória rodam (174 hoje) e os de contrato do Prisma/Postgres aparecem como `SKIP`; com `ASKOUT_TEST_DATABASE_URL` apontando para um banco de teste, os de Postgres também rodam (incluindo os 8 de Flash, ainda não executados em Postgres real).
@@ -71,7 +71,8 @@ O Flash avisa os amigos que você está livre **agora** (a Agenda é para o futu
 - Convite vale 15 minutos (ou até um dos Flash acabar). Quem recebe aceita ou recusa. **Só depois do aceite** os dois passam a ver a posição um do outro, e só durante o encontro.
 - Guardamos apenas a **última** posição de cada um (sem histórico). Ela é considerada "sem sinal" após 120 s sem atualização e é apagada quando o encontro acaba, o Flash desliga, o convite vence ou há bloqueio.
 - Bloquear (na lista, no convite ou no encontro) encerra tudo entre os dois. Uma limpeza roda a cada minuto na API e também na leitura.
-- No navegador a localização só funciona em **conexão segura (https ou localhost)**. Testar no celular por `http://192.168...` não libera o GPS: é preciso https.
+- No navegador a localização só funciona em **conexão segura (https ou localhost)**. Para testar no celular use `npm run dev:https` em `apps/web` (certificado autoassinado, aceite o aviso do navegador) e abra o endereço `https://IP-DO-MAC:5173`. Esse modo ainda não foi executado.
+- O mapa usa os tiles públicos do OpenStreetMap, ok para desenvolvimento; em produção é preciso um provedor de tiles próprio ou contratado (a política do OSM não permite uso pesado). Cada tile pedido expõe o IP de quem abre o mapa a esse provedor.
 
 Para ativar no seu banco (depois de `git pull` e `npm install`):
 
@@ -170,7 +171,7 @@ Os testes foram checados também quebrando as regras de propósito (por exemplo,
 - **Agenda:** os horários são avulsos (sem repetição semanal), não há integração com Google/Apple Calendar e ainda não existem encontros nem convites: hoje a pessoa vê a compatibilidade, mas não cria o encontro. Cada horário vai até 24 h, no máximo 300 ativos por pessoa.
 - **`@askout/availability-engine` é consumido como código TypeScript do workspace** (funciona em `npm run dev` e nos testes). O `npm run build` + `npm start` a partir de `dist/` ainda não resolve esse pacote: falta compilar o motor. Resolver antes de publicar.
 - Não há ainda limite de tentativas de login, recuperação de senha nem troca de e-mail. **O envio real de e-mail não existe**: o núcleo usa uma interface (`EmailSender`); falta escolher o provedor (decisão sua, tem custo).
-- **Flash:** a posição só é enviada com a tela do encontro aberta (navegador não envia em segundo plano; o app nativo resolve isso depois). Convites e posições são atualizados por consulta a cada 8–10 s, não por conexão em tempo real. Ainda não há mapa, nem aviso quando alguém te convida fora do app.
+- **Flash:** a posição só é enviada com a tela do encontro aberta (navegador não envia em segundo plano; o app nativo resolve isso depois). Convites e posições são atualizados por consulta a cada 8–10 s, não por conexão em tempo real. Não há aviso quando alguém te convida fora do app.
 - `total` nas listas de seguidores pode incluir pessoas ocultas por bloqueio de terceiros.
 
 ## Próximos passos
@@ -178,7 +179,7 @@ Os testes foram checados também quebrando as regras de propósito (por exemplo,
 1. Escolher o provedor de e-mail e implementar o envio real; limite por IP e Helmet (hoje só o cadastro tem limites, no núcleo).
 2. Front end web: cadastro, login, perfil, seguir e bloquear consumindo estas rotas.
 3. Limite de tentativas, verificação de e-mail, recuperação de senha, refresh token.
-4. Fase 2 (em andamento): agenda manual e comparação **feitas**; Flash **feito sem mapa** (etapa A); faltam o mapa do Flash, encontros e convites a partir do melhor horário, repetição semanal, conversas e grupos.
+4. Fase 2 (em andamento): agenda manual e comparação **feitas**; Flash feito (mapa a validar na sua máquina); faltam encontros e convites a partir do melhor horário, repetição semanal, conversas e grupos.
 5. Compilar o motor de compatibilidade para o build de produção da API.
 
 ## Regras do motor de compatibilidade (confirmadas)
