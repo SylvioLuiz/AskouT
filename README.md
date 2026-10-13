@@ -8,14 +8,14 @@ Menos tempo combinando. Mais tempo juntos.
 |---|---|
 | `packages/availability-engine` (compatibilidade de agendas) | **implementado e testado** (15 testes) |
 | `apps/api/src/core` (cadastro com código por e-mail, login, perfil, seguir, bloquear, amizade) | **implementado e testado** (tipos limpos) |
-| Suíte de contrato dos repositórios (`core/testing/contracts.ts`) | **roda e passa nos repositórios em memória**; contra Postgres só roda na sua máquina (ver abaixo) |
-| Repositórios Prisma (`apps/api/src/infra/prisma`) | **escritos, NÃO executados**: só passaram na checagem de tipos com um stub do Prisma |
+| Suíte de contrato dos repositórios (`core/testing/contracts.ts`) | **passa em memória e contra um Postgres 16 real** (146 testes no total, 3 rodadas seguidas sem falha) |
+| Repositórios Prisma (`apps/api/src/infra/prisma`) | **validados contra Postgres real** pela suíte de contrato |
 | Camada HTTP NestJS (`apps/api/src/http`) | **escrita, NÃO executada**: o NestJS não pôde ser instalado onde isto foi escrito. Partes sem Nest (config, mapeamento de erros, leitura de parâmetros) têm testes e passam |
-| `apps/api/prisma/schema.prisma` | escrito, **ainda não validado** com `prisma validate` |
-| View `friendships` + restrições (SQL) | escrito, **ainda não executado** em um Postgres |
+| `apps/api/prisma/schema.prisma` + migration `init` | **aplicados em Postgres real** (a migration está em `prisma/migrations`) |
+| View `friendships` + restrições (SQL) | **aplicados em Postgres real** (`prisma/sql/001_...sql`, depois da migration) |
 | Front end (web, painéis, design system) | **não iniciado** |
 
-Nada acima é simulado: o que consta como implementado roda e tem teste. O que consta como "escrito, não executado", "não iniciado" ou "não validado" não deve ser tratado como pronto. Os 130 testes que rodam sem banco passam; os do Prisma/Postgres aparecem como `SKIP` até você configurar o banco de teste.
+Nada acima é simulado: o que consta como implementado roda e tem teste. O que consta como "escrito, não executado", "não iniciado" ou "não validado" não deve ser tratado como pronto. Sem banco, 130 testes rodam e os 16 do Prisma/Postgres aparecem como `SKIP`; com `ASKOUT_TEST_DATABASE_URL` apontando para um banco de teste, os 146 rodam.
 
 ## Rodar os testes
 
@@ -32,29 +32,24 @@ Checagem de tipos (precisa de `npm install` na raiz, para `typescript` e `@types
     npm install
     npm run typecheck
 
-## Validar o que ainda não foi executado (na sua máquina)
+## Banco de dados e testes contra Postgres
 
-Estes passos fecham as lacunas da tabela acima. **Se algo falhar, me envie a saída completa do erro**: é esperado que apareçam ajustes, já que esse código nunca rodou.
+Já validado em Postgres 16 (Postgres.app no macOS). Com Docker, `docker compose up -d` sobe o mesmo banco.
 
     cd apps/api
     npm install
-    cp .env.example .env          # preencha JWT_SECRET e CODE_SECRET (veja o comando no arquivo)
-    docker compose up -d          # Postgres local
-    npx prisma validate           # 1. valida o schema
-    npx prisma generate
-    npx prisma migrate dev --name init
-    # aplicar também prisma/sql/001_friendships_and_constraints.sql (restrições e view)
+    cp .env.example .env            # preencha JWT_SECRET e CODE_SECRET; ajuste DATABASE_URL
+    createdb askout && createdb askout_test
+    npx prisma migrate deploy       # cria as tabelas (use migrate dev ao alterar o schema)
+    psql askout -v ON_ERROR_STOP=1 -f prisma/sql/001_friendships_and_constraints.sql
 
-    # 2. contrato dos repositórios contra o Postgres real. Use um banco SEPARADO terminado em _test:
-    #    os testes apagam todos os dados dele (e recusam rodar em banco com outro nome).
-    #    (crie o banco askout_test e rode o migrate nele com DATABASE_URL apontando para ele)
-    ASKOUT_TEST_DATABASE_URL=postgresql://askout:askout@localhost:5432/askout_test npm test
+Para o banco de teste, repita `migrate deploy` e o `psql` com `DATABASE_URL` apontando para `askout_test`. Depois:
 
-    # 3. checagem de tipos completa, com NestJS e Prisma reais
-    npm run typecheck:full
+    ASKOUT_TEST_DATABASE_URL=postgresql://USUARIO@localhost:5432/askout_test npm test
 
-    # 4. subir a API
-    npm run dev
+**Atenção:** esses testes APAGAM todos os dados do banco de teste a cada caso. Por segurança eles recusam rodar se o nome do banco não terminar em `_test`.
+
+Ainda **não validado**: subir a API (`npm run dev`) e chamar as rotas por HTTP, e `npm run typecheck:full` com NestJS e Prisma reais.
 
 ## Rotas da API (camada HTTP, ainda não executada)
 
@@ -117,7 +112,7 @@ Os testes foram checados também quebrando as regras de propósito (por exemplo,
 
 ## Próximos passos
 
-1. Você rodar a seção "Validar o que ainda não foi executado" e me trazer os erros; eu corrijo até o contrato passar no Postgres e a API subir.
+1. Rodar `npm run typecheck:full`, subir a API (`npm run dev`) e testar cadastro e login por HTTP; corrigir o que aparecer.
 2. Escolher o provedor de e-mail e implementar o envio real; limite por IP e Helmet.
 3. Limite de tentativas, verificação de e-mail, recuperação de senha, refresh token.
 4. Fase 2: expansão de recorrência, agenda manual, encontros e convites usando o motor, conversas, grupos e Flash.
