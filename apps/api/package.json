@@ -1,0 +1,12 @@
+{
+  "name": "@askout/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/core/index.ts",
+  "scripts": {
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "engines": { "node": ">=22" }
+}

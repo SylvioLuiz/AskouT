@@ -3,7 +3,12 @@
   "private": true,
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
-    "test": "npm test --workspaces --if-present"
+    "test": "npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0"
   },
   "engines": { "node": ">=22" }
 }

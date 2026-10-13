@@ -1,0 +1,205 @@
+import { conflict } from '../errors.ts';
+import { evaluateFriendship } from '../friendship.ts';
+import type { BlockRepository, Clock, FollowRepository, IdGenerator, UserRepository } from '../ports.ts';
+import type { Direction, Follow, FollowStatus, Page, Profile, User } from '../types.ts';
+
+/**
+ * Repositórios em memória. Servem para testar as regras sem banco e como
+ * referência de comportamento para a implementação Prisma/Postgres.
+ */
+
+export class InMemoryUserRepository implements UserRepository {
+  readonly users = new Map<string, User>();
+  readonly profiles = new Map<string, Profile>();
+
+  async create(user: User, profile: Profile): Promise<void> {
+    for (const existing of this.users.values()) {
+      if (existing.email === user.email) throw conflict('Este e-mail já está em uso', { email: 'Este e-mail já está em uso' });
+    }
+    for (const existing of this.profiles.values()) {
+      if (existing.username === profile.username) {
+        throw conflict('Este nome de usuário já está em uso', { username: 'Este nome de usuário já está em uso' });
+      }
+    }
+    this.users.set(user.id, { ...user });
+    this.profiles.set(profile.userId, { ...profile });
+  }
+
+  async findById(id: string): Promise<User | undefined> {
+    const u = this.users.get(id);
+    return u ? { ...u } : undefined;
+  }
+
+  async findByEmail(email: string): Promise<User | undefined> {
+    for (const u of this.users.values()) if (u.email === email) return { ...u };
+    return undefined;
+  }
+
+  async findProfileById(userId: string): Promise<Profile | undefined> {
+    const p = this.profiles.get(userId);
+    return p ? { ...p } : undefined;
+  }
+
+  async findProfileByUsername(username: string): Promise<Profile | undefined> {
+    for (const p of this.profiles.values()) if (p.username === username) return { ...p };
+    return undefined;
+  }
+
+  async findProfilesByIds(ids: string[]): Promise<Profile[]> {
+    const out: Profile[] = [];
+    for (const id of ids) {
+      const p = this.profiles.get(id);
+      if (p && this.users.get(id)?.status !== 'SUSPENDED') out.push({ ...p });
+    }
+    return out;
+  }
+
+  async updateProfile(profile: Profile): Promise<void> {
+    this.profiles.set(profile.userId, { ...profile });
+  }
+
+  async searchProfiles(query: string, limit: number, excludeIds: string[]): Promise<Profile[]> {
+    const q = query.toLowerCase();
+    const excluded = new Set(excludeIds);
+    return [...this.profiles.values()]
+      .filter((p) => !excluded.has(p.userId) && this.users.get(p.userId)?.status !== 'SUSPENDED')
+      .filter((p) => p.username.startsWith(q) || p.displayName.toLowerCase().includes(q))
+      .sort((a, b) => a.username.localeCompare(b.username))
+      .slice(0, limit)
+      .map((p) => ({ ...p }));
+  }
+}
+
+export class InMemoryBlockRepository implements BlockRepository {
+  /** chave "blockerId>blockedId" */
+  readonly rows = new Map<string, Date>();
+
+  async add(blockerId: string, blockedId: string, createdAt: Date): Promise<void> {
+    const key = `${blockerId}>${blockedId}`;
+    if (!this.rows.has(key)) this.rows.set(key, createdAt);
+  }
+
+  async remove(blockerId: string, blockedId: string): Promise<boolean> {
+    return this.rows.delete(`${blockerId}>${blockedId}`);
+  }
+
+  async exists(blockerId: string, blockedId: string): Promise<boolean> {
+    return this.rows.has(`${blockerId}>${blockedId}`);
+  }
+
+  async existsEitherWay(a: string, b: string): Promise<boolean> {
+    return this.rows.has(`${a}>${b}`) || this.rows.has(`${b}>${a}`);
+  }
+
+  async listBlockedBy(blockerId: string): Promise<string[]> {
+    return [...this.rows.keys()].filter((k) => k.startsWith(`${blockerId}>`)).map((k) => k.slice(blockerId.length + 1));
+  }
+
+  async listRelatedIds(userId: string): Promise<string[]> {
+    const out = new Set<string>();
+    for (const key of this.rows.keys()) {
+      const [blocker, blocked] = key.split('>') as [string, string];
+      if (blocker === userId) out.add(blocked);
+      if (blocked === userId) out.add(blocker);
+    }
+    return [...out];
+  }
+}
+
+export class InMemoryFollowRepository implements FollowRepository {
+  readonly rows = new Map<string, Follow>();
+  private readonly blocks: BlockRepository;
+
+  constructor(blocks: BlockRepository) {
+    this.blocks = blocks;
+  }
+
+  private key(followerId: string, followeeId: string): string {
+    return `${followerId}>${followeeId}`;
+  }
+
+  async get(followerId: string, followeeId: string): Promise<Follow | undefined> {
+    const f = this.rows.get(this.key(followerId, followeeId));
+    return f ? { ...f } : undefined;
+  }
+
+  async save(follow: Follow): Promise<void> {
+    const key = this.key(follow.followerId, follow.followeeId);
+    const existing = this.rows.get(key);
+    this.rows.set(key, { ...follow, createdAt: existing?.createdAt ?? follow.createdAt });
+  }
+
+  async delete(followerId: string, followeeId: string): Promise<boolean> {
+    return this.rows.delete(this.key(followerId, followeeId));
+  }
+
+  async deleteBetween(a: string, b: string): Promise<void> {
+    this.rows.delete(this.key(a, b));
+    this.rows.delete(this.key(b, a));
+  }
+
+  async list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]> {
+    return this.matching(userId, direction, status)
+      .sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime() || x.followerId.localeCompare(y.followerId))
+      .slice(page.offset, page.offset + page.limit)
+      .map((f) => ({ ...f }));
+  }
+
+  async count(userId: string, direction: Direction, status: FollowStatus): Promise<number> {
+    return this.matching(userId, direction, status).length;
+  }
+
+  async acceptAllPending(followeeId: string): Promise<number> {
+    let n = 0;
+    for (const [key, f] of this.rows) {
+      if (f.followeeId === followeeId && f.status === 'PENDING') {
+        this.rows.set(key, { ...f, status: 'ACCEPTED' });
+        n += 1;
+      }
+    }
+    return n;
+  }
+
+  async listFriendIds(userId: string): Promise<string[]> {
+    const out: string[] = [];
+    for (const f of this.rows.values()) {
+      if (f.followerId !== userId) continue;
+      const back = this.rows.get(this.key(f.followeeId, userId));
+      const blocked = await this.blocks.existsEitherWay(userId, f.followeeId);
+      if (evaluateFriendship(f, back, blocked)) out.push(f.followeeId);
+    }
+    return out;
+  }
+
+  private matching(userId: string, direction: Direction, status: FollowStatus): Follow[] {
+    return [...this.rows.values()].filter(
+      (f) => f.status === status && (direction === 'followers' ? f.followeeId === userId : f.followerId === userId),
+    );
+  }
+}
+
+/** Relógio controlável: cada chamada a tick() avança o tempo. */
+export class FakeClock implements Clock {
+  private current: number;
+
+  constructor(startIso = '2026-10-13T12:00:00.000Z') {
+    this.current = Date.parse(startIso);
+  }
+
+  now(): Date {
+    return new Date(this.current);
+  }
+
+  tick(ms = 1000): void {
+    this.current += ms;
+  }
+}
+
+export class SequentialIds implements IdGenerator {
+  private n = 0;
+
+  next(): string {
+    this.n += 1;
+    return `id-${this.n}`;
+  }
+}
