@@ -17,6 +17,7 @@ import {
 } from '../lib/flash.ts';
 import { initials } from '../lib/avatar.ts';
 import { toApiError } from '../lib/errors.ts';
+import type { OtherPin } from '../components/match-map.tsx';
 import type { AvailableFriend, FlashInvite, FlashMatch, PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 
@@ -36,6 +37,19 @@ export function FlashScreen() {
   const available = useAsync(() => (active ? api.flashAvailable().then((r) => r.items) : Promise.resolve([] as AvailableFriend[])), [active]);
   const invites = useAsync(() => api.flashInvites(), []);
 
+  // Mapa: onde estão os amigos que aceitaram sair com você (e só eles).
+  const matchIds = (invites.data?.matches ?? []).map((m) => m.id);
+  const matchKey = matchIds.join(',');
+  const matchViews = useAsync(
+    () => (active && matchIds.length > 0 ? Promise.all(matchIds.map((id) => api.flashMatch(id).catch(() => undefined))).then((r) => r.filter((m): m is FlashMatch => m !== undefined)) : Promise.resolve([] as FlashMatch[])),
+    [active, matchKey],
+  );
+  const share = useShareLocation(matchIds, () => {
+    invites.reload();
+    matchViews.reload();
+  });
+  const [mapFailed, setMapFailed] = useState(false);
+
   const [hours, setHours] = useState(2);
   const [note, setNote] = useState('');
   const [noteError, setNoteError] = useState<string | undefined>();
@@ -49,6 +63,7 @@ export function FlashScreen() {
     status.reload();
     invites.reload();
     available.reload();
+    matchViews.reload();
     setTick((n) => n + 1);
   }, POLL_MS);
 
@@ -101,6 +116,9 @@ export function FlashScreen() {
   const left = status.data?.expiresAt ? minutesLeft(status.data.expiresAt, now) : 0;
   const received = invites.data?.received ?? [];
   const matches = invites.data?.matches ?? [];
+  const mapOthers: OtherPin[] = (matchViews.data ?? []).flatMap((m) =>
+    m.them ? [{ id: m.inviteId, lat: m.them.lat, lng: m.them.lng, stale: m.them.stale, initials: initials(m.other.displayName, m.other.username) }] : [],
+  );
 
   return (
     <>
@@ -160,6 +178,39 @@ export function FlashScreen() {
           <p className="muted">Seus amigos que também estiverem com Flash ligado veem seu nome e sua foto. Sua localização só é compartilhada com quem aceitar sair com você.</p>
         </section>
       )}
+
+      {active ? (
+        <section className="section" aria-labelledby="mapa-titulo">
+          <h2 id="mapa-titulo" className="section__title">
+            No mapa
+          </h2>
+          {!mapFailed && (share.mine || mapOthers.length > 0) ? (
+            <Suspense fallback={<div className="matchmap matchmap--loading" role="status">Carregando o mapa…</div>}>
+              <MatchMap me={share.mine} others={mapOthers} onFail={() => setMapFailed(true)} />
+            </Suspense>
+          ) : null}
+          <p className="muted">
+            {matches.length === 0
+              ? 'Só aparecem aqui você e os amigos que aceitaram sair com você. Convide alguém da lista abaixo.'
+              : mapOthers.length === 0
+                ? 'Seus amigos aparecem no mapa quando compartilharem a localização.'
+                : 'Amigos que aceitaram sair com você, atualizados a cada poucos segundos.'}
+          </p>
+          {share.state.phase === 'sharing' ? (
+            <Button variant="secondary" full onClick={share.stop}>
+              Parar de compartilhar
+            </Button>
+          ) : (
+            <>
+              {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
+              <Button full loading={share.state.phase === 'asking'} onClick={share.start}>
+                Compartilhar minha localização
+              </Button>
+              <p className="muted">Sua localização só vai para quem aceitou sair com você, enquanto este Flash estiver ligado.</p>
+            </>
+          )}
+        </section>
+      ) : null}
 
       {received.length > 0 ? (
         <section className="section" aria-labelledby="recebidos-titulo">
@@ -389,18 +440,21 @@ type ShareState =
 
 const SEND_EVERY_MS = 10_000;
 
-/** Acompanha a posição do aparelho e envia ao encontro. Só começa quando a pessoa toca no botão. */
-function useShareLocation(inviteId: string, onEnded: () => void) {
+/** Acompanha a posição do aparelho e envia a cada encontro aceito. Só começa quando a pessoa toca no botão. */
+function useShareLocation(inviteIds: readonly string[], onEnded: () => void) {
   const [state, setState] = useState<ShareState>({ phase: 'idle' });
   const [mine, setMine] = useState<{ lat: number; lng: number } | undefined>();
   const watchId = useRef<number | undefined>(undefined);
   const lastSent = useRef(0);
   const endedRef = useRef(onEnded);
   endedRef.current = onEnded;
+  const idsRef = useRef(inviteIds);
+  idsRef.current = inviteIds;
 
   function stop() {
     if (watchId.current !== undefined) navigator.geolocation.clearWatch(watchId.current);
     watchId.current = undefined;
+    setMine(undefined);
     setState({ phase: 'idle' });
   }
 
@@ -423,12 +477,13 @@ function useShareLocation(inviteId: string, onEnded: () => void) {
         setState((current) => (current.phase === 'error' ? current : { phase: 'sharing', accuracyM: Math.round(accuracy), lastSentAt: current.phase === 'sharing' ? current.lastSentAt : undefined }));
         if (now - lastSent.current < SEND_EVERY_MS) return;
         lastSent.current = now;
-        api.flashShareLocation(inviteId, { lat: latitude, lng: longitude, accuracyM: Math.round(accuracy) }).then(
-          () => setState((current) => (current.phase === 'sharing' ? { ...current, lastSentAt: Date.now() } : current)),
-          (failure: unknown) => {
-            if (toApiError(failure).code === 'NOT_FOUND') endedRef.current();
-          },
-        );
+        // Sem nenhum encontro aceito não há para quem enviar: o ponto aparece só para você.
+        Promise.allSettled(
+          idsRef.current.map((id) => api.flashShareLocation(id, { lat: latitude, lng: longitude, accuracyM: Math.round(accuracy) })),
+        ).then((results) => {
+          setState((current) => (current.phase === 'sharing' ? { ...current, lastSentAt: Date.now() } : current));
+          if (results.some((r) => r.status === 'rejected' && toApiError(r.reason).code === 'NOT_FOUND')) endedRef.current();
+        });
       },
       (failure) => {
         if (watchId.current !== undefined) navigator.geolocation.clearWatch(watchId.current);
@@ -461,7 +516,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>();
-  const share = useShareLocation(inviteId, match.reload);
+  const share = useShareLocation([inviteId], match.reload);
   const [mapFailed, setMapFailed] = useState(false);
 
   if (match.loading && !match.data && !match.error) return <Loading />;
@@ -540,8 +595,9 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         <Suspense fallback={<div className="matchmap matchmap--loading" role="status">Carregando o mapa…</div>}>
           <MatchMap
             me={myPoint}
-            them={them ? { lat: them.lat, lng: them.lng, stale: them.stale } : undefined}
-            themInitials={initials(data.other.displayName, data.other.username)}
+            others={
+              them ? [{ id: inviteId, lat: them.lat, lng: them.lng, stale: them.stale, initials: initials(data.other.displayName, data.other.username) }] : []
+            }
             onFail={() => setMapFailed(true)}
           />
         </Suspense>

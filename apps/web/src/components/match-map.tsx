@@ -10,11 +10,17 @@ export interface MapPin {
   lng: number;
 }
 
+export interface OtherPin extends MapPin {
+  /** Identifica o pin (o id do encontro), para atualizar em vez de recriar. */
+  id: string;
+  stale: boolean;
+  /** Iniciais da pessoa, desenhadas dentro do pin. */
+  initials: string;
+}
+
 interface Props {
   me: MapPin | undefined;
-  them: (MapPin & { stale: boolean }) | undefined;
-  /** Iniciais da outra pessoa, desenhadas dentro do pin dela. */
-  themInitials: string;
+  others: readonly OtherPin[];
   onFail: () => void;
 }
 
@@ -41,9 +47,9 @@ function pinElement(className: string, text: string): HTMLDivElement {
   return el;
 }
 
-export default function MatchMap({ me, them, themInitials, onFail }: Props) {
+export default function MatchMap({ me, others, onFail }: Props) {
   const box = useRef<HTMLDivElement>(null);
-  const live = useRef<{ map: GlMap; lib: Lib; me?: Marker; them?: Marker; fitKey: string } | undefined>(undefined);
+  const live = useRef<{ map: GlMap; lib: Lib; me?: Marker; others: Map<string, Marker>; fitKey: string } | undefined>(undefined);
   const failRef = useRef(onFail);
   failRef.current = onFail;
   const [ready, setReady] = useState(false);
@@ -62,7 +68,7 @@ export default function MatchMap({ me, them, themInitials, onFail }: Props) {
           attributionControl: { compact: true },
         });
         map.addControl(new lib.NavigationControl({ showCompass: false }), 'top-right');
-        live.current = { map, lib, fitKey: '' };
+        live.current = { map, lib, others: new Map(), fitKey: '' };
         setReady(true);
       } catch {
         if (!cancelled) failRef.current();
@@ -80,34 +86,46 @@ export default function MatchMap({ me, them, themInitials, onFail }: Props) {
     if (!ready || !state) return;
     const { map, lib } = state;
 
-    const place = (key: 'me' | 'them', point: MapPin | undefined, make: () => HTMLDivElement) => {
-      const existing = state[key];
-      if (!point) {
-        existing?.remove();
-        state[key] = undefined;
-        return;
-      }
-      if (existing) existing.setLngLat([point.lng, point.lat]);
-      else state[key] = new lib.Marker({ element: make() }).setLngLat([point.lng, point.lat]).addTo(map);
-    };
-    place('me', me, () => pinElement('pin pin--me', ''));
-    place('them', them, () => pinElement('pin pin--them', themInitials));
-    state.them?.getElement().classList.toggle('pin--stale', Boolean(them?.stale));
+    // Seu pin.
+    if (!me) {
+      state.me?.remove();
+      state.me = undefined;
+    } else if (state.me) state.me.setLngLat([me.lng, me.lat]);
+    else state.me = new lib.Marker({ element: pinElement('pin pin--me', '') }).setLngLat([me.lng, me.lat]).addTo(map);
 
-    // Reenquadra só quando aparece ou some um pin, para não tirar o mapa do lugar enquanto a pessoa o move.
-    const fitKey = `${me ? 'm' : ''}${them ? 't' : ''}`;
-    if (fitKey !== state.fitKey && fitKey !== '') {
-      state.fitKey = fitKey;
-      if (me && them) {
-        const bounds = new lib.LngLatBounds([me.lng, me.lat], [me.lng, me.lat]);
-        bounds.extend([them.lng, them.lat]);
-        map.fitBounds(bounds, { padding: 64, maxZoom: 17, duration: 0 });
-      } else {
-        const only = (me ?? them) as MapPin;
-        map.easeTo({ center: [only.lng, only.lat], zoom: 16, duration: 0 });
+    // Um pin por pessoa que aceitou sair com você; some quando o encontro acaba.
+    const wanted = new Set(others.map((o) => o.id));
+    for (const [id, marker] of state.others) {
+      if (!wanted.has(id)) {
+        marker.remove();
+        state.others.delete(id);
       }
     }
-  }, [ready, me, them, themInitials]);
+    for (const other of others) {
+      let marker = state.others.get(other.id);
+      if (marker) marker.setLngLat([other.lng, other.lat]);
+      else {
+        marker = new lib.Marker({ element: pinElement('pin pin--them', other.initials) }).setLngLat([other.lng, other.lat]).addTo(map);
+        state.others.set(other.id, marker);
+      }
+      marker.getElement().classList.toggle('pin--stale', other.stale);
+    }
+
+    // Reenquadra só quando aparece ou some um pin, para não tirar o mapa do lugar enquanto a pessoa o move.
+    const fitKey = `${me ? 'm' : ''}|${[...wanted].sort().join(',')}`;
+    if (fitKey !== state.fitKey && fitKey !== '|') {
+      state.fitKey = fitKey;
+      const points: MapPin[] = [...(me ? [me] : []), ...others];
+      const first = points[0] as MapPin;
+      if (points.length === 1) {
+        map.easeTo({ center: [first.lng, first.lat], zoom: 16, duration: 0 });
+      } else {
+        const bounds = new lib.LngLatBounds([first.lng, first.lat], [first.lng, first.lat]);
+        for (const point of points) bounds.extend([point.lng, point.lat]);
+        map.fitBounds(bounds, { padding: 64, maxZoom: 17, duration: 0 });
+      }
+    }
+  }, [ready, me, others]);
 
   return <div ref={box} className="matchmap" role="region" aria-label="Mapa com a posição de vocês dois" />;
 }
