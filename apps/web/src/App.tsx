@@ -8,6 +8,7 @@ import type { RouteDef } from './router.tsx';
 import { AgendaScreen, CompareScreen, FriendAgendaScreen } from './screens/agenda.tsx';
 import { ActivityScreen } from './screens/activity.tsx';
 import { LoginScreen, SignupScreen } from './screens/auth.tsx';
+import { FlashScreen, MatchScreen } from './screens/flash.tsx';
 import { ExploreScreen, HomeScreen, SoonScreen } from './screens/main-tabs.tsx';
 import { BlockedScreen, FriendsScreen, MyProfileScreen } from './screens/me.tsx';
 import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
@@ -25,6 +26,8 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/conversas', render: () => <SoonScreen title="Conversas" text="As conversas com seus amigos chegam numa próxima etapa." /> },
   { path: '/agenda', render: () => <AgendaScreen /> },
   { path: '/agenda/comparar', render: () => <CompareScreen /> },
+  { path: '/flash', render: () => <FlashScreen /> },
+  { path: '/flash/encontro/:id', render: (p) => <MatchScreen inviteId={p['id'] ?? ''} /> },
   { path: '/atividades', render: () => <ActivityScreen /> },
   { path: '/perfil', render: () => <MyProfileScreen /> },
   { path: '/amigos', render: () => <FriendsScreen /> },

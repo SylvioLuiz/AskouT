@@ -1,6 +1,11 @@
 import { errorFromResponse, networkError } from './errors.ts';
 import type {
   AuthResult,
+  AvailableFriend,
+  FlashInvite,
+  FlashInvites,
+  FlashMatch,
+  FlashStatus,
   BestDatesInput,
   Compatibility,
   FriendAvailability,
@@ -136,6 +141,21 @@ export function createApi(deps: ApiDeps) {
       request<Compatibility>('POST', '/compatibility', { body: { friendIds, start, end } }),
     bestDates: (input: BestDatesInput) =>
       request<{ items: Compatibility[] }>('POST', '/compatibility/best-dates', { body: input }),
+
+    // Flash
+    flashStatus: () => request<FlashStatus>('GET', '/me/flash'),
+    flashOn: (hours: number, note: string) =>
+      request<FlashStatus>('POST', '/me/flash', { body: note === '' ? { hours } : { hours, note } }),
+    flashOff: () => request<{ ended: boolean }>('DELETE', '/me/flash'),
+    flashAvailable: () => request<{ items: AvailableFriend[] }>('GET', '/flash/available'),
+    flashInvites: () => request<FlashInvites>('GET', '/flash/invites'),
+    flashInvite: (userId: string) => request<FlashInvite>('POST', '/flash/invites', { body: { userId } }),
+    flashRespond: (inviteId: string, action: 'accept' | 'decline') =>
+      request<{ status: 'ACCEPTED' | 'DECLINED' }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: { action } }),
+    flashEnd: (inviteId: string) => request<{ ended: boolean }>('DELETE', `/flash/invites/${id(inviteId)}`),
+    flashMatch: (inviteId: string) => request<FlashMatch>('GET', `/flash/matches/${id(inviteId)}`),
+    flashShareLocation: (inviteId: string, position: { lat: number; lng: number; accuracyM?: number }) =>
+      request<{ ok: true }>('PUT', `/flash/matches/${id(inviteId)}/location`, { body: position }),
 
     // Bloqueios
     block: (userId: string) => request<{ ok: true }>('POST', `/users/${id(userId)}/block`),

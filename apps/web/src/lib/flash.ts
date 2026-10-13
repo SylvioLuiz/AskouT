@@ -1,0 +1,74 @@
+// Contas do Flash que não dependem de tela: distância, tempo restante e rótulos.
+
+const EARTH_RADIUS_M = 6_371_000;
+
+export interface Point {
+  lat: number;
+  lng: number;
+}
+
+const rad = (degrees: number) => (degrees * Math.PI) / 180;
+
+/** Distância em metros entre dois pontos (fórmula de haversine). */
+export function distanceMeters(a: Point, b: Point): number {
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** 80 -> "80 m"; 1240 -> "1,2 km"; 15000 -> "15 km". Arredonda para não fingir precisão que o GPS não tem. */
+export function formatDistance(meters: number): string {
+  if (!Number.isFinite(meters) || meters < 0) return '—';
+  if (meters < 100) return `${Math.max(10, Math.round(meters / 10) * 10)} m`;
+  if (meters < 1000) return `${Math.round(meters / 50) * 50} m`;
+  const km = meters / 1000;
+  return `${km < 10 ? km.toFixed(1).replace('.', ',') : Math.round(km)} km`;
+}
+
+/** Minutos restantes até `iso`: 0 quando já passou, arredondando para cima. */
+export function minutesLeft(iso: string, nowMs: number): number {
+  const target = Date.parse(iso);
+  if (Number.isNaN(target)) return 0;
+  return Math.max(0, Math.ceil((target - nowMs) / 60_000));
+}
+
+/** 5 -> "5 min"; 90 -> "1 h 30 min"; 120 -> "2 h". */
+export function formatRemaining(minutes: number): string {
+  if (minutes <= 0) return 'acabou';
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+/** "há 30 s", "há 3 min". Usa o relógio do servidor para não depender da hora do aparelho. */
+export function formatAge(updatedAtIso: string, serverNowIso: string): string {
+  const seconds = Math.max(0, Math.round((Date.parse(serverNowIso) - Date.parse(updatedAtIso)) / 1000));
+  if (Number.isNaN(seconds)) return '';
+  if (seconds < 10) return 'agora';
+  if (seconds < 60) return `há ${seconds} s`;
+  return `há ${Math.floor(seconds / 60)} min`;
+}
+
+/** Avisa o resto do app (o raio do topo, por exemplo) que o Flash ligou, desligou ou mudou de estado. */
+export const FLASH_CHANGED_EVENT = 'askout:flash-changed';
+export function announceFlashChange(): void {
+  window.dispatchEvent(new Event(FLASH_CHANGED_EVENT));
+}
+
+export const FLASH_DURATIONS: readonly number[] = [1, 2, 3];
+export const FLASH_NOTE_MAX = 60;
+
+export function flashNoteProblem(note: string): string | undefined {
+  return Array.from(note.trim()).length > FLASH_NOTE_MAX ? `Use no máximo ${FLASH_NOTE_MAX} caracteres` : undefined;
+}
+
+/** Mensagem para cada motivo de falha do navegador ao pegar a localização (códigos de GeolocationPositionError). */
+export function geolocationMessage(code: number | undefined, secure: boolean): string {
+  if (!secure) return 'O navegador só libera a localização em conexão segura (https).';
+  if (code === 1) return 'A localização está bloqueada. Libere nas configurações do navegador ou do celular para compartilhar.';
+  if (code === 2) return 'Não foi possível descobrir onde você está agora. Vá para um lugar com melhor sinal.';
+  if (code === 3) return 'A localização demorou demais. Toque em compartilhar para tentar de novo.';
+  return 'Este aparelho não consegue informar a localização.';
+}

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { BoltIcon } from '../components/icons.tsx';
 import { Avatar, EmptyState, ErrorState, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
+import { formatRemaining, minutesLeft } from '../lib/flash.ts';
 import { pluralize } from '../lib/format.ts';
 import { Link } from '../router.tsx';
 
@@ -11,10 +13,26 @@ export function HomeScreen() {
   const user = useUser();
   const friends = useAsync(() => api.friends(), []);
   const count = friends.data?.length ?? 0;
+  const flash = useAsync(() => api.flashStatus(), []);
+  const flashOn = flash.data?.active === true;
 
   return (
     <>
       <PageHead title={`Olá, ${user.profile.displayName}`} />
+
+      <Link to="/flash" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
+        <span className="flashcta__icon">
+          <BoltIcon filled />
+        </span>
+        <span className="flashcta__text">
+          <span className="flashcta__title">{flashOn ? 'Flash ligado' : 'Flash: estou livre agora'}</span>
+          <span className="flashcta__sub">
+            {flashOn && flash.data?.expiresAt
+              ? `Faltam ${formatRemaining(minutesLeft(flash.data.expiresAt, Date.now()))}. Veja quem mais está livre.`
+              : 'Avise seus amigos que dá para sair agora.'}
+          </span>
+        </span>
+      </Link>
 
       <section className="section" aria-labelledby="amigos-titulo">
         <div className="section__head">
@@ -56,7 +74,7 @@ export function HomeScreen() {
       <section className="section">
         <h2 className="section__title">O que vem por aí</h2>
         <p className="muted">
-          Disponibilidade dos amigos, encontros e o Flash ainda não estão no app. Quando chegarem, aparecem aqui.
+          Encontros marcados pela agenda e as conversas ainda não estão no app. Quando chegarem, aparecem aqui.
         </p>
       </section>
     </>

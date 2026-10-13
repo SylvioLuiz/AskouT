@@ -120,3 +120,54 @@ export interface BestDatesInput {
   timeZone: string;
   limit: number;
 }
+
+// ---------- Flash ----------
+
+export interface FlashStatus {
+  active: boolean;
+  startsAt: string | null;
+  expiresAt: string | null;
+  note: string | null;
+}
+
+export type InviteDirection = 'SENT' | 'RECEIVED' | 'MATCHED';
+
+export interface FlashInvite {
+  id: string;
+  direction: InviteDirection;
+  other: PublicProfile;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface AvailableFriend {
+  profile: PublicProfile;
+  note: string | null;
+  expiresAt: string;
+  /** Convite aberto com essa pessoa. A lista nunca traz localização. */
+  invite: { id: string; direction: InviteDirection } | null;
+}
+
+export interface FlashInvites {
+  received: FlashInvite[];
+  sent: FlashInvite[];
+  matches: FlashInvite[];
+}
+
+export interface FlashPosition {
+  lat: number;
+  lng: number;
+  accuracyM: number | null;
+  updatedAt: string;
+  stale: boolean;
+}
+
+export interface FlashMatch {
+  inviteId: string;
+  other: PublicProfile;
+  expiresAt: string;
+  /** Relógio do servidor no momento da resposta. */
+  now: string;
+  me: FlashPosition | null;
+  them: FlashPosition | null;
+}

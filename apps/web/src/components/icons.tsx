@@ -97,3 +97,8 @@ export const PlusIcon = () => (
     <path d="M12 5v14M5 12h14" />
   </Svg>
 );
+export const BoltIcon = ({ filled = false }: { filled?: boolean }) => (
+  <svg className="icon" viewBox="0 0 24 24" width="24" height="24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <path d="M13.5 2.5 5 13.5h6l-1 8 8.5-11h-6z" />
+  </svg>
+);

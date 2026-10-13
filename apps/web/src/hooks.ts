@@ -60,3 +60,21 @@ export function useDebounced<T>(value: T, delayMs: number): T {
   }, [value, delayMs]);
   return debounced;
 }
+
+/** Chama `tick` a cada `everyMs` enquanto a aba está visível, e de novo quando ela volta a ficar visível. */
+export function usePolling(tick: () => void, everyMs: number, enabled = true): void {
+  const ref = useRef(tick);
+  ref.current = tick;
+  useEffect(() => {
+    if (!enabled) return;
+    const run = () => {
+      if (document.visibilityState === 'visible') ref.current();
+    };
+    const handle = window.setInterval(run, everyMs);
+    document.addEventListener('visibilitychange', run);
+    return () => {
+      window.clearInterval(handle);
+      document.removeEventListener('visibilitychange', run);
+    };
+  }, [everyMs, enabled]);
+}

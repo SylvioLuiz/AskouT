@@ -1,9 +1,11 @@
+import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
-import { useAsync } from '../hooks.ts';
+import { useAsync, usePolling } from '../hooks.ts';
+import { FLASH_CHANGED_EVENT } from '../lib/flash.ts';
 import { Link, usePathname } from '../router.tsx';
-import { BellIcon, CalendarIcon, ChatIcon, HomeIcon, SearchIcon, UserIcon } from './icons.tsx';
+import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, HomeIcon, SearchIcon, UserIcon } from './icons.tsx';
 import { Avatar } from './ui.tsx';
 
 interface NavItem {
@@ -45,7 +47,23 @@ export function Shell({ children }: { children: ReactNode }) {
   // Solicitações de seguir pendentes: alimentam a bolinha em Atividades.
   const pending = useAsync(() => api.followRequests({ limit: 1 }), [pathname]);
   const hasPending = (pending.data?.total ?? 0) > 0;
+  // Flash: o raio fica cheio com o Flash ligado e ganha uma bolinha quando alguém te convida.
+  const flash = useAsync(() => api.flashStatus(), [pathname]);
+  const flashInvites = useAsync(() => api.flashInvites(), [pathname]);
+  const reloadFlash = () => {
+    flash.reload();
+    flashInvites.reload();
+  };
+  usePolling(reloadFlash, 30_000);
+  useEffect(() => {
+    window.addEventListener(FLASH_CHANGED_EVENT, reloadFlash);
+    return () => window.removeEventListener(FLASH_CHANGED_EVENT, reloadFlash);
+  });
+  const flashOn = flash.data?.active === true;
+  const flashInvited = (flashInvites.data?.received.length ?? 0) > 0;
+  const flashLabel = flashInvited ? 'Flash, você tem um convite' : flashOn ? 'Flash, ligado' : 'Flash';
 
+  const flashItem: NavItem = { to: '/flash', label: 'Flash', icon: <BoltIcon filled={flashOn} />, also: ['/flash/encontro'] };
   const activities: NavItem = { to: '/atividades', label: 'Atividades', icon: <BellIcon /> };
   const profile: NavItem = {
     to: '/perfil',
@@ -68,6 +86,7 @@ export function Shell({ children }: { children: ReactNode }) {
           {MAIN.map((item) => (
             <NavLink key={item.to} item={item} pathname={pathname} />
           ))}
+          <NavLink item={flashItem} pathname={pathname} badge={flashInvited} />
           <NavLink item={activities} pathname={pathname} badge={hasPending} />
           <NavLink item={profile} pathname={pathname} />
         </nav>
@@ -85,6 +104,10 @@ export function Shell({ children }: { children: ReactNode }) {
           AskouT
         </Link>
         <nav className="topbar__actions" aria-label="Conta">
+          <Link to="/flash" className={`iconbtn iconbtn--flash${flashOn ? ' iconbtn--on' : ''}`} aria-label={flashLabel} aria-current={pathname.startsWith('/flash') ? 'page' : undefined}>
+            <BoltIcon filled={flashOn} />
+            {flashInvited ? <span className="navlink__badge" aria-hidden="true" /> : null}
+          </Link>
           <Link to="/atividades" className="iconbtn" aria-label={hasPending ? 'Atividades, há novidades' : 'Atividades'} aria-current={pathname === '/atividades' ? 'page' : undefined}>
             <BellIcon />
             {hasPending ? <span className="navlink__badge" aria-hidden="true" /> : null}
