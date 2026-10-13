@@ -1,0 +1,19 @@
+# Postgres local para desenvolvimento e testes. Sobe com: docker compose up -d
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: askout
+      POSTGRES_PASSWORD: askout
+      POSTGRES_DB: askout
+    ports:
+      - "5432:5432"
+    volumes:
+      - askout-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U askout"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  askout-db:

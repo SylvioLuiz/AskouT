@@ -472,6 +472,19 @@ test('autenticação: usuário removido deixa o token inválido', async () => {
   await rejectsWith(w.core.auth.authenticate(ana.token), 'UNAUTHORIZED');
 });
 
+test('sessão (me): devolve os dados do próprio usuário e recusa conta removida ou suspensa', async () => {
+  const w = makeWorld();
+  const ana = await w.signUp('ana', { displayName: 'Ana' });
+  const me = await w.core.auth.me({ userId: ana.user.id, role: 'USER' });
+  assert.equal(me.email, 'ana@exemplo.com');
+  assert.equal(me.profile.displayName, 'Ana');
+  assert.ok(!JSON.stringify(me).includes('passwordHash'));
+
+  w.users.users.get(ana.user.id)!.status = 'SUSPENDED';
+  await rejectsWith(w.core.auth.me({ userId: ana.user.id, role: 'USER' }), 'UNAUTHORIZED');
+  await rejectsWith(w.core.auth.me({ userId: 'nao-existe', role: 'USER' }), 'UNAUTHORIZED');
+});
+
 test('repositório: barra e-mail e username duplicados mesmo sem passar pelo serviço (corrida)', async () => {
   const w = makeWorld();
   const a = await w.signUp('ana');

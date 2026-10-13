@@ -231,6 +231,14 @@ export class AuthService {
     return { userId: user.id, role: user.role };
   }
 
+  /** Dados da própria sessão (inclui o e-mail, que só o dono vê). */
+  async me(actor: Actor): Promise<SessionUser> {
+    const user = await this.deps.users.findById(actor.userId);
+    const profile = user ? await this.deps.users.findProfileById(user.id) : undefined;
+    if (!user || !profile || user.status === 'SUSPENDED') throw unauthorized('Sessão inválida');
+    return { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile) };
+  }
+
   /** Começa com @ -> usuário; tem @ no meio -> e-mail; senão -> usuário. */
   private async findByIdentifier(identifier: string): Promise<User | undefined> {
     const { users } = this.deps;

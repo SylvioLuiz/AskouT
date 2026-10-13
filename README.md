@@ -7,29 +7,71 @@ Menos tempo combinando. Mais tempo juntos.
 | Item | Estado |
 |---|---|
 | `packages/availability-engine` (compatibilidade de agendas) | **implementado e testado** (15 testes) |
-| `apps/api/src/core` (cadastro com código por e-mail, login, perfil, seguir, bloquear, amizade) | **implementado e testado** (98 testes, tipos limpos) |
+| `apps/api/src/core` (cadastro com código por e-mail, login, perfil, seguir, bloquear, amizade) | **implementado e testado** (tipos limpos) |
+| Suíte de contrato dos repositórios (`core/testing/contracts.ts`) | **roda e passa nos repositórios em memória**; contra Postgres só roda na sua máquina (ver abaixo) |
+| Repositórios Prisma (`apps/api/src/infra/prisma`) | **escritos, NÃO executados**: só passaram na checagem de tipos com um stub do Prisma |
+| Camada HTTP NestJS (`apps/api/src/http`) | **escrita, NÃO executada**: o NestJS não pôde ser instalado onde isto foi escrito. Partes sem Nest (config, mapeamento de erros, leitura de parâmetros) têm testes e passam |
 | `apps/api/prisma/schema.prisma` | escrito, **ainda não validado** com `prisma validate` |
 | View `friendships` + restrições (SQL) | escrito, **ainda não executado** em um Postgres |
-| Camada HTTP (NestJS) | **não iniciada** |
-| Repositórios Prisma/Postgres | **não iniciados** |
 | Front end (web, painéis, design system) | **não iniciado** |
 
-Nada acima é simulado: o que consta como implementado roda e tem teste. O que consta como "não iniciado" ou "não validado" não deve ser tratado como pronto.
+Nada acima é simulado: o que consta como implementado roda e tem teste. O que consta como "escrito, não executado", "não iniciado" ou "não validado" não deve ser tratado como pronto. Os 130 testes que rodam sem banco passam; os do Prisma/Postgres aparecem como `SKIP` até você configurar o banco de teste.
 
 ## Rodar os testes
 
-Requer Node 22 ou mais novo. Não precisa de banco de dados.
+Requer Node 22 ou mais novo. Os testes comuns não precisam de banco de dados.
 
     # motor de compatibilidade
     cd packages/availability-engine && npm test
 
-    # núcleo da API
+    # API (núcleo + partes puras da camada HTTP)
     cd apps/api && npm test
 
 Checagem de tipos (precisa de `npm install` na raiz, para `typescript` e `@types/node`):
 
     npm install
     npm run typecheck
+
+## Validar o que ainda não foi executado (na sua máquina)
+
+Estes passos fecham as lacunas da tabela acima. **Se algo falhar, me envie a saída completa do erro**: é esperado que apareçam ajustes, já que esse código nunca rodou.
+
+    cd apps/api
+    npm install
+    cp .env.example .env          # preencha JWT_SECRET e CODE_SECRET (veja o comando no arquivo)
+    docker compose up -d          # Postgres local
+    npx prisma validate           # 1. valida o schema
+    npx prisma generate
+    npx prisma migrate dev --name init
+    # aplicar também prisma/sql/001_friendships_and_constraints.sql (restrições e view)
+
+    # 2. contrato dos repositórios contra o Postgres real. Use um banco SEPARADO terminado em _test:
+    #    os testes apagam todos os dados dele (e recusam rodar em banco com outro nome).
+    #    (crie o banco askout_test e rode o migrate nele com DATABASE_URL apontando para ele)
+    ASKOUT_TEST_DATABASE_URL=postgresql://askout:askout@localhost:5432/askout_test npm test
+
+    # 3. checagem de tipos completa, com NestJS e Prisma reais
+    npm run typecheck:full
+
+    # 4. subir a API
+    npm run dev
+
+## Rotas da API (camada HTTP, ainda não executada)
+
+Sem token: `POST /auth/signup`, `POST /auth/signup/resend`, `POST /auth/signup/confirm`, `POST /auth/login`. Todas as outras exigem `Authorization: Bearer <token>`.
+
+| Rota | O que faz |
+|---|---|
+| `GET /auth/me` | usuário da sessão |
+| `GET /profiles/search?q=&limit=` · `GET /profiles/:username` | busca e perfil |
+| `PATCH /profiles/me` · `PATCH /profiles/me/privacy` | editar perfil, tornar privado/público |
+| `POST/DELETE /users/:userId/follow` | seguir / deixar de seguir |
+| `GET /users/:userId/followers` · `.../following` | listas (`limit`, `offset`) |
+| `GET /me/follow-requests` · `POST /me/follow-requests/:userId/approve` · `.../reject` | solicitações pendentes |
+| `DELETE /me/followers/:userId` · `GET /me/friends` | remover seguidor, amigos |
+| `POST/DELETE /users/:userId/block` · `GET /me/blocks` | bloqueios |
+
+Erros: `{ "error": { "code", "message", "details?" } }` com status 400/401/403/404/409/429 (429 envia `Retry-After`). Erro inesperado vira 500 genérico, sem vazar detalhes.
 
 ## Núcleo da API (`apps/api/src/core`)
 
@@ -43,7 +85,7 @@ Regras de negócio em TypeScript puro, sem framework e sem banco. O acesso a dad
 | `block-service.ts` | bloquear, desbloquear, listar |
 | `friendship.ts` | regra de amizade (seguimento mútuo aceito, sem bloqueio) |
 | `adapters/crypto.ts` | senha com scrypt, token JWT HS256 e códigos de confirmação (HMAC) usando só `node:crypto` |
-| `testing/` | repositórios em memória, relógio e ids de teste |
+| `testing/` | repositórios em memória, relógio e ids de teste, e a suíte de contrato que vale para qualquer repositório |
 
 Regras principais, todas cobertas por testes:
 
@@ -67,13 +109,16 @@ Os testes foram checados também quebrando as regras de propósito (por exemplo,
 ## Limitações conhecidas
 
 - O ambiente onde isto foi escrito não conseguia baixar pacotes do npm, por isso NestJS, Prisma e o acesso real ao banco **não foram construídos nem testados**. A criptografia usa `node:crypto` (scrypt e HMAC); quando houver acesso ao npm, dá para trocar por argon2id e uma biblioteca de JWT, atrás das mesmas interfaces.
+- **A camada HTTP não tem limite de requisições por IP nem cabeçalhos de segurança (Helmet).** Os limites do cadastro (tentativas, reenvio) existem no núcleo, mas o limite por IP e contra força bruta no login precisam ser feitos antes de ir para produção.
+- Em produção a API **recusa subir** com o envio de e-mail "console" (ele imprime os códigos no log).
+- O NestJS roda em ESM importando pacotes CommonJS; isso costuma funcionar, mas é um dos pontos que a validação na sua máquina precisa confirmar.
 - Não há ainda limite de tentativas de login, recuperação de senha nem troca de e-mail. **O envio real de e-mail não existe**: o núcleo usa uma interface (`EmailSender`); falta escolher o provedor (decisão sua, tem custo).
 - `total` nas listas de seguidores pode incluir pessoas ocultas por bloqueio de terceiros.
 
 ## Próximos passos
 
-1. Com acesso ao npm: NestJS (rotas, validação, guarda de autenticação) e repositórios Prisma que implementam as interfaces, com os mesmos testes rodando contra um Postgres de verdade.
-2. Validar `schema.prisma` e executar o SQL de amizade num Postgres.
+1. Você rodar a seção "Validar o que ainda não foi executado" e me trazer os erros; eu corrijo até o contrato passar no Postgres e a API subir.
+2. Escolher o provedor de e-mail e implementar o envio real; limite por IP e Helmet.
 3. Limite de tentativas, verificação de e-mail, recuperação de senha, refresh token.
 4. Fase 2: expansão de recorrência, agenda manual, encontros e convites usando o motor, conversas, grupos e Flash.
 5. Design system e navegação do app web.

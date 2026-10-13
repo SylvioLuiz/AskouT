@@ -1,0 +1,395 @@
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { after, before, beforeEach, describe, it } from 'node:test';
+import { DomainError } from '../errors.ts';
+import type { BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { PendingSignup, Profile, User, UserStatus } from '../types.ts';
+
+/**
+ * Suíte de contrato das portas de dados. Roda contra QUALQUER implementação:
+ * hoje nos repositórios em memória; na máquina com Postgres, nos repositórios Prisma.
+ * Garante que o comportamento que as regras de negócio assumem vale nas duas.
+ */
+
+export interface RepoHarness {
+  users: UserRepository;
+  follows: FollowRepository;
+  blocks: BlockRepository;
+  pending: PendingSignupRepository;
+  setUserStatus(userId: string, status: UserStatus): Promise<void>;
+  /** Apaga todos os dados entre os testes. */
+  reset(): Promise<void>;
+  close(): Promise<void>;
+}
+
+const T0 = Date.parse('2026-10-13T12:00:00.000Z');
+const at = (seconds: number) => new Date(T0 + seconds * 1000);
+
+export function defineRepositoryContract(
+  name: string,
+  makeHarness: () => Promise<RepoHarness>,
+  options: { skip?: string | false } = {},
+): void {
+  describe(`contrato dos repositórios: ${name}`, { skip: options.skip ?? false }, () => {
+    let h: RepoHarness;
+
+    before(async () => {
+      h = await makeHarness();
+    });
+    beforeEach(async () => {
+      await h.reset();
+    });
+    after(async () => {
+      await h.close();
+    });
+
+    async function newUser(
+      username: string,
+      extra: { displayName?: string; isPrivate?: boolean; bio?: string | null } = {},
+    ): Promise<string> {
+      const id = randomUUID();
+      const user: User = {
+        id,
+        email: `${username}@exemplo.com`,
+        passwordHash: 'scrypt$1024$8$1$c2FsdA==$a2V5',
+        status: 'ACTIVE',
+        role: 'USER',
+        createdAt: at(0),
+      };
+      const profile: Profile = {
+        userId: id,
+        username,
+        displayName: extra.displayName ?? username,
+        bio: extra.bio ?? null,
+        avatarUrl: null,
+        isPrivate: extra.isPrivate ?? false,
+      };
+      await h.users.create(user, profile);
+      return id;
+    }
+
+    async function rejectsConflict(promise: Promise<unknown>, field: string): Promise<void> {
+      let caught: unknown;
+      try {
+        await promise;
+      } catch (e) {
+        caught = e;
+      }
+      assert.ok(caught instanceof DomainError, `esperava DomainError, veio ${String(caught)}`);
+      assert.equal(caught.code, 'CONFLICT');
+      assert.ok(caught.details?.[field], `esperava details.${field}`);
+    }
+
+    // ---------- Usuários e perfis ----------
+
+    describe('usuários', () => {
+      it('cria e encontra por id, e-mail e username, preservando os campos', async () => {
+        const id = randomUUID();
+        await h.users.create(
+          { id, email: 'ana@exemplo.com', passwordHash: 'hash-x', status: 'ACTIVE', role: 'VENUE_OWNER', createdAt: at(5) },
+          { userId: id, username: 'ana.silva', displayName: 'Ana Silva', bio: 'oi\ntudo bem', avatarUrl: 'https://x.com/a.png', isPrivate: true },
+        );
+
+        const byId = await h.users.findById(id);
+        assert.ok(byId);
+        assert.equal(byId.email, 'ana@exemplo.com');
+        assert.equal(byId.passwordHash, 'hash-x');
+        assert.equal(byId.status, 'ACTIVE');
+        assert.equal(byId.role, 'VENUE_OWNER');
+        assert.equal(byId.createdAt.getTime(), at(5).getTime());
+
+        assert.equal((await h.users.findByEmail('ana@exemplo.com'))?.id, id);
+
+        const profile = await h.users.findProfileById(id);
+        assert.deepEqual(profile, {
+          userId: id,
+          username: 'ana.silva',
+          displayName: 'Ana Silva',
+          bio: 'oi\ntudo bem',
+          avatarUrl: 'https://x.com/a.png',
+          isPrivate: true,
+        });
+        assert.deepEqual(await h.users.findProfileByUsername('ana.silva'), profile);
+      });
+
+      it('devolve undefined para inexistentes e para ids que não são UUID', async () => {
+        assert.equal(await h.users.findById(randomUUID()), undefined);
+        assert.equal(await h.users.findById('nao-e-uuid'), undefined);
+        assert.equal(await h.users.findProfileById('nao-e-uuid'), undefined);
+        assert.equal(await h.users.findByEmail('ninguem@exemplo.com'), undefined);
+        assert.equal(await h.users.findProfileByUsername('ninguem'), undefined);
+      });
+
+      it('barra e-mail e username repetidos com CONFLICT e não deixa registro pela metade', async () => {
+        await newUser('ana');
+
+        const dupEmailId = randomUUID();
+        await rejectsConflict(
+          h.users.create(
+            { id: dupEmailId, email: 'ana@exemplo.com', passwordHash: 'h', status: 'ACTIVE', role: 'USER', createdAt: at(0) },
+            { userId: dupEmailId, username: 'outra', displayName: 'Outra', bio: null, avatarUrl: null, isPrivate: false },
+          ),
+          'email',
+        );
+        assert.equal(await h.users.findById(dupEmailId), undefined);
+        assert.equal(await h.users.findProfileByUsername('outra'), undefined);
+
+        const dupNameId = randomUUID();
+        await rejectsConflict(
+          h.users.create(
+            { id: dupNameId, email: 'outro@exemplo.com', passwordHash: 'h', status: 'ACTIVE', role: 'USER', createdAt: at(0) },
+            { userId: dupNameId, username: 'ana', displayName: 'Outra', bio: null, avatarUrl: null, isPrivate: false },
+          ),
+          'username',
+        );
+        assert.equal(await h.users.findById(dupNameId), undefined);
+        assert.equal(await h.users.findByEmail('outro@exemplo.com'), undefined);
+      });
+
+      it('atualiza o perfil', async () => {
+        const id = await newUser('ana');
+        const current = (await h.users.findProfileById(id))!;
+        await h.users.updateProfile({ ...current, displayName: 'Ana Luiza', bio: 'nova', avatarUrl: 'https://x.com/b.png', isPrivate: true });
+        const after = (await h.users.findProfileById(id))!;
+        assert.equal(after.displayName, 'Ana Luiza');
+        assert.equal(after.bio, 'nova');
+        assert.equal(after.avatarUrl, 'https://x.com/b.png');
+        assert.equal(after.isPrivate, true);
+        assert.equal(after.username, 'ana');
+
+        await h.users.updateProfile({ ...after, bio: null, avatarUrl: null });
+        const cleared = (await h.users.findProfileById(id))!;
+        assert.equal(cleared.bio, null);
+        assert.equal(cleared.avatarUrl, null);
+      });
+
+      it('findProfilesByIds mantém a ordem pedida, ignora ausentes e suspensos', async () => {
+        const a = await newUser('ana');
+        const b = await newUser('bia');
+        const c = await newUser('caio');
+        await h.setUserStatus(b, 'SUSPENDED');
+
+        const found = await h.users.findProfilesByIds([c, randomUUID(), a, b]);
+        assert.deepEqual(found.map((p) => p.username), ['caio', 'ana']);
+        assert.deepEqual(await h.users.findProfilesByIds([]), []);
+      });
+
+      it('busca por prefixo de username ou trecho do nome, sem diferenciar maiúsculas', async () => {
+        const eu = await newUser('eumesmo', { displayName: 'Eu Mesmo' });
+        await newUser('maria', { displayName: 'Maria Souza' });
+        await newUser('mariana', { displayName: 'Mariana' });
+        await newUser('joao', { displayName: 'João da MARIA' });
+        await newUser('pedro', { displayName: 'Pedro' });
+        const suspenso = await newUser('mariano', { displayName: 'Mariano' });
+        await h.setUserStatus(suspenso, 'SUSPENDED');
+
+        const found = await h.users.searchProfiles('maria', 10, [eu]);
+        assert.deepEqual(found.map((p) => p.username), ['joao', 'maria', 'mariana']);
+      });
+
+      it('busca respeita excludeIds e o limite', async () => {
+        const a = await newUser('luza');
+        await newUser('luzb');
+        await newUser('luzc');
+        assert.deepEqual((await h.users.searchProfiles('luz', 10, [a])).map((p) => p.username), ['luzb', 'luzc']);
+        assert.deepEqual((await h.users.searchProfiles('luz', 2, [])).map((p) => p.username), ['luza', 'luzb']);
+        assert.deepEqual(await h.users.searchProfiles('zzz', 10, []), []);
+      });
+    });
+
+    // ---------- Seguimentos ----------
+
+    describe('seguimentos', () => {
+      it('salva, lê e atualiza o status preservando a data de criação', async () => {
+        const a = await newUser('ana');
+        const b = await newUser('bia');
+        await h.follows.save({ followerId: a, followeeId: b, status: 'PENDING', createdAt: at(10) });
+        const first = (await h.follows.get(a, b))!;
+        assert.equal(first.status, 'PENDING');
+        assert.equal(first.createdAt.getTime(), at(10).getTime());
+
+        await h.follows.save({ followerId: a, followeeId: b, status: 'ACCEPTED', createdAt: at(99) });
+        const second = (await h.follows.get(a, b))!;
+        assert.equal(second.status, 'ACCEPTED');
+        assert.equal(second.createdAt.getTime(), at(10).getTime(), 'createdAt original preservado');
+
+        assert.equal(await h.follows.get(b, a), undefined, 'o sentido importa');
+      });
+
+      it('delete informa se removeu; deleteBetween remove os dois sentidos', async () => {
+        const a = await newUser('ana');
+        const b = await newUser('bia');
+        const c = await newUser('caio');
+        await h.follows.save({ followerId: a, followeeId: b, status: 'ACCEPTED', createdAt: at(1) });
+        await h.follows.save({ followerId: b, followeeId: a, status: 'PENDING', createdAt: at(2) });
+        await h.follows.save({ followerId: c, followeeId: a, status: 'ACCEPTED', createdAt: at(3) });
+
+        assert.equal(await h.follows.delete(a, b), true);
+        assert.equal(await h.follows.delete(a, b), false);
+
+        await h.follows.save({ followerId: a, followeeId: b, status: 'ACCEPTED', createdAt: at(4) });
+        await h.follows.deleteBetween(a, b);
+        assert.equal(await h.follows.get(a, b), undefined);
+        assert.equal(await h.follows.get(b, a), undefined);
+        assert.ok(await h.follows.get(c, a), 'terceiros intactos');
+      });
+
+      it('lista seguidores e seguindo por status, mais recentes primeiro, com paginação e contagem', async () => {
+        const alvo = await newUser('alvo');
+        const f1 = await newUser('fa');
+        const f2 = await newUser('fb');
+        const f3 = await newUser('fc');
+        const pend = await newUser('fd');
+        await h.follows.save({ followerId: f1, followeeId: alvo, status: 'ACCEPTED', createdAt: at(1) });
+        await h.follows.save({ followerId: f2, followeeId: alvo, status: 'ACCEPTED', createdAt: at(2) });
+        await h.follows.save({ followerId: f3, followeeId: alvo, status: 'ACCEPTED', createdAt: at(3) });
+        await h.follows.save({ followerId: pend, followeeId: alvo, status: 'PENDING', createdAt: at(4) });
+        await h.follows.save({ followerId: alvo, followeeId: f1, status: 'ACCEPTED', createdAt: at(5) });
+
+        const all = await h.follows.list(alvo, 'followers', 'ACCEPTED', { limit: 10, offset: 0 });
+        assert.deepEqual(all.map((f) => f.followerId), [f3, f2, f1]);
+        const page = await h.follows.list(alvo, 'followers', 'ACCEPTED', { limit: 2, offset: 1 });
+        assert.deepEqual(page.map((f) => f.followerId), [f2, f1]);
+        assert.deepEqual(
+          (await h.follows.list(alvo, 'followers', 'PENDING', { limit: 10, offset: 0 })).map((f) => f.followerId),
+          [pend],
+        );
+        assert.deepEqual(
+          (await h.follows.list(alvo, 'following', 'ACCEPTED', { limit: 10, offset: 0 })).map((f) => f.followeeId),
+          [f1],
+        );
+
+        assert.equal(await h.follows.count(alvo, 'followers', 'ACCEPTED'), 3);
+        assert.equal(await h.follows.count(alvo, 'followers', 'PENDING'), 1);
+        assert.equal(await h.follows.count(alvo, 'following', 'ACCEPTED'), 1);
+        assert.equal(await h.follows.count(f1, 'followers', 'ACCEPTED'), 1);
+      });
+
+      it('acceptAllPending aceita só as pendentes recebidas pelo usuário e informa quantas', async () => {
+        const dona = await newUser('dona');
+        const outra = await newUser('outra');
+        const x = await newUser('xx1');
+        const y = await newUser('yy1');
+        await h.follows.save({ followerId: x, followeeId: dona, status: 'PENDING', createdAt: at(1) });
+        await h.follows.save({ followerId: y, followeeId: dona, status: 'PENDING', createdAt: at(2) });
+        await h.follows.save({ followerId: x, followeeId: outra, status: 'PENDING', createdAt: at(3) });
+
+        assert.equal(await h.follows.acceptAllPending(dona), 2);
+        assert.equal((await h.follows.get(x, dona))!.status, 'ACCEPTED');
+        assert.equal((await h.follows.get(x, outra))!.status, 'PENDING', 'pendência de outra conta não muda');
+        assert.equal(await h.follows.acceptAllPending(dona), 0);
+      });
+
+      it('listFriendIds: só seguimento mútuo aceito, sem bloqueio em nenhum sentido', async () => {
+        const eu = await newUser('eumesmo');
+        const amigo = await newUser('amigo');
+        const sentido = await newUser('sentido'); // só eu sigo
+        const pendente = await newUser('pendente'); // mútuo, mas um lado pendente
+        const bloqueado = await newUser('bloqueado'); // mútuo, mas bloqueado
+        const bloqueador = await newUser('bloqueador'); // mútuo, mas me bloqueou
+
+        const mutual = async (other: string, ab: 'ACCEPTED' | 'PENDING' = 'ACCEPTED', ba: 'ACCEPTED' | 'PENDING' = 'ACCEPTED') => {
+          await h.follows.save({ followerId: eu, followeeId: other, status: ab, createdAt: at(1) });
+          await h.follows.save({ followerId: other, followeeId: eu, status: ba, createdAt: at(2) });
+        };
+        await mutual(amigo);
+        await h.follows.save({ followerId: eu, followeeId: sentido, status: 'ACCEPTED', createdAt: at(1) });
+        await mutual(pendente, 'ACCEPTED', 'PENDING');
+        await mutual(bloqueado);
+        await mutual(bloqueador);
+        await h.blocks.add(eu, bloqueado, at(3));
+        await h.blocks.add(bloqueador, eu, at(3));
+
+        assert.deepEqual(await h.follows.listFriendIds(eu), [amigo]);
+        assert.deepEqual(await h.follows.listFriendIds(amigo), [eu], 'vale nos dois sentidos');
+        assert.deepEqual(await h.follows.listFriendIds(sentido), []);
+        assert.deepEqual(await h.follows.listFriendIds(bloqueado), []);
+      });
+    });
+
+    // ---------- Bloqueios ----------
+
+    describe('bloqueios', () => {
+      it('add é idempotente; exists, existsEitherWay e remove se comportam', async () => {
+        const a = await newUser('ana');
+        const b = await newUser('bia');
+        await h.blocks.add(a, b, at(1));
+        await h.blocks.add(a, b, at(2));
+
+        assert.equal(await h.blocks.exists(a, b), true);
+        assert.equal(await h.blocks.exists(b, a), false);
+        assert.equal(await h.blocks.existsEitherWay(a, b), true);
+        assert.equal(await h.blocks.existsEitherWay(b, a), true);
+
+        assert.equal(await h.blocks.remove(b, a), false);
+        assert.equal(await h.blocks.remove(a, b), true);
+        assert.equal(await h.blocks.remove(a, b), false);
+        assert.equal(await h.blocks.existsEitherWay(a, b), false);
+      });
+
+      it('listBlockedBy e listRelatedIds', async () => {
+        const a = await newUser('ana');
+        const b = await newUser('bia');
+        const c = await newUser('caio');
+        const d = await newUser('dani');
+        await h.blocks.add(a, b, at(1));
+        await h.blocks.add(c, a, at(2));
+        await h.blocks.add(a, c, at(3)); // bloqueio nos dois sentidos com c: c aparece uma vez só
+        await h.blocks.add(d, b, at(4));
+
+        assert.deepEqual((await h.blocks.listBlockedBy(a)).sort(), [b, c].sort());
+        assert.deepEqual((await h.blocks.listRelatedIds(a)).sort(), [b, c].sort());
+        assert.deepEqual(await h.blocks.listBlockedBy(b), []);
+        assert.deepEqual((await h.blocks.listRelatedIds(b)).sort(), [a, d].sort());
+      });
+    });
+
+    // ---------- Cadastros pendentes ----------
+
+    describe('cadastros pendentes', () => {
+      const sample = (email: string, over: Partial<PendingSignup> = {}): PendingSignup => ({
+        email,
+        username: 'ana',
+        displayName: 'Ana',
+        passwordHash: 'hash-senha',
+        codeHash: 'hash-codigo',
+        expiresAt: at(600),
+        attempts: 0,
+        sendCount: 1,
+        lastSentAt: at(0),
+        createdAt: at(0),
+        ...over,
+      });
+
+      it('salva, lê, substitui por e-mail e apaga (idempotente)', async () => {
+        await h.pending.save(sample('ana@exemplo.com'));
+        const first = (await h.pending.find('ana@exemplo.com'))!;
+        assert.deepEqual(first, sample('ana@exemplo.com'));
+
+        await h.pending.save(sample('ana@exemplo.com', { username: 'ana.nova', sendCount: 2, codeHash: 'novo', attempts: 0 }));
+        const second = (await h.pending.find('ana@exemplo.com'))!;
+        assert.equal(second.username, 'ana.nova');
+        assert.equal(second.sendCount, 2);
+        assert.equal(second.codeHash, 'novo');
+
+        assert.equal(await h.pending.find('outra@exemplo.com'), undefined);
+        await h.pending.delete('ana@exemplo.com');
+        await h.pending.delete('ana@exemplo.com');
+        assert.equal(await h.pending.find('ana@exemplo.com'), undefined);
+      });
+
+      it('incrementAttempts soma 1, devolve o total e é atômico', async () => {
+        assert.equal(await h.pending.incrementAttempts('ninguem@exemplo.com'), undefined);
+        await h.pending.save(sample('ana@exemplo.com'));
+        assert.equal(await h.pending.incrementAttempts('ana@exemplo.com'), 1);
+        assert.equal(await h.pending.incrementAttempts('ana@exemplo.com'), 2);
+
+        const results = await Promise.all(
+          Array.from({ length: 10 }, () => h.pending.incrementAttempts('ana@exemplo.com')),
+        );
+        assert.equal((await h.pending.find('ana@exemplo.com'))!.attempts, 12, 'nenhum incremento perdido');
+        assert.equal(new Set(results).size, 10, 'cada chamada recebeu um total diferente');
+      });
+    });
+  });
+}
