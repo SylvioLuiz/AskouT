@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, ExternalPlace, MessageRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MessageRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -134,6 +134,28 @@ export interface PlaceRepository {
     to: Date,
     limit: number,
   ): Promise<{ event: PlaceEventRecord; venue: VenueRecord }[]>;
+  /** Busca de eventos para o Explorar. Sem `center`, não filtra por distância. Mais cedo primeiro, depois mais perto. */
+  searchEvents(query: EventSearchQuery): Promise<{ event: PlaceEventRecord; venue: VenueRecord; distanceM: number | null }[]>;
+  findEvent(id: string): Promise<{ event: PlaceEventRecord; venue: VenueRecord } | undefined>;
+  /** Hashtags de eventos que ainda não acabaram, com a contagem, filtradas pelo começo do texto. */
+  listTags(prefix: string, from: Date, to: Date, limit: number): Promise<{ tag: string; count: number }[]>;
+  /** Locais do AskouT pelo nome (qualquer parte). Sem `center`, não filtra por distância. */
+  searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number): Promise<{ venue: VenueRecord; distanceM: number | null }[]>;
+}
+
+export interface EventSearchQuery {
+  center?: { lat: number; lng: number };
+  radiusM?: number;
+  /** Em andamento ou que começam entre `from` e `to`. */
+  from: Date;
+  to: Date;
+  kind?: EventKind;
+  freeOnly?: boolean;
+  /** Hashtag (sem #): o evento tem alguma hashtag que começa com isto. */
+  tagPrefix?: string;
+  /** Texto: qualquer parte do título, do nome do local ou de uma hashtag. */
+  text?: string;
+  limit: number;
 }
 
 /** Fonte externa de lugares (OpenStreetMap). Nunca lança: se não conseguir, devolve `available: false`. */

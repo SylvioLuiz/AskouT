@@ -735,7 +735,7 @@ export function defineRepositoryContract(
 
     describe('lugares e eventos', () => {
       const venue = (name: string, lat: number, lng: number, isSample = false): VenueRecord => ({ id: randomUUID(), name, address: null, category: 'bar', lat, lng, isSample });
-      const event = (venueId: string, title: string, startS: number, endS: number): PlaceEventRecord => ({ id: randomUUID(), venueId, title, description: null, startsAt: at(startS), endsAt: at(endS), isSample: true });
+      const event = (venueId: string, title: string, startS: number, endS: number): PlaceEventRecord => ({ id: randomUUID(), venueId, title, description: null, kind: 'OTHER', isFree: false, imageUrl: null, tags: [], startsAt: at(startS), endsAt: at(endS), isSample: true });
       const centre = { lat: -23.5505, lng: -46.6333 };
       const H = 3600;
 
@@ -768,6 +768,50 @@ export function defineRepositoryContract(
         await h.places.createEvent(event(v.id, 'terminou', -2 * H, 0));
         await h.places.createEvent(event(v.id, 'comeca-no-fim', 12 * H, 13 * H));
         assert.deepEqual(await h.places.findEventsNear(centre, 1000, at(0), at(12 * H), 10), []);
+      });
+
+      it('searchEvents: tipo, grátis, hashtag, texto sem acento, raio opcional e ordem por horário', async () => {
+        const bar = venue('Bar do Zé', -23.5515, -46.6333);
+        const far = venue('Casa Distante', -23.6505, -46.6333); // ~11 km
+        await h.places.createVenue(bar);
+        await h.places.createVenue(far);
+        const mk = (v: VenueRecord, title: string, startS: number, over: Partial<PlaceEventRecord>) => ({ ...event(v.id, title, startS, startS + 2 * H), ...over });
+        await h.places.createEvent(mk(bar, 'Samba de Raiz', 3 * H, { kind: 'SHOW', isFree: true, tags: ['samba', 'sambarock'] }));
+        await h.places.createEvent(mk(bar, 'Cinema ao Ar Livre', 1 * H, { kind: 'CINEMA', tags: ['filme'] }));
+        await h.places.createEvent(mk(far, 'Exposição Fotográfica', 2 * H, { kind: 'EXHIBITION', isFree: true }));
+        const q = (over: object) => ({ from: at(0), to: at(24 * H), limit: 20, ...over });
+        const titles = async (over: object) => (await h.places.searchEvents(q(over))).map((r) => r.event.title);
+        assert.deepEqual(await titles({}), ['Cinema ao Ar Livre', 'Exposição Fotográfica', 'Samba de Raiz']);
+        assert.deepEqual(await titles({ kind: 'SHOW' }), ['Samba de Raiz']);
+        assert.deepEqual(await titles({ freeOnly: true }), ['Exposição Fotográfica', 'Samba de Raiz']);
+        assert.deepEqual(await titles({ tagPrefix: 'samb' }), ['Samba de Raiz']);
+        assert.deepEqual(await titles({ text: 'exposicao' }), ['Exposição Fotográfica']);
+        assert.deepEqual(await titles({ text: 'ze' }), ['Cinema ao Ar Livre', 'Samba de Raiz']);
+        assert.deepEqual(await titles({ center: centre, radiusM: 3000 }), ['Cinema ao Ar Livre', 'Samba de Raiz']);
+        const withDistance = await h.places.searchEvents(q({ center: centre, radiusM: 50000, limit: 1 }));
+        assert.equal(withDistance.length, 1);
+        assert.ok((withDistance[0]!.distanceM ?? 0) > 100);
+        assert.equal((await h.places.searchEvents(q({}))).every((r) => r.distanceM === null), true);
+        assert.deepEqual(await titles({ from: at(10 * H), to: at(20 * H) }), []);
+        const first = (await h.places.searchEvents(q({ kind: 'SHOW' })))[0]!;
+        assert.deepEqual(first.event.tags, ['samba', 'sambarock']);
+        assert.equal((await h.places.findEvent(first.event.id))?.venue.name, 'Bar do Zé');
+        assert.equal(await h.places.findEvent('nao-existe'), undefined);
+      });
+
+      it('listTags conta por prefixo só de eventos ativos e searchVenues acha por nome', async () => {
+        const a = venue('Bar Alfa', -23.5515, -46.6333);
+        const b = venue('Boteco Beta', -23.7505, -46.6333); // ~22 km
+        await h.places.createVenue(a);
+        await h.places.createVenue(b);
+        await h.places.createEvent({ ...event(a.id, 'x', 1 * H, 2 * H), tags: ['samba', 'rock'] });
+        await h.places.createEvent({ ...event(b.id, 'y', 1 * H, 2 * H), tags: ['samba'] });
+        await h.places.createEvent({ ...event(a.id, 'velho', -9 * H, -8 * H), tags: ['samba'] });
+        assert.deepEqual(await h.places.listTags('sa', at(0), at(24 * H), 10), [{ tag: 'samba', count: 2 }]);
+        assert.deepEqual(await h.places.listTags('', at(0), at(24 * H), 10), [{ tag: 'samba', count: 2 }, { tag: 'rock', count: 1 }]);
+        assert.deepEqual((await h.places.searchVenues('BAR', undefined, 0, 10)).map((r) => r.venue.name), ['Bar Alfa']);
+        assert.deepEqual((await h.places.searchVenues('bot', centre, 5000, 10)).map((r) => r.venue.name), []);
+        assert.deepEqual((await h.places.searchVenues('bot', centre, 30000, 10)).map((r) => r.venue.name), ['Boteco Beta']);
       });
     });
   });

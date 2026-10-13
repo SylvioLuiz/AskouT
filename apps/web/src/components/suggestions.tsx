@@ -18,7 +18,7 @@ function SourceTag({ source }: { source: SuggestionCard['source'] }) {
 }
 
 /** Estrelas e nota do Google. O crédito "Google" é exigido pelos termos de uso do serviço. */
-function Rating({ rating, count }: { rating: number; count: number | null }) {
+export function Rating({ rating, count }: { rating: number; count: number | null }) {
   return (
     <p className="rating" aria-label={ratingLabel(rating, count)}>
       <span className="stars" aria-hidden="true" style={{ ['--fill' as string]: `${starPercent(rating)}%` }}>
@@ -33,7 +33,7 @@ function Rating({ rating, count }: { rating: number; count: number | null }) {
 }
 
 /** Foto do lugar, buscada pelo servidor. Se falhar, o cartão segue sem foto. */
-function PlacePhoto({ path, author }: { path: string; author: string | null }) {
+export function PlacePhoto({ path, author }: { path: string; author: string | null }) {
   const [failed, setFailed] = useState(false);
   if (failed) return null;
   return (

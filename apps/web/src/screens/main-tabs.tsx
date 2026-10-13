@@ -1,11 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
 import { BoltIcon } from '../components/icons.tsx';
 import { Avatar, EmptyState, ErrorState, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
-import { useAsync, useDebounced, useTitle } from '../hooks.ts';
+import { useAsync, useTitle } from '../hooks.ts';
 import { formatRemaining, minutesLeft } from '../lib/flash.ts';
-import { pluralize } from '../lib/format.ts';
 import { Link } from '../router.tsx';
 
 export function HomeScreen() {
@@ -77,70 +75,6 @@ export function HomeScreen() {
           Encontros marcados pela agenda e as conversas ainda não estão no app. Quando chegarem, aparecem aqui.
         </p>
       </section>
-    </>
-  );
-}
-
-export function ExploreScreen() {
-  useTitle('Explorar');
-  const [query, setQuery] = useState('');
-  const debounced = useDebounced(query.trim(), 300);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [touched, setTouched] = useState(false);
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  const results = useAsync(
-    () => (debounced.length >= 2 ? api.searchProfiles(debounced, 20) : Promise.resolve([])),
-    [debounced],
-  );
-  const searching = debounced.length >= 2;
-
-  return (
-    <>
-      <PageHead title="Explorar" />
-      <div className="search">
-        <label className="visually-hidden" htmlFor="busca">
-          Buscar pessoas
-        </label>
-        <input
-          id="busca"
-          ref={inputRef}
-          className="search__input"
-          type="search"
-          placeholder="Buscar por nome ou @usuário"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setTouched(true);
-          }}
-          autoComplete="off"
-          spellCheck={false}
-        />
-      </div>
-
-      {!searching ? (
-        <p className="muted">{touched && query.trim().length > 0 ? 'Digite ao menos 2 letras.' : 'Digite um nome ou @usuário para encontrar pessoas.'}</p>
-      ) : null}
-      {searching && results.loading ? <Loading label="Buscando" /> : null}
-      {searching && results.error ? <ErrorState message={results.error.message} onRetry={results.reload} /> : null}
-      {searching && !results.loading && results.data && results.data.length === 0 ? (
-        <EmptyState title="Ninguém encontrado">Confira se escreveu certo. A busca olha o começo do @usuário e qualquer parte do nome.</EmptyState>
-      ) : null}
-      {searching && !results.loading && results.data && results.data.length > 0 ? (
-        <>
-          <p className="muted" aria-live="polite">
-            {pluralize(results.data.length, 'perfil encontrado', 'perfis encontrados')}
-          </p>
-          <ul className="list">
-            {results.data.map((profile) => (
-              <PersonRow key={profile.userId} profile={profile} />
-            ))}
-          </ul>
-        </>
-      ) : null}
     </>
   );
 }

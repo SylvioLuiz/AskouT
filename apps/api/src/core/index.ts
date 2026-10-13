@@ -4,21 +4,24 @@ import { BlockService } from './block-service.ts';
 import { FlashService } from './flash-service.ts';
 import { ConversationService } from './conversation-service.ts';
 import { FollowService } from './follow-service.ts';
+import { ExploreService } from './explore-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
 import type { CoreDeps } from './ports.ts';
 import { ProfileService } from './profile-service.ts';
 
 export function createCore(deps: CoreDeps) {
   const flash = new FlashService(deps);
+  const profiles = new ProfileService(deps);
   return {
     auth: new AuthService(deps),
-    profiles: new ProfileService(deps),
+    profiles,
     follows: new FollowService(deps),
     blocks: new BlockService(deps),
     availability: new AvailabilityService(deps),
     flash,
     conversations: new ConversationService(deps),
     suggestions: new SuggestionService(deps, flash),
+    explore: new ExploreService(deps, profiles),
   };
 }
 
@@ -75,6 +78,8 @@ export { ConversationService, MESSAGE_MAX, MESSAGES_PER_MINUTE, parseSuggestion 
 export type { ConversationListItem, ConversationView, MessageView } from './conversation-service.ts';
 export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_APART_M } from './suggestion-service.ts';
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
+export { ExploreService, EXPLORE_DEFAULT_RADIUS_KM, EXPLORE_MAX_RADIUS_KM } from './explore-service.ts';
+export type { ExploreEventItem, ExplorePlaceItem, ExploreView } from './explore-service.ts';
 export { distanceMeters, midpoint, boundingBox } from './geo.ts';
 export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';

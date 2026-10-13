@@ -17,6 +17,9 @@ import type {
   Slot,
   SlotInput,
   ConnectionsPage,
+  ExploreEvent,
+  ExploreParams,
+  ExploreResult,
   PageRequest,
   Profile,
   ProfilePatch,
@@ -163,6 +166,25 @@ export function createApi(deps: ApiDeps) {
       request<{ ok: true }>('PUT', `/flash/matches/${id(inviteId)}/location`, { body: position }),
 
     flashSuggestions: (inviteId: string) => request<Suggestions>('GET', `/flash/matches/${id(inviteId)}/suggestions`),
+
+    // Explorar
+    explore: (params: ExploreParams) => {
+      const query = new URLSearchParams();
+      if (params.q) query.set('q', params.q);
+      if (params.lat !== undefined && params.lng !== undefined) {
+        query.set('lat', String(params.lat));
+        query.set('lng', String(params.lng));
+      }
+      if (params.radiusKm !== undefined) query.set('radiusKm', String(params.radiusKm));
+      if (params.from) query.set('from', params.from);
+      if (params.to) query.set('to', params.to);
+      if (params.kind) query.set('kind', params.kind);
+      if (params.free) query.set('free', 'true');
+      const text = query.toString();
+      return request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
+    },
+    exploreEvent: (eventId: string, position?: { lat: number; lng: number }) =>
+      request<ExploreEvent>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
 
     // Conversas
     conversations: () => request<{ items: ConversationItem[] }>('GET', '/conversations'),

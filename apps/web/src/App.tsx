@@ -10,7 +10,8 @@ import { ActivityScreen } from './screens/activity.tsx';
 import { LoginScreen, SignupScreen } from './screens/auth.tsx';
 import { ChatScreen, ConversationsScreen } from './screens/conversations.tsx';
 import { FlashScreen, MatchScreen } from './screens/flash.tsx';
-import { ExploreScreen, HomeScreen } from './screens/main-tabs.tsx';
+import { EventScreen, ExploreScreen } from './screens/explore.tsx';
+import { HomeScreen } from './screens/main-tabs.tsx';
 import { BlockedScreen, FriendsScreen, MyProfileScreen } from './screens/me.tsx';
 import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
 
@@ -24,6 +25,7 @@ const GUEST_ROUTES: RouteDef[] = [
 const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/', render: () => <HomeScreen /> },
   { path: '/explorar', render: () => <ExploreScreen /> },
+  { path: '/eventos/:id', render: (p) => <EventScreen key={p['id']} eventId={p['id'] ?? ''} /> },
   { path: '/conversas', render: () => <ConversationsScreen /> },
   { path: '/conversas/:id', render: (p) => <ChatScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/agenda', render: () => <AgendaScreen /> },

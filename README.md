@@ -115,6 +115,8 @@ Sem token: `POST /auth/signup`, `POST /auth/signup/resend`, `POST /auth/signup/c
 | `GET/POST /conversations` | minhas conversas (com não lidas) / abrir a conversa com um amigo (`{userId}`) |
 | `POST /conversations/:id/messages/:messageId/respond` · `GET /places/photo` | aceitar/recusar o lugar (`{action}`) / foto do lugar (endereço assinado) |
 | `GET/POST /conversations/:id/messages` · `POST /conversations/:id/read` | mensagens (`limit`, `before`) / enviar `{body}` ou `{suggestion}` / marcar como lida |
+| `GET /explore?q=&lat=&lng=&radiusKm=&from=&to=&kind=&free=` | Explorar: sem `q`, eventos perto; com `q`, eventos, locais, pessoas e `#`. `kind`: DIGITAL, SHOW, CINEMA, THEATER, EXHIBITION, GASTRONOMY, NIGHT, OTHER |
+| `GET /events/:id?lat=&lng=` | um evento (com distância se enviar a posição) |
 | `GET /flash/matches/:id` · `PUT /flash/matches/:id/location` | encontro aceito: posição dos dois / enviar a minha (`{lat, lng, accuracyM?}`) |
 
 Erros: `{ "error": { "code", "message", "details?" } }` com status 400/401/403/404/409/429 (429 envia `Retry-After`). Erro inesperado vira 500 genérico, sem vazar detalhes.
@@ -129,6 +131,15 @@ Erros: `{ "error": { "code", "message", "details?" } }` com status 400/401/403/4
 - **Eventos de exemplo:** ainda não existe cadastro real de eventos (painel do local). Para testar, `cd apps/api && npm run seed:places -- --lat <sua latitude> --lng <sua longitude>` cria 6 lugares com eventos marcados como **[TESTE]** e com o selo "Exemplo de teste" no app. `npm run seed:places -- --here` centraliza nas posições que o Flash acabou de receber (sem digitar coordenadas; compartilhe a localização num encontro antes); `npm run seed:places -- --clear` apaga todos. Nada disso é apresentado como real.
 - **OpenStreetMap (Overpass):** consulta ao servidor público `overpass-api.de` com cache de 10 min e coordenada arredondada (~110 m); se não responder, o app mostra só os eventos do AskouT e avisa. O servidor público serve para desenvolvimento: em produção é preciso instância própria ou provedor contratado. Defina `OSM_CONTACT` (e-mail ou site) no `.env` da API para identificar o app, como a política do serviço pede. Crédito "© colaboradores do OpenStreetMap" aparece no carrossel.
 - Passos na sua máquina: `git pull`, `npm run update` (aplica a migração `20261014120000_conversations_places` e as restrições `003_*.sql` nos dois bancos e roda os testes, inclusive os de contrato no Postgres), `npm run seed:places`, `npm run dev:all -- --https`, `npm run smoke`.
+
+## Explorar
+
+Ao abrir o Explorar o app pede a sua localização e já mostra, em mosaico de duas colunas, os eventos perto (padrão: hoje, 10 km). Quem quiser usa os filtros (Quando: hoje, amanhã, esta semana, fim de semana, próxima semana, este mês, próximos 30 dias; Tipo de evento; Grátis; Raio de 1 a 50 km) ou a barra de busca. Com texto, o resultado vem em abas **Tudo / Eventos / Locais / Pessoas / #**: eventos (título, local ou hashtag), locais do AskouT por nome, lugares de fora (Google ou OpenStreetMap, só com a localização liberada e sem filtro de tipo/grátis, até 10 km), pessoas (mesmas regras da busca de perfis: sem você e sem bloqueios) e hashtags. `#samba` busca só hashtags e os eventos com ela. Tocar num cartão abre o evento (`/eventos/:id`: quando, onde, distância, descrição, hashtags, rota).
+
+- A localização vale só para a consulta e **não é guardada** (nem no banco, nem no aparelho). Sem permissão, os eventos aparecem sem distância.
+- Evento tem tipo, "grátis", imagem (só `https`, enviada por quem criar o evento; nunca copiada do Google) e hashtags. Sem imagem, o cartão usa um degradê pelo tipo.
+- Dados de exemplo continuam com o selo "Exemplo de teste". `npm run seed:places -- --here` agora cria 10 eventos de tipos, preços, hashtags e datas variados (hoje até daqui a 6 dias).
+- Passos na sua máquina: `git pull`, `npm run update` (aplica a migração `20261014180000_explore_events` e `005_explore_constraints.sql`), `cd apps/api && npm run seed:places -- --here`, `cd ../.. && npm run dev:all -- --https`.
 
 ## App web (`apps/web`)
 
@@ -196,6 +207,7 @@ Os testes foram checados também quebrando as regras de propósito (por exemplo,
 - Não há ainda limite de tentativas de login, recuperação de senha nem troca de e-mail. **O envio real de e-mail não existe**: o núcleo usa uma interface (`EmailSender`); falta escolher o provedor (decisão sua, tem custo).
 - **Flash:** a posição só é enviada com a tela do encontro aberta (navegador não envia em segundo plano; o app nativo resolve isso depois). Convites e posições são atualizados por consulta a cada 8–10 s, não por conexão em tempo real. Não há aviso quando alguém te convida fora do app.
 - **Conversas:** as mensagens chegam por consulta a cada 5 s (não em tempo real), sem aviso fora do app, sem anexos, sem editar/apagar, sem marcar "digitando". Mensagens ficam guardadas em texto puro no banco (sem criptografia de ponta a ponta); denúncia e moderação ainda não existem.
+- **Explorar:** ainda não existe cadastro real de eventos (virá com o painel do local); até lá só aparecem os de exemplo e os lugares do Google/OpenStreetMap. Hashtags existem só em eventos (não há posts). A busca olha até 500 eventos pré-filtrados por período/raio/tipo; a ordem é por horário. Sem ordenação escolhida pelo usuário e sem paginação.
 - `total` nas listas de seguidores pode incluir pessoas ocultas por bloqueio de terceiros.
 
 ## Próximos passos

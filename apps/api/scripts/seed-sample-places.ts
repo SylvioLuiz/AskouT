@@ -39,13 +39,18 @@ if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math
 // Deslocamentos em metros a partir do centro, para os exemplos ficarem perto de quem testa.
 const M_LAT = 1 / 111_320;
 const M_LNG = 1 / (111_320 * Math.cos((lat * Math.PI) / 180));
+const DAY = 1440;
 const SAMPLES = [
-  { name: 'Bar Exemplo Um', category: 'bar', dx: 200, dy: 150, title: 'Música ao vivo', startsInMin: 30, hours: 3 },
-  { name: 'Café Exemplo Dois', category: 'cafe', dx: -400, dy: 300, title: 'Degustação de cafés', startsInMin: -20, hours: 2 },
-  { name: 'Pub Exemplo Três', category: 'pub', dx: 900, dy: -500, title: 'Quiz de bar', startsInMin: 120, hours: 2 },
-  { name: 'Restaurante Exemplo Quatro', category: 'restaurant', dx: -1200, dy: -300, title: 'Feijoada de sábado', startsInMin: 60, hours: 4 },
-  { name: 'Praça Exemplo Cinco', category: 'park', dx: 1800, dy: 1200, title: 'Feira de artesanato', startsInMin: 240, hours: 5 },
-  { name: 'Bar Exemplo Seis', category: 'bar', dx: -2400, dy: 1500, title: 'Noite de jogos de tabuleiro', startsInMin: 300, hours: 3 },
+  { name: 'Bar Exemplo Um', category: 'bar', dx: 200, dy: 150, title: 'Música ao vivo', startsInMin: 30, hours: 3, kind: 'SHOW', free: true, tags: ['musica', 'aovivo'] },
+  { name: 'Café Exemplo Dois', category: 'cafe', dx: -400, dy: 300, title: 'Degustação de cafés', startsInMin: -20, hours: 2, kind: 'GASTRONOMY', free: false, tags: ['cafe', 'degustacao'] },
+  { name: 'Pub Exemplo Três', category: 'pub', dx: 900, dy: -500, title: 'Quiz de bar', startsInMin: 120, hours: 2, kind: 'NIGHT', free: true, tags: ['quiz', 'amigos'] },
+  { name: 'Restaurante Exemplo Quatro', category: 'restaurant', dx: -1200, dy: -300, title: 'Feijoada de sábado', startsInMin: 60, hours: 4, kind: 'GASTRONOMY', free: false, tags: ['feijoada', 'samba'] },
+  { name: 'Praça Exemplo Cinco', category: 'park', dx: 1800, dy: 1200, title: 'Feira de artesanato', startsInMin: 240, hours: 5, kind: 'EXHIBITION', free: true, tags: ['artesanato'] },
+  { name: 'Bar Exemplo Seis', category: 'bar', dx: -2400, dy: 1500, title: 'Noite de jogos de tabuleiro', startsInMin: 300, hours: 3, kind: 'NIGHT', free: false, tags: ['jogos', 'amigos'] },
+  { name: 'Cine Exemplo Sete', category: 'cinema', dx: 600, dy: 900, title: 'Sessão de clássicos', startsInMin: DAY + 120, hours: 3, kind: 'CINEMA', free: false, tags: ['cinema', 'classicos'] },
+  { name: 'Teatro Exemplo Oito', category: 'theatre', dx: -800, dy: -1500, title: 'Peça de comédia', startsInMin: 2 * DAY + 60, hours: 2, kind: 'THEATER', free: false, tags: ['teatro', 'comedia'] },
+  { name: 'Casa de Shows Exemplo Nove', category: 'nightclub', dx: 3000, dy: -2000, title: 'Show de rock', startsInMin: 4 * DAY, hours: 4, kind: 'SHOW', free: false, tags: ['rock', 'musica'] },
+  { name: 'Galeria Exemplo Dez', category: 'gallery', dx: 1500, dy: 2500, title: 'Exposição de fotografia', startsInMin: 6 * DAY, hours: 6, kind: 'EXHIBITION', free: true, tags: ['fotografia', 'arte'] },
 ];
 
 const prisma = new PrismaClient({ datasourceUrl: databaseUrl() });
@@ -78,6 +83,9 @@ try {
           description: 'Evento de exemplo criado para testar o AskouT. Não é real.',
           startsAt,
           endsAt: new Date(startsAt.getTime() + s.hours * 3_600_000),
+          kind: s.kind as 'SHOW',
+          isFree: s.free,
+          tags: s.tags,
           isSample: true,
         },
       });

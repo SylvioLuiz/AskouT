@@ -78,6 +78,17 @@ enum ConversationType {
   GROUP
 }
 
+enum EventKind {
+  DIGITAL
+  SHOW
+  CINEMA
+  THEATER
+  EXHIBITION
+  GASTRONOMY
+  NIGHT
+  OTHER
+}
+
 enum SuggestionResponse {
   ACCEPTED
   DECLINED
@@ -429,6 +440,12 @@ model PlaceEvent {
   description String?
   startsAt    DateTime
   endsAt      DateTime
+  kind        EventKind @default(OTHER)
+  isFree      Boolean   @default(false)
+  /// Endereço https de uma imagem fornecida por quem criou o evento (nunca copiada do Google).
+  imageUrl    String?
+  /// Hashtags em minúsculas, sem "#" e sem acento.
+  tags        String[]  @default([])
   isSample    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -437,4 +454,5 @@ model PlaceEvent {
 
   @@index([startsAt])
   @@index([venueId])
+  @@index([kind])
 }

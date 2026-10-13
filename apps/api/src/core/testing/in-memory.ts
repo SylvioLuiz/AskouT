@@ -13,7 +13,9 @@ import type {
   IdGenerator,
   PendingSignupRepository,
   UserRepository,
+  EventSearchQuery,
 } from '../ports.ts';
+import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
 import type { ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
@@ -530,7 +532,7 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   }
 
   async createEvent(event: PlaceEventRecord): Promise<void> {
-    this.events.set(event.id, { ...event });
+    this.events.set(event.id, { ...event, tags: [...event.tags] });
   }
 
   async findEventsNear(center: { lat: number; lng: number }, radiusM: number, from: Date, to: Date, limit: number) {
@@ -545,6 +547,37 @@ export class InMemoryPlaceRepository implements PlaceRepository {
     }
     rows.sort((a, b) => a.d - b.d || a.event.startsAt.getTime() - b.event.startsAt.getTime() || (a.event.id < b.event.id ? -1 : 1));
     return rows.slice(0, limit).map(({ event, venue }) => ({ event, venue }));
+  }
+
+  async searchEvents(query: EventSearchQuery) {
+    const out: EventMatch[] = [];
+    for (const event of this.events.values()) {
+      const venue = this.venues.get(event.venueId);
+      if (!venue) continue;
+      const m = matchEvent(event, venue, query);
+      if (m) out.push(m);
+    }
+    return out.sort(compareMatches).slice(0, query.limit);
+  }
+
+  async findEvent(id: string) {
+    const event = this.events.get(id);
+    const venue = event ? this.venues.get(event.venueId) : undefined;
+    return event && venue ? { event: { ...event, tags: [...event.tags] }, venue: { ...venue } } : undefined;
+  }
+
+  async listTags(prefix: string, from: Date, to: Date, limit: number) {
+    const live = [...this.events.values()].filter((e) => e.endsAt > from && e.startsAt < to);
+    return countTags(live, prefix, limit);
+  }
+
+  async searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number) {
+    const out: { venue: VenueRecord; distanceM: number | null }[] = [];
+    for (const venue of this.venues.values()) {
+      const m = matchVenue(venue, text, center, radiusM);
+      if (m) out.push(m);
+    }
+    return out.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0) || (a.venue.id < b.venue.id ? -1 : 1)).slice(0, limit);
   }
 }
 

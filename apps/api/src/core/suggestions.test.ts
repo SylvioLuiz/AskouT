@@ -28,7 +28,7 @@ async function share(w: Awaited<ReturnType<typeof matched>>['w'], who: string, i
 async function venueWithEvent(w: Awaited<ReturnType<typeof matched>>['w'], name: string, lat: number, lng: number, startsInH: number, sample = true) {
   const venueId = `v-${name}`;
   await w.places.createVenue({ id: venueId, name, address: null, category: 'bar', lat, lng, isSample: sample });
-  await w.places.createEvent({ id: `e-${name}`, venueId, title: `Evento ${name}`, description: null, startsAt: new Date(w.clock.now().getTime() + startsInH * H), endsAt: new Date(w.clock.now().getTime() + (startsInH + 2) * H), isSample: sample });
+  await w.places.createEvent({ id: `e-${name}`, venueId, title: `Evento ${name}`, description: null, kind: 'OTHER', isFree: false, imageUrl: null, tags: [], startsAt: new Date(w.clock.now().getTime() + startsInH * H), endsAt: new Date(w.clock.now().getTime() + (startsInH + 2) * H), isSample: sample });
 }
 
 test('aceitar o convite cria a conversa dos dois e o encontro aponta para ela', async () => {

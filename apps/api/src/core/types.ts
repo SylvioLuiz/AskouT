@@ -195,6 +195,9 @@ export interface VenueRecord {
   isSample: boolean;
 }
 
+export type EventKind = 'DIGITAL' | 'SHOW' | 'CINEMA' | 'THEATER' | 'EXHIBITION' | 'GASTRONOMY' | 'NIGHT' | 'OTHER';
+export const EVENT_KINDS: readonly EventKind[] = ['DIGITAL', 'SHOW', 'CINEMA', 'THEATER', 'EXHIBITION', 'GASTRONOMY', 'NIGHT', 'OTHER'];
+
 export interface PlaceEventRecord {
   id: string;
   venueId: string;
@@ -202,6 +205,12 @@ export interface PlaceEventRecord {
   description: string | null;
   startsAt: Date;
   endsAt: Date;
+  kind: EventKind;
+  isFree: boolean;
+  /** Imagem https de quem criou o evento. */
+  imageUrl: string | null;
+  /** Hashtags em minúsculas, sem "#" e sem acento. */
+  tags: string[];
   isSample: boolean;
 }
 

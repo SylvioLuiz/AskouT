@@ -259,6 +259,17 @@ try {
   check('id inválido: 400', (await call('GET', '/conversations/xyz/messages', { token: a.token })).status === 400);
   check('sem login: 401', (await call('GET', '/conversations')).status === 401);
 
+  console.log('\nExplorar');
+  const ex = await call('GET', '/explore?lat=-23.55&lng=-46.63&radiusKm=10', { token: a.token });
+  check('explorar sem texto devolve eventos perto', ex.status === 200 && ex.body.mode === 'NEARBY' && Array.isArray(ex.body.events) && ex.body.located === true, ex.body);
+  const exq = await call('GET', '/explore?q=%23samba', { token: a.token });
+  check('busca por # responde', exq.status === 200 && exq.body.mode === 'TAG' && Array.isArray(exq.body.tags), exq.body);
+  check('busca por texto traz pessoas, locais e eventos', (await call('GET', '/explore?q=ana', { token: a.token })).body.people !== undefined);
+  check('raio inválido: 400', (await call('GET', '/explore?radiusKm=999', { token: a.token })).status === 400);
+  check('tipo inválido: 400', (await call('GET', '/explore?kind=FESTA', { token: a.token })).status === 400);
+  check('evento inexistente: 404', (await call('GET', '/events/nao-existe', { token: a.token })).status === 404);
+  check('explorar sem login: 401', (await call('GET', '/explore')).status === 401);
+
   console.log('\nBloqueio');
   const block = await call('POST', `/users/${b.id}/block`, { token: a.token });
   check('bloquear', block.status === 200, block.body);

@@ -252,3 +252,65 @@ export interface Suggestions {
   placesAvailable: boolean;
   items: SuggestionItem[];
 }
+
+// ---------- Explorar ----------
+
+export type EventKind = 'DIGITAL' | 'SHOW' | 'CINEMA' | 'THEATER' | 'EXHIBITION' | 'GASTRONOMY' | 'NIGHT' | 'OTHER';
+
+export interface ExploreEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  startsAt: string;
+  endsAt: string;
+  kind: EventKind;
+  isFree: boolean;
+  imageUrl: string | null;
+  tags: string[];
+  /** Dado de exemplo para teste, nunca um evento real. */
+  sample: boolean;
+  venue: { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number };
+  distanceM: number | null;
+}
+
+export interface ExplorePlace {
+  key: string;
+  source: 'ASKOUT' | 'GOOGLE' | 'OSM';
+  name: string;
+  category: string | null;
+  address: string | null;
+  lat: number;
+  lng: number;
+  sample: boolean;
+  distanceM: number | null;
+  rating: number | null;
+  ratingCount: number | null;
+  photoPath: string | null;
+  photoAuthor: string | null;
+  mapsUri: string | null;
+}
+
+export interface ExploreResult {
+  mode: 'NEARBY' | 'TAG' | 'SEARCH';
+  q: string;
+  located: boolean;
+  radiusKm: number;
+  from: string;
+  to: string;
+  events: ExploreEvent[];
+  places: ExplorePlace[];
+  people: PublicProfile[];
+  tags: { tag: string; count: number }[];
+  placesAvailable: boolean;
+}
+
+export interface ExploreParams {
+  q?: string;
+  lat?: number;
+  lng?: number;
+  radiusKm?: number;
+  from?: string;
+  to?: string;
+  kind?: EventKind;
+  free?: boolean;
+}
