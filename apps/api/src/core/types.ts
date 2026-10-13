@@ -139,6 +139,7 @@ export interface FlashPositionRecord {
 // ---------- Conversas ----------
 
 export type MessageKind = 'TEXT' | 'SUGGESTION';
+export type SuggestionResponse = 'ACCEPTED' | 'DECLINED';
 
 /** Conversa 1 a 1 entre amigos. `directKey` = "<menor id>:<maior id>", único por dupla. */
 export interface ConversationRecord {
@@ -149,7 +150,7 @@ export interface ConversationRecord {
 
 /** Cartão de sugestão enviado numa conversa. Não carrega nada sobre onde as pessoas estão. */
 export interface SuggestionCard {
-  source: 'EVENT' | 'OSM';
+  source: 'EVENT' | 'OSM' | 'GOOGLE';
   title: string;
   venueName: string;
   lat: number;
@@ -169,6 +170,9 @@ export interface MessageRecord {
   kind: MessageKind;
   body: string;
   suggestion: SuggestionCard | null;
+  /** Resposta de quem recebeu o cartão; nula enquanto não respondeu e sempre nula em texto. */
+  response: SuggestionResponse | null;
+  respondedAt: Date | null;
   createdAt: Date;
 }
 
@@ -201,11 +205,21 @@ export interface PlaceEventRecord {
   isSample: boolean;
 }
 
-/** Lugar vindo de uma fonte externa (OpenStreetMap). */
+/** Lugar vindo de uma fonte externa (Google Places ou OpenStreetMap). Dados do Google só vivem na memória, nunca no banco. */
 export interface ExternalPlace {
   externalId: string;
+  source: 'GOOGLE' | 'OSM';
   name: string;
   category: string | null;
   lat: number;
   lng: number;
+  /** Nota de 0 a 5 e número de avaliações (só Google). */
+  rating?: number | null;
+  ratingCount?: number | null;
+  /** Referência opaca da foto na fonte; a imagem é buscada pelo servidor, a chave nunca vai ao app. */
+  photoRef?: string | null;
+  /** Quem tirou a foto, para o crédito exigido pelo Google. */
+  photoAuthor?: string | null;
+  /** Endereço da página do lugar na fonte. */
+  mapsUri?: string | null;
 }

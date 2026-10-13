@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { ConversationRepository } from '../../core/ports.ts';
-import type { ConversationRecord, ConversationSummaryRecord, MessageRecord, SuggestionCard } from '../../core/types.ts';
+import type { ConversationRecord, ConversationSummaryRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
 import { isUuid, uniqueViolationTargets } from './helpers.ts';
 
 type MessageRow = {
@@ -10,6 +10,8 @@ type MessageRow = {
   kind: 'TEXT' | 'SUGGESTION';
   body: string;
   suggestion: unknown;
+  response: 'ACCEPTED' | 'DECLINED' | null;
+  respondedAt: Date | null;
   createdAt: Date;
 };
 
@@ -20,6 +22,8 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   kind: r.kind,
   body: r.body,
   suggestion: r.suggestion === null || r.suggestion === undefined ? null : (r.suggestion as SuggestionCard),
+  response: r.response,
+  respondedAt: r.respondedAt,
   createdAt: r.createdAt,
 });
 
@@ -117,6 +121,19 @@ export class PrismaConversationRepository implements ConversationRepository {
         createdAt: m.createdAt,
       },
     });
+  }
+
+  async findMessage(id: string): Promise<MessageRecord | undefined> {
+    if (!isUuid(id)) return undefined;
+    const row = await this.prisma.message.findUnique({ where: { id } });
+    return row ? toMessage(row as MessageRow) : undefined;
+  }
+
+  async setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean> {
+    if (!isUuid(messageId)) return false;
+    // Só grava se ainda não houver resposta: duas respostas ao mesmo tempo não se sobrescrevem.
+    const result = await this.prisma.message.updateMany({ where: { id: messageId, kind: 'SUGGESTION', response: null }, data: { response, respondedAt: at } });
+    return result.count > 0;
   }
 
   async listMessages(conversationId: string, limit: number, before?: Date): Promise<MessageRecord[]> {

@@ -1,5 +1,6 @@
-import { forbidden, notFound, rateLimited, validationError } from './errors.ts';
+import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
+import { distanceMeters } from './geo.ts';
 import type { ConversationRecord, MessageRecord, PublicProfile, SuggestionCard } from './types.ts';
 import { toPublicProfile } from './types.ts';
 
@@ -19,6 +20,14 @@ export interface MessageView {
   kind: 'TEXT' | 'SUGGESTION';
   body: string;
   suggestion: SuggestionCard | null;
+  /** Resposta de quem recebeu o cartão: aceitou ou recusou o lugar. */
+  response: 'ACCEPTED' | 'DECLINED' | null;
+  respondedAt: string | null;
+  /**
+   * Distância em linha reta do lugar até cada um, enquanto o encontro Flash está ativo e os dois compartilham
+   * a localização. Calculada na hora e nunca guardada: quando o encontro acaba, some.
+   */
+  distances: { meM: number; themM: number } | null;
   createdAt: string;
 }
 
@@ -47,7 +56,7 @@ export interface SendInput {
   suggestion?: unknown;
 }
 
-function toMessageView(m: MessageRecord, actorId: string): MessageView {
+function toMessageView(m: MessageRecord, actorId: string, distances: MessageView['distances'] = null): MessageView {
   return {
     id: m.id,
     senderId: m.senderId,
@@ -55,6 +64,9 @@ function toMessageView(m: MessageRecord, actorId: string): MessageView {
     kind: m.kind,
     body: m.body,
     suggestion: m.suggestion,
+    response: m.response,
+    respondedAt: m.respondedAt ? m.respondedAt.toISOString() : null,
+    distances: m.suggestion ? distances : null,
     createdAt: m.createdAt.toISOString(),
   };
 }
@@ -89,7 +101,7 @@ function isoOrNull(value: unknown, field: string): string | null {
 export function parseSuggestion(value: unknown): SuggestionCard {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw validationError('Sugestão inválida', { suggestion: 'Sugestão inválida' });
   const v = value as Record<string, unknown>;
-  if (v.source !== 'EVENT' && v.source !== 'OSM') throw validationError('Sugestão inválida', { suggestion: 'Campo source inválido' });
+  if (v.source !== 'EVENT' && v.source !== 'OSM' && v.source !== 'GOOGLE') throw validationError('Sugestão inválida', { suggestion: 'Campo source inválido' });
   const lat = v.lat;
   const lng = v.lng;
   if (typeof lat !== 'number' || !Number.isFinite(lat) || lat < -90 || lat > 90 || typeof lng !== 'number' || !Number.isFinite(lng) || lng < -180 || lng > 180) {
@@ -177,12 +189,13 @@ export class ConversationService {
     const items = hasMore ? page.slice(page.length - limit) : page;
     if (before === undefined) await conversations.markRead(conversationId, actorId, now);
     const friends = await this.deps.follows.listFriendIds(actorId);
+    const positions = items.some((m) => m.suggestion) ? await this.livePositions(actorId, otherId, now) : null;
     return {
       id: conversationId,
       other: toPublicProfile(other),
       canSend: friends.includes(otherId),
       now: now.toISOString(),
-      messages: items.map((m) => toMessageView(m, actorId)),
+      messages: items.map((m) => toMessageView(m, actorId, m.suggestion ? this.distancesOf(m.suggestion, positions) : null)),
       hasMore,
     };
   }
@@ -212,16 +225,54 @@ export class ConversationService {
     const recent = await conversations.countSentSince(actorId, new Date(now.getTime() - 60_000));
     if (recent >= MESSAGES_PER_MINUTE) throw rateLimited('Você está enviando mensagens rápido demais. Espere um instante.', 30);
 
-    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, createdAt: now };
+    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, createdAt: now };
     await conversations.addMessage(message);
     await conversations.markRead(conversationId, actorId, now);
-    return toMessageView(message, actorId);
+    const positions = suggestion ? await this.livePositions(actorId, otherId, now) : null;
+    return toMessageView(message, actorId, suggestion ? this.distancesOf(suggestion, positions) : null);
+  }
+
+  /** Quem recebeu o cartão aceita ou recusa o lugar. Só uma resposta, só do destinatário, só entre amigos. */
+  async respond(actorId: string, conversationId: string, messageId: string, action: unknown): Promise<MessageView> {
+    if (action !== 'accept' && action !== 'decline') throw validationError('Ação inválida', { action: 'Use accept ou decline' });
+    const { conversations, follows, clock } = this.deps;
+    const { otherId } = await this.access(actorId, conversationId);
+    const message = typeof messageId === 'string' && messageId.length <= 64 ? await conversations.findMessage(messageId) : undefined;
+    if (!message || message.conversationId !== conversationId || message.kind !== 'SUGGESTION') throw notFound('Sugestão não encontrada');
+    if (message.senderId === actorId) throw forbidden('Quem sugeriu não responde à própria sugestão');
+    const friends = await follows.listFriendIds(actorId);
+    if (!friends.includes(otherId)) throw forbidden('Vocês não são mais amigos.');
+    const now = clock.now();
+    const response = action === 'accept' ? 'ACCEPTED' : 'DECLINED';
+    const saved = await conversations.setSuggestionResponse(messageId, response, now);
+    if (!saved) throw conflict('Essa sugestão já foi respondida');
+    const updated = { ...message, response, respondedAt: now } satisfies MessageRecord;
+    const positions = await this.livePositions(actorId, otherId, now);
+    return toMessageView(updated, actorId, updated.suggestion ? this.distancesOf(updated.suggestion, positions) : null);
   }
 
   async markRead(actorId: string, conversationId: string): Promise<{ ok: true }> {
     await this.access(actorId, conversationId);
     await this.deps.conversations.markRead(conversationId, actorId, this.deps.clock.now());
     return { ok: true };
+  }
+
+  /** Posições das duas pessoas num encontro Flash ativo entre elas, ou null. Nunca sai daqui: só serve para as distâncias. */
+  private async livePositions(actorId: string, otherId: string, now: Date): Promise<{ me: { lat: number; lng: number }; them: { lat: number; lng: number } } | null> {
+    const { flash } = this.deps;
+    const open = await flash.listOpenInvitesFor(actorId, now);
+    const match = open.find((i) => i.status === 'ACCEPTED' && (i.fromUserId === otherId || i.toUserId === otherId));
+    if (!match) return null;
+    const positions = await flash.listPositions(match.id);
+    const me = positions.find((p) => p.userId === actorId);
+    const them = positions.find((p) => p.userId === otherId);
+    return me && them ? { me: { lat: me.lat, lng: me.lng }, them: { lat: them.lat, lng: them.lng } } : null;
+  }
+
+  private distancesOf(card: SuggestionCard, positions: { me: { lat: number; lng: number }; them: { lat: number; lng: number } } | null): MessageView['distances'] {
+    if (!positions) return null;
+    const at = { lat: card.lat, lng: card.lng };
+    return { meM: Math.round(distanceMeters(at, positions.me)), themM: Math.round(distanceMeters(at, positions.them)) };
   }
 
   private parseLimit(value: unknown): number {

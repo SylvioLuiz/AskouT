@@ -629,6 +629,8 @@ export function defineRepositoryContract(
         kind: extra.suggestion ? 'SUGGESTION' : 'TEXT',
         body,
         suggestion: extra.suggestion ?? null,
+        response: null,
+        respondedAt: null,
         createdAt: at(whenS),
       });
       const card: SuggestionCard = { source: 'EVENT', title: 'Jazz', venueName: 'Bar do Zé', lat: -23.55, lng: -46.63, startsAt: '2026-10-13T20:00:00.000Z', endsAt: null, sample: true, externalId: 'event:1' };
@@ -695,6 +697,27 @@ export function defineRepositoryContract(
         await h.conversations.addMessage(msg(c1.id, bia, 'd', 21));
         assert.equal((await h.conversations.listForUser(ana))[0]!.unread, 1);
         assert.deepEqual(await h.conversations.listForUser(randomUUID()), []);
+      });
+
+      it('findMessage e setSuggestionResponse: grava uma resposta só, e só em cartão', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const c = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        const card1 = msg(c.id, ana, 'Jazz — Bar do Zé', 1, { suggestion: card });
+        const text = msg(c.id, ana, 'oi', 2);
+        await h.conversations.addMessage(card1);
+        await h.conversations.addMessage(text);
+        assert.deepEqual(await h.conversations.findMessage(card1.id), card1);
+        assert.equal(await h.conversations.findMessage(randomUUID()), undefined);
+        assert.equal(await h.conversations.findMessage('nao-e-uuid'), undefined);
+        assert.equal(await h.conversations.setSuggestionResponse(text.id, 'ACCEPTED', at(5)), false, 'texto não tem resposta');
+        assert.equal(await h.conversations.setSuggestionResponse(randomUUID(), 'ACCEPTED', at(5)), false);
+        assert.equal(await h.conversations.setSuggestionResponse(card1.id, 'ACCEPTED', at(5)), true);
+        assert.equal(await h.conversations.setSuggestionResponse(card1.id, 'DECLINED', at(6)), false, 'a primeira resposta vale');
+        const saved = (await h.conversations.findMessage(card1.id))!;
+        assert.equal(saved.response, 'ACCEPTED');
+        assert.deepEqual(saved.respondedAt, at(5));
+        assert.equal((await h.conversations.findMessage(text.id))!.response, null);
       });
 
       it('countSentSince conta só as mensagens do remetente dentro da janela', async () => {

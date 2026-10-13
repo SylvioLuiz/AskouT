@@ -41,6 +41,13 @@ export class ConversationsController {
     return this.core.conversations.send(actor.userId, id, { body: b.body, suggestion: b.suggestion });
   }
 
+  /** Quem recebeu o cartão aceita ou recusa o lugar (`{action: 'accept' | 'decline'}`). */
+  @Post(':id/messages/:messageId/respond')
+  @HttpCode(200)
+  respond(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Param('messageId', new ParseUUIDPipe()) messageId: string, @Body() body: unknown) {
+    return this.core.conversations.respond(actor.userId, id, messageId, asBody(body).action);
+  }
+
   @Post(':id/read')
   @HttpCode(200)
   read(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {

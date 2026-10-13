@@ -12,16 +12,33 @@ import {
   PrismaPendingSignupRepository,
   PrismaUserRepository,
 } from '../infra/prisma/index.ts';
+import { GooglePlaceSource } from '../infra/google/google-place-source.ts';
+import { FallbackPlaceSource } from '../infra/places/fallback-place-source.ts';
 import { OverpassPlaceSource } from '../infra/overpass/overpass-place-source.ts';
 import { ConsoleEmailSender } from './console-email-sender.ts';
 import type { AppConfig } from './support/config.ts';
-import { CONFIG, CORE, PRISMA } from './tokens.ts';
+import { PhotoSigner } from './support/photo-signing.ts';
+import { CONFIG, CORE, PLACE_PHOTOS, PRISMA } from './tokens.ts';
+
+/** Fonte do Google, só se houver chave. Compartilhada entre a busca de lugares e o proxy de fotos. */
+export const googleProvider = {
+  provide: 'GOOGLE_SOURCE',
+  inject: [CONFIG],
+  useFactory: (config: AppConfig) =>
+    config.googlePlacesKey ? new GooglePlaceSource({ apiKey: config.googlePlacesKey, dailyLimit: config.googleDailyLimit }) : undefined,
+};
+
+export const placePhotosProvider = {
+  provide: PLACE_PHOTOS,
+  inject: [CONFIG, 'GOOGLE_SOURCE'],
+  useFactory: (config: AppConfig, google: GooglePlaceSource | undefined) => ({ google, signer: new PhotoSigner(config.codeSecret) }),
+};
 
 /** Monta o núcleo com os adaptadores reais (Postgres via Prisma, scrypt, JWT, relógio e UUID do sistema). */
 export const coreProvider = {
   provide: CORE,
-  inject: [CONFIG, PRISMA],
-  useFactory: (config: AppConfig, prisma: PrismaClient) =>
+  inject: [CONFIG, PRISMA, 'GOOGLE_SOURCE'],
+  useFactory: (config: AppConfig, prisma: PrismaClient, google: GooglePlaceSource | undefined) =>
     createCore({
       users: new PrismaUserRepository(prisma),
       follows: new PrismaFollowRepository(prisma),
@@ -30,7 +47,7 @@ export const coreProvider = {
       flash: new PrismaFlashRepository(prisma),
       conversations: new PrismaConversationRepository(prisma),
       places: new PrismaPlaceRepository(prisma),
-      placeSource: new OverpassPlaceSource({ contact: config.osmContact }),
+      placeSource: google ? new FallbackPlaceSource(google, new OverpassPlaceSource({ contact: config.osmContact })) : new OverpassPlaceSource({ contact: config.osmContact }),
       pending: new PrismaPendingSignupRepository(prisma),
       mailer: new ConsoleEmailSender(),
       codes: new HmacOneTimeCodes({ secret: config.codeSecret }),

@@ -139,3 +139,71 @@ test('send: limite de mensagens por minuto; passada a janela, libera', async () 
   w.clock.tick(61_000);
   await w.core.conversations.send(ana, id, { body: 'liberou' });
 });
+
+// ---------- Aceitar o lugar e distâncias ----------
+
+async function sentCard() {
+  const f = await friends();
+  const sent = await f.w.core.conversations.send(f.ana, f.id, { suggestion: card });
+  return { ...f, messageId: sent.id };
+}
+
+test('respond: só o destinatário responde, uma vez, e o resultado aparece para os dois', async () => {
+  const { w, ana, bia, id, messageId } = await sentCard();
+  await rejectsWith(w.core.conversations.respond(ana, id, messageId, 'accept'), 'FORBIDDEN');
+  await rejectsWith(w.core.conversations.respond(bia, id, messageId, 'talvez'), 'VALIDATION');
+  await rejectsWith(w.core.conversations.respond(bia, id, 'nao-existe', 'accept'), 'NOT_FOUND');
+  const done = await w.core.conversations.respond(bia, id, messageId, 'accept');
+  assert.equal(done.response, 'ACCEPTED');
+  assert.ok(done.respondedAt);
+  await rejectsWith(w.core.conversations.respond(bia, id, messageId, 'decline'), 'CONFLICT');
+  for (const who of [ana, bia]) {
+    const view = await w.core.conversations.messages(who, id);
+    assert.equal(view.messages[0]!.response, 'ACCEPTED');
+  }
+  const list = await w.core.conversations.list(ana);
+  assert.equal(list[0]!.lastMessage!.response, 'ACCEPTED');
+});
+
+test('respond: mensagem de texto não é sugestão, estranhos não respondem, ex-amigos não respondem', async () => {
+  const { w, ana, bia, caio, id } = await sentCard();
+  const text = await w.core.conversations.send(ana, id, { body: 'oi' });
+  await rejectsWith(w.core.conversations.respond(bia, id, text.id, 'accept'), 'NOT_FOUND');
+  const card2 = await w.core.conversations.send(ana, id, { suggestion: card });
+  await rejectsWith(w.core.conversations.respond(caio, id, card2.id, 'accept'), 'NOT_FOUND');
+  await w.core.follows.unfollow(bia, ana);
+  await rejectsWith(w.core.conversations.respond(bia, id, card2.id, 'accept'), 'FORBIDDEN');
+});
+
+test('distâncias do cartão: só com encontro Flash ativo e os dois compartilhando; somem quando acaba', async () => {
+  const w = makeWorld();
+  const { ana, bia } = await w.signUpMany('ana', 'bia');
+  await befriend(w, ana!, bia!);
+  await w.core.flash.turnOn(ana!, { hours: 2 });
+  await w.core.flash.turnOn(bia!, { hours: 2 });
+  const invite = await w.core.flash.invite(ana!, bia!);
+  const { conversationId } = await w.core.flash.respond(bia!, invite.id, 'accept');
+  const id = conversationId!;
+  await w.core.conversations.send(ana!, id, { suggestion: card });
+
+  const before = await w.core.conversations.messages(bia!, id);
+  assert.equal(before.messages[0]!.distances, null, 'sem localização não há distância');
+
+  await w.core.flash.shareLocation(ana!, invite.id, { lat: -23.55, lng: -46.63 }); // em cima do lugar
+  await w.core.flash.shareLocation(bia!, invite.id, { lat: -23.56, lng: -46.63 }); // ~1,1 km ao sul
+  const during = await w.core.conversations.messages(bia!, id);
+  const d = during.messages[0]!.distances!;
+  assert.ok(d.themM < 10, `Ana está no lugar: ${d.themM}`);
+  assert.ok(d.meM > 1000 && d.meM < 1200, `Bia está a ~1,1 km: ${d.meM}`);
+  const forAna = (await w.core.conversations.messages(ana!, id)).messages[0]!.distances!;
+  assert.equal(forAna.meM, d.themM, 'cada um vê a própria distância como "me"');
+  assert.equal(forAna.themM, d.meM);
+
+  const text = await w.core.conversations.send(ana!, id, { body: 'oi' });
+  assert.equal(text.distances, null, 'texto não tem distância');
+
+  await w.core.flash.end(ana!, invite.id);
+  const after = await w.core.conversations.messages(bia!, id);
+  assert.equal(after.messages[0]!.distances, null, 'encontro acabou: a distância some, nada ficou guardado');
+  assert.equal(JSON.stringify(after).includes('-23.56'), false);
+});

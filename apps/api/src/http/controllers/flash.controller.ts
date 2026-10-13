@@ -1,16 +1,19 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put } from '@nestjs/common';
+import type { PlacePhotos } from './places.controller.ts';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
 import { asBody } from '../support/parse.ts';
-import { CORE } from '../tokens.ts';
+import { CORE, PLACE_PHOTOS } from '../tokens.ts';
 
 @Controller()
 export class FlashController {
   private readonly core: Core;
+  private readonly photos: PlacePhotos;
 
-  constructor(@Inject(CORE) core: Core) {
+  constructor(@Inject(CORE) core: Core, @Inject(PLACE_PHOTOS) photos: PlacePhotos) {
     this.core = core;
+    this.photos = photos;
   }
 
   @Get('me/flash')
@@ -63,8 +66,13 @@ export class FlashController {
   }
 
   @Get('flash/matches/:inviteId/suggestions')
-  suggestions(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string) {
-    return this.core.suggestions.forMatch(actor.userId, inviteId);
+  async suggestions(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string) {
+    const view = await this.core.suggestions.forMatch(actor.userId, inviteId);
+    // A referência da foto não sai da API: o app recebe um endereço assinado e com validade.
+    return {
+      ...view,
+      items: view.items.map(({ photoRef, ...item }) => ({ ...item, photoPath: photoRef && this.photos.google ? this.photos.signer.path(photoRef) : null })),
+    };
   }
 
   @Put('flash/matches/:inviteId/location')

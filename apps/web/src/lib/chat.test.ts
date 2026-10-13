@@ -52,3 +52,22 @@ test('previewOf', () => {
   assert.equal(previewOf(msg('1', 'x', { body: 'oi\n  tudo?', mine: true })), 'Você: oi tudo?');
   assert.equal(previewOf(msg('2', 'x', { kind: 'SUGGESTION', suggestion: toCard(item) })), 'Sugeriu Bar');
 });
+
+import { formatRating, ratingLabel, routeLink, sourceLabel, starPercent } from './chat.ts';
+
+test('nota do Google: texto, rótulo acessível e estrelas em meias unidades', () => {
+  assert.equal(formatRating(4.62), '4,6');
+  assert.equal(formatRating(5), '5,0');
+  assert.equal(ratingLabel(4.6, 321), 'Nota 4,6 de 5, 321 avaliações no Google');
+  assert.equal(ratingLabel(4.6, 1), 'Nota 4,6 de 5, 1 avaliação no Google');
+  assert.equal(ratingLabel(4.6, null), 'Nota 4,6 de 5 no Google');
+  assert.equal(starPercent(4.6), 90);
+  assert.equal(starPercent(4.2), 80);
+  assert.equal(starPercent(9), 100);
+  assert.equal(starPercent(-1), 0);
+});
+
+test('rota e fonte', () => {
+  assert.equal(routeLink(-23.5, -46.6), 'https://www.google.com/maps/dir/?api=1&destination=-23.5,-46.6&travelmode=walking');
+  assert.equal(sourceLabel('GOOGLE'), 'Lugar do Google');
+});

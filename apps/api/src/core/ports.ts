@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, ExternalPlace, MessageRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, ExternalPlace, MessageRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -109,6 +109,9 @@ export interface ConversationRepository {
   /** Conversas do usuário, da mais recente para a mais antiga (por última mensagem, depois criação). */
   listForUser(userId: string): Promise<ConversationSummaryRecord[]>;
   addMessage(message: MessageRecord): Promise<void>;
+  findMessage(id: string): Promise<MessageRecord | undefined>;
+  /** Grava a resposta ao cartão só se ainda não houver uma. Devolve false se já tinha. */
+  setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean>;
   /** Mensagens em ordem cronológica. `before` pagina para trás (só as anteriores a esse instante). */
   listMessages(conversationId: string, limit: number, before?: Date): Promise<MessageRecord[]>;
   /** Marca como lida até `now` para `userId`. */

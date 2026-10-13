@@ -177,6 +177,10 @@ export function createApi(deps: ApiDeps) {
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { body } }),
     sendSuggestion: (conversationId: string, suggestion: SuggestionCard) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { suggestion } }),
+    respondSuggestion: (conversationId: string, messageId: string, action: 'accept' | 'decline') =>
+      request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages/${id(messageId)}/respond`, { body: { action } }),
+    /** Endereço completo de um recurso da API (a foto do lugar), a partir do caminho que ela devolveu. */
+    assetUrl: (path: string) => `${deps.baseUrl}${path}`,
     markRead: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/read`),
 
     // Bloqueios

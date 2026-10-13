@@ -10,6 +10,10 @@ export interface AppConfig {
   emailTransport: 'console';
   /** Contato (e-mail ou site) enviado no User-Agent ao consultar o OpenStreetMap. Opcional em desenvolvimento. */
   osmContact: string | undefined;
+  /** Chave do Google Places. Sem ela, a fonte Google fica desligada e o app usa só OpenStreetMap. */
+  googlePlacesKey: string | undefined;
+  /** Teto de buscas ao Google por dia, para não estourar o crédito gratuito sem perceber. */
+  googleDailyLimit: number;
 }
 
 const MIN_SECRET = 32;
@@ -57,9 +61,14 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     .filter((o) => o.length > 0);
   if (corsOrigins.some((o) => o === '*')) problems.push('CORS_ORIGINS não aceita "*"; liste as origens');
 
+  const googleDailyLimit = Number(env.GOOGLE_DAILY_LIMIT ?? '500');
+  if (!Number.isInteger(googleDailyLimit) || googleDailyLimit < 1 || googleDailyLimit > 100_000) {
+    problems.push('GOOGLE_DAILY_LIMIT deve ser um inteiro entre 1 e 100000');
+  }
+
   if (problems.length > 0) {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit };
 }

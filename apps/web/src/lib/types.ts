@@ -178,7 +178,7 @@ export interface FlashMatch {
 
 /** Cartão de sugestão de lugar ou evento, enviado numa conversa. Nunca traz a posição de ninguém. */
 export interface SuggestionCard {
-  source: 'EVENT' | 'OSM';
+  source: 'EVENT' | 'OSM' | 'GOOGLE';
   title: string;
   venueName: string;
   lat: number;
@@ -197,6 +197,11 @@ export interface ChatMessage {
   kind: 'TEXT' | 'SUGGESTION';
   body: string;
   suggestion: SuggestionCard | null;
+  /** Resposta de quem recebeu o cartão. */
+  response: 'ACCEPTED' | 'DECLINED' | null;
+  respondedAt: string | null;
+  /** Distância em linha reta do lugar até cada um, só durante o encontro Flash. */
+  distances: { meM: number; themM: number } | null;
   createdAt: string;
 }
 
@@ -220,7 +225,7 @@ export interface ChatView {
 
 export interface SuggestionItem {
   key: string;
-  source: 'EVENT' | 'OSM';
+  source: 'EVENT' | 'OSM' | 'GOOGLE';
   title: string;
   venueName: string;
   category: string | null;
@@ -229,6 +234,13 @@ export interface SuggestionItem {
   sample: boolean;
   lat: number;
   lng: number;
+  /** Nota e avaliações do Google (só quando a fonte é o Google). */
+  rating: number | null;
+  ratingCount: number | null;
+  /** Caminho assinado da foto, relativo à API. */
+  photoPath: string | null;
+  photoAuthor: string | null;
+  mapsUri: string | null;
   distanceFromMeM: number;
   distanceFromThemM: number;
   distanceFromMidM: number;
@@ -237,6 +249,6 @@ export interface SuggestionItem {
 export interface Suggestions {
   reason: 'TOO_FAR' | null;
   radiusM: number;
-  osmAvailable: boolean;
+  placesAvailable: boolean;
   items: SuggestionItem[];
 }

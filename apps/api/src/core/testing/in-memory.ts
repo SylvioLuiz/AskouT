@@ -15,7 +15,7 @@ import type {
   UserRepository,
 } from '../ports.ts';
 import { distanceMeters } from '../geo.ts';
-import type { ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -491,6 +491,19 @@ export class InMemoryConversationRepository implements ConversationRepository {
 
   async addMessage(message: MessageRecord): Promise<void> {
     this.messages.push({ ...message });
+  }
+
+  async findMessage(id: string): Promise<MessageRecord | undefined> {
+    const m = this.messages.find((x) => x.id === id);
+    return m ? { ...m } : undefined;
+  }
+
+  async setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean> {
+    const m = this.messages.find((x) => x.id === messageId);
+    if (!m || m.kind !== 'SUGGESTION' || m.response !== null) return false;
+    m.response = response;
+    m.respondedAt = at;
+    return true;
   }
 
   async listMessages(conversationId: string, limit: number, before?: Date): Promise<MessageRecord[]> {

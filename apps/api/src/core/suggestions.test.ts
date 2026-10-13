@@ -69,7 +69,7 @@ test('eventos do AskouT vêm primeiro, perto do ponto médio; fora do raio e da 
   assert.ok(first!.distanceFromMidM < 3000);
   assert.equal(first!.distanceFromMeM, Math.round(distanceMeters({ lat: first!.lat, lng: first!.lng }, ANA)));
   assert.equal(first!.distanceFromThemM, Math.round(distanceMeters({ lat: first!.lat, lng: first!.lng }, BIA)));
-  assert.equal(view.osmAvailable, true);
+  assert.equal(view.placesAvailable, true);
 });
 
 test('completa com OpenStreetMap, sem duplicar nomes e identificando a origem', async () => {
@@ -79,10 +79,10 @@ test('completa com OpenStreetMap, sem duplicar nomes e identificando a origem', 
   const mid = { lat: (ANA.lat + BIA.lat) / 2, lng: (ANA.lng + BIA.lng) / 2 };
   await venueWithEvent(w, 'Bar do Zé', mid.lat, mid.lng, 1);
   w.placeSource.places = [
-    { externalId: 'node/1', name: 'Bar do Zé', category: 'bar', lat: mid.lat, lng: mid.lng },
-    { externalId: 'node/2', name: 'Café Longe', category: 'cafe', lat: mid.lat + 0.05, lng: mid.lng },
-    { externalId: 'node/3', name: 'Café Perto', category: 'cafe', lat: mid.lat + 0.002, lng: mid.lng },
-    { externalId: 'node/4', name: 'Pub Médio', category: 'pub', lat: mid.lat + 0.01, lng: mid.lng },
+    { source: 'OSM' as const, externalId: 'node/1', name: 'Bar do Zé', category: 'bar', lat: mid.lat, lng: mid.lng },
+    { source: 'OSM' as const, externalId: 'node/2', name: 'Café Longe', category: 'cafe', lat: mid.lat + 0.05, lng: mid.lng },
+    { source: 'OSM' as const, externalId: 'node/3', name: 'Café Perto', category: 'cafe', lat: mid.lat + 0.002, lng: mid.lng },
+    { source: 'OSM' as const, externalId: 'node/4', name: 'Pub Médio', category: 'pub', lat: mid.lat + 0.01, lng: mid.lng },
   ];
   const view = await w.core.suggestions.forMatch(ana, inviteId);
   assert.deepEqual(view.items.map((i) => `${i.source}:${i.venueName}`), ['EVENT:Bar do Zé', 'OSM:Café Perto', 'OSM:Pub Médio']);
@@ -98,7 +98,7 @@ test('se o OpenStreetMap não responde, devolve só os eventos e avisa', async (
   await share(w, bia, inviteId, BIA);
   w.placeSource.available = false;
   const view = await w.core.suggestions.forMatch(ana, inviteId);
-  assert.equal(view.osmAvailable, false);
+  assert.equal(view.placesAvailable, false);
   assert.deepEqual(view.items, []);
 });
 

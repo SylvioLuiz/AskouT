@@ -53,7 +53,29 @@ export function formatDistances(item: Pick<SuggestionItem, 'distanceFromMeM' | '
 }
 
 export function sourceLabel(source: SuggestionCard['source']): string {
-  return source === 'EVENT' ? 'Evento no AskouT' : 'Lugar do OpenStreetMap';
+  return source === 'EVENT' ? 'Evento no AskouT' : source === 'GOOGLE' ? 'Lugar do Google' : 'Lugar do OpenStreetMap';
+}
+
+/** 4.62 -> "4,6" */
+export function formatRating(rating: number): string {
+  return rating.toFixed(1).replace('.', ',');
+}
+
+/** "Nota 4,6 de 5, 321 avaliações no Google" */
+export function ratingLabel(rating: number, count: number | null): string {
+  const base = `Nota ${formatRating(rating)} de 5`;
+  return count === null ? `${base} no Google` : `${base}, ${count} ${count === 1 ? 'avaliação' : 'avaliações'} no Google`;
+}
+
+/** Percentual de estrelas cheias (0–100), arredondado para meia estrela. */
+export function starPercent(rating: number): number {
+  const clamped = Math.min(5, Math.max(0, rating));
+  return (Math.round(clamped * 2) / 10) * 100;
+}
+
+/** Rota a pé até o lugar, aberta no app de mapas a partir de onde a pessoa estiver. */
+export function routeLink(lat: number, lng: number): string {
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
 }
 
 /** O cartão que vai na mensagem: só os campos que o servidor aceita. */

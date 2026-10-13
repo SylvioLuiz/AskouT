@@ -16,7 +16,7 @@ export const SUGGESTION_MIN_EVENTS = 6;
 export interface SuggestionItem {
   /** Identificador estável do cartão. */
   key: string;
-  source: 'EVENT' | 'OSM';
+  source: 'EVENT' | 'OSM' | 'GOOGLE';
   title: string;
   venueName: string;
   category: string | null;
@@ -26,6 +26,14 @@ export interface SuggestionItem {
   sample: boolean;
   lat: number;
   lng: number;
+  /** Nota e avaliações do Google, só quando a fonte é o Google. Vivem só na resposta, nunca no banco. */
+  rating: number | null;
+  ratingCount: number | null;
+  /** Referência da foto na fonte; a API a transforma em endereço assinado. */
+  photoRef: string | null;
+  photoAuthor: string | null;
+  /** Página do lugar na fonte (Google Maps), quando houver. */
+  mapsUri: string | null;
   /** Distância do lugar até você, até a outra pessoa e até o ponto médio, em metros. */
   distanceFromMeM: number;
   distanceFromThemM: number;
@@ -36,8 +44,8 @@ export interface SuggestionsView {
   /** TOO_FAR: estão distantes demais. NO_LOCATION não existe aqui: falta de posição vira erro 409. */
   reason: 'TOO_FAR' | null;
   radiusM: number;
-  /** false quando a fonte do OpenStreetMap não respondeu (a lista pode ter só eventos do AskouT). */
-  osmAvailable: boolean;
+  /** false quando a fonte externa de lugares (Google ou OpenStreetMap) não respondeu (a lista pode ter só eventos do AskouT). */
+  placesAvailable: boolean;
   items: SuggestionItem[];
 }
 
@@ -62,16 +70,16 @@ export class SuggestionService {
     const theirs = { lat: them.lat, lng: them.lng };
     const mid = midpoint(mine, theirs);
     if (distanceMeters(mine, theirs) > SUGGESTION_MAX_APART_M) {
-      return { reason: 'TOO_FAR', radiusM: SUGGESTION_RADIUS_M, osmAvailable: true, items: [] };
+      return { reason: 'TOO_FAR', radiusM: SUGGESTION_RADIUS_M, placesAvailable: true, items: [] };
     }
 
     const now = clock.now();
     const to = new Date(now.getTime() + SUGGESTION_WINDOW_HOURS * 3_600_000);
     const found = await places.findEventsNear(mid, SUGGESTION_RADIUS_M, now, to, SUGGESTION_MAX_ITEMS);
 
-    const toItem = (item: Omit<SuggestionItem, 'distanceFromMeM' | 'distanceFromThemM' | 'distanceFromMidM'>): SuggestionItem => {
+    const toItem = (item: Omit<SuggestionItem, 'distanceFromMeM' | 'distanceFromThemM' | 'distanceFromMidM' | 'rating' | 'ratingCount' | 'photoRef' | 'photoAuthor' | 'mapsUri'> & Partial<Pick<SuggestionItem, 'rating' | 'ratingCount' | 'photoRef' | 'photoAuthor' | 'mapsUri'>>): SuggestionItem => {
       const at = { lat: item.lat, lng: item.lng };
-      return { ...item, distanceFromMeM: round(distanceMeters(at, mine)), distanceFromThemM: round(distanceMeters(at, theirs)), distanceFromMidM: round(distanceMeters(at, mid)) };
+      return { rating: null, ratingCount: null, photoRef: null, photoAuthor: null, mapsUri: null, ...item, distanceFromMeM: round(distanceMeters(at, mine)), distanceFromThemM: round(distanceMeters(at, theirs)), distanceFromMidM: round(distanceMeters(at, mid)) };
     };
 
     const items: SuggestionItem[] = found.map(({ event, venue }) =>
@@ -89,10 +97,10 @@ export class SuggestionService {
       }),
     );
 
-    let osmAvailable = true;
+    let placesAvailable = true;
     if (items.length < SUGGESTION_MIN_EVENTS) {
       const osm = await placeSource.nearby(mid, SUGGESTION_RADIUS_M, SUGGESTION_MAX_ITEMS * 2);
-      osmAvailable = osm.available;
+      placesAvailable = osm.available;
       const seen = new Set(items.map((i) => i.venueName.trim().toLowerCase()));
       const extra = osm.places
         .filter((p) => !seen.has(p.name.trim().toLowerCase()))
@@ -106,8 +114,8 @@ export class SuggestionService {
         seen.add(name);
         items.push(
           toItem({
-            key: `osm:${p.externalId}`,
-            source: 'OSM',
+            key: `${p.source.toLowerCase()}:${p.externalId}`,
+            source: p.source,
             title: p.name,
             venueName: p.name,
             category: p.category,
@@ -116,10 +124,15 @@ export class SuggestionService {
             sample: false,
             lat: p.lat,
             lng: p.lng,
+            rating: p.rating ?? null,
+            ratingCount: p.ratingCount ?? null,
+            photoRef: p.photoRef ?? null,
+            photoAuthor: p.photoAuthor ?? null,
+            mapsUri: p.mapsUri ?? null,
           }),
         );
       }
     }
-    return { reason: null, radiusM: SUGGESTION_RADIUS_M, osmAvailable, items };
+    return { reason: null, radiusM: SUGGESTION_RADIUS_M, placesAvailable, items };
   }
 }

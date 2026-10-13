@@ -215,7 +215,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             <div key={m.id} className="chat__item">
               {showDay ? <p className="chat__day">{day}</p> : null}
               <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.kind === 'SUGGESTION' ? ' bubble--card' : ''}`}>
-                {m.kind === 'SUGGESTION' && m.suggestion ? <SuggestionBubble card={m.suggestion} nowIso={data.now} /> : <p className="bubble__text">{m.body}</p>}
+                {m.kind === 'SUGGESTION' && m.suggestion ? <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} /> : <p className="bubble__text">{m.body}</p>}
                 <span className="bubble__time">{formatClock(m.createdAt)}</span>
               </div>
             </div>

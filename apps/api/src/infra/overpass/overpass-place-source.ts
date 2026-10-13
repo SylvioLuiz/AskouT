@@ -85,7 +85,7 @@ function parse(elements: OverpassElement[] | undefined): ExternalPlace[] {
     const externalId = `${el.type}/${el.id}`;
     if (seen.has(externalId)) continue;
     seen.add(externalId);
-    out.push({ externalId, name, category: el.tags?.amenity ?? null, lat, lng });
+    out.push({ externalId, source: 'OSM', name, category: el.tags?.amenity ?? null, lat, lng });
   }
   return out;
 }

@@ -242,9 +242,17 @@ try {
   const card = { source: 'OSM', title: 'Café Teste', venueName: 'Café Teste', lat: -23.52, lng: -46.62, startsAt: null, endsAt: null, sample: false, externalId: 'node/1' };
   const sentCard = await call('POST', `/conversations/${convId}/messages`, { token: a.token, body: { suggestion: card } });
   check('enviar sugestão', sentCard.status === 201 && sentCard.body?.kind === 'SUGGESTION', sentCard.body);
+  check('quem sugeriu não responde à própria sugestão (403)', (await call('POST', `/conversations/${convId}/messages/${sentCard.body?.id}/respond`, { token: a.token, body: { action: 'accept' } })).status === 403);
+  const accepted = await call('POST', `/conversations/${convId}/messages/${sentCard.body?.id}/respond`, { token: b.token, body: { action: 'accept' } });
+  check('aceitar o lugar sugerido', accepted.status === 200 && accepted.body?.response === 'ACCEPTED', accepted.body);
+  check('responder duas vezes: 409', (await call('POST', `/conversations/${convId}/messages/${sentCard.body?.id}/respond`, { token: b.token, body: { action: 'decline' } })).status === 409);
+  const withDist = await call('GET', `/conversations/${convId}/messages`, { token: a.token });
+  const cardMsg = withDist.body?.messages?.find((m) => m.kind === 'SUGGESTION');
+  check('cartão traz a distância dos dois enquanto o encontro está ativo', typeof cardMsg?.distances?.meM === 'number' && typeof cardMsg?.distances?.themM === 'number', cardMsg);
   const unreadList = await call('GET', '/conversations', { token: b.token });
   check('não lidas aparecem para quem recebeu', unreadList.body.items.find((i) => i.id === convId)?.unread === 2, unreadList.body);
   const read = await call('GET', `/conversations/${convId}/messages`, { token: b.token });
+  check('a foto do Google exige endereço assinado (404 sem assinatura)', (await call('GET', '/places/photo?ref=places/a/photos/b&exp=1&sig=x')).status === 404);
   check('ler as mensagens em ordem', read.status === 200 && read.body.messages.length === 2 && read.body.messages[1].kind === 'SUGGESTION' && read.body.canSend === true, read.body);
   check('abrir marcou como lida', (await call('GET', '/conversations', { token: b.token })).body.items.find((i) => i.id === convId)?.unread === 0);
   check('quem não participa não lê (404)', (await call('GET', `/conversations/${convId}/messages`, { token: c.token })).status === 404);

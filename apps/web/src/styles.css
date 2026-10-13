@@ -2066,6 +2066,7 @@ button {
 
 .carousel {
   display: flex;
+  align-items: flex-start;
   gap: 10px;
   margin: 0 -16px;
   padding: 4px 16px 8px;
@@ -2167,4 +2168,111 @@ button {
 .tag--sample {
   background: #fff1d6;
   color: #7a4a00;
+}
+
+/* ---------- Nota, foto e rota dos lugares ---------- */
+
+.tag--google {
+  background: #e8f0fe;
+  color: #174ea6;
+}
+
+.rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.stars {
+  position: relative;
+  display: inline-block;
+  font-size: 1.0625rem;
+  letter-spacing: 1px;
+  line-height: 1;
+  color: var(--line-strong);
+  background: linear-gradient(90deg, #f0a30a var(--fill, 0%), var(--line-strong) var(--fill, 0%));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sugcard__photo {
+  position: relative;
+  margin: -14px -14px 6px;
+  height: 120px;
+  overflow: hidden;
+  background: var(--brand-soft);
+  border-radius: calc(var(--radius-panel) - 2px) calc(var(--radius-panel) - 2px) 0 0;
+}
+
+.sugcard__photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sugcard__photo figcaption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  max-width: 100%;
+  padding: 2px 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  color: #fff;
+  background: rgb(27 31 74 / 0.6);
+  border-radius: 8px 0 0 0;
+}
+
+.sugcard__routes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 2px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+}
+
+.sugcard__links {
+  display: flex;
+  gap: 16px;
+}
+
+.sugcard__links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  font-size: 0.9375rem;
+}
+
+.sugcard__answer {
+  margin: 6px 0 0;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.sugcard__answer--yes {
+  color: var(--ok);
+}
+
+.sugcard__answer--no {
+  color: var(--danger);
+}
+
+.sugcard__problem {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--danger);
+}
+
+.bubble--card .sugcard__actions {
+  padding-top: 4px;
 }
