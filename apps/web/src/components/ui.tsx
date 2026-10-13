@@ -175,7 +175,7 @@ export function PersonRow({ profile, aside }: { profile: PublicProfile; aside?: 
 
 // ---------- Estrutura de página ----------
 
-export function PageHead({ title, back, subtitle }: { title: string; back?: string; subtitle?: string }) {
+export function PageHead({ title, back, subtitle, titleTo }: { title: string; back?: string; subtitle?: string; titleTo?: string }) {
   return (
     <header className="pagehead">
       {back ? (
@@ -183,10 +183,17 @@ export function PageHead({ title, back, subtitle }: { title: string; back?: stri
           <ChevronLeftIcon />
         </Link>
       ) : null}
-      <div>
-        <h1 className="pagehead__title">{title}</h1>
-        {subtitle ? <p className="pagehead__subtitle">{subtitle}</p> : null}
-      </div>
+      {titleTo ? (
+        <Link to={titleTo} className="pagehead__link">
+          <h1 className="pagehead__title">{title}</h1>
+          {subtitle ? <p className="pagehead__subtitle">{subtitle}</p> : null}
+        </Link>
+      ) : (
+        <div>
+          <h1 className="pagehead__title">{title}</h1>
+          {subtitle ? <p className="pagehead__subtitle">{subtitle}</p> : null}
+        </div>
+      )}
     </header>
   );
 }
@@ -205,5 +212,15 @@ export function Confirm({ question, confirmLabel, onConfirm, onCancel, busy, dan
         </Button>
       </div>
     </div>
+  );
+}
+
+/** Círculo do grupo: a inicial do nome sobre uma cor fixa (ainda não há foto de grupo). */
+export function GroupAvatar({ name, size = 44 }: { name: string; size?: number }) {
+  const letter = Array.from(name.trim())[0]?.toUpperCase() ?? '#';
+  return (
+    <span className="avatar avatar--group" style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }} aria-hidden="true">
+      {letter}
+    </span>
   );
 }

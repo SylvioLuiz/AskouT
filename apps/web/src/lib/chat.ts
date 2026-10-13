@@ -109,6 +109,8 @@ export function previewOf(m: ChatMessage | null): string {
   if (!m) return 'Nenhuma mensagem ainda';
   const prefix = m.mine ? 'Você: ' : '';
   if (m.kind === 'SUGGESTION' && m.suggestion) return `${prefix}Sugeriu ${m.suggestion.venueName}`;
+  if (m.kind === 'MEETUP') return `${prefix}${m.body}`;
+  if (m.senderName && !m.mine) return `${m.senderName}: ${m.body.replace(/\s+/g, ' ')}`;
   return `${prefix}${m.body.replace(/\s+/g, ' ')}`;
 }
 

@@ -138,13 +138,19 @@ export interface FlashPositionRecord {
 
 // ---------- Conversas ----------
 
-export type MessageKind = 'TEXT' | 'SUGGESTION';
+export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP';
 export type SuggestionResponse = 'ACCEPTED' | 'DECLINED';
 
-/** Conversa 1 a 1 entre amigos. `directKey` = "<menor id>:<maior id>", único por dupla. */
+/**
+ * Conversa 1 a 1 entre amigos (`directKey` = "<menor id>:<maior id>", único por dupla) ou grupo de um encontro
+ * (`name` e `ownerId`; entra quem aceita o convite do encontro).
+ */
 export interface ConversationRecord {
   id: string;
-  directKey: string;
+  type: 'DIRECT' | 'GROUP';
+  directKey: string | null;
+  name: string | null;
+  ownerId: string | null;
   createdAt: Date;
 }
 
@@ -173,12 +179,14 @@ export interface MessageRecord {
   /** Resposta de quem recebeu o cartão; nula enquanto não respondeu e sempre nula em texto. */
   response: SuggestionResponse | null;
   respondedAt: Date | null;
+  /** Cartão de encontro (kind MEETUP). */
+  meetupId: string | null;
   createdAt: Date;
 }
 
 export interface ConversationSummaryRecord {
   conversation: ConversationRecord;
-  participantIds: [string, string];
+  participantIds: string[];
   lastMessage: MessageRecord | null;
   unread: number;
 }
@@ -231,4 +239,28 @@ export interface ExternalPlace {
   photoAuthor?: string | null;
   /** Endereço da página do lugar na fonte. */
   mapsUri?: string | null;
+}
+
+// ---------- Encontros ----------
+
+export type MeetupParticipantStatus = 'INVITED' | 'CONFIRMED' | 'DECLINED';
+
+export interface MeetupParticipantRecord {
+  userId: string;
+  status: MeetupParticipantStatus;
+  respondedAt: Date | null;
+}
+
+/** Encontro marcado a partir de um evento. Quem organiza já entra confirmado; os convidados aceitam ou recusam. */
+export interface MeetupRecord {
+  id: string;
+  organizerId: string;
+  /** Conversa onde o encontro vive: a 1 a 1 (um convidado) ou a do grupo (vários). */
+  conversationId: string;
+  eventId: string | null;
+  title: string;
+  startsAt: Date;
+  endsAt: Date;
+  createdAt: Date;
+  participants: MeetupParticipantRecord[];
 }

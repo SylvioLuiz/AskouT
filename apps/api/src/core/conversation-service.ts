@@ -1,7 +1,9 @@
 import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import { distanceMeters } from './geo.ts';
-import type { ConversationRecord, MessageRecord, PublicProfile, SuggestionCard } from './types.ts';
+import { buildMeetupViews } from './meetup-view.ts';
+import type { MeetupView } from './meetup-view.ts';
+import type { ConversationRecord, MessageKind, MessageRecord, PublicProfile, SuggestionCard } from './types.ts';
 import { toPublicProfile } from './types.ts';
 
 export const MESSAGE_MAX = 2000;
@@ -17,9 +19,13 @@ export interface MessageView {
   id: string;
   senderId: string;
   mine: boolean;
-  kind: 'TEXT' | 'SUGGESTION';
+  /** Nome de quem enviou; só nas conversas de grupo (na 1 a 1 já se sabe quem é). */
+  senderName: string | null;
+  kind: MessageKind;
   body: string;
   suggestion: SuggestionCard | null;
+  /** Cartão do encontro (kind MEETUP), do seu ponto de vista. */
+  meetup: MeetupView | null;
   /** Resposta de quem recebeu o cartão: aceitou ou recusou o lugar. */
   response: 'ACCEPTED' | 'DECLINED' | null;
   respondedAt: string | null;
@@ -33,16 +39,24 @@ export interface MessageView {
 
 export interface ConversationListItem {
   id: string;
-  other: PublicProfile;
+  type: 'DIRECT' | 'GROUP';
+  /** Na conversa 1 a 1, a outra pessoa; no grupo, nulo. */
+  other: PublicProfile | null;
+  /** Nome do grupo; nulo na conversa 1 a 1. */
+  name: string | null;
+  memberCount: number;
   lastMessage: MessageView | null;
   unread: number;
-  /** Só amigos conversam. Se deixaram de ser amigos, o histórico continua legível, mas sem enviar. */
+  /** Na 1 a 1, só amigos conversam: se deixaram de ser, o histórico continua legível, mas sem enviar. */
   canSend: boolean;
 }
 
 export interface ConversationView {
   id: string;
-  other: PublicProfile;
+  type: 'DIRECT' | 'GROUP';
+  other: PublicProfile | null;
+  name: string | null;
+  memberCount: number;
   canSend: boolean;
   /** Relógio do servidor. */
   now: string;
@@ -51,19 +65,38 @@ export interface ConversationView {
   hasMore: boolean;
 }
 
+export interface GroupDetails {
+  id: string;
+  name: string;
+  ownerId: string;
+  members: { profile: PublicProfile; role: 'OWNER' | 'MEMBER' }[];
+  meetups: MeetupView[];
+  /** Fotos e vídeos ainda não existem no AskouT. */
+  mediaAvailable: false;
+}
+
 export interface SendInput {
   body?: unknown;
   suggestion?: unknown;
 }
 
-function toMessageView(m: MessageRecord, actorId: string, distances: MessageView['distances'] = null): MessageView {
+interface ViewExtras {
+  distances?: MessageView['distances'];
+  senderName?: string | null;
+  meetup?: MeetupView | null;
+}
+
+function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {}): MessageView {
+  const distances = extras.distances ?? null;
   return {
     id: m.id,
     senderId: m.senderId,
     mine: m.senderId === actorId,
+    senderName: extras.senderName ?? null,
     kind: m.kind,
     body: m.body,
     suggestion: m.suggestion,
+    meetup: extras.meetup ?? null,
     response: m.response,
     respondedAt: m.respondedAt ? m.respondedAt.toISOString() : null,
     distances: m.suggestion ? distances : null,
@@ -153,20 +186,23 @@ export class ConversationService {
       follows.listFriendIds(actorId),
     ]);
     const hidden = new Set(blocked);
-    const visible = summaries
-      .map((s) => ({ s, otherId: s.participantIds[0] === actorId ? s.participantIds[1] : s.participantIds[0] }))
-      .filter(({ otherId }) => !hidden.has(otherId));
-    const profiles = new Map((await users.findProfilesByIds(visible.map((v) => v.otherId))).map((p) => [p.userId, p] as const));
+    const rows = summaries
+      .map((s) => ({ s, otherId: s.conversation.type === 'DIRECT' ? (s.participantIds.find((id) => id !== actorId) ?? null) : null }))
+      .filter(({ s, otherId }) => s.conversation.type === 'GROUP' || (otherId !== null && !hidden.has(otherId)));
+    const profiles = new Map((await users.findProfilesByIds(rows.flatMap((v) => (v.otherId ? [v.otherId] : [])))).map((p) => [p.userId, p] as const));
     const items: ConversationListItem[] = [];
-    for (const { s, otherId } of visible) {
-      const profile = profiles.get(otherId);
-      if (!profile) continue;
+    for (const { s, otherId } of rows) {
+      const profile = otherId ? profiles.get(otherId) : undefined;
+      if (s.conversation.type === 'DIRECT' && !profile) continue;
       items.push({
         id: s.conversation.id,
-        other: toPublicProfile(profile),
+        type: s.conversation.type,
+        other: profile ? toPublicProfile(profile) : null,
+        name: s.conversation.name,
+        memberCount: s.participantIds.length,
         lastMessage: s.lastMessage ? toMessageView(s.lastMessage, actorId) : null,
         unread: s.unread,
-        canSend: friends.includes(otherId),
+        canSend: s.conversation.type === 'GROUP' ? true : otherId !== null && friends.includes(otherId),
       });
     }
     return items;
@@ -175,7 +211,7 @@ export class ConversationService {
   /** Mensagens da conversa. A primeira página (sem `before`) também marca a conversa como lida. */
   async messages(actorId: string, conversationId: string, query: { limit?: unknown; before?: unknown } = {}): Promise<ConversationView> {
     const { conversations, clock } = this.deps;
-    const { otherId, other } = await this.access(actorId, conversationId);
+    const { conversation, memberIds, otherId, other } = await this.access(actorId, conversationId);
     const limit = this.parseLimit(query.limit);
     let before: Date | undefined;
     if (query.before !== undefined && query.before !== null && query.before !== '') {
@@ -188,26 +224,43 @@ export class ConversationService {
     const hasMore = page.length > limit;
     const items = hasMore ? page.slice(page.length - limit) : page;
     if (before === undefined) await conversations.markRead(conversationId, actorId, now);
-    const friends = await this.deps.follows.listFriendIds(actorId);
-    const positions = items.some((m) => m.suggestion) ? await this.livePositions(actorId, otherId, now) : null;
+    const isGroup = conversation.type === 'GROUP';
+    const friends = isGroup ? [] : await this.deps.follows.listFriendIds(actorId);
+    const positions = otherId && items.some((m) => m.suggestion) ? await this.livePositions(actorId, otherId, now) : null;
+
+    const meetupIds = [...new Set(items.flatMap((m) => (m.meetupId ? [m.meetupId] : [])))];
+    const records = (await Promise.all(meetupIds.map((id) => this.deps.meetups.find(id)))).filter((m) => m !== undefined);
+    const meetupViews = new Map((await buildMeetupViews(this.deps, actorId, records)).map((v) => [v.id, v] as const));
+    const names = isGroup ? new Map((await this.deps.users.findProfilesByIds([...new Set(items.map((m) => m.senderId))])).map((p) => [p.userId, p.displayName] as const)) : null;
+
     return {
       id: conversationId,
-      other: toPublicProfile(other),
-      canSend: friends.includes(otherId),
+      type: conversation.type,
+      other: other ? toPublicProfile(other) : null,
+      name: conversation.name,
+      memberCount: memberIds.length,
+      canSend: isGroup ? true : otherId !== null && friends.includes(otherId),
       now: now.toISOString(),
-      messages: items.map((m) => toMessageView(m, actorId, m.suggestion ? this.distancesOf(m.suggestion, positions) : null)),
+      messages: items.map((m) =>
+        toMessageView(m, actorId, {
+          distances: m.suggestion && otherId ? this.distancesOf(m.suggestion, positions) : null,
+          senderName: names ? (names.get(m.senderId) ?? null) : null,
+          meetup: m.meetupId ? (meetupViews.get(m.meetupId) ?? null) : null,
+        }),
+      ),
       hasMore,
     };
   }
 
   async send(actorId: string, conversationId: string, input: SendInput): Promise<MessageView> {
     const { conversations, follows, clock, ids } = this.deps;
-    const { otherId } = await this.access(actorId, conversationId);
+    const { conversation, otherId } = await this.access(actorId, conversationId);
     const hasText = input.body !== undefined && input.body !== null;
     const hasSuggestion = input.suggestion !== undefined && input.suggestion !== null;
     if (hasText === hasSuggestion) throw validationError('Envie um texto ou uma sugestão', { body: 'Envie um texto ou uma sugestão' });
+    if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de lugar só em conversas 1 a 1', { suggestion: 'Sugestões de lugar só em conversas 1 a 1' });
 
-    let kind: 'TEXT' | 'SUGGESTION' = 'TEXT';
+    let kind: MessageKind = 'TEXT';
     let body = '';
     let suggestion: SuggestionCard | null = null;
     if (hasSuggestion) {
@@ -218,18 +271,21 @@ export class ConversationService {
       body = parseText(input.body);
     }
 
-    const friends = await follows.listFriendIds(actorId);
-    if (!friends.includes(otherId)) throw forbidden('Vocês não são mais amigos. Não dá para enviar mensagens.');
+    if (otherId) {
+      const friends = await follows.listFriendIds(actorId);
+      if (!friends.includes(otherId)) throw forbidden('Vocês não são mais amigos. Não dá para enviar mensagens.');
+    }
 
     const now = clock.now();
     const recent = await conversations.countSentSince(actorId, new Date(now.getTime() - 60_000));
     if (recent >= MESSAGES_PER_MINUTE) throw rateLimited('Você está enviando mensagens rápido demais. Espere um instante.', 30);
 
-    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, createdAt: now };
+    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, createdAt: now };
     await conversations.addMessage(message);
     await conversations.markRead(conversationId, actorId, now);
-    const positions = suggestion ? await this.livePositions(actorId, otherId, now) : null;
-    return toMessageView(message, actorId, suggestion ? this.distancesOf(suggestion, positions) : null);
+    const positions = suggestion && otherId ? await this.livePositions(actorId, otherId, now) : null;
+    const senderName = conversation.type === 'GROUP' ? ((await this.deps.users.findProfilesByIds([actorId]))[0]?.displayName ?? null) : null;
+    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName });
   }
 
   /** Quem recebeu o cartão aceita ou recusa o lugar. Só uma resposta, só do destinatário, só entre amigos. */
@@ -237,6 +293,7 @@ export class ConversationService {
     if (action !== 'accept' && action !== 'decline') throw validationError('Ação inválida', { action: 'Use accept ou decline' });
     const { conversations, follows, clock } = this.deps;
     const { otherId } = await this.access(actorId, conversationId);
+    if (!otherId) throw notFound('Sugestão não encontrada');
     const message = typeof messageId === 'string' && messageId.length <= 64 ? await conversations.findMessage(messageId) : undefined;
     if (!message || message.conversationId !== conversationId || message.kind !== 'SUGGESTION') throw notFound('Sugestão não encontrada');
     if (message.senderId === actorId) throw forbidden('Quem sugeriu não responde à própria sugestão');
@@ -248,13 +305,29 @@ export class ConversationService {
     if (!saved) throw conflict('Essa sugestão já foi respondida');
     const updated = { ...message, response, respondedAt: now } satisfies MessageRecord;
     const positions = await this.livePositions(actorId, otherId, now);
-    return toMessageView(updated, actorId, updated.suggestion ? this.distancesOf(updated.suggestion, positions) : null);
+    return toMessageView(updated, actorId, { distances: updated.suggestion ? this.distancesOf(updated.suggestion, positions) : null });
   }
 
   async markRead(actorId: string, conversationId: string): Promise<{ ok: true }> {
     await this.access(actorId, conversationId);
     await this.deps.conversations.markRead(conversationId, actorId, this.deps.clock.now());
     return { ok: true };
+  }
+
+  /** Detalhes do grupo (tocar no nome): pessoas, eventos e mídia. Só quem está no grupo. */
+  async group(actorId: string, conversationId: string): Promise<GroupDetails> {
+    const { conversation, memberIds } = await this.access(actorId, conversationId);
+    if (conversation.type !== 'GROUP' || conversation.name === null || conversation.ownerId === null) throw notFound('Grupo não encontrado');
+    const profiles = new Map((await this.deps.users.findProfilesByIds(memberIds)).map((p) => [p.userId, p] as const));
+    const ownerId = conversation.ownerId;
+    const members = memberIds
+      .flatMap((id) => {
+        const p = profiles.get(id);
+        return p ? [{ profile: toPublicProfile(p), role: id === ownerId ? ('OWNER' as const) : ('MEMBER' as const) }] : [];
+      })
+      .sort((a, b) => (a.role === b.role ? a.profile.displayName.localeCompare(b.profile.displayName, 'pt-BR') : a.role === 'OWNER' ? -1 : 1));
+    const meetups = await buildMeetupViews(this.deps, actorId, await this.deps.meetups.listForConversation(conversationId));
+    return { id: conversationId, name: conversation.name, ownerId, members, meetups, mediaAvailable: false };
   }
 
   /** Posições das duas pessoas num encontro Flash ativo entre elas, ou null. Nunca sai daqui: só serve para as distâncias. */
@@ -282,15 +355,18 @@ export class ConversationService {
     return Math.min(n, PAGE_MAX);
   }
 
-  /** Quem não participa vê "não encontrada"; bloqueio em qualquer sentido também. */
+  /** Quem não participa vê "não encontrada"; na 1 a 1, bloqueio em qualquer sentido também. */
   private async access(actorId: string, conversationId: string) {
     const { conversations, blocks, users } = this.deps;
-    const pair = conversationId.length <= 64 ? await conversations.participantIds(conversationId) : undefined;
-    if (!pair || !pair.includes(actorId)) throw notFound('Conversa não encontrada');
-    const otherId = pair[0] === actorId ? pair[1] : pair[0];
+    const conversation = conversationId.length <= 64 ? await conversations.findById(conversationId) : undefined;
+    const memberIds = conversation ? await conversations.participantIds(conversationId) : undefined;
+    if (!conversation || !memberIds || !memberIds.includes(actorId)) throw notFound('Conversa não encontrada');
+    if (conversation.type === 'GROUP') return { conversation, memberIds, otherId: null, other: null };
+    const otherId = memberIds.find((id) => id !== actorId);
+    if (!otherId) throw notFound('Conversa não encontrada');
     if (await blocks.existsEitherWay(actorId, otherId)) throw notFound('Conversa não encontrada');
     const [other] = await users.findProfilesByIds([otherId]);
     if (!other) throw notFound('Conversa não encontrada');
-    return { otherId, other };
+    return { conversation, memberIds, otherId, other };
   }
 }

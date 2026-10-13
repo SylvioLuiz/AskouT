@@ -2670,3 +2670,230 @@ button {
     column-count: 3;
   }
 }
+
+/* ---------- Encontros e grupos ---------- */
+
+.pagehead__link {
+  display: block;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.pagehead__link:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.avatar--group {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--brand-ink);
+  background: linear-gradient(150deg, #5b57ff, #2b27d6);
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.bubble__sender {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--brand-hover);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.meetcard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.meetcard__cover {
+  border-radius: 12px;
+  margin-bottom: 6px;
+}
+
+.meetcard__who {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.meetcard__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.meetcard__venue {
+  margin: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.meetcard__line,
+.meetcard__hint {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+
+.meetcard__hint {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.meetsheet__intro {
+  margin: 0 0 12px;
+}
+
+.friendpick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 46dvh;
+  margin: 0 0 14px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.friendpick__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 12px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.friendpick__row[aria-pressed='true'] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.friendpick__row:focus-visible {
+  outline: 3px solid var(--brand-soft);
+  border-color: var(--brand);
+}
+
+.friendpick__name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.friendpick__handle {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.friendpick__check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--brand-ink);
+  font-weight: 800;
+}
+
+.friendpick__check--on {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.grouphead {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 16px;
+}
+
+.segtabs--fill .segtabs__tab {
+  flex: 1;
+}
+
+.groupevents {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.groupevent {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.groupevent__link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.groupevent__link:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: -3px;
+}
+
+.groupevent .meetcard__cover {
+  margin: 0;
+  border-radius: 0;
+}
+
+.groupevent__body {
+  padding: 12px 14px 14px;
+}
+
+.groupevent__title {
+  margin: 0 0 2px;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  overflow-wrap: anywhere;
+}
+
+.groupevent__venue {
+  margin: 0 0 10px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.groupevent__facts {
+  display: flex;
+  gap: 18px;
+  margin: 0;
+}
+
+.groupevent__facts dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.groupevent__facts dd {
+  margin: 0;
+  font-weight: 650;
+}

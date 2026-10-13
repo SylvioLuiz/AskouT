@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MessageRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -104,8 +104,12 @@ export interface ConversationRepository {
   /** Idempotente: devolve a conversa da dupla, criando (com os dois participantes) se não existir. */
   getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord>;
   findById(id: string): Promise<ConversationRecord | undefined>;
-  /** Os dois participantes de uma conversa DIRECT. */
-  participantIds(conversationId: string): Promise<[string, string] | undefined>;
+  /** Quem participa da conversa (dois na 1 a 1; os que entraram no grupo). */
+  participantIds(conversationId: string): Promise<string[] | undefined>;
+  /** Cria a conversa de grupo só com quem organiza. */
+  createGroup(input: { id: string; name: string; ownerId: string; now: Date }): Promise<ConversationRecord>;
+  /** Idempotente: coloca a pessoa no grupo. */
+  addParticipant(conversationId: string, userId: string, now: Date): Promise<void>;
   /** Conversas do usuário, da mais recente para a mais antiga (por última mensagem, depois criação). */
   listForUser(userId: string): Promise<ConversationSummaryRecord[]>;
   addMessage(message: MessageRecord): Promise<void>;
@@ -118,6 +122,18 @@ export interface ConversationRepository {
   markRead(conversationId: string, userId: string, now: Date): Promise<void>;
   /** Quantas mensagens `userId` enviou desde `since` (limite de envio). */
   countSentSince(userId: string, since: Date): Promise<number>;
+}
+
+export interface MeetupRepository {
+  /** Grava o encontro com os participantes (quem organiza já confirmado). */
+  create(meetup: MeetupRecord): Promise<void>;
+  find(id: string): Promise<MeetupRecord | undefined>;
+  /** Encontros de uma conversa, o mais próximo no tempo primeiro. */
+  listForConversation(conversationId: string): Promise<MeetupRecord[]>;
+  /** Responde ao convite só se ainda estiver INVITED. Devolve false se já respondeu (ou não foi convidado). */
+  respond(meetupId: string, userId: string, status: 'CONFIRMED' | 'DECLINED', at: Date): Promise<boolean>;
+  /** Quantos encontros a pessoa criou desde `since` (limite de criação). */
+  countCreatedSince(userId: string, since: Date): Promise<number>;
 }
 
 export interface PlaceRepository {
@@ -208,6 +224,7 @@ export interface CoreDeps {
   availability: AvailabilityRepository;
   flash: FlashRepository;
   conversations: ConversationRepository;
+  meetups: MeetupRepository;
   places: PlaceRepository;
   placeSource: PlaceSource;
   pending: PendingSignupRepository;

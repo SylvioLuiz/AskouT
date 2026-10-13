@@ -2,6 +2,7 @@ import { conflict } from '../errors.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
   ConversationRepository,
+  MeetupRepository,
   PlaceRepository,
   PlaceSource,
   AvailabilityRepository,
@@ -17,7 +18,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { MeetupRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -459,7 +460,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
   async getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord> {
     const directKey = a < b ? `${a}:${b}` : `${b}:${a}`;
     for (const c of this.conversations.values()) if (c.directKey === directKey) return { ...c };
-    const record: ConversationRecord = { id, directKey, createdAt: now };
+    const record: ConversationRecord = { id, type: 'DIRECT', directKey, name: null, ownerId: null, createdAt: now };
     this.conversations.set(id, record);
     this.participants.set(id, new Map([[a, null], [b, null]]));
     return { ...record };
@@ -470,11 +471,22 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return c ? { ...c } : undefined;
   }
 
-  async participantIds(conversationId: string): Promise<[string, string] | undefined> {
+  async participantIds(conversationId: string): Promise<string[] | undefined> {
     const p = this.participants.get(conversationId);
-    if (!p) return undefined;
-    const [x, y] = [...p.keys()];
-    return x !== undefined && y !== undefined ? [x, y] : undefined;
+    return p ? [...p.keys()] : undefined;
+  }
+
+  async createGroup(input: { id: string; name: string; ownerId: string; now: Date }): Promise<ConversationRecord> {
+    const record: ConversationRecord = { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, createdAt: input.now };
+    this.conversations.set(input.id, record);
+    this.participants.set(input.id, new Map([[input.ownerId, null]]));
+    return { ...record };
+  }
+
+  async addParticipant(conversationId: string, userId: string, now: Date): Promise<void> {
+    const p = this.participants.get(conversationId);
+    if (p && !p.has(userId)) p.set(userId, null);
+    void now;
   }
 
   async listForUser(userId: string): Promise<ConversationSummaryRecord[]> {
@@ -484,8 +496,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
       const msgs = this.messages.filter((m) => m.conversationId === id);
       const lastRead = p.get(userId) ?? null;
       const unread = msgs.filter((m) => m.senderId !== userId && (lastRead === null || m.createdAt > lastRead)).length;
-      const [x, y] = [...p.keys()] as [string, string];
-      out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [x, y], lastMessage: msgs.at(-1) ?? null, unread });
+      out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [...p.keys()], lastMessage: msgs.at(-1) ?? null, unread });
     }
     const stamp = (s: ConversationSummaryRecord) => (s.lastMessage ?? s.conversation).createdAt.getTime();
     return out.sort((a, b) => stamp(b) - stamp(a));
@@ -520,6 +531,42 @@ export class InMemoryConversationRepository implements ConversationRepository {
 
   async countSentSince(userId: string, since: Date): Promise<number> {
     return this.messages.filter((m) => m.senderId === userId && m.createdAt >= since).length;
+  }
+}
+
+export class InMemoryMeetupRepository implements MeetupRepository {
+  readonly meetups = new Map<string, MeetupRecord>();
+
+  private copy(m: MeetupRecord): MeetupRecord {
+    return { ...m, participants: m.participants.map((p) => ({ ...p })) };
+  }
+
+  async create(meetup: MeetupRecord): Promise<void> {
+    this.meetups.set(meetup.id, this.copy(meetup));
+  }
+
+  async find(id: string): Promise<MeetupRecord | undefined> {
+    const m = this.meetups.get(id);
+    return m ? this.copy(m) : undefined;
+  }
+
+  async listForConversation(conversationId: string): Promise<MeetupRecord[]> {
+    return [...this.meetups.values()]
+      .filter((m) => m.conversationId === conversationId)
+      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map((m) => this.copy(m));
+  }
+
+  async respond(meetupId: string, userId: string, status: 'CONFIRMED' | 'DECLINED', at: Date): Promise<boolean> {
+    const p = this.meetups.get(meetupId)?.participants.find((x) => x.userId === userId);
+    if (!p || p.status !== 'INVITED') return false;
+    p.status = status;
+    p.respondedAt = at;
+    return true;
+  }
+
+  async countCreatedSince(userId: string, since: Date): Promise<number> {
+    return [...this.meetups.values()].filter((m) => m.organizerId === userId && m.createdAt >= since).length;
   }
 }
 

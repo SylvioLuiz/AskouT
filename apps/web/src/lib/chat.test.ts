@@ -27,6 +27,12 @@ test('dayLabel e listTimeLabel', () => {
 
 const item: SuggestionItem = { key: 'osm:node/1', source: 'OSM', title: 'Bar', venueName: 'Bar', category: 'bar', startsAt: null, endsAt: null, sample: false, lat: -23.5, lng: -46.6, rating: null, ratingCount: null, photoPath: null, photoAuthor: null, mapsUri: null, distanceFromMeM: 1240, distanceFromThemM: 830, distanceFromMidM: 100 };
 
+test('previewOf: encontro e mensagem de grupo', () => {
+  assert.equal(previewOf(msg('a', '2026-10-13T10:00:00Z', { kind: 'MEETUP', body: 'Encontro: Show', mine: true })), 'Você: Encontro: Show');
+  assert.equal(previewOf(msg('b', '2026-10-13T10:00:00Z', { body: 'oi gente', senderName: 'Bia' })), 'Bia: oi gente');
+  assert.equal(previewOf(msg('c', '2026-10-13T10:00:00Z', { body: 'oi', mine: true, senderName: 'Ana' })), 'Você: oi');
+});
+
 test('formatDistances usa o nome da outra pessoa', () => {
   assert.equal(formatDistances(item, 'Bia'), 'a 1,2 km de você · 850 m de Bia');
 });
@@ -37,7 +43,7 @@ test('toCard leva só os campos do cartão', () => {
   assert.equal(card.externalId, 'osm:node/1');
 });
 
-const msg = (id: string, createdAt: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ id, senderId: 'u', mine: false, kind: 'TEXT', body: id, suggestion: null, response: null, respondedAt: null, distances: null, createdAt, ...extra });
+const msg = (id: string, createdAt: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ id, senderId: 'u', mine: false, senderName: null, kind: 'TEXT', body: id, suggestion: null, meetup: null, response: null, respondedAt: null, distances: null, createdAt, ...extra });
 
 test('mergeMessages: sem repetir, em ordem, a versão mais nova vence', () => {
   const a = [msg('1', '2026-10-13T10:00:00.000Z'), msg('2', '2026-10-13T10:01:00.000Z')];

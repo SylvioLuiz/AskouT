@@ -102,7 +102,7 @@ test('list e messages: última mensagem, não lidas e leitura ao abrir', async (
   assert.equal(item!.unread, 2);
   assert.equal(item!.lastMessage!.body, 'dois');
   assert.equal(item!.lastMessage!.mine, false);
-  assert.equal(item!.other.username, 'ana');
+  assert.equal(item!.other!.username, 'ana');
   assert.equal((await w.core.conversations.list(ana))[0]!.unread, 0, 'o que você enviou não conta como não lido');
 
   const view = await w.core.conversations.messages(bia, id);

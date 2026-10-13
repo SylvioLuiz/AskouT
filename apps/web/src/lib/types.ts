@@ -190,13 +190,52 @@ export interface SuggestionCard {
   externalId: string;
 }
 
+export interface MeetupView {
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  organizer: PublicProfile;
+  event: {
+    id: string;
+    venueName: string;
+    address: string | null;
+    kind: EventKind;
+    imageUrl: string | null;
+    isFree: boolean;
+    sample: boolean;
+    lat: number;
+    lng: number;
+  } | null;
+  conversationId: string;
+  isGroup: boolean;
+  groupName: string | null;
+  confirmedCount: number;
+  invitedCount: number;
+  declinedCount: number;
+  myStatus: 'ORGANIZER' | 'INVITED' | 'CONFIRMED' | 'DECLINED' | null;
+}
+
+export interface GroupDetails {
+  id: string;
+  name: string;
+  ownerId: string;
+  members: { profile: PublicProfile; role: 'OWNER' | 'MEMBER' }[];
+  meetups: MeetupView[];
+  mediaAvailable: false;
+}
+
 export interface ChatMessage {
   id: string;
   senderId: string;
   mine: boolean;
-  kind: 'TEXT' | 'SUGGESTION';
+  /** Nome de quem enviou; só em grupo. */
+  senderName: string | null;
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP';
   body: string;
   suggestion: SuggestionCard | null;
+  /** Cartão do encontro (kind MEETUP). */
+  meetup: MeetupView | null;
   /** Resposta de quem recebeu o cartão. */
   response: 'ACCEPTED' | 'DECLINED' | null;
   respondedAt: string | null;
@@ -207,7 +246,11 @@ export interface ChatMessage {
 
 export interface ConversationItem {
   id: string;
-  other: PublicProfile;
+  type: 'DIRECT' | 'GROUP';
+  /** Na conversa 1 a 1, a outra pessoa; no grupo, nulo. */
+  other: PublicProfile | null;
+  name: string | null;
+  memberCount: number;
   lastMessage: ChatMessage | null;
   unread: number;
   canSend: boolean;
@@ -215,7 +258,10 @@ export interface ConversationItem {
 
 export interface ChatView {
   id: string;
-  other: PublicProfile;
+  type: 'DIRECT' | 'GROUP';
+  other: PublicProfile | null;
+  name: string | null;
+  memberCount: number;
   canSend: boolean;
   /** Relógio do servidor. */
   now: string;

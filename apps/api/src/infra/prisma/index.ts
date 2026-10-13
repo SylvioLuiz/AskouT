@@ -5,4 +5,5 @@ export { PrismaFollowRepository } from './prisma-follow.repository.ts';
 export { PrismaPendingSignupRepository } from './prisma-pending-signup.repository.ts';
 export { PrismaUserRepository } from './prisma-user.repository.ts';
 export { PrismaConversationRepository } from './prisma-conversation.repository.ts';
+export { PrismaMeetupRepository } from './prisma-meetup.repository.ts';
 export { PrismaPlaceRepository } from './prisma-place.repository.ts';

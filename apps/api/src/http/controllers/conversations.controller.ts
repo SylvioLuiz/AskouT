@@ -48,6 +48,12 @@ export class ConversationsController {
     return this.core.conversations.respond(actor.userId, id, messageId, asBody(body).action);
   }
 
+  /** Detalhes do grupo (pessoas, eventos, mídia). 404 se não for um grupo seu. */
+  @Get(':id/group')
+  group(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.conversations.group(actor.userId, id);
+  }
+
   @Post(':id/read')
   @HttpCode(200)
   read(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {

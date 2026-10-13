@@ -4,6 +4,7 @@ import { BlockService } from './block-service.ts';
 import { FlashService } from './flash-service.ts';
 import { ConversationService } from './conversation-service.ts';
 import { FollowService } from './follow-service.ts';
+import { MeetupService } from './meetup-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
 import type { CoreDeps } from './ports.ts';
@@ -22,6 +23,7 @@ export function createCore(deps: CoreDeps) {
     conversations: new ConversationService(deps),
     suggestions: new SuggestionService(deps, flash),
     explore: new ExploreService(deps, profiles),
+    meetups: new MeetupService(deps),
   };
 }
 
@@ -75,11 +77,13 @@ export type {
   PositionView,
 } from './flash-service.ts';
 export { ConversationService, MESSAGE_MAX, MESSAGES_PER_MINUTE, parseSuggestion } from './conversation-service.ts';
-export type { ConversationListItem, ConversationView, MessageView } from './conversation-service.ts';
+export type { ConversationListItem, ConversationView, GroupDetails, MessageView } from './conversation-service.ts';
 export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_APART_M } from './suggestion-service.ts';
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { ExploreService, EXPLORE_DEFAULT_RADIUS_KM, EXPLORE_MAX_RADIUS_KM } from './explore-service.ts';
 export type { ExploreEventItem, ExplorePlaceItem, ExploreView } from './explore-service.ts';
+export { MeetupService, MEETUP_MAX_GUESTS } from './meetup-service.ts';
+export type { MeetupView } from './meetup-view.ts';
 export { distanceMeters, midpoint, boundingBox } from './geo.ts';
 export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';

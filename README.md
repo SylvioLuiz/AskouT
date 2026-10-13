@@ -132,6 +132,17 @@ Erros: `{ "error": { "code", "message", "details?" } }` com status 400/401/403/4
 - **OpenStreetMap (Overpass):** consulta ao servidor público `overpass-api.de` com cache de 10 min e coordenada arredondada (~110 m); se não responder, o app mostra só os eventos do AskouT e avisa. O servidor público serve para desenvolvimento: em produção é preciso instância própria ou provedor contratado. Defina `OSM_CONTACT` (e-mail ou site) no `.env` da API para identificar o app, como a política do serviço pede. Crédito "© colaboradores do OpenStreetMap" aparece no carrossel.
 - Passos na sua máquina: `git pull`, `npm run update` (aplica a migração `20261014120000_conversations_places` e as restrições `003_*.sql` nos dois bancos e roda os testes, inclusive os de contrato no Postgres), `npm run seed:places`, `npm run dev:all -- --https`, `npm run smoke`.
 
+## Encontros e grupos
+
+Na página de um evento, o botão **Criar encontro** (nome provisório; muda em `apps/web/src/lib/meetup.ts`) abre a escolha de amigos (só amigos, até 15).
+- **Uma pessoa:** não há grupo. O convite é um cartão do encontro na conversa 1 a 1; a pessoa aceita ou recusa ali.
+- **Várias pessoas:** cria-se um **grupo** (nome opcional; padrão: título do evento) onde o cartão do encontro fica. Cada convidado recebe o convite na conversa 1 a 1 com quem criou e **só entra no grupo ao aceitar**; quem recusa não entra e não vê o grupo.
+- **Detalhes do grupo** (tocar no nome na conversa): **Pessoas**, **Eventos** (imagem, local, confirmados, data e hora) e **Mídia** (ainda não existe envio de mídia; a aba diz isso).
+- Regras: só uma resposta por convite; não responde a encontro que já terminou; bloqueio impede convidar e aceitar; até 10 encontros criados por hora; no grupo só texto (sugestão de lugar do Flash continua só na conversa 1 a 1).
+- Rotas: `POST /meetups` (`{eventId, guestIds, name?}`), `GET /meetups/:id`, `POST /meetups/:id/respond` (`{action}`), `GET /conversations/:id/group`.
+- Passos na sua máquina: `git pull`, `npm run update` (migração `20261014210000_meetups_groups` e `006_meetup_constraints.sql`), `npm run dev:all -- --https`.
+- Ainda não existe: sair do grupo, remover/convidar pessoas depois, editar o encontro, trocar o nome ou a foto do grupo, aviso fora do app, mídia. Se alguém bloquear outro membro dentro de um grupo, os dois continuam vendo as mensagens um do outro (o bloqueio só vale na 1 a 1 e para convidar).
+
 ## Explorar
 
 Ao abrir o Explorar o app pede a sua localização e já mostra, em mosaico de duas colunas, os eventos perto (padrão: hoje, 10 km). Quem quiser usa os filtros (Quando: hoje, amanhã, esta semana, fim de semana, próxima semana, este mês, próximos 30 dias; Tipo de evento; Grátis; Raio de 1 a 50 km) ou a barra de busca. Com texto, o resultado vem em abas **Tudo / Eventos / Locais / Pessoas / #**: eventos (título, local ou hashtag), locais do AskouT por nome, lugares de fora (Google ou OpenStreetMap, só com a localização liberada e sem filtro de tipo/grátis, até 10 km), pessoas (mesmas regras da busca de perfis: sem você e sem bloqueios) e hashtags. `#samba` busca só hashtags e os eventos com ela. Tocar num cartão abre o evento (`/eventos/:id`: quando, onde, distância, descrição, hashtags, rota).

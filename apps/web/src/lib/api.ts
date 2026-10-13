@@ -18,6 +18,8 @@ import type {
   SlotInput,
   ConnectionsPage,
   ExploreEvent,
+  GroupDetails,
+  MeetupView,
   ExploreParams,
   ExploreResult,
   PageRequest,
@@ -203,7 +205,13 @@ export function createApi(deps: ApiDeps) {
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages/${id(messageId)}/respond`, { body: { action } }),
     /** Endereço completo de um recurso da API (a foto do lugar), a partir do caminho que ela devolveu. */
     assetUrl: (path: string) => `${deps.baseUrl}${path}`,
+    group: (conversationId: string) => request<GroupDetails>('GET', `/conversations/${id(conversationId)}/group`),
     markRead: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/read`),
+
+    // Encontros
+    createMeetup: (input: { eventId: string; guestIds: string[]; name?: string }) => request<MeetupView>('POST', '/meetups', { body: input }),
+    meetup: (meetupId: string) => request<MeetupView>('GET', `/meetups/${id(meetupId)}`),
+    respondMeetup: (meetupId: string, action: 'accept' | 'decline') => request<MeetupView>('POST', `/meetups/${id(meetupId)}/respond`, { body: { action } }),
 
     // Bloqueios
     block: (userId: string) => request<{ ok: true }>('POST', `/users/${id(userId)}/block`),

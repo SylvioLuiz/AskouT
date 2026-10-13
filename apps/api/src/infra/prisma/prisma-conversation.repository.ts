@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { ConversationRepository } from '../../core/ports.ts';
 import type { ConversationRecord, ConversationSummaryRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
@@ -7,11 +8,12 @@ type MessageRow = {
   id: string;
   conversationId: string;
   senderId: string;
-  kind: 'TEXT' | 'SUGGESTION';
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP';
   body: string;
   suggestion: unknown;
   response: 'ACCEPTED' | 'DECLINED' | null;
   respondedAt: Date | null;
+  meetupId: string | null;
   createdAt: Date;
 };
 
@@ -24,7 +26,19 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   suggestion: r.suggestion === null || r.suggestion === undefined ? null : (r.suggestion as SuggestionCard),
   response: r.response,
   respondedAt: r.respondedAt,
+  meetupId: r.meetupId,
   createdAt: r.createdAt,
+});
+
+type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; group: { name: string; ownerId: string } | null };
+
+const toConversation = (c: ConversationRow): ConversationRecord => ({
+  id: c.id,
+  type: c.type,
+  directKey: c.directKey,
+  name: c.group?.name ?? null,
+  ownerId: c.group?.ownerId ?? null,
+  createdAt: c.createdAt,
 });
 
 const directKeyOf = (a: string, b: string) => (a < b ? `${a}:${b}` : `${b}:${a}`);
@@ -39,8 +53,8 @@ export class PrismaConversationRepository implements ConversationRepository {
   async getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord> {
     const directKey = directKeyOf(a, b);
     const find = async () => {
-      const row = await this.prisma.conversation.findUnique({ where: { directKey } });
-      return row ? { id: row.id, directKey, createdAt: row.createdAt } : undefined;
+      const row = await this.prisma.conversation.findUnique({ where: { directKey }, include: { group: true } });
+      return row ? toConversation(row) : undefined;
     };
     const existing = await find();
     if (existing) return existing;
@@ -54,7 +68,7 @@ export class PrismaConversationRepository implements ConversationRepository {
           participants: { create: [{ userId: a }, { userId: b }] },
         },
       });
-      return { id, directKey, createdAt: now };
+      return { id, type: 'DIRECT', directKey, name: null, ownerId: null, createdAt: now };
     } catch (error) {
       // Duas requisições criaram ao mesmo tempo: a segunda usa a conversa da primeira.
       if (uniqueViolationTargets(error) !== undefined) {
@@ -67,39 +81,62 @@ export class PrismaConversationRepository implements ConversationRepository {
 
   async findById(id: string): Promise<ConversationRecord | undefined> {
     if (!isUuid(id)) return undefined;
-    const row = await this.prisma.conversation.findUnique({ where: { id } });
-    if (!row || row.directKey === null) return undefined;
-    return { id: row.id, directKey: row.directKey, createdAt: row.createdAt };
+    const row = await this.prisma.conversation.findUnique({ where: { id }, include: { group: true } });
+    return row ? toConversation(row) : undefined;
   }
 
-  async participantIds(conversationId: string): Promise<[string, string] | undefined> {
+  async participantIds(conversationId: string): Promise<string[] | undefined> {
     if (!isUuid(conversationId)) return undefined;
     const rows = await this.prisma.conversationParticipant.findMany({ where: { conversationId }, select: { userId: true }, orderBy: { userId: 'asc' } });
-    const [x, y] = rows;
-    return rows.length === 2 && x && y ? [x.userId, y.userId] : undefined;
+    return rows.length > 0 ? rows.map((r) => r.userId) : undefined;
+  }
+
+  async createGroup(input: { id: string; name: string; ownerId: string; now: Date }): Promise<ConversationRecord> {
+    const groupId = randomUUID();
+    await this.prisma.group.create({
+      data: {
+        id: groupId,
+        ownerId: input.ownerId,
+        name: input.name,
+        createdAt: input.now,
+        members: { create: [{ userId: input.ownerId, role: 'OWNER', joinedAt: input.now }] },
+        conversation: { create: { id: input.id, type: 'GROUP', createdAt: input.now, participants: { create: [{ userId: input.ownerId }] } } },
+      },
+    });
+    return { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, createdAt: input.now };
+  }
+
+  async addParticipant(conversationId: string, userId: string, now: Date): Promise<void> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return;
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.conversationParticipant.upsert({ where: { conversationId_userId: { conversationId, userId } }, create: { conversationId, userId }, update: {} });
+      if (conversation?.groupId) {
+        await tx.groupMember.upsert({ where: { groupId_userId: { groupId: conversation.groupId, userId } }, create: { groupId: conversation.groupId, userId, joinedAt: now }, update: {} });
+      }
+    });
   }
 
   async listForUser(userId: string): Promise<ConversationSummaryRecord[]> {
     if (!isUuid(userId)) return [];
     const mine = await this.prisma.conversationParticipant.findMany({
-      where: { userId, conversation: { type: 'DIRECT' } },
+      where: { userId },
       include: {
-        conversation: { include: { participants: { select: { userId: true } }, messages: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1 } } },
+        conversation: { include: { group: true, participants: { select: { userId: true } }, messages: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1 } } },
       },
     });
     const out: ConversationSummaryRecord[] = [];
     for (const p of mine) {
       const c = p.conversation;
       const ids = c.participants.map((x: { userId: string }) => x.userId).sort();
-      const [x, y] = ids;
-      if (ids.length !== 2 || x === undefined || y === undefined || c.directKey === null) continue;
+      if (c.type === 'DIRECT' && ids.length !== 2) continue;
       const unread = await this.prisma.message.count({
         where: { conversationId: c.id, senderId: { not: userId }, ...(p.lastReadAt ? { createdAt: { gt: p.lastReadAt } } : {}) },
       });
       const last = c.messages[0];
       out.push({
-        conversation: { id: c.id, directKey: c.directKey, createdAt: c.createdAt },
-        participantIds: [x, y],
+        conversation: toConversation(c),
+        participantIds: ids,
         lastMessage: last ? toMessage(last as MessageRow) : null,
         unread,
       });
@@ -118,6 +155,7 @@ export class PrismaConversationRepository implements ConversationRepository {
         body: m.body,
         // Mensagem de texto não leva o campo (a restrição do banco exige NULL fora de SUGGESTION).
         ...(m.suggestion ? { suggestion: m.suggestion as unknown as Prisma.InputJsonValue } : {}),
+        ...(m.meetupId ? { meetupId: m.meetupId } : {}),
         createdAt: m.createdAt,
       },
     });

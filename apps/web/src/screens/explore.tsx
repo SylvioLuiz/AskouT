@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sheet } from '../components/agenda.tsx';
+import { CreateMeetupSheet } from '../components/meetup.tsx';
+import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
 import { SearchIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
 import { Button, EmptyState, ErrorState, Loading, PageHead, PersonRow } from '../components/ui.tsx';
@@ -429,6 +431,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   useTitle(e?.title ?? 'Evento');
   const [failed, setFailed] = useState(false);
   const image = e && !failed ? safeImage(e.imageUrl) : null;
+  const [planning, setPlanning] = useState(false);
 
   return (
     <>
@@ -473,8 +476,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
               ))}
             </ul>
           ) : null}
+          {Date.parse(e.endsAt) > Date.now() ? (
+            <Button full onClick={() => setPlanning(true)}>
+              {MEETUP_ACTION_LABEL}
+            </Button>
+          ) : (
+            <p className="muted">Esse evento já terminou.</p>
+          )}
           <div className="sugcard__actions">
-            <a className="btn btn--small" href={routeLink(e.venue.lat, e.venue.lng)} target="_blank" rel="noopener noreferrer">
+            <a className="btn btn--quiet btn--small" href={routeLink(e.venue.lat, e.venue.lng)} target="_blank" rel="noopener noreferrer">
               Rota até lá
             </a>
             <a className="btn btn--quiet btn--small" href={mapLink(e.venue.lat, e.venue.lng)} target="_blank" rel="noopener noreferrer">
@@ -483,6 +493,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
           </div>
         </article>
       ) : null}
+      {planning && e ? <CreateMeetupSheet event={e} onClose={() => setPlanning(false)} /> : null}
     </>
   );
 }

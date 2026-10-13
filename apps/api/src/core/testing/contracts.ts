@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { ConversationRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
-import type { MessageRecord, PlaceEventRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
+import type { ConversationRepository, MeetupRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { MeetupRecord, MessageRecord, PlaceEventRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
  * Suíte de contrato das portas de dados. Roda contra QUALQUER implementação:
@@ -20,6 +20,7 @@ export interface RepoHarness {
   flash: FlashRepository;
   conversations: ConversationRepository;
   places: PlaceRepository;
+  meetups: MeetupRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
   /** Apaga todos os dados entre os testes. */
   reset(): Promise<void>;
@@ -631,6 +632,7 @@ export function defineRepositoryContract(
         suggestion: extra.suggestion ?? null,
         response: null,
         respondedAt: null,
+        meetupId: null,
         createdAt: at(whenS),
       });
       const card: SuggestionCard = { source: 'EVENT', title: 'Jazz', venueName: 'Bar do Zé', lat: -23.55, lng: -46.63, startsAt: '2026-10-13T20:00:00.000Z', endsAt: null, sample: true, externalId: 'event:1' };
@@ -812,6 +814,85 @@ export function defineRepositoryContract(
         assert.deepEqual((await h.places.searchVenues('BAR', undefined, 0, 10)).map((r) => r.venue.name), ['Bar Alfa']);
         assert.deepEqual((await h.places.searchVenues('bot', centre, 5000, 10)).map((r) => r.venue.name), []);
         assert.deepEqual((await h.places.searchVenues('bot', centre, 30000, 10)).map((r) => r.venue.name), ['Boteco Beta']);
+      });
+    });
+
+    describe('grupos e encontros', () => {
+      const H = 3600;
+      const setup = async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const v: VenueRecord = { id: randomUUID(), name: 'Parque', address: null, category: 'park', lat: -23.58, lng: -46.65, isSample: true };
+        await h.places.createVenue(v);
+        const e: PlaceEventRecord = { id: randomUUID(), venueId: v.id, title: 'Piquenique', description: null, kind: 'OTHER', isFree: true, imageUrl: null, tags: [], startsAt: at(2 * H), endsAt: at(5 * H), isSample: true };
+        await h.places.createEvent(e);
+        return { ana, bia, caio, e };
+      };
+      const meetup = (organizerId: string, conversationId: string, eventId: string, guests: string[]): MeetupRecord => ({
+        id: randomUUID(), organizerId, conversationId, eventId, title: 'Piquenique', startsAt: at(2 * H), endsAt: at(5 * H), createdAt: at(0),
+        participants: [{ userId: organizerId, status: 'CONFIRMED', respondedAt: at(0) }, ...guests.map((userId) => ({ userId, status: 'INVITED' as const, respondedAt: null }))],
+      });
+
+      it('grupo começa só com quem organiza e cada aceite entra (sem repetir)', async () => {
+        const { ana, bia, caio } = await setup();
+        const g = await h.conversations.createGroup({ id: randomUUID(), name: 'Grupo da fofoca', ownerId: ana, now: at(1) });
+        assert.equal(g.type, 'GROUP');
+        assert.equal(g.name, 'Grupo da fofoca');
+        assert.equal(g.ownerId, ana);
+        assert.equal(g.directKey, null);
+        assert.deepEqual(await h.conversations.participantIds(g.id), [ana]);
+        await h.conversations.addParticipant(g.id, bia, at(2));
+        await h.conversations.addParticipant(g.id, bia, at(3));
+        assert.deepEqual([...(await h.conversations.participantIds(g.id))!].sort(), [ana, bia].sort());
+        assert.deepEqual(await h.conversations.findById(g.id), g);
+        assert.equal((await h.conversations.listForUser(caio)).length, 0);
+        const mine = await h.conversations.listForUser(bia);
+        assert.equal(mine.length, 1);
+        assert.equal(mine[0]!.conversation.name, 'Grupo da fofoca');
+        assert.equal(mine[0]!.participantIds.length, 2);
+        await h.conversations.addMessage({ id: randomUUID(), conversationId: g.id, senderId: ana, kind: 'TEXT', body: 'oi grupo', suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: at(4) });
+        assert.equal((await h.conversations.listForUser(bia))[0]!.unread, 1);
+      });
+
+      it('encontro: criar, ler, responder uma vez, contar e listar por conversa', async () => {
+        const { ana, bia, caio, e } = await setup();
+        const g = await h.conversations.createGroup({ id: randomUUID(), name: 'G', ownerId: ana, now: at(1) });
+        const m = meetup(ana, g.id, e.id, [bia, caio]);
+        await h.meetups.create(m);
+        const found = (await h.meetups.find(m.id))!;
+        assert.equal(found.organizerId, ana);
+        assert.equal(found.eventId, e.id);
+        assert.deepEqual(found.startsAt, at(2 * H));
+        assert.deepEqual(found.participants.map((p) => [p.userId, p.status]).sort(), [[ana, 'CONFIRMED'], [bia, 'INVITED'], [caio, 'INVITED']].sort());
+        assert.equal(await h.meetups.find(randomUUID()), undefined);
+        assert.equal(await h.meetups.find('nao-e-uuid'), undefined);
+        assert.equal(await h.meetups.respond(m.id, bia, 'CONFIRMED', at(10)), true);
+        assert.equal(await h.meetups.respond(m.id, bia, 'DECLINED', at(11)), false, 'só uma resposta');
+        assert.equal(await h.meetups.respond(m.id, ana, 'DECLINED', at(11)), false, 'quem organiza não responde');
+        assert.equal(await h.meetups.respond(m.id, randomUUID(), 'CONFIRMED', at(11)), false);
+        assert.equal(await h.meetups.respond(m.id, caio, 'DECLINED', at(12)), true);
+        const after = (await h.meetups.find(m.id))!;
+        assert.equal(after.participants.find((p) => p.userId === bia)!.status, 'CONFIRMED');
+        assert.deepEqual(after.participants.find((p) => p.userId === bia)!.respondedAt, at(10));
+        assert.equal(after.participants.find((p) => p.userId === caio)!.status, 'DECLINED');
+        assert.deepEqual((await h.meetups.listForConversation(g.id)).map((x) => x.id), [m.id]);
+        assert.deepEqual(await h.meetups.listForConversation(randomUUID()), []);
+        assert.equal(await h.meetups.countCreatedSince(ana, at(0)), 1);
+        assert.equal(await h.meetups.countCreatedSince(ana, at(5)), 0);
+        assert.equal(await h.meetups.countCreatedSince(bia, at(0)), 0);
+      });
+
+      it('mensagem de encontro guarda o id e volta na leitura', async () => {
+        const { ana, bia, e } = await setup();
+        const c = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        const m = meetup(ana, c.id, e.id, [bia]);
+        await h.meetups.create(m);
+        await h.conversations.addMessage({ id: randomUUID(), conversationId: c.id, senderId: ana, kind: 'MEETUP', body: 'Encontro: Piquenique', suggestion: null, response: null, respondedAt: null, meetupId: m.id, createdAt: at(1) });
+        const [got] = await h.conversations.listMessages(c.id, 10);
+        assert.equal(got!.kind, 'MEETUP');
+        assert.equal(got!.meetupId, m.id);
+        assert.equal(got!.suggestion, null);
       });
     });
   });

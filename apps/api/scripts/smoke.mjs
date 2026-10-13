@@ -243,8 +243,8 @@ try {
   const sentCard = await call('POST', `/conversations/${convId}/messages`, { token: a.token, body: { suggestion: card } });
   check('enviar sugestão', sentCard.status === 201 && sentCard.body?.kind === 'SUGGESTION', sentCard.body);
   check('quem sugeriu não responde à própria sugestão (403)', (await call('POST', `/conversations/${convId}/messages/${sentCard.body?.id}/respond`, { token: a.token, body: { action: 'accept' } })).status === 403);
-  const accepted = await call('POST', `/conversations/${convId}/messages/${sentCard.body?.id}/respond`, { token: b.token, body: { action: 'accept' } });
-  check('aceitar o lugar sugerido', accepted.status === 200 && accepted.body?.response === 'ACCEPTED', accepted.body);
+  const acceptedPlace = await call('POST', `/conversations/${convId}/messages/${sentCard.body?.id}/respond`, { token: b.token, body: { action: 'accept' } });
+  check('aceitar o lugar sugerido', acceptedPlace.status === 200 && acceptedPlace.body?.response === 'ACCEPTED', acceptedPlace.body);
   check('responder duas vezes: 409', (await call('POST', `/conversations/${convId}/messages/${sentCard.body?.id}/respond`, { token: b.token, body: { action: 'decline' } })).status === 409);
   const withDist = await call('GET', `/conversations/${convId}/messages`, { token: a.token });
   const cardMsg = withDist.body?.messages?.find((m) => m.kind === 'SUGGESTION');
@@ -269,6 +269,23 @@ try {
   check('tipo inválido: 400', (await call('GET', '/explore?kind=FESTA', { token: a.token })).status === 400);
   check('evento inexistente: 404', (await call('GET', '/events/nao-existe', { token: a.token })).status === 404);
   check('explorar sem login: 401', (await call('GET', '/explore')).status === 401);
+
+  console.log('\nEncontros e grupos');
+  const anyEvent = (await call('GET', '/explore?radiusKm=50', { token: a.token })).body?.events?.[0];
+  if (!anyEvent) {
+    console.log('  (pulado: não há evento no banco. Rode "cd apps/api && npm run seed:places -- --here" e repita.)');
+  } else {
+    const one = await call('POST', '/meetups', { token: a.token, body: { eventId: anyEvent.id, guestIds: [b.id] } });
+    check('criar encontro com 1 pessoa (sem grupo)', one.status === 200 && one.body.isGroup === false && one.body.myStatus === 'ORGANIZER', one.body);
+    check('convidado vê o convite', (await call('GET', `/meetups/${one.body.id}`, { token: b.token })).body?.myStatus === 'INVITED');
+    check('quem não foi convidado não vê (404)', (await call('GET', `/meetups/${one.body.id}`, { token: c.token })).status === 404);
+    const acc = await call('POST', `/meetups/${one.body.id}/respond`, { token: b.token, body: { action: 'accept' } });
+    check('convidado aceita', acc.status === 200 && acc.body.myStatus === 'CONFIRMED', acc.body);
+    check('responder de novo: 409', (await call('POST', `/meetups/${one.body.id}/respond`, { token: b.token, body: { action: 'decline' } })).status === 409);
+    check('convidar quem não é amigo: 403', (await call('POST', '/meetups', { token: a.token, body: { eventId: anyEvent.id, guestIds: [c.id] } })).status === 403);
+    check('sem convidados: 400', (await call('POST', '/meetups', { token: a.token, body: { eventId: anyEvent.id, guestIds: [] } })).status === 400);
+    check('grupo só existe com vários convidados (404 na 1 a 1)', (await call('GET', `/conversations/${one.body.conversationId}/group`, { token: a.token })).status === 404);
+  }
 
   console.log('\nBloqueio');
   const block = await call('POST', `/users/${b.id}/block`, { token: a.token });
