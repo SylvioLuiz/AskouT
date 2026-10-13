@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "dev": "tsx watch --tsconfig tsconfig.build.json src/http/main.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/http/main.js"
+    "start": "node dist/http/main.js",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
