@@ -10,7 +10,7 @@ Menos tempo combinando. Mais tempo juntos.
 | `apps/api/src/core` (cadastro com código por e-mail, login, perfil, seguir, bloquear, amizade) | **implementado e testado** (tipos limpos) |
 | Suíte de contrato dos repositórios (`core/testing/contracts.ts`) | **passa em memória e contra um Postgres 16 real** (146 testes no total, 3 rodadas seguidas sem falha) |
 | Repositórios Prisma (`apps/api/src/infra/prisma`) | **validados contra Postgres real** pela suíte de contrato |
-| Camada HTTP NestJS (`apps/api/src/http`) | **escrita, NÃO executada**: o NestJS não pôde ser instalado onde isto foi escrito. Partes sem Nest (config, mapeamento de erros, leitura de parâmetros) têm testes e passam |
+| Camada HTTP NestJS (`apps/api/src/http`) | **sobe e responde**: teste de fumaça por HTTP (`npm run smoke`, 34 verificações) passa contra Postgres real; `typecheck:full` limpo. Falta endurecer para produção (ver limitações) |
 | `apps/api/prisma/schema.prisma` + migration `init` | **aplicados em Postgres real** (a migration está em `prisma/migrations`) |
 | View `friendships` + restrições (SQL) | **aplicados em Postgres real** (`prisma/sql/001_...sql`, depois da migration) |
 | Front end (web, painéis, design system) | **não iniciado** |
@@ -49,9 +49,16 @@ Para o banco de teste, repita `migrate deploy` e o `psql` com `DATABASE_URL` apo
 
 **Atenção:** esses testes APAGAM todos os dados do banco de teste a cada caso. Por segurança eles recusam rodar se o nome do banco não terminar em `_test`.
 
-Ainda **não validado**: subir a API (`npm run dev`) e chamar as rotas por HTTP, e `npm run typecheck:full` com NestJS e Prisma reais.
+## Subir a API e testar por HTTP
 
-## Rotas da API (camada HTTP, ainda não executada)
+    cd apps/api
+    # preencha JWT_SECRET e CODE_SECRET no .env (valores diferentes, 32+ caracteres)
+    npx tsx --tsconfig tsconfig.build.json src/http/main.ts > ~/askout-api.log 2>&1 &
+    npm run smoke        # cadastra 3 usuários novos e confere cadastro, login, seguir, privado e bloqueio
+
+`npm run dev` faz o mesmo com reinício automático a cada alteração de arquivo. Em desenvolvimento o código de cadastro não é enviado por e-mail: aparece no log da API (`[DEV e-mail]`), que é de onde o teste de fumaça o lê.
+
+## Rotas da API
 
 Sem token: `POST /auth/signup`, `POST /auth/signup/resend`, `POST /auth/signup/confirm`, `POST /auth/login`. Todas as outras exigem `Authorization: Bearer <token>`.
 
@@ -112,8 +119,8 @@ Os testes foram checados também quebrando as regras de propósito (por exemplo,
 
 ## Próximos passos
 
-1. Rodar `npm run typecheck:full`, subir a API (`npm run dev`) e testar cadastro e login por HTTP; corrigir o que aparecer.
-2. Escolher o provedor de e-mail e implementar o envio real; limite por IP e Helmet.
+1. Escolher o provedor de e-mail e implementar o envio real; limite por IP e Helmet (hoje só o cadastro tem limites, no núcleo).
+2. Front end web: cadastro, login, perfil, seguir e bloquear consumindo estas rotas.
 3. Limite de tentativas, verificação de e-mail, recuperação de senha, refresh token.
 4. Fase 2: expansão de recorrência, agenda manual, encontros e convites usando o motor, conversas, grupos e Flash.
 5. Design system e navegação do app web.
