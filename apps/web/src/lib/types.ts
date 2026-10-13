@@ -170,4 +170,73 @@ export interface FlashMatch {
   now: string;
   me: FlashPosition | null;
   them: FlashPosition | null;
+  /** Conversa 1:1 dos dois, criada ao aceitar. */
+  conversationId: string;
+}
+
+// ---------- Conversas e sugestões ----------
+
+/** Cartão de sugestão de lugar ou evento, enviado numa conversa. Nunca traz a posição de ninguém. */
+export interface SuggestionCard {
+  source: 'EVENT' | 'OSM';
+  title: string;
+  venueName: string;
+  lat: number;
+  lng: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  /** Dado de exemplo para teste, nunca um evento real. */
+  sample: boolean;
+  externalId: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  mine: boolean;
+  kind: 'TEXT' | 'SUGGESTION';
+  body: string;
+  suggestion: SuggestionCard | null;
+  createdAt: string;
+}
+
+export interface ConversationItem {
+  id: string;
+  other: PublicProfile;
+  lastMessage: ChatMessage | null;
+  unread: number;
+  canSend: boolean;
+}
+
+export interface ChatView {
+  id: string;
+  other: PublicProfile;
+  canSend: boolean;
+  /** Relógio do servidor. */
+  now: string;
+  messages: ChatMessage[];
+  hasMore: boolean;
+}
+
+export interface SuggestionItem {
+  key: string;
+  source: 'EVENT' | 'OSM';
+  title: string;
+  venueName: string;
+  category: string | null;
+  startsAt: string | null;
+  endsAt: string | null;
+  sample: boolean;
+  lat: number;
+  lng: number;
+  distanceFromMeM: number;
+  distanceFromThemM: number;
+  distanceFromMidM: number;
+}
+
+export interface Suggestions {
+  reason: 'TOO_FAR' | null;
+  radiusM: number;
+  osmAvailable: boolean;
+  items: SuggestionItem[];
 }

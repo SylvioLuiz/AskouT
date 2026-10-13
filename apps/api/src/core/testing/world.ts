@@ -3,6 +3,9 @@ import { createCore } from '../index.ts';
 import type { AuthResult } from '../auth-service.ts';
 import {
   FakeClock,
+  FakePlaceSource,
+  InMemoryConversationRepository,
+  InMemoryPlaceRepository,
   InMemoryAvailabilityRepository,
   InMemoryFlashRepository,
   FakeEmailSender,
@@ -22,6 +25,9 @@ export function makeWorld() {
   const follows = new InMemoryFollowRepository(blocks);
   const availability = new InMemoryAvailabilityRepository();
   const flash = new InMemoryFlashRepository();
+  const conversations = new InMemoryConversationRepository();
+  const places = new InMemoryPlaceRepository();
+  const placeSource = new FakePlaceSource();
   const users = new InMemoryUserRepository();
   const pending = new InMemoryPendingSignupRepository();
   const mailer = new FakeEmailSender();
@@ -32,7 +38,7 @@ export function makeWorld() {
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, pending, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, places, placeSource, pending, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string } = {}): Promise<AuthResult> {
@@ -49,5 +55,5 @@ export function makeWorld() {
     return out;
   }
 
-  return { core, users, follows, blocks, availability, flash, pending, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+  return { core, users, follows, blocks, availability, flash, conversations, places, placeSource, pending, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
 }

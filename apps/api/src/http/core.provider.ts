@@ -5,11 +5,14 @@ import { createCore } from '../core/index.ts';
 import {
   PrismaAvailabilityRepository,
   PrismaBlockRepository,
+  PrismaConversationRepository,
+  PrismaPlaceRepository,
   PrismaFlashRepository,
   PrismaFollowRepository,
   PrismaPendingSignupRepository,
   PrismaUserRepository,
 } from '../infra/prisma/index.ts';
+import { OverpassPlaceSource } from '../infra/overpass/overpass-place-source.ts';
 import { ConsoleEmailSender } from './console-email-sender.ts';
 import type { AppConfig } from './support/config.ts';
 import { CONFIG, CORE, PRISMA } from './tokens.ts';
@@ -25,6 +28,9 @@ export const coreProvider = {
       blocks: new PrismaBlockRepository(prisma),
       availability: new PrismaAvailabilityRepository(prisma),
       flash: new PrismaFlashRepository(prisma),
+      conversations: new PrismaConversationRepository(prisma),
+      places: new PrismaPlaceRepository(prisma),
+      placeSource: new OverpassPlaceSource({ contact: config.osmContact }),
       pending: new PrismaPendingSignupRepository(prisma),
       mailer: new ConsoleEmailSender(),
       codes: new HmacOneTimeCodes({ secret: config.codeSecret }),

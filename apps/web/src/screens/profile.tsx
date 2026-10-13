@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LockIcon } from '../components/icons.tsx';
+import { ChatButton } from '../components/chat-button.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -152,6 +153,7 @@ export function ProfileScreen({ username }: { username: string }) {
             {action.label}
           </Button>
         ) : null}
+        {relationship.isFriend && !relationship.isSelf && action.kind !== 'blocked' ? <ChatButton userId={profile.userId} variant="primary" /> : null}
         {action.kind === 'blocked' ? (
           <Button variant="secondary" loading={busy} onClick={() => run(() => api.unblock(profile.userId), `Você desbloqueou @${profile.username}.`)}>
             Desbloquear

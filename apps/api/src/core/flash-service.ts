@@ -61,6 +61,8 @@ export interface MatchView {
   now: string;
   me: PositionView | null;
   them: PositionView | null;
+  /** Conversa 1:1 dos dois (criada ao aceitar). Continua existindo depois que o Flash acaba. */
+  conversationId: string;
 }
 
 function sessionView(s: FlashSessionRecord | undefined): FlashStatusView {
@@ -190,7 +192,7 @@ export class FlashService {
   }
 
   /** Quem recebeu aceita ou recusa. Ao aceitar, os dois passam a ver a posição um do outro até o encontro acabar. */
-  async respond(actorId: string, inviteId: string, action: unknown): Promise<{ status: 'ACCEPTED' | 'DECLINED' }> {
+  async respond(actorId: string, inviteId: string, action: unknown): Promise<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }> {
     if (action !== 'accept' && action !== 'decline') {
       throw validationError('Ação inválida', { action: 'Use accept ou decline' });
     }
@@ -207,7 +209,7 @@ export class FlashService {
 
     if (action === 'decline') {
       await flash.saveInvite({ ...invite, status: 'DECLINED', respondedAt: now, endedAt: now });
-      return { status: 'DECLINED' };
+      return { status: 'DECLINED', conversationId: null };
     }
 
     const [mine, theirs] = await Promise.all([flash.findActiveSession(actorId, now), flash.findActiveSession(invite.fromUserId, now)]);
@@ -222,7 +224,8 @@ export class FlashService {
       respondedAt: now,
       expiresAt: new Date(Math.min(mine.expiresAt.getTime(), theirs.expiresAt.getTime())),
     });
-    return { status: 'ACCEPTED' };
+    const conversation = await this.deps.conversations.getOrCreateDirect(invite.fromUserId, invite.toUserId, this.deps.ids.next(), now);
+    return { status: 'ACCEPTED', conversationId: conversation.id };
   }
 
   /** Cancela um convite que você enviou, recusa um que recebeu ou encerra um encontro. A posição some. Idempotente. */
@@ -300,7 +303,16 @@ export class FlashService {
       now: now.toISOString(),
       me: view(positions.find((p) => p.userId === actorId)),
       them: view(positions.find((p) => p.userId === otherId)),
+      conversationId: (await this.deps.conversations.getOrCreateDirect(actorId, otherId, this.deps.ids.next(), now)).id,
     };
+  }
+
+  /** Para as sugestões: as duas últimas posições do encontro (uso interno do núcleo, nunca vai para a API). */
+  async positionsForMatch(actorId: string, inviteId: string): Promise<{ me: FlashPositionRecord | undefined; them: FlashPositionRecord | undefined; otherId: string }> {
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, this.deps.clock.now());
+    const otherId = invite.fromUserId === actorId ? invite.toUserId : invite.fromUserId;
+    const positions = await this.deps.flash.listPositions(inviteId);
+    return { me: positions.find((p) => p.userId === actorId), them: positions.find((p) => p.userId === otherId), otherId };
   }
 
   /** Faxina periódica (chamada por um agendador na camada HTTP). */

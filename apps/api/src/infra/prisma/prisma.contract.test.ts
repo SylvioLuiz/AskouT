@@ -4,6 +4,8 @@ import type { UserStatus } from '../../core/types.ts';
 import {
   PrismaAvailabilityRepository,
   PrismaBlockRepository,
+  PrismaConversationRepository,
+  PrismaPlaceRepository,
   PrismaFlashRepository,
   PrismaFollowRepository,
   PrismaPendingSignupRepository,
@@ -48,12 +50,14 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     pending: new PrismaPendingSignupRepository(prisma),
     availability: new PrismaAvailabilityRepository(prisma),
     flash: new PrismaFlashRepository(prisma),
+    conversations: new PrismaConversationRepository(prisma),
+    places: new PrismaPlaceRepository(prisma),
     async setUserStatus(userId: string, status: UserStatus) {
       await prisma.user.update({ where: { id: userId }, data: { status } });
     },
     async reset() {
-      // CASCADE leva junto todas as tabelas que referenciam "User"; PendingSignup não tem chave estrangeira.
-      await prisma.$executeRawUnsafe('TRUNCATE TABLE "User", "PendingSignup" CASCADE');
+      // CASCADE leva junto todas as tabelas que referenciam "User"; PendingSignup e Venue não têm chave estrangeira para User.
+      await prisma.$executeRawUnsafe('TRUNCATE TABLE "User", "PendingSignup", "Venue" CASCADE');
     },
     async close() {
       await prisma.$disconnect();

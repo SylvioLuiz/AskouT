@@ -1,6 +1,9 @@
 import { conflict } from '../errors.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
+  ConversationRepository,
+  PlaceRepository,
+  PlaceSource,
   AvailabilityRepository,
   FlashRepository,
   BlockRepository,
@@ -11,7 +14,8 @@ import type {
   PendingSignupRepository,
   UserRepository,
 } from '../ports.ts';
-import type { AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import { distanceMeters } from '../geo.ts';
+import type { ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -442,5 +446,103 @@ export class SequentialIds implements IdGenerator {
   next(): string {
     this.n += 1;
     return `id-${this.n}`;
+  }
+}
+
+export class InMemoryConversationRepository implements ConversationRepository {
+  readonly conversations = new Map<string, ConversationRecord>();
+  readonly participants = new Map<string, Map<string, Date | null>>();
+  readonly messages: MessageRecord[] = [];
+
+  async getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord> {
+    const directKey = a < b ? `${a}:${b}` : `${b}:${a}`;
+    for (const c of this.conversations.values()) if (c.directKey === directKey) return { ...c };
+    const record: ConversationRecord = { id, directKey, createdAt: now };
+    this.conversations.set(id, record);
+    this.participants.set(id, new Map([[a, null], [b, null]]));
+    return { ...record };
+  }
+
+  async findById(id: string): Promise<ConversationRecord | undefined> {
+    const c = this.conversations.get(id);
+    return c ? { ...c } : undefined;
+  }
+
+  async participantIds(conversationId: string): Promise<[string, string] | undefined> {
+    const p = this.participants.get(conversationId);
+    if (!p) return undefined;
+    const [x, y] = [...p.keys()];
+    return x !== undefined && y !== undefined ? [x, y] : undefined;
+  }
+
+  async listForUser(userId: string): Promise<ConversationSummaryRecord[]> {
+    const out: ConversationSummaryRecord[] = [];
+    for (const [id, p] of this.participants) {
+      if (!p.has(userId)) continue;
+      const msgs = this.messages.filter((m) => m.conversationId === id);
+      const lastRead = p.get(userId) ?? null;
+      const unread = msgs.filter((m) => m.senderId !== userId && (lastRead === null || m.createdAt > lastRead)).length;
+      const [x, y] = [...p.keys()] as [string, string];
+      out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [x, y], lastMessage: msgs.at(-1) ?? null, unread });
+    }
+    const stamp = (s: ConversationSummaryRecord) => (s.lastMessage ?? s.conversation).createdAt.getTime();
+    return out.sort((a, b) => stamp(b) - stamp(a));
+  }
+
+  async addMessage(message: MessageRecord): Promise<void> {
+    this.messages.push({ ...message });
+  }
+
+  async listMessages(conversationId: string, limit: number, before?: Date): Promise<MessageRecord[]> {
+    const all = this.messages.filter((m) => m.conversationId === conversationId && (before === undefined || m.createdAt < before));
+    return all.slice(Math.max(0, all.length - limit)).map((m) => ({ ...m }));
+  }
+
+  async markRead(conversationId: string, userId: string, now: Date): Promise<void> {
+    const p = this.participants.get(conversationId);
+    if (p?.has(userId)) p.set(userId, now);
+  }
+
+  async countSentSince(userId: string, since: Date): Promise<number> {
+    return this.messages.filter((m) => m.senderId === userId && m.createdAt >= since).length;
+  }
+}
+
+export class InMemoryPlaceRepository implements PlaceRepository {
+  readonly venues = new Map<string, VenueRecord>();
+  readonly events = new Map<string, PlaceEventRecord>();
+
+  async createVenue(venue: VenueRecord): Promise<void> {
+    this.venues.set(venue.id, { ...venue });
+  }
+
+  async createEvent(event: PlaceEventRecord): Promise<void> {
+    this.events.set(event.id, { ...event });
+  }
+
+  async findEventsNear(center: { lat: number; lng: number }, radiusM: number, from: Date, to: Date, limit: number) {
+    const rows: { event: PlaceEventRecord; venue: VenueRecord; d: number }[] = [];
+    for (const event of this.events.values()) {
+      const venue = this.venues.get(event.venueId);
+      if (!venue) continue;
+      // Em andamento ou começando no intervalo: termina depois de `from` e começa antes de `to`.
+      if (!(event.endsAt > from && event.startsAt < to)) continue;
+      const d = distanceMeters(center, venue);
+      if (d <= radiusM) rows.push({ event: { ...event }, venue: { ...venue }, d });
+    }
+    rows.sort((a, b) => a.d - b.d || a.event.startsAt.getTime() - b.event.startsAt.getTime() || (a.event.id < b.event.id ? -1 : 1));
+    return rows.slice(0, limit).map(({ event, venue }) => ({ event, venue }));
+  }
+}
+
+/** Fonte de lugares falsa para testes: devolve o que for configurado. */
+export class FakePlaceSource implements PlaceSource {
+  places: ExternalPlace[] = [];
+  available = true;
+  calls = 0;
+
+  async nearby(): Promise<{ available: boolean; places: ExternalPlace[] }> {
+    this.calls += 1;
+    return this.available ? { available: true, places: this.places.map((p) => ({ ...p })) } : { available: false, places: [] };
   }
 }

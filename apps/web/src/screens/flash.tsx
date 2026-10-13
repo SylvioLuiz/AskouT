@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BoltIcon } from '../components/icons.tsx';
+import { ChatButton } from '../components/chat-button.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
@@ -240,9 +241,10 @@ export function FlashScreen() {
                     <span className="person__handle">Aceitou sair com você</span>
                   </span>
                 </Link>
-                <div className="person__aside">
-                  <Link to={`/flash/encontro/${invite.id}`} className="btn btn--primary btn--small">
-                    Ver encontro
+                <div className="person__aside row-actions">
+                  <ChatButton userId={invite.other.userId} variant="primary" small />
+                  <Link to={`/flash/encontro/${invite.id}`} className="btn btn--secondary btn--small">
+                    Mapa
                   </Link>
                 </div>
               </li>
@@ -391,9 +393,11 @@ function InviteRow({ invite, canAccept, onChanged, onFeedback }: { invite: Flash
   async function answer(action: 'accept' | 'decline') {
     setBusy(action);
     try {
-      await api.flashRespond(invite.id, action);
+      const result = await api.flashRespond(invite.id, action);
       if (action === 'accept') {
-        navigate(`/flash/encontro/${invite.id}`);
+        announceFlashChange();
+        // Aceitou: abre a conversa com a pessoa. O mapa do encontro fica a um toque dali.
+        navigate(result.conversationId ? `/conversas/${result.conversationId}` : `/flash/encontro/${invite.id}`);
         return;
       }
       onChanged();
@@ -627,6 +631,9 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
       </section>
 
       <div className="stack">
+        <Link to={`/conversas/${data.conversationId}`} className="btn btn--primary btn--full">
+          Conversar e sugerir um lugar
+        </Link>
         {confirmEnd ? (
           <Confirm question="Encerrar o encontro? A localização dos dois deixa de ser compartilhada." confirmLabel="Encerrar" onConfirm={endMatch} onCancel={() => setConfirmEnd(false)} busy={busy} danger />
         ) : (

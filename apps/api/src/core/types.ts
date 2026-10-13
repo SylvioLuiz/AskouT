@@ -135,3 +135,77 @@ export interface FlashPositionRecord {
   accuracyM: number | null;
   updatedAt: Date;
 }
+
+// ---------- Conversas ----------
+
+export type MessageKind = 'TEXT' | 'SUGGESTION';
+
+/** Conversa 1 a 1 entre amigos. `directKey` = "<menor id>:<maior id>", único por dupla. */
+export interface ConversationRecord {
+  id: string;
+  directKey: string;
+  createdAt: Date;
+}
+
+/** Cartão de sugestão enviado numa conversa. Não carrega nada sobre onde as pessoas estão. */
+export interface SuggestionCard {
+  source: 'EVENT' | 'OSM';
+  title: string;
+  venueName: string;
+  lat: number;
+  lng: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  /** Dado de teste (nunca apresentado como real). */
+  sample: boolean;
+  /** Id do evento no AskouT ou do elemento no OpenStreetMap, para evitar duplicatas. */
+  externalId: string;
+}
+
+export interface MessageRecord {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  kind: MessageKind;
+  body: string;
+  suggestion: SuggestionCard | null;
+  createdAt: Date;
+}
+
+export interface ConversationSummaryRecord {
+  conversation: ConversationRecord;
+  participantIds: [string, string];
+  lastMessage: MessageRecord | null;
+  unread: number;
+}
+
+// ---------- Lugares e eventos ----------
+
+export interface VenueRecord {
+  id: string;
+  name: string;
+  address: string | null;
+  category: string | null;
+  lat: number;
+  lng: number;
+  isSample: boolean;
+}
+
+export interface PlaceEventRecord {
+  id: string;
+  venueId: string;
+  title: string;
+  description: string | null;
+  startsAt: Date;
+  endsAt: Date;
+  isSample: boolean;
+}
+
+/** Lugar vindo de uma fonte externa (OpenStreetMap). */
+export interface ExternalPlace {
+  externalId: string;
+  name: string;
+  category: string | null;
+  lat: number;
+  lng: number;
+}

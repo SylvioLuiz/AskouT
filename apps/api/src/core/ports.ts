@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, ExternalPlace, MessageRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -100,6 +100,44 @@ export interface FlashRepository {
   purgeExpired(now: Date): Promise<{ invites: number; positions: number; removed: number }>;
 }
 
+export interface ConversationRepository {
+  /** Idempotente: devolve a conversa da dupla, criando (com os dois participantes) se não existir. */
+  getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord>;
+  findById(id: string): Promise<ConversationRecord | undefined>;
+  /** Os dois participantes de uma conversa DIRECT. */
+  participantIds(conversationId: string): Promise<[string, string] | undefined>;
+  /** Conversas do usuário, da mais recente para a mais antiga (por última mensagem, depois criação). */
+  listForUser(userId: string): Promise<ConversationSummaryRecord[]>;
+  addMessage(message: MessageRecord): Promise<void>;
+  /** Mensagens em ordem cronológica. `before` pagina para trás (só as anteriores a esse instante). */
+  listMessages(conversationId: string, limit: number, before?: Date): Promise<MessageRecord[]>;
+  /** Marca como lida até `now` para `userId`. */
+  markRead(conversationId: string, userId: string, now: Date): Promise<void>;
+  /** Quantas mensagens `userId` enviou desde `since` (limite de envio). */
+  countSentSince(userId: string, since: Date): Promise<number>;
+}
+
+export interface PlaceRepository {
+  createVenue(venue: VenueRecord): Promise<void>;
+  createEvent(event: PlaceEventRecord): Promise<void>;
+  /**
+   * Eventos que acontecem entre `from` e `to` (em andamento ou que começam nesse intervalo) em locais a até
+   * `radiusM` metros de `center`. Mais perto primeiro. O filtro por distância é exato, não só por caixa.
+   */
+  findEventsNear(
+    center: { lat: number; lng: number },
+    radiusM: number,
+    from: Date,
+    to: Date,
+    limit: number,
+  ): Promise<{ event: PlaceEventRecord; venue: VenueRecord }[]>;
+}
+
+/** Fonte externa de lugares (OpenStreetMap). Nunca lança: se não conseguir, devolve `available: false`. */
+export interface PlaceSource {
+  nearby(center: { lat: number; lng: number }, radiusM: number, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }>;
+}
+
 export interface EmailSender {
   /** Falha com erro comum se o e-mail não puder ser enviado. */
   sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void>;
@@ -144,6 +182,9 @@ export interface CoreDeps {
   blocks: BlockRepository;
   availability: AvailabilityRepository;
   flash: FlashRepository;
+  conversations: ConversationRepository;
+  places: PlaceRepository;
+  placeSource: PlaceSource;
   pending: PendingSignupRepository;
   mailer: EmailSender;
   codes: OneTimeCodes;

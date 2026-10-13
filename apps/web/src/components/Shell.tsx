@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling } from '../hooks.ts';
+import { CHATS_CHANGED_EVENT } from '../lib/chat.ts';
 import { FLASH_CHANGED_EVENT } from '../lib/flash.ts';
 import { Link, usePathname } from '../router.tsx';
 import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, HomeIcon, SearchIcon, UserIcon } from './icons.tsx';
@@ -59,6 +60,15 @@ export function Shell({ children }: { children: ReactNode }) {
     window.addEventListener(FLASH_CHANGED_EVENT, reloadFlash);
     return () => window.removeEventListener(FLASH_CHANGED_EVENT, reloadFlash);
   });
+  // Conversas: bolinha quando há mensagem não lida.
+  const convs = useAsync(() => api.conversations(), [pathname]);
+  usePolling(convs.reload, 15_000);
+  useEffect(() => {
+    window.addEventListener(CHATS_CHANGED_EVENT, convs.reload);
+    return () => window.removeEventListener(CHATS_CHANGED_EVENT, convs.reload);
+  }, [convs.reload]);
+  const hasUnread = (convs.data?.items ?? []).some((c) => c.unread > 0);
+  const inChat = /^\/conversas\/[^/]+$/.test(pathname);
   const flashOn = flash.data?.active === true;
   const flashInvited = (flashInvites.data?.received.length ?? 0) > 0;
   const flashLabel = flashInvited ? 'Flash, você tem um convite' : flashOn ? 'Flash, ligado' : 'Flash';
@@ -73,7 +83,7 @@ export function Shell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="shell">
+    <div className={`shell${inChat ? ' shell--chat' : ''}`}>
       <a className="skip" href="#conteudo">
         Ir para o conteúdo
       </a>
@@ -84,7 +94,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </Link>
         <nav className="rail__nav" aria-label="Principal">
           {MAIN.map((item) => (
-            <NavLink key={item.to} item={item} pathname={pathname} />
+            <NavLink key={item.to} item={item} pathname={pathname} badge={item.to === '/conversas' && hasUnread} />
           ))}
           <NavLink item={flashItem} pathname={pathname} badge={flashInvited} />
           <NavLink item={activities} pathname={pathname} badge={hasPending} />
@@ -124,7 +134,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <nav className="tabbar" aria-label="Principal">
         {MAIN.map((item) => (
-          <NavLink key={item.to} item={item} pathname={pathname} />
+          <NavLink key={item.to} item={item} pathname={pathname} badge={item.to === '/conversas' && hasUnread} />
         ))}
       </nav>
     </div>

@@ -218,6 +218,39 @@ try {
   await call('POST', `/flash/invites/${inv4.body.id}/respond`, { token: b.token, body: { action: 'accept' } });
   await call('PUT', `/flash/matches/${inv4.body.id}/location`, { token: a.token, body: { lat: -23.5, lng: -46.6 } });
 
+  console.log('\nConversas e sugestões');
+  const acc = await call('POST', `/flash/invites/${inv4.body.id}/respond`, { token: b.token, body: { action: 'accept' } });
+  check('aceitar de novo o convite já aceito falha (404)', acc.status === 404, acc.body);
+  const matchView = await call('GET', `/flash/matches/${inv4.body.id}`, { token: a.token });
+  const convId = matchView.body?.conversationId;
+  check('o encontro traz a conversa dos dois', typeof convId === 'string', matchView.body);
+  const early = await call('GET', `/flash/matches/${inv4.body.id}/suggestions`, { token: a.token });
+  check('sugestões sem a localização dos dois: 409', early.status === 409, early.body);
+  await call('PUT', `/flash/matches/${inv4.body.id}/location`, { token: b.token, body: { lat: -23.51, lng: -46.61 } });
+  const sug = await call('GET', `/flash/matches/${inv4.body.id}/suggestions`, { token: a.token });
+  check('sugestões com a localização dos dois: 200', sug.status === 200 && Array.isArray(sug.body?.items), sug.body);
+  check('sugestão de quem não participa: 404', (await call('GET', `/flash/matches/${inv4.body.id}/suggestions`, { token: c.token })).status === 404);
+
+  const list0 = await call('GET', '/conversations', { token: b.token });
+  check('lista de conversas', list0.status === 200 && list0.body.items.some((i) => i.id === convId), list0.body);
+  const opened = await call('POST', '/conversations', { token: b.token, body: { userId: a.id } });
+  check('abrir a conversa com o amigo devolve a mesma', opened.body?.id === convId, opened.body);
+  check('abrir conversa com quem não é amigo: 403', (await call('POST', '/conversations', { token: a.token, body: { userId: c.id } })).status === 403);
+  const sent = await call('POST', `/conversations/${convId}/messages`, { token: a.token, body: { body: '  Bora tomar um café?  ' } });
+  check('enviar mensagem', sent.status === 201 && sent.body?.body === 'Bora tomar um café?', sent.body);
+  check('mensagem vazia: 400', (await call('POST', `/conversations/${convId}/messages`, { token: a.token, body: { body: '   ' } })).status === 400);
+  const card = { source: 'OSM', title: 'Café Teste', venueName: 'Café Teste', lat: -23.52, lng: -46.62, startsAt: null, endsAt: null, sample: false, externalId: 'node/1' };
+  const sentCard = await call('POST', `/conversations/${convId}/messages`, { token: a.token, body: { suggestion: card } });
+  check('enviar sugestão', sentCard.status === 201 && sentCard.body?.kind === 'SUGGESTION', sentCard.body);
+  const unreadList = await call('GET', '/conversations', { token: b.token });
+  check('não lidas aparecem para quem recebeu', unreadList.body.items.find((i) => i.id === convId)?.unread === 2, unreadList.body);
+  const read = await call('GET', `/conversations/${convId}/messages`, { token: b.token });
+  check('ler as mensagens em ordem', read.status === 200 && read.body.messages.length === 2 && read.body.messages[1].kind === 'SUGGESTION' && read.body.canSend === true, read.body);
+  check('abrir marcou como lida', (await call('GET', '/conversations', { token: b.token })).body.items.find((i) => i.id === convId)?.unread === 0);
+  check('quem não participa não lê (404)', (await call('GET', `/conversations/${convId}/messages`, { token: c.token })).status === 404);
+  check('id inválido: 400', (await call('GET', '/conversations/xyz/messages', { token: a.token })).status === 400);
+  check('sem login: 401', (await call('GET', '/conversations')).status === 401);
+
   console.log('\nBloqueio');
   const block = await call('POST', `/users/${b.id}/block`, { token: a.token });
   check('bloquear', block.status === 200, block.body);
@@ -231,6 +264,7 @@ try {
   check('quem foi bloqueado não consegue seguir', blockedFollow.status === 404 || blockedFollow.status === 403, blockedFollow.body);
   const blockedList = await call('GET', '/me/blocks', { token: a.token });
   check('lista de bloqueados', blockedList.body?.length === 1, blockedList.body);
+  check('bloquear esconde a conversa dos dois', (await call('GET', `/conversations/${convId}/messages`, { token: b.token })).status === 404 && (await call('GET', '/conversations', { token: a.token })).body.items.every((i) => i.id !== convId));
   const unblock = await call('DELETE', `/users/${b.id}/block`, { token: a.token });
   check('desbloquear', unblock.status === 200 && unblock.body.removed === true, unblock.body);
 } catch (error) {

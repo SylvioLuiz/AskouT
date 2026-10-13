@@ -2,6 +2,11 @@ import { errorFromResponse, networkError } from './errors.ts';
 import type {
   AuthResult,
   AvailableFriend,
+  ChatMessage,
+  ChatView,
+  ConversationItem,
+  SuggestionCard,
+  Suggestions,
   FlashInvite,
   FlashInvites,
   FlashMatch,
@@ -151,11 +156,28 @@ export function createApi(deps: ApiDeps) {
     flashInvites: () => request<FlashInvites>('GET', '/flash/invites'),
     flashInvite: (userId: string) => request<FlashInvite>('POST', '/flash/invites', { body: { userId } }),
     flashRespond: (inviteId: string, action: 'accept' | 'decline') =>
-      request<{ status: 'ACCEPTED' | 'DECLINED' }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: { action } }),
+      request<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: { action } }),
     flashEnd: (inviteId: string) => request<{ ended: boolean }>('DELETE', `/flash/invites/${id(inviteId)}`),
     flashMatch: (inviteId: string) => request<FlashMatch>('GET', `/flash/matches/${id(inviteId)}`),
     flashShareLocation: (inviteId: string, position: { lat: number; lng: number; accuracyM?: number }) =>
       request<{ ok: true }>('PUT', `/flash/matches/${id(inviteId)}/location`, { body: position }),
+
+    flashSuggestions: (inviteId: string) => request<Suggestions>('GET', `/flash/matches/${id(inviteId)}/suggestions`),
+
+    // Conversas
+    conversations: () => request<{ items: ConversationItem[] }>('GET', '/conversations'),
+    openConversation: (userId: string) => request<{ id: string }>('POST', '/conversations', { body: { userId } }),
+    messages: (conversationId: string, options: { before?: string; limit?: number } = {}) => {
+      const params: string[] = [];
+      if (options.before !== undefined) params.push(`before=${id(options.before)}`);
+      if (options.limit !== undefined) params.push(`limit=${options.limit}`);
+      return request<ChatView>('GET', `/conversations/${id(conversationId)}/messages${params.length > 0 ? `?${params.join('&')}` : ''}`);
+    },
+    sendText: (conversationId: string, body: string) =>
+      request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { body } }),
+    sendSuggestion: (conversationId: string, suggestion: SuggestionCard) =>
+      request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { suggestion } }),
+    markRead: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/read`),
 
     // Bloqueios
     block: (userId: string) => request<{ ok: true }>('POST', `/users/${id(userId)}/block`),

@@ -1866,3 +1866,305 @@ button {
 .pin--stale {
   opacity: 0.55;
 }
+
+/* ---------- Conversas ---------- */
+
+.convlist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.convrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 0;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.convrow__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.convrow__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.convrow__name {
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.convrow__time {
+  flex: none;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.convrow__preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.convrow--unread .convrow__preview,
+.convrow--unread .convrow__time {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.convrow__count {
+  flex: none;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  background: var(--brand);
+  color: var(--brand-ink);
+  border-radius: 11px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Conversa aberta: a barra de baixo sai para dar lugar ao campo de mensagem. */
+.shell--chat .tabbar {
+  display: none;
+}
+
+.shell--chat .content {
+  padding-bottom: 0;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 120px);
+}
+
+.chat__match {
+  margin-bottom: 8px;
+}
+
+.chat__thread {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  padding-bottom: 12px;
+}
+
+.chat__older {
+  display: flex;
+  justify-content: center;
+}
+
+.chat__empty {
+  text-align: center;
+  margin: 32px 0;
+}
+
+.chat__day {
+  margin: 12px 0 6px;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.bubble {
+  position: relative;
+  max-width: 82%;
+  padding: 8px 12px 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px 16px 16px 4px;
+  overflow-wrap: anywhere;
+}
+
+.bubble--mine {
+  margin-left: auto;
+  background: var(--brand-soft);
+  border-color: transparent;
+  border-radius: 16px 16px 4px 16px;
+}
+
+.bubble--card {
+  width: min(82%, 320px);
+}
+
+.bubble__text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.bubble__time {
+  display: block;
+  margin-top: 2px;
+  text-align: right;
+  font-size: 0.6875rem;
+  color: var(--muted);
+}
+
+.composer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 -16px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+.composer__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  max-height: 120px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 1rem; /* 16 px: o iPhone não dá zoom ao focar */
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--line-strong);
+  border-radius: 14px;
+  resize: none;
+  field-sizing: content;
+}
+
+.composer__input:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+/* ---------- Sugestões de lugar ---------- */
+
+.sheet__lead {
+  margin: 0 0 10px;
+}
+
+.sheet__foot {
+  margin: 10px 0 0;
+  font-size: 0.8125rem;
+}
+
+.carousel {
+  display: flex;
+  gap: 10px;
+  margin: 0 -16px;
+  padding: 4px 16px 8px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 16px;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.carousel__slide {
+  flex: 0 0 82%;
+  max-width: 320px;
+  scroll-snap-align: start;
+}
+
+.sugcard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+  padding: 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-panel);
+}
+
+.sugcard--inline {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.sugcard__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sugcard__title {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.sugcard__venue,
+.sugcard__when,
+.sugcard__dist {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.sugcard__when {
+  font-weight: 600;
+}
+
+.sugcard__dist {
+  color: var(--muted);
+}
+
+.sugcard__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.sugcard__map {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  font-size: 0.9375rem;
+}
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.tag--event {
+  background: var(--brand-soft);
+  color: var(--brand-hover);
+}
+
+.tag--osm {
+  background: #e3f3ea;
+  color: #0b6b44;
+}
+
+.tag--sample {
+  background: #fff1d6;
+  color: #7a4a00;
+}

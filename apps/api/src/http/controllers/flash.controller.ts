@@ -62,6 +62,11 @@ export class FlashController {
     return this.core.flash.getMatch(actor.userId, inviteId);
   }
 
+  @Get('flash/matches/:inviteId/suggestions')
+  suggestions(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string) {
+    return this.core.suggestions.forMatch(actor.userId, inviteId);
+  }
+
   @Put('flash/matches/:inviteId/location')
   shareLocation(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string, @Body() body: unknown) {
     const b = asBody(body);

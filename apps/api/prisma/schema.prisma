@@ -78,6 +78,11 @@ enum ConversationType {
   GROUP
 }
 
+enum MessageKind {
+  TEXT
+  SUGGESTION
+}
+
 model User {
   id           String     @id @default(uuid()) @db.Uuid
   email        String     @unique
@@ -274,6 +279,8 @@ model Conversation {
   id      String           @id @default(uuid()) @db.Uuid
   type    ConversationType
   groupId String?          @unique @db.Uuid
+  /// Só nas conversas DIRECT: "<menor id>:<maior id>" da dupla, para existir uma única conversa por par.
+  directKey String?        @unique
   createdAt DateTime       @default(now())
 
   group        Group?                    @relation(fields: [groupId], references: [id], onDelete: Cascade)
@@ -297,7 +304,10 @@ model Message {
   id             String   @id @default(uuid()) @db.Uuid
   conversationId String   @db.Uuid
   senderId       String   @db.Uuid
+  kind           MessageKind @default(TEXT)
   body           String
+  /// Cartão de sugestão de lugar/evento (kind = SUGGESTION); texto simples em `body` serve de reserva.
+  suggestion     Json?
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -382,4 +392,41 @@ model PendingSignup {
   createdAt    DateTime @default(now())
 
   @@index([expiresAt])
+}
+
+/// Local físico (bar, café, casa de show). Por enquanto cadastrado à mão ou por seed de TESTE (isSample);
+/// o painel de bares passa a criar e editar isto.
+model Venue {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  address   String?
+  category  String?
+  lat       Float
+  lng       Float
+  /// Dado de teste, nunca apresentado como real.
+  isSample  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events PlaceEvent[]
+
+  @@index([lat, lng])
+}
+
+/// Evento num local, com data e hora. Chamado PlaceEvent para não colidir com a palavra "Event" em outros contextos.
+model PlaceEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  venueId     String   @db.Uuid
+  title       String
+  description String?
+  startsAt    DateTime
+  endsAt      DateTime
+  isSample    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([startsAt])
+  @@index([venueId])
 }

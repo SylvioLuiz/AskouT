@@ -8,6 +8,8 @@ export interface AppConfig {
   corsOrigins: string[];
   /** Hoje só existe o envio "console" (imprime o código no terminal, só para desenvolvimento). */
   emailTransport: 'console';
+  /** Contato (e-mail ou site) enviado no User-Agent ao consultar o OpenStreetMap. Opcional em desenvolvimento. */
+  osmContact: string | undefined;
 }
 
 const MIN_SECRET = 32;
@@ -59,5 +61,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console' };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined };
 }

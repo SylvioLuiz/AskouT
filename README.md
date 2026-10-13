@@ -16,6 +16,7 @@ Menos tempo combinando. Mais tempo juntos.
 | Agenda: serviço de disponibilidade (`core/availability-service.ts`), repositório Prisma e rotas HTTP | **validado contra Postgres real**: 168 testes (20 de contrato Prisma) e teste de fumaça por HTTP com 45 verificações, sem falhas |
 | App web mobile-first (`apps/web`): conta, perfil, seguir, bloquear, Agenda, Encontrar melhor data | **verificado em navegador real** contra o núcleo em memória (celular 390 px). `typecheck`/`build` do Vite ainda a conferir na sua máquina |
 | Flash (disponível agora): núcleo, repositório Prisma, rotas HTTP e limpeza periódica | núcleo e rotas **testados em memória** (174 testes) e a tela **verificada em navegador de celular** (39 verificações). O repositório Prisma e a migração `flash` **ainda não foram executados em Postgres real**: dependem de você rodar os passos da seção "Flash" abaixo |
+| Conversas entre amigos + sugestões de lugares no encontro Flash | núcleo, rotas e telas **testados em memória** (202 testes de API, 56 de web, 43 verificações em navegador de celular simulado). O repositório Prisma, a migração `conversations_places` e a busca real no OpenStreetMap (Overpass) **ainda não foram executados na sua máquina**: dependem dos passos da seção "Conversas e sugestões" |
 | Flash: mapa com pins (MapLibre + OpenStreetMap) | **confirmado funcionando no celular** (https, MapLibre real, tiles do OpenStreetMap), além de verificado contra um dublê do `maplibre-gl` no navegador de teste |
 | Painéis de bares e admin, app nativo | **não iniciados** |
 
@@ -110,13 +111,24 @@ Sem token: `POST /auth/signup`, `POST /auth/signup/resend`, `POST /auth/signup/c
 | `GET /flash/available` | amigos com Flash ligado (exige o seu ligado); sem localização |
 | `GET/POST /flash/invites` | meus convites (recebidos, enviados, encontros) / convidar (`{userId}`) |
 | `POST /flash/invites/:id/respond` · `DELETE /flash/invites/:id` | aceitar ou recusar (`{action}`) / cancelar ou encerrar |
+| `GET /flash/matches/:id/suggestions` | eventos e lugares perto do ponto médio entre os dois (até 3 km); 409 se um dos dois não compartilhou a localização |
+| `GET/POST /conversations` | minhas conversas (com não lidas) / abrir a conversa com um amigo (`{userId}`) |
+| `GET/POST /conversations/:id/messages` · `POST /conversations/:id/read` | mensagens (`limit`, `before`) / enviar `{body}` ou `{suggestion}` / marcar como lida |
 | `GET /flash/matches/:id` · `PUT /flash/matches/:id/location` | encontro aceito: posição dos dois / enviar a minha (`{lat, lng, accuracyM?}`) |
 
 Erros: `{ "error": { "code", "message", "details?" } }` com status 400/401/403/404/409/429 (429 envia `Retry-After`). Erro inesperado vira 500 genérico, sem vazar detalhes.
 
+## Conversas e sugestões
+
+- **Conversas 1 a 1, só entre amigos.** Aceitar um convite do Flash cria (ou reaproveita) a conversa dos dois; ela continua depois que o Flash acaba. Quem deixa de ser amigo mantém o histórico legível, mas não envia. Bloqueio esconde a conversa dos dois lados; desbloquear traz o histórico de volta. Limite de 30 mensagens por minuto e 2000 caracteres.
+- **Carrossel de sugestões** (só durante um encontro Flash ativo, e só quando os dois compartilharam a localização): o servidor calcula o **ponto médio** entre as duas últimas posições e busca num raio de **3 km**: primeiro **eventos do AskouT** (em andamento ou nas próximas 12 h), depois completa com **lugares do OpenStreetMap** (bares, cafés, restaurantes) até 10. Cada cartão mostra a fonte, o horário (ou "Horário não informado") e as distâncias. Se estiverem a mais de 20 km um do outro, não há sugestão. A resposta **nunca traz a posição das pessoas**; o cartão enviado na conversa também não.
+- **Eventos de exemplo:** ainda não existe cadastro real de eventos (painel do local). Para testar, `cd apps/api && npm run seed:places -- --lat <sua latitude> --lng <sua longitude>` cria 6 lugares com eventos marcados como **[TESTE]** e com o selo "Exemplo de teste" no app. `npm run seed:places -- --clear` apaga todos. Nada disso é apresentado como real.
+- **OpenStreetMap (Overpass):** consulta ao servidor público `overpass-api.de` com cache de 10 min e coordenada arredondada (~110 m); se não responder, o app mostra só os eventos do AskouT e avisa. O servidor público serve para desenvolvimento: em produção é preciso instância própria ou provedor contratado. Defina `OSM_CONTACT` (e-mail ou site) no `.env` da API para identificar o app, como a política do serviço pede. Crédito "© colaboradores do OpenStreetMap" aparece no carrossel.
+- Passos na sua máquina: `git pull`, `npm run update` (aplica a migração `20261014120000_conversations_places` e as restrições `003_*.sql` nos dois bancos e roda os testes, inclusive os de contrato no Postgres), `npm run seed:places`, `npm run dev:all -- --https`, `npm run smoke`.
+
 ## App web (`apps/web`)
 
-React 19 + Vite 7 + TypeScript. Telas: entrar, criar conta (2 passos com código por e-mail), Home (amigos), Explorar (busca), Atividades (pedidos para seguir), perfil de outras pessoas (seguir, pedir, deixar de seguir, bloquear), Meu perfil (editar, privacidade), Amigos, Bloqueados. Agenda (faixa de 28 dias, folha "Marcar horário", agenda do amigo) e "Encontrar melhor data" (escolher amigos, período, duração e horário de início). Flash (raio no topo e botão grande na Home): ligar por 1/2/3 h, mapa na tela do Flash com você e os amigos que aceitaram sair com você, livres agora, convidar, aceitar/recusar, encontro com mapa, distância e bloquear. Conversas aparece como "em breve".
+React 19 + Vite 7 + TypeScript. Telas: entrar, criar conta (2 passos com código por e-mail), Home (amigos), Explorar (busca), Atividades (pedidos para seguir), perfil de outras pessoas (seguir, pedir, deixar de seguir, bloquear), Meu perfil (editar, privacidade), Amigos, Bloqueados. Agenda (faixa de 28 dias, folha "Marcar horário", agenda do amigo) e "Encontrar melhor data" (escolher amigos, período, duração e horário de início). Flash (raio no topo e botão grande na Home): ligar por 1/2/3 h, mapa na tela do Flash com você e os amigos que aceitaram sair com você, livres agora, convidar, aceitar/recusar, encontro com mapa, distância e bloquear. Conversas: lista com não lidas e chat 1 a 1 entre amigos; ao aceitar um convite do Flash a conversa abre, com o botão "Sugerir um lugar" (mini carrossel de eventos e lugares perto do ponto médio entre os dois).
 
 Rodar (a API precisa estar de pé em `localhost:3000`, veja acima):
 
@@ -179,6 +191,7 @@ Os testes foram checados também quebrando as regras de propósito (por exemplo,
 - **`@askout/availability-engine` é consumido como código TypeScript do workspace** (funciona em `npm run dev` e nos testes). O `npm run build` + `npm start` a partir de `dist/` ainda não resolve esse pacote: falta compilar o motor. Resolver antes de publicar.
 - Não há ainda limite de tentativas de login, recuperação de senha nem troca de e-mail. **O envio real de e-mail não existe**: o núcleo usa uma interface (`EmailSender`); falta escolher o provedor (decisão sua, tem custo).
 - **Flash:** a posição só é enviada com a tela do encontro aberta (navegador não envia em segundo plano; o app nativo resolve isso depois). Convites e posições são atualizados por consulta a cada 8–10 s, não por conexão em tempo real. Não há aviso quando alguém te convida fora do app.
+- **Conversas:** as mensagens chegam por consulta a cada 5 s (não em tempo real), sem aviso fora do app, sem anexos, sem editar/apagar, sem marcar "digitando". Mensagens ficam guardadas em texto puro no banco (sem criptografia de ponta a ponta); denúncia e moderação ainda não existem.
 - `total` nas listas de seguidores pode incluir pessoas ocultas por bloqueio de terceiros.
 
 ## Próximos passos
@@ -186,7 +199,7 @@ Os testes foram checados também quebrando as regras de propósito (por exemplo,
 1. Escolher o provedor de e-mail e implementar o envio real; limite por IP e Helmet (hoje só o cadastro tem limites, no núcleo).
 2. Front end web: cadastro, login, perfil, seguir e bloquear consumindo estas rotas.
 3. Limite de tentativas, verificação de e-mail, recuperação de senha, refresh token.
-4. Fase 2 (em andamento): agenda manual e comparação **feitas**; Flash feito e validado no celular; faltam encontros e convites a partir do melhor horário, repetição semanal, conversas e grupos.
+4. Fase 2 (em andamento): agenda manual e comparação **feitas**; Flash feito e validado no celular; conversas 1 a 1 e sugestões de lugares feitas (a validar na sua máquina); faltam encontros e convites a partir do melhor horário, repetição semanal, grupos e o cadastro real de eventos pelo painel do local.
 5. Compilar o motor de compatibilidade para o build de produção da API.
 
 ## Regras do motor de compatibilidade (confirmadas)

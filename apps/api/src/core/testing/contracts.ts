@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
-import type { PendingSignup, Profile, User, UserStatus } from '../types.ts';
+import type { ConversationRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { MessageRecord, PlaceEventRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
  * Suíte de contrato das portas de dados. Roda contra QUALQUER implementação:
@@ -18,6 +18,8 @@ export interface RepoHarness {
   pending: PendingSignupRepository;
   availability: AvailabilityRepository;
   flash: FlashRepository;
+  conversations: ConversationRepository;
+  places: PlaceRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
   /** Apaga todos os dados entre os testes. */
   reset(): Promise<void>;
@@ -617,6 +619,132 @@ export function defineRepositoryContract(
         const later = await h.flash.purgeExpired(at(26 * 60 * MIN));
         assert.ok(later.removed >= 2, 'convite e sessão antigos saem');
         assert.equal(await h.flash.getInvite(accepted.id), undefined);
+      });
+    });
+    describe('conversas', () => {
+      const msg = (conversationId: string, senderId: string, body: string, whenS: number, extra: Partial<{ suggestion: SuggestionCard }> = {}): MessageRecord => ({
+        id: randomUUID(),
+        conversationId,
+        senderId,
+        kind: extra.suggestion ? 'SUGGESTION' : 'TEXT',
+        body,
+        suggestion: extra.suggestion ?? null,
+        createdAt: at(whenS),
+      });
+      const card: SuggestionCard = { source: 'EVENT', title: 'Jazz', venueName: 'Bar do Zé', lat: -23.55, lng: -46.63, startsAt: '2026-10-13T20:00:00.000Z', endsAt: null, sample: true, externalId: 'event:1' };
+
+      it('getOrCreateDirect é idempotente e não depende da ordem', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const first = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        const again = await h.conversations.getOrCreateDirect(bia, ana, randomUUID(), at(5));
+        assert.equal(again.id, first.id);
+        assert.equal(first.directKey, [ana, bia].sort().join(':'));
+        assert.deepEqual(await h.conversations.findById(first.id), first);
+        assert.equal(await h.conversations.findById(randomUUID()), undefined);
+        assert.equal(await h.conversations.findById('nao-e-uuid'), undefined);
+        assert.deepEqual([...(await h.conversations.participantIds(first.id))!].sort(), [ana, bia].sort());
+        assert.equal(await h.conversations.participantIds(randomUUID()), undefined);
+        const cia = await newUser('cia');
+        const other = await h.conversations.getOrCreateDirect(ana, cia, randomUUID(), at(6));
+        assert.notEqual(other.id, first.id);
+      });
+
+      it('mensagens: ordem cronológica, limite e paginação para trás', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const c = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        for (let i = 1; i <= 5; i++) await h.conversations.addMessage(msg(c.id, i % 2 ? ana : bia, `m${i}`, i));
+        assert.deepEqual((await h.conversations.listMessages(c.id, 3)).map((m) => m.body), ['m3', 'm4', 'm5']);
+        assert.deepEqual((await h.conversations.listMessages(c.id, 10, at(3))).map((m) => m.body), ['m1', 'm2']);
+        assert.deepEqual(await h.conversations.listMessages(randomUUID(), 10), []);
+      });
+
+      it('guarda o cartão de sugestão e devolve igual', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const c = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        const m = msg(c.id, ana, 'Jazz — Bar do Zé', 1, { suggestion: card });
+        await h.conversations.addMessage(m);
+        await h.conversations.addMessage(msg(c.id, bia, 'oi', 2));
+        const [got, text] = await h.conversations.listMessages(c.id, 10);
+        assert.equal(got!.kind, 'SUGGESTION');
+        assert.deepEqual(got!.suggestion, card);
+        assert.equal(text!.kind, 'TEXT');
+        assert.equal(text!.suggestion, null);
+      });
+
+      it('listForUser: última mensagem, não lidas e ordem; markRead zera só para quem leu', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const cia = await newUser('cia');
+        const c1 = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        const c2 = await h.conversations.getOrCreateDirect(ana, cia, randomUUID(), at(1));
+        await h.conversations.addMessage(msg(c1.id, bia, 'a', 10));
+        await h.conversations.addMessage(msg(c1.id, bia, 'b', 11));
+        await h.conversations.addMessage(msg(c1.id, ana, 'c', 12));
+        const list = await h.conversations.listForUser(ana);
+        assert.deepEqual(list.map((s) => s.conversation.id), [c1.id, c2.id], 'mais recente primeiro; sem mensagens usa a criação');
+        assert.equal(list[0]!.lastMessage!.body, 'c');
+        assert.equal(list[0]!.unread, 2);
+        assert.equal(list[1]!.lastMessage, null);
+        assert.equal((await h.conversations.listForUser(bia))[0]!.unread, 1, 'só o que a outra pessoa enviou conta');
+        await h.conversations.markRead(c1.id, ana, at(20));
+        assert.equal((await h.conversations.listForUser(ana))[0]!.unread, 0);
+        assert.equal((await h.conversations.listForUser(bia))[0]!.unread, 1);
+        await h.conversations.addMessage(msg(c1.id, bia, 'd', 21));
+        assert.equal((await h.conversations.listForUser(ana))[0]!.unread, 1);
+        assert.deepEqual(await h.conversations.listForUser(randomUUID()), []);
+      });
+
+      it('countSentSince conta só as mensagens do remetente dentro da janela', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const c = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        await h.conversations.addMessage(msg(c.id, ana, 'x', 10));
+        await h.conversations.addMessage(msg(c.id, ana, 'y', 50));
+        await h.conversations.addMessage(msg(c.id, bia, 'z', 51));
+        assert.equal(await h.conversations.countSentSince(ana, at(0)), 2);
+        assert.equal(await h.conversations.countSentSince(ana, at(11)), 1);
+        assert.equal(await h.conversations.countSentSince(bia, at(0)), 1);
+      });
+    });
+
+    describe('lugares e eventos', () => {
+      const venue = (name: string, lat: number, lng: number, isSample = false): VenueRecord => ({ id: randomUUID(), name, address: null, category: 'bar', lat, lng, isSample });
+      const event = (venueId: string, title: string, startS: number, endS: number): PlaceEventRecord => ({ id: randomUUID(), venueId, title, description: null, startsAt: at(startS), endsAt: at(endS), isSample: true });
+      const centre = { lat: -23.5505, lng: -46.6333 };
+      const H = 3600;
+
+      it('filtra por raio exato, por janela de tempo e ordena do mais perto', async () => {
+        const near = venue('Perto', -23.5515, -46.6333, true); // ~111 m
+        const mid = venue('Médio', -23.5605, -46.6333); // ~1,1 km
+        const far = venue('Longe', -23.5905, -46.6333); // ~4,5 km
+        for (const v of [near, mid, far]) await h.places.createVenue(v);
+        const eNear = event(near.id, 'A', 1 * H, 3 * H);
+        const eMid = event(mid.id, 'B', 2 * H, 4 * H);
+        const eFar = event(far.id, 'C', 1 * H, 3 * H);
+        const eLate = event(near.id, 'Tarde', 30 * H, 32 * H);
+        const eOver = event(near.id, 'Acabou', -5 * H, -4 * H);
+        const eNow = event(mid.id, 'Em andamento', -1 * H, 1 * H);
+        for (const e of [eMid, eFar, eNear, eLate, eOver, eNow]) await h.places.createEvent(e);
+
+        const got = await h.places.findEventsNear(centre, 3000, at(0), at(12 * H), 10);
+        assert.deepEqual(got.map((r) => r.event.title), ['A', 'Em andamento', 'B']);
+        assert.equal(got[0]!.venue.name, 'Perto');
+        assert.equal(got[0]!.venue.isSample, true);
+        assert.deepEqual(got[0]!.event.startsAt, at(1 * H));
+        assert.deepEqual((await h.places.findEventsNear(centre, 3000, at(0), at(12 * H), 1)).map((r) => r.event.title), ['A']);
+        assert.deepEqual((await h.places.findEventsNear(centre, 200, at(0), at(12 * H), 10)).map((r) => r.event.title), ['A']);
+        assert.deepEqual(await h.places.findEventsNear({ lat: 40, lng: 40 }, 3000, at(0), at(12 * H), 10), []);
+      });
+
+      it('evento que termina exatamente em `from` ou começa em `to` fica de fora', async () => {
+        const v = venue('V', centre.lat, centre.lng);
+        await h.places.createVenue(v);
+        await h.places.createEvent(event(v.id, 'terminou', -2 * H, 0));
+        await h.places.createEvent(event(v.id, 'comeca-no-fim', 12 * H, 13 * H));
+        assert.deepEqual(await h.places.findEventsNear(centre, 1000, at(0), at(12 * H), 10), []);
       });
     });
   });

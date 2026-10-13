@@ -143,14 +143,16 @@ test('respond: aceitar ou recusar muda o convite e o aceito vira encontro', asyn
   assert.equal(overview.received[0]!.direction, 'RECEIVED');
   assert.equal((await w.core.flash.listInvites(ana)).sent.length, 1);
 
-  assert.deepEqual(await w.core.flash.respond(bia, invite.id, 'accept'), { status: 'ACCEPTED' });
+  const accepted = await w.core.flash.respond(bia, invite.id, 'accept');
+  assert.equal(accepted.status, 'ACCEPTED');
+  assert.ok(accepted.conversationId);
   assert.equal((await w.core.flash.listInvites(ana)).matches.length, 1);
   assert.equal((await w.core.flash.listInvites(bia)).matches[0]!.direction, 'MATCHED');
   await rejectsWith(w.core.flash.respond(bia, invite.id, 'accept'), 'NOT_FOUND'); // já respondido
 
   const w2 = await pair();
   const i2 = await w2.w.core.flash.invite(w2.ana, w2.bia);
-  assert.deepEqual(await w2.w.core.flash.respond(w2.bia, i2.id, 'decline'), { status: 'DECLINED' });
+  assert.deepEqual(await w2.w.core.flash.respond(w2.bia, i2.id, 'decline'), { status: 'DECLINED', conversationId: null });
   assert.deepEqual(await w2.w.core.flash.listInvites(w2.ana), { received: [], sent: [], matches: [] });
   await w2.w.core.flash.invite(w2.ana, w2.bia); // depois de recusado pode convidar de novo
 });

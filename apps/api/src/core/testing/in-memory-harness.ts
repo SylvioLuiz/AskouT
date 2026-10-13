@@ -2,6 +2,8 @@ import type { UserStatus } from '../types.ts';
 import type { RepoHarness } from './contracts.ts';
 import {
   InMemoryAvailabilityRepository,
+  InMemoryConversationRepository,
+  InMemoryPlaceRepository,
   InMemoryFlashRepository,
   InMemoryBlockRepository,
   InMemoryFollowRepository,
@@ -16,6 +18,8 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let pending = new InMemoryPendingSignupRepository();
   let availability = new InMemoryAvailabilityRepository();
   let flash = new InMemoryFlashRepository();
+  let conversations = new InMemoryConversationRepository();
+  let places = new InMemoryPlaceRepository();
 
   // Os repositórios são trocados no reset; o proxy abaixo sempre aponta para os atuais.
   return {
@@ -37,6 +41,12 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
     get flash() {
       return flash;
     },
+    get conversations() {
+      return conversations;
+    },
+    get places() {
+      return places;
+    },
     async setUserStatus(userId: string, status: UserStatus) {
       const user = users.users.get(userId);
       if (user) user.status = status;
@@ -48,6 +58,8 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
       pending = new InMemoryPendingSignupRepository();
       availability = new InMemoryAvailabilityRepository();
       flash = new InMemoryFlashRepository();
+      conversations = new InMemoryConversationRepository();
+      places = new InMemoryPlaceRepository();
     },
     async close() {},
   };
