@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, Direction, Follow, FollowStatus, Page, PendingSignup, Profile, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -70,6 +70,36 @@ export interface AvailabilityRepository {
   countActive(userId: string, since: Date): Promise<number>;
 }
 
+export interface FlashRepository {
+  /** Sessão ligada e ainda não expirada em `now`. */
+  findActiveSession(userId: string, now: Date): Promise<FlashSessionRecord | undefined>;
+  listActiveSessions(userIds: string[], now: Date): Promise<FlashSessionRecord[]>;
+  /** Insere a sessão. CONFLICT se a pessoa já tem uma ligada e não expirada (uma por vez). */
+  createSession(session: FlashSessionRecord, now: Date): Promise<void>;
+  /** Encerra a sessão ativa da pessoa. Retorna se havia uma. */
+  endSession(userId: string, now: Date): Promise<boolean>;
+
+  /** Insere o convite. CONFLICT se já há um aberto (pendente ou aceito, não expirado) entre os dois, em qualquer sentido. */
+  createInvite(invite: FlashInviteRecord, now: Date): Promise<void>;
+  getInvite(id: string): Promise<FlashInviteRecord | undefined>;
+  /** Atualiza status e datas de um convite existente. Ao sair de ACCEPTED, apaga as posições. */
+  saveInvite(invite: FlashInviteRecord): Promise<void>;
+  /** Convites em que a pessoa participa, pendentes ou aceitos, ainda não expirados em `now`. */
+  listOpenInvitesFor(userId: string, now: Date): Promise<FlashInviteRecord[]>;
+  /** Pendentes viram CANCELED e aceitos viram ENDED, e as posições somem. Retorna quantos. */
+  closeOpenInvitesOf(userId: string, now: Date): Promise<number>;
+  closeOpenInvitesBetween(a: string, b: string, now: Date): Promise<number>;
+
+  upsertPosition(position: FlashPositionRecord): Promise<void>;
+  listPositions(inviteId: string): Promise<FlashPositionRecord[]>;
+
+  /**
+   * Faxina: convites vencidos viram EXPIRED/ENDED, posições de encontros que não estão mais abertos
+   * são apagadas e registros fechados há mais de 24 h saem do banco.
+   */
+  purgeExpired(now: Date): Promise<{ invites: number; positions: number; removed: number }>;
+}
+
 export interface EmailSender {
   /** Falha com erro comum se o e-mail não puder ser enviado. */
   sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void>;
@@ -113,6 +143,7 @@ export interface CoreDeps {
   follows: FollowRepository;
   blocks: BlockRepository;
   availability: AvailabilityRepository;
+  flash: FlashRepository;
   pending: PendingSignupRepository;
   mailer: EmailSender;
   codes: OneTimeCodes;

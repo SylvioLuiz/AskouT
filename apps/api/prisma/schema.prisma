@@ -64,6 +64,15 @@ enum GroupRole {
   MEMBER
 }
 
+enum FlashInviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+  EXPIRED
+  ENDED
+}
+
 enum ConversationType {
   DIRECT
   GROUP
@@ -98,7 +107,10 @@ model User {
   conversationParticipations ConversationParticipant[]
   messages                   Message[]
 
-  flashSessions FlashSession[]
+  flashSessions       FlashSession[]
+  flashInvitesSent    FlashInvite[]   @relation("FlashInviteFrom")
+  flashInvitesReceived FlashInvite[]  @relation("FlashInviteTo")
+  flashPositions      FlashPosition[]
   notifications Notification[]
 }
 
@@ -295,15 +307,51 @@ model Message {
 }
 
 model FlashSession {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
-  startsAt  DateTime @default(now())
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  startsAt  DateTime  @default(now())
   expiresAt DateTime // obrigatório: todo Flash expira
+  endedAt   DateTime? // preenchido quando a pessoa desliga antes do fim
+  note      String? // recado curto opcional
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
+}
+
+// Convite entre dois amigos com Flash ligado. ACCEPTED é o encontro: só nele a posição é compartilhada.
+model FlashInvite {
+  id          String            @id @default(uuid()) @db.Uuid
+  fromUserId  String            @db.Uuid
+  toUserId    String            @db.Uuid
+  status      FlashInviteStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  expiresAt   DateTime
+  respondedAt DateTime?
+  endedAt     DateTime?
+
+  from      User            @relation("FlashInviteFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  to        User            @relation("FlashInviteTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  positions FlashPosition[]
+
+  @@index([fromUserId, status])
+  @@index([toUserId, status])
+}
+
+// Última posição de cada pessoa num encontro. Sem histórico: o upsert substitui a anterior.
+model FlashPosition {
+  inviteId  String   @db.Uuid
+  userId    String   @db.Uuid
+  lat       Float
+  lng       Float
+  accuracyM Float?
+  updatedAt DateTime
+
+  invite FlashInvite @relation(fields: [inviteId], references: [id], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([inviteId, userId])
 }
 
 model Notification {

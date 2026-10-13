@@ -4,6 +4,7 @@ import type { UserStatus } from '../../core/types.ts';
 import {
   PrismaAvailabilityRepository,
   PrismaBlockRepository,
+  PrismaFlashRepository,
   PrismaFollowRepository,
   PrismaPendingSignupRepository,
   PrismaUserRepository,
@@ -46,6 +47,7 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     blocks: new PrismaBlockRepository(prisma),
     pending: new PrismaPendingSignupRepository(prisma),
     availability: new PrismaAvailabilityRepository(prisma),
+    flash: new PrismaFlashRepository(prisma),
     async setUserStatus(userId: string, status: UserStatus) {
       await prisma.user.update({ where: { id: userId }, data: { status } });
     },

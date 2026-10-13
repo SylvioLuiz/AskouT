@@ -19,12 +19,14 @@ export class BlockService {
    */
   async block(actorId: string, targetId: string): Promise<void> {
     if (actorId === targetId) throw validationError('Você não pode bloquear a si mesmo');
-    const { users, blocks, follows, clock } = this.deps;
+    const { users, blocks, follows, flash, clock } = this.deps;
     const target = await users.findById(targetId);
     if (!target) throw notFound('Usuário não encontrado');
 
     await blocks.add(actorId, targetId, clock.now());
     await follows.deleteBetween(actorId, targetId);
+    // Convites e encontros do Flash entre os dois terminam e a posição some.
+    await flash.closeOpenInvitesBetween(actorId, targetId, clock.now());
   }
 
   /** Remove só o bloqueio. Os seguimentos removidos não voltam. Idempotente. */

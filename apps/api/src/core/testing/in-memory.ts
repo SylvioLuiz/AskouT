@@ -2,6 +2,7 @@ import { conflict } from '../errors.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
   AvailabilityRepository,
+  FlashRepository,
   BlockRepository,
   Clock,
   EmailSender,
@@ -10,7 +11,7 @@ import type {
   PendingSignupRepository,
   UserRepository,
 } from '../ports.ts';
-import type { AvailabilitySlotRecord, Direction, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -143,6 +144,160 @@ export class InMemoryAvailabilityRepository implements AvailabilityRepository {
 
   async countActive(userId: string, since: Date): Promise<number> {
     return [...this.rows.values()].filter((r) => r.userId === userId && r.endsAt > since).length;
+  }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const isOpen = (i: FlashInviteRecord) => i.status === 'PENDING' || i.status === 'ACCEPTED';
+
+export class InMemoryFlashRepository implements FlashRepository {
+  readonly sessions = new Map<string, FlashSessionRecord>();
+  readonly invites = new Map<string, FlashInviteRecord>();
+  readonly positions = new Map<string, FlashPositionRecord>();
+
+  private active(s: FlashSessionRecord, now: Date): boolean {
+    return s.endedAt === null && s.expiresAt > now;
+  }
+
+  async findActiveSession(userId: string, now: Date): Promise<FlashSessionRecord | undefined> {
+    for (const s of this.sessions.values()) if (s.userId === userId && this.active(s, now)) return { ...s };
+    return undefined;
+  }
+
+  async listActiveSessions(userIds: string[], now: Date): Promise<FlashSessionRecord[]> {
+    const wanted = new Set(userIds);
+    return [...this.sessions.values()].filter((s) => wanted.has(s.userId) && this.active(s, now)).map((s) => ({ ...s }));
+  }
+
+  async createSession(session: FlashSessionRecord, now: Date): Promise<void> {
+    for (const s of this.sessions.values()) {
+      if (s.userId !== session.userId || s.endedAt !== null) continue;
+      if (s.expiresAt <= now) s.endedAt = s.expiresAt;
+      else throw conflict('Seu Flash já está ligado. Desligue para recomeçar.');
+    }
+    this.sessions.set(session.id, { ...session });
+  }
+
+  async endSession(userId: string, now: Date): Promise<boolean> {
+    for (const s of this.sessions.values()) {
+      if (s.userId === userId && this.active(s, now)) {
+        s.endedAt = now;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private dropPositions(inviteId: string): number {
+    let n = 0;
+    for (const key of [...this.positions.keys()]) {
+      if (key.startsWith(`${inviteId}|`)) {
+        this.positions.delete(key);
+        n += 1;
+      }
+    }
+    return n;
+  }
+
+  private close(invite: FlashInviteRecord, endedAt: Date, accepted: 'ENDED' | 'EXPIRED', pending: 'CANCELED' | 'EXPIRED'): void {
+    invite.status = invite.status === 'ACCEPTED' ? accepted : pending;
+    invite.endedAt = endedAt;
+    this.dropPositions(invite.id);
+  }
+
+  async createInvite(invite: FlashInviteRecord, now: Date): Promise<void> {
+    for (const i of this.invites.values()) {
+      const samePair =
+        (i.fromUserId === invite.fromUserId && i.toUserId === invite.toUserId) ||
+        (i.fromUserId === invite.toUserId && i.toUserId === invite.fromUserId);
+      if (!samePair || !isOpen(i)) continue;
+      if (i.expiresAt <= now) this.close(i, i.expiresAt, 'ENDED', 'EXPIRED');
+      else throw conflict('Já existe um convite aberto entre vocês dois');
+    }
+    this.invites.set(invite.id, { ...invite });
+  }
+
+  async getInvite(id: string): Promise<FlashInviteRecord | undefined> {
+    const i = this.invites.get(id);
+    return i ? { ...i } : undefined;
+  }
+
+  async saveInvite(invite: FlashInviteRecord): Promise<void> {
+    this.invites.set(invite.id, { ...invite });
+    if (invite.status !== 'ACCEPTED') this.dropPositions(invite.id);
+  }
+
+  async listOpenInvitesFor(userId: string, now: Date): Promise<FlashInviteRecord[]> {
+    return [...this.invites.values()]
+      .filter((i) => (i.fromUserId === userId || i.toUserId === userId) && isOpen(i) && i.expiresAt > now)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .map((i) => ({ ...i }));
+  }
+
+  async closeOpenInvitesOf(userId: string, now: Date): Promise<number> {
+    let n = 0;
+    for (const i of this.invites.values()) {
+      if ((i.fromUserId === userId || i.toUserId === userId) && isOpen(i)) {
+        this.close(i, now, 'ENDED', 'CANCELED');
+        n += 1;
+      }
+    }
+    return n;
+  }
+
+  async closeOpenInvitesBetween(a: string, b: string, now: Date): Promise<number> {
+    let n = 0;
+    for (const i of this.invites.values()) {
+      const pair = (i.fromUserId === a && i.toUserId === b) || (i.fromUserId === b && i.toUserId === a);
+      if (pair && isOpen(i)) {
+        this.close(i, now, 'ENDED', 'CANCELED');
+        n += 1;
+      }
+    }
+    return n;
+  }
+
+  async upsertPosition(position: FlashPositionRecord): Promise<void> {
+    this.positions.set(`${position.inviteId}|${position.userId}`, { ...position });
+  }
+
+  async listPositions(inviteId: string): Promise<FlashPositionRecord[]> {
+    return [...this.positions.values()].filter((p) => p.inviteId === inviteId).map((p) => ({ ...p }));
+  }
+
+  async purgeExpired(now: Date): Promise<{ invites: number; positions: number; removed: number }> {
+    let invites = 0;
+    for (const i of this.invites.values()) {
+      if (isOpen(i) && i.expiresAt <= now) {
+        this.close(i, i.expiresAt, 'ENDED', 'EXPIRED');
+        invites += 1;
+      }
+    }
+    let positions = 0;
+    for (const key of [...this.positions.keys()]) {
+      const inviteId = key.split('|')[0] as string;
+      if (this.invites.get(inviteId)?.status !== 'ACCEPTED') {
+        this.positions.delete(key);
+        positions += 1;
+      }
+    }
+    let removed = 0;
+    const cutoff = now.getTime() - DAY_MS;
+    for (const [id, s] of this.sessions) {
+      if (s.endedAt !== null || s.expiresAt <= now) {
+        if ((s.endedAt ?? s.expiresAt).getTime() < cutoff) {
+          this.sessions.delete(id);
+          removed += 1;
+        }
+      }
+    }
+    for (const [id, i] of this.invites) {
+      if (!isOpen(i) && i.endedAt !== null && i.endedAt.getTime() < cutoff) {
+        this.invites.delete(id);
+        removed += 1;
+      }
+    }
+    return { invites, positions, removed };
   }
 }
 

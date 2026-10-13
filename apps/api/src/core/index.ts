@@ -1,6 +1,7 @@
 import { AvailabilityService } from './availability-service.ts';
 import { AuthService } from './auth-service.ts';
 import { BlockService } from './block-service.ts';
+import { FlashService } from './flash-service.ts';
 import { FollowService } from './follow-service.ts';
 import type { CoreDeps } from './ports.ts';
 import { ProfileService } from './profile-service.ts';
@@ -12,6 +13,7 @@ export function createCore(deps: CoreDeps) {
     follows: new FollowService(deps),
     blocks: new BlockService(deps),
     availability: new AvailabilityService(deps),
+    flash: new FlashService(deps),
   };
 }
 
@@ -48,6 +50,22 @@ export type {
   SlotInput,
   SlotView,
 } from './availability-service.ts';
+export { FlashService } from './flash-service.ts';
+export {
+  FLASH_HOURS,
+  FLASH_NOTE_MAX,
+  INVITE_TTL_MINUTES,
+  POSITION_STALE_SECONDS,
+} from './flash-service.ts';
+export type {
+  AvailableFriendView,
+  FlashStatusView,
+  InviteDirection,
+  InviteView,
+  InvitesOverview,
+  MatchView,
+  PositionView,
+} from './flash-service.ts';
 export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';
 export type { ConnectionsPage, FollowResult } from './follow-service.ts';
@@ -63,6 +81,7 @@ export type {
   Clock,
   CoreDeps,
   EmailSender,
+  FlashRepository,
   FollowRepository,
   IdGenerator,
   OneTimeCodes,
@@ -75,6 +94,10 @@ export type {
 export type {
   Actor,
   AvailabilitySlotRecord,
+  FlashInviteRecord,
+  FlashInviteStatus,
+  FlashPositionRecord,
+  FlashSessionRecord,
   SlotState,
   Direction,
   Follow,

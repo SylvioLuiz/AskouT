@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { AvailabilityRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
 import type { PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
@@ -17,6 +17,7 @@ export interface RepoHarness {
   blocks: BlockRepository;
   pending: PendingSignupRepository;
   availability: AvailabilityRepository;
+  flash: FlashRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
   /** Apaga todos os dados entre os testes. */
   reset(): Promise<void>;
@@ -460,6 +461,162 @@ export function defineRepositoryContract(
         assert.equal(await h.availability.countActive(ana, at(60 * 60)), 1, 'um que termina exatamente agora já acabou');
         assert.equal(await h.availability.countActive(ana, at(160 * 60)), 0);
         assert.equal(await h.availability.countActive(randomUUID(), at(0)), 0);
+      });
+    });
+    describe('flash', () => {
+      const MIN = 60;
+      const session = (userId: string, startS: number, endS: number, extra: Partial<{ note: string | null }> = {}) => ({
+        id: randomUUID(),
+        userId,
+        startsAt: at(startS),
+        expiresAt: at(endS),
+        endedAt: null,
+        note: extra.note ?? null,
+      });
+      const invite = (from: string, to: string, extra: Partial<{ status: 'PENDING' | 'ACCEPTED'; expiresS: number }> = {}) => ({
+        id: randomUUID(),
+        fromUserId: from,
+        toUserId: to,
+        status: extra.status ?? ('PENDING' as const),
+        createdAt: at(0),
+        expiresAt: at(extra.expiresS ?? 15 * MIN),
+        respondedAt: null,
+        endedAt: null,
+      });
+      const pos = (inviteId: string, userId: string, lat: number, lng: number, whenS = 0) => ({ inviteId, userId, lat, lng, accuracyM: null, updatedAt: at(whenS) });
+      const conflicts = (p: Promise<unknown>) => assert.rejects(p, (e: unknown) => e instanceof DomainError && e.code === 'CONFLICT');
+
+      it('sessão: cria, acha só a ativa, expira e encerra', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const s = session(ana, 0, 60 * MIN, { note: 'chopp?' });
+        await h.flash.createSession(s, at(0));
+        assert.deepEqual(await h.flash.findActiveSession(ana, at(10)), s);
+        assert.equal(await h.flash.findActiveSession(bia, at(10)), undefined);
+        assert.equal((await h.flash.listActiveSessions([ana, bia], at(10))).length, 1);
+        assert.equal(await h.flash.findActiveSession(ana, at(60 * MIN)), undefined, 'no instante de expirar já não está ativa');
+        assert.deepEqual(await h.flash.listActiveSessions([], at(10)), []);
+        assert.equal(await h.flash.endSession(bia, at(20)), false);
+        assert.equal(await h.flash.endSession(ana, at(20)), true);
+        assert.equal(await h.flash.endSession(ana, at(21)), false);
+        assert.equal(await h.flash.findActiveSession(ana, at(22)), undefined);
+      });
+
+      it('sessão: só uma ativa por pessoa; depois de expirada ou encerrada pode criar outra', async () => {
+        const ana = await newUser('ana');
+        await h.flash.createSession(session(ana, 0, 60 * MIN), at(0));
+        await conflicts(h.flash.createSession(session(ana, 10, 70 * MIN), at(10)));
+        await h.flash.createSession(session(ana, 61 * MIN, 120 * MIN), at(61 * MIN)); // a primeira expirou
+        await h.flash.endSession(ana, at(62 * MIN));
+        await h.flash.createSession(session(ana, 63 * MIN, 120 * MIN), at(63 * MIN));
+        assert.ok(await h.flash.findActiveSession(ana, at(64 * MIN)));
+      });
+
+      it('convite: cria, lê e atualiza; só um aberto por par, em qualquer sentido', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const i = invite(ana, bia);
+        await h.flash.createInvite(i, at(0));
+        assert.deepEqual(await h.flash.getInvite(i.id), i);
+        assert.equal(await h.flash.getInvite(randomUUID()), undefined);
+        assert.equal(await h.flash.getInvite('não-é-uuid'), undefined);
+        await conflicts(h.flash.createInvite(invite(ana, bia), at(1)));
+        await conflicts(h.flash.createInvite(invite(bia, ana), at(1)));
+        await h.flash.createInvite(invite(ana, caio), at(1)); // outro par
+
+        await h.flash.saveInvite({ ...i, status: 'DECLINED', respondedAt: at(5), endedAt: at(5) });
+        const saved = (await h.flash.getInvite(i.id))!;
+        assert.equal(saved.status, 'DECLINED');
+        assert.deepEqual(saved.respondedAt, at(5));
+        await h.flash.createInvite(invite(bia, ana), at(6)); // depois de fechado pode de novo
+      });
+
+      it('convite vencido não bloqueia um novo e vira EXPIRED', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const old = invite(ana, bia, { expiresS: 15 * MIN });
+        await h.flash.createInvite(old, at(0));
+        await h.flash.createInvite(invite(ana, bia), at(20 * MIN));
+        assert.equal((await h.flash.getInvite(old.id))!.status, 'EXPIRED');
+      });
+
+      it('listOpenInvitesFor: pendentes e aceitos não vencidos, dos dois lados', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const a = invite(ana, bia);
+        const b = invite(caio, ana, { status: 'ACCEPTED' });
+        const vencido = invite(bia, caio, { expiresS: 5 * MIN });
+        await h.flash.createInvite(a, at(0));
+        await h.flash.createInvite(b, at(0));
+        await h.flash.createInvite(vencido, at(0));
+        const mine = await h.flash.listOpenInvitesFor(ana, at(10 * MIN));
+        assert.deepEqual(mine.map((x) => x.id).sort(), [a.id, b.id].sort());
+        assert.deepEqual((await h.flash.listOpenInvitesFor(bia, at(10 * MIN))).map((x) => x.id), [a.id], 'o vencido não aparece');
+        assert.deepEqual(await h.flash.listOpenInvitesFor(randomUUID(), at(0)), []);
+      });
+
+      it('posição: guarda só a última por pessoa e some quando o convite deixa de estar aceito', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const i = invite(ana, bia, { status: 'ACCEPTED' });
+        await h.flash.createInvite(i, at(0));
+        await h.flash.upsertPosition(pos(i.id, ana, 1, 2, 1));
+        await h.flash.upsertPosition(pos(i.id, ana, 3, 4, 2));
+        await h.flash.upsertPosition(pos(i.id, bia, 5, 6, 2));
+        const list = await h.flash.listPositions(i.id);
+        assert.equal(list.length, 2);
+        const mine = list.find((p) => p.userId === ana)!;
+        assert.deepEqual([mine.lat, mine.lng], [3, 4]);
+        assert.deepEqual(mine.updatedAt, at(2));
+        assert.deepEqual(await h.flash.listPositions(randomUUID()), []);
+
+        await h.flash.saveInvite({ ...i, status: 'ENDED', endedAt: at(10) });
+        assert.deepEqual(await h.flash.listPositions(i.id), []);
+      });
+
+      it('closeOpenInvitesOf e closeOpenInvitesBetween: pendente vira CANCELED, aceito vira ENDED, posições somem', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const pending = invite(ana, bia);
+        const accepted = invite(caio, ana, { status: 'ACCEPTED' });
+        await h.flash.createInvite(pending, at(0));
+        await h.flash.createInvite(accepted, at(0));
+        await h.flash.upsertPosition(pos(accepted.id, caio, 1, 1));
+
+        assert.equal(await h.flash.closeOpenInvitesBetween(ana, bia, at(5)), 1);
+        assert.equal((await h.flash.getInvite(pending.id))!.status, 'CANCELED');
+        assert.equal((await h.flash.getInvite(accepted.id))!.status, 'ACCEPTED', 'outro par não é afetado');
+        assert.equal(await h.flash.closeOpenInvitesBetween(ana, bia, at(6)), 0);
+
+        assert.equal(await h.flash.closeOpenInvitesOf(ana, at(7)), 1);
+        const ended = (await h.flash.getInvite(accepted.id))!;
+        assert.equal(ended.status, 'ENDED');
+        assert.deepEqual(ended.endedAt, at(7));
+        assert.deepEqual(await h.flash.listPositions(accepted.id), []);
+        assert.equal(await h.flash.closeOpenInvitesOf(randomUUID(), at(8)), 0);
+      });
+
+      it('purgeExpired: vence convites, apaga posições órfãs e remove o que fechou há mais de 24 h', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const accepted = invite(ana, bia, { status: 'ACCEPTED', expiresS: 30 * MIN });
+        await h.flash.createInvite(accepted, at(0));
+        await h.flash.upsertPosition(pos(accepted.id, ana, 1, 1));
+        const keep = session(ana, 0, 60 * MIN);
+        await h.flash.createSession(keep, at(0));
+
+        const first = await h.flash.purgeExpired(at(31 * MIN));
+        assert.equal(first.invites, 1);
+        assert.equal((await h.flash.getInvite(accepted.id))!.status, 'ENDED');
+        assert.deepEqual(await h.flash.listPositions(accepted.id), []);
+        assert.equal(first.removed, 0, 'nada fechado há mais de 24 h ainda');
+
+        const later = await h.flash.purgeExpired(at(26 * 60 * MIN));
+        assert.ok(later.removed >= 2, 'convite e sessão antigos saem');
+        assert.equal(await h.flash.getInvite(accepted.id), undefined);
       });
     });
   });

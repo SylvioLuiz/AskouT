@@ -5,6 +5,7 @@ import { createCore } from '../core/index.ts';
 import {
   PrismaAvailabilityRepository,
   PrismaBlockRepository,
+  PrismaFlashRepository,
   PrismaFollowRepository,
   PrismaPendingSignupRepository,
   PrismaUserRepository,
@@ -23,6 +24,7 @@ export const coreProvider = {
       follows: new PrismaFollowRepository(prisma),
       blocks: new PrismaBlockRepository(prisma),
       availability: new PrismaAvailabilityRepository(prisma),
+      flash: new PrismaFlashRepository(prisma),
       pending: new PrismaPendingSignupRepository(prisma),
       mailer: new ConsoleEmailSender(),
       codes: new HmacOneTimeCodes({ secret: config.codeSecret }),

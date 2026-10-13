@@ -100,3 +100,38 @@ export interface AvailabilitySlotRecord {
   state: SlotState;
   createdAt: Date;
 }
+
+/** Flash ligado por uma pessoa: ela está disponível "agora" até `expiresAt`. */
+export interface FlashSessionRecord {
+  id: string;
+  userId: string;
+  startsAt: Date;
+  expiresAt: Date;
+  /** Preenchido quando a pessoa desliga antes do fim. */
+  endedAt: Date | null;
+  note: string | null;
+}
+
+export type FlashInviteStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELED' | 'EXPIRED' | 'ENDED';
+
+/** Convite entre dois amigos com Flash ligado. ACCEPTED é o "encontro": só nele a posição é compartilhada. */
+export interface FlashInviteRecord {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  status: FlashInviteStatus;
+  createdAt: Date;
+  expiresAt: Date;
+  respondedAt: Date | null;
+  endedAt: Date | null;
+}
+
+/** Última posição de uma pessoa num encontro. Sem histórico: cada atualização substitui a anterior. */
+export interface FlashPositionRecord {
+  inviteId: string;
+  userId: string;
+  lat: number;
+  lng: number;
+  accuracyM: number | null;
+  updatedAt: Date;
+}
