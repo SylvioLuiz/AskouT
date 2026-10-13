@@ -1,0 +1,320 @@
+// AskouT — modelo de dados (Fases 1 e 2). Posts, locais/eventos e moderação entram em migrations próprias.
+// ATENÇÃO: ainda não validado com `prisma validate` (sem rede no ambiente de geração).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETION_REQUESTED
+}
+
+enum UserRole {
+  USER
+  VENUE_OWNER
+  ADMIN
+}
+
+enum FollowStatus {
+  PENDING
+  ACCEPTED
+}
+
+enum AvailabilityState {
+  AVAILABLE
+  PARTIAL
+  UNAVAILABLE
+}
+
+enum CalendarProvider {
+  GOOGLE
+  APPLE
+}
+
+enum CalendarConnectionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+}
+
+enum MeetingStatus {
+  PLANNING
+  CONFIRMED
+  CANCELLED
+}
+
+enum ParticipationStatus {
+  INVITED
+  CONFIRMED
+  MAYBE
+  DECLINED
+  AWAITING
+}
+
+enum GroupRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  role         UserRole   @default(USER)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  profile  Profile?
+  settings UserSettings?
+
+  following Follow[] @relation("Follower")
+  followers Follow[] @relation("Followee")
+  blocksMade Block[] @relation("Blocker")
+  blockedBy  Block[] @relation("Blocked")
+
+  availabilitySlots   AvailabilitySlot[]
+  calendarConnections CalendarConnection[]
+
+  organizedMeetings     Meeting[]            @relation("MeetingOrganizer")
+  meetingParticipations MeetingParticipant[]
+
+  ownedGroups  Group[]       @relation("GroupOwner")
+  groupMembers GroupMember[]
+
+  conversationParticipations ConversationParticipant[]
+  messages                   Message[]
+
+  flashSessions FlashSession[]
+  notifications Notification[]
+}
+
+model Profile {
+  userId      String  @id @db.Uuid
+  username    String  @unique // sempre salvo em minúsculas pela aplicação
+  displayName String
+  bio         String?
+  avatarUrl   String?
+  isPrivate   Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserSettings {
+  userId       String @id @db.Uuid
+  timeZone     String @default("America/Sao_Paulo")
+  notifyPrefs  Json   @default("{}")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Follow {
+  followerId String       @db.Uuid
+  followeeId String       @db.Uuid
+  status     FollowStatus @default(ACCEPTED)
+  createdAt  DateTime     @default(now())
+
+  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followee User @relation("Followee", fields: [followeeId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followeeId])
+  @@index([followeeId, status])
+}
+
+model Block {
+  blockerId String   @db.Uuid
+  blockedId String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model AvailabilitySlot {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @db.Uuid
+  startsAt       DateTime
+  endsAt         DateTime
+  state          AvailabilityState
+  recurrenceRule String? // RRULE; expandida antes de chamar o motor
+  createdAt      DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startsAt])
+}
+
+model CalendarConnection {
+  id             String                   @id @default(uuid()) @db.Uuid
+  userId         String                   @db.Uuid
+  provider       CalendarProvider
+  status         CalendarConnectionStatus @default(ACTIVE)
+  refreshTokenEnc String? // criptografado em repouso; nunca em texto puro
+  lastSyncAt     DateTime?
+  createdAt      DateTime                 @default(now())
+
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  busyIntervals CalendarBusyInterval[]
+
+  @@index([userId])
+}
+
+// Somente início e fim. Nunca título, descrição ou participantes do compromisso.
+model CalendarBusyInterval {
+  id           String   @id @default(uuid()) @db.Uuid
+  connectionId String   @db.Uuid
+  startsAt     DateTime
+  endsAt       DateTime
+
+  connection CalendarConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, startsAt])
+}
+
+model Group {
+  id        String   @id @default(uuid()) @db.Uuid
+  ownerId   String   @db.Uuid
+  name      String
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  owner   User          @relation("GroupOwner", fields: [ownerId], references: [id])
+  members GroupMember[]
+  meetings Meeting[]
+  conversation Conversation?
+}
+
+model GroupMember {
+  groupId  String    @db.Uuid
+  userId   String    @db.Uuid
+  role     GroupRole @default(MEMBER)
+  joinedAt DateTime  @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+}
+
+model Meeting {
+  id          String        @id @default(uuid()) @db.Uuid
+  organizerId String        @db.Uuid
+  groupId     String?       @db.Uuid
+  title       String
+  description String?
+  startsAt    DateTime?
+  endsAt      DateTime?
+  status      MeetingStatus @default(PLANNING)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  organizer    User                 @relation("MeetingOrganizer", fields: [organizerId], references: [id])
+  group        Group?               @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  participants MeetingParticipant[]
+  dateOptions  MeetingDateOption[]
+
+  @@index([organizerId])
+  @@index([groupId])
+}
+
+model MeetingParticipant {
+  meetingId String              @db.Uuid
+  userId    String              @db.Uuid
+  status    ParticipationStatus @default(INVITED)
+  respondedAt DateTime?
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([meetingId, userId])
+  @@index([userId, status])
+}
+
+model MeetingDateOption {
+  id        String   @id @default(uuid()) @db.Uuid
+  meetingId String   @db.Uuid
+  startsAt  DateTime
+  endsAt    DateTime
+
+  meeting Meeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+}
+
+model Conversation {
+  id      String           @id @default(uuid()) @db.Uuid
+  type    ConversationType
+  groupId String?          @unique @db.Uuid
+  createdAt DateTime       @default(now())
+
+  group        Group?                    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  conversationId String    @db.Uuid
+  userId         String    @db.Uuid
+  lastReadAt     DateTime?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @db.Uuid
+  senderId       String   @db.Uuid
+  body           String
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
+}
+
+model FlashSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  startsAt  DateTime @default(now())
+  expiresAt DateTime // obrigatório: todo Flash expira
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
