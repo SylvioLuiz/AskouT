@@ -188,6 +188,8 @@ export class FlashService {
       endedAt: null,
     };
     await flash.createInvite(invite, now);
+    const inviter = (await users.findProfilesByIds([actorId]))[0]?.displayName ?? 'Alguém';
+    await this.deps.notifier.notify({ userId: targetId, type: 'FLASH_INVITE', title: `${inviter} convidou você para o Flash`, body: 'Vale por poucos minutos', url: '/flash', dedupeKey: `flash-invite:${actorId}` });
     return this.inviteView(invite, actorId, profile);
   }
 
@@ -225,6 +227,8 @@ export class FlashService {
       expiresAt: new Date(Math.min(mine.expiresAt.getTime(), theirs.expiresAt.getTime())),
     });
     const conversation = await this.deps.conversations.getOrCreateDirect(invite.fromUserId, invite.toUserId, this.deps.ids.next(), now);
+    const accepter = (await this.deps.users.findProfilesByIds([actorId]))[0]?.displayName ?? 'Alguém';
+    await this.deps.notifier.notify({ userId: invite.fromUserId, type: 'FLASH_INVITE', title: `${accepter} aceitou seu convite do Flash`, body: 'Vocês podem se encontrar agora', url: `/conversas/${conversation.id}`, dedupeKey: `flash-accepted:${actorId}` });
     return { status: 'ACCEPTED', conversationId: conversation.id };
   }
 

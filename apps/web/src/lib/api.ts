@@ -20,6 +20,7 @@ import type {
   ExploreEvent,
   GroupDetails,
   MeetupView,
+  NotificationList,
   ExploreParams,
   ExploreResult,
   PageRequest,
@@ -219,6 +220,14 @@ export function createApi(deps: ApiDeps) {
     renameMeetup: (meetupId: string, title: string) => request<MeetupView>('PATCH', `/meetups/${id(meetupId)}`, { body: { title } }),
     cancelMeetup: (meetupId: string) => request<MeetupView>('POST', `/meetups/${id(meetupId)}/cancel`),
     respondMeetup: (meetupId: string, action: 'accept' | 'decline') => request<MeetupView>('POST', `/meetups/${id(meetupId)}/respond`, { body: { action } }),
+
+    // Avisos
+    notifications: () => request<NotificationList>('GET', '/notifications'),
+    unreadNotifications: () => request<{ unread: number }>('GET', '/notifications/unread'),
+    markNotificationsRead: (notificationId?: string) => request<{ unread: number }>('POST', '/notifications/read', { body: notificationId ? { id: notificationId } : {} }),
+    pushKey: () => request<{ publicKey: string | null }>('GET', '/notifications/push-key'),
+    pushSubscribe: (input: { endpoint: string; keys: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
+    pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),
 
     // Bloqueios
     block: (userId: string) => request<{ ok: true }>('POST', `/users/${id(userId)}/block`),

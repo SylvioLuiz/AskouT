@@ -1,3 +1,4 @@
+import { vapidKeysMatch } from '../../infra/push/web-push-sender.ts';
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
   port: number;
@@ -14,6 +15,8 @@ export interface AppConfig {
   googlePlacesKey: string | undefined;
   /** Teto de buscas ao Google por dia, para não estourar o crédito gratuito sem perceber. */
   googleDailyLimit: number;
+  /** Chaves VAPID do Web Push. Sem as duas, o aviso fora do app fica desligado (o sino dentro do app continua). */
+  vapid: { publicKey: string; privateKey: string; subject: string } | undefined;
 }
 
 const MIN_SECRET = 32;
@@ -66,9 +69,20 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     problems.push('GOOGLE_DAILY_LIMIT deve ser um inteiro entre 1 e 100000');
   }
 
+  const vapidPublic = env.VAPID_PUBLIC_KEY?.trim() ?? '';
+  const vapidPrivate = env.VAPID_PRIVATE_KEY?.trim() ?? '';
+  const vapidSubject = env.VAPID_SUBJECT?.trim() || 'mailto:contato@askout.invalid';
+  let vapid: AppConfig['vapid'];
+  if (vapidPublic !== '' || vapidPrivate !== '') {
+    if (vapidPublic === '' || vapidPrivate === '') problems.push('VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY devem ser definidas juntas');
+    else if (!vapidKeysMatch({ publicKey: vapidPublic, privateKey: vapidPrivate })) problems.push('VAPID_PUBLIC_KEY não corresponde à VAPID_PRIVATE_KEY (rode "npm run update" ou gere de novo o par)');
+    else if (!/^(mailto:|https:\/\/)/.test(vapidSubject)) problems.push('VAPID_SUBJECT deve começar com mailto: ou https://');
+    else vapid = { publicKey: vapidPublic, privateKey: vapidPrivate, subject: vapidSubject };
+  }
+
   if (problems.length > 0) {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, vapid };
 }

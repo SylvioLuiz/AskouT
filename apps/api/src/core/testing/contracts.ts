@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { ConversationRepository, MeetupRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { ConversationRepository, MeetupRepository, NotificationRepository, PushSubscriptionRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
 import type { MeetupRecord, MessageRecord, PlaceEventRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
@@ -21,6 +21,8 @@ export interface RepoHarness {
   conversations: ConversationRepository;
   places: PlaceRepository;
   meetups: MeetupRepository;
+  notifications: NotificationRepository;
+  pushSubscriptions: PushSubscriptionRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
   /** Apaga todos os dados entre os testes. */
   reset(): Promise<void>;
@@ -946,6 +948,50 @@ export function defineRepositoryContract(
         assert.equal(final.participants.find((p) => p.userId === bia)!.status, 'DECLINED');
         assert.equal(final.participants.find((p) => p.userId === ana)!.status, 'CONFIRMED', 'quem organiza continua');
         assert.equal(final.participants.find((p) => p.userId === caio)!.status, 'INVITED');
+      });
+
+      it('avisos: criar, listar do mais novo ao mais antigo, contar, juntar por chave e marcar como lido', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const n = (id: string, userId: string, s: number, dedupeKey: string | null = null) => ({ id, userId, type: 'MESSAGE' as const, title: 'T' + id.slice(-1), body: 'B', url: '/conversas', dedupeKey, readAt: null, createdAt: at(s) });
+        const ids = ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-000000000004'];
+        await h.notifications.create(n(ids[0]!, ana, 1, 'k1'));
+        await h.notifications.create(n(ids[1]!, ana, 2));
+        await h.notifications.create(n(ids[2]!, ana, 3, 'k2'));
+        await h.notifications.create(n(ids[3]!, bia, 4, 'k1'));
+        assert.deepEqual((await h.notifications.listForUser(ana, 10)).map((x) => x.id), [ids[2], ids[1], ids[0]]);
+        assert.equal((await h.notifications.listForUser(ana, 2)).length, 2);
+        assert.equal((await h.notifications.listForUser(ana, 10))[0]!.dedupeKey, 'k2');
+        assert.equal(await h.notifications.unreadCount(ana), 3);
+        assert.equal(await h.notifications.hasUnread(ana, 'k1'), true);
+        assert.equal(await h.notifications.hasUnread(ana, 'k9'), false);
+        assert.equal(await h.notifications.markRead(ana, at(10), [ids[0]!, ids[3]!]), 1, 'só marca o que é da pessoa');
+        assert.equal(await h.notifications.hasUnread(ana, 'k1'), false, 'lido não segura novos avisos');
+        assert.equal(await h.notifications.hasUnread(bia, 'k1'), true);
+        assert.equal((await h.notifications.listForUser(ana, 10)).find((x) => x.id === ids[0])!.readAt?.getTime(), at(10).getTime());
+        assert.equal(await h.notifications.markRead(ana, at(11)), 2);
+        assert.equal(await h.notifications.unreadCount(ana), 0);
+        assert.equal(await h.notifications.markRead(ana, at(12)), 0);
+      });
+
+      it('inscrições de push: uma por endpoint, troca de dono, remoção por dono', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const sub = (userId: string, endpoint: string, s: number) => ({ userId, endpoint, p256dh: 'pk', auth: 'au', createdAt: at(s) });
+        await h.pushSubscriptions.upsert(sub(ana, 'https://p/1', 1));
+        await h.pushSubscriptions.upsert(sub(ana, 'https://p/2', 2));
+        await h.pushSubscriptions.upsert({ ...sub(ana, 'https://p/1', 9), p256dh: 'novo' });
+        const list = await h.pushSubscriptions.listForUser(ana);
+        assert.deepEqual(list.map((x) => x.endpoint), ['https://p/1', 'https://p/2']);
+        assert.equal(list[0]!.p256dh, 'novo');
+        await h.pushSubscriptions.upsert(sub(bia, 'https://p/1', 10));
+        assert.deepEqual((await h.pushSubscriptions.listForUser(ana)).map((x) => x.endpoint), ['https://p/2'], 'o aparelho passa para quem entrou por último');
+        await h.pushSubscriptions.remove('https://p/1', ana);
+        assert.equal((await h.pushSubscriptions.listForUser(bia)).length, 1, 'outra pessoa não remove');
+        await h.pushSubscriptions.remove('https://p/1', bia);
+        assert.equal((await h.pushSubscriptions.listForUser(bia)).length, 0);
+        await h.pushSubscriptions.remove('https://p/2');
+        assert.equal((await h.pushSubscriptions.listForUser(ana)).length, 0);
       });
     });
   });

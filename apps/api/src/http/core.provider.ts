@@ -7,12 +7,15 @@ import {
   PrismaBlockRepository,
   PrismaConversationRepository,
   PrismaMeetupRepository,
+  PrismaNotificationRepository,
+  PrismaPushSubscriptionRepository,
   PrismaPlaceRepository,
   PrismaFlashRepository,
   PrismaFollowRepository,
   PrismaPendingSignupRepository,
   PrismaUserRepository,
 } from '../infra/prisma/index.ts';
+import { DisabledPushSender, WebPushSender } from '../infra/push/web-push-sender.ts';
 import { GooglePlaceSource } from '../infra/google/google-place-source.ts';
 import { FallbackPlaceSource } from '../infra/places/fallback-place-source.ts';
 import { OverpassPlaceSource } from '../infra/overpass/overpass-place-source.ts';
@@ -47,7 +50,10 @@ export const coreProvider = {
       availability: new PrismaAvailabilityRepository(prisma),
       flash: new PrismaFlashRepository(prisma),
       conversations: new PrismaConversationRepository(prisma),
-    meetups: new PrismaMeetupRepository(prisma),
+      meetups: new PrismaMeetupRepository(prisma),
+      notifications: new PrismaNotificationRepository(prisma),
+      pushSubscriptions: new PrismaPushSubscriptionRepository(prisma),
+      push: config.vapid ? new WebPushSender({ keys: { publicKey: config.vapid.publicKey, privateKey: config.vapid.privateKey }, subject: config.vapid.subject }) : new DisabledPushSender(),
       places: new PrismaPlaceRepository(prisma),
       placeSource: google ? new FallbackPlaceSource(google, new OverpassPlaceSource({ contact: config.osmContact })) : new OverpassPlaceSource({ contact: config.osmContact }),
       pending: new PrismaPendingSignupRepository(prisma),

@@ -62,6 +62,30 @@ step('git pull', root, 'git', ['pull', '--ff-only']).ok ||
   (step('descartar package-lock.json local', root, 'git', ['checkout', 'package-lock.json']).ok && step('git pull (de novo)', root, 'git', ['pull', '--ff-only']));
 step('npm install', root, 'npm', ['install', '--no-audit', '--no-fund']);
 
+// 1b. Chaves do aviso fora do app (Web Push). Geradas uma vez e gravadas no .env da API; nunca sobrescreve.
+{
+  process.stdout.write('  chaves do aviso fora do app ... ');
+  const envFile = join(api, '.env');
+  try {
+    const text = existsSync(envFile) ? readFileSync(envFile, 'utf8') : '';
+    const has = (k) => new RegExp(`^${k}=.+`, 'm').test(text);
+    if (has('VAPID_PUBLIC_KEY') && has('VAPID_PRIVATE_KEY')) {
+      console.log('ok (já existem)');
+    } else {
+      const { createECDH } = await import('node:crypto');
+      const ecdh = createECDH('prime256v1');
+      ecdh.generateKeys();
+      const cleaned = text.split('\n').filter((l) => !/^VAPID_(PUBLIC|PRIVATE)_KEY=/.test(l)).join('\n').replace(/\n*$/, '\n');
+      writeFileSync(envFile, `${cleaned}VAPID_PUBLIC_KEY=${ecdh.getPublicKey().toString('base64url')}\nVAPID_PRIVATE_KEY=${ecdh.getPrivateKey().toString('base64url')}\n`);
+      console.log('ok (geradas)');
+    }
+    results.push({ title: 'chaves VAPID', ok: true });
+  } catch (error) {
+    console.log(`FALHOU\n    ${error instanceof Error ? error.message : error}`);
+    results.push({ title: 'chaves VAPID', ok: false, optional: true });
+  }
+}
+
 // 2. Bancos
 const urls = dbUrls();
 if (!urls) {

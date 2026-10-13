@@ -267,3 +267,29 @@ export interface MeetupRecord {
   createdAt: Date;
   participants: MeetupParticipantRecord[];
 }
+
+// ---------- Avisos ----------
+
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE';
+
+/** Aviso guardado para a pessoa. `url` é um caminho dentro do app; `dedupeKey` evita avisos repetidos enquanto o anterior não foi lido. */
+export interface NotificationRecord {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  url: string;
+  dedupeKey: string | null;
+  readAt: Date | null;
+  createdAt: Date;
+}
+
+/** Inscrição de um aparelho/navegador para receber Web Push. */
+export interface PushSubscriptionRecord {
+  userId: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  createdAt: Date;
+}

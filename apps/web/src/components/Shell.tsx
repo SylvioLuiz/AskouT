@@ -5,7 +5,8 @@ import { api } from '../client.ts';
 import { useAsync, usePolling } from '../hooks.ts';
 import { CHATS_CHANGED_EVENT } from '../lib/chat.ts';
 import { FLASH_CHANGED_EVENT } from '../lib/flash.ts';
-import { Link, usePathname } from '../router.tsx';
+import { NOTIFICATIONS_CHANGED_EVENT } from '../lib/notifications.ts';
+import { Link, navigate, usePathname } from '../router.tsx';
 import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, HomeIcon, SearchIcon, UserIcon } from './icons.tsx';
 import { Avatar } from './ui.tsx';
 
@@ -47,7 +48,23 @@ export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   // Solicitações de seguir pendentes: alimentam a bolinha em Atividades.
   const pending = useAsync(() => api.followRequests({ limit: 1 }), [pathname]);
-  const hasPending = (pending.data?.total ?? 0) > 0;
+  const unreadNews = useAsync(() => api.unreadNotifications(), [pathname]);
+  usePolling(unreadNews.reload, 20_000);
+  useEffect(() => {
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, unreadNews.reload);
+    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, unreadNews.reload);
+  }, [unreadNews.reload]);
+  // Tocar num aviso do aparelho com o app aberto: o service worker pede para abrir a tela certa.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: unknown; url?: unknown } | null;
+      if (data?.type === 'askout:navigate' && typeof data.url === 'string' && data.url.startsWith('/')) navigate(data.url);
+    };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, []);
+  const hasPending = (pending.data?.total ?? 0) > 0 || (unreadNews.data?.unread ?? 0) > 0;
   // Flash: o raio fica cheio com o Flash ligado e ganha uma bolinha quando alguém te convida.
   const flash = useAsync(() => api.flashStatus(), [pathname]);
   const flashInvites = useAsync(() => api.flashInvites(), [pathname]);

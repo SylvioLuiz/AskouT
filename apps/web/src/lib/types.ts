@@ -219,6 +219,24 @@ export interface MeetupView {
   canManage: boolean;
 }
 
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE';
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  /** Caminho dentro do app. */
+  url: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface NotificationList {
+  items: NotificationItem[];
+  unread: number;
+}
+
 export interface GroupDetails {
   id: string;
   name: string;

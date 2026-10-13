@@ -6,6 +6,8 @@ import {
   PrismaBlockRepository,
   PrismaConversationRepository,
   PrismaMeetupRepository,
+  PrismaNotificationRepository,
+  PrismaPushSubscriptionRepository,
   PrismaPlaceRepository,
   PrismaFlashRepository,
   PrismaFollowRepository,
@@ -53,6 +55,8 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     flash: new PrismaFlashRepository(prisma),
     conversations: new PrismaConversationRepository(prisma),
     meetups: new PrismaMeetupRepository(prisma),
+    notifications: new PrismaNotificationRepository(prisma),
+    pushSubscriptions: new PrismaPushSubscriptionRepository(prisma),
     places: new PrismaPlaceRepository(prisma),
     async setUserStatus(userId: string, status: UserStatus) {
       await prisma.user.update({ where: { id: userId }, data: { status } });

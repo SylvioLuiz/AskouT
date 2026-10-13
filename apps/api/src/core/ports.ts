@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -227,7 +227,49 @@ export interface IdGenerator {
   next(): string;
 }
 
+export interface NotificationRepository {
+  create(record: NotificationRecord): Promise<void>;
+  /** Mais recentes primeiro. */
+  listForUser(userId: string, limit: number): Promise<NotificationRecord[]>;
+  unreadCount(userId: string): Promise<number>;
+  /** Já existe aviso não lido com essa chave? */
+  hasUnread(userId: string, dedupeKey: string): Promise<boolean>;
+  /** Marca como lidos (todos se `ids` for omitido). Devolve quantos mudaram. */
+  markRead(userId: string, now: Date, ids?: string[]): Promise<number>;
+}
+
+export interface PushSubscriptionRepository {
+  /** Um endpoint pertence a uma pessoa só: se já existia, passa para quem inscreveu agora. */
+  upsert(record: PushSubscriptionRecord): Promise<void>;
+  remove(endpoint: string, userId?: string): Promise<void>;
+  listForUser(userId: string): Promise<PushSubscriptionRecord[]>;
+}
+
+export interface PushMessage {
+  title: string;
+  body: string;
+  /** Caminho dentro do app que abre ao tocar. */
+  url: string;
+  /** Avisos com a mesma `tag` se substituem na tela do aparelho. */
+  tag: string;
+}
+
+/** SENT: entregue ao serviço de push; GONE: a inscrição não vale mais (apagar); FAILED: erro passageiro. */
+export type PushResult = 'SENT' | 'GONE' | 'FAILED';
+
+export interface PushSender {
+  /** Chave pública que o navegador usa para se inscrever; `null` se o envio não está configurado. */
+  readonly publicKey: string | null;
+  send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult>;
+}
+
+/** Cria o aviso dentro do app e tenta o push. Nunca lança erro: falha de aviso não derruba a ação principal. */
+export interface Notifier {
+  notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string }): Promise<void>;
+}
+
 export interface CoreDeps {
+  notifier: Notifier;
   users: UserRepository;
   follows: FollowRepository;
   blocks: BlockRepository;

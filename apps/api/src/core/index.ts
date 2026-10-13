@@ -7,10 +7,19 @@ import { FollowService } from './follow-service.ts';
 import { MeetupService } from './meetup-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
-import type { CoreDeps } from './ports.ts';
+import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
+import { NotificationService, StoredNotifier } from './notification-service.ts';
 import { ProfileService } from './profile-service.ts';
 
-export function createCore(deps: CoreDeps) {
+export type CoreInput = Omit<CoreDeps, 'notifier'> & {
+  notifications: NotificationRepository;
+  pushSubscriptions: PushSubscriptionRepository;
+  push: PushSender;
+};
+
+export function createCore(input: CoreInput) {
+  const notifier = new StoredNotifier(input);
+  const deps: CoreDeps = { ...input, notifier };
   const flash = new FlashService(deps);
   const profiles = new ProfileService(deps);
   return {
@@ -24,6 +33,9 @@ export function createCore(deps: CoreDeps) {
     suggestions: new SuggestionService(deps, flash),
     explore: new ExploreService(deps, profiles),
     meetups: new MeetupService(deps),
+    notifications: new NotificationService(input),
+    /** Espera os pushes em andamento (testes e desligamento). */
+    flushNotifications: () => notifier.flush(),
   };
 }
 
@@ -85,6 +97,8 @@ export type { ExploreEventItem, ExplorePlaceItem, ExploreView } from './explore-
 export { MeetupService, MEETUP_MAX_GUESTS } from './meetup-service.ts';
 export type { MeetupView } from './meetup-view.ts';
 export { distanceMeters, midpoint, boundingBox } from './geo.ts';
+export { NotificationService, StoredNotifier } from './notification-service.ts';
+export type { NotificationView } from './notification-service.ts';
 export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';
 export type { ConnectionsPage, FollowResult } from './follow-service.ts';

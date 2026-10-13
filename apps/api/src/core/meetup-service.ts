@@ -105,12 +105,16 @@ export class MeetupService {
     // recebe o convite na conversa 1 a 1 com quem organiza (ele só entra no grupo ao aceitar).
     await this.deps.conversations.addMessage(card(conversation.id));
     await conversations.markRead(conversation.id, actorId, now);
+    const organizerName = await this.nameOf(actorId);
     if (guests.length > 1) {
       for (const g of guests) {
         const direct = await conversations.getOrCreateDirect(actorId, g, ids.next(), now);
         await conversations.addMessage(card(direct.id));
         await conversations.markRead(direct.id, actorId, now);
+        await this.notifyInvite(g, organizerName, title, direct.id, meetup.id);
       }
+    } else {
+      await this.notifyInvite(guests[0] as string, organizerName, title, conversation.id, meetup.id);
     }
     const [view] = await buildMeetupViews(this.deps, actorId, [meetup]);
     if (!view) throw notFound('Encontro não encontrado');
@@ -148,6 +152,7 @@ export class MeetupService {
       const direct = await conversations.getOrCreateDirect(actorId, g, ids.next(), now);
       await conversations.addMessage({ id: ids.next(), conversationId: direct.id, senderId: actorId, kind: 'MEETUP', body: `Encontro: ${meetup.title}`, suggestion: null, response: null, respondedAt: null, meetupId, createdAt: now });
       await conversations.markRead(direct.id, actorId, now);
+      await this.notifyInvite(g, actorName, meetup.title, direct.id, meetupId);
     }
     if (invited.length > 0) {
       const names = (await users.findProfilesByIds(invited)).map((p) => p.displayName);
@@ -172,7 +177,12 @@ export class MeetupService {
   async cancel(actorId: string, meetupId: string): Promise<MeetupView> {
     const meetup = await this.managed(actorId, meetupId);
     await this.deps.meetups.update(meetupId, { status: 'CANCELLED' });
-    await this.say(meetup, actorId, `${await this.nameOf(actorId)} cancelou o encontro "${meetup.title}"`);
+    const actorName = await this.nameOf(actorId);
+    await this.say(meetup, actorId, `${actorName} cancelou o encontro "${meetup.title}"`);
+    for (const p of meetup.participants) {
+      if (p.userId === actorId || p.status === 'DECLINED') continue;
+      await this.deps.notifier.notify({ userId: p.userId, type: 'MEETUP_CANCELLED', title: meetup.title, body: `${actorName} cancelou o encontro`, url: `/conversas/${meetup.conversationId}` });
+    }
     return this.get(actorId, meetupId);
   }
 
@@ -182,6 +192,10 @@ export class MeetupService {
     if (meetup.status === 'CANCELLED') throw conflict('Esse encontro foi cancelado');
     if (meetup.endsAt <= this.deps.clock.now()) throw conflict('Esse encontro já aconteceu');
     return meetup;
+  }
+
+  private async notifyInvite(guestId: string, organizerName: string, title: string, conversationId: string, meetupId: string): Promise<void> {
+    await this.deps.notifier.notify({ userId: guestId, type: 'MEETUP_INVITE', title: `${organizerName} convidou você`, body: title, url: `/conversas/${conversationId}`, dedupeKey: `meetup-invite:${meetupId}` });
   }
 
   private async nameOf(userId: string): Promise<string> {
@@ -218,6 +232,9 @@ export class MeetupService {
     if (status === 'CONFIRMED') {
       const conversation = await conversations.findById(meetup.conversationId);
       if (conversation?.type === 'GROUP') await conversations.addParticipant(conversation.id, actorId, now);
+    }
+    if (status === 'CONFIRMED') {
+      await this.deps.notifier.notify({ userId: meetup.organizerId, type: 'MEETUP_ACCEPTED', title: meetup.title, body: `${await this.nameOf(actorId)} vai ao encontro`, url: `/conversas/${meetup.conversationId}`, dedupeKey: `meetup-accepted:${meetupId}` });
     }
     return this.get(actorId, meetupId);
   }

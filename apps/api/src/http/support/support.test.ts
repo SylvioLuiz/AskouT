@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DomainError, rateLimited, validationError, notFound, conflict, forbidden, unauthorized } from '../../core/errors.ts';
+import { generateVapidKeys } from '../../infra/push/web-push-sender.ts';
 import { loadConfig } from './config.ts';
 import { describeError } from './error-mapping.ts';
 import { asBody, bearerToken, parseIntParam } from './parse.ts';
@@ -39,6 +40,15 @@ describe('loadConfig', () => {
     assert.throws(() => loadConfig({ ...good, EMAIL_TRANSPORT: 'smtp' }), /EMAIL_TRANSPORT/);
     assert.throws(() => loadConfig({ ...good, CORS_ORIGINS: '*' }), /CORS_ORIGINS/);
     assert.throws(() => loadConfig({ ...good, TOKEN_TTL_SECONDS: '5' }), /TOKEN_TTL_SECONDS/);
+  });
+
+  it('chaves VAPID: opcionais, devem vir em par e combinar', () => {
+    const keys = generateVapidKeys();
+    assert.equal(loadConfig(good).vapid, undefined);
+    assert.deepEqual(loadConfig({ ...good, VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey }).vapid?.publicKey, keys.publicKey);
+    assert.throws(() => loadConfig({ ...good, VAPID_PUBLIC_KEY: keys.publicKey }), /juntas/);
+    assert.throws(() => loadConfig({ ...good, VAPID_PUBLIC_KEY: generateVapidKeys().publicKey, VAPID_PRIVATE_KEY: keys.privateKey }), /não corresponde/);
+    assert.throws(() => loadConfig({ ...good, VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: 'ftp://x' }), /VAPID_SUBJECT/);
   });
 
   it('lê lista de origens CORS', () => {

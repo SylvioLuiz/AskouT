@@ -2909,3 +2909,17 @@ button {
 .memberrow > :first-child { flex: 1; min-width: 0; }
 .filebtn { position: relative; overflow: hidden; }
 .filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+
+/* ---------- Avisos ---------- */
+.pushcard { margin: 0 0 16px; }
+.pushcard__hint { margin: 0 0 16px; }
+.newshead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.newslist { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; }
+.newsrow { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 12px 0; background: none; border: 0; border-bottom: 1px solid var(--line, #d9dcec); text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.newsrow__dot { flex: none; width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: transparent; }
+.newsrow--unread .newsrow__dot { background: var(--brand, #3b37ff); }
+.newsrow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.newsrow__title { font-weight: 500; overflow-wrap: anywhere; }
+.newsrow--unread .newsrow__title { font-weight: 700; }
+.newsrow__text { color: var(--muted, #6b6b7b); font-size: 0.875rem; overflow-wrap: anywhere; }
+.newsrow__time { flex: none; color: var(--muted, #6b6b7b); font-size: 0.75rem; margin-top: 3px; }

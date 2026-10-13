@@ -5,6 +5,8 @@ import {
   InMemoryConversationRepository,
   InMemoryPlaceRepository,
   InMemoryMeetupRepository,
+  InMemoryNotificationRepository,
+  InMemoryPushSubscriptionRepository,
   InMemoryFlashRepository,
   InMemoryBlockRepository,
   InMemoryFollowRepository,
@@ -22,6 +24,8 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let conversations = new InMemoryConversationRepository();
   let places = new InMemoryPlaceRepository();
   let meetups = new InMemoryMeetupRepository();
+  let notifications = new InMemoryNotificationRepository();
+  let pushSubscriptions = new InMemoryPushSubscriptionRepository();
 
   // Os repositórios são trocados no reset; o proxy abaixo sempre aponta para os atuais.
   return {
@@ -52,6 +56,12 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
     get meetups() {
       return meetups;
     },
+    get notifications() {
+      return notifications;
+    },
+    get pushSubscriptions() {
+      return pushSubscriptions;
+    },
     async setUserStatus(userId: string, status: UserStatus) {
       const user = users.users.get(userId);
       if (user) user.status = status;
@@ -66,6 +76,8 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
       conversations = new InMemoryConversationRepository();
       places = new InMemoryPlaceRepository();
       meetups = new InMemoryMeetupRepository();
+      notifications = new InMemoryNotificationRepository();
+      pushSubscriptions = new InMemoryPushSubscriptionRepository();
     },
     async close() {},
   };

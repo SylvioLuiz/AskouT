@@ -284,7 +284,7 @@ export class ConversationService {
 
   async send(actorId: string, conversationId: string, input: SendInput): Promise<MessageView> {
     const { conversations, follows, clock, ids } = this.deps;
-    const { conversation, otherId } = await this.access(actorId, conversationId);
+    const { conversation, otherId, memberIds } = await this.access(actorId, conversationId);
     const hasText = input.body !== undefined && input.body !== null;
     const hasSuggestion = input.suggestion !== undefined && input.suggestion !== null;
     if (hasText === hasSuggestion) throw validationError('Envie um texto ou uma sugestão', { body: 'Envie um texto ou uma sugestão' });
@@ -314,8 +314,21 @@ export class ConversationService {
     await conversations.addMessage(message);
     await conversations.markRead(conversationId, actorId, now);
     const positions = suggestion && otherId ? await this.livePositions(actorId, otherId, now) : null;
-    const senderName = conversation.type === 'GROUP' ? ((await this.deps.users.findProfilesByIds([actorId]))[0]?.displayName ?? null) : null;
+    const actorName = (await this.deps.users.findProfilesByIds([actorId]))[0]?.displayName ?? 'Alguém';
+    const senderName = conversation.type === 'GROUP' ? actorName : null;
+    await this.notifyMembers(actorId, actorName, conversation, memberIds, suggestion ? 'sugeriu um lugar' : 'enviou uma mensagem');
     return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName });
+  }
+
+  /** Avisa os outros membros (menos quem bloqueou ou foi bloqueado por quem escreveu). O texto da mensagem não vai no aviso. */
+  private async notifyMembers(actorId: string, actorName: string, conversation: ConversationRecord, memberIds: string[], what: string): Promise<void> {
+    const hidden = new Set(await this.deps.blocks.listRelatedIds(actorId));
+    const title = conversation.type === 'GROUP' ? (conversation.name ?? 'Grupo') : actorName;
+    const body = conversation.type === 'GROUP' ? `${actorName} ${what}` : what.charAt(0).toUpperCase() + what.slice(1);
+    for (const id of memberIds) {
+      if (id === actorId || hidden.has(id)) continue;
+      await this.deps.notifier.notify({ userId: id, type: 'MESSAGE', title, body, url: `/conversas/${conversation.id}`, dedupeKey: `msg:${conversation.id}` });
+    }
   }
 
   /** Quem recebeu o cartão aceita ou recusa o lugar. Só uma resposta, só do destinatário, só entre amigos. */
@@ -391,6 +404,7 @@ export class ConversationService {
     await conversations.removeParticipant(conversationId, targetId);
     await meetups.declineAllFor(conversationId, targetId, now);
     await this.postSystem(conversationId, actorId, `${await this.nameOf(targetId)} foi removido(a) por ${await this.nameOf(actorId)}`, now);
+    await this.deps.notifier.notify({ userId: targetId, type: 'GROUP_REMOVED', title: conversation.name ?? 'Grupo', body: 'Você foi removido(a) do grupo', url: '/conversas' });
     return { ok: true };
   }
 

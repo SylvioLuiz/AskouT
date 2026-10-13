@@ -145,7 +145,16 @@ Na página de um evento, o botão **Criar encontro** (nome provisório; muda em 
 - **Editar o encontro** (aba Eventos, só quem organiza, até ele acabar): mudar o nome, **convidar mais amigos** (quem já está no grupo não aparece; mais de 16 pessoas não) e **cancelar** (cartões e aba passam a mostrar "Cancelado").
 - **Bloqueio dentro do grupo:** se alguém bloqueia outro membro, os dois deixam de ver as mensagens e a presença um do outro naquele grupo (o resto do grupo continua normal).
 - Rotas novas: `POST /conversations/:id/leave`, `DELETE /conversations/:id/members/:userId`, `PUT /conversations/:id/group/name` (`{name}`), `PUT /conversations/:id/group/photo` (`{image: dataURL|null}`), `POST /meetups/:id/invite` (`{guestIds}`), `PATCH /meetups/:id` (`{title}`), `POST /meetups/:id/cancel`. Migração `20261014230000_group_management` e `007_group_constraints.sql` (rodam no `npm run update`).
-- Ainda não existe: aviso fora do app, mídia.
+- Ainda não existe: mídia.
+
+## Avisos (sino e fora do app)
+
+- **Sino (dentro do app):** cada aviso fica guardado no banco (tabela `Notification`). A tela **Atividades** lista as novidades (não lidas em destaque; tocar abre a tela certa e marca como lida; "Marcar tudo como lido") e, abaixo, os pedidos para seguir. A bolinha do sino aparece com avisos não lidos ou pedidos pendentes.
+- **Quando avisa:** nova mensagem (1 a 1 ou grupo), convite de encontro, alguém aceitou ou cancelou o encontro, remoção do grupo, pedido para seguir e pedido aprovado, convite do Flash e Flash aceito. Mensagens seguidas na mesma conversa viram **um** aviso até você abrir. Quem bloqueou alguém não é avisado das mensagens dessa pessoa num grupo. **O texto da mensagem nunca vai no aviso** (só "enviou uma mensagem").
+- **Fora do app (Web Push):** em Atividades, **Ativar avisos** pede a permissão do navegador e inscreve o aparelho (até 10 por pessoa; **Desligar neste aparelho** cancela). O servidor cifra o aviso (RFC 8291) e se identifica com VAPID (RFC 8292), tudo com `node:crypto`, sem biblioteca. O `npm run update` gera o par de chaves e grava `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` em `apps/api/.env` (só se faltarem); sem as chaves o push fica desligado e o app avisa isso.
+- **O que foi testado e o que não foi:** a criptografia confere com o exemplo oficial do RFC 8291, a assinatura VAPID é verificada nos testes, e o fluxo de tela roda num navegador de teste com a parte do navegador simulada. **Ainda não foi testado com um serviço de push de verdade** (Chrome/Firefox/Safari): isso só dá para confirmar no seu aparelho.
+- **Limites do navegador:** o push só funciona em conexão segura (`https` ou `localhost`). Com o certificado autoassinado do `dev:all -- --https`, o celular não registra o service worker; para testar no celular é preciso um endereço `https` confiável (ex.: um túnel). No iPhone/iPad só funciona com o AskouT adicionado à Tela de Início.
+- Rotas: `GET /notifications`, `GET /notifications/unread`, `POST /notifications/read` (`{id?}`), `GET /notifications/push-key`, `POST /notifications/push` (`{endpoint, keys}`), `POST /notifications/push/remove` (`{endpoint}`). Migração `20261015120000_notifications_push` (roda no `npm run update`).
 
 ## Explorar
 

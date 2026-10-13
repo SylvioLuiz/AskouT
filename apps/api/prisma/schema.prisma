@@ -135,6 +135,7 @@ model User {
   flashInvitesReceived FlashInvite[]  @relation("FlashInviteTo")
   flashPositions      FlashPosition[]
   notifications Notification[]
+  pushSubscriptions PushSubscription[]
 }
 
 model Profile {
@@ -410,6 +411,19 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt])
+}
+
+// Inscrição de um navegador/aparelho para Web Push. O endpoint é único: pertence a uma pessoa só.
+model PushSubscription {
+  endpoint  String   @id
+  userId    String   @db.Uuid
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // Cadastro aguardando o código enviado por e-mail. A conta (User + Profile) só nasce na confirmação.

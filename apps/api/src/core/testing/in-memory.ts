@@ -3,6 +3,11 @@ import { evaluateFriendship } from '../friendship.ts';
 import type {
   ConversationRepository,
   MeetupRepository,
+  NotificationRepository,
+  PushMessage,
+  PushResult,
+  PushSender,
+  PushSubscriptionRepository,
   PlaceRepository,
   PlaceSource,
   AvailabilityRepository,
@@ -18,7 +23,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { MeetupRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -685,5 +690,70 @@ export class FakePlaceSource implements PlaceSource {
   async nearby(): Promise<{ available: boolean; places: ExternalPlace[] }> {
     this.calls += 1;
     return this.available ? { available: true, places: this.places.map((p) => ({ ...p })) } : { available: false, places: [] };
+  }
+}
+
+export class InMemoryNotificationRepository implements NotificationRepository {
+  readonly rows: NotificationRecord[] = [];
+
+  async create(record: NotificationRecord): Promise<void> {
+    this.rows.push({ ...record });
+  }
+
+  async listForUser(userId: string, limit: number): Promise<NotificationRecord[]> {
+    return this.rows
+      .filter((n) => n.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+      .slice(0, limit)
+      .map((n) => ({ ...n }));
+  }
+
+  async unreadCount(userId: string): Promise<number> {
+    return this.rows.filter((n) => n.userId === userId && n.readAt === null).length;
+  }
+
+  async hasUnread(userId: string, dedupeKey: string): Promise<boolean> {
+    return this.rows.some((n) => n.userId === userId && n.readAt === null && n.dedupeKey === dedupeKey);
+  }
+
+  async markRead(userId: string, now: Date, ids?: string[]): Promise<number> {
+    let changed = 0;
+    for (const n of this.rows) {
+      if (n.userId !== userId || n.readAt !== null) continue;
+      if (ids && !ids.includes(n.id)) continue;
+      n.readAt = now;
+      changed += 1;
+    }
+    return changed;
+  }
+}
+
+export class InMemoryPushSubscriptionRepository implements PushSubscriptionRepository {
+  readonly rows = new Map<string, PushSubscriptionRecord>();
+
+  async upsert(record: PushSubscriptionRecord): Promise<void> {
+    const existing = this.rows.get(record.endpoint);
+    this.rows.set(record.endpoint, { ...record, createdAt: existing?.createdAt ?? record.createdAt });
+  }
+
+  async remove(endpoint: string, userId?: string): Promise<void> {
+    const row = this.rows.get(endpoint);
+    if (row && (userId === undefined || row.userId === userId)) this.rows.delete(endpoint);
+  }
+
+  async listForUser(userId: string): Promise<PushSubscriptionRecord[]> {
+    return [...this.rows.values()].filter((r) => r.userId === userId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((r) => ({ ...r }));
+  }
+}
+
+/** Guarda o que seria enviado; `results` permite simular inscrição vencida ou falha. */
+export class FakePushSender implements PushSender {
+  publicKey: string | null = 'chave-publica-de-teste';
+  readonly sent: { subscription: PushSubscriptionRecord; message: PushMessage }[] = [];
+  results = new Map<string, PushResult>();
+
+  async send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
+    this.sent.push({ subscription, message });
+    return this.results.get(subscription.endpoint) ?? 'SENT';
   }
 }

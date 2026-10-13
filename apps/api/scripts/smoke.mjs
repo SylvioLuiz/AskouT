@@ -285,6 +285,25 @@ try {
     check('convidar quem não é amigo: 403', (await call('POST', '/meetups', { token: a.token, body: { eventId: anyEvent.id, guestIds: [c.id] } })).status === 403);
     check('sem convidados: 400', (await call('POST', '/meetups', { token: a.token, body: { eventId: anyEvent.id, guestIds: [] } })).status === 400);
     check('grupo só existe com vários convidados (404 na 1 a 1)', (await call('GET', `/conversations/${one.body.conversationId}/group`, { token: a.token })).status === 404);
+    check('convidar mais gente num encontro de 2: 400', (await call('POST', `/meetups/${one.body.id}/invite`, { token: a.token, body: { guestIds: [c.id] } })).status === 400);
+    check('só quem organiza renomeia: 403', (await call('PATCH', `/meetups/${one.body.id}`, { token: b.token, body: { title: 'x' } })).status === 403);
+    const renamed = await call('PATCH', `/meetups/${one.body.id}`, { token: a.token, body: { title: 'Nome de teste' } });
+    check('organizador renomeia o encontro', renamed.status === 200 && renamed.body.title === 'Nome de teste', renamed.body);
+    check('sair de uma conversa 1 a 1 como grupo: 404', (await call('POST', `/conversations/${one.body.conversationId}/leave`, { token: b.token })).status === 404);
+
+    console.log('\nAvisos');
+    const news = await call('GET', '/notifications', { token: b.token });
+    check('convidado recebeu aviso do encontro', news.status === 200 && news.body.items.some((n) => n.type === 'MEETUP_INVITE') && news.body.unread >= 1, news.body);
+    check('contagem de não lidos', (await call('GET', '/notifications/unread', { token: b.token })).body?.unread >= 1);
+    const firstNews = news.body.items.find((n) => n.type === 'MEETUP_INVITE');
+    const read = await call('POST', '/notifications/read', { token: b.token, body: { id: firstNews.id } });
+    check('marcar um aviso como lido', read.status === 200 && read.body.unread < news.body.unread, read.body);
+    check('marcar todos como lidos', (await call('POST', '/notifications/read', { token: b.token, body: {} })).body?.unread === 0);
+    const key = await call('GET', '/notifications/push-key', { token: b.token });
+    check('chave pública do push (ou null se não configurado)', key.status === 200 && (key.body.publicKey === null || typeof key.body.publicKey === 'string'), key.body);
+    check('inscrição inválida: 400 ou 409', [400, 409].includes((await call('POST', '/notifications/push', { token: b.token, body: { endpoint: 'http://x', keys: {} } })).status));
+    check('avisos sem login: 401', (await call('GET', '/notifications')).status === 401);
+
   }
 
   console.log('\nBloqueio');
