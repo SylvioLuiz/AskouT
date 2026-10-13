@@ -10,7 +10,7 @@ Menos tempo combinando. Mais tempo juntos.
 | `apps/api/src/core` (cadastro com código por e-mail, login, perfil, seguir, bloquear, amizade) | **implementado e testado** (tipos limpos) |
 | Suíte de contrato dos repositórios (`core/testing/contracts.ts`) | **passa em memória e contra um Postgres 16 real** (202 testes no total) |
 | Repositórios Prisma (`apps/api/src/infra/prisma`) | **validados contra Postgres real** pela suíte de contrato |
-| Camada HTTP NestJS (`apps/api/src/http`) | **sobe e responde**: teste de fumaça por HTTP (`npm run smoke`, 45 verificações) passa contra Postgres real; `typecheck:full` limpo. Falta endurecer para produção (ver limitações) |
+| Camada HTTP NestJS (`apps/api/src/http`) | **sobe e responde**: teste de fumaça por HTTP (`npm run smoke`, 79 verificações, incluindo o Flash) passa contra Postgres real; `typecheck:full` limpo. Falta endurecer para produção (ver limitações) |
 | `apps/api/prisma/schema.prisma` + migration `init` | **aplicados em Postgres real** (a migration está em `prisma/migrations`) |
 | View `friendships` + restrições (SQL) | **aplicados em Postgres real** (`prisma/sql/001_...sql`, depois da migration) |
 | Agenda: serviço de disponibilidade (`core/availability-service.ts`), repositório Prisma e rotas HTTP | **validado contra Postgres real**: 168 testes (20 de contrato Prisma) e teste de fumaça por HTTP com 45 verificações, sem falhas |
