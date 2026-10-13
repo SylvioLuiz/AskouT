@@ -8,16 +8,16 @@ Menos tempo combinando. Mais tempo juntos.
 |---|---|
 | `packages/availability-engine` (compatibilidade de agendas) | **implementado e testado** (15 testes) |
 | `apps/api/src/core` (cadastro com código por e-mail, login, perfil, seguir, bloquear, amizade) | **implementado e testado** (tipos limpos) |
-| Suíte de contrato dos repositórios (`core/testing/contracts.ts`) | **passa em memória e contra um Postgres 16 real** (146 testes no total, 3 rodadas seguidas sem falha) |
+| Suíte de contrato dos repositórios (`core/testing/contracts.ts`) | **passa em memória e contra um Postgres 16 real** (168 testes no total) |
 | Repositórios Prisma (`apps/api/src/infra/prisma`) | **validados contra Postgres real** pela suíte de contrato |
-| Camada HTTP NestJS (`apps/api/src/http`) | **sobe e responde**: teste de fumaça por HTTP (`npm run smoke`, 34 verificações) passa contra Postgres real; `typecheck:full` limpo. Falta endurecer para produção (ver limitações) |
+| Camada HTTP NestJS (`apps/api/src/http`) | **sobe e responde**: teste de fumaça por HTTP (`npm run smoke`, 45 verificações) passa contra Postgres real; `typecheck:full` limpo. Falta endurecer para produção (ver limitações) |
 | `apps/api/prisma/schema.prisma` + migration `init` | **aplicados em Postgres real** (a migration está em `prisma/migrations`) |
 | View `friendships` + restrições (SQL) | **aplicados em Postgres real** (`prisma/sql/001_...sql`, depois da migration) |
-| Agenda: serviço de disponibilidade (`core/availability-service.ts`) + rotas HTTP | **núcleo testado em memória** (148 testes da API). O repositório Prisma da agenda e as rotas **ainda não foram rodados contra Postgres**: faltam o `npm test` com banco e o `npm run smoke` na sua máquina |
+| Agenda: serviço de disponibilidade (`core/availability-service.ts`), repositório Prisma e rotas HTTP | **validado contra Postgres real**: 168 testes (20 de contrato Prisma) e teste de fumaça por HTTP com 45 verificações, sem falhas |
 | App web mobile-first (`apps/web`): conta, perfil, seguir, bloquear, Agenda, Encontrar melhor data | **verificado em navegador real** contra o núcleo em memória (celular 390 px). `typecheck`/`build` do Vite ainda a conferir na sua máquina |
 | Painéis de bares e admin, app nativo | **não iniciados** |
 
-Nada acima é simulado: o que consta como implementado roda e tem teste. O que consta como "escrito, não executado", "não iniciado" ou "não validado" não deve ser tratado como pronto. Sem banco, 130 testes rodam e os 16 do Prisma/Postgres aparecem como `SKIP`; com `ASKOUT_TEST_DATABASE_URL` apontando para um banco de teste, os 146 rodam.
+Nada acima é simulado: o que consta como implementado roda e tem teste. O que consta como "escrito, não executado", "não iniciado" ou "não validado" não deve ser tratado como pronto. Sem banco, 148 testes rodam e os 20 do Prisma/Postgres aparecem como `SKIP`; com `ASKOUT_TEST_DATABASE_URL` apontando para um banco de teste, os 168 rodam.
 
 ## Rodar os testes
 
