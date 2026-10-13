@@ -1,3 +1,4 @@
+import { AvailabilityService } from './availability-service.ts';
 import { AuthService } from './auth-service.ts';
 import { BlockService } from './block-service.ts';
 import { FollowService } from './follow-service.ts';
@@ -10,6 +11,7 @@ export function createCore(deps: CoreDeps) {
     profiles: new ProfileService(deps),
     follows: new FollowService(deps),
     blocks: new BlockService(deps),
+    availability: new AvailabilityService(deps),
   };
 }
 
@@ -30,6 +32,22 @@ export type {
   SignupInput,
   SignupStarted,
 } from './auth-service.ts';
+export { AvailabilityService } from './availability-service.ts';
+export {
+  DEFAULT_TIME_ZONE,
+  MAX_ACTIVE_SLOTS,
+  MAX_FRIENDS_PER_QUERY,
+  MAX_RANGE_DAYS,
+  MAX_SLOT_HOURS,
+} from './availability-service.ts';
+export type {
+  BestDatesInput,
+  CompatibilityView,
+  FriendAvailability,
+  ParticipantView,
+  SlotInput,
+  SlotView,
+} from './availability-service.ts';
 export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';
 export type { ConnectionsPage, FollowResult } from './follow-service.ts';
@@ -40,6 +58,7 @@ export type { ErrorCode } from './errors.ts';
 export { evaluateFriendship } from './friendship.ts';
 export { HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from './adapters/crypto.ts';
 export type {
+  AvailabilityRepository,
   BlockRepository,
   Clock,
   CoreDeps,
@@ -55,6 +74,8 @@ export type {
 } from './ports.ts';
 export type {
   Actor,
+  AvailabilitySlotRecord,
+  SlotState,
   Direction,
   Follow,
   FollowStatus,

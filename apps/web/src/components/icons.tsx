@@ -64,3 +64,36 @@ export const ChevronLeftIcon = () => (
     <path d="M14.5 5.5L8 12l6.5 6.5" />
   </Svg>
 );
+export const CheckIcon = () => (
+  <Svg>
+    <path d="M5 12.5l4.5 4.5L19 7.5" />
+  </Svg>
+);
+export const AlertIcon = () => (
+  <Svg>
+    <path d="M12 4.5l8.5 15h-17z" />
+    <path d="M12 10v4M12 16.8v.2" />
+  </Svg>
+);
+export const HalfIcon = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="7.5" />
+    <path d="M12 4.5v15a7.5 7.5 0 0 0 0-15z" fill="currentColor" />
+  </Svg>
+);
+export const XIcon = () => (
+  <Svg>
+    <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
+  </Svg>
+);
+export const ClockIcon = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="8" />
+    <path d="M12 7.5V12l3 2" />
+  </Svg>
+);
+export const PlusIcon = () => (
+  <Svg>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+);

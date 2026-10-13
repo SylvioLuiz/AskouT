@@ -1,6 +1,11 @@
 import { errorFromResponse, networkError } from './errors.ts';
 import type {
   AuthResult,
+  BestDatesInput,
+  Compatibility,
+  FriendAvailability,
+  Slot,
+  SlotInput,
   ConnectionsPage,
   PageRequest,
   Profile,
@@ -119,6 +124,18 @@ export function createApi(deps: ApiDeps) {
     rejectRequest: (userId: string) => request<{ ok: true }>('POST', `/me/follow-requests/${id(userId)}/reject`),
     removeFollower: (userId: string) => request<{ ok: true }>('DELETE', `/me/followers/${id(userId)}`),
     friends: () => request<PublicProfile[]>('GET', '/me/friends'),
+
+    // Agenda
+    mySlots: (from: string, to: string) =>
+      request<Slot[]>('GET', `/me/availability?from=${id(from)}&to=${id(to)}`),
+    addSlot: (input: SlotInput) => request<Slot>('POST', '/me/availability', { body: input }),
+    removeSlot: (slotId: string) => request<{ removed: boolean }>('DELETE', `/me/availability/${id(slotId)}`),
+    friendSlots: (userId: string, from: string, to: string) =>
+      request<FriendAvailability>('GET', `/users/${id(userId)}/availability?from=${id(from)}&to=${id(to)}`),
+    compatibility: (friendIds: string[], start: string, end: string) =>
+      request<Compatibility>('POST', '/compatibility', { body: { friendIds, start, end } }),
+    bestDates: (input: BestDatesInput) =>
+      request<{ items: Compatibility[] }>('POST', '/compatibility/best-dates', { body: input }),
 
     // Bloqueios
     block: (userId: string) => request<{ ok: true }>('POST', `/users/${id(userId)}/block`),

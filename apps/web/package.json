@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit -p . && vite build",
     "preview": "vite preview",
-    "test": "node --test \"src/lib/**/*.test.ts\"",
+    "test": "TZ=America/Sao_Paulo node --test \"src/lib/**/*.test.ts\"",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {

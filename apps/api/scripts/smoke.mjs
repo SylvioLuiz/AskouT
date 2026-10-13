@@ -138,6 +138,29 @@ try {
   const cSees2 = await call('GET', `/profiles/${b.username}`, { token: c.token });
   check('depois de aprovado vê o conteúdo', cSees2.body?.canViewContent === true, cSees2.body);
 
+  console.log('\nAgenda e compatibilidade');
+  const day = (n, h) => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + n, h)).toISOString();
+  const slotA = await call('POST', '/me/availability', { token: a.token, body: { start: day(3, 22), end: day(4, 2), state: 'AVAILABLE' } });
+  check('criar horário', slotA.status < 300 && slotA.body?.id, slotA.body);
+  const overlap = await call('POST', '/me/availability', { token: a.token, body: { start: day(3, 23), end: day(4, 1), state: 'UNAVAILABLE' } });
+  check('horário sobreposto é recusado (409)', overlap.status === 409, overlap.body);
+  const badSlot = await call('POST', '/me/availability', { token: a.token, body: { start: 'amanhã', end: day(4, 2), state: 'TALVEZ' } });
+  check('horário inválido dá 400 com campos', badSlot.status === 400 && badSlot.body?.error?.details?.state, badSlot.body);
+  const mine = await call('GET', `/me/availability?from=${encodeURIComponent(day(0, 0))}&to=${encodeURIComponent(day(10, 0))}`, { token: a.token });
+  check('listar meus horários', mine.status === 200 && mine.body.length === 1, mine.body);
+  const friendRange = `from=${encodeURIComponent(day(0, 0))}&to=${encodeURIComponent(day(10, 0))}`;
+  check('amigo vê a agenda', (await call('GET', `/users/${a.id}/availability?${friendRange}`, { token: b.token })).status === 200);
+  check('quem não é amigo não vê (403)', (await call('GET', `/users/${a.id}/availability?${friendRange}`, { token: c.token })).status === 403);
+  const compat = await call('POST', '/compatibility', { token: a.token, body: { friendIds: [b.id], start: day(3, 23), end: day(4, 1) } });
+  check('compatibilidade sem info do amigo = aguardando', compat.status === 200 && compat.body.level === 'awaiting', compat.body);
+  await call('POST', '/me/availability', { token: b.token, body: { start: day(3, 22), end: day(4, 2), state: 'AVAILABLE' } });
+  const compat2 = await call('POST', '/compatibility', { token: a.token, body: { friendIds: [b.id], start: day(3, 23), end: day(4, 1) } });
+  check('os dois livres = verde', compat2.body?.level === 'green', compat2.body);
+  const best = await call('POST', '/compatibility/best-dates', { token: a.token, body: { friendIds: [b.id], fromDate: day(1, 0).slice(0, 10), toDate: day(6, 0).slice(0, 10), durationMinutes: 120, earliestStart: '16:00', latestStart: '23:00', limit: 3 } });
+  check('melhor data devolve candidatos verdes primeiro', best.status === 200 && best.body.items?.[0]?.level === 'green', best.body);
+  check('compatibilidade com quem não é amigo (403)', (await call('POST', '/compatibility', { token: a.token, body: { friendIds: [c.id], start: day(3, 23), end: day(4, 1) } })).status === 403);
+  check('remover horário', (await call('DELETE', `/me/availability/${slotA.body.id}`, { token: a.token })).body?.removed === true);
+
   console.log('\nBloqueio');
   const block = await call('POST', `/users/${b.id}/block`, { token: a.token });
   check('bloquear', block.status === 200, block.body);

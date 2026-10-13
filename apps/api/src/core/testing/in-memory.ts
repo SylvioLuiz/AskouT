@@ -1,6 +1,7 @@
 import { conflict } from '../errors.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
+  AvailabilityRepository,
   BlockRepository,
   Clock,
   EmailSender,
@@ -9,7 +10,7 @@ import type {
   PendingSignupRepository,
   UserRepository,
 } from '../ports.ts';
-import type { Direction, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { AvailabilitySlotRecord, Direction, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -111,6 +112,37 @@ export class InMemoryBlockRepository implements BlockRepository {
       if (blocked === userId) out.add(blocker);
     }
     return [...out];
+  }
+}
+
+export class InMemoryAvailabilityRepository implements AvailabilityRepository {
+  readonly rows = new Map<string, AvailabilitySlotRecord>();
+
+  async add(slot: AvailabilitySlotRecord): Promise<void> {
+    for (const r of this.rows.values()) {
+      if (r.userId === slot.userId && r.startsAt < slot.endsAt && slot.startsAt < r.endsAt) {
+        throw conflict('Você já tem um horário neste período. Remova o outro antes.');
+      }
+    }
+    this.rows.set(slot.id, { ...slot });
+  }
+
+  async delete(userId: string, slotId: string): Promise<boolean> {
+    const r = this.rows.get(slotId);
+    if (!r || r.userId !== userId) return false;
+    return this.rows.delete(slotId);
+  }
+
+  async listForUsers(userIds: string[], from: Date, to: Date): Promise<AvailabilitySlotRecord[]> {
+    const wanted = new Set(userIds);
+    return [...this.rows.values()]
+      .filter((r) => wanted.has(r.userId) && r.startsAt < to && from < r.endsAt)
+      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || a.id.localeCompare(b.id))
+      .map((r) => ({ ...r }));
+  }
+
+  async countActive(userId: string, since: Date): Promise<number> {
+    return [...this.rows.values()].filter((r) => r.userId === userId && r.endsAt > since).length;
   }
 }
 

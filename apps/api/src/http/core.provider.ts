@@ -3,6 +3,7 @@ import { HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../co
 import { SystemClock, UuidGenerator } from '../core/adapters/system.ts';
 import { createCore } from '../core/index.ts';
 import {
+  PrismaAvailabilityRepository,
   PrismaBlockRepository,
   PrismaFollowRepository,
   PrismaPendingSignupRepository,
@@ -21,6 +22,7 @@ export const coreProvider = {
       users: new PrismaUserRepository(prisma),
       follows: new PrismaFollowRepository(prisma),
       blocks: new PrismaBlockRepository(prisma),
+      availability: new PrismaAvailabilityRepository(prisma),
       pending: new PrismaPendingSignupRepository(prisma),
       mailer: new ConsoleEmailSender(),
       codes: new HmacOneTimeCodes({ secret: config.codeSecret }),

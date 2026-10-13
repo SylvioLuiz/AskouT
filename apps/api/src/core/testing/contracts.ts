@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { AvailabilityRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
 import type { PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
@@ -16,6 +16,7 @@ export interface RepoHarness {
   follows: FollowRepository;
   blocks: BlockRepository;
   pending: PendingSignupRepository;
+  availability: AvailabilityRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
   /** Apaga todos os dados entre os testes. */
   reset(): Promise<void>;
@@ -389,6 +390,76 @@ export function defineRepositoryContract(
         );
         assert.equal((await h.pending.find('ana@exemplo.com'))!.attempts, 12, 'nenhum incremento perdido');
         assert.equal(new Set(results).size, 10, 'cada chamada recebeu um total diferente');
+      });
+    });
+    describe('disponibilidade', () => {
+      const slot = (userId: string, id: string, startMin: number, endMin: number, state: 'AVAILABLE' | 'PARTIAL' | 'UNAVAILABLE' = 'AVAILABLE') => ({
+        id,
+        userId,
+        startsAt: at(startMin * 60),
+        endsAt: at(endMin * 60),
+        state,
+        createdAt: at(0),
+      });
+      const newId = () => randomUUID();
+
+      it('add e listForUsers: intervalo semiaberto, ordenado, só dos usuários pedidos', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const a2 = slot(ana, newId(), 120, 180);
+        const a1 = slot(ana, newId(), 0, 60, 'PARTIAL');
+        const b1 = slot(bia, newId(), 0, 60, 'UNAVAILABLE');
+        await h.availability.add(a2);
+        await h.availability.add(a1);
+        await h.availability.add(b1);
+
+        const mine = await h.availability.listForUsers([ana], at(-3600), at(10_000 * 60));
+        assert.deepEqual(mine.map((s) => s.id), [a1.id, a2.id]);
+        assert.deepEqual(mine[0], a1, 'devolve exatamente o que foi gravado');
+
+        const both = await h.availability.listForUsers([ana, bia], at(0), at(30 * 60));
+        assert.deepEqual(both.map((s) => s.id).sort(), [a1.id, b1.id].sort());
+
+        // Quem só encosta na borda não entra: [start, end) é semiaberto.
+        assert.equal((await h.availability.listForUsers([ana], at(60 * 60), at(120 * 60))).length, 0);
+        assert.equal((await h.availability.listForUsers([ana], at(59 * 60), at(121 * 60))).length, 2);
+        assert.deepEqual(await h.availability.listForUsers([], at(0), at(1e6)), []);
+      });
+
+      it('recusa horário que se sobrepõe a outro do mesmo usuário, mas aceita encostar e outros usuários', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        await h.availability.add(slot(ana, newId(), 60, 120));
+        await assert.rejects(h.availability.add(slot(ana, newId(), 90, 150)), (e: unknown) => e instanceof DomainError && e.code === 'CONFLICT');
+        await assert.rejects(h.availability.add(slot(ana, newId(), 30, 61)), (e: unknown) => e instanceof DomainError && e.code === 'CONFLICT');
+        await assert.rejects(h.availability.add(slot(ana, newId(), 70, 80)), (e: unknown) => e instanceof DomainError && e.code === 'CONFLICT');
+        await h.availability.add(slot(ana, newId(), 120, 180)); // começa onde o outro termina
+        await h.availability.add(slot(ana, newId(), 0, 60)); // termina onde o outro começa
+        await h.availability.add(slot(bia, newId(), 60, 120)); // outro usuário, mesmo período
+        assert.equal((await h.availability.listForUsers([ana], at(0), at(1e6))).length, 3);
+      });
+
+      it('delete só remove horário do próprio usuário', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const s = slot(ana, newId(), 0, 60);
+        await h.availability.add(s);
+        assert.equal(await h.availability.delete(bia, s.id), false);
+        assert.equal(await h.availability.delete(ana, randomUUID()), false);
+        assert.equal(await h.availability.delete(ana, 'não-é-uuid'), false);
+        assert.equal((await h.availability.listForUsers([ana], at(0), at(1e6))).length, 1);
+        assert.equal(await h.availability.delete(ana, s.id), true);
+        assert.equal(await h.availability.delete(ana, s.id), false);
+      });
+
+      it('countActive conta só o que ainda não terminou', async () => {
+        const ana = await newUser('ana');
+        await h.availability.add(slot(ana, newId(), 0, 60));
+        await h.availability.add(slot(ana, newId(), 100, 160));
+        assert.equal(await h.availability.countActive(ana, at(0)), 2);
+        assert.equal(await h.availability.countActive(ana, at(60 * 60)), 1, 'um que termina exatamente agora já acabou');
+        assert.equal(await h.availability.countActive(ana, at(160 * 60)), 0);
+        assert.equal(await h.availability.countActive(randomUUID(), at(0)), 0);
       });
     });
   });

@@ -75,3 +75,48 @@ export interface ProfilePatch {
   bio?: string;
   avatarUrl?: string;
 }
+
+// ---------- Agenda ----------
+
+export type SlotState = 'AVAILABLE' | 'PARTIAL' | 'UNAVAILABLE';
+
+export interface Slot {
+  id: string;
+  /** Instantes ISO 8601 em UTC. */
+  start: string;
+  end: string;
+  state: SlotState;
+}
+
+export interface SlotInput {
+  start: string;
+  end: string;
+  state: SlotState;
+}
+
+export interface FriendAvailability {
+  profile: PublicProfile;
+  slots: Slot[];
+}
+
+export type CompatibilityLevel = 'green' | 'orange' | 'red' | 'awaiting';
+export type ParticipantStatus = 'available' | 'partial' | 'unavailable' | 'unknown';
+
+export interface Compatibility {
+  start: string;
+  end: string;
+  level: CompatibilityLevel;
+  counts: { total: number; available: number; partial: number; unavailable: number; unknown: number };
+  participants: { profile: PublicProfile; status: ParticipantStatus; isMe: boolean }[];
+}
+
+export interface BestDatesInput {
+  friendIds: string[];
+  fromDate: string;
+  toDate: string;
+  durationMinutes: number;
+  earliestStart: string;
+  latestStart: string;
+  timeZone: string;
+  limit: number;
+}

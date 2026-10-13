@@ -13,7 +13,9 @@ Menos tempo combinando. Mais tempo juntos.
 | Camada HTTP NestJS (`apps/api/src/http`) | **sobe e responde**: teste de fumaça por HTTP (`npm run smoke`, 34 verificações) passa contra Postgres real; `typecheck:full` limpo. Falta endurecer para produção (ver limitações) |
 | `apps/api/prisma/schema.prisma` + migration `init` | **aplicados em Postgres real** (a migration está em `prisma/migrations`) |
 | View `friendships` + restrições (SQL) | **aplicados em Postgres real** (`prisma/sql/001_...sql`, depois da migration) |
-| Front end (web, painéis, design system) | **não iniciado** |
+| Agenda: serviço de disponibilidade (`core/availability-service.ts`) + rotas HTTP | **núcleo testado em memória** (148 testes da API). O repositório Prisma da agenda e as rotas **ainda não foram rodados contra Postgres**: faltam o `npm test` com banco e o `npm run smoke` na sua máquina |
+| App web mobile-first (`apps/web`): conta, perfil, seguir, bloquear, Agenda, Encontrar melhor data | **verificado em navegador real** contra o núcleo em memória (celular 390 px). `typecheck`/`build` do Vite ainda a conferir na sua máquina |
+| Painéis de bares e admin, app nativo | **não iniciados** |
 
 Nada acima é simulado: o que consta como implementado roda e tem teste. O que consta como "escrito, não executado", "não iniciado" ou "não validado" não deve ser tratado como pronto. Sem banco, 130 testes rodam e os 16 do Prisma/Postgres aparecem como `SKIP`; com `ASKOUT_TEST_DATABASE_URL` apontando para um banco de teste, os 146 rodam.
 
@@ -72,12 +74,16 @@ Sem token: `POST /auth/signup`, `POST /auth/signup/resend`, `POST /auth/signup/c
 | `GET /me/follow-requests` · `POST /me/follow-requests/:userId/approve` · `.../reject` | solicitações pendentes |
 | `DELETE /me/followers/:userId` · `GET /me/friends` | remover seguidor, amigos |
 | `POST/DELETE /users/:userId/block` · `GET /me/blocks` | bloqueios |
+| `GET/POST /me/availability` · `DELETE /me/availability/:slotId` | meus horários (disponível, parcial, indisponível); não podem se sobrepor |
+| `GET /users/:userId/availability?from=&to=` | agenda de um amigo (só amigos; 403 para os demais) |
+| `POST /compatibility` | compatibilidade de um horário entre você e até 9 amigos |
+| `POST /compatibility/best-dates` | "Encontrar melhor data": o melhor horário de cada dia, do mais ao menos compatível |
 
 Erros: `{ "error": { "code", "message", "details?" } }` com status 400/401/403/404/409/429 (429 envia `Retry-After`). Erro inesperado vira 500 genérico, sem vazar detalhes.
 
 ## App web (`apps/web`)
 
-React 19 + Vite 7 + TypeScript. Telas: entrar, criar conta (2 passos com código por e-mail), Home (amigos), Explorar (busca), Atividades (pedidos para seguir), perfil de outras pessoas (seguir, pedir, deixar de seguir, bloquear), Meu perfil (editar, privacidade), Amigos, Bloqueados. Conversas e Agenda aparecem como "em breve": ainda não existem no backend.
+React 19 + Vite 7 + TypeScript. Telas: entrar, criar conta (2 passos com código por e-mail), Home (amigos), Explorar (busca), Atividades (pedidos para seguir), perfil de outras pessoas (seguir, pedir, deixar de seguir, bloquear), Meu perfil (editar, privacidade), Amigos, Bloqueados. Agenda (faixa de 28 dias, folha "Marcar horário", agenda do amigo) e "Encontrar melhor data" (escolher amigos, período, duração e horário de início). Conversas aparece como "em breve".
 
 Rodar (a API precisa estar de pé em `localhost:3000`, veja acima):
 
@@ -93,7 +99,9 @@ O código de confirmação do cadastro aparece no log da API (e-mail de desenvol
 
 Estado de verificação: a lógica foi testada (26 testes) e o app foi exercitado num navegador real contra o núcleo da API em memória (32 verificações, celular e desktop). **`npm run typecheck` e `npm run build` ainda não foram rodados** — o ambiente onde isto foi escrito não conseguia instalar `@types/react`; a primeira execução na sua máquina é a verificação de tipos de verdade.
 
-Não feito ainda: modo escuro, páginas de termos e privacidade (dependem de texto jurídico real), Home com feed, Agenda, Conversas.
+Não feito ainda: modo escuro, páginas de termos e privacidade (dependem de texto jurídico real), Home com feed, Conversas.
+
+As datas da agenda usam o fuso do aparelho. `npm test` fixa `TZ=America/Sao_Paulo` para os testes de data.
 
 ## Núcleo da API (`apps/api/src/core`)
 
@@ -134,6 +142,8 @@ Os testes foram checados também quebrando as regras de propósito (por exemplo,
 - **A camada HTTP não tem limite de requisições por IP nem cabeçalhos de segurança (Helmet).** Os limites do cadastro (tentativas, reenvio) existem no núcleo, mas o limite por IP e contra força bruta no login precisam ser feitos antes de ir para produção.
 - Em produção a API **recusa subir** com o envio de e-mail "console" (ele imprime os códigos no log).
 - O NestJS roda em ESM importando pacotes CommonJS; isso costuma funcionar, mas é um dos pontos que a validação na sua máquina precisa confirmar.
+- **Agenda:** os horários são avulsos (sem repetição semanal), não há integração com Google/Apple Calendar e ainda não existem encontros nem convites: hoje a pessoa vê a compatibilidade, mas não cria o encontro. Cada horário vai até 24 h, no máximo 300 ativos por pessoa.
+- **`@askout/availability-engine` é consumido como código TypeScript do workspace** (funciona em `npm run dev` e nos testes). O `npm run build` + `npm start` a partir de `dist/` ainda não resolve esse pacote: falta compilar o motor. Resolver antes de publicar.
 - Não há ainda limite de tentativas de login, recuperação de senha nem troca de e-mail. **O envio real de e-mail não existe**: o núcleo usa uma interface (`EmailSender`); falta escolher o provedor (decisão sua, tem custo).
 - `total` nas listas de seguidores pode incluir pessoas ocultas por bloqueio de terceiros.
 
@@ -142,8 +152,8 @@ Os testes foram checados também quebrando as regras de propósito (por exemplo,
 1. Escolher o provedor de e-mail e implementar o envio real; limite por IP e Helmet (hoje só o cadastro tem limites, no núcleo).
 2. Front end web: cadastro, login, perfil, seguir e bloquear consumindo estas rotas.
 3. Limite de tentativas, verificação de e-mail, recuperação de senha, refresh token.
-4. Fase 2: expansão de recorrência, agenda manual, encontros e convites usando o motor, conversas, grupos e Flash.
-5. Design system e navegação do app web.
+4. Fase 2 (em andamento): agenda manual e comparação **feitas**; faltam encontros e convites a partir do melhor horário, repetição semanal, conversas, grupos e Flash.
+5. Compilar o motor de compatibilidade para o build de produção da API.
 
 ## Regras do motor de compatibilidade (confirmadas)
 

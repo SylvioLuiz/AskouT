@@ -5,6 +5,7 @@ import { Button, EmptyState } from './components/ui.tsx';
 import { useTitle } from './hooks.ts';
 import { Link, navigate, resolveRoute, usePathname } from './router.tsx';
 import type { RouteDef } from './router.tsx';
+import { AgendaScreen, CompareScreen, FriendAgendaScreen } from './screens/agenda.tsx';
 import { ActivityScreen } from './screens/activity.tsx';
 import { LoginScreen, SignupScreen } from './screens/auth.tsx';
 import { ExploreScreen, HomeScreen, SoonScreen } from './screens/main-tabs.tsx';
@@ -22,12 +23,14 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/', render: () => <HomeScreen /> },
   { path: '/explorar', render: () => <ExploreScreen /> },
   { path: '/conversas', render: () => <SoonScreen title="Conversas" text="As conversas com seus amigos chegam numa próxima etapa." /> },
-  { path: '/agenda', render: () => <SoonScreen title="Agenda" text="A agenda e a comparação de horários com seus amigos chegam numa próxima etapa." /> },
+  { path: '/agenda', render: () => <AgendaScreen /> },
+  { path: '/agenda/comparar', render: () => <CompareScreen /> },
   { path: '/atividades', render: () => <ActivityScreen /> },
   { path: '/perfil', render: () => <MyProfileScreen /> },
   { path: '/amigos', render: () => <FriendsScreen /> },
   { path: '/bloqueados', render: () => <BlockedScreen /> },
   { path: '/u/:username', render: (p) => <ProfileScreen username={p['username'] ?? ''} /> },
+  { path: '/u/:username/agenda', render: (p) => <FriendAgendaScreen username={p['username'] ?? ''} /> },
   { path: '/u/:username/seguidores', render: (p) => <ConnectionsScreen username={p['username'] ?? ''} direction="followers" /> },
   { path: '/u/:username/seguindo', render: (p) => <ConnectionsScreen username={p['username'] ?? ''} direction="following" /> },
 ];

@@ -1,4 +1,4 @@
-import type { Direction, Follow, FollowStatus, Page, PendingSignup, Profile, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, Direction, Follow, FollowStatus, Page, PendingSignup, Profile, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -59,6 +59,17 @@ export interface PendingSignupRepository {
   incrementAttempts(email: string): Promise<number | undefined>;
 }
 
+export interface AvailabilityRepository {
+  /** Insere o horário. Lança DomainError CONFLICT se já houver horário do mesmo usuário que se sobreponha. */
+  add(slot: AvailabilitySlotRecord): Promise<void>;
+  /** Remove só se o horário for do usuário. Retorna se removeu. */
+  delete(userId: string, slotId: string): Promise<boolean>;
+  /** Horários dos usuários que se sobrepõem a [from, to), ordenados por início. */
+  listForUsers(userIds: string[], from: Date, to: Date): Promise<AvailabilitySlotRecord[]>;
+  /** Quantidade de horários do usuário que ainda não terminaram em `since`. */
+  countActive(userId: string, since: Date): Promise<number>;
+}
+
 export interface EmailSender {
   /** Falha com erro comum se o e-mail não puder ser enviado. */
   sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void>;
@@ -101,6 +112,7 @@ export interface CoreDeps {
   users: UserRepository;
   follows: FollowRepository;
   blocks: BlockRepository;
+  availability: AvailabilityRepository;
   pending: PendingSignupRepository;
   mailer: EmailSender;
   codes: OneTimeCodes;

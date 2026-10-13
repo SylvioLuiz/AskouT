@@ -1,6 +1,7 @@
 export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETION_REQUESTED';
 export type UserRole = 'USER' | 'VENUE_OWNER' | 'ADMIN';
 export type FollowStatus = 'PENDING' | 'ACCEPTED';
+export type SlotState = 'AVAILABLE' | 'PARTIAL' | 'UNAVAILABLE';
 
 export interface User {
   id: string;
@@ -88,4 +89,14 @@ export function normalizePage(input?: Partial<Page>): Page {
     limit: Math.min(Math.max(rawLimit, 1), MAX_PAGE_LIMIT),
     offset: Math.max(rawOffset, 0),
   };
+}
+
+/** Horário informado manualmente por uma pessoa. Intervalo semiaberto [startsAt, endsAt). */
+export interface AvailabilitySlotRecord {
+  id: string;
+  userId: string;
+  startsAt: Date;
+  endsAt: Date;
+  state: SlotState;
+  createdAt: Date;
 }

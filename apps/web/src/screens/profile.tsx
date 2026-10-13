@@ -191,7 +191,20 @@ export function ProfileScreen({ username }: { username: string }) {
           {relationship.following === 'PENDING' ? 'Seu pedido foi enviado. Você vê o conteúdo quando @' + profile.username + ' aprovar.' : 'Peça para seguir e aguarde a aprovação para ver o conteúdo.'}
         </EmptyState>
       ) : (
-        <p className="muted profile__soon">Publicações e agenda deste perfil chegam nas próximas etapas.</p>
+        <>
+          {relationship.isFriend ? (
+            <Link to={`/u/${encodeURIComponent(profile.username)}/agenda`} className="callout callout--link">
+              <span className="callout__text">
+                <strong>Ver agenda de {profile.displayName}</strong>
+                <br />
+                Veja os horários e compare com os seus.
+              </span>
+            </Link>
+          ) : relationship.isSelf ? null : (
+            <p className="muted profile__soon">A agenda é visível só para amigos, quando vocês se seguem.</p>
+          )}
+          <p className="muted profile__soon">Publicações deste perfil chegam nas próximas etapas.</p>
+        </>
       )}
     </>
   );

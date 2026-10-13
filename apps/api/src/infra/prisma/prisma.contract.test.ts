@@ -2,6 +2,7 @@ import { defineRepositoryContract } from '../../core/testing/contracts.ts';
 import type { RepoHarness } from '../../core/testing/contracts.ts';
 import type { UserStatus } from '../../core/types.ts';
 import {
+  PrismaAvailabilityRepository,
   PrismaBlockRepository,
   PrismaFollowRepository,
   PrismaPendingSignupRepository,
@@ -44,6 +45,7 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     follows: new PrismaFollowRepository(prisma),
     blocks: new PrismaBlockRepository(prisma),
     pending: new PrismaPendingSignupRepository(prisma),
+    availability: new PrismaAvailabilityRepository(prisma),
     async setUserStatus(userId: string, status: UserStatus) {
       await prisma.user.update({ where: { id: userId }, data: { status } });
     },
