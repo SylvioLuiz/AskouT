@@ -8,7 +8,7 @@ Menos tempo combinando. Mais tempo juntos.
 |---|---|
 | `packages/availability-engine` (compatibilidade de agendas) | **implementado e testado** (15 testes) |
 | `apps/api/src/core` (cadastro com código por e-mail, login, perfil, seguir, bloquear, amizade) | **implementado e testado** (tipos limpos) |
-| Suíte de contrato dos repositórios (`core/testing/contracts.ts`) | **passa em memória e contra um Postgres 16 real** (168 testes no total) |
+| Suíte de contrato dos repositórios (`core/testing/contracts.ts`) | **passa em memória e contra um Postgres 16 real** (202 testes no total) |
 | Repositórios Prisma (`apps/api/src/infra/prisma`) | **validados contra Postgres real** pela suíte de contrato |
 | Camada HTTP NestJS (`apps/api/src/http`) | **sobe e responde**: teste de fumaça por HTTP (`npm run smoke`, 45 verificações) passa contra Postgres real; `typecheck:full` limpo. Falta endurecer para produção (ver limitações) |
 | `apps/api/prisma/schema.prisma` + migration `init` | **aplicados em Postgres real** (a migration está em `prisma/migrations`) |
@@ -19,7 +19,7 @@ Menos tempo combinando. Mais tempo juntos.
 | Flash: mapa com pins (MapLibre + OpenStreetMap) | **escrito, não executado com a biblioteca real**: o componente foi exercitado só contra um dublê do `maplibre-gl` (ciclo de vida, 2 pins, enquadramento). Confirme na sua máquina com `npm install` + `npm run dev` |
 | Painéis de bares e admin, app nativo | **não iniciados** |
 
-Nada acima é simulado: o que consta como implementado roda e tem teste. O que consta como "escrito, não executado", "não iniciado" ou "não validado" não deve ser tratado como pronto. Sem banco, os testes em memória rodam (174 hoje) e os de contrato do Prisma/Postgres aparecem como `SKIP`; com `ASKOUT_TEST_DATABASE_URL` apontando para um banco de teste, os de Postgres também rodam (incluindo os 8 de Flash, ainda não executados em Postgres real).
+Nada acima é simulado: o que consta como implementado roda e tem teste. O que consta como "escrito, não executado", "não iniciado" ou "não validado" não deve ser tratado como pronto. Sem banco, os testes em memória rodam (174 hoje) e os de contrato do Prisma/Postgres aparecem como `SKIP`; com `ASKOUT_TEST_DATABASE_URL` apontando para um banco de teste, os de Postgres também rodam (202 no total, incluindo os de Flash, já executados em Postgres real).
 
 ## Subir tudo com um comando
 
