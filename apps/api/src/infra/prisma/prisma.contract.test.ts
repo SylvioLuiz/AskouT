@@ -31,7 +31,12 @@ function assertSafeDatabase(raw: string): void {
 async function makePrismaHarness(): Promise<RepoHarness> {
   assertSafeDatabase(url!);
   const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient({ datasourceUrl: url });
+  // Folga nos tempos de conexão: com os outros testes rodando em paralelo (hash de senha usa muito
+  // processador), abrir várias conexões ao mesmo tempo pode passar do limite padrão de 5 s do Prisma.
+  const dbUrl = new URL(url!);
+  if (!dbUrl.searchParams.has('connect_timeout')) dbUrl.searchParams.set('connect_timeout', '30');
+  if (!dbUrl.searchParams.has('pool_timeout')) dbUrl.searchParams.set('pool_timeout', '30');
+  const prisma = new PrismaClient({ datasourceUrl: dbUrl.toString() });
   await prisma.$connect();
 
   return {
