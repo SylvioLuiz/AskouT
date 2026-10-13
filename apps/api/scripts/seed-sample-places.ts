@@ -3,6 +3,7 @@
 //
 //   npm run seed:places                                   (centro: Av. Paulista, São Paulo)
 //   npm run seed:places -- --lat -23.5614 --lng -46.6559  (centro: onde você está testando)
+//   npm run seed:places -- --here                         (centro: a posição que o Flash acabou de receber)
 //   npm run seed:places -- --clear                        (só apaga os exemplos)
 //
 // Pode rodar quantas vezes quiser: apaga os exemplos anteriores e recria com horários a partir de agora.
@@ -29,8 +30,8 @@ function arg(name: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
-const lat = Number(arg('lat') ?? -23.5614);
-const lng = Number(arg('lng') ?? -46.6559);
+let lat = Number(arg('lat') ?? -23.5614);
+let lng = Number(arg('lng') ?? -46.6559);
 if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
   throw new Error('--lat e --lng precisam ser coordenadas válidas');
 }
@@ -49,6 +50,14 @@ const SAMPLES = [
 
 const prisma = new PrismaClient({ datasourceUrl: databaseUrl() });
 try {
+  // --here: centraliza nas posições que o Flash recebeu agora (a de quem está testando), sem digitar coordenadas.
+  if (process.argv.includes('--here')) {
+    const recent = await prisma.flashPosition.findMany({ orderBy: { updatedAt: 'desc' }, take: 10 });
+    if (recent.length === 0) throw new Error('Nenhuma posição do Flash encontrada. Abra um encontro, toque em "Compartilhar minha localização" e rode de novo.');
+    lat = recent.reduce((sum, p) => sum + p.lat, 0) / recent.length;
+    lng = recent.reduce((sum, p) => sum + p.lng, 0) / recent.length;
+    console.log(`Usando a posição do Flash: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+  }
   const removed = await prisma.venue.deleteMany({ where: { isSample: true } });
   console.log(`Exemplos anteriores apagados: ${removed.count} lugar(es) (os eventos saem junto).`);
   if (process.argv.includes('--clear')) {
