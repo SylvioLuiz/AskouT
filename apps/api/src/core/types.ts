@@ -310,6 +310,10 @@ export interface PostRecord {
   caption: string | null;
   placeName: string | null;
   placeAddress: string | null;
+  /** Post que é um evento criado pela pessoa: título e horário (o lugar é `placeName`). */
+  eventTitle: string | null;
+  eventStartsAt: Date | null;
+  eventEndsAt: Date | null;
   createdAt: Date;
 }
 

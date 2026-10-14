@@ -128,6 +128,12 @@ export function PostCard({ post, onDeleted }: { post: PostView; onDeleted?: (id:
           </button>
         </p>
       ) : null}
+      {post.event ? (
+        <p className="post__event">
+          <span className="post__eventbadge">Evento</span> <strong>{post.event.title}</strong>
+          <span className="muted"> · {eventWhen(post.event.startsAt)}</span>
+        </p>
+      ) : null}
       <Carousel images={post.images} />
       {post.placeName ? (
         <p className="post__place">
@@ -198,6 +204,11 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey }: { load: (of
 }
 
 /** Grade de quadrados do perfil: toque abre o post. */
+const eventFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+function eventWhen(iso: string): string {
+  return eventFmt.format(new Date(iso));
+}
+
 export function PostGrid({ username }: { username: string }) {
   const [page, setPage] = useState<PostsPage | undefined>();
   const [items, setItems] = useState<PostView[]>([]);
@@ -234,6 +245,7 @@ export function PostGrid({ username }: { username: string }) {
             <li key={post.id}>
               <Link to={`/posts/${encodeURIComponent(post.id)}`} className="postgrid__item" aria-label={post.caption ? `Post: ${post.caption}` : 'Abrir post'}>
                 {first?.path ? <img src={api.assetUrl(first.path)} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span className="postgrid__none" />}
+                {post.event ? <span className="postgrid__event">Evento</span> : null}
                 {post.images.length > 1 ? (
                   <span className="postgrid__multi" aria-label={`${post.images.length} fotos`}>
                     <CarouselIcon />

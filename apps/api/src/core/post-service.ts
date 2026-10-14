@@ -23,6 +23,8 @@ export interface PostInput {
   placeAddress?: unknown;
   /** Amigos marcados (até 10). Cada um precisa aceitar para o post entrar no feed e no perfil dele. */
   tagUserIds?: unknown;
+  /** Evento criado pela pessoa: `{title, startsAt, endsAt?}` (ISO). Pede o nome do lugar. */
+  event?: unknown;
 }
 
 export interface PostImageView {
@@ -31,6 +33,12 @@ export interface PostImageView {
   /** Só em foto do lugar: referência para montar o endereço assinado. */
   photoRef: string | null;
   photoAuthor: string | null;
+}
+
+export interface PostEventView {
+  title: string;
+  startsAt: string;
+  endsAt: string;
 }
 
 export interface PostTagView {
@@ -44,6 +52,8 @@ export interface PostView {
   caption: string | null;
   placeName: string | null;
   placeAddress: string | null;
+  /** Preenchido quando o post é um evento. */
+  event: PostEventView | null;
   createdAt: string;
   images: PostImageView[];
   mine: boolean;
@@ -95,6 +105,7 @@ export class PostService {
     const caption = optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
     const placeName = optionalText(input.placeName, 120, 'placeName', 'Nome do lugar');
     const placeAddress = optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
+    const event = this.parseEvent(input.event, placeName);
     const raw = input.images;
     if (!Array.isArray(raw) || raw.length < 1 || raw.length > POST_IMAGES_MAX) {
       throw validationError('Fotos inválidas', { images: `Envie de 1 a ${POST_IMAGES_MAX} fotos` });
@@ -117,7 +128,7 @@ export class PostService {
     });
     if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do lugar por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
-    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, createdAt: clock.now() }, images);
+    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, createdAt: clock.now() }, images);
     if (tagIds.length > 0) {
       await posts.createTags(postId, tagIds, clock.now());
       const me = await this.deps.users.findProfileById(actorId);
@@ -191,6 +202,29 @@ export class PostService {
     return this.deps.posts.findImage(imageId);
   }
 
+  /** Evento: título, início no futuro (até 2 anos), fim opcional (padrão: 3 h depois; no máximo 24 h) e lugar obrigatório. */
+  private parseEvent(raw: unknown, placeName: string | null): { title: string; startsAt: Date; endsAt: Date } | null {
+    if (raw === undefined || raw === null) return null;
+    if (typeof raw !== 'object' || Array.isArray(raw)) throw validationError('Evento inválido', { event: 'Dados do evento inválidos' });
+    const e = raw as { title?: unknown; startsAt?: unknown; endsAt?: unknown };
+    const title = optionalText(e.title, 120, 'event', 'Título do evento');
+    if (!title) throw validationError('Evento inválido', { event: 'Dê um nome ao evento' });
+    if (!placeName) throw validationError('Evento inválido', { event: 'Escolha o lugar do evento' });
+    const date = (v: unknown, label: string): Date => {
+      const d = typeof v === 'string' && v.length <= 40 ? new Date(v) : new Date(Number.NaN);
+      if (Number.isNaN(d.getTime())) throw validationError('Evento inválido', { event: `${label} inválido` });
+      return d;
+    };
+    const now = this.deps.clock.now().getTime();
+    const startsAt = date(e.startsAt, 'Início');
+    if (startsAt.getTime() < now - 5 * 60_000) throw validationError('Evento inválido', { event: 'O início precisa ser no futuro' });
+    if (startsAt.getTime() > now + 2 * 365 * 24 * 3_600_000) throw validationError('Evento inválido', { event: 'Início distante demais' });
+    const endsAt = e.endsAt === undefined || e.endsAt === null || e.endsAt === '' ? new Date(startsAt.getTime() + 3 * 3_600_000) : date(e.endsAt, 'Fim');
+    if (endsAt.getTime() <= startsAt.getTime()) throw validationError('Evento inválido', { event: 'O fim precisa ser depois do início' });
+    if (endsAt.getTime() - startsAt.getTime() > 24 * 3_600_000) throw validationError('Evento inválido', { event: 'O evento pode durar até 24 horas' });
+    return { title, startsAt, endsAt };
+  }
+
   private async validTags(actorId: string, raw: unknown): Promise<string[]> {
     if (raw === undefined || raw === null) return [];
     if (!Array.isArray(raw) || raw.some((v) => typeof v !== 'string') || raw.length > POST_TAGS_MAX) {
@@ -242,6 +276,7 @@ export class PostService {
           caption: post.caption,
           placeName: post.placeName,
           placeAddress: post.placeAddress,
+          event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString() } : null,
           createdAt: post.createdAt.toISOString(),
           mine: post.authorId === viewerId,
           myTag: tagRows.find((t) => t.postId === post.id && t.userId === viewerId)?.status ?? null,

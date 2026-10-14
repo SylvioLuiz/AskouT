@@ -3133,3 +3133,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .tagreq { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .tagreq__link { display: flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; }
 .tagreq__link img, .tagreq__none { width: 56px; height: 56px; flex: none; border-radius: 10px; object-fit: cover; background: var(--line); }
+
+.post__event { font-size: 0.9375rem; margin: 0; }
+.post__eventbadge, .postgrid__event { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 0.75rem; font-weight: 700; }
+.postgrid__event { position: absolute; left: 6px; bottom: 6px; }

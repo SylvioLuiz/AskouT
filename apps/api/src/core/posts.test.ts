@@ -157,3 +157,19 @@ test('post marcado de autor que o visitante não pode ver não aparece no perfil
   assert.equal((await w.core.posts.listByUsername(bia, 'bia')).items.length, 1, 'a própria Bia vê (segue a Ana)');
   assert.equal((await w.core.posts.listByUsername(caio, 'bia')).items.length, 0, 'Caio não segue a Ana (privada)');
 });
+
+test('evento: título, lugar e início no futuro; fim padrão 3 h depois; post comum vem com event nulo', async () => {
+  const { w, ana } = await setup();
+  const start = new Date(w.clock.now().getTime() + 24 * 3_600_000).toISOString();
+  const plain = await w.core.posts.create(ana, { images: [JPEG()] });
+  assert.equal(plain.event, null);
+  const ev = await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Bar do Zé', event: { title: 'Pagode de sábado', startsAt: start } });
+  assert.equal(ev.event?.title, 'Pagode de sábado');
+  assert.equal(new Date(ev.event!.endsAt).getTime() - new Date(ev.event!.startsAt).getTime(), 3 * 3_600_000);
+  assert.equal((await w.core.posts.get(ana, ev.id)).event?.title, 'Pagode de sábado');
+  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], event: { title: 'Sem lugar', startsAt: start } }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'X', event: { title: '', startsAt: start } }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'X', event: { title: 'Passado', startsAt: new Date(w.clock.now().getTime() - 3_600_000).toISOString() } }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'X', event: { title: 'Fim antes', startsAt: start, endsAt: new Date(new Date(start).getTime() - 1000).toISOString() } }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'X', event: { title: 'Data ruim', startsAt: 'amanhã' } }), 'VALIDATION');
+});

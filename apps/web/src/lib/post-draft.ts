@@ -43,13 +43,43 @@ export function effectivePlace(images: readonly DraftImage[], linked: LinkedPlac
   return linked;
 }
 
+export interface EventDraft {
+  title: string;
+  /** Valor de <input type="datetime-local">, na hora do aparelho. */
+  startsAt: string;
+  endsAt: string;
+}
+
+/** Converte o valor do campo de data/hora (hora local do aparelho) para ISO; vazio ou inválido vira null. */
+export function localToIso(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/** O que falta para publicar como evento (null = tudo certo). */
+export function eventProblem(event: EventDraft, place: LinkedPlace | null, now: Date): string | null {
+  if (!event.title.trim()) return 'Dê um nome ao evento.';
+  if (!place) return 'Escolha o lugar do evento.';
+  const start = localToIso(event.startsAt);
+  if (!start) return 'Escolha o dia e a hora de início.';
+  if (new Date(start).getTime() < now.getTime() - 5 * 60_000) return 'O início precisa ser no futuro.';
+  if (event.endsAt) {
+    const end = localToIso(event.endsAt);
+    if (!end || new Date(end).getTime() <= new Date(start).getTime()) return 'O fim precisa ser depois do início.';
+    if (new Date(end).getTime() - new Date(start).getTime() > 24 * 3_600_000) return 'O evento pode durar até 24 horas.';
+  }
+  return null;
+}
+
 /** Corpo do `POST /posts` a partir do rascunho. */
-export function buildPostBody(images: readonly DraftImage[], caption: string, linked: LinkedPlace | null, tagUserIds: readonly string[]) {
+export function buildPostBody(images: readonly DraftImage[], caption: string, linked: LinkedPlace | null, tagUserIds: readonly string[], event: EventDraft | null = null) {
   const place = effectivePlace(images, linked);
   return {
     images: images.map((i) => (i.kind === 'UPLOAD' ? i.dataUrl : { photoPath: i.photoPath, photoAuthor: i.author })),
     ...(caption.trim() ? { caption: caption.trim() } : {}),
     ...(place ? { placeName: place.name, ...(place.address ? { placeAddress: place.address } : {}) } : {}),
     ...(tagUserIds.length > 0 ? { tagUserIds: [...tagUserIds] } : {}),
+    ...(event ? { event: { title: event.title.trim(), startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}) } } : {}),
   };
 }

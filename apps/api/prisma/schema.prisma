@@ -529,6 +529,10 @@ model Post {
   caption      String?
   placeName    String?
   placeAddress String?
+  /// Preenchidos quando o post é um evento criado pela pessoa.
+  eventTitle    String?
+  eventStartsAt DateTime?
+  eventEndsAt   DateTime?
   createdAt    DateTime @default(now())
 
   author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)

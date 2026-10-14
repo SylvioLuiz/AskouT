@@ -428,6 +428,8 @@ export interface PostView {
   caption: string | null;
   placeName: string | null;
   placeAddress: string | null;
+  /** Preenchido quando o post é um evento criado pela pessoa. */
+  event: { title: string; startsAt: string; endsAt: string } | null;
   createdAt: string;
   images: PostImage[];
   mine: boolean;

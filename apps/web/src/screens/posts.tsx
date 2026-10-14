@@ -10,7 +10,7 @@ import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { resizePostPhoto } from '../lib/image.ts';
 import { toggleId } from '../lib/meetup.ts';
-import { addImages, buildPostBody, effectivePlace, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
+import { addImages, buildPostBody, effectivePlace, eventProblem, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
 import type { DraftImage, LinkedPlace } from '../lib/post-draft.ts';
 import type { ExplorePlace } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
@@ -111,6 +111,10 @@ export function CreatePostScreen() {
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const [linking, setLinking] = useState(false);
   const [tagging, setTagging] = useState(false);
+  const [kind, setKind] = useState<'POST' | 'EVENT'>('POST');
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventStart, setEventStart] = useState('');
+  const [eventEnd, setEventEnd] = useState('');
   const friends = useAsync(() => api.friends(), []);
 
   const room = POST_IMAGES_MAX - items.length;
@@ -165,8 +169,15 @@ export function CreatePostScreen() {
   async function publish() {
     setBusy(true);
     setMessage(undefined);
+    const eventDraft = kind === 'EVENT' ? { title: eventTitle, startsAt: eventStart, endsAt: eventEnd } : null;
+    const problem = eventDraft ? eventProblem(eventDraft, effectivePlace(items, linked), new Date()) : null;
+    if (problem) {
+      setMessage({ tone: 'error', text: problem });
+      setBusy(false);
+      return;
+    }
     try {
-      const created = await api.createPost(buildPostBody(items, caption, linked, tags));
+      const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft));
       navigate(`/posts/${encodeURIComponent(created.id)}`);
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
@@ -196,6 +207,22 @@ export function CreatePostScreen() {
             </li>
           ))}
         </ul>
+        <div className="segmented" role="group" aria-label="Tipo de publicação">
+          <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
+            Post
+          </button>
+          <button type="button" className={`segmented__tab${kind === 'EVENT' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'EVENT'} onClick={() => setKind('EVENT')}>
+            Evento
+          </button>
+        </div>
+        {kind === 'EVENT' ? (
+          <section className="compose__row" aria-label="Dados do evento">
+            <Field label="Nome do evento" value={eventTitle} onChange={setEventTitle} maxLength={120} />
+            <Field label="Começa" type="datetime-local" value={eventStart} onChange={setEventStart} />
+            <Field label="Termina (opcional)" type="datetime-local" value={eventEnd} onChange={setEventEnd} hint="Sem horário de fim, o evento dura 3 horas." />
+            <p className="muted">Um evento precisa de um lugar. Escolha abaixo.</p>
+          </section>
+        ) : null}
         <Field label="Descrição (opcional)" value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />
 
         <section className="compose__row" aria-labelledby="lugar-titulo">

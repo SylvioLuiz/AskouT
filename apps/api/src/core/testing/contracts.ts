@@ -1034,7 +1034,7 @@ export function defineRepositoryContract(
         const mk = (authorId: string, n: number, id = randomUUID()) => {
           const postId = id;
           return {
-            post: { id: postId, authorId, caption: n === 1 ? null : `legenda ${n}`, placeName: null, placeAddress: null, createdAt: at(n) },
+            post: { id: postId, authorId, caption: n === 1 ? null : `legenda ${n}`, placeName: null, placeAddress: null, eventTitle: null, eventStartsAt: null, eventEndsAt: null, createdAt: at(n) },
             images: [
               { id: randomUUID(), postId, position: 0, mime: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff, n]), placePhotoRef: null, placePhotoAuthor: null },
               { id: randomUUID(), postId, position: 1, mime: null, data: null, placePhotoRef: 'places/x/photos/y', placePhotoAuthor: 'Maria' },

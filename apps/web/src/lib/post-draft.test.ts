@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { addImages, buildPostBody, effectivePlace } from './post-draft.ts';
+import { addImages, buildPostBody, effectivePlace, eventProblem, localToIso } from './post-draft.ts';
 import type { DraftImage } from './post-draft.ts';
 
 const up = (n: number): DraftImage => ({ key: `u${n}`, kind: 'UPLOAD', preview: 'p', dataUrl: `data:image/jpeg;base64,${n}` });
@@ -37,4 +37,21 @@ describe('rascunho do post', () => {
     });
     assert.deepEqual(buildPostBody([up(1)], '', { name: 'Bar', address: null }, []), { images: ['data:image/jpeg;base64,1'], placeName: 'Bar' });
   });
+});
+
+it('evento: pede nome, lugar e início no futuro; corpo leva o evento em ISO', () => {
+  const now = new Date('2026-10-13T12:00:00Z');
+  const place = { name: 'Bar do Zé', address: null };
+  const ok = { title: 'Pagode', startsAt: '2026-10-20T20:00', endsAt: '' };
+  assert.equal(eventProblem(ok, place, now), null);
+  assert.match(eventProblem({ ...ok, title: ' ' }, place, now) ?? '', /nome/);
+  assert.match(eventProblem(ok, null, now) ?? '', /lugar/);
+  assert.match(eventProblem({ ...ok, startsAt: '2026-10-01T20:00' }, place, now) ?? '', /futuro/);
+  assert.match(eventProblem({ ...ok, startsAt: '' }, place, now) ?? '', /início/);
+  assert.match(eventProblem({ ...ok, endsAt: '2026-10-20T19:00' }, place, now) ?? '', /depois/);
+  assert.equal(localToIso('lixo'), null);
+  const body = buildPostBody([], '', place, [], ok) as { event?: { title: string; startsAt: string } };
+  assert.equal(body.event?.title, 'Pagode');
+  assert.equal(body.event?.startsAt, new Date('2026-10-20T20:00').toISOString());
+  assert.equal((buildPostBody([], '', place, []) as { event?: unknown }).event, undefined);
 });

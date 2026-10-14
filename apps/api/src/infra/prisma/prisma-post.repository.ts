@@ -18,6 +18,9 @@ export class PrismaPostRepository implements PostRepository {
         caption: post.caption,
         placeName: post.placeName,
         placeAddress: post.placeAddress,
+        eventTitle: post.eventTitle,
+        eventStartsAt: post.eventStartsAt,
+        eventEndsAt: post.eventEndsAt,
         createdAt: post.createdAt,
         images: {
           create: images.map((i) => ({
@@ -39,11 +42,14 @@ export class PrismaPostRepository implements PostRepository {
     caption: string | null;
     placeName: string | null;
     placeAddress: string | null;
+    eventTitle: string | null;
+    eventStartsAt: Date | null;
+    eventEndsAt: Date | null;
     createdAt: Date;
     images: { id: string; position: number; mime: string | null; placePhotoRef: string | null; placePhotoAuthor: string | null }[];
   }): PostWithImages {
     return {
-      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, createdAt: row.createdAt },
+      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, createdAt: row.createdAt },
       images: row.images.map((i) => ({ id: i.id, position: i.position, isUpload: i.mime !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor })),
     };
   }
