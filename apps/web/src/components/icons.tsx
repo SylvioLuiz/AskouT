@@ -167,3 +167,11 @@ export const PlusBigIcon = () => (
     <path d="M12 5v14M5 12h14" />
   </svg>
 );
+
+export const InfoIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v6" />
+    <circle cx="12" cy="7.5" r="0.6" fill="currentColor" />
+  </svg>
+);
