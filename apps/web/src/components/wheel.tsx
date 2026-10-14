@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-const ITEM = 44; // altura de cada número, em px (igual no CSS)
+const ITEM = 38; // altura de cada número, em px (igual no CSS)
 
 type WheelProps = {
   label: string;
