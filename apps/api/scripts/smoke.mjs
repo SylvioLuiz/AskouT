@@ -186,6 +186,15 @@ try {
   check('amigo com Flash aparece (só nome e foto, sem localização)', avail.body?.items?.length === 1 && avail.body.items[0].profile.userId === b.id && !JSON.stringify(avail.body).includes('"lat"'), avail.body);
   check('quem não é amigo não aparece nem pode ser convidado (403)', (await call('POST', '/flash/invites', { token: a.token, body: { userId: c.id } })).status === 403);
   check('convidar a si mesmo dá 400', (await call('POST', '/flash/invites', { token: a.token, body: { userId: a.id } })).status === 400);
+  const hide1 = await call('PUT', `/flash/visibility/${b.id}`, { token: a.token, body: { hideTheirs: true } });
+  check('ocultar o Flash dele (grava na tabela FlashHidden)', hide1.status === 200 && hide1.body?.hideTheirs === true && hide1.body.hideMine === false, hide1.body);
+  check('oculto: some da minha lista de disponíveis', (await call('GET', '/flash/available', { token: a.token })).body?.items?.length === 0);
+  check('oculto: não dá para convidar (409)', (await call('POST', '/flash/invites', { token: a.token, body: { userId: b.id } })).status === 409);
+  const hide2 = await call('PUT', `/flash/visibility/${b.id}`, { token: a.token, body: { hideTheirs: false, hideMine: true } });
+  check('não deixar ele me ver: ele não me vê, eu continuo vendo', hide2.body?.hideMine === true && (await call('GET', '/flash/available', { token: b.token })).body?.items?.length === 0 && (await call('GET', '/flash/available', { token: a.token })).body?.items?.length === 1);
+  check('a escolha é só minha: ele não vê meu estado', (await call('GET', `/flash/visibility/${a.id}`, { token: b.token })).body?.hideMine === false);
+  check('visibilidade com valor inválido dá 400', (await call('PUT', `/flash/visibility/${b.id}`, { token: a.token, body: { hideMine: 'sim' } })).status === 400);
+  await call('PUT', `/flash/visibility/${b.id}`, { token: a.token, body: { hideTheirs: false, hideMine: false } });
   const inv = await call('POST', '/flash/invites', { token: a.token, body: { userId: b.id } });
   check('convidar amigo', inv.status < 300 && inv.body?.id && inv.body.direction === 'SENT', inv.body);
   check('convite duplicado dá 409', (await call('POST', '/flash/invites', { token: a.token, body: { userId: b.id } })).status === 409);

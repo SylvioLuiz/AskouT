@@ -15,3 +15,12 @@ export function postShareText(authorName: string): string {
 export function eventShareText(title: string): string {
   return `Olha esse evento no AskouT: ${title}`;
 }
+
+/** Link do perfil, para mandar fora do app ou numa conversa. */
+export function profileLink(origin: string, username: string): string {
+  return `${origin}/u/${encodeURIComponent(username)}`;
+}
+
+export function profileShareText(username: string): string {
+  return `Olha o perfil de @${username} no AskouT`;
+}

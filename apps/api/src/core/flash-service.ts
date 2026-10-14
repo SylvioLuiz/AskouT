@@ -1,6 +1,6 @@
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
-import type { FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, PublicProfile } from './types.ts';
+import type { FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
 
 export const FLASH_HOURS: readonly number[] = [1, 2, 3];
@@ -22,6 +22,23 @@ export interface FlashStatusView {
   startsAt: string | null;
   expiresAt: string | null;
   note: string | null;
+}
+
+export interface FlashVisibilityView {
+  /** Eu não vejo o Flash dela. */
+  hideTheirs: boolean;
+  /** Ela não vê o meu Flash. */
+  hideMine: boolean;
+}
+
+/** Quem `userId` não enxerga no Flash: quem ele ocultou e quem o ocultou dele. */
+function unseenBy(userId: string, rows: FlashHiddenRecord[]): string[] {
+  const out: string[] = [];
+  for (const r of rows) {
+    if (r.ownerId === userId && r.hideTheirs) out.push(r.otherId);
+    if (r.otherId === userId && r.hideMine) out.push(r.ownerId);
+  }
+  return out;
 }
 
 export type InviteDirection = 'SENT' | 'RECEIVED' | 'MATCHED';
@@ -154,7 +171,8 @@ export class FlashService {
     const now = clock.now();
     await this.requireActive(actorId, now);
 
-    const friendIds = await follows.listFriendIds(actorId);
+    const skip = new Set(unseenBy(actorId, await flash.listHidden(actorId)));
+    const friendIds = (await follows.listFriendIds(actorId)).filter((id) => !skip.has(id));
     const [sessions, invites] = await Promise.all([flash.listActiveSessions(friendIds, now), flash.listOpenInvitesFor(actorId, now)]);
     const profiles = new Map((await users.findProfilesByIds(sessions.map((s) => s.userId))).map((p) => [p.userId, p] as const));
 
@@ -173,6 +191,34 @@ export class FlashService {
     return items.sort((a, b) => a.profile.username.localeCompare(b.profile.username, 'pt-BR'));
   }
 
+  /** Como o Flash está oculto entre mim e essa pessoa (só o que eu mesmo escolhi). */
+  async visibility(actorId: string, otherId: string): Promise<FlashVisibilityView> {
+    const row = (await this.deps.flash.listHidden(actorId)).find((r) => r.ownerId === actorId && r.otherId === otherId);
+    return { hideTheirs: row?.hideTheirs ?? false, hideMine: row?.hideMine ?? false };
+  }
+
+  /**
+   * `hideTheirs`: eu deixo de ver o Flash dela. `hideMine`: ela deixa de me ver disponível.
+   * Só o que vier no pedido muda. Convites abertos entre os dois são cancelados ao ocultar.
+   */
+  async setVisibility(actorId: string, otherId: string, input: { hideTheirs?: unknown; hideMine?: unknown }): Promise<FlashVisibilityView> {
+    const { flash, users, clock } = this.deps;
+    if (actorId === otherId) throw validationError('Você não pode ocultar o Flash de si mesmo');
+    for (const key of ['hideTheirs', 'hideMine'] as const) {
+      if (input[key] !== undefined && typeof input[key] !== 'boolean') throw validationError('Confira os dados', { [key]: 'Use verdadeiro ou falso' });
+    }
+    const [other] = await users.findProfilesByIds([otherId]);
+    if (!other) throw notFound('Pessoa não encontrada');
+    const current = await this.visibility(actorId, otherId);
+    const next: FlashVisibilityView = {
+      hideTheirs: typeof input.hideTheirs === 'boolean' ? input.hideTheirs : current.hideTheirs,
+      hideMine: typeof input.hideMine === 'boolean' ? input.hideMine : current.hideMine,
+    };
+    await flash.setHidden({ ownerId: actorId, otherId, ...next });
+    if ((next.hideTheirs && !current.hideTheirs) || (next.hideMine && !current.hideMine)) await flash.closeOpenInvitesBetween(actorId, otherId, clock.now());
+    return next;
+  }
+
   /** Convida um amigo que está com o Flash ligado. O convite vale 15 minutos (ou até um dos Flash acabar). */
   async invite(actorId: string, targetId: string): Promise<InviteView> {
     const { flash, follows, users, clock, ids } = this.deps;
@@ -182,6 +228,8 @@ export class FlashService {
 
     const friends = await follows.listFriendIds(actorId);
     if (!friends.includes(targetId)) throw forbidden('Só amigos podem ser convidados');
+    const rows = await flash.listHidden(actorId);
+    if (unseenBy(actorId, rows).includes(targetId) || rows.some((r) => r.ownerId === actorId && r.otherId === targetId && r.hideMine) || rows.some((r) => r.ownerId === targetId && r.otherId === actorId && r.hideTheirs)) throw conflict('Essa pessoa não está mais com o Flash ligado');
     const theirs = await flash.findActiveSession(targetId, now);
     if (!theirs) throw conflict('Essa pessoa não está mais com o Flash ligado');
     const [profile] = await users.findProfilesByIds([targetId]);

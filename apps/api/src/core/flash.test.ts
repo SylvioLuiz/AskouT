@@ -277,3 +277,44 @@ test('flash: duração livre em minutos (5 a 180, de 5 em 5)', async () => {
   const span = new Date(on.expiresAt!).getTime() - new Date(on.startsAt!).getTime();
   assert.equal(span, 45 * 60_000);
 });
+
+test('visibilidade: ocultar o Flash dela e não deixar ela me ver, cada um no seu sentido', async () => {
+  const { w, ana, bia } = await pair();
+  assert.deepEqual(await w.core.flash.visibility(ana, bia), { hideTheirs: false, hideMine: false });
+  assert.equal((await w.core.flash.listAvailable(ana)).length, 1);
+
+  // Ana oculta o Flash da Bia: Ana não vê Bia, e Bia continua vendo Ana.
+  assert.deepEqual(await w.core.flash.setVisibility(ana, bia, { hideTheirs: true }), { hideTheirs: true, hideMine: false });
+  assert.equal((await w.core.flash.listAvailable(ana)).length, 0);
+  assert.equal((await w.core.flash.listAvailable(bia)).length, 1);
+  await rejectsWith(w.core.flash.invite(ana, bia), 'CONFLICT');
+  await rejectsWith(w.core.flash.invite(bia, ana), 'CONFLICT'); // Ana ocultou Bia: Bia não convida Ana
+  assert.deepEqual(await w.core.flash.visibility(bia, ana), { hideTheirs: false, hideMine: false }, 'Bia não vê as escolhas da Ana');
+
+  // Ana também não deixa a Bia vê-la.
+  assert.deepEqual(await w.core.flash.setVisibility(ana, bia, { hideMine: true }), { hideTheirs: true, hideMine: true });
+  assert.equal((await w.core.flash.listAvailable(bia)).length, 0);
+
+  // A escolha da Bia é só dela: não mexe na da Ana.
+  await w.core.flash.setVisibility(bia, ana, { hideTheirs: true });
+  assert.deepEqual(await w.core.flash.visibility(ana, bia), { hideTheirs: true, hideMine: true });
+  await w.core.flash.setVisibility(bia, ana, { hideTheirs: false });
+
+  // Desfazer volta tudo ao normal.
+  await w.core.flash.setVisibility(ana, bia, { hideTheirs: false, hideMine: false });
+  assert.equal((await w.core.flash.listAvailable(ana)).length, 1);
+  assert.equal((await w.core.flash.listAvailable(bia)).length, 1);
+  const again = await w.core.flash.invite(ana, bia);
+  assert.ok(again.id);
+});
+
+test('visibilidade: ocultar cancela convite aberto e valida o pedido', async () => {
+  const { w, ana, bia } = await pair();
+  await w.core.flash.invite(ana, bia);
+  await w.core.flash.setVisibility(bia, ana, { hideMine: true });
+  const invites = await w.core.flash.listInvites(ana);
+  assert.equal(invites.sent.length + invites.received.length, 0);
+  await rejectsWith(w.core.flash.setVisibility(ana, ana, { hideTheirs: true }), 'VALIDATION');
+  await rejectsWith(w.core.flash.setVisibility(ana, bia, { hideTheirs: 'sim' }), 'VALIDATION');
+  await rejectsWith(w.core.flash.setVisibility(ana, '00000000-0000-4000-8000-000000000000', { hideTheirs: true }), 'NOT_FOUND');
+});

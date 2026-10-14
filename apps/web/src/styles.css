@@ -2942,7 +2942,7 @@ button {
 
 .profile__bar { display: flex; align-items: center; justify-content: space-between; margin: -6px 0 8px; }
 .profile__barname { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; }
-.profile__edit { margin-left: auto; flex: none; align-self: flex-start; }
+.profile__edit, .profile__more { margin-left: auto; flex: none; align-self: flex-start; }
 .profile__counts { justify-content: space-around; gap: 12px; padding: 12px 0; border-block: 1px solid var(--line); text-align: center; }
 .profile__counts > * { display: flex; flex-direction: column; align-items: center; font-size: 0.8125rem; line-height: 1.2; }
 .profile__counts strong { font-family: var(--font-display); font-size: 1.25rem; }
@@ -3193,6 +3193,8 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .post__action .icon { width: 26px; height: 26px; }
 .post__action--on { color: #e0245e; }
 .sharelist__item--danger strong { color: var(--danger); }
+.sharelist__item--on { border-color: var(--brand); }
+.sharelist__item--on strong::after { content: 'Ativo'; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 0.75rem; font-weight: 600; vertical-align: 1px; }
 .inlineicon { display: inline-flex; vertical-align: middle; }
 .inlineicon .icon { width: 18px; height: 18px; }
 .reasons { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }

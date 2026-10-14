@@ -145,6 +145,8 @@ model User {
   flashInvitesSent    FlashInvite[]   @relation("FlashInviteFrom")
   flashInvitesReceived FlashInvite[]  @relation("FlashInviteTo")
   flashPositions      FlashPosition[]
+  flashHides          FlashHidden[]   @relation("FlashHiddenOwner")
+  flashHiddenFrom     FlashHidden[]   @relation("FlashHiddenOther")
   notifications Notification[]
   pushSubscriptions PushSubscription[]
   postedEvents      PostedEvent[]
@@ -424,6 +426,21 @@ model FlashPosition {
   user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([inviteId, userId])
+}
+
+// Ocultação do Flash entre duas pessoas, do ponto de vista de `ownerId`: não ver o Flash dela e/ou não deixar ela ver o meu.
+model FlashHidden {
+  ownerId    String   @db.Uuid
+  otherId    String   @db.Uuid
+  hideTheirs Boolean  @default(false)
+  hideMine   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  owner User @relation("FlashHiddenOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  other User @relation("FlashHiddenOther", fields: [otherId], references: [id], onDelete: Cascade)
+
+  @@id([ownerId, otherId])
+  @@index([otherId])
 }
 
 model Notification {

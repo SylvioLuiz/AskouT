@@ -38,6 +38,17 @@ export class FlashController {
     return { items: await this.core.flash.listAvailable(actor.userId) };
   }
 
+  @Get('flash/visibility/:userId')
+  visibility(@CurrentActor() actor: Actor, @Param('userId', new ParseUUIDPipe()) userId: string) {
+    return this.core.flash.visibility(actor.userId, userId);
+  }
+
+  @Put('flash/visibility/:userId')
+  setVisibility(@CurrentActor() actor: Actor, @Param('userId', new ParseUUIDPipe()) userId: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.flash.setVisibility(actor.userId, userId, { hideTheirs: b.hideTheirs, hideMine: b.hideMine });
+  }
+
   @Get('flash/invites')
   invites(@CurrentActor() actor: Actor) {
     return this.core.flash.listInvites(actor.userId);

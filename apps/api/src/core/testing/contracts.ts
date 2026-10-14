@@ -493,6 +493,22 @@ export function defineRepositoryContract(
       const pos = (inviteId: string, userId: string, lat: number, lng: number, whenS = 0) => ({ inviteId, userId, lat, lng, accuracyM: null, updatedAt: at(whenS) });
       const conflicts = (p: Promise<unknown>) => assert.rejects(p, (e: unknown) => e instanceof DomainError && e.code === 'CONFLICT');
 
+      it('ocultar: grava por pessoa, é idempotente, lista dos dois lados e remove quando zera', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        assert.deepEqual(await h.flash.listHidden(ana), []);
+        await h.flash.setHidden({ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: false });
+        await h.flash.setHidden({ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: false });
+        assert.deepEqual(await h.flash.listHidden(ana), [{ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: false }]);
+        assert.deepEqual(await h.flash.listHidden(bia), [{ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: false }]);
+        await h.flash.setHidden({ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: true });
+        await h.flash.setHidden({ ownerId: bia, otherId: ana, hideTheirs: false, hideMine: true });
+        assert.equal((await h.flash.listHidden(ana)).length, 2);
+        await h.flash.setHidden({ ownerId: ana, otherId: bia, hideTheirs: false, hideMine: false });
+        await h.flash.setHidden({ ownerId: ana, otherId: bia, hideTheirs: false, hideMine: false });
+        assert.deepEqual(await h.flash.listHidden(ana), [{ ownerId: bia, otherId: ana, hideTheirs: false, hideMine: true }]);
+      });
+
       it('sessão: cria, acha só a ativa, expira e encerra', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');

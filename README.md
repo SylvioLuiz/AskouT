@@ -218,6 +218,13 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 - A API aceita `minutes` (múltiplo de 5, 5–180) em `POST /me/flash`; `hours` (1, 2 ou 3) continua valendo por compatibilidade.
 - Verificado em navegador de celular simulado (rolagem e teclado); o toque real no celular ainda não foi testado.
 
+### Menu ⋯ do perfil
+
+- No perfil de outra pessoa, o canto superior direito tem o botão **⋯**, que abre uma aba (fecha puxando para baixo) com: **Compartilhar perfil**, **Remover seguidor** (só se ela segue você), **Ocultar Flash dela**, **Não deixar ela me ver no Flash** e **Bloquear** (com confirmação). O botão Bloquear solto saiu da página.
+- **Compartilhar perfil**: manda o link `/u/usuario` para uma conversa do app (amigo ou grupo) ou para fora, pelo compartilhar do aparelho; sem isso, copia o link.
+- As duas opções de Flash só aparecem para amigos e são independentes: `PUT /flash/visibility/:userId` com `hideTheirs` (eu não vejo o Flash dela) e/ou `hideMine` (ela não me vê disponível). `GET` no mesmo caminho devolve o meu estado. Ocultar cancela convite aberto entre os dois, e quem foi ocultado não é avisado nem vê a escolha.
+- Tabela nova `FlashHidden` (migration `20261022120000_flash_hidden` + `sql/011_flash_hidden_constraints.sql`, aplicadas pelo `AskouT.command`). Só testada em memória aqui; no Postgres vale rodar `npm test` e `smoke.mjs` na sua máquina.
+
 ### Menu ⋯ e ações do post
 
 - Todo post tem, embaixo, **Curtir, Comentar e Compartilhar**. Curtidas e comentários avisam o autor (sino).

@@ -25,7 +25,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -180,6 +180,7 @@ export class InMemoryFlashRepository implements FlashRepository {
   readonly sessions = new Map<string, FlashSessionRecord>();
   readonly invites = new Map<string, FlashInviteRecord>();
   readonly positions = new Map<string, FlashPositionRecord>();
+  readonly hidden = new Map<string, FlashHiddenRecord>();
 
   private active(s: FlashSessionRecord, now: Date): boolean {
     return s.endedAt === null && s.expiresAt > now;
@@ -281,6 +282,16 @@ export class InMemoryFlashRepository implements FlashRepository {
       }
     }
     return n;
+  }
+
+  async setHidden(record: FlashHiddenRecord): Promise<void> {
+    const key = `${record.ownerId}|${record.otherId}`;
+    if (record.hideTheirs || record.hideMine) this.hidden.set(key, { ...record });
+    else this.hidden.delete(key);
+  }
+
+  async listHidden(userId: string): Promise<FlashHiddenRecord[]> {
+    return [...this.hidden.values()].filter((r) => r.ownerId === userId || r.otherId === userId).map((r) => ({ ...r }));
   }
 
   async upsertPosition(position: FlashPositionRecord): Promise<void> {

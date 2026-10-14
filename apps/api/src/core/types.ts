@@ -395,3 +395,13 @@ export interface PostTagRecord {
   status: PostTagStatus;
   createdAt: Date;
 }
+
+/** Ocultação do Flash entre duas pessoas, do ponto de vista de `ownerId`. Cada pessoa tem a sua linha. */
+export interface FlashHiddenRecord {
+  ownerId: string;
+  otherId: string;
+  /** `ownerId` não vê o Flash de `otherId`. */
+  hideTheirs: boolean;
+  /** `otherId` não vê o Flash de `ownerId`. */
+  hideMine: boolean;
+}

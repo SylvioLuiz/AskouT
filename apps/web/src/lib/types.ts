@@ -123,6 +123,14 @@ export interface BestDatesInput {
 
 // ---------- Flash ----------
 
+/** Escolhas minhas sobre o Flash entre mim e uma pessoa. */
+export interface FlashVisibility {
+  /** Eu não vejo o Flash dela. */
+  hideTheirs: boolean;
+  /** Ela não me vê disponível no Flash. */
+  hideMine: boolean;
+}
+
 export interface FlashStatus {
   active: boolean;
   startsAt: string | null;

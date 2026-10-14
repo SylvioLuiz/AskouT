@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -92,6 +92,11 @@ export interface FlashRepository {
   /** Pendentes viram CANCELED e aceitos viram ENDED, e as posições somem. Retorna quantos. */
   closeOpenInvitesOf(userId: string, now: Date): Promise<number>;
   closeOpenInvitesBetween(a: string, b: string, now: Date): Promise<number>;
+
+  /** Grava a ocultação de `ownerId` para `otherId`. Sem nenhum dos dois ligados, a linha some. Idempotente. */
+  setHidden(record: FlashHiddenRecord): Promise<void>;
+  /** Linhas em que a pessoa é `ownerId` ou `otherId`. */
+  listHidden(userId: string): Promise<FlashHiddenRecord[]>;
 
   upsertPosition(position: FlashPositionRecord): Promise<void>;
   listPositions(inviteId: string): Promise<FlashPositionRecord[]>;

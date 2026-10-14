@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { conflict } from '../../core/errors.ts';
 import type { FlashRepository } from '../../core/ports.ts';
-import type { FlashInviteRecord, FlashPositionRecord, FlashSessionRecord } from '../../core/types.ts';
+import type { FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord } from '../../core/types.ts';
 import { isUuid, onlyUuids } from './helpers.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -214,6 +214,29 @@ export class PrismaFlashRepository implements FlashRepository {
       },
       now,
     );
+  }
+
+  async setHidden(record: FlashHiddenRecord): Promise<void> {
+    const { ownerId, otherId, hideTheirs, hideMine } = record;
+    if (!isUuid(ownerId) || !isUuid(otherId)) return;
+    if (hideTheirs || hideMine) {
+      await this.prisma.flashHidden.upsert({
+        where: { ownerId_otherId: { ownerId, otherId } },
+        create: { ownerId, otherId, hideTheirs, hideMine },
+        update: { hideTheirs, hideMine },
+      });
+    } else {
+      await this.prisma.flashHidden.deleteMany({ where: { ownerId, otherId } });
+    }
+  }
+
+  async listHidden(userId: string): Promise<FlashHiddenRecord[]> {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.flashHidden.findMany({
+      where: { OR: [{ ownerId: userId }, { otherId: userId }] },
+      select: { ownerId: true, otherId: true, hideTheirs: true, hideMine: true },
+    });
+    return rows.map((r) => ({ ownerId: r.ownerId, otherId: r.otherId, hideTheirs: r.hideTheirs, hideMine: r.hideMine }));
   }
 
   async upsertPosition(position: FlashPositionRecord): Promise<void> {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EditIcon, LockIcon, MenuIcon } from '../components/icons.tsx';
+import { ProfileActions } from '../components/profile-actions.tsx';
 import { ProfileMenu } from '../components/profile-menu.tsx';
 import { PostedEvents } from '../components/profile-events.tsx';
 import { PostGrid } from '../components/post.tsx';
@@ -14,7 +15,7 @@ import { hasIncomingRequest, profileAction, relationNote } from '../lib/relation
 import type { ConnectionsPage } from '../lib/types.ts';
 import { Link, useSearch } from '../router.tsx';
 
-type Pending = 'unfollow' | 'block' | undefined;
+type Pending = 'unfollow' | undefined;
 
 function NotFoundProfile({ error, onRetry }: { error: ApiError; onRetry: () => void }) {
   if (error.code === 'NOT_FOUND') {
@@ -109,6 +110,15 @@ export function ProfileScreen({ username }: { username: string }) {
           <Link to="/perfil/editar" className="iconbtn profile__edit" aria-label="Editar perfil">
             <EditIcon />
           </Link>
+        ) : !relationship.isSelf ? (
+          <ProfileActions
+            profile={profile}
+            relationship={relationship}
+            onChanged={(notice) => {
+              setMessage({ tone: 'ok', text: notice });
+              view.reload();
+            }}
+          />
         ) : null}
       </header>
 
@@ -181,11 +191,6 @@ export function ProfileScreen({ username }: { username: string }) {
             Desbloquear
           </Button>
         ) : null}
-        {action.kind !== 'self' && action.kind !== 'blocked' ? (
-          <Button variant="quiet" disabled={busy} onClick={() => setPending(pending === 'block' ? undefined : 'block')} aria-expanded={pending === 'block'}>
-            Bloquear
-          </Button>
-        ) : null}
       </div>
 
       {pending === 'unfollow' ? (
@@ -195,16 +200,6 @@ export function ProfileScreen({ username }: { username: string }) {
           busy={busy}
           onCancel={() => setPending(undefined)}
           onConfirm={() => run(() => api.unfollow(profile.userId), `Você deixou de seguir @${profile.username}.`)}
-        />
-      ) : null}
-      {pending === 'block' ? (
-        <Confirm
-          danger
-          question={`Bloquear @${profile.username}? Essa pessoa deixa de ver seu perfil e vocês param de se seguir.`}
-          confirmLabel="Bloquear"
-          busy={busy}
-          onCancel={() => setPending(undefined)}
-          onConfirm={() => run(() => api.block(profile.userId), `Você bloqueou @${profile.username}.`)}
         />
       ) : null}
 

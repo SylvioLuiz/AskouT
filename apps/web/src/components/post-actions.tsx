@@ -404,12 +404,15 @@ export function AdjustSheet({ post, onClose, onSaved }: { post: PostView; onClos
 // ---------- Compartilhar ----------
 
 export function SharePostSheet({ post, onClose }: { post: PostView; onClose: () => void }) {
+  return <ShareLinkSheet url={postLink(window.location.origin, post.id)} text={postShareText(post.author.username)} onClose={onClose} />;
+}
+
+/** Compartilhar um link: numa conversa do app (amigo ou grupo) ou fora dele (compartilhar do aparelho / copiar). */
+export function ShareLinkSheet({ url, text, onClose }: { url: string; text: string; onClose: () => void }) {
   const [step, setStep] = useState<'menu' | 'chat'>('menu');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const chats = useAsync(() => (step === 'chat' ? api.conversations() : Promise.resolve(null)), [step]);
-  const url = postLink(window.location.origin, post.id);
-  const text = postShareText(post.author.username);
 
   async function outside() {
     setMessage(undefined);
