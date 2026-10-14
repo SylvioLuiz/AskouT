@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Avatar, Button, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
-import { ArrowUpIcon } from '../components/icons.tsx';
+import { ArrowUpIcon, MicIcon } from '../components/icons.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
 import { EventBubble } from '../components/share-event.tsx';
 import { peopleLabel } from '../lib/meetup.ts';
@@ -86,6 +86,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [older, setOlder] = useState<{ hasMore: boolean; loading: boolean }>({ hasMore: false, loading: false });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [voiceNote, setVoiceNote] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [suggesting, setSuggesting] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -260,7 +261,10 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
               value={draft}
               maxLength={MESSAGE_MAX}
               placeholder="Escreva uma mensagem"
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+              setDraft(e.target.value);
+              setVoiceNote(false);
+            }}
               onKeyDown={(e) => {
                 // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
                 if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
@@ -270,8 +274,17 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
               <button type="submit" className="commentbox__send composer__send" disabled={sending} aria-label="Enviar mensagem" aria-busy={sending || undefined}>
                 <ArrowUpIcon />
               </button>
-            ) : null}
+            ) : (
+              <button type="button" className="commentbox__send composer__send" aria-label="Gravar áudio" onClick={() => setVoiceNote(true)}>
+                <MicIcon />
+              </button>
+            )}
           </div>
+          {voiceNote ? (
+            <p className="composer__note" role="status">
+              Mensagens de áudio ainda não estão disponíveis.
+            </p>
+          ) : null}
         </form>
       ) : (
         <Notice>Vocês não são mais amigos. O histórico continua aqui, mas não dá para enviar novas mensagens.</Notice>
