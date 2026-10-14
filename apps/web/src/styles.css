@@ -3065,10 +3065,10 @@ button {
 .post__caption { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .pcarousel { position: relative; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
-.pcarousel__track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.pcarousel__track { display: flex; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-x pan-y; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .pcarousel__track::-webkit-scrollbar { display: none; }
-.pcarousel__slide { position: relative; flex: 0 0 100%; margin: 0; aspect-ratio: var(--carousel-ratio, 4 / 5); max-height: 60vh; max-height: 60dvh; scroll-snap-align: center; display: grid; }
-.pcarousel__slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pcarousel__slide { position: relative; flex: 0 0 100%; margin: 0; aspect-ratio: var(--carousel-ratio, 4 / 5); max-height: 60vh; max-height: 60dvh; scroll-snap-align: center; display: grid; overflow: hidden; }
+.pcarousel__slide img { width: 100%; height: 100%; min-height: 0; max-height: 100%; object-fit: cover; display: block; }
 .pcarousel__slide figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 12px 8px; color: #fff; font-size: 0.75rem; background: linear-gradient(transparent, rgb(0 0 0 / 0.55)); }
 .pcarousel__missing { display: grid; place-items: center; color: var(--muted); font-size: 0.875rem; }
 .pcarousel__count { position: absolute; top: 10px; right: 10px; padding: 2px 9px; border-radius: 999px; background: rgb(0 0 0 / 0.55); color: #fff; font-size: 0.75rem; font-weight: 700; }
