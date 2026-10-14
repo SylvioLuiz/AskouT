@@ -329,3 +329,19 @@ test('aceitar o convite deixa uma mensagem de sistema na conversa, para o botão
   assert.equal(last.kind, 'SYSTEM');
   assert.equal(last.body, FLASH_MATCH_MESSAGE);
 });
+
+test('activeIds: eu e amigos com Flash ligado, sem ocultos e sem depender do meu Flash', async () => {
+  const { w, ana, bia, caio } = await pair();
+  await w.core.flash.turnOn(caio, { hours: 1 });
+  assert.deepEqual((await w.core.flash.activeIds(ana)).sort(), [ana, bia].sort(), 'Caio não é amigo, não aparece');
+  await w.core.flash.turnOff(ana);
+  assert.deepEqual(await w.core.flash.activeIds(ana), [bia], 'com o meu desligado ainda vejo a Bia');
+  await w.core.flash.setVisibility(ana, bia, { hideTheirs: true });
+  assert.deepEqual(await w.core.flash.activeIds(ana), []);
+  assert.deepEqual(await w.core.flash.activeIds(bia), [bia], 'Bia ainda vê a si mesma; Ana está desligada');
+  await w.core.flash.turnOn(ana, { hours: 1 });
+  await w.core.flash.setVisibility(ana, bia, { hideTheirs: false, hideMine: true });
+  assert.deepEqual(await w.core.flash.activeIds(bia), [bia], 'Ana me ocultou: não vejo o raio dela');
+  w.clock.tick(2 * 60 * 60 * 1000);
+  assert.deepEqual(await w.core.flash.activeIds(ana), [], 'expirou');
+});

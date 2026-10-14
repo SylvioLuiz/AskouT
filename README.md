@@ -218,6 +218,12 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 - A API aceita `minutes` (múltiplo de 5, 5–180) em `POST /me/flash`; `hours` (1, 2 ou 3) continua valendo por compatibilidade.
 - Verificado em navegador de celular simulado (rolagem e teclado); o toque real no celular ainda não foi testado.
 
+### Raio do Flash no avatar
+
+- Quem está com o Flash ligado ganha um pequeno **raio no canto inferior esquerdo do avatar**, em todo lugar onde o avatar aparece (listas, conversa, perfil, comentários, agenda etc.). O seu próprio avatar também ganha o raio enquanto o seu Flash está ligado.
+- `GET /flash/active` devolve os ids de quem está ligado e **eu posso ver**: eu mesmo e amigos, menos quem eu ocultei e quem me ocultou (Menu ⋯ do perfil). Diferente da lista do Flash, **não exige o seu Flash ligado**. O app atualiza a cada 30 s e na hora ao ligar/desligar.
+- Só amigos veem o raio: o Flash continua sendo disponibilidade entre amigos. Sem mudança no banco.
+
 ### Menu ⋯ da conversa e Flash na mensagem
 
 - No topo da conversa, no canto oposto ao nome, o botão **⋯** abre: **Limpar conversa**, **Bloquear** (só na 1 a 1) e **Denunciar**.

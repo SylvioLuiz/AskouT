@@ -4,7 +4,8 @@ import { useId, useState } from 'react';
 import type { ButtonHTMLAttributes, HTMLInputTypeAttribute, ReactNode } from 'react';
 import { initials, tintIndex } from '../lib/avatar.ts';
 import type { PublicProfile } from '../lib/types.ts';
-import { ChevronLeftIcon } from './icons.tsx';
+import { BoltIcon, ChevronLeftIcon } from './icons.tsx';
+import { useFlashOn } from './flash-presence.tsx';
 import { Link } from '../router.tsx';
 
 // ---------- Botões ----------
@@ -149,16 +150,28 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 
 // ---------- Pessoas ----------
 
-type AvatarProfile = Pick<PublicProfile, 'username' | 'displayName' | 'avatarUrl'>;
+type AvatarProfile = Pick<PublicProfile, 'username' | 'displayName' | 'avatarUrl'> & { userId?: string };
 
+/** Foto (ou iniciais) da pessoa. Com o Flash ligado, ganha um pequeno raio no canto inferior esquerdo, em qualquer tela. */
 export function Avatar({ profile, size = 44 }: { profile: AvatarProfile; size?: number }) {
+  const flashOn = useFlashOn(profile.userId);
   const style = { width: size, height: size, fontSize: Math.round(size * 0.38) };
-  if (profile.avatarUrl) {
-    return <img className="avatar avatar--photo" src={profile.avatarUrl.startsWith('/') ? api.assetUrl(profile.avatarUrl) : profile.avatarUrl} alt="" style={style} referrerPolicy="no-referrer" />;
-  }
-  return (
+  const face = profile.avatarUrl ? (
+    <img className="avatar avatar--photo" src={profile.avatarUrl.startsWith('/') ? api.assetUrl(profile.avatarUrl) : profile.avatarUrl} alt="" style={style} referrerPolicy="no-referrer" />
+  ) : (
     <span className={`avatar avatar--tint-${tintIndex(profile.username)}`} style={style} aria-hidden="true">
       {initials(profile.username)}
+    </span>
+  );
+  if (!flashOn) return face;
+  const badge = Math.max(14, Math.round(size * 0.38));
+  return (
+    <span className="avatarflash" style={{ width: size, height: size }}>
+      {face}
+      <span className="avatarflash__bolt" style={{ width: badge, height: badge }} title="Flash ligado" aria-hidden="true">
+        <BoltIcon filled />
+      </span>
+      <span className="visually-hidden">Flash ligado</span>
     </span>
   );
 }

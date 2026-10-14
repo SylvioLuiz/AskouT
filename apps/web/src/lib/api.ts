@@ -193,6 +193,7 @@ export function createApi(deps: ApiDeps) {
     flashOn: (minutes: number, note: string) =>
       request<FlashStatus>('POST', '/me/flash', { body: note === '' ? { minutes } : { minutes, note } }),
     flashOff: () => request<{ ended: boolean }>('DELETE', '/me/flash'),
+    flashActive: () => request<{ userIds: string[] }>('GET', '/flash/active'),
     flashVisibility: (userId: string) => request<FlashVisibility>('GET', `/flash/visibility/${id(userId)}`),
     setFlashVisibility: (userId: string, body: Partial<FlashVisibility>) => request<FlashVisibility>('PUT', `/flash/visibility/${id(userId)}`, { body }),
     flashAvailable: () => request<{ items: AvailableFriend[] }>('GET', '/flash/available'),

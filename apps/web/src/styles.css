@@ -3270,3 +3270,8 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .sharedlist__meta { color: var(--muted); font-size: 0.8125rem; margin-bottom: 4px; }
 .sharedlist__link { display: block; overflow-wrap: anywhere; color: var(--brand); }
 .sharedlist__item .bubble { max-width: 100%; }
+
+/* Raio do Flash no canto inferior esquerdo do avatar */
+.avatarflash { position: relative; flex: none; display: inline-block; }
+.avatarflash__bolt { position: absolute; left: -2px; bottom: -2px; display: grid; place-items: center; border-radius: 50%; background: var(--brand); color: var(--brand-ink); border: 2px solid var(--bg); box-sizing: content-box; }
+.avatarflash__bolt svg { width: 62%; height: 62%; }

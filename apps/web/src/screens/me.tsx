@@ -100,7 +100,7 @@ export function EditProfileScreen() {
     <>
       <PageHead title="Editar perfil" back="/perfil" />
       <div className="photoedit">
-        <Avatar profile={{ username: user.profile.username, displayName: displayName || user.profile.displayName, avatarUrl }} size={96} />
+        <Avatar profile={{ userId: user.profile.userId, username: user.profile.username, displayName: displayName || user.profile.displayName, avatarUrl }} size={96} />
         <div className="photoedit__actions">
           <input ref={fileRef} type="file" accept="image/*" className="visually-hidden" id="foto" onChange={pickPhoto} />
           <Button variant="secondary" small loading={photoBusy} onClick={() => fileRef.current?.click()}>

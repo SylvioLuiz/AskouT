@@ -38,6 +38,11 @@ export class FlashController {
     return { items: await this.core.flash.listAvailable(actor.userId) };
   }
 
+  @Get('flash/active')
+  async active(@CurrentActor() actor: Actor) {
+    return { userIds: await this.core.flash.activeIds(actor.userId) };
+  }
+
   @Get('flash/visibility/:userId')
   visibility(@CurrentActor() actor: Actor, @Param('userId', new ParseUUIDPipe()) userId: string) {
     return this.core.flash.visibility(actor.userId, userId);

@@ -193,6 +193,19 @@ export class FlashService {
     return items.sort((a, b) => a.profile.username.localeCompare(b.profile.username, 'pt-BR'));
   }
 
+  /**
+   * Quem está com o Flash ligado e eu posso ver, para o raio no avatar: eu mesmo e amigos, menos os que eu ocultei
+   * ou que me ocultaram. Não depende do meu Flash estar ligado.
+   */
+  async activeIds(actorId: string): Promise<string[]> {
+    const { flash, follows, clock } = this.deps;
+    const now = clock.now();
+    const skip = new Set(unseenBy(actorId, await flash.listHidden(actorId)));
+    const friendIds = (await follows.listFriendIds(actorId)).filter((id) => !skip.has(id));
+    const sessions = await flash.listActiveSessions([actorId, ...friendIds], now);
+    return [...new Set(sessions.map((s) => s.userId))];
+  }
+
   /** Como o Flash está oculto entre mim e essa pessoa (só o que eu mesmo escolhi). */
   async visibility(actorId: string, otherId: string): Promise<FlashVisibilityView> {
     const row = (await this.deps.flash.listHidden(actorId)).find((r) => r.ownerId === actorId && r.otherId === otherId);

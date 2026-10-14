@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { FlashPresenceProvider } from './components/flash-presence.tsx';
 import { AuthProvider, useAuthContext, useUser } from './auth.tsx';
 import { Shell } from './components/Shell.tsx';
 import { Button, EmptyState } from './components/ui.tsx';
@@ -111,7 +112,11 @@ function AppRoutes() {
   if (state.status === 'guest') return guest ? <>{guest.route.render(guest.params)}</> : null;
 
   if (guest) return null; // redirecionando para a Home
-  return <Shell>{priv ? priv.route.render(priv.params) : <NotFoundScreen />}</Shell>;
+  return (
+    <FlashPresenceProvider>
+      <Shell>{priv ? priv.route.render(priv.params) : <NotFoundScreen />}</Shell>
+    </FlashPresenceProvider>
+  );
 }
 
 export function App() {
