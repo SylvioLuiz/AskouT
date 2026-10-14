@@ -191,7 +191,7 @@ export function FlashScreen() {
             </button>
           </div>
           {infoOpen ? (
-            <Sheet title="Como o Flash funciona" closeAsButton onClose={() => setInfoOpen(false)}>
+            <Sheet title="Como o Flash funciona" onClose={() => setInfoOpen(false)}>
               <p>Seus amigos que também estiverem com Flash ligado veem seu nome e sua foto.</p>
               <p>Sua localização só é compartilhada com quem aceitar sair com você.</p>
             </Sheet>

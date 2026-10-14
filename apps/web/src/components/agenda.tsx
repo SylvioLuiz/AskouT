@@ -112,16 +112,47 @@ export function DayStrip({ days, selected, today, onSelect, statesOf }: DayStrip
 interface SheetProps {
   title: string;
   onClose: () => void;
-  /** Fecha com um X no estilo de botão (em vez do ícone solto). */
-  closeAsButton?: boolean;
   children: ReactNode;
 }
 
 /** No celular sobe da base da tela; em telas grandes vira uma janela no centro. Fecha com Esc ou toque fora. */
-export function Sheet({ title, onClose, closeAsButton, children }: SheetProps) {
+export function Sheet({ title, onClose, children }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+
+  // Puxar o topo da aba para baixo fecha; soltar antes do limite faz ela voltar.
+  const drag = useRef<{ startY: number; lastY: number; lastT: number; velocity: number; id: number } | undefined>(undefined);
+  function onDragStart(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    drag.current = { startY: event.clientY, lastY: event.clientY, lastT: event.timeStamp, velocity: 0, id: event.pointerId };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    if (panelRef.current) panelRef.current.style.transition = 'none';
+  }
+  function onDragMove(event: React.PointerEvent<HTMLDivElement>) {
+    const d = drag.current;
+    if (!d || !panelRef.current) return;
+    const dy = Math.max(0, event.clientY - d.startY);
+    const dt = event.timeStamp - d.lastT;
+    if (dt > 0) d.velocity = (event.clientY - d.lastY) / dt;
+    d.lastY = event.clientY;
+    d.lastT = event.timeStamp;
+    panelRef.current.style.transform = `translateY(${dy}px)`;
+  }
+  function onDragEnd(event: React.PointerEvent<HTMLDivElement>) {
+    const d = drag.current;
+    drag.current = undefined;
+    const panel = panelRef.current;
+    if (!d || !panel) return;
+    const dy = Math.max(0, event.clientY - d.startY);
+    panel.style.transition = 'transform 0.2s ease-out';
+    if (dy > 90 || (dy > 30 && d.velocity > 0.5)) {
+      panel.style.transform = 'translateY(100%)';
+      window.setTimeout(() => closeRef.current(), 160);
+    } else {
+      panel.style.transform = '';
+    }
+  }
 
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -157,12 +188,15 @@ export function Sheet({ title, onClose, closeAsButton, children }: SheetProps) {
   return (
     <div className="sheet" onMouseDown={(event) => event.target === event.currentTarget && closeRef.current()}>
       <div className="sheet__panel" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={panelRef}>
-        <div className="sheet__grab" aria-hidden="true" />
-        <div className="sheet__head">
-          <h2 className="sheet__title">{title}</h2>
-          <button type="button" className={closeAsButton ? 'btn btn--secondary sheet__x' : 'iconbtn'} onClick={() => closeRef.current()} aria-label="Fechar">
-            <XIcon />
-          </button>
+        <div className="sheet__drag" onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}>
+          <div className="sheet__grab" aria-hidden="true" />
+          <div className="sheet__head">
+            <h2 className="sheet__title">{title}</h2>
+            {/* No celular fecha-se puxando a aba para baixo; o botão só aparece em tela grande (e para leitor de tela). */}
+            <button type="button" className="sheet__close" onClick={() => closeRef.current()} onPointerDown={(event) => event.stopPropagation()} aria-label="Fechar">
+              <XIcon />
+            </button>
+          </div>
         </div>
         {children}
       </div>

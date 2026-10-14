@@ -1398,12 +1398,16 @@ button {
 }
 
 .sheet__grab {
-  width: 40px;
-  height: 4px;
-  margin: 4px auto 8px;
+  width: 44px;
+  height: 5px;
+  margin: 6px auto 12px;
   background: var(--line-strong);
   border-radius: 2px;
 }
+
+.sheet__drag { touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.sheet__drag:active { cursor: grabbing; }
+.sheet__close { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; padding: 0; background: transparent; color: var(--ink); }
 
 .sheet__head {
   display: flex;
@@ -1640,6 +1644,9 @@ button {
   .sheet__grab {
     display: none;
   }
+
+  .sheet__drag { touch-action: auto; cursor: auto; }
+  .sheet__close { position: static; width: 44px; height: 44px; margin: 0; clip: auto; display: grid; place-items: center; cursor: pointer; }
 }
 
 .form__pair {
@@ -3220,7 +3227,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .flashpanel__go > :first-child { flex: 1; }
 .flashpanel__info { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 .flashpanel__info:hover { color: var(--ink); }
-.sheet__x, .sheet__x:hover:not(:disabled) { width: 44px; min-width: 44px; padding: 0; border: 0; background: transparent; color: var(--ink); }
 
 /* Gravar e ouvir mensagem de voz */
 .recbar { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 6px 0 4px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); }
