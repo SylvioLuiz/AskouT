@@ -1,0 +1,105 @@
+import { MeetupCover } from './meetup.tsx';
+import { VoiceBubble } from './voice.tsx';
+import { Button, EmptyState } from './ui.tsx';
+import type { ChatMessage, MeetupView, SharedLink, SharedVoice } from '../lib/types.ts';
+import { Link } from '../router.tsx';
+
+const dateFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+export function GroupEvent({ meetup, onManage }: { meetup: MeetupView; onManage?: () => void }) {
+  const start = new Date(meetup.startsAt);
+  const body = (
+    <>
+      <MeetupCover meetup={meetup} />
+      <div className="groupevent__body">
+        <h3 className="groupevent__title">{meetup.title}</h3>
+        {meetup.status === 'CANCELLED' ? <p className="groupevent__venue">Cancelado</p> : null}
+        <p className="groupevent__venue">{meetup.event?.venueName ?? 'Local do evento'}</p>
+        <dl className="groupevent__facts">
+          <div>
+            <dt>Confirmados</dt>
+            <dd>{meetup.confirmedCount}</dd>
+          </div>
+          <div>
+            <dt>Data</dt>
+            <dd>{dateFmt.format(start)}</dd>
+          </div>
+          <div>
+            <dt>Hora</dt>
+            <dd>{timeFmt.format(start)}</dd>
+          </div>
+        </dl>
+      </div>
+    </>
+  );
+  return (
+    <li className={`groupevent${meetup.status === 'CANCELLED' ? ' groupevent--cancelled' : ''}`}>
+      {meetup.event ? (
+        <Link to={`/eventos/${encodeURIComponent(meetup.event.id)}`} className="groupevent__link">
+          {body}
+        </Link>
+      ) : (
+        body
+      )}
+      {onManage ? (
+        <div className="groupmanage groupmanage--event">
+          <Button small variant="secondary" onClick={onManage}>
+            Editar encontro
+          </Button>
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+
+/** Encontros marcados nesta conversa. */
+export function SharedEvents({ meetups }: { meetups: MeetupView[] }) {
+  if (meetups.length === 0) return <EmptyState title="Nenhum evento ainda">Os encontros marcados nesta conversa aparecem aqui.</EmptyState>;
+  return (
+    <ul className="groupevents">
+      {meetups.map((m) => (
+        <GroupEvent key={m.id} meetup={m} />
+      ))}
+    </ul>
+  );
+}
+
+/** Mídia da conversa: por enquanto, as mensagens de voz (fotos e vídeos ainda não existem no AskouT). */
+export function SharedMedia({ voice, conversationId }: { voice: SharedVoice[]; conversationId: string }) {
+  if (voice.length === 0) return <EmptyState title="Nenhuma mídia ainda">As mensagens de voz enviadas aqui aparecem nesta aba. Fotos e vídeos ainda não existem no AskouT.</EmptyState>;
+  return (
+    <ul className="sharedlist">
+      {voice.map((v) => (
+        <li key={v.messageId} className="sharedlist__item">
+          <p className="sharedlist__meta">
+            {v.mine ? 'Você' : v.senderName} · {dateFmt.format(new Date(v.createdAt))} {timeFmt.format(new Date(v.createdAt))}
+          </p>
+          <div className={`bubble bubble--voice${v.mine ? ' bubble--mine' : ''}`}>
+            <VoiceBubble message={{ id: v.messageId, audio: { durationMs: v.durationMs } } as unknown as ChatMessage} conversationId={conversationId} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Links que apareceram nas mensagens, do mais recente para o mais antigo. */
+export function SharedLinks({ links }: { links: SharedLink[] }) {
+  if (links.length === 0) return <EmptyState title="Nenhum link ainda">Os links enviados nas mensagens aparecem aqui.</EmptyState>;
+  return (
+    <ul className="sharedlist">
+      {links.map((l) => (
+        <li key={`${l.messageId}|${l.url}`} className="sharedlist__item">
+          <p className="sharedlist__meta">
+            {l.mine ? 'Você' : l.senderName} · {dateFmt.format(new Date(l.createdAt))}
+          </p>
+          <a className="sharedlist__link" href={l.url} target="_blank" rel="noopener noreferrer">
+            {l.url}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}

@@ -230,6 +230,20 @@ export class PrismaConversationRepository implements ConversationRepository {
     return (rows as MessageRow[]).reverse().map(toMessage);
   }
 
+  async listShared(conversationId: string, limit: number, excludeSenderIds: readonly string[] = []): Promise<MessageRecord[]> {
+    if (!isUuid(conversationId)) return [];
+    const rows = await this.prisma.message.findMany({
+      where: {
+        conversationId,
+        OR: [{ kind: 'AUDIO' }, { kind: 'TEXT', body: { contains: 'http', mode: 'insensitive' } }],
+        ...(excludeSenderIds.length > 0 ? { senderId: { notIn: [...excludeSenderIds] } } : {}),
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+    });
+    return (rows as MessageRow[]).map(toMessage);
+  }
+
   async markRead(conversationId: string, userId: string, now: Date): Promise<void> {
     if (!isUuid(conversationId) || !isUuid(userId)) return;
     await this.prisma.conversationParticipant.updateMany({ where: { conversationId, userId }, data: { lastReadAt: now } });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
@@ -46,6 +46,21 @@ function NavLink({ item, pathname, badge }: { item: NavItem; pathname: string; b
 export function Shell({ children }: { children: ReactNode }) {
   const user = useUser();
   const pathname = usePathname();
+  // Faixas coladas no topo (como o cabeçalho da conversa) precisam saber a altura da barra do app.
+  const topbarRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const el = topbarRef.current;
+    if (!el) return;
+    const apply = () => document.documentElement.style.setProperty('--topbar-h', `${el.offsetHeight}px`);
+    apply();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(apply) : undefined;
+    observer?.observe(el);
+    window.addEventListener('resize', apply);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', apply);
+    };
+  }, []);
   // Solicitações de seguir pendentes: alimentam a bolinha em Atividades.
   const pending = useAsync(() => api.followRequests({ limit: 1 }), [pathname]);
   const unreadNews = useAsync(() => api.unreadNotifications(), [pathname]);
@@ -140,7 +155,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </Link>
       </aside>
 
-      <header className="topbar">
+      <header className="topbar" ref={topbarRef}>
         <Link to="/" className="wordmark" aria-label="AskouT, ir para a Home">
           AskouT
         </Link>

@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { ArrowUpIcon, MicIcon } from '../components/icons.tsx';
@@ -194,11 +195,13 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   let lastDay = '';
   return (
     <div className="chat">
-      {isGroup ? (
-        <PageHead title={chatName} back="/conversas" subtitle={`${peopleLabel(data.memberCount)} · toque para ver o grupo`} titleTo={`/conversas/${conversationId}/grupo`} />
-      ) : (
-        <PageHead title={chatName} back="/conversas" subtitle={data.other ? `@${data.other.username}` : undefined} />
-      )}
+      <ChatHead
+        conversationId={conversationId}
+        other={data.other}
+        groupName={data.name}
+        groupImageUrl={data.imageUrl}
+        subtitle={isGroup ? `${peopleLabel(data.memberCount)} · toque para ver o grupo` : data.other ? `@${data.other.username}` : undefined}
+      />
 
       {match ? (
         <div className="callout chat__match">

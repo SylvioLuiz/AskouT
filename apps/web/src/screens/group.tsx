@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { ManageMeetupSheet, MeetupCover } from '../components/meetup.tsx';
+import { ManageMeetupSheet } from '../components/meetup.tsx';
+import { GroupEvent, SharedLinks, SharedMedia } from '../components/shared-tabs.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { Button, EmptyState, ErrorState, Field, GroupAvatar, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { useUser } from '../auth.tsx';
@@ -11,61 +12,13 @@ import { peopleLabel } from '../lib/meetup.ts';
 import type { MeetupView } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 
-type Tab = 'people' | 'events' | 'media';
-
-const dateFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-function GroupEvent({ meetup, onManage }: { meetup: MeetupView; onManage?: () => void }) {
-  const start = new Date(meetup.startsAt);
-  const body = (
-    <>
-      <MeetupCover meetup={meetup} />
-      <div className="groupevent__body">
-        <h3 className="groupevent__title">{meetup.title}</h3>
-        {meetup.status === 'CANCELLED' ? <p className="groupevent__venue">Cancelado</p> : null}
-        <p className="groupevent__venue">{meetup.event?.venueName ?? 'Local do evento'}</p>
-        <dl className="groupevent__facts">
-          <div>
-            <dt>Confirmados</dt>
-            <dd>{meetup.confirmedCount}</dd>
-          </div>
-          <div>
-            <dt>Data</dt>
-            <dd>{dateFmt.format(start)}</dd>
-          </div>
-          <div>
-            <dt>Hora</dt>
-            <dd>{timeFmt.format(start)}</dd>
-          </div>
-        </dl>
-      </div>
-    </>
-  );
-  return (
-    <li className={`groupevent${meetup.status === 'CANCELLED' ? ' groupevent--cancelled' : ''}`}>
-      {meetup.event ? (
-        <Link to={`/eventos/${encodeURIComponent(meetup.event.id)}`} className="groupevent__link">
-          {body}
-        </Link>
-      ) : (
-        body
-      )}
-      {onManage ? (
-        <div className="groupmanage groupmanage--event">
-          <Button small variant="secondary" onClick={onManage}>
-            Editar encontro
-          </Button>
-        </div>
-      ) : null}
-    </li>
-  );
-}
+type Tab = 'people' | 'events' | 'media' | 'links';
 
 /** Detalhes do grupo: pessoas, eventos e mídia. Abre ao tocar no nome do grupo na conversa. */
 export function GroupScreen({ conversationId }: { conversationId: string }) {
   const group = useAsync(() => api.group(conversationId), [conversationId]);
   usePolling(group.reload, 15_000);
+  const shared = useAsync(() => api.shared(conversationId), [conversationId]);
   const me = useUser();
   const [tab, setTab] = useState<Tab>('people');
   const [sheet, setSheet] = useState<'rename' | 'leave' | { remove: string } | { meetup: MeetupView } | undefined>();
@@ -115,6 +68,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
     { id: 'people', label: 'Pessoas' },
     { id: 'events', label: 'Eventos' },
     { id: 'media', label: 'Mídia' },
+    { id: 'links', label: 'Links' },
   ];
 
   return (
@@ -186,7 +140,15 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         )
       ) : null}
 
-      {tab === 'media' ? <EmptyState title="Mídia ainda não está disponível">Fotos e vídeos do grupo vão aparecer aqui quando o envio de mídia existir no AskouT.</EmptyState> : null}
+      {tab === 'media' || tab === 'links' ? (
+        shared.data ? (
+          tab === 'media' ? <SharedMedia voice={shared.data.voice} conversationId={conversationId} /> : <SharedLinks links={shared.data.links} />
+        ) : shared.error ? (
+          <ErrorState message={shared.error.message} onRetry={shared.reload} />
+        ) : (
+          <Loading />
+        )
+      ) : null}
 
       {sheet === 'rename' ? (
         <Sheet title="Mudar nome do grupo" onClose={() => setSheet(undefined)}>

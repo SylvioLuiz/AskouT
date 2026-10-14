@@ -58,6 +58,11 @@ export class ConversationsController {
   }
 
   /** Detalhes do grupo (pessoas, eventos, mídia). 404 se não for um grupo seu. */
+  @Get(':id/shared')
+  shared(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.conversations.shared(actor.userId, id);
+  }
+
   @Get(':id/group')
   group(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.core.conversations.group(actor.userId, id);

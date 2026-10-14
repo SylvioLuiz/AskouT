@@ -133,6 +133,8 @@ export interface ConversationRepository {
   setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean>;
   /** Mensagens em ordem cronológica. `before` pagina para trás (só as anteriores a esse instante). */
   listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds?: readonly string[]): Promise<MessageRecord[]>;
+  /** Mensagens de voz e textos com link (http/https), da mais recente para a mais antiga. */
+  listShared(conversationId: string, limit: number, excludeSenderIds?: readonly string[]): Promise<MessageRecord[]>;
   /** Marca como lida até `now` para `userId`. */
   markRead(conversationId: string, userId: string, now: Date): Promise<void>;
   /** Quantas mensagens `userId` enviou desde `since` (limite de envio). */

@@ -269,6 +269,33 @@ export interface PostedEventsPage {
   offset: number;
 }
 
+export interface SharedLink {
+  messageId: string;
+  url: string;
+  senderName: string;
+  mine: boolean;
+  createdAt: string;
+}
+
+export interface SharedVoice {
+  messageId: string;
+  durationMs: number;
+  senderName: string;
+  mine: boolean;
+  createdAt: string;
+}
+
+/** Informações da conversa: quem é, encontros, links e mensagens de voz. */
+export interface SharedView {
+  type: 'DIRECT' | 'GROUP';
+  other: PublicProfile | null;
+  name: string | null;
+  imageUrl: string | null;
+  meetups: MeetupView[];
+  links: SharedLink[];
+  voice: SharedVoice[];
+}
+
 export interface GroupDetails {
   id: string;
   name: string;

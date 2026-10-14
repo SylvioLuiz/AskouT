@@ -684,6 +684,20 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.conversations.listMessages(randomUUID(), 10), []);
       });
 
+      it('compartilhados: só voz e textos com link, mais recentes primeiro, respeitando o limite e quem ocultar', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const c = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        await h.conversations.addMessage(msg(c.id, ana, 'oi', 1));
+        await h.conversations.addMessage(msg(c.id, ana, 'veja https://exemplo.com/a', 2));
+        await h.conversations.addMessage(msg(c.id, bia, 'HTTP://OUTRO.com', 3));
+        await h.conversations.addMessage(msg(c.id, bia, 'sem link', 4));
+        assert.deepEqual((await h.conversations.listShared(c.id, 10)).map((m) => m.body), ['HTTP://OUTRO.com', 'veja https://exemplo.com/a']);
+        assert.deepEqual((await h.conversations.listShared(c.id, 1)).map((m) => m.body), ['HTTP://OUTRO.com']);
+        assert.deepEqual((await h.conversations.listShared(c.id, 10, [bia])).map((m) => m.body), ['veja https://exemplo.com/a']);
+        assert.deepEqual(await h.conversations.listShared(randomUUID(), 10), []);
+      });
+
       it('mensagem de voz: guarda a duração na mensagem e os bytes à parte; some junto com a conversa', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');

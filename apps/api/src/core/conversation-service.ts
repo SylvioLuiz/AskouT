@@ -80,6 +80,43 @@ export interface ConversationView {
   hasMore: boolean;
 }
 
+export interface SharedLink {
+  messageId: string;
+  url: string;
+  senderName: string;
+  mine: boolean;
+  createdAt: string;
+}
+
+export interface SharedVoice {
+  messageId: string;
+  durationMs: number;
+  senderName: string;
+  mine: boolean;
+  createdAt: string;
+}
+
+/** O que já foi trocado na conversa: encontros, links e mensagens de voz (tela de informações). */
+export interface SharedView {
+  type: 'DIRECT' | 'GROUP';
+  /** Na conversa 1 a 1, a outra pessoa. */
+  other: PublicProfile | null;
+  name: string | null;
+  imageUrl: string | null;
+  meetups: MeetupView[];
+  links: SharedLink[];
+  voice: SharedVoice[];
+}
+
+const SHARED_SCAN = 300;
+const URL_RE = /https?:\/\/[^\s<>"']+/gi;
+
+/** Links de um texto, sem pontuação colada no fim, sem repetir. */
+export function extractLinks(text: string): string[] {
+  const found = (text.match(URL_RE) ?? []).map((u) => u.replace(/[.,;:!?)\]]+$/, '')).filter((u) => u.length > 8);
+  return [...new Set(found)];
+}
+
 export interface GroupDetails {
   id: string;
   name: string;
@@ -391,6 +428,27 @@ export class ConversationService {
     await this.access(actorId, conversationId);
     await this.deps.conversations.markRead(conversationId, actorId, this.deps.clock.now());
     return { ok: true };
+  }
+
+  /** Informações da conversa (1 a 1 ou grupo): encontros, links e mensagens de voz. */
+  async shared(actorId: string, conversationId: string): Promise<SharedView> {
+    const { conversations, users, meetups, blocks } = this.deps;
+    const { conversation, other } = await this.access(actorId, conversationId);
+    const hiddenIds = await blocks.listRelatedIds(actorId);
+    const rows = await conversations.listShared(conversationId, SHARED_SCAN, hiddenIds);
+    const names = new Map((await users.findProfilesByIds([...new Set(rows.map((r) => r.senderId))])).map((p) => [p.userId, p.displayName] as const));
+    const links: SharedLink[] = [];
+    const voice: SharedVoice[] = [];
+    for (const m of rows) {
+      const base = { messageId: m.id, senderName: names.get(m.senderId) ?? 'Alguém', mine: m.senderId === actorId, createdAt: m.createdAt.toISOString() };
+      if (m.kind === 'AUDIO') {
+        if (m.audioMs != null) voice.push({ ...base, durationMs: m.audioMs });
+        continue;
+      }
+      for (const url of extractLinks(m.body)) links.push({ ...base, url });
+    }
+    const views = await buildMeetupViews(this.deps, actorId, await meetups.listForConversation(conversationId));
+    return { type: conversation.type, other: other ? toPublicProfile(other) : null, name: conversation.name, imageUrl: conversation.imageUrl, meetups: views, links, voice };
   }
 
   /** Detalhes do grupo (tocar no nome): pessoas, eventos e mídia. Só quem está no grupo. */

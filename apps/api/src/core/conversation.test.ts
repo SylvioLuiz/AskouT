@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MESSAGES_PER_MINUTE, MESSAGE_MAX } from './conversation-service.ts';
+import { MESSAGES_PER_MINUTE, MESSAGE_MAX, extractLinks } from './conversation-service.ts';
 import { rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
 
@@ -257,4 +257,28 @@ test('áudio: deixou de ser amigo, não envia; aviso não carrega o conteúdo', 
   const { w, ana, bia, id } = await friends();
   await w.core.follows.unfollow(bia, ana);
   await rejectsWith(w.core.conversations.send(ana, id, { audio: voice(WEBM), audioMs: 3000 }), 'FORBIDDEN');
+});
+
+test('shared: links, mensagens de voz e encontros da conversa; só quem participa e sem bloqueados', async () => {
+  const { w, ana, bia, caio, id } = await friends();
+  await w.core.conversations.send(ana, id, { body: 'Olha isso (https://exemplo.com/x), e também http://b.com/y.' });
+  await w.core.conversations.send(bia, id, { body: 'sem link nenhum' });
+  await w.core.conversations.send(bia, id, { audio: voice(WEBM), audioMs: 3000 });
+  const s = await w.core.conversations.shared(ana, id);
+  assert.deepEqual(s.links.map((l) => l.url).sort(), ['http://b.com/y', 'https://exemplo.com/x']);
+  assert.equal(s.links[0]!.mine, true);
+  assert.equal(s.voice.length, 1);
+  assert.equal(s.voice[0]!.durationMs, 3000);
+  assert.equal(s.voice[0]!.mine, false);
+  assert.deepEqual(s.meetups, []);
+  assert.equal(s.type, 'DIRECT');
+  assert.equal(s.other?.userId, bia);
+  await rejectsWith(w.core.conversations.shared(caio, id), 'NOT_FOUND');
+  await w.core.blocks.block(ana, bia);
+  await rejectsWith(w.core.conversations.shared(ana, id), 'NOT_FOUND');
+});
+
+test('extractLinks: tira pontuação do fim e repetidos', () => {
+  assert.deepEqual(extractLinks('a https://x.com/a, b https://x.com/a. c (http://y.org/p?q=1)'), ['https://x.com/a', 'http://y.org/p?q=1']);
+  assert.deepEqual(extractLinks('nada aqui'), []);
 });

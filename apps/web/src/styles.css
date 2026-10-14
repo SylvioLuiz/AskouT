@@ -3248,3 +3248,24 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .voice__track { flex: 1; height: 4px; border-radius: 2px; background: var(--line-strong); overflow: hidden; }
 .voice__bar { height: 100%; background: var(--brand); }
 .voice__time { flex: none; min-width: 3.2em; text-align: right; font-size: 0.8125rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* Topo da conversa: preso abaixo da barra do app ao rolar */
+.chathead { position: sticky; top: var(--topbar-h, 0px); z-index: 15; display: flex; align-items: center; gap: 8px; margin: 0 -16px 8px; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.chathead .pagehead__back { flex: none; }
+.chathead__who { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; color: inherit; text-decoration: none; border-radius: 12px; }
+.chathead__who:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.chathead__who .avatar { flex: none; }
+.chathead__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.chathead__name { font-family: var(--font-display); font-weight: 700; font-size: 1.125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chathead__sub { color: var(--muted); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Informações da conversa */
+.chatinfo { display: flex; justify-content: center; margin: 4px 0 14px; }
+.chatinfo__who { display: flex; flex-direction: column; align-items: center; gap: 4px; color: inherit; text-decoration: none; text-align: center; }
+.chatinfo__name { font-family: var(--font-display); font-weight: 700; font-size: 1.375rem; margin-top: 8px; }
+.chatinfo__handle { color: var(--muted); }
+.sharedlist { display: flex; flex-direction: column; gap: 10px; }
+.sharedlist__item { padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); }
+.sharedlist__meta { color: var(--muted); font-size: 0.8125rem; margin-bottom: 4px; }
+.sharedlist__link { display: block; overflow-wrap: anywhere; color: var(--brand); }
+.sharedlist__item .bubble { max-width: 100%; }

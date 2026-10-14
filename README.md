@@ -218,6 +218,12 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 - A API aceita `minutes` (múltiplo de 5, 5–180) em `POST /me/flash`; `hours` (1, 2 ou 3) continua valendo por compatibilidade.
 - Verificado em navegador de celular simulado (rolagem e teclado); o toque real no celular ainda não foi testado.
 
+### Topo da conversa e informações
+
+- O topo da conversa (voltar, **foto** e nome) fica **preso abaixo da barra do app** ao rolar. Tocar na foto ou no nome abre as informações; na conversa 1 a 1 o nome é o real e abaixo vai o @usuário.
+- `/conversas/:id/info` (1 a 1): foto grande, nome e três abas: **Eventos** (encontros marcados na conversa), **Mídia** (mensagens de voz, com player; fotos e vídeos ainda não existem) e **Links** (links achados nas mensagens, até as últimas 300 com link ou voz). Tocar na foto abre o perfil. O grupo ganhou as mesmas abas de Mídia e Links.
+- API: `GET /conversations/:id/shared` (só quem participa; bloqueados ficam de fora). Nada novo no banco: lê as mensagens existentes (`listShared`, só testada em memória aqui; no Postgres vale rodar `npm test`).
+
 ### Menu ⋯ do perfil
 
 - No perfil de outra pessoa, o canto superior direito tem o botão **⋯**, que abre uma aba (fecha puxando para baixo) com: **Compartilhar perfil**, **Remover seguidor** (só se ela segue você), **Ocultar Flash dela**, **Não deixar ela me ver no Flash** e **Bloquear** (com confirmação). O botão Bloquear solto saiu da página.

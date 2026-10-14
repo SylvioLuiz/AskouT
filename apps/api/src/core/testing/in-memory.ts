@@ -574,6 +574,14 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return all.slice(Math.max(0, all.length - limit)).map((m) => ({ ...m }));
   }
 
+  async listShared(conversationId: string, limit: number, excludeSenderIds: readonly string[] = []): Promise<MessageRecord[]> {
+    return this.messages
+      .filter((m) => m.conversationId === conversationId && !excludeSenderIds.includes(m.senderId) && (m.kind === 'AUDIO' || (m.kind === 'TEXT' && /https?:\/\//i.test(m.body))))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit)
+      .map((m) => ({ ...m }));
+  }
+
   async markRead(conversationId: string, userId: string, now: Date): Promise<void> {
     const p = this.participants.get(conversationId);
     if (p?.has(userId)) p.set(userId, now);
