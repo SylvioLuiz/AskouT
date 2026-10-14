@@ -49,6 +49,8 @@ it('evento: pede nome, lugar e início no futuro; corpo leva o evento em ISO', (
   assert.match(eventProblem({ ...ok, startsAt: '2026-10-01T20:00' }, place, now) ?? '', /futuro/);
   assert.match(eventProblem({ ...ok, startsAt: '' }, place, now) ?? '', /início/);
   assert.match(eventProblem({ ...ok, endsAt: '2026-10-20T19:00' }, place, now) ?? '', /depois/);
+  assert.equal(eventProblem({ ...ok, endsAt: '2026-10-23T12:00' }, place, now), null, 'mais de 24 h é permitido');
+  assert.match(eventProblem({ ...ok, endsAt: '2026-11-25T12:00' }, place, now) ?? '', /30 dias/);
   assert.equal(localToIso('lixo'), null);
   const body = buildPostBody([], '', place, [], ok) as { event?: { title: string; startsAt: string } };
   assert.equal(body.event?.title, 'Pagode');

@@ -70,6 +70,9 @@ export function isoToLocalInput(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** Duração máxima de um evento (igual à da API). */
+export const POST_EVENT_MAX_DAYS = 30;
+
 /** O que falta para publicar como evento (null = tudo certo). */
 export function eventProblem(event: EventDraft, place: LinkedPlace | null, now: Date): string | null {
   if (!event.title.trim()) return 'Dê um nome ao evento.';
@@ -80,7 +83,7 @@ export function eventProblem(event: EventDraft, place: LinkedPlace | null, now: 
   if (event.endsAt) {
     const end = localToIso(event.endsAt);
     if (!end || new Date(end).getTime() <= new Date(start).getTime()) return 'O fim precisa ser depois do início.';
-    if (new Date(end).getTime() - new Date(start).getTime() > 24 * 3_600_000) return 'O evento pode durar até 24 horas.';
+    if (new Date(end).getTime() - new Date(start).getTime() > POST_EVENT_MAX_DAYS * 24 * 3_600_000) return `O evento pode durar até ${POST_EVENT_MAX_DAYS} dias.`;
   }
   return null;
 }

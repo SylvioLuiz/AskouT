@@ -41,7 +41,15 @@ export function formatWhen(startsAt: string | null, endsAt: string | null, now: 
   const start = new Date(startsAt);
   if (Number.isNaN(start.getTime())) return 'Horário não informado';
   const end = endsAt === null ? undefined : new Date(endsAt);
-  const until = end && !Number.isNaN(end.getTime()) ? ` até ${clock.format(end)}` : '';
+  const hasEnd = end !== undefined && !Number.isNaN(end.getTime());
+  // O fim só leva a data quando cai em outro dia que o início (ou, em andamento, que hoje): eventos podem passar de 24 h.
+  const sameDay = (a: Date, b: Date) => dayDiff(a, b) === 0;
+  const endDay = (e: Date) => {
+    const d = -dayDiff(e, now);
+    return d === 0 ? 'hoje' : d === 1 ? 'amanhã' : dayMonth.format(e);
+  };
+  const reference = start.getTime() <= now.getTime() ? now : start;
+  const until = hasEnd ? (sameDay(end, reference) ? ` até ${clock.format(end)}` : ` até ${endDay(end)} às ${clock.format(end)}`) : '';
   if (start.getTime() <= now.getTime()) return `Acontecendo agora${until}`;
   const diff = -dayDiff(start, now);
   const day = diff === 0 ? 'Hoje' : diff === 1 ? 'Amanhã' : dayLabel(startsAt, now);

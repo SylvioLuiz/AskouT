@@ -301,3 +301,14 @@ test('arquivar: some do feed, do perfil e para os outros; volta ao desarquivar',
   assert.equal((await w.core.posts.feed(bia)).items.length, 1);
   assert.equal((await w.core.posts.listArchived(ana)).items.length, 0);
 });
+
+test('evento: pode durar mais de 24 h, até 30 dias', async () => {
+  const { w, ana } = await setup();
+  const start = new Date(w.clock.now().getTime() + 24 * 3_600_000);
+  const at = (days: number) => new Date(start.getTime() + days * 24 * 3_600_000).toISOString();
+  const festival = await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Parque', event: { title: 'Festival de 3 dias', startsAt: start.toISOString(), endsAt: at(3) } });
+  assert.equal(new Date(festival.event!.endsAt).getTime() - start.getTime(), 3 * 24 * 3_600_000);
+  await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Parque', event: { title: 'Mês inteiro', startsAt: start.toISOString(), endsAt: at(30) } });
+  const err = await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'Parque', event: { title: 'Longo demais', startsAt: start.toISOString(), endsAt: at(31) } }), 'VALIDATION');
+  assert.match(JSON.stringify(err.details), /30 dias/);
+});

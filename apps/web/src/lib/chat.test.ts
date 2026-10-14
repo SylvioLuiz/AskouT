@@ -12,6 +12,10 @@ test('formatWhen: agora, hoje, amanhã, sem horário', () => {
   assert.equal(formatWhen(iso(at(13, 17, 0)), null, NOW), 'Acontecendo agora');
   assert.equal(formatWhen(iso(at(13, 20, 15)), iso(at(13, 23, 0)), NOW), 'Hoje às 20:15 até 23:00');
   assert.equal(formatWhen(iso(at(14, 9, 0)), null, NOW), 'Amanhã às 09:00');
+  assert.equal(formatWhen(iso(at(13, 22, 0)), iso(at(14, 2, 0)), NOW), 'Hoje às 22:00 até amanhã às 02:00');
+  assert.match(formatWhen(iso(at(13, 20, 0)), iso(at(16, 12, 0)), NOW), /^Hoje às 20:00 até 16 de out\. às 12:00$/);
+  assert.match(formatWhen(iso(at(13, 17, 0)), iso(at(15, 10, 0)), NOW), /^Acontecendo agora até 15 de out\. às 10:00$/);
+  assert.equal(formatWhen(iso(at(13, 17, 0)), iso(at(14, 1, 0)), NOW), 'Acontecendo agora até amanhã às 01:00');
   assert.equal(formatWhen(null, null, NOW), 'Horário não informado');
   assert.equal(formatWhen('lixo', null, NOW), 'Horário não informado');
 });

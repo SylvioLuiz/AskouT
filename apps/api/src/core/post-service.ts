@@ -12,6 +12,8 @@ export const POST_IMAGE_MAX_BYTES = 100 * 1024;
 export const POST_TAGS_MAX = 10;
 export const POST_COMMENT_MAX = 500;
 export const POST_REPORT_DETAILS_MAX = 300;
+/** Duração máxima de um evento: festivais e viagens passam de 24 h. */
+export const POST_EVENT_MAX_DAYS = 30;
 export const POST_PAGE_DEFAULT = 12;
 export const POST_PAGE_MAX = 30;
 
@@ -383,7 +385,7 @@ export class PostService {
     return this.deps.posts.findImage(imageId);
   }
 
-  /** Evento: título, início no futuro (até 2 anos), fim opcional (padrão: 3 h depois; no máximo 24 h) e lugar obrigatório. */
+  /** Evento: título, início no futuro (até 2 anos), fim opcional (padrão: 3 h depois; no máximo 30 dias) e lugar obrigatório. */
   private parseEvent(raw: unknown, placeName: string | null, keepStart?: Date | null): { title: string; startsAt: Date; endsAt: Date } | null {
     if (raw === undefined || raw === null) return null;
     if (typeof raw !== 'object' || Array.isArray(raw)) throw validationError('Evento inválido', { event: 'Dados do evento inválidos' });
@@ -403,7 +405,7 @@ export class PostService {
     if (startsAt.getTime() > now + 2 * 365 * 24 * 3_600_000) throw validationError('Evento inválido', { event: 'Início distante demais' });
     const endsAt = e.endsAt === undefined || e.endsAt === null || e.endsAt === '' ? new Date(startsAt.getTime() + 3 * 3_600_000) : date(e.endsAt, 'Fim');
     if (endsAt.getTime() <= startsAt.getTime()) throw validationError('Evento inválido', { event: 'O fim precisa ser depois do início' });
-    if (endsAt.getTime() - startsAt.getTime() > 24 * 3_600_000) throw validationError('Evento inválido', { event: 'O evento pode durar até 24 horas' });
+    if (endsAt.getTime() - startsAt.getTime() > POST_EVENT_MAX_DAYS * 24 * 3_600_000) throw validationError('Evento inválido', { event: `O evento pode durar até ${POST_EVENT_MAX_DAYS} dias` });
     return { title, startsAt, endsAt };
   }
 
