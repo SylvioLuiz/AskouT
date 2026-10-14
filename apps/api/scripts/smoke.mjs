@@ -252,6 +252,14 @@ try {
   const card = { source: 'OSM', title: 'Café Teste', venueName: 'Café Teste', lat: -23.52, lng: -46.62, startsAt: null, endsAt: null, sample: false, externalId: 'node/1' };
   const sentCard = await call('POST', `/conversations/${convId}/messages`, { token: a.token, body: { suggestion: card } });
   check('enviar sugestão', sentCard.status === 201 && sentCard.body?.kind === 'SUGGESTION', sentCard.body);
+  const webm = `data:audio/webm;codecs=opus;base64,${Buffer.from([0x1a, 0x45, 0xdf, 0xa3, ...new Array(60).fill(5)]).toString('base64')}`;
+  const voiceMsg = await call('POST', `/conversations/${convId}/messages`, { token: a.token, body: { audio: webm, audioMs: 3000 } });
+  check('mensagem de voz: envia', voiceMsg.status === 200 && voiceMsg.body?.kind === 'AUDIO' && voiceMsg.body?.audio?.durationMs === 3000, voiceMsg.body);
+  const voiceGet = await fetch(`${BASE}/conversations/${convId}/messages/${voiceMsg.body?.id}/audio`, { headers: { Authorization: `Bearer ${b.token}` } });
+  check('mensagem de voz: o outro amigo baixa o áudio', voiceGet.status === 200 && (voiceGet.headers.get('content-type') ?? '').startsWith('audio/webm'));
+  check('mensagem de voz: sem token, 401', (await fetch(`${BASE}/conversations/${convId}/messages/${voiceMsg.body?.id}/audio`)).status === 401);
+  check('mensagem de voz: arquivo falso, 400', (await call('POST', `/conversations/${convId}/messages`, { token: a.token, body: { audio: 'data:audio/webm;base64,AAAA', audioMs: 3000 } })).status === 400);
+  check('mensagem de voz: duração fora do limite, 400', (await call('POST', `/conversations/${convId}/messages`, { token: a.token, body: { audio: webm, audioMs: 95000 } })).status === 400);
   check('quem sugeriu não responde à própria sugestão (403)', (await call('POST', `/conversations/${convId}/messages/${sentCard.body?.id}/respond`, { token: a.token, body: { action: 'accept' } })).status === 403);
   const acceptedPlace = await call('POST', `/conversations/${convId}/messages/${sentCard.body?.id}/respond`, { token: b.token, body: { action: 'accept' } });
   check('aceitar o lugar sugerido', acceptedPlace.status === 200 && acceptedPlace.body?.response === 'ACCEPTED', acceptedPlace.body);

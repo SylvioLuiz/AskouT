@@ -190,6 +190,15 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 - Rotas: `POST /posts`, `GET /posts/feed`, `GET /posts/pending-tags`, `GET/DELETE /posts/:id`, `POST /posts/:id/tag` (`{action: 'accept'|'decline'}`), `GET /profiles/:usuario/posts`, `GET /posts/images/:id` (pública, como a foto de perfil; o id é aleatório).
 - Limites honestos: **o navegador não deixa um site listar a galeria do celular sozinho** (só pelo seletor do sistema); a galeria aberta direto no app, como no Instagram, só vem com o app nativo (Capacitor). O corpo JSON da API passou de 100 KB para 1 MB (cada foto chega em base64). Fotos no banco, sem armazenamento de arquivos nem moderação. A referência da foto do Google pode expirar (a foto então aparece como "indisponível"). Não há curtir, comentar, editar post nem reordenar fotos ainda. O Postgres só é exercitado na sua máquina (`AskouT.command` aplica as migrações `20261017120000_posts` e `20261018120000_post_tags` e o `009_post_constraints.sql`).
 
+### Mensagens de voz
+
+- Na conversa (1 a 1 e grupo), com o campo vazio o botão redondo é um **microfone**. Tocar nele grava: a barra mostra X (cancelar), o tempo e a seta (enviar). Ao digitar qualquer caractere o microfone vira a seta de texto.
+- Limites: **1 a 90 segundos** e até 600 KB (gravação a ~32 kbps, ~360 KB em 90 s). Ao chegar em 90 s a gravação para e é enviada.
+- O balão tem play/pausa, barra de progresso e duração; só um áudio toca por vez. O áudio só é baixado quando alguém toca nele, com o token da pessoa: `GET /conversations/:id/messages/:messageId/audio` responde 404 para quem não está na conversa e 401 sem login.
+- Formatos (o que cada navegador grava): webm/opus (Chrome), mp4 (Safari), ogg/opus (Firefox). A API confere os primeiros bytes do arquivo, não só o tipo declarado.
+- Banco: migração `20261021120000_voice_messages` (`Message.audioMs` e tabela `MessageAudio`) e `prisma/sql/010_voice_constraints.sql`; o `AskouT.command` aplica sozinho.
+- Limites honestos: **o navegador só libera o microfone em https** (ou localhost) e pede permissão; o áudio fica no banco (sem armazenamento de arquivos, sem transcrição nem moderação); sem pré-escuta antes de enviar, sem onda sonora; a gravação testada aqui usa um microfone de teste do Chromium. **Ainda não foi ouvido num celular real**, e o repositório Prisma/Postgres só roda na sua máquina.
+
 ### Duração do Flash em roleta
 
 - Ao ligar o Flash, a duração se escolhe numa **roleta de horas e minutos** (estilo relógio do iPhone): de 5 min a 3 h, de 5 em 5 minutos, com o horário em que termina logo abaixo.

@@ -207,3 +207,47 @@ test('distâncias do cartão: só com encontro Flash ativo e os dois compartilha
   assert.equal(after.messages[0]!.distances, null, 'encontro acabou: a distância some, nada ficou guardado');
   assert.equal(JSON.stringify(after).includes('-23.56'), false);
 });
+
+const voice = (head: number[], extra = 40, mime = 'audio/webm;codecs=opus') => `data:${mime};base64,${Buffer.from([...head, ...new Array(extra).fill(7)]).toString('base64')}`;
+const WEBM = [0x1a, 0x45, 0xdf, 0xa3];
+
+test('áudio: envia mensagem de voz, só quem está na conversa ouve, e valida o arquivo', async () => {
+  const { w, ana, bia, caio, id } = await friends();
+  const sent = await w.core.conversations.send(ana, id, { audio: voice(WEBM), audioMs: 4200 });
+  assert.equal(sent.kind, 'AUDIO');
+  assert.deepEqual(sent.audio, { durationMs: 4200 });
+  assert.equal(sent.body, 'Mensagem de voz');
+  const got = await w.core.conversations.audio(bia, id, sent.id);
+  assert.equal(got.mime, 'audio/webm');
+  assert.equal(got.data.length, 44);
+  const list = await w.core.conversations.messages(bia, id);
+  assert.deepEqual(list.messages.at(-1)!.audio, { durationMs: 4200 });
+  assert.equal(list.messages.at(-1)!.mine, false);
+  await rejectsWith(w.core.conversations.audio(caio, id, sent.id), 'NOT_FOUND');
+  await rejectsWith(w.core.conversations.audio(bia, id, 'nao-existe'), 'NOT_FOUND');
+  const text = await w.core.conversations.send(ana, id, { body: 'oi' });
+  await rejectsWith(w.core.conversations.audio(bia, id, text.id), 'NOT_FOUND');
+  // formatos de gravação de cada navegador
+  await w.core.conversations.send(ana, id, { audio: voice([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70], 30, 'audio/mp4'), audioMs: 2000 });
+  await w.core.conversations.send(ana, id, { audio: voice([0x4f, 0x67, 0x67, 0x53], 30, 'audio/ogg;codecs=opus'), audioMs: 2000 });
+});
+
+test('áudio: recusa arquivo falso, grande demais, duração fora de 1–90 s e mistura com texto', async () => {
+  const { w, ana, id } = await friends();
+  await rejectsWith(w.core.conversations.send(ana, id, { audio: voice([1, 2, 3, 4]), audioMs: 3000 }), 'VALIDATION'); // não é webm de verdade
+  await rejectsWith(w.core.conversations.send(ana, id, { audio: 'data:text/html;base64,PGI+', audioMs: 3000 }), 'VALIDATION');
+  await rejectsWith(w.core.conversations.send(ana, id, { audio: 'lixo', audioMs: 3000 }), 'VALIDATION');
+  await rejectsWith(w.core.conversations.send(ana, id, { audio: voice(WEBM, 700 * 1024), audioMs: 3000 }), 'VALIDATION');
+  for (const bad of [0, 999, 90_001, 1500.5, '3000', undefined, null]) {
+    await rejectsWith(w.core.conversations.send(ana, id, { audio: voice(WEBM), audioMs: bad }), 'VALIDATION');
+  }
+  await rejectsWith(w.core.conversations.send(ana, id, { audio: voice(WEBM), audioMs: 3000, body: 'oi' }), 'VALIDATION');
+  await w.core.conversations.send(ana, id, { audio: voice(WEBM), audioMs: 90_000 });
+  await w.core.conversations.send(ana, id, { audio: voice(WEBM), audioMs: 1_000 });
+});
+
+test('áudio: deixou de ser amigo, não envia; aviso não carrega o conteúdo', async () => {
+  const { w, ana, bia, id } = await friends();
+  await w.core.follows.unfollow(bia, ana);
+  await rejectsWith(w.core.conversations.send(ana, id, { audio: voice(WEBM), audioMs: 3000 }), 'FORBIDDEN');
+});

@@ -190,3 +190,16 @@ export const MicIcon = () => (
     <path d="M12 18v3" />
   </svg>
 );
+
+export const PlayIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" focusable="false">
+    <path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z" />
+  </svg>
+);
+
+export const PauseIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" focusable="false">
+    <rect x="6" y="5" width="4.2" height="14" rx="1.2" />
+    <rect x="13.8" y="5" width="4.2" height="14" rx="1.2" />
+  </svg>
+);

@@ -668,6 +668,26 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.conversations.listMessages(randomUUID(), 10), []);
       });
 
+      it('mensagem de voz: guarda a duração na mensagem e os bytes à parte; some junto com a conversa', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const c = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        const id = randomUUID();
+        const bytes = new Uint8Array([0x1a, 0x45, 0xdf, 0xa3, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+        await h.conversations.addMessage({ ...msg(c.id, ana, 'Mensagem de voz', 1), id, kind: 'AUDIO', audioMs: 3400 }, { mime: 'audio/webm', data: bytes });
+        const [m] = await h.conversations.listMessages(c.id, 10);
+        assert.equal(m!.kind, 'AUDIO');
+        assert.equal(m!.audioMs, 3400);
+        const audio = await h.conversations.findAudio(id);
+        assert.equal(audio!.mime, 'audio/webm');
+        assert.deepEqual(Array.from(audio!.data), Array.from(bytes));
+        assert.equal(await h.conversations.findAudio(randomUUID()), undefined);
+        await h.conversations.addMessage(msg(c.id, bia, 'oi', 2));
+        const text = (await h.conversations.listMessages(c.id, 10)).at(-1)!;
+        assert.equal(await h.conversations.findAudio(text.id), undefined, 'texto não tem áudio');
+        assert.ok(!text.audioMs, 'texto não tem duração');
+      });
+
       it('guarda o cartão de sugestão e devolve igual', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');

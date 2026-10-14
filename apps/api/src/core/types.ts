@@ -138,7 +138,7 @@ export interface FlashPositionRecord {
 
 // ---------- Conversas ----------
 
-export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT';
+export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO';
 export type SuggestionResponse = 'ACCEPTED' | 'DECLINED';
 
 /**
@@ -185,6 +185,8 @@ export interface MessageRecord {
   meetupId: string | null;
   /** Evento compartilhado (kind EVENT). Ausente = nulo. */
   eventId?: string | null;
+  /** Duração da mensagem de voz em ms (kind AUDIO). O áudio em si fica à parte. */
+  audioMs?: number | null;
   createdAt: Date;
 }
 

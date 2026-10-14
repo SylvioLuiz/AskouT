@@ -277,9 +277,11 @@ export interface ChatMessage {
   mine: boolean;
   /** Nome de quem enviou; só em grupo. */
   senderName: string | null;
-  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT';
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO';
   body: string;
   suggestion: SuggestionCard | null;
+  /** Mensagem de voz (kind AUDIO): só a duração; o áudio é baixado ao tocar. */
+  audio: { durationMs: number } | null;
   /** Evento compartilhado (kind EVENT). */
   event: EventCard | null;
   /** Cartão do encontro (kind MEETUP). */

@@ -43,7 +43,7 @@ test('toCard leva só os campos do cartão', () => {
   assert.equal(card.externalId, 'osm:node/1');
 });
 
-const msg = (id: string, createdAt: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ id, senderId: 'u', mine: false, senderName: null, kind: 'TEXT', body: id, suggestion: null, meetup: null, response: null, respondedAt: null, distances: null, createdAt, ...extra });
+const msg = (id: string, createdAt: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ id, senderId: 'u', mine: false, senderName: null, kind: 'TEXT', body: id, suggestion: null, audio: null, meetup: null, response: null, respondedAt: null, distances: null, createdAt, ...extra });
 
 test('mergeMessages: sem repetir, em ordem, a versão mais nova vence', () => {
   const a = [msg('1', '2026-10-13T10:00:00.000Z'), msg('2', '2026-10-13T10:01:00.000Z')];
@@ -76,4 +76,10 @@ test('nota do Google: texto, rótulo acessível e estrelas em meias unidades', (
 test('rota e fonte', () => {
   assert.equal(routeLink(-23.5, -46.6), 'https://www.google.com/maps/dir/?api=1&destination=-23.5,-46.6&travelmode=walking');
   assert.equal(sourceLabel('GOOGLE'), 'Lugar do Google');
+});
+
+test('previewOf: mensagem de voz mostra a duração', () => {
+  const m = msg('a', '2026-10-14T10:00:00Z', { kind: 'AUDIO', body: 'Mensagem de voz', audio: { durationMs: 7400 }, mine: true });
+  assert.equal(previewOf(m), 'Você: Mensagem de voz (0:07)');
+  assert.equal(previewOf({ ...m, mine: false, senderName: 'Bia' }), 'Bia: Mensagem de voz (0:07)');
 });

@@ -1,5 +1,6 @@
 // Contas das conversas que não dependem de tela: horários, rótulos e junção de mensagens.
 import { formatDistance } from './flash.ts';
+import { formatVoiceTime } from './voice.ts';
 import type { ChatMessage, SuggestionCard, SuggestionItem } from './types.ts';
 
 const clock = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -109,6 +110,7 @@ export function previewOf(m: ChatMessage | null): string {
   if (!m) return 'Nenhuma mensagem ainda';
   const prefix = m.mine ? 'Você: ' : '';
   if (m.kind === 'SUGGESTION' && m.suggestion) return `${prefix}Sugeriu ${m.suggestion.venueName}`;
+  if (m.kind === 'AUDIO') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}Mensagem de voz${m.audio ? ` (${formatVoiceTime(m.audio.durationMs)})` : ''}`;
   if (m.kind === 'MEETUP') return `${prefix}${m.body}`;
   if (m.kind === 'EVENT') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}Compartilhou ${m.event?.title ?? 'um evento'}`;
   if (m.senderName && !m.mine) return `${m.senderName}: ${m.body.replace(/\s+/g, ' ')}`;

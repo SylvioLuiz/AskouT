@@ -533,8 +533,16 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return out.sort((a, b) => stamp(b) - stamp(a));
   }
 
-  async addMessage(message: MessageRecord): Promise<void> {
+  private audios = new Map<string, { mime: string; data: Uint8Array }>();
+
+  async addMessage(message: MessageRecord, audio?: { mime: string; data: Uint8Array }): Promise<void> {
     this.messages.push({ ...message });
+    if (audio) this.audios.set(message.id, { mime: audio.mime, data: new Uint8Array(audio.data) });
+  }
+
+  async findAudio(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    const a = this.audios.get(messageId);
+    return a ? { mime: a.mime, data: new Uint8Array(a.data) } : undefined;
   }
 
   async findMessage(id: string): Promise<MessageRecord | undefined> {

@@ -94,12 +94,22 @@ enum SuggestionResponse {
   DECLINED
 }
 
+/// Bytes de uma mensagem de voz (até 600 KB; a API confere antes). Só quem está na conversa consegue ouvir.
+model MessageAudio {
+  messageId String @id @db.Uuid
+  mime      String
+  data      Bytes
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
 enum MessageKind {
   TEXT
   SUGGESTION
   MEETUP
   SYSTEM
   EVENT
+  AUDIO
 }
 
 model User {
@@ -353,8 +363,11 @@ model Message {
   meetupId       String?  @db.Uuid
   /// Evento compartilhado na conversa (kind = EVENT).
   eventId        String?  @db.Uuid
+  /// Duração da mensagem de voz em ms (kind = AUDIO); os bytes ficam em MessageAudio.
+  audioMs        Int?
   createdAt      DateTime @default(now())
 
+  audio        MessageAudio?
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation(fields: [senderId], references: [id])
   meetup       Meeting?     @relation(fields: [meetupId], references: [id], onDelete: Cascade)

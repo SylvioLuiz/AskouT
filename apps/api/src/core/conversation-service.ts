@@ -1,5 +1,6 @@
 import { buildEventCards } from './event-card.ts';
 import type { EventCardView } from './event-card.ts';
+import { decodeAudioDataUrl, parseAudioDuration } from './audio.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
@@ -33,6 +34,8 @@ export interface MessageView {
   meetup: MeetupView | null;
   /** Evento compartilhado (kind EVENT). */
   event: EventCardView | null;
+  /** Mensagem de voz (kind AUDIO): só a duração; o áudio vem de `GET .../messages/:id/audio`. */
+  audio: { durationMs: number } | null;
   /** Resposta de quem recebeu o cartão: aceitou ou recusou o lugar. */
   response: 'ACCEPTED' | 'DECLINED' | null;
   respondedAt: string | null;
@@ -94,6 +97,9 @@ export interface SendInput {
   suggestion?: unknown;
   /** Compartilha um evento na conversa. */
   eventId?: unknown;
+  /** Mensagem de voz: data URL do áudio gravado e `audioMs` (duração). */
+  audio?: unknown;
+  audioMs?: unknown;
 }
 
 interface ViewExtras {
@@ -115,6 +121,7 @@ function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {
     suggestion: m.suggestion,
     meetup: extras.meetup ?? null,
     event: extras.event ?? null,
+    audio: m.kind === 'AUDIO' && m.audioMs ? { durationMs: m.audioMs } : null,
     response: m.response,
     respondedAt: m.respondedAt ? m.respondedAt.toISOString() : null,
     distances: m.suggestion ? distances : null,
@@ -286,7 +293,8 @@ export class ConversationService {
     const hasText = input.body !== undefined && input.body !== null;
     const hasSuggestion = input.suggestion !== undefined && input.suggestion !== null;
     const hasEvent = input.eventId !== undefined && input.eventId !== null;
-    if ([hasText, hasSuggestion, hasEvent].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão ou um evento', { body: 'Envie um texto, uma sugestão ou um evento' });
+    const hasAudio = input.audio !== undefined && input.audio !== null;
+    if ([hasText, hasSuggestion, hasEvent, hasAudio].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento ou um áudio', { body: 'Envie um texto, uma sugestão, um evento ou um áudio' });
     if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de lugar só em conversas 1 a 1', { suggestion: 'Sugestões de lugar só em conversas 1 a 1' });
 
     let kind: MessageKind = 'TEXT';
@@ -294,7 +302,15 @@ export class ConversationService {
     let suggestion: SuggestionCard | null = null;
     let eventId: string | null = null;
     let eventCard: EventCardView | null = null;
-    if (hasEvent) {
+    let audio: { mime: string; data: Uint8Array } | undefined;
+    let audioMs: number | null = null;
+    if (hasAudio) {
+      const decoded = decodeAudioDataUrl(input.audio);
+      audioMs = parseAudioDuration(input.audioMs);
+      audio = { mime: decoded.mime, data: new Uint8Array(decoded.bytes) };
+      kind = 'AUDIO';
+      body = 'Mensagem de voz';
+    } else if (hasEvent) {
       if (typeof input.eventId !== 'string' || input.eventId === '' || input.eventId.length > 64) throw notFound('Evento não encontrado');
       eventCard = (await buildEventCards(this.deps, [input.eventId])).get(input.eventId) ?? null;
       if (!eventCard) throw notFound('Evento não encontrado');
@@ -318,14 +334,24 @@ export class ConversationService {
     const recent = await conversations.countSentSince(actorId, new Date(now.getTime() - 60_000));
     if (recent >= MESSAGES_PER_MINUTE) throw rateLimited('Você está enviando mensagens rápido demais. Espere um instante.', 30);
 
-    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, createdAt: now };
-    await conversations.addMessage(message);
+    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, audioMs, createdAt: now };
+    await conversations.addMessage(message, audio);
     await conversations.markRead(conversationId, actorId, now);
     const positions = suggestion && otherId ? await this.livePositions(actorId, otherId, now) : null;
     const actorName = (await this.deps.users.findProfilesByIds([actorId]))[0]?.displayName ?? 'Alguém';
     const senderName = conversation.type === 'GROUP' ? actorName : null;
-    await this.notifyMembers(actorId, actorName, conversation, memberIds, eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um lugar' : 'enviou uma mensagem');
+    await this.notifyMembers(actorId, actorName, conversation, memberIds, audio ? 'enviou um áudio' : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um lugar' : 'enviou uma mensagem');
     return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard });
+  }
+
+  /** Bytes de uma mensagem de voz, só para quem está na conversa. */
+  async audio(actorId: string, conversationId: string, messageId: string): Promise<{ mime: string; data: Uint8Array }> {
+    await this.access(actorId, conversationId);
+    const message = await this.deps.conversations.findMessage(messageId);
+    if (!message || message.conversationId !== conversationId || message.kind !== 'AUDIO') throw notFound('Áudio não encontrado');
+    const found = await this.deps.conversations.findAudio(messageId);
+    if (!found) throw notFound('Áudio não encontrado');
+    return found;
   }
 
   /** Avisa os outros membros (menos quem bloqueou ou foi bloqueado por quem escreveu). O texto da mensagem não vai no aviso. */

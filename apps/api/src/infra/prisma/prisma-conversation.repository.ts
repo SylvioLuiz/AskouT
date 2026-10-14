@@ -8,13 +8,14 @@ type MessageRow = {
   id: string;
   conversationId: string;
   senderId: string;
-  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT';
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO';
   body: string;
   suggestion: unknown;
   response: 'ACCEPTED' | 'DECLINED' | null;
   respondedAt: Date | null;
   meetupId: string | null;
   eventId: string | null;
+  audioMs: number | null;
   createdAt: Date;
 };
 
@@ -29,6 +30,7 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   respondedAt: r.respondedAt,
   meetupId: r.meetupId,
   eventId: r.eventId,
+  audioMs: r.audioMs,
   createdAt: r.createdAt,
 });
 
@@ -180,7 +182,13 @@ export class PrismaConversationRepository implements ConversationRepository {
     return out.sort((a, b) => stamp(b) - stamp(a));
   }
 
-  async addMessage(m: MessageRecord): Promise<void> {
+  async findAudio(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (!isUuid(messageId)) return undefined;
+    const row = await this.prisma.messageAudio.findUnique({ where: { messageId } });
+    return row ? { mime: row.mime, data: new Uint8Array(row.data) } : undefined;
+  }
+
+  async addMessage(m: MessageRecord, audio?: { mime: string; data: Uint8Array }): Promise<void> {
     await this.prisma.message.create({
       data: {
         id: m.id,
@@ -192,6 +200,8 @@ export class PrismaConversationRepository implements ConversationRepository {
         ...(m.suggestion ? { suggestion: m.suggestion as unknown as Prisma.InputJsonValue } : {}),
         ...(m.meetupId ? { meetupId: m.meetupId } : {}),
         ...(m.eventId ? { eventId: m.eventId } : {}),
+        ...(m.audioMs ? { audioMs: m.audioMs } : {}),
+        ...(audio ? { audio: { create: { mime: audio.mime, data: Buffer.from(audio.data) } } } : {}),
         createdAt: m.createdAt,
       },
     });

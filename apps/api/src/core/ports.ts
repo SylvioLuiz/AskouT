@@ -119,7 +119,10 @@ export interface ConversationRepository {
   updateGroup(conversationId: string, patch: { name?: string; imageUrl?: string | null; ownerId?: string }): Promise<void>;
   /** Conversas do usuário, da mais recente para a mais antiga (por última mensagem, depois criação). */
   listForUser(userId: string, hiddenSenderIds?: readonly string[]): Promise<ConversationSummaryRecord[]>;
-  addMessage(message: MessageRecord): Promise<void>;
+  /** Com `audio`, grava os bytes da mensagem de voz junto (mesma operação). */
+  addMessage(message: MessageRecord, audio?: { mime: string; data: Uint8Array }): Promise<void>;
+  /** Bytes da mensagem de voz (só de mensagens kind AUDIO). */
+  findAudio(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
   findMessage(id: string): Promise<MessageRecord | undefined>;
   /** Grava a resposta ao cartão só se ainda não houver uma. Devolve false se já tinha. */
   setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean>;

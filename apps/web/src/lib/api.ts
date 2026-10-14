@@ -233,6 +233,20 @@ export function createApi(deps: ApiDeps) {
     },
     sendText: (conversationId: string, body: string) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { body } }),
+    sendAudio: (conversationId: string, audio: string, audioMs: number) =>
+      request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { audio, audioMs } }),
+    /** Baixa o áudio de uma mensagem de voz (a rota exige o token, então não dá para usar <audio src>). */
+    messageAudio: async (conversationId: string, messageId: string): Promise<Blob> => {
+      const token = deps.getToken();
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/conversations/${id(conversationId)}/messages/${id(messageId)}/audio`, { method: 'GET', headers: token !== undefined ? { Authorization: `Bearer ${token}` } : {} });
+      } catch {
+        throw networkError();
+      }
+      if (!response.ok) throw errorFromResponse(response.status, undefined, response.headers.get('Retry-After'));
+      return response.blob();
+    },
     sendSuggestion: (conversationId: string, suggestion: SuggestionCard) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { suggestion } }),
     respondSuggestion: (conversationId: string, messageId: string, action: 'accept' | 'decline') =>

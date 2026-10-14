@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Avatar, Button, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { ArrowUpIcon, MicIcon } from '../components/icons.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
 import { EventBubble } from '../components/share-event.tsx';
@@ -86,7 +87,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [older, setOlder] = useState<{ hasMore: boolean; loading: boolean }>({ hasMore: false, loading: false });
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
-  const [voiceNote, setVoiceNote] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [suggesting, setSuggesting] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -166,6 +167,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     }
   }
 
+  async function sendVoice(audio: string, durationMs: number) {
+    const message = await api.sendAudio(conversationId, audio, durationMs);
+    stickToEnd.current = true;
+    setMessages((current) => mergeMessages(current, [message]));
+  }
+
   async function send(event: FormEvent) {
     event.preventDefault();
     const text = draft.trim();
@@ -226,12 +233,14 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             <div key={m.id} className="chat__item">
               {showDay ? <p className="chat__day">{day}</p> : null}
               {m.kind === 'SYSTEM' ? <p className="chat__system">{m.body}</p> : (
-              <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.kind !== 'TEXT' ? ' bubble--card' : ''}`}>
+              <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.kind === 'AUDIO' ? ' bubble--voice' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`}>
                 {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
                 {m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
                   <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} />
                 ) : m.kind === 'MEETUP' && m.meetup ? (
                   <MeetupBubble meetup={m.meetup} nowIso={data.now} onUpdated={(updated) => setMessages((current) => current.map((x) => (x.id === m.id || x.meetup?.id === updated.id ? { ...x, meetup: updated } : x)))} />
+                ) : m.kind === 'AUDIO' && m.audio ? (
+                  <VoiceBubble message={m} conversationId={conversationId} />
                 ) : m.kind === 'EVENT' && m.event ? (
                   <EventBubble event={m.event} />
                 ) : (
@@ -253,38 +262,37 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           <label className="visually-hidden" htmlFor="msg">
             Mensagem para {chatName}
           </label>
-          <div className="commentbox composer__box">
-            <textarea
-              id="msg"
-              className="composer__input"
-              rows={1}
-              value={draft}
-              maxLength={MESSAGE_MAX}
-              placeholder="Escreva uma mensagem"
-              onChange={(e) => {
-              setDraft(e.target.value);
-              setVoiceNote(false);
-            }}
-              onKeyDown={(e) => {
-                // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
-                if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
-              }}
-            />
-            {draft.trim() !== '' ? (
-              <button type="submit" className="commentbox__send composer__send" disabled={sending} aria-label="Enviar mensagem" aria-busy={sending || undefined}>
-                <ArrowUpIcon />
-              </button>
-            ) : (
-              <button type="button" className="commentbox__send composer__send" aria-label="Gravar áudio" onClick={() => setVoiceNote(true)}>
-                <MicIcon />
-              </button>
-            )}
-          </div>
-          {voiceNote ? (
-            <p className="composer__note" role="status">
-              Mensagens de áudio ainda não estão disponíveis.
-            </p>
-          ) : null}
+          {recording ? (
+            <VoiceRecorderBar onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
+          ) : (
+            <div className="commentbox composer__box">
+              <textarea
+                id="msg"
+                className="composer__input"
+                rows={1}
+                value={draft}
+                maxLength={MESSAGE_MAX}
+                placeholder="Escreva uma mensagem"
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
+                  if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
+                }}
+              />
+              {draft.trim() !== '' ? (
+                <button type="submit" className="commentbox__send composer__send" disabled={sending} aria-label="Enviar mensagem" aria-busy={sending || undefined}>
+                  <ArrowUpIcon />
+                </button>
+              ) : (
+                <button type="button" className="commentbox__send composer__send" aria-label="Gravar áudio" onClick={() => {
+                    setProblem(undefined);
+                    setRecording(true);
+                  }}>
+                  <MicIcon />
+                </button>
+              )}
+            </div>
+          )}
         </form>
       ) : (
         <Notice>Vocês não são mais amigos. O histórico continua aqui, mas não dá para enviar novas mensagens.</Notice>

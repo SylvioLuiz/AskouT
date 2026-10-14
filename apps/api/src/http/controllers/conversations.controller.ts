@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put, Query, StreamableFile } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
@@ -38,7 +38,16 @@ export class ConversationsController {
   @Post(':id/messages')
   send(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.conversations.send(actor.userId, id, { body: b.body, suggestion: b.suggestion, eventId: b.eventId });
+    return this.core.conversations.send(actor.userId, id, { body: b.body, suggestion: b.suggestion, eventId: b.eventId, audio: b.audio, audioMs: b.audioMs });
+  }
+
+  /** Áudio de uma mensagem de voz. Exige o token (só quem está na conversa): o app baixa e toca a partir de um blob. */
+  @Get(':id/messages/:messageId/audio')
+  @Header('Cache-Control', 'private, max-age=86400')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async audio(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Param('messageId', new ParseUUIDPipe()) messageId: string) {
+    const found = await this.core.conversations.audio(actor.userId, id, messageId);
+    return new StreamableFile(found.data, { type: found.mime });
   }
 
   /** Quem recebeu o cartão aceita ou recusa o lugar (`{action: 'accept' | 'decline'}`). */
