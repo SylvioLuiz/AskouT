@@ -27,7 +27,7 @@ Nada acima é simulado: o que consta como implementado roda e tem teste. O que c
     npm run dev:all             # na raiz: confere o Postgres (abre o Postgres.app se preciso), libera as portas 3000/5173, sobe API e web
     npm run dev:all -- --https  # igual, com https para testar a localização no celular
 
-No Mac também dá para dar dois cliques em `scripts/AskouT.command`. A saída da API vai para `~/askout-api.log`, que o `npm run smoke` lê. Banco, API e app rodam na sua máquina, então cair a internet não derruba nada (só os tiles do mapa precisam dela). Este script foi verificado só até a checagem do Postgres; a subida completa ainda precisa ser confirmada no seu Mac.
+No Mac também dá para dar dois cliques em `scripts/AskouT.command`: ele confere o GitHub e, se houver novidade, roda o `npm run update` antes de subir (sem internet, sobe direto com o que já está aí). A saída da API vai para `~/askout-api.log`, que o `npm run smoke` lê. Banco, API e app rodam na sua máquina, então cair a internet não derruba nada (só os tiles do mapa precisam dela). Este script foi verificado só até a checagem do Postgres; a subida completa ainda precisa ser confirmada no seu Mac.
 
 ## Rodar os testes
 
