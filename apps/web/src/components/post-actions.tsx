@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sheet } from './agenda.tsx';
 import { CropEditor } from './crop.tsx';
-import { CropIcon } from './icons.tsx';
+import { ArrowUpIcon, CropIcon } from './icons.tsx';
 import { Avatar, Button, Confirm, ErrorState, Field, GroupAvatar, Loading, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
@@ -220,7 +220,7 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
     <Sheet title="Comentários" onClose={onClose}>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {!loaded ? <Loading /> : null}
-      {loaded && items.length === 0 && !error ? <p className="muted">Ainda não há comentários. Seja o primeiro.</p> : null}
+      {loaded && items.length === 0 && !error ? <p className="comments__empty">Ainda não há nenhum comentário.</p> : null}
       <ul className="comments">
         {items.map((c) => (
           <CommentRow key={c.id} comment={c} busy={deleting === c.id} onDelete={() => void remove(c)} />
@@ -239,10 +239,17 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
           void send();
         }}
       >
-        <Field label="Escreva um comentário" value={text} onChange={setText} maxLength={520} />
-        <Button type="submit" loading={busy} disabled={text.trim() === ''}>
-          Publicar
-        </Button>
+        <label className="visually-hidden" htmlFor="comment-input">
+          Escreva um comentário
+        </label>
+        <div className="commentbox">
+          <input id="comment-input" className="commentbox__input" value={text} onChange={(event) => setText(event.target.value)} maxLength={520} placeholder="Escreva um comentário" autoComplete="off" enterKeyHint="send" />
+          {text.trim() !== '' ? (
+            <button type="submit" className="commentbox__send" disabled={busy} aria-label="Publicar comentário" aria-busy={busy || undefined}>
+              <ArrowUpIcon />
+            </button>
+          ) : null}
+        </div>
       </form>
     </Sheet>
   );

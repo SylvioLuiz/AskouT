@@ -175,3 +175,10 @@ export const InfoIcon = () => (
     <path d="M12 7.6h.01" />
   </svg>
 );
+
+export const ArrowUpIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <path d="M12 19V5" />
+    <path d="m6 11 6-6 6 6" />
+  </svg>
+);

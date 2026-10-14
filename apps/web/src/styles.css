@@ -3193,7 +3193,13 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .comment__name { font-weight: 700; color: var(--ink); text-decoration: none; }
 .comment__text { overflow-wrap: anywhere; white-space: pre-wrap; }
 .comment__del { flex: none; font-size: 0.8125rem; }
-.comments__form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.comments__form { margin-top: 8px; }
+.comments__empty { margin: 8px 0 16px; text-align: center; color: var(--muted); }
+.commentbox { position: relative; display: flex; align-items: center; }
+.commentbox__input { width: 100%; min-height: 48px; padding: 0 52px 0 16px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; }
+.commentbox__input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.commentbox__send { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: var(--brand); color: var(--brand-ink); cursor: pointer; }
+.commentbox__send:disabled { opacity: 0.6; }
 
 /* Roleta de duração do Flash (estilo relógio do iPhone) */
 .wheels { position: relative; isolation: isolate; display: flex; justify-content: center; gap: 8px; margin: 4px 0; }
