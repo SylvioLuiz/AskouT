@@ -3171,3 +3171,24 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .compose__stage { position: relative; }
 .stage__crop { position: absolute; left: 8px; bottom: 8px; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: rgb(0 0 0 / 0.6); color: #fff; cursor: pointer; }
 .stage__crop .icon { width: 20px; height: 20px; }
+
+/* Ações do post: menu ⋯, curtir, comentar, compartilhar */
+.post__more { flex: none; }
+.post__actions { display: flex; align-items: center; gap: 18px; padding: 2px 2px; }
+.post__action { display: inline-flex; align-items: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--ink); font-weight: 700; font-size: 0.9375rem; cursor: pointer; }
+.post__action .icon { width: 26px; height: 26px; }
+.post__action--on { color: #e0245e; }
+.sharelist__item--danger strong { color: var(--danger); }
+.inlineicon { display: inline-flex; vertical-align: middle; }
+.inlineicon .icon { width: 18px; height: 18px; }
+.reasons { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.reasons__item { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); cursor: pointer; }
+.reasons__item--on { border-color: var(--brand); background: var(--brand-soft); }
+.comments { display: flex; flex-direction: column; gap: 14px; margin: 0 0 12px; padding: 0; list-style: none; }
+.comment { display: flex; gap: 10px; align-items: flex-start; }
+.comment__body { flex: 1; min-width: 0; }
+.comment__body p { margin: 0; }
+.comment__name { font-weight: 700; color: var(--ink); text-decoration: none; }
+.comment__text { overflow-wrap: anywhere; white-space: pre-wrap; }
+.comment__del { flex: none; font-size: 0.8125rem; }
+.comments__form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }

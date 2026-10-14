@@ -25,7 +25,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -839,11 +839,21 @@ export class InMemoryPostRepository implements PostRepository {
 
   readonly tags = new Map<string, PostTagRecord>();
 
-  private visibleFor(authorIds: string[], taggedIds: string[]): PostRecord[] {
+  readonly hidden = new Set<string>();
+  readonly likes = new Map<string, Date>();
+  readonly comments = new Map<string, PostCommentRecord>();
+  readonly reports = new Map<string, PostReportRecord>();
+
+  private visibleFor(authorIds: string[], taggedIds: string[], scope: PostScope = {}): PostRecord[] {
     const authors = new Set(authorIds);
     const tagged = new Set(taggedIds);
     const viaTag = new Set([...this.tags.values()].filter((t) => t.status === 'ACCEPTED' && tagged.has(t.userId)).map((t) => t.postId));
-    return [...this.posts.values()].filter((p) => authors.has(p.authorId) || viaTag.has(p.id));
+    return [...this.posts.values()].filter(
+      (p) =>
+        (authors.has(p.authorId) || viaTag.has(p.id)) &&
+        (scope.archived ? p.archivedAt !== null : p.archivedAt === null) &&
+        !(scope.hideFor && this.hidden.has(`${p.id}|${scope.hideFor}`)),
+    );
   }
 
   private newestFirst(posts: PostRecord[]): PostRecord[] {
@@ -854,8 +864,8 @@ export class InMemoryPostRepository implements PostRepository {
     return only === undefined || (only === 'EVENT') === (p.eventTitle !== null);
   }
 
-  async listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter): Promise<PostWithImages[]> {
-    return this.newestFirst(this.visibleFor(authorIds, taggedIds).filter((p) => InMemoryPostRepository.matches(p, only)))
+  async listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter, scope?: PostScope): Promise<PostWithImages[]> {
+    return this.newestFirst(this.visibleFor(authorIds, taggedIds, scope).filter((p) => InMemoryPostRepository.matches(p, only)))
       .slice(page.offset, page.offset + page.limit)
       .map((p) => this.withImages(p));
   }
@@ -896,7 +906,89 @@ export class InMemoryPostRepository implements PostRepository {
     this.posts.delete(postId);
     for (const [key, t] of this.tags) if (t.postId === postId) this.tags.delete(key);
     for (const [id, i] of this.images) if (i.postId === postId) this.images.delete(id);
+    for (const key of [...this.likes.keys()]) if (key.startsWith(`${postId}|`)) this.likes.delete(key);
+    for (const [id, c] of this.comments) if (c.postId === postId) this.comments.delete(id);
+    for (const [key, r] of this.reports) if (r.postId === postId) this.reports.delete(key);
+    for (const key of [...this.hidden]) if (key.startsWith(`${postId}|`)) this.hidden.delete(key);
     return true;
+  }
+
+  async update(postId: string, authorId: string, patch: PostPatch): Promise<boolean> {
+    const post = this.posts.get(postId);
+    if (!post || post.authorId !== authorId) return false;
+    Object.assign(post, patch);
+    return true;
+  }
+
+  async setArchived(postId: string, authorId: string, at: Date | null): Promise<boolean> {
+    const post = this.posts.get(postId);
+    if (!post || post.authorId !== authorId) return false;
+    post.archivedAt = at;
+    return true;
+  }
+
+  async listArchived(authorId: string, page: Page): Promise<PostWithImages[]> {
+    return this.newestFirst([...this.posts.values()].filter((p) => p.authorId === authorId && p.archivedAt !== null))
+      .slice(page.offset, page.offset + page.limit)
+      .map((p) => this.withImages(p));
+  }
+
+  async replaceImage(postId: string, imageId: string, newId: string, mime: string, data: Uint8Array): Promise<boolean> {
+    const image = this.images.get(imageId);
+    if (!image || image.postId !== postId || image.data === null) return false;
+    this.images.delete(imageId);
+    this.images.set(newId, { ...image, id: newId, mime, data: new Uint8Array(data) });
+    return true;
+  }
+
+  async hide(postId: string, userId: string): Promise<void> {
+    this.hidden.add(`${postId}|${userId}`);
+  }
+
+  async like(postId: string, userId: string, at: Date): Promise<void> {
+    const key = `${postId}|${userId}`;
+    if (!this.likes.has(key)) this.likes.set(key, at);
+  }
+
+  async unlike(postId: string, userId: string): Promise<void> {
+    this.likes.delete(`${postId}|${userId}`);
+  }
+
+  async likeStats(postIds: string[], viewerId: string): Promise<{ postId: string; count: number; liked: boolean }[]> {
+    return postIds.map((postId) => ({
+      postId,
+      count: [...this.likes.keys()].filter((k) => k.startsWith(`${postId}|`)).length,
+      liked: this.likes.has(`${postId}|${viewerId}`),
+    }));
+  }
+
+  async addComment(comment: PostCommentRecord): Promise<void> {
+    this.comments.set(comment.id, { ...comment });
+  }
+
+  async findComment(id: string): Promise<PostCommentRecord | undefined> {
+    const c = this.comments.get(id);
+    return c ? { ...c } : undefined;
+  }
+
+  async listComments(postId: string, page: Page): Promise<PostCommentRecord[]> {
+    return [...this.comments.values()]
+      .filter((c) => c.postId === postId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .slice(page.offset, page.offset + page.limit)
+      .map((c) => ({ ...c }));
+  }
+
+  async deleteComment(id: string): Promise<void> {
+    this.comments.delete(id);
+  }
+
+  async commentCounts(postIds: string[]): Promise<{ postId: string; count: number }[]> {
+    return postIds.map((postId) => ({ postId, count: [...this.comments.values()].filter((c) => c.postId === postId).length }));
+  }
+
+  async report(report: PostReportRecord): Promise<void> {
+    this.reports.set(`${report.postId}|${report.reporterId}`, { ...report });
   }
 
   async findImage(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {

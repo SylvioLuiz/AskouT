@@ -190,6 +190,15 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 - Rotas: `POST /posts`, `GET /posts/feed`, `GET /posts/pending-tags`, `GET/DELETE /posts/:id`, `POST /posts/:id/tag` (`{action: 'accept'|'decline'}`), `GET /profiles/:usuario/posts`, `GET /posts/images/:id` (pública, como a foto de perfil; o id é aleatório).
 - Limites honestos: **o navegador não deixa um site listar a galeria do celular sozinho** (só pelo seletor do sistema); a galeria aberta direto no app, como no Instagram, só vem com o app nativo (Capacitor). O corpo JSON da API passou de 100 KB para 1 MB (cada foto chega em base64). Fotos no banco, sem armazenamento de arquivos nem moderação. A referência da foto do Google pode expirar (a foto então aparece como "indisponível"). Não há curtir, comentar, editar post nem reordenar fotos ainda. O Postgres só é exercitado na sua máquina (`AskouT.command` aplica as migrações `20261017120000_posts` e `20261018120000_post_tags` e o `009_post_constraints.sql`).
 
+### Menu ⋯ e ações do post
+
+- Todo post tem, embaixo, **Curtir, Comentar e Compartilhar**. Curtidas e comentários avisam o autor (sino).
+- Menu ⋯ em post de outra pessoa: **Denunciar** (motivo + detalhes, guardado em `PostReport` para o futuro painel admin) e **Não tenho interesse** (o post some só do seu feed).
+- Menu ⋯ no seu post: **Excluir, Editar** (legenda, lugar, evento), **Ajustar** (`<>`, recorta de novo a foto enviada; a foto ganha endereço novo para não aparecer a versão antiga em cache) e **Arquivar** (some do feed e do perfil; fica em `/arquivados`, menu do perfil).
+- Compartilhar envia o link do post por conversa ou pelo compartilhamento nativo do aparelho (sem cartão rico no chat).
+- Migração `20261020120000_post_engagement` + acréscimos em `prisma/sql/009_post_constraints.sql`; o `AskouT.command` aplica sozinho.
+- Limites: só testado em memória aqui; a versão Postgres/Prisma e o `smoke.mjs` rodam no seu Mac; arrastar o recorte no celular real ainda não foi testado; denúncias só são guardadas (sem tela de análise ainda).
+
 ## App web (`apps/web`)
 
 React 19 + Vite 7 + TypeScript. Telas: entrar, criar conta (2 passos com código por e-mail), Home (amigos), Explorar (busca), Atividades (pedidos para seguir), perfil de outras pessoas (seguir, pedir, deixar de seguir, bloquear), Meu perfil (editar, privacidade), Amigos, Bloqueados. Agenda (faixa de 28 dias, folha "Marcar horário", agenda do amigo) e "Encontrar melhor data" (escolher amigos, período, duração e horário de início). Flash (raio no topo e botão grande na Home): ligar por 1/2/3 h, mapa na tela do Flash com você e os amigos que aceitaram sair com você, livres agora, convidar, aceitar/recusar, encontro com mapa, distância e bloquear. Conversas: lista com não lidas e chat 1 a 1 entre amigos; ao aceitar um convite do Flash a conversa abre, com o botão "Sugerir um lugar" (mini carrossel de eventos e lugares perto do ponto médio entre os dois).

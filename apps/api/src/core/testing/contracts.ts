@@ -1034,7 +1034,7 @@ export function defineRepositoryContract(
         const mk = (authorId: string, n: number, id = randomUUID()) => {
           const postId = id;
           return {
-            post: { id: postId, authorId, caption: n === 1 ? null : `legenda ${n}`, placeName: null, placeAddress: null, eventTitle: null, eventStartsAt: null, eventEndsAt: null, createdAt: at(n) },
+            post: { id: postId, authorId, caption: n === 1 ? null : `legenda ${n}`, placeName: null, placeAddress: null, eventTitle: null, eventStartsAt: null, eventEndsAt: null, archivedAt: null, editedAt: null, createdAt: at(n) },
             images: [
               { id: randomUUID(), postId, position: 0, mime: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff, n]), placePhotoRef: null, placePhotoAuthor: null },
               { id: randomUUID(), postId, position: 1, mime: null, data: null, placePhotoRef: 'places/x/photos/y', placePhotoAuthor: 'Maria' },
@@ -1075,6 +1075,75 @@ export function defineRepositoryContract(
         assert.equal(await h.posts.delete(p1.post.id, ana), false);
         assert.equal(await h.posts.findImage(p1.images[0]!.id), undefined, 'as fotos vão junto');
         assert.equal(await h.posts.countFor(ana), 1);
+      });
+
+      it('posts: curtir, comentar, denunciar, esconder, editar, ajustar foto e arquivar', async () => {
+        const { ana, bia } = await setup();
+        const postId = randomUUID();
+        const imgId = randomUUID();
+        const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]);
+        await h.posts.create(
+          { id: postId, authorId: ana, caption: 'a', placeName: null, placeAddress: null, eventTitle: null, eventStartsAt: null, eventEndsAt: null, archivedAt: null, editedAt: null, createdAt: at(1) },
+          [{ id: imgId, postId, position: 0, mime: 'image/jpeg', data: jpeg, placePhotoRef: null, placePhotoAuthor: null }],
+        );
+        const page = { limit: 10, offset: 0 };
+        // curtidas
+        await h.posts.like(postId, bia, at(2));
+        await h.posts.like(postId, bia, at(3));
+        await h.posts.like(postId, ana, at(4));
+        assert.deepEqual(await h.posts.likeStats([postId], bia), [{ postId, count: 2, liked: true }]);
+        await h.posts.unlike(postId, bia);
+        assert.deepEqual(await h.posts.likeStats([postId], bia), [{ postId, count: 1, liked: false }]);
+        // comentários
+        const c1 = { id: randomUUID(), postId, authorId: bia, body: 'primeiro', createdAt: at(5) };
+        const c2 = { id: randomUUID(), postId, authorId: ana, body: 'segundo', createdAt: at(6) };
+        await h.posts.addComment(c2);
+        await h.posts.addComment(c1);
+        assert.deepEqual((await h.posts.listComments(postId, page)).map((c) => c.body), ['primeiro', 'segundo'], 'mais antigo primeiro');
+        assert.deepEqual((await h.posts.listComments(postId, { limit: 1, offset: 1 })).map((c) => c.body), ['segundo']);
+        assert.equal((await h.posts.findComment(c1.id))?.authorId, bia);
+        assert.deepEqual(await h.posts.commentCounts([postId]), [{ postId, count: 2 }]);
+        await h.posts.deleteComment(c1.id);
+        assert.equal(await h.posts.findComment(c1.id), undefined);
+        // denúncia: uma por pessoa
+        await h.posts.report({ id: randomUUID(), postId, reporterId: bia, reason: 'SPAM', details: null, createdAt: at(7) });
+        await h.posts.report({ id: randomUUID(), postId, reporterId: bia, reason: 'OTHER', details: 'x', createdAt: at(8) });
+        // "não tenho interesse"
+        assert.equal((await h.posts.listFor([ana], [], page, undefined, { hideFor: bia })).length, 1);
+        await h.posts.hide(postId, bia);
+        await h.posts.hide(postId, bia);
+        assert.equal((await h.posts.listFor([ana], [], page, undefined, { hideFor: bia })).length, 0, 'some para quem escondeu');
+        assert.equal((await h.posts.listFor([ana], [], page, undefined, { hideFor: ana })).length, 1, 'e só para ela');
+        assert.equal((await h.posts.listFor([ana], [], page)).length, 1, 'perfil sem filtro de escondidos');
+        // editar
+        const patch = { caption: 'novo', placeName: 'Bar', placeAddress: null, eventTitle: 'Show', eventStartsAt: at(30), eventEndsAt: at(40), editedAt: at(9) };
+        assert.equal(await h.posts.update(postId, bia, patch), false, 'só o autor edita');
+        assert.equal(await h.posts.update(postId, ana, patch), true);
+        const edited = (await h.posts.findById(postId))!.post;
+        assert.deepEqual([edited.caption, edited.placeName, edited.eventTitle, edited.editedAt?.getTime()], ['novo', 'Bar', 'Show', at(9).getTime()]);
+        // ajustar foto
+        assert.equal(await h.posts.replaceImage(postId, randomUUID(), randomUUID(), 'image/jpeg', jpeg), false);
+        assert.equal(await h.posts.replaceImage(randomUUID(), imgId, randomUUID(), 'image/jpeg', jpeg), false, 'foto de outro post não vale');
+        const newImg = randomUUID();
+        assert.equal(await h.posts.replaceImage(postId, imgId, newImg, 'image/png', new Uint8Array([9, 9, 9])), true);
+        assert.equal(await h.posts.findImage(imgId), undefined, 'o endereço antigo deixa de existir');
+        const swapped = (await h.posts.findImage(newImg))!;
+        assert.deepEqual([swapped.mime, Array.from(swapped.data)], ['image/png', [9, 9, 9]]);
+        assert.deepEqual((await h.posts.findById(postId))!.images.map((i) => i.id), [newImg], 'continua na mesma posição');
+        // arquivar
+        assert.equal(await h.posts.setArchived(postId, bia, at(10)), false, 'só o autor arquiva');
+        assert.equal(await h.posts.setArchived(postId, ana, at(10)), true);
+        assert.equal((await h.posts.listFor([ana], [], page)).length, 0, 'arquivado sai das listas');
+        assert.equal(await h.posts.countFor(ana), 0);
+        assert.deepEqual((await h.posts.listArchived(ana, page)).map((r) => r.post.id), [postId]);
+        assert.equal((await h.posts.listArchived(bia, page)).length, 0);
+        assert.equal((await h.posts.listFor([ana], [], page, undefined, { archived: true })).length, 1);
+        assert.equal(await h.posts.setArchived(postId, ana, null), true);
+        assert.equal(await h.posts.countFor(ana), 1);
+        // apagar leva tudo junto
+        assert.equal(await h.posts.delete(postId, ana), true);
+        assert.deepEqual(await h.posts.commentCounts([postId]), [{ postId, count: 0 }]);
+        assert.deepEqual(await h.posts.likeStats([postId], ana), [{ postId, count: 0, liked: false }]);
       });
 
       it('mensagem de evento guarda o evento; encontros do usuário listados do mais recente', async () => {

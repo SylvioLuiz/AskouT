@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { CarouselIcon } from './icons.tsx';
-import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading } from './ui.tsx';
+import { CarouselIcon, CommentIcon, HeartIcon, MoreIcon, SendIcon } from './icons.tsx';
+import { AdjustSheet, CommentsSheet, EditPostSheet, PostMenuSheet, ReportSheet, SharePostSheet } from './post-actions.tsx';
+import type { PostGone } from './post-actions.tsx';
+import { Avatar, Button, EmptyState, ErrorState, Loading } from './ui.tsx';
 import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ApiError } from '../lib/errors.ts';
@@ -93,12 +95,15 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
   );
 }
 
-export function PostCard({ post, onDeleted, asEvent }: { post: PostView; onDeleted?: (id: string) => void; asEvent?: boolean }) {
-  const [confirming, setConfirming] = useState(false);
+export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean }) {
+  const [post, setPost] = useState(initial);
+  const [sheet, setSheet] = useState<'menu' | 'edit' | 'adjust' | 'report' | 'comments' | 'share' | undefined>();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
-  const [myTag, setMyTag] = useState(post.myTag);
+  const [myTag, setMyTag] = useState(initial.myTag);
   const [tagBusy, setTagBusy] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
+
   async function answerTag(action: 'accept' | 'decline') {
     setTagBusy(true);
     setProblem(undefined);
@@ -111,17 +116,56 @@ export function PostCard({ post, onDeleted, asEvent }: { post: PostView; onDelet
       setTagBusy(false);
     }
   }
-  async function remove() {
+
+  async function run(action: () => Promise<unknown>, why: PostGone) {
     setBusy(true);
     setProblem(undefined);
     try {
-      await api.deletePost(post.id);
-      onDeleted?.(post.id);
+      await action();
+      setSheet(undefined);
+      onGone?.(post.id, why);
     } catch (failure) {
       setProblem(toApiError(failure).message);
+      setSheet(undefined);
+    } finally {
       setBusy(false);
     }
   }
+
+  async function toggleArchive() {
+    if (!post.archived) return run(() => api.archivePost(post.id), 'archived');
+    setBusy(true);
+    try {
+      await api.unarchivePost(post.id);
+      setPost({ ...post, archived: false });
+      setSheet(undefined);
+      onGone?.(post.id, 'archived');
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      setSheet(undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleLike() {
+    if (likeBusy) return;
+    const was = post.likedByMe;
+    setPost({ ...post, likedByMe: !was, likeCount: Math.max(0, post.likeCount + (was ? -1 : 1)) });
+    setLikeBusy(true);
+    setProblem(undefined);
+    try {
+      const result = was ? await api.unlikePost(post.id) : await api.likePost(post.id);
+      setPost((current) => ({ ...current, likedByMe: result.liked, likeCount: result.likeCount }));
+    } catch (failure) {
+      setPost((current) => ({ ...current, likedByMe: was, likeCount: Math.max(0, current.likeCount + (was ? 1 : -1)) }));
+      setProblem(toApiError(failure).message);
+    } finally {
+      setLikeBusy(false);
+    }
+  }
+
+  const eventCard = post.event && asEvent;
   return (
     <article className="post">
       <header className="post__head">
@@ -131,14 +175,13 @@ export function PostCard({ post, onDeleted, asEvent }: { post: PostView; onDelet
         </Link>
         <Link to={`/posts/${encodeURIComponent(post.id)}`} className="post__when">
           {timeAgo(post.createdAt, new Date())}
+          {post.edited ? ' · editado' : ''}
         </Link>
-        {post.mine ? (
-          <Button variant="quiet" small onClick={() => setConfirming(!confirming)} aria-expanded={confirming}>
-            Apagar
-          </Button>
-        ) : null}
+        <button type="button" className="iconbtn post__more" onClick={() => setSheet('menu')} aria-label="Mais opções do post" aria-haspopup="dialog">
+          <MoreIcon />
+        </button>
       </header>
-      {confirming ? <Confirm danger question="Apagar este post? As fotos e a legenda são removidas." confirmLabel="Apagar" busy={busy} onCancel={() => setConfirming(false)} onConfirm={remove} /> : null}
+      {post.archived ? <p className="muted">Arquivado: só você vê este post.</p> : null}
       {problem ? <p className="field__error">{problem}</p> : null}
       {myTag === 'PENDING' ? (
         <div className="callout">
@@ -163,15 +206,28 @@ export function PostCard({ post, onDeleted, asEvent }: { post: PostView; onDelet
           </button>
         </p>
       ) : null}
-      {post.event && asEvent ? <EventPostCard post={post} event={post.event} /> : null}
-      {post.event && !asEvent ? (
+      {post.event && eventCard ? <EventPostCard post={post} event={post.event} /> : null}
+      {post.event && !eventCard ? (
         <p className="post__event">
           <span className="post__eventbadge">Evento</span> <strong>{post.event.title}</strong>
           <span className="muted"> · {eventWhen(post.event.startsAt)}</span>
         </p>
       ) : null}
-      {post.event && asEvent ? null : <Carousel images={post.images} />}
-      {post.placeName && !(post.event && asEvent) ? (
+      {eventCard ? null : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} />}
+      <div className="post__actions" role="group" aria-label="Ações do post">
+        <button type="button" className={`post__action${post.likedByMe ? ' post__action--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
+          <HeartIcon filled={post.likedByMe} />
+          <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
+        </button>
+        <button type="button" className="post__action" onClick={() => setSheet('comments')} aria-label={post.commentCount > 0 ? `Comentários (${post.commentCount})` : 'Comentar'}>
+          <CommentIcon />
+          <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
+        </button>
+        <button type="button" className="post__action" onClick={() => setSheet('share')} aria-label="Compartilhar">
+          <SendIcon />
+        </button>
+      </div>
+      {post.placeName && !eventCard ? (
         <p className="post__place">
           <strong>{post.placeName}</strong>
           {post.placeAddress ? <span> · {post.placeAddress}</span> : null}
@@ -190,6 +246,43 @@ export function PostCard({ post, onDeleted, asEvent }: { post: PostView; onDelet
         </p>
       ) : null}
       {post.caption ? <p className="post__caption">{post.caption}</p> : null}
+
+      {sheet === 'menu' ? (
+        <PostMenuSheet
+          post={post}
+          busy={busy}
+          onClose={() => setSheet(undefined)}
+          onEdit={() => setSheet('edit')}
+          onAdjust={() => setSheet('adjust')}
+          onReport={() => setSheet('report')}
+          onArchiveToggle={() => void toggleArchive()}
+          onNotInterested={() => void run(() => api.notInterested(post.id), 'hidden')}
+          onDelete={() => void run(() => api.deletePost(post.id), 'deleted')}
+        />
+      ) : null}
+      {sheet === 'edit' ? (
+        <EditPostSheet
+          post={post}
+          onClose={() => setSheet(undefined)}
+          onSaved={(updated) => {
+            setPost(updated);
+            setSheet(undefined);
+          }}
+        />
+      ) : null}
+      {sheet === 'adjust' ? (
+        <AdjustSheet
+          post={post}
+          onClose={() => setSheet(undefined)}
+          onSaved={(updated) => {
+            setPost(updated);
+            setSheet(undefined);
+          }}
+        />
+      ) : null}
+      {sheet === 'report' ? <ReportSheet postId={post.id} onClose={() => setSheet(undefined)} onDone={() => { setSheet(undefined); onGone?.(post.id, 'hidden'); }} /> : null}
+      {sheet === 'comments' ? <CommentsSheet postId={post.id} onClose={() => setSheet(undefined)} onCountChange={(delta) => setPost((current) => ({ ...current, commentCount: Math.max(0, current.commentCount + delta) }))} /> : null}
+      {sheet === 'share' ? <SharePostSheet post={post} onClose={() => setSheet(undefined)} /> : null}
     </article>
   );
 }
@@ -225,7 +318,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey }: { load: (of
   return (
     <div className="postlist">
       {items.map((post) => (
-        <PostCard key={post.id} post={post} asEvent onDeleted={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
+        <PostCard key={post.id} post={post} asEvent onGone={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
       ))}
       {error ? <ErrorState message={error.message} onRetry={() => void more(items.length)} /> : null}
       {page.hasMore ? (

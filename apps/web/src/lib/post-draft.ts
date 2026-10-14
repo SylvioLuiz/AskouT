@@ -62,6 +62,14 @@ export function localToIso(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
+/** ISO para o valor de <input type="datetime-local"> (hora do aparelho). */
+export function isoToLocalInput(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** O que falta para publicar como evento (null = tudo certo). */
 export function eventProblem(event: EventDraft, place: LinkedPlace | null, now: Date): string | null {
   if (!event.title.trim()) return 'Dê um nome ao evento.';

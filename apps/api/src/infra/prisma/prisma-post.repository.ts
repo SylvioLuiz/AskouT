@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type { PostRepository } from '../../core/ports.ts';
-import type { Page, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages } from '../../core/types.ts';
+import type { Page, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 export class PrismaPostRepository implements PostRepository {
@@ -21,6 +21,8 @@ export class PrismaPostRepository implements PostRepository {
         eventTitle: post.eventTitle,
         eventStartsAt: post.eventStartsAt,
         eventEndsAt: post.eventEndsAt,
+        archivedAt: post.archivedAt,
+        editedAt: post.editedAt,
         createdAt: post.createdAt,
         images: {
           create: images.map((i) => ({
@@ -45,11 +47,13 @@ export class PrismaPostRepository implements PostRepository {
     eventTitle: string | null;
     eventStartsAt: Date | null;
     eventEndsAt: Date | null;
+    archivedAt: Date | null;
+    editedAt: Date | null;
     createdAt: Date;
     images: { id: string; position: number; mime: string | null; placePhotoRef: string | null; placePhotoAuthor: string | null }[];
   }): PostWithImages {
     return {
-      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, createdAt: row.createdAt },
+      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, archivedAt: row.archivedAt, editedAt: row.editedAt, createdAt: row.createdAt },
       images: row.images.map((i) => ({ id: i.id, position: i.position, isUpload: i.mime !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor })),
     };
   }
@@ -73,13 +77,20 @@ export class PrismaPostRepository implements PostRepository {
     return only === undefined ? {} : only === 'EVENT' ? { eventTitle: { not: null } } : { eventTitle: null };
   }
 
-  async listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter): Promise<PostWithImages[]> {
+  async listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter, scope: PostScope = {}): Promise<PostWithImages[]> {
     const authors = authorIds.filter(isUuid);
     const tagged = taggedIds.filter(isUuid);
     const or = [...(authors.length > 0 ? [{ authorId: { in: authors } }] : []), ...(tagged.length > 0 ? [PrismaPostRepository.viaTag(tagged)] : [])];
     if (or.length === 0) return [];
     const rows = await this.prisma.post.findMany({
-      where: { AND: [{ OR: or }, PrismaPostRepository.kindWhere(only)] },
+      where: {
+        AND: [
+          { OR: or },
+          PrismaPostRepository.kindWhere(only),
+          scope.archived ? { archivedAt: { not: null } } : { archivedAt: null },
+          ...(scope.hideFor && isUuid(scope.hideFor) ? [{ hiddenBy: { none: { userId: scope.hideFor } } }] : []),
+        ],
+      },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: page.offset,
       take: page.limit,
@@ -90,7 +101,7 @@ export class PrismaPostRepository implements PostRepository {
 
   async countFor(userId: string, only?: PostKindFilter): Promise<number> {
     if (!isUuid(userId)) return 0;
-    return this.prisma.post.count({ where: { AND: [{ OR: [{ authorId: userId }, PrismaPostRepository.viaTag([userId])] }, PrismaPostRepository.kindWhere(only)] } });
+    return this.prisma.post.count({ where: { AND: [{ OR: [{ authorId: userId }, PrismaPostRepository.viaTag([userId])] }, PrismaPostRepository.kindWhere(only), { archivedAt: null }] } });
   }
 
   async createTags(postId: string, userIds: string[], at: Date): Promise<void> {
@@ -115,7 +126,7 @@ export class PrismaPostRepository implements PostRepository {
   async listPendingTags(userId: string, page: Page): Promise<PostWithImages[]> {
     if (!isUuid(userId)) return [];
     const rows = await this.prisma.post.findMany({
-      where: { tags: { some: { userId, status: 'PENDING' } } },
+      where: { tags: { some: { userId, status: 'PENDING' } }, archivedAt: null },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: page.offset,
       take: page.limit,
@@ -128,6 +139,99 @@ export class PrismaPostRepository implements PostRepository {
     if (!isUuid(postId) || !isUuid(authorId)) return false;
     const result = await this.prisma.post.deleteMany({ where: { id: postId, authorId } });
     return result.count > 0;
+  }
+
+  async update(postId: string, authorId: string, patch: PostPatch): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(authorId)) return false;
+    const result = await this.prisma.post.updateMany({ where: { id: postId, authorId }, data: patch });
+    return result.count > 0;
+  }
+
+  async setArchived(postId: string, authorId: string, at: Date | null): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(authorId)) return false;
+    const result = await this.prisma.post.updateMany({ where: { id: postId, authorId }, data: { archivedAt: at } });
+    return result.count > 0;
+  }
+
+  async listArchived(authorId: string, page: Page): Promise<PostWithImages[]> {
+    if (!isUuid(authorId)) return [];
+    const rows = await this.prisma.post.findMany({
+      where: { authorId, archivedAt: { not: null } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: page.offset,
+      take: page.limit,
+      include: PrismaPostRepository.include,
+    });
+    return rows.map(PrismaPostRepository.toView);
+  }
+
+  async replaceImage(postId: string, imageId: string, newId: string, mime: string, data: Uint8Array): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(imageId) || !isUuid(newId)) return false;
+    const result = await this.prisma.postImage.updateMany({ where: { id: imageId, postId, data: { not: null } }, data: { id: newId, mime, data: Buffer.from(data) } });
+    return result.count > 0;
+  }
+
+  async hide(postId: string, userId: string): Promise<void> {
+    if (!isUuid(postId) || !isUuid(userId)) return;
+    await this.prisma.postHidden.createMany({ data: [{ postId, userId }], skipDuplicates: true });
+  }
+
+  async like(postId: string, userId: string, at: Date): Promise<void> {
+    if (!isUuid(postId) || !isUuid(userId)) return;
+    await this.prisma.postLike.createMany({ data: [{ postId, userId, createdAt: at }], skipDuplicates: true });
+  }
+
+  async unlike(postId: string, userId: string): Promise<void> {
+    if (!isUuid(postId) || !isUuid(userId)) return;
+    await this.prisma.postLike.deleteMany({ where: { postId, userId } });
+  }
+
+  async likeStats(postIds: string[], viewerId: string): Promise<{ postId: string; count: number; liked: boolean }[]> {
+    const ids = postIds.filter(isUuid);
+    if (ids.length === 0) return [];
+    const [groups, mine] = await Promise.all([
+      this.prisma.postLike.groupBy({ by: ['postId'], where: { postId: { in: ids } }, _count: { _all: true } }),
+      isUuid(viewerId) ? this.prisma.postLike.findMany({ where: { postId: { in: ids }, userId: viewerId }, select: { postId: true } }) : Promise.resolve([]),
+    ]);
+    const counts = new Map(groups.map((g) => [g.postId, g._count._all]));
+    const liked = new Set(mine.map((m) => m.postId));
+    return ids.map((postId) => ({ postId, count: counts.get(postId) ?? 0, liked: liked.has(postId) }));
+  }
+
+  async addComment(comment: PostCommentRecord): Promise<void> {
+    await this.prisma.postComment.create({ data: { id: comment.id, postId: comment.postId, authorId: comment.authorId, body: comment.body, createdAt: comment.createdAt } });
+  }
+
+  async findComment(id: string): Promise<PostCommentRecord | undefined> {
+    if (!isUuid(id)) return undefined;
+    const row = await this.prisma.postComment.findUnique({ where: { id } });
+    return row ?? undefined;
+  }
+
+  async listComments(postId: string, page: Page): Promise<PostCommentRecord[]> {
+    if (!isUuid(postId)) return [];
+    return this.prisma.postComment.findMany({ where: { postId }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], skip: page.offset, take: page.limit });
+  }
+
+  async deleteComment(id: string): Promise<void> {
+    if (!isUuid(id)) return;
+    await this.prisma.postComment.deleteMany({ where: { id } });
+  }
+
+  async commentCounts(postIds: string[]): Promise<{ postId: string; count: number }[]> {
+    const ids = postIds.filter(isUuid);
+    if (ids.length === 0) return [];
+    const groups = await this.prisma.postComment.groupBy({ by: ['postId'], where: { postId: { in: ids } }, _count: { _all: true } });
+    const counts = new Map(groups.map((g) => [g.postId, g._count._all]));
+    return ids.map((postId) => ({ postId, count: counts.get(postId) ?? 0 }));
+  }
+
+  async report(report: PostReportRecord): Promise<void> {
+    await this.prisma.postReport.upsert({
+      where: { postId_reporterId: { postId: report.postId, reporterId: report.reporterId } },
+      create: { id: report.id, postId: report.postId, reporterId: report.reporterId, reason: report.reason, details: report.details, createdAt: report.createdAt },
+      update: { reason: report.reason, details: report.details },
+    });
   }
 
   async findImage(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {

@@ -121,6 +121,33 @@ export const ShareIcon = () => (
   </Svg>
 );
 
+export const HeartIcon = ({ filled = false }: { filled?: boolean }) => (
+  <svg className="icon" viewBox="0 0 24 24" width="24" height="24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2Z" />
+  </svg>
+);
+
+export const CommentIcon = () => (
+  <Svg>
+    <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5Z" />
+  </Svg>
+);
+
+export const SendIcon = () => (
+  <Svg>
+    <path d="M21 4 10.5 14.5" />
+    <path d="M21 4l-6.5 17-4-6.5L4 10.5Z" />
+  </Svg>
+);
+
+export const MoreIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true" focusable="false">
+    <circle cx="5.5" cy="12" r="1.9" />
+    <circle cx="12" cy="12" r="1.9" />
+    <circle cx="18.5" cy="12" r="1.9" />
+  </svg>
+);
+
 export const CropIcon = () => (
   <Svg>
     <path d="M8 6.5 2.5 12 8 17.5" />

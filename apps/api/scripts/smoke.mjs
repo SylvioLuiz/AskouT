@@ -296,6 +296,17 @@ try {
   check('marcar quem não é amigo: 400', (await call('POST', '/posts', { token: a.token, body: { images: [tinyJpeg], tagUserIds: [c.id] } })).status === 400);
   check('marcado aceita', (await call('POST', `/posts/${tagged.body.id}/tag`, { token: b.token, body: { action: 'accept' } })).body?.status === 'ACCEPTED');
   check('quem não foi marcado não responde: 404', (await call('POST', `/posts/${tagged.body.id}/tag`, { token: c.token, body: { action: 'accept' } })).status === 404);
+  const lk = await call('POST', `/posts/${post.body.id}/like`, { token: b.token });
+  check('amigo curte o post', lk.status === 200 && lk.body?.liked === true && lk.body?.likeCount === 1, lk.body);
+  const cm = await call('POST', `/posts/${post.body.id}/comments`, { token: b.token, body: { body: 'Bora!' } });
+  check('amigo comenta', cm.status === 200 && cm.body?.body === 'Bora!', cm.body);
+  check('lista comentários', (await call('GET', `/posts/${post.body.id}/comments`, { token: a.token })).body?.items?.length === 1);
+  check('não-autor não edita: 403', (await call('PATCH', `/posts/${post.body.id}`, { token: b.token, body: { caption: 'x' } })).status === 403);
+  check('autor edita legenda', (await call('PATCH', `/posts/${post.body.id}`, { token: a.token, body: { caption: 'Editada' } })).body?.edited === true);
+  check('autor arquiva', (await call('POST', `/posts/${post.body.id}/archive`, { token: a.token })).status === 200);
+  check('arquivado some p/ outros: 404', (await call('GET', `/posts/${post.body.id}`, { token: b.token })).status === 404);
+  check('autor desarquiva', (await call('DELETE', `/posts/${post.body.id}/archive`, { token: a.token })).status === 200);
+  check('autor não denuncia o próprio: 403', (await call('POST', `/posts/${post.body.id}/report`, { token: a.token, body: { reason: 'SPAM' } })).status === 403);
   check('outra pessoa não apaga: 404', (await call('DELETE', `/posts/${post.body.id}`, { token: b.token })).status === 404);
   check('autor apaga', (await call('DELETE', `/posts/${post.body.id}`, { token: a.token })).status === 200);
 

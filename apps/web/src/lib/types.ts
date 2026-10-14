@@ -219,7 +219,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE' | 'POST_TAG';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT';
 
 export interface NotificationItem {
   id: string;
@@ -436,6 +436,36 @@ export interface PostView {
   tags: { user: PublicProfile; status: 'PENDING' | 'ACCEPTED' }[];
   /** Sua marcação neste post, se houver. */
   myTag: 'PENDING' | 'ACCEPTED' | 'DECLINED' | null;
+  likeCount: number;
+  likedByMe: boolean;
+  commentCount: number;
+  archived: boolean;
+  edited: boolean;
+}
+
+export interface PostComment {
+  id: string;
+  author: PublicProfile;
+  body: string;
+  createdAt: string;
+  mine: boolean;
+  canDelete: boolean;
+}
+
+export interface PostCommentsPage {
+  items: PostComment[];
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+export type ReportReason = 'SPAM' | 'OFFENSIVE' | 'NUDITY' | 'VIOLENCE' | 'FALSE_INFO' | 'OTHER';
+
+export interface PostEdit {
+  caption?: string | null;
+  placeName?: string | null;
+  placeAddress?: string | null;
+  event?: { title: string; startsAt: string | null; endsAt?: string | null } | null;
 }
 
 export interface PostsPage {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { addImages, buildPostBody, effectivePlace, eventProblem, localToIso } from './post-draft.ts';
+import { addImages, buildPostBody, effectivePlace, eventProblem, isoToLocalInput, localToIso } from './post-draft.ts';
 import type { DraftImage } from './post-draft.ts';
 
 const up = (n: number): DraftImage => ({ key: `u${n}`, kind: 'UPLOAD', preview: 'p', dataUrl: `data:image/jpeg;base64,${n}` });
@@ -54,4 +54,10 @@ it('evento: pede nome, lugar e início no futuro; corpo leva o evento em ISO', (
   assert.equal(body.event?.title, 'Pagode');
   assert.equal(body.event?.startsAt, new Date('2026-10-20T20:00').toISOString());
   assert.equal((buildPostBody([], '', place, []) as { event?: unknown }).event, undefined);
+});
+
+it('data/hora: ida e volta entre ISO e o campo do formulário', () => {
+  assert.equal(isoToLocalInput(new Date('2026-10-20T20:05').toISOString()), '2026-10-20T20:05');
+  assert.equal(localToIso(isoToLocalInput('2026-03-01T09:30:00.000Z')), new Date(new Date('2026-03-01T09:30:00.000Z').setSeconds(0, 0)).toISOString());
+  assert.equal(isoToLocalInput('lixo'), '');
 });

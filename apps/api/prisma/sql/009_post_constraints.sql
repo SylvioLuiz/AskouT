@@ -38,3 +38,15 @@ BEGIN
   END IF;
 END
 $$;
+
+-- Comentário: texto de 1 a 500 caracteres. Denúncia: só motivos conhecidos.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'post_comment_body') THEN
+    ALTER TABLE "PostComment" ADD CONSTRAINT post_comment_body CHECK (char_length("body") BETWEEN 1 AND 500);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'post_report_reason') THEN
+    ALTER TABLE "PostReport" ADD CONSTRAINT post_report_reason CHECK ("reason" IN ('SPAM', 'OFFENSIVE', 'NUDITY', 'VIOLENCE', 'FALSE_INFO', 'OTHER'));
+  END IF;
+END
+$$;

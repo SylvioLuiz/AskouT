@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Delete, Get, Header, HttpCode, Inject, NotFoundException, Param, Post, Query, StreamableFile } from '@nestjs/common';
+import { BadRequestException, Controller, Delete, Get, Header, HttpCode, Inject, NotFoundException, Param, Patch, Post, Put, Query, StreamableFile } from '@nestjs/common';
 import { Body } from '@nestjs/common';
 import type { PlacePhotos } from './places.controller.ts';
 import type { Core } from '../../core/index.ts';
@@ -57,6 +57,13 @@ export class PostsController {
     return this.present(await this.core.posts.create(actor.userId, { caption: b.caption, images, placeName: b.placeName, placeAddress: b.placeAddress, tagUserIds: b.tagUserIds, event: b.event }));
   }
 
+  /** Seus posts arquivados (só você vê). Vem antes de `posts/:id`. */
+  @Get('posts/archived')
+  async archived(@CurrentActor() actor: Actor, @Query('limit') limit?: string, @Query('offset') offset?: string) {
+    const page = await this.core.posts.listArchived(actor.userId, { limit, offset });
+    return { ...page, items: page.items.map((p) => this.present(p)) };
+  }
+
   /** Posts seus e dos seus amigos. */
   @Get('posts/feed')
   async feed(@CurrentActor() actor: Actor, @Query('limit') limit?: string, @Query('offset') offset?: string) {
@@ -97,6 +104,72 @@ export class PostsController {
   @Delete('posts/:id')
   delete(@CurrentActor() actor: Actor, @Param('id') id: string) {
     return this.core.posts.delete(actor.userId, id);
+  }
+
+  /** Edita legenda, lugar e evento: `{caption?, placeName?, placeAddress?, event?}` (só o autor). */
+  @Patch('posts/:id')
+  async edit(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.present(await this.core.posts.update(actor.userId, id, { caption: b.caption, placeName: b.placeName, placeAddress: b.placeAddress, event: b.event }));
+  }
+
+  /** Ajuste de uma foto enviada: `{image: dataUrl}` já recortada pelo app (só o autor). */
+  @Put('posts/:id/images/:imageId')
+  async adjustImage(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('imageId') imageId: string, @Body() body: unknown) {
+    return this.present(await this.core.posts.replaceImage(actor.userId, id, imageId, asBody(body).image));
+  }
+
+  @Post('posts/:id/archive')
+  @HttpCode(200)
+  archive(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.posts.archive(actor.userId, id);
+  }
+
+  @Delete('posts/:id/archive')
+  unarchive(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.posts.unarchive(actor.userId, id);
+  }
+
+  @Post('posts/:id/like')
+  @HttpCode(200)
+  like(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.posts.like(actor.userId, id);
+  }
+
+  @Delete('posts/:id/like')
+  unlike(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.posts.unlike(actor.userId, id);
+  }
+
+  @Get('posts/:id/comments')
+  comments(@CurrentActor() actor: Actor, @Param('id') id: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
+    return this.core.posts.comments(actor.userId, id, { limit, offset });
+  }
+
+  /** `{body}` */
+  @Post('posts/:id/comments')
+  @HttpCode(200)
+  addComment(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.posts.addComment(actor.userId, id, asBody(body).body);
+  }
+
+  @Delete('posts/:id/comments/:commentId')
+  deleteComment(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('commentId') commentId: string) {
+    return this.core.posts.deleteComment(actor.userId, id, commentId);
+  }
+
+  /** `{reason: SPAM|OFFENSIVE|NUDITY|VIOLENCE|FALSE_INFO|OTHER, details?}` */
+  @Post('posts/:id/report')
+  @HttpCode(200)
+  report(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.posts.report(actor.userId, id, b.reason, b.details);
+  }
+
+  @Post('posts/:id/not-interested')
+  @HttpCode(200)
+  notInterested(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.posts.notInterested(actor.userId, id);
   }
 
   /** Posts de uma pessoa (perfil privado só para quem segue). */

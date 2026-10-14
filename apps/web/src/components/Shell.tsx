@@ -97,7 +97,7 @@ export function Shell({ children }: { children: ReactNode }) {
     to: '/perfil',
     label: 'Perfil',
     icon: <UserIcon />,
-    also: ['/amigos', '/bloqueados', '/configuracao', '/privacidade', '/interacoes', '/ajuda', '/tema'],
+    also: ['/amigos', '/bloqueados', '/configuracao', '/privacidade', '/interacoes', '/arquivados', '/ajuda', '/tema'],
   };
 
   return (

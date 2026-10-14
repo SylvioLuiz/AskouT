@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostKindFilter, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -166,7 +166,7 @@ export interface PostRepository {
   create(post: PostRecord, images: PostImageRecord[]): Promise<void>;
   findById(id: string): Promise<PostWithImages | undefined>;
   /** Posts escritos por qualquer um de `authorIds` OU em que alguém de `taggedIds` aceitou a marcação. Mais recentes primeiro. */
-  listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter): Promise<PostWithImages[]>;
+  listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter, scope?: PostScope): Promise<PostWithImages[]>;
   /** Mesma regra de `listFor`, para uma pessoa só (escritos por ela ou em que ela aceitou a marcação). */
   countFor(userId: string, only?: PostKindFilter): Promise<number>;
   createTags(postId: string, userIds: string[], at: Date): Promise<void>;
@@ -177,6 +177,31 @@ export interface PostRepository {
   listPendingTags(userId: string, page: Page): Promise<PostWithImages[]>;
   /** Só apaga se `authorId` é o autor. Devolve false se não existia ou era de outra pessoa. */
   delete(postId: string, authorId: string): Promise<boolean>;
+  /** Troca legenda, lugar e dados do evento. Só o autor. Devolve false se não existe ou é de outra pessoa. */
+  update(postId: string, authorId: string, patch: PostPatch): Promise<boolean>;
+  /** Arquiva (`at`) ou desarquiva (`null`). Só o autor. */
+  setArchived(postId: string, authorId: string, at: Date | null): Promise<boolean>;
+  /** Arquivados do autor, mais recentes primeiro. */
+  listArchived(authorId: string, page: Page): Promise<PostWithImages[]>;
+  /**
+   * Troca os bytes de uma foto enviada do post (ajuste/recorte). A foto ganha um id novo (`newId`) para o endereço dela mudar
+   * e nenhum cache mostrar a versão antiga. Devolve false se a foto não é desse post ou é de lugar.
+   */
+  replaceImage(postId: string, imageId: string, newId: string, mime: string, data: Uint8Array): Promise<boolean>;
+  /** "Não tenho interesse": o post some das listas de `userId` (`listFor` com `scope.hideFor`). */
+  hide(postId: string, userId: string): Promise<void>;
+  like(postId: string, userId: string, at: Date): Promise<void>;
+  unlike(postId: string, userId: string): Promise<void>;
+  /** Curtidas de cada post e se `viewerId` curtiu. */
+  likeStats(postIds: string[], viewerId: string): Promise<{ postId: string; count: number; liked: boolean }[]>;
+  addComment(comment: PostCommentRecord): Promise<void>;
+  findComment(id: string): Promise<PostCommentRecord | undefined>;
+  /** Mais antigos primeiro. */
+  listComments(postId: string, page: Page): Promise<PostCommentRecord[]>;
+  deleteComment(id: string): Promise<void>;
+  commentCounts(postIds: string[]): Promise<{ postId: string; count: number }[]>;
+  /** Uma denúncia por pessoa e post (denunciar de novo troca o motivo). */
+  report(report: PostReportRecord): Promise<void>;
   /** Bytes de uma foto enviada (fotos de lugar não têm bytes). */
   findImage(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
 }

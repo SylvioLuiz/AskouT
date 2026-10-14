@@ -141,6 +141,10 @@ model User {
   photo             ProfilePhoto?
   posts             Post[]
   postTags          PostTag[]
+  postLikes         PostLike[]    @relation("PostLikes")
+  postComments      PostComment[] @relation("PostComments")
+  postReports       PostReport[]  @relation("PostReports")
+  postHidden        PostHidden[]  @relation("PostHidden")
 }
 
 model Profile {
@@ -533,11 +537,17 @@ model Post {
   eventTitle    String?
   eventStartsAt DateTime?
   eventEndsAt   DateTime?
+  archivedAt    DateTime?
+  editedAt      DateTime?
   createdAt    DateTime @default(now())
 
   author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   images PostImage[]
   tags   PostTag[]
+  likes    PostLike[]
+  comments PostComment[]
+  reports  PostReport[]
+  hiddenBy PostHidden[]
 
   @@index([authorId, createdAt])
 }
@@ -558,6 +568,59 @@ model PostImage {
 }
 
 // Marcação de uma pessoa num post. Só vale no perfil e no feed dela depois que ela aceita.
+model PostLike {
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation("PostLikes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId])
+}
+
+model PostComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @db.Uuid
+  authorId  String   @db.Uuid
+  body      String
+  createdAt DateTime @default(now())
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation("PostComments", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+}
+
+/// Denúncia de post: uma por pessoa e post. Quem revisa é o painel de administração (fase seguinte).
+model PostReport {
+  id         String   @id @default(uuid()) @db.Uuid
+  postId     String   @db.Uuid
+  reporterId String   @db.Uuid
+  reason     String
+  details    String?
+  createdAt  DateTime @default(now())
+
+  post     Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reporter User @relation("PostReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, reporterId])
+  @@index([createdAt])
+}
+
+/// "Não tenho interesse": o post some das listas dessa pessoa.
+model PostHidden {
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation("PostHidden", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+}
+
 model PostTag {
   postId    String   @db.Uuid
   userId    String   @db.Uuid

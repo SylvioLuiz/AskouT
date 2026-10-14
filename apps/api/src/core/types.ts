@@ -272,7 +272,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE' | 'POST_TAG';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT';
 
 /** Aviso guardado para a pessoa. `url` é um caminho dentro do app; `dedupeKey` evita avisos repetidos enquanto o anterior não foi lido. */
 export interface NotificationRecord {
@@ -314,6 +314,9 @@ export interface PostRecord {
   eventTitle: string | null;
   eventStartsAt: Date | null;
   eventEndsAt: Date | null;
+  /** Arquivado: some do feed e do perfil, só a própria pessoa vê. */
+  archivedAt: Date | null;
+  editedAt: Date | null;
   createdAt: Date;
 }
 
@@ -340,6 +343,43 @@ export interface PostImageMeta {
 export interface PostWithImages {
   post: PostRecord;
   images: PostImageMeta[];
+}
+
+export interface PostCommentRecord {
+  id: string;
+  postId: string;
+  authorId: string;
+  body: string;
+  createdAt: Date;
+}
+
+export const POST_REPORT_REASONS = ['SPAM', 'OFFENSIVE', 'NUDITY', 'VIOLENCE', 'FALSE_INFO', 'OTHER'] as const;
+export type PostReportReason = (typeof POST_REPORT_REASONS)[number];
+
+export interface PostReportRecord {
+  id: string;
+  postId: string;
+  reporterId: string;
+  reason: PostReportReason;
+  details: string | null;
+  createdAt: Date;
+}
+
+/** Campos que a edição troca (a pessoa autora é quem edita). */
+export interface PostPatch {
+  caption: string | null;
+  placeName: string | null;
+  placeAddress: string | null;
+  eventTitle: string | null;
+  eventStartsAt: Date | null;
+  eventEndsAt: Date | null;
+  editedAt: Date;
+}
+
+/** Filtros extras das listas: só arquivados, ou sem o que `hideFor` marcou como "não tenho interesse". */
+export interface PostScope {
+  archived?: boolean;
+  hideFor?: string;
 }
 
 /** Só eventos (posts com dados de evento) ou só posts comuns. */

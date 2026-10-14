@@ -189,3 +189,115 @@ test('lista do perfil separa eventos de posts comuns (kind=event|post)', async (
   assert.deepEqual(onlyPosts.items.map((p) => p.id), [plain.id]);
   await rejectsWith(w.core.posts.listByUsername(ana, 'ana', { kind: 'xis' }), 'VALIDATION');
 });
+
+test('curtir: conta, desfaz, avisa o autor uma vez e não vale em post que não dá para ver', async () => {
+  const { w, ana, bia, caio } = await setup();
+  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  assert.deepEqual([post.likeCount, post.likedByMe, post.commentCount], [0, false, 0]);
+  assert.deepEqual(await w.core.posts.like(bia, post.id), { liked: true, likeCount: 1 });
+  assert.deepEqual(await w.core.posts.like(bia, post.id), { liked: true, likeCount: 1 }, 'curtir de novo não duplica');
+  const seen = await w.core.posts.get(bia, post.id);
+  assert.deepEqual([seen.likeCount, seen.likedByMe], [1, true]);
+  assert.equal((await w.core.posts.get(ana, post.id)).likedByMe, false);
+  const news = await w.core.notifications.list(ana);
+  assert.equal(news.items.filter((n) => n.type === 'POST_LIKE').length, 1);
+  assert.deepEqual(await w.core.posts.unlike(bia, post.id), { liked: false, likeCount: 0 });
+  await w.core.posts.like(ana, post.id);
+  assert.equal((await w.core.notifications.list(ana)).items.filter((n) => n.type === 'POST_LIKE').length, 1, 'curtir o próprio post não avisa');
+  await w.core.profiles.setPrivacy(ana, true);
+  await rejectsWith(w.core.posts.like(caio, post.id), 'NOT_FOUND');
+  await rejectsWith(w.core.posts.like(bia, 'nao-existe'), 'NOT_FOUND');
+});
+
+test('comentários: escrever, listar do mais antigo, apagar (autor do comentário ou do post) e avisar', async () => {
+  const { w, ana, bia, caio } = await setup();
+  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const c1 = await w.core.posts.addComment(bia, post.id, '  Que legal!  ');
+  assert.equal(c1.body, 'Que legal!');
+  assert.deepEqual([c1.mine, c1.canDelete], [true, true]);
+  w.clock.tick(1000);
+  const c2 = await w.core.posts.addComment(ana, post.id, 'Valeu');
+  const list = await w.core.posts.comments(ana, post.id);
+  assert.deepEqual(list.items.map((c) => c.body), ['Que legal!', 'Valeu']);
+  assert.deepEqual(list.items.map((c) => [c.mine, c.canDelete]), [[false, true], [true, true]], 'o dono do post pode apagar qualquer um');
+  assert.equal((await w.core.posts.get(ana, post.id)).commentCount, 2);
+  assert.equal((await w.core.notifications.list(ana)).items.filter((n) => n.type === 'POST_COMMENT').length, 1, 'só o comentário de outra pessoa avisa');
+  await rejectsWith(w.core.posts.addComment(bia, post.id, '   '), 'VALIDATION');
+  await rejectsWith(w.core.posts.addComment(bia, post.id, 'x'.repeat(501)), 'VALIDATION');
+  await rejectsWith(w.core.posts.deleteComment(bia, post.id, c2.id), 'FORBIDDEN');
+  await w.core.posts.deleteComment(bia, post.id, c1.id);
+  await w.core.posts.deleteComment(ana, post.id, c2.id);
+  assert.equal((await w.core.posts.comments(ana, post.id)).items.length, 0);
+  await rejectsWith(w.core.posts.deleteComment(ana, post.id, c2.id), 'NOT_FOUND');
+  await w.core.profiles.setPrivacy(ana, true);
+  await rejectsWith(w.core.posts.addComment(caio, post.id, 'oi'), 'NOT_FOUND');
+});
+
+test('denunciar e "não tenho interesse": somem do feed de quem pediu; o próprio post não', async () => {
+  const { w, ana, bia } = await setup();
+  const p1 = await w.core.posts.create(ana, { images: [JPEG()] });
+  w.clock.tick(1000);
+  const p2 = await w.core.posts.create(ana, { images: [JPEG()] });
+  assert.equal((await w.core.posts.feed(bia)).items.length, 2);
+  await w.core.posts.notInterested(bia, p1.id);
+  assert.deepEqual((await w.core.posts.feed(bia)).items.map((p) => p.id), [p2.id]);
+  assert.equal((await w.core.posts.feed(ana)).items.length, 2, 'não afeta quem publicou');
+  assert.equal((await w.core.posts.listByUsername(bia, 'ana')).items.length, 2, 'o perfil continua mostrando');
+  await rejectsWith(w.core.posts.report(bia, p2.id, 'NADA'), 'VALIDATION');
+  await rejectsWith(w.core.posts.report(ana, p2.id, 'SPAM'), 'FORBIDDEN');
+  await rejectsWith(w.core.posts.notInterested(ana, p2.id), 'FORBIDDEN');
+  assert.deepEqual(await w.core.posts.report(bia, p2.id, 'SPAM', 'propaganda'), { reported: true });
+  assert.deepEqual(await w.core.posts.report(bia, p2.id, 'OFFENSIVE'), { reported: true }, 'denunciar de novo troca o motivo');
+  assert.equal((await w.core.posts.feed(bia)).items.length, 0, 'denunciado também some');
+});
+
+test('editar: legenda, lugar e evento; só o autor; evento mantém o início se não mudou', async () => {
+  const { w, ana, bia } = await setup();
+  const start = new Date(w.clock.now().getTime() + 24 * 3_600_000).toISOString();
+  const post = await w.core.posts.create(ana, { caption: 'antes', images: [JPEG()], placeName: 'Bar', event: { title: 'Show', startsAt: start } });
+  const edited = await w.core.posts.update(ana, post.id, { caption: 'depois' });
+  assert.deepEqual([edited.caption, edited.edited, edited.event?.title, edited.placeName], ['depois', true, 'Show', 'Bar']);
+  assert.equal((await w.core.posts.update(ana, post.id, { caption: '' })).caption, null, 'vazio limpa');
+  assert.equal((await w.core.posts.update(ana, post.id, { event: { title: 'Show 2', startsAt: start } })).event?.title, 'Show 2');
+  w.clock.tick(48 * 3_600_000);
+  assert.equal((await w.core.posts.update(ana, post.id, { caption: 'já passou' })).event?.title, 'Show 2', 'editar a legenda de um evento que já passou funciona');
+  assert.equal((await w.core.posts.update(ana, post.id, { event: { title: 'Show 3', startsAt: start } })).event?.title, 'Show 3', 'mesmo início, mesmo no passado');
+  await rejectsWith(w.core.posts.update(ana, post.id, { event: { title: 'Outro', startsAt: new Date(w.clock.now().getTime() - 2 * 86_400_000).toISOString() } }), 'VALIDATION');
+  assert.equal((await w.core.posts.update(ana, post.id, { event: null })).event, null, 'tirar o evento vira post comum');
+  await rejectsWith(w.core.posts.update(ana, post.id, { placeName: '', event: { title: 'X', startsAt: new Date(w.clock.now().getTime() + 3_600_000).toISOString() } }), 'VALIDATION');
+  await rejectsWith(w.core.posts.update(bia, post.id, { caption: 'invadi' }), 'FORBIDDEN');
+  await rejectsWith(w.core.posts.update(ana, post.id, { caption: 'x'.repeat(501) }), 'VALIDATION');
+});
+
+test('ajustar foto: troca os bytes de uma foto enviada, só do autor; foto de lugar não', async () => {
+  const { w, ana, bia } = await setup();
+  const post = await w.core.posts.create(ana, { images: [JPEG(3), { placePhotoRef: 'places/x/photos/y' }] });
+  const [up, place] = post.images;
+  const after = await w.core.posts.replaceImage(ana, post.id, up!.id, JPEG(9));
+  assert.equal(after.images.length, 2);
+  assert.notEqual(after.images[0]!.id, up!.id, 'a foto ganha endereço novo (sem cache velho)');
+  assert.equal(await w.core.posts.image(up!.id), undefined);
+  assert.equal((await w.core.posts.image(after.images[0]!.id))!.data.length, 13);
+  assert.equal(after.images[1]!.kind, 'PLACE', 'a ordem se mantém');
+  await rejectsWith(w.core.posts.replaceImage(ana, post.id, place!.id, JPEG()), 'NOT_FOUND');
+  await rejectsWith(w.core.posts.replaceImage(bia, post.id, after.images[0]!.id, JPEG()), 'FORBIDDEN');
+  await rejectsWith(w.core.posts.replaceImage(ana, post.id, after.images[0]!.id, 'data:text/html;base64,PGI+'), 'VALIDATION');
+});
+
+test('arquivar: some do feed, do perfil e para os outros; volta ao desarquivar', async () => {
+  const { w, ana, bia } = await setup();
+  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  await rejectsWith(w.core.posts.archive(bia, post.id), 'FORBIDDEN');
+  assert.deepEqual(await w.core.posts.archive(ana, post.id), { archived: true });
+  assert.equal((await w.core.posts.feed(ana)).items.length, 0);
+  assert.equal((await w.core.posts.feed(bia)).items.length, 0);
+  assert.equal((await w.core.posts.listByUsername(bia, 'ana')).items.length, 0);
+  assert.equal((await w.core.posts.listByUsername(ana, 'ana')).total, 0);
+  await rejectsWith(w.core.posts.get(bia, post.id), 'NOT_FOUND');
+  await rejectsWith(w.core.posts.like(bia, post.id), 'NOT_FOUND');
+  assert.equal((await w.core.posts.get(ana, post.id)).archived, true);
+  assert.deepEqual((await w.core.posts.listArchived(ana)).items.map((p) => p.id), [post.id]);
+  await w.core.posts.unarchive(ana, post.id);
+  assert.equal((await w.core.posts.feed(bia)).items.length, 1);
+  assert.equal((await w.core.posts.listArchived(ana)).items.length, 0);
+});

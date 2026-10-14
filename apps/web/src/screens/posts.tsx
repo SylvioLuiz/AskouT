@@ -4,7 +4,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { CropIcon, XIcon } from '../components/icons.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { CropEditor } from '../components/crop.tsx';
-import { PostCard } from '../components/post.tsx';
+import { PostCard, PostList } from '../components/post.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
@@ -394,6 +394,18 @@ export function CreatePostScreen() {
   );
 }
 
+/** Posts que você arquivou: só você vê. Pelo menu ⋯ do post dá para desarquivar. */
+export function ArchivedScreen() {
+  useTitle('Arquivados');
+  return (
+    <>
+      <PageHead title="Arquivados" back="/perfil" />
+      <p className="muted">Posts que você arquivou ficam fora do feed e do seu perfil. Só você vê.</p>
+      <PostList load={(offset) => api.archivedPosts({ limit: 12, offset })} emptyTitle="Nada arquivado" emptyHint="Use o menu ⋯ de um post seu e escolha Arquivar." />
+    </>
+  );
+}
+
 export function PostScreen({ postId }: { postId: string }) {
   useTitle('Post');
   const post = useAsync(() => api.post(postId), [postId]);
@@ -418,7 +430,7 @@ export function PostScreen({ postId }: { postId: string }) {
   return (
     <>
       <PageHead title="Post" back={`/u/${encodeURIComponent(post.data.author.username)}`} />
-      <PostCard post={post.data} onDeleted={() => navigate('/perfil')} />
+      <PostCard post={post.data} onGone={(_id, why) => navigate(why === 'hidden' ? '/' : '/perfil')} />
     </>
   );
 }
