@@ -21,7 +21,8 @@ export class NotificationsController {
   /** Só a contagem de não lidos (para a bolinha do sino). */
   @Get('unread')
   async unread(@CurrentActor() actor: Actor) {
-    return { unread: await this.core.notifications.unreadCount(actor.userId) };
+    const [unread, latestUnreadAt] = await Promise.all([this.core.notifications.unreadCount(actor.userId), this.core.notifications.latestUnreadAt(actor.userId)]);
+    return { unread, latestUnreadAt };
   }
 
   /** `{id}` marca um aviso; sem corpo, marca todos. */

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PushCard } from '../components/notifications.tsx';
 import { listTimeLabel } from '../lib/chat.ts';
 import { Link, navigate } from '../router.tsx';
-import { announceNotificationsChanged } from '../lib/notifications.ts';
+import { announceNotificationsChanged, readActivitySeen, writeActivitySeen } from '../lib/notifications.ts';
+import { useUser } from '../auth.tsx';
 import { Button, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
@@ -31,6 +32,28 @@ export function ActivityScreen() {
     }
   }
   usePolling(news.reload, 15_000);
+
+  // Abrir Atividades apaga a bolinha do sino: tudo o que está na tela já foi "visto", mesmo sem abrir cada aviso.
+  // Cada aviso não aberto continua marcado aqui dentro.
+  const me = useUser();
+  useEffect(() => {
+    if (!news.data || !requests.data) return;
+    let storage: Storage | undefined;
+    try {
+      storage = window.localStorage;
+    } catch {
+      storage = undefined;
+    }
+    const before = readActivitySeen(storage, me.id);
+    const unread = news.data.items.filter((n) => !n.read).map((n) => n.createdAt);
+    const latest = unread.length > 0 ? unread.reduce((a, b) => (a > b ? a : b)) : null;
+    const newsAt = latest !== null && (before.newsAt === null || latest > before.newsAt) ? latest : before.newsAt;
+    const next = { newsAt, requests: requests.data.total };
+    if (next.newsAt !== before.newsAt || next.requests !== before.requests) {
+      writeActivitySeen(storage, me.id, next);
+      announceNotificationsChanged();
+    }
+  }, [news.data, requests.data, me.id]);
   const [busyId, setBusyId] = useState<string | undefined>();
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
 

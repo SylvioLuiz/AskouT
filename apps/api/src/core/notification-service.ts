@@ -97,6 +97,13 @@ export class NotificationService {
     return { items: items.map(toNotificationView), unread };
   }
 
+  /** Quando chegou o aviso não lido mais recente (ISO), ou nulo. Serve para a bolinha do sino saber o que é novo desde a última visita. */
+  async latestUnreadAt(userId: string): Promise<string | null> {
+    const items = await this.deps.notifications.listForUser(userId, NOTIFICATIONS_PAGE);
+    const unread = items.filter((n) => n.readAt === null);
+    return unread.length === 0 ? null : new Date(Math.max(...unread.map((n) => n.createdAt.getTime()))).toISOString();
+  }
+
   unreadCount(userId: string): Promise<number> {
     return this.deps.notifications.unreadCount(userId);
   }

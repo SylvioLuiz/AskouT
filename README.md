@@ -190,6 +190,11 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 - Rotas: `POST /posts`, `GET /posts/feed`, `GET /posts/pending-tags`, `GET/DELETE /posts/:id`, `POST /posts/:id/tag` (`{action: 'accept'|'decline'}`), `GET /profiles/:usuario/posts`, `GET /posts/images/:id` (pública, como a foto de perfil; o id é aleatório).
 - Limites honestos: **o navegador não deixa um site listar a galeria do celular sozinho** (só pelo seletor do sistema); a galeria aberta direto no app, como no Instagram, só vem com o app nativo (Capacitor). O corpo JSON da API passou de 100 KB para 1 MB (cada foto chega em base64). Fotos no banco, sem armazenamento de arquivos nem moderação. A referência da foto do Google pode expirar (a foto então aparece como "indisponível"). Não há curtir, comentar, editar post nem reordenar fotos ainda. O Postgres só é exercitado na sua máquina (`AskouT.command` aplica as migrações `20261017120000_posts` e `20261018120000_post_tags` e o `009_post_constraints.sql`).
 
+### Bolinha do sino (Atividades)
+
+- A bolinha do sino significa **"tem novidade desde a última vez que você abriu Atividades"**. Ao entrar na tela ela some, mesmo sem abrir cada aviso. Dentro da tela, cada aviso que você ainda não abriu continua marcado (ponto azul e título em negrito) até abrir ou usar "Marcar tudo como lido". Uma novidade que chegar depois acende a bolinha de novo.
+- `GET /notifications/unread` devolve também `latestUnreadAt`. O que já foi visto fica **só neste aparelho** (navegador); em outro aparelho a bolinha aparece de novo até a tela ser aberta lá.
+
 ### Mensagens de voz
 
 - Na conversa (1 a 1 e grupo), com o campo vazio o botão redondo é um **microfone**. Tocar nele grava: a barra mostra X (cancelar), o tempo e a seta (enviar). Ao digitar qualquer caractere o microfone vira a seta de texto.

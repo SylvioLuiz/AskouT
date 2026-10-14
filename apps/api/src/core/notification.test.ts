@@ -10,6 +10,19 @@ async function friends(w: ReturnType<typeof makeWorld>, ...names: string[]) {
 }
 
 describe('avisos', () => {
+  it('latestUnreadAt: o aviso não lido mais recente; nulo sem não lidos', async () => {
+    const w = makeWorld();
+    const { ana, bia } = await friends(w, 'ana', 'bia');
+    assert.equal(await w.core.notifications.latestUnreadAt(bia!), null);
+    const { id } = await w.core.conversations.open(ana!, bia!);
+    await w.core.conversations.send(ana!, id, { body: 'oi' });
+    await w.core.flushNotifications();
+    const list = await w.core.notifications.list(bia!);
+    assert.equal(await w.core.notifications.latestUnreadAt(bia!), list.items[0]!.createdAt);
+    await w.core.notifications.markRead(bia!);
+    assert.equal(await w.core.notifications.latestUnreadAt(bia!), null);
+  });
+
   it('mensagem avisa quem recebe, sem o texto, e junta avisos enquanto não leu', async () => {
     const w = makeWorld();
     const { ana, bia } = await friends(w, 'ana', 'bia');

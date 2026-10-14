@@ -1,11 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling } from '../hooks.ts';
 import { CHATS_CHANGED_EVENT } from '../lib/chat.ts';
 import { FLASH_CHANGED_EVENT } from '../lib/flash.ts';
-import { NOTIFICATIONS_CHANGED_EVENT } from '../lib/notifications.ts';
+import { hasNewActivity, NOTIFICATIONS_CHANGED_EVENT, readActivitySeen } from '../lib/notifications.ts';
 import { Link, navigate, usePathname } from '../router.tsx';
 import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, HomeIcon, PlusBigIcon, SearchIcon, UserIcon } from './icons.tsx';
 import { Avatar } from './ui.tsx';
@@ -50,9 +50,15 @@ export function Shell({ children }: { children: ReactNode }) {
   const pending = useAsync(() => api.followRequests({ limit: 1 }), [pathname]);
   const unreadNews = useAsync(() => api.unreadNotifications(), [pathname]);
   usePolling(unreadNews.reload, 20_000);
+  // O sino só mostra bolinha para o que chegou depois da última vez que Atividades foi aberta.
+  const [, setSeenTick] = useState(0);
   useEffect(() => {
-    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, unreadNews.reload);
-    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, unreadNews.reload);
+    const onChange = () => {
+      unreadNews.reload();
+      setSeenTick((n) => n + 1);
+    };
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, onChange);
   }, [unreadNews.reload]);
   // Tocar num aviso do aparelho com o app aberto: o service worker pede para abrir a tela certa.
   useEffect(() => {
@@ -64,7 +70,13 @@ export function Shell({ children }: { children: ReactNode }) {
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
   }, []);
-  const hasPending = (pending.data?.total ?? 0) > 0 || (unreadNews.data?.unread ?? 0) > 0;
+  let storage: Storage | undefined;
+  try {
+    storage = window.localStorage;
+  } catch {
+    storage = undefined;
+  }
+  const hasPending = hasNewActivity({ latestUnreadAt: unreadNews.data?.latestUnreadAt ?? null, requests: pending.data?.total ?? 0 }, readActivitySeen(storage, user.id));
   // Flash: o raio fica cheio com o Flash ligado e ganha uma bolinha quando alguém te convida.
   const flash = useAsync(() => api.flashStatus(), [pathname]);
   const flashInvites = useAsync(() => api.flashInvites(), [pathname]);
