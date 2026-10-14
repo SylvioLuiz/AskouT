@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -15,6 +15,9 @@ export interface UserRepository {
   /** Mantém a ordem de `ids`; ignora ausentes e usuários suspensos. */
   findProfilesByIds(ids: string[]): Promise<Profile[]>;
   updateProfile(profile: Profile): Promise<void>;
+  /** Guarda (ou, com `null`, remove) a foto de perfil. */
+  setPhoto(userId: string, photo: ProfilePhotoRecord | null): Promise<void>;
+  findPhoto(userId: string): Promise<ProfilePhotoRecord | undefined>;
   /** Busca por prefixo de username ou trecho do nome. Ignora suspensos e `excludeIds`. */
   searchProfiles(query: string, limit: number, excludeIds: string[]): Promise<Profile[]>;
 }
@@ -142,8 +145,21 @@ export interface MeetupRepository {
   invite(meetupId: string, userIds: string[]): Promise<string[]>;
   /** Quem sai ou é removido do grupo deixa de constar nos encontros dele: CONFIRMED e INVITED viram DECLINED (menos quem organiza). */
   declineAllFor(conversationId: string, userId: string, at: Date): Promise<void>;
+  /** Encontros em que a pessoa organiza ou foi convidada, o mais recente primeiro. */
+  listForUser(userId: string, limit: number): Promise<MeetupRecord[]>;
   /** Quantos encontros a pessoa criou desde `since` (limite de criação). */
   countCreatedSince(userId: string, since: Date): Promise<number>;
+}
+
+/** Eventos que a pessoa decidiu postar no próprio perfil. */
+export interface ProfileEventRepository {
+  /** Devolve false se já estava postado. */
+  add(userId: string, eventId: string, at: Date): Promise<boolean>;
+  remove(userId: string, eventId: string): Promise<boolean>;
+  has(userId: string, eventId: string): Promise<boolean>;
+  /** Mais recentes primeiro. */
+  list(userId: string, page: Page): Promise<{ eventId: string; createdAt: Date }[]>;
+  count(userId: string): Promise<number>;
 }
 
 export interface PlaceRepository {
@@ -277,6 +293,7 @@ export interface CoreDeps {
   flash: FlashRepository;
   conversations: ConversationRepository;
   meetups: MeetupRepository;
+  profileEvents: ProfileEventRepository;
   places: PlaceRepository;
   placeSource: PlaceSource;
   pending: PendingSignupRepository;

@@ -1,3 +1,6 @@
+import { buildEventCards } from './event-card.ts';
+import type { EventCardView } from './event-card.ts';
+import { decodeImageDataUrl } from './image.ts';
 import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import { distanceMeters } from './geo.ts';
@@ -28,6 +31,8 @@ export interface MessageView {
   suggestion: SuggestionCard | null;
   /** Cartão do encontro (kind MEETUP), do seu ponto de vista. */
   meetup: MeetupView | null;
+  /** Evento compartilhado (kind EVENT). */
+  event: EventCardView | null;
   /** Resposta de quem recebeu o cartão: aceitou ou recusou o lugar. */
   response: 'ACCEPTED' | 'DECLINED' | null;
   respondedAt: string | null;
@@ -87,12 +92,15 @@ export interface GroupDetails {
 export interface SendInput {
   body?: unknown;
   suggestion?: unknown;
+  /** Compartilha um evento na conversa. */
+  eventId?: unknown;
 }
 
 interface ViewExtras {
   distances?: MessageView['distances'];
   senderName?: string | null;
   meetup?: MeetupView | null;
+  event?: EventCardView | null;
 }
 
 function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {}): MessageView {
@@ -106,6 +114,7 @@ function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {
     body: m.body,
     suggestion: m.suggestion,
     meetup: extras.meetup ?? null,
+    event: extras.event ?? null,
     response: m.response,
     respondedAt: m.respondedAt ? m.respondedAt.toISOString() : null,
     distances: m.suggestion ? distances : null,
@@ -163,23 +172,10 @@ export function parseSuggestion(value: unknown): SuggestionCard {
   };
 }
 
-const IMAGE_RE = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
-
-/** Aceita só jpeg/png/webp em base64, até 40 KB, conferindo os primeiros bytes (não confia no tipo declarado). */
+/** Foto do grupo: até 40 KB. Devolve o próprio data URL (o grupo guarda assim). */
 export function parseGroupImage(value: unknown): string {
-  const fail = () => validationError('Imagem inválida', { image: 'Use uma imagem JPEG, PNG ou WebP de até 40 KB' });
-  if (typeof value !== 'string' || value.length > 60_000) throw fail();
-  const match = IMAGE_RE.exec(value);
-  if (!match) throw fail();
-  const bytes = Buffer.from(match[2] as string, 'base64');
-  if (bytes.length === 0 || bytes.length > GROUP_IMAGE_MAX_BYTES) throw fail();
-  const type = match[1];
-  const ok =
-    (type === 'jpeg' && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) ||
-    (type === 'png' && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) ||
-    (type === 'webp' && bytes.subarray(0, 4).toString('latin1') === 'RIFF' && bytes.subarray(8, 12).toString('latin1') === 'WEBP');
-  if (!ok) throw fail();
-  return value;
+  decodeImageDataUrl(value, GROUP_IMAGE_MAX_BYTES, '40 KB');
+  return value as string;
 }
 
 export class ConversationService {
@@ -259,6 +255,7 @@ export class ConversationService {
     const meetupIds = [...new Set(items.flatMap((m) => (m.meetupId ? [m.meetupId] : [])))];
     const records = (await Promise.all(meetupIds.map((id) => this.deps.meetups.find(id)))).filter((m) => m !== undefined);
     const meetupViews = new Map((await buildMeetupViews(this.deps, actorId, records)).map((v) => [v.id, v] as const));
+    const eventCards = await buildEventCards(this.deps, items.flatMap((m) => (m.eventId ? [m.eventId] : [])));
     const names = isGroup ? new Map((await this.deps.users.findProfilesByIds([...new Set(items.map((m) => m.senderId))])).map((p) => [p.userId, p.displayName] as const)) : null;
 
     return {
@@ -276,6 +273,7 @@ export class ConversationService {
           distances: m.suggestion && otherId ? this.distancesOf(m.suggestion, positions) : null,
           senderName: names ? (names.get(m.senderId) ?? null) : null,
           meetup: m.meetupId ? (meetupViews.get(m.meetupId) ?? null) : null,
+          event: m.eventId ? (eventCards.get(m.eventId) ?? null) : null,
         }),
       ),
       hasMore,
@@ -287,13 +285,23 @@ export class ConversationService {
     const { conversation, otherId, memberIds } = await this.access(actorId, conversationId);
     const hasText = input.body !== undefined && input.body !== null;
     const hasSuggestion = input.suggestion !== undefined && input.suggestion !== null;
-    if (hasText === hasSuggestion) throw validationError('Envie um texto ou uma sugestão', { body: 'Envie um texto ou uma sugestão' });
+    const hasEvent = input.eventId !== undefined && input.eventId !== null;
+    if ([hasText, hasSuggestion, hasEvent].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão ou um evento', { body: 'Envie um texto, uma sugestão ou um evento' });
     if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de lugar só em conversas 1 a 1', { suggestion: 'Sugestões de lugar só em conversas 1 a 1' });
 
     let kind: MessageKind = 'TEXT';
     let body = '';
     let suggestion: SuggestionCard | null = null;
-    if (hasSuggestion) {
+    let eventId: string | null = null;
+    let eventCard: EventCardView | null = null;
+    if (hasEvent) {
+      if (typeof input.eventId !== 'string' || input.eventId === '' || input.eventId.length > 64) throw notFound('Evento não encontrado');
+      eventCard = (await buildEventCards(this.deps, [input.eventId])).get(input.eventId) ?? null;
+      if (!eventCard) throw notFound('Evento não encontrado');
+      eventId = eventCard.id;
+      kind = 'EVENT';
+      body = `Evento: ${eventCard.title}`;
+    } else if (hasSuggestion) {
       suggestion = parseSuggestion(input.suggestion);
       kind = 'SUGGESTION';
       body = `${suggestion.title} — ${suggestion.venueName}`;
@@ -310,14 +318,14 @@ export class ConversationService {
     const recent = await conversations.countSentSince(actorId, new Date(now.getTime() - 60_000));
     if (recent >= MESSAGES_PER_MINUTE) throw rateLimited('Você está enviando mensagens rápido demais. Espere um instante.', 30);
 
-    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, createdAt: now };
+    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, createdAt: now };
     await conversations.addMessage(message);
     await conversations.markRead(conversationId, actorId, now);
     const positions = suggestion && otherId ? await this.livePositions(actorId, otherId, now) : null;
     const actorName = (await this.deps.users.findProfilesByIds([actorId]))[0]?.displayName ?? 'Alguém';
     const senderName = conversation.type === 'GROUP' ? actorName : null;
-    await this.notifyMembers(actorId, actorName, conversation, memberIds, suggestion ? 'sugeriu um lugar' : 'enviou uma mensagem');
-    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName });
+    await this.notifyMembers(actorId, actorName, conversation, memberIds, eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um lugar' : 'enviou uma mensagem');
+    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard });
   }
 
   /** Avisa os outros membros (menos quem bloqueou ou foi bloqueado por quem escreveu). O texto da mensagem não vai no aviso. */

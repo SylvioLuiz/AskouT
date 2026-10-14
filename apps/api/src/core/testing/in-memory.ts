@@ -8,6 +8,7 @@ import type {
   PushResult,
   PushSender,
   PushSubscriptionRepository,
+  ProfileEventRepository,
   PlaceRepository,
   PlaceSource,
   AvailabilityRepository,
@@ -23,7 +24,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -45,6 +46,18 @@ export class InMemoryUserRepository implements UserRepository {
     }
     this.users.set(user.id, { ...user });
     this.profiles.set(profile.userId, { ...profile });
+  }
+
+  readonly photos = new Map<string, ProfilePhotoRecord>();
+
+  async setPhoto(userId: string, photo: ProfilePhotoRecord | null): Promise<void> {
+    if (photo) this.photos.set(userId, { ...photo, data: new Uint8Array(photo.data) });
+    else this.photos.delete(userId);
+  }
+
+  async findPhoto(userId: string): Promise<ProfilePhotoRecord | undefined> {
+    const p = this.photos.get(userId);
+    return p ? { ...p, data: new Uint8Array(p.data) } : undefined;
   }
 
   async findById(id: string): Promise<User | undefined> {
@@ -618,6 +631,14 @@ export class InMemoryMeetupRepository implements MeetupRepository {
     }
   }
 
+  async listForUser(userId: string, limit: number): Promise<MeetupRecord[]> {
+    return [...this.meetups.values()]
+      .filter((m) => m.organizerId === userId || m.participants.some((p) => p.userId === userId))
+      .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime() || (a.id < b.id ? -1 : 1))
+      .slice(0, limit)
+      .map((m) => this.copy(m));
+  }
+
   async countCreatedSince(userId: string, since: Date): Promise<number> {
     return [...this.meetups.values()].filter((m) => m.organizerId === userId && m.createdAt >= since).length;
   }
@@ -690,6 +711,41 @@ export class FakePlaceSource implements PlaceSource {
   async nearby(): Promise<{ available: boolean; places: ExternalPlace[] }> {
     this.calls += 1;
     return this.available ? { available: true, places: this.places.map((p) => ({ ...p })) } : { available: false, places: [] };
+  }
+}
+
+export class InMemoryProfileEventRepository implements ProfileEventRepository {
+  readonly rows = new Map<string, { userId: string; eventId: string; createdAt: Date }>();
+
+  private key(userId: string, eventId: string): string {
+    return `${userId}|${eventId}`;
+  }
+
+  async add(userId: string, eventId: string, at: Date): Promise<boolean> {
+    const key = this.key(userId, eventId);
+    if (this.rows.has(key)) return false;
+    this.rows.set(key, { userId, eventId, createdAt: at });
+    return true;
+  }
+
+  async remove(userId: string, eventId: string): Promise<boolean> {
+    return this.rows.delete(this.key(userId, eventId));
+  }
+
+  async has(userId: string, eventId: string): Promise<boolean> {
+    return this.rows.has(this.key(userId, eventId));
+  }
+
+  async list(userId: string, page: Page): Promise<{ eventId: string; createdAt: Date }[]> {
+    return [...this.rows.values()]
+      .filter((r) => r.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.eventId < b.eventId ? 1 : -1))
+      .slice(page.offset ?? 0, (page.offset ?? 0) + (page.limit ?? 50))
+      .map((r) => ({ eventId: r.eventId, createdAt: r.createdAt }));
+  }
+
+  async count(userId: string): Promise<number> {
+    return [...this.rows.values()].filter((r) => r.userId === userId).length;
   }
 }
 

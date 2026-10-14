@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
+import { ShareEventSheet } from '../components/share-event.tsx';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
 import { SearchIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
@@ -432,6 +433,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [failed, setFailed] = useState(false);
   const image = e && !failed ? safeImage(e.imageUrl) : null;
   const [planning, setPlanning] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [posted, setPosted] = useState<boolean | undefined>();
+  const isPosted = posted ?? e?.postedByMe ?? false;
 
   return (
     <>
@@ -483,6 +487,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
           ) : (
             <p className="muted">Esse evento já terminou.</p>
           )}
+          <Button full variant="secondary" onClick={() => setSharing(true)}>
+            Compartilhar
+          </Button>
           <div className="sugcard__actions">
             <a className="btn btn--quiet btn--small" href={routeLink(e.venue.lat, e.venue.lng)} target="_blank" rel="noopener noreferrer">
               Rota até lá
@@ -493,6 +500,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
           </div>
         </article>
       ) : null}
+      {sharing && e ? <ShareEventSheet eventId={e.id} title={e.title} posted={isPosted} onPostedChange={setPosted} onClose={() => setSharing(false)} /> : null}
       {planning && e ? <CreateMeetupSheet event={e} onClose={() => setPlanning(false)} /> : null}
     </>
   );

@@ -1,3 +1,4 @@
+import { decodeImageDataUrl } from './image.ts';
 import { notFound, validationError } from './errors.ts';
 import { evaluateFriendship } from './friendship.ts';
 import type { CoreDeps } from './ports.ts';
@@ -16,9 +17,12 @@ import {
 
 export type RelationState = 'NONE' | FollowStatus;
 
+export const PROFILE_PHOTO_MAX_BYTES = 60 * 1024;
+
 export interface ProfileView {
   profile: Profile;
-  counts: { followers: number; following: number };
+  /** `events`: quantos eventos a pessoa postou no perfil. */
+  counts: { followers: number; following: number; events: number };
   relationship: {
     isSelf: boolean;
     /** O visitante segue este perfil? */
@@ -54,11 +58,12 @@ export class ProfileService {
     const target = profile ? await users.findById(profile.userId) : undefined;
     if (!profile || !target || target.status === 'SUSPENDED') throw notFound('Usuário não encontrado');
 
-    const [followers, following] = await Promise.all([
+    const [followers, following, events] = await Promise.all([
       follows.count(profile.userId, 'followers', 'ACCEPTED'),
       follows.count(profile.userId, 'following', 'ACCEPTED'),
+      this.deps.profileEvents.count(profile.userId),
     ]);
-    const counts = { followers, following };
+    const counts = { followers, following, events };
 
     if (viewerId === profile.userId) {
       return {
@@ -128,6 +133,32 @@ export class ProfileService {
     assertNoProblems(problems);
     await users.updateProfile(next);
     return next;
+  }
+
+  /** Troca (ou, com `null`, remove) a foto de perfil. A imagem chega já reduzida pelo app (até 60 KB). */
+  async setPhoto(userId: string, image: unknown): Promise<Profile> {
+    const { users, clock } = this.deps;
+    const current = await users.findProfileById(userId);
+    if (!current) throw notFound('Perfil não encontrado');
+    if (image === null) {
+      await users.setPhoto(userId, null);
+      const next = { ...current, avatarUrl: null };
+      await users.updateProfile(next);
+      return next;
+    }
+    const decoded = decodeImageDataUrl(image, PROFILE_PHOTO_MAX_BYTES, '60 KB');
+    const updatedAt = clock.now();
+    await users.setPhoto(userId, { mime: decoded.mime, data: decoded.bytes, updatedAt });
+    const next = { ...current, avatarUrl: `/users/${userId}/avatar?v=${updatedAt.getTime()}` };
+    await users.updateProfile(next);
+    return next;
+  }
+
+  /** Bytes da foto de perfil (rota pública, usada em <img>). */
+  async photo(userId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (typeof userId !== 'string' || userId.length === 0 || userId.length > 64) return undefined;
+    const found = await this.deps.users.findPhoto(userId);
+    return found ? { mime: found.mime, data: found.data } : undefined;
   }
 
   /**

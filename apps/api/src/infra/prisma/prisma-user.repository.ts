@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import { conflict } from '../../core/errors.ts';
 import type { UserRepository } from '../../core/ports.ts';
-import type { Profile, User } from '../../core/types.ts';
+import type { Profile, ProfilePhotoRecord, User } from '../../core/types.ts';
 import { isUuid, onlyUuids, uniqueViolationTargets } from './helpers.ts';
 
 function toUser(row: {
@@ -119,6 +119,26 @@ export class PrismaUserRepository implements UserRepository {
       if (p) ordered.push(p);
     }
     return ordered;
+  }
+
+  async setPhoto(userId: string, photo: ProfilePhotoRecord | null): Promise<void> {
+    if (!isUuid(userId)) return;
+    if (photo === null) {
+      await this.prisma.profilePhoto.deleteMany({ where: { userId } });
+      return;
+    }
+    const data = Buffer.from(photo.data);
+    await this.prisma.profilePhoto.upsert({
+      where: { userId },
+      create: { userId, mime: photo.mime, data, updatedAt: photo.updatedAt },
+      update: { mime: photo.mime, data, updatedAt: photo.updatedAt },
+    });
+  }
+
+  async findPhoto(userId: string): Promise<ProfilePhotoRecord | undefined> {
+    if (!isUuid(userId)) return undefined;
+    const row = await this.prisma.profilePhoto.findUnique({ where: { userId } });
+    return row ? { mime: row.mime as ProfilePhotoRecord['mime'], data: new Uint8Array(row.data), updatedAt: row.updatedAt } : undefined;
   }
 
   async updateProfile(profile: Profile): Promise<void> {

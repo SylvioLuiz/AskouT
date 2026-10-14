@@ -1,3 +1,4 @@
+import { api } from '../client.ts';
 import { safeGroupImage } from '../lib/image.ts';
 import { useId, useState } from 'react';
 import type { ButtonHTMLAttributes, HTMLInputTypeAttribute, ReactNode } from 'react';
@@ -149,7 +150,7 @@ type AvatarProfile = Pick<PublicProfile, 'username' | 'displayName' | 'avatarUrl
 export function Avatar({ profile, size = 44 }: { profile: AvatarProfile; size?: number }) {
   const style = { width: size, height: size, fontSize: Math.round(size * 0.38) };
   if (profile.avatarUrl) {
-    return <img className="avatar avatar--photo" src={profile.avatarUrl} alt="" style={style} referrerPolicy="no-referrer" />;
+    return <img className="avatar avatar--photo" src={profile.avatarUrl.startsWith('/') ? api.assetUrl(profile.avatarUrl) : profile.avatarUrl} alt="" style={style} referrerPolicy="no-referrer" />;
   }
   return (
     <span className={`avatar avatar--tint-${tintIndex(profile.username)}`} style={style} aria-hidden="true">

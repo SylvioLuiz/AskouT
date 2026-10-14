@@ -8,12 +8,13 @@ type MessageRow = {
   id: string;
   conversationId: string;
   senderId: string;
-  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM';
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT';
   body: string;
   suggestion: unknown;
   response: 'ACCEPTED' | 'DECLINED' | null;
   respondedAt: Date | null;
   meetupId: string | null;
+  eventId: string | null;
   createdAt: Date;
 };
 
@@ -27,6 +28,7 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   response: r.response,
   respondedAt: r.respondedAt,
   meetupId: r.meetupId,
+  eventId: r.eventId,
   createdAt: r.createdAt,
 });
 
@@ -189,6 +191,7 @@ export class PrismaConversationRepository implements ConversationRepository {
         // Mensagem de texto não leva o campo (a restrição do banco exige NULL fora de SUGGESTION).
         ...(m.suggestion ? { suggestion: m.suggestion as unknown as Prisma.InputJsonValue } : {}),
         ...(m.meetupId ? { meetupId: m.meetupId } : {}),
+        ...(m.eventId ? { eventId: m.eventId } : {}),
         createdAt: m.createdAt,
       },
     });

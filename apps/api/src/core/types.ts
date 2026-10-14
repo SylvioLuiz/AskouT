@@ -138,7 +138,7 @@ export interface FlashPositionRecord {
 
 // ---------- Conversas ----------
 
-export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM';
+export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT';
 export type SuggestionResponse = 'ACCEPTED' | 'DECLINED';
 
 /**
@@ -183,6 +183,8 @@ export interface MessageRecord {
   respondedAt: Date | null;
   /** Cartão de encontro (kind MEETUP). */
   meetupId: string | null;
+  /** Evento compartilhado (kind EVENT). Ausente = nulo. */
+  eventId?: string | null;
   createdAt: Date;
 }
 
@@ -292,4 +294,11 @@ export interface PushSubscriptionRecord {
   p256dh: string;
   auth: string;
   createdAt: Date;
+}
+
+/** Foto de perfil guardada no banco (já reduzida pelo app). */
+export interface ProfilePhotoRecord {
+  mime: 'image/jpeg' | 'image/png' | 'image/webp';
+  data: Uint8Array;
+  updatedAt: Date;
 }

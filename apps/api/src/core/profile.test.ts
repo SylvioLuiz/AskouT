@@ -10,7 +10,7 @@ test('perfil: visão do próprio usuário', async () => {
   assert.equal(view.profile.displayName, 'Ana Silva');
   assert.equal(view.relationship.isSelf, true);
   assert.equal(view.canViewContent, true);
-  assert.deepEqual(view.counts, { followers: 0, following: 0 });
+  assert.deepEqual(view.counts, { followers: 0, following: 0, events: 0 });
 });
 
 test('perfil: contadores contam só seguimentos aceitos', async () => {
@@ -23,7 +23,7 @@ test('perfil: contadores contam só seguimentos aceitos', async () => {
   await w.core.follows.follow(bia!, ana!);
 
   const view = await w.core.profiles.getByUsername(ana!, 'bia');
-  assert.deepEqual(view.counts, { followers: 1, following: 1 });
+  assert.deepEqual(view.counts, { followers: 1, following: 1, events: 0 });
 });
 
 test('perfil: relacionamento com o visitante (seguindo, pendente, seguido, amigo)', async () => {

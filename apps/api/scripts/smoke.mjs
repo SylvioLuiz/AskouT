@@ -107,6 +107,16 @@ try {
   check('busca encontra os outros, sem o próprio', search.status === 200 && search.body.length === 2, search.body);
   const edit = await call('PATCH', '/profiles/me', { token: a.token, body: { bio: 'Olá, AskouT' } });
   check('editar biografia', edit.status === 200 && edit.body.bio === 'Olá, AskouT', edit.body);
+  // JPEG mínimo válido (1x1) para testar a foto de perfil.
+  const tinyJpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+  const photo = await call('PUT', '/profiles/me/photo', { token: a.token, body: { image: tinyJpeg } });
+  check('subir foto de perfil', photo.status === 200 && typeof photo.body.avatarUrl === 'string' && photo.body.avatarUrl.startsWith('/users/'), photo.body);
+  const avatar = await fetch(`${BASE}${photo.body?.avatarUrl ?? '/users/x/avatar'}`);
+  check('foto é servida como imagem, sem login', avatar.status === 200 && /image\/jpeg/.test(avatar.headers.get('content-type') ?? ''), avatar.status);
+  check('foto que não é imagem: 400', (await call('PUT', '/profiles/me/photo', { token: a.token, body: { image: 'data:text/html;base64,PGI+' } })).status === 400);
+  check('remover foto', (await call('PUT', '/profiles/me/photo', { token: a.token, body: { image: null } })).body?.avatarUrl === null);
+  check('eventos postados: lista vazia no começo', (await call('GET', `/profiles/${a.username}/events`, { token: a.token })).body?.total === 0);
+  check('meus encontros: lista', Array.isArray((await call('GET', '/meetups', { token: a.token })).body?.items));
   const missing = await call('GET', '/profiles/naoexiste999', { token: a.token });
   check('perfil inexistente dá 404', missing.status === 404, missing.body);
 
@@ -290,6 +300,14 @@ try {
     const renamed = await call('PATCH', `/meetups/${one.body.id}`, { token: a.token, body: { title: 'Nome de teste' } });
     check('organizador renomeia o encontro', renamed.status === 200 && renamed.body.title === 'Nome de teste', renamed.body);
     check('sair de uma conversa 1 a 1 como grupo: 404', (await call('POST', `/conversations/${one.body.conversationId}/leave`, { token: b.token })).status === 404);
+
+    const posted = await call('POST', `/events/${anyEvent.id}/post`, { token: a.token });
+    check('postar evento no perfil', posted.status === 200 || posted.status === 201, posted.body);
+    const mine = await call('GET', `/profiles/${a.username}/events`, { token: b.token });
+    check('amigo vê o evento postado', mine.status === 200 && mine.body.total === 1 && mine.body.items[0].id === anyEvent.id, mine.body);
+    const shared = await call('POST', `/conversations/${one.body.conversationId}/messages`, { token: a.token, body: { eventId: anyEvent.id } });
+    check('enviar evento numa conversa', shared.status === 200 || shared.status === 201 ? shared.body?.kind === 'EVENT' : false, shared.body);
+    check('tirar evento do perfil', (await call('DELETE', `/events/${anyEvent.id}/post`, { token: a.token })).status === 200);
 
     console.log('\nAvisos');
     const news = await call('GET', '/notifications', { token: b.token });

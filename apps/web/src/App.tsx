@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AuthProvider, useAuthContext } from './auth.tsx';
+import { AuthProvider, useAuthContext, useUser } from './auth.tsx';
 import { Shell } from './components/Shell.tsx';
 import { Button, EmptyState } from './components/ui.tsx';
 import { useTitle } from './hooks.ts';
@@ -13,7 +13,7 @@ import { FlashScreen, MatchScreen } from './screens/flash.tsx';
 import { GroupScreen } from './screens/group.tsx';
 import { EventScreen, ExploreScreen } from './screens/explore.tsx';
 import { HomeScreen } from './screens/main-tabs.tsx';
-import { BlockedScreen, FriendsScreen, MyProfileScreen } from './screens/me.tsx';
+import { BlockedScreen, EditProfileScreen, FriendsScreen, HelpScreen, InteractionsScreen, PrivacyScreen, SettingsScreen, ThemeScreen } from './screens/me.tsx';
 import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
 
 // Telas para quem ainda não entrou.
@@ -21,6 +21,11 @@ const GUEST_ROUTES: RouteDef[] = [
   { path: '/entrar', render: () => <LoginScreen /> },
   { path: '/cadastro', render: () => <SignupScreen /> },
 ];
+
+function OwnProfile() {
+  const user = useUser();
+  return <ProfileScreen key={user.profile.username} username={user.profile.username} />;
+}
 
 // Telas do app, dentro da navegação principal.
 const PRIVATE_ROUTES: RouteDef[] = [
@@ -35,7 +40,13 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/flash', render: () => <FlashScreen /> },
   { path: '/flash/encontro/:id', render: (p) => <MatchScreen inviteId={p['id'] ?? ''} /> },
   { path: '/atividades', render: () => <ActivityScreen /> },
-  { path: '/perfil', render: () => <MyProfileScreen /> },
+  { path: '/perfil', render: () => <OwnProfile /> },
+  { path: '/perfil/editar', render: () => <EditProfileScreen /> },
+  { path: '/configuracao', render: () => <SettingsScreen /> },
+  { path: '/privacidade', render: () => <PrivacyScreen /> },
+  { path: '/interacoes', render: () => <InteractionsScreen /> },
+  { path: '/ajuda', render: () => <HelpScreen /> },
+  { path: '/tema', render: () => <ThemeScreen /> },
   { path: '/amigos', render: () => <FriendsScreen /> },
   { path: '/bloqueados', render: () => <BlockedScreen /> },
   { path: '/u/:username', render: (p) => <ProfileScreen username={p['username'] ?? ''} /> },

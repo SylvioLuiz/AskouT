@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { LockIcon } from '../components/icons.tsx';
+import { EditIcon, LockIcon, MenuIcon } from '../components/icons.tsx';
+import { ProfileMenu } from '../components/profile-menu.tsx';
+import { PostedEvents } from '../components/profile-events.tsx';
 import { ChatButton } from '../components/chat-button.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -39,10 +41,14 @@ export function ProfileScreen({ username }: { username: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const [pending, setPending] = useState<Pending>(undefined);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [eventTotal, setEventTotal] = useState<number | undefined>();
 
   useEffect(() => {
     setMessage(undefined);
     setPending(undefined);
+    setMenuOpen(false);
+    setEventTotal(undefined);
   }, [username]);
 
   async function run(action: () => Promise<unknown>, success?: string) {
@@ -71,6 +77,15 @@ export function ProfileScreen({ username }: { username: string }) {
 
   return (
     <>
+      {relationship.isSelf ? (
+        <div className="profile__bar">
+          <span className="profile__barname">@{profile.username}</span>
+          <button type="button" className="iconbtn" onClick={() => setMenuOpen(true)} aria-label="Abrir menu" aria-haspopup="dialog">
+            <MenuIcon />
+          </button>
+        </div>
+      ) : null}
+      {menuOpen ? <ProfileMenu onClose={() => setMenuOpen(false)} /> : null}
       <header className="profile">
         <Avatar profile={profile} size={88} />
         <div className="profile__id">
@@ -86,6 +101,11 @@ export function ProfileScreen({ username }: { username: string }) {
           <p className="profile__handle">@{profile.username}</p>
           {note ? <p className="profile__note">{note}</p> : null}
         </div>
+        {relationship.isSelf ? (
+          <Link to="/perfil/editar" className="iconbtn profile__edit" aria-label="Editar perfil">
+            <EditIcon />
+          </Link>
+        ) : null}
       </header>
 
       {profile.bio ? <p className="profile__bio">{profile.bio}</p> : null}
@@ -111,6 +131,9 @@ export function ProfileScreen({ username }: { username: string }) {
               </span>
             </>
           )}
+          <span>
+            <strong>{formatCount(eventTotal ?? counts.events)}</strong> {(eventTotal ?? counts.events) === 1 ? 'evento' : 'eventos'}
+          </span>
         </p>
       ) : null}
 
@@ -134,7 +157,7 @@ export function ProfileScreen({ username }: { username: string }) {
 
       <div className="profile__actions">
         {action.kind === 'self' ? (
-          <Link to="/perfil" className="btn btn--secondary">
+          <Link to="/perfil/editar" className="btn btn--secondary">
             Editar perfil
           </Link>
         ) : null}
@@ -205,7 +228,8 @@ export function ProfileScreen({ username }: { username: string }) {
           ) : relationship.isSelf ? null : (
             <p className="muted profile__soon">A agenda é visível só para amigos, quando vocês se seguem.</p>
           )}
-          <p className="muted profile__soon">Publicações deste perfil chegam nas próximas etapas.</p>
+          <h2 className="profile__section">Eventos</h2>
+          <PostedEvents username={profile.username} mine={relationship.isSelf} onCount={setEventTotal} />
         </>
       )}
     </>

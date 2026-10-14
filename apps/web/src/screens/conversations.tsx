@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Avatar, Button, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
+import { EventBubble } from '../components/share-event.tsx';
 import { peopleLabel } from '../lib/meetup.ts';
 import { SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
 import { api } from '../client.ts';
@@ -229,6 +230,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                   <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} />
                 ) : m.kind === 'MEETUP' && m.meetup ? (
                   <MeetupBubble meetup={m.meetup} nowIso={data.now} onUpdated={(updated) => setMessages((current) => current.map((x) => (x.id === m.id || x.meetup?.id === updated.id ? { ...x, meetup: updated } : x)))} />
+                ) : m.kind === 'EVENT' && m.event ? (
+                  <EventBubble event={m.event} />
                 ) : (
                   <p className="bubble__text">{m.body}</p>
                 )}

@@ -165,6 +165,16 @@ Ao abrir o Explorar o app pede a sua localização e já mostra, em mosaico de d
 - Dados de exemplo continuam com o selo "Exemplo de teste". `npm run seed:places -- --here` agora cria 10 eventos de tipos, preços, hashtags e datas variados (hoje até daqui a 6 dias).
 - Passos na sua máquina: `git pull`, `npm run update` (aplica a migração `20261014180000_explore_events` e `005_explore_constraints.sql`), `cd apps/api && npm run seed:places -- --here`, `cd ../.. && npm run dev:all -- --https`.
 
+## Perfil, eventos postados e menu
+
+- **Perfil** (o seu em `/perfil`, o de outras pessoas em `/u/:usuario`): foto, nome, @, descrição, números de seguidores, seguindo e eventos, e uma grade de duas colunas com os eventos que a pessoa postou. Perfil privado só mostra a grade a quem segue (com aprovação).
+- **Postar um evento**: na página do evento, **Compartilhar** → *Postar no meu perfil* (ou *Tirar do meu perfil*). Na grade do seu perfil também dá para tirar. Rotas: `POST/DELETE /events/:id/post`, `GET /profiles/:usuario/events`.
+- **Compartilhar** tem três opções: postar no perfil (feed), *Enviar em uma conversa* (cartão do evento para um amigo ou grupo, mensagem do tipo `EVENT`) e *Fora do app* (menu de compartilhar do aparelho; sem ele, copia o link `/eventos/:id`).
+- **Editar perfil** (lápis no perfil): subir, trocar e remover a foto, nome e descrição. A foto é reduzida no aparelho (até 384 px, 56 KB) e guardada no banco (`ProfilePhoto`); é servida em `GET /users/:id/avatar` (pública, como em redes sociais; o endereço muda a cada troca).
+- **Menu hambúrguer** (só no seu perfil): Configuração (e-mail, @, avisos no aparelho, amigos e bloqueados), Privacidade (perfil privado, pedidos, bloqueados), Suas interações (seus encontros, pedidos para seguir, eventos postados), Ajuda (perguntas frequentes), Tema (Automático, Claro, Escuro; guardado no aparelho) e Sair.
+- Interpretações minhas: "postar" é um botão no evento, não uma tela de publicação; "Suas interações" junta encontros, pedidos e posts.
+- Limites honestos: não dá para trocar e-mail ou senha ainda; não há canal de suporte (a Ajuda é um texto fixo); fotos ficam no banco, sem armazenamento de arquivos nem moderação; as rotas novas no Postgres só são testadas na sua máquina (`npm run update` aplica a migração `20261016120000_profile_posts` e `008_profile_constraints.sql`).
+
 ## App web (`apps/web`)
 
 React 19 + Vite 7 + TypeScript. Telas: entrar, criar conta (2 passos com código por e-mail), Home (amigos), Explorar (busca), Atividades (pedidos para seguir), perfil de outras pessoas (seguir, pedir, deixar de seguir, bloquear), Meu perfil (editar, privacidade), Amigos, Bloqueados. Agenda (faixa de 28 dias, folha "Marcar horário", agenda do amigo) e "Encontrar melhor data" (escolher amigos, período, duração e horário de início). Flash (raio no topo e botão grande na Home): ligar por 1/2/3 h, mapa na tela do Flash com você e os amigos que aceitaram sair com você, livres agora, convidar, aceitar/recusar, encontro com mapa, distância e bloquear. Conversas: lista com não lidas e chat 1 a 1 entre amigos; ao aceitar um convite do Flash a conversa abre, com o botão "Sugerir um lugar" (mini carrossel de eventos e lugares perto do ponto médio entre os dois).

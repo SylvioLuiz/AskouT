@@ -23,8 +23,15 @@ export function safeGroupImage(value: string | null | undefined): string | null 
   return typeof value === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(value) ? value : null;
 }
 
+export interface ResizeOptions {
+  /** Maior lado final, em pixels. */
+  side: number;
+  /** Limite de bytes da imagem final. */
+  maxBytes: number;
+}
+
 /** Reduz a foto escolhida para caber no limite da API. Lança Error com texto claro se não der. */
-export async function resizeGroupPhoto(file: File): Promise<string> {
+export async function resizePhoto(file: File, options: ResizeOptions): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('Escolha um arquivo de imagem');
   let bitmap: ImageBitmap;
   try {
@@ -32,7 +39,7 @@ export async function resizeGroupPhoto(file: File): Promise<string> {
   } catch {
     throw new Error('Não foi possível ler essa imagem. Tente uma foto JPEG ou PNG.');
   }
-  const { width, height } = fitWithin(bitmap.width, bitmap.height, GROUP_PHOTO_SIDE);
+  const { width, height } = fitWithin(bitmap.width, bitmap.height, options.side);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -42,7 +49,14 @@ export async function resizeGroupPhoto(file: File): Promise<string> {
   bitmap.close();
   for (const quality of [0.85, 0.7, 0.55, 0.4, 0.3]) {
     const url = canvas.toDataURL('image/jpeg', quality);
-    if (url.startsWith('data:image/jpeg') && dataUrlBytes(url) <= GROUP_PHOTO_MAX_BYTES) return url;
+    if (url.startsWith('data:image/jpeg') && dataUrlBytes(url) <= options.maxBytes) return url;
   }
   throw new Error('A imagem ficou grande demais mesmo reduzida. Escolha outra.');
 }
+
+export const resizeGroupPhoto = (file: File) => resizePhoto(file, { side: GROUP_PHOTO_SIDE, maxBytes: GROUP_PHOTO_MAX_BYTES });
+
+/** Foto de perfil: até 384 px e 56 KB (a API aceita até 60 KB). */
+export const PROFILE_PHOTO_SIDE = 384;
+export const PROFILE_PHOTO_MAX_BYTES = 56 * 1024;
+export const resizeProfilePhoto = (file: File) => resizePhoto(file, { side: PROFILE_PHOTO_SIDE, maxBytes: PROFILE_PHOTO_MAX_BYTES });

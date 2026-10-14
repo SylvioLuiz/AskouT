@@ -102,3 +102,21 @@ export const BoltIcon = ({ filled = false }: { filled?: boolean }) => (
     <path d="M13.5 2.5 5 13.5h6l-1 8 8.5-11h-6z" />
   </svg>
 );
+
+export const MenuIcon = () => (
+  <Svg>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </Svg>
+);
+export const EditIcon = () => (
+  <Svg>
+    <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16z" />
+    <path d="M13.5 6.5l4 4" />
+  </Svg>
+);
+export const ShareIcon = () => (
+  <Svg>
+    <path d="M12 15V4M8 8l4-4 4 4" />
+    <path d="M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12" />
+  </Svg>
+);

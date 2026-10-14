@@ -99,6 +99,7 @@ enum MessageKind {
   SUGGESTION
   MEETUP
   SYSTEM
+  EVENT
 }
 
 model User {
@@ -136,6 +137,8 @@ model User {
   flashPositions      FlashPosition[]
   notifications Notification[]
   pushSubscriptions PushSubscription[]
+  postedEvents      PostedEvent[]
+  photo             ProfilePhoto?
 }
 
 model Profile {
@@ -342,13 +345,17 @@ model Message {
   respondedAt    DateTime?
   /// Cartão de encontro (kind = MEETUP).
   meetupId       String?  @db.Uuid
+  /// Evento compartilhado na conversa (kind = EVENT).
+  eventId        String?  @db.Uuid
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation(fields: [senderId], references: [id])
   meetup       Meeting?     @relation(fields: [meetupId], references: [id], onDelete: Cascade)
+  event        PlaceEvent?  @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
+  @@index([eventId])
   @@index([meetupId])
 }
 
@@ -411,6 +418,29 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt])
+}
+
+// Foto de perfil enviada pela pessoa (já reduzida pelo app). `Profile.avatarUrl` aponta para /users/:id/avatar.
+model ProfilePhoto {
+  userId    String   @id @db.Uuid
+  mime      String
+  data      Bytes
+  updatedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Evento que a pessoa decidiu postar no próprio perfil.
+model PostedEvent {
+  userId    String   @db.Uuid
+  eventId   String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event PlaceEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@id([userId, eventId])
+  @@index([userId, createdAt])
 }
 
 // Inscrição de um navegador/aparelho para Web Push. O endpoint é único: pertence a uma pessoa só.
@@ -482,6 +512,8 @@ model PlaceEvent {
 
   venue    Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
   meetings Meeting[]
+  messages Message[]
+  posts    PostedEvent[]
 
   @@index([startsAt])
   @@index([venueId])

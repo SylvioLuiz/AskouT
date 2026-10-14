@@ -112,6 +112,12 @@ export class PrismaMeetupRepository implements MeetupRepository {
     });
   }
 
+  async listForUser(userId: string, limit: number): Promise<MeetupRecord[]> {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.meeting.findMany({ where: { participants: { some: { userId } } }, include: { participants: true }, orderBy: [{ startsAt: 'desc' }, { id: 'asc' }], take: limit });
+    return rows.map(toRecord).filter((m): m is MeetupRecord => m !== undefined);
+  }
+
   async countCreatedSince(userId: string, since: Date): Promise<number> {
     if (!isUuid(userId)) return 0;
     return this.prisma.meeting.count({ where: { organizerId: userId, createdAt: { gte: since } } });

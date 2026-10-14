@@ -10,7 +10,7 @@ import { NotificationsController } from './controllers/notifications.controller.
 import { ExploreController } from './controllers/explore.controller.ts';
 import { FlashController } from './controllers/flash.controller.ts';
 import { FollowsController } from './controllers/follows.controller.ts';
-import { ProfilesController } from './controllers/profiles.controller.ts';
+import { ProfilesController, AvatarController } from './controllers/profiles.controller.ts';
 import { PlacesController } from './controllers/places.controller.ts';
 import { coreProvider, googleProvider, placePhotosProvider } from './core.provider.ts';
 import { FlashPurge } from './flash-purge.ts';
@@ -19,7 +19,7 @@ import { loadConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
 
 @Module({
-  controllers: [AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, FlashController, ConversationsController, PlacesController, ExploreController, MeetupsController, NotificationsController],
+  controllers: [AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, FlashController, ConversationsController, PlacesController, ExploreController, MeetupsController, NotificationsController, AvatarController],
   providers: [
     { provide: CONFIG, useFactory: () => loadConfig(process.env) },
     prismaProvider,

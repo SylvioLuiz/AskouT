@@ -6,6 +6,7 @@ import {
   FakePlaceSource,
   InMemoryConversationRepository, InMemoryMeetupRepository,
   InMemoryNotificationRepository,
+  InMemoryProfileEventRepository,
   InMemoryPushSubscriptionRepository,
   FakePushSender,
   InMemoryPlaceRepository,
@@ -30,6 +31,7 @@ export function makeWorld() {
   const flash = new InMemoryFlashRepository();
   const conversations = new InMemoryConversationRepository();
   const meetups = new InMemoryMeetupRepository();
+  const profileEvents = new InMemoryProfileEventRepository();
   const notifications = new InMemoryNotificationRepository();
   const pushSubscriptions = new InMemoryPushSubscriptionRepository();
   const push = new FakePushSender();
@@ -45,7 +47,7 @@ export function makeWorld() {
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, notifications, pushSubscriptions, push, places, placeSource, pending, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, profileEvents, notifications, pushSubscriptions, push, places, placeSource, pending, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string } = {}): Promise<AuthResult> {
@@ -62,5 +64,5 @@ export function makeWorld() {
     return out;
   }
 
-  return { core, users, follows, blocks, availability, flash, conversations, meetups, notifications, pushSubscriptions, push, places, placeSource, pending, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+  return { core, users, follows, blocks, availability, flash, conversations, meetups, profileEvents, notifications, pushSubscriptions, push, places, placeSource, pending, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
 }

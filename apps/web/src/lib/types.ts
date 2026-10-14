@@ -28,7 +28,7 @@ export interface Relationship {
 
 export interface ProfileView {
   profile: Profile;
-  counts: { followers: number; following: number };
+  counts: { followers: number; following: number; events: number };
   relationship: Relationship;
   canViewContent: boolean;
 }
@@ -237,6 +237,30 @@ export interface NotificationList {
   unread: number;
 }
 
+/** Resumo de um evento (cartão na conversa, grade do perfil). */
+export interface EventCard {
+  id: string;
+  title: string;
+  kind: EventKind;
+  isFree: boolean;
+  imageUrl: string | null;
+  venueName: string;
+  startsAt: string;
+  endsAt: string;
+  sample: boolean;
+}
+
+export interface PostedEvent extends EventCard {
+  postedAt: string;
+}
+
+export interface PostedEventsPage {
+  items: PostedEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface GroupDetails {
   id: string;
   name: string;
@@ -253,9 +277,11 @@ export interface ChatMessage {
   mine: boolean;
   /** Nome de quem enviou; só em grupo. */
   senderName: string | null;
-  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM';
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT';
   body: string;
   suggestion: SuggestionCard | null;
+  /** Evento compartilhado (kind EVENT). */
+  event: EventCard | null;
   /** Cartão do encontro (kind MEETUP). */
   meetup: MeetupView | null;
   /** Resposta de quem recebeu o cartão. */
@@ -342,6 +368,8 @@ export interface ExploreEvent {
   sample: boolean;
   venue: { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number };
   distanceM: number | null;
+  /** Você já postou este evento no seu perfil. */
+  postedByMe?: boolean;
 }
 
 export interface ExplorePlace {

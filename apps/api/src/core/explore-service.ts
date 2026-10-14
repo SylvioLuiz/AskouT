@@ -44,6 +44,8 @@ export interface ExploreEventItem {
   sample: boolean;
   venue: { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number };
   distanceM: number | null;
+  /** Quem consulta já postou este evento no próprio perfil (só na consulta de um evento). */
+  postedByMe?: boolean;
 }
 
 export interface ExplorePlaceItem {
@@ -256,7 +258,6 @@ export class ExploreService {
 
   /** Um evento pelo id. Com posição, inclui a distância (usada só nesta resposta). */
   async event(actorId: string, id: unknown, input: { lat?: unknown; lng?: unknown } = {}): Promise<ExploreEventItem> {
-    void actorId;
     if (typeof id !== 'string' || id.length === 0 || id.length > 64) throw notFound('Evento não encontrado');
     const lat = parseNumber(input.lat, 'lat');
     const lng = parseNumber(input.lng, 'lng');
@@ -264,6 +265,6 @@ export class ExploreService {
     const found = await this.deps.places.findEvent(id);
     if (!found) throw notFound('Evento não encontrado');
     const distance = lat !== undefined && lng !== undefined ? distanceMeters({ lat, lng }, found.venue) : null;
-    return toEventItem(found.event, found.venue, distance);
+    return { ...toEventItem(found.event, found.venue, distance), postedByMe: await this.deps.profileEvents.has(actorId, id) };
   }
 }

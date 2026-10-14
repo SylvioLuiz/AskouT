@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { ConversationRepository, MeetupRepository, NotificationRepository, PushSubscriptionRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PushSubscriptionRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
 import type { MeetupRecord, MessageRecord, PlaceEventRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
@@ -21,6 +21,7 @@ export interface RepoHarness {
   conversations: ConversationRepository;
   places: PlaceRepository;
   meetups: MeetupRepository;
+  profileEvents: ProfileEventRepository;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
@@ -992,6 +993,60 @@ export function defineRepositoryContract(
         assert.equal((await h.pushSubscriptions.listForUser(bia)).length, 0);
         await h.pushSubscriptions.remove('https://p/2');
         assert.equal((await h.pushSubscriptions.listForUser(ana)).length, 0);
+      });
+
+      it('perfil: foto guardada, trocada e removida; eventos postados com contagem e paginação', async () => {
+        const { ana, bia, e } = await setup();
+        assert.equal(await h.users.findPhoto(ana), undefined);
+        await h.users.setPhoto(ana, { mime: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]), updatedAt: at(1) });
+        const got = (await h.users.findPhoto(ana))!;
+        assert.equal(got.mime, 'image/jpeg');
+        assert.deepEqual([...got.data], [0xff, 0xd8, 0xff, 1, 2, 3]);
+        await h.users.setPhoto(ana, { mime: 'image/png', data: new Uint8Array([9, 9]), updatedAt: at(2) });
+        assert.equal((await h.users.findPhoto(ana))!.mime, 'image/png');
+        assert.equal(await h.users.findPhoto(bia), undefined, 'foto é de cada pessoa');
+        await h.users.setPhoto(ana, null);
+        assert.equal(await h.users.findPhoto(ana), undefined);
+        await h.users.setPhoto(ana, null);
+
+        const e2: PlaceEventRecord = { ...e, id: randomUUID(), title: 'Outro' };
+        const e3: PlaceEventRecord = { ...e, id: randomUUID(), title: 'Mais um' };
+        await h.places.createEvent(e2);
+        await h.places.createEvent(e3);
+        assert.equal(await h.profileEvents.add(ana, e.id, at(10)), true);
+        assert.equal(await h.profileEvents.add(ana, e.id, at(11)), false, 'já postado');
+        await h.profileEvents.add(ana, e2.id, at(12));
+        await h.profileEvents.add(ana, e3.id, at(13));
+        await h.profileEvents.add(bia, e.id, at(14));
+        assert.equal(await h.profileEvents.count(ana), 3);
+        assert.equal(await h.profileEvents.has(ana, e.id), true);
+        assert.equal(await h.profileEvents.has(bia, e2.id), false);
+        assert.deepEqual((await h.profileEvents.list(ana, { limit: 10, offset: 0 })).map((r) => r.eventId), [e3.id, e2.id, e.id], 'mais recente primeiro');
+        assert.deepEqual((await h.profileEvents.list(ana, { limit: 1, offset: 1 })).map((r) => r.eventId), [e2.id]);
+        assert.equal(await h.profileEvents.remove(ana, e2.id), true);
+        assert.equal(await h.profileEvents.remove(ana, e2.id), false);
+        assert.equal(await h.profileEvents.count(ana), 2);
+      });
+
+      it('mensagem de evento guarda o evento; encontros do usuário listados do mais recente', async () => {
+        const { ana, bia, caio, e } = await setup();
+        const conv = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(1));
+        const m: MessageRecord = { id: randomUUID(), conversationId: conv.id, senderId: ana, kind: 'EVENT', body: 'Evento: Piquenique', suggestion: null, response: null, respondedAt: null, meetupId: null, eventId: e.id, createdAt: at(2) };
+        await h.conversations.addMessage(m);
+        const back = (await h.conversations.listMessages(conv.id, 10))[0]!;
+        assert.equal(back.kind, 'EVENT');
+        assert.equal(back.eventId, e.id);
+        const text = (await h.conversations.listMessages(conv.id, 10)).length;
+        assert.equal(text, 1);
+
+        const g = await h.conversations.createGroup({ id: randomUUID(), name: 'G', ownerId: ana, now: at(1) });
+        const m1 = { ...meetup(ana, g.id, e.id, [bia]), id: randomUUID(), startsAt: at(5 * H), endsAt: at(6 * H) };
+        const m2 = { ...meetup(bia, conv.id, e.id, [ana]), id: randomUUID(), startsAt: at(8 * H), endsAt: at(9 * H) };
+        await h.meetups.create(m1);
+        await h.meetups.create(m2);
+        assert.deepEqual((await h.meetups.listForUser(ana, 10)).map((x) => x.id), [m2.id, m1.id]);
+        assert.deepEqual((await h.meetups.listForUser(bia, 1)).map((x) => x.id), [m2.id]);
+        assert.deepEqual(await h.meetups.listForUser(caio, 10), []);
       });
     });
   });

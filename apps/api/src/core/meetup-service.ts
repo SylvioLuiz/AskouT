@@ -207,6 +207,12 @@ export class MeetupService {
     await conversations.addMessage({ id: ids.next(), conversationId: meetup.conversationId, senderId, kind: 'SYSTEM', body, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: clock.now() });
   }
 
+  /** Encontros em que você organiza ou foi convidado (o mais recente primeiro). Quem recusou continua vendo no histórico. */
+  async listMine(actorId: string): Promise<MeetupView[]> {
+    const records = await this.deps.meetups.listForUser(actorId, 50);
+    return buildMeetupViews(this.deps, actorId, records);
+  }
+
   /** Só quem organiza ou foi convidado vê o encontro. */
   async get(actorId: string, meetupId: string): Promise<MeetupView> {
     const meetup = await this.visible(actorId, meetupId);

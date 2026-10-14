@@ -38,7 +38,7 @@ export class ConversationsController {
   @Post(':id/messages')
   send(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.conversations.send(actor.userId, id, { body: b.body, suggestion: b.suggestion });
+    return this.core.conversations.send(actor.userId, id, { body: b.body, suggestion: b.suggestion, eventId: b.eventId });
   }
 
   /** Quem recebeu o cartão aceita ou recusa o lugar (`{action: 'accept' | 'decline'}`). */

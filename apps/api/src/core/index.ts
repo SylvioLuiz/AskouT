@@ -5,6 +5,7 @@ import { FlashService } from './flash-service.ts';
 import { ConversationService } from './conversation-service.ts';
 import { FollowService } from './follow-service.ts';
 import { MeetupService } from './meetup-service.ts';
+import { ProfileEventService } from './profile-event-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
@@ -33,6 +34,7 @@ export function createCore(input: CoreInput) {
     suggestions: new SuggestionService(deps, flash),
     explore: new ExploreService(deps, profiles),
     meetups: new MeetupService(deps),
+    profileEvents: new ProfileEventService(deps, profiles),
     notifications: new NotificationService(input),
     /** Espera os pushes em andamento (testes e desligamento). */
     flushNotifications: () => notifier.flush(),
@@ -99,6 +101,9 @@ export type { MeetupView } from './meetup-view.ts';
 export { distanceMeters, midpoint, boundingBox } from './geo.ts';
 export { NotificationService, StoredNotifier } from './notification-service.ts';
 export type { NotificationView } from './notification-service.ts';
+export { ProfileEventService } from './profile-event-service.ts';
+export type { PostedEventsPage, PostedEventView } from './profile-event-service.ts';
+export type { EventCardView } from './event-card.ts';
 export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';
 export type { ConnectionsPage, FollowResult } from './follow-service.ts';

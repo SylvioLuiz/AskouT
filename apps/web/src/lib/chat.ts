@@ -110,6 +110,7 @@ export function previewOf(m: ChatMessage | null): string {
   const prefix = m.mine ? 'Você: ' : '';
   if (m.kind === 'SUGGESTION' && m.suggestion) return `${prefix}Sugeriu ${m.suggestion.venueName}`;
   if (m.kind === 'MEETUP') return `${prefix}${m.body}`;
+  if (m.kind === 'EVENT') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}Compartilhou ${m.event?.title ?? 'um evento'}`;
   if (m.senderName && !m.mine) return `${m.senderName}: ${m.body.replace(/\s+/g, ' ')}`;
   return `${prefix}${m.body.replace(/\s+/g, ' ')}`;
 }

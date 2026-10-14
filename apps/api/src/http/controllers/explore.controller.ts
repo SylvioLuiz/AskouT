@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Param, Query } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
 import type { PlacePhotos } from './places.controller.ts';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
@@ -24,6 +24,18 @@ export class ExploreController {
       ...view,
       places: view.places.map(({ photoRef, ...p }) => ({ ...p, photoPath: photoRef && this.photos.google ? this.photos.signer.path(photoRef) : null })),
     };
+  }
+
+  /** Posta o evento no seu perfil. */
+  @Post('events/:id/post')
+  @HttpCode(200)
+  post(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.profileEvents.post(actor.userId, id);
+  }
+
+  @Delete('events/:id/post')
+  unpost(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.profileEvents.unpost(actor.userId, id);
   }
 
   @Get('events/:id')

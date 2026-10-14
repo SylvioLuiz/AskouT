@@ -14,6 +14,12 @@ export class MeetupsController {
   }
 
   /** Cria um encontro a partir de um evento: `{eventId, guestIds, name?}`. Vários convidados criam um grupo. */
+  /** Seus encontros (organizados e convidados), do mais recente ao mais antigo. */
+  @Get()
+  async mine(@CurrentActor() actor: Actor) {
+    return { items: await this.core.meetups.listMine(actor.userId) };
+  }
+
   @Post()
   @HttpCode(200)
   create(@CurrentActor() actor: Actor, @Body() body: unknown) {

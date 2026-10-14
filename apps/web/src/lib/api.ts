@@ -21,6 +21,7 @@ import type {
   GroupDetails,
   MeetupView,
   NotificationList,
+  PostedEventsPage,
   ExploreParams,
   ExploreResult,
   PageRequest,
@@ -119,6 +120,12 @@ export function createApi(deps: ApiDeps) {
         `/profiles/search?q=${id(query)}${limit !== undefined ? `&limit=${limit}` : ''}`,
       ),
     getProfile: (username: string) => request<ProfileView>('GET', `/profiles/${id(username)}`),
+    setProfilePhoto: (image: string | null) => request<Profile>('PUT', '/profiles/me/photo', { body: { image } }),
+    profileEvents: (username: string, page?: PageRequest) => request<PostedEventsPage>('GET', `/profiles/${id(username)}/events${pageQuery(page)}`),
+    postEvent: (eventId: string) => request<{ posted: true }>('POST', `/events/${id(eventId)}/post`),
+    unpostEvent: (eventId: string) => request<{ posted: false }>('DELETE', `/events/${id(eventId)}/post`),
+    sendEvent: (conversationId: string, eventId: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { eventId } }),
+    myMeetups: () => request<{ items: MeetupView[] }>('GET', '/meetups'),
     updateProfile: (patch: ProfilePatch) => request<Profile>('PATCH', '/profiles/me', { body: patch }),
     setPrivacy: (isPrivate: boolean) =>
       request<{ isPrivate: boolean; acceptedPending: number }>('PATCH', '/profiles/me/privacy', {
