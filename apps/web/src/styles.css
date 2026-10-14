@@ -3067,7 +3067,7 @@ button {
 .carousel { position: relative; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
 .carousel__track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .carousel__track::-webkit-scrollbar { display: none; }
-.carousel__slide { position: relative; flex: 0 0 100%; margin: 0; aspect-ratio: 4 / 5; scroll-snap-align: center; display: grid; }
+.carousel__slide { position: relative; flex: 0 0 100%; margin: 0; aspect-ratio: var(--carousel-ratio, 4 / 5); scroll-snap-align: center; display: grid; }
 .carousel__slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .carousel__slide figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 12px 8px; color: #fff; font-size: 0.75rem; background: linear-gradient(transparent, rgb(0 0 0 / 0.55)); }
 .carousel__missing { display: grid; place-items: center; color: var(--muted); font-size: 0.875rem; }
@@ -3103,7 +3103,7 @@ button {
 .segmented__tab { padding: 10px 8px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2); font-weight: 700; cursor: pointer; }
 .segmented__tab--on { background: var(--surface); color: var(--brand); box-shadow: 0 1px 3px rgb(27 31 74 / 0.15); }
 .compose__stage { display: grid; place-items: center; aspect-ratio: 1; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
-.compose__stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.compose__stage img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .compose__empty { width: 100%; height: 100%; padding: 16px; border: 2px dashed var(--line-strong); border-radius: var(--radius-panel); background: transparent; color: var(--ink-2); font-weight: 700; text-align: center; display: grid; place-items: center; cursor: pointer; }
 p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .composegrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
@@ -3137,3 +3137,24 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .post__event { font-size: 0.9375rem; margin: 0; }
 .post__eventbadge, .postgrid__event { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 0.75rem; font-weight: 700; }
 .postgrid__event { position: absolute; left: 6px; bottom: 6px; }
+
+/* Recorte */
+.cropper { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.cropper__modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.cropper__mode { padding: 9px 4px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--ink-2); font-weight: 700; cursor: pointer; }
+.cropper__mode--on { border-color: var(--brand); background: var(--brand-soft); color: var(--brand); }
+.cropper__frame { position: relative; margin: 0 auto; overflow: hidden; background: #000; border-radius: var(--radius-panel); touch-action: none; user-select: none; }
+.cropper__frame > img { display: block; width: 100%; height: 100%; pointer-events: none; }
+.cropper__box { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.55); cursor: move; touch-action: none; background-image: linear-gradient(rgb(255 255 255 / 0.35) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 0.35) 1px, transparent 1px); background-size: 33.333% 33.333%; }
+.cropper__handle { position: absolute; width: 44px; height: 44px; touch-action: none; }
+.cropper__handle::after { content: ''; position: absolute; width: 16px; height: 16px; background: #fff; border-radius: 3px; box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4); }
+.cropper__handle--nw { left: -2px; top: -2px; cursor: nwse-resize; }
+.cropper__handle--ne { right: -2px; top: -2px; cursor: nesw-resize; }
+.cropper__handle--sw { left: -2px; bottom: -2px; cursor: nesw-resize; }
+.cropper__handle--se { right: -2px; bottom: -2px; cursor: nwse-resize; }
+.cropper__handle--nw::after { left: 0; top: 0; }
+.cropper__handle--ne::after { right: 0; top: 0; }
+.cropper__handle--sw::after { left: 0; bottom: 0; }
+.cropper__handle--se::after { right: 0; bottom: 0; }
+.cropper__hint { text-align: center; margin: 0; }
+.compose__recortar { margin-top: 8px; }

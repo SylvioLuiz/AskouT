@@ -3,12 +3,14 @@ import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { XIcon } from '../components/icons.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
+import { CropEditor } from '../components/crop.tsx';
 import { PostCard } from '../components/post.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
-import { resizePostPhoto } from '../lib/image.ts';
+import { cropPostPhoto, readPostSource, resizePostPhoto } from '../lib/image.ts';
+import type { CropRect } from '../lib/crop.ts';
 import { toggleId } from '../lib/meetup.ts';
 import { addImages, buildPostBody, effectivePlace, eventProblem, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
 import type { DraftImage, LinkedPlace } from '../lib/post-draft.ts';
@@ -111,6 +113,8 @@ export function CreatePostScreen() {
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const [linking, setLinking] = useState(false);
   const [tagging, setTagging] = useState(false);
+  const [cropKey, setCropKey] = useState<string | undefined>();
+  const [cropBusy, setCropBusy] = useState(false);
   const [kind, setKind] = useState<'POST' | 'EVENT'>('POST');
   const [eventTitle, setEventTitle] = useState('');
   const [eventStart, setEventStart] = useState('');
@@ -135,7 +139,8 @@ export function CreatePostScreen() {
     for (const file of files.slice(0, Math.max(room, 0))) {
       try {
         const dataUrl = await resizePostPhoto(file);
-        added.push({ key: nextKey(), kind: 'UPLOAD', preview: dataUrl, dataUrl });
+        const source = await readPostSource(file).catch(() => undefined);
+        added.push({ key: nextKey(), kind: 'UPLOAD', preview: dataUrl, dataUrl, ...(source ? { source } : {}) });
       } catch (failure) {
         skipped.push(`${file.name}: ${failure instanceof Error ? failure.message : 'não foi possível usar'}`);
       }
@@ -159,6 +164,22 @@ export function CreatePostScreen() {
     setItems(next);
     setFocusKey(image.key);
     setMessage(undefined);
+  }
+
+  async function applyCrop(key: string, rect: CropRect) {
+    const target = items.find((i) => i.key === key);
+    if (!target || target.kind !== 'UPLOAD' || !target.source) return;
+    setCropBusy(true);
+    try {
+      const dataUrl = await cropPostPhoto(target.source, rect);
+      setItems((current) => current.map((i) => (i.key === key && i.kind === 'UPLOAD' ? { ...i, dataUrl, preview: dataUrl, crop: rect } : i)));
+      setCropKey(undefined);
+      setMessage(undefined);
+    } catch (failure) {
+      setMessage({ tone: 'error', text: failure instanceof Error ? failure.message : 'Não foi possível recortar a foto.' });
+    } finally {
+      setCropBusy(false);
+    }
   }
 
   function remove(key: string) {
@@ -306,7 +327,7 @@ export function CreatePostScreen() {
           <XIcon />
         </Link>
         <h1 className="compose__title">Nova publicação</h1>
-        <Button small disabled={items.length === 0 || reading} onClick={() => setStep('details')}>
+        <Button small disabled={items.length === 0 || reading || cropKey !== undefined} onClick={() => setStep('details')}>
           Avançar
         </Button>
       </header>
@@ -323,6 +344,9 @@ export function CreatePostScreen() {
 
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
 
+      {cropKey && focused && focused.key === cropKey && focused.kind === 'UPLOAD' && focused.source ? (
+        <CropEditor source={focused.source} initial={focused.crop} busy={cropBusy} onApply={(rect) => void applyCrop(focused.key, rect)} onCancel={() => setCropKey(undefined)} />
+      ) : (
       <div className="compose__stage">
         {focused ? (
           <img src={focused.preview} alt="Foto em destaque" referrerPolicy="no-referrer" />
@@ -334,12 +358,20 @@ export function CreatePostScreen() {
           <p className="compose__empty">Busque um lugar abaixo para usar a foto dele.</p>
         )}
       </div>
+      )}
+      {focused && focused.kind === 'UPLOAD' && focused.source && cropKey === undefined ? (
+        <div className="compose__recortar">
+          <Button variant="secondary" small onClick={() => setCropKey(focused.key)}>
+            Recortar esta foto
+          </Button>
+        </div>
+      ) : null}
 
       {items.length > 0 ? (
         <ul className="composegrid" aria-label="Fotos escolhidas">
           {items.map((item, i) => (
             <li key={item.key} className={`composegrid__item${item.key === focused?.key ? ' composegrid__item--on' : ''}`}>
-              <button type="button" className="composegrid__pick" onClick={() => setFocusKey(item.key)} aria-label={`Ver foto ${i + 1}`} aria-pressed={item.key === focused?.key}>
+              <button type="button" className="composegrid__pick" onClick={() => { if (cropKey === undefined) setFocusKey(item.key); }} disabled={cropKey !== undefined && item.key !== cropKey} aria-label={`Ver foto ${i + 1}`} aria-pressed={item.key === focused?.key}>
                 <img src={item.preview} alt="" referrerPolicy="no-referrer" />
                 <span className="composegrid__n">{i + 1}</span>
               </button>

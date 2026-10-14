@@ -1,3 +1,5 @@
+import type { CropRect } from './crop.ts';
+
 export const POST_IMAGES_MAX = 5;
 export const POST_CAPTION_MAX = 500;
 
@@ -6,6 +8,9 @@ export interface DraftUpload {
   kind: 'UPLOAD';
   preview: string;
   dataUrl: string;
+  /** Cópia de trabalho (até 1600 px) para recortar de novo sem perder qualidade. */
+  source?: string;
+  crop?: CropRect;
 }
 
 export interface DraftPlacePhoto {
