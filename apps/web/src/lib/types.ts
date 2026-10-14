@@ -389,7 +389,7 @@ export interface Suggestions {
 
 // ---------- Explorar ----------
 
-export type EventKind = 'DIGITAL' | 'SHOW' | 'CINEMA' | 'THEATER' | 'EXHIBITION' | 'GASTRONOMY' | 'NIGHT' | 'OTHER';
+export type EventKind = 'DIGITAL' | 'SHOW' | 'CINEMA' | 'THEATER' | 'EXHIBITION' | 'GASTRONOMY' | 'NIGHT' | 'OUTDOOR' | 'SPORT' | 'OTHER';
 
 export interface ExploreEvent {
   id: string;
@@ -407,6 +407,47 @@ export interface ExploreEvent {
   distanceM: number | null;
   /** Você já postou este evento no seu perfil. */
   postedByMe?: boolean;
+}
+
+export interface EventPost {
+  id: string;
+  author: PublicProfile;
+  caption: string;
+  /** Endereço da foto, quando o post tem uma. */
+  imagePath: string | null;
+  createdAt: string;
+  mine: boolean;
+  canDelete: boolean;
+}
+
+/** Página do evento: do local (PLACE) ou criado por uma pessoa (USER). */
+export interface EventPage {
+  id: string;
+  source: 'PLACE' | 'USER';
+  title: string;
+  description: string | null;
+  kind: EventKind;
+  startsAt: string;
+  endsAt: string;
+  isFree: boolean;
+  /** Dado de exemplo para teste, nunca um evento real. */
+  sample: boolean;
+  /** Capa: a primeira foto do evento (enviada, do Google ou a imagem do evento do local). */
+  coverPath: string | null;
+  coverAuthor: string | null;
+  venue: { name: string; address: string | null; lat: number | null; lng: number | null };
+  tags: string[];
+  distanceM: number | null;
+  postedByMe: boolean;
+  confirmedCount: number;
+  going: boolean;
+  attendees: PublicProfile[];
+  owner: PublicProfile | null;
+  isOwner: boolean;
+  postsEnabled: boolean;
+  postsPublic: boolean;
+  canPost: boolean;
+  posts: EventPost[];
 }
 
 export interface ExplorePlace {
@@ -466,7 +507,7 @@ export interface PostView {
   placeName: string | null;
   placeAddress: string | null;
   /** Preenchido quando o post é um evento criado pela pessoa. */
-  event: { title: string; startsAt: string; endsAt: string } | null;
+  event: { title: string; kind: EventKind; startsAt: string; endsAt: string } | null;
   createdAt: string;
   images: PostImage[];
   mine: boolean;
@@ -502,7 +543,7 @@ export interface PostEdit {
   caption?: string | null;
   placeName?: string | null;
   placeAddress?: string | null;
-  event?: { title: string; startsAt: string | null; endsAt?: string | null } | null;
+  event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null } | null;
 }
 
 export interface PostsPage {

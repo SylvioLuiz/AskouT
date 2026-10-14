@@ -305,6 +305,15 @@ try {
   check('raio inválido: 400', (await call('GET', '/explore?radiusKm=999', { token: a.token })).status === 400);
   check('tipo inválido: 400', (await call('GET', '/explore?kind=FESTA', { token: a.token })).status === 400);
   check('evento inexistente: 404', (await call('GET', '/events/nao-existe', { token: a.token })).status === 404);
+  const uev = await call('POST', '/posts', { token: a.token, body: { images: [tinyJpeg], placeName: 'Parque de teste', event: { title: 'Corrida de teste', kind: 'SPORT', startsAt: new Date(Date.now() + 86_400_000).toISOString() } } });
+  check('criar evento com tipo Esporte', uev.status === 200 && uev.body.event?.kind === 'SPORT', uev.body);
+  const evp = await call('GET', `/events/${uev.body.id}`, { token: a.token });
+  check('página do evento da pessoa: dono, capa e 1 confirmado', evp.status === 200 && evp.body.source === 'USER' && evp.body.isOwner === true && evp.body.confirmedCount === 1 && evp.body.coverPath?.startsWith('/posts/images/'), evp.body);
+  const evPost = await call('POST', `/events/${uev.body.id}/posts`, { token: a.token, body: { caption: 'Ponto de encontro' } });
+  check('dono posta no evento', evPost.status === 200 && evPost.body.mine === true, evPost.body);
+  check('Eu vou em evento inexistente: 404', (await call('POST', '/events/nao-existe/going', { token: a.token })).status === 404);
+  const evOpen = await call('PUT', `/events/${uev.body.id}/posts-public`, { token: a.token, body: { public: true } });
+  check('dono abre os posts para quem vai', evOpen.status === 200 && evOpen.body.postsPublic === true, evOpen.body);
   check('explorar sem login: 401', (await call('GET', '/explore')).status === 401);
 
   console.log('\nPosts');

@@ -20,6 +20,8 @@ export const KINDS: readonly { id: EventKind; label: string }[] = [
   { id: 'EXHIBITION', label: 'Exposição' },
   { id: 'GASTRONOMY', label: 'Gastronomia' },
   { id: 'NIGHT', label: 'Noite' },
+  { id: 'OUTDOOR', label: 'Ar livre' },
+  { id: 'SPORT', label: 'Esporte' },
   { id: 'OTHER', label: 'Outros' },
 ];
 

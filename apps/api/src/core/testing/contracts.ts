@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
 import type { MeetupRecord, MessageRecord, PlaceEventRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
@@ -23,6 +23,7 @@ export interface RepoHarness {
   meetups: MeetupRepository;
   profileEvents: ProfileEventRepository;
   posts: PostRepository;
+  eventRoom: EventRoomRepository;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
@@ -1114,7 +1115,7 @@ export function defineRepositoryContract(
         const mk = (authorId: string, n: number, id = randomUUID()) => {
           const postId = id;
           return {
-            post: { id: postId, authorId, caption: n === 1 ? null : `legenda ${n}`, placeName: null, placeAddress: null, eventTitle: null, eventStartsAt: null, eventEndsAt: null, archivedAt: null, editedAt: null, createdAt: at(n) },
+            post: { id: postId, authorId, caption: n === 1 ? null : `legenda ${n}`, placeName: null, placeAddress: null, eventTitle: null, eventStartsAt: null, eventEndsAt: null, eventKind: 'OTHER' as const, eventPostsPublic: false, archivedAt: null, editedAt: null, createdAt: at(n) },
             images: [
               { id: randomUUID(), postId, position: 0, mime: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff, n]), placePhotoRef: null, placePhotoAuthor: null },
               { id: randomUUID(), postId, position: 1, mime: null, data: null, placePhotoRef: 'places/x/photos/y', placePhotoAuthor: 'Maria' },
@@ -1163,7 +1164,7 @@ export function defineRepositoryContract(
         const imgId = randomUUID();
         const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]);
         await h.posts.create(
-          { id: postId, authorId: ana, caption: 'a', placeName: null, placeAddress: null, eventTitle: null, eventStartsAt: null, eventEndsAt: null, archivedAt: null, editedAt: null, createdAt: at(1) },
+          { id: postId, authorId: ana, caption: 'a', placeName: null, placeAddress: null, eventTitle: null, eventStartsAt: null, eventEndsAt: null, eventKind: 'OTHER' as const, eventPostsPublic: false, archivedAt: null, editedAt: null, createdAt: at(1) },
           [{ id: imgId, postId, position: 0, mime: 'image/jpeg', data: jpeg, placePhotoRef: null, placePhotoAuthor: null }],
         );
         const page = { limit: 10, offset: 0 };
@@ -1196,7 +1197,7 @@ export function defineRepositoryContract(
         assert.equal((await h.posts.listFor([ana], [], page, undefined, { hideFor: ana })).length, 1, 'e só para ela');
         assert.equal((await h.posts.listFor([ana], [], page)).length, 1, 'perfil sem filtro de escondidos');
         // editar
-        const patch = { caption: 'novo', placeName: 'Bar', placeAddress: null, eventTitle: 'Show', eventStartsAt: at(30), eventEndsAt: at(40), editedAt: at(9) };
+        const patch = { caption: 'novo', placeName: 'Bar', placeAddress: null, eventTitle: 'Show', eventStartsAt: at(30), eventEndsAt: at(40), eventKind: 'SPORT' as const, editedAt: at(9) };
         assert.equal(await h.posts.update(postId, bia, patch), false, 'só o autor edita');
         assert.equal(await h.posts.update(postId, ana, patch), true);
         const edited = (await h.posts.findById(postId))!.post;
@@ -1224,6 +1225,52 @@ export function defineRepositoryContract(
         assert.equal(await h.posts.delete(postId, ana), true);
         assert.deepEqual(await h.posts.commentCounts([postId]), [{ postId, count: 0 }]);
         assert.deepEqual(await h.posts.likeStats([postId], ana), [{ postId, count: 0, liked: false }]);
+      });
+
+      it('presença e posts de evento: confirmar, contar, listar, apagar e publicação aberta', async () => {
+        const { ana, bia, caio, e } = await setup();
+        const postId = randomUUID();
+        await h.posts.create(
+          { id: postId, authorId: ana, caption: null, placeName: 'Parque', placeAddress: null, eventTitle: 'Piquenique', eventStartsAt: at(5), eventEndsAt: at(9), eventKind: 'OUTDOOR' as const, eventPostsPublic: false, archivedAt: null, editedAt: null, createdAt: at(1) },
+          [],
+        );
+        const user = { source: 'USER' as const, id: postId };
+        const place = { source: 'PLACE' as const, id: e.id };
+        assert.equal(await h.eventRoom.addGoing(user, bia, at(2)), true);
+        assert.equal(await h.eventRoom.addGoing(user, bia, at(3)), false, 'confirmar de novo não duplica');
+        assert.equal(await h.eventRoom.addGoing(user, ana, at(4)), true);
+        assert.equal(await h.eventRoom.addGoing(place, bia, at(5)), true, 'o mesmo usuário vai a eventos diferentes');
+        assert.deepEqual((await h.eventRoom.listGoing(user)).map((r) => r.userId), [bia, ana], 'ordem da confirmação');
+        assert.equal(await h.eventRoom.isGoing(user, bia), true);
+        assert.equal(await h.eventRoom.isGoing(user, caio), false);
+        const counts = await h.eventRoom.countGoing([user, place]);
+        assert.deepEqual([counts.get(postId), counts.get(e.id)], [2, 1]);
+        assert.equal(await h.eventRoom.removeGoing(user, bia), true);
+        assert.equal(await h.eventRoom.removeGoing(user, bia), false);
+        assert.equal((await h.eventRoom.countGoing([user])).get(postId), 1);
+        // posts dentro do evento
+        const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 7]);
+        const p1 = { id: randomUUID(), eventId: postId, authorId: ana, caption: 'primeiro', mime: 'image/jpeg', data: jpeg, createdAt: at(6) };
+        const p2 = { id: randomUUID(), eventId: postId, authorId: bia, caption: 'segundo', mime: null, data: null, createdAt: at(7) };
+        await h.eventRoom.addPost(p1);
+        await h.eventRoom.addPost(p2);
+        const listed = await h.eventRoom.listPosts(postId, { limit: 10, offset: 0 });
+        assert.deepEqual(listed.map((r) => [r.caption, r.hasImage]), [['segundo', false], ['primeiro', true]], 'mais recentes primeiro');
+        assert.equal((await h.eventRoom.listPosts(postId, { limit: 1, offset: 1 }))[0]!.caption, 'primeiro');
+        assert.deepEqual(Array.from((await h.eventRoom.findPostImage(p1.id))!.data), Array.from(jpeg));
+        assert.equal(await h.eventRoom.findPostImage(p2.id), undefined);
+        assert.equal((await h.eventRoom.findPost(p2.id))!.authorId, bia);
+        await h.eventRoom.deletePost(p2.id);
+        assert.equal(await h.eventRoom.findPost(p2.id), undefined);
+        // publicação aberta: só o dono muda
+        assert.equal(await h.eventRoom.setPostsPublic(postId, bia, true), false);
+        assert.equal(await h.eventRoom.setPostsPublic(postId, ana, true), true);
+        assert.equal((await h.posts.findById(postId))!.post.eventPostsPublic, true);
+        // apagar o evento leva presença e posts
+        assert.equal(await h.posts.delete(postId, ana), true);
+        assert.equal((await h.eventRoom.countGoing([user])).get(postId), 0);
+        assert.deepEqual(await h.eventRoom.listPosts(postId, { limit: 10, offset: 0 }), []);
+        assert.equal((await h.eventRoom.listGoing(place)).length, 1, 'o evento do local segue');
       });
 
       it('mensagem de evento guarda o evento; encontros do usuário listados do mais recente', async () => {

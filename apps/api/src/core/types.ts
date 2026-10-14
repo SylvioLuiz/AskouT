@@ -209,8 +209,8 @@ export interface VenueRecord {
   isSample: boolean;
 }
 
-export type EventKind = 'DIGITAL' | 'SHOW' | 'CINEMA' | 'THEATER' | 'EXHIBITION' | 'GASTRONOMY' | 'NIGHT' | 'OTHER';
-export const EVENT_KINDS: readonly EventKind[] = ['DIGITAL', 'SHOW', 'CINEMA', 'THEATER', 'EXHIBITION', 'GASTRONOMY', 'NIGHT', 'OTHER'];
+export type EventKind = 'DIGITAL' | 'SHOW' | 'CINEMA' | 'THEATER' | 'EXHIBITION' | 'GASTRONOMY' | 'NIGHT' | 'OUTDOOR' | 'SPORT' | 'OTHER';
+export const EVENT_KINDS: readonly EventKind[] = ['DIGITAL', 'SHOW', 'CINEMA', 'THEATER', 'EXHIBITION', 'GASTRONOMY', 'NIGHT', 'OUTDOOR', 'SPORT', 'OTHER'];
 
 export interface PlaceEventRecord {
   id: string;
@@ -316,6 +316,10 @@ export interface PostRecord {
   eventTitle: string | null;
   eventStartsAt: Date | null;
   eventEndsAt: Date | null;
+  /** Tipo do evento (ícone da página). Só vale quando o post é um evento. */
+  eventKind: EventKind;
+  /** Evento público: o dono e quem confirmou presença postam no evento. Privado (padrão): só o dono. */
+  eventPostsPublic: boolean;
   /** Arquivado: some do feed e do perfil, só a própria pessoa vê. */
   archivedAt: Date | null;
   editedAt: Date | null;
@@ -368,6 +372,28 @@ export interface PostReportRecord {
 }
 
 /** Campos que a edição troca (a pessoa autora é quem edita). */
+/** Qual evento: um do local (Explorar) ou um criado por uma pessoa (post com dados de evento). */
+export interface EventRef {
+  source: 'PLACE' | 'USER';
+  id: string;
+}
+
+export interface EventAttendanceRecord {
+  userId: string;
+  createdAt: Date;
+}
+
+/** Post dentro de um evento criado por uma pessoa. A foto (opcional) fica na própria linha. */
+export interface EventPostRecord {
+  id: string;
+  eventId: string;
+  authorId: string;
+  caption: string;
+  mime: string | null;
+  data: Uint8Array | null;
+  createdAt: Date;
+}
+
 export interface PostPatch {
   caption: string | null;
   placeName: string | null;
@@ -375,6 +401,7 @@ export interface PostPatch {
   eventTitle: string | null;
   eventStartsAt: Date | null;
   eventEndsAt: Date | null;
+  eventKind: EventKind;
   editedAt: Date;
 }
 

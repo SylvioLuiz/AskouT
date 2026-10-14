@@ -41,7 +41,7 @@ function PostTile({ post, mine, onRemove, busy }: { post: PostView; mine: boolea
   if (!event) return null;
   return (
     <li className="ptile">
-      <Link to={`/posts/${encodeURIComponent(post.id)}`} className={`ptile__link evcover--other${image ? '' : ' ptile__link--plain'}`}>
+      <Link to={`/eventos/${encodeURIComponent(post.id)}`} className={`ptile__link evcover--other${image ? '' : ' ptile__link--plain'}`}>
         {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="ptile__kind" aria-hidden="true">Evento</span>}
         <span className="ptile__info">
           <span className="ptile__title">{event.title}</span>

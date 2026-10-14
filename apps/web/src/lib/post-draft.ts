@@ -1,4 +1,5 @@
 import type { CropRect } from './crop.ts';
+import type { EventKind } from './types.ts';
 
 export const POST_IMAGES_MAX = 5;
 export const POST_CAPTION_MAX = 500;
@@ -50,6 +51,8 @@ export function effectivePlace(images: readonly DraftImage[], linked: LinkedPlac
 
 export interface EventDraft {
   title: string;
+  /** Tipo do evento (decide o ícone da página). Sem escolha, "Outros". */
+  kind?: EventKind;
   /** Valor de <input type="datetime-local">, na hora do aparelho. */
   startsAt: string;
   endsAt: string;
@@ -96,6 +99,6 @@ export function buildPostBody(images: readonly DraftImage[], caption: string, li
     ...(caption.trim() ? { caption: caption.trim() } : {}),
     ...(place ? { placeName: place.name, ...(place.address ? { placeAddress: place.address } : {}) } : {}),
     ...(tagUserIds.length > 0 ? { tagUserIds: [...tagUserIds] } : {}),
-    ...(event ? { event: { title: event.title.trim(), startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}) } } : {}),
+    ...(event ? { event: { title: event.title.trim(), kind: event.kind ?? 'OTHER', startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}) } } : {}),
   };
 }

@@ -3,7 +3,8 @@ import { forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
 import type { PostCommentRecord, PostPatch, PostReportReason, PostKindFilter, PostImageRecord, PostTagStatus, PostWithImages, PublicProfile } from './types.ts';
-import { POST_REPORT_REASONS, toPublicProfile } from './types.ts';
+import type { EventKind } from './types.ts';
+import { EVENT_KINDS, POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
 export const POST_IMAGES_MAX = 5;
 export const POST_CAPTION_MAX = 500;
@@ -41,6 +42,7 @@ export interface PostImageView {
 
 export interface PostEventView {
   title: string;
+  kind: EventKind;
   startsAt: string;
   endsAt: string;
 }
@@ -171,7 +173,7 @@ export class PostService {
     });
     if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do lugar por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
-    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, archivedAt: null, editedAt: null, createdAt: clock.now() }, images);
+    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPostsPublic: false, archivedAt: null, editedAt: null, createdAt: clock.now() }, images);
     if (tagIds.length > 0) {
       await posts.createTags(postId, tagIds, clock.now());
       const me = await this.deps.users.findProfileById(actorId);
@@ -289,14 +291,14 @@ export class PostService {
     const caption = input.caption === undefined ? post.caption : optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
     const placeName = input.placeName === undefined ? post.placeName : optionalText(input.placeName, 120, 'placeName', 'Nome do lugar');
     const placeAddress = input.placeAddress === undefined ? post.placeAddress : optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
-    let event: { title: string; startsAt: Date; endsAt: Date } | null;
+    let event: { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null;
     if (input.event === undefined) {
-      event = post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, startsAt: post.eventStartsAt, endsAt: post.eventEndsAt } : null;
+      event = post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, startsAt: post.eventStartsAt, endsAt: post.eventEndsAt, kind: post.eventKind } : null;
       if (event && !placeName) throw validationError('Evento inválido', { event: 'Um evento precisa de um lugar' });
     } else {
-      event = this.parseEvent(input.event, placeName, post.eventStartsAt);
+      event = this.parseEvent(input.event, placeName, post.eventStartsAt, post.eventKind);
     }
-    const patch: PostPatch = { caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, editedAt: this.deps.clock.now() };
+    const patch: PostPatch = { caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', editedAt: this.deps.clock.now() };
     if (!(await this.deps.posts.update(post.id, actorId, patch))) throw notFound('Post não encontrado');
     return this.get(actorId, post.id);
   }
@@ -386,10 +388,15 @@ export class PostService {
   }
 
   /** Evento: título, início no futuro (até 2 anos), fim opcional (padrão: 3 h depois; no máximo 30 dias) e lugar obrigatório. */
-  private parseEvent(raw: unknown, placeName: string | null, keepStart?: Date | null): { title: string; startsAt: Date; endsAt: Date } | null {
+  private parseEvent(raw: unknown, placeName: string | null, keepStart?: Date | null, keepKind?: EventKind): { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null {
     if (raw === undefined || raw === null) return null;
     if (typeof raw !== 'object' || Array.isArray(raw)) throw validationError('Evento inválido', { event: 'Dados do evento inválidos' });
-    const e = raw as { title?: unknown; startsAt?: unknown; endsAt?: unknown };
+    const e = raw as { title?: unknown; startsAt?: unknown; endsAt?: unknown; kind?: unknown };
+    let kind: EventKind = keepKind ?? 'OTHER';
+    if (e.kind !== undefined && e.kind !== null) {
+      if (typeof e.kind !== 'string' || !(EVENT_KINDS as readonly string[]).includes(e.kind)) throw validationError('Evento inválido', { event: 'Tipo de evento inválido' });
+      kind = e.kind as EventKind;
+    }
     const title = optionalText(e.title, 120, 'event', 'Título do evento');
     if (!title) throw validationError('Evento inválido', { event: 'Dê um nome ao evento' });
     if (!placeName) throw validationError('Evento inválido', { event: 'Escolha o lugar do evento' });
@@ -406,7 +413,7 @@ export class PostService {
     const endsAt = e.endsAt === undefined || e.endsAt === null || e.endsAt === '' ? new Date(startsAt.getTime() + 3 * 3_600_000) : date(e.endsAt, 'Fim');
     if (endsAt.getTime() <= startsAt.getTime()) throw validationError('Evento inválido', { event: 'O fim precisa ser depois do início' });
     if (endsAt.getTime() - startsAt.getTime() > POST_EVENT_MAX_DAYS * 24 * 3_600_000) throw validationError('Evento inválido', { event: `O evento pode durar até ${POST_EVENT_MAX_DAYS} dias` });
-    return { title, startsAt, endsAt };
+    return { title, startsAt, endsAt, kind };
   }
 
   private async validTags(actorId: string, raw: unknown): Promise<string[]> {
@@ -463,7 +470,7 @@ export class PostService {
           caption: post.caption,
           placeName: post.placeName,
           placeAddress: post.placeAddress,
-          event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString() } : null,
+          event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString() } : null,
           createdAt: post.createdAt.toISOString(),
           mine: post.authorId === viewerId,
           likeCount: likes.get(post.id)?.count ?? 0,

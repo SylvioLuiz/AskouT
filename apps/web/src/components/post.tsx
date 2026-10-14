@@ -80,7 +80,7 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
   const image = first?.path && !failed ? api.assetUrl(first.path) : null;
   return (
     <div className="evcard evcard--post">
-      <Link to={`/posts/${encodeURIComponent(post.id)}`} className="evcard__link">
+      <Link to={`/eventos/${encodeURIComponent(post.id)}`} className="evcard__link">
         <div className="evcover evcover--hero">
           {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="evcover__kind" aria-hidden="true">Evento</span>}
           {post.images.length > 1 ? <span className="postgrid__multi" aria-label={`${post.images.length} fotos`}><CarouselIcon /></span> : null}

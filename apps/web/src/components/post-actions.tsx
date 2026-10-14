@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sheet } from './agenda.tsx';
 import { CropEditor } from './crop.tsx';
+import { EventKindPicker } from './event-kind-picker.tsx';
 import { ArrowUpIcon, CropIcon, TrashIcon } from './icons.tsx';
 import { Avatar, Button, Confirm, ErrorState, Field, GroupAvatar, Loading, Notice } from './ui.tsx';
 import { api } from '../client.ts';
@@ -11,7 +12,7 @@ import { toApiError } from '../lib/errors.ts';
 import { timeAgo } from '../lib/format.ts';
 import { eventProblem, isoToLocalInput, localToIso, POST_CAPTION_MAX } from '../lib/post-draft.ts';
 import { postLink, postShareText } from '../lib/share.ts';
-import type { ConversationItem, PostComment, PostView, ReportReason } from '../lib/types.ts';
+import type { ConversationItem, EventKind, PostComment, PostView, ReportReason } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 
 export type PostGone = 'deleted' | 'hidden' | 'archived';
@@ -277,6 +278,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
   const [placeAddress, setPlaceAddress] = useState(post.placeAddress ?? '');
   const [kind, setKind] = useState<'POST' | 'EVENT'>(post.event ? 'EVENT' : 'POST');
   const [title, setTitle] = useState(post.event?.title ?? '');
+  const [eventKind, setEventKind] = useState<EventKind>(post.event?.kind ?? 'OTHER');
   const [starts, setStarts] = useState(post.event ? isoToLocalInput(post.event.startsAt) : '');
   const [ends, setEnds] = useState(post.event ? isoToLocalInput(post.event.endsAt) : '');
   const [busy, setBusy] = useState(false);
@@ -288,7 +290,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
     // O início só precisa estar no futuro se a pessoa mudou o horário.
     const unchanged = post.event && starts === isoToLocalInput(post.event.startsAt);
     if (kind === 'EVENT') {
-      const problem = eventProblem({ title, startsAt: starts, endsAt: ends }, place, unchanged ? new Date(0) : new Date());
+      const problem = eventProblem({ title, kind: eventKind, startsAt: starts, endsAt: ends }, place, unchanged ? new Date(0) : new Date());
       if (problem) {
         setMessage({ tone: 'error', text: problem });
         return;
@@ -300,7 +302,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
         caption: caption.trim() || null,
         placeName: place?.name ?? null,
         placeAddress: place?.address ?? null,
-        event: kind === 'EVENT' ? { title: title.trim(), startsAt: localToIso(starts), endsAt: ends ? localToIso(ends) : null } : null,
+        event: kind === 'EVENT' ? { title: title.trim(), kind: eventKind, startsAt: localToIso(starts), endsAt: ends ? localToIso(ends) : null } : null,
       });
       onSaved(updated);
     } catch (failure) {
@@ -323,6 +325,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
       {kind === 'EVENT' ? (
         <>
           <Field label="Nome do evento" value={title} onChange={setTitle} maxLength={120} />
+          <EventKindPicker value={eventKind} onChange={setEventKind} />
           <Field label="Começa" type="datetime-local" value={starts} onChange={setStarts} />
           <Field label="Termina (opcional)" type="datetime-local" value={ends} onChange={setEnds} />
         </>

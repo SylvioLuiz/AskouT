@@ -19,7 +19,9 @@ import type {
   Slot,
   SlotInput,
   ConnectionsPage,
-  ExploreEvent,
+  EventKind,
+  EventPage,
+  EventPost,
   GroupDetails,
   MeetupView,
   NotificationList,
@@ -134,7 +136,7 @@ export function createApi(deps: ApiDeps) {
     postEvent: (eventId: string) => request<{ posted: true }>('POST', `/events/${id(eventId)}/post`),
     unpostEvent: (eventId: string) => request<{ posted: false }>('DELETE', `/events/${id(eventId)}/post`),
     sendEvent: (conversationId: string, eventId: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { eventId } }),
-    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; tagUserIds?: string[]; event?: { title: string; startsAt: string | null; endsAt?: string | null } }) => request<PostView>('POST', '/posts', { body: input }),
+    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null } }) => request<PostView>('POST', '/posts', { body: input }),
     post: (postId: string) => request<PostView>('GET', `/posts/${id(postId)}`),
     deletePost: (postId: string) => request<{ deleted: true }>('DELETE', `/posts/${id(postId)}`),
     pendingTags: (page?: PageRequest) => request<PostsPage>('GET', `/posts/pending-tags${pageQuery(page)}`),
@@ -224,8 +226,13 @@ export function createApi(deps: ApiDeps) {
       const text = query.toString();
       return request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
     },
-    exploreEvent: (eventId: string, position?: { lat: number; lng: number }) =>
-      request<ExploreEvent>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
+    eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
+      request<EventPage>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
+    eventGo: (eventId: string) => request<EventPage>('POST', `/events/${id(eventId)}/going`),
+    eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),
+    eventPostsPublic: (eventId: string, value: boolean) => request<EventPage>('PUT', `/events/${id(eventId)}/posts-public`, { body: { public: value } }),
+    createEventPost: (eventId: string, input: { caption: string; image?: string }) => request<EventPost>('POST', `/events/${id(eventId)}/posts`, { body: input }),
+    deleteEventPost: (eventId: string, postId: string) => request<{ deleted: true }>('DELETE', `/events/${id(eventId)}/posts/${id(postId)}`),
 
     // Conversas
     conversations: () => request<{ items: ConversationItem[] }>('GET', '/conversations'),

@@ -1,0 +1,294 @@
+import { decodeImageDataUrl } from './image.ts';
+import { distanceMeters } from './geo.ts';
+import { forbidden, notFound, validationError } from './errors.ts';
+import type { CoreDeps } from './ports.ts';
+import type { ProfileService } from './profile-service.ts';
+import type { EventKind, EventRef, PublicProfile } from './types.ts';
+import { toPublicProfile } from './types.ts';
+
+export const EVENT_POST_CAPTION_MAX = 500;
+/** Foto do post do evento: chega já reduzida pelo app, até 100 KB. */
+export const EVENT_POST_IMAGE_MAX_BYTES = 100 * 1024;
+/** Quantos posts e quantos avatares a página traz de uma vez. */
+export const EVENT_POSTS_LIMIT = 30;
+export const EVENT_ATTENDEES_LIMIT = 60;
+
+/** A capa: o que o dono enviou, a foto que o Google deu para o lugar ou a imagem do evento do local. */
+export type EventCoverView =
+  | { kind: 'URL'; url: string }
+  | { kind: 'UPLOAD'; imageId: string }
+  | { kind: 'PLACE'; photoRef: string; author: string | null };
+
+export interface EventPostView {
+  id: string;
+  author: PublicProfile;
+  caption: string;
+  hasImage: boolean;
+  createdAt: string;
+  mine: boolean;
+  /** Quem escreveu e o dono do evento apagam. */
+  canDelete: boolean;
+}
+
+export interface EventPageView {
+  id: string;
+  /** PLACE: evento do local (Explorar). USER: evento criado por uma pessoa. */
+  source: 'PLACE' | 'USER';
+  title: string;
+  description: string | null;
+  kind: EventKind;
+  startsAt: string;
+  endsAt: string;
+  isFree: boolean;
+  /** Dado de exemplo para teste, nunca um evento real. */
+  sample: boolean;
+  cover: EventCoverView | null;
+  venue: { name: string; address: string | null; lat: number | null; lng: number | null };
+  tags: string[];
+  distanceM: number | null;
+  /** Só em evento do local: o visitante já postou no próprio perfil. */
+  postedByMe: boolean;
+  /** Confirmados, contando o dono (que está confirmado por ser dono). */
+  confirmedCount: number;
+  /** O visitante confirmou (o dono sempre está). */
+  going: boolean;
+  /** O dono primeiro, depois quem confirmou, em ordem. Sem quem tem bloqueio com o visitante. */
+  attendees: PublicProfile[];
+  owner: PublicProfile | null;
+  isOwner: boolean;
+  /** Evento de pessoa tem área de posts; evento do local ainda não (não tem dono). */
+  postsEnabled: boolean;
+  /** true: o dono e quem confirmou postam; false: só o dono. */
+  postsPublic: boolean;
+  canPost: boolean;
+  posts: EventPostView[];
+}
+
+export interface EventPostInput {
+  caption?: unknown;
+  /** Data URL da foto (opcional), já reduzida pelo app. */
+  image?: unknown;
+}
+
+function optionalText(value: unknown, max: number, field: string, label: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') throw validationError('Dados inválidos', { [field]: `${label} inválido` });
+  const text = value.trim().replace(/\r\n/g, '\n');
+  if (text === '') return null;
+  if (Array.from(text).length > max) throw validationError('Dados inválidos', { [field]: `${label} pode ter até ${max} caracteres` });
+  return text;
+}
+
+function parseId(id: unknown): string {
+  if (typeof id !== 'string' || id === '' || id.length > 64) throw notFound('Evento não encontrado');
+  return id;
+}
+
+interface Resolved {
+  ref: EventRef;
+  owner: PublicProfile | null;
+}
+
+/** Página do evento: capa, confirmados ("Eu vou") e posts dentro do evento (só eventos criados por pessoas). */
+export class EventPageService {
+  private readonly deps: CoreDeps;
+  private readonly profiles: ProfileService;
+
+  constructor(deps: CoreDeps, profiles: ProfileService) {
+    this.deps = deps;
+    this.profiles = profiles;
+  }
+
+  /** O evento existe e o visitante pode vê-lo? Evento de pessoa segue a regra de privacidade do post. */
+  private async resolve(viewerId: string, rawId: unknown): Promise<Resolved> {
+    const id = parseId(rawId);
+    if (await this.deps.places.findEvent(id)) return { ref: { source: 'PLACE', id }, owner: null };
+    const found = await this.deps.posts.findById(id);
+    const post = found?.post;
+    if (!post || post.eventTitle === null || !post.eventStartsAt || !post.eventEndsAt) throw notFound('Evento não encontrado');
+    if (post.archivedAt !== null && post.authorId !== viewerId) throw notFound('Evento não encontrado');
+    if (post.authorId !== viewerId) {
+      if (await this.deps.blocks.existsEitherWay(viewerId, post.authorId)) throw notFound('Evento não encontrado');
+      const author = await this.deps.users.findProfileById(post.authorId);
+      if (!author) throw notFound('Evento não encontrado');
+      let canSee = false;
+      try {
+        canSee = (await this.profiles.getByUsername(viewerId, author.username)).canViewContent;
+      } catch {
+        canSee = false;
+      }
+      if (!canSee) throw notFound('Evento não encontrado');
+    }
+    const authorProfile = await this.deps.users.findProfileById(post.authorId);
+    return { ref: { source: 'USER', id }, owner: authorProfile ? toPublicProfile(authorProfile) : null };
+  }
+
+  async get(viewerId: string, rawId: unknown, input: { lat?: number; lng?: number } = {}): Promise<EventPageView> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
+
+    const base = await this.base(viewerId, ref, input);
+    const going = await this.deps.eventRoom.listGoing(ref);
+    const goingIds = going.map((g) => g.userId).filter((u) => u !== owner?.userId);
+    const ordered = [...(owner ? [owner.userId] : []), ...goingIds];
+    const visibleIds = ordered.filter((u) => u === viewerId || !hidden.has(u));
+    const profiles = await this.deps.users.findProfilesByIds(visibleIds.slice(0, EVENT_ATTENDEES_LIMIT));
+    const byId = new Map(profiles.map((p) => [p.userId, toPublicProfile(p)]));
+    const attendees = visibleIds.flatMap((u) => {
+      const p = byId.get(u);
+      return p ? [p] : [];
+    });
+
+    const isOwner = owner?.userId === viewerId;
+    const iGo = isOwner || going.some((g) => g.userId === viewerId);
+    const postsEnabled = ref.source === 'USER';
+    const postsPublic = base.postsPublic;
+    const posts = postsEnabled ? await this.postViews(viewerId, ref.id, owner?.userId ?? '', hidden) : [];
+    return {
+      ...base.view,
+      confirmedCount: ordered.length,
+      going: iGo,
+      attendees,
+      owner,
+      isOwner,
+      postsEnabled,
+      postsPublic,
+      canPost: postsEnabled && (isOwner || (postsPublic && iGo)),
+      posts,
+    };
+  }
+
+  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'postsEnabled' | 'postsPublic' | 'canPost' | 'posts'>; postsPublic: boolean }> {
+    if (ref.source === 'PLACE') {
+      const found = await this.deps.places.findEvent(ref.id);
+      if (!found) throw notFound('Evento não encontrado');
+      const { event, venue } = found;
+      const distance = input.lat !== undefined && input.lng !== undefined ? Math.round(distanceMeters({ lat: input.lat, lng: input.lng }, venue)) : null;
+      return {
+        postsPublic: false,
+        view: {
+          id: event.id,
+          source: 'PLACE',
+          title: event.title,
+          description: event.description,
+          kind: event.kind,
+          startsAt: event.startsAt.toISOString(),
+          endsAt: event.endsAt.toISOString(),
+          isFree: event.isFree,
+          sample: event.isSample || venue.isSample,
+          cover: event.imageUrl ? { kind: 'URL', url: event.imageUrl } : null,
+          venue: { name: venue.name, address: venue.address, lat: venue.lat, lng: venue.lng },
+          tags: [...event.tags],
+          distanceM: distance,
+          postedByMe: await this.deps.profileEvents.has(viewerId, event.id),
+        },
+      };
+    }
+    const found = await this.deps.posts.findById(ref.id);
+    const title = found?.post.eventTitle;
+    const startsAt = found?.post.eventStartsAt;
+    const endsAt = found?.post.eventEndsAt;
+    if (!found || !title || !startsAt || !endsAt) throw notFound('Evento não encontrado');
+    const { post, images } = found;
+    const first = [...images].sort((a, b) => a.position - b.position)[0];
+    const cover: EventCoverView | null = !first ? null : first.isUpload ? { kind: 'UPLOAD', imageId: first.id } : first.placePhotoRef ? { kind: 'PLACE', photoRef: first.placePhotoRef, author: first.placePhotoAuthor } : null;
+    return {
+      postsPublic: post.eventPostsPublic,
+      view: {
+        id: post.id,
+        source: 'USER',
+        title,
+        description: post.caption,
+        kind: post.eventKind,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        isFree: false,
+        sample: false,
+        cover,
+        venue: { name: post.placeName ?? '', address: post.placeAddress, lat: null, lng: null },
+        tags: [],
+        distanceM: null,
+        postedByMe: false,
+      },
+    };
+  }
+
+  private async postViews(viewerId: string, eventId: string, ownerId: string, hidden: Set<string>): Promise<EventPostView[]> {
+    const rows = await this.deps.eventRoom.listPosts(eventId, { limit: EVENT_POSTS_LIMIT, offset: 0 });
+    const visible = rows.filter((r) => r.authorId === viewerId || !hidden.has(r.authorId));
+    const authors = await this.deps.users.findProfilesByIds([...new Set(visible.map((r) => r.authorId))]);
+    const byId = new Map(authors.map((a) => [a.userId, toPublicProfile(a)]));
+    return visible.flatMap((r) => {
+      const author = byId.get(r.authorId);
+      if (!author) return [];
+      return [{ id: r.id, author, caption: r.caption, hasImage: r.hasImage, createdAt: r.createdAt.toISOString(), mine: r.authorId === viewerId, canDelete: r.authorId === viewerId || ownerId === viewerId }];
+    });
+  }
+
+  /** "Eu vou". O dono já conta como confirmado: confirmar de novo não muda nada. */
+  async go(viewerId: string, rawId: unknown): Promise<EventPageView> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    if (owner?.userId !== viewerId) {
+      const found = ref.source === 'PLACE' ? await this.deps.places.findEvent(ref.id) : await this.deps.posts.findById(ref.id);
+      if (!found) throw notFound('Evento não encontrado');
+      await this.deps.eventRoom.addGoing(ref, viewerId, this.deps.clock.now());
+    }
+    return this.get(viewerId, ref.id);
+  }
+
+  async cancel(viewerId: string, rawId: unknown): Promise<EventPageView> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    if (owner?.userId === viewerId) throw forbidden('Você é o dono: o evento já conta com você. Apague o evento se não vai mais acontecer.');
+    await this.deps.eventRoom.removeGoing(ref, viewerId);
+    return this.get(viewerId, ref.id);
+  }
+
+  /** Só o dono escolhe: posts públicos (dono e confirmados postam) ou privados (só o dono). */
+  async setPostsPublic(viewerId: string, rawId: unknown, value: unknown): Promise<EventPageView> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    if (ref.source !== 'USER') throw forbidden('Este evento não tem área de posts');
+    if (owner?.userId !== viewerId) throw forbidden('Só o dono do evento muda quem pode postar');
+    if (typeof value !== 'boolean') throw validationError('Valor inválido', { public: 'Use true ou false' });
+    if (!(await this.deps.eventRoom.setPostsPublic(ref.id, viewerId, value))) throw notFound('Evento não encontrado');
+    return this.get(viewerId, ref.id);
+  }
+
+  async createPost(viewerId: string, rawId: unknown, input: EventPostInput): Promise<EventPostView> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    if (ref.source !== 'USER') throw forbidden('Este evento não tem área de posts');
+    const isOwner = owner?.userId === viewerId;
+    if (!isOwner) {
+      const post = await this.deps.posts.findById(ref.id);
+      if (!post?.post.eventPostsPublic) throw forbidden('Neste evento só o dono posta');
+      if (!(await this.deps.eventRoom.isGoing(ref, viewerId))) throw forbidden('Confirme presença para postar neste evento');
+    }
+    const caption = optionalText(input.caption, EVENT_POST_CAPTION_MAX, 'caption', 'Texto');
+    if (!caption) throw validationError('Post vazio', { caption: 'Escreva algo para postar' });
+    let mime: string | null = null;
+    let data: Uint8Array | null = null;
+    if (input.image !== undefined && input.image !== null) {
+      const decoded = decodeImageDataUrl(input.image, EVENT_POST_IMAGE_MAX_BYTES, '100 KB');
+      mime = decoded.mime;
+      data = new Uint8Array(decoded.bytes);
+    }
+    const record = { id: this.deps.ids.next(), eventId: ref.id, authorId: viewerId, caption, mime, data, createdAt: this.deps.clock.now() };
+    await this.deps.eventRoom.addPost(record);
+    const me = await this.deps.users.findProfileById(viewerId);
+    return { id: record.id, author: toPublicProfile(me!), caption, hasImage: data !== null, createdAt: record.createdAt.toISOString(), mine: true, canDelete: true };
+  }
+
+  async deletePost(viewerId: string, rawId: unknown, postId: unknown): Promise<{ deleted: true }> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    const post = typeof postId === 'string' && postId.length <= 64 ? await this.deps.eventRoom.findPost(postId) : undefined;
+    if (!post || post.eventId !== ref.id) throw notFound('Post não encontrado');
+    if (post.authorId !== viewerId && owner?.userId !== viewerId) throw forbidden('Só quem escreveu ou o dono do evento apaga o post');
+    await this.deps.eventRoom.deletePost(post.id);
+    return { deleted: true };
+  }
+
+  /** Foto de um post de evento, para o <img>. Quem tem o endereço (id aleatório) vê, como nas fotos dos posts. */
+  async postImage(postId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (typeof postId !== 'string' || postId === '' || postId.length > 64) return undefined;
+    return this.deps.eventRoom.findPostImage(postId);
+  }
+}

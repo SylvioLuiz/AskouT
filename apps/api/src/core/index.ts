@@ -7,6 +7,7 @@ import { FollowService } from './follow-service.ts';
 import { MeetupService } from './meetup-service.ts';
 import { ProfileEventService } from './profile-event-service.ts';
 import { PostService } from './post-service.ts';
+import { EventPageService } from './event-page-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
@@ -34,6 +35,7 @@ export function createCore(input: CoreInput) {
     conversations: new ConversationService(deps),
     suggestions: new SuggestionService(deps, flash),
     explore: new ExploreService(deps, profiles),
+    eventPages: new EventPageService(deps, profiles),
     meetups: new MeetupService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
     posts: new PostService(deps, profiles),
@@ -96,6 +98,8 @@ export { ConversationService, MESSAGE_MAX, MESSAGES_PER_MINUTE, parseSuggestion 
 export type { ConversationListItem, ConversationView, GroupDetails, MessageView } from './conversation-service.ts';
 export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_APART_M } from './suggestion-service.ts';
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
+export { EventPageService } from './event-page-service.ts';
+export type { EventPageView, EventPostView, EventCoverView } from './event-page-service.ts';
 export { ExploreService, EXPLORE_DEFAULT_RADIUS_KM, EXPLORE_MAX_RADIUS_KM } from './explore-service.ts';
 export type { ExploreEventItem, ExplorePlaceItem, ExploreView } from './explore-service.ts';
 export { MeetupService, MEETUP_MAX_GUESTS } from './meetup-service.ts';

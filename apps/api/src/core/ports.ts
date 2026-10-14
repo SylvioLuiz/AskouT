@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -344,6 +344,26 @@ export interface Notifier {
   notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string }): Promise<void>;
 }
 
+/** Presença ("Eu vou") e posts dentro de eventos criados por pessoas. */
+export interface EventRoomRepository {
+  /** Confirma presença. Devolve false se já estava confirmada. */
+  addGoing(ref: EventRef, userId: string, at: Date): Promise<boolean>;
+  removeGoing(ref: EventRef, userId: string): Promise<boolean>;
+  isGoing(ref: EventRef, userId: string): Promise<boolean>;
+  /** Quem confirmou, na ordem da confirmação (mais antigo primeiro). */
+  listGoing(ref: EventRef): Promise<EventAttendanceRecord[]>;
+  /** Números de confirmados de vários eventos de uma vez. */
+  countGoing(refs: EventRef[]): Promise<Map<string, number>>;
+  addPost(post: EventPostRecord): Promise<void>;
+  /** Mais recentes primeiro, sem os bytes da foto. */
+  listPosts(eventId: string, page: Page): Promise<(Omit<EventPostRecord, 'data'> & { hasImage: boolean })[]>;
+  findPost(id: string): Promise<(Omit<EventPostRecord, 'data'> & { hasImage: boolean }) | undefined>;
+  deletePost(id: string): Promise<void>;
+  findPostImage(id: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+  /** Liga/desliga a publicação aberta. Só o dono. Devolve false se o evento não existe ou é de outra pessoa. */
+  setPostsPublic(postId: string, ownerId: string, value: boolean): Promise<boolean>;
+}
+
 export interface CoreDeps {
   notifier: Notifier;
   users: UserRepository;
@@ -355,6 +375,7 @@ export interface CoreDeps {
   meetups: MeetupRepository;
   profileEvents: ProfileEventRepository;
   posts: PostRepository;
+  eventRoom: EventRoomRepository;
   places: PlaceRepository;
   placeSource: PlaceSource;
   pending: PendingSignupRepository;

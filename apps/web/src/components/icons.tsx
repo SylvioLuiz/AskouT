@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { EventKind } from '../lib/types.ts';
 
 function Svg({ children }: { children: ReactNode }) {
   return (
@@ -212,3 +213,90 @@ export const TrashIcon = () => (
     <path d="M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7" />
   </svg>
 );
+
+/** Ícone do tipo de evento (o círculo no meio da capa). */
+export function EventKindIcon({ kind }: { kind: EventKind }) {
+  switch (kind) {
+    case 'OUTDOOR':
+      // Árvore.
+      return (
+        <Svg>
+          <path d="M12 3 7 10h3l-4 6h12l-4-6h3z" />
+          <path d="M12 16v5" />
+        </Svg>
+      );
+    case 'SPORT':
+      // Troféu.
+      return (
+        <Svg>
+          <path d="M8 4h8v5a4 4 0 0 1-8 0z" />
+          <path d="M8 6H5a3 3 0 0 0 3 4" />
+          <path d="M16 6h3a3 3 0 0 1-3 4" />
+          <path d="M12 13v4" />
+          <path d="M8 21h8M9 17h6v4H9z" />
+        </Svg>
+      );
+    case 'SHOW':
+      return (
+        <Svg>
+          <path d="M9 18V6l10-2v12" />
+          <circle cx="6.5" cy="18" r="2.5" />
+          <circle cx="16.5" cy="16" r="2.5" />
+        </Svg>
+      );
+    case 'CINEMA':
+      return (
+        <Svg>
+          <rect x="3" y="8" width="18" height="12" rx="2" />
+          <path d="m3 8 3-5h4L7 8" />
+          <path d="m10 8 3-5h4l-3 5" />
+        </Svg>
+      );
+    case 'THEATER':
+      return (
+        <Svg>
+          <path d="M4 5h10v6a5 5 0 0 1-10 0z" />
+          <path d="M7.5 8.5h.01M10.5 8.5h.01" />
+          <path d="M7 12q2 1.6 4 0" />
+          <path d="M16 9h4v5a4 4 0 0 1-6.5 3" />
+        </Svg>
+      );
+    case 'EXHIBITION':
+      return (
+        <Svg>
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <circle cx="9" cy="10" r="1.6" />
+          <path d="m21 16-5-5-8 9" />
+        </Svg>
+      );
+    case 'GASTRONOMY':
+      return (
+        <Svg>
+          <path d="M5 3v5a2 2 0 0 0 4 0V3" />
+          <path d="M7 3v18" />
+          <path d="M17 3c-2 2-3 5-3 8h3" />
+          <path d="M17 3v18" />
+        </Svg>
+      );
+    case 'NIGHT':
+      return (
+        <Svg>
+          <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />
+        </Svg>
+      );
+    case 'DIGITAL':
+      return (
+        <Svg>
+          <rect x="3" y="4" width="18" height="12" rx="2" />
+          <path d="M8 20h8" />
+          <path d="M12 16v4" />
+        </Svg>
+      );
+    default:
+      return (
+        <Svg>
+          <path d="m12 3 2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5l-5.4 3 1.2-6-4.5-4.2 6.1-.7z" />
+        </Svg>
+      );
+  }
+}

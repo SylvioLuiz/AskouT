@@ -2,6 +2,7 @@ import { conflict } from '../errors.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
   PostRepository,
+  EventRoomRepository,
   ConversationRepository,
   MeetupRepository,
   NotificationRepository,
@@ -25,7 +26,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -1036,5 +1037,92 @@ export class InMemoryPostRepository implements PostRepository {
   async findImage(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
     const i = this.images.get(imageId);
     return i && i.data && i.mime ? { mime: i.mime, data: new Uint8Array(i.data) } : undefined;
+  }
+}
+
+export class InMemoryEventRoomRepository implements EventRoomRepository {
+  private readonly postsRepo: InMemoryPostRepository;
+  readonly going = new Map<string, { ref: EventRef; userId: string; createdAt: Date }>();
+  readonly eventPosts = new Map<string, EventPostRecord>();
+
+  constructor(postsRepo: InMemoryPostRepository) {
+    this.postsRepo = postsRepo;
+  }
+
+  private static key(ref: EventRef): string {
+    return `${ref.source}:${ref.id}`;
+  }
+
+  async addGoing(ref: EventRef, userId: string, at: Date): Promise<boolean> {
+    const key = `${InMemoryEventRoomRepository.key(ref)}|${userId}`;
+    if (this.going.has(key)) return false;
+    this.going.set(key, { ref: { ...ref }, userId, createdAt: at });
+    return true;
+  }
+
+  async removeGoing(ref: EventRef, userId: string): Promise<boolean> {
+    return this.going.delete(`${InMemoryEventRoomRepository.key(ref)}|${userId}`);
+  }
+
+  /** Evento de pessoa apagado leva a presença e os posts junto (como o ON DELETE CASCADE do banco). */
+  private alive(ref: EventRef): boolean {
+    return ref.source === 'PLACE' || this.postsRepo.posts.has(ref.id);
+  }
+
+  async isGoing(ref: EventRef, userId: string): Promise<boolean> {
+    return this.alive(ref) && this.going.has(`${InMemoryEventRoomRepository.key(ref)}|${userId}`);
+  }
+
+  async listGoing(ref: EventRef): Promise<EventAttendanceRecord[]> {
+    const key = InMemoryEventRoomRepository.key(ref);
+    if (!this.alive(ref)) return [];
+    return [...this.going.values()]
+      .filter((r) => InMemoryEventRoomRepository.key(r.ref) === key)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.userId < b.userId ? -1 : 1))
+      .map((r) => ({ userId: r.userId, createdAt: r.createdAt }));
+  }
+
+  async countGoing(refs: EventRef[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    for (const ref of refs) out.set(ref.id, 0);
+    for (const r of this.going.values()) if (this.alive(r.ref) && out.has(r.ref.id) && refs.some((x) => x.source === r.ref.source && x.id === r.ref.id)) out.set(r.ref.id, (out.get(r.ref.id) ?? 0) + 1);
+    return out;
+  }
+
+  async addPost(post: EventPostRecord): Promise<void> {
+    this.eventPosts.set(post.id, { ...post, data: post.data ? new Uint8Array(post.data) : null });
+  }
+
+  private static meta(p: EventPostRecord): Omit<EventPostRecord, 'data'> & { hasImage: boolean } {
+    return { id: p.id, eventId: p.eventId, authorId: p.authorId, caption: p.caption, mime: p.mime, createdAt: p.createdAt, hasImage: p.data !== null };
+  }
+
+  async listPosts(eventId: string, page: Page): Promise<(Omit<EventPostRecord, 'data'> & { hasImage: boolean })[]> {
+    return [...this.eventPosts.values()]
+      .filter((p) => p.eventId === eventId && this.postsRepo.posts.has(eventId))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+      .slice(page.offset ?? 0, (page.offset ?? 0) + (page.limit ?? 50))
+      .map(InMemoryEventRoomRepository.meta);
+  }
+
+  async findPost(id: string): Promise<(Omit<EventPostRecord, 'data'> & { hasImage: boolean }) | undefined> {
+    const p = this.eventPosts.get(id);
+    return p ? InMemoryEventRoomRepository.meta(p) : undefined;
+  }
+
+  async deletePost(id: string): Promise<void> {
+    this.eventPosts.delete(id);
+  }
+
+  async findPostImage(id: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    const p = this.eventPosts.get(id);
+    return p && p.mime && p.data ? { mime: p.mime, data: new Uint8Array(p.data) } : undefined;
+  }
+
+  async setPostsPublic(postId: string, ownerId: string, value: boolean): Promise<boolean> {
+    const post = this.postsRepo.posts.get(postId);
+    if (!post || post.authorId !== ownerId || post.eventTitle === null) return false;
+    post.eventPostsPublic = value;
+    return true;
   }
 }

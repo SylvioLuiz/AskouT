@@ -4,6 +4,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { CropIcon, XIcon } from '../components/icons.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { CropEditor } from '../components/crop.tsx';
+import { EventKindPicker } from '../components/event-kind-picker.tsx';
 import { PostCard, PostList } from '../components/post.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -14,7 +15,7 @@ import type { CropRect } from '../lib/crop.ts';
 import { toggleId } from '../lib/meetup.ts';
 import { addImages, buildPostBody, effectivePlace, eventProblem, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
 import type { DraftImage, LinkedPlace } from '../lib/post-draft.ts';
-import type { ExplorePlace } from '../lib/types.ts';
+import type { EventKind, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
 
@@ -117,6 +118,7 @@ export function CreatePostScreen() {
   const [cropBusy, setCropBusy] = useState(false);
   const [kind, setKind] = useState<'POST' | 'EVENT'>('POST');
   const [eventTitle, setEventTitle] = useState('');
+  const [eventKind, setEventKind] = useState<EventKind>('OTHER');
   const [eventStart, setEventStart] = useState('');
   const [eventEnd, setEventEnd] = useState('');
   const friends = useAsync(() => api.friends(), []);
@@ -190,7 +192,7 @@ export function CreatePostScreen() {
   async function publish() {
     setBusy(true);
     setMessage(undefined);
-    const eventDraft = kind === 'EVENT' ? { title: eventTitle, startsAt: eventStart, endsAt: eventEnd } : null;
+    const eventDraft = kind === 'EVENT' ? { title: eventTitle, kind: eventKind, startsAt: eventStart, endsAt: eventEnd } : null;
     const problem = eventDraft ? eventProblem(eventDraft, effectivePlace(items, linked), new Date()) : null;
     if (problem) {
       setMessage({ tone: 'error', text: problem });
@@ -239,6 +241,7 @@ export function CreatePostScreen() {
         {kind === 'EVENT' ? (
           <section className="compose__row" aria-label="Dados do evento">
             <Field label="Nome do evento" value={eventTitle} onChange={setEventTitle} maxLength={120} />
+            <EventKindPicker value={eventKind} onChange={setEventKind} />
             <Field label="Começa" type="datetime-local" value={eventStart} onChange={setEventStart} />
             <Field label="Termina (opcional)" type="datetime-local" value={eventEnd} onChange={setEventEnd} hint="Sem horário de fim, o evento dura 3 horas." />
             <p className="muted">Um evento precisa de um lugar. Escolha abaixo.</p>

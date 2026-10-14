@@ -7,7 +7,7 @@ import { formatWhen } from '../lib/chat.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { toApiError } from '../lib/errors.ts';
 import { MEETUP_ACTION_LABEL, MEETUP_NAME_MAX, goingLabel, statusLabel, toggleId } from '../lib/meetup.ts';
-import type { ExploreEvent, MeetupView } from '../lib/types.ts';
+import type { MeetupView } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 /** Capa do evento do encontro: imagem https ou degradê pelo tipo. */
 export function MeetupCover({ meetup }: { meetup: MeetupView }) {
@@ -142,7 +142,7 @@ export function FriendPicker({ picked, onToggle, exclude = [] }: { picked: strin
 }
 
 /** Folha para criar o encontro a partir de um evento: escolhe os amigos; com mais de um, nasce um grupo. */
-export function CreateMeetupSheet({ event, onClose }: { event: ExploreEvent; onClose: () => void }) {
+export function CreateMeetupSheet({ event, onClose }: { event: { id: string; title: string }; onClose: () => void }) {
   const friends = useAsync(() => api.friends(), []);
   const [picked, setPicked] = useState<string[]>([]);
   const [name, setName] = useState('');
