@@ -265,3 +265,15 @@ test('purgeExpired remove registros fechados há mais de 24 h e mantém os recen
   assert.ok(result.removed >= 2);
   assert.equal(w.flash.invites.size, 0);
 });
+
+test('flash: duração livre em minutos (5 a 180, de 5 em 5)', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  for (const bad of [0, 4, 7, 185, 181, 2.5, '30', null]) {
+    const err = await rejectsWith(w.core.flash.turnOn(ana!, { minutes: bad }), 'VALIDATION');
+    assert.ok(err.details && 'minutes' in err.details, String(bad));
+  }
+  const on = await w.core.flash.turnOn(ana!, { minutes: 45 });
+  const span = new Date(on.expiresAt!).getTime() - new Date(on.startsAt!).getTime();
+  assert.equal(span, 45 * 60_000);
+});

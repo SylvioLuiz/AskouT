@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BoltIcon } from '../components/icons.tsx';
+import { Wheel } from '../components/wheel.tsx';
 import { ChatButton } from '../components/chat-button.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -7,7 +8,9 @@ import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import {
   announceFlashChange,
   distanceMeters,
-  FLASH_DURATIONS,
+  FLASH_DEFAULT_MINUTES,
+  clampFlashMinutes,
+  formatFlashDuration,
   FLASH_NOTE_MAX,
   flashNoteProblem,
   formatAge,
@@ -23,6 +26,7 @@ import type { AvailableFriend, FlashInvite, FlashMatch, PublicProfile } from '..
 import { Link, navigate } from '../router.tsx';
 
 const POLL_MS = 10_000;
+const MINUTE_STEPS: readonly number[] = Array.from({ length: 12 }, (_, i) => i * 5);
 
 // O mapa (MapLibre) é pesado: só é baixado quando alguém abre um encontro.
 const MatchMap = lazy(() => import('../components/match-map.tsx'));
@@ -51,7 +55,7 @@ export function FlashScreen() {
   });
   const [mapFailed, setMapFailed] = useState(false);
 
-  const [hours, setHours] = useState(2);
+  const [minutes, setMinutes] = useState(FLASH_DEFAULT_MINUTES);
   const [note, setNote] = useState('');
   const [noteError, setNoteError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -81,7 +85,7 @@ export function FlashScreen() {
     setBusy(true);
     setFeedback(undefined);
     try {
-      status.setData(await api.flashOn(hours, note.trim()));
+      status.setData(await api.flashOn(minutes, note.trim()));
       available.reload();
       announceFlashChange();
     } catch (failure) {
@@ -156,14 +160,15 @@ export function FlashScreen() {
         </section>
       ) : (
         <section className="flashpanel" aria-label="Ligar o Flash">
-          <p className="flashpanel__lead">Quanto tempo você fica disponível?</p>
-          <div className="chips" role="group" aria-label="Duração do Flash">
-            {FLASH_DURATIONS.map((h) => (
-              <button key={h} type="button" className="chip" aria-pressed={hours === h} onClick={() => setHours(h)}>
-                {h} {h === 1 ? 'hora' : 'horas'}
-              </button>
-            ))}
+          <p className="flashpanel__lead">Por quanto tempo você fica disponível?</p>
+          <div className="wheels" role="group" aria-label="Duração do Flash">
+            <Wheel label="Horas" values={[0, 1, 2, 3]} value={Math.floor(minutes / 60)} format={(v) => `${v} h`} onChange={(h) => setMinutes((cur) => clampFlashMinutes(h * 60 + (cur % 60)))} />
+            <Wheel label="Minutos" values={MINUTE_STEPS} value={minutes % 60} format={(v) => `${String(v).padStart(2, '0')} min`} onChange={(m) => setMinutes((cur) => clampFlashMinutes(Math.floor(cur / 60) * 60 + m))} />
+            <div className="wheels__band" aria-hidden="true" />
           </div>
+          <p className="flashpanel__until" aria-live="polite">
+            {formatFlashDuration(minutes)}, até {new Date(Date.now() + minutes * 60_000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </p>
           <Field
             label="Recado (opcional)"
             value={note}

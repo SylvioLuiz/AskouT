@@ -188,8 +188,8 @@ export function createApi(deps: ApiDeps) {
 
     // Flash
     flashStatus: () => request<FlashStatus>('GET', '/me/flash'),
-    flashOn: (hours: number, note: string) =>
-      request<FlashStatus>('POST', '/me/flash', { body: note === '' ? { hours } : { hours, note } }),
+    flashOn: (minutes: number, note: string) =>
+      request<FlashStatus>('POST', '/me/flash', { body: note === '' ? { minutes } : { minutes, note } }),
     flashOff: () => request<{ ended: boolean }>('DELETE', '/me/flash'),
     flashAvailable: () => request<{ items: AvailableFriend[] }>('GET', '/flash/available'),
     flashInvites: () => request<FlashInvites>('GET', '/flash/invites'),

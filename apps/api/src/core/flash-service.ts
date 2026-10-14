@@ -4,6 +4,9 @@ import type { FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Public
 import { toPublicProfile } from './types.ts';
 
 export const FLASH_HOURS: readonly number[] = [1, 2, 3];
+/** Duração livre em minutos (de 5 em 5), de 5 min até 3 h. */
+export const FLASH_MIN_MINUTES = 5;
+export const FLASH_MAX_MINUTES = 180;
 export const FLASH_NOTE_MAX = 60;
 export const INVITE_TTL_MINUTES = 15;
 /** Depois disso a última posição conhecida é tratada como "sem sinal". */
@@ -98,11 +101,19 @@ export class FlashService {
   }
 
   /** Liga o Flash por 1, 2 ou 3 horas. Só um por vez; para mudar a duração é preciso desligar antes. */
-  async turnOn(actorId: string, input: { hours?: unknown; note?: unknown }): Promise<FlashStatusView> {
+  async turnOn(actorId: string, input: { hours?: unknown; minutes?: unknown; note?: unknown }): Promise<FlashStatusView> {
     const { flash, clock, ids } = this.deps;
     const problems: Record<string, string> = {};
-    const hours = input.hours;
-    if (typeof hours !== 'number' || !FLASH_HOURS.includes(hours)) problems.hours = 'Escolha 1, 2 ou 3 horas';
+    let minutes = 0;
+    if (input.minutes !== undefined) {
+      const m = input.minutes;
+      if (typeof m !== 'number' || !Number.isInteger(m) || m % 5 !== 0 || m < FLASH_MIN_MINUTES || m > FLASH_MAX_MINUTES) problems.minutes = 'Escolha de 5 minutos a 3 horas, de 5 em 5 minutos';
+      else minutes = m;
+    } else {
+      const hours = input.hours;
+      if (typeof hours !== 'number' || !FLASH_HOURS.includes(hours)) problems.hours = 'Escolha 1, 2 ou 3 horas';
+      else minutes = hours * 60;
+    }
     let note: string | null = null;
     try {
       note = parseNote(input.note);
@@ -116,7 +127,7 @@ export class FlashService {
       id: ids.next(),
       userId: actorId,
       startsAt: now,
-      expiresAt: new Date(now.getTime() + (hours as number) * HOUR_MS),
+      expiresAt: new Date(now.getTime() + minutes * 60_000),
       endedAt: null,
       note,
     };

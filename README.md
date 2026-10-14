@@ -190,6 +190,12 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 - Rotas: `POST /posts`, `GET /posts/feed`, `GET /posts/pending-tags`, `GET/DELETE /posts/:id`, `POST /posts/:id/tag` (`{action: 'accept'|'decline'}`), `GET /profiles/:usuario/posts`, `GET /posts/images/:id` (pública, como a foto de perfil; o id é aleatório).
 - Limites honestos: **o navegador não deixa um site listar a galeria do celular sozinho** (só pelo seletor do sistema); a galeria aberta direto no app, como no Instagram, só vem com o app nativo (Capacitor). O corpo JSON da API passou de 100 KB para 1 MB (cada foto chega em base64). Fotos no banco, sem armazenamento de arquivos nem moderação. A referência da foto do Google pode expirar (a foto então aparece como "indisponível"). Não há curtir, comentar, editar post nem reordenar fotos ainda. O Postgres só é exercitado na sua máquina (`AskouT.command` aplica as migrações `20261017120000_posts` e `20261018120000_post_tags` e o `009_post_constraints.sql`).
 
+### Duração do Flash em roleta
+
+- Ao ligar o Flash, a duração se escolhe numa **roleta de horas e minutos** (estilo relógio do iPhone): de 5 min a 3 h, de 5 em 5 minutos, com o horário em que termina logo abaixo.
+- A API aceita `minutes` (múltiplo de 5, 5–180) em `POST /me/flash`; `hours` (1, 2 ou 3) continua valendo por compatibilidade.
+- Verificado em navegador de celular simulado (rolagem e teclado); o toque real no celular ainda não foi testado.
+
 ### Menu ⋯ e ações do post
 
 - Todo post tem, embaixo, **Curtir, Comentar e Compartilhar**. Curtidas e comentários avisam o autor (sino).

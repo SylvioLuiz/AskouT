@@ -58,6 +58,23 @@ export function announceFlashChange(): void {
 }
 
 export const FLASH_DURATIONS: readonly number[] = [1, 2, 3];
+export const FLASH_MIN_MINUTES = 5;
+export const FLASH_MAX_MINUTES = 180;
+export const FLASH_DEFAULT_MINUTES = 120;
+
+/** Mantém a duração dentro do que a API aceita (5 min a 3 h, de 5 em 5). */
+export function clampFlashMinutes(minutes: number): number {
+  const rounded = Math.round(minutes / 5) * 5;
+  return Math.min(FLASH_MAX_MINUTES, Math.max(FLASH_MIN_MINUTES, rounded));
+}
+
+/** "1 h 30 min", "45 min", "2 h". */
+export function formatFlashDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
 export const FLASH_NOTE_MAX = 60;
 
 export function flashNoteProblem(note: string): string | undefined {

@@ -25,7 +25,7 @@ export class FlashController {
   @HttpCode(200)
   turnOn(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.flash.turnOn(actor.userId, { hours: b.hours, note: b.note });
+    return this.core.flash.turnOn(actor.userId, { hours: b.hours, minutes: b.minutes, note: b.note });
   }
 
   @Delete('me/flash')
