@@ -14,12 +14,12 @@ import { Link } from '../router.tsx';
 function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: number; total: number; onFirstLoad?: (w: number, h: number) => void }) {
   const [failed, setFailed] = useState(false);
   return (
-    <figure className="carousel__slide" aria-label={`Foto ${index + 1} de ${total}`}>
+    <figure className="pcarousel__slide" aria-label={`Foto ${index + 1} de ${total}`}>
       {image.path && !failed ? (
         <img
           src={api.assetUrl(image.path)}
           alt=""
-          loading="lazy"
+          loading={index === 0 ? 'lazy' : 'eager'}
           referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
           onLoad={(event) => {
@@ -27,7 +27,7 @@ function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: 
           }}
         />
       ) : (
-        <span className="carousel__missing">Foto indisponível</span>
+        <span className="pcarousel__missing">Foto indisponível</span>
       )}
       {image.kind === 'PLACE' ? <figcaption>Foto: {image.photoAuthor ? `${image.photoAuthor} · ` : ''}Google</figcaption> : null}
     </figure>
@@ -49,20 +49,20 @@ export function Carousel({ images }: { images: PostImage[] }) {
     if (el) el.scrollTo({ left: to * el.clientWidth, behavior: 'smooth' });
   }
   return (
-    <div className="carousel" style={{ '--carousel-ratio': String(ratio) } as CSSProperties}>
-      <div className="carousel__track" ref={ref} onScroll={onScroll} role="group" aria-label="Fotos do post" tabIndex={images.length > 1 ? 0 : undefined}>
+    <div className="pcarousel" style={{ '--carousel-ratio': String(ratio) } as CSSProperties}>
+      <div className="pcarousel__track" ref={ref} onScroll={onScroll} role="group" aria-label="Fotos do post" tabIndex={images.length > 1 ? 0 : undefined}>
         {images.map((image, i) => (
           <Slide key={image.id} image={image} index={i} total={images.length} onFirstLoad={(w, h) => setRatio(feedRatio(w, h))} />
         ))}
       </div>
       {images.length > 1 ? (
         <>
-          <span className="carousel__count" aria-hidden="true">
+          <span className="pcarousel__count" aria-hidden="true">
             {index + 1}/{images.length}
           </span>
-          <div className="carousel__dots">
+          <div className="pcarousel__dots">
             {images.map((image, i) => (
-              <button key={image.id} type="button" className={`carousel__dot${i === index ? ' carousel__dot--on' : ''}`} onClick={() => go(i)} aria-label={`Ir para a foto ${i + 1}`} aria-current={i === index ? 'true' : undefined} />
+              <button key={image.id} type="button" className={`pcarousel__dot${i === index ? ' pcarousel__dot--on' : ''}`} onClick={() => go(i)} aria-label={`Ir para a foto ${i + 1}`} aria-current={i === index ? 'true' : undefined} />
             ))}
           </div>
         </>

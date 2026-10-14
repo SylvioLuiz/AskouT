@@ -121,6 +121,13 @@ export const ShareIcon = () => (
   </Svg>
 );
 
+export const CropIcon = () => (
+  <Svg>
+    <path d="M8 6.5 2.5 12 8 17.5" />
+    <path d="M16 6.5 21.5 12 16 17.5" />
+  </Svg>
+);
+
 export const CarouselIcon = () => (
   <Svg>
     <rect x="8" y="3.5" width="12.5" height="12.5" rx="2" />

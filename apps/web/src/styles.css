@@ -3064,18 +3064,18 @@ button {
 .post__place { font-size: 0.9375rem; color: var(--ink-2); }
 .post__caption { white-space: pre-wrap; overflow-wrap: anywhere; }
 
-.carousel { position: relative; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
-.carousel__track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-.carousel__track::-webkit-scrollbar { display: none; }
-.carousel__slide { position: relative; flex: 0 0 100%; margin: 0; aspect-ratio: var(--carousel-ratio, 4 / 5); scroll-snap-align: center; display: grid; }
-.carousel__slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.carousel__slide figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 12px 8px; color: #fff; font-size: 0.75rem; background: linear-gradient(transparent, rgb(0 0 0 / 0.55)); }
-.carousel__missing { display: grid; place-items: center; color: var(--muted); font-size: 0.875rem; }
-.carousel__count { position: absolute; top: 10px; right: 10px; padding: 2px 9px; border-radius: 999px; background: rgb(0 0 0 / 0.55); color: #fff; font-size: 0.75rem; font-weight: 700; }
-.carousel__dots { position: absolute; left: 0; right: 0; bottom: 30px; display: flex; justify-content: center; gap: 2px; }
-.carousel__dot { width: 20px; height: 20px; padding: 0; border: 0; background: transparent; position: relative; cursor: pointer; }
-.carousel__dot::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: rgb(255 255 255 / 0.55); }
-.carousel__dot--on::after { background: #fff; }
+.pcarousel { position: relative; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
+.pcarousel__track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.pcarousel__track::-webkit-scrollbar { display: none; }
+.pcarousel__slide { position: relative; flex: 0 0 100%; margin: 0; aspect-ratio: var(--carousel-ratio, 4 / 5); max-height: 60vh; max-height: 60dvh; scroll-snap-align: center; display: grid; }
+.pcarousel__slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pcarousel__slide figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 12px 8px; color: #fff; font-size: 0.75rem; background: linear-gradient(transparent, rgb(0 0 0 / 0.55)); }
+.pcarousel__missing { display: grid; place-items: center; color: var(--muted); font-size: 0.875rem; }
+.pcarousel__count { position: absolute; top: 10px; right: 10px; padding: 2px 9px; border-radius: 999px; background: rgb(0 0 0 / 0.55); color: #fff; font-size: 0.75rem; font-weight: 700; }
+.pcarousel__dots { position: absolute; left: 0; right: 0; bottom: 30px; display: flex; justify-content: center; gap: 2px; }
+.pcarousel__dot { width: 20px; height: 20px; padding: 0; border: 0; background: transparent; position: relative; cursor: pointer; }
+.pcarousel__dot::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: rgb(255 255 255 / 0.55); }
+.pcarousel__dot--on::after { background: #fff; }
 
 .postgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
 .postgrid__item { position: relative; display: block; aspect-ratio: 1; background: var(--line); overflow: hidden; }
@@ -3158,3 +3158,16 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .cropper__handle--se::after { right: 0; bottom: 0; }
 .cropper__hint { text-align: center; margin: 0; }
 .compose__recortar { margin-top: 8px; }
+
+/* Foto do post: ocupa toda a largura; na vertical, no máximo 60% da tela. */
+@media (max-width: 719px) {
+  .pcarousel { margin-inline: -16px; border-radius: 0; }
+}
+@media (min-width: 720px) {
+  .post { max-width: 600px; }
+}
+
+/* Botão pequeno de recorte (<>) no canto da foto */
+.compose__stage { position: relative; }
+.stage__crop { position: absolute; left: 8px; bottom: 8px; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: rgb(0 0 0 / 0.6); color: #fff; cursor: pointer; }
+.stage__crop .icon { width: 20px; height: 20px; }

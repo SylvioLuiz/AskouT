@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
-import { XIcon } from '../components/icons.tsx';
+import { CropIcon, XIcon } from '../components/icons.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { CropEditor } from '../components/crop.tsx';
 import { PostCard } from '../components/post.tsx';
@@ -357,15 +357,13 @@ export function CreatePostScreen() {
         ) : (
           <p className="compose__empty">Busque um lugar abaixo para usar a foto dele.</p>
         )}
+        {focused && focused.kind === 'UPLOAD' && focused.source ? (
+          <button type="button" className="stage__crop" onClick={() => setCropKey(focused.key)} aria-label="Recortar foto" title="Recortar">
+            <CropIcon />
+          </button>
+        ) : null}
       </div>
       )}
-      {focused && focused.kind === 'UPLOAD' && focused.source && cropKey === undefined ? (
-        <div className="compose__recortar">
-          <Button variant="secondary" small onClick={() => setCropKey(focused.key)}>
-            Recortar esta foto
-          </Button>
-        </div>
-      ) : null}
 
       {items.length > 0 ? (
         <ul className="composegrid" aria-label="Fotos escolhidas">
