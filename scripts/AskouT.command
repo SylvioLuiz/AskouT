@@ -1,7 +1,7 @@
 #!/bin/bash
-# Dois cliques neste arquivo (no Finder) sobem o AskouT inteiro. Pode ficar na mesa: ele acha o projeto sozinho.
+# Dois cliques neste arquivo (no Finder) atualizam (se houver novidade) e sobem o AskouT inteiro. Pode ficar na mesa: ele acha o projeto sozinho.
 cd "$(dirname "$0")/.." || exit 1
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-npm run dev:all -- --https
+npm run dev:all -- --https --update
 echo; echo "O AskouT foi encerrado. Pode fechar esta janela."
 read -r -n 1

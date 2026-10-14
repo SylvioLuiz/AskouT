@@ -5,6 +5,9 @@
 //  3. sobe a API e o app web, com a saída da API gravada em ~/askout-api.log (o smoke test lê o código de cadastro de lá);
 //  4. Ctrl+C encerra os dois.
 //
+// Com --update: antes de subir, busca novidades no GitHub e, se houver, roda o `npm run update` (pull, instalação,
+// migrações, testes). Sem internet ou sem novidades, segue direto. É o que o AskouT.command usa.
+//
 // Internet não é necessária: API, banco e app rodam na sua máquina. Só os tiles do mapa vêm da internet.
 import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream, existsSync } from 'node:fs';
@@ -102,6 +105,16 @@ process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
 
 await ensurePostgres();
+if (process.argv.includes('--update')) {
+  const fetched = spawnSync('git', ['fetch', '-q'], { cwd: root, encoding: 'utf8', timeout: 20_000 });
+  const behind = fetched.status === 0 ? Number(spawnSync('git', ['rev-list', '--count', 'HEAD..@{u}'], { cwd: root, encoding: 'utf8' }).stdout.trim() || '0') : 0;
+  if (fetched.status !== 0) console.log('[dev] Sem acesso ao GitHub agora; subindo com o código que já está aqui.');
+  else if (behind > 0) {
+    console.log(`[dev] Há ${behind} novidade(s) no GitHub: rodando o update antes de subir (pode levar alguns minutos)…`);
+    const result = spawnSync(process.execPath, [join(root, 'scripts/update.mjs')], { cwd: root, stdio: 'inherit' });
+    if (result.status !== 0) console.log('[dev] O update terminou com problemas (veja acima). Subindo mesmo assim; se algo quebrar, me mande o relatório.');
+  } else console.log('[dev] Código já está atualizado.');
+}
 freePort(3000);
 freePort(5173);
 await sleep(500);
