@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { Sheet } from '../components/agenda.tsx';
-import { ChevronLeftIcon, EventKindIcon, ShareIcon, TrashIcon, XIcon } from '../components/icons.tsx';
+import { ChevronLeftIcon, EventKindIcon, MoreIcon, ShareIcon, TrashIcon, XIcon } from '../components/icons.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
@@ -115,24 +115,51 @@ function EventPostCard({ post, onDelete, busy }: { post: EventPost; onDelete: ()
   );
 }
 
-function EventPosts({ page, onChange }: { page: EventPage; onChange: (page: EventPage) => void }) {
-  const [composing, setComposing] = useState(false);
-  const [busyId, setBusyId] = useState<string | undefined>();
-  const [toggling, setToggling] = useState(false);
+/** Menu ⋯ do dono: quem pode postar no evento. */
+function EventMenuSheet({ page, onChange, onClose }: { page: EventPage; onChange: (page: EventPage) => void; onClose: () => void }) {
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | undefined>();
 
-  async function setPublic(value: boolean) {
-    if (value === page.postsPublic) return;
-    setToggling(true);
+  async function choose(value: boolean) {
+    if (value === page.postsPublic || busy) return;
+    setBusy(true);
     setMessage(undefined);
     try {
       onChange(await api.eventPostsPublic(page.id, value));
+      onClose();
     } catch (failure) {
       setMessage(toApiError(failure).message);
-    } finally {
-      setToggling(false);
+      setBusy(false);
     }
   }
+
+  return (
+    <Sheet title="Quem pode postar" onClose={onClose}>
+      {message ? <Notice tone="error">{message}</Notice> : null}
+      <div className="radiolist" role="radiogroup" aria-label="Quem pode postar neste evento">
+        <label className="radiolist__item">
+          <input type="radio" name="quem-posta" checked={!page.postsPublic} disabled={busy} onChange={() => void choose(false)} />
+          <span>
+            <strong>Só eu</strong>
+            <span className="muted radiolist__desc">Todos veem, mas só você publica.</span>
+          </span>
+        </label>
+        <label className="radiolist__item">
+          <input type="radio" name="quem-posta" checked={page.postsPublic} disabled={busy} onChange={() => void choose(true)} />
+          <span>
+            <strong>Eu e quem vai</strong>
+            <span className="muted radiolist__desc">Quem confirmou presença também publica.</span>
+          </span>
+        </label>
+      </div>
+    </Sheet>
+  );
+}
+
+function EventPosts({ page, onChange }: { page: EventPage; onChange: (page: EventPage) => void }) {
+  const [composing, setComposing] = useState(false);
+  const [busyId, setBusyId] = useState<string | undefined>();
+  const [message, setMessage] = useState<string | undefined>();
 
   async function remove(post: EventPost) {
     setBusyId(post.id);
@@ -160,17 +187,7 @@ function EventPosts({ page, onChange }: { page: EventPage; onChange: (page: Even
         ) : null}
       </div>
       {page.isOwner ? (
-        <div className="evposts__who">
-          <p className="muted">Quem pode postar neste evento</p>
-          <div className="segmented" role="group" aria-label="Quem pode postar">
-            <button type="button" className={`segmented__tab${!page.postsPublic ? ' segmented__tab--on' : ''}`} aria-pressed={!page.postsPublic} disabled={toggling} onClick={() => void setPublic(false)}>
-              Só eu
-            </button>
-            <button type="button" className={`segmented__tab${page.postsPublic ? ' segmented__tab--on' : ''}`} aria-pressed={page.postsPublic} disabled={toggling} onClick={() => void setPublic(true)}>
-              Eu e quem vai
-            </button>
-          </div>
-        </div>
+        <p className="muted">{page.postsPublic ? 'Você e quem confirmou presença podem postar.' : 'Só você posta neste evento.'} Mude no menu ⋯ do topo.</p>
       ) : page.postsPublic ? (
         <p className="muted">{page.going ? 'Você confirmou presença: pode postar aqui.' : 'Confirme presença para postar neste evento.'}</p>
       ) : (
@@ -214,6 +231,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [coverFailed, setCoverFailed] = useState(false);
   const [planning, setPlanning] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [menu, setMenu] = useState(false);
   const [posted, setPosted] = useState<boolean | undefined>();
   const [goBusy, setGoBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -257,9 +275,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
             <button type="button" className="evhero__btn evhero__btn--back" onClick={goBack} aria-label="Voltar">
               <ChevronLeftIcon />
             </button>
-            <button type="button" className="evhero__btn evhero__btn--share" onClick={() => setSharing(true)} aria-label="Compartilhar o evento">
-              <ShareIcon />
-            </button>
+            {e.isOwner && e.postsEnabled ? (
+              <button type="button" className="evhero__btn evhero__btn--share" onClick={() => setMenu(true)} aria-label="Mais opções do evento" aria-haspopup="dialog">
+                <MoreIcon />
+              </button>
+            ) : (
+              <button type="button" className="evhero__btn evhero__btn--share" onClick={() => setSharing(true)} aria-label="Compartilhar o evento">
+                <ShareIcon />
+              </button>
+            )}
             <div className="evhero__body">
               <span className="evhero__badge" title={kindLabel(e.kind)}>
                 <EventKindIcon kind={e.kind} />
@@ -379,6 +403,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
           <ShareLinkSheet url={eventLink(window.location.origin, e.id)} text={`Evento ${e.title}`} onClose={() => setSharing(false)} />
         )
       ) : null}
+      {menu && e ? <EventMenuSheet page={e} onChange={setFresh} onClose={() => setMenu(false)} /> : null}
       {planning && e ? <CreateMeetupSheet event={{ id: e.id, title: e.title }} onClose={() => setPlanning(false)} /> : null}
     </>
   );

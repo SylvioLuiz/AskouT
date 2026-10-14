@@ -260,7 +260,7 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 - Topo com a **capa** (primeira foto: a enviada, a do Google ou a imagem do evento do local), um **círculo com o ícone do tipo** (árvore em Ar livre, troféu em Esporte etc.), nome e local sobre a imagem; 3 colunas **Confirmados / Data / Hora**; fileira de avatares de quem confirmou.
 - **Eu vou** confirma ou cancela. O dono do evento conta como confirmado automaticamente. Tabela `EventAttendance` (um dos dois alvos, por `CHECK` em `013_event_page_constraints.sql`).
 - Tipos novos `OUTDOOR` (Ar livre) e `SPORT` (Esporte); ao criar ou editar um evento há seletor de tipo (`Post.eventKind`, padrão Outros).
-- **Posts dentro do evento** (só em evento de pessoa; evento do local ainda não tem dono): texto + 1 foto opcional (até 100 KB), tabela `EventPost`. O dono escolhe **Só eu** (padrão) ou **Eu e quem vai** (`Post.eventPostsPublic`). Todos veem; dono e autor apagam.
+- **Posts dentro do evento** (só em evento de pessoa; evento do local ainda não tem dono): texto + 1 foto opcional (até 100 KB), tabela `EventPost`. O dono escolhe, no menu ⋯ do topo da página (radio), **Só eu** (padrão) ou **Eu e quem vai** (`Post.eventPostsPublic`). Todos veem; dono e autor apagam.
 - Migração `20261024120000_event_page`; o `AskouT.command` aplica o SQL sozinho.
 - Limites: posts do evento não têm curtida/comentário; mostra só os 30 mais recentes; "Criar encontro" fica só nos eventos do local (o encontro depende de um evento do local); sem aviso (sino) de confirmação ou post; Postgres/Prisma e `smoke.mjs` só rodam no seu Mac; nada testado em celular real.
 
