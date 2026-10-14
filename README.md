@@ -194,6 +194,7 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 
 - Fora do perfil da própria pessoa, **todo mundo aparece só pelo identificador, sem o `@`**: feed, comentários, curtidas e marcações, conversas e grupos, buscas, listas de seguidores e amigos, Flash, agenda, encontros, avisos (sino e push) e mensagens do sistema. As letras do avatar sem foto também vêm do usuário (`bruna.alves` vira "BA").
 - O **nome real só aparece no perfil** da pessoa (e na edição do próprio perfil). Evita confusão entre pessoas de nome parecido.
+- **Exceção: dentro da conversa aparece o nome real** (lista de conversas, título do chat, quem fala no grupo, cartões de sugestão e de encontro, tela do grupo e mensagens automáticas como "X saiu do grupo"). Os avisos do sino e do aparelho continuam usando só o usuário.
 - Mantive o nome real apenas em dois lugares que são só seus: a saudação "Olá, …" da Home e o seu cartão no menu lateral do computador.
 - A busca continua achando também pelo nome real; só o resultado é mostrado pelo identificador.
 

@@ -61,7 +61,7 @@ export function MeetupBubble({ meetup, nowIso, onUpdated }: { meetup: MeetupView
   return (
     <div className="meetcard">
       <MeetupCover meetup={meetup} />
-      <p className="meetcard__who">{meetup.myStatus === 'ORGANIZER' ? 'Você criou um encontro' : `${meetup.organizer.username} convidou você`}</p>
+      <p className="meetcard__who">{meetup.myStatus === 'ORGANIZER' ? 'Você criou um encontro' : `${meetup.organizer.displayName} convidou você`}</p>
       <h3 className="meetcard__title">{meetup.title}</h3>
       <MeetupFacts meetup={meetup} now={now} />
       {meetup.isGroup && meetup.groupName ? <p className="meetcard__line">Grupo: {meetup.groupName}</p> : null}

@@ -263,7 +263,7 @@ export class ConversationService {
     const records = (await Promise.all(meetupIds.map((id) => this.deps.meetups.find(id)))).filter((m) => m !== undefined);
     const meetupViews = new Map((await buildMeetupViews(this.deps, actorId, records)).map((v) => [v.id, v] as const));
     const eventCards = await buildEventCards(this.deps, items.flatMap((m) => (m.eventId ? [m.eventId] : [])));
-    const names = isGroup ? new Map((await this.deps.users.findProfilesByIds([...new Set(items.map((m) => m.senderId))])).map((p) => [p.userId, p.username] as const)) : null;
+    const names = isGroup ? new Map((await this.deps.users.findProfilesByIds([...new Set(items.map((m) => m.senderId))])).map((p) => [p.userId, p.displayName] as const)) : null;
 
     return {
       id: conversationId,
@@ -338,8 +338,10 @@ export class ConversationService {
     await conversations.addMessage(message, audio);
     await conversations.markRead(conversationId, actorId, now);
     const positions = suggestion && otherId ? await this.livePositions(actorId, otherId, now) : null;
-    const actorName = (await this.deps.users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
-    const senderName = conversation.type === 'GROUP' ? actorName : null;
+    const actorProfile = (await this.deps.users.findProfilesByIds([actorId]))[0];
+    const actorName = actorProfile?.username ?? 'Alguém';
+    // Dentro da conversa aparece o nome real; o aviso (sino/push) usa só o usuário.
+    const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
     await this.notifyMembers(actorId, actorName, conversation, memberIds, audio ? 'enviou um áudio' : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um lugar' : 'enviou uma mensagem');
     return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard });
   }
@@ -404,7 +406,7 @@ export class ConversationService {
         const p = profiles.get(id);
         return p ? [{ profile: toPublicProfile(p), role: id === ownerId ? ('OWNER' as const) : ('MEMBER' as const) }] : [];
       })
-      .sort((a, b) => (a.role === b.role ? a.profile.username.localeCompare(b.profile.username, 'pt-BR') : a.role === 'OWNER' ? -1 : 1));
+      .sort((a, b) => (a.role === b.role ? a.profile.displayName.localeCompare(b.profile.displayName, 'pt-BR') : a.role === 'OWNER' ? -1 : 1));
     const meetups = await buildMeetupViews(this.deps, actorId, await this.deps.meetups.listForConversation(conversationId));
     return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl, members, meetups, mediaAvailable: false };
   }
@@ -473,7 +475,7 @@ export class ConversationService {
   }
 
   private async nameOf(userId: string): Promise<string> {
-    return (await this.deps.users.findProfilesByIds([userId]))[0]?.username ?? 'Alguém';
+    return (await this.deps.users.findProfilesByIds([userId]))[0]?.displayName ?? 'Alguém';
   }
 
   private async postSystem(conversationId: string, senderId: string, body: string, now: Date): Promise<void> {

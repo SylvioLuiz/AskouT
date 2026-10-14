@@ -155,8 +155,9 @@ export class MeetupService {
       await this.notifyInvite(g, actorName, meetup.title, direct.id, meetupId);
     }
     if (invited.length > 0) {
-      const names = (await users.findProfilesByIds(invited)).map((p) => p.username);
-      await conversations.addMessage({ id: ids.next(), conversationId: meetup.conversationId, senderId: actorId, kind: 'SYSTEM', body: `${actorName} convidou ${names.join(', ')} para "${meetup.title}"`, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: now });
+      const names = (await users.findProfilesByIds(invited)).map((p) => p.displayName);
+      const actorRealName = await this.realNameOf(actorId);
+      await conversations.addMessage({ id: ids.next(), conversationId: meetup.conversationId, senderId: actorId, kind: 'SYSTEM', body: `${actorRealName} convidou ${names.join(', ')} para "${meetup.title}"`, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: now });
     }
     return this.get(actorId, meetupId);
   }
@@ -169,7 +170,7 @@ export class MeetupService {
     }
     const title = rawTitle.trim();
     await this.deps.meetups.update(meetupId, { title });
-    await this.say(meetup, actorId, `${await this.nameOf(actorId)} mudou o nome do encontro para "${title}"`);
+    await this.say(meetup, actorId, `${await this.realNameOf(actorId)} mudou o nome do encontro para "${title}"`);
     return this.get(actorId, meetupId);
   }
 
@@ -178,7 +179,7 @@ export class MeetupService {
     const meetup = await this.managed(actorId, meetupId);
     await this.deps.meetups.update(meetupId, { status: 'CANCELLED' });
     const actorName = await this.nameOf(actorId);
-    await this.say(meetup, actorId, `${actorName} cancelou o encontro "${meetup.title}"`);
+    await this.say(meetup, actorId, `${await this.realNameOf(actorId)} cancelou o encontro "${meetup.title}"`);
     for (const p of meetup.participants) {
       if (p.userId === actorId || p.status === 'DECLINED') continue;
       await this.deps.notifier.notify({ userId: p.userId, type: 'MEETUP_CANCELLED', title: meetup.title, body: `${actorName} cancelou o encontro`, url: `/conversas/${meetup.conversationId}` });
@@ -196,6 +197,11 @@ export class MeetupService {
 
   private async notifyInvite(guestId: string, organizerName: string, title: string, conversationId: string, meetupId: string): Promise<void> {
     await this.deps.notifier.notify({ userId: guestId, type: 'MEETUP_INVITE', title: `${organizerName} convidou você`, body: title, url: `/conversas/${conversationId}`, dedupeKey: `meetup-invite:${meetupId}` });
+  }
+
+  /** Nome real, para as mensagens dentro da conversa (os avisos usam só o usuário). */
+  private async realNameOf(userId: string): Promise<string> {
+    return (await this.deps.users.findProfilesByIds([userId]))[0]?.displayName ?? 'Alguém';
   }
 
   private async nameOf(userId: string): Promise<string> {

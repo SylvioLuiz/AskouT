@@ -164,13 +164,14 @@ export function Avatar({ profile, size = 44 }: { profile: AvatarProfile; size?: 
 }
 
 /** Linha de pessoa, usada em buscas e listas. Leva ao perfil. */
-export function PersonRow({ profile, aside }: { profile: PublicProfile; aside?: ReactNode }) {
+export function PersonRow({ profile, aside, realName = false }: { profile: PublicProfile; aside?: ReactNode; realName?: boolean }) {
   return (
     <li className="person">
       <Link to={`/u/${encodeURIComponent(profile.username)}`} className="person__link">
         <Avatar profile={profile} />
         <span className="person__body">
-          <span className="person__name">{profile.username}</span>
+          <span className="person__name">{realName ? profile.displayName : profile.username}</span>
+          {realName ? <span className="person__handle">@{profile.username}</span> : null}
         </span>
       </Link>
       {aside ? <div className="person__aside">{aside}</div> : null}
