@@ -112,11 +112,13 @@ export function DayStrip({ days, selected, today, onSelect, statesOf }: DayStrip
 interface SheetProps {
   title: string;
   onClose: () => void;
+  /** Fecha com um X no estilo de botão (em vez do ícone solto). */
+  closeAsButton?: boolean;
   children: ReactNode;
 }
 
 /** No celular sobe da base da tela; em telas grandes vira uma janela no centro. Fecha com Esc ou toque fora. */
-export function Sheet({ title, onClose, children }: SheetProps) {
+export function Sheet({ title, onClose, closeAsButton, children }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -158,7 +160,7 @@ export function Sheet({ title, onClose, children }: SheetProps) {
         <div className="sheet__grab" aria-hidden="true" />
         <div className="sheet__head">
           <h2 className="sheet__title">{title}</h2>
-          <button type="button" className="iconbtn" onClick={() => closeRef.current()} aria-label="Fechar">
+          <button type="button" className={closeAsButton ? 'btn btn--secondary sheet__x' : 'iconbtn'} onClick={() => closeRef.current()} aria-label="Fechar">
             <XIcon />
           </button>
         </div>

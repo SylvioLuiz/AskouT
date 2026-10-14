@@ -169,9 +169,9 @@ export const PlusBigIcon = () => (
 );
 
 export const InfoIcon = () => (
-  <svg className="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+  <svg className="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" focusable="false">
     <circle cx="12" cy="12" r="9" />
-    <path d="M12 11v6" />
-    <circle cx="12" cy="7.5" r="0.6" fill="currentColor" />
+    <path d="M12 11v5" />
+    <path d="M12 7.6h.01" />
   </svg>
 );

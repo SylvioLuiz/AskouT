@@ -59,7 +59,6 @@ export function FlashScreen() {
   const [minutes, setMinutes] = useState(FLASH_DEFAULT_MINUTES);
   const [note, setNote] = useState('');
   const [noteError, setNoteError] = useState<string | undefined>();
-  const [noteOpen, setNoteOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmOff, setConfirmOff] = useState(false);
@@ -172,38 +171,29 @@ export function FlashScreen() {
           <p className="flashpanel__until" aria-live="polite">
             {formatFlashDuration(minutes)}, até {new Date(Date.now() + minutes * 60_000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
           </p>
-          <button type="button" className="notetoggle" aria-expanded={noteOpen} aria-controls="flash-recado" onClick={() => setNoteOpen((v) => !v)}>
-            <span>{note.trim() !== '' && !noteOpen ? `Recado: ${note.trim()}` : 'Adicionar recado'}</span>
-            <span className="notetoggle__chev" aria-hidden="true">{noteOpen ? '−' : '+'}</span>
-          </button>
-          {noteOpen || noteError ? (
-            <div id="flash-recado">
-              <Field
-                label="Recado (opcional)"
-                value={note}
-                onChange={setNote}
-                error={noteError}
-                hint={`${Array.from(note).length}/${FLASH_NOTE_MAX}`}
-                maxLength={FLASH_NOTE_MAX + 20}
-                autoComplete="off"
-              />
-            </div>
-          ) : null}
+          <Field
+            label="Recado (opcional)"
+            hideLabel
+            placeholder="Adicionar recado"
+            value={note}
+            onChange={setNote}
+            error={noteError}
+            hint={note === '' ? undefined : `${Array.from(note).length}/${FLASH_NOTE_MAX}`}
+            maxLength={FLASH_NOTE_MAX + 20}
+            autoComplete="off"
+          />
           <div className="flashpanel__go">
             <Button full loading={busy} onClick={turnOn}>
               Ligar Flash
             </Button>
-            <button type="button" className="iconbtn flashpanel__info" aria-label="Como o Flash funciona" onClick={() => setInfoOpen(true)}>
+            <button type="button" className="flashpanel__info" aria-label="Como o Flash funciona" onClick={() => setInfoOpen(true)}>
               <InfoIcon />
             </button>
           </div>
           {infoOpen ? (
-            <Sheet title="Como o Flash funciona" onClose={() => setInfoOpen(false)}>
+            <Sheet title="Como o Flash funciona" closeAsButton onClose={() => setInfoOpen(false)}>
               <p>Seus amigos que também estiverem com Flash ligado veem seu nome e sua foto.</p>
               <p>Sua localização só é compartilhada com quem aceitar sair com você.</p>
-              <Button full variant="secondary" onClick={() => setInfoOpen(false)}>
-                Entendi
-              </Button>
             </Sheet>
           ) : null}
         </section>

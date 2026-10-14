@@ -44,9 +44,12 @@ interface FieldProps {
   multiline?: boolean;
   trailing?: ReactNode;
   name?: string;
+  placeholder?: string;
+  /** O rótulo continua para leitores de tela, mas não aparece. */
+  hideLabel?: boolean;
 }
 
-export function Field({ label, value, onChange, type = 'text', error, hint, autoComplete, inputMode, prefix, maxLength, autoFocus, multiline, trailing, name }: FieldProps) {
+export function Field({ label, value, onChange, type = 'text', error, hint, autoComplete, inputMode, prefix, maxLength, autoFocus, multiline, trailing, name, placeholder, hideLabel }: FieldProps) {
   const id = useId();
   const messageId = `${id}-msg`;
   const message = error ?? hint;
@@ -58,6 +61,7 @@ export function Field({ label, value, onChange, type = 'text', error, hint, auto
     autoFocus,
     autoComplete,
     inputMode,
+    placeholder,
     'aria-invalid': error ? true : undefined,
     'aria-describedby': message ? messageId : undefined,
     className: 'field__input',
@@ -65,7 +69,7 @@ export function Field({ label, value, onChange, type = 'text', error, hint, auto
 
   return (
     <div className={`field${error ? ' field--error' : ''}`}>
-      <label className="field__label" htmlFor={id}>
+      <label className={`field__label${hideLabel ? ' visually-hidden' : ''}`} htmlFor={id}>
         {label}
       </label>
       <div className="field__control">
