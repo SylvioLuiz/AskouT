@@ -178,7 +178,7 @@ export function CreatePostScreen() {
     }
     try {
       const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft));
-      navigate(`/posts/${encodeURIComponent(created.id)}`);
+      navigate(created.event ? '/perfil?aba=eventos' : `/posts/${encodeURIComponent(created.id)}`);
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
       setBusy(false);

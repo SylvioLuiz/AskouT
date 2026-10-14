@@ -209,7 +209,8 @@ function eventWhen(iso: string): string {
   return eventFmt.format(new Date(iso));
 }
 
-export function PostGrid({ username }: { username: string }) {
+/** Grade de posts de uma pessoa. `kind` separa eventos de posts comuns; `quiet` não mostra o aviso de lista vazia. */
+export function PostGrid({ username, kind, quiet, onCount }: { username: string; kind?: 'event' | 'post'; quiet?: boolean; onCount?: (total: number) => void }) {
   const [page, setPage] = useState<PostsPage | undefined>();
   const [items, setItems] = useState<PostView[]>([]);
   const [error, setError] = useState<ApiError | undefined>();
@@ -218,8 +219,9 @@ export function PostGrid({ username }: { username: string }) {
     setLoading(true);
     setError(undefined);
     try {
-      const next = await api.userPosts(username, { limit: 18, offset });
+      const next = await api.userPosts(username, { limit: 18, offset }, kind);
       setPage(next);
+      if (next.total !== null) onCount?.(next.total);
       setItems((current) => (offset === 0 ? next.items : [...current, ...next.items]));
     } catch (failure) {
       setError(toApiError(failure));
@@ -232,10 +234,10 @@ export function PostGrid({ username }: { username: string }) {
     setItems([]);
     void more(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [username]);
+  }, [username, kind]);
   if (error && items.length === 0) return <ErrorState message={error.message} onRetry={() => void more(0)} />;
   if (!page) return <Loading />;
-  if (items.length === 0) return <EmptyState title="Nenhum post ainda">Posts com fotos aparecem aqui.</EmptyState>;
+  if (items.length === 0) return quiet ? null : <EmptyState title="Nenhum post ainda">Posts com fotos aparecem aqui.</EmptyState>;
   return (
     <>
       <ul className="postgrid" aria-label="Posts">

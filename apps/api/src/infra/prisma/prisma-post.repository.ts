@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type { PostRepository } from '../../core/ports.ts';
-import type { Page, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages } from '../../core/types.ts';
+import type { Page, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 export class PrismaPostRepository implements PostRepository {
@@ -69,13 +69,17 @@ export class PrismaPostRepository implements PostRepository {
     return { tags: { some: { userId: { in: taggedIds }, status: 'ACCEPTED' } } };
   }
 
-  async listFor(authorIds: string[], taggedIds: string[], page: Page): Promise<PostWithImages[]> {
+  private static kindWhere(only?: PostKindFilter) {
+    return only === undefined ? {} : only === 'EVENT' ? { eventTitle: { not: null } } : { eventTitle: null };
+  }
+
+  async listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter): Promise<PostWithImages[]> {
     const authors = authorIds.filter(isUuid);
     const tagged = taggedIds.filter(isUuid);
     const or = [...(authors.length > 0 ? [{ authorId: { in: authors } }] : []), ...(tagged.length > 0 ? [PrismaPostRepository.viaTag(tagged)] : [])];
     if (or.length === 0) return [];
     const rows = await this.prisma.post.findMany({
-      where: { OR: or },
+      where: { AND: [{ OR: or }, PrismaPostRepository.kindWhere(only)] },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: page.offset,
       take: page.limit,
@@ -84,9 +88,9 @@ export class PrismaPostRepository implements PostRepository {
     return rows.map(PrismaPostRepository.toView);
   }
 
-  async countFor(userId: string): Promise<number> {
+  async countFor(userId: string, only?: PostKindFilter): Promise<number> {
     if (!isUuid(userId)) return 0;
-    return this.prisma.post.count({ where: { OR: [{ authorId: userId }, PrismaPostRepository.viaTag([userId])] } });
+    return this.prisma.post.count({ where: { AND: [{ OR: [{ authorId: userId }, PrismaPostRepository.viaTag([userId])] }, PrismaPostRepository.kindWhere(only)] } });
   }
 
   async createTags(postId: string, userIds: string[], at: Date): Promise<void> {

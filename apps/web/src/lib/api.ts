@@ -134,7 +134,7 @@ export function createApi(deps: ApiDeps) {
     pendingTags: (page?: PageRequest) => request<PostsPage>('GET', `/posts/pending-tags${pageQuery(page)}`),
     respondTag: (postId: string, action: 'accept' | 'decline') => request<{ status: 'ACCEPTED' | 'DECLINED' }>('POST', `/posts/${id(postId)}/tag`, { body: { action } }),
     postsFeed: (page?: PageRequest) => request<PostsPage>('GET', `/posts/feed${pageQuery(page)}`),
-    userPosts: (username: string, page?: PageRequest) => request<PostsPage>('GET', `/profiles/${id(username)}/posts${pageQuery(page)}`),
+    userPosts: (username: string, page?: PageRequest, kind?: 'event' | 'post') => request<PostsPage>('GET', `/profiles/${id(username)}/posts${pageQuery(page)}${kind ? `${page ? '&' : '?'}kind=${kind}` : ''}`),
     myMeetups: () => request<{ items: MeetupView[] }>('GET', '/meetups'),
     updateProfile: (patch: ProfilePatch) => request<Profile>('PATCH', '/profiles/me', { body: patch }),
     setPrivacy: (isPrivate: boolean) =>

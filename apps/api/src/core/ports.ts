@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostKindFilter, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -166,9 +166,9 @@ export interface PostRepository {
   create(post: PostRecord, images: PostImageRecord[]): Promise<void>;
   findById(id: string): Promise<PostWithImages | undefined>;
   /** Posts escritos por qualquer um de `authorIds` OU em que alguém de `taggedIds` aceitou a marcação. Mais recentes primeiro. */
-  listFor(authorIds: string[], taggedIds: string[], page: Page): Promise<PostWithImages[]>;
+  listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter): Promise<PostWithImages[]>;
   /** Mesma regra de `listFor`, para uma pessoa só (escritos por ela ou em que ela aceitou a marcação). */
-  countFor(userId: string): Promise<number>;
+  countFor(userId: string, only?: PostKindFilter): Promise<number>;
   createTags(postId: string, userIds: string[], at: Date): Promise<void>;
   tagsFor(postIds: string[]): Promise<PostTagRecord[]>;
   /** Muda o status de uma marcação existente. Devolve false se a pessoa não foi marcada nesse post. */

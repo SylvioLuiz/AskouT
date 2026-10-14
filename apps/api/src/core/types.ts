@@ -342,6 +342,9 @@ export interface PostWithImages {
   images: PostImageMeta[];
 }
 
+/** Só eventos (posts com dados de evento) ou só posts comuns. */
+export type PostKindFilter = 'EVENT' | 'POST';
+
 export type PostTagStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
 
 export interface PostTagRecord {

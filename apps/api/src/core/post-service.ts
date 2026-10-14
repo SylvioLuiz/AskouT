@@ -2,7 +2,7 @@ import { decodeImageDataUrl } from './image.ts';
 import { forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
-import type { PostImageRecord, PostTagStatus, PostWithImages, PublicProfile } from './types.ts';
+import type { PostKindFilter, PostImageRecord, PostTagStatus, PostWithImages, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
 
 export const POST_IMAGES_MAX = 5;
@@ -81,6 +81,14 @@ function parsePage(raw: { limit?: unknown; offset?: unknown }): { limit: number;
   return { limit: num(raw.limit, POST_PAGE_DEFAULT, 1, POST_PAGE_MAX, 'limit'), offset: num(raw.offset, 0, 0, 1_000_000, 'offset') };
 }
 
+/** `kind` da lista do perfil: `event` (só eventos) ou `post` (só posts comuns); vazio traz tudo. */
+function parseKind(v: unknown): PostKindFilter | undefined {
+  if (v === undefined || v === null || v === '') return undefined;
+  if (v === 'event') return 'EVENT';
+  if (v === 'post') return 'POST';
+  throw validationError('Valor inválido', { kind: 'Use event ou post' });
+}
+
 function optionalText(value: unknown, max: number, field: string, label: string): string | null {
   if (value === undefined || value === null) return null;
   if (typeof value !== 'string') throw validationError('Dados inválidos', { [field]: `${label} inválido` });
@@ -156,13 +164,14 @@ export class PostService {
   }
 
   /** Posts de `username`, vistos por `viewerId`. Perfil privado só para quem segue (ou o próprio). */
-  async listByUsername(viewerId: string, username: unknown, query: { limit?: unknown; offset?: unknown } = {}): Promise<PostsPage> {
+  async listByUsername(viewerId: string, username: unknown, query: { limit?: unknown; offset?: unknown; kind?: unknown } = {}): Promise<PostsPage> {
+    const only = parseKind(query.kind);
     const view = await this.profiles.getByUsername(viewerId, username);
     if (view.relationship.blockedByViewer) throw notFound('Usuário não encontrado');
     if (!view.canViewContent) throw forbidden('Esta conta é privada');
     const page = parsePage(query);
     const { posts } = this.deps;
-    const [rows, total] = await Promise.all([posts.listFor([view.profile.userId], [view.profile.userId], { limit: page.limit + 1, offset: page.offset }), posts.countFor(view.profile.userId)]);
+    const [rows, total] = await Promise.all([posts.listFor([view.profile.userId], [view.profile.userId], { limit: page.limit + 1, offset: page.offset }, only), posts.countFor(view.profile.userId, only)]);
     const hasMore = rows.length > page.limit;
     const visible = await this.onlySeeable(viewerId, rows.slice(0, page.limit));
     return { items: await this.views(viewerId, visible), total, ...page, hasMore };

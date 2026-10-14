@@ -173,3 +173,19 @@ test('evento: título, lugar e início no futuro; fim padrão 3 h depois; post c
   await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'X', event: { title: 'Fim antes', startsAt: start, endsAt: new Date(new Date(start).getTime() - 1000).toISOString() } }), 'VALIDATION');
   await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'X', event: { title: 'Data ruim', startsAt: 'amanhã' } }), 'VALIDATION');
 });
+
+test('lista do perfil separa eventos de posts comuns (kind=event|post)', async () => {
+  const { w, ana } = await setup();
+  const start = new Date(w.clock.now().getTime() + 24 * 3_600_000).toISOString();
+  const plain = await w.core.posts.create(ana, { images: [JPEG()] });
+  w.clock.tick(1000);
+  const ev = await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Bar', event: { title: 'Pagode', startsAt: start } });
+  const all = await w.core.posts.listByUsername(ana, 'ana');
+  assert.equal(all.items.length, 2);
+  const onlyEvents = await w.core.posts.listByUsername(ana, 'ana', { kind: 'event' });
+  assert.deepEqual(onlyEvents.items.map((p) => p.id), [ev.id]);
+  assert.equal(onlyEvents.total, 1);
+  const onlyPosts = await w.core.posts.listByUsername(ana, 'ana', { kind: 'post' });
+  assert.deepEqual(onlyPosts.items.map((p) => p.id), [plain.id]);
+  await rejectsWith(w.core.posts.listByUsername(ana, 'ana', { kind: 'xis' }), 'VALIDATION');
+});

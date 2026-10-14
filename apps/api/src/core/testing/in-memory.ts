@@ -25,7 +25,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -850,14 +850,18 @@ export class InMemoryPostRepository implements PostRepository {
     return posts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1));
   }
 
-  async listFor(authorIds: string[], taggedIds: string[], page: Page): Promise<PostWithImages[]> {
-    return this.newestFirst(this.visibleFor(authorIds, taggedIds))
+  private static matches(p: PostRecord, only?: PostKindFilter): boolean {
+    return only === undefined || (only === 'EVENT') === (p.eventTitle !== null);
+  }
+
+  async listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter): Promise<PostWithImages[]> {
+    return this.newestFirst(this.visibleFor(authorIds, taggedIds).filter((p) => InMemoryPostRepository.matches(p, only)))
       .slice(page.offset, page.offset + page.limit)
       .map((p) => this.withImages(p));
   }
 
-  async countFor(userId: string): Promise<number> {
-    return this.visibleFor([userId], [userId]).length;
+  async countFor(userId: string, only?: PostKindFilter): Promise<number> {
+    return this.visibleFor([userId], [userId]).filter((p) => InMemoryPostRepository.matches(p, only)).length;
   }
 
   async createTags(postId: string, userIds: string[], at: Date): Promise<void> {

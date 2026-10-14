@@ -12,7 +12,7 @@ import type { ApiError } from '../lib/errors.ts';
 import { formatCount, pluralize } from '../lib/format.ts';
 import { hasIncomingRequest, profileAction, relationNote } from '../lib/relations.ts';
 import type { ConnectionsPage } from '../lib/types.ts';
-import { Link } from '../router.tsx';
+import { Link, useSearch } from '../router.tsx';
 
 type Pending = 'unfollow' | 'block' | undefined;
 
@@ -43,8 +43,10 @@ export function ProfileScreen({ username }: { username: string }) {
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const [pending, setPending] = useState<Pending>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [tab, setTab] = useState<'events' | 'posts'>('events');
+  const search = useSearch();
+  const [tab, setTab] = useState<'events' | 'posts'>(search.get('aba') === 'posts' ? 'posts' : 'events');
   const [eventTotal, setEventTotal] = useState<number | undefined>();
+  const [eventPostTotal, setEventPostTotal] = useState(0);
 
   useEffect(() => {
     setMessage(undefined);
@@ -135,7 +137,7 @@ export function ProfileScreen({ username }: { username: string }) {
             </>
           )}
           <span>
-            <strong>{formatCount(eventTotal ?? counts.events)}</strong> {(eventTotal ?? counts.events) === 1 ? 'evento' : 'eventos'}
+            <strong>{formatCount((eventTotal ?? counts.events) + eventPostTotal)}</strong> {(eventTotal ?? counts.events) + eventPostTotal === 1 ? 'evento' : 'eventos'}
           </span>
         </p>
       ) : null}
@@ -159,11 +161,6 @@ export function ProfileScreen({ username }: { username: string }) {
       ) : null}
 
       <div className="profile__actions">
-        {action.kind === 'self' ? (
-          <Link to="/perfil/editar" className="btn btn--secondary">
-            Editar perfil
-          </Link>
-        ) : null}
         {action.kind === 'follow' ? (
           <Button loading={busy} onClick={() => run(() => api.follow(profile.userId))}>
             {action.label}
@@ -240,7 +237,14 @@ export function ProfileScreen({ username }: { username: string }) {
             </button>
           </div>
           <div id="painel-perfil" role="tabpanel" aria-labelledby={tab === 'events' ? 'aba-eventos' : 'aba-posts'}>
-            {tab === 'events' ? <PostedEvents username={profile.username} mine={relationship.isSelf} onCount={setEventTotal} /> : <PostGrid username={profile.username} />}
+            {tab === 'events' ? (
+              <>
+                <PostGrid username={profile.username} kind="event" quiet onCount={setEventPostTotal} />
+                <PostedEvents username={profile.username} mine={relationship.isSelf} onCount={setEventTotal} quietEmpty={eventPostTotal > 0} />
+              </>
+            ) : (
+              <PostGrid username={profile.username} kind="post" />
+            )}
           </div>
         </>
       )}

@@ -33,7 +33,7 @@ function Tile({ event, mine, onRemove, busy }: { event: PostedEvent; mine: boole
 }
 
 /** Grade de duas colunas com os eventos que a pessoa postou. */
-export function PostedEvents({ username, mine, onCount }: { username: string; mine: boolean; onCount?: (total: number) => void }) {
+export function PostedEvents({ username, mine, onCount, quietEmpty }: { username: string; mine: boolean; onCount?: (total: number) => void; quietEmpty?: boolean }) {
   const [page, setPage] = useState<PostedEventsPage | undefined>();
   const [error, setError] = useState<ApiError | undefined>();
   const [loading, setLoading] = useState(false);
@@ -75,6 +75,7 @@ export function PostedEvents({ username, mine, onCount }: { username: string; mi
   if (error && !page) return <ErrorState message={error.message} onRetry={() => void load(0)} />;
   if (!page) return <Loading />;
   if (page.items.length === 0) {
+    if (quietEmpty) return null;
     return mine ? (
       <EmptyState
         title="Você ainda não postou eventos"

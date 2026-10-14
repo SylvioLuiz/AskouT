@@ -101,8 +101,8 @@ export class PostsController {
 
   /** Posts de uma pessoa (perfil privado só para quem segue). */
   @Get('profiles/:username/posts')
-  async byUser(@CurrentActor() actor: Actor, @Param('username') username: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
-    const page = await this.core.posts.listByUsername(actor.userId, username, { limit, offset });
+  async byUser(@CurrentActor() actor: Actor, @Param('username') username: string, @Query('limit') limit?: string, @Query('offset') offset?: string, @Query('kind') kind?: string) {
+    const page = await this.core.posts.listByUsername(actor.userId, username, { limit, offset, kind });
     return { ...page, items: page.items.map((p) => this.present(p)) };
   }
 }
