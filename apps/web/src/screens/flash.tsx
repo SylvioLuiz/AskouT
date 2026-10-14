@@ -276,7 +276,11 @@ export function FlashScreen() {
         <h2 id="livres-titulo" className="section__title">
           Livres agora
         </h2>
-        {!active ? <p className="muted">Ligue seu Flash para ver quais amigos estão livres agora.</p> : null}
+        {!active ? (
+          <p className="muted">
+            Ligue seu Flash para ver quais amigos estão livres agora. Para outro dia, use a <Link to="/agenda">Agenda</Link>.
+          </p>
+        ) : null}
         {active && available.loading && !available.data ? <Loading /> : null}
         {active && available.error && !available.data ? <ErrorState message={available.error.message} onRetry={available.reload} /> : null}
         {active && available.data && available.data.length === 0 ? (

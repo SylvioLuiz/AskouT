@@ -114,6 +114,9 @@ button {
 /* ---------- Marca ---------- */
 
 .wordmark {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 1.5rem;
@@ -370,7 +373,7 @@ button {
 }
 
 .btn--small {
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 14px;
   font-size: 0.9375rem;
 }
@@ -2326,7 +2329,7 @@ button {
 
 .fchip {
   flex: none;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   color: var(--ink);
   background: var(--surface);
@@ -2435,18 +2438,19 @@ button {
 
 /* Mosaico de duas colunas: as capas têm alturas diferentes */
 .evgrid {
-  column-count: 2;
-  column-gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .evcard {
-  display: inline-block;
+  display: block;
   width: 100%;
-  margin: 0 0 12px;
-  break-inside: avoid;
+  margin: 0;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
@@ -2681,7 +2685,7 @@ button {
 
 @media (min-width: 720px) {
   .evgrid {
-    column-count: 3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -3229,7 +3233,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 
 .flashpanel__go { display: flex; gap: 8px; align-items: center; }
 .flashpanel__go > :first-child { flex: 1; }
-.flashpanel__info { flex: 0 0 auto; display: grid; place-items: center; width: 40px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.flashpanel__info { flex: 0 0 auto; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 .flashpanel__info:hover { color: var(--ink); }
 
 /* Gravar e ouvir mensagem de voz */
@@ -3345,3 +3349,14 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .eventdates__grid input::-webkit-calendar-picker-indicator { margin: 0 0 0 2px; padding: 0; }
 .eventdates__grid .field__input { width: 100%; min-width: 0; padding-left: 8px; padding-right: 6px; font-size: 0.8125rem; }
 .eventdates__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 0.8125rem; }
+
+/* ---------- Revisão de UX ---------- */
+.section__head a { display: inline-flex; align-items: center; min-height: 44px; }
+.shell--detail .topbar { display: none; }
+.evpage { padding-bottom: 24px; }
+.evcover__fallback { position: absolute; inset: 0; padding-top: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: rgb(255 255 255 / 0.95); }
+.evcover__fallback svg { width: 44px; height: 44px; }
+.evcover__fallback .evcover__kind { padding: 0; font-size: 1.0625rem; }
+.welcome { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); }
+.welcome h2 { margin: 0; font-family: var(--font-display); font-size: 1.125rem; }
+.welcome p { margin: 0; color: var(--ink-2); }

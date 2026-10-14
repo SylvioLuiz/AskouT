@@ -3,7 +3,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
-import { SearchIcon } from '../components/icons.tsx';
+import { EventKindIcon, SearchIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
 import { Button, EmptyState, ErrorState, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -77,7 +77,7 @@ function EventCover({ event, shape }: { event: ExploreEvent; shape: string }) {
   const image = failed ? null : safeImage(event.imageUrl);
   return (
     <div className={`evcover evcover--${shape} evcover--${event.kind.toLowerCase()}`}>
-      {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="evcover__kind" aria-hidden="true">{kindLabel(event.kind)}</span>}
+      {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="evcover__fallback" aria-hidden="true"><EventKindIcon kind={event.kind} /><span className="evcover__kind">{kindLabel(event.kind)}</span></span>}
       <span className="evcover__tags">
         {event.isFree ? <span className="tag tag--free">Grátis</span> : null}
         {event.sample ? <SampleBadge /> : null}

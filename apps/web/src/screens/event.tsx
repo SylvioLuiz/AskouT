@@ -376,7 +376,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
 
           <div className="evactions">
             {e.source === 'PLACE' && !ended ? (
-              <Button full onClick={() => setPlanning(true)}>
+              <Button full variant="secondary" onClick={() => setPlanning(true)}>
                 {MEETUP_ACTION_LABEL}
               </Button>
             ) : null}

@@ -40,11 +40,11 @@ export function HomeScreen() {
           </h2>
           <Link to="/criar">Criar post</Link>
         </div>
-        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint="Seus posts e os dos seus amigos aparecem aqui. Toque em + para criar o primeiro." />
+        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint="Seus posts e os dos seus amigos aparecem aqui." />
       </section>
 
       <section className="section" aria-labelledby="amigos-titulo">
-        <div className="section__head">
+        <div className={`section__head${friends.data && count === 0 ? ' visually-hidden' : ''}`}>
           <h2 id="amigos-titulo" className="section__title">
             Seus amigos
           </h2>
@@ -53,16 +53,13 @@ export function HomeScreen() {
         {friends.loading ? <Loading /> : null}
         {friends.error ? <ErrorState message={friends.error.message} onRetry={friends.reload} /> : null}
         {friends.data && count === 0 ? (
-          <EmptyState
-            title="Você ainda não tem amigos no AskouT"
-            action={
-              <Link to="/explorar" className="btn btn--primary">
-                Encontrar pessoas
-              </Link>
-            }
-          >
-            Amigos são pessoas que seguem você e que você segue de volta. Procure alguém pelo nome ou @usuário.
-          </EmptyState>
+          <div className="welcome">
+            <h2>Encontre seus amigos</h2>
+            <p>Amigos são pessoas que seguem você e que você segue de volta.</p>
+            <Link to="/explorar" className="btn btn--primary">
+              Encontrar pessoas
+            </Link>
+          </div>
         ) : null}
         {friends.data && count > 0 ? (
           <>

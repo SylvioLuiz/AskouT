@@ -209,7 +209,7 @@ export function CreatePostScreen() {
     }
   }
 
-  const fileInput = <input ref={fileRef} type="file" accept="image/*" multiple className="visually-hidden" id="fotos-post" onChange={addFiles} />;
+  const fileInput = <input ref={fileRef} type="file" accept="image/*" multiple className="visually-hidden" aria-label="Escolher fotos" id="fotos-post" onChange={addFiles} />;
 
   if (step === 'details') {
     return (

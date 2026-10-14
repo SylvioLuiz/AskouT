@@ -113,6 +113,7 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [convs.reload]);
   const hasUnread = (convs.data?.items ?? []).some((c) => c.unread > 0);
   const inChat = /^\/conversas\/[^/]+$/.test(pathname);
+  const inEvent = /^\/eventos\/[^/]+$/.test(pathname);
   const flashOn = flash.data?.active === true;
   const flashInvited = (flashInvites.data?.received.length ?? 0) > 0;
   const flashLabel = flashInvited ? 'Flash, você tem um convite' : flashOn ? 'Flash, ligado' : 'Flash';
@@ -128,7 +129,7 @@ export function Shell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className={`shell${inChat ? ' shell--chat' : ''}`}>
+    <div className={`shell${inChat ? ' shell--chat' : ''}${inEvent ? ' shell--detail' : ''}`}>
       <a className="skip" href="#conteudo">
         Ir para o conteúdo
       </a>
