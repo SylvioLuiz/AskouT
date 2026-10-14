@@ -230,6 +230,13 @@ test('áudio: envia mensagem de voz, só quem está na conversa ouve, e valida o
   // formatos de gravação de cada navegador
   await w.core.conversations.send(ana, id, { audio: voice([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70], 30, 'audio/mp4'), audioMs: 2000 });
   await w.core.conversations.send(ana, id, { audio: voice([0x4f, 0x67, 0x67, 0x53], 30, 'audio/ogg;codecs=opus'), audioMs: 2000 });
+  // variações de escrita do tipo e mp4 fragmentado do Safari
+  await w.core.conversations.send(ana, id, { audio: voice([0x4f, 0x67, 0x67, 0x53], 30, 'audio/ogg; codecs=opus'), audioMs: 2000 });
+  await w.core.conversations.send(ana, id, { audio: voice([0, 0, 0, 20, 0x73, 0x74, 0x79, 0x70], 30, 'audio/mp4'), audioMs: 2000 });
+  await w.core.conversations.send(ana, id, { audio: voice(WEBM, 30, 'audio/webm'), audioMs: 2000 });
+  await w.core.conversations.send(ana, id, { audio: voice(WEBM, 30, 'audio/webm;codecs=opus;foo=bar'), audioMs: 2000 });
+  const err = await rejectsWith(w.core.conversations.send(ana, id, { audio: voice([1, 2, 3, 4], 30, 'audio/webm'), audioMs: 2000 }), 'VALIDATION');
+  assert.match(String(err.details?.audio), /webm/);
 });
 
 test('áudio: recusa arquivo falso, grande demais, duração fora de 1–90 s e mistura com texto', async () => {

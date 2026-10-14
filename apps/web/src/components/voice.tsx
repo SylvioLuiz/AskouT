@@ -18,10 +18,16 @@ export function voiceSupported(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined';
 }
 
-function toDataUrl(blob: Blob): Promise<string> {
+/** Data URL com o tipo "limpo" (sem `codecs=`): cada navegador escreve esses parâmetros de um jeito. */
+function toDataUrl(blob: Blob, fallbackMime: string): Promise<string> {
+  const base = (blob.type || fallbackMime).split(';')[0]?.trim().toLowerCase() || 'audio/webm';
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
+    reader.onload = () => {
+      const result = String(reader.result);
+      const comma = result.indexOf(',');
+      resolve(`data:${base};base64,${comma >= 0 ? result.slice(comma + 1) : ''}`);
+    };
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
   });
@@ -103,10 +109,11 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
         return;
       }
       try {
-        const dataUrl = await toDataUrl(blob);
+        const dataUrl = await toDataUrl(blob, mime);
         await callbacks.current.onSend(dataUrl, Math.min(durationMs, VOICE_MAX_MS));
       } catch (failure) {
-        callbacks.current.onProblem(toApiError(failure).message);
+        const error = toApiError(failure);
+        callbacks.current.onProblem(error.fields['audio'] ?? error.message);
       }
       callbacks.current.onCancel();
     }
