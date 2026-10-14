@@ -3042,3 +3042,53 @@ button {
   :root:not([data-theme='light']) .tag--google { background: #1c2f57; color: #b9d0ff; }
   :root:not([data-theme='light']) .btn--primary { color: var(--brand-ink); }
 }
+
+/* ---------- Botão (+) da barra e posts ---------- */
+
+.tabbar { grid-template-columns: repeat(5, 1fr); align-items: center; }
+.tabbar__create { display: grid; place-items: center; justify-self: center; width: 52px; height: 52px; margin-top: -14px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); box-shadow: 0 6px 18px rgb(58 54 245 / 0.35); text-decoration: none; }
+.tabbar__create:hover { background: var(--brand-hover); color: var(--brand-ink); }
+.tabbar__create--active { outline: 3px solid var(--brand-soft); }
+.shell--chat .tabbar { grid-template-columns: repeat(5, 1fr); }
+
+.tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); margin: 6px 0 14px; }
+.tabs__tab { padding: 12px 8px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); font-weight: 700; cursor: pointer; }
+.tabs__tab--on { color: var(--ink); border-bottom-color: var(--brand); }
+
+.postlist { display: flex; flex-direction: column; gap: 22px; }
+.post { display: flex; flex-direction: column; gap: 8px; }
+.post__head { display: flex; align-items: center; gap: 10px; }
+.post__author { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--ink); text-decoration: none; }
+.post__author strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.post__when { margin-right: auto; color: var(--muted); font-size: 0.8125rem; text-decoration: none; }
+.post__place { font-size: 0.9375rem; color: var(--ink-2); }
+.post__caption { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.carousel { position: relative; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
+.carousel__track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.carousel__track::-webkit-scrollbar { display: none; }
+.carousel__slide { position: relative; flex: 0 0 100%; margin: 0; aspect-ratio: 4 / 5; scroll-snap-align: center; display: grid; }
+.carousel__slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.carousel__slide figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 12px 8px; color: #fff; font-size: 0.75rem; background: linear-gradient(transparent, rgb(0 0 0 / 0.55)); }
+.carousel__missing { display: grid; place-items: center; color: var(--muted); font-size: 0.875rem; }
+.carousel__count { position: absolute; top: 10px; right: 10px; padding: 2px 9px; border-radius: 999px; background: rgb(0 0 0 / 0.55); color: #fff; font-size: 0.75rem; font-weight: 700; }
+.carousel__dots { position: absolute; left: 0; right: 0; bottom: 30px; display: flex; justify-content: center; gap: 2px; }
+.carousel__dot { width: 20px; height: 20px; padding: 0; border: 0; background: transparent; position: relative; cursor: pointer; }
+.carousel__dot::after { content: ''; position: absolute; inset: 7px; border-radius: 50%; background: rgb(255 255 255 / 0.55); }
+.carousel__dot--on::after { background: #fff; }
+
+.postgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.postgrid__item { position: relative; display: block; aspect-ratio: 1; background: var(--line); overflow: hidden; }
+.postgrid__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.postgrid__none { display: block; width: 100%; height: 100%; }
+.postgrid__multi { position: absolute; top: 6px; right: 6px; color: #fff; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6)); }
+.postgrid__multi .icon { width: 20px; height: 20px; }
+
+.composepics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.composepics__item { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: var(--line); }
+.composepics__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.composepics__cover { position: absolute; left: 6px; bottom: 6px; padding: 1px 8px; border-radius: 999px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 0.75rem; font-weight: 700; }
+.composepics__remove { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 1.25rem; line-height: 1; cursor: pointer; }
+.placepick { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.placepick__item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
+.placepick__item img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex: none; }

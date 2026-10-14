@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -162,6 +162,18 @@ export interface ProfileEventRepository {
   count(userId: string): Promise<number>;
 }
 
+export interface PostRepository {
+  create(post: PostRecord, images: PostImageRecord[]): Promise<void>;
+  findById(id: string): Promise<PostWithImages | undefined>;
+  /** Posts de qualquer um dos autores, mais recentes primeiro. */
+  listByAuthors(authorIds: string[], page: Page): Promise<PostWithImages[]>;
+  countByAuthor(authorId: string): Promise<number>;
+  /** Só apaga se `authorId` é o autor. Devolve false se não existia ou era de outra pessoa. */
+  delete(postId: string, authorId: string): Promise<boolean>;
+  /** Bytes de uma foto enviada (fotos de lugar não têm bytes). */
+  findImage(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+}
+
 export interface PlaceRepository {
   createVenue(venue: VenueRecord): Promise<void>;
   createEvent(event: PlaceEventRecord): Promise<void>;
@@ -294,6 +306,7 @@ export interface CoreDeps {
   conversations: ConversationRepository;
   meetups: MeetupRepository;
   profileEvents: ProfileEventRepository;
+  posts: PostRepository;
   places: PlaceRepository;
   placeSource: PlaceSource;
   pending: PendingSignupRepository;

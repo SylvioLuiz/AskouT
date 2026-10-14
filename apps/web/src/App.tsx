@@ -15,6 +15,7 @@ import { EventScreen, ExploreScreen } from './screens/explore.tsx';
 import { HomeScreen } from './screens/main-tabs.tsx';
 import { BlockedScreen, EditProfileScreen, FriendsScreen, HelpScreen, InteractionsScreen, PrivacyScreen, SettingsScreen, ThemeScreen } from './screens/me.tsx';
 import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
+import { CreatePostScreen, PostScreen } from './screens/posts.tsx';
 
 // Telas para quem ainda não entrou.
 const GUEST_ROUTES: RouteDef[] = [
@@ -40,6 +41,8 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/flash', render: () => <FlashScreen /> },
   { path: '/flash/encontro/:id', render: (p) => <MatchScreen inviteId={p['id'] ?? ''} /> },
   { path: '/atividades', render: () => <ActivityScreen /> },
+  { path: '/criar', render: () => <CreatePostScreen /> },
+  { path: '/posts/:id', render: (p) => <PostScreen key={p['id']} postId={p['id'] ?? ''} /> },
   { path: '/perfil', render: () => <OwnProfile /> },
   { path: '/perfil/editar', render: () => <EditProfileScreen /> },
   { path: '/configuracao', render: () => <SettingsScreen /> },

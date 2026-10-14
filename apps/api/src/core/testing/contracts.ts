@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PushSubscriptionRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
 import type { MeetupRecord, MessageRecord, PlaceEventRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
@@ -22,6 +22,7 @@ export interface RepoHarness {
   places: PlaceRepository;
   meetups: MeetupRepository;
   profileEvents: ProfileEventRepository;
+  posts: PostRepository;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
@@ -1026,6 +1027,40 @@ export function defineRepositoryContract(
         assert.equal(await h.profileEvents.remove(ana, e2.id), true);
         assert.equal(await h.profileEvents.remove(ana, e2.id), false);
         assert.equal(await h.profileEvents.count(ana), 2);
+      });
+
+      it('posts: criar com fotos enviadas e do lugar, listar por autores, contar, apagar só do autor', async () => {
+        const { ana, bia } = await setup();
+        const mk = (authorId: string, n: number, id = randomUUID()) => {
+          const postId = id;
+          return {
+            post: { id: postId, authorId, caption: n === 1 ? null : `legenda ${n}`, placeName: null, placeAddress: null, createdAt: at(n) },
+            images: [
+              { id: randomUUID(), postId, position: 0, mime: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff, n]), placePhotoRef: null, placePhotoAuthor: null },
+              { id: randomUUID(), postId, position: 1, mime: null, data: null, placePhotoRef: 'places/x/photos/y', placePhotoAuthor: 'Maria' },
+            ],
+          };
+        };
+        const p1 = mk(ana, 1), p2 = mk(ana, 2), p3 = mk(bia, 3);
+        for (const p of [p1, p2, p3]) await h.posts.create(p.post, p.images);
+        const found = (await h.posts.findById(p1.post.id))!;
+        assert.equal(found.post.caption, null);
+        assert.deepEqual(found.images.map((i) => [i.position, i.isUpload, i.placePhotoRef, i.placePhotoAuthor]), [[0, true, null, null], [1, false, 'places/x/photos/y', 'Maria']]);
+        assert.equal(await h.posts.findById(randomUUID()), undefined);
+        assert.deepEqual((await h.posts.listByAuthors([ana], { limit: 10, offset: 0 })).map((r) => r.post.id), [p2.post.id, p1.post.id], 'mais recente primeiro');
+        assert.deepEqual((await h.posts.listByAuthors([ana, bia], { limit: 10, offset: 0 })).map((r) => r.post.id), [p3.post.id, p2.post.id, p1.post.id]);
+        assert.deepEqual((await h.posts.listByAuthors([ana, bia], { limit: 1, offset: 1 })).map((r) => r.post.id), [p2.post.id]);
+        assert.deepEqual(await h.posts.listByAuthors([], { limit: 10, offset: 0 }), []);
+        assert.equal(await h.posts.countByAuthor(ana), 2);
+        const img = (await h.posts.findImage(p1.images[0]!.id))!;
+        assert.equal(img.mime, 'image/jpeg');
+        assert.deepEqual([...img.data], [0xff, 0xd8, 0xff, 1]);
+        assert.equal(await h.posts.findImage(p1.images[1]!.id), undefined, 'foto do lugar não tem bytes');
+        assert.equal(await h.posts.delete(p1.post.id, bia), false, 'só o autor apaga');
+        assert.equal(await h.posts.delete(p1.post.id, ana), true);
+        assert.equal(await h.posts.delete(p1.post.id, ana), false);
+        assert.equal(await h.posts.findImage(p1.images[0]!.id), undefined, 'as fotos vão junto');
+        assert.equal(await h.posts.countByAuthor(ana), 1);
       });
 
       it('mensagem de evento guarda o evento; encontros do usuário listados do mais recente', async () => {

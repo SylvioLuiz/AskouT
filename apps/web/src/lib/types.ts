@@ -413,3 +413,33 @@ export interface ExploreParams {
   kind?: EventKind;
   free?: boolean;
 }
+
+export interface PostImage {
+  id: string;
+  kind: 'UPLOAD' | 'PLACE';
+  /** Caminho na API (foto enviada ou foto do lugar assinada); nulo se a foto do lugar não está disponível. */
+  path: string | null;
+  photoAuthor: string | null;
+}
+
+export interface PostView {
+  id: string;
+  author: PublicProfile;
+  caption: string | null;
+  placeName: string | null;
+  placeAddress: string | null;
+  createdAt: string;
+  images: PostImage[];
+  mine: boolean;
+}
+
+export interface PostsPage {
+  items: PostView[];
+  total: number | null;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+/** Foto de um post a criar: enviada (data URL já reduzida) ou a foto de um lugar. */
+export type PostImageInput = string | { photoPath: string; photoAuthor: string | null };

@@ -139,6 +139,7 @@ model User {
   pushSubscriptions PushSubscription[]
   postedEvents      PostedEvent[]
   photo             ProfilePhoto?
+  posts             Post[]
 }
 
 model Profile {
@@ -518,4 +519,34 @@ model PlaceEvent {
   @@index([startsAt])
   @@index([venueId])
   @@index([kind])
+}
+
+// Post com fotos (enviadas pela pessoa ou a foto de um lugar) e legenda opcional.
+model Post {
+  id           String   @id @default(uuid()) @db.Uuid
+  authorId     String   @db.Uuid
+  caption      String?
+  placeName    String?
+  placeAddress String?
+  createdAt    DateTime @default(now())
+
+  author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  images PostImage[]
+
+  @@index([authorId, createdAt])
+}
+
+// Foto enviada: `mime` e `data`. Foto do lugar: só `placePhotoRef` (o servidor busca no Google na hora de mostrar).
+model PostImage {
+  id               String  @id @default(uuid()) @db.Uuid
+  postId           String  @db.Uuid
+  position         Int
+  mime             String?
+  data             Bytes?
+  placePhotoRef    String?
+  placePhotoAuthor String?
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, position])
 }

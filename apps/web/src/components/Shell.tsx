@@ -7,7 +7,7 @@ import { CHATS_CHANGED_EVENT } from '../lib/chat.ts';
 import { FLASH_CHANGED_EVENT } from '../lib/flash.ts';
 import { NOTIFICATIONS_CHANGED_EVENT } from '../lib/notifications.ts';
 import { Link, navigate, usePathname } from '../router.tsx';
-import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, HomeIcon, SearchIcon, UserIcon } from './icons.tsx';
+import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, HomeIcon, PlusBigIcon, SearchIcon, UserIcon } from './icons.tsx';
 import { Avatar } from './ui.tsx';
 
 interface NavItem {
@@ -91,6 +91,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const flashLabel = flashInvited ? 'Flash, você tem um convite' : flashOn ? 'Flash, ligado' : 'Flash';
 
   const flashItem: NavItem = { to: '/flash', label: 'Flash', icon: <BoltIcon filled={flashOn} />, also: ['/flash/encontro'] };
+  const createItem: NavItem = { to: '/criar', label: 'Criar post', icon: <PlusBigIcon /> };
   const activities: NavItem = { to: '/atividades', label: 'Atividades', icon: <BellIcon /> };
   const profile: NavItem = {
     to: '/perfil',
@@ -113,6 +114,7 @@ export function Shell({ children }: { children: ReactNode }) {
           {MAIN.map((item) => (
             <NavLink key={item.to} item={item} pathname={pathname} badge={item.to === '/conversas' && hasUnread} />
           ))}
+          <NavLink item={createItem} pathname={pathname} />
           <NavLink item={flashItem} pathname={pathname} badge={flashInvited} />
           <NavLink item={activities} pathname={pathname} badge={hasPending} />
           <NavLink item={profile} pathname={pathname} />
@@ -150,7 +152,13 @@ export function Shell({ children }: { children: ReactNode }) {
       </main>
 
       <nav className="tabbar" aria-label="Principal">
-        {MAIN.map((item) => (
+        {MAIN.slice(0, 2).map((item) => (
+          <NavLink key={item.to} item={item} pathname={pathname} />
+        ))}
+        <Link to="/criar" className={`tabbar__create${pathname === '/criar' ? ' tabbar__create--active' : ''}`} aria-label="Criar post" aria-current={pathname === '/criar' ? 'page' : undefined}>
+          <PlusBigIcon />
+        </Link>
+        {MAIN.slice(2).map((item) => (
           <NavLink key={item.to} item={item} pathname={pathname} badge={item.to === '/conversas' && hasUnread} />
         ))}
       </nav>

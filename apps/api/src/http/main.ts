@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { existsSync } from 'node:fs';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.ts';
 import { AllExceptionsFilter } from './exception.filter.ts';
 import type { AppConfig } from './support/config.ts';
@@ -10,9 +11,11 @@ import { CONFIG } from './tokens.ts';
 // têm prioridade, então em produção valem as do servidor.
 if (existsSync('.env')) process.loadEnvFile('.env');
 
-const app = await NestFactory.create(AppModule);
+const app = await NestFactory.create<NestExpressApplication>(AppModule);
 const config = app.get<AppConfig>(CONFIG);
 
+// Posts levam até 5 fotos já reduzidas (≤100 KB cada, em base64): o limite padrão (100 KB) não basta.
+app.useBodyParser('json', { limit: '1mb' });
 app.useGlobalFilters(new AllExceptionsFilter());
 app.enableShutdownHooks();
 if (config.corsOrigins.length > 0) {

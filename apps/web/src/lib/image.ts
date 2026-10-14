@@ -60,3 +60,8 @@ export const resizeGroupPhoto = (file: File) => resizePhoto(file, { side: GROUP_
 export const PROFILE_PHOTO_SIDE = 384;
 export const PROFILE_PHOTO_MAX_BYTES = 56 * 1024;
 export const resizeProfilePhoto = (file: File) => resizePhoto(file, { side: PROFILE_PHOTO_SIDE, maxBytes: PROFILE_PHOTO_MAX_BYTES });
+
+/** Foto de post: até 720 px e 95 KB (a API aceita até 100 KB por foto). */
+export const POST_PHOTO_SIDE = 720;
+export const POST_PHOTO_MAX_BYTES = 95 * 1024;
+export const resizePostPhoto = (file: File) => resizePhoto(file, { side: POST_PHOTO_SIDE, maxBytes: POST_PHOTO_MAX_BYTES });

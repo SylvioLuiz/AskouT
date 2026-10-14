@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { EditIcon, LockIcon, MenuIcon } from '../components/icons.tsx';
 import { ProfileMenu } from '../components/profile-menu.tsx';
 import { PostedEvents } from '../components/profile-events.tsx';
+import { PostGrid } from '../components/post.tsx';
 import { ChatButton } from '../components/chat-button.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -42,12 +43,14 @@ export function ProfileScreen({ username }: { username: string }) {
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const [pending, setPending] = useState<Pending>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [tab, setTab] = useState<'events' | 'posts'>('events');
   const [eventTotal, setEventTotal] = useState<number | undefined>();
 
   useEffect(() => {
     setMessage(undefined);
     setPending(undefined);
     setMenuOpen(false);
+    setTab('events');
     setEventTotal(undefined);
   }, [username]);
 
@@ -228,8 +231,17 @@ export function ProfileScreen({ username }: { username: string }) {
           ) : relationship.isSelf ? null : (
             <p className="muted profile__soon">A agenda é visível só para amigos, quando vocês se seguem.</p>
           )}
-          <h2 className="profile__section">Eventos</h2>
-          <PostedEvents username={profile.username} mine={relationship.isSelf} onCount={setEventTotal} />
+          <div className="tabs" role="tablist" aria-label="Conteúdo do perfil">
+            <button type="button" role="tab" id="aba-eventos" aria-selected={tab === 'events'} aria-controls="painel-perfil" className={`tabs__tab${tab === 'events' ? ' tabs__tab--on' : ''}`} onClick={() => setTab('events')}>
+              Eventos
+            </button>
+            <button type="button" role="tab" id="aba-posts" aria-selected={tab === 'posts'} aria-controls="painel-perfil" className={`tabs__tab${tab === 'posts' ? ' tabs__tab--on' : ''}`} onClick={() => setTab('posts')}>
+              Posts
+            </button>
+          </div>
+          <div id="painel-perfil" role="tabpanel" aria-labelledby={tab === 'events' ? 'aba-eventos' : 'aba-posts'}>
+            {tab === 'events' ? <PostedEvents username={profile.username} mine={relationship.isSelf} onCount={setEventTotal} /> : <PostGrid username={profile.username} />}
+          </div>
         </>
       )}
     </>

@@ -1,6 +1,7 @@
 import { conflict } from '../errors.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
+  PostRepository,
   ConversationRepository,
   MeetupRepository,
   NotificationRepository,
@@ -24,7 +25,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { PostImageRecord, PostRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -811,5 +812,54 @@ export class FakePushSender implements PushSender {
   async send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
     this.sent.push({ subscription, message });
     return this.results.get(subscription.endpoint) ?? 'SENT';
+  }
+}
+
+export class InMemoryPostRepository implements PostRepository {
+  readonly posts = new Map<string, PostRecord>();
+  readonly images = new Map<string, PostImageRecord>();
+
+  async create(post: PostRecord, images: PostImageRecord[]): Promise<void> {
+    this.posts.set(post.id, { ...post });
+    for (const i of images) this.images.set(i.id, { ...i, data: i.data ? new Uint8Array(i.data) : null });
+  }
+
+  private withImages(post: PostRecord): PostWithImages {
+    const images = [...this.images.values()]
+      .filter((i) => i.postId === post.id)
+      .sort((a, b) => a.position - b.position)
+      .map((i) => ({ id: i.id, position: i.position, isUpload: i.data !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor }));
+    return { post: { ...post }, images };
+  }
+
+  async findById(id: string): Promise<PostWithImages | undefined> {
+    const post = this.posts.get(id);
+    return post ? this.withImages(post) : undefined;
+  }
+
+  async listByAuthors(authorIds: string[], page: Page): Promise<PostWithImages[]> {
+    const set = new Set(authorIds);
+    return [...this.posts.values()]
+      .filter((p) => set.has(p.authorId))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+      .slice(page.offset, page.offset + page.limit)
+      .map((p) => this.withImages(p));
+  }
+
+  async countByAuthor(authorId: string): Promise<number> {
+    return [...this.posts.values()].filter((p) => p.authorId === authorId).length;
+  }
+
+  async delete(postId: string, authorId: string): Promise<boolean> {
+    const post = this.posts.get(postId);
+    if (!post || post.authorId !== authorId) return false;
+    this.posts.delete(postId);
+    for (const [id, i] of this.images) if (i.postId === postId) this.images.delete(id);
+    return true;
+  }
+
+  async findImage(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    const i = this.images.get(imageId);
+    return i && i.data && i.mime ? { mime: i.mime, data: new Uint8Array(i.data) } : undefined;
   }
 }

@@ -23,3 +23,16 @@ export function formatCountdown(seconds: number): string {
 export function pluralize(count: number, singular: string, plural: string): string {
   return `${formatCount(count)} ${count === 1 ? singular : plural}`;
 }
+
+/** "agora", "há 5 min", "há 3 h", "há 2 dias" ou a data, para posts. */
+export function timeAgo(iso: string, now: Date): string {
+  const diff = Math.max(0, now.getTime() - Date.parse(iso));
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `há ${d} ${d === 1 ? 'dia' : 'dias'}`;
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}

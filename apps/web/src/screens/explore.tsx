@@ -39,7 +39,7 @@ let lastPosition: { position: Position; at: number } | undefined;
 const POSITION_MAX_AGE_MS = 5 * 60_000;
 
 /** Pede a posição ao abrir o Explorar. Só fica em memória nesta sessão da página. */
-function useCurrentPosition(): LocationState {
+export function useCurrentPosition(): LocationState {
   const [state, setState] = useState<LocationState>(() =>
     lastPosition && Date.now() - lastPosition.at < POSITION_MAX_AGE_MS ? { status: 'ok', position: lastPosition.position } : { status: 'asking' },
   );

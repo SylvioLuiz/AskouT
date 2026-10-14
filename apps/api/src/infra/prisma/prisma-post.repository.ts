@@ -1,0 +1,91 @@
+import type { PrismaClient } from '@prisma/client';
+import type { PostRepository } from '../../core/ports.ts';
+import type { Page, PostImageRecord, PostRecord, PostWithImages } from '../../core/types.ts';
+import { isUuid } from './helpers.ts';
+
+export class PrismaPostRepository implements PostRepository {
+  private readonly prisma: PrismaClient;
+
+  constructor(prisma: PrismaClient) {
+    this.prisma = prisma;
+  }
+
+  async create(post: PostRecord, images: PostImageRecord[]): Promise<void> {
+    await this.prisma.post.create({
+      data: {
+        id: post.id,
+        authorId: post.authorId,
+        caption: post.caption,
+        placeName: post.placeName,
+        placeAddress: post.placeAddress,
+        createdAt: post.createdAt,
+        images: {
+          create: images.map((i) => ({
+            id: i.id,
+            position: i.position,
+            mime: i.mime,
+            data: i.data ? Buffer.from(i.data) : null,
+            placePhotoRef: i.placePhotoRef,
+            placePhotoAuthor: i.placePhotoAuthor,
+          })),
+        },
+      },
+    });
+  }
+
+  private static toView(row: {
+    id: string;
+    authorId: string;
+    caption: string | null;
+    placeName: string | null;
+    placeAddress: string | null;
+    createdAt: Date;
+    images: { id: string; position: number; mime: string | null; placePhotoRef: string | null; placePhotoAuthor: string | null }[];
+  }): PostWithImages {
+    return {
+      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, createdAt: row.createdAt },
+      images: row.images.map((i) => ({ id: i.id, position: i.position, isUpload: i.mime !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor })),
+    };
+  }
+
+  // Não traz os bytes das fotos: só os campos de metadados.
+  private static readonly include = {
+    images: { select: { id: true, position: true, mime: true, placePhotoRef: true, placePhotoAuthor: true }, orderBy: { position: 'asc' as const } },
+  };
+
+  async findById(id: string): Promise<PostWithImages | undefined> {
+    if (!isUuid(id)) return undefined;
+    const row = await this.prisma.post.findUnique({ where: { id }, include: PrismaPostRepository.include });
+    return row ? PrismaPostRepository.toView(row) : undefined;
+  }
+
+  async listByAuthors(authorIds: string[], page: Page): Promise<PostWithImages[]> {
+    const ids = authorIds.filter(isUuid);
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.post.findMany({
+      where: { authorId: { in: ids } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: page.offset,
+      take: page.limit,
+      include: PrismaPostRepository.include,
+    });
+    return rows.map(PrismaPostRepository.toView);
+  }
+
+  async countByAuthor(authorId: string): Promise<number> {
+    if (!isUuid(authorId)) return 0;
+    return this.prisma.post.count({ where: { authorId } });
+  }
+
+  async delete(postId: string, authorId: string): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(authorId)) return false;
+    const result = await this.prisma.post.deleteMany({ where: { id: postId, authorId } });
+    return result.count > 0;
+  }
+
+  async findImage(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (!isUuid(imageId)) return undefined;
+    const row = await this.prisma.postImage.findUnique({ where: { id: imageId }, select: { mime: true, data: true } });
+    return row && row.mime && row.data ? { mime: row.mime, data: new Uint8Array(row.data) } : undefined;
+  }
+}

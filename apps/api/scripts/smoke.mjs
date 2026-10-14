@@ -280,6 +280,19 @@ try {
   check('evento inexistente: 404', (await call('GET', '/events/nao-existe', { token: a.token })).status === 404);
   check('explorar sem login: 401', (await call('GET', '/explore')).status === 401);
 
+  console.log('\nPosts');
+  const post = await call('POST', '/posts', { token: a.token, body: { caption: 'Post de teste', images: [tinyJpeg, tinyJpeg] } });
+  check('criar post com 2 fotos', post.status === 200 && post.body.images.length === 2 && post.body.images[0].path.startsWith('/posts/images/'), post.body);
+  const postImg = await fetch(`${BASE}${post.body?.images?.[0]?.path ?? '/posts/images/x'}`);
+  check('foto do post é servida como imagem, sem login', postImg.status === 200 && /image\/jpeg/.test(postImg.headers.get('content-type') ?? ''), postImg.status);
+  check('post sem fotos: 400', (await call('POST', '/posts', { token: a.token, body: { images: [] } })).status === 400);
+  check('foto de lugar com endereço falso: 400', (await call('POST', '/posts', { token: a.token, body: { images: [{ photoPath: '/places/photo?ref=x&exp=1&sig=y' }] } })).status === 400);
+  const aPosts = await call('GET', `/profiles/${a.username}/posts`, { token: b.token });
+  check('amigo vê os posts do perfil', aPosts.status === 200 && aPosts.body.total === 1, aPosts.body);
+  check('feed traz o post do amigo', (await call('GET', '/posts/feed', { token: b.token })).body?.items?.some((p) => p.id === post.body.id));
+  check('outra pessoa não apaga: 404', (await call('DELETE', `/posts/${post.body.id}`, { token: b.token })).status === 404);
+  check('autor apaga', (await call('DELETE', `/posts/${post.body.id}`, { token: a.token })).status === 200);
+
   console.log('\nEncontros e grupos');
   const anyEvent = (await call('GET', '/explore?radiusKm=50', { token: a.token })).body?.events?.[0];
   if (!anyEvent) {

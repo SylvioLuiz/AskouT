@@ -302,3 +302,38 @@ export interface ProfilePhotoRecord {
   data: Uint8Array;
   updatedAt: Date;
 }
+
+/** Post de uma pessoa: 1 a 5 fotos (enviadas por ela ou a foto de um lugar) e legenda opcional. */
+export interface PostRecord {
+  id: string;
+  authorId: string;
+  caption: string | null;
+  placeName: string | null;
+  placeAddress: string | null;
+  createdAt: Date;
+}
+
+export interface PostImageRecord {
+  id: string;
+  postId: string;
+  position: number;
+  /** Foto enviada: tipo e bytes. Foto do lugar: ambos nulos e `placePhotoRef` preenchido. */
+  mime: string | null;
+  data: Uint8Array | null;
+  placePhotoRef: string | null;
+  placePhotoAuthor: string | null;
+}
+
+/** Imagem sem os bytes (a lista não carrega as fotos, só o endereço delas). */
+export interface PostImageMeta {
+  id: string;
+  position: number;
+  isUpload: boolean;
+  placePhotoRef: string | null;
+  placePhotoAuthor: string | null;
+}
+
+export interface PostWithImages {
+  post: PostRecord;
+  images: PostImageMeta[];
+}

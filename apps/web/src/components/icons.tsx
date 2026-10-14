@@ -120,3 +120,16 @@ export const ShareIcon = () => (
     <path d="M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12" />
   </Svg>
 );
+
+export const CarouselIcon = () => (
+  <Svg>
+    <rect x="8" y="3.5" width="12.5" height="12.5" rx="2" />
+    <path d="M4 8v10.5A2 2 0 0 0 6 20.5h10.5" />
+  </Svg>
+);
+
+export const PlusBigIcon = () => (
+  <svg className="icon" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true" focusable="false">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);

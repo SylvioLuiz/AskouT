@@ -4,6 +4,7 @@ import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
 import { useAsync, useTitle } from '../hooks.ts';
 import { formatRemaining, minutesLeft } from '../lib/flash.ts';
+import { PostList } from '../components/post.tsx';
 import { Link } from '../router.tsx';
 
 export function HomeScreen() {
@@ -31,6 +32,16 @@ export function HomeScreen() {
           </span>
         </span>
       </Link>
+
+      <section className="section" aria-labelledby="posts-titulo">
+        <div className="section__head">
+          <h2 id="posts-titulo" className="section__title">
+            Posts dos amigos
+          </h2>
+          <Link to="/criar">Criar post</Link>
+        </div>
+        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint="Seus posts e os dos seus amigos aparecem aqui. Toque em + para criar o primeiro." />
+      </section>
 
       <section className="section" aria-labelledby="amigos-titulo">
         <div className="section__head">
@@ -69,12 +80,6 @@ export function HomeScreen() {
         ) : null}
       </section>
 
-      <section className="section">
-        <h2 className="section__title">O que vem por aí</h2>
-        <p className="muted">
-          Encontros marcados pela agenda e as conversas ainda não estão no app. Quando chegarem, aparecem aqui.
-        </p>
-      </section>
     </>
   );
 }
