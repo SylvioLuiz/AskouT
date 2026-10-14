@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Avatar, Button, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { ArrowUpIcon } from '../components/icons.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
 import { EventBubble } from '../components/share-event.tsx';
 import { peopleLabel } from '../lib/meetup.ts';
@@ -251,22 +252,26 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           <label className="visually-hidden" htmlFor="msg">
             Mensagem para {chatName}
           </label>
-          <textarea
-            id="msg"
-            className="composer__input"
-            rows={1}
-            value={draft}
-            maxLength={MESSAGE_MAX}
-            placeholder="Escreva uma mensagem"
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
-              if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
-            }}
-          />
-          <Button type="submit" loading={sending} disabled={draft.trim() === ''}>
-            Enviar
-          </Button>
+          <div className="commentbox composer__box">
+            <textarea
+              id="msg"
+              className="composer__input"
+              rows={1}
+              value={draft}
+              maxLength={MESSAGE_MAX}
+              placeholder="Escreva uma mensagem"
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
+                if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
+              }}
+            />
+            {draft.trim() !== '' ? (
+              <button type="submit" className="commentbox__send composer__send" disabled={sending} aria-label="Enviar mensagem" aria-busy={sending || undefined}>
+                <ArrowUpIcon />
+              </button>
+            ) : null}
+          </div>
         </form>
       ) : (
         <Notice>Vocês não são mais amigos. O histórico continua aqui, mas não dá para enviar novas mensagens.</Notice>
