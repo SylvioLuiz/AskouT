@@ -39,7 +39,7 @@ export function ShareEventSheet({ eventId, title, posted, onPostedChange, onClos
     setMessage(undefined);
     try {
       await api.sendEvent(conversation.id, eventId);
-      setMessage({ tone: 'ok', text: `Enviado para ${conversation.type === 'GROUP' ? (conversation.name ?? 'o grupo') : (conversation.other?.displayName ?? 'a conversa')}.` });
+      setMessage({ tone: 'ok', text: `Enviado para ${conversation.type === 'GROUP' ? (conversation.name ?? 'o grupo') : (conversation.other?.username ?? 'a conversa')}.` });
       setStep('menu');
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
@@ -101,7 +101,7 @@ export function ShareEventSheet({ eventId, title, posted, onPostedChange, onClos
               <li key={c.id}>
                 <button type="button" className="sharelist__item sharelist__item--person" onClick={() => sendTo(c)} disabled={busy}>
                   {c.type === 'GROUP' ? <GroupAvatar name={c.name ?? 'Grupo'} size={40} imageUrl={c.imageUrl} /> : c.other ? <Avatar profile={c.other} size={40} /> : null}
-                  <strong>{c.type === 'GROUP' ? (c.name ?? 'Grupo') : (c.other?.displayName ?? 'Conversa')}</strong>
+                  <strong>{c.type === 'GROUP' ? (c.name ?? 'Grupo') : (c.other?.username ?? 'Conversa')}</strong>
                 </button>
               </li>
             ))}

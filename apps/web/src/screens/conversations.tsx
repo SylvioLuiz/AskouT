@@ -54,7 +54,7 @@ export function ConversationsScreen() {
                 {c.other ? <Avatar profile={c.other} size={48} /> : <GroupAvatar name={c.name ?? 'Grupo'} size={48} imageUrl={c.imageUrl} />}
                 <span className="convrow__body">
                   <span className="convrow__top">
-                    <span className="convrow__name">{c.other ? c.other.displayName : (c.name ?? 'Grupo')}</span>
+                    <span className="convrow__name">{c.other ? c.other.username : (c.name ?? 'Grupo')}</span>
                     {c.lastMessage ? <span className="convrow__time">{listTimeLabel(c.lastMessage.createdAt, now)}</span> : null}
                   </span>
                   <span className="convrow__preview">{previewOf(c.lastMessage)}</span>
@@ -94,7 +94,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const stickToEnd = useRef(true);
   const loadedFirst = useRef(false);
 
-  const chatName = view.data ? (view.data.other ? view.data.other.displayName : (view.data.name ?? 'Grupo')) : 'Conversa';
+  const chatName = view.data ? (view.data.other ? view.data.other.username : (view.data.name ?? 'Grupo')) : 'Conversa';
   useTitle(chatName);
 
   useEffect(() => {
@@ -197,7 +197,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       {isGroup ? (
         <PageHead title={chatName} back="/conversas" subtitle={`${peopleLabel(data.memberCount)} · toque para ver o grupo`} titleTo={`/conversas/${conversationId}/grupo`} />
       ) : (
-        <PageHead title={chatName} back="/conversas" subtitle={data.other ? `@${data.other.username}` : undefined} />
+        <PageHead title={chatName} back="/conversas" />
       )}
 
       {match ? (
@@ -224,7 +224,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             </Button>
           </div>
         ) : null}
-        {messages.length === 0 ? <p className="muted chat__empty">Nenhuma mensagem ainda. Diga oi{data.other ? ` para ${data.other.displayName}` : ' para o grupo'}.</p> : null}
+        {messages.length === 0 ? <p className="muted chat__empty">Nenhuma mensagem ainda. Diga oi{data.other ? ` para ${data.other.username}` : ' para o grupo'}.</p> : null}
         {messages.map((m) => {
           const day = dayLabel(m.createdAt, new Date(serverNow));
           const showDay = day !== lastDay;
@@ -236,7 +236,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
               <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.kind === 'AUDIO' ? ' bubble--voice' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`}>
                 {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
                 {m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
-                  <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} />
+                  <SuggestionBubble message={m} otherName={data.other.username} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} />
                 ) : m.kind === 'MEETUP' && m.meetup ? (
                   <MeetupBubble meetup={m.meetup} nowIso={data.now} onUpdated={(updated) => setMessages((current) => current.map((x) => (x.id === m.id || x.meetup?.id === updated.id ? { ...x, meetup: updated } : x)))} />
                 ) : m.kind === 'AUDIO' && m.audio ? (
@@ -302,7 +302,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         <SuggestionsSheet
           inviteId={match.id}
           conversationId={conversationId}
-          otherName={data.other?.displayName ?? ''}
+          otherName={data.other?.username ?? ''}
           onClose={() => setSuggesting(false)}
           onSent={(message) => {
             stickToEnd.current = true;

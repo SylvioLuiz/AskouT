@@ -1,11 +1,10 @@
-/** Iniciais para o avatar quando a pessoa não tem foto: até duas letras, em maiúsculas. */
-export function initials(displayName: string, username: string): string {
-  const words = displayName.trim().split(/\s+/).filter((w) => w !== '');
-  const source = words.length > 0 ? words : [username];
-  const letters = source
-    .slice(0, 2)
-    .map((word) => Array.from(word)[0] ?? '')
-    .join('');
+/**
+ * Iniciais para o avatar quando a pessoa não tem foto: vêm do @usuário, nunca do nome real.
+ * "bruna.alves" vira "BA"; "bruno" vira "BR".
+ */
+export function initials(username: string): string {
+  const parts = username.split(/[^\p{L}\p{N}]+/u).filter((p) => p !== '');
+  const letters = parts.length >= 2 ? parts.slice(0, 2).map((p) => Array.from(p)[0] ?? '').join('') : Array.from(parts[0] ?? '').slice(0, 2).join('');
   return letters.toLocaleUpperCase('pt-BR') || '?';
 }
 

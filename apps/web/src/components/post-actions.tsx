@@ -136,13 +136,13 @@ export function ReportSheet({ postId, onClose, onDone }: { postId: string; onClo
 function CommentRow({ comment, onDelete, busy }: { comment: PostComment; onDelete: () => void; busy: boolean }) {
   return (
     <li className="comment">
-      <Link to={`/u/${encodeURIComponent(comment.author.username)}`} aria-label={`Perfil de ${comment.author.displayName}`}>
+      <Link to={`/u/${encodeURIComponent(comment.author.username)}`} aria-label={`Perfil de ${comment.author.username}`}>
         <Avatar profile={comment.author} size={32} />
       </Link>
       <div className="comment__body">
         <p>
           <Link to={`/u/${encodeURIComponent(comment.author.username)}`} className="comment__name">
-            {comment.author.displayName}
+            {comment.author.username}
           </Link>{' '}
           <span className="muted">{timeAgo(comment.createdAt, new Date())}</span>
         </p>
@@ -409,7 +409,7 @@ export function SharePostSheet({ post, onClose }: { post: PostView; onClose: () 
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const chats = useAsync(() => (step === 'chat' ? api.conversations() : Promise.resolve(null)), [step]);
   const url = postLink(window.location.origin, post.id);
-  const text = postShareText(post.author.displayName);
+  const text = postShareText(post.author.username);
 
   async function outside() {
     setMessage(undefined);
@@ -431,7 +431,7 @@ export function SharePostSheet({ post, onClose }: { post: PostView; onClose: () 
     setMessage(undefined);
     try {
       await api.sendText(conversation.id, `${text}: ${url}`);
-      setMessage({ tone: 'ok', text: `Enviado para ${conversation.type === 'GROUP' ? (conversation.name ?? 'o grupo') : (conversation.other?.displayName ?? 'a conversa')}.` });
+      setMessage({ tone: 'ok', text: `Enviado para ${conversation.type === 'GROUP' ? (conversation.name ?? 'o grupo') : (conversation.other?.username ?? 'a conversa')}.` });
       setStep('menu');
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
@@ -469,7 +469,7 @@ export function SharePostSheet({ post, onClose }: { post: PostView; onClose: () 
               <li key={c.id}>
                 <button type="button" className="sharelist__item sharelist__item--person" onClick={() => void sendTo(c)} disabled={busy}>
                   {c.type === 'GROUP' ? <GroupAvatar name={c.name ?? 'Grupo'} size={40} imageUrl={c.imageUrl} /> : c.other ? <Avatar profile={c.other} size={40} /> : null}
-                  <strong>{c.type === 'GROUP' ? (c.name ?? 'Grupo') : (c.other?.displayName ?? 'Conversa')}</strong>
+                  <strong>{c.type === 'GROUP' ? (c.name ?? 'Grupo') : (c.other?.username ?? 'Conversa')}</strong>
                 </button>
               </li>
             ))}

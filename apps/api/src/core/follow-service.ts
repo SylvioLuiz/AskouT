@@ -70,7 +70,7 @@ export class FollowService {
   }
 
   private async nameOf(userId: string): Promise<string> {
-    return (await this.deps.users.findProfilesByIds([userId]))[0]?.displayName ?? 'Alguém';
+    return (await this.deps.users.findProfilesByIds([userId]))[0]?.username ?? 'Alguém';
   }
 
   async reject(actorId: string, followerId: string): Promise<void> {
@@ -112,7 +112,7 @@ export class FollowService {
     const profiles = await this.deps.users.findProfilesByIds(ids);
     return profiles
       .map(toPublicProfile)
-      .sort((a, b) => a.displayName.localeCompare(b.displayName, 'pt-BR') || a.userId.localeCompare(b.userId));
+      .sort((a, b) => a.username.localeCompare(b.username, 'pt-BR') || a.userId.localeCompare(b.userId));
   }
 
   /**

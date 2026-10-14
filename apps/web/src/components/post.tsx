@@ -171,7 +171,7 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
       <header className="post__head">
         <Link to={`/u/${encodeURIComponent(post.author.username)}`} className="post__author">
           <Avatar profile={post.author} size={36} />
-          <strong>{post.author.displayName}</strong>
+          <strong>{post.author.username}</strong>
         </Link>
         <Link to={`/posts/${encodeURIComponent(post.id)}`} className="post__when">
           {timeAgo(post.createdAt, new Date())}
@@ -186,7 +186,7 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
       {myTag === 'PENDING' ? (
         <div className="callout">
           <p className="callout__text">
-            <strong>{post.author.displayName}</strong> marcou você neste post. Se aceitar, ele aparece no seu perfil e no seu feed.
+            <strong>{post.author.username}</strong> marcou você neste post. Se aceitar, ele aparece no seu perfil e no seu feed.
           </p>
           <div className="row-actions">
             <Button small loading={tagBusy} onClick={() => void answerTag('accept')}>
@@ -239,7 +239,7 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
           {post.tags.map((t, i) => (
             <span key={t.user.userId}>
               {i > 0 ? ', ' : ''}
-              <Link to={`/u/${encodeURIComponent(t.user.username)}`}>@{t.user.username}</Link>
+              <Link to={`/u/${encodeURIComponent(t.user.username)}`}>{t.user.username}</Link>
               {t.status === 'PENDING' ? <span className="muted"> (aguardando)</span> : null}
             </span>
           ))}

@@ -128,10 +128,12 @@ describe('validação de formulário', () => {
 
 describe('avatar', () => {
   it('iniciais', () => {
-    assert.equal(initials('Ana Maria Souza', 'ana'), 'AM');
-    assert.equal(initials('  ana ', 'ana'), 'A');
-    assert.equal(initials('', 'bruno'), 'B');
-    assert.equal(initials('édson lima', 'e'), 'ÉL');
+    assert.equal(initials('bruna.alves'), 'BA');
+    assert.equal(initials('ana_maria_souza'), 'AM');
+    assert.equal(initials('bruno'), 'BR');
+    assert.equal(initials('a'), 'A');
+    assert.equal(initials('édson.lima'), 'ÉL');
+    assert.equal(initials('...'), '?');
   });
 
   it('cor estável e dentro do intervalo', () => {

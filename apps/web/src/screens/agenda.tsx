@@ -236,7 +236,7 @@ export function FriendAgendaScreen({ username }: { username: string }) {
   const profile = useAsync(() => api.getProfile(username), [username]);
   const isFriend = profile.data?.relationship.isFriend === true;
   const userId = profile.data?.profile.userId;
-  useTitle(profile.data ? `Agenda de ${profile.data.profile.displayName}` : 'Agenda');
+  useTitle(profile.data ? `Agenda de ${profile.data.profile.username}` : 'Agenda');
 
   const slots = useAsync(
     () => (isFriend && userId ? api.friendSlots(userId, range.from, range.to) : Promise.resolve(undefined)),
@@ -250,7 +250,7 @@ export function FriendAgendaScreen({ username }: { username: string }) {
   if (profile.error) return <ErrorState message={profile.error.message} onRetry={profile.reload} />;
   if (!profile.data) return null;
 
-  const name = profile.data.profile.displayName;
+  const name = profile.data.profile.username;
   if (!isFriend) {
     return (
       <>
@@ -262,7 +262,7 @@ export function FriendAgendaScreen({ username }: { username: string }) {
 
   return (
     <>
-      <PageHead title={`Agenda de ${name}`} back={back} subtitle={`@${username}`} />
+      <PageHead title={`Agenda de ${name}`} back={back} />
       <DayStrip days={days} selected={selected} today={today} onSelect={setSelected} statesOf={(key) => statesOnDay(all, key)} />
       <section className="section" aria-labelledby="dia-titulo">
         <h2 id="dia-titulo" className="section__title section__title--day">
@@ -275,7 +275,7 @@ export function FriendAgendaScreen({ username }: { username: string }) {
         {ofDay.length > 0 ? <SlotList slots={ofDay} day={selected} /> : null}
       </section>
       <Link to={`/agenda/comparar?com=${encodeURIComponent(username)}`} className="btn btn--primary">
-        Comparar com @{username}
+        Comparar com {username}
       </Link>
     </>
   );
@@ -336,7 +336,7 @@ function ResultCard({ result }: { result: Compatibility }) {
           {result.participants.map((p) => (
             <li key={p.profile.userId} className="who__row">
               <Avatar profile={p.profile} size={32} />
-              <span className="who__name">{p.isMe ? 'Você' : p.profile.displayName}</span>
+              <span className="who__name">{p.isMe ? 'Você' : p.profile.username}</span>
               <ParticipantMark status={p.status} />
             </li>
           ))}
@@ -433,8 +433,7 @@ export function CompareScreen() {
                   <input type="checkbox" checked={on} onChange={() => toggle(friend.userId)} disabled={!on && selected.length >= MAX_FRIENDS} />
                   <Avatar profile={friend} size={36} />
                   <span className="pick__body">
-                    <span className="person__name">{friend.displayName}</span>
-                    <span className="person__handle">@{friend.username}</span>
+                    <span className="person__name">{friend.username}</span>
                   </span>
                 </label>
               );

@@ -65,11 +65,11 @@ export function ActivityScreen() {
       if (decision === 'approve') {
         const result = await api.approveRequest(profile.userId);
         text = result.isFriend
-          ? `Você aprovou @${profile.username}. Agora vocês são amigos.`
-          : `Você aprovou @${profile.username}. Siga de volta para virarem amigos.`;
+          ? `Você aprovou ${profile.username}. Agora vocês são amigos.`
+          : `Você aprovou ${profile.username}. Siga de volta para virarem amigos.`;
       } else {
         await api.rejectRequest(profile.userId);
-        text = `Você recusou o pedido de @${profile.username}.`;
+        text = `Você recusou o pedido de ${profile.username}.`;
       }
       if (requests.data) {
         requests.setData({
@@ -152,7 +152,7 @@ export function ActivityScreen() {
                 <Link to={`/posts/${encodeURIComponent(post.id)}`} className="tagreq__link">
                   {post.images[0]?.path ? <img src={api.assetUrl(post.images[0].path)} alt="" referrerPolicy="no-referrer" /> : <span className="tagreq__none" />}
                   <span>
-                    <strong>{post.author.displayName}</strong> marcou você num post
+                    <strong>{post.author.username}</strong> marcou você num post
                     {post.caption ? <span className="muted"> {post.caption.slice(0, 60)}</span> : null}
                   </span>
                 </Link>

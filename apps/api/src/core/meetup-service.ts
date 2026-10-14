@@ -147,7 +147,7 @@ export class MeetupService {
     }
     if (current.size + fresh.length > MEETUP_MAX_PEOPLE) throw validationError(`No máximo ${MEETUP_MAX_PEOPLE} pessoas no encontro`, { guestIds: `No máximo ${MEETUP_MAX_PEOPLE} pessoas` });
     const invited = await meetups.invite(meetupId, fresh);
-    const actorName = (await users.findProfilesByIds([actorId]))[0]?.displayName ?? 'Alguém';
+    const actorName = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
     for (const g of invited) {
       const direct = await conversations.getOrCreateDirect(actorId, g, ids.next(), now);
       await conversations.addMessage({ id: ids.next(), conversationId: direct.id, senderId: actorId, kind: 'MEETUP', body: `Encontro: ${meetup.title}`, suggestion: null, response: null, respondedAt: null, meetupId, createdAt: now });
@@ -155,7 +155,7 @@ export class MeetupService {
       await this.notifyInvite(g, actorName, meetup.title, direct.id, meetupId);
     }
     if (invited.length > 0) {
-      const names = (await users.findProfilesByIds(invited)).map((p) => p.displayName);
+      const names = (await users.findProfilesByIds(invited)).map((p) => p.username);
       await conversations.addMessage({ id: ids.next(), conversationId: meetup.conversationId, senderId: actorId, kind: 'SYSTEM', body: `${actorName} convidou ${names.join(', ')} para "${meetup.title}"`, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: now });
     }
     return this.get(actorId, meetupId);
@@ -199,7 +199,7 @@ export class MeetupService {
   }
 
   private async nameOf(userId: string): Promise<string> {
-    return (await this.deps.users.findProfilesByIds([userId]))[0]?.displayName ?? 'Alguém';
+    return (await this.deps.users.findProfilesByIds([userId]))[0]?.username ?? 'Alguém';
   }
 
   private async say(meetup: MeetupRecord, senderId: string, body: string): Promise<void> {

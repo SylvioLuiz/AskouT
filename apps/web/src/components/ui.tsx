@@ -158,7 +158,7 @@ export function Avatar({ profile, size = 44 }: { profile: AvatarProfile; size?: 
   }
   return (
     <span className={`avatar avatar--tint-${tintIndex(profile.username)}`} style={style} aria-hidden="true">
-      {initials(profile.displayName, profile.username)}
+      {initials(profile.username)}
     </span>
   );
 }
@@ -170,8 +170,7 @@ export function PersonRow({ profile, aside }: { profile: PublicProfile; aside?: 
       <Link to={`/u/${encodeURIComponent(profile.username)}`} className="person__link">
         <Avatar profile={profile} />
         <span className="person__body">
-          <span className="person__name">{profile.displayName}</span>
-          <span className="person__handle">@{profile.username}</span>
+          <span className="person__name">{profile.username}</span>
         </span>
       </Link>
       {aside ? <div className="person__aside">{aside}</div> : null}

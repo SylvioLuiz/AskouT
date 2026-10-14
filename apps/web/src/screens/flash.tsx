@@ -124,7 +124,7 @@ export function FlashScreen() {
   const received = invites.data?.received ?? [];
   const matches = invites.data?.matches ?? [];
   const mapOthers: OtherPin[] = (matchViews.data ?? []).flatMap((m) =>
-    m.them ? [{ id: m.inviteId, lat: m.them.lat, lng: m.them.lng, stale: m.them.stale, initials: initials(m.other.displayName, m.other.username) }] : [],
+    m.them ? [{ id: m.inviteId, lat: m.them.lat, lng: m.them.lng, stale: m.them.stale, initials: initials(m.other.username) }] : [],
   );
 
   return (
@@ -256,7 +256,7 @@ export function FlashScreen() {
                 <Link to={`/flash/encontro/${invite.id}`} className="person__link">
                   <Avatar profile={invite.other} />
                   <span className="person__body">
-                    <span className="person__name">{invite.other.displayName}</span>
+                    <span className="person__name">{invite.other.username}</span>
                     <span className="person__handle">Aceitou sair com você</span>
                   </span>
                 </Link>
@@ -304,7 +304,7 @@ function BlockAction({ profile, onDone, onFeedback }: { profile: PublicProfile; 
     setBusy(true);
     try {
       await api.block(profile.userId);
-      onFeedback({ tone: 'ok', text: `Você bloqueou @${profile.username}. Ele não vê mais você e vocês deixam de ser amigos.` });
+      onFeedback({ tone: 'ok', text: `Você bloqueou ${profile.username}. Ele não vê mais você e vocês deixam de ser amigos.` });
       onDone();
     } catch (failure) {
       onFeedback({ tone: 'error', text: toApiError(failure).message });
@@ -322,7 +322,7 @@ function BlockAction({ profile, onDone, onFeedback }: { profile: PublicProfile; 
   }
   return (
     <Confirm
-      question={`Bloquear @${profile.username}? Vocês deixam de ser amigos e nenhum dos dois vê o outro.`}
+      question={`Bloquear ${profile.username}? Vocês deixam de ser amigos e nenhum dos dois vê o outro.`}
       confirmLabel="Bloquear"
       onConfirm={block}
       onCancel={() => setAsking(false)}
@@ -341,7 +341,7 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
     setBusy(true);
     try {
       await api.flashInvite(profile.userId);
-      onFeedback({ tone: 'ok', text: `Convite enviado para ${profile.displayName}. Vale por 15 minutos.` });
+      onFeedback({ tone: 'ok', text: `Convite enviado para ${profile.username}. Vale por 15 minutos.` });
       onChanged();
     } catch (failure) {
       onFeedback({ tone: 'error', text: toApiError(failure).message });
@@ -393,7 +393,7 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
         <div className="person__link">
           <Avatar profile={profile} />
           <span className="person__body">
-            <span className="person__name">{profile.displayName}</span>
+            <span className="person__name">{profile.username}</span>
             <span className="person__handle">{friend.note ? `“${friend.note}”` : `Livre por mais ${formatRemaining(left)}`}</span>
           </span>
         </div>
@@ -434,7 +434,7 @@ function InviteRow({ invite, canAccept, onChanged, onFeedback }: { invite: Flash
         <div className="person__link">
           <Avatar profile={invite.other} />
           <span className="person__body">
-            <span className="person__name">{invite.other.displayName}</span>
+            <span className="person__name">{invite.other.username}</span>
             <span className="person__handle">Quer sair agora · {formatRemaining(minutesLeft(invite.expiresAt, Date.now()))} para responder</span>
           </span>
         </div>
@@ -584,21 +584,21 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
 
   return (
     <>
-      <PageHead title={data.other.displayName} back="/flash" subtitle={`Encontro Flash · acaba em ${formatRemaining(left)}`} />
+      <PageHead title={data.other.username} back="/flash" subtitle={`Encontro Flash · acaba em ${formatRemaining(left)}`} />
       {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
 
-      <section className="whereis" aria-label={`Onde ${data.other.displayName} está`}>
+      <section className="whereis" aria-label={`Onde ${data.other.username} está`}>
         <Avatar profile={data.other} size={56} />
         {!them ? (
           <>
             <p className="whereis__main">Ainda sem localização</p>
-            <p className="muted">{data.other.displayName} ainda não compartilhou. Assim que compartilhar, a distância aparece aqui.</p>
+            <p className="muted">{data.other.username} ainda não compartilhou. Assim que compartilhar, a distância aparece aqui.</p>
           </>
         ) : them.stale ? (
           <>
             <p className="whereis__main">Sem sinal</p>
             <p className="muted">
-              A última localização de {data.other.displayName} foi {formatAge(them.updatedAt, data.now)}. Ela volta quando o sinal voltar.
+              A última localização de {data.other.username} foi {formatAge(them.updatedAt, data.now)}. Ela volta quando o sinal voltar.
             </p>
           </>
         ) : (
@@ -619,7 +619,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
           <MatchMap
             me={myPoint}
             others={
-              them ? [{ id: inviteId, lat: them.lat, lng: them.lng, stale: them.stale, initials: initials(data.other.displayName, data.other.username) }] : []
+              them ? [{ id: inviteId, lat: them.lat, lng: them.lng, stale: them.stale, initials: initials(data.other.username) }] : []
             }
             onFail={() => setMapFailed(true)}
           />
@@ -640,7 +640,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         ) : (
           <>
             <p className="sharebox__title">Mostrar onde estou</p>
-            <p className="muted">Só {data.other.displayName} vê sua localização, só durante este encontro, e ela some quando ele acabar.</p>
+            <p className="muted">Só {data.other.username} vê sua localização, só durante este encontro, e ela some quando ele acabar.</p>
             {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
             <Button full loading={share.state.phase === 'asking'} onClick={share.start}>
               Compartilhar minha localização

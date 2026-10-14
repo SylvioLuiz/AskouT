@@ -10,6 +10,21 @@ async function friends(w: ReturnType<typeof makeWorld>, ...names: string[]) {
 }
 
 describe('avisos', () => {
+  it('avisos identificam a pessoa pelo @usuário, nunca pelo nome real', async () => {
+    const w = makeWorld();
+    const { ana, bia } = await friends(w, 'ana', 'bia');
+    const { id } = await w.core.conversations.open(ana!, bia!);
+    await w.core.conversations.send(ana!, id, { body: 'oi' });
+    await w.core.flushNotifications();
+    const item = (await w.core.notifications.list(bia!)).items[0]!;
+    await w.core.profiles.updateOwn(ana!, { displayName: 'Ana Maria Souza' });
+    await w.core.conversations.send(ana!, id, { body: 'oi de novo' });
+    await w.core.flushNotifications();
+    const titles = (await w.core.notifications.list(bia!)).items.map((n) => n.title);
+    assert.ok(titles.length > 0 && titles.every((t) => t === 'ana'), titles.join(','));
+    assert.equal(item.title, 'ana');
+  });
+
   it('latestUnreadAt: o aviso não lido mais recente; nulo sem não lidos', async () => {
     const w = makeWorld();
     const { ana, bia } = await friends(w, 'ana', 'bia');

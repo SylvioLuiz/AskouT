@@ -174,7 +174,7 @@ export class PostService {
       await posts.createTags(postId, tagIds, clock.now());
       const me = await this.deps.users.findProfileById(actorId);
       for (const userId of tagIds) {
-        await this.deps.notifier.notify({ userId, type: 'POST_TAG', title: `${me?.displayName ?? 'Alguém'} marcou você num post`, body: 'Aceite para ele aparecer no seu perfil', url: '/atividades', dedupeKey: `post-tag:${postId}` });
+        await this.deps.notifier.notify({ userId, type: 'POST_TAG', title: `${me?.username ?? 'Alguém'} marcou você num post`, body: 'Aceite para ele aparecer no seu perfil', url: '/atividades', dedupeKey: `post-tag:${postId}` });
       }
     }
     const created = await posts.findById(postId);
@@ -204,7 +204,7 @@ export class PostService {
     await this.deps.posts.like(post.id, viewerId, this.deps.clock.now());
     if (post.authorId !== viewerId) {
       const me = await this.deps.users.findProfileById(viewerId);
-      await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_LIKE', title: `${me?.displayName ?? 'Alguém'} curtiu seu post`, body: post.caption ? post.caption.slice(0, 80) : 'Toque para ver', url: `/posts/${post.id}`, dedupeKey: `post-like:${post.id}:${viewerId}` });
+      await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_LIKE', title: `${me?.username ?? 'Alguém'} curtiu seu post`, body: post.caption ? post.caption.slice(0, 80) : 'Toque para ver', url: `/posts/${post.id}`, dedupeKey: `post-like:${post.id}:${viewerId}` });
     }
     const stats = (await this.deps.posts.likeStats([post.id], viewerId))[0];
     return { liked: true, likeCount: stats?.count ?? 0 };
@@ -233,7 +233,7 @@ export class PostService {
     await this.deps.posts.addComment(record);
     if (post.authorId !== viewerId) {
       const me = await this.deps.users.findProfileById(viewerId);
-      await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_COMMENT', title: `${me?.displayName ?? 'Alguém'} comentou no seu post`, body: text.slice(0, 80), url: `/posts/${post.id}`, dedupeKey: `post-comment:${record.id}` });
+      await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_COMMENT', title: `${me?.username ?? 'Alguém'} comentou no seu post`, body: text.slice(0, 80), url: `/posts/${post.id}`, dedupeKey: `post-comment:${record.id}` });
     }
     return (await this.commentViews(viewerId, post.authorId, [record]))[0] as PostCommentView;
   }

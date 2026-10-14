@@ -61,7 +61,7 @@ export function MeetupBubble({ meetup, nowIso, onUpdated }: { meetup: MeetupView
   return (
     <div className="meetcard">
       <MeetupCover meetup={meetup} />
-      <p className="meetcard__who">{meetup.myStatus === 'ORGANIZER' ? 'Você criou um encontro' : `${meetup.organizer.displayName} convidou você`}</p>
+      <p className="meetcard__who">{meetup.myStatus === 'ORGANIZER' ? 'Você criou um encontro' : `${meetup.organizer.username} convidou você`}</p>
       <h3 className="meetcard__title">{meetup.title}</h3>
       <MeetupFacts meetup={meetup} now={now} />
       {meetup.isGroup && meetup.groupName ? <p className="meetcard__line">Grupo: {meetup.groupName}</p> : null}
@@ -104,7 +104,7 @@ export function FriendPicker({ picked, onToggle, exclude = [] }: { picked: strin
   const available = useMemo(() => (friends.data ?? []).filter((f) => !exclude.includes(f.userId)), [friends.data, exclude]);
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    return available.filter((f) => q === '' || f.displayName.toLowerCase().includes(q) || f.username.toLowerCase().includes(q));
+    return available.filter((f) => q === '' || f.username.toLowerCase().includes(q));
   }, [available, filter]);
 
   if (friends.loading) return <Loading />;
@@ -127,8 +127,7 @@ export function FriendPicker({ picked, onToggle, exclude = [] }: { picked: strin
               <button type="button" className="friendpick__row" aria-pressed={on} onClick={() => onToggle(f.userId)}>
                 <Avatar profile={f} size={40} />
                 <span className="friendpick__name">
-                  {f.displayName}
-                  <span className="friendpick__handle">@{f.username}</span>
+                  {f.username}
                 </span>
                 <span className={`friendpick__check${on ? ' friendpick__check--on' : ''}`} aria-hidden="true">
                   {on ? '✓' : ''}

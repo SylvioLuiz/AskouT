@@ -212,7 +212,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
 
       {sheet && typeof sheet === 'object' && 'remove' in sheet ? (
         <Sheet title="Remover do grupo" onClose={() => setSheet(undefined)}>
-          <p className="muted">{data.members.find((m) => m.profile.userId === sheet.remove)?.profile.displayName ?? 'Essa pessoa'} sai do grupo e dos encontros dele.</p>
+          <p className="muted">{data.members.find((m) => m.profile.userId === sheet.remove)?.profile.username ?? 'Essa pessoa'} sai do grupo e dos encontros dele.</p>
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full variant="danger" loading={busy} onClick={() => void act(() => api.removeMember(conversationId, sheet.remove))}>
             Remover
