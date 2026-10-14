@@ -4,6 +4,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { CropIcon, XIcon } from '../components/icons.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { CropEditor } from '../components/crop.tsx';
+import { EventDates } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
 import { PostCard, PostList } from '../components/post.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
@@ -242,8 +243,7 @@ export function CreatePostScreen() {
           <section className="compose__row" aria-label="Dados do evento">
             <Field label="Nome do evento" value={eventTitle} onChange={setEventTitle} maxLength={120} />
             <EventKindPicker value={eventKind} onChange={setEventKind} />
-            <Field label="Começa" type="datetime-local" value={eventStart} onChange={setEventStart} />
-            <Field label="Termina (opcional)" type="datetime-local" value={eventEnd} onChange={setEventEnd} hint="Sem horário de fim, o evento dura 3 horas." />
+            <EventDates starts={eventStart} ends={eventEnd} onStarts={setEventStart} onEnds={setEventEnd} />
             <p className="muted">Um evento precisa de um lugar. Escolha abaixo.</p>
           </section>
         ) : null}

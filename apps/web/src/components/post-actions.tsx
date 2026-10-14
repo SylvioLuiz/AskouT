@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sheet } from './agenda.tsx';
 import { CropEditor } from './crop.tsx';
+import { EventDates } from './event-dates.tsx';
 import { EventKindPicker } from './event-kind-picker.tsx';
 import { ArrowUpIcon, CropIcon, TrashIcon } from './icons.tsx';
 import { Avatar, Button, Confirm, ErrorState, Field, GroupAvatar, Loading, Notice } from './ui.tsx';
@@ -326,8 +327,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
         <>
           <Field label="Nome do evento" value={title} onChange={setTitle} maxLength={120} />
           <EventKindPicker value={eventKind} onChange={setEventKind} />
-          <Field label="Começa" type="datetime-local" value={starts} onChange={setStarts} />
-          <Field label="Termina (opcional)" type="datetime-local" value={ends} onChange={setEnds} />
+          <EventDates starts={starts} ends={ends} onStarts={setStarts} onEnds={setEnds} />
         </>
       ) : null}
       <Field label="Descrição" value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />

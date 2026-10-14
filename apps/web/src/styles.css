@@ -3339,3 +3339,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .radiolist__desc { display: block; }
 .radiolist__title { margin: 8px 0 0; font-size: 1rem; }
 .sheet .btn .icon { display: inline-block; vertical-align: -6px; margin-right: 6px; width: 20px; height: 20px; }
+.eventdates { display: flex; flex-direction: column; gap: 6px; }
+.eventdates__grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.eventdates__grid > * { min-width: 0; }
+.eventdates__grid input::-webkit-calendar-picker-indicator { margin: 0 0 0 2px; padding: 0; }
+.eventdates__grid .field__input { width: 100%; min-width: 0; padding-left: 8px; padding-right: 6px; font-size: 0.8125rem; }
+.eventdates__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 0.8125rem; }
