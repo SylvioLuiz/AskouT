@@ -4,6 +4,7 @@ import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading } from './ui.t
 import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ApiError } from '../lib/errors.ts';
+import { formatWhen } from '../lib/chat.ts';
 import { timeAgo } from '../lib/format.ts';
 import type { PostImage, PostView, PostsPage } from '../lib/types.ts';
 import { Link } from '../router.tsx';
@@ -58,7 +59,29 @@ export function Carousel({ images }: { images: PostImage[] }) {
   );
 }
 
-export function PostCard({ post, onDeleted }: { post: PostView; onDeleted?: (id: string) => void }) {
+/** Evento publicado como post, no mesmo desenho de um evento do Explorar: capa, nome, lugar e horário. */
+function EventPostCard({ post, event }: { post: PostView; event: NonNullable<PostView['event']> }) {
+  const [failed, setFailed] = useState(false);
+  const first = post.images[0];
+  const image = first?.path && !failed ? api.assetUrl(first.path) : null;
+  return (
+    <div className="evcard evcard--post">
+      <Link to={`/posts/${encodeURIComponent(post.id)}`} className="evcard__link">
+        <div className="evcover evcover--hero">
+          {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="evcover__kind" aria-hidden="true">Evento</span>}
+          {post.images.length > 1 ? <span className="postgrid__multi" aria-label={`${post.images.length} fotos`}><CarouselIcon /></span> : null}
+        </div>
+        <div className="evcard__body">
+          <h3 className="evcard__title">{event.title}</h3>
+          {post.placeName ? <p className="evcard__venue">{post.placeName}</p> : null}
+          <p className="evcard__when">{formatWhen(event.startsAt, event.endsAt, new Date())}</p>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+export function PostCard({ post, onDeleted, asEvent }: { post: PostView; onDeleted?: (id: string) => void; asEvent?: boolean }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -128,14 +151,15 @@ export function PostCard({ post, onDeleted }: { post: PostView; onDeleted?: (id:
           </button>
         </p>
       ) : null}
-      {post.event ? (
+      {post.event && asEvent ? <EventPostCard post={post} event={post.event} /> : null}
+      {post.event && !asEvent ? (
         <p className="post__event">
           <span className="post__eventbadge">Evento</span> <strong>{post.event.title}</strong>
           <span className="muted"> · {eventWhen(post.event.startsAt)}</span>
         </p>
       ) : null}
-      <Carousel images={post.images} />
-      {post.placeName ? (
+      {post.event && asEvent ? null : <Carousel images={post.images} />}
+      {post.placeName && !(post.event && asEvent) ? (
         <p className="post__place">
           <strong>{post.placeName}</strong>
           {post.placeAddress ? <span> · {post.placeAddress}</span> : null}
@@ -189,7 +213,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey }: { load: (of
   return (
     <div className="postlist">
       {items.map((post) => (
-        <PostCard key={post.id} post={post} onDeleted={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
+        <PostCard key={post.id} post={post} asEvent onDeleted={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
       ))}
       {error ? <ErrorState message={error.message} onRetry={() => void more(items.length)} /> : null}
       {page.hasMore ? (
