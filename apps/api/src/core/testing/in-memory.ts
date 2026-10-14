@@ -25,7 +25,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { PostImageRecord, PostRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -837,23 +837,60 @@ export class InMemoryPostRepository implements PostRepository {
     return post ? this.withImages(post) : undefined;
   }
 
-  async listByAuthors(authorIds: string[], page: Page): Promise<PostWithImages[]> {
-    const set = new Set(authorIds);
-    return [...this.posts.values()]
-      .filter((p) => set.has(p.authorId))
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+  readonly tags = new Map<string, PostTagRecord>();
+
+  private visibleFor(authorIds: string[], taggedIds: string[]): PostRecord[] {
+    const authors = new Set(authorIds);
+    const tagged = new Set(taggedIds);
+    const viaTag = new Set([...this.tags.values()].filter((t) => t.status === 'ACCEPTED' && tagged.has(t.userId)).map((t) => t.postId));
+    return [...this.posts.values()].filter((p) => authors.has(p.authorId) || viaTag.has(p.id));
+  }
+
+  private newestFirst(posts: PostRecord[]): PostRecord[] {
+    return posts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1));
+  }
+
+  async listFor(authorIds: string[], taggedIds: string[], page: Page): Promise<PostWithImages[]> {
+    return this.newestFirst(this.visibleFor(authorIds, taggedIds))
       .slice(page.offset, page.offset + page.limit)
       .map((p) => this.withImages(p));
   }
 
-  async countByAuthor(authorId: string): Promise<number> {
-    return [...this.posts.values()].filter((p) => p.authorId === authorId).length;
+  async countFor(userId: string): Promise<number> {
+    return this.visibleFor([userId], [userId]).length;
+  }
+
+  async createTags(postId: string, userIds: string[], at: Date): Promise<void> {
+    for (const userId of userIds) {
+      const key = `${postId}|${userId}`;
+      if (!this.tags.has(key)) this.tags.set(key, { postId, userId, status: 'PENDING', createdAt: at });
+    }
+  }
+
+  async tagsFor(postIds: string[]): Promise<PostTagRecord[]> {
+    const set = new Set(postIds);
+    return [...this.tags.values()].filter((t) => set.has(t.postId)).map((t) => ({ ...t }));
+  }
+
+  async respondTag(postId: string, userId: string, status: PostTagStatus): Promise<boolean> {
+    const tag = this.tags.get(`${postId}|${userId}`);
+    if (!tag) return false;
+    tag.status = status;
+    return true;
+  }
+
+  async listPendingTags(userId: string, page: Page): Promise<PostWithImages[]> {
+    const ids = new Set([...this.tags.values()].filter((t) => t.userId === userId && t.status === 'PENDING').map((t) => t.postId));
+    return this.newestFirst([...this.posts.values()].filter((p) => ids.has(p.id)))
+      .slice(page.offset, page.offset + page.limit)
+      .map((p) => this.withImages(p));
   }
 
   async delete(postId: string, authorId: string): Promise<boolean> {
     const post = this.posts.get(postId);
     if (!post || post.authorId !== authorId) return false;
     this.posts.delete(postId);
+    for (const [key, t] of this.tags) if (t.postId === postId) this.tags.delete(key);
     for (const [id, i] of this.images) if (i.postId === postId) this.images.delete(id);
     return true;
   }

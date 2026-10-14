@@ -290,6 +290,12 @@ try {
   const aPosts = await call('GET', `/profiles/${a.username}/posts`, { token: b.token });
   check('amigo vê os posts do perfil', aPosts.status === 200 && aPosts.body.total === 1, aPosts.body);
   check('feed traz o post do amigo', (await call('GET', '/posts/feed', { token: b.token })).body?.items?.some((p) => p.id === post.body.id));
+  const tagged = await call('POST', '/posts', { token: a.token, body: { images: [tinyJpeg], tagUserIds: [b.id] } });
+  check('marcar amigo: fica pendente', tagged.status === 200 && tagged.body.tags?.[0]?.status === 'PENDING', tagged.body);
+  check('marcado vê a marcação pendente', (await call('GET', '/posts/pending-tags', { token: b.token })).body?.items?.some((p) => p.id === tagged.body.id));
+  check('marcar quem não é amigo: 400', (await call('POST', '/posts', { token: a.token, body: { images: [tinyJpeg], tagUserIds: [c.id] } })).status === 400);
+  check('marcado aceita', (await call('POST', `/posts/${tagged.body.id}/tag`, { token: b.token, body: { action: 'accept' } })).body?.status === 'ACCEPTED');
+  check('quem não foi marcado não responde: 404', (await call('POST', `/posts/${tagged.body.id}/tag`, { token: c.token, body: { action: 'accept' } })).status === 404);
   check('outra pessoa não apaga: 404', (await call('DELETE', `/posts/${post.body.id}`, { token: b.token })).status === 404);
   check('autor apaga', (await call('DELETE', `/posts/${post.body.id}`, { token: a.token })).status === 200);
 

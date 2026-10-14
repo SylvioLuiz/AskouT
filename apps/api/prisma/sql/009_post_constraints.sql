@@ -17,3 +17,12 @@ BEGIN
   END IF;
 END
 $$;
+
+-- Marcação: só os três estados conhecidos.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'post_tag_status') THEN
+    ALTER TABLE "PostTag" ADD CONSTRAINT post_tag_status CHECK ("status" IN ('PENDING', 'ACCEPTED', 'DECLINED'));
+  END IF;
+END
+$$;

@@ -62,6 +62,20 @@ export function PostCard({ post, onDeleted }: { post: PostView; onDeleted?: (id:
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  const [myTag, setMyTag] = useState(post.myTag);
+  const [tagBusy, setTagBusy] = useState(false);
+  async function answerTag(action: 'accept' | 'decline') {
+    setTagBusy(true);
+    setProblem(undefined);
+    try {
+      const result = await api.respondTag(post.id, action);
+      setMyTag(result.status);
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setTagBusy(false);
+    }
+  }
   async function remove() {
     setBusy(true);
     setProblem(undefined);
@@ -91,11 +105,46 @@ export function PostCard({ post, onDeleted }: { post: PostView; onDeleted?: (id:
       </header>
       {confirming ? <Confirm danger question="Apagar este post? As fotos e a legenda são removidas." confirmLabel="Apagar" busy={busy} onCancel={() => setConfirming(false)} onConfirm={remove} /> : null}
       {problem ? <p className="field__error">{problem}</p> : null}
+      {myTag === 'PENDING' ? (
+        <div className="callout">
+          <p className="callout__text">
+            <strong>{post.author.displayName}</strong> marcou você neste post. Se aceitar, ele aparece no seu perfil e no seu feed.
+          </p>
+          <div className="row-actions">
+            <Button small loading={tagBusy} onClick={() => void answerTag('accept')}>
+              Aceitar
+            </Button>
+            <Button small variant="secondary" disabled={tagBusy} onClick={() => void answerTag('decline')}>
+              Recusar
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {myTag === 'ACCEPTED' && !post.mine ? (
+        <p className="muted">
+          Você está marcado neste post.{' '}
+          <button type="button" className="linkbtn" onClick={() => void answerTag('decline')} disabled={tagBusy}>
+            Tirar minha marcação
+          </button>
+        </p>
+      ) : null}
       <Carousel images={post.images} />
       {post.placeName ? (
         <p className="post__place">
           <strong>{post.placeName}</strong>
           {post.placeAddress ? <span> · {post.placeAddress}</span> : null}
+        </p>
+      ) : null}
+      {post.tags.length > 0 ? (
+        <p className="post__tags">
+          Com{' '}
+          {post.tags.map((t, i) => (
+            <span key={t.user.userId}>
+              {i > 0 ? ', ' : ''}
+              <Link to={`/u/${encodeURIComponent(t.user.username)}`}>@{t.user.username}</Link>
+              {t.status === 'PENDING' ? <span className="muted"> (aguardando)</span> : null}
+            </span>
+          ))}
         </p>
       ) : null}
       {post.caption ? <p className="post__caption">{post.caption}</p> : null}

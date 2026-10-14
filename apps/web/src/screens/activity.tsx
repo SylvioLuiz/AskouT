@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PushCard } from '../components/notifications.tsx';
 import { listTimeLabel } from '../lib/chat.ts';
-import { navigate } from '../router.tsx';
+import { Link, navigate } from '../router.tsx';
 import { announceNotificationsChanged } from '../lib/notifications.ts';
 import { Button, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -14,6 +14,22 @@ export function ActivityScreen() {
   useTitle('Atividades');
   const requests = useAsync(() => api.followRequests({ limit: 50 }), []);
   const news = useAsync(() => api.notifications(), []);
+  const tagReqs = useAsync(() => api.pendingTags({ limit: 20 }), []);
+  const [tagBusy, setTagBusy] = useState<string | undefined>();
+  async function answerTag(postId: string, action: 'accept' | 'decline') {
+    setTagBusy(postId);
+    setMessage(undefined);
+    try {
+      await api.respondTag(postId, action);
+      if (tagReqs.data) tagReqs.setData({ ...tagReqs.data, items: tagReqs.data.items.filter((p) => p.id !== postId) });
+      setMessage({ tone: 'ok', text: action === 'accept' ? 'Marcação aceita. O post aparece no seu perfil e no seu feed.' : 'Marcação recusada.' });
+    } catch (failure) {
+      setMessage({ tone: 'error', text: toApiError(failure).message });
+      tagReqs.reload();
+    } finally {
+      setTagBusy(undefined);
+    }
+  }
   usePolling(news.reload, 15_000);
   const [busyId, setBusyId] = useState<string | undefined>();
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
@@ -104,6 +120,32 @@ export function ActivityScreen() {
       ) : null}
       {news.data && news.data.items.length === 0 ? <p className="muted">Nenhuma novidade ainda. Mensagens, convites e encontros aparecem aqui.</p> : null}
       {news.error && !news.data ? <ErrorState message={news.error.message} onRetry={news.reload} /> : null}
+      {tagReqs.data && tagReqs.data.items.length > 0 ? (
+        <>
+          <h2 className="results__h">Marcações</h2>
+          <ul className="list">
+            {tagReqs.data.items.map((post) => (
+              <li key={post.id} className="tagreq">
+                <Link to={`/posts/${encodeURIComponent(post.id)}`} className="tagreq__link">
+                  {post.images[0]?.path ? <img src={api.assetUrl(post.images[0].path)} alt="" referrerPolicy="no-referrer" /> : <span className="tagreq__none" />}
+                  <span>
+                    <strong>{post.author.displayName}</strong> marcou você num post
+                    {post.caption ? <span className="muted"> {post.caption.slice(0, 60)}</span> : null}
+                  </span>
+                </Link>
+                <div className="row-actions">
+                  <Button small onClick={() => void answerTag(post.id, 'accept')} loading={tagBusy === post.id}>
+                    Aceitar
+                  </Button>
+                  <Button small variant="secondary" onClick={() => void answerTag(post.id, 'decline')} disabled={tagBusy === post.id}>
+                    Recusar
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       <h2 className="results__h">Pedidos para seguir</h2>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {requests.loading && !requests.data ? <Loading /> : null}

@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -165,9 +165,16 @@ export interface ProfileEventRepository {
 export interface PostRepository {
   create(post: PostRecord, images: PostImageRecord[]): Promise<void>;
   findById(id: string): Promise<PostWithImages | undefined>;
-  /** Posts de qualquer um dos autores, mais recentes primeiro. */
-  listByAuthors(authorIds: string[], page: Page): Promise<PostWithImages[]>;
-  countByAuthor(authorId: string): Promise<number>;
+  /** Posts escritos por qualquer um de `authorIds` OU em que alguém de `taggedIds` aceitou a marcação. Mais recentes primeiro. */
+  listFor(authorIds: string[], taggedIds: string[], page: Page): Promise<PostWithImages[]>;
+  /** Mesma regra de `listFor`, para uma pessoa só (escritos por ela ou em que ela aceitou a marcação). */
+  countFor(userId: string): Promise<number>;
+  createTags(postId: string, userIds: string[], at: Date): Promise<void>;
+  tagsFor(postIds: string[]): Promise<PostTagRecord[]>;
+  /** Muda o status de uma marcação existente. Devolve false se a pessoa não foi marcada nesse post. */
+  respondTag(postId: string, userId: string, status: PostTagStatus): Promise<boolean>;
+  /** Posts em que `userId` foi marcado e ainda não respondeu, mais recentes primeiro. */
+  listPendingTags(userId: string, page: Page): Promise<PostWithImages[]>;
   /** Só apaga se `authorId` é o autor. Devolve false se não existia ou era de outra pessoa. */
   delete(postId: string, authorId: string): Promise<boolean>;
   /** Bytes de uma foto enviada (fotos de lugar não têm bytes). */

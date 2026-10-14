@@ -272,7 +272,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE' | 'POST_TAG';
 
 /** Aviso guardado para a pessoa. `url` é um caminho dentro do app; `dedupeKey` evita avisos repetidos enquanto o anterior não foi lido. */
 export interface NotificationRecord {
@@ -336,4 +336,13 @@ export interface PostImageMeta {
 export interface PostWithImages {
   post: PostRecord;
   images: PostImageMeta[];
+}
+
+export type PostTagStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
+
+export interface PostTagRecord {
+  postId: string;
+  userId: string;
+  status: PostTagStatus;
+  createdAt: Date;
 }

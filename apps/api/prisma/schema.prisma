@@ -140,6 +140,7 @@ model User {
   postedEvents      PostedEvent[]
   photo             ProfilePhoto?
   posts             Post[]
+  postTags          PostTag[]
 }
 
 model Profile {
@@ -532,6 +533,7 @@ model Post {
 
   author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   images PostImage[]
+  tags   PostTag[]
 
   @@index([authorId, createdAt])
 }
@@ -549,4 +551,18 @@ model PostImage {
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([postId, position])
+}
+
+// Marcação de uma pessoa num post. Só vale no perfil e no feed dela depois que ela aceita.
+model PostTag {
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId, status])
 }

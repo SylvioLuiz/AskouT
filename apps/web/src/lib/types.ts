@@ -219,7 +219,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE' | 'POST_TAG';
 
 export interface NotificationItem {
   id: string;
@@ -431,6 +431,9 @@ export interface PostView {
   createdAt: string;
   images: PostImage[];
   mine: boolean;
+  tags: { user: PublicProfile; status: 'PENDING' | 'ACCEPTED' }[];
+  /** Sua marcação neste post, se houver. */
+  myTag: 'PENDING' | 'ACCEPTED' | 'DECLINED' | null;
 }
 
 export interface PostsPage {

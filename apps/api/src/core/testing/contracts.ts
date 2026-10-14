@@ -1047,20 +1047,34 @@ export function defineRepositoryContract(
         assert.equal(found.post.caption, null);
         assert.deepEqual(found.images.map((i) => [i.position, i.isUpload, i.placePhotoRef, i.placePhotoAuthor]), [[0, true, null, null], [1, false, 'places/x/photos/y', 'Maria']]);
         assert.equal(await h.posts.findById(randomUUID()), undefined);
-        assert.deepEqual((await h.posts.listByAuthors([ana], { limit: 10, offset: 0 })).map((r) => r.post.id), [p2.post.id, p1.post.id], 'mais recente primeiro');
-        assert.deepEqual((await h.posts.listByAuthors([ana, bia], { limit: 10, offset: 0 })).map((r) => r.post.id), [p3.post.id, p2.post.id, p1.post.id]);
-        assert.deepEqual((await h.posts.listByAuthors([ana, bia], { limit: 1, offset: 1 })).map((r) => r.post.id), [p2.post.id]);
-        assert.deepEqual(await h.posts.listByAuthors([], { limit: 10, offset: 0 }), []);
-        assert.equal(await h.posts.countByAuthor(ana), 2);
+        assert.deepEqual((await h.posts.listFor([ana], [], { limit: 10, offset: 0 })).map((r) => r.post.id), [p2.post.id, p1.post.id], 'mais recente primeiro');
+        assert.deepEqual((await h.posts.listFor([ana, bia], [], { limit: 10, offset: 0 })).map((r) => r.post.id), [p3.post.id, p2.post.id, p1.post.id]);
+        assert.deepEqual((await h.posts.listFor([ana, bia], [], { limit: 1, offset: 1 })).map((r) => r.post.id), [p2.post.id]);
+        assert.deepEqual(await h.posts.listFor([], [], { limit: 10, offset: 0 }), []);
+        assert.equal(await h.posts.countFor(ana), 2);
         const img = (await h.posts.findImage(p1.images[0]!.id))!;
         assert.equal(img.mime, 'image/jpeg');
         assert.deepEqual([...img.data], [0xff, 0xd8, 0xff, 1]);
         assert.equal(await h.posts.findImage(p1.images[1]!.id), undefined, 'foto do lugar não tem bytes');
+        // marcações: pendente não conta; aceita entra em listFor/countFor da pessoa marcada
+        await h.posts.createTags(p2.post.id, [bia], at(20));
+        await h.posts.createTags(p2.post.id, [bia], at(21));
+        assert.deepEqual((await h.posts.tagsFor([p2.post.id])).map((t) => [t.userId, t.status]), [[bia, 'PENDING']], 'idempotente');
+        assert.deepEqual((await h.posts.listPendingTags(bia, { limit: 10, offset: 0 })).map((r) => r.post.id), [p2.post.id]);
+        assert.equal(await h.posts.countFor(bia), 1, 'pendente não conta');
+        assert.equal(await h.posts.respondTag(p2.post.id, bia, 'ACCEPTED'), true);
+        assert.equal(await h.posts.respondTag(p2.post.id, randomUUID(), 'ACCEPTED'), false, 'só marcado responde');
+        assert.equal(await h.posts.countFor(bia), 2);
+        assert.deepEqual((await h.posts.listFor([], [bia], { limit: 10, offset: 0 })).map((r) => r.post.id), [p2.post.id]);
+        assert.deepEqual((await h.posts.listFor([bia], [bia], { limit: 10, offset: 0 })).map((r) => r.post.id), [p3.post.id, p2.post.id], 'sem repetir');
+        assert.equal((await h.posts.listPendingTags(bia, { limit: 10, offset: 0 })).length, 0);
+        await h.posts.respondTag(p2.post.id, bia, 'DECLINED');
+        assert.equal(await h.posts.countFor(bia), 1, 'recusada sai');
         assert.equal(await h.posts.delete(p1.post.id, bia), false, 'só o autor apaga');
         assert.equal(await h.posts.delete(p1.post.id, ana), true);
         assert.equal(await h.posts.delete(p1.post.id, ana), false);
         assert.equal(await h.posts.findImage(p1.images[0]!.id), undefined, 'as fotos vão junto');
-        assert.equal(await h.posts.countByAuthor(ana), 1);
+        assert.equal(await h.posts.countFor(ana), 1);
       });
 
       it('mensagem de evento guarda o evento; encontros do usuário listados do mais recente', async () => {

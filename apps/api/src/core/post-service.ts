@@ -2,13 +2,14 @@ import { decodeImageDataUrl } from './image.ts';
 import { forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
-import type { PostImageRecord, PostWithImages, PublicProfile } from './types.ts';
+import type { PostImageRecord, PostTagStatus, PostWithImages, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
 
 export const POST_IMAGES_MAX = 5;
 export const POST_CAPTION_MAX = 500;
 /** Cada foto enviada chega já reduzida pelo app: até 100 KB. */
 export const POST_IMAGE_MAX_BYTES = 100 * 1024;
+export const POST_TAGS_MAX = 10;
 export const POST_PAGE_DEFAULT = 12;
 export const POST_PAGE_MAX = 30;
 
@@ -20,6 +21,8 @@ export interface PostInput {
   images?: unknown;
   placeName?: unknown;
   placeAddress?: unknown;
+  /** Amigos marcados (até 10). Cada um precisa aceitar para o post entrar no feed e no perfil dele. */
+  tagUserIds?: unknown;
 }
 
 export interface PostImageView {
@@ -28,6 +31,11 @@ export interface PostImageView {
   /** Só em foto do lugar: referência para montar o endereço assinado. */
   photoRef: string | null;
   photoAuthor: string | null;
+}
+
+export interface PostTagView {
+  user: PublicProfile;
+  status: 'PENDING' | 'ACCEPTED';
 }
 
 export interface PostView {
@@ -39,6 +47,10 @@ export interface PostView {
   createdAt: string;
   images: PostImageView[];
   mine: boolean;
+  /** Marcados: todos veem os que aceitaram; o autor e o próprio marcado também veem os pendentes. */
+  tags: PostTagView[];
+  /** A marcação do visitante neste post, se houver. */
+  myTag: PostTagStatus | null;
 }
 
 export interface PostsPage {
@@ -104,7 +116,15 @@ export class PostService {
       return { id, postId, position, mime: null, data: null, placePhotoRef: place.placePhotoRef, placePhotoAuthor: author };
     });
     if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do lugar por post' });
+    const tagIds = await this.validTags(actorId, input.tagUserIds);
     await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, createdAt: clock.now() }, images);
+    if (tagIds.length > 0) {
+      await posts.createTags(postId, tagIds, clock.now());
+      const me = await this.deps.users.findProfileById(actorId);
+      for (const userId of tagIds) {
+        await this.deps.notifier.notify({ userId, type: 'POST_TAG', title: `${me?.displayName ?? 'Alguém'} marcou você num post`, body: 'Aceite para ele aparecer no seu perfil', url: '/atividades', dedupeKey: `post-tag:${postId}` });
+      }
+    }
     const created = await posts.findById(postId);
     if (!created) throw notFound('Post não encontrado');
     return (await this.views(actorId, [created]))[0] as PostView;
@@ -131,24 +151,68 @@ export class PostService {
     if (!view.canViewContent) throw forbidden('Esta conta é privada');
     const page = parsePage(query);
     const { posts } = this.deps;
-    const [rows, total] = await Promise.all([posts.listByAuthors([view.profile.userId], { limit: page.limit + 1, offset: page.offset }), posts.countByAuthor(view.profile.userId)]);
+    const [rows, total] = await Promise.all([posts.listFor([view.profile.userId], [view.profile.userId], { limit: page.limit + 1, offset: page.offset }), posts.countFor(view.profile.userId)]);
     const hasMore = rows.length > page.limit;
-    return { items: await this.views(viewerId, rows.slice(0, page.limit)), total, ...page, hasMore };
+    const visible = await this.onlySeeable(viewerId, rows.slice(0, page.limit));
+    return { items: await this.views(viewerId, visible), total, ...page, hasMore };
   }
 
   /** Posts seus e dos seus amigos (quem segue você e que você segue), do mais recente ao mais antigo. */
   async feed(viewerId: string, query: { limit?: unknown; offset?: unknown } = {}): Promise<PostsPage> {
     const page = parsePage(query);
     const friends = await this.deps.follows.listFriendIds(viewerId);
-    const rows = await this.deps.posts.listByAuthors([viewerId, ...friends], { limit: page.limit + 1, offset: page.offset });
+    const rows = await this.deps.posts.listFor([viewerId, ...friends], [viewerId], { limit: page.limit + 1, offset: page.offset });
     const hasMore = rows.length > page.limit;
-    return { items: await this.views(viewerId, rows.slice(0, page.limit)), total: null, ...page, hasMore };
+    const visible = await this.onlySeeable(viewerId, rows.slice(0, page.limit));
+    return { items: await this.views(viewerId, visible), total: null, ...page, hasMore };
+  }
+
+  /** Posts em que você foi marcado e ainda não respondeu. */
+  async pendingTags(viewerId: string, query: { limit?: unknown; offset?: unknown } = {}): Promise<PostsPage> {
+    const page = parsePage(query);
+    const rows = await this.deps.posts.listPendingTags(viewerId, { limit: page.limit + 1, offset: page.offset });
+    const hasMore = rows.length > page.limit;
+    const visible = await this.onlySeeable(viewerId, rows.slice(0, page.limit));
+    return { items: await this.views(viewerId, visible), total: null, ...page, hasMore };
+  }
+
+  /** Aceitar ou recusar (ou desfazer) a sua marcação num post. */
+  async respondTag(viewerId: string, postId: unknown, action: unknown): Promise<{ status: PostTagStatus }> {
+    if (typeof postId !== 'string' || postId === '' || postId.length > 64) throw notFound('Post não encontrado');
+    if (action !== 'accept' && action !== 'decline') throw validationError('Ação inválida', { action: 'Use accept ou decline' });
+    const status: PostTagStatus = action === 'accept' ? 'ACCEPTED' : 'DECLINED';
+    if (!(await this.deps.posts.respondTag(postId, viewerId, status))) throw notFound('Marcação não encontrada');
+    return { status };
   }
 
   /** Foto enviada, para o <img>. Quem tem o endereço (id aleatório) vê, como na foto de perfil. */
   async image(imageId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
     if (typeof imageId !== 'string' || imageId === '' || imageId.length > 64) return undefined;
     return this.deps.posts.findImage(imageId);
+  }
+
+  private async validTags(actorId: string, raw: unknown): Promise<string[]> {
+    if (raw === undefined || raw === null) return [];
+    if (!Array.isArray(raw) || raw.some((v) => typeof v !== 'string') || raw.length > POST_TAGS_MAX) {
+      throw validationError('Marcações inválidas', { tagUserIds: `Marque até ${POST_TAGS_MAX} amigos` });
+    }
+    const ids = [...new Set(raw as string[])].filter((id) => id !== actorId);
+    if (ids.length === 0) return [];
+    const friends = new Set(await this.deps.follows.listFriendIds(actorId));
+    if (ids.some((id) => !friends.has(id))) throw validationError('Marcações inválidas', { tagUserIds: 'Só dá para marcar amigos (quem segue você e que você segue)' });
+    return ids;
+  }
+
+  /** Posts de outras pessoas só entram numa lista se quem vê também pode ver o autor. */
+  private async onlySeeable(viewerId: string, rows: PostWithImages[]): Promise<PostWithImages[]> {
+    const memo = new Map<string, boolean>();
+    const out: PostWithImages[] = [];
+    for (const row of rows) {
+      const author = row.post.authorId;
+      if (!memo.has(author)) memo.set(author, await this.canSee(viewerId, author));
+      if (memo.get(author)) out.push(row);
+    }
+    return out;
   }
 
   private async canSee(viewerId: string, authorId: string): Promise<boolean> {
@@ -164,6 +228,9 @@ export class PostService {
 
   private async views(viewerId: string, rows: PostWithImages[]): Promise<PostView[]> {
     const authors = await this.deps.users.findProfilesByIds([...new Set(rows.map((r) => r.post.authorId))]);
+    const tagRows = await this.deps.posts.tagsFor(rows.map((r) => r.post.id));
+    const tagged = await this.deps.users.findProfilesByIds([...new Set(tagRows.map((t) => t.userId))]);
+    const taggedById = new Map(tagged.map((a) => [a.userId, toPublicProfile(a)]));
     const byId = new Map(authors.map((a) => [a.userId, toPublicProfile(a)]));
     return rows.flatMap(({ post, images }) => {
       const author = byId.get(post.authorId);
@@ -177,6 +244,13 @@ export class PostService {
           placeAddress: post.placeAddress,
           createdAt: post.createdAt.toISOString(),
           mine: post.authorId === viewerId,
+          myTag: tagRows.find((t) => t.postId === post.id && t.userId === viewerId)?.status ?? null,
+          tags: tagRows.flatMap((t): PostTagView[] => {
+            if (t.postId !== post.id || t.status === 'DECLINED') return [];
+            if (t.status === 'PENDING' && post.authorId !== viewerId && t.userId !== viewerId) return [];
+            const user = taggedById.get(t.userId);
+            return user ? [{ user, status: t.status }] : [];
+          }),
           images: [...images]
             .sort((a, b) => a.position - b.position)
             .map((i): PostImageView => ({ id: i.id, kind: i.isUpload ? 'UPLOAD' : 'PLACE', photoRef: i.placePhotoRef, photoAuthor: i.placePhotoAuthor })),

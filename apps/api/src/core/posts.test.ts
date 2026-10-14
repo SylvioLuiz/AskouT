@@ -120,3 +120,40 @@ test('apagar: só o autor; some do perfil e do feed e a foto deixa de existir', 
   assert.equal(await w.core.posts.image(post.images[0]!.id), undefined);
   await rejectsWith(w.core.posts.get(ana, 'nao-existe'), 'NOT_FOUND');
 });
+
+test('marcar amigos: só amigos, fica pendente, avisa e só entra no feed e no perfil depois de aceitar', async () => {
+  const { w, ana, bia, caio } = await setup();
+  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], tagUserIds: [caio] }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], tagUserIds: 'bia' }), 'VALIDATION');
+  const post = await w.core.posts.create(ana, { caption: 'Com a Bia', images: [JPEG()], tagUserIds: [bia, bia, ana] });
+  assert.deepEqual(post.tags.map((t) => [t.user.username, t.status]), [['bia', 'PENDING']], 'duplicado e a própria pessoa são ignorados');
+  const news = await w.core.notifications.list(bia);
+  assert.ok(news.items.some((n) => n.type === 'POST_TAG' && n.body.includes('Aceite')));
+  // pendente: Caio (público) não vê a marcação; Bia vê a sua; o feed e o perfil dela não trazem o post marcado
+  const asCaio = await w.core.posts.get(caio, post.id);
+  assert.deepEqual(asCaio.tags, []);
+  assert.equal((await w.core.posts.get(bia, post.id)).myTag, 'PENDING');
+  assert.equal((await w.core.posts.listByUsername(caio, 'bia')).items.length, 0);
+  assert.equal((await w.core.posts.pendingTags(bia)).items[0]!.id, post.id);
+  // aceitar: aparece na lista de quem vê o perfil da Bia e no feed dela, e a marcação fica pública
+  assert.deepEqual(await w.core.posts.respondTag(bia, post.id, 'accept'), { status: 'ACCEPTED' });
+  assert.equal((await w.core.posts.pendingTags(bia)).items.length, 0);
+  assert.deepEqual((await w.core.posts.listByUsername(caio, 'bia')).items.map((p) => p.id), [post.id]);
+  assert.deepEqual((await w.core.posts.get(caio, post.id)).tags.map((t) => t.user.username), ['bia']);
+  assert.equal((await w.core.posts.feed(bia)).items.length, 1);
+  // recusar depois: some de novo
+  await w.core.posts.respondTag(bia, post.id, 'decline');
+  assert.equal((await w.core.posts.listByUsername(caio, 'bia')).items.length, 0);
+  assert.deepEqual((await w.core.posts.get(ana, post.id)).tags, []);
+  await rejectsWith(w.core.posts.respondTag(caio, post.id, 'accept'), 'NOT_FOUND');
+  await rejectsWith(w.core.posts.respondTag(bia, post.id, 'talvez'), 'VALIDATION');
+});
+
+test('post marcado de autor que o visitante não pode ver não aparece no perfil do marcado', async () => {
+  const { w, ana, bia, caio } = await setup();
+  const post = await w.core.posts.create(ana, { images: [JPEG()], tagUserIds: [bia] });
+  await w.core.posts.respondTag(bia, post.id, 'accept');
+  await w.core.profiles.setPrivacy(ana, true);
+  assert.equal((await w.core.posts.listByUsername(bia, 'bia')).items.length, 1, 'a própria Bia vê (segue a Ana)');
+  assert.equal((await w.core.posts.listByUsername(caio, 'bia')).items.length, 0, 'Caio não segue a Ana (privada)');
+});

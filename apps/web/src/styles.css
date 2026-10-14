@@ -3092,3 +3092,44 @@ button {
 .placepick { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
 .placepick__item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; }
 .placepick__item img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; flex: none; }
+
+/* ---------- Publicação em etapas ---------- */
+
+.compose { display: flex; flex-direction: column; gap: 12px; }
+.compose__bar { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 8px; margin: -6px 0 2px; }
+.compose__bar .iconbtn { margin-left: -10px; font-size: 1.75rem; line-height: 1; text-decoration: none; }
+.compose__title { font-family: var(--font-display); font-size: 1.125rem; text-align: center; }
+.segmented { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; gap: 4px; border-radius: 12px; background: var(--brand-soft); }
+.segmented__tab { padding: 10px 8px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2); font-weight: 700; cursor: pointer; }
+.segmented__tab--on { background: var(--surface); color: var(--brand); box-shadow: 0 1px 3px rgb(27 31 74 / 0.15); }
+.compose__stage { display: grid; place-items: center; aspect-ratio: 1; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
+.compose__stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.compose__empty { width: 100%; height: 100%; padding: 16px; border: 2px dashed var(--line-strong); border-radius: var(--radius-panel); background: transparent; color: var(--ink-2); font-weight: 700; text-align: center; display: grid; place-items: center; cursor: pointer; }
+p.compose__empty { cursor: default; border: 0; font-weight: 500; }
+.composegrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.composegrid__item { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--line); }
+.composegrid__item--on { outline: 3px solid var(--brand); outline-offset: -3px; }
+.composegrid__pick { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.composegrid__pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.composegrid__n { position: absolute; left: 4px; bottom: 4px; min-width: 20px; padding: 0 6px; border-radius: 999px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 0.75rem; font-weight: 700; text-align: center; }
+.composegrid__remove { position: absolute; top: 2px; right: 2px; width: 30px; height: 30px; border: 0; border-radius: 50%; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 1.125rem; line-height: 1; cursor: pointer; }
+.composegrid__add { display: grid; place-items: center; width: 100%; height: 100%; border: 2px dashed var(--line-strong); border-radius: 10px; background: transparent; color: var(--brand); font-size: 1.75rem; cursor: pointer; }
+.composestrip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.composestrip li { flex: none; width: 76px; height: 76px; border-radius: 10px; overflow: hidden; background: var(--line); }
+.composestrip img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.compose__row { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-top: 1px solid var(--line); }
+.compose__h { font-family: var(--font-display); font-size: 1rem; }
+.compose__value { overflow-wrap: anywhere; }
+.placegrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.placegrid__item { position: relative; display: block; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 10px; overflow: hidden; background: var(--line); cursor: pointer; }
+.placegrid__item[aria-pressed='true'] { outline: 3px solid var(--brand); outline-offset: -3px; }
+.placegrid__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.placegrid__name { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 6px 5px; color: #fff; font-size: 0.6875rem; font-weight: 700; text-align: left; background: linear-gradient(transparent, rgb(0 0 0 / 0.65)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 4px; border-radius: 999px; background: var(--brand-soft); font-size: 0.875rem; }
+.chip button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; color: var(--ink-2); font-size: 1.125rem; line-height: 1; cursor: pointer; }
+.linkbtn { padding: 0; border: 0; background: none; color: var(--brand); text-decoration: underline; cursor: pointer; font: inherit; }
+.post__tags { font-size: 0.9375rem; color: var(--ink-2); }
+.tagreq { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.tagreq__link { display: flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; }
+.tagreq__link img, .tagreq__none { width: 56px; height: 56px; flex: none; border-radius: 10px; object-fit: cover; background: var(--line); }

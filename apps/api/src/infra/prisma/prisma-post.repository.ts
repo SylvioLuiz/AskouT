@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type { PostRepository } from '../../core/ports.ts';
-import type { Page, PostImageRecord, PostRecord, PostWithImages } from '../../core/types.ts';
+import type { Page, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 export class PrismaPostRepository implements PostRepository {
@@ -59,11 +59,17 @@ export class PrismaPostRepository implements PostRepository {
     return row ? PrismaPostRepository.toView(row) : undefined;
   }
 
-  async listByAuthors(authorIds: string[], page: Page): Promise<PostWithImages[]> {
-    const ids = authorIds.filter(isUuid);
-    if (ids.length === 0) return [];
+  private static viaTag(taggedIds: string[]) {
+    return { tags: { some: { userId: { in: taggedIds }, status: 'ACCEPTED' } } };
+  }
+
+  async listFor(authorIds: string[], taggedIds: string[], page: Page): Promise<PostWithImages[]> {
+    const authors = authorIds.filter(isUuid);
+    const tagged = taggedIds.filter(isUuid);
+    const or = [...(authors.length > 0 ? [{ authorId: { in: authors } }] : []), ...(tagged.length > 0 ? [PrismaPostRepository.viaTag(tagged)] : [])];
+    if (or.length === 0) return [];
     const rows = await this.prisma.post.findMany({
-      where: { authorId: { in: ids } },
+      where: { OR: or },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: page.offset,
       take: page.limit,
@@ -72,9 +78,40 @@ export class PrismaPostRepository implements PostRepository {
     return rows.map(PrismaPostRepository.toView);
   }
 
-  async countByAuthor(authorId: string): Promise<number> {
-    if (!isUuid(authorId)) return 0;
-    return this.prisma.post.count({ where: { authorId } });
+  async countFor(userId: string): Promise<number> {
+    if (!isUuid(userId)) return 0;
+    return this.prisma.post.count({ where: { OR: [{ authorId: userId }, PrismaPostRepository.viaTag([userId])] } });
+  }
+
+  async createTags(postId: string, userIds: string[], at: Date): Promise<void> {
+    const ids = userIds.filter(isUuid);
+    if (!isUuid(postId) || ids.length === 0) return;
+    await this.prisma.postTag.createMany({ data: ids.map((userId) => ({ postId, userId, status: 'PENDING', createdAt: at })), skipDuplicates: true });
+  }
+
+  async tagsFor(postIds: string[]): Promise<PostTagRecord[]> {
+    const ids = postIds.filter(isUuid);
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.postTag.findMany({ where: { postId: { in: ids } } });
+    return rows.map((r) => ({ postId: r.postId, userId: r.userId, status: r.status as PostTagStatus, createdAt: r.createdAt }));
+  }
+
+  async respondTag(postId: string, userId: string, status: PostTagStatus): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(userId)) return false;
+    const result = await this.prisma.postTag.updateMany({ where: { postId, userId }, data: { status } });
+    return result.count > 0;
+  }
+
+  async listPendingTags(userId: string, page: Page): Promise<PostWithImages[]> {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.post.findMany({
+      where: { tags: { some: { userId, status: 'PENDING' } } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: page.offset,
+      take: page.limit,
+      include: PrismaPostRepository.include,
+    });
+    return rows.map(PrismaPostRepository.toView);
   }
 
   async delete(postId: string, authorId: string): Promise<boolean> {

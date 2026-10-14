@@ -40,7 +40,7 @@ export class PostsController {
     };
   }
 
-  /** `{images: [dataUrl | {photoPath, photoAuthor}], caption?, placeName?, placeAddress?}` */
+  /** `{images: [dataUrl | {photoPath, photoAuthor}], caption?, placeName?, placeAddress?, tagUserIds?: string[]}` */
   @Post('posts')
   @HttpCode(200)
   async create(@CurrentActor() actor: Actor, @Body() body: unknown) {
@@ -54,7 +54,7 @@ export class PostsController {
           return i;
         })
       : b.images;
-    return this.present(await this.core.posts.create(actor.userId, { caption: b.caption, images, placeName: b.placeName, placeAddress: b.placeAddress }));
+    return this.present(await this.core.posts.create(actor.userId, { caption: b.caption, images, placeName: b.placeName, placeAddress: b.placeAddress, tagUserIds: b.tagUserIds }));
   }
 
   /** Posts seus e dos seus amigos. */
@@ -62,6 +62,20 @@ export class PostsController {
   async feed(@CurrentActor() actor: Actor, @Query('limit') limit?: string, @Query('offset') offset?: string) {
     const page = await this.core.posts.feed(actor.userId, { limit, offset });
     return { ...page, items: page.items.map((p) => this.present(p)) };
+  }
+
+  /** Posts em que você foi marcado e ainda não respondeu. */
+  @Get('posts/pending-tags')
+  async pendingTags(@CurrentActor() actor: Actor, @Query('limit') limit?: string, @Query('offset') offset?: string) {
+    const page = await this.core.posts.pendingTags(actor.userId, { limit, offset });
+    return { ...page, items: page.items.map((p) => this.present(p)) };
+  }
+
+  /** `{action: 'accept' | 'decline'}`: aceitar (o post entra no seu perfil e feed) ou recusar a marcação. */
+  @Post('posts/:id/tag')
+  @HttpCode(200)
+  respondTag(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.posts.respondTag(actor.userId, id, asBody(body).action);
   }
 
   /** Foto enviada, para o <img> (que não manda o token). O id é aleatório, como na foto de perfil. */
