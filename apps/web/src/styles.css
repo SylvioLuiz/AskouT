@@ -3204,7 +3204,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .comment__body p { margin: 0; }
 .comment__name { font-weight: 700; color: var(--ink); text-decoration: none; }
 .comment__text { overflow-wrap: anywhere; white-space: pre-wrap; }
-.comment__del { flex: none; font-size: 0.8125rem; }
+.comment__del { flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.comment__del:hover:not(:disabled) { color: #d92d20; }
+.comment__del:disabled { opacity: 0.5; }
 .comments__form { margin-top: 8px; }
 .comments__empty { margin: 8px 0 16px; text-align: center; color: var(--muted); }
 .commentbox { position: relative; display: flex; align-items: center; }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Sheet } from './agenda.tsx';
 import { CropEditor } from './crop.tsx';
-import { ArrowUpIcon, CropIcon } from './icons.tsx';
+import { ArrowUpIcon, CropIcon, TrashIcon } from './icons.tsx';
 import { Avatar, Button, Confirm, ErrorState, Field, GroupAvatar, Loading, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
@@ -149,8 +149,8 @@ function CommentRow({ comment, onDelete, busy }: { comment: PostComment; onDelet
         <p className="comment__text">{comment.body}</p>
       </div>
       {comment.canDelete ? (
-        <button type="button" className="linkbtn comment__del" onClick={onDelete} disabled={busy} aria-label="Apagar comentário">
-          Apagar
+        <button type="button" className="comment__del" onClick={onDelete} disabled={busy} aria-label="Apagar comentário">
+          <TrashIcon />
         </button>
       ) : null}
     </li>
