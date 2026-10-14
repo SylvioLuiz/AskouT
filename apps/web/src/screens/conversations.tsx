@@ -12,7 +12,7 @@ import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { announceChatsChanged, dayLabel, formatClock, listTimeLabel, mergeMessages, previewOf } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
-import { formatRemaining, minutesLeft } from '../lib/flash.ts';
+import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
 import type { ChatMessage } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 
@@ -192,6 +192,24 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     }
   }
 
+  // O botão de sugerir lugar vive na mensagem "Flash combinado" mais recente. Encontro antigo, sem essa mensagem, mostra o cartão no fim.
+  const matchMessageId = [...messages].reverse().find((m) => m.kind === 'SYSTEM' && m.body === FLASH_MATCH_MESSAGE)?.id;
+  const matchCard = match ? (
+    <div className="callout chat__match">
+      <p className="callout__text">
+        <strong>Encontro Flash ativo</strong> · acaba em {formatRemaining(minutesLeft(match.expiresAt, serverNow))}
+      </p>
+      <div className="row-actions">
+        <Button small onClick={() => setSuggesting(true)}>
+          Sugerir um lugar
+        </Button>
+        <Link to={`/flash/encontro/${match.id}`} className="btn btn--secondary btn--small">
+          Ver no mapa
+        </Link>
+      </div>
+    </div>
+  ) : null;
+
   let lastDay = '';
   return (
     <div className="chat">
@@ -201,23 +219,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         groupName={data.name}
         groupImageUrl={data.imageUrl}
         subtitle={isGroup ? `${peopleLabel(data.memberCount)} · toque para ver o grupo` : data.other ? `@${data.other.username}` : undefined}
+        onCleared={() => {
+          setMessages([]);
+          setOlder({ hasMore: false, loading: false });
+          view.reload();
+        }}
       />
-
-      {match ? (
-        <div className="callout chat__match">
-          <p className="callout__text">
-            <strong>Encontro Flash ativo</strong> · acaba em {formatRemaining(minutesLeft(match.expiresAt, serverNow))}
-          </p>
-          <div className="row-actions">
-            <Button small onClick={() => setSuggesting(true)}>
-              Sugerir um lugar
-            </Button>
-            <Link to={`/flash/encontro/${match.id}`} className="btn btn--secondary btn--small">
-              Ver no mapa
-            </Link>
-          </div>
-        </div>
-      ) : null}
 
       <div className="chat__thread" aria-live="polite">
         {older.hasMore ? (
@@ -235,7 +242,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           return (
             <div key={m.id} className="chat__item">
               {showDay ? <p className="chat__day">{day}</p> : null}
-              {m.kind === 'SYSTEM' ? <p className="chat__system">{m.body}</p> : (
+              {m.kind === 'SYSTEM' ? (
+                <>
+                  <p className="chat__system">{m.body}</p>
+                  {match && m.id === matchMessageId ? matchCard : null}
+                </>
+              ) : (
               <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.kind === 'AUDIO' ? ' bubble--voice' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`}>
                 {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
                 {m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
@@ -255,6 +267,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             </div>
           );
         })}
+        {match && !matchMessageId ? matchCard : null}
         <div ref={endRef} />
       </div>
 

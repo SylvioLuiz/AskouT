@@ -257,6 +257,8 @@ export function createApi(deps: ApiDeps) {
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages/${id(messageId)}/respond`, { body: { action } }),
     /** Endereço completo de um recurso da API (a foto do lugar), a partir do caminho que ela devolveu. */
     assetUrl: (path: string) => `${deps.baseUrl}${path}`,
+    clearConversation: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/clear`),
+    reportConversation: (conversationId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/conversations/${id(conversationId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
     shared: (conversationId: string) => request<SharedView>('GET', `/conversations/${id(conversationId)}/shared`),
     group: (conversationId: string) => request<GroupDetails>('GET', `/conversations/${id(conversationId)}/group`),
     leaveGroup: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/leave`),

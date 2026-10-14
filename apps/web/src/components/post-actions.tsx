@@ -82,6 +82,19 @@ const REASONS: { id: ReportReason; label: string }[] = [
 ];
 
 export function ReportSheet({ postId, onClose, onDone }: { postId: string; onClose: () => void; onDone: () => void }) {
+  return (
+    <ReasonSheet
+      title="Denunciar post"
+      doneText="Obrigado por avisar. A equipe vai analisar, e você não verá mais este post."
+      submit={(reason, details) => api.reportPost(postId, reason, details)}
+      onClose={onClose}
+      onDone={onDone}
+    />
+  );
+}
+
+/** Aba de denúncia: escolhe o motivo, escreve detalhes (opcional) e envia pela função recebida. */
+export function ReasonSheet({ title, doneText, extra, submit, onClose, onDone }: { title: string; doneText: string; extra?: string; submit: (reason: ReportReason, details?: string) => Promise<unknown>; onClose: () => void; onDone: () => void }) {
   const [reason, setReason] = useState<ReportReason | undefined>();
   const [details, setDetails] = useState('');
   const [busy, setBusy] = useState(false);
@@ -93,7 +106,7 @@ export function ReportSheet({ postId, onClose, onDone }: { postId: string; onClo
     setBusy(true);
     setMessage(undefined);
     try {
-      await api.reportPost(postId, reason, details.trim() || undefined);
+      await submit(reason, details.trim() || undefined);
       setSent(true);
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
@@ -105,7 +118,7 @@ export function ReportSheet({ postId, onClose, onDone }: { postId: string; onClo
   if (sent) {
     return (
       <Sheet title="Denúncia enviada" onClose={onDone}>
-        <p>Obrigado por avisar. A equipe vai analisar, e você não verá mais este post.</p>
+        <p>{doneText}</p>
         <Button full onClick={onDone}>
           Fechar
         </Button>
@@ -113,8 +126,9 @@ export function ReportSheet({ postId, onClose, onDone }: { postId: string; onClo
     );
   }
   return (
-    <Sheet title="Denunciar post" onClose={onClose}>
+    <Sheet title={title} onClose={onClose}>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      {extra ? <p className="muted">{extra}</p> : null}
       <div className="reasons" role="radiogroup" aria-label="Motivo da denúncia">
         {REASONS.map((r) => (
           <label key={r.id} className={`reasons__item${reason === r.id ? ' reasons__item--on' : ''}`}>
@@ -123,7 +137,7 @@ export function ReportSheet({ postId, onClose, onDone }: { postId: string; onClo
           </label>
         ))}
       </div>
-      <Field label="Detalhes (opcional)" value={details} onChange={setDetails} multiline maxLength={320} />
+      <Field label="Detalhes (opcional)" value={details} onChange={setDetails} multiline maxLength={300} />
       <Button full disabled={!reason} loading={busy} onClick={() => void send()}>
         Enviar denúncia
       </Button>

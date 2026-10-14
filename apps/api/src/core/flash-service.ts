@@ -8,6 +8,8 @@ export const FLASH_HOURS: readonly number[] = [1, 2, 3];
 export const FLASH_MIN_MINUTES = 5;
 export const FLASH_MAX_MINUTES = 180;
 export const FLASH_NOTE_MAX = 60;
+/** Mensagem de sistema que abre o encontro Flash na conversa; o app mostra nela o botão de sugerir lugar. */
+export const FLASH_MATCH_MESSAGE = 'Flash combinado! Vocês dois estão disponíveis agora.';
 export const INVITE_TTL_MINUTES = 15;
 /** Depois disso a última posição conhecida é tratada como "sem sinal". */
 export const POSITION_STALE_SECONDS = 120;
@@ -286,6 +288,7 @@ export class FlashService {
       expiresAt: new Date(Math.min(mine.expiresAt.getTime(), theirs.expiresAt.getTime())),
     });
     const conversation = await this.deps.conversations.getOrCreateDirect(invite.fromUserId, invite.toUserId, this.deps.ids.next(), now);
+    await this.deps.conversations.addMessage({ id: this.deps.ids.next(), conversationId: conversation.id, senderId: actorId, kind: 'SYSTEM', body: FLASH_MATCH_MESSAGE, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: now });
     const accepter = (await this.deps.users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
     await this.deps.notifier.notify({ userId: invite.fromUserId, type: 'FLASH_INVITE', title: `${accepter} aceitou seu convite do Flash`, body: 'Vocês podem se encontrar agora', url: `/conversas/${conversation.id}`, dedupeKey: `flash-accepted:${actorId}` });
     return { status: 'ACCEPTED', conversationId: conversation.id };

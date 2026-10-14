@@ -7,8 +7,8 @@ import type { CoreDeps } from './ports.ts';
 import { distanceMeters } from './geo.ts';
 import { buildMeetupViews } from './meetup-view.ts';
 import type { MeetupView } from './meetup-view.ts';
-import type { ConversationRecord, MessageKind, MessageRecord, PublicProfile, SuggestionCard } from './types.ts';
-import { toPublicProfile } from './types.ts';
+import type { ConversationRecord, MessageKind, MessageRecord, PostReportReason, PublicProfile, SuggestionCard } from './types.ts';
+import { POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
 export const MESSAGE_MAX = 2000;
 export const MESSAGES_PER_MINUTE = 30;
@@ -108,6 +108,7 @@ export interface SharedView {
   voice: SharedVoice[];
 }
 
+export const CONVERSATION_REPORT_DETAILS_MAX = 300;
 const SHARED_SCAN = 300;
 const URL_RE = /https?:\/\/[^\s<>"']+/gi;
 
@@ -288,7 +289,8 @@ export class ConversationService {
     const now = clock.now();
     // Em grupo, quem tem bloqueio com você (nos dois sentidos) some do chat, como na conversa 1 a 1.
     const hiddenIds = conversation.type === 'GROUP' ? await this.deps.blocks.listRelatedIds(actorId) : [];
-    const page = await conversations.listMessages(conversationId, limit + 1, before, hiddenIds);
+    const clearedAt = (await conversations.getCleared(conversationId, actorId)) ?? undefined;
+    const page = await conversations.listMessages(conversationId, limit + 1, before, hiddenIds, clearedAt);
     const hasMore = page.length > limit;
     const items = hasMore ? page.slice(page.length - limit) : page;
     if (before === undefined) await conversations.markRead(conversationId, actorId, now);
@@ -430,12 +432,36 @@ export class ConversationService {
     return { ok: true };
   }
 
+  /** Limpa a conversa só para você: as mensagens até agora somem para você e continuam para a outra pessoa. */
+  async clear(actorId: string, conversationId: string): Promise<{ ok: true }> {
+    await this.access(actorId, conversationId);
+    await this.deps.conversations.setCleared(conversationId, actorId, this.deps.clock.now());
+    return { ok: true };
+  }
+
+  /** Denuncia a conversa (ou a pessoa, na 1 a 1). Guarda as últimas mensagens de texto para a análise da equipe. */
+  async report(actorId: string, conversationId: string, reason: unknown, details?: unknown): Promise<{ reported: true }> {
+    const { conversations, ids, clock } = this.deps;
+    const { otherId } = await this.access(actorId, conversationId);
+    if (typeof reason !== 'string' || !(POST_REPORT_REASONS as readonly string[]).includes(reason)) throw validationError('Motivo inválido', { reason: 'Escolha um motivo da lista' });
+    let text: string | null = null;
+    if (details !== undefined && details !== null && details !== '') {
+      if (typeof details !== 'string') throw validationError('Detalhes inválidos', { details: 'Detalhes inválidos' });
+      text = details.trim() === '' ? null : details.trim();
+      if (text !== null && text.length > CONVERSATION_REPORT_DETAILS_MAX) throw validationError('Detalhes longos demais', { details: `Use no máximo ${CONVERSATION_REPORT_DETAILS_MAX} caracteres` });
+    }
+    const recent = (await conversations.listMessages(conversationId, 20)).filter((m) => m.kind === 'TEXT');
+    const evidence = recent.map((m) => `[${m.createdAt.toISOString()}] ${m.senderId === actorId ? 'quem denunciou' : otherId ? 'denunciado' : 'membro'}: ${m.body.replace(/\s+/g, ' ')}`).join('\n').slice(-4000);
+    await conversations.addReport({ id: ids.next(), conversationId, reporterId: actorId, reportedUserId: otherId, reason: reason as PostReportReason, details: text, evidence, createdAt: clock.now() });
+    return { reported: true };
+  }
+
   /** Informações da conversa (1 a 1 ou grupo): encontros, links e mensagens de voz. */
   async shared(actorId: string, conversationId: string): Promise<SharedView> {
     const { conversations, users, meetups, blocks } = this.deps;
     const { conversation, other } = await this.access(actorId, conversationId);
     const hiddenIds = await blocks.listRelatedIds(actorId);
-    const rows = await conversations.listShared(conversationId, SHARED_SCAN, hiddenIds);
+    const rows = await conversations.listShared(conversationId, SHARED_SCAN, hiddenIds, (await conversations.getCleared(conversationId, actorId)) ?? undefined);
     const names = new Map((await users.findProfilesByIds([...new Set(rows.map((r) => r.senderId))])).map((p) => [p.userId, p.displayName] as const));
     const links: SharedLink[] = [];
     const voice: SharedVoice[] = [];

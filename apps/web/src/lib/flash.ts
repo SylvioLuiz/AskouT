@@ -52,6 +52,8 @@ export function formatAge(updatedAtIso: string, serverNowIso: string): string {
 }
 
 /** Avisa o resto do app (o raio do topo, por exemplo) que o Flash ligou, desligou ou mudou de estado. */
+/** Mensagem de sistema que a API posta ao casar um Flash (mesmo texto de `FLASH_MATCH_MESSAGE` na API). */
+export const FLASH_MATCH_MESSAGE = 'Flash combinado! Vocês dois estão disponíveis agora.';
 export const FLASH_CHANGED_EVENT = 'askout:flash-changed';
 export function announceFlashChange(): void {
   window.dispatchEvent(new Event(FLASH_CHANGED_EVENT));

@@ -405,3 +405,16 @@ export interface FlashHiddenRecord {
   /** `otherId` não vê o Flash de `ownerId`. */
   hideMine: boolean;
 }
+
+/** Denúncia de uma conversa (1 a 1 ou grupo). `evidence` guarda as últimas mensagens de texto, só para a análise da equipe. */
+export interface ConversationReportRecord {
+  id: string;
+  conversationId: string;
+  reporterId: string;
+  /** Na conversa 1 a 1, a pessoa denunciada; no grupo, nulo. */
+  reportedUserId: string | null;
+  reason: PostReportReason;
+  details: string | null;
+  evidence: string;
+  createdAt: Date;
+}

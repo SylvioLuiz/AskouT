@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventKind, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -132,9 +132,15 @@ export interface ConversationRepository {
   /** Grava a resposta ao cartão só se ainda não houver uma. Devolve false se já tinha. */
   setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean>;
   /** Mensagens em ordem cronológica. `before` pagina para trás (só as anteriores a esse instante). */
-  listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds?: readonly string[]): Promise<MessageRecord[]>;
+  listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds?: readonly string[], after?: Date): Promise<MessageRecord[]>;
   /** Mensagens de voz e textos com link (http/https), da mais recente para a mais antiga. */
-  listShared(conversationId: string, limit: number, excludeSenderIds?: readonly string[]): Promise<MessageRecord[]>;
+  listShared(conversationId: string, limit: number, excludeSenderIds?: readonly string[], after?: Date): Promise<MessageRecord[]>;
+  /** "Limpar conversa": só para `userId`. Mensagens até `at` deixam de aparecer para ele (listas, não lidas e prévia). */
+  setCleared(conversationId: string, userId: string, at: Date): Promise<void>;
+  /** Quando a pessoa limpou a conversa pela última vez, ou null. */
+  getCleared(conversationId: string, userId: string): Promise<Date | null>;
+  /** Uma denúncia por pessoa e conversa: denunciar de novo atualiza motivo e detalhes. */
+  addReport(report: ConversationReportRecord): Promise<void>;
   /** Marca como lida até `now` para `userId`. */
   markRead(conversationId: string, userId: string, now: Date): Promise<void>;
   /** Quantas mensagens `userId` enviou desde `since` (limite de envio). */

@@ -3252,6 +3252,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 /* Topo da conversa: preso abaixo da barra do app ao rolar */
 .chathead { position: sticky; top: var(--topbar-h, 0px); z-index: 15; display: flex; align-items: center; gap: 8px; margin: 0 -16px 8px; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
 .chathead .pagehead__back { flex: none; }
+.chathead__more { flex: none; margin-right: -8px; }
 .chathead__who { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; color: inherit; text-decoration: none; border-radius: 12px; }
 .chathead__who:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .chathead__who .avatar { flex: none; }

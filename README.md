@@ -218,6 +218,14 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 - A API aceita `minutes` (múltiplo de 5, 5–180) em `POST /me/flash`; `hours` (1, 2 ou 3) continua valendo por compatibilidade.
 - Verificado em navegador de celular simulado (rolagem e teclado); o toque real no celular ainda não foi testado.
 
+### Menu ⋯ da conversa e Flash na mensagem
+
+- No topo da conversa, no canto oposto ao nome, o botão **⋯** abre: **Limpar conversa**, **Bloquear** (só na 1 a 1) e **Denunciar**.
+- **Limpar** vale só para quem pediu (`POST /conversations/:id/clear`, coluna `ConversationParticipant.clearedAt`): some das mensagens, da prévia, dos não lidos e das abas de informações; a outra pessoa continua vendo e as mensagens novas chegam normalmente.
+- **Denunciar** (`POST /conversations/:id/report`, tabela `ConversationReport`): motivo da lista + detalhes (até 300). Guarda as **últimas 20 mensagens de texto** como evidência para a equipe e a tela avisa isso antes de enviar. Denunciar de novo atualiza a mesma denúncia. Ainda **não existe tela de admin** para ler as denúncias (virá no painel admin).
+- Ao aceitar um convite do Flash, a API posta na conversa a mensagem de sistema "Flash combinado!" e é **nela** que ficam o tempo restante, **Sugerir um lugar** e **Ver no mapa** (antes ficavam fixos no topo). Encontros anteriores a essa mudança, sem a mensagem, mostram o cartão no fim da conversa.
+- Migration `20261023120000_conversation_clear_report` + `sql/012_conversation_report_constraints.sql`, aplicadas pelo `AskouT.command`. Só testadas em memória aqui.
+
 ### Topo da conversa e informações
 
 - O topo da conversa (voltar, **foto** e nome) fica **preso abaixo da barra do app** ao rolar. Tocar na foto ou no nome abre as informações; na conversa 1 a 1 o nome é o real e abaixo vai o @usuário.

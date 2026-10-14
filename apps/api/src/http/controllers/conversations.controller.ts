@@ -58,6 +58,19 @@ export class ConversationsController {
   }
 
   /** Detalhes do grupo (pessoas, eventos, mídia). 404 se não for um grupo seu. */
+  @Post(':id/clear')
+  @HttpCode(200)
+  clear(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.conversations.clear(actor.userId, id);
+  }
+
+  @Post(':id/report')
+  @HttpCode(200)
+  report(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.conversations.report(actor.userId, id, b.reason, b.details);
+  }
+
   @Get(':id/shared')
   shared(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.core.conversations.shared(actor.userId, id);

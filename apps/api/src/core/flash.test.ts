@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { FLASH_MATCH_MESSAGE } from './flash-service.ts';
 import { rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
 
@@ -317,4 +318,14 @@ test('visibilidade: ocultar cancela convite aberto e valida o pedido', async () 
   await rejectsWith(w.core.flash.setVisibility(ana, ana, { hideTheirs: true }), 'VALIDATION');
   await rejectsWith(w.core.flash.setVisibility(ana, bia, { hideTheirs: 'sim' }), 'VALIDATION');
   await rejectsWith(w.core.flash.setVisibility(ana, '00000000-0000-4000-8000-000000000000', { hideTheirs: true }), 'NOT_FOUND');
+});
+
+test('aceitar o convite deixa uma mensagem de sistema na conversa, para o botão de sugerir lugar', async () => {
+  const { w, ana, bia } = await pair();
+  const invite = await w.core.flash.invite(ana, bia);
+  const answer = await w.core.flash.respond(bia, invite.id, 'accept');
+  const chat = await w.core.conversations.messages(ana, answer.conversationId!);
+  const last = chat.messages.at(-1)!;
+  assert.equal(last.kind, 'SYSTEM');
+  assert.equal(last.body, FLASH_MATCH_MESSAGE);
 });

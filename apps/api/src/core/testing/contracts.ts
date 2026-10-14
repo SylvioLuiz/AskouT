@@ -698,6 +698,36 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.conversations.listShared(randomUUID(), 10), []);
       });
 
+      it('limpar conversa: só para quem limpou (mensagens, prévia e não lidas); denúncia é uma por pessoa', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const c = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        await h.conversations.addMessage(msg(c.id, bia, 'antiga', 1));
+        await h.conversations.addMessage(msg(c.id, bia, 'https://velho.com', 2));
+        assert.equal(await h.conversations.getCleared(c.id, ana), null);
+        await h.conversations.setCleared(c.id, ana, at(3));
+        assert.deepEqual(await h.conversations.getCleared(c.id, ana), at(3));
+        assert.equal(await h.conversations.getCleared(c.id, bia), null);
+        await h.conversations.addMessage(msg(c.id, bia, 'nova', 4));
+        assert.deepEqual((await h.conversations.listMessages(c.id, 10, undefined, [], at(3))).map((m) => m.body), ['nova']);
+        assert.deepEqual((await h.conversations.listMessages(c.id, 10)).map((m) => m.body), ['antiga', 'https://velho.com', 'nova']);
+        assert.deepEqual(await h.conversations.listShared(c.id, 10, [], at(3)), []);
+        assert.equal((await h.conversations.listShared(c.id, 10)).length, 1);
+        const mine = (await h.conversations.listForUser(ana))[0]!;
+        assert.equal(mine.lastMessage?.body, 'nova');
+        assert.equal(mine.unread, 1);
+        const hers = (await h.conversations.listForUser(bia))[0]!;
+        assert.equal(hers.lastMessage?.body, 'nova');
+        await h.conversations.setCleared(c.id, ana, at(5));
+        const empty = (await h.conversations.listForUser(ana))[0]!;
+        assert.equal(empty.lastMessage, null);
+        assert.equal(empty.unread, 0);
+
+        const report = { id: randomUUID(), conversationId: c.id, reporterId: ana, reportedUserId: bia, reason: 'SPAM' as const, details: null, evidence: 'x', createdAt: at(6) };
+        await h.conversations.addReport(report);
+        await h.conversations.addReport({ ...report, id: randomUUID(), reason: 'OTHER', details: 'mudei' });
+      });
+
       it('mensagem de voz: guarda a duração na mensagem e os bytes à parte; some junto com a conversa', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');

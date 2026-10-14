@@ -156,6 +156,8 @@ model User {
   postLikes         PostLike[]    @relation("PostLikes")
   postComments      PostComment[] @relation("PostComments")
   postReports       PostReport[]  @relation("PostReports")
+  conversationReports  ConversationReport[] @relation("ConversationReports")
+  conversationReported ConversationReport[] @relation("ConversationReported")
   postHidden        PostHidden[]  @relation("PostHidden")
 }
 
@@ -336,18 +338,40 @@ model Conversation {
   participants ConversationParticipant[]
   messages     Message[]
   meetings     Meeting[]
+  reports      ConversationReport[]
 }
 
 model ConversationParticipant {
   conversationId String    @db.Uuid
   userId         String    @db.Uuid
   lastReadAt     DateTime?
+  /// "Limpar conversa": mensagens até esse instante não aparecem para essa pessoa.
+  clearedAt      DateTime?
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([conversationId, userId])
   @@index([userId])
+}
+
+/// Denúncia de conversa. `evidence` guarda as últimas mensagens de texto, só para a análise da equipe.
+model ConversationReport {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @db.Uuid
+  reporterId     String   @db.Uuid
+  reportedUserId String?  @db.Uuid
+  reason         String
+  details        String?
+  evidence       String   @default("")
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  reporter     User         @relation("ConversationReports", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported     User?        @relation("ConversationReported", fields: [reportedUserId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, reporterId])
+  @@index([createdAt])
 }
 
 model Message {

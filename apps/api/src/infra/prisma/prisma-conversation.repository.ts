@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { ConversationRepository } from '../../core/ports.ts';
-import type { ConversationRecord, ConversationSummaryRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
+import type { ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
 import { isUuid, uniqueViolationTargets } from './helpers.ts';
 
 type MessageRow = {
@@ -159,7 +159,7 @@ export class PrismaConversationRepository implements ConversationRepository {
     const mine = await this.prisma.conversationParticipant.findMany({
       where: { userId },
       include: {
-        conversation: { include: { group: true, participants: { select: { userId: true } }, messages: { where: hiddenSenderIds.length > 0 ? { senderId: { notIn: [...hiddenSenderIds] } } : {}, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1 } } },
+        conversation: { include: { group: true, participants: { select: { userId: true } } } },
       },
     });
     const out: ConversationSummaryRecord[] = [];
@@ -167,10 +167,12 @@ export class PrismaConversationRepository implements ConversationRepository {
       const c = p.conversation;
       const ids = c.participants.map((x: { userId: string }) => x.userId).sort();
       if (c.type === 'DIRECT' && ids.length !== 2) continue;
+      const visible = { ...(hiddenSenderIds.length > 0 ? { senderId: { notIn: [...hiddenSenderIds] } } : {}), ...(p.clearedAt ? { createdAt: { gt: p.clearedAt } } : {}) };
+      const lastReadFloor = [p.lastReadAt, p.clearedAt].filter((d): d is Date => d !== null).sort((x, y) => y.getTime() - x.getTime())[0];
       const unread = await this.prisma.message.count({
-        where: { conversationId: c.id, senderId: { notIn: [userId, ...hiddenSenderIds] }, ...(p.lastReadAt ? { createdAt: { gt: p.lastReadAt } } : {}) },
+        where: { conversationId: c.id, senderId: { notIn: [userId, ...hiddenSenderIds] }, ...(lastReadFloor ? { createdAt: { gt: lastReadFloor } } : {}) },
       });
-      const last = c.messages[0];
+      const last = await this.prisma.message.findFirst({ where: { conversationId: c.id, ...visible }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
       out.push({
         conversation: toConversation(c),
         participantIds: ids,
@@ -220,21 +222,41 @@ export class PrismaConversationRepository implements ConversationRepository {
     return result.count > 0;
   }
 
-  async listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds: readonly string[] = []): Promise<MessageRecord[]> {
+  async listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds: readonly string[] = [], after?: Date): Promise<MessageRecord[]> {
     if (!isUuid(conversationId)) return [];
     const rows = await this.prisma.message.findMany({
-      where: { conversationId, ...(before ? { createdAt: { lt: before } } : {}), ...(excludeSenderIds.length > 0 ? { senderId: { notIn: [...excludeSenderIds] } } : {}) },
+      where: { conversationId, ...(before || after ? { createdAt: { ...(before ? { lt: before } : {}), ...(after ? { gt: after } : {}) } } : {}), ...(excludeSenderIds.length > 0 ? { senderId: { notIn: [...excludeSenderIds] } } : {}) },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit,
     });
     return (rows as MessageRow[]).reverse().map(toMessage);
   }
 
-  async listShared(conversationId: string, limit: number, excludeSenderIds: readonly string[] = []): Promise<MessageRecord[]> {
+  async setCleared(conversationId: string, userId: string, at: Date): Promise<void> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return;
+    await this.prisma.conversationParticipant.updateMany({ where: { conversationId, userId }, data: { clearedAt: at } });
+  }
+
+  async getCleared(conversationId: string, userId: string): Promise<Date | null> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return null;
+    const row = await this.prisma.conversationParticipant.findUnique({ where: { conversationId_userId: { conversationId, userId } }, select: { clearedAt: true } });
+    return row?.clearedAt ?? null;
+  }
+
+  async addReport(report: ConversationReportRecord): Promise<void> {
+    await this.prisma.conversationReport.upsert({
+      where: { conversationId_reporterId: { conversationId: report.conversationId, reporterId: report.reporterId } },
+      create: { id: report.id, conversationId: report.conversationId, reporterId: report.reporterId, reportedUserId: report.reportedUserId, reason: report.reason, details: report.details, evidence: report.evidence, createdAt: report.createdAt },
+      update: { reason: report.reason, details: report.details, evidence: report.evidence },
+    });
+  }
+
+  async listShared(conversationId: string, limit: number, excludeSenderIds: readonly string[] = [], after?: Date): Promise<MessageRecord[]> {
     if (!isUuid(conversationId)) return [];
     const rows = await this.prisma.message.findMany({
       where: {
         conversationId,
+        ...(after ? { createdAt: { gt: after } } : {}),
         OR: [{ kind: 'AUDIO' }, { kind: 'TEXT', body: { contains: 'http', mode: 'insensitive' } }],
         ...(excludeSenderIds.length > 0 ? { senderId: { notIn: [...excludeSenderIds] } } : {}),
       },

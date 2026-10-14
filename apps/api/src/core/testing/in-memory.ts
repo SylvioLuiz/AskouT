@@ -25,7 +25,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -485,6 +485,8 @@ export class SequentialIds implements IdGenerator {
 export class InMemoryConversationRepository implements ConversationRepository {
   readonly conversations = new Map<string, ConversationRecord>();
   readonly participants = new Map<string, Map<string, Date | null>>();
+  readonly cleared = new Map<string, Date>();
+  readonly reports = new Map<string, ConversationReportRecord>();
   readonly messages: MessageRecord[] = [];
 
   async getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord> {
@@ -535,7 +537,8 @@ export class InMemoryConversationRepository implements ConversationRepository {
     const out: ConversationSummaryRecord[] = [];
     for (const [id, p] of this.participants) {
       if (!p.has(userId)) continue;
-      const msgs = this.messages.filter((m) => m.conversationId === id && !hiddenSenderIds.includes(m.senderId));
+      const clearedAt = this.cleared.get(`${id}|${userId}`) ?? null;
+      const msgs = this.messages.filter((m) => m.conversationId === id && !hiddenSenderIds.includes(m.senderId) && (clearedAt === null || m.createdAt > clearedAt));
       const lastRead = p.get(userId) ?? null;
       const unread = msgs.filter((m) => m.senderId !== userId && (lastRead === null || m.createdAt > lastRead)).length;
       out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [...p.keys()], lastMessage: msgs.at(-1) ?? null, unread });
@@ -569,14 +572,26 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return true;
   }
 
-  async listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds: readonly string[] = []): Promise<MessageRecord[]> {
-    const all = this.messages.filter((m) => m.conversationId === conversationId && (before === undefined || m.createdAt < before) && !excludeSenderIds.includes(m.senderId));
+  async listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds: readonly string[] = [], after?: Date): Promise<MessageRecord[]> {
+    const all = this.messages.filter((m) => m.conversationId === conversationId && (before === undefined || m.createdAt < before) && (after === undefined || m.createdAt > after) && !excludeSenderIds.includes(m.senderId));
     return all.slice(Math.max(0, all.length - limit)).map((m) => ({ ...m }));
   }
 
-  async listShared(conversationId: string, limit: number, excludeSenderIds: readonly string[] = []): Promise<MessageRecord[]> {
+  async setCleared(conversationId: string, userId: string, at: Date): Promise<void> {
+    if (this.participants.get(conversationId)?.has(userId)) this.cleared.set(`${conversationId}|${userId}`, at);
+  }
+
+  async getCleared(conversationId: string, userId: string): Promise<Date | null> {
+    return this.cleared.get(`${conversationId}|${userId}`) ?? null;
+  }
+
+  async addReport(report: ConversationReportRecord): Promise<void> {
+    this.reports.set(`${report.conversationId}|${report.reporterId}`, { ...report });
+  }
+
+  async listShared(conversationId: string, limit: number, excludeSenderIds: readonly string[] = [], after?: Date): Promise<MessageRecord[]> {
     return this.messages
-      .filter((m) => m.conversationId === conversationId && !excludeSenderIds.includes(m.senderId) && (m.kind === 'AUDIO' || (m.kind === 'TEXT' && /https?:\/\//i.test(m.body))))
+      .filter((m) => m.conversationId === conversationId && !excludeSenderIds.includes(m.senderId) && (after === undefined || m.createdAt > after) && (m.kind === 'AUDIO' || (m.kind === 'TEXT' && /https?:\/\//i.test(m.body))))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit)
       .map((m) => ({ ...m }));

@@ -1,13 +1,21 @@
-import { Avatar, GroupAvatar } from './ui.tsx';
-import { ChevronLeftIcon } from './icons.tsx';
+import { useState } from 'react';
+import { Sheet } from './agenda.tsx';
+import { ChevronLeftIcon, MoreIcon } from './icons.tsx';
+import { ReasonSheet } from './post-actions.tsx';
+import { Avatar, Confirm, GroupAvatar, Notice } from './ui.tsx';
+import { api } from '../client.ts';
+import { toApiError } from '../lib/errors.ts';
 import type { PublicProfile } from '../lib/types.ts';
-import { Link } from '../router.tsx';
+import { Link, navigate } from '../router.tsx';
 
-/** Topo da conversa: voltar, foto e nome. Fica preso no topo ao rolar; tocar na foto ou no nome abre as informações. */
-export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string }) {
+type Step = 'menu' | 'clear' | 'block' | 'report';
+
+/** Topo da conversa: voltar, foto e nome (preso ao rolar) e o menu ⋯ no canto oposto. */
+export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void }) {
   const isGroup = !other;
   const name = other ? other.displayName : (groupName ?? 'Grupo');
   const to = isGroup ? `/conversas/${conversationId}/grupo` : `/conversas/${conversationId}/info`;
+  const [open, setOpen] = useState(false);
   return (
     <header className="chathead">
       <Link to="/conversas" className="pagehead__back" aria-label="Voltar">
@@ -20,6 +28,80 @@ export function ChatHead({ conversationId, other, groupName, groupImageUrl, subt
           {subtitle ? <span className="chathead__sub">{subtitle}</span> : null}
         </span>
       </Link>
+      <button type="button" className="iconbtn chathead__more" onClick={() => setOpen(true)} aria-label="Mais opções da conversa" aria-haspopup="dialog">
+        <MoreIcon />
+      </button>
+      {open ? <ChatMenu conversationId={conversationId} other={other} onClose={() => setOpen(false)} onCleared={onCleared} /> : null}
     </header>
+  );
+}
+
+function ChatMenu({ conversationId, other, onClose, onCleared }: { conversationId: string; other: PublicProfile | null; onClose: () => void; onCleared: () => void }) {
+  const [step, setStep] = useState<Step>('menu');
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+
+  async function run(work: () => Promise<unknown>, after: () => void) {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      await work();
+      after();
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      setBusy(false);
+    }
+  }
+
+  if (step === 'report') {
+    return (
+      <ReasonSheet
+        title={other ? `Denunciar @${other.username}` : 'Denunciar grupo'}
+        extra="Enviamos as últimas mensagens de texto desta conversa para a equipe analisar."
+        doneText="Obrigado por avisar. A equipe vai analisar. Se quiser, bloqueie a pessoa também."
+        submit={(reason, details) => api.reportConversation(conversationId, reason, details)}
+        onClose={onClose}
+        onDone={onClose}
+      />
+    );
+  }
+
+  const row = (label: string, hint: string, onClick: () => void, danger?: boolean) => (
+    <li>
+      <button type="button" className={`sharelist__item${danger ? ' sharelist__item--danger' : ''}`} onClick={onClick}>
+        <strong>{label}</strong>
+        <span>{hint}</span>
+      </button>
+    </li>
+  );
+
+  return (
+    <Sheet title="Conversa" onClose={onClose}>
+      {problem ? <Notice tone="error">{problem}</Notice> : null}
+      {step === 'clear' ? (
+        <Confirm
+          question="Limpar esta conversa? As mensagens somem só para você; a outra parte continua vendo."
+          confirmLabel="Limpar conversa"
+          busy={busy}
+          onCancel={() => setStep('menu')}
+          onConfirm={() => void run(() => api.clearConversation(conversationId), () => { onClose(); onCleared(); })}
+        />
+      ) : step === 'block' && other ? (
+        <Confirm
+          danger
+          question={`Bloquear @${other.username}? Essa pessoa deixa de ver seu perfil, vocês param de se seguir e a conversa some.`}
+          confirmLabel="Bloquear"
+          busy={busy}
+          onCancel={() => setStep('menu')}
+          onConfirm={() => void run(() => api.block(other.userId), () => navigate('/conversas'))}
+        />
+      ) : (
+        <ul className="sharelist">
+          {row('Limpar conversa', 'Apaga as mensagens só para você.', () => setStep('clear'))}
+          {other ? row('Bloquear', 'Ela deixa de ver seu perfil e vocês param de se seguir.', () => setStep('block'), true) : null}
+          {row('Denunciar', other ? 'Avise a equipe sobre esta pessoa.' : 'Avise a equipe sobre este grupo.', () => setStep('report'), true)}
+        </ul>
+      )}
+    </Sheet>
   );
 }

@@ -187,15 +187,15 @@ test('distâncias do cartão: só com encontro Flash ativo e os dois compartilha
   await w.core.conversations.send(ana!, id, { suggestion: card });
 
   const before = await w.core.conversations.messages(bia!, id);
-  assert.equal(before.messages[0]!.distances, null, 'sem localização não há distância');
+  assert.equal(before.messages.find((m) => m.suggestion)!.distances, null, 'sem localização não há distância');
 
   await w.core.flash.shareLocation(ana!, invite.id, { lat: -23.55, lng: -46.63 }); // em cima do lugar
   await w.core.flash.shareLocation(bia!, invite.id, { lat: -23.56, lng: -46.63 }); // ~1,1 km ao sul
   const during = await w.core.conversations.messages(bia!, id);
-  const d = during.messages[0]!.distances!;
+  const d = during.messages.find((m) => m.suggestion)!.distances!;
   assert.ok(d.themM < 10, `Ana está no lugar: ${d.themM}`);
   assert.ok(d.meM > 1000 && d.meM < 1200, `Bia está a ~1,1 km: ${d.meM}`);
-  const forAna = (await w.core.conversations.messages(ana!, id)).messages[0]!.distances!;
+  const forAna = (await w.core.conversations.messages(ana!, id)).messages.find((m) => m.suggestion)!.distances!;
   assert.equal(forAna.meM, d.themM, 'cada um vê a própria distância como "me"');
   assert.equal(forAna.themM, d.meM);
 
@@ -204,7 +204,7 @@ test('distâncias do cartão: só com encontro Flash ativo e os dois compartilha
 
   await w.core.flash.end(ana!, invite.id);
   const after = await w.core.conversations.messages(bia!, id);
-  assert.equal(after.messages[0]!.distances, null, 'encontro acabou: a distância some, nada ficou guardado');
+  assert.equal(after.messages.find((m) => m.suggestion)!.distances, null, 'encontro acabou: a distância some, nada ficou guardado');
   assert.equal(JSON.stringify(after).includes('-23.56'), false);
 });
 
@@ -281,4 +281,36 @@ test('shared: links, mensagens de voz e encontros da conversa; só quem particip
 test('extractLinks: tira pontuação do fim e repetidos', () => {
   assert.deepEqual(extractLinks('a https://x.com/a, b https://x.com/a. c (http://y.org/p?q=1)'), ['https://x.com/a', 'http://y.org/p?q=1']);
   assert.deepEqual(extractLinks('nada aqui'), []);
+});
+
+test('clear: limpa só para quem pediu; a outra pessoa continua vendo tudo e as novas mensagens chegam', async () => {
+  const { w, ana, bia, caio, id } = await friends();
+  await w.core.conversations.send(ana, id, { body: 'um' });
+  await w.core.conversations.send(bia, id, { body: 'dois https://x.com/a' });
+  await w.core.conversations.clear(ana, id);
+  assert.equal((await w.core.conversations.messages(ana, id)).messages.length, 0);
+  assert.equal((await w.core.conversations.messages(bia, id)).messages.length, 2);
+  assert.equal((await w.core.conversations.shared(ana, id)).links.length, 0);
+  assert.equal((await w.core.conversations.shared(bia, id)).links.length, 1);
+  assert.equal((await w.core.conversations.list(ana))[0]!.lastMessage, null);
+  w.clock.tick(5_000);
+  await w.core.conversations.send(bia, id, { body: 'três' });
+  assert.deepEqual((await w.core.conversations.messages(ana, id)).messages.map((m) => m.body), ['três']);
+  await rejectsWith(w.core.conversations.clear(caio, id), 'NOT_FOUND');
+});
+
+test('report: motivo da lista, detalhes limitados, guarda as últimas mensagens e só quem participa denuncia', async () => {
+  const { w, ana, bia, caio, id } = await friends();
+  await w.core.conversations.send(bia, id, { body: 'ofensa  qualquer' });
+  await rejectsWith(w.core.conversations.report(ana, id, 'NADA'), 'VALIDATION');
+  await rejectsWith(w.core.conversations.report(ana, id, undefined), 'VALIDATION');
+  await rejectsWith(w.core.conversations.report(ana, id, 'SPAM', 'x'.repeat(301)), 'VALIDATION');
+  await rejectsWith(w.core.conversations.report(caio, id, 'SPAM'), 'NOT_FOUND');
+  assert.deepEqual(await w.core.conversations.report(ana, id, 'OFFENSIVE', ' xingou '), { reported: true });
+  assert.deepEqual(await w.core.conversations.report(ana, id, 'SPAM'), { reported: true }, 'denunciar de novo atualiza');
+  const stored = [...w.conversations.reports.values()];
+  assert.equal(stored.length, 1);
+  assert.equal(stored[0]!.reason, 'SPAM');
+  assert.equal(stored[0]!.reportedUserId, bia);
+  assert.match(stored[0]!.evidence, /denunciado: ofensa qualquer/);
 });
