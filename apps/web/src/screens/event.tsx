@@ -115,8 +115,8 @@ function EventPostCard({ post, onDelete, busy }: { post: EventPost; onDelete: ()
   );
 }
 
-/** Menu ⋯ do dono: quem pode postar no evento. */
-function EventMenuSheet({ page, onChange, onClose }: { page: EventPage; onChange: (page: EventPage) => void; onClose: () => void }) {
+/** Menu ⋯ do evento: compartilhar e, para o dono, quem pode postar. */
+function EventMenuSheet({ page, onChange, onShare, onClose }: { page: EventPage; onChange: (page: EventPage) => void; onShare: () => void; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | undefined>();
 
@@ -134,8 +134,14 @@ function EventMenuSheet({ page, onChange, onClose }: { page: EventPage; onChange
   }
 
   return (
-    <Sheet title="Quem pode postar" onClose={onClose}>
+    <Sheet title="Opções do evento" onClose={onClose}>
       {message ? <Notice tone="error">{message}</Notice> : null}
+      <Button full variant="secondary" onClick={onShare}>
+        <ShareIcon /> Compartilhar
+      </Button>
+      {page.isOwner && page.postsEnabled ? (
+      <>
+      <h3 className="radiolist__title">Quem pode postar</h3>
       <div className="radiolist" role="radiogroup" aria-label="Quem pode postar neste evento">
         <label className="radiolist__item">
           <input type="radio" name="quem-posta" checked={!page.postsPublic} disabled={busy} onChange={() => void choose(false)} />
@@ -152,6 +158,8 @@ function EventMenuSheet({ page, onChange, onClose }: { page: EventPage; onChange
           </span>
         </label>
       </div>
+      </>
+      ) : null}
     </Sheet>
   );
 }
@@ -275,15 +283,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
             <button type="button" className="evhero__btn evhero__btn--back" onClick={goBack} aria-label="Voltar">
               <ChevronLeftIcon />
             </button>
-            {e.isOwner && e.postsEnabled ? (
-              <button type="button" className="evhero__btn evhero__btn--share" onClick={() => setMenu(true)} aria-label="Mais opções do evento" aria-haspopup="dialog">
-                <MoreIcon />
-              </button>
-            ) : (
-              <button type="button" className="evhero__btn evhero__btn--share" onClick={() => setSharing(true)} aria-label="Compartilhar o evento">
-                <ShareIcon />
-              </button>
-            )}
+            <button type="button" className="evhero__btn evhero__btn--share" onClick={() => setMenu(true)} aria-label="Mais opções do evento" aria-haspopup="dialog">
+              <MoreIcon />
+            </button>
             <div className="evhero__body">
               <span className="evhero__badge" title={kindLabel(e.kind)}>
                 <EventKindIcon kind={e.kind} />
@@ -380,9 +382,6 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 {MEETUP_ACTION_LABEL}
               </Button>
             ) : null}
-            <Button full variant="secondary" onClick={() => setSharing(true)}>
-              Compartilhar
-            </Button>
             <div className="sugcard__actions">
               {e.venue.lat !== null && e.venue.lng !== null ? (
                 <a className="btn btn--quiet btn--small" href={routeLink(e.venue.lat, e.venue.lng)} target="_blank" rel="noopener noreferrer">
@@ -403,7 +402,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
           <ShareLinkSheet url={eventLink(window.location.origin, e.id)} text={`Evento ${e.title}`} onClose={() => setSharing(false)} />
         )
       ) : null}
-      {menu && e ? <EventMenuSheet page={e} onChange={setFresh} onClose={() => setMenu(false)} /> : null}
+      {menu && e ? <EventMenuSheet page={e} onChange={setFresh} onShare={() => { setMenu(false); setSharing(true); }} onClose={() => setMenu(false)} /> : null}
       {planning && e ? <CreateMeetupSheet event={{ id: e.id, title: e.title }} onClose={() => setPlanning(false)} /> : null}
     </>
   );

@@ -3337,3 +3337,5 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .radiolist__item input { width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--brand); flex: none; }
 .radiolist__item:has(input:checked) { border-color: var(--brand); background: var(--brand-soft); }
 .radiolist__desc { display: block; }
+.radiolist__title { margin: 8px 0 0; font-size: 1rem; }
+.sheet .btn .icon { display: inline-block; vertical-align: -6px; margin-right: 6px; width: 20px; height: 20px; }
