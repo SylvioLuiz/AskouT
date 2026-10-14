@@ -335,9 +335,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
             ) : (
               <p className="muted">Ninguém confirmou ainda. Seja o primeiro.</p>
             )}
-            {e.isOwner ? (
-              <p className="evgoing__note">Você é quem organiza: já está confirmado.</p>
-            ) : ended ? (
+            {e.isOwner ? null : ended ? (
               <p className="muted">Esse evento já terminou.</p>
             ) : (
               <Button full variant={e.going ? 'secondary' : 'primary'} loading={goBusy} onClick={() => void toggleGoing()} aria-pressed={e.going}>
