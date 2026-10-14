@@ -106,14 +106,18 @@ process.on('SIGTERM', () => shutdown(0));
 
 await ensurePostgres();
 if (process.argv.includes('--update')) {
-  const fetched = spawnSync('git', ['fetch', '-q'], { cwd: root, encoding: 'utf8', timeout: 20_000 });
+  const fetched = spawnSync('git', ['fetch', '-q'], { cwd: root, encoding: 'utf8', timeout: 30_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
   const behind = fetched.status === 0 ? Number(spawnSync('git', ['rev-list', '--count', 'HEAD..@{u}'], { cwd: root, encoding: 'utf8' }).stdout.trim() || '0') : 0;
-  if (fetched.status !== 0) console.log('[dev] Sem acesso ao GitHub agora; subindo com o código que já está aqui.');
+  if (fetched.status !== 0) console.log(`[dev] Sem acesso ao GitHub agora (${(fetched.stderr || fetched.error?.message || 'sem detalhe').trim().split('\n')[0]}); subindo com o código que já está aqui.`);
   else if (behind > 0) {
     console.log(`[dev] Há ${behind} novidade(s) no GitHub: rodando o update antes de subir (pode levar alguns minutos)…`);
     const result = spawnSync(process.execPath, [join(root, 'scripts/update.mjs')], { cwd: root, stdio: 'inherit' });
     if (result.status !== 0) console.log('[dev] O update terminou com problemas (veja acima). Subindo mesmo assim; se algo quebrar, me mande o relatório.');
   } else console.log('[dev] Código já está atualizado.');
+}
+if (process.argv.includes('--update')) {
+  const { ensureSetup } = await import('./ensure-setup.mjs');
+  ensureSetup();
 }
 freePort(3000);
 freePort(5173);
