@@ -264,3 +264,25 @@ test('amigos: lista só seguimento mútuo, em ordem alfabética, sem suspensos',
   w.users.users.get(bia)!.status = 'SUSPENDED';
   assert.deepEqual((await w.core.follows.listFriends(me)).map((p) => p.displayName), ['Ana', 'Zeca']);
 });
+
+test('pessoas que você talvez conheça: amigos de amigos, sem quem já é amigo, seguido ou bloqueado', async () => {
+  const w = makeWorld();
+  const u = await w.signUpMany('leo', 'ana', 'bia', 'caio', 'duda', 'edu');
+  const [eu, ana, bia, caio, duda, edu] = [u['leo']!, u['ana']!, u['bia']!, u['caio']!, u['duda']!, u['edu']!];
+  const friends = async (a: string, b: string) => {
+    await w.core.follows.follow(a, b);
+    await w.core.follows.follow(b, a);
+  };
+  await friends(eu, ana);
+  await friends(eu, bia);
+  await friends(ana, caio);
+  await friends(bia, caio);
+  await friends(ana, duda);
+  await friends(ana, edu);
+  await w.core.follows.follow(eu, edu);
+  const r = await w.core.follows.suggestedPeople(eu);
+  assert.deepEqual(r.items.map((p) => [p.username, p.mutualCount]), [['caio', 2], ['duda', 1]]);
+  assert.equal(r.followingCount, 3);
+  await w.core.blocks.block(eu, duda);
+  assert.deepEqual((await w.core.follows.suggestedPeople(eu)).items.map((p) => p.username), ['caio']);
+});

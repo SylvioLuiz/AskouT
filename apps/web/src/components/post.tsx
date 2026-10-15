@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { CarouselIcon, CommentIcon, HeartIcon, MoreIcon, SendIcon } from './icons.tsx';
 import { AdjustSheet, CommentsSheet, EditPostSheet, PostMenuSheet, ReportSheet, SharePostSheet } from './post-actions.tsx';
 import type { PostGone } from './post-actions.tsx';
@@ -296,7 +296,8 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
 }
 
 /** Lista de posts com "Carregar mais". `load` busca uma página a partir de um deslocamento. */
-export function PostList({ load, emptyTitle, emptyHint, reloadKey }: { load: (offset: number) => Promise<PostsPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string }) {
+/** `inject`: bloco que entra depois de `after` posts (ou no fim, se houver menos). */
+export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { load: (offset: number) => Promise<PostsPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } }) {
   const [page, setPage] = useState<PostsPage | undefined>();
   const [items, setItems] = useState<PostView[]>([]);
   const [error, setError] = useState<ApiError | undefined>();
@@ -322,11 +323,21 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey }: { load: (of
   }, [reloadKey]);
   if (error && items.length === 0) return <ErrorState message={error.message} onRetry={() => void more(0)} />;
   if (!page) return <Loading />;
-  if (items.length === 0) return <EmptyState title={emptyTitle}>{emptyHint}</EmptyState>;
+  if (items.length === 0) {
+    return (
+      <>
+        <EmptyState title={emptyTitle}>{emptyHint}</EmptyState>
+        {inject?.node}
+      </>
+    );
+  }
   return (
     <div className="postlist">
-      {items.map((post) => (
-        <PostCard key={post.id} post={post} asEvent onGone={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
+      {items.map((post, index) => (
+        <Fragment key={post.id}>
+          <PostCard post={post} asEvent onGone={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
+          {inject && index === Math.min(inject.after, items.length) - 1 ? inject.node : null}
+        </Fragment>
       ))}
       {error ? <ErrorState message={error.message} onRetry={() => void more(items.length)} /> : null}
       {page.hasMore ? (

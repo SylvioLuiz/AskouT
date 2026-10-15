@@ -6,6 +6,7 @@ import { useAsync, useTitle } from '../hooks.ts';
 import { formatRemaining, minutesLeft } from '../lib/flash.ts';
 import { PostList } from '../components/post.tsx';
 import { Link } from '../router.tsx';
+import { SuggestedPeople } from '../components/suggested-people.tsx';
 import { EventCard } from './explore.tsx';
 
 export function HomeScreen() {
@@ -59,7 +60,7 @@ export function HomeScreen() {
           </h2>
           <Link to="/criar">Criar post</Link>
         </div>
-        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint="Seus posts e os dos seus amigos aparecem aqui." />
+        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint="Seus posts e os dos seus amigos aparecem aqui." inject={{ after: 5, node: <SuggestedPeople /> }} />
       </section>
 
       <section className="section" aria-labelledby="amigos-titulo">

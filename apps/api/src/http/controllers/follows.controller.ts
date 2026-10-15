@@ -70,6 +70,11 @@ export class FollowsController {
     return { ok: true };
   }
 
+  @Get('me/suggested-people')
+  suggestedPeople(@CurrentActor() actor: Actor) {
+    return this.core.follows.suggestedPeople(actor.userId);
+  }
+
   @Get('me/friends')
   friends(@CurrentActor() actor: Actor) {
     return this.core.follows.listFriends(actor.userId);

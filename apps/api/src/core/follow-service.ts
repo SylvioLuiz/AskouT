@@ -2,7 +2,7 @@ import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import { evaluateFriendship } from './friendship.ts';
 import type { CoreDeps } from './ports.ts';
 import type { Direction, FollowStatus, Page, Profile, PublicProfile } from './types.ts';
-import { normalizePage, toPublicProfile } from './types.ts';
+import { MAX_PAGE_LIMIT, normalizePage, toPublicProfile } from './types.ts';
 
 export interface FollowResult {
   status: FollowStatus;
@@ -113,6 +113,38 @@ export class FollowService {
     return profiles
       .map(toPublicProfile)
       .sort((a, b) => a.username.localeCompare(b.username, 'pt-BR') || a.userId.localeCompare(b.userId));
+  }
+
+  /**
+   * "Pessoas que você talvez conheça": amigos dos seus amigos, quem tem mais amigos em comum primeiro.
+   * Fora: você, seus amigos, quem você já segue (ou pediu para seguir) e quem tem bloqueio com você.
+   */
+  async suggestedPeople(actorId: string): Promise<{ items: (PublicProfile & { mutualCount: number })[]; followingCount: number }> {
+    const { follows, blocks, users } = this.deps;
+    const friends = await follows.listFriendIds(actorId);
+    const [followingCount, related] = await Promise.all([follows.count(actorId, 'following', 'ACCEPTED'), blocks.listRelatedIds(actorId)]);
+    const skip = new Set<string>([actorId, ...friends, ...related]);
+    for (const status of ['ACCEPTED', 'PENDING'] as const) {
+      for (let offset = 0; offset < 2000; offset += MAX_PAGE_LIMIT) {
+        const rows = await follows.list(actorId, 'following', status, { limit: MAX_PAGE_LIMIT, offset });
+        for (const r of rows) skip.add(r.followeeId);
+        if (rows.length < MAX_PAGE_LIMIT) break;
+      }
+    }
+    const mutual = new Map<string, number>();
+    for (const friendId of friends.slice(0, 100)) {
+      for (const candidate of await follows.listFriendIds(friendId)) {
+        if (!skip.has(candidate)) mutual.set(candidate, (mutual.get(candidate) ?? 0) + 1);
+      }
+    }
+    const top = [...mutual.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 20);
+    const profiles = await users.findProfilesByIds(top.map(([id]) => id));
+    const byId = new Map(profiles.map((p) => [p.userId, p]));
+    const items = top.flatMap(([id, count]) => {
+      const p = byId.get(id);
+      return p ? [{ ...toPublicProfile(p), mutualCount: count }] : [];
+    });
+    return { items, followingCount };
   }
 
   /**
