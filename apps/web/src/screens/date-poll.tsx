@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar, Button, Confirm, ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
-import { LEVEL_LABEL, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLabel, durationLabel, longDay, monthTitle, percent, shortDay } from '../lib/date-poll.ts';
+import { LEVEL_LABEL, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLabel, longDay, monthTitle, percent, shortDay } from '../lib/date-poll.ts';
 import type { ConfirmationAnswer, DateStats, PollView, VoteStatus } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import { Link } from '../router.tsx';
@@ -74,7 +74,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
   return (
     <div className="dpoll">
-      <PageHead title={poll.title} back={`/conversas/${poll.conversationId}`} subtitle={`${shortDay(poll.rangeStart)} a ${shortDay(poll.rangeEnd)} · ${durationLabel(poll.durationMinutes)}`} />
+      <PageHead title={poll.title} back={`/conversas/${poll.conversationId}`} subtitle={`${shortDay(poll.rangeStart)} a ${shortDay(poll.rangeEnd)}`} />
       {problem ? <Notice tone="error">{problem}</Notice> : null}
 
       {poll.status === 'FINALIZED' && poll.final ? (
@@ -326,7 +326,7 @@ function ProposalCard({ poll, busy, act }: { poll: PollView; busy: boolean; act:
       <p className="callout__text">
         <strong>Data proposta: {longDay(p.date)}</strong>
         <br />
-        {new Date(p.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })} · {durationLabel(poll.durationMinutes)} · {percent(p.compatibility)} de compatibilidade
+        {new Date(p.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })} · {percent(p.compatibility)} de compatibilidade
       </p>
       <p className="muted">
         {p.tally.confirmed} confirmaram · {p.tally.adjust} precisam ajustar · {p.tally.declined} recusaram · {p.tally.pending} sem resposta

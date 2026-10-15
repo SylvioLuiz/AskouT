@@ -3676,3 +3676,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .pollstrip__item.is-todo { border-color: var(--brand); }
 .sharelist__note { margin: 0; padding: 4px 2px; }
 .sharelist__item--on { outline: 2px solid var(--brand); }
+.chips--fill { flex-wrap: nowrap; gap: 6px; }
+.chips--fill .chip { flex: 1 1 0; min-width: 0; padding: 0 6px; font-size: 0.875rem; white-space: normal; line-height: 1.15; text-align: center; }
+.chips--fill { flex-wrap: nowrap; gap: 6px; }
+.chips--fill .chip { flex: 1 1 0; min-width: 0; padding: 0 6px; font-size: 0.875rem; white-space: normal; line-height: 1.15; text-align: center; }
