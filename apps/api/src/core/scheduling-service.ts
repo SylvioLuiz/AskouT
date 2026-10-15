@@ -95,6 +95,10 @@ export interface PollSummary {
   /** Proposta esperando a sua confirmação. */
   needsMyConfirmation: boolean;
   participantCount: number;
+  /** Quantas pessoas já marcaram ao menos um dia. */
+  votedCount: number;
+  /** Fim do encontro definido (some da conversa depois dele). */
+  finalEndsAt: string | null;
   /** Quantas pessoas marcaram "concluí minha votação". */
   finishedCount: number;
   /** Melhor data até agora (nula sem votos suficientes). */
@@ -492,8 +496,10 @@ export class SchedulingService {
       const mine = participants.find((x) => x.userId === actorId);
       if (!mine) continue;
       let best: PollSummary['best'] = null;
+      const allVotes = await scheduling.listVotes(p.id);
+      const votedCount = new Set(allVotes.map((v) => v.userId)).size;
       if (p.status === 'VOTING') {
-        const days = computeDateStats(dateRange(p.rangeStart, p.rangeEnd), await scheduling.listVotes(p.id), participants.map((x) => x.userId), this.thresholds(p));
+        const days = computeDateStats(dateRange(p.rangeStart, p.rangeEnd), allVotes, participants.map((x) => x.userId), this.thresholds(p));
         const top = rankDates(days)[0];
         if (top && hasEnoughData([top])) best = { date: top.date, compatibility: top.compatibility, coverage: top.coverage };
       }
@@ -505,8 +511,13 @@ export class SchedulingService {
         proposedDate = open?.candidateDate ?? null;
         if (open) needsMyConfirmation = !(await scheduling.listConfirmations(open.id)).some((c) => c.userId === actorId);
       }
-      if (p.status === 'FINALIZED' && p.finalProposalId) finalDate = (await scheduling.findProposal(p.finalProposalId))?.candidateDate ?? null;
-      out.push({ id: p.id, conversationId: p.conversationId, title: p.title, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && !this.isClosed(p) && mine.finishedAt === null, needsMyConfirmation, participantCount: participants.length, finishedCount: participants.filter((x) => x.finishedAt !== null).length, best, proposedDate, votingDeadline: p.votingDeadline ? p.votingDeadline.toISOString() : null });
+      let finalEndsAt: string | null = null;
+      if (p.status === 'FINALIZED' && p.finalProposalId) {
+        const fin = await scheduling.findProposal(p.finalProposalId);
+        finalDate = fin?.candidateDate ?? null;
+        finalEndsAt = fin ? fin.candidateEndAt.toISOString() : null;
+      }
+      out.push({ id: p.id, conversationId: p.conversationId, title: p.title, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && !this.isClosed(p) && mine.finishedAt === null, needsMyConfirmation, participantCount: participants.length, votedCount, finalEndsAt, finishedCount: participants.filter((x) => x.finishedAt !== null).length, best, proposedDate, votingDeadline: p.votingDeadline ? p.votingDeadline.toISOString() : null });
     }
     return out;
   }

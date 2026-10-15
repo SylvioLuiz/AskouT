@@ -190,3 +190,17 @@ test('prazo vencido encerra sozinho e some da lista "falta votar"', async () => 
   const proposed = await w.core.scheduling.propose(ana, p.id, '2026-10-22');
   assert.equal(proposed.status, 'CONFIRMING');
 });
+
+test('resumo traz votantes e fim da data definida', async () => {
+  const { w, ana, bia, caio, group, poll } = await setup('MANUAL');
+  await w.core.scheduling.vote(bia, poll.id, { status: 'YES', dates: ['2026-10-24'] });
+  let s = (await w.core.scheduling.listForConversation(ana, group.id)).items[0]!;
+  assert.equal(s.votedCount, 1);
+  assert.equal(s.finalEndsAt, null);
+  await w.core.scheduling.propose(ana, poll.id, '2026-10-24');
+  await w.core.scheduling.respond(bia, poll.id, 'CONFIRMED');
+  await w.core.scheduling.finalizeManual(ana, poll.id);
+  s = (await w.core.scheduling.listForConversation(caio, group.id)).items[0]!;
+  assert.equal(s.finalDate, '2026-10-24');
+  assert.equal(s.finalEndsAt, '2026-10-25T02:00:00.000Z');
+});

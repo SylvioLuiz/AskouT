@@ -1,31 +1,29 @@
 import { api } from '../client.ts';
-import { useAsync } from '../hooks.ts';
-import { shortDay } from '../lib/date-poll.ts';
-import type { PollSummary } from '../lib/date-poll.ts';
+import { useAsync, usePolling } from '../hooks.ts';
+import { pollLine } from '../lib/date-poll.ts';
 import { Link } from '../router.tsx';
 
-function statusText(p: PollSummary): string {
-  if (p.status === 'FINALIZED') return p.finalDate ? `Data definida: ${shortDay(p.finalDate)}` : 'Data definida';
-  if (p.needsMyConfirmation) return 'Confirme a data proposta';
-  if (p.status === 'CONFIRMING') return 'Data em confirmação';
-  return p.needsMyVote ? 'Falta você votar' : 'Você já votou';
-}
+const MAX_LINES = 2;
 
-/** Votações de data desta conversa, logo abaixo do topo. */
-export function PollStrip({ conversationId }: { conversationId: string }) {
+/** Linha fixa logo abaixo do título da conversa: andamento das votações de data e a data já marcada. */
+export function PollLine({ conversationId }: { conversationId: string }) {
   const list = useAsync(() => api.conversationPolls(conversationId), [conversationId]);
-  const items = list.data?.items ?? [];
-  if (items.length === 0) return null;
+  usePolling(list.reload, 30_000);
+  const now = new Date();
+  const lines = (list.data?.items ?? []).flatMap((p) => {
+    const text = pollLine(p, now);
+    return text ? [{ id: p.id, text, todo: p.needsMyVote || p.needsMyConfirmation }] : [];
+  });
+  if (lines.length === 0) return null;
+  const shown = lines.slice(0, MAX_LINES);
   return (
-    <ul className="pollstrip" aria-label="Votações de data">
-      {items.map((p) => (
-        <li key={p.id}>
-          <Link to={`/planejar/${p.id}`} className={`pollstrip__item${p.needsMyVote || p.needsMyConfirmation ? ' is-todo' : ''}`}>
-            <strong>{p.title}</strong>
-            <span>{statusText(p)}</span>
-          </Link>
-        </li>
+    <div className="pollline">
+      {shown.map((l) => (
+        <Link key={l.id} to={`/planejar/${l.id}`} className={`pollline__item${l.todo ? ' is-todo' : ''}`}>
+          {l.text}
+        </Link>
       ))}
-    </ul>
+      {lines.length > MAX_LINES ? <span className="pollline__more">+{lines.length - MAX_LINES} votações</span> : null}
+    </div>
   );
 }

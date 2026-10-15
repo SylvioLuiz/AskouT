@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
 import { ChevronLeftIcon, MoreIcon } from './icons.tsx';
 import { DatePollCreateSheet } from './date-poll-create.tsx';
@@ -12,7 +13,7 @@ import { Link, navigate } from '../router.tsx';
 type Step = 'menu' | 'clear' | 'block' | 'report' | 'poll';
 
 /** Topo da conversa: voltar, foto e nome (preso ao rolar) e o menu ⋯ no canto oposto. */
-export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void }) {
+export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared, below }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode }) {
   const isGroup = !other;
   const name = other ? other.displayName : (groupName ?? 'Grupo');
   const to = isGroup ? `/conversas/${conversationId}/grupo` : `/conversas/${conversationId}/info`;
@@ -32,6 +33,7 @@ export function ChatHead({ conversationId, other, groupName, groupImageUrl, subt
       <button type="button" className="iconbtn chathead__more" onClick={() => setOpen(true)} aria-label="Mais opções da conversa" aria-haspopup="dialog">
         <MoreIcon />
       </button>
+      {below ? <div className="chathead__below">{below}</div> : null}
       {open ? <ChatMenu conversationId={conversationId} other={other} onClose={() => setOpen(false)} onCleared={onCleared} /> : null}
     </header>
   );

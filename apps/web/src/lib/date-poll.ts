@@ -77,6 +77,8 @@ export interface PollSummary {
   needsMyVote: boolean;
   needsMyConfirmation: boolean;
   participantCount: number;
+  votedCount: number;
+  finalEndsAt: string | null;
   finishedCount: number;
   best: { date: string; compatibility: number | null; coverage: number } | null;
   proposedDate: string | null;
@@ -163,4 +165,16 @@ export function cellLabel(stats: DateStats, mine: VoteStatus | undefined): strin
   const parts = [longDay(stats.date), mine ? `sua resposta: ${VOTE_LABEL[mine]}` : 'sem resposta sua'];
   parts.push(stats.compatibility === null ? 'sem votos' : `${percent(stats.compatibility)} de compatibilidade, ${percent(stats.coverage)} votaram`);
   return parts.join(', ');
+}
+
+/** Linha fixa da conversa: "Nome · em votação: 50% dos votos" ou "Nome · marcado para sexta-feira, 24/10". Nula quando não há o que mostrar. */
+export function pollLine(p: PollSummary, now: Date): string | null {
+  if (p.status === 'CANCELLED') return null;
+  if (p.status === 'FINALIZED') {
+    if (!p.finalDate || (p.finalEndsAt && new Date(p.finalEndsAt).getTime() < now.getTime())) return null;
+    return `${p.title} · marcado para ${weekdayName(p.finalDate)}, ${shortDay(p.finalDate)}`;
+  }
+  if (p.status === 'CONFIRMING') return `${p.title} · confirmando ${p.proposedDate ? shortDay(p.proposedDate) : 'a data'}`;
+  const share = p.participantCount > 0 ? Math.round((p.votedCount / p.participantCount) * 100) : 0;
+  return `${p.title} · em votação: ${share}% dos votos`;
 }
