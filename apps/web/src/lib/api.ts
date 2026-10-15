@@ -269,6 +269,7 @@ export function createApi(deps: ApiDeps) {
 
     // Conversas
     conversations: () => request<{ items: ConversationItem[] }>('GET', '/conversations'),
+    createGroup: (name: string, memberIds: string[]) => request<{ id: string }>('POST', '/conversations/groups', { body: { name, memberIds } }),
     openConversation: (userId: string) => request<{ id: string }>('POST', '/conversations', { body: { userId } }),
     messages: (conversationId: string, options: { before?: string; limit?: number } = {}) => {
       const params: string[] = [];

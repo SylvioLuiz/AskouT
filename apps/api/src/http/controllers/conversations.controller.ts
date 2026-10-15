@@ -25,6 +25,14 @@ export class ConversationsController {
     return this.core.conversations.open(actor.userId, asBody(body).userId);
   }
 
+  /** `{name, memberIds}`: novo grupo com amigos. */
+  @Post('groups')
+  @HttpCode(200)
+  createGroup(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.conversations.createGroup(actor.userId, { name: b.name, memberIds: b.memberIds });
+  }
+
   @Get(':id/messages')
   messages(
     @CurrentActor() actor: Actor,

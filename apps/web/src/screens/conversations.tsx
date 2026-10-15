@@ -3,7 +3,8 @@ import type { FormEvent } from 'react';
 import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
-import { ArrowUpIcon, MicIcon } from '../components/icons.tsx';
+import { NewConversationSheet } from '../components/new-conversation.tsx';
+import { ArrowUpIcon, MicIcon, PlusIcon } from '../components/icons.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
 import { EventBubble } from '../components/share-event.tsx';
 import { peopleLabel } from '../lib/meetup.ts';
@@ -27,6 +28,7 @@ export function ConversationsScreen() {
   useEffect(() => {
     if (list.data) announceChatsChanged();
   }, [list.data]);
+  const [creating, setCreating] = useState(false);
   const now = new Date();
 
   if (list.loading && !list.data) return <Loading />;
@@ -35,7 +37,15 @@ export function ConversationsScreen() {
 
   return (
     <>
-      <PageHead title="Conversas" />
+      <PageHead
+        title="Conversas"
+        action={
+          <button type="button" className="iconbtn" aria-label="Nova conversa" onClick={() => setCreating(true)}>
+            <PlusIcon />
+          </button>
+        }
+      />
+      {creating ? <NewConversationSheet onClose={() => setCreating(false)} /> : null}
       {items.length === 0 ? (
         <EmptyState
           title="Nenhuma conversa ainda"

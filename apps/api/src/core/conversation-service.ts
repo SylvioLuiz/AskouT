@@ -223,6 +223,8 @@ export function parseGroupImage(value: unknown): string {
   return value as string;
 }
 
+const GROUP_MAX_MEMBERS = 15;
+
 export class ConversationService {
   private readonly deps: CoreDeps;
 
@@ -240,6 +242,35 @@ export class ConversationService {
     if (!friends.includes(otherId)) throw forbidden('Só amigos podem conversar');
     const conversation = await conversations.getOrCreateDirect(actorId, otherId, ids.next(), clock.now());
     return { id: conversation.id };
+  }
+
+  /** Cria um grupo com amigos (2 a 15 pessoas além de quem cria). Quem criou é o dono; as pessoas entram direto e recebem um aviso. */
+  async createGroup(actorId: string, input: { name?: unknown; memberIds?: unknown }): Promise<{ id: string }> {
+    const { conversations, follows, blocks, clock, ids } = this.deps;
+    const name = typeof input.name === 'string' ? input.name.trim() : '';
+    if (name === '' || CONTROL_CHARS_RE.test(name) || Array.from(name).length > GROUP_NAME_MAX) throw validationError('Nome inválido', { name: `Use de 1 a ${GROUP_NAME_MAX} caracteres` });
+    if (!Array.isArray(input.memberIds)) throw validationError('Escolha as pessoas', { memberIds: 'Escolha ao menos duas pessoas' });
+    const memberIds = [...new Set(input.memberIds)];
+    for (const m of memberIds) {
+      if (typeof m !== 'string' || m === '' || m.length > 64) throw validationError('Pessoa inválida', { memberIds: 'Pessoa inválida' });
+      if (m === actorId) throw validationError('Você já está no grupo', { memberIds: 'Não escolha a si mesmo' });
+    }
+    if (memberIds.length < 2) throw validationError('Escolha ao menos duas pessoas', { memberIds: 'Para uma conversa só com uma pessoa, abra a conversa dela' });
+    if (memberIds.length > GROUP_MAX_MEMBERS) throw validationError(`No máximo ${GROUP_MAX_MEMBERS} pessoas`, { memberIds: `No máximo ${GROUP_MAX_MEMBERS} pessoas` });
+    const members = memberIds as string[];
+    const [friends, related] = await Promise.all([follows.listFriendIds(actorId), blocks.listRelatedIds(actorId)]);
+    for (const m of members) {
+      if (related.includes(m)) throw notFound('Pessoa não encontrada');
+      if (!friends.includes(m)) throw forbidden('Só amigos podem entrar no grupo');
+    }
+    const now = clock.now();
+    const group = await conversations.createGroup({ id: ids.next(), name, ownerId: actorId, now });
+    for (const m of members) await conversations.addParticipant(group.id, m, now);
+    const creator = await this.nameOf(actorId);
+    await this.postSystem(group.id, actorId, `${creator} criou o grupo`, now);
+    await conversations.markRead(group.id, actorId, now);
+    await this.notifyMembers(actorId, creator, group, members, 'adicionou você ao grupo');
+    return { id: group.id };
   }
 
   /** Garante a conversa entre dois amigos (usado pelo Flash ao aceitar). Quem chama já checou amizade e bloqueio. */

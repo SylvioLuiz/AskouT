@@ -139,3 +139,23 @@ test('editar e cancelar o encontro: só quem organiza', async () => {
   const system = (await w.core.conversations.messages(bia, cid)).messages.filter((m) => m.kind === 'SYSTEM').map((m) => m.body);
   assert.ok(system.some((b) => b.includes('mudou o nome do encontro')) && system.some((b) => b.includes('cancelou o encontro')));
 });
+
+test('novo grupo direto: só amigos, 2 a 15 pessoas, dono é quem criou', async () => {
+  const w = makeWorld();
+  const u = await w.signUpMany('ana', 'bia', 'caio', 'dani');
+  const ana = u['ana']!;
+  for (const n of ['bia', 'caio']) {
+    await w.core.follows.follow(ana, u[n]!);
+    await w.core.follows.follow(u[n]!, ana);
+  }
+  const { id } = await w.core.conversations.createGroup(ana, { name: ' Turma ', memberIds: [u['bia']!, u['caio']!] });
+  const g = await w.core.conversations.group(ana, id);
+  assert.equal(g.name, 'Turma');
+  assert.equal(g.ownerId, ana);
+  assert.deepEqual(g.members.map((m) => m.profile.username).sort(), ['ana', 'bia', 'caio']);
+  assert.ok((await w.core.conversations.list(u['bia']!)).some((c) => c.id === id));
+  await rejectsWith(w.core.conversations.createGroup(ana, { name: 'X', memberIds: [u['bia']!] }), 'VALIDATION');
+  await rejectsWith(w.core.conversations.createGroup(ana, { name: '', memberIds: [u['bia']!, u['caio']!] }), 'VALIDATION');
+  await rejectsWith(w.core.conversations.createGroup(ana, { name: 'X', memberIds: [u['bia']!, u['dani']!] }), 'FORBIDDEN');
+  await rejectsWith(w.core.conversations.createGroup(ana, { name: 'X', memberIds: [u['bia']!, ana] }), 'VALIDATION');
+});
