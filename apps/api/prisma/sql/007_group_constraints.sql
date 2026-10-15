@@ -1,12 +1,6 @@
 -- Aplicar depois da migration group_management. Pode ser rodado de novo sem erro.
 
--- Forma de cada tipo de mensagem: texto e aviso do sistema sem cartão; sugestão com cartão; encontro com o id do encontro.
-ALTER TABLE "Message" DROP CONSTRAINT IF EXISTS message_suggestion_shape;
-ALTER TABLE "Message" ADD CONSTRAINT message_suggestion_shape CHECK (
-  (kind = 'SUGGESTION' AND suggestion IS NOT NULL AND "meetupId" IS NULL)
-  OR (kind IN ('TEXT', 'SYSTEM') AND suggestion IS NULL AND "meetupId" IS NULL)
-  OR (kind = 'MEETUP' AND suggestion IS NULL AND "meetupId" IS NOT NULL)
-);
+-- (a forma das mensagens é definida por último em 010_voice_constraints.sql; repetir aqui falharia em bancos que já têm mensagens de voz)
 
 -- Foto do grupo guardada como data URL: até ~60 mil caracteres (40 KB de imagem em base64).
 DO $$

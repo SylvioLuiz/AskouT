@@ -1,14 +1,6 @@
 -- Aplicar depois da migration profile_posts. Pode ser rodado de novo sem erro.
 
--- Forma de cada tipo de mensagem: texto e aviso do sistema sem cartão; sugestão com cartão; encontro com o id do
--- encontro; evento compartilhado com o id do evento.
-ALTER TABLE "Message" DROP CONSTRAINT IF EXISTS message_suggestion_shape;
-ALTER TABLE "Message" ADD CONSTRAINT message_suggestion_shape CHECK (
-  (kind = 'SUGGESTION' AND suggestion IS NOT NULL AND "meetupId" IS NULL AND "eventId" IS NULL)
-  OR (kind IN ('TEXT', 'SYSTEM') AND suggestion IS NULL AND "meetupId" IS NULL AND "eventId" IS NULL)
-  OR (kind = 'MEETUP' AND suggestion IS NULL AND "meetupId" IS NOT NULL AND "eventId" IS NULL)
-  OR (kind = 'EVENT' AND suggestion IS NULL AND "meetupId" IS NULL AND "eventId" IS NOT NULL)
-);
+-- (a forma das mensagens é definida por último em 010_voice_constraints.sql; repetir aqui falharia em bancos que já têm mensagens de voz)
 
 -- Foto de perfil: até 80 KB já reduzida (a API confere antes; o banco é a segunda trava).
 DO $$

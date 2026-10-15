@@ -1,12 +1,6 @@
 -- Aplicar depois da migration meetups_groups. Pode ser rodado de novo sem erro.
 
--- Forma de cada tipo de mensagem: texto sem cartão; sugestão com cartão; encontro com o id do encontro.
-ALTER TABLE "Message" DROP CONSTRAINT IF EXISTS message_suggestion_shape;
-ALTER TABLE "Message" ADD CONSTRAINT message_suggestion_shape CHECK (
-  (kind = 'SUGGESTION' AND suggestion IS NOT NULL AND "meetupId" IS NULL)
-  OR (kind = 'TEXT' AND suggestion IS NULL AND "meetupId" IS NULL)
-  OR (kind = 'MEETUP' AND suggestion IS NULL AND "meetupId" IS NOT NULL)
-);
+-- (a forma das mensagens é definida por último em 010_voice_constraints.sql; repetir aqui falharia em bancos que já têm mensagens de voz)
 
 -- Encontro termina depois de começar (quando os dois existem).
 DO $$
