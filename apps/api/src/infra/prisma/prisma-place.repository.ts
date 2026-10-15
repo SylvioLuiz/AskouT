@@ -19,7 +19,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
     await this.prisma.venue.create({
       data: {
         id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample, ownerId: v.ownerId ?? null,
-        description: v.description ?? null, hoursJson: v.hours ? JSON.stringify(v.hours) : null, coverUrl: v.coverUrl ?? null,
+        description: v.description ?? null, hoursJson: v.hours ? JSON.stringify(v.hours) : null, coverUrl: v.coverUrl ?? null, logoUrl: v.logoUrl ?? null,
         externalKey: v.externalKey ?? null, photoRef: v.photoRef ?? null, photoAuthor: v.photoAuthor ?? null,
       },
     });
@@ -29,7 +29,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
     if (!isUuid(venueId)) return;
     await this.prisma.venue.updateMany({
       where: { id: venueId },
-      data: { name: patch.name, address: patch.address, category: patch.category, description: patch.description, hoursJson: patch.hours ? JSON.stringify(patch.hours) : null, coverUrl: patch.coverUrl },
+      data: { name: patch.name, address: patch.address, category: patch.category, description: patch.description, hoursJson: patch.hours ? JSON.stringify(patch.hours) : null, coverUrl: patch.coverUrl, logoUrl: patch.logoUrl },
     });
   }
 
@@ -47,6 +47,23 @@ export class PrismaPlaceRepository implements PlaceRepository {
   async findVenueCover(venueId: string) {
     if (!isUuid(venueId)) return undefined;
     const r = await this.prisma.venueCover.findUnique({ where: { venueId } });
+    return r ? { mime: r.mime, data: new Uint8Array(r.data) } : undefined;
+  }
+
+  async setVenueLogo(venueId: string, mime: string, data: Uint8Array): Promise<void> {
+    if (!isUuid(venueId)) return;
+    const bytes = Buffer.from(data);
+    await this.prisma.venueLogo.upsert({ where: { venueId }, create: { venueId, mime, data: bytes }, update: { mime, data: bytes, updatedAt: new Date() } });
+  }
+
+  async clearVenueLogo(venueId: string): Promise<void> {
+    if (!isUuid(venueId)) return;
+    await this.prisma.venueLogo.deleteMany({ where: { venueId } });
+  }
+
+  async findVenueLogo(venueId: string) {
+    if (!isUuid(venueId)) return undefined;
+    const r = await this.prisma.venueLogo.findUnique({ where: { venueId } });
     return r ? { mime: r.mime, data: new Uint8Array(r.data) } : undefined;
   }
 
@@ -220,7 +237,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
 }
 
 interface EventRow { id: string; venueId: string; title: string; description: string | null; startsAt: Date; endsAt: Date; kind: PlaceEventRecord['kind']; isFree: boolean; imageUrl: string | null; tags: string[]; isSample: boolean }
-interface VenueRow { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; isSample: boolean; ownerId?: string | null; description?: string | null; hoursJson?: string | null; coverUrl?: string | null; externalKey?: string | null; photoRef?: string | null; photoAuthor?: string | null }
+interface VenueRow { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; isSample: boolean; ownerId?: string | null; description?: string | null; hoursJson?: string | null; coverUrl?: string | null; logoUrl?: string | null; externalKey?: string | null; photoRef?: string | null; photoAuthor?: string | null }
 
 function toEvent(r: EventRow): PlaceEventRecord {
   return { id: r.id, venueId: r.venueId, title: r.title, description: r.description, startsAt: r.startsAt, endsAt: r.endsAt, kind: r.kind, isFree: r.isFree, imageUrl: r.imageUrl, tags: [...r.tags], isSample: r.isSample };
@@ -229,7 +246,7 @@ function toEvent(r: EventRow): PlaceEventRecord {
 function toVenue(v: VenueRow): VenueRecord {
   return {
     id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample, ownerId: v.ownerId ?? null,
-    description: v.description ?? null, hours: parseHours(v.hoursJson), coverUrl: v.coverUrl ?? null, externalKey: v.externalKey ?? null, photoRef: v.photoRef ?? null, photoAuthor: v.photoAuthor ?? null,
+    description: v.description ?? null, hours: parseHours(v.hoursJson), coverUrl: v.coverUrl ?? null, logoUrl: v.logoUrl ?? null, externalKey: v.externalKey ?? null, photoRef: v.photoRef ?? null, photoAuthor: v.photoAuthor ?? null,
   };
 }
 

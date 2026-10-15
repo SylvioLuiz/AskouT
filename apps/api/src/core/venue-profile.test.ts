@@ -160,3 +160,31 @@ test('lugar do Google: abre a página conferindo na fonte e não duplica', async
   assert.equal(page.photoAuthor, 'Maria');
   assert.equal((await w.core.venues.follow(ana, venueId)).followerCount, 1);
 });
+
+test('logo do estabelecimento: aparelho, link, manter, remover; independente da capa', async () => {
+  const { w, dono } = await setup();
+  const a = await w.core.venues.updateProfile(dono, 'v1', { logoData: JPEG(40), imageData: JPEG(60) });
+  assert.match(a.logoUrl ?? '', /^\/venues\/v1\/logo\?v=\d+$/);
+  assert.match(a.coverUrl ?? '', /^\/venues\/v1\/cover\?v=\d+$/);
+  assert.equal((await w.core.venues.venueLogo('v1'))?.mime, 'image/jpeg');
+  // editar só o nome mantém as duas
+  const kept = await w.core.venues.updateProfile(dono, 'v1', { name: 'Zé 2' });
+  assert.equal(kept.logoUrl, a.logoUrl);
+  assert.equal(kept.coverUrl, a.coverUrl);
+  // trocar a capa por link não apaga a logo
+  await w.core.venues.updateProfile(dono, 'v1', { imageUrl: 'https://img.exemplo/capa.jpg' });
+  assert.ok(await w.core.venues.venueLogo('v1'));
+  assert.equal(await w.core.venues.venueCover('v1'), undefined);
+  // a logo não aceita o caminho da capa, nem arquivo grande ou PDF
+  await rejectsWith(w.core.venues.updateProfile(dono, 'v1', { logoUrl: '/venues/v1/cover?v=1' }), 'VALIDATION');
+  await rejectsWith(w.core.venues.updateProfile(dono, 'v1', { logoUrl: 'http://x.com/l.png' }), 'VALIDATION');
+  await rejectsWith(w.core.venues.updateProfile(dono, 'v1', { logoData: JPEG(200 * 1024) }), 'VALIDATION');
+  await rejectsWith(w.core.venues.updateProfile(dono, 'v1', { logoData: 'data:application/pdf;base64,JVBERi0=' }), 'VALIDATION');
+  const link = await w.core.venues.updateProfile(dono, 'v1', { logoUrl: 'https://img.exemplo/logo.png' });
+  assert.equal(link.logoUrl, 'https://img.exemplo/logo.png');
+  assert.equal(await w.core.venues.venueLogo('v1'), undefined);
+  await w.core.venues.updateProfile(dono, 'v1', { logoData: JPEG() });
+  const none = await w.core.venues.updateProfile(dono, 'v1', { logoUrl: null });
+  assert.equal(none.logoUrl, null);
+  assert.equal(await w.core.venues.venueLogo('v1'), undefined);
+});

@@ -1127,15 +1127,16 @@ export function defineRepositoryContract(
         assert.equal((await h.places.findVenueByExternalKey('google:ABC'))!.id, v.id);
         assert.equal(await h.places.findVenueByExternalKey('google:OUTRO'), undefined);
         const hours = [null, { open: '18:00', close: '02:00' }, null, null, null, { open: '12:00', close: '23:30' }, null];
-        await h.places.updateVenueProfile(v.id, { name: 'Bar do Zé', address: 'Rua A, 1', category: 'Boteco', description: 'Ao vivo', hours, coverUrl: 'https://x.com/a.jpg' });
+        await h.places.updateVenueProfile(v.id, { name: 'Bar do Zé', address: 'Rua A, 1', category: 'Boteco', description: 'Ao vivo', hours, coverUrl: 'https://x.com/a.jpg', logoUrl: 'https://x.com/l.png' });
         const edited = (await h.places.findVenue(v.id))!;
         assert.equal(edited.name, 'Bar do Zé');
         assert.equal(edited.address, 'Rua A, 1');
         assert.equal(edited.description, 'Ao vivo');
         assert.deepEqual(edited.hours, hours);
         assert.equal(edited.coverUrl, 'https://x.com/a.jpg');
+        assert.equal(edited.logoUrl, 'https://x.com/l.png');
         assert.equal(edited.externalKey, 'google:ABC', 'a origem externa não muda ao editar');
-        await h.places.updateVenueProfile(v.id, { name: 'Bar do Zé', address: null, category: null, description: null, hours: null, coverUrl: null });
+        await h.places.updateVenueProfile(v.id, { name: 'Bar do Zé', address: null, category: null, description: null, hours: null, coverUrl: null, logoUrl: null });
         const cleared = (await h.places.findVenue(v.id))!;
         assert.equal(cleared.hours ?? null, null);
         assert.equal(cleared.description ?? null, null);
@@ -1148,6 +1149,16 @@ export function defineRepositoryContract(
         assert.deepEqual([...cover.data], [0xff, 0xd8, 0xff, 2]);
         await h.places.clearVenueCover(v.id);
         assert.equal(await h.places.findVenueCover(v.id), undefined);
+        assert.equal(await h.places.findVenueLogo(v.id), undefined);
+        await h.places.setVenueLogo(v.id, 'image/png', new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1]));
+        await h.places.setVenueLogo(v.id, 'image/webp', new Uint8Array([1, 2, 3]));
+        const logo = (await h.places.findVenueLogo(v.id))!;
+        assert.equal(logo.mime, 'image/webp');
+        assert.deepEqual([...logo.data], [1, 2, 3]);
+        assert.equal(await h.places.findVenueCover(v.id), undefined, 'logo e capa são independentes');
+        await h.places.clearVenueLogo(v.id);
+        assert.equal(await h.places.findVenueLogo(v.id), undefined);
+        assert.equal(await h.places.findVenueLogo('nao-e-uuid'), undefined);
         assert.equal(await h.places.findVenueCover('nao-e-uuid'), undefined);
       });
 

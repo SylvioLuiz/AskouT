@@ -2,10 +2,10 @@ import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Button, Field, Notice } from './ui.tsx';
 import { safeImage } from '../lib/explore.ts';
-import { resizeEventCover } from '../lib/image.ts';
+import { resizeEventCover, resizeVenueLogo } from '../lib/image.ts';
 
 /** Imagem de capa (evento ou estabelecimento): botão "Adicionar imagem" com as duas origens (aparelho ou link da web). */
-export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem, a capa usa a foto do lugar.' }: { imageUrl: string; imageData: string; onChange: (patch: { imageUrl?: string; imageData?: string }) => void; hint?: string }) {
+export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem, a capa usa a foto do lugar.', logo = false }: { imageUrl: string; imageData: string; onChange: (patch: { imageUrl?: string; imageData?: string }) => void; hint?: string; logo?: boolean }) {
   const [menu, setMenu] = useState(false);
   const [linking, setLinking] = useState(false);
   const [link, setLink] = useState('');
@@ -22,7 +22,7 @@ export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem,
     setReading(true);
     setError(undefined);
     try {
-      onChange({ imageData: await resizeEventCover(file), imageUrl: '' });
+      onChange({ imageData: await (logo ? resizeVenueLogo(file) : resizeEventCover(file)), imageUrl: '' });
       setMenu(false);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Não foi possível usar essa imagem.');
@@ -46,9 +46,9 @@ export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem,
 
   return (
     <div className="cover">
-      {current ? <img className="cover__preview" src={current} alt="Capa do evento" /> : null}
+      {current ? <img className={logo ? 'cover__preview cover__preview--logo' : 'cover__preview'} src={current} alt={logo ? 'Logo' : 'Capa'} /> : null}
       <Button variant="secondary" full loading={reading} aria-expanded={menu} onClick={() => { setMenu(!menu); setLinking(false); setError(undefined); }}>
-        {has ? 'Trocar imagem' : 'Adicionar imagem'}
+        {has ? (logo ? 'Trocar logo' : 'Trocar imagem') : logo ? 'Adicionar logo' : 'Adicionar imagem'}
       </Button>
       {menu ? (
         <div className="cover__menu" role="group" aria-label="Origem da imagem">
@@ -60,7 +60,7 @@ export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem,
           </Button>
           {has ? (
             <Button variant="quiet" onClick={() => { onChange({ imageUrl: '', imageData: '' }); setMenu(false); }}>
-              Remover imagem
+              {logo ? 'Remover logo' : 'Remover imagem'}
             </Button>
           ) : null}
         </div>

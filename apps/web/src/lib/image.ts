@@ -124,3 +124,8 @@ export async function cropPostPhoto(source: string, rect: CropRect): Promise<str
 export const EVENT_COVER_SIDE = 1280;
 export const EVENT_COVER_MAX_BYTES = 240 * 1024;
 export const resizeEventCover = (file: File) => resizePhoto(file, { side: EVENT_COVER_SIDE, maxBytes: EVENT_COVER_MAX_BYTES });
+
+// Logo do estabelecimento: quadrada, até 384 px e 120 KB (a API aceita até 128 KB)
+export const VENUE_LOGO_SIDE = 384;
+export const VENUE_LOGO_MAX_BYTES = 120 * 1024;
+export const resizeVenueLogo = (file: File) => resizePhoto(file, { side: VENUE_LOGO_SIDE, maxBytes: VENUE_LOGO_MAX_BYTES });

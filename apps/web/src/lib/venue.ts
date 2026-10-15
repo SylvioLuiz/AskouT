@@ -68,7 +68,7 @@ export interface VenueEventDraft {
 }
 
 /** Capa enviada antes, servida pela própria API. */
-export const isOwnCoverPath = (v: string): boolean => /^\/(place-events|venues)\/[\w-]+\/cover(\?v=\d+)?$/.test(v);
+export const isOwnCoverPath = (v: string): boolean => /^\/(place-events|venues)\/[\w-]+\/(cover|logo)(\?v=\d+)?$/.test(v);
 
 export const EMPTY_VENUE_EVENT: VenueEventDraft = { title: '', description: '', kind: 'OTHER', starts: '', ends: '', isFree: false, imageUrl: '', imageData: '', tags: '' };
 

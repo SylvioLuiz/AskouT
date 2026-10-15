@@ -215,6 +215,8 @@ export interface VenueRecord {
   hours?: VenueHours | null;
   /** Capa: endereço https ou `/venues/:id/cover?v=` quando enviada do aparelho. */
   coverUrl?: string | null;
+  /** Logo (círculo da página): https ou `/venues/:id/logo?v=` quando enviada do aparelho. */
+  logoUrl?: string | null;
   /** Origem externa ("google:ID", "osm:ID") de um local que entrou sob demanda. */
   externalKey?: string | null;
   /** Foto do Google (referência opaca) e o crédito de quem tirou. Só para locais externos. */
@@ -237,6 +239,7 @@ export interface VenueProfilePatch {
   description: string | null;
   hours: VenueHours | null;
   coverUrl: string | null;
+  logoUrl: string | null;
 }
 
 export type ClaimStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

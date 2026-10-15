@@ -624,6 +624,7 @@ export interface VenueProfile {
   hours: VenueHours | null;
   /** https ou caminho da capa enviada. */
   coverUrl: string | null;
+  logoUrl: string | null;
   /** Foto do Google quando o local não tem capa própria. */
   photoPath: string | null;
   photoAuthor: string | null;
@@ -645,6 +646,8 @@ export interface VenueProfileBody {
   hours: VenueHours | null;
   imageUrl?: string | null;
   imageData?: string;
+  logoUrl?: string | null;
+  logoData?: string;
 }
 
 export interface VenueEventBody {

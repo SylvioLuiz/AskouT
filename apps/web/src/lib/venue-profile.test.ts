@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applyToAll, draftFromProfile, hoursLines, openStatus, profileBody, profileProblem } from './venue-profile.ts';
+import { applyToAll, daysSummary, draftFromProfile, hoursLines, openStatus, profileBody, profileProblem } from './venue-profile.ts';
 import type { VenueHours, VenueProfile } from './types.ts';
 
 // Dom null; Seg-Sáb 18:00 → 02:00 (passa da meia-noite)
@@ -14,7 +14,7 @@ test('sem horários informados não há estado', () => {
 });
 
 test('aberto durante o expediente e mostra a hora de fechar', () => {
-  assert.deepEqual(openStatus(NIGHT, at(3, 20)), { open: true, label: 'Aberto agora · fecha às 02:00' });
+  assert.deepEqual(openStatus(NIGHT, at(3, 20)), { open: true, label: 'Aberto agora · fecha às 02:00', short: 'Aberto até 02:00', closingSoon: false });
 });
 
 test('expediente que passa da meia-noite continua aberto na madrugada seguinte', () => {
@@ -42,7 +42,7 @@ test('linhas da página: segunda a domingo, hoje marcado', () => {
   assert.deepEqual(hoursLines(null, at(3, 12)), []);
 });
 
-const PROFILE: VenueProfile = { id: 'v1', name: 'Bar do Zé', address: 'Rua A', category: 'bar', description: null, hours: NIGHT, coverUrl: '/venues/v1/cover?v=1', photoPath: null, photoAuthor: null, lat: 0, lng: 0, sample: false, claimed: true, isOwner: true, following: false, followerCount: 0, upcomingEvents: [] };
+const PROFILE: VenueProfile = { id: 'v1', name: 'Bar do Zé', address: 'Rua A', category: 'bar', description: null, hours: NIGHT, coverUrl: '/venues/v1/cover?v=1', logoUrl: null, photoPath: null, photoAuthor: null, lat: 0, lng: 0, sample: false, claimed: true, isOwner: true, following: false, followerCount: 0, upcomingEvents: [] };
 
 test('rascunho do perfil: ida e volta e validações', () => {
   const d = draftFromProfile(PROFILE);
@@ -52,6 +52,8 @@ test('rascunho do perfil: ida e volta e validações', () => {
   const body = profileBody(d);
   assert.deepEqual(body.hours, NIGHT);
   assert.equal(body.imageUrl, '/venues/v1/cover?v=1');
+  assert.equal(body.logoUrl, null);
+  assert.equal(profileBody({ ...d, logoData: 'data:image/png;base64,AA' }).logoData, 'data:image/png;base64,AA');
   assert.equal(body.description, null);
   assert.match(profileProblem({ ...d, name: ' A ' }) ?? '', /pelo menos/);
   assert.match(profileProblem({ ...d, description: 'x'.repeat(601) }) ?? '', /600/);
@@ -67,4 +69,29 @@ test('aplicar a todos os dias', () => {
   const d = draftFromProfile(PROFILE);
   const all = applyToAll(d.days, 1);
   assert.equal(all.every((x) => x.open && x.from === '18:00' && x.to === '02:00'), true);
+});
+
+test('texto curto do horário: até quando, já vai fechar ou quando abre', () => {
+  assert.equal(openStatus(NIGHT, at(3, 20))?.short, 'Aberto até 02:00');
+  assert.equal(openStatus(NIGHT, at(3, 20))?.closingSoon, false);
+  const soon = openStatus(NIGHT, at(4, 1, 20));
+  assert.equal(soon?.short, 'Fecha em 40 min');
+  assert.equal(soon?.closingSoon, true);
+  assert.equal(openStatus(NIGHT, at(3, 10))?.short, 'Abre hoje às 18:00');
+  const lunch: VenueHours = Array.from({ length: 7 }, () => ({ open: '11:00', close: '15:00' }));
+  assert.equal(openStatus(lunch, at(3, 16))?.short, 'Abre amanhã às 11:00');
+  assert.equal(openStatus(lunch, at(3, 14, 30))?.short, 'Fecha em 30 min');
+});
+
+test('resumo dos dias em que funciona', () => {
+  assert.equal(daysSummary(null), null);
+  assert.equal(daysSummary(Array.from({ length: 7 }, () => null)), null);
+  assert.equal(daysSummary(NIGHT), 'Seg a Sáb');
+  assert.equal(daysSummary(Array.from({ length: 7 }, () => ({ open: '10:00', close: '22:00' }))), 'Todos os dias');
+  const d = (days: number[]): VenueHours => Array.from({ length: 7 }, (_, i) => (days.includes(i) ? { open: '18:00', close: '23:00' } : null));
+  assert.equal(daysSummary(d([5, 6])), 'Sex e Sáb');
+  assert.equal(daysSummary(d([1, 3, 5])), 'Seg, Qua e Sex');
+  assert.equal(daysSummary(d([5, 6, 0])), 'Sex a Dom');
+  assert.equal(daysSummary(d([2])), 'Ter');
+  assert.equal(daysSummary(d([1, 2, 3, 5, 6])), 'Seg a Qua, Sex e Sáb');
 });

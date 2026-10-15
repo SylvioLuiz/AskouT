@@ -262,6 +262,10 @@ export interface PlaceRepository {
   setVenueCover(venueId: string, mime: string, data: Uint8Array): Promise<void>;
   clearVenueCover(venueId: string): Promise<void>;
   findVenueCover(venueId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+  /** Logo enviada do aparelho (bytes no banco). */
+  setVenueLogo(venueId: string, mime: string, data: Uint8Array): Promise<void>;
+  clearVenueLogo(venueId: string): Promise<void>;
+  findVenueLogo(venueId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
   /** Local que entrou de uma fonte externa ("google:ID"). */
   findVenueByExternalKey(key: string): Promise<VenueRecord | undefined>;
   followVenue(userId: string, venueId: string, at: Date): Promise<void>;

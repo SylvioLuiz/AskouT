@@ -565,6 +565,8 @@ model Venue {
   hoursJson   String?
   /// https ou `/venues/:id/cover?v=` (capa enviada, bytes em VenueCover).
   coverUrl    String?
+  /// https ou `/venues/:id/logo?v=` (logo enviada, bytes em VenueLogo).
+  logoUrl     String?
   /// "google:ID" quando o local entrou de uma fonte externa; único.
   externalKey String?  @unique
   photoRef    String?
@@ -576,6 +578,7 @@ model Venue {
   events PlaceEvent[]
   claims VenueClaim[]
   cover  VenueCover?
+  logo   VenueLogo?
   followers VenueFollow[]
   posts  Post[]
 
@@ -843,4 +846,14 @@ model VenueFollow {
 
   @@id([userId, venueId])
   @@index([venueId])
+}
+
+/// Logo do estabelecimento enviada do aparelho (JPEG/PNG/WebP até 128 KB), servida em `/venues/:id/logo`.
+model VenueLogo {
+  venueId   String   @id @db.Uuid
+  mime      String
+  data      Bytes
+  updatedAt DateTime @default(now())
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
 }

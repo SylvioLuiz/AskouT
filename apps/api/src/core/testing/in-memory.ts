@@ -695,6 +695,7 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   readonly events = new Map<string, PlaceEventRecord>();
   readonly covers = new Map<string, { mime: string; data: Uint8Array }>();
   readonly venueCovers = new Map<string, { mime: string; data: Uint8Array }>();
+  readonly venueLogos = new Map<string, { mime: string; data: Uint8Array }>();
   readonly venueFollows = new Map<string, Date>();
 
   async updateVenueProfile(venueId: string, patch: VenueProfilePatch) {
@@ -712,6 +713,19 @@ export class InMemoryPlaceRepository implements PlaceRepository {
 
   async findVenueCover(venueId: string) {
     const c = this.venueCovers.get(venueId);
+    return c ? { mime: c.mime, data: new Uint8Array(c.data) } : undefined;
+  }
+
+  async setVenueLogo(venueId: string, mime: string, data: Uint8Array) {
+    if (this.venues.has(venueId)) this.venueLogos.set(venueId, { mime, data: new Uint8Array(data) });
+  }
+
+  async clearVenueLogo(venueId: string) {
+    this.venueLogos.delete(venueId);
+  }
+
+  async findVenueLogo(venueId: string) {
+    const c = this.venueLogos.get(venueId);
     return c ? { mime: c.mime, data: new Uint8Array(c.data) } : undefined;
   }
 

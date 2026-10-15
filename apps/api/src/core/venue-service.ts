@@ -85,6 +85,29 @@ export function venueCoverPath(venueId: string, version: number): string {
   return `/venues/${venueId}/cover?v=${version}`;
 }
 
+/** Logo enviada do aparelho (a tela reduz para um quadrado antes de enviar). */
+export const VENUE_LOGO_MAX_BYTES = 128 * 1024;
+
+export function venueLogoPath(venueId: string, version: number): string {
+  return `/venues/${venueId}/logo?v=${version}`;
+}
+
+/** Troca de uma imagem do perfil (capa ou logo): mantém, remove, usa link https ou guarda um arquivo enviado. */
+function resolveImage(input: { url: unknown; data: unknown }, current: string | null, ownPrefix: string, maxBytes: number, maxLabel: string, ownPath: () => string): { url: string | null; upload?: { mime: string; bytes: Uint8Array } } {
+  const own = current !== null && current.startsWith(ownPrefix) ? current : null;
+  const badUrl = () => validationError('Dados inválidos', { imageUrl: 'Use um endereço de imagem que comece com https://' });
+  if (input.data !== undefined && input.data !== null && input.data !== '') {
+    const img = decodeImageDataUrl(input.data, maxBytes, maxLabel);
+    return { url: ownPath(), upload: { mime: img.mime, bytes: img.bytes } };
+  }
+  if (input.url === null || input.url === '') return { url: null };
+  if (input.url === undefined) return { url: current };
+  if (typeof input.url !== 'string' || input.url.length > 500) throw badUrl();
+  if (own !== null && input.url === own) return { url: own };
+  if (/^https:\/\/[^\s]+$/.test(input.url)) return { url: input.url };
+  throw badUrl();
+}
+
 /** Página pública de um estabelecimento (qualquer local, com ou sem dono). */
 export interface VenueProfileView {
   id: string;
@@ -95,6 +118,8 @@ export interface VenueProfileView {
   hours: VenueHours | null;
   /** https ou caminho da capa enviada (a borda HTTP monta o endereço). */
   coverUrl: string | null;
+  /** Logo: https ou caminho da logo enviada. */
+  logoUrl: string | null;
   /** Foto do Google (referência opaca) e o crédito, quando o local veio de lá e não tem capa própria. */
   photoRef: string | null;
   photoAuthor: string | null;
@@ -120,6 +145,9 @@ export interface VenueProfileInput {
   imageUrl?: unknown;
   /** Data URL (JPEG, PNG ou WebP, até 256 KB) enviada do aparelho. */
   imageData?: unknown;
+  /** Logo: mesmas regras da capa (`logoUrl` https ou `logoData` até 128 KB). */
+  logoUrl?: unknown;
+  logoData?: unknown;
 }
 
 function parseHours(value: unknown): VenueHours | null {
@@ -353,6 +381,7 @@ export class VenueService {
       description: venue.description ?? null,
       hours: venue.hours ?? null,
       coverUrl: venue.coverUrl ?? null,
+      logoUrl: venue.logoUrl ?? null,
       photoRef: venue.photoRef ?? null,
       photoAuthor: venue.photoAuthor ?? null,
       lat: venue.lat,
@@ -376,26 +405,23 @@ export class VenueService {
     const category = input.category === undefined ? venue.category : text(input.category, VENUE_CATEGORY_MAX, 'category', 'Categoria');
     const description = input.description === undefined ? (venue.description ?? null) : text(input.description, VENUE_DESCRIPTION_MAX, 'description', 'Descrição');
     const hours = input.hours === undefined ? (venue.hours ?? null) : parseHours(input.hours);
-    const own = venue.coverUrl?.startsWith(`/venues/${venue.id}/cover`) ? venue.coverUrl : null;
-    let coverUrl: string | null = venue.coverUrl ?? null;
-    let upload: { mime: string; bytes: Uint8Array } | undefined;
-    if (input.imageData !== undefined && input.imageData !== null && input.imageData !== '') {
-      const img = decodeImageDataUrl(input.imageData, VENUE_COVER_MAX_BYTES, '250 KB');
-      upload = { mime: img.mime, bytes: img.bytes };
-      coverUrl = venueCoverPath(venue.id, this.deps.clock.now().getTime());
-    } else if (input.imageUrl === null || input.imageUrl === '') {
-      coverUrl = null;
-    } else if (input.imageUrl !== undefined) {
-      const url = input.imageUrl;
-      if (typeof url !== 'string' || url.length > 500) throw validationError('Dados inválidos', { imageUrl: 'Use um endereço de imagem que comece com https://' });
-      if (own !== null && url === own) coverUrl = own;
-      else if (/^https:\/\/[^\s]+$/.test(url)) coverUrl = url;
-      else throw validationError('Dados inválidos', { imageUrl: 'Use um endereço de imagem que comece com https://' });
-    }
-    await this.deps.places.updateVenueProfile(venue.id, { name, address, category, description, hours, coverUrl });
-    if (upload) await this.deps.places.setVenueCover(venue.id, upload.mime, upload.bytes);
-    else if (coverUrl === null || (coverUrl !== own && !coverUrl.startsWith(`/venues/${venue.id}/cover`))) await this.deps.places.clearVenueCover(venue.id);
+    const now = this.deps.clock.now().getTime();
+    const cover = resolveImage({ url: input.imageUrl, data: input.imageData }, venue.coverUrl ?? null, `/venues/${venue.id}/cover`, VENUE_COVER_MAX_BYTES, '250 KB', () => venueCoverPath(venue.id, now));
+    const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => venueLogoPath(venue.id, now));
+    await this.deps.places.updateVenueProfile(venue.id, { name, address, category, description, hours, coverUrl: cover.url, logoUrl: logo.url });
+    const ownCover = cover.url !== null && cover.url.startsWith(`/venues/${venue.id}/cover`);
+    const ownLogo = logo.url !== null && logo.url.startsWith(`/venues/${venue.id}/logo`);
+    if (cover.upload) await this.deps.places.setVenueCover(venue.id, cover.upload.mime, cover.upload.bytes);
+    else if (!ownCover) await this.deps.places.clearVenueCover(venue.id);
+    if (logo.upload) await this.deps.places.setVenueLogo(venue.id, logo.upload.mime, logo.upload.bytes);
+    else if (!ownLogo) await this.deps.places.clearVenueLogo(venue.id);
     return this.profile(userId, venue.id);
+  }
+
+  /** Logo enviada do local, para o <img>. */
+  async venueLogo(venueId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (typeof venueId !== 'string' || venueId === '' || venueId.length > 64) return undefined;
+    return this.deps.places.findVenueLogo(venueId);
   }
 
   /** Capa enviada do local, para o <img> (que não manda o token). */

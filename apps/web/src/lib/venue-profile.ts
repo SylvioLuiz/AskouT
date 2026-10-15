@@ -24,10 +24,17 @@ function span(day: VenueDayHours): number {
   return close > open ? close - open : 1440 - open + close;
 }
 
+/** Faltando tanto ou menos que isto para fechar, a página avisa que já vai fechar. */
+export const CLOSING_SOON_MIN = 60;
+
 export interface OpenStatus {
   open: boolean;
   /** "Aberto agora · fecha às 02:00" ou "Fechado · abre hoje às 18:00". */
   label: string;
+  /** Versão curta para o painel de números: "Aberto até 02:00", "Fecha em 40 min", "Abre amanhã às 11:00". */
+  short: string;
+  /** Aberto, mas fecha em até uma hora. */
+  closingSoon: boolean;
 }
 
 /** Estado de funcionamento no horário local do aparelho. `null` se o bar não informou horários. */
@@ -41,13 +48,35 @@ export function openStatus(hours: VenueHours | null, now: Date): OpenStatus | nu
     const base = d * 1440 + toMin(day.open);
     const length = span(day);
     // O expediente de sábado pode entrar pelo domingo (semana anterior): confere também a semana passada.
-    if ([-WEEK, 0].some((shift) => nowMin >= base + shift && nowMin < base + shift + length)) return { open: true, label: `Aberto agora · fecha às ${day.close}` };
+    for (const shift of [-WEEK, 0]) {
+      if (nowMin >= base + shift && nowMin < base + shift + length) {
+        const left = base + shift + length - nowMin;
+        const soon = left <= CLOSING_SOON_MIN;
+        return { open: true, label: `Aberto agora · fecha às ${day.close}`, short: soon ? `Fecha em ${left} min` : `Aberto até ${day.close}`, closingSoon: soon };
+      }
+    }
     for (const start of [base, base + WEEK]) if (start > nowMin && (!next || start < next.start)) next = { start, day: d, time: day.open };
   }
-  if (!next) return { open: false, label: 'Fechado' };
+  if (!next) return { open: false, label: 'Fechado', short: 'Fechado', closingSoon: false };
   const diffDays = Math.floor(next.start / 1440) - now.getDay();
   const when = diffDays === 0 ? 'hoje' : diffDays === 1 ? 'amanhã' : DAY_LONG[next.day]!;
-  return { open: false, label: `Fechado · abre ${when} às ${next.time}` };
+  return { open: false, label: `Fechado · abre ${when} às ${next.time}`, short: `Abre ${when} às ${next.time}`, closingSoon: false };
+}
+
+/** Dias em que abre, em poucas palavras: "Seg a Sáb", "Sex e Sáb", "Todos os dias". `null` se não há horários. */
+export function daysSummary(hours: VenueHours | null): string | null {
+  if (!hours || hours.length !== 7) return null;
+  const open = DISPLAY_ORDER.filter((d) => hours[d]);
+  if (open.length === 0) return null;
+  if (open.length === 7) return 'Todos os dias';
+  const runs: number[][] = [];
+  for (const d of open) {
+    const last = runs[runs.length - 1];
+    if (last && DISPLAY_ORDER.indexOf(last[last.length - 1] as never) + 1 === DISPLAY_ORDER.indexOf(d as never)) last.push(d);
+    else runs.push([d]);
+  }
+  const parts = runs.flatMap((r) => (r.length >= 3 ? [`${DAY_SHORT[r[0]!]} a ${DAY_SHORT[r[r.length - 1]!]}`] : r.map((d) => DAY_SHORT[d]!)));
+  return parts.length === 1 ? parts[0]! : `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}`;
 }
 
 export interface HoursLine {
@@ -82,6 +111,8 @@ export interface VenueProfileDraft {
   days: DayDraft[];
   imageUrl: string;
   imageData: string;
+  logoUrl: string;
+  logoData: string;
 }
 
 const DEFAULT_DAY: DayDraft = { open: false, from: '18:00', to: '23:00' };
@@ -98,6 +129,8 @@ export function draftFromProfile(v: VenueProfile): VenueProfileDraft {
     }),
     imageUrl: v.coverUrl ?? '',
     imageData: '',
+    logoUrl: v.logoUrl ?? '',
+    logoData: '',
   };
 }
 
@@ -129,6 +162,7 @@ export function profileBody(d: VenueProfileDraft): VenueProfileBody {
     description: text(d.description),
     hours: days.every((x) => x === null) ? null : days,
     ...(d.imageData !== '' ? { imageData: d.imageData } : { imageUrl: d.imageUrl.trim() === '' ? null : d.imageUrl.trim() }),
+    ...(d.logoData !== '' ? { logoData: d.logoData } : { logoUrl: d.logoUrl.trim() === '' ? null : d.logoUrl.trim() }),
   };
 }
 

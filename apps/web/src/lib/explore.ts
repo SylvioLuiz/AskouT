@@ -93,7 +93,7 @@ export function setAssetBase(base: string): void {
 export function safeImage(url: string | null): string | null {
   if (url === null) return null;
   if (url.startsWith('https://')) return url;
-  if (/^\/(place-events|venues)\/[\w-]+\/cover(\?v=\d+)?$/.test(url)) return `${assetBase}${url}`;
+  if (/^\/(place-events|venues)\/[\w-]+\/(cover|logo)(\?v=\d+)?$/.test(url)) return `${assetBase}${url}`;
   return null;
 }
 

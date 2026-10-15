@@ -4,6 +4,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { CoverPicker } from '../components/cover-picker.tsx';
 import { PostList } from '../components/post.tsx';
 import { PlacePhoto, SampleBadge } from '../components/suggestions.tsx';
+import { ChevronLeftIcon } from '../components/icons.tsx';
 import { Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -12,9 +13,9 @@ import { toApiError } from '../lib/errors.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { resizePostPhoto } from '../lib/image.ts';
 import type { VenueEvent, VenueProfile } from '../lib/types.ts';
-import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX, VENUE_NAME_MAX, VENUE_POST_CAPTION_MAX, VENUE_POST_PHOTOS_MAX, applyToAll, draftFromProfile, hoursLines, openStatus, profileBody, profileProblem } from '../lib/venue-profile.ts';
+import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX, VENUE_NAME_MAX, VENUE_POST_CAPTION_MAX, VENUE_POST_PHOTOS_MAX, applyToAll, daysSummary, draftFromProfile, hoursLines, openStatus, profileBody, profileProblem } from '../lib/venue-profile.ts';
 import type { VenueProfileDraft } from '../lib/venue-profile.ts';
-import { Link } from '../router.tsx';
+import { Link, navigate } from '../router.tsx';
 import { VenueEventRow, VenueEventSheet } from './venues.tsx';
 
 type Tab = 'about' | 'events' | 'posts';
@@ -24,21 +25,70 @@ function initialsOf(name: string): string {
   return ((parts[0]?.[0] ?? '?') + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '')).toUpperCase();
 }
 
-function VenueHero({ venue }: { venue: VenueProfile }) {
-  const [failed, setFailed] = useState(false);
-  const own = safeImage(venue.coverUrl);
+function PinIcon() {
   return (
-    <section className="vhero">
-      {own && !failed ? (
-        <img className="vhero__img" src={own} alt="" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
-      ) : venue.photoPath ? (
-        <PlacePhoto path={venue.photoPath} author={venue.photoAuthor} />
-      ) : (
-        <div className="vhero__fallback" aria-hidden="true">
-          {initialsOf(venue.name)}
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" />
+    </svg>
+  );
+}
+
+function goBack() {
+  if (window.history.length > 1) window.history.back();
+  else navigate('/explorar');
+}
+
+/** Topo da página: capa (a fachada) ao fundo, logo em círculo, nome, localização e os três números. */
+function VenueHero({ venue, now }: { venue: VenueProfile; now: Date }) {
+  const [coverFailed, setCoverFailed] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
+  const own = safeImage(venue.coverUrl);
+  const google = own === null && venue.photoPath ? api.assetUrl(venue.photoPath) : null;
+  const bg = !coverFailed ? (own ?? google) : null;
+  const logo = !logoFailed ? safeImage(venue.logoUrl) : null;
+  const status = openStatus(venue.hours, now);
+  const days = daysSummary(venue.hours);
+  const place = venue.address ?? venue.category;
+  return (
+    <header className="vhero">
+      {bg ? <img className="vhero__bg" src={bg} alt="" referrerPolicy="no-referrer" onError={() => setCoverFailed(true)} /> : null}
+      <div className="vhero__shade" />
+      <button type="button" className="vhero__back" onClick={goBack} aria-label="Voltar">
+        <ChevronLeftIcon />
+      </button>
+      <div className="vhero__body">
+        {logo ? (
+          <img className="vhero__logo" src={logo} alt={`Logo de ${venue.name}`} onError={() => setLogoFailed(true)} />
+        ) : (
+          <span className="vhero__logo vhero__logo--initials" aria-hidden="true">
+            {initialsOf(venue.name)}
+          </span>
+        )}
+        <h1 className="vhero__name">{venue.name}</h1>
+        {place ? (
+          <p className="vhero__place">
+            <PinIcon />
+            <span>{place}</span>
+          </p>
+        ) : null}
+        {venue.sample ? <SampleBadge /> : null}
+      </div>
+      <dl className="vstats">
+        <div className="vstat vstat--followers">
+          <dd className="vstat__value">{venue.followerCount}</dd>
+          <dt className="vstat__label">{venue.followerCount === 1 ? 'Seguidor' : 'Seguidores'}</dt>
         </div>
-      )}
-    </section>
+        <div className="vstat vstat--days">
+          <dd className="vstat__value">{days ?? '—'}</dd>
+          <dt className="vstat__label">Funcionamento</dt>
+        </div>
+        <div className={`vstat vstat--hours${status ? (status.closingSoon ? ' vstat--soon' : status.open ? ' vstat--open' : '') : ''}`}>
+          <dd className="vstat__value">{status ? status.short : '—'}</dd>
+          <dt className="vstat__label">Horário</dt>
+        </div>
+      </dl>
+      {google && !coverFailed ? <p className="vhero__credit">Foto: {venue.photoAuthor ? `${venue.photoAuthor} · ` : ''}Google</p> : null}
+    </header>
   );
 }
 
@@ -120,7 +170,8 @@ function ProfileEditSheet({ venue, onClose, onSaved }: { venue: VenueProfile; on
   return (
     <Sheet title="Editar perfil do bar" onClose={onClose}>
       <div className="claim">
-        <CoverPicker imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} hint="Sem imagem, a página usa uma capa simples." />
+        <CoverPicker imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} hint="Foto de fundo da página, de preferência a fachada do bar." />
+        <CoverPicker logo imageUrl={draft.logoUrl} imageData={draft.logoData} onChange={(patch) => setDraft((d) => ({ ...d, ...(patch.imageUrl !== undefined ? { logoUrl: patch.imageUrl } : {}), ...(patch.imageData !== undefined ? { logoData: patch.imageData } : {}) }))} hint="Aparece em círculo sobre a capa." />
         <Field label="Nome do bar" value={draft.name} onChange={(v) => set('name', v)} maxLength={VENUE_NAME_MAX} />
         <Field label="Tipo de lugar (opcional)" value={draft.category} onChange={(v) => set('category', v)} maxLength={VENUE_CATEGORY_MAX} placeholder="Bar, boteco, casa de shows…" />
         <Field label="Endereço (opcional)" value={draft.address} onChange={(v) => set('address', v)} maxLength={VENUE_ADDRESS_MAX} />
@@ -284,7 +335,6 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
     );
   }
 
-  const status = openStatus(v.hours, now);
   const lines = hoursLines(v.hours, now);
   const tabs: { id: Tab; label: string; n?: number }[] = [
     { id: 'about', label: 'Sobre' },
@@ -294,16 +344,8 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
 
   return (
     <>
-      <PageHead title={v.name} back="/explorar" subtitle={[v.category, v.address].filter(Boolean).join(' · ') || undefined} />
-      <VenueHero venue={v} />
+      <VenueHero venue={v} now={now} />
       <div className="vhead">
-        <div className="vhead__tags">
-          {v.sample ? <SampleBadge /> : null}
-          {status ? <span className={`tag ${status.open ? 'tag--free' : 'tag--osm'}`}>{status.label}</span> : null}
-        </div>
-        <p className="vhead__followers">
-          {v.followerCount === 1 ? '1 seguidor' : `${v.followerCount} seguidores`}
-        </p>
         {v.isOwner ? (
           <div className="vhead__actions">
             <Button small onClick={() => setSheet('edit')}>

@@ -45,6 +45,17 @@ export class VenuesController {
     return new StreamableFile(photo.data, { type: photo.mime });
   }
 
+  /** Logo enviada do aparelho, para o <img>. */
+  @Public()
+  @Get('venues/:id/logo')
+  @Header('Cache-Control', 'public, max-age=31536000, immutable')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async venueLogo(@Param('id') id: string) {
+    const photo = await this.core.venues.venueLogo(id);
+    if (!photo) throw new NotFoundException();
+    return new StreamableFile(photo.data, { type: photo.mime });
+  }
+
   /** Abre a página de um lugar que só existe no Google: `{key: "google:ID", lat, lng}` → `{venueId}`. */
   @Post('venues/external')
   @HttpCode(200)
