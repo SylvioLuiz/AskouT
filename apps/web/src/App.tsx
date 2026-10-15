@@ -14,7 +14,7 @@ import { FlashScreen, MatchScreen } from './screens/flash.tsx';
 import { ChatInfoScreen } from './screens/chat-info.tsx';
 import { GroupScreen } from './screens/group.tsx';
 import { VenuePageScreen } from './screens/venue-page.tsx';
-import { VenuePanelScreen, VenuesScreen } from './screens/venues.tsx';
+import { VenuesScreen } from './screens/venues.tsx';
 import { EventScreen } from './screens/event.tsx';
 import { ExploreScreen } from './screens/explore.tsx';
 import { HomeScreen } from './screens/main-tabs.tsx';
@@ -59,7 +59,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/tema', render: () => <ThemeScreen /> },
   { path: '/locais', render: () => <VenuesScreen /> },
   { path: '/bares/:id', render: (p) => <VenuePageScreen key={p['id']} venueId={p['id'] ?? ''} /> },
-  { path: '/locais/:id', render: (p) => <VenuePanelScreen key={p['id']} venueId={p['id'] ?? ''} /> },
+  { path: '/locais/:id', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}`} /> },
   { path: '/amigos', render: () => <FriendsScreen /> },
   { path: '/bloqueados', render: () => <BlockedScreen /> },
   { path: '/u/:username', render: (p) => <ProfileScreen username={p['username'] ?? ''} /> },
@@ -67,6 +67,12 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/u/:username/seguidores', render: (p) => <ConnectionsScreen username={p['username'] ?? ''} direction="followers" /> },
   { path: '/u/:username/seguindo', render: (p) => <ConnectionsScreen username={p['username'] ?? ''} direction="following" /> },
 ];
+
+/** Endereços antigos continuam funcionando: leva ao novo e não deixa o antigo no histórico. */
+function Redirect({ to }: { to: string }) {
+  useEffect(() => navigate(to, { replace: true }), [to]);
+  return null;
+}
 
 function NotFoundScreen() {
   useTitle('Página não encontrada');

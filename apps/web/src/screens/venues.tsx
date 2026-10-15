@@ -191,7 +191,7 @@ export function VenuesScreen() {
             <ul className="venuelist" aria-label="Locais que você administra">
               {mine.data.venues.map((v) => (
                 <li key={v.id}>
-                  <Link to={`/locais/${encodeURIComponent(v.id)}`} className="venuerow">
+                  <Link to={`/bares/${encodeURIComponent(v.id)}`} className="venuerow">
                     <VenueLine venue={v} />
                   </Link>
                 </li>
@@ -266,7 +266,7 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved }: { venueId:
   );
 }
 
-function VenueEventRow({ venueId, event, now, onEdit, onChanged }: { venueId: string; event: VenueEvent; now: Date; onEdit: () => void; onChanged: () => void }) {
+export function VenueEventRow({ venueId, event, now, onEdit, onChanged }: { venueId: string; event: VenueEvent; now: Date; onEdit: () => void; onChanged: () => void }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -308,50 +308,5 @@ function VenueEventRow({ venueId, event, now, onEdit, onChanged }: { venueId: st
       )}
       {error ? <Notice tone="error">{error}</Notice> : null}
     </li>
-  );
-}
-
-export function VenuePanelScreen({ venueId }: { venueId: string }) {
-  const panel = useAsync(() => api.venuePanel(venueId), [venueId]);
-  useTitle(panel.data?.venue.name ?? 'Meu local');
-  const [editing, setEditing] = useState<VenueEvent | 'new' | undefined>();
-  const now = new Date();
-
-  return (
-    <>
-      <PageHead title={panel.data?.venue.name ?? 'Meu local'} back="/locais" subtitle={panel.data?.venue.address ?? undefined} />
-      {panel.loading && !panel.data ? <Loading /> : null}
-      {panel.error && !panel.data ? <ErrorState message={panel.error.message} onRetry={panel.reload} /> : null}
-      {panel.data ? (
-        <>
-          <Link to={`/bares/${encodeURIComponent(venueId)}`} className="btn btn--secondary btn--full">
-            Ver e editar a página do bar
-          </Link>
-          <Button full onClick={() => setEditing('new')}>
-            Novo evento
-          </Button>
-          {panel.data.events.length === 0 ? (
-            <EmptyState title="Nenhum evento ainda">Os eventos que você criar aparecem no Explorar para quem está perto.</EmptyState>
-          ) : (
-            <ul className="velist" aria-label="Eventos do local">
-              {panel.data.events.map((e) => (
-                <VenueEventRow key={e.id} venueId={venueId} event={e} now={now} onEdit={() => setEditing(e)} onChanged={panel.reload} />
-              ))}
-            </ul>
-          )}
-        </>
-      ) : null}
-      {editing ? (
-        <VenueEventSheet
-          venueId={venueId}
-          {...(editing === 'new' ? {} : { event: editing })}
-          onClose={() => setEditing(undefined)}
-          onSaved={() => {
-            setEditing(undefined);
-            panel.reload();
-          }}
-        />
-      ) : null}
-    </>
   );
 }

@@ -3446,3 +3446,4 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .vpost__thumbs img { display: block; width: 92px; height: 92px; object-fit: cover; border-radius: 10px; }
 .vpost__remove { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border: 0; border-radius: 13px; background: rgba(0,0,0,.65); color: #fff; font-size: 18px; line-height: 1; cursor: pointer; }
 .evhero__placelink { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.vowner { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }

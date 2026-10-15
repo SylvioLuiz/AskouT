@@ -15,9 +15,9 @@ import type { VenueEvent, VenueProfile } from '../lib/types.ts';
 import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX, VENUE_NAME_MAX, VENUE_POST_CAPTION_MAX, VENUE_POST_PHOTOS_MAX, applyToAll, draftFromProfile, hoursLines, openStatus, profileBody, profileProblem } from '../lib/venue-profile.ts';
 import type { VenueProfileDraft } from '../lib/venue-profile.ts';
 import { Link } from '../router.tsx';
-import { VenueEventSheet } from './venues.tsx';
+import { VenueEventRow, VenueEventSheet } from './venues.tsx';
 
-type Tab = 'about' | 'agenda' | 'posts';
+type Tab = 'about' | 'events' | 'posts';
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -207,6 +207,38 @@ function VenuePostSheet({ venueId, onClose, onSaved }: { venueId: string; onClos
   );
 }
 
+/** Aba de eventos de quem administra: todos (os que já passaram também), com editar e apagar. */
+function OwnerEvents({ venueId, now, reloadKey, onNew, onEdit, onChanged }: { venueId: string; now: Date; reloadKey: number; onNew: () => void; onEdit: (e: VenueEvent) => void; onChanged: () => void }) {
+  const panel = useAsync(() => api.venuePanel(venueId), [venueId, reloadKey]);
+  return (
+    <section className="vowner">
+      <Button full onClick={onNew}>
+        Novo evento
+      </Button>
+      {panel.loading && !panel.data ? <Loading /> : null}
+      {panel.error && !panel.data ? <ErrorState message={panel.error.message} onRetry={panel.reload} /> : null}
+      {panel.data && panel.data.events.length === 0 ? <EmptyState title="Nenhum evento ainda">Os eventos que você criar aparecem aqui e no Explorar para quem está perto.</EmptyState> : null}
+      {panel.data && panel.data.events.length > 0 ? (
+        <ul className="velist" aria-label="Eventos do bar">
+          {panel.data.events.map((e) => (
+            <VenueEventRow
+              key={e.id}
+              venueId={venueId}
+              event={e}
+              now={now}
+              onEdit={() => onEdit(e)}
+              onChanged={() => {
+                panel.reload();
+                onChanged();
+              }}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
 export function VenuePageScreen({ venueId }: { venueId: string }) {
   const page = useAsync(() => api.venueProfile(venueId), [venueId]);
   const v = page.data;
@@ -216,6 +248,8 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const [followBusy, setFollowBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [postsKey, setPostsKey] = useState(0);
+  const [eventsKey, setEventsKey] = useState(0);
+  const [editing, setEditing] = useState<VenueEvent | undefined>();
   const now = new Date();
 
   async function toggleFollow() {
@@ -254,7 +288,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const lines = hoursLines(v.hours, now);
   const tabs: { id: Tab; label: string; n?: number }[] = [
     { id: 'about', label: 'Sobre' },
-    { id: 'agenda', label: 'Agenda', n: v.upcomingEvents.length },
+    { id: 'events', label: 'Eventos', n: v.upcomingEvents.length },
     { id: 'posts', label: 'Posts' },
   ];
 
@@ -281,9 +315,6 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             <Button small variant="secondary" onClick={() => setSheet('post')}>
               Novo post
             </Button>
-            <Link to={`/locais/${encodeURIComponent(v.id)}`} className="btn btn--quiet btn--small">
-              Gerenciar eventos
-            </Link>
           </div>
         ) : (
           <div className="vhead__actions">
@@ -332,9 +363,11 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         </section>
       ) : null}
 
-      {tab === 'agenda' ? (
-        v.upcomingEvents.length === 0 ? (
-          <EmptyState title="Nenhum evento marcado">{v.isOwner ? 'Toque em Novo evento para divulgar a próxima atração.' : 'Quando o bar divulgar eventos, eles aparecem aqui.'}</EmptyState>
+      {tab === 'events' ? (
+        v.isOwner ? (
+          <OwnerEvents venueId={v.id} now={now} reloadKey={eventsKey} onNew={() => setSheet('event')} onEdit={(e) => setEditing(e)} onChanged={page.reload} />
+        ) : v.upcomingEvents.length === 0 ? (
+          <EmptyState title="Nenhum evento marcado">Quando o bar divulgar eventos, eles aparecem aqui.</EmptyState>
         ) : (
           <ul className="vagenda" aria-label="Próximos eventos">
             {v.upcomingEvents.map((e) => (
@@ -356,14 +389,20 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
           }}
         />
       ) : null}
-      {sheet === 'event' ? (
+      {sheet === 'event' || editing ? (
         <VenueEventSheet
           venueId={v.id}
-          onClose={() => setSheet(undefined)}
+          {...(editing ? { event: editing } : {})}
+          onClose={() => {
+            setSheet(undefined);
+            setEditing(undefined);
+          }}
           onSaved={() => {
             setSheet(undefined);
+            setEditing(undefined);
+            setEventsKey((k) => k + 1);
             page.reload();
-            setTab('agenda');
+            setTab('events');
           }}
         />
       ) : null}
