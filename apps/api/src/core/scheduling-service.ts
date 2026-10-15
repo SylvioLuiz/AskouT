@@ -59,6 +59,10 @@ export interface PollView {
   votingDeadline: string | null;
   /** Dá para votar agora: votando e dentro do prazo. */
   votingOpen: boolean;
+  /** Votos encerrados: pelo organizador ou porque o prazo acabou. */
+  votingClosed: boolean;
+  /** Quem organiza pode encerrar agora: todos já concluíram. */
+  canClose: boolean;
   confirmationPolicy: ConfirmationPolicy;
   thresholds: Thresholds;
   participants: { profile: PublicProfile; finished: boolean; confirmation: ConfirmationStatus | null }[];
@@ -316,6 +320,21 @@ export class SchedulingService {
     return this.view(actorId, { ...poll, status: 'CONFIRMING' });
   }
 
+  /** Quem organiza encerra os votos quando todos já concluíram. Depois disso ninguém muda voto e a data pode ser escolhida. */
+  async closeVoting(actorId: string, pollId: unknown): Promise<PollView> {
+    const { scheduling, clock } = this.deps;
+    const poll = await this.accessible(actorId, pollId);
+    if (poll.organizerId !== actorId) throw forbidden('Só quem criou a votação a encerra');
+    if (poll.status !== 'VOTING') throw conflict('Esta votação já passou da fase de votos');
+    if (this.isClosed(poll)) throw conflict('Os votos já foram encerrados');
+    const participants = await scheduling.listParticipants(poll.id);
+    if (!participants.every((p) => p.finishedAt !== null)) throw conflict('Ainda faltam pessoas concluírem a votação');
+    const now = clock.now();
+    await scheduling.updatePoll(poll.id, { votingClosedAt: now });
+    await this.postSystem(poll.conversationId, actorId, `Votação "${poll.title}" encerrada: todos votaram. Falta escolher a data.`, now);
+    return this.view(actorId, { ...poll, votingClosedAt: now });
+  }
+
   /** Quem organiza desiste da data proposta e a votação volta a ficar aberta. */
   async withdraw(actorId: string, pollId: unknown): Promise<PollView> {
     const { scheduling } = this.deps;
@@ -324,8 +343,8 @@ export class SchedulingService {
     const open = poll.status === 'CONFIRMING' ? await this.openProposal(poll.id) : undefined;
     if (!open) throw conflict('Não há data em confirmação');
     await scheduling.updateProposal(open.id, { status: 'WITHDRAWN' });
-    await scheduling.updatePoll(poll.id, { status: 'VOTING' });
-    return this.view(actorId, { ...poll, status: 'VOTING' });
+    await scheduling.updatePoll(poll.id, { status: 'VOTING', votingClosedAt: null });
+    return this.view(actorId, { ...poll, status: 'VOTING', votingClosedAt: null });
   }
 
   /** Cada convidado: confirmar, pedir ajuste na agenda ou recusar. A regra da votação decide se a data fecha. */
@@ -377,7 +396,12 @@ export class SchedulingService {
 
   private requireVotingOpen(poll: PollRecord): void {
     if (poll.status !== 'VOTING') throw conflict(poll.status === 'CONFIRMING' ? 'A votação está em confirmação' : 'Esta votação já terminou');
-    if (poll.votingDeadline && poll.votingDeadline <= this.deps.clock.now()) throw conflict('O prazo da votação acabou');
+    if (this.isClosed(poll)) throw conflict(poll.votingClosedAt ? 'A votação foi encerrada' : 'O prazo da votação acabou');
+  }
+
+  /** Encerrada à mão ou pelo prazo (que vale sozinho, sem precisar de ninguém). */
+  private isClosed(poll: PollRecord): boolean {
+    return poll.votingClosedAt != null || (poll.votingDeadline !== null && poll.votingDeadline <= this.deps.clock.now());
   }
 
   /** Só quem participa da votação (e ainda está na conversa) a vê. */
@@ -400,11 +424,11 @@ export class SchedulingService {
     if (verdict === 'FINALIZE') return this.finalize(poll, proposal);
     if (verdict === 'REJECT') {
       await scheduling.updateProposal(proposal.id, { status: 'REJECTED' });
-      await scheduling.updatePoll(poll.id, { status: 'VOTING' });
+      await scheduling.updatePoll(poll.id, { status: 'VOTING', votingClosedAt: null });
       const now = clock.now();
       await this.postSystem(poll.conversationId, responderId, `A data ${dayFmt(proposal.candidateDate)} não passou. A votação voltou a ficar aberta.`, now);
       await this.deps.notifier.notify({ userId: poll.organizerId, type: 'MEETUP_INVITE', title: `Data ${dayFmt(proposal.candidateDate)} não passou`, body: `"${poll.title}" voltou para a votação.`, url: `/planejar/${poll.id}`, dedupeKey: `poll-rejected:${proposal.id}` });
-      return { ...poll, status: 'VOTING' };
+      return { ...poll, status: 'VOTING', votingClosedAt: null };
     }
     return poll;
   }
@@ -482,7 +506,7 @@ export class SchedulingService {
         if (open) needsMyConfirmation = !(await scheduling.listConfirmations(open.id)).some((c) => c.userId === actorId);
       }
       if (p.status === 'FINALIZED' && p.finalProposalId) finalDate = (await scheduling.findProposal(p.finalProposalId))?.candidateDate ?? null;
-      out.push({ id: p.id, conversationId: p.conversationId, title: p.title, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && mine.finishedAt === null, needsMyConfirmation, participantCount: participants.length, finishedCount: participants.filter((x) => x.finishedAt !== null).length, best, proposedDate, votingDeadline: p.votingDeadline ? p.votingDeadline.toISOString() : null });
+      out.push({ id: p.id, conversationId: p.conversationId, title: p.title, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && !this.isClosed(p) && mine.finishedAt === null, needsMyConfirmation, participantCount: participants.length, finishedCount: participants.filter((x) => x.finishedAt !== null).length, best, proposedDate, votingDeadline: p.votingDeadline ? p.votingDeadline.toISOString() : null });
     }
     return out;
   }
@@ -522,7 +546,9 @@ export class SchedulingService {
       preferredTimeStart: poll.preferredTimeStart,
       timezone: poll.timezone,
       votingDeadline: poll.votingDeadline ? poll.votingDeadline.toISOString() : null,
-      votingOpen: poll.status === 'VOTING' && !(poll.votingDeadline && poll.votingDeadline <= clock.now()),
+      votingOpen: poll.status === 'VOTING' && !this.isClosed(poll),
+      votingClosed: poll.status === 'VOTING' && this.isClosed(poll),
+      canClose: poll.status === 'VOTING' && poll.organizerId === actorId && !this.isClosed(poll) && participants.every((p) => p.finishedAt !== null),
       confirmationPolicy: poll.confirmationPolicy,
       thresholds: th,
       participants: participants.flatMap((p) => {

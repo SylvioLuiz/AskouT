@@ -18,7 +18,7 @@ import { toggleId } from '../lib/meetup.ts';
 import { addImages, buildPostBody, effectivePlace, eventProblem, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
 import type { DraftImage, LinkedPlace } from '../lib/post-draft.ts';
 import type { EventKind, ExplorePlace } from '../lib/types.ts';
-import { Link, navigate } from '../router.tsx';
+import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
 
 let counter = 0;
@@ -118,13 +118,16 @@ export function CreatePostScreen() {
   const [tagging, setTagging] = useState(false);
   const [cropKey, setCropKey] = useState<string | undefined>();
   const [cropBusy, setCropBusy] = useState(false);
-  const [kind, setKind] = useState<'POST' | 'EVENT'>('POST');
-  const [eventTitle, setEventTitle] = useState('');
+  // Vindo de uma votação de data fechada: já abre como evento, com nome, horário e a conversa marcada.
+  const prefill = useSearch();
+  const fromPoll = prefill.get('votacao') !== null;
+  const [kind, setKind] = useState<'POST' | 'EVENT'>(fromPoll ? 'EVENT' : 'POST');
+  const [eventTitle, setEventTitle] = useState(fromPoll ? (prefill.get('titulo') ?? '').slice(0, 120) : '');
   const [eventKind, setEventKind] = useState<EventKind>('OTHER');
-  const [eventStart, setEventStart] = useState('');
-  const [eventEnd, setEventEnd] = useState('');
+  const [eventStart, setEventStart] = useState(fromPoll ? (prefill.get('inicio') ?? '') : '');
+  const [eventEnd, setEventEnd] = useState(fromPoll ? (prefill.get('fim') ?? '') : '');
   const [eventPrivate, setEventPrivate] = useState(false);
-  const [shareTo, setShareTo] = useState<string[]>([]);
+  const [shareTo, setShareTo] = useState<string[]>(fromPoll && prefill.get('conversa') ? [prefill.get('conversa') as string] : []);
   const [createdId, setCreatedId] = useState<string | undefined>();
   const friends = useAsync(() => api.friends(), []);
 

@@ -323,6 +323,7 @@ export function createApi(deps: ApiDeps) {
     poll: (pollId: string) => request<PollView>('GET', `/date-polls/${id(pollId)}`),
     votePoll: (pollId: string, status: VoteStatus | 'CLEAR', dates: string[]) => request<PollView>('POST', `/date-polls/${id(pollId)}/votes`, { body: { status, dates } }),
     finishPoll: (pollId: string, finished: boolean) => request<PollView>('POST', `/date-polls/${id(pollId)}/finish`, { body: { finished } }),
+    closePoll: (pollId: string) => request<PollView>('POST', `/date-polls/${id(pollId)}/close`),
     proposePoll: (pollId: string, date: string) => request<PollView>('POST', `/date-polls/${id(pollId)}/propose`, { body: { date } }),
     withdrawPoll: (pollId: string) => request<PollView>('POST', `/date-polls/${id(pollId)}/withdraw`),
     respondPoll: (pollId: string, status: ConfirmationAnswer) => request<PollView>('POST', `/date-polls/${id(pollId)}/respond`, { body: { status } }),

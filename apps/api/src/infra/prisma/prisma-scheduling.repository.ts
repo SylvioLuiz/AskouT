@@ -15,6 +15,7 @@ type PollRow = {
   preferredTimeStart: string | null;
   timezone: string;
   votingDeadline: Date | null;
+  votingClosedAt: Date | null;
   confirmationPolicy: string;
   greenMin: number;
   orangeMin: number;
@@ -54,6 +55,7 @@ function toPoll(r: PollRow): PollRecord {
     preferredTimeStart: r.preferredTimeStart,
     timezone: r.timezone,
     votingDeadline: r.votingDeadline,
+    votingClosedAt: r.votingClosedAt,
     confirmationPolicy: r.confirmationPolicy as PollRecord['confirmationPolicy'],
     greenMin: r.greenMin,
     orangeMin: r.orangeMin,
@@ -105,6 +107,7 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
         preferredTimeStart: poll.preferredTimeStart,
         timezone: poll.timezone,
         votingDeadline: poll.votingDeadline,
+        votingClosedAt: poll.votingClosedAt ?? null,
         confirmationPolicy: poll.confirmationPolicy,
         greenMin: poll.greenMin,
         orangeMin: poll.orangeMin,
@@ -174,7 +177,7 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
     await this.prisma.datePollParticipant.updateMany({ where: { pollId, userId }, data: { finishedAt: at } });
   }
 
-  async updatePoll(pollId: string, patch: { status?: PollStatus; finalProposalId?: string | null; meetupId?: string | null }): Promise<void> {
+  async updatePoll(pollId: string, patch: { status?: PollStatus; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null }): Promise<void> {
     if (!isUuid(pollId)) return;
     await this.prisma.datePoll.updateMany({ where: { id: pollId }, data: patch });
   }

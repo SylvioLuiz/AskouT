@@ -654,6 +654,8 @@ export interface PollRecord {
   preferredTimeStart: string | null;
   timezone: string;
   votingDeadline: Date | null;
+  /** Quem organiza encerrou os votos antes do prazo. */
+  votingClosedAt?: Date | null;
   confirmationPolicy: 'UNANIMITY' | 'MAJORITY' | 'MANUAL';
   greenMin: number;
   orangeMin: number;

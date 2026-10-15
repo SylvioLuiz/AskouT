@@ -1587,7 +1587,7 @@ export class InMemorySchedulingRepository implements SchedulingRepository {
     if (m?.has(userId)) m.set(userId, at);
   }
 
-  async updatePoll(pollId: string, patch: { status?: PollStatus; finalProposalId?: string | null; meetupId?: string | null }): Promise<void> {
+  async updatePoll(pollId: string, patch: { status?: PollStatus; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null }): Promise<void> {
     const p = this.polls.get(pollId);
     if (p) this.polls.set(pollId, { ...p, ...patch });
   }

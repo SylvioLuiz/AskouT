@@ -157,3 +157,36 @@ test('resumo da conversa: progresso, melhor data até agora e proposta', async (
   assert.equal(s.needsMyConfirmation, true);
   assert.equal(s.best, null);
 });
+
+test('encerrar votos: só o organizador, só com todos concluídos; trava votos; prazo fecha sozinho', async () => {
+  const { w, ana, bia, caio, dani, poll } = await setup('MANUAL');
+  assert.equal(poll.canClose, false);
+  await rejectsWith(w.core.scheduling.closeVoting(ana, poll.id), 'CONFLICT');
+  for (const u of [ana, bia, caio, dani]) await w.core.scheduling.finish(u, poll.id, true);
+  assert.equal((await w.core.scheduling.get(ana, poll.id)).canClose, true);
+  assert.equal((await w.core.scheduling.get(bia, poll.id)).canClose, false);
+  await rejectsWith(w.core.scheduling.closeVoting(bia, poll.id), 'FORBIDDEN');
+  const closed = await w.core.scheduling.closeVoting(ana, poll.id);
+  assert.equal(closed.votingClosed, true);
+  assert.equal(closed.votingOpen, false);
+  await rejectsWith(w.core.scheduling.vote(bia, poll.id, { status: 'NO', dates: ['2026-10-24'] }), 'CONFLICT');
+  await rejectsWith(w.core.scheduling.closeVoting(ana, poll.id), 'CONFLICT');
+  // com votos fechados ainda dá para propor, e uma proposta recusada reabre os votos
+  await w.core.scheduling.propose(ana, poll.id, '2026-10-24');
+  const back = await w.core.scheduling.withdraw(ana, poll.id);
+  assert.equal(back.votingOpen, true);
+});
+
+test('prazo vencido encerra sozinho e some da lista "falta votar"', async () => {
+  const { w, ana, bia, group } = await setup();
+  const deadline = new Date(w.clock.now().getTime() + 3_600_000).toISOString();
+  const p = await w.core.scheduling.create(ana, group.id, { title: 'Cinema', rangeStart: '2026-10-21', rangeEnd: '2026-10-23', votingDeadline: deadline });
+  assert.equal((await w.core.scheduling.get(bia, p.id)).votingClosed, false);
+  w.clock.tick(2 * 3_600_000);
+  const v = await w.core.scheduling.get(bia, p.id);
+  assert.equal(v.votingClosed, true);
+  const item = (await w.core.scheduling.listForConversation(bia, group.id)).items.find((i) => i.id === p.id)!;
+  assert.equal(item.needsMyVote, false);
+  const proposed = await w.core.scheduling.propose(ana, p.id, '2026-10-22');
+  assert.equal(proposed.status, 'CONFIRMING');
+});

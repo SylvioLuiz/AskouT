@@ -1,0 +1,1 @@
+ALTER TABLE "DatePoll" ADD COLUMN "votingClosedAt" TIMESTAMP(3);

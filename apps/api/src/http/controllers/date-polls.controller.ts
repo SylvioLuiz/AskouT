@@ -55,6 +55,13 @@ export class DatePollsController {
   }
 
   /** Quem organiza manda uma data para confirmação: `{date}`. */
+  /** Encerra os votos (só quando todos concluíram). */
+  @Post(':id/close')
+  @HttpCode(200)
+  close(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.scheduling.closeVoting(actor.userId, id);
+  }
+
   @Post(':id/propose')
   @HttpCode(200)
   propose(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {

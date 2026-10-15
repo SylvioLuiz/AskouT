@@ -922,6 +922,8 @@ model DatePoll {
   preferredTimeStart String?   @db.VarChar(5)
   timezone           String
   votingDeadline     DateTime?
+  /// Votação encerrada à mão por quem organiza (ou já passou do prazo). Nulo = aberta.
+  votingClosedAt     DateTime?
   /// UNANIMITY, MAJORITY ou MANUAL.
   confirmationPolicy String
   greenMin           Int       @default(80)

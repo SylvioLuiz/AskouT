@@ -5,6 +5,7 @@ import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { LEVEL_LABEL, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLabel, longDay, monthTitle, percent, shortDay } from '../lib/date-poll.ts';
 import type { ConfirmationAnswer, DateStats, PollView, VoteStatus } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
+import { isoToLocalInput } from '../lib/post-draft.ts';
 import { Link } from '../router.tsx';
 
 const WEEK_HEAD = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -93,8 +94,24 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
             <Link to={`/conversas/${poll.conversationId}`} className="btn btn--secondary btn--small">
               Voltar à conversa
             </Link>
+            {poll.isOrganizer ? (
+              <Link to={`/criar?${new URLSearchParams({ votacao: poll.id, titulo: poll.title, inicio: isoToLocalInput(poll.final.startsAt), fim: isoToLocalInput(poll.final.endsAt), conversa: poll.conversationId }).toString()}`} className="btn btn--primary btn--small">
+                Transformar em evento
+              </Link>
+            ) : null}
           </div>
         </section>
+      ) : null}
+      {poll.status === 'VOTING' && poll.votingClosed ? <Notice>Os votos foram encerrados. {poll.isOrganizer ? 'Escolha a data entre as melhores abaixo.' : 'Aguarde quem organiza escolher a data.'}</Notice> : null}
+      {poll.canClose ? (
+        <div className="callout">
+          <p className="callout__text">
+            <strong>Todos já votaram.</strong> Você pode encerrar a votação agora e escolher a data.
+          </p>
+          <Button small loading={busy} onClick={() => void act(() => api.closePoll(poll.id))}>
+            Encerrar votação
+          </Button>
+        </div>
       ) : null}
       {poll.status === 'CANCELLED' ? <Notice>Esta votação foi cancelada.</Notice> : null}
 
@@ -102,7 +119,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
       <p className="dpoll__meta muted">
         {POLICY_LABEL[poll.confirmationPolicy]}
-        {poll.votingDeadline ? ` · votação até ${new Date(poll.votingDeadline).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
+        {poll.votingClosed ? ' · votos encerrados' : poll.votingDeadline ? ` · votação até ${new Date(poll.votingDeadline).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
         {' · '}
         {finished} de {poll.participants.length} concluíram
       </p>

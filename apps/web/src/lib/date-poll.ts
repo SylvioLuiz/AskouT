@@ -50,6 +50,8 @@ export interface PollView {
   timezone: string;
   votingDeadline: string | null;
   votingOpen: boolean;
+  votingClosed: boolean;
+  canClose: boolean;
   confirmationPolicy: Policy;
   thresholds: { green: number; orange: number; minCoverage: number };
   participants: { profile: PublicProfile; finished: boolean; confirmation: ConfirmationAnswer | null }[];
