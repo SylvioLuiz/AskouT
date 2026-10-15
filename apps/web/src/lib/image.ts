@@ -119,3 +119,8 @@ export async function cropPostPhoto(source: string, rect: CropRect): Promise<str
   const size = fitWithin(region.sw, region.sh, POST_PHOTO_SIDE);
   return jpegWithin(paint(img, region, size), POST_PHOTO_MAX_BYTES);
 }
+
+// Capa de evento (enviada do aparelho pelo dono do local)
+export const EVENT_COVER_SIDE = 1280;
+export const EVENT_COVER_MAX_BYTES = 240 * 1024;
+export const resizeEventCover = (file: File) => resizePhoto(file, { side: EVENT_COVER_SIDE, maxBytes: EVENT_COVER_MAX_BYTES });

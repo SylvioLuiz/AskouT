@@ -115,6 +115,23 @@ export class PrismaPlaceRepository implements PlaceRepository {
     return r ? { event: toEvent(r), venue: toVenue(r.venue) } : undefined;
   }
 
+  async setEventCover(eventId: string, mime: string, data: Uint8Array): Promise<void> {
+    if (!isUuid(eventId)) return;
+    const bytes = Buffer.from(data);
+    await this.prisma.placeEventCover.upsert({ where: { eventId }, create: { eventId, mime, data: bytes }, update: { mime, data: bytes, updatedAt: new Date() } });
+  }
+
+  async clearEventCover(eventId: string): Promise<void> {
+    if (!isUuid(eventId)) return;
+    await this.prisma.placeEventCover.deleteMany({ where: { eventId } });
+  }
+
+  async findEventCover(eventId: string) {
+    if (!isUuid(eventId)) return undefined;
+    const r = await this.prisma.placeEventCover.findUnique({ where: { eventId }, select: { mime: true, data: true } });
+    return r ? { mime: r.mime, data: new Uint8Array(r.data) } : undefined;
+  }
+
   async listTags(prefix: string, from: Date, to: Date, limit: number) {
     const rows = await this.prisma.placeEvent.findMany({
       where: { endsAt: { gt: from }, startsAt: { lt: to }, tags: { isEmpty: false } },

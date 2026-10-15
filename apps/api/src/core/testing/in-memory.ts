@@ -693,6 +693,7 @@ export class InMemoryMeetupRepository implements MeetupRepository {
 export class InMemoryPlaceRepository implements PlaceRepository {
   readonly venues = new Map<string, VenueRecord>();
   readonly events = new Map<string, PlaceEventRecord>();
+  readonly covers = new Map<string, { mime: string; data: Uint8Array }>();
 
   async createVenue(venue: VenueRecord): Promise<void> {
     this.venues.set(venue.id, { ...venue, ownerId: venue.ownerId ?? null });
@@ -722,7 +723,21 @@ export class InMemoryPlaceRepository implements PlaceRepository {
     const current = this.events.get(eventId);
     if (!current || current.venueId !== venueId) return false;
     this.events.delete(eventId);
+    this.covers.delete(eventId);
     return true;
+  }
+
+  async setEventCover(eventId: string, mime: string, data: Uint8Array) {
+    if (this.events.has(eventId)) this.covers.set(eventId, { mime, data: new Uint8Array(data) });
+  }
+
+  async clearEventCover(eventId: string) {
+    this.covers.delete(eventId);
+  }
+
+  async findEventCover(eventId: string) {
+    const c = this.covers.get(eventId);
+    return c ? { mime: c.mime, data: new Uint8Array(c.data) } : undefined;
   }
 
   async setVenueOwner(venueId: string, ownerId: string | null) {
@@ -1291,6 +1306,7 @@ export class InMemoryAdminRepository implements AdminRepository {
   }
 
   async deletePlaceEvent(id: string) {
+    this.places.covers.delete(id);
     return this.places.events.delete(id);
   }
 

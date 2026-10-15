@@ -1,4 +1,5 @@
 import { createApi } from './lib/api.ts';
+import { setAssetBase } from './lib/explore.ts';
 import { createSessionStore } from './lib/session.ts';
 import type { StorageLike } from './lib/session.ts';
 
@@ -20,6 +21,8 @@ export function setUnauthorizedHandler(handler: () => void): void {
 }
 
 const baseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
+
+setAssetBase(baseUrl);
 
 export const api = createApi({
   baseUrl,

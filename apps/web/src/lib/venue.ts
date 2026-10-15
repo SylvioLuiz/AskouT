@@ -60,11 +60,17 @@ export interface VenueEventDraft {
   starts: string;
   ends: string;
   isFree: boolean;
+  /** Endereço https (link da web) ou o caminho da capa já enviada. */
   imageUrl: string;
+  /** Foto nova escolhida no aparelho (data URL já reduzida). */
+  imageData: string;
   tags: string;
 }
 
-export const EMPTY_VENUE_EVENT: VenueEventDraft = { title: '', description: '', kind: 'OTHER', starts: '', ends: '', isFree: false, imageUrl: '', tags: '' };
+/** Capa enviada antes, servida pela própria API. */
+export const isOwnCoverPath = (v: string): boolean => /^\/place-events\/[\w-]+\/cover(\?v=\d+)?$/.test(v);
+
+export const EMPTY_VENUE_EVENT: VenueEventDraft = { title: '', description: '', kind: 'OTHER', starts: '', ends: '', isFree: false, imageUrl: '', imageData: '', tags: '' };
 
 /** Texto do primeiro problema do rascunho, ou null. `editing`: o início de um evento já existente pode estar no passado. */
 export function venueEventProblem(d: VenueEventDraft, now: Date, editing: boolean): string | null {
@@ -80,7 +86,7 @@ export function venueEventProblem(d: VenueEventDraft, now: Date, editing: boolea
     if (new Date(end).getTime() <= new Date(start).getTime()) return 'O fim precisa ser depois do início.';
     if (new Date(end).getTime() - new Date(start).getTime() > VENUE_EVENT_MAX_DAYS * 24 * 3_600_000) return `O evento pode durar até ${VENUE_EVENT_MAX_DAYS} dias.`;
   }
-  if (d.imageUrl.trim() !== '' && !/^https:\/\/\S+$/.test(d.imageUrl.trim())) return 'O endereço da imagem precisa começar com https://';
+  if (d.imageData === '' && d.imageUrl.trim() !== '' && !isOwnCoverPath(d.imageUrl.trim()) && !/^https:\/\/\S+$/.test(d.imageUrl.trim())) return 'O endereço da imagem precisa começar com https://';
   if (parseTags(d.tags).length > VENUE_EVENT_TAGS_MAX) return `Use até ${VENUE_EVENT_TAGS_MAX} hashtags.`;
   return null;
 }
@@ -93,13 +99,13 @@ export function venueEventBody(d: VenueEventDraft): VenueEventBody {
     startsAt: localToIso(d.starts) as string,
     endsAt: d.ends === '' ? null : localToIso(d.ends),
     isFree: d.isFree,
-    imageUrl: d.imageUrl.trim() === '' ? null : d.imageUrl.trim(),
+    ...(d.imageData !== '' ? { imageData: d.imageData } : { imageUrl: d.imageUrl.trim() === '' ? null : d.imageUrl.trim() }),
     tags: parseTags(d.tags),
   };
 }
 
 export function draftFromEvent(e: VenueEvent, isoToLocalInput: (iso: string) => string): VenueEventDraft {
-  return { title: e.title, description: e.description ?? '', kind: e.kind, starts: isoToLocalInput(e.startsAt), ends: isoToLocalInput(e.endsAt), isFree: e.isFree, imageUrl: e.imageUrl ?? '', tags: e.tags.map((t) => `#${t}`).join(' ') };
+  return { title: e.title, description: e.description ?? '', kind: e.kind, starts: isoToLocalInput(e.startsAt), ends: isoToLocalInput(e.endsAt), isFree: e.isFree, imageUrl: e.imageUrl ?? '', imageData: '', tags: e.tags.map((t) => `#${t}`).join(' ') };
 }
 
 export function phaseLabel(phase: VenueEvent['phase']): string {

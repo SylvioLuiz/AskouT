@@ -47,3 +47,14 @@ test('rótulos do pedido', () => {
   assert.equal(claimStatusLabel('PENDING'), 'Avaliação em andamento');
   assert.equal(claimStatusLabel('REJECTED'), 'Recusado');
 });
+
+test('capa: foto do aparelho vai como imageData; capa já enviada é mantida', () => {
+  const base = { ...EMPTY_VENUE_EVENT, title: 'X', starts: '2026-12-01T20:00' };
+  const up = venueEventBody({ ...base, imageData: 'data:image/jpeg;base64,AAAA' });
+  assert.equal(up.imageData, 'data:image/jpeg;base64,AAAA');
+  assert.equal('imageUrl' in up, false);
+  const own = { ...base, imageUrl: '/place-events/abc-1/cover?v=123' };
+  assert.equal(venueEventProblem(own, new Date('2026-11-01T00:00:00Z'), true), null);
+  assert.equal(venueEventBody(own).imageUrl, '/place-events/abc-1/cover?v=123');
+  assert.match(venueEventProblem({ ...base, imageUrl: '/outra/coisa' }, new Date('2026-11-01T00:00:00Z'), true) ?? '', /https/);
+});

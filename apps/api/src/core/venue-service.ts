@@ -15,6 +15,15 @@ export const VENUE_EVENT_DESCRIPTION_MAX = 1000;
 export const VENUE_EVENT_TAGS_MAX = 5;
 export const VENUE_EVENT_MAX_DAYS = 30;
 export const VENUE_EVENTS_LIMIT = 100;
+/** Capa enviada do aparelho (a tela reduz a foto antes de enviar). */
+export const EVENT_COVER_MAX_BYTES = 256 * 1024;
+
+/** Endereço da capa enviada; `v` muda a cada troca para o navegador não mostrar a antiga. */
+export function eventCoverPath(eventId: string, version: number): string {
+  return `/place-events/${eventId}/cover?v=${version}`;
+}
+
+type CoverChange = { mode: 'keep' } | { mode: 'none' } | { mode: 'url'; url: string } | { mode: 'upload'; mime: string; bytes: Uint8Array };
 
 const PDF_RE = /^data:application\/pdf;base64,([A-Za-z0-9+/]+={0,2})$/;
 
@@ -72,7 +81,10 @@ export interface VenueEventInput {
   startsAt?: unknown;
   endsAt?: unknown;
   isFree?: unknown;
+  /** Endereço https de uma imagem da web; vazio/nulo tira a capa; ausente mantém a atual. */
   imageUrl?: unknown;
+  /** Data URL (JPEG, PNG ou WebP, até 256 KB) de uma foto enviada do aparelho. */
+  imageData?: unknown;
   tags?: unknown;
 }
 
@@ -217,9 +229,12 @@ export class VenueService {
 
   async createEvent(userId: string, venueId: unknown, input: VenueEventInput): Promise<VenueEventView> {
     const venue = await this.ownedOrThrow(userId, venueId);
-    const fields = this.parseEvent(input);
-    const event: PlaceEventRecord = { id: this.deps.ids.next(), venueId: venue.id, ...fields, isSample: false };
+    const { cover, ...fields } = this.parseEvent(input);
+    const id = this.deps.ids.next();
+    const event: PlaceEventRecord = { id, venueId: venue.id, ...fields, imageUrl: cover.mode === 'url' ? cover.url : null, isSample: false };
+    if (cover.mode === 'upload') event.imageUrl = eventCoverPath(id, this.deps.clock.now().getTime());
     await this.deps.places.createEvent(event);
+    if (cover.mode === 'upload') await this.deps.places.setEventCover(id, cover.mime, cover.bytes);
     return this.eventView(event);
   }
 
@@ -227,9 +242,14 @@ export class VenueService {
     const venue = await this.ownedOrThrow(userId, venueId);
     const current = typeof eventId === 'string' && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;
     if (!current || current.event.venueId !== venue.id) throw notFound('Evento não encontrado');
-    const fields = this.parseEvent(input, current.event.startsAt);
+    const { cover, ...fields } = this.parseEvent(input, current.event.startsAt, current.event);
     const event: PlaceEventRecord = { ...current.event, ...fields };
+    if (cover.mode === 'url') event.imageUrl = cover.url;
+    else if (cover.mode === 'none') event.imageUrl = null;
+    else if (cover.mode === 'upload') event.imageUrl = eventCoverPath(event.id, this.deps.clock.now().getTime());
     if (!(await this.deps.places.updateEvent(venue.id, event))) throw notFound('Evento não encontrado');
+    if (cover.mode === 'upload') await this.deps.places.setEventCover(event.id, cover.mime, cover.bytes);
+    else if (cover.mode === 'url' || cover.mode === 'none') await this.deps.places.clearEventCover(event.id);
     return this.eventView(event);
   }
 
@@ -237,6 +257,12 @@ export class VenueService {
     const venue = await this.ownedOrThrow(userId, venueId);
     if (typeof eventId !== 'string' || eventId.length > 64 || !(await this.deps.places.deleteEvent(venue.id, eventId))) throw notFound('Evento não encontrado');
     return { deleted: true };
+  }
+
+  /** Capa enviada de um evento, para o <img> (que não manda o token). */
+  async eventCover(eventId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (typeof eventId !== 'string' || eventId === '' || eventId.length > 64) return undefined;
+    return this.deps.places.findEventCover(eventId);
   }
 
   /** Documento de um pedido, só para admin. */
@@ -266,7 +292,7 @@ export class VenueService {
     return { id: e.id, title: e.title, description: e.description, kind: e.kind, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, phase, sample: e.isSample };
   }
 
-  private parseEvent(input: VenueEventInput, keepStart?: Date): Omit<PlaceEventRecord, 'id' | 'venueId' | 'isSample'> {
+  private parseEvent(input: VenueEventInput, keepStart?: Date, current?: PlaceEventRecord): Omit<PlaceEventRecord, 'id' | 'venueId' | 'isSample' | 'imageUrl'> & { cover: CoverChange } {
     if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Evento inválido', { event: 'Dados do evento inválidos' });
     const title = text(input.title, VENUE_EVENT_TITLE_MAX, 'title', 'Nome do evento', true) as string;
     const description = text(input.description, VENUE_EVENT_DESCRIPTION_MAX, 'description', 'Descrição');
@@ -277,10 +303,17 @@ export class VenueService {
     }
     if (input.isFree !== undefined && typeof input.isFree !== 'boolean') throw validationError('Evento inválido', { isFree: 'Informe se é grátis ou não' });
     const isFree = input.isFree === true;
-    let imageUrl: string | null = null;
-    if (input.imageUrl !== undefined && input.imageUrl !== null && input.imageUrl !== '') {
-      if (typeof input.imageUrl !== 'string' || input.imageUrl.length > 500 || !/^https:\/\/[^\s]+$/.test(input.imageUrl)) throw validationError('Evento inválido', { imageUrl: 'Use um endereço de imagem que comece com https://' });
-      imageUrl = input.imageUrl;
+    let cover: CoverChange = current ? { mode: 'keep' } : { mode: 'none' };
+    if (input.imageData !== undefined && input.imageData !== null && input.imageData !== '') {
+      const img = decodeImageDataUrl(input.imageData, EVENT_COVER_MAX_BYTES, '250 KB');
+      cover = { mode: 'upload', mime: img.mime, bytes: img.bytes };
+    } else if (input.imageUrl === null || input.imageUrl === '') {
+      cover = { mode: 'none' };
+    } else if (input.imageUrl !== undefined) {
+      if (typeof input.imageUrl !== 'string' || input.imageUrl.length > 500) throw validationError('Evento inválido', { imageUrl: 'Use um endereço de imagem que comece com https://' });
+      if (current && input.imageUrl === current.imageUrl && input.imageUrl.startsWith(`/place-events/${current.id}/cover`)) cover = { mode: 'keep' };
+      else if (/^https:\/\/[^\s]+$/.test(input.imageUrl)) cover = { mode: 'url', url: input.imageUrl };
+      else throw validationError('Evento inválido', { imageUrl: 'Use um endereço de imagem que comece com https://' });
     }
     let tags: string[] = [];
     if (input.tags !== undefined && input.tags !== null) {
@@ -301,6 +334,6 @@ export class VenueService {
     const endsAt = input.endsAt === undefined || input.endsAt === null || input.endsAt === '' ? new Date(startsAt.getTime() + 3 * 3_600_000) : date(input.endsAt, 'Fim', 'endsAt');
     if (endsAt.getTime() <= startsAt.getTime()) throw validationError('Evento inválido', { endsAt: 'O fim precisa ser depois do início' });
     if (endsAt.getTime() - startsAt.getTime() > VENUE_EVENT_MAX_DAYS * 24 * 3_600_000) throw validationError('Evento inválido', { endsAt: `O evento pode durar até ${VENUE_EVENT_MAX_DAYS} dias` });
-    return { title, description, kind, startsAt, endsAt, isFree, imageUrl, tags };
+    return { title, description, kind, startsAt, endsAt, isFree, tags, cover };
   }
 }

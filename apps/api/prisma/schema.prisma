@@ -621,6 +621,7 @@ model PlaceEvent {
   messages Message[]
   posts    PostedEvent[]
   attendees EventAttendance[]
+  cover    PlaceEventCover?
 
   @@index([startsAt])
   @@index([venueId])
@@ -791,4 +792,14 @@ model AdminAudit {
   createdAt  DateTime @default(now())
 
   @@index([createdAt])
+}
+
+/// Capa enviada pelo dono do local (JPEG/PNG/WebP até 256 KB), servida em `/place-events/:id/cover`.
+model PlaceEventCover {
+  eventId   String   @id @db.Uuid
+  mime      String
+  data      Bytes
+  updatedAt DateTime @default(now())
+
+  event PlaceEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
 }

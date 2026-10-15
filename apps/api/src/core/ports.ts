@@ -250,6 +250,10 @@ export interface PlaceRepository {
   /** Troca os campos editáveis; false se o evento não é do local. */
   updateEvent(venueId: string, event: PlaceEventRecord): Promise<boolean>;
   deleteEvent(venueId: string, eventId: string): Promise<boolean>;
+  /** Capa enviada pelo dono do local (bytes no banco). */
+  setEventCover(eventId: string, mime: string, data: Uint8Array): Promise<void>;
+  clearEventCover(eventId: string): Promise<void>;
+  findEventCover(eventId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
   /** Define o dono (null tira). Só no aceite de uma reivindicação. */
   setVenueOwner(venueId: string, ownerId: string | null): Promise<void>;
 }

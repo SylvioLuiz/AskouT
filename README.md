@@ -269,6 +269,7 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 Dentro do perfil: **Meus locais** (`/locais`). A pessoa busca um local já cadastrado, envia um documento (PDF/JPEG/PNG/WebP até 2 MB, guardado no banco e só visível a admin) e fica com um pedido **em análise**. Quando um admin aprova (`VenuesService.reviewClaim`), ela vira dona (`Venue.ownerId`) e passa a criar, editar e apagar os eventos do local em `/locais/:id`; eles aparecem no Explorar e na página do evento como qualquer outro.
 
 - Rotas: `GET /me/venues`, `GET /venues/claimable?q=`, `POST /venues/:id/claims`, `DELETE /venue-claims/:id`, `GET /me/venues/:id`, `POST|PUT|DELETE /me/venues/:id/events[/:eventId]`.
+- Capa do evento: `imageData` (data URL JPEG/PNG/WebP, até 256 KB, guardada no banco em `PlaceEventCover`) ou `imageUrl` (https); vazio remove; ausente mantém. Servida sem login em `GET /place-events/:id/cover` (o `?v=` muda a cada troca). A tela reduz a foto antes de enviar.
 - Quem não é dono recebe 404 (não revela quais locais têm dono). No máximo 5 pedidos em análise por pessoa.
 - Aprovar e recusar pedidos é feito na plataforma de gestão (seção abaixo).
 - Migration `20261025120000_venue_claims` e `prisma/sql/014_venue_claim_constraints.sql` (rodar `npm run prisma:generate` depois de baixar).

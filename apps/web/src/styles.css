@@ -3400,3 +3400,10 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .claimrow__help { margin: 0; color: var(--ink-2); font-size: 0.9375rem; }
 .claimrow__status--pending { background: var(--surface); color: var(--brand); }
 .claimlist { margin-bottom: 16px; }
+
+/* Capa do evento (painel do local) */
+.cover { display: flex; flex-direction: column; gap: 10px; }
+.cover__preview { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--radius-control); background: var(--surface); }
+.cover__menu { display: flex; flex-direction: column; gap: 8px; }
+.cover__link { display: flex; flex-direction: column; gap: 8px; }
+.cover__hint { margin: 0; font-size: 13px; color: var(--text-2, #6e6e73); }

@@ -153,3 +153,34 @@ test('evento já começado pode ser editado sem mexer no início', async () => {
   w.clock.tick(5 * H);
   assert.equal((await w.core.venues.panel(ana, 'v1')).events[0]?.phase, 'PAST');
 });
+
+test('capa do evento: enviar do aparelho, manter, trocar por link e remover', async () => {
+  const { w, ana, adm, start } = await setup();
+  const claim = await w.core.venues.requestClaim(ana, 'v1', { document: JPEG() });
+  await w.core.venues.reviewClaim(adm, claim.id, 'APPROVED');
+  const created = await w.core.venues.createEvent(ana, 'v1', { title: 'Noite', startsAt: start(), imageData: JPEG(50) });
+  assert.match(created.imageUrl ?? '', new RegExp(`^/place-events/${created.id}/cover\\?v=\\d+$`));
+  const stored = await w.core.venues.eventCover(created.id);
+  assert.equal(stored?.mime, 'image/jpeg');
+  // editar sem mexer na imagem mantém a capa; mandar o próprio endereço também
+  const kept = await w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'Noite 2', startsAt: created.startsAt });
+  assert.equal(kept.imageUrl, created.imageUrl);
+  const kept2 = await w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'Noite 3', startsAt: created.startsAt, imageUrl: created.imageUrl });
+  assert.equal(kept2.imageUrl, created.imageUrl);
+  assert.ok(await w.core.venues.eventCover(created.id));
+  // inválidos
+  await rejectsWith(w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'X', startsAt: created.startsAt, imageData: PDF() }), 'VALIDATION');
+  await rejectsWith(w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'X', startsAt: created.startsAt, imageData: JPEG(300 * 1024) }), 'VALIDATION');
+  await rejectsWith(w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'X', startsAt: created.startsAt, imageUrl: '/place-events/outro/cover' }), 'VALIDATION');
+  // trocar por link apaga o arquivo
+  const link = await w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'Noite', startsAt: created.startsAt, imageUrl: 'https://img.exemplo/a.jpg' });
+  assert.equal(link.imageUrl, 'https://img.exemplo/a.jpg');
+  assert.equal(await w.core.venues.eventCover(created.id), undefined);
+  // enviar de novo e remover
+  await w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'Noite', startsAt: created.startsAt, imageData: JPEG() });
+  assert.ok(await w.core.venues.eventCover(created.id));
+  const none = await w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'Noite', startsAt: created.startsAt, imageUrl: '' });
+  assert.equal(none.imageUrl, null);
+  assert.equal(await w.core.venues.eventCover(created.id), undefined);
+  assert.equal(await w.core.venues.eventCover('nao-existe'), undefined);
+});

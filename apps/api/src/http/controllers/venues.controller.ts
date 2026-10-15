@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, Inject, NotFoundException, Param, Post, Put, Query, StreamableFile } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { asBody } from '../support/parse.ts';
-import { CurrentActor } from '../decorators.ts';
+import { CurrentActor, Public } from '../decorators.ts';
 import { CORE } from '../tokens.ts';
 
 /** Painel do local (dentro do perfil): reivindicar um local e cuidar dos eventos dele. */
@@ -12,6 +12,17 @@ export class VenuesController {
 
   constructor(@Inject(CORE) core: Core) {
     this.core = core;
+  }
+
+  /** Capa enviada do aparelho, para o <img> (que não manda o token). O endereço leva `?v=` e muda a cada troca. */
+  @Public()
+  @Get('place-events/:id/cover')
+  @Header('Cache-Control', 'public, max-age=31536000, immutable')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async cover(@Param('id') id: string) {
+    const photo = await this.core.venues.eventCover(id);
+    if (!photo) throw new NotFoundException();
+    return new StreamableFile(photo.data, { type: photo.mime });
   }
 
   /** Meus locais e meus pedidos de reivindicação. */

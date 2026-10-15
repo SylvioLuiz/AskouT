@@ -57,3 +57,13 @@ test('coverShape é estável; safeImage só aceita https; contagem de filtros', 
   assert.equal(activeFilterCount({ range: 'today', kind: null, free: false, radiusKm: 10 }), 0);
   assert.equal(activeFilterCount({ range: 'week', kind: 'SHOW', free: true, radiusKm: 5 }), 4);
 });
+
+test('safeImage aceita capas servidas pela API com o endereço base', async () => {
+  const { safeImage, setAssetBase } = await import('./explore.ts');
+  setAssetBase('/api');
+  assert.equal(safeImage('/place-events/a1/cover?v=5'), '/api/place-events/a1/cover?v=5');
+  assert.equal(safeImage('/etc/passwd'), null);
+  assert.equal(safeImage('http://x.com/a.jpg'), null);
+  assert.equal(safeImage('https://x.com/a.jpg'), 'https://x.com/a.jpg');
+  setAssetBase('');
+});

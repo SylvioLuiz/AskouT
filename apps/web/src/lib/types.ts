@@ -613,6 +613,7 @@ export interface VenueEventBody {
   startsAt: string;
   endsAt: string | null;
   isFree: boolean;
-  imageUrl: string | null;
+  imageUrl?: string | null;
+  imageData?: string;
   tags: string[];
 }

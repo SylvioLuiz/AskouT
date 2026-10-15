@@ -84,8 +84,17 @@ export function coverShape(id: string): 'tall' | 'square' | 'wide' {
 }
 
 /** Uma imagem de evento só vale se for https. */
+let assetBase = '';
+/** Endereço da API, para as imagens que ela mesma serve (capas enviadas). */
+export function setAssetBase(base: string): void {
+  assetBase = base;
+}
+
 export function safeImage(url: string | null): string | null {
-  return url !== null && url.startsWith('https://') ? url : null;
+  if (url === null) return null;
+  if (url.startsWith('https://')) return url;
+  if (/^\/place-events\/[\w-]+\/cover(\?v=\d+)?$/.test(url)) return `${assetBase}${url}`;
+  return null;
 }
 
 export function activeFilterCount(f: { range: RangeId; kind: EventKind | null; free: boolean; radiusKm: number }): number {
