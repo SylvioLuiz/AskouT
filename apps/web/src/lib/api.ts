@@ -2,6 +2,7 @@ import { errorFromResponse, networkError } from './errors.ts';
 import type { SuggestedPerson } from './suggested-people.ts';
 import type {
   ClaimableVenue,
+  ExploreEvent,
   MyVenues,
   VenueClaim,
   VenueEvent,

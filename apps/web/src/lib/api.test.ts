@@ -26,6 +26,7 @@ function setup(reply: { status?: number; body?: unknown; headers?: Record<string
         if (reply.badJson) throw new SyntaxError('Unexpected token');
         return reply.body;
       },
+      blob: async () => new Blob(),
     };
   };
   let token: string | undefined = 'tok123';
