@@ -3580,5 +3580,19 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .vinfo__stars { position: relative; display: inline-block; font-size: 17px; letter-spacing: 1px; line-height: 1; color: var(--line-strong, #c9c9ce); background: linear-gradient(90deg, #f5a623 var(--fill, 0%), var(--line-strong, #c9c9ce) var(--fill, 0%)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .vhours--panel { margin: 0 0 0 58px; background: none; border-bottom: 1px solid var(--line); }
 .vhours--panel .vhours__row { padding: 9px 4px; }
-.vrate { padding: 8px 4px 14px 62px; border-bottom: 1px solid var(--line); }
 @media (prefers-reduced-motion: reduce) { .vinfo__chev { transition: none; } }
+
+/* Avaliar na própria linha da nota */
+.vrate { margin: 0; padding: 0; }
+.vrate__stars { display: flex; align-items: center; gap: 0; margin-left: -6px; }
+.vrate__star { width: 40px; height: 44px; padding: 0; border: 0; background: none; font-size: 30px; line-height: 1; color: var(--line-strong, #c9c9ce); cursor: pointer; transition: transform .12s, color .12s; }
+.vrate__star--on { color: #f5a623; }
+.vrate__star:active { transform: scale(.88); }
+.vrate__label { margin-left: 6px; font-size: 13px; color: var(--muted); }
+.vrate__stars--five .vrate__star { animation: vrate-pop .5s cubic-bezier(.3,1.6,.5,1) both; }
+.vrate__stars--five .vrate__star:nth-child(2) { animation-delay: .06s; }
+.vrate__stars--five .vrate__star:nth-child(3) { animation-delay: .12s; }
+.vrate__stars--five .vrate__star:nth-child(4) { animation-delay: .18s; }
+.vrate__stars--five .vrate__star:nth-child(5) { animation-delay: .24s; }
+@keyframes vrate-pop { 0% { transform: scale(1); } 45% { transform: scale(1.35) rotate(-8deg); text-shadow: 0 0 12px rgba(245,166,35,.8); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .vrate__stars--five .vrate__star { animation: none; } .vrate__star { transition: none; } }

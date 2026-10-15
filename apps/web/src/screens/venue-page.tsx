@@ -42,10 +42,11 @@ function goBack() {
 }
 
 /** Topo da página: capa (a fachada) ao fundo, logo em círculo, nome, localização e os três números. */
-/** Estrelas para avaliar o bar: toque na nota; tocar de novo na mesma nota tira a avaliação. */
+/** Estrelas para avaliar o bar, na própria linha da nota: toque na nota; tocar de novo na mesma tira a avaliação. Cinco estrelas ganham uma animação sutil. */
 function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  const [cheer, setCheer] = useState(0);
   const mine = venue.rating.mine;
   async function pick(stars: number) {
     if (busy) return;
@@ -53,7 +54,10 @@ function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
     setProblem(undefined);
     try {
       if (mine === stars) await api.clearVenueRating(venue.id);
-      else await api.rateVenue(venue.id, stars);
+      else {
+        await api.rateVenue(venue.id, stars);
+        if (stars === 5) setCheer((n) => n + 1);
+      }
       onChanged();
     } catch (failure) {
       setProblem(toApiError(failure).message);
@@ -63,14 +67,14 @@ function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
   }
   return (
     <div className="vrate">
-      <div className="vrate__stars" role="group" aria-label="Sua nota de 1 a 5">
+      <div key={cheer} className={`vrate__stars${cheer > 0 && mine === 5 ? ' vrate__stars--five' : ''}`} role="group" aria-label={mine ? `Sua nota: ${mine} de 5` : 'Toque para dar a sua nota de 1 a 5'}>
         {[1, 2, 3, 4, 5].map((n) => (
           <button key={n} type="button" className={`vrate__star${mine !== null && n <= mine ? ' vrate__star--on' : ''}`} aria-pressed={mine === n} aria-label={`${n} ${n === 1 ? 'estrela' : 'estrelas'}`} disabled={busy} onClick={() => void pick(n)}>
             ★
           </button>
         ))}
+        <span className="vrate__label">{mine ? 'Sua nota' : 'Avaliar'}</span>
       </div>
-      {mine ? <p className="muted vrate__hint">Toque na mesma estrela para remover a sua nota.</p> : null}
       {problem ? <p className="field__error">{problem}</p> : null}
     </div>
   );
@@ -129,32 +133,28 @@ function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
   );
 }
 
-/** Nota do bar: média, estrelas e quantas avaliações; quem não é dono toca para avaliar. */
+/** Nota do bar: média, estrelas e quantas avaliações; quem não é dono avalia na mesma linha. */
 function RatingInfo({ venue, onChanged }: { venue: VenueProfile; onChanged: () => void }) {
-  const [open, setOpen] = useState(false);
   const r = venue.rating;
-  const summary =
-    r.count > 0 ? (
-      <>
-        <strong>{formatRating(r.average ?? 0)}</strong>
-        <span className="vinfo__stars" aria-hidden="true" style={{ ['--fill' as string]: `${starPercent(r.average ?? 0)}%` }}>
-          ★★★★★
-        </span>
-        <span className="vinfo__sub vinfo__sub--inline">
-          {r.count} {r.count === 1 ? 'avaliação' : 'avaliações'}
-        </span>
-      </>
-    ) : (
-      <span className="vinfo__sub vinfo__sub--inline">Ainda sem avaliações</span>
-    );
   return (
-    <>
-      <InfoRow icon={<StarIcon />} open={venue.isOwner ? undefined : open} onToggle={venue.isOwner ? undefined : () => setOpen((o) => !o)} label={venue.rating.mine ? 'Ver ou mudar a sua avaliação' : 'Avaliar este bar'}>
-        <span className="vinfo__rate">{summary}</span>
-        {!venue.isOwner ? <span className="vinfo__sub">{r.mine ? `Sua nota: ${r.mine}` : 'Toque para avaliar'}</span> : null}
-      </InfoRow>
-      {open && !venue.isOwner ? <StarPicker venue={venue} onChanged={onChanged} /> : null}
-    </>
+    <InfoRow icon={<StarIcon />}>
+      <span className="vinfo__rate">
+        {r.count > 0 ? (
+          <>
+            <strong>{formatRating(r.average ?? 0)}</strong>
+            <span className="vinfo__stars" aria-hidden="true" style={{ ['--fill' as string]: `${starPercent(r.average ?? 0)}%` }}>
+              ★★★★★
+            </span>
+            <span className="vinfo__sub vinfo__sub--inline">
+              {r.count} {r.count === 1 ? 'avaliação' : 'avaliações'}
+            </span>
+          </>
+        ) : (
+          <span className="vinfo__sub vinfo__sub--inline">Ainda sem avaliações</span>
+        )}
+      </span>
+      {!venue.isOwner ? <StarPicker venue={venue} onChanged={onChanged} /> : null}
+    </InfoRow>
   );
 }
 
