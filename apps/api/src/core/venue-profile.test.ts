@@ -113,7 +113,7 @@ test('posts do bar: só o dono publica, aparecem na página e no feed de quem se
   await rejectsWith(w.core.posts.createForVenue(dono, 'v2', { images: [JPEG()] }), 'NOT_FOUND');
   await rejectsWith(w.core.posts.createForVenue(dono, 'v1', { images: [{ placePhotoRef: 'places/x/photos/y' }] }), 'VALIDATION');
   const post = await w.core.posts.createForVenue(dono, 'v1', { caption: 'Hoje tem samba', images: [JPEG()], tagUserIds: [ana], event: { title: 'x' } });
-  assert.deepEqual(post.venue, { id: 'v1', name: 'Bar do Zé' });
+  assert.deepEqual(post.venue, { id: 'v1', name: 'Bar do Zé', logoUrl: null });
   assert.equal(post.placeName, 'Bar do Zé');
   assert.equal(post.tags.length, 0);
   assert.equal(post.event, null);
@@ -187,4 +187,54 @@ test('logo do estabelecimento: aparelho, link, manter, remover; independente da 
   const none = await w.core.venues.updateProfile(dono, 'v1', { logoUrl: null });
   assert.equal(none.logoUrl, null);
   assert.equal(await w.core.venues.venueLogo('v1'), undefined);
+});
+
+test('dono comenta no post do próprio bar como o bar; nos outros posts, como pessoa', async () => {
+  const { w, dono, ana, bia } = await setup();
+  await w.core.profiles.setPrivacy(dono, true);
+  const post = await w.core.posts.createForVenue(dono, 'v1', { images: [JPEG()] });
+  const a = await w.core.posts.addComment(ana, post.id, 'Que legal!');
+  assert.equal(a.venue, null);
+  const b = await w.core.posts.addComment(dono, post.id, 'Obrigado, aparece!');
+  assert.deepEqual(b.venue, { id: 'v1', name: 'Bar do Zé', logoUrl: null });
+  assert.equal(b.mine, true);
+  // a lista mostra o comentário do bar mesmo para quem não segue o perfil (privado) do dono
+  const list = await w.core.posts.comments(bia, post.id);
+  assert.deepEqual(list.items.map((c) => [c.body, c.venue?.name ?? null]), [['Que legal!', null], ['Obrigado, aparece!', 'Bar do Zé']]);
+  // quem escreveu ou o dono apaga; o dono apaga o comentário de outra pessoa no post do bar
+  assert.equal(list.items[0]!.canDelete, false);
+  assert.equal((await w.core.posts.comments(dono, post.id)).items[0]!.canDelete, true);
+  // post pessoal do dono: comentário de pessoa
+  const own = await w.core.posts.create(dono, { images: [JPEG()] });
+  const c = await w.core.posts.addComment(dono, own.id, 'Meu post');
+  assert.equal(c.venue, null);
+  // post de outro bar (v2 não é dele, mas o post é de um bar de outra pessoa): comenta como pessoa
+  await w.places.createVenue({ id: 'v3', name: 'Outro Bar', address: null, category: null, lat: 0, lng: 0, isSample: false, ownerId: ana });
+  const other = await w.core.posts.createForVenue(ana, 'v3', { images: [JPEG()] });
+  assert.equal((await w.core.posts.addComment(dono, other.id, 'Parabéns')).venue, null);
+});
+
+test('busca de bares traz o perfil: logo, seguidores, horários e se já segue', async () => {
+  const { w, dono, ana } = await setup();
+  await w.core.venues.updateProfile(dono, 'v1', { logoUrl: 'https://img.exemplo/logo.png', hours: WEEK() });
+  await w.core.venues.follow(ana, 'v1');
+  const found = await w.core.explore.search(ana, { q: 'zé' });
+  const place = found.places.find((p) => p.name === 'Bar do Zé')!;
+  assert.equal(place.source, 'ASKOUT');
+  assert.deepEqual(place.venue, { id: 'v1', logoUrl: 'https://img.exemplo/logo.png', hours: WEEK(), followerCount: 1, following: true, claimed: true });
+  const dois = found.places.find((p) => p.name === 'Sem dono');
+  assert.equal(dois, undefined);
+  const free = (await w.core.explore.search(dono, { q: 'sem dono' })).places[0]!;
+  assert.deepEqual([free.venue?.following, free.venue?.followerCount, free.venue?.claimed], [false, 0, false]);
+});
+
+test('lugar do Google já aberto não aparece duas vezes na busca', async () => {
+  const { w, ana } = await setup();
+  w.placeSource.places = [{ externalId: 'ABC', source: 'GOOGLE', name: 'Boteco da Esquina', category: 'bar', lat: -23.55, lng: -46.63 }];
+  const before = await w.core.explore.search(ana, { q: 'boteco', lat: -23.55, lng: -46.63 });
+  assert.deepEqual(before.places.map((p) => p.source), ['GOOGLE']);
+  await w.core.venues.openExternal({ key: 'google:ABC', lat: -23.55, lng: -46.63 });
+  const after = await w.core.explore.search(ana, { q: 'boteco', lat: -23.55, lng: -46.63 });
+  assert.deepEqual(after.places.map((p) => p.source), ['ASKOUT']);
+  assert.equal(after.places[0]!.venue?.claimed, false);
 });

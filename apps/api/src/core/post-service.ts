@@ -56,6 +56,8 @@ export interface PostTagView {
 export interface PostVenueView {
   id: string;
   name: string;
+  /** https ou caminho da logo enviada. */
+  logoUrl: string | null;
 }
 
 export interface PostView {
@@ -86,6 +88,8 @@ export interface PostView {
 export interface PostCommentView {
   id: string;
   author: PublicProfile;
+  /** Preenchido quando o comentário é do estabelecimento: a tela mostra o local no lugar do autor. */
+  venue: PostVenueView | null;
   body: string;
   createdAt: string;
   mine: boolean;
@@ -251,7 +255,13 @@ export class PostService {
     const { post } = await this.seeable(viewerId, postId);
     const text = optionalText(body, POST_COMMENT_MAX, 'body', 'Comentário');
     if (!text) throw validationError('Comentário vazio', { body: 'Escreva algo para comentar' });
-    const record: PostCommentRecord = { id: this.deps.ids.next(), postId: post.id, authorId: viewerId, body: text, createdAt: this.deps.clock.now() };
+    // Quem administra o bar e comenta num post do próprio bar comenta como o bar.
+    let asVenue: string | null = null;
+    if (post.venueId) {
+      const venue = await this.deps.places.findVenue(post.venueId);
+      if (venue && venue.ownerId === viewerId) asVenue = venue.id;
+    }
+    const record: PostCommentRecord = { id: this.deps.ids.next(), postId: post.id, authorId: viewerId, body: text, createdAt: this.deps.clock.now(), venueId: asVenue };
     await this.deps.posts.addComment(record);
     if (post.authorId !== viewerId) {
       const me = await this.deps.users.findProfileById(viewerId);
@@ -274,12 +284,19 @@ export class PostService {
     const byId = new Map(profiles.map((p) => [p.userId, toPublicProfile(p)]));
     const memo = new Map<string, boolean>();
     const out: PostCommentView[] = [];
+    const venueIds = [...new Set(rows.flatMap((r) => (r.venueId ? [r.venueId] : [])))];
+    const venues = new Map((await Promise.all(venueIds.map((id) => this.deps.places.findVenue(id)))).flatMap((v) => (v ? [[v.id, { id: v.id, name: v.name, logoUrl: v.logoUrl ?? null }] as const] : [])));
     for (const row of rows) {
       const author = byId.get(row.authorId);
       if (!author) continue;
+      const venue = (row.venueId ? venues.get(row.venueId) : undefined) ?? null;
+      if (venue) {
+        out.push({ id: row.id, author, venue, body: row.body, createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId });
+        continue;
+      }
       if (!memo.has(row.authorId)) memo.set(row.authorId, row.authorId === viewerId || (await this.canSee(viewerId, row.authorId)));
       if (!memo.get(row.authorId)) continue;
-      out.push({ id: row.id, author, body: row.body, createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId });
+      out.push({ id: row.id, author, venue: null, body: row.body, createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId });
     }
     return out;
   }
@@ -491,7 +508,7 @@ export class PostService {
     const taggedById = new Map(tagged.map((a) => [a.userId, toPublicProfile(a)]));
     const byId = new Map(authors.map((a) => [a.userId, toPublicProfile(a)]));
     const venueIds = [...new Set(rows.flatMap((r) => (r.post.venueId ? [r.post.venueId] : [])))];
-    const venues = new Map((await Promise.all(venueIds.map((id) => this.deps.places.findVenue(id)))).flatMap((v) => (v ? [[v.id, { id: v.id, name: v.name }] as const] : [])));
+    const venues = new Map((await Promise.all(venueIds.map((id) => this.deps.places.findVenue(id)))).flatMap((v) => (v ? [[v.id, { id: v.id, name: v.name, logoUrl: v.logoUrl ?? null }] as const] : [])));
     const ids = rows.map((r) => r.post.id);
     const likes = new Map((await this.deps.posts.likeStats(ids, viewerId)).map((l) => [l.postId, l]));
     const comments = new Map((await this.deps.posts.commentCounts(ids)).map((c) => [c.postId, c.count]));

@@ -4,6 +4,7 @@ import { CropEditor } from './crop.tsx';
 import { EventDates } from './event-dates.tsx';
 import { EventKindPicker } from './event-kind-picker.tsx';
 import { ArrowUpIcon, CropIcon, TrashIcon } from './icons.tsx';
+import { VenueLogo } from './venue-logo.tsx';
 import { Avatar, Button, Confirm, ErrorState, Field, GroupAvatar, Loading, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
@@ -152,14 +153,26 @@ export function ReasonSheet({ title, doneText, extra, submit, onClose, onDone }:
 function CommentRow({ comment, onDelete, busy }: { comment: PostComment; onDelete: () => void; busy: boolean }) {
   return (
     <li className="comment">
-      <Link to={`/u/${encodeURIComponent(comment.author.username)}`} aria-label={`Perfil de ${comment.author.username}`}>
-        <Avatar profile={comment.author} size={32} />
-      </Link>
+      {comment.venue ? (
+        <Link to={`/bares/${encodeURIComponent(comment.venue.id)}`} aria-label={`Página de ${comment.venue.name}`}>
+          <VenueLogo name={comment.venue.name} logoUrl={comment.venue.logoUrl} size={32} />
+        </Link>
+      ) : (
+        <Link to={`/u/${encodeURIComponent(comment.author.username)}`} aria-label={`Perfil de ${comment.author.username}`}>
+          <Avatar profile={comment.author} size={32} />
+        </Link>
+      )}
       <div className="comment__body">
         <p>
-          <Link to={`/u/${encodeURIComponent(comment.author.username)}`} className="comment__name">
-            {comment.author.username}
-          </Link>{' '}
+          {comment.venue ? (
+            <Link to={`/bares/${encodeURIComponent(comment.venue.id)}`} className="comment__name">
+              {comment.venue.name} <span className="tag tag--event">Bar</span>
+            </Link>
+          ) : (
+            <Link to={`/u/${encodeURIComponent(comment.author.username)}`} className="comment__name">
+              {comment.author.username}
+            </Link>
+          )}{' '}
           <span className="muted">{timeAgo(comment.createdAt, new Date())}</span>
         </p>
         <p className="comment__text">{comment.body}</p>

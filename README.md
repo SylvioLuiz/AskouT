@@ -281,7 +281,8 @@ Todo local tem uma página pública, com ou sem dono: capa, nome, tipo, endereç
 - Post do bar é um `Post` com `venueId` (o autor é quem administra). Aparece só pelo bar (página e feed de seguidores), nunca no perfil pessoal de quem postou; é aberto a qualquer pessoa, mesmo que o perfil do dono seja privado. Sem marcações nem evento próprio, só fotos do aparelho.
 - Lugar que só existe no Google/OSM: `POST /venues/external {key: "google:ID", lat, lng}` confere na fonte que o lugar existe ali perto e cria o local na primeira vez (`Venue.externalKey`, único). Nada do que o app manda vira nome ou dado do local. A foto do Google continua só como referência (nunca copiada) e aparece com crédito.
 - Topo da página: capa de fundo (a fachada), **logo** em círculo (`logoData` JPEG/PNG/WebP até 128 KB em `VenueLogo`, ou `logoUrl` https; servida em `GET /venues/:id/logo`), nome, localização e três números: seguidores, dias de funcionamento ("Seg a Sáb") e horário ("Aberto até 02:00", "Fecha em 40 min", "Abre amanhã às 11:00").
-- Migrations `20261028120000_venue_profile` e `20261029120000_venue_logo`, SQL `017` e `018` (aplicados por `npm run update`).
+- Migrations `20261028120000_venue_profile` `20261029120000_venue_logo` e `20261030120000_venue_comments`, SQL `017` e `018` (aplicados por `npm run update`).
+- Dono que comenta em post do próprio bar comenta **como o bar** (nome e logo do bar, link para a página). Na busca (Explorar → Locais) os bares do AskouT aparecem como perfil: logo, categoria, seguidores, status (aberto/fecha em…) e botão Seguir; lugares do Google já abertos não duplicam.
 - Ainda não existe: avisar seguidores por notificação a cada post, trocar o dono mantendo a autoria dos posts antigos, criar um bar novo do zero.
 - Migration `20261025120000_venue_claims` e `prisma/sql/014_venue_claim_constraints.sql` (rodar `npm run prisma:generate` depois de baixar).
 

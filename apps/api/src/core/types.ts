@@ -411,6 +411,8 @@ export interface PostCommentRecord {
   authorId: string;
   body: string;
   createdAt: Date;
+  /** Comentário feito como estabelecimento (quem administra comentando num post do próprio bar). */
+  venueId?: string | null;
 }
 
 export const POST_REPORT_REASONS = ['SPAM', 'OFFENSIVE', 'NUDITY', 'VIOLENCE', 'FALSE_INFO', 'OTHER'] as const;

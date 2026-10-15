@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { CarouselIcon, CommentIcon, HeartIcon, MoreIcon, SendIcon } from './icons.tsx';
 import { AdjustSheet, CommentsSheet, EditPostSheet, PostMenuSheet, ReportSheet, SharePostSheet } from './post-actions.tsx';
 import type { PostGone } from './post-actions.tsx';
+import { VenueLogo } from './venue-logo.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Loading } from './ui.tsx';
 import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -171,9 +172,7 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
       <header className="post__head">
         {post.venue ? (
           <Link to={`/bares/${encodeURIComponent(post.venue.id)}`} className="post__author">
-            <span className="avatar avatar--tint-1 post__venueavatar" style={{ width: 36, height: 36, fontSize: 14 }} aria-hidden="true">
-              {post.venue.name.trim().slice(0, 2).toUpperCase()}
-            </span>
+            <VenueLogo name={post.venue.name} logoUrl={post.venue.logoUrl} size={36} />
             <strong>{post.venue.name}</strong>
           </Link>
         ) : (

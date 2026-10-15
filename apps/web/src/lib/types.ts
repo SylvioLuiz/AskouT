@@ -465,6 +465,8 @@ export interface ExplorePlace {
   photoPath: string | null;
   photoAuthor: string | null;
   mapsUri: string | null;
+  /** Só em local do AskouT: dados do perfil para a lista. */
+  venue: { id: string; logoUrl: string | null; hours: VenueHours | null; followerCount: number; following: boolean; claimed: boolean } | null;
 }
 
 export interface ExploreResult {
@@ -504,7 +506,7 @@ export interface PostView {
   id: string;
   author: PublicProfile;
   /** Post de um estabelecimento: mostra o local no lugar do autor. */
-  venue?: { id: string; name: string } | null;
+  venue?: { id: string; name: string; logoUrl: string | null } | null;
   caption: string | null;
   placeName: string | null;
   placeAddress: string | null;
@@ -526,6 +528,8 @@ export interface PostView {
 export interface PostComment {
   id: string;
   author: PublicProfile;
+  /** Comentário do estabelecimento: mostra o local no lugar do autor. */
+  venue?: { id: string; name: string; logoUrl: string | null } | null;
   body: string;
   createdAt: string;
   mine: boolean;

@@ -3,7 +3,7 @@ import { fold, normalizeTag } from './explore-match.ts';
 import { distanceMeters } from './geo.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
-import type { EventKind, PlaceEventRecord, VenueRecord } from './types.ts';
+import type { EventKind, PlaceEventRecord, VenueHours, VenueRecord } from './types.ts';
 import { EVENT_KINDS } from './types.ts';
 
 export const EXPLORE_DEFAULT_RADIUS_KM = 10;
@@ -63,6 +63,17 @@ export interface ExplorePlaceItem {
   photoRef: string | null;
   photoAuthor: string | null;
   mapsUri: string | null;
+  /** Só em local do AskouT: o que a lista mostra do perfil (logo, seguidores, horários) e se a pessoa já segue. */
+  venue: ExplorePlaceVenue | null;
+}
+
+export interface ExplorePlaceVenue {
+  id: string;
+  logoUrl: string | null;
+  hours: VenueHours | null;
+  followerCount: number;
+  following: boolean;
+  claimed: boolean;
 }
 
 export interface ExploreView {
@@ -201,6 +212,10 @@ export class ExploreService {
       text.length >= 2 ? this.profiles.search(actorId, text, PEOPLE_LIMIT).catch(() => []) : Promise.resolve([]),
     ]);
 
+    const profiles = await Promise.all(
+      venues.map(async ({ venue }) => ({ id: venue.id, followerCount: await places.countVenueFollowers(venue.id), following: await places.isFollowingVenue(actorId, venue.id) })),
+    );
+    const profileById = new Map(profiles.map((p) => [p.id, p]));
     const placeItems: ExplorePlaceItem[] = venues.map(({ venue, distanceM }) => ({
       key: `askout:${venue.id}`,
       source: 'ASKOUT',
@@ -213,9 +228,10 @@ export class ExploreService {
       distanceM: distanceM === null ? null : Math.round(distanceM),
       rating: null,
       ratingCount: null,
-      photoRef: null,
-      photoAuthor: null,
+      photoRef: venue.photoRef ?? null,
+      photoAuthor: venue.photoAuthor ?? null,
       mapsUri: null,
+      venue: { id: venue.id, logoUrl: venue.logoUrl ?? null, hours: venue.hours ?? null, followerCount: profileById.get(venue.id)?.followerCount ?? 0, following: profileById.get(venue.id)?.following ?? false, claimed: (venue.ownerId ?? null) !== null },
     }));
 
     let placesAvailable = true;
@@ -225,6 +241,7 @@ export class ExploreService {
       placesAvailable = ext.available;
       const needle = fold(text);
       const seen = new Set(placeItems.map((p) => fold(p.name)));
+      const known = new Set(venues.flatMap(({ venue }) => (venue.externalKey ? [venue.externalKey] : [])));
       const extra = ext.places
         .filter((p) => fold(p.name).includes(needle))
         .map((p) => ({ p, d: distanceMeters(center, { lat: p.lat, lng: p.lng }) }))
@@ -232,7 +249,7 @@ export class ExploreService {
       for (const { p, d } of extra) {
         if (placeItems.length >= VENUE_LIMIT) break;
         const name = fold(p.name);
-        if (seen.has(name)) continue;
+        if (seen.has(name) || known.has(`${p.source.toLowerCase()}:${p.externalId}`)) continue;
         seen.add(name);
         placeItems.push({
           key: `${p.source.toLowerCase()}:${p.externalId}`,
@@ -249,6 +266,7 @@ export class ExploreService {
           photoRef: p.photoRef ?? null,
           photoAuthor: p.photoAuthor ?? null,
           mapsUri: p.mapsUri ?? null,
+          venue: null,
         });
       }
     }

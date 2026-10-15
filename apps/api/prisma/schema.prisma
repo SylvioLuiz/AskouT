@@ -581,6 +581,7 @@ model Venue {
   logo   VenueLogo?
   followers VenueFollow[]
   posts  Post[]
+  comments PostComment[]
 
   @@index([lat, lng])
   @@index([ownerId])
@@ -714,8 +715,11 @@ model PostComment {
   authorId  String   @db.Uuid
   body      String
   createdAt DateTime @default(now())
+  /// Comentário feito como estabelecimento (quem administra, num post do próprio bar).
+  venueId   String?  @db.Uuid
 
   post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  venue  Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
   author User @relation("PostComments", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([postId, createdAt])

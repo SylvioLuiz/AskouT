@@ -30,6 +30,8 @@ import { formatDistance } from '../lib/flash.ts';
 import { pluralize } from '../lib/format.ts';
 import type { EventKind, ExploreEvent, ExplorePlace, ExploreResult } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
+import { VenueLogo } from '../components/venue-logo.tsx';
+import { openStatus } from '../lib/venue-profile.ts';
 
 // ---------- Posição (só para esta consulta; nada é guardado no aparelho) ----------
 
@@ -122,6 +124,48 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
       setProblem(toApiError(failure).message);
       setOpening(false);
     }
+  }
+
+  const venue = place.source === 'ASKOUT' ? place.venue : null;
+  const [following, setFollowing] = useState(venue?.following ?? false);
+  const [followers, setFollowers] = useState(venue?.followerCount ?? 0);
+  const [busy, setBusy] = useState(false);
+  async function toggleFollow() {
+    if (!venue) return;
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      const r = following ? await api.unfollowVenue(venue.id) : await api.followVenue(venue.id);
+      setFollowing(r.following);
+      setFollowers(r.followerCount);
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (venue) {
+    const status = openStatus(venue.hours, new Date());
+    return (
+      <li className="placerow placerow--venue">
+        <button type="button" className="placerow__profile" onClick={() => void openPage()} aria-label={`Abrir página de ${place.name}`}>
+          <VenueLogo name={place.name} logoUrl={venue.logoUrl} size={48} />
+          <span className="placerow__info">
+            <span className="placerow__name">{place.name}</span>
+            <span className="placerow__line">
+              {[place.category ?? 'Local', pluralize(followers, 'seguidor', 'seguidores'), status?.short, place.distanceM !== null ? `a ${formatDistance(place.distanceM)}` : null]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </span>
+        </button>
+        <Button small variant={following ? 'quiet' : 'primary'} loading={busy} onClick={() => void toggleFollow()}>
+          {following ? 'Seguindo' : 'Seguir'}
+        </Button>
+        {problem ? <p className="field__error">{problem}</p> : null}
+      </li>
+    );
   }
 
   return (
