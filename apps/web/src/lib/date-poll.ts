@@ -167,14 +167,14 @@ export function cellLabel(stats: DateStats, mine: VoteStatus | undefined): strin
   return parts.join(', ');
 }
 
-/** Linha fixa da conversa: "Nome · em votação: 50% dos votos" ou "Nome · marcado para sexta-feira, 24/10". Nula quando não há o que mostrar. */
-export function pollLine(p: PollSummary, now: Date): string | null {
+/** Linha fixa da conversa: nome à esquerda e o andamento à direita ("em votação: 75% dos votos", "marcado para sábado, 24/10"). Nula quando não há o que mostrar. */
+export function pollLine(p: PollSummary, now: Date): { name: string; status: string } | null {
   if (p.status === 'CANCELLED') return null;
   if (p.status === 'FINALIZED') {
     if (!p.finalDate || (p.finalEndsAt && new Date(p.finalEndsAt).getTime() < now.getTime())) return null;
-    return `${p.title} · marcado para ${weekdayName(p.finalDate)}, ${shortDay(p.finalDate)}`;
+    return { name: p.title, status: `marcado para ${weekdayName(p.finalDate)}, ${shortDay(p.finalDate)}` };
   }
-  if (p.status === 'CONFIRMING') return `${p.title} · confirmando ${p.proposedDate ? shortDay(p.proposedDate) : 'a data'}`;
+  if (p.status === 'CONFIRMING') return { name: p.title, status: `confirmando ${p.proposedDate ? shortDay(p.proposedDate) : 'a data'}` };
   const share = p.participantCount > 0 ? Math.round((p.votedCount / p.participantCount) * 100) : 0;
-  return `${p.title} · em votação: ${share}% dos votos`;
+  return { name: p.title, status: `em votação: ${share}% dos votos` };
 }

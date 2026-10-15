@@ -3687,6 +3687,8 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .chathead { flex-wrap: wrap; }
 .chathead__below { flex: 0 0 100%; min-width: 0; }
 .pollline { display: flex; flex-direction: column; gap: 2px; padding: 4px 2px 0; }
-.pollline__item { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--ink-2); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 24px; line-height: 24px; }
+.pollline__item { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 0.8125rem; color: var(--ink-2); text-decoration: none; min-height: 24px; line-height: 24px; }
+.pollline__name { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pollline__status { flex: 0 1 auto; max-width: 62%; text-align: right; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pollline__item.is-todo { color: var(--brand); }
 .pollline__more { font-size: 0.75rem; color: var(--muted); }

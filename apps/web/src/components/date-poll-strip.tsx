@@ -12,7 +12,7 @@ export function PollLine({ conversationId }: { conversationId: string }) {
   const now = new Date();
   const lines = (list.data?.items ?? []).flatMap((p) => {
     const text = pollLine(p, now);
-    return text ? [{ id: p.id, text, todo: p.needsMyVote || p.needsMyConfirmation }] : [];
+    return text ? [{ id: p.id, name: text.name, status: text.status, todo: p.needsMyVote || p.needsMyConfirmation }] : [];
   });
   if (lines.length === 0) return null;
   const shown = lines.slice(0, MAX_LINES);
@@ -20,7 +20,8 @@ export function PollLine({ conversationId }: { conversationId: string }) {
     <div className="pollline">
       {shown.map((l) => (
         <Link key={l.id} to={`/planejar/${l.id}`} className={`pollline__item${l.todo ? ' is-todo' : ''}`}>
-          {l.text}
+          <span className="pollline__name">{l.name}</span>
+          <span className="pollline__status">{l.status}</span>
         </Link>
       ))}
       {lines.length > MAX_LINES ? <span className="pollline__more">+{lines.length - MAX_LINES} votações</span> : null}
