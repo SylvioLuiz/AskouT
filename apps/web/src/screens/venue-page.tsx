@@ -1,15 +1,15 @@
 import { useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CoverPicker } from '../components/cover-picker.tsx';
 import { PostList } from '../components/post.tsx';
 import { PlacePhoto, SampleBadge } from '../components/suggestions.tsx';
-import { ChevronLeftIcon, ShareIcon } from '../components/icons.tsx';
+import { ChevronDownIcon, ChevronLeftIcon, ClockIcon, LocationIcon, ShareIcon, StarIcon } from '../components/icons.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
-import { formatRating, formatWhen, routeLink } from '../lib/chat.ts';
+import { formatRating, formatWhen, routeLink, starPercent } from '../lib/chat.ts';
 import { distanceMeters, formatDistance } from '../lib/flash.ts';
 import { useCurrentPosition } from './explore.tsx';
 import { toApiError } from '../lib/errors.ts';
@@ -63,7 +63,6 @@ function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
   }
   return (
     <div className="vrate">
-      <h2 className="vabout__h">{mine ? 'Sua avaliação' : 'Avalie este bar'}</h2>
       <div className="vrate__stars" role="group" aria-label="Sua nota de 1 a 5">
         {[1, 2, 3, 4, 5].map((n) => (
           <button key={n} type="button" className={`vrate__star${mine !== null && n <= mine ? ' vrate__star--on' : ''}`} aria-pressed={mine === n} aria-label={`${n} ${n === 1 ? 'estrela' : 'estrelas'}`} disabled={busy} onClick={() => void pick(n)}>
@@ -74,6 +73,88 @@ function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
       {mine ? <p className="muted vrate__hint">Toque na mesma estrela para remover a sua nota.</p> : null}
       {problem ? <p className="field__error">{problem}</p> : null}
     </div>
+  );
+}
+
+/** Linha de informação no estilo "ficha do lugar": ícone, conteúdo e, quando abre, uma seta. */
+function InfoRow({ icon, children, open, onToggle, label }: { icon: ReactNode; children: ReactNode; open?: boolean; onToggle?: () => void; label?: string }) {
+  const body = (
+    <>
+      <span className="vinfo__icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="vinfo__body">{children}</span>
+      {onToggle ? (
+        <span className={`vinfo__chev${open ? ' vinfo__chev--open' : ''}`} aria-hidden="true">
+          <ChevronDownIcon />
+        </span>
+      ) : null}
+    </>
+  );
+  return onToggle ? (
+    <button type="button" className="vinfo vinfo--btn" aria-expanded={open} aria-label={label} onClick={onToggle}>
+      {body}
+    </button>
+  ) : (
+    <div className="vinfo">{body}</div>
+  );
+}
+
+/** Horário de funcionamento: fechado mostra o estado e o dia de hoje; aberto (sanfona), a semana toda. */
+function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
+  const [open, setOpen] = useState(false);
+  const lines = hoursLines(venue.hours, now);
+  const status = openStatus(venue.hours, now);
+  if (lines.length === 0) {
+    return <InfoRow icon={<ClockIcon />}><span className="muted">{venue.isOwner ? 'Informe os horários em Editar perfil.' : 'O bar ainda não informou os horários.'}</span></InfoRow>;
+  }
+  const today = lines.find((l) => l.today);
+  return (
+    <>
+      <InfoRow icon={<ClockIcon />} open={open} onToggle={() => setOpen((o) => !o)} label={open ? 'Esconder os horários da semana' : 'Ver os horários da semana'}>
+        <span className={`vinfo__status${status ? (status.closingSoon ? ' vinfo__status--soon' : status.open ? ' vinfo__status--open' : ' vinfo__status--closed') : ''}`}>{status?.label ?? 'Horário de funcionamento'}</span>
+        {today && !open ? <span className="vinfo__sub">Hoje: {today.text}</span> : null}
+      </InfoRow>
+      {open ? (
+        <ul className="vhours vhours--panel">
+          {lines.map((l) => (
+            <li key={l.day} className={l.today ? 'vhours__row vhours__row--today' : 'vhours__row'}>
+              <span>{l.label}</span>
+              <span>{l.text}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+
+/** Nota do bar: média, estrelas e quantas avaliações; quem não é dono toca para avaliar. */
+function RatingInfo({ venue, onChanged }: { venue: VenueProfile; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const r = venue.rating;
+  const summary =
+    r.count > 0 ? (
+      <>
+        <strong>{formatRating(r.average ?? 0)}</strong>
+        <span className="vinfo__stars" aria-hidden="true" style={{ ['--fill' as string]: `${starPercent(r.average ?? 0)}%` }}>
+          ★★★★★
+        </span>
+        <span className="vinfo__sub vinfo__sub--inline">
+          {r.count} {r.count === 1 ? 'avaliação' : 'avaliações'}
+        </span>
+      </>
+    ) : (
+      <span className="vinfo__sub vinfo__sub--inline">Ainda sem avaliações</span>
+    );
+  return (
+    <>
+      <InfoRow icon={<StarIcon />} open={venue.isOwner ? undefined : open} onToggle={venue.isOwner ? undefined : () => setOpen((o) => !o)} label={venue.rating.mine ? 'Ver ou mudar a sua avaliação' : 'Avaliar este bar'}>
+        <span className="vinfo__rate">{summary}</span>
+        {!venue.isOwner ? <span className="vinfo__sub">{r.mine ? `Sua nota: ${r.mine}` : 'Toque para avaliar'}</span> : null}
+      </InfoRow>
+      {open && !venue.isOwner ? <StarPicker venue={venue} onChanged={onChanged} /> : null}
+    </>
   );
 }
 
@@ -441,21 +522,22 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
       {tab === 'about' ? (
         <section className="vabout">
           {v.description ? <p className="vabout__text">{v.description}</p> : v.isOwner ? <p className="muted">Conte o que as pessoas encontram aí. Toque em Editar perfil.</p> : null}
-          <h2 className="vabout__h">Horário de funcionamento</h2>
-          {lines.length > 0 ? (
-            <ul className="vhours">
-              {lines.map((l) => (
-                <li key={l.day} className={l.today ? 'vhours__row vhours__row--today' : 'vhours__row'}>
-                  <span>{l.label}</span>
-                  <span>{l.text}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="muted">{v.isOwner ? 'Informe os horários em Editar perfil.' : 'O bar ainda não informou os horários.'}</p>
-          )}
-          {v.address ? <p className="vabout__addr">{v.address}</p> : null}
-          {!v.isOwner ? <StarPicker venue={v} onChanged={page.reload} /> : null}
+          <div className="vinfolist">
+            <HoursInfo venue={v} now={now} />
+            {v.address ? (
+              <InfoRow icon={<LocationIcon />}>
+                <span className="vinfo__addr">{v.address}</span>
+                <a className="vinfo__sub vinfo__link" href={routeLink(v.lat, v.lng)} target="_blank" rel="noopener noreferrer">
+                  Como chegar
+                </a>
+              </InfoRow>
+            ) : v.isOwner ? (
+              <InfoRow icon={<LocationIcon />}>
+                <span className="muted">Informe o endereço em Editar perfil.</span>
+              </InfoRow>
+            ) : null}
+            <RatingInfo venue={v} onChanged={page.reload} />
+          </div>
         </section>
       ) : null}
 

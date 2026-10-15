@@ -307,3 +307,20 @@ export const MapIcon = () => (
     <path d="M9 4v14M15 6v14" />
   </Svg>
 );
+
+export const ChevronDownIcon = () => (
+  <Svg>
+    <path d="M6 9.5l6 6 6-6" />
+  </Svg>
+);
+export const StarIcon = () => (
+  <Svg>
+    <path d="M12 3.8l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8L12 3.8Z" />
+  </Svg>
+);
+export const LocationIcon = () => (
+  <Svg>
+    <path d="M12 21s6.5-6.1 6.5-11A6.5 6.5 0 0 0 5.5 10c0 4.9 6.5 11 6.5 11Z" />
+    <circle cx="12" cy="10" r="2.3" />
+  </Svg>
+);
