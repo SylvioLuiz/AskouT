@@ -3692,3 +3692,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .pollline__status { flex: 0 1 auto; max-width: 62%; text-align: right; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pollline__item.is-todo { color: var(--brand); }
 .pollline__more { font-size: 0.75rem; color: var(--muted); }
+
+.suggest .section__head { flex-wrap: nowrap; align-items: baseline; gap: 8px; }
+.suggest .section__title { white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.suggest__contacts { margin-left: auto; flex: 0 0 auto; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
