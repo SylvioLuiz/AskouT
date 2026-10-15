@@ -27,6 +27,11 @@ function span(day: VenueDayHours): number {
 /** Faltando tanto ou menos que isto para fechar, a página avisa que já vai fechar. */
 export const CLOSING_SOON_MIN = 60;
 
+/** Hora redonda abreviada ("10:00" → "10h", "02:00" → "2h"); com minutos, fica como está ("10:30"). */
+export function shortHour(hhmm: string): string {
+  return hhmm.endsWith(':00') ? `${Number(hhmm.slice(0, 2))}h` : hhmm;
+}
+
 export interface OpenStatus {
   open: boolean;
   /** "Aberto agora · fecha às 02:00" ou "Fechado · abre hoje às 18:00". */
@@ -52,7 +57,7 @@ export function openStatus(hours: VenueHours | null, now: Date): OpenStatus | nu
       if (nowMin >= base + shift && nowMin < base + shift + length) {
         const left = base + shift + length - nowMin;
         const soon = left <= CLOSING_SOON_MIN;
-        return { open: true, label: `Aberto agora · fecha às ${day.close}`, short: soon ? `Fecha em ${left} min` : `Aberto até ${day.close}`, closingSoon: soon };
+        return { open: true, label: `Aberto agora · fecha às ${day.close}`, short: soon ? `Fecha em ${left} min` : `Aberto até ${shortHour(day.close)}`, closingSoon: soon };
       }
     }
     for (const start of [base, base + WEEK]) if (start > nowMin && (!next || start < next.start)) next = { start, day: d, time: day.open };
@@ -60,7 +65,7 @@ export function openStatus(hours: VenueHours | null, now: Date): OpenStatus | nu
   if (!next) return { open: false, label: 'Fechado', short: 'Fechado', closingSoon: false };
   const diffDays = Math.floor(next.start / 1440) - now.getDay();
   const when = diffDays === 0 ? 'hoje' : diffDays === 1 ? 'amanhã' : DAY_LONG[next.day]!;
-  return { open: false, label: `Fechado · abre ${when} às ${next.time}`, short: `Abre ${when} às ${next.time}`, closingSoon: false };
+  return { open: false, label: `Fechado · abre ${when} às ${next.time}`, short: diffDays === 0 || diffDays === 1 ? `Abre às ${shortHour(next.time)}` : `Abre ${when} às ${shortHour(next.time)}`, closingSoon: false };
 }
 
 /** Dias em que abre, em poucas palavras: "Seg a Sáb", "Sex e Sáb", "Todos os dias". `null` se não há horários. */

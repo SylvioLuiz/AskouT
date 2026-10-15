@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applyToAll, daysSummary, draftFromProfile, hoursLines, openStatus, profileBody, profileProblem } from './venue-profile.ts';
+import { shortHour, applyToAll, daysSummary, draftFromProfile, hoursLines, openStatus, profileBody, profileProblem } from './venue-profile.ts';
 import type { VenueHours, VenueProfile } from './types.ts';
 
 // Dom null; Seg-Sáb 18:00 → 02:00 (passa da meia-noite)
@@ -14,7 +14,7 @@ test('sem horários informados não há estado', () => {
 });
 
 test('aberto durante o expediente e mostra a hora de fechar', () => {
-  assert.deepEqual(openStatus(NIGHT, at(3, 20)), { open: true, label: 'Aberto agora · fecha às 02:00', short: 'Aberto até 02:00', closingSoon: false });
+  assert.deepEqual(openStatus(NIGHT, at(3, 20)), { open: true, label: 'Aberto agora · fecha às 02:00', short: 'Aberto até 2h', closingSoon: false });
 });
 
 test('expediente que passa da meia-noite continua aberto na madrugada seguinte', () => {
@@ -72,14 +72,14 @@ test('aplicar a todos os dias', () => {
 });
 
 test('texto curto do horário: até quando, já vai fechar ou quando abre', () => {
-  assert.equal(openStatus(NIGHT, at(3, 20))?.short, 'Aberto até 02:00');
+  assert.equal(openStatus(NIGHT, at(3, 20))?.short, 'Aberto até 2h');
   assert.equal(openStatus(NIGHT, at(3, 20))?.closingSoon, false);
   const soon = openStatus(NIGHT, at(4, 1, 20));
   assert.equal(soon?.short, 'Fecha em 40 min');
   assert.equal(soon?.closingSoon, true);
-  assert.equal(openStatus(NIGHT, at(3, 10))?.short, 'Abre hoje às 18:00');
+  assert.equal(openStatus(NIGHT, at(3, 10))?.short, 'Abre às 18h');
   const lunch: VenueHours = Array.from({ length: 7 }, () => ({ open: '11:00', close: '15:00' }));
-  assert.equal(openStatus(lunch, at(3, 16))?.short, 'Abre amanhã às 11:00');
+  assert.equal(openStatus(lunch, at(3, 16))?.short, 'Abre às 11h');
   assert.equal(openStatus(lunch, at(3, 14, 30))?.short, 'Fecha em 30 min');
 });
 
@@ -94,4 +94,16 @@ test('resumo dos dias em que funciona', () => {
   assert.equal(daysSummary(d([5, 6, 0])), 'Sex a Dom');
   assert.equal(daysSummary(d([2])), 'Ter');
   assert.equal(daysSummary(d([1, 2, 3, 5, 6])), 'Seg a Qua, Sex e Sáb');
+});
+
+test('hora redonda abreviada, com minutos fica como está; sem "hoje" nem "amanhã"', () => {
+  assert.equal(shortHour('10:00'), '10h');
+  assert.equal(shortHour('00:00'), '0h');
+  assert.equal(shortHour('09:00'), '9h');
+  assert.equal(shortHour('10:30'), '10:30');
+  const half: VenueHours = Array.from({ length: 7 }, () => ({ open: '17:30', close: '23:45' }));
+  assert.equal(openStatus(half, at(3, 10))?.short, 'Abre às 17:30');
+  assert.equal(openStatus(half, at(3, 20))?.short, 'Aberto até 23:45');
+  const onlyFri: VenueHours = [null, null, null, null, null, { open: '19:00', close: '23:00' }, null];
+  assert.equal(openStatus(onlyFri, at(3, 10))?.short, 'Abre sexta às 19h', 'outros dias mantêm o nome do dia');
 });
