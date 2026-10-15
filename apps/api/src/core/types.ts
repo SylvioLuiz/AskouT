@@ -491,6 +491,7 @@ export interface AdminStats {
   userEvents: number;
   posts: number;
   pendingClaims: number;
+  approvedClaims: number;
   openPostReports: number;
   openConversationReports: number;
 }

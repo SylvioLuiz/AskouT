@@ -1239,6 +1239,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       userEvents: posts.filter((p) => p.eventTitle !== null).length,
       posts: posts.length,
       pendingClaims: [...this.claims.claims.values()].filter((c) => c.status === 'PENDING').length,
+      approvedClaims: [...this.claims.claims.values()].filter((c) => c.status === 'APPROVED').length,
       openPostReports: [...this.posts.reports.values()].filter((r) => !r.resolvedAt).length,
       openConversationReports: [...this.conversations.reports.values()].filter((r) => !r.resolvedAt).length,
     };

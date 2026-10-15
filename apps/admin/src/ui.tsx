@@ -3,6 +3,9 @@ import type { ReactNode } from 'react';
 import { ApiError } from './api.ts';
 import type { Async } from './hooks.ts';
 
+/** Avisa o menu lateral para atualizar os contadores depois de uma decisão. */
+export const CHANGED_EVENT = 'askout-admin-changed';
+
 export function PageHead({ title, hint, children }: { title: string; hint?: string; children?: ReactNode }) {
   return (
     <header className="pagehead">
@@ -25,13 +28,13 @@ export function SearchBox({ value, onChange, placeholder, label }: { value: stri
   );
 }
 
-export function Tabs<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { value: T; label: string; count?: number }[] }) {
+export function Tabs<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { value: T; label: string; count?: number; quiet?: boolean }[] }) {
   return (
     <div className="tabs" role="tablist">
       {options.map((o) => (
         <button key={o.value} type="button" role="tab" aria-selected={o.value === value} className={o.value === value ? 'tab tab--on' : 'tab'} onClick={() => onChange(o.value)}>
           {o.label}
-          {o.count !== undefined && o.count > 0 ? <span className="tab__count">{o.count}</span> : null}
+          {o.count !== undefined && o.count > 0 ? <span className={o.quiet ? 'tab__count tab__count--quiet' : 'tab__count'}>{o.count}</span> : null}
         </button>
       ))}
     </div>
@@ -131,6 +134,7 @@ export function ActionDialog({ spec, onClose, onDone }: { spec: ActionSpec; onCl
     setError(undefined);
     try {
       await spec.run(note.trim());
+      window.dispatchEvent(new Event(CHANGED_EVENT));
       onDone();
       onClose();
     } catch (e) {

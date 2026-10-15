@@ -39,6 +39,7 @@ export function DashboardPage() {
             <div className="cards">
               <Card label="Pessoas" value={s.users} sub={`${s.suspendedUsers} suspensa(s)`} to="/pessoas" />
               <Card label="Locais" value={s.venues} sub={`${s.venuesWithOwner} com responsável`} to="/locais" />
+              <Card label="Pedidos aprovados" value={s.approvedClaims} sub="donos de locais" to="/pedidos" />
               <Card label="Eventos de locais" value={s.placeEvents} to="/eventos" />
               <Card label="Eventos de pessoas" value={s.userEvents} to="/posts" />
               <Card label="Posts" value={s.posts} to="/posts" />

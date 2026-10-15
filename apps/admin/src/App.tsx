@@ -11,6 +11,7 @@ import { PostsPage } from './pages/posts.tsx';
 import { ReportsPage } from './pages/reports.tsx';
 import { UsersPage } from './pages/users.tsx';
 import { VenuesPage } from './pages/venues.tsx';
+import { CHANGED_EVENT } from './ui.tsx';
 import { go, useRoute } from './router.ts';
 import { ROUTES } from './routes.ts';
 import type { RoutePath } from './routes.ts';
@@ -103,9 +104,12 @@ function Shell({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
       );
     void load();
     const t = setInterval(load, 60_000);
+    const onChanged = () => void load();
+    window.addEventListener(CHANGED_EVENT, onChanged);
     return () => {
       alive = false;
       clearInterval(t);
+      window.removeEventListener(CHANGED_EVENT, onChanged);
     };
   }, [route]);
 

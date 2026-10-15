@@ -957,6 +957,7 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.admin.searchPlaceEvents('xyz', page), []);
         const s = await h.admin.stats();
         assert.deepEqual([s.venues, s.venuesWithOwner, s.placeEvents], [2, 1, 1]);
+        assert.equal(s.approvedClaims, 0);
         assert.equal(await h.admin.deletePlaceEvent('nao-e-uuid'), false);
         assert.equal(await h.admin.deletePlaceEvent(ev.id), true);
         assert.equal(await h.admin.deletePlaceEvent(ev.id), false);

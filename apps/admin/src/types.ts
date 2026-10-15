@@ -32,6 +32,7 @@ export interface Stats {
   userEvents: number;
   posts: number;
   pendingClaims: number;
+  approvedClaims: number;
   openPostReports: number;
   openConversationReports: number;
 }

@@ -40,7 +40,7 @@ export class PrismaAdminRepository implements AdminRepository {
 
   async stats(): Promise<AdminStats> {
     const p = this.prisma;
-    const [users, suspendedUsers, venues, venuesWithOwner, placeEvents, userEvents, posts, pendingClaims, openPostReports, openConversationReports] = await Promise.all([
+    const [users, suspendedUsers, venues, venuesWithOwner, placeEvents, userEvents, posts, pendingClaims, approvedClaims, openPostReports, openConversationReports] = await Promise.all([
       p.user.count(),
       p.user.count({ where: { status: 'SUSPENDED' } }),
       p.venue.count(),
@@ -49,10 +49,11 @@ export class PrismaAdminRepository implements AdminRepository {
       p.post.count({ where: { eventTitle: { not: null } } }),
       p.post.count(),
       p.venueClaim.count({ where: { status: 'PENDING' } }),
+      p.venueClaim.count({ where: { status: 'APPROVED' } }),
       p.postReport.count({ where: { resolvedAt: null } }),
       p.conversationReport.count({ where: { resolvedAt: null } }),
     ]);
-    return { users, suspendedUsers, venues, venuesWithOwner, placeEvents, userEvents, posts, pendingClaims, openPostReports, openConversationReports };
+    return { users, suspendedUsers, venues, venuesWithOwner, placeEvents, userEvents, posts, pendingClaims, approvedClaims, openPostReports, openConversationReports };
   }
 
   async searchUsers(text: string, status: UserStatus | undefined, page: Page): Promise<AdminUserRow[]> {

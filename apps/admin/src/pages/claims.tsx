@@ -128,7 +128,7 @@ export function ClaimsPage() {
   const [status, setStatus] = useState<ClaimStatus>('PENDING');
   const [open, setOpen] = useState<Claim>();
   const list = useAsync(() => api.claims(status), [status]);
-  const pendingCount = useAsync(() => api.stats().then((s) => s.pendingClaims), []);
+  const counts = useAsync(() => api.stats().then((s) => ({ pending: s.pendingClaims, approved: s.approvedClaims })), []);
   return (
     <>
       <PageHead title="Pedidos de donos" hint="Quem quer administrar um local. Confira o documento antes de aprovar." />
@@ -136,8 +136,8 @@ export function ClaimsPage() {
         value={status}
         onChange={setStatus}
         options={[
-          { value: 'PENDING', label: 'Em análise', count: pendingCount.data },
-          { value: 'APPROVED', label: 'Aprovados' },
+          { value: 'PENDING', label: 'Em análise', count: counts.data?.pending },
+          { value: 'APPROVED', label: 'Aprovados', count: counts.data?.approved, quiet: true },
           { value: 'REJECTED', label: 'Recusados' },
         ]}
       />
@@ -179,7 +179,7 @@ export function ClaimsPage() {
           </table>
         )}
       </Loadable>
-      {open ? <ClaimDetail claim={open} onClose={() => setOpen(undefined)} onChanged={() => { list.reload(); pendingCount.reload(); }} /> : null}
+      {open ? <ClaimDetail claim={open} onClose={() => setOpen(undefined)} onChanged={() => { list.reload(); counts.reload(); }} /> : null}
     </>
   );
 }

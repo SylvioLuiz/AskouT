@@ -51,6 +51,7 @@ test('pedidos de donos: lista com documento, aprova e deixa no registro', async 
   assert.equal((await w.places.findVenue('v1'))?.ownerId, ana);
   assert.deepEqual(await w.core.admin.listClaims(A, {}), []);
   assert.equal((await w.core.admin.listClaims(A, { status: 'APPROVED' })).length, 1);
+  assert.deepEqual([(await w.core.admin.stats(A)).approvedClaims, (await w.core.admin.stats(A)).pendingClaims], [1, 0]);
   const log = await w.core.admin.audit(A, {});
   assert.deepEqual([log.items[0]!.action, log.items[0]!.adminUsername, log.items[0]!.targetId], ['CLAIM_APPROVED', 'adm', c.id]);
   void adm;
