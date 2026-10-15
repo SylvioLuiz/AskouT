@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -256,6 +256,19 @@ export interface PlaceRepository {
   findEventCover(eventId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
   /** Define o dono (null tira). Só no aceite de uma reivindicação. */
   setVenueOwner(venueId: string, ownerId: string | null): Promise<void>;
+  /** Troca o que o dono edita no perfil (nome, endereço, categoria, descrição, horários e endereço da capa). */
+  updateVenueProfile(venueId: string, patch: VenueProfilePatch): Promise<void>;
+  /** Capa enviada do aparelho (bytes no banco). */
+  setVenueCover(venueId: string, mime: string, data: Uint8Array): Promise<void>;
+  clearVenueCover(venueId: string): Promise<void>;
+  findVenueCover(venueId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+  /** Local que entrou de uma fonte externa ("google:ID"). */
+  findVenueByExternalKey(key: string): Promise<VenueRecord | undefined>;
+  followVenue(userId: string, venueId: string, at: Date): Promise<void>;
+  unfollowVenue(userId: string, venueId: string): Promise<void>;
+  isFollowingVenue(userId: string, venueId: string): Promise<boolean>;
+  countVenueFollowers(venueId: string): Promise<number>;
+  listFollowedVenueIds(userId: string): Promise<string[]>;
 }
 
 export interface VenueClaimRepository {

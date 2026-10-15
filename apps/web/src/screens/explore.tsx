@@ -9,6 +9,7 @@ import { Button, EmptyState, ErrorState, Loading, PageHead, PersonRow } from '..
 import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { formatWhen, mapLink, routeLink } from '../lib/chat.ts';
+import { toApiError } from '../lib/errors.ts';
 import {
   KINDS,
   RADIUS_DEFAULT_KM,
@@ -103,6 +104,26 @@ function EventCard({ event, now }: { event: ExploreEvent; now: Date }) {
 }
 
 function PlaceRow({ place }: { place: ExplorePlace }) {
+  const [opening, setOpening] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+
+  // Local do AskouT: a chave é `askout:<id>`. Lugar de fora (Google/OSM): o servidor confere na fonte e cria a página na primeira vez.
+  async function openPage() {
+    setProblem(undefined);
+    if (place.source === 'ASKOUT') {
+      navigate(`/bares/${encodeURIComponent(place.key.replace(/^askout:/, ''))}`);
+      return;
+    }
+    setOpening(true);
+    try {
+      const { venueId } = await api.openExternalVenue({ key: place.key, lat: place.lat, lng: place.lng });
+      navigate(`/bares/${encodeURIComponent(venueId)}`);
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      setOpening(false);
+    }
+  }
+
   return (
     <li className="placerow">
       {place.photoPath ? <PlacePhoto path={place.photoPath} author={place.photoAuthor} /> : null}
@@ -117,7 +138,11 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
         {place.category ? `${place.category}` : 'Local'}
         {place.distanceM !== null ? ` · a ${formatDistance(place.distanceM)}` : ''}
       </p>
+      {problem ? <p className="field__error">{problem}</p> : null}
       <div className="sugcard__actions">
+        <Button small loading={opening} onClick={() => void openPage()}>
+          Ver página
+        </Button>
         <a className="btn btn--quiet btn--small" href={routeLink(place.lat, place.lng)} target="_blank" rel="noopener noreferrer">
           Rota
         </a>

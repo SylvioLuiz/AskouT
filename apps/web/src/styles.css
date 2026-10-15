@@ -3407,3 +3407,42 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .cover__menu { display: flex; flex-direction: column; gap: 8px; }
 .cover__link { display: flex; flex-direction: column; gap: 8px; }
 .cover__hint { margin: 0; font-size: 13px; color: var(--text-2, #6e6e73); }
+
+/* Página do estabelecimento */
+.vhero { margin: 0 -16px 12px; }
+.vhero__img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--surface); }
+.vhero .sugcard__photo { margin: 0; }
+.vhero .sugcard__photo img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.vhero__fallback { display: grid; place-items: center; aspect-ratio: 16 / 9; font-size: 44px; font-weight: 700; letter-spacing: 2px; color: #fff; background: linear-gradient(135deg, #0066cc, #5e5ce6); }
+.vhead { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.vhead__tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.vhead__followers { margin: 0; color: var(--muted); font-weight: 600; }
+.vhead__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.vhead__actions .btn { flex: 1 1 auto; }
+.vhead__unclaimed { margin: 0; }
+.vabout { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; }
+.vabout__text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.vabout__h { margin: 8px 0 0; font-size: 17px; }
+.vabout__addr { margin: 0; color: var(--muted); }
+.vhours { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; background: var(--surface); border-radius: var(--radius-control); }
+.vhours__row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+.vhours__row:last-child { border-bottom: 0; }
+.vhours__row--today { font-weight: 700; color: var(--brand); }
+.vagenda { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.vagenda__link { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius-control); color: inherit; text-decoration: none; }
+.vagenda__title { font-size: 16px; }
+.vagenda__when { color: var(--brand); font-weight: 600; }
+.vagenda__meta { color: var(--muted); font-size: 14px; }
+.hours { display: flex; flex-direction: column; gap: 8px; border: 0; margin: 0; padding: 0; min-inline-size: 0; }
+.hours__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 44px; }
+.hours__day { display: flex; align-items: center; gap: 10px; min-width: 118px; font-weight: 600; text-transform: capitalize; }
+.hours__day input { width: 22px; height: 22px; accent-color: var(--brand); }
+.hours__times { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hours__times input[type=time] { min-height: 40px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; font: inherit; background: var(--bg-elev, #fff); }
+.hours__closed { color: var(--muted); }
+.linkbtn { border: 0; background: transparent; color: var(--brand); font: inherit; font-size: 13px; padding: 8px 4px; cursor: pointer; }
+.vpost__thumbs { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; overflow-x: auto; }
+.vpost__thumbs li { position: relative; flex: 0 0 auto; }
+.vpost__thumbs img { display: block; width: 92px; height: 92px; object-fit: cover; border-radius: 10px; }
+.vpost__remove { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border: 0; border-radius: 13px; background: rgba(0,0,0,.65); color: #fff; font-size: 18px; line-height: 1; cursor: pointer; }
+.evhero__placelink { color: inherit; text-decoration: underline; text-underline-offset: 3px; }

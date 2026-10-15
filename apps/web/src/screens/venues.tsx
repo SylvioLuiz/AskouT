@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
+import { CoverPicker } from '../components/cover-picker.tsx';
 import { EventDates } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
@@ -9,8 +10,7 @@ import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { formatWhen } from '../lib/chat.ts';
-import { kindLabel, safeImage } from '../lib/explore.ts';
-import { resizeEventCover } from '../lib/image.ts';
+import { kindLabel } from '../lib/explore.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
 import type { ClaimableVenue, VenueClaim, VenueEvent, VenueSummary } from '../lib/types.ts';
 import { CLAIM_NOTE_MAX, EMPTY_VENUE_EVENT, VENUE_EVENT_DESCRIPTION_MAX, VENUE_EVENT_TITLE_MAX, claimStateLabel, claimStatusLabel, documentProblem, draftFromEvent, phaseLabel, venueEventBody, venueEventProblem } from '../lib/venue.ts';
@@ -219,83 +219,7 @@ export function VenuesScreen() {
 
 // ---------- Painel de um local ----------
 
-/** Imagem de capa do evento: botão "Adicionar imagem" com as duas origens (aparelho ou link da web). */
-function EventCoverPicker({ draft, onChange }: { draft: VenueEventDraft; onChange: (patch: Partial<VenueEventDraft>) => void }) {
-  const [menu, setMenu] = useState(false);
-  const [linking, setLinking] = useState(false);
-  const [link, setLink] = useState('');
-  const [error, setError] = useState<string | undefined>();
-  const [reading, setReading] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const current = draft.imageData !== '' ? draft.imageData : safeImage(draft.imageUrl.trim() === '' ? null : draft.imageUrl.trim());
-  const has = draft.imageData !== '' || draft.imageUrl.trim() !== '';
-
-  async function pick(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
-    setReading(true);
-    setError(undefined);
-    try {
-      onChange({ imageData: await resizeEventCover(file), imageUrl: '' });
-      setMenu(false);
-    } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Não foi possível usar essa imagem.');
-    } finally {
-      setReading(false);
-    }
-  }
-
-  function useLink() {
-    const v = link.trim();
-    if (!/^https:\/\/\S+$/.test(v) || v.length > 500) {
-      setError('Cole um endereço de imagem que comece com https://');
-      return;
-    }
-    setError(undefined);
-    onChange({ imageUrl: v, imageData: '' });
-    setLinking(false);
-    setMenu(false);
-    setLink('');
-  }
-
-  return (
-    <div className="cover">
-      {current ? <img className="cover__preview" src={current} alt="Capa do evento" /> : null}
-      <Button variant="secondary" full loading={reading} aria-expanded={menu} onClick={() => { setMenu(!menu); setLinking(false); setError(undefined); }}>
-        {has ? 'Trocar imagem' : 'Adicionar imagem'}
-      </Button>
-      {menu ? (
-        <div className="cover__menu" role="group" aria-label="Origem da imagem">
-          <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-            Fotos do aparelho
-          </Button>
-          <Button variant="secondary" onClick={() => { setLinking(true); setError(undefined); }}>
-            Link da web
-          </Button>
-          {has ? (
-            <Button variant="quiet" onClick={() => { onChange({ imageUrl: '', imageData: '' }); setMenu(false); }}>
-              Remover imagem
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-      <input ref={fileRef} type="file" accept="image/*" hidden onChange={pick} aria-label="Escolher foto do aparelho" />
-      {linking ? (
-        <div className="cover__link">
-          <Field label="Endereço da imagem" value={link} onChange={setLink} type="url" placeholder="https://" autoFocus />
-          <Button small onClick={useLink}>
-            Usar este link
-          </Button>
-        </div>
-      ) : null}
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      {!has ? <p className="cover__hint">Sem imagem, a capa usa a foto do lugar.</p> : null}
-    </div>
-  );
-}
-
-function VenueEventSheet({ venueId, event, onClose, onSaved }: { venueId: string; event?: VenueEvent; onClose: () => void; onSaved: () => void }) {
+export function VenueEventSheet({ venueId, event, onClose, onSaved }: { venueId: string; event?: VenueEvent; onClose: () => void; onSaved: () => void }) {
   const [draft, setDraft] = useState<VenueEventDraft>(event ? draftFromEvent(event, isoToLocalInput) : EMPTY_VENUE_EVENT);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | undefined>();
@@ -323,7 +247,7 @@ function VenueEventSheet({ venueId, event, onClose, onSaved }: { venueId: string
   return (
     <Sheet title={event ? 'Editar evento' : 'Novo evento'} onClose={onClose}>
       <div className="claim">
-        <EventCoverPicker draft={draft} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
+        <CoverPicker imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
         <Field label="Nome do evento" value={draft.title} onChange={(v) => set('title', v)} maxLength={VENUE_EVENT_TITLE_MAX} />
         <EventKindPicker value={draft.kind} onChange={(k) => set('kind', k)} />
         <EventDates starts={draft.starts} ends={draft.ends} onStarts={(v) => set('starts', v)} onEnds={(v) => set('ends', v)} />
@@ -400,6 +324,9 @@ export function VenuePanelScreen({ venueId }: { venueId: string }) {
       {panel.error && !panel.data ? <ErrorState message={panel.error.message} onRetry={panel.reload} /> : null}
       {panel.data ? (
         <>
+          <Link to={`/bares/${encodeURIComponent(venueId)}`} className="btn btn--secondary btn--full">
+            Ver e editar a página do bar
+          </Link>
           <Button full onClick={() => setEditing('new')}>
             Novo evento
           </Button>

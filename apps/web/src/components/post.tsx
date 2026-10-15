@@ -169,10 +169,19 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
   return (
     <article className="post">
       <header className="post__head">
-        <Link to={`/u/${encodeURIComponent(post.author.username)}`} className="post__author">
-          <Avatar profile={post.author} size={36} />
-          <strong>{post.author.username}</strong>
-        </Link>
+        {post.venue ? (
+          <Link to={`/bares/${encodeURIComponent(post.venue.id)}`} className="post__author">
+            <span className="avatar avatar--tint-1 post__venueavatar" style={{ width: 36, height: 36, fontSize: 14 }} aria-hidden="true">
+              {post.venue.name.trim().slice(0, 2).toUpperCase()}
+            </span>
+            <strong>{post.venue.name}</strong>
+          </Link>
+        ) : (
+          <Link to={`/u/${encodeURIComponent(post.author.username)}`} className="post__author">
+            <Avatar profile={post.author} size={36} />
+            <strong>{post.author.username}</strong>
+          </Link>
+        )}
         <Link to={`/posts/${encodeURIComponent(post.id)}`} className="post__when">
           {timeAgo(post.createdAt, new Date())}
           {post.edited ? ' · editado' : ''}

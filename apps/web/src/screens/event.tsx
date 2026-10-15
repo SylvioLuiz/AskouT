@@ -292,7 +292,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <span className="visually-hidden">{kindLabel(e.kind)}</span>
               </span>
               <h1 className="evhero__title">{e.title}</h1>
-              <p className="evhero__place">{venueLine(e.venue)}</p>
+              <p className="evhero__place">
+                {e.venue.id ? (
+                  <Link to={`/bares/${encodeURIComponent(e.venue.id)}`} className="evhero__placelink">
+                    {venueLine(e.venue)}
+                  </Link>
+                ) : (
+                  venueLine(e.venue)
+                )}
+              </p>
             </div>
           </section>
 

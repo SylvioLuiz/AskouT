@@ -26,6 +26,7 @@ export class PrismaPostRepository implements PostRepository {
         archivedAt: post.archivedAt,
         editedAt: post.editedAt,
         createdAt: post.createdAt,
+        venueId: post.venueId ?? null,
         images: {
           create: images.map((i) => ({
             id: i.id,
@@ -54,10 +55,11 @@ export class PrismaPostRepository implements PostRepository {
     archivedAt: Date | null;
     editedAt: Date | null;
     createdAt: Date;
+    venueId?: string | null;
     images: { id: string; position: number; mime: string | null; placePhotoRef: string | null; placePhotoAuthor: string | null }[];
   }): PostWithImages {
     return {
-      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, eventKind: row.eventKind, eventPostsPublic: row.eventPostsPublic, archivedAt: row.archivedAt, editedAt: row.editedAt, createdAt: row.createdAt },
+      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, eventKind: row.eventKind, eventPostsPublic: row.eventPostsPublic, archivedAt: row.archivedAt, editedAt: row.editedAt, createdAt: row.createdAt, venueId: row.venueId ?? null },
       images: row.images.map((i) => ({ id: i.id, position: i.position, isUpload: i.mime !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor })),
     };
   }
@@ -84,7 +86,13 @@ export class PrismaPostRepository implements PostRepository {
   async listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter, scope: PostScope = {}): Promise<PostWithImages[]> {
     const authors = authorIds.filter(isUuid);
     const tagged = taggedIds.filter(isUuid);
-    const or = [...(authors.length > 0 ? [{ authorId: { in: authors } }] : []), ...(tagged.length > 0 ? [PrismaPostRepository.viaTag(tagged)] : [])];
+    const venues = (scope.venueIds ?? []).filter(isUuid);
+    // Posts em nome de um local só entram pelo local (seguido ou da página), nunca pelo perfil de quem postou.
+    const or = [
+      ...(authors.length > 0 ? [{ authorId: { in: authors }, venueId: null }] : []),
+      ...(tagged.length > 0 ? [{ AND: [PrismaPostRepository.viaTag(tagged), { venueId: null }] }] : []),
+      ...(venues.length > 0 ? [{ venueId: { in: venues } }] : []),
+    ];
     if (or.length === 0) return [];
     const rows = await this.prisma.post.findMany({
       where: {
@@ -105,7 +113,7 @@ export class PrismaPostRepository implements PostRepository {
 
   async countFor(userId: string, only?: PostKindFilter): Promise<number> {
     if (!isUuid(userId)) return 0;
-    return this.prisma.post.count({ where: { AND: [{ OR: [{ authorId: userId }, PrismaPostRepository.viaTag([userId])] }, PrismaPostRepository.kindWhere(only), { archivedAt: null }] } });
+    return this.prisma.post.count({ where: { AND: [{ OR: [{ authorId: userId }, PrismaPostRepository.viaTag([userId])] }, { venueId: null }, PrismaPostRepository.kindWhere(only), { archivedAt: null }] } });
   }
 
   async createTags(postId: string, userIds: string[], at: Date): Promise<void> {

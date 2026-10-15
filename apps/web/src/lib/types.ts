@@ -435,7 +435,7 @@ export interface EventPage {
   /** Capa: a primeira foto do evento (enviada, do Google ou a imagem do evento do local). */
   coverPath: string | null;
   coverAuthor: string | null;
-  venue: { name: string; address: string | null; lat: number | null; lng: number | null };
+  venue: { id?: string; name: string; address: string | null; lat: number | null; lng: number | null };
   tags: string[];
   distanceM: number | null;
   postedByMe: boolean;
@@ -503,6 +503,8 @@ export interface PostImage {
 export interface PostView {
   id: string;
   author: PublicProfile;
+  /** Post de um estabelecimento: mostra o local no lugar do autor. */
+  venue?: { id: string; name: string } | null;
   caption: string | null;
   placeName: string | null;
   placeAddress: string | null;
@@ -604,6 +606,45 @@ export interface VenueEvent {
 export interface VenuePanel {
   venue: VenueSummary;
   events: VenueEvent[];
+}
+
+export interface VenueDayHours {
+  open: string;
+  close: string;
+}
+/** Domingo (0) a sábado (6); `null` = fechado. */
+export type VenueHours = (VenueDayHours | null)[];
+
+export interface VenueProfile {
+  id: string;
+  name: string;
+  address: string | null;
+  category: string | null;
+  description: string | null;
+  hours: VenueHours | null;
+  /** https ou caminho da capa enviada. */
+  coverUrl: string | null;
+  /** Foto do Google quando o local não tem capa própria. */
+  photoPath: string | null;
+  photoAuthor: string | null;
+  lat: number;
+  lng: number;
+  sample: boolean;
+  claimed: boolean;
+  isOwner: boolean;
+  following: boolean;
+  followerCount: number;
+  upcomingEvents: VenueEvent[];
+}
+
+export interface VenueProfileBody {
+  name: string;
+  address: string | null;
+  category: string | null;
+  description: string | null;
+  hours: VenueHours | null;
+  imageUrl?: string | null;
+  imageData?: string;
 }
 
 export interface VenueEventBody {

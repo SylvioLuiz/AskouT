@@ -43,7 +43,8 @@ export interface EventPageView {
   /** Dado de exemplo para teste, nunca um evento real. */
   sample: boolean;
   cover: EventCoverView | null;
-  venue: { name: string; address: string | null; lat: number | null; lng: number | null };
+  /** Só em evento de um local: abre a página do estabelecimento. */
+  venue: { id?: string; name: string; address: string | null; lat: number | null; lng: number | null };
   tags: string[];
   distanceM: number | null;
   /** Só em evento do local: o visitante já postou no próprio perfil. */
@@ -177,7 +178,7 @@ export class EventPageService {
           isFree: event.isFree,
           sample: event.isSample || venue.isSample,
           cover: event.imageUrl ? { kind: 'URL', url: event.imageUrl } : null,
-          venue: { name: venue.name, address: venue.address, lat: venue.lat, lng: venue.lng },
+          venue: { id: venue.id, name: venue.name, address: venue.address, lat: venue.lat, lng: venue.lng },
           tags: [...event.tags],
           distanceM: distance,
           postedByMe: await this.deps.profileEvents.has(viewerId, event.id),

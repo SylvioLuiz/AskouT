@@ -52,9 +52,17 @@ export interface PostTagView {
   status: 'PENDING' | 'ACCEPTED';
 }
 
+/** Estabelecimento em nome de quem o post foi publicado. */
+export interface PostVenueView {
+  id: string;
+  name: string;
+}
+
 export interface PostView {
   id: string;
   author: PublicProfile;
+  /** Preenchido quando o post é de um estabelecimento: a tela mostra o local no lugar do autor. */
+  venue: PostVenueView | null;
   caption: string | null;
   placeName: string | null;
   placeAddress: string | null;
@@ -145,11 +153,19 @@ export class PostService {
     this.profiles = profiles;
   }
 
-  async create(actorId: string, input: PostInput): Promise<PostView> {
+  /** Post em nome de um estabelecimento: só quem administra o local. Sem marcações nem evento próprio (eventos têm o painel do local). */
+  async createForVenue(actorId: string, venueId: unknown, input: PostInput): Promise<PostView> {
+    const venue = typeof venueId === 'string' && venueId !== '' && venueId.length <= 64 ? await this.deps.places.findVenue(venueId) : undefined;
+    if (!venue || venue.ownerId !== actorId) throw notFound('Local não encontrado');
+    if (!Array.isArray(input.images) || input.images.some((i) => typeof i !== 'string')) throw validationError('Fotos inválidas', { images: 'Envie fotos do aparelho' });
+    return this.create(actorId, { caption: input.caption, images: input.images }, venue);
+  }
+
+  async create(actorId: string, input: PostInput, venue?: { id: string; name: string; address: string | null }): Promise<PostView> {
     const { posts, ids, clock } = this.deps;
     const caption = optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
-    const placeName = optionalText(input.placeName, 120, 'placeName', 'Nome do lugar');
-    const placeAddress = optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
+    const placeName = venue ? venue.name : optionalText(input.placeName, 120, 'placeName', 'Nome do lugar');
+    const placeAddress = venue ? venue.address : optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
     const event = this.parseEvent(input.event, placeName);
     const raw = input.images;
     if (!Array.isArray(raw) || raw.length < 1 || raw.length > POST_IMAGES_MAX) {
@@ -173,7 +189,7 @@ export class PostService {
     });
     if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do lugar por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
-    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPostsPublic: false, archivedAt: null, editedAt: null, createdAt: clock.now() }, images);
+    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPostsPublic: false, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null }, images);
     if (tagIds.length > 0) {
       await posts.createTags(postId, tagIds, clock.now());
       const me = await this.deps.users.findProfileById(actorId);
@@ -191,7 +207,9 @@ export class PostService {
     const found = await this.deps.posts.findById(postId);
     if (!found) throw notFound('Post não encontrado');
     if (found.post.archivedAt !== null && found.post.authorId !== viewerId) throw notFound('Post não encontrado');
-    if (!(await this.canSee(viewerId, found.post.authorId))) throw notFound('Post não encontrado');
+    if (found.post.venueId === null || found.post.venueId === undefined) {
+      if (!(await this.canSee(viewerId, found.post.authorId))) throw notFound('Post não encontrado');
+    }
     return (await this.views(viewerId, [found]))[0] as PostView;
   }
 
@@ -199,7 +217,7 @@ export class PostService {
   private async seeable(viewerId: string, postId: unknown): Promise<PostWithImages> {
     if (typeof postId !== 'string' || postId === '' || postId.length > 64) throw notFound('Post não encontrado');
     const found = await this.deps.posts.findById(postId);
-    if (!found || (found.post.archivedAt !== null && found.post.authorId !== viewerId) || !(await this.canSee(viewerId, found.post.authorId))) throw notFound('Post não encontrado');
+    if (!found || (found.post.archivedAt !== null && found.post.authorId !== viewerId) || (!found.post.venueId && !(await this.canSee(viewerId, found.post.authorId)))) throw notFound('Post não encontrado');
     return found;
   }
 
@@ -357,10 +375,21 @@ export class PostService {
   async feed(viewerId: string, query: { limit?: unknown; offset?: unknown } = {}): Promise<PostsPage> {
     const page = parsePage(query);
     const friends = await this.deps.follows.listFriendIds(viewerId);
-    const rows = await this.deps.posts.listFor([viewerId, ...friends], [viewerId], { limit: page.limit + 1, offset: page.offset }, undefined, { hideFor: viewerId });
+    const venueIds = await this.deps.places.listFollowedVenueIds(viewerId);
+    const rows = await this.deps.posts.listFor([viewerId, ...friends], [viewerId], { limit: page.limit + 1, offset: page.offset }, undefined, { hideFor: viewerId, venueIds });
     const hasMore = rows.length > page.limit;
     const visible = await this.onlySeeable(viewerId, rows.slice(0, page.limit));
     return { items: await this.views(viewerId, visible), total: null, ...page, hasMore };
+  }
+
+  /** Posts publicados em nome de um estabelecimento, abertos a qualquer pessoa. */
+  async listByVenue(viewerId: string, venueId: unknown, query: { limit?: unknown; offset?: unknown } = {}): Promise<PostsPage> {
+    const venue = typeof venueId === 'string' && venueId !== '' && venueId.length <= 64 ? await this.deps.places.findVenue(venueId) : undefined;
+    if (!venue) throw notFound('Local não encontrado');
+    const page = parsePage(query);
+    const rows = await this.deps.posts.listFor([], [], { limit: page.limit + 1, offset: page.offset }, undefined, { hideFor: viewerId, venueIds: [venue.id] });
+    const hasMore = rows.length > page.limit;
+    return { items: await this.views(viewerId, rows.slice(0, page.limit)), total: null, ...page, hasMore };
   }
 
   /** Posts em que você foi marcado e ainda não respondeu. */
@@ -433,6 +462,10 @@ export class PostService {
     const memo = new Map<string, boolean>();
     const out: PostWithImages[] = [];
     for (const row of rows) {
+      if (row.post.venueId) {
+        out.push(row);
+        continue;
+      }
       const author = row.post.authorId;
       if (!memo.has(author)) memo.set(author, await this.canSee(viewerId, author));
       if (memo.get(author)) out.push(row);
@@ -457,6 +490,8 @@ export class PostService {
     const tagged = await this.deps.users.findProfilesByIds([...new Set(tagRows.map((t) => t.userId))]);
     const taggedById = new Map(tagged.map((a) => [a.userId, toPublicProfile(a)]));
     const byId = new Map(authors.map((a) => [a.userId, toPublicProfile(a)]));
+    const venueIds = [...new Set(rows.flatMap((r) => (r.post.venueId ? [r.post.venueId] : [])))];
+    const venues = new Map((await Promise.all(venueIds.map((id) => this.deps.places.findVenue(id)))).flatMap((v) => (v ? [[v.id, { id: v.id, name: v.name }] as const] : [])));
     const ids = rows.map((r) => r.post.id);
     const likes = new Map((await this.deps.posts.likeStats(ids, viewerId)).map((l) => [l.postId, l]));
     const comments = new Map((await this.deps.posts.commentCounts(ids)).map((c) => [c.postId, c.count]));
@@ -467,6 +502,7 @@ export class PostService {
         {
           id: post.id,
           author,
+          venue: (post.venueId ? venues.get(post.venueId) : undefined) ?? null,
           caption: post.caption,
           placeName: post.placeName,
           placeAddress: post.placeAddress,

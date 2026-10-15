@@ -1116,6 +1116,85 @@ export function defineRepositoryContract(
       });
     });
 
+    describe('perfil do estabelecimento', () => {
+      it('edita o perfil, guarda capa, acha pela origem externa e some com a capa ao apagar', async () => {
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: -23.5, lng: -46.6, isSample: false, externalKey: 'google:ABC', photoRef: 'places/ABC/photos/p', photoAuthor: 'Maria' };
+        await h.places.createVenue(v);
+        const got = await h.places.findVenue(v.id);
+        assert.equal(got!.externalKey, 'google:ABC');
+        assert.equal(got!.photoRef, 'places/ABC/photos/p');
+        assert.equal(got!.hours ?? null, null);
+        assert.equal((await h.places.findVenueByExternalKey('google:ABC'))!.id, v.id);
+        assert.equal(await h.places.findVenueByExternalKey('google:OUTRO'), undefined);
+        const hours = [null, { open: '18:00', close: '02:00' }, null, null, null, { open: '12:00', close: '23:30' }, null];
+        await h.places.updateVenueProfile(v.id, { name: 'Bar do Zé', address: 'Rua A, 1', category: 'Boteco', description: 'Ao vivo', hours, coverUrl: 'https://x.com/a.jpg' });
+        const edited = (await h.places.findVenue(v.id))!;
+        assert.equal(edited.name, 'Bar do Zé');
+        assert.equal(edited.address, 'Rua A, 1');
+        assert.equal(edited.description, 'Ao vivo');
+        assert.deepEqual(edited.hours, hours);
+        assert.equal(edited.coverUrl, 'https://x.com/a.jpg');
+        assert.equal(edited.externalKey, 'google:ABC', 'a origem externa não muda ao editar');
+        await h.places.updateVenueProfile(v.id, { name: 'Bar do Zé', address: null, category: null, description: null, hours: null, coverUrl: null });
+        const cleared = (await h.places.findVenue(v.id))!;
+        assert.equal(cleared.hours ?? null, null);
+        assert.equal(cleared.description ?? null, null);
+        // capa enviada
+        assert.equal(await h.places.findVenueCover(v.id), undefined);
+        await h.places.setVenueCover(v.id, 'image/png', new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1]));
+        await h.places.setVenueCover(v.id, 'image/jpeg', new Uint8Array([0xff, 0xd8, 0xff, 2]));
+        const cover = (await h.places.findVenueCover(v.id))!;
+        assert.equal(cover.mime, 'image/jpeg');
+        assert.deepEqual([...cover.data], [0xff, 0xd8, 0xff, 2]);
+        await h.places.clearVenueCover(v.id);
+        assert.equal(await h.places.findVenueCover(v.id), undefined);
+        assert.equal(await h.places.findVenueCover('nao-e-uuid'), undefined);
+      });
+
+      it('seguidores do local: seguir é idempotente, conta, lista e desfaz', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: -23.5, lng: -46.6, isSample: false };
+        const w: VenueRecord = { ...v, id: randomUUID(), name: 'Outro' };
+        await h.places.createVenue(v);
+        await h.places.createVenue(w);
+        await h.places.followVenue(ana, v.id, at(1));
+        await h.places.followVenue(ana, v.id, at(2));
+        await h.places.followVenue(bia, v.id, at(3));
+        await h.places.followVenue(ana, w.id, at(4));
+        await h.places.followVenue(ana, randomUUID(), at(5));
+        assert.equal(await h.places.countVenueFollowers(v.id), 2);
+        assert.equal(await h.places.isFollowingVenue(ana, v.id), true);
+        assert.equal(await h.places.isFollowingVenue(bia, w.id), false);
+        assert.deepEqual((await h.places.listFollowedVenueIds(ana)).sort(), [v.id, w.id].sort());
+        await h.places.unfollowVenue(ana, v.id);
+        assert.equal(await h.places.countVenueFollowers(v.id), 1);
+        assert.equal(await h.places.isFollowingVenue(ana, v.id), false);
+        assert.equal(await h.places.isFollowingVenue('nao-e-uuid', v.id), false);
+        assert.deepEqual(await h.places.listFollowedVenueIds('nao-e-uuid'), []);
+      });
+
+      it('posts em nome do local só entram pelo local, nunca pelo perfil de quem postou', async () => {
+        const ana = await newUser('ana');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: -23.5, lng: -46.6, isSample: false, ownerId: ana };
+        await h.places.createVenue(v);
+        const mk = (n: number, venueId: string | null) => {
+          const id = randomUUID();
+          return { post: { id, authorId: ana, caption: `p${n}`, placeName: null, placeAddress: null, eventTitle: null, eventStartsAt: null, eventEndsAt: null, eventKind: 'OTHER' as const, eventPostsPublic: false, archivedAt: null, editedAt: null, createdAt: at(n), venueId }, images: [{ id: randomUUID(), postId: id, position: 0, mime: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff, n]), placePhotoRef: null, placePhotoAuthor: null }] };
+        };
+        const mine = mk(1, null), venuePost = mk(2, v.id);
+        for (const p of [mine, venuePost]) await h.posts.create(p.post, p.images);
+        assert.equal((await h.posts.findById(venuePost.post.id))!.post.venueId, v.id);
+        assert.equal((await h.posts.findById(mine.post.id))!.post.venueId ?? null, null);
+        const page = { limit: 10, offset: 0 };
+        assert.deepEqual((await h.posts.listFor([ana], [ana], page)).map((r) => r.post.caption), ['p1'], 'perfil pessoal sem o post do local');
+        assert.equal(await h.posts.countFor(ana), 1);
+        assert.deepEqual((await h.posts.listFor([], [], page, undefined, { venueIds: [v.id] })).map((r) => r.post.caption), ['p2']);
+        assert.deepEqual((await h.posts.listFor([ana], [ana], page, undefined, { venueIds: [v.id] })).map((r) => r.post.caption), ['p2', 'p1'], 'feed: pessoal e local, mais novo primeiro');
+        assert.deepEqual(await h.posts.listFor([], [], page, undefined, { venueIds: [] }), []);
+      });
+    });
+
     describe('grupos e encontros', () => {
       const H = 3600;
       const setup = async () => {

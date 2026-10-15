@@ -209,6 +209,34 @@ export interface VenueRecord {
   isSample: boolean;
   /** Quem administra o local (reivindicação aprovada). */
   ownerId?: string | null;
+  /** Perfil do estabelecimento. Tudo opcional: um local sem dono só tem nome, endereço e posição. */
+  description?: string | null;
+  /** Horário de funcionamento de domingo (0) a sábado (6); `null` num dia = fechado. */
+  hours?: VenueHours | null;
+  /** Capa: endereço https ou `/venues/:id/cover?v=` quando enviada do aparelho. */
+  coverUrl?: string | null;
+  /** Origem externa ("google:ID", "osm:ID") de um local que entrou sob demanda. */
+  externalKey?: string | null;
+  /** Foto do Google (referência opaca) e o crédito de quem tirou. Só para locais externos. */
+  photoRef?: string | null;
+  photoAuthor?: string | null;
+}
+
+/** Abre e fecha em "HH:MM"; `close` menor ou igual a `open` significa que passa da meia-noite. */
+export interface VenueDayHours {
+  open: string;
+  close: string;
+}
+export type VenueHours = (VenueDayHours | null)[];
+
+/** Campos que o dono edita no perfil. */
+export interface VenueProfilePatch {
+  name: string;
+  address: string | null;
+  category: string | null;
+  description: string | null;
+  hours: VenueHours | null;
+  coverUrl: string | null;
 }
 
 export type ClaimStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -345,6 +373,8 @@ export interface PostRecord {
   archivedAt: Date | null;
   editedAt: Date | null;
   createdAt: Date;
+  /** Post publicado em nome de um estabelecimento (o autor é quem administra o local). */
+  venueId?: string | null;
 }
 
 export interface PostImageRecord {
@@ -439,6 +469,8 @@ export interface PostPatch {
 export interface PostScope {
   archived?: boolean;
   hideFor?: string;
+  /** Inclui também os posts feitos em nome destes estabelecimentos (os que a pessoa segue, ou o da página). */
+  venueIds?: string[];
 }
 
 /** Só eventos (posts com dados de evento) ou só posts comuns. */

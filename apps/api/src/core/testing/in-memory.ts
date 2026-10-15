@@ -28,7 +28,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -694,6 +694,53 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   readonly venues = new Map<string, VenueRecord>();
   readonly events = new Map<string, PlaceEventRecord>();
   readonly covers = new Map<string, { mime: string; data: Uint8Array }>();
+  readonly venueCovers = new Map<string, { mime: string; data: Uint8Array }>();
+  readonly venueFollows = new Map<string, Date>();
+
+  async updateVenueProfile(venueId: string, patch: VenueProfilePatch) {
+    const v = this.venues.get(venueId);
+    if (v) this.venues.set(venueId, { ...v, ...patch, hours: patch.hours ? patch.hours.map((d) => (d ? { ...d } : null)) : null });
+  }
+
+  async setVenueCover(venueId: string, mime: string, data: Uint8Array) {
+    if (this.venues.has(venueId)) this.venueCovers.set(venueId, { mime, data: new Uint8Array(data) });
+  }
+
+  async clearVenueCover(venueId: string) {
+    this.venueCovers.delete(venueId);
+  }
+
+  async findVenueCover(venueId: string) {
+    const c = this.venueCovers.get(venueId);
+    return c ? { mime: c.mime, data: new Uint8Array(c.data) } : undefined;
+  }
+
+  async findVenueByExternalKey(key: string) {
+    for (const v of this.venues.values()) if (v.externalKey === key) return { ...v };
+    return undefined;
+  }
+
+  async followVenue(userId: string, venueId: string, at: Date) {
+    if (!this.venues.has(venueId)) return;
+    const key = `${userId}|${venueId}`;
+    if (!this.venueFollows.has(key)) this.venueFollows.set(key, at);
+  }
+
+  async unfollowVenue(userId: string, venueId: string) {
+    this.venueFollows.delete(`${userId}|${venueId}`);
+  }
+
+  async isFollowingVenue(userId: string, venueId: string) {
+    return this.venueFollows.has(`${userId}|${venueId}`);
+  }
+
+  async countVenueFollowers(venueId: string) {
+    return [...this.venueFollows.keys()].filter((k) => k.endsWith(`|${venueId}`)).length;
+  }
+
+  async listFollowedVenueIds(userId: string) {
+    return [...this.venueFollows.keys()].filter((k) => k.startsWith(`${userId}|`)).map((k) => k.slice(userId.length + 1));
+  }
 
   async createVenue(venue: VenueRecord): Promise<void> {
     this.venues.set(venue.id, { ...venue, ownerId: venue.ownerId ?? null });
@@ -979,9 +1026,10 @@ export class InMemoryPostRepository implements PostRepository {
     const authors = new Set(authorIds);
     const tagged = new Set(taggedIds);
     const viaTag = new Set([...this.tags.values()].filter((t) => t.status === 'ACCEPTED' && tagged.has(t.userId)).map((t) => t.postId));
+    const venues = new Set(scope.venueIds ?? []);
     return [...this.posts.values()].filter(
       (p) =>
-        (authors.has(p.authorId) || viaTag.has(p.id)) &&
+        (p.venueId ? venues.has(p.venueId) : authors.has(p.authorId) || viaTag.has(p.id)) &&
         (scope.archived ? p.archivedAt !== null : p.archivedAt === null) &&
         !(scope.hideFor && this.hidden.has(`${p.id}|${scope.hideFor}`)),
     );

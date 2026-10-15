@@ -165,6 +165,7 @@ model User {
   postHidden        PostHidden[]  @relation("PostHidden")
   ownedVenues       Venue[]       @relation("VenueOwner")
   venueClaims       VenueClaim[]  @relation("ClaimUser")
+  venueFollows      VenueFollow[]
   reviewedClaims    VenueClaim[]  @relation("ClaimReviewer")
 }
 
@@ -558,12 +559,25 @@ model Venue {
   isSample  Boolean  @default(false)
   /// Quem administra o local (pedido de reivindicação aprovado por um admin).
   ownerId   String?  @db.Uuid
+  /// Perfil do estabelecimento (editável por quem administra).
+  description String?
+  /// JSON com 7 posições (domingo a sábado): {open, close} ou null (fechado).
+  hoursJson   String?
+  /// https ou `/venues/:id/cover?v=` (capa enviada, bytes em VenueCover).
+  coverUrl    String?
+  /// "google:ID" quando o local entrou de uma fonte externa; único.
+  externalKey String?  @unique
+  photoRef    String?
+  photoAuthor String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   owner  User?        @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   events PlaceEvent[]
   claims VenueClaim[]
+  cover  VenueCover?
+  followers VenueFollow[]
+  posts  Post[]
 
   @@index([lat, lng])
   @@index([ownerId])
@@ -645,8 +659,11 @@ model Post {
   archivedAt    DateTime?
   editedAt      DateTime?
   createdAt    DateTime @default(now())
+  /// Post feito em nome de um estabelecimento (o autor é quem administra o local).
+  venueId      String?  @db.Uuid
 
   author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  venue  Venue?      @relation(fields: [venueId], references: [id], onDelete: Cascade)
   images PostImage[]
   tags   PostTag[]
   likes    PostLike[]
@@ -657,6 +674,7 @@ model Post {
   eventPosts EventPost[]
 
   @@index([authorId, createdAt])
+  @@index([venueId, createdAt])
 }
 
 // Foto enviada: `mime` e `data`. Foto do lugar: só `placePhotoRef` (o servidor busca no Google na hora de mostrar).
@@ -802,4 +820,27 @@ model PlaceEventCover {
   updatedAt DateTime @default(now())
 
   event PlaceEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+}
+
+/// Capa do estabelecimento enviada do aparelho (JPEG/PNG/WebP até 256 KB), servida em `/venues/:id/cover`.
+model VenueCover {
+  venueId   String   @id @db.Uuid
+  mime      String
+  data      Bytes
+  updatedAt DateTime @default(now())
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+}
+
+/// Quem segue um estabelecimento: os posts dele entram no feed.
+model VenueFollow {
+  userId    String   @db.Uuid
+  venueId   String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([userId, venueId])
+  @@index([venueId])
 }

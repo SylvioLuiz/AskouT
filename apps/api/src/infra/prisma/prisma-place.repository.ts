@@ -3,7 +3,7 @@ import { isUuid } from './helpers.ts';
 import { boundingBox, distanceMeters } from '../../core/geo.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../../core/explore-match.ts';
 import type { EventSearchQuery, PlaceRepository } from '../../core/ports.ts';
-import type { PlaceEventRecord, VenueRecord } from '../../core/types.ts';
+import type { PlaceEventRecord, VenueHours, VenueProfilePatch, VenueRecord } from '../../core/types.ts';
 
 /** Teto de linhas trazidas da caixa antes do filtro exato; evita ler a cidade inteira. */
 const PREFILTER_CAP = 500;
@@ -16,7 +16,69 @@ export class PrismaPlaceRepository implements PlaceRepository {
   }
 
   async createVenue(v: VenueRecord): Promise<void> {
-    await this.prisma.venue.create({ data: { id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample, ownerId: v.ownerId ?? null } });
+    await this.prisma.venue.create({
+      data: {
+        id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample, ownerId: v.ownerId ?? null,
+        description: v.description ?? null, hoursJson: v.hours ? JSON.stringify(v.hours) : null, coverUrl: v.coverUrl ?? null,
+        externalKey: v.externalKey ?? null, photoRef: v.photoRef ?? null, photoAuthor: v.photoAuthor ?? null,
+      },
+    });
+  }
+
+  async updateVenueProfile(venueId: string, patch: VenueProfilePatch): Promise<void> {
+    if (!isUuid(venueId)) return;
+    await this.prisma.venue.updateMany({
+      where: { id: venueId },
+      data: { name: patch.name, address: patch.address, category: patch.category, description: patch.description, hoursJson: patch.hours ? JSON.stringify(patch.hours) : null, coverUrl: patch.coverUrl },
+    });
+  }
+
+  async setVenueCover(venueId: string, mime: string, data: Uint8Array): Promise<void> {
+    if (!isUuid(venueId)) return;
+    const bytes = Buffer.from(data);
+    await this.prisma.venueCover.upsert({ where: { venueId }, create: { venueId, mime, data: bytes }, update: { mime, data: bytes, updatedAt: new Date() } });
+  }
+
+  async clearVenueCover(venueId: string): Promise<void> {
+    if (!isUuid(venueId)) return;
+    await this.prisma.venueCover.deleteMany({ where: { venueId } });
+  }
+
+  async findVenueCover(venueId: string) {
+    if (!isUuid(venueId)) return undefined;
+    const r = await this.prisma.venueCover.findUnique({ where: { venueId } });
+    return r ? { mime: r.mime, data: new Uint8Array(r.data) } : undefined;
+  }
+
+  async findVenueByExternalKey(key: string) {
+    const r = await this.prisma.venue.findUnique({ where: { externalKey: key } });
+    return r ? toVenue(r) : undefined;
+  }
+
+  async followVenue(userId: string, venueId: string, at: Date): Promise<void> {
+    if (!isUuid(userId) || !isUuid(venueId)) return;
+    await this.prisma.venueFollow.createMany({ data: [{ userId, venueId, createdAt: at }], skipDuplicates: true });
+  }
+
+  async unfollowVenue(userId: string, venueId: string): Promise<void> {
+    if (!isUuid(userId) || !isUuid(venueId)) return;
+    await this.prisma.venueFollow.deleteMany({ where: { userId, venueId } });
+  }
+
+  async isFollowingVenue(userId: string, venueId: string): Promise<boolean> {
+    if (!isUuid(userId) || !isUuid(venueId)) return false;
+    return (await this.prisma.venueFollow.count({ where: { userId, venueId } })) > 0;
+  }
+
+  async countVenueFollowers(venueId: string): Promise<number> {
+    if (!isUuid(venueId)) return 0;
+    return this.prisma.venueFollow.count({ where: { venueId } });
+  }
+
+  async listFollowedVenueIds(userId: string): Promise<string[]> {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.venueFollow.findMany({ where: { userId }, select: { venueId: true } });
+    return rows.map((r) => r.venueId);
   }
 
   async createEvent(e: PlaceEventRecord): Promise<void> {
@@ -158,12 +220,25 @@ export class PrismaPlaceRepository implements PlaceRepository {
 }
 
 interface EventRow { id: string; venueId: string; title: string; description: string | null; startsAt: Date; endsAt: Date; kind: PlaceEventRecord['kind']; isFree: boolean; imageUrl: string | null; tags: string[]; isSample: boolean }
-interface VenueRow { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; isSample: boolean; ownerId?: string | null }
+interface VenueRow { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; isSample: boolean; ownerId?: string | null; description?: string | null; hoursJson?: string | null; coverUrl?: string | null; externalKey?: string | null; photoRef?: string | null; photoAuthor?: string | null }
 
 function toEvent(r: EventRow): PlaceEventRecord {
   return { id: r.id, venueId: r.venueId, title: r.title, description: r.description, startsAt: r.startsAt, endsAt: r.endsAt, kind: r.kind, isFree: r.isFree, imageUrl: r.imageUrl, tags: [...r.tags], isSample: r.isSample };
 }
 
 function toVenue(v: VenueRow): VenueRecord {
-  return { id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample, ownerId: v.ownerId ?? null };
+  return {
+    id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample, ownerId: v.ownerId ?? null,
+    description: v.description ?? null, hours: parseHours(v.hoursJson), coverUrl: v.coverUrl ?? null, externalKey: v.externalKey ?? null, photoRef: v.photoRef ?? null, photoAuthor: v.photoAuthor ?? null,
+  };
+}
+
+function parseHours(json: string | null | undefined): VenueHours | null {
+  if (!json) return null;
+  try {
+    const parsed: unknown = JSON.parse(json);
+    return Array.isArray(parsed) && parsed.length === 7 ? (parsed as VenueHours) : null;
+  } catch {
+    return null;
+  }
 }

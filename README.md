@@ -272,6 +272,16 @@ Dentro do perfil: **Meus locais** (`/locais`). A pessoa busca um local já cadas
 - Capa do evento: `imageData` (data URL JPEG/PNG/WebP, até 256 KB, guardada no banco em `PlaceEventCover`) ou `imageUrl` (https); vazio remove; ausente mantém. Servida sem login em `GET /place-events/:id/cover` (o `?v=` muda a cada troca). A tela reduz a foto antes de enviar.
 - Quem não é dono recebe 404 (não revela quais locais têm dono). No máximo 5 pedidos em análise por pessoa.
 - Aprovar e recusar pedidos é feito na plataforma de gestão (seção abaixo).
+
+### Página do estabelecimento (`/bares/:id`)
+
+Todo local tem uma página pública, com ou sem dono: capa, nome, tipo, endereço, **sobre**, **horário de funcionamento** (domingo a sábado; fechar em hora menor que a de abrir vale como "passa da meia-noite"; "aberto agora" é calculado no aparelho), **agenda** (eventos que ainda vão acontecer) e **posts**. Quem administra edita tudo ali (nome, tipo, endereço, descrição, horários, capa), cria eventos e publica **em nome do bar**; qualquer pessoa pode **seguir** o bar e os posts dele entram no feed de quem segue.
+
+- Rotas: `GET /venues/:id/profile`, `PUT /me/venues/:id/profile`, `POST|DELETE /venues/:id/follow`, `GET /venues/:id/posts`, `POST /me/venues/:id/posts`, `GET /venues/:id/cover` (pública, capa enviada: `imageData` JPEG/PNG/WebP até 256 KB em `VenueCover`, ou `imageUrl` https).
+- Post do bar é um `Post` com `venueId` (o autor é quem administra). Aparece só pelo bar (página e feed de seguidores), nunca no perfil pessoal de quem postou; é aberto a qualquer pessoa, mesmo que o perfil do dono seja privado. Sem marcações nem evento próprio, só fotos do aparelho.
+- Lugar que só existe no Google/OSM: `POST /venues/external {key: "google:ID", lat, lng}` confere na fonte que o lugar existe ali perto e cria o local na primeira vez (`Venue.externalKey`, único). Nada do que o app manda vira nome ou dado do local. A foto do Google continua só como referência (nunca copiada) e aparece com crédito.
+- Migration `20261028120000_venue_profile` e SQL `017_venue_profile_constraints.sql` (aplicados por `npm run update`).
+- Ainda não existe: avisar seguidores por notificação a cada post, trocar o dono mantendo a autoria dos posts antigos, criar um bar novo do zero.
 - Migration `20261025120000_venue_claims` e `prisma/sql/014_venue_claim_constraints.sql` (rodar `npm run prisma:generate` depois de baixar).
 
 ### Plataforma de gestão (`apps/admin`)

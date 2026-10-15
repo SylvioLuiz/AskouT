@@ -2,7 +2,7 @@ import { decodeImageDataUrl } from './image.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import { normalizeTag } from './explore-match.ts';
 import type { CoreDeps } from './ports.ts';
-import type { ClaimDocumentMime, ClaimStatus, EventKind, PlaceEventRecord, VenueClaimRecord, VenueRecord } from './types.ts';
+import type { ClaimDocumentMime, ClaimStatus, EventKind, PlaceEventRecord, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
 import { EVENT_KINDS } from './types.ts';
 
 export const CLAIM_DOCUMENT_MAX_BYTES = 2 * 1024 * 1024;
@@ -67,6 +67,76 @@ export interface VenueEventView {
   /** Para a lista do painel: ainda vai acontecer, está acontecendo ou já passou. */
   phase: 'UPCOMING' | 'LIVE' | 'PAST';
   sample: boolean;
+}
+
+export const VENUE_NAME_MAX = 80;
+export const VENUE_ADDRESS_MAX = 200;
+export const VENUE_CATEGORY_MAX = 40;
+export const VENUE_DESCRIPTION_MAX = 600;
+export const VENUE_UPCOMING_LIMIT = 30;
+/** Capa do estabelecimento enviada do aparelho (a tela reduz a foto antes). */
+export const VENUE_COVER_MAX_BYTES = 256 * 1024;
+const HOUR_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const EXTERNAL_KEY_RE = /^(google|osm):[A-Za-z0-9_./:-]{1,200}$/;
+/** Raio para conferir, na fonte externa, que o local mesmo existe onde o app diz. */
+const EXTERNAL_CHECK_RADIUS_M = 150;
+
+export function venueCoverPath(venueId: string, version: number): string {
+  return `/venues/${venueId}/cover?v=${version}`;
+}
+
+/** Página pública de um estabelecimento (qualquer local, com ou sem dono). */
+export interface VenueProfileView {
+  id: string;
+  name: string;
+  address: string | null;
+  category: string | null;
+  description: string | null;
+  hours: VenueHours | null;
+  /** https ou caminho da capa enviada (a borda HTTP monta o endereço). */
+  coverUrl: string | null;
+  /** Foto do Google (referência opaca) e o crédito, quando o local veio de lá e não tem capa própria. */
+  photoRef: string | null;
+  photoAuthor: string | null;
+  lat: number;
+  lng: number;
+  sample: boolean;
+  /** Tem alguém administrando (a página é "oficial"). */
+  claimed: boolean;
+  isOwner: boolean;
+  following: boolean;
+  followerCount: number;
+  /** Eventos que ainda vão acontecer ou estão acontecendo, do mais cedo ao mais tarde. */
+  upcomingEvents: VenueEventView[];
+}
+
+export interface VenueProfileInput {
+  name?: unknown;
+  address?: unknown;
+  category?: unknown;
+  description?: unknown;
+  hours?: unknown;
+  /** Ausente mantém a capa; vazio/nulo remove; https troca. */
+  imageUrl?: unknown;
+  /** Data URL (JPEG, PNG ou WebP, até 256 KB) enviada do aparelho. */
+  imageData?: unknown;
+}
+
+function parseHours(value: unknown): VenueHours | null {
+  if (value === undefined || value === null) return null;
+  const bad = () => validationError('Horários inválidos', { hours: 'Use 7 dias, de domingo a sábado, com abre e fecha em HH:MM' });
+  if (!Array.isArray(value) || value.length !== 7) throw bad();
+  const out: VenueHours = [];
+  for (const day of value as unknown[]) {
+    if (day === null) {
+      out.push(null);
+      continue;
+    }
+    const d = day as { open?: unknown; close?: unknown } | undefined;
+    if (typeof day !== 'object' || !d || typeof d.open !== 'string' || typeof d.close !== 'string' || !HOUR_RE.test(d.open) || !HOUR_RE.test(d.close) || d.open === d.close) throw bad();
+    out.push({ open: d.open, close: d.close });
+  }
+  return out.every((d) => d === null) ? null : out;
 }
 
 export interface VenuePanelView {
@@ -263,6 +333,124 @@ export class VenueService {
   async eventCover(eventId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
     if (typeof eventId !== 'string' || eventId === '' || eventId.length > 64) return undefined;
     return this.deps.places.findEventCover(eventId);
+  }
+
+  /** Página pública do local. Qualquer pessoa logada vê; quem administra também recebe `isOwner`. */
+  async profile(viewerId: string, venueId: unknown): Promise<VenueProfileView> {
+    const venue = await this.venueOrThrow(venueId);
+    const now = this.deps.clock.now().getTime();
+    const [following, followerCount, events] = await Promise.all([this.deps.places.isFollowingVenue(viewerId, venue.id), this.deps.places.countVenueFollowers(venue.id), this.deps.places.listVenueEvents(venue.id)]);
+    const upcoming = events
+      .filter((e) => e.endsAt.getTime() > now)
+      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || (a.id < b.id ? -1 : 1))
+      .slice(0, VENUE_UPCOMING_LIMIT)
+      .map((e) => this.eventView(e));
+    return {
+      id: venue.id,
+      name: venue.name,
+      address: venue.address,
+      category: venue.category,
+      description: venue.description ?? null,
+      hours: venue.hours ?? null,
+      coverUrl: venue.coverUrl ?? null,
+      photoRef: venue.photoRef ?? null,
+      photoAuthor: venue.photoAuthor ?? null,
+      lat: venue.lat,
+      lng: venue.lng,
+      sample: venue.isSample,
+      claimed: (venue.ownerId ?? null) !== null,
+      isOwner: venue.ownerId === viewerId,
+      following,
+      followerCount,
+      upcomingEvents: upcoming,
+    };
+  }
+
+  /** Dono edita nome, endereço, categoria, descrição, horários e capa. Só o que vier muda; vazio apaga o que é opcional. */
+  async updateProfile(userId: string, venueId: unknown, input: VenueProfileInput): Promise<VenueProfileView> {
+    const venue = await this.ownedOrThrow(userId, venueId);
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Perfil inválido', { profile: 'Dados do perfil inválidos' });
+    const name = input.name === undefined ? venue.name : (text(input.name, VENUE_NAME_MAX, 'name', 'Nome', true) as string);
+    if (Array.from(name).length < 2) throw validationError('Dados inválidos', { name: 'O nome precisa de pelo menos 2 caracteres' });
+    const address = input.address === undefined ? venue.address : text(input.address, VENUE_ADDRESS_MAX, 'address', 'Endereço');
+    const category = input.category === undefined ? venue.category : text(input.category, VENUE_CATEGORY_MAX, 'category', 'Categoria');
+    const description = input.description === undefined ? (venue.description ?? null) : text(input.description, VENUE_DESCRIPTION_MAX, 'description', 'Descrição');
+    const hours = input.hours === undefined ? (venue.hours ?? null) : parseHours(input.hours);
+    const own = venue.coverUrl?.startsWith(`/venues/${venue.id}/cover`) ? venue.coverUrl : null;
+    let coverUrl: string | null = venue.coverUrl ?? null;
+    let upload: { mime: string; bytes: Uint8Array } | undefined;
+    if (input.imageData !== undefined && input.imageData !== null && input.imageData !== '') {
+      const img = decodeImageDataUrl(input.imageData, VENUE_COVER_MAX_BYTES, '250 KB');
+      upload = { mime: img.mime, bytes: img.bytes };
+      coverUrl = venueCoverPath(venue.id, this.deps.clock.now().getTime());
+    } else if (input.imageUrl === null || input.imageUrl === '') {
+      coverUrl = null;
+    } else if (input.imageUrl !== undefined) {
+      const url = input.imageUrl;
+      if (typeof url !== 'string' || url.length > 500) throw validationError('Dados inválidos', { imageUrl: 'Use um endereço de imagem que comece com https://' });
+      if (own !== null && url === own) coverUrl = own;
+      else if (/^https:\/\/[^\s]+$/.test(url)) coverUrl = url;
+      else throw validationError('Dados inválidos', { imageUrl: 'Use um endereço de imagem que comece com https://' });
+    }
+    await this.deps.places.updateVenueProfile(venue.id, { name, address, category, description, hours, coverUrl });
+    if (upload) await this.deps.places.setVenueCover(venue.id, upload.mime, upload.bytes);
+    else if (coverUrl === null || (coverUrl !== own && !coverUrl.startsWith(`/venues/${venue.id}/cover`))) await this.deps.places.clearVenueCover(venue.id);
+    return this.profile(userId, venue.id);
+  }
+
+  /** Capa enviada do local, para o <img> (que não manda o token). */
+  async venueCover(venueId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (typeof venueId !== 'string' || venueId === '' || venueId.length > 64) return undefined;
+    return this.deps.places.findVenueCover(venueId);
+  }
+
+  async follow(userId: string, venueId: unknown): Promise<{ following: true; followerCount: number }> {
+    const venue = await this.venueOrThrow(venueId);
+    await this.deps.places.followVenue(userId, venue.id, this.deps.clock.now());
+    return { following: true, followerCount: await this.deps.places.countVenueFollowers(venue.id) };
+  }
+
+  async unfollow(userId: string, venueId: unknown): Promise<{ following: false; followerCount: number }> {
+    const venue = await this.venueOrThrow(venueId);
+    await this.deps.places.unfollowVenue(userId, venue.id);
+    return { following: false, followerCount: await this.deps.places.countVenueFollowers(venue.id) };
+  }
+
+  /**
+   * Página de um lugar que só existe na fonte externa (Google): confere lá que o lugar existe ali perto e cria o local
+   * na primeira vez. Nunca confia no nome vindo do app. Devolve o id para abrir `/bares/:id`.
+   */
+  async openExternal(input: { key?: unknown; lat?: unknown; lng?: unknown }): Promise<{ venueId: string }> {
+    const key = input.key;
+    if (typeof key !== 'string' || !EXTERNAL_KEY_RE.test(key)) throw validationError('Local inválido', { key: 'Identificador de local inválido' });
+    const known = await this.deps.places.findVenueByExternalKey(key);
+    if (known) return { venueId: known.id };
+    const { lat, lng } = input;
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw validationError('Local inválido', { lat: 'Posição inválida' });
+    const found = await this.deps.placeSource.nearby({ lat, lng }, EXTERNAL_CHECK_RADIUS_M, 40);
+    const place = found.places.find((p) => `${p.source.toLowerCase()}:${p.externalId}` === key);
+    if (!place) throw notFound('Local não encontrado');
+    const venue: VenueRecord = {
+      id: this.deps.ids.next(),
+      name: place.name.slice(0, VENUE_NAME_MAX),
+      address: null,
+      category: place.category ? place.category.slice(0, VENUE_CATEGORY_MAX) : null,
+      lat: place.lat,
+      lng: place.lng,
+      isSample: false,
+      ownerId: null,
+      externalKey: key,
+      photoRef: place.photoRef ?? null,
+      photoAuthor: place.photoAuthor ?? null,
+    };
+    try {
+      await this.deps.places.createVenue(venue);
+    } catch (error) {
+      const again = await this.deps.places.findVenueByExternalKey(key);
+      if (again) return { venueId: again.id };
+      throw error;
+    }
+    return { venueId: venue.id };
   }
 
   /** Documento de um pedido, só para admin. */

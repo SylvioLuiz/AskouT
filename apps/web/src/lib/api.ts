@@ -5,6 +5,8 @@ import type {
   VenueClaim,
   VenueEvent,
   VenueEventBody,
+  VenueProfile,
+  VenueProfileBody,
   VenuePanel,
   AuthResult,
   AvailableFriend,
@@ -248,6 +250,13 @@ export function createApi(deps: ApiDeps) {
     venuePanel: (venueId: string) => request<VenuePanel>('GET', `/me/venues/${id(venueId)}`),
     createVenueEvent: (venueId: string, body: VenueEventBody) => request<VenueEvent>('POST', `/me/venues/${id(venueId)}/events`, { body }),
     updateVenueEvent: (venueId: string, eventId: string, body: VenueEventBody) => request<VenueEvent>('PUT', `/me/venues/${id(venueId)}/events/${id(eventId)}`, { body }),
+    venueProfile: (venueId: string) => request<VenueProfile>('GET', `/venues/${id(venueId)}/profile`),
+    updateVenueProfile: (venueId: string, body: VenueProfileBody) => request<VenueProfile>('PUT', `/me/venues/${id(venueId)}/profile`, { body }),
+    followVenue: (venueId: string) => request<{ following: true; followerCount: number }>('POST', `/venues/${id(venueId)}/follow`),
+    unfollowVenue: (venueId: string) => request<{ following: false; followerCount: number }>('DELETE', `/venues/${id(venueId)}/follow`),
+    venuePosts: (venueId: string, page?: PageRequest) => request<PostsPage>('GET', `/venues/${id(venueId)}/posts${pageQuery(page)}`),
+    createVenuePost: (venueId: string, input: { images: string[]; caption?: string }) => request<PostView>('POST', `/me/venues/${id(venueId)}/posts`, { body: input }),
+    openExternalVenue: (input: { key: string; lat: number; lng: number }) => request<{ venueId: string }>('POST', '/venues/external', { body: input }),
     deleteVenueEvent: (venueId: string, eventId: string) => request<{ deleted: true }>('DELETE', `/me/venues/${id(venueId)}/events/${id(eventId)}`),
 
     // Conversas
