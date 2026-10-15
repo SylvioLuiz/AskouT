@@ -137,11 +137,12 @@ function ClaimRow({ claim, onChanged }: { claim: VenueClaim; onChanged: () => vo
   }
 
   return (
-    <li className="claimrow">
+    <li className={`claimrow claimrow--${claim.status.toLowerCase()}`}>
       <div className="claimrow__main">
         <span className="venuerow__name">{claim.venue.name}</span>
         <span className={`tag claimrow__status claimrow__status--${claim.status.toLowerCase()}`}>{claimStatusLabel(claim.status)}</span>
       </div>
+      {claim.status === 'PENDING' ? <p className="claimrow__help">Um administrador está avaliando o documento enviado em {new Date(claim.createdAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}. Você recebe um aviso quando houver resposta.</p> : null}
       {claim.status === 'REJECTED' && claim.reviewNote ? <p className="muted">Motivo: {claim.reviewNote}</p> : null}
       {claim.status === 'PENDING' ? (
         asking ? (
@@ -171,9 +172,21 @@ export function VenuesScreen() {
       {mine.error && !mine.data ? <ErrorState message={mine.error.message} onRetry={mine.reload} /> : null}
       {mine.data ? (
         <>
-          {mine.data.venues.length === 0 ? (
+          {mine.data.claims.length > 0 ? (
+            <section aria-labelledby="pedidos-titulo">
+              <h2 id="pedidos-titulo" className="section__title">
+                Seus pedidos
+              </h2>
+              <ul className="claimlist">
+                {mine.data.claims.map((c) => (
+                  <ClaimRow key={c.id} claim={c} onChanged={mine.reload} />
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {mine.data.venues.length === 0 && mine.data.claims.length === 0 ? (
             <EmptyState title="Você ainda não administra nenhum local">Reivindique o seu bar ou casa para criar os eventos dele. O pedido é analisado por um administrador.</EmptyState>
-          ) : (
+          ) : mine.data.venues.length === 0 ? null : (
             <ul className="venuelist" aria-label="Locais que você administra">
               {mine.data.venues.map((v) => (
                 <li key={v.id}>
@@ -187,18 +200,6 @@ export function VenuesScreen() {
           <Button full onClick={() => setClaiming(true)}>
             Reivindicar um local
           </Button>
-          {mine.data.claims.length > 0 ? (
-            <section aria-labelledby="pedidos-titulo">
-              <h2 id="pedidos-titulo" className="section__title">
-                Seus pedidos
-              </h2>
-              <ul className="claimlist">
-                {mine.data.claims.map((c) => (
-                  <ClaimRow key={c.id} claim={c} onChanged={mine.reload} />
-                ))}
-              </ul>
-            </section>
-          ) : null}
         </>
       ) : null}
       {claiming ? (

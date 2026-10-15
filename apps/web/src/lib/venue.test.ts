@@ -44,6 +44,6 @@ test('corpo enviado para a API', () => {
 });
 
 test('rótulos do pedido', () => {
-  assert.equal(claimStatusLabel('PENDING'), 'Em análise');
+  assert.equal(claimStatusLabel('PENDING'), 'Avaliação em andamento');
   assert.equal(claimStatusLabel('REJECTED'), 'Recusado');
 });

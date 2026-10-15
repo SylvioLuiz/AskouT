@@ -35,7 +35,7 @@ export function claimStateLabel(state: ClaimState): string {
 export function claimStatusLabel(status: ClaimStatus): string {
   switch (status) {
     case 'PENDING':
-      return 'Em análise';
+      return 'Avaliação em andamento';
     case 'APPROVED':
       return 'Aprovado';
     default:
