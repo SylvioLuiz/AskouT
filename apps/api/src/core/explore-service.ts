@@ -1,3 +1,4 @@
+import { ratingView } from './venue-service.ts';
 import { notFound, validationError } from './errors.ts';
 import { fold, normalizeTag } from './explore-match.ts';
 import { distanceMeters } from './geo.ts';
@@ -42,7 +43,7 @@ export interface ExploreEventItem {
   tags: string[];
   /** Dado de exemplo para teste, nunca um evento real. */
   sample: boolean;
-  venue: { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number };
+  venue: { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; logoUrl: string | null };
   distanceM: number | null;
   /** Quem consulta já postou este evento no próprio perfil (só na consulta de um evento). */
   postedByMe?: boolean;
@@ -123,7 +124,7 @@ function toEventItem(event: PlaceEventRecord, venue: VenueRecord, distanceM: num
     imageUrl: event.imageUrl,
     tags: [...event.tags],
     sample: event.isSample || venue.isSample,
-    venue: { id: venue.id, name: venue.name, address: venue.address, category: venue.category, lat: venue.lat, lng: venue.lng },
+    venue: { id: venue.id, name: venue.name, address: venue.address, category: venue.category, lat: venue.lat, lng: venue.lng, logoUrl: venue.logoUrl ?? null },
     distanceM: distanceM === null ? null : Math.round(distanceM),
   };
 }
@@ -213,7 +214,7 @@ export class ExploreService {
     ]);
 
     const profiles = await Promise.all(
-      venues.map(async ({ venue }) => ({ id: venue.id, followerCount: await places.countVenueFollowers(venue.id), following: await places.isFollowingVenue(actorId, venue.id) })),
+      venues.map(async ({ venue }) => ({ id: venue.id, followerCount: await places.countVenueFollowers(venue.id), following: await places.isFollowingVenue(actorId, venue.id), rating: await places.venueRating(venue.id, actorId) })),
     );
     const profileById = new Map(profiles.map((p) => [p.id, p]));
     const placeItems: ExplorePlaceItem[] = venues.map(({ venue, distanceM }) => ({
@@ -226,8 +227,8 @@ export class ExploreService {
       lng: venue.lng,
       sample: venue.isSample,
       distanceM: distanceM === null ? null : Math.round(distanceM),
-      rating: null,
-      ratingCount: null,
+      rating: ratingView(profileById.get(venue.id)!.rating).average,
+      ratingCount: profileById.get(venue.id)!.rating.count || null,
       photoRef: venue.photoRef ?? null,
       photoAuthor: venue.photoAuthor ?? null,
       mapsUri: null,

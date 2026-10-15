@@ -131,8 +131,20 @@ export interface VenueProfileView {
   isOwner: boolean;
   following: boolean;
   followerCount: number;
+  rating: VenueRatingView;
   /** Eventos que ainda vão acontecer ou estão acontecendo, do mais cedo ao mais tarde. */
   upcomingEvents: VenueEventView[];
+}
+
+/** Nota do estabelecimento: média de 1 a 5 (uma casa decimal), quantas pessoas avaliaram e a nota de quem consulta. */
+export interface VenueRatingView {
+  average: number | null;
+  count: number;
+  mine: number | null;
+}
+
+export function ratingView(r: { count: number; sum: number; mine: number | null }): VenueRatingView {
+  return { average: r.count === 0 ? null : Math.round((r.sum / r.count) * 10) / 10, count: r.count, mine: r.mine };
 }
 
 export interface VenueProfileInput {
@@ -367,7 +379,7 @@ export class VenueService {
   async profile(viewerId: string, venueId: unknown): Promise<VenueProfileView> {
     const venue = await this.venueOrThrow(venueId);
     const now = this.deps.clock.now().getTime();
-    const [following, followerCount, events] = await Promise.all([this.deps.places.isFollowingVenue(viewerId, venue.id), this.deps.places.countVenueFollowers(venue.id), this.deps.places.listVenueEvents(venue.id)]);
+    const [following, followerCount, events, rating] = await Promise.all([this.deps.places.isFollowingVenue(viewerId, venue.id), this.deps.places.countVenueFollowers(venue.id), this.deps.places.listVenueEvents(venue.id), this.deps.places.venueRating(venue.id, viewerId)]);
     const upcoming = events
       .filter((e) => e.endsAt.getTime() > now)
       .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || (a.id < b.id ? -1 : 1))
@@ -391,6 +403,7 @@ export class VenueService {
       isOwner: venue.ownerId === viewerId,
       following,
       followerCount,
+      rating: ratingView(rating),
       upcomingEvents: upcoming,
     };
   }
@@ -434,6 +447,21 @@ export class VenueService {
     const venue = await this.venueOrThrow(venueId);
     await this.deps.places.followVenue(userId, venue.id, this.deps.clock.now());
     return { following: true, followerCount: await this.deps.places.countVenueFollowers(venue.id) };
+  }
+
+  /** Avalia o local de 1 a 5 estrelas (de novo = troca a nota). Quem administra o local não avalia o próprio. */
+  async rate(userId: string, venueId: unknown, stars: unknown): Promise<VenueRatingView> {
+    const venue = await this.venueOrThrow(venueId);
+    if (typeof stars !== 'number' || !Number.isInteger(stars) || stars < 1 || stars > 5) throw validationError('Nota inválida', { stars: 'Use um número inteiro de 1 a 5' });
+    if (venue.ownerId === userId) throw forbidden('Você não pode avaliar o seu próprio estabelecimento');
+    await this.deps.places.rateVenue(userId, venue.id, stars, this.deps.clock.now());
+    return ratingView(await this.deps.places.venueRating(venue.id, userId));
+  }
+
+  async clearRating(userId: string, venueId: unknown): Promise<VenueRatingView> {
+    const venue = await this.venueOrThrow(venueId);
+    await this.deps.places.clearVenueRating(userId, venue.id);
+    return ratingView(await this.deps.places.venueRating(venue.id, userId));
   }
 
   async unfollow(userId: string, venueId: unknown): Promise<{ following: false; followerCount: number }> {

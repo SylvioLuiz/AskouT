@@ -697,6 +697,7 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   readonly venueCovers = new Map<string, { mime: string; data: Uint8Array }>();
   readonly venueLogos = new Map<string, { mime: string; data: Uint8Array }>();
   readonly venueFollows = new Map<string, Date>();
+  readonly venueRatings = new Map<string, number>();
 
   async updateVenueProfile(venueId: string, patch: VenueProfilePatch) {
     const v = this.venues.get(venueId);
@@ -754,6 +755,27 @@ export class InMemoryPlaceRepository implements PlaceRepository {
 
   async listFollowedVenueIds(userId: string) {
     return [...this.venueFollows.keys()].filter((k) => k.startsWith(`${userId}|`)).map((k) => k.slice(userId.length + 1));
+  }
+
+  async rateVenue(userId: string, venueId: string, stars: number) {
+    if (!this.venues.has(venueId)) return;
+    this.venueRatings.set(`${userId}|${venueId}`, stars);
+  }
+
+  async clearVenueRating(userId: string, venueId: string) {
+    this.venueRatings.delete(`${userId}|${venueId}`);
+  }
+
+  async venueRating(venueId: string, userId: string) {
+    let count = 0;
+    let sum = 0;
+    for (const [k, v] of this.venueRatings) {
+      if (k.endsWith(`|${venueId}`)) {
+        count += 1;
+        sum += v;
+      }
+    }
+    return { count, sum, mine: this.venueRatings.get(`${userId}|${venueId}`) ?? null };
   }
 
   async createVenue(venue: VenueRecord): Promise<void> {

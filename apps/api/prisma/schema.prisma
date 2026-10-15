@@ -166,6 +166,7 @@ model User {
   ownedVenues       Venue[]       @relation("VenueOwner")
   venueClaims       VenueClaim[]  @relation("ClaimUser")
   venueFollows      VenueFollow[]
+  venueRatings      VenueRating[]
   reviewedClaims    VenueClaim[]  @relation("ClaimReviewer")
 }
 
@@ -580,6 +581,7 @@ model Venue {
   cover  VenueCover?
   logo   VenueLogo?
   followers VenueFollow[]
+  ratings   VenueRating[]
   posts  Post[]
   comments PostComment[]
 
@@ -844,6 +846,21 @@ model VenueFollow {
   userId    String   @db.Uuid
   venueId   String   @db.Uuid
   createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([userId, venueId])
+  @@index([venueId])
+}
+
+/// Nota de 1 a 5 estrelas que uma pessoa dá a um estabelecimento (uma por pessoa).
+model VenueRating {
+  userId    String   @db.Uuid
+  venueId   String   @db.Uuid
+  stars     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)

@@ -17,6 +17,7 @@ import { VenuePageScreen } from './screens/venue-page.tsx';
 import { VenuesScreen } from './screens/venues.tsx';
 import { EventScreen } from './screens/event.tsx';
 import { ExploreScreen } from './screens/explore.tsx';
+import { EventsMapScreen } from './screens/events-map.tsx';
 import { HomeScreen } from './screens/main-tabs.tsx';
 import { BlockedScreen, EditProfileScreen, FriendsScreen, HelpScreen, InteractionsScreen, PrivacyScreen, SettingsScreen, ThemeScreen } from './screens/me.tsx';
 import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
@@ -37,6 +38,7 @@ function OwnProfile() {
 const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/', render: () => <HomeScreen /> },
   { path: '/explorar', render: () => <ExploreScreen /> },
+  { path: '/explorar/mapa', render: () => <EventsMapScreen /> },
   { path: '/eventos/:id', render: (p) => <EventScreen key={p['id']} eventId={p['id'] ?? ''} /> },
   { path: '/conversas', render: () => <ConversationsScreen /> },
   { path: '/conversas/:id/info', render: (p) => <ChatInfoScreen key={p['id']} conversationId={p['id'] ?? ''} /> },

@@ -1,3 +1,4 @@
+import { VenueLink } from './venue-link.tsx';
 import { MeetupCover } from './meetup.tsx';
 import { VoiceBubble } from './voice.tsx';
 import { Button, EmptyState } from './ui.tsx';
@@ -15,7 +16,7 @@ export function GroupEvent({ meetup, onManage }: { meetup: MeetupView; onManage?
       <div className="groupevent__body">
         <h3 className="groupevent__title">{meetup.title}</h3>
         {meetup.status === 'CANCELLED' ? <p className="groupevent__venue">Cancelado</p> : null}
-        <p className="groupevent__venue">{meetup.event?.venueName ?? 'Local do evento'}</p>
+        <p className="groupevent__venue">{meetup.event ? <VenueLink venueId={meetup.event.venueId} name={meetup.event.venueName} nested /> : 'Local do evento'}</p>
         <dl className="groupevent__facts">
           <div>
             <dt>Confirmados</dt>

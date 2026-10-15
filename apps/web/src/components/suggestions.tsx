@@ -1,3 +1,4 @@
+import { VenueLink } from './venue-link.tsx';
 import { useState } from 'react';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
@@ -177,7 +178,11 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
                   {item.sample ? <SampleBadge /> : null}
                 </div>
                 <h3 className="sugcard__title">{item.title}</h3>
-                {item.venueName !== item.title ? <p className="sugcard__venue">{item.venueName}</p> : null}
+                {item.venueName !== item.title ? (
+                  <p className="sugcard__venue">
+                    <VenueLink venueId={item.venueId} name={item.venueName} />
+                  </p>
+                ) : null}
                 {item.rating !== null ? <Rating rating={item.rating} count={item.ratingCount} /> : null}
                 <p className="sugcard__when">{formatWhen(item.startsAt, item.endsAt, now)}</p>
                 <p className="sugcard__dist">{formatDistances(item, otherName)}</p>

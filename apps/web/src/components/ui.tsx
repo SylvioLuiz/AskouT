@@ -194,7 +194,7 @@ export function PersonRow({ profile, aside, realName = false }: { profile: Publi
 
 // ---------- Estrutura de página ----------
 
-export function PageHead({ title, back, subtitle, titleTo }: { title: string; back?: string; subtitle?: string; titleTo?: string }) {
+export function PageHead({ title, back, subtitle, titleTo, action }: { title: string; back?: string; subtitle?: string; titleTo?: string; action?: ReactNode }) {
   return (
     <header className="pagehead">
       {back ? (
@@ -213,6 +213,7 @@ export function PageHead({ title, back, subtitle, titleTo }: { title: string; ba
           {subtitle ? <p className="pagehead__subtitle">{subtitle}</p> : null}
         </div>
       )}
+      {action ? <div className="pagehead__action">{action}</div> : null}
     </header>
   );
 }

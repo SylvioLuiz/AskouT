@@ -1185,6 +1185,23 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.places.listFollowedVenueIds('nao-e-uuid'), []);
       });
 
+      it('avaliação do local: uma nota por pessoa, soma, troca e remove', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: -23.5, lng: -46.6, isSample: false };
+        await h.places.createVenue(v);
+        assert.deepEqual(await h.places.venueRating(v.id, ana), { count: 0, sum: 0, mine: null });
+        await h.places.rateVenue(ana, v.id, 5, at(1));
+        await h.places.rateVenue(bia, v.id, 3, at(2));
+        await h.places.rateVenue(ana, v.id, 4, at(3));
+        await h.places.rateVenue(ana, randomUUID(), 4, at(4));
+        assert.deepEqual(await h.places.venueRating(v.id, ana), { count: 2, sum: 7, mine: 4 });
+        assert.deepEqual(await h.places.venueRating(v.id, randomUUID()), { count: 2, sum: 7, mine: null });
+        await h.places.clearVenueRating(ana, v.id);
+        assert.deepEqual(await h.places.venueRating(v.id, ana), { count: 1, sum: 3, mine: null });
+        assert.deepEqual(await h.places.venueRating('nao-e-uuid', ana), { count: 0, sum: 0, mine: null });
+      });
+
       it('posts em nome do local só entram pelo local, nunca pelo perfil de quem postou', async () => {
         const ana = await newUser('ana');
         const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: -23.5, lng: -46.6, isSample: false, ownerId: ana };

@@ -238,3 +238,31 @@ test('lugar do Google já aberto não aparece duas vezes na busca', async () => 
   assert.deepEqual(after.places.map((p) => p.source), ['ASKOUT']);
   assert.equal(after.places[0]!.venue?.claimed, false);
 });
+
+test('avaliação de 1 a 5: uma nota por pessoa, média, troca, remoção e dono não avalia', async () => {
+  const { w, dono, ana, bia } = await setup();
+  const empty = (await w.core.venues.profile(ana, 'v1')).rating;
+  assert.deepEqual(empty, { average: null, count: 0, mine: null });
+  assert.deepEqual(await w.core.venues.rate(ana, 'v1', 5), { average: 5, count: 1, mine: 5 });
+  assert.deepEqual(await w.core.venues.rate(bia, 'v1', 4), { average: 4.5, count: 2, mine: 4 });
+  // avaliar de novo troca a nota, não soma
+  assert.deepEqual(await w.core.venues.rate(ana, 'v1', 2), { average: 3, count: 2, mine: 2 });
+  assert.deepEqual((await w.core.venues.profile(bia, 'v1')).rating, { average: 3, count: 2, mine: 4 });
+  assert.equal((await w.core.venues.profile(dono, 'v1')).rating.mine, null);
+  await rejectsWith(w.core.venues.rate(dono, 'v1', 5), 'FORBIDDEN');
+  for (const bad of [0, 6, 3.5, '4', null, undefined, Number.NaN]) await rejectsWith(w.core.venues.rate(ana, 'v1', bad), 'VALIDATION');
+  await rejectsWith(w.core.venues.rate(ana, 'nao-existe', 3), 'NOT_FOUND');
+  assert.deepEqual(await w.core.venues.clearRating(ana, 'v1'), { average: 4, count: 1, mine: null });
+  // local sem dono também pode ser avaliado
+  assert.equal((await w.core.venues.rate(ana, 'v2', 3)).average, 3);
+});
+
+test('busca de locais traz a nota do estabelecimento', async () => {
+  const { w, ana, bia } = await setup();
+  await w.core.venues.rate(ana, 'v1', 4);
+  await w.core.venues.rate(bia, 'v1', 5);
+  const r = await w.core.explore.search(ana, { q: 'Bar do Zé' });
+  const item = r.places.find((p) => p.key === 'askout:v1')!;
+  assert.equal(item.rating, 4.5);
+  assert.equal(item.ratingCount, 2);
+});

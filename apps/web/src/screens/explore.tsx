@@ -3,12 +3,12 @@ import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
-import { EventKindIcon, SearchIcon } from '../components/icons.tsx';
+import { EventKindIcon, MapIcon, SearchIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
 import { Button, EmptyState, ErrorState, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
-import { formatWhen, mapLink, routeLink } from '../lib/chat.ts';
+import { formatRating, formatWhen, mapLink, routeLink } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
 import {
   KINDS,
@@ -30,6 +30,7 @@ import { formatDistance } from '../lib/flash.ts';
 import { pluralize } from '../lib/format.ts';
 import type { EventKind, ExploreEvent, ExplorePlace, ExploreResult } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
+import { VenueLink } from '../components/venue-link.tsx';
 import { VenueLogo } from '../components/venue-logo.tsx';
 import { openStatus } from '../lib/venue-profile.ts';
 
@@ -96,7 +97,9 @@ function EventCard({ event, now }: { event: ExploreEvent; now: Date }) {
         <EventCover event={event} shape={coverShape(event.id)} />
         <div className="evcard__body">
           <h3 className="evcard__title">{event.title}</h3>
-          <p className="evcard__venue">{event.venue.name}</p>
+          <p className="evcard__venue">
+            <VenueLink venueId={event.venue.id} name={event.venue.name} nested />
+          </p>
           <p className="evcard__when">{formatWhen(event.startsAt, event.endsAt, now)}</p>
           {event.distanceM !== null ? <p className="evcard__dist">a {formatDistance(event.distanceM)}</p> : null}
         </div>
@@ -154,7 +157,7 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
           <span className="placerow__info">
             <span className="placerow__name">{place.name}</span>
             <span className="placerow__line">
-              {[place.category ?? 'Local', pluralize(followers, 'seguidor', 'seguidores'), status?.short, place.distanceM !== null ? `a ${formatDistance(place.distanceM)}` : null]
+              {[place.category ?? 'Local', place.rating !== null ? `★ ${formatRating(place.rating)}${place.ratingCount ? ` (${place.ratingCount})` : ''}` : null, pluralize(followers, 'seguidor', 'seguidores'), status?.short, place.distanceM !== null ? `a ${formatDistance(place.distanceM)}` : null]
                 .filter(Boolean)
                 .join(' · ')}
             </span>
@@ -163,6 +166,14 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
         <Button small variant={following ? 'quiet' : 'primary'} loading={busy} onClick={() => void toggleFollow()}>
           {following ? 'Seguindo' : 'Seguir'}
         </Button>
+        <div className="placerow__actions">
+          <a className="btn btn--quiet btn--small" href={routeLink(place.lat, place.lng)} target="_blank" rel="noopener noreferrer">
+            Rota
+          </a>
+          <a className="btn btn--quiet btn--small" href={place.mapsUri ?? mapLink(place.lat, place.lng)} target="_blank" rel="noopener noreferrer">
+            Mapa
+          </a>
+        </div>
         {problem ? <p className="field__error">{problem}</p> : null}
       </li>
     );
@@ -265,7 +276,14 @@ export function ExploreScreen() {
 
   return (
     <>
-      <PageHead title="Explorar" />
+      <PageHead
+        title="Explorar"
+        action={
+          <Link to="/explorar/mapa" className="btn btn--secondary btn--small">
+            <MapIcon /> Ver no mapa
+          </Link>
+        }
+      />
 
       <div className="search search--explore" role="search">
         <span className="search__icon" aria-hidden="true">

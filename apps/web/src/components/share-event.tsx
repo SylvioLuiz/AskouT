@@ -1,3 +1,4 @@
+import { VenueLink } from './venue-link.tsx';
 import { useState } from 'react';
 import { Sheet } from './agenda.tsx';
 import { Avatar, Button, ErrorState, GroupAvatar, Loading, Notice } from './ui.tsx';
@@ -126,7 +127,9 @@ export function EventBubble({ event }: { event: EventCard }) {
       </span>
       <strong className="evbubble__title">{event.title}</strong>
       <span className="evbubble__sub">{formatWhen(event.startsAt, event.endsAt, new Date())}</span>
-      <span className="evbubble__sub">{event.venueName}</span>
+      <span className="evbubble__sub">
+        <VenueLink venueId={event.venueId} name={event.venueName} nested />
+      </span>
       {event.sample ? <span className="tag tag--sample">Exemplo de teste</span> : null}
     </Link>
   );

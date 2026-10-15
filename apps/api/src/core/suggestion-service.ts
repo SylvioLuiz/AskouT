@@ -18,6 +18,8 @@ export interface SuggestionItem {
   key: string;
   source: 'EVENT' | 'OSM' | 'GOOGLE';
   title: string;
+  /** Só em evento do AskouT: leva à página do local. */
+  venueId?: string;
   venueName: string;
   category: string | null;
   startsAt: string | null;
@@ -87,6 +89,7 @@ export class SuggestionService {
         key: `event:${event.id}`,
         source: 'EVENT',
         title: event.title,
+        venueId: venue.id,
         venueName: venue.name,
         category: venue.category,
         startsAt: event.startsAt.toISOString(),

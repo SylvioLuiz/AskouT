@@ -85,6 +85,16 @@ export class VenuesController {
     return this.core.venues.unfollow(actor.userId, id);
   }
 
+  @Put('venues/:id/rating')
+  rate(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: { stars?: unknown }) {
+    return this.core.venues.rate(actor.userId, id, body?.stars);
+  }
+
+  @Delete('venues/:id/rating')
+  clearRating(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.venues.clearRating(actor.userId, id);
+  }
+
   /** Posts feitos em nome do local. */
   @Get('venues/:id/posts')
   async posts(@CurrentActor() actor: Actor, @Param('id') id: string, @Query() query: { limit?: string; offset?: string }) {

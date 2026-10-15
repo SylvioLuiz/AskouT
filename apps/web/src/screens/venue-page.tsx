@@ -4,11 +4,14 @@ import { Sheet } from '../components/agenda.tsx';
 import { CoverPicker } from '../components/cover-picker.tsx';
 import { PostList } from '../components/post.tsx';
 import { PlacePhoto, SampleBadge } from '../components/suggestions.tsx';
-import { ChevronLeftIcon } from '../components/icons.tsx';
+import { ChevronLeftIcon, ShareIcon } from '../components/icons.tsx';
+import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
-import { formatWhen, routeLink } from '../lib/chat.ts';
+import { formatRating, formatWhen, routeLink } from '../lib/chat.ts';
+import { distanceMeters, formatDistance } from '../lib/flash.ts';
+import { useCurrentPosition } from './explore.tsx';
 import { toApiError } from '../lib/errors.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { resizePostPhoto } from '../lib/image.ts';
@@ -39,7 +42,42 @@ function goBack() {
 }
 
 /** Topo da página: capa (a fachada) ao fundo, logo em círculo, nome, localização e os três números. */
-function VenueHero({ venue, now }: { venue: VenueProfile; now: Date }) {
+/** Estrelas para avaliar o bar: toque na nota; tocar de novo na mesma nota tira a avaliação. */
+function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+  const mine = venue.rating.mine;
+  async function pick(stars: number) {
+    if (busy) return;
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      if (mine === stars) await api.clearVenueRating(venue.id);
+      else await api.rateVenue(venue.id, stars);
+      onChanged();
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="vrate">
+      <h2 className="vabout__h">{mine ? 'Sua avaliação' : 'Avalie este bar'}</h2>
+      <div className="vrate__stars" role="group" aria-label="Sua nota de 1 a 5">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" className={`vrate__star${mine !== null && n <= mine ? ' vrate__star--on' : ''}`} aria-pressed={mine === n} aria-label={`${n} ${n === 1 ? 'estrela' : 'estrelas'}`} disabled={busy} onClick={() => void pick(n)}>
+            ★
+          </button>
+        ))}
+      </div>
+      {mine ? <p className="muted vrate__hint">Toque na mesma estrela para remover a sua nota.</p> : null}
+      {problem ? <p className="field__error">{problem}</p> : null}
+    </div>
+  );
+}
+
+function VenueHero({ venue, now, onShare }: { venue: VenueProfile; now: Date; onShare: () => void }) {
   const [coverFailed, setCoverFailed] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
   const own = safeImage(venue.coverUrl);
@@ -56,6 +94,9 @@ function VenueHero({ venue, now }: { venue: VenueProfile; now: Date }) {
       <button type="button" className="vhero__back" onClick={goBack} aria-label="Voltar">
         <ChevronLeftIcon />
       </button>
+      <button type="button" className="vhero__share" onClick={onShare} aria-label="Compartilhar página do bar">
+        <ShareIcon />
+      </button>
       <div className="vhero__body">
         {logo ? (
           <img className="vhero__logo" src={logo} alt={`Logo de ${venue.name}`} onError={() => setLogoFailed(true)} />
@@ -71,6 +112,16 @@ function VenueHero({ venue, now }: { venue: VenueProfile; now: Date }) {
             <span>{place}</span>
           </p>
         ) : null}
+        <p className="vhero__rating" aria-label={venue.rating.count > 0 ? `Nota ${formatRating(venue.rating.average ?? 0)} de 5, ${venue.rating.count} ${venue.rating.count === 1 ? 'avaliação' : 'avaliações'}` : 'Ainda sem avaliações'}>
+          {venue.rating.count > 0 ? (
+            <>
+              <span aria-hidden="true">★ {formatRating(venue.rating.average ?? 0)}</span>
+              <span aria-hidden="true"> · {venue.rating.count} {venue.rating.count === 1 ? 'avaliação' : 'avaliações'}</span>
+            </>
+          ) : (
+            <span aria-hidden="true">Ainda sem avaliações</span>
+          )}
+        </p>
         {venue.sample ? <SampleBadge /> : null}
       </div>
       <dl className="vstats">
@@ -298,6 +349,8 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | undefined>();
   const [followBusy, setFollowBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  const [sharing, setSharing] = useState(false);
+  const where = useCurrentPosition();
   const [postsKey, setPostsKey] = useState(0);
   const [eventsKey, setEventsKey] = useState(0);
   const [editing, setEditing] = useState<VenueEvent | undefined>();
@@ -344,7 +397,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
 
   return (
     <>
-      <VenueHero venue={v} now={now} />
+      <VenueHero venue={v} now={now} onShare={() => setSharing(true)} />
       <div className="vhead">
         {v.isOwner ? (
           <div className="vhead__actions">
@@ -364,7 +417,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
               {v.following ? 'Seguindo' : 'Seguir'}
             </Button>
             <a className="btn btn--quiet" href={routeLink(v.lat, v.lng)} target="_blank" rel="noopener noreferrer">
-              Rota
+              Rota{where.status === 'ok' ? ` · a ${formatDistance(distanceMeters(where.position, { lat: v.lat, lng: v.lng }))}` : ''}
             </a>
           </div>
         )}
@@ -402,6 +455,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             <p className="muted">{v.isOwner ? 'Informe os horários em Editar perfil.' : 'O bar ainda não informou os horários.'}</p>
           )}
           {v.address ? <p className="vabout__addr">{v.address}</p> : null}
+          {!v.isOwner ? <StarPicker venue={v} onChanged={page.reload} /> : null}
         </section>
       ) : null}
 
@@ -459,6 +513,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
           }}
         />
       ) : null}
+      {sharing ? <ShareLinkSheet url={`${window.location.origin}/bares/${encodeURIComponent(v.id)}`} text={`${v.name} no AskouT`} onClose={() => setSharing(false)} /> : null}
     </>
   );
 }

@@ -273,6 +273,10 @@ export interface PlaceRepository {
   isFollowingVenue(userId: string, venueId: string): Promise<boolean>;
   countVenueFollowers(venueId: string): Promise<number>;
   listFollowedVenueIds(userId: string): Promise<string[]>;
+  /** Nota de 1 a 5 do local: uma por pessoa; avaliar de novo troca a nota. */
+  rateVenue(userId: string, venueId: string, stars: number, at: Date): Promise<void>;
+  clearVenueRating(userId: string, venueId: string): Promise<void>;
+  venueRating(venueId: string, userId: string): Promise<{ count: number; sum: number; mine: number | null }>;
 }
 
 export interface VenueClaimRepository {

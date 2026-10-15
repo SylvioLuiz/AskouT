@@ -92,6 +92,27 @@ export class PrismaPlaceRepository implements PlaceRepository {
     return this.prisma.venueFollow.count({ where: { venueId } });
   }
 
+  async rateVenue(userId: string, venueId: string, stars: number, at: Date): Promise<void> {
+    if (!isUuid(userId) || !isUuid(venueId)) return;
+    await this.prisma.venueRating.upsert({
+      where: { userId_venueId: { userId, venueId } },
+      create: { userId, venueId, stars, createdAt: at, updatedAt: at },
+      update: { stars, updatedAt: at },
+    });
+  }
+
+  async clearVenueRating(userId: string, venueId: string): Promise<void> {
+    if (!isUuid(userId) || !isUuid(venueId)) return;
+    await this.prisma.venueRating.deleteMany({ where: { userId, venueId } });
+  }
+
+  async venueRating(venueId: string, userId: string): Promise<{ count: number; sum: number; mine: number | null }> {
+    if (!isUuid(venueId)) return { count: 0, sum: 0, mine: null };
+    const agg = await this.prisma.venueRating.aggregate({ where: { venueId }, _count: { _all: true }, _sum: { stars: true } });
+    const mine = isUuid(userId) ? await this.prisma.venueRating.findUnique({ where: { userId_venueId: { userId, venueId } }, select: { stars: true } }) : null;
+    return { count: agg._count._all, sum: agg._sum.stars ?? 0, mine: mine?.stars ?? null };
+  }
+
   async listFollowedVenueIds(userId: string): Promise<string[]> {
     if (!isUuid(userId)) return [];
     const rows = await this.prisma.venueFollow.findMany({ where: { userId }, select: { venueId: true } });

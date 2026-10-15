@@ -11,6 +11,7 @@ export interface MeetupView {
   /** Evento do AskouT de onde o encontro saiu; nulo se foi apagado. */
   event: {
     id: string;
+    venueId: string;
     venueName: string;
     address: string | null;
     kind: EventKind;
@@ -62,6 +63,7 @@ export async function buildMeetupViews(deps: CoreDeps, actorId: string, records:
       event: found
         ? {
             id: found.event.id,
+            venueId: found.venue.id,
             venueName: found.venue.name,
             address: found.venue.address,
             kind: found.event.kind,

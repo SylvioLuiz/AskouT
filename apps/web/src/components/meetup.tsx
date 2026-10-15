@@ -1,3 +1,4 @@
+import { VenueLink } from './venue-link.tsx';
 import { useMemo, useState } from 'react';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading } from './ui.tsx';
 import { Sheet } from './agenda.tsx';
@@ -30,7 +31,7 @@ export function MeetupCover({ meetup }: { meetup: MeetupView }) {
 export function MeetupFacts({ meetup, now }: { meetup: MeetupView; now: Date }) {
   return (
     <>
-      <p className="meetcard__venue">{meetup.event?.venueName ?? 'Local do evento'}</p>
+      <p className="meetcard__venue">{meetup.event ? <VenueLink venueId={meetup.event.venueId} name={meetup.event.venueName} nested /> : 'Local do evento'}</p>
       <p className="meetcard__line">{formatWhen(meetup.startsAt, meetup.endsAt, now)}</p>
       <p className="meetcard__line">{goingLabel(meetup)}</p>
     </>

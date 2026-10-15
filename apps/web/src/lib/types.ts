@@ -206,6 +206,7 @@ export interface MeetupView {
   organizer: PublicProfile;
   event: {
     id: string;
+    venueId: string;
     venueName: string;
     address: string | null;
     kind: EventKind;
@@ -252,6 +253,7 @@ export interface EventCard {
   kind: EventKind;
   isFree: boolean;
   imageUrl: string | null;
+  venueId: string;
   venueName: string;
   startsAt: string;
   endsAt: string;
@@ -361,6 +363,8 @@ export interface SuggestionItem {
   key: string;
   source: 'EVENT' | 'OSM' | 'GOOGLE';
   title: string;
+  /** Só em evento do AskouT. */
+  venueId?: string;
   venueName: string;
   category: string | null;
   startsAt: string | null;
@@ -619,6 +623,13 @@ export interface VenueDayHours {
 /** Domingo (0) a sábado (6); `null` = fechado. */
 export type VenueHours = (VenueDayHours | null)[];
 
+/** Média de 1 a 5, quantas pessoas avaliaram e a nota de quem consulta. */
+export interface VenueRating {
+  average: number | null;
+  count: number;
+  mine: number | null;
+}
+
 export interface VenueProfile {
   id: string;
   name: string;
@@ -639,6 +650,7 @@ export interface VenueProfile {
   isOwner: boolean;
   following: boolean;
   followerCount: number;
+  rating: VenueRating;
   upcomingEvents: VenueEvent[];
 }
 

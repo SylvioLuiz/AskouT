@@ -3460,7 +3460,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .vstat__label { order: 2; font-size: 12px; opacity: .85; }
 .vstat--open .vstat__value { color: #8ff0a4; }
 .vstat--soon .vstat__value { color: #ffd166; }
-.vhero__credit { position: absolute; z-index: 1; right: 8px; top: 14px; margin: 0; padding: 2px 8px; font-size: 11px; border-radius: 8px; background: rgba(0,0,0,.45); }
+.vhero__credit { position: absolute; z-index: 1; right: 8px; top: 62px; margin: 0; padding: 2px 8px; font-size: 11px; border-radius: 8px; background: rgba(0,0,0,.45); }
 .cover__preview--logo { width: 96px; height: 96px; aspect-ratio: 1 / 1; border-radius: 50%; align-self: center; }
 
 /* Logo do estabelecimento (círculo com iniciais quando não há imagem) */
@@ -3507,3 +3507,52 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.vhero__share { position: absolute; top: 10px; right: 10px; z-index: 2; display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 22px; background: rgba(0,0,0,.35); color: #fff; cursor: pointer; }
+.vhero__rating { margin: 0; font-size: 14px; font-weight: 600; color: #ffd166; text-shadow: 0 1px 6px rgba(0,0,0,.5); }
+.vhero__rating span + span { color: #fff; font-weight: 400; }
+.vrate { margin-top: 16px; }
+.vrate__stars { display: flex; gap: 4px; }
+.vrate__star { width: 44px; height: 44px; border: 0; background: none; font-size: 32px; line-height: 1; color: var(--line-strong, #c9c9ce); cursor: pointer; }
+.vrate__star--on { color: #f5a623; }
+.vrate__hint { margin: 4px 0 0; font-size: 13px; }
+.placerow--venue { flex-wrap: wrap; }
+.placerow__actions { flex-basis: 100%; display: flex; gap: 8px; }
+.venuelink { color: inherit; text-decoration: underline; text-decoration-color: rgba(0,0,0,.3); text-underline-offset: 2px; cursor: pointer; }
+.venuelink:hover { text-decoration-color: currentColor; }
+
+/* Mapa de eventos acontecendo agora (tela cheia) */
+.pagehead__action { margin-left: auto; }
+.pagehead__action .btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.pagehead__action svg { width: 18px; height: 18px; }
+.evmap { position: fixed; inset: 0; z-index: 60; background: #1c1c1e; }
+.evmap__canvas { position: absolute; inset: 0; }
+.evmap__canvas--off { display: grid; place-items: center; padding: 24px; background: var(--bg, #fff); }
+.evmap__top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px; pointer-events: none; }
+.evmap__top > * { pointer-events: auto; }
+.evmap__back { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 22px; background: rgba(255,255,255,.94); color: #111; box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer; }
+.evmap__title { margin: 0; padding: 8px 14px; border-radius: 20px; background: rgba(255,255,255,.94); color: #111; font-size: 16px; font-weight: 700; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.evmap__count { min-width: 28px; padding: 6px 10px; border-radius: 16px; background: var(--brand, #3a36f5); color: #fff; font-size: 14px; font-weight: 700; text-align: center; }
+.evmap__bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 14px); }
+.evmap__status { margin: 0 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; border-radius: 18px; background: rgba(20,20,22,.92); color: #fff; text-align: center; }
+.evmap__status p { margin: 0; }
+.evmap__note { margin: 8px 16px 0; font-size: 12px; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.8); text-align: center; }
+.evmap__strip { display: flex; gap: 12px; margin: 0; padding: 4px 16px; list-style: none; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.evmap__strip::-webkit-scrollbar { display: none; }
+.evmap__slide { flex: 0 0 82%; max-width: 340px; scroll-snap-align: center; }
+.evmapcard { overflow: hidden; border-radius: 22px; background: #121214; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.4); outline: 2px solid transparent; }
+.evmap__slide--on .evmapcard { outline-color: var(--brand, #3a36f5); }
+.evmapcard__link { display: block; color: inherit; text-decoration: none; }
+.evmapcard__cover { position: relative; display: block; height: 140px; background: #2b2b30; }
+.evmapcard__cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.evmapcard__shade { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.72)); }
+.evmapcard__title { position: absolute; left: 14px; right: 14px; bottom: 10px; font-size: 18px; line-height: 1.2; text-shadow: 0 1px 6px rgba(0,0,0,.6); overflow-wrap: anywhere; }
+.evmapcard__bar { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 12px; }
+.evmapcard__venue { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.evmapcard__venue .venuelink { text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evmapcard__facts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; opacity: .9; }
+.evpin { width: 30px; height: 38px; padding: 0; border: 0; background: none; cursor: pointer; }
+.evpin::before { content: ''; display: block; width: 30px; height: 30px; box-sizing: border-box; border: 3px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #1aa7a7; box-shadow: 0 2px 6px rgba(0,0,0,.45); transition: transform .15s, background .15s; }
+.evpin--on::before { background: var(--brand, #3a36f5); transform: rotate(-45deg) scale(1.3); }
+.evpin--me { width: 18px; height: 18px; border: 3px solid #fff; border-radius: 50%; background: #0a84ff; box-shadow: 0 0 0 6px rgba(10,132,255,.25); cursor: default; }
+.evpin--me::before { content: none; }

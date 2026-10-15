@@ -8,6 +8,7 @@ export interface EventCardView {
   kind: EventKind;
   isFree: boolean;
   imageUrl: string | null;
+  venueId: string;
   venueName: string;
   startsAt: string;
   endsAt: string;
@@ -27,6 +28,7 @@ export async function buildEventCards(deps: CoreDeps, ids: string[]): Promise<Ma
       kind: event.kind,
       isFree: event.isFree,
       imageUrl: event.imageUrl,
+      venueId: venue.id,
       venueName: venue.name,
       startsAt: event.startsAt.toISOString(),
       endsAt: event.endsAt.toISOString(),
