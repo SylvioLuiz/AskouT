@@ -23,6 +23,7 @@ type PollRow = {
   status: string;
   finalProposalId: string | null;
   meetupId: string | null;
+  eventPostId: string | null;
   createdAt: Date;
 };
 
@@ -63,6 +64,7 @@ function toPoll(r: PollRow): PollRecord {
     status: r.status as PollStatus,
     finalProposalId: r.finalProposalId,
     meetupId: r.meetupId,
+    eventPostId: r.eventPostId,
     createdAt: r.createdAt,
   };
 }
@@ -127,6 +129,12 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
     return row ? toPoll(row) : undefined;
   }
 
+  async findByEventPost(postId: string): Promise<PollRecord | undefined> {
+    if (!isUuid(postId)) return undefined;
+    const row = await this.prisma.datePoll.findFirst({ where: { eventPostId: postId } });
+    return row ? toPoll(row) : undefined;
+  }
+
   async listForConversation(conversationId: string): Promise<PollRecord[]> {
     if (!isUuid(conversationId)) return [];
     const rows = await this.prisma.datePoll.findMany({ where: { conversationId }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], take: 100 });
@@ -177,7 +185,7 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
     await this.prisma.datePollParticipant.updateMany({ where: { pollId, userId }, data: { finishedAt: at } });
   }
 
-  async updatePoll(pollId: string, patch: { status?: PollStatus; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null }): Promise<void> {
+  async updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null }): Promise<void> {
     if (!isUuid(pollId)) return;
     await this.prisma.datePoll.updateMany({ where: { id: pollId }, data: patch });
   }

@@ -106,6 +106,10 @@ export interface PollSummary {
   /** Data proposta, enquanto espera confirmação. */
   proposedDate: string | null;
   votingDeadline: string | null;
+  /** Encontro (agenda) gerado ao definir a data. */
+  meetupId: string | null;
+  /** Evento criado a partir desta votação; quando existe, substitui a votação nas listas do grupo. */
+  event: { id: string; title: string; startsAt: string; endsAt: string } | null;
 }
 
 function parseThresholds(raw: unknown): Thresholds {
@@ -517,7 +521,9 @@ export class SchedulingService {
         finalDate = fin?.candidateDate ?? null;
         finalEndsAt = fin ? fin.candidateEndAt.toISOString() : null;
       }
-      out.push({ id: p.id, conversationId: p.conversationId, title: p.title, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && !this.isClosed(p) && mine.finishedAt === null, needsMyConfirmation, participantCount: participants.length, votedCount, finalEndsAt, finishedCount: participants.filter((x) => x.finishedAt !== null).length, best, proposedDate, votingDeadline: p.votingDeadline ? p.votingDeadline.toISOString() : null });
+      const eventPost = p.eventPostId ? await this.deps.posts.findById(p.eventPostId) : undefined;
+      const event = eventPost?.post.eventTitle && eventPost.post.eventStartsAt && eventPost.post.eventEndsAt ? { id: eventPost.post.id, title: eventPost.post.eventTitle, startsAt: eventPost.post.eventStartsAt.toISOString(), endsAt: eventPost.post.eventEndsAt.toISOString() } : null;
+      out.push({ id: p.id, conversationId: p.conversationId, title: p.title, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && !this.isClosed(p) && mine.finishedAt === null, needsMyConfirmation, participantCount: participants.length, votedCount, finalEndsAt, finishedCount: participants.filter((x) => x.finishedAt !== null).length, best, proposedDate, votingDeadline: p.votingDeadline ? p.votingDeadline.toISOString() : null, meetupId: p.meetupId ?? null, event });
     }
     return out;
   }

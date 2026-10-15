@@ -1,6 +1,4 @@
 import { Link } from '../router.tsx';
-import { api } from '../client.ts';
-import { useAsync } from '../hooks.ts';
 import { longDay, percent, shortDay } from '../lib/date-poll.ts';
 import type { PollSummary } from '../lib/date-poll.ts';
 
@@ -18,17 +16,27 @@ function todo(p: PollSummary): string | null {
 }
 
 /** Resumo das votações de data do grupo: progresso, melhor data até agora e o que falta de você. */
-export function GroupPolls({ conversationId, reloadKey }: { conversationId: string; reloadKey?: number }) {
-  const list = useAsync(() => api.conversationPolls(conversationId), [conversationId, reloadKey]);
-  const items = list.data?.items ?? [];
+export function GroupPolls({ items }: { items: PollSummary[] }) {
   if (items.length === 0) return null;
   return (
     <section aria-labelledby="grp-polls">
       <h2 id="grp-polls" className="dpoll__h">
-        Votações de data
+        Votações e eventos marcados
       </h2>
       <ul className="dpsum">
         {items.map((p) => {
+          if (p.event) {
+            const starts = new Date(p.event.startsAt);
+            return (
+              <li key={p.id}>
+                <Link to={`/eventos/${encodeURIComponent(p.event.id)}`} className="dpsum__item">
+                  <strong>{p.event.title}</strong>
+                  <span>{starts.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="muted">Evento marcado pela votação</span>
+                </Link>
+              </li>
+            );
+          }
           const action = todo(p);
           return (
             <li key={p.id}>

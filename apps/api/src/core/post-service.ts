@@ -1,8 +1,8 @@
 import { decodeImageDataUrl } from './image.ts';
-import { forbidden, notFound, validationError } from './errors.ts';
+import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
-import type { PostCommentRecord, PostPatch, PostReportReason, PostKindFilter, PostImageRecord, PostTagStatus, PostWithImages, PublicProfile } from './types.ts';
+import type { PollRecord, PostCommentRecord, PostPatch, PostReportReason, PostKindFilter, PostImageRecord, PostTagStatus, PostWithImages, PublicProfile } from './types.ts';
 import type { EventKind } from './types.ts';
 import { EVENT_KINDS, POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
@@ -30,6 +30,8 @@ export interface PostInput {
   tagUserIds?: unknown;
   /** Evento criado pela pessoa: `{title, startsAt, endsAt?}` (ISO). O lugar é opcional. */
   event?: unknown;
+  /** Votação de datas concluída da qual este evento é consequência (só quem organizou a votação). */
+  datePollId?: unknown;
 }
 
 export interface PostImageView {
@@ -174,6 +176,7 @@ export class PostService {
     const placeAddress = venue ? venue.address : optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
     const event = this.parseEvent(input.event, placeName);
     const eventPrivate = event !== null && this.parsePrivate(input.event);
+    const poll = event !== null && input.datePollId !== undefined && input.datePollId !== null ? await this.pollToLink(actorId, input.datePollId) : undefined;
     const raw = input.images;
     if (!Array.isArray(raw) || raw.length < 1 || raw.length > POST_IMAGES_MAX) {
       throw validationError('Fotos inválidas', { images: `Envie de 1 a ${POST_IMAGES_MAX} fotos` });
@@ -204,9 +207,42 @@ export class PostService {
         await this.deps.notifier.notify({ userId, type: 'POST_TAG', title: `${me?.username ?? 'Alguém'} marcou você num post`, body: 'Aceite para ele aparecer no seu perfil', url: '/atividades', dedupeKey: `post-tag:${postId}` });
       }
     }
+    if (poll && event) await this.linkPoll(poll, postId, event.title, actorId);
     const created = await posts.findById(postId);
     if (!created) throw notFound('Post não encontrado');
     return (await this.views(actorId, [created]))[0] as PostView;
+  }
+
+  /** A votação concluída (data definida) de quem organiza, ainda sem evento. */
+  private async pollToLink(actorId: string, id: unknown): Promise<PollRecord> {
+    const poll = typeof id === 'string' && id !== '' && id.length <= 64 ? await this.deps.scheduling.find(id) : undefined;
+    if (!poll || poll.organizerId !== actorId) throw notFound('Votação não encontrada');
+    if (poll.status !== 'FINALIZED') throw conflict('A votação ainda não tem data definida');
+    if (poll.eventPostId) throw conflict('Esta votação já virou evento');
+    return poll;
+  }
+
+  /** Vincula o evento à votação: mesmo nome, e quem confirmou na votação já vai confirmado no evento. */
+  private async linkPoll(poll: PollRecord, postId: string, title: string, actorId: string): Promise<void> {
+    const { scheduling, meetups, eventRoom, clock } = this.deps;
+    await scheduling.updatePoll(poll.id, { eventPostId: postId, title });
+    const meetup = poll.meetupId ? await meetups.find(poll.meetupId) : undefined;
+    if (meetup) {
+      await meetups.update(meetup.id, { title });
+      const going = new Set([actorId, ...meetup.participants.filter((p) => p.status === 'CONFIRMED').map((p) => p.userId)]);
+      for (const userId of going) await eventRoom.addGoing({ source: 'USER', id: postId }, userId, clock.now());
+    } else {
+      await eventRoom.addGoing({ source: 'USER', id: postId }, actorId, clock.now());
+    }
+  }
+
+  /** O nome do evento é o nome da votação (e do encontro dela). */
+  private async syncPollTitle(postId: string, title: string): Promise<void> {
+    const { scheduling, meetups } = this.deps;
+    const poll = await scheduling.findByEventPost(postId);
+    if (!poll) return;
+    if (poll.title !== title) await scheduling.updatePoll(poll.id, { title });
+    if (poll.meetupId) await meetups.update(poll.meetupId, { title });
   }
 
   async get(viewerId: string, postId: unknown): Promise<PostView> {
@@ -338,6 +374,7 @@ export class PostService {
     }
     const patch: PostPatch = { caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', editedAt: this.deps.clock.now() };
     if (!(await this.deps.posts.update(post.id, actorId, patch))) throw notFound('Post não encontrado');
+    if (event) await this.syncPollTitle(post.id, event.title);
     return this.get(actorId, post.id);
   }
 

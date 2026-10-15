@@ -209,7 +209,7 @@ export function CreatePostScreen() {
       return;
     }
     try {
-      const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft));
+      const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft, prefill.get('votacao')));
       if (created.event && shareTo.length > 0) {
         const results = await Promise.allSettled(shareTo.map((conversationId) => api.sendEvent(conversationId, created.id)));
         const failed = results.filter((r) => r.status === 'rejected').length;

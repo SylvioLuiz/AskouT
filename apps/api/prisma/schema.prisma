@@ -706,6 +706,7 @@ model Post {
   eventPosts EventPost[]
   sharedInMessages Message[] @relation("MessagePostEvent")
   repostedBy PostedUserEvent[]
+  datePolls  DatePoll[] @relation("PollEventPost")
 
   @@index([authorId, createdAt])
   @@index([venueId, createdAt])
@@ -933,9 +934,12 @@ model DatePoll {
   status             String    @default("VOTING")
   finalProposalId    String?   @db.Uuid
   meetupId           String?   @db.Uuid
+  /// Evento (post) criado a partir da data definida.
+  eventPostId        String?   @db.Uuid
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  eventPost    Post?                 @relation("PollEventPost", fields: [eventPostId], references: [id], onDelete: SetNull)
   conversation Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   organizer    User                  @relation("PollOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
   participants DatePollParticipant[]

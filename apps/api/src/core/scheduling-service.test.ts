@@ -204,3 +204,27 @@ test('resumo traz votantes e fim da data definida', async () => {
   assert.equal(s.finalDate, '2026-10-24');
   assert.equal(s.finalEndsAt, '2026-10-25T02:00:00.000Z');
 });
+
+const JPEG = `data:image/jpeg;base64,${Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(10, 1)]).toString('base64')}`;
+
+test('evento criado a partir da votação: confirmados já vão, nome sincroniza, uma vez só', async () => {
+  const { w, ana, bia, caio, dani, poll, group } = await setup('MAJORITY');
+  await rejectsWith(w.core.posts.create(ana, { images: [JPEG], event: { title: 'X', startsAt: '2026-10-24T22:00:00.000Z' }, datePollId: poll.id }), 'CONFLICT');
+  await w.core.scheduling.propose(ana, poll.id, '2026-10-24');
+  await w.core.scheduling.respond(bia, poll.id, 'CONFIRMED');
+  await w.core.scheduling.respond(caio, poll.id, 'CONFIRMED');
+  await rejectsWith(w.core.posts.create(bia, { images: [JPEG], event: { title: 'X', startsAt: '2026-10-24T22:00:00.000Z' }, datePollId: poll.id }), 'NOT_FOUND');
+  const post = await w.core.posts.create(ana, { images: [JPEG], event: { title: 'Churras na laje', startsAt: '2026-10-24T22:00:00.000Z' }, datePollId: poll.id });
+  const ref = { source: 'USER' as const, id: post.id };
+  assert.equal(await w.eventRoom.isGoing(ref, bia), true);
+  assert.equal(await w.eventRoom.isGoing(ref, caio), true);
+  assert.equal(await w.eventRoom.isGoing(ref, dani), false);
+  const [item] = (await w.core.scheduling.listForConversation(ana, group.id)).items;
+  assert.equal(item!.title, 'Churras na laje');
+  assert.equal(item!.event?.id, post.id);
+  await rejectsWith(w.core.posts.create(ana, { images: [JPEG], event: { title: 'Outro', startsAt: '2026-10-24T22:00:00.000Z' }, datePollId: poll.id }), 'CONFLICT');
+  await w.core.posts.update(ana, post.id, { event: { title: 'Churras renomeado', startsAt: '2026-10-24T22:00:00.000Z' } });
+  const after = (await w.core.scheduling.listForConversation(ana, group.id)).items[0]!;
+  assert.equal(after.title, 'Churras renomeado');
+  assert.equal((await w.core.meetups.get(ana, after.meetupId!)).title, 'Churras renomeado');
+});

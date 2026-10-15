@@ -176,6 +176,8 @@ export interface SchedulingRepository {
   /** Grava a votação com os participantes (quem organiza inclusive). */
   create(poll: PollRecord, participantIds: string[], at: Date): Promise<void>;
   find(id: string): Promise<PollRecord | undefined>;
+  /** A votação que gerou este evento (post), se houver. */
+  findByEventPost(postId: string): Promise<PollRecord | undefined>;
   /** Votações de uma conversa, a mais recente primeiro. */
   listForConversation(conversationId: string): Promise<PollRecord[]>;
   /** Votações abertas (votando ou confirmando) em que a pessoa participa, a mais recente primeiro. */
@@ -186,7 +188,7 @@ export interface SchedulingRepository {
   setVotes(pollId: string, userId: string, dates: string[], status: 'YES' | 'MAYBE' | 'NO' | null, at: Date): Promise<void>;
   /** "Concluí minha votação" (ou `null` para reabrir). */
   setFinished(pollId: string, userId: string, at: Date | null): Promise<void>;
-  updatePoll(pollId: string, patch: { status?: PollStatus; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null }): Promise<void>;
+  updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null }): Promise<void>;
   createProposal(proposal: PollProposalRecord): Promise<void>;
   findProposal(id: string): Promise<PollProposalRecord | undefined>;
   /** Propostas da votação, a mais recente primeiro. */

@@ -83,6 +83,9 @@ export interface PollSummary {
   best: { date: string; compatibility: number | null; coverage: number } | null;
   proposedDate: string | null;
   votingDeadline: string | null;
+  meetupId: string | null;
+  /** Evento criado a partir da votação: ele substitui a votação nas listas do grupo. */
+  event: { id: string; title: string; startsAt: string; endsAt: string } | null;
 }
 
 export interface PollInput {

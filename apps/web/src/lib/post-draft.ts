@@ -93,13 +93,14 @@ export function eventProblem(event: EventDraft, _place: LinkedPlace | null, now:
 }
 
 /** Corpo do `POST /posts` a partir do rascunho. */
-export function buildPostBody(images: readonly DraftImage[], caption: string, linked: LinkedPlace | null, tagUserIds: readonly string[], event: EventDraft | null = null) {
+export function buildPostBody(images: readonly DraftImage[], caption: string, linked: LinkedPlace | null, tagUserIds: readonly string[], event: EventDraft | null = null, datePollId: string | null = null) {
   const place = effectivePlace(images, linked);
   return {
     images: images.map((i) => (i.kind === 'UPLOAD' ? i.dataUrl : { photoPath: i.photoPath, photoAuthor: i.author })),
     ...(caption.trim() ? { caption: caption.trim() } : {}),
     ...(place ? { placeName: place.name, ...(place.address ? { placeAddress: place.address } : {}) } : {}),
     ...(tagUserIds.length > 0 ? { tagUserIds: [...tagUserIds] } : {}),
+    ...(event && datePollId ? { datePollId } : {}),
     ...(event ? { event: { title: event.title.trim(), kind: event.kind ?? 'OTHER', startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}), ...(event.private ? { private: true } : {}) } } : {}),
   };
 }

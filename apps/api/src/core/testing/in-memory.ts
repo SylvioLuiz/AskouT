@@ -1549,6 +1549,11 @@ export class InMemorySchedulingRepository implements SchedulingRepository {
     return p ? { ...p } : undefined;
   }
 
+  async findByEventPost(postId: string): Promise<PollRecord | undefined> {
+    const p = [...this.polls.values()].find((x) => x.eventPostId === postId);
+    return p ? { ...p } : undefined;
+  }
+
   async listForConversation(conversationId: string): Promise<PollRecord[]> {
     return [...this.polls.values()]
       .filter((p) => p.conversationId === conversationId)
@@ -1587,7 +1592,7 @@ export class InMemorySchedulingRepository implements SchedulingRepository {
     if (m?.has(userId)) m.set(userId, at);
   }
 
-  async updatePoll(pollId: string, patch: { status?: PollStatus; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null }): Promise<void> {
+  async updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null }): Promise<void> {
     const p = this.polls.get(pollId);
     if (p) this.polls.set(pollId, { ...p, ...patch });
   }

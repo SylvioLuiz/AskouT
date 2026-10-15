@@ -663,6 +663,8 @@ export interface PollRecord {
   status: PollStatus;
   finalProposalId: string | null;
   meetupId: string | null;
+  /** Evento (post) criado a partir desta votação. */
+  eventPostId?: string | null;
   createdAt: Date;
 }
 

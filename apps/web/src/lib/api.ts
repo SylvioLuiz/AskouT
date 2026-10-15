@@ -149,7 +149,7 @@ export function createApi(deps: ApiDeps) {
     postEvent: (eventId: string) => request<{ posted: true }>('POST', `/events/${id(eventId)}/post`),
     unpostEvent: (eventId: string) => request<{ posted: false }>('DELETE', `/events/${id(eventId)}/post`),
     sendEvent: (conversationId: string, eventId: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { eventId } }),
-    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null } }) => request<PostView>('POST', '/posts', { body: input }),
+    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
     post: (postId: string) => request<PostView>('GET', `/posts/${id(postId)}`),
     deletePost: (postId: string) => request<{ deleted: true }>('DELETE', `/posts/${id(postId)}`),
     pendingTags: (page?: PageRequest) => request<PostsPage>('GET', `/posts/pending-tags${pageQuery(page)}`),

@@ -20,6 +20,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   const group = useAsync(() => api.group(conversationId), [conversationId]);
   usePolling(group.reload, 15_000);
   const shared = useAsync(() => api.shared(conversationId), [conversationId]);
+  const polls = useAsync(() => api.conversationPolls(conversationId), [conversationId]);
   const me = useUser();
   const [tab, setTab] = useState<Tab>('people');
   const [sheet, setSheet] = useState<'rename' | 'leave' | { remove: string } | { meetup: MeetupView } | undefined>();
@@ -43,6 +44,9 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
     );
   }
   const data = group.data!;
+  // O encontro gerado por uma votação aparece pela votação (ou pelo evento dela), nunca os dois.
+  const pollMeetups = new Set((polls.data?.items ?? []).flatMap((p) => (p.meetupId ? [p.meetupId] : [])));
+  const visibleMeetups = data.meetups.filter((m) => !pollMeetups.has(m.id));
   const isOwner = data.ownerId === me.id;
 
   async function act(work: () => Promise<unknown>, after?: () => void) {
@@ -129,13 +133,13 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         </>
       ) : null}
 
-      {tab === 'events' ? <GroupPolls conversationId={conversationId} /> : null}
+      {tab === 'events' ? <GroupPolls items={polls.data?.items ?? []} /> : null}
       {tab === 'events' ? (
-        data.meetups.length === 0 ? (
+        visibleMeetups.length === 0 && (polls.data?.items.length ?? 0) === 0 ? (
           <EmptyState title="Nenhum evento no grupo">Os encontros marcados com este grupo aparecem aqui.</EmptyState>
         ) : (
           <ul className="groupevents">
-            {data.meetups.map((m) => (
+            {visibleMeetups.map((m) => (
               <GroupEvent key={m.id} meetup={m} onManage={m.canManage ? () => { setProblem(undefined); setSheet({ meetup: m }); } : undefined} />
             ))}
           </ul>
