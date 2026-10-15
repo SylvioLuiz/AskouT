@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueClaimRecord, ClaimStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -243,6 +243,27 @@ export interface PlaceRepository {
   listTags(prefix: string, from: Date, to: Date, limit: number): Promise<{ tag: string; count: number }[]>;
   /** Locais do AskouT pelo nome (qualquer parte). Sem `center`, não filtra por distância. */
   searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number): Promise<{ venue: VenueRecord; distanceM: number | null }[]>;
+  findVenue(id: string): Promise<VenueRecord | undefined>;
+  listVenuesByOwner(ownerId: string): Promise<VenueRecord[]>;
+  /** Todos os eventos do local (passados também), do mais novo para o mais antigo. */
+  listVenueEvents(venueId: string): Promise<PlaceEventRecord[]>;
+  /** Troca os campos editáveis; false se o evento não é do local. */
+  updateEvent(venueId: string, event: PlaceEventRecord): Promise<boolean>;
+  deleteEvent(venueId: string, eventId: string): Promise<boolean>;
+  /** Define o dono (null tira). Só no aceite de uma reivindicação. */
+  setVenueOwner(venueId: string, ownerId: string | null): Promise<void>;
+}
+
+export interface VenueClaimRepository {
+  create(claim: VenueClaimRecord, document: Uint8Array): Promise<void>;
+  findById(id: string): Promise<VenueClaimRecord | undefined>;
+  listByUser(userId: string): Promise<VenueClaimRecord[]>;
+  /** Mais antigos primeiro. */
+  listByStatus(status: ClaimStatus, limit: number): Promise<VenueClaimRecord[]>;
+  hasPending(venueId: string, userId: string): Promise<boolean>;
+  /** Só muda um pedido pendente; false se já foi decidido. */
+  review(id: string, status: 'APPROVED' | 'REJECTED', reviewerId: string, reviewNote: string | null, at: Date): Promise<boolean>;
+  findDocument(id: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
 }
 
 export interface EventSearchQuery {
@@ -377,6 +398,7 @@ export interface CoreDeps {
   posts: PostRepository;
   eventRoom: EventRoomRepository;
   places: PlaceRepository;
+  claims: VenueClaimRepository;
   placeSource: PlaceSource;
   pending: PendingSignupRepository;
   mailer: EmailSender;

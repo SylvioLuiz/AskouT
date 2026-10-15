@@ -14,8 +14,9 @@ if (existsSync('.env')) process.loadEnvFile('.env');
 const app = await NestFactory.create<NestExpressApplication>(AppModule);
 const config = app.get<AppConfig>(CONFIG);
 
-// Posts levam até 5 fotos já reduzidas (≤100 KB cada, em base64): o limite padrão (100 KB) não basta.
-app.useBodyParser('json', { limit: '1mb' });
+// Posts levam até 5 fotos já reduzidas (≤100 KB cada, em base64) e o pedido de reivindicação leva um documento de até 2 MB (~2,7 MB em base64):
+// o limite padrão (100 KB) não basta.
+app.useBodyParser('json', { limit: '3mb' });
 app.useGlobalFilters(new AllExceptionsFilter());
 app.enableShutdownHooks();
 if (config.corsOrigins.length > 0) {

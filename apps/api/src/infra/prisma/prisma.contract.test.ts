@@ -12,6 +12,7 @@ import {
   PrismaEventRoomRepository,
   PrismaPushSubscriptionRepository,
   PrismaPlaceRepository,
+  PrismaVenueClaimRepository,
   PrismaFlashRepository,
   PrismaFollowRepository,
   PrismaPendingSignupRepository,
@@ -64,6 +65,7 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     notifications: new PrismaNotificationRepository(prisma),
     pushSubscriptions: new PrismaPushSubscriptionRepository(prisma),
     places: new PrismaPlaceRepository(prisma),
+    claims: new PrismaVenueClaimRepository(prisma),
     async setUserStatus(userId: string, status: UserStatus) {
       await prisma.user.update({ where: { id: userId }, data: { status } });
     },

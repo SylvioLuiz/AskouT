@@ -4,6 +4,7 @@ import {
   InMemoryAvailabilityRepository,
   InMemoryConversationRepository,
   InMemoryPlaceRepository,
+  InMemoryVenueClaimRepository,
   InMemoryMeetupRepository,
   InMemoryNotificationRepository,
   InMemoryProfileEventRepository,
@@ -26,6 +27,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let flash = new InMemoryFlashRepository();
   let conversations = new InMemoryConversationRepository();
   let places = new InMemoryPlaceRepository();
+  let claims = new InMemoryVenueClaimRepository();
   let meetups = new InMemoryMeetupRepository();
   let profileEvents = new InMemoryProfileEventRepository();
   let posts = new InMemoryPostRepository();
@@ -59,6 +61,9 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
     get places() {
       return places;
     },
+    get claims() {
+      return claims;
+    },
     get meetups() {
       return meetups;
     },
@@ -90,6 +95,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
       flash = new InMemoryFlashRepository();
       conversations = new InMemoryConversationRepository();
       places = new InMemoryPlaceRepository();
+      claims = new InMemoryVenueClaimRepository();
       meetups = new InMemoryMeetupRepository();
       profileEvents = new InMemoryProfileEventRepository();
       posts = new InMemoryPostRepository();

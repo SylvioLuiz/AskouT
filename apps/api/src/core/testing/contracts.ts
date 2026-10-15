@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
-import type { MeetupRecord, MessageRecord, PlaceEventRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
+import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
  * Suíte de contrato das portas de dados. Roda contra QUALQUER implementação:
@@ -20,6 +20,7 @@ export interface RepoHarness {
   flash: FlashRepository;
   conversations: ConversationRepository;
   places: PlaceRepository;
+  claims: VenueClaimRepository;
   meetups: MeetupRepository;
   profileEvents: ProfileEventRepository;
   posts: PostRepository;
@@ -899,6 +900,73 @@ export function defineRepositoryContract(
         assert.deepEqual((await h.places.searchVenues('BAR', undefined, 0, 10)).map((r) => r.venue.name), ['Bar Alfa']);
         assert.deepEqual((await h.places.searchVenues('bot', centre, 5000, 10)).map((r) => r.venue.name), []);
         assert.deepEqual((await h.places.searchVenues('bot', centre, 30000, 10)).map((r) => r.venue.name), ['Boteco Beta']);
+      });
+    });
+
+    describe('locais com dono e reivindicações', () => {
+      const H = 3600;
+      it('dono do local: define, lista, edita e apaga eventos só do próprio local', async () => {
+        const ana = await newUser('ana');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar do Zé', address: 'Rua A', category: 'bar', lat: -23.58, lng: -46.65, isSample: false };
+        const w: VenueRecord = { ...v, id: randomUUID(), name: 'Outro' };
+        await h.places.createVenue(v);
+        await h.places.createVenue(w);
+        assert.equal((await h.places.findVenue(v.id))!.ownerId ?? null, null);
+        assert.equal(await h.places.findVenue(randomUUID()), undefined);
+        assert.equal(await h.places.findVenue('nao-e-uuid'), undefined);
+        assert.equal(await h.places.findEvent('nao-e-uuid'), undefined);
+        assert.deepEqual(await h.places.listVenueEvents('nao-e-uuid'), []);
+        assert.equal(await h.places.deleteEvent('nao-e-uuid', 'nao-e-uuid'), false);
+        assert.deepEqual(await h.places.listVenuesByOwner(ana), []);
+        await h.places.setVenueOwner(v.id, ana);
+        assert.equal((await h.places.findVenue(v.id))!.ownerId, ana);
+        assert.deepEqual((await h.places.listVenuesByOwner(ana)).map((x) => x.id), [v.id]);
+        const mk = (venueId: string, title: string, startS: number): PlaceEventRecord => ({ id: randomUUID(), venueId, title, description: null, kind: 'OTHER', isFree: false, imageUrl: null, tags: [], startsAt: at(startS), endsAt: at(startS + 2 * H), isSample: false });
+        const e1 = mk(v.id, 'Primeiro', 10 * H);
+        const e2 = mk(v.id, 'Segundo', 20 * H);
+        const other = mk(w.id, 'De outro', 5 * H);
+        for (const e of [e1, e2, other]) await h.places.createEvent(e);
+        assert.deepEqual((await h.places.listVenueEvents(v.id)).map((e) => e.title), ['Segundo', 'Primeiro'], 'mais novo primeiro');
+        assert.equal(await h.places.updateEvent(v.id, { ...other, title: 'Invadido' }), false, 'evento de outro local não muda');
+        assert.equal(await h.places.updateEvent(v.id, { ...e1, title: 'Renomeado', description: 'Nova', kind: 'SHOW', isFree: true, imageUrl: 'https://x.exemplo/a.jpg', tags: ['samba'], startsAt: at(11 * H), endsAt: at(13 * H) }), true);
+        const back = (await h.places.findEvent(e1.id))!.event;
+        assert.deepEqual([back.title, back.description, back.kind, back.isFree, back.imageUrl, back.tags, back.startsAt.getTime()], ['Renomeado', 'Nova', 'SHOW', true, 'https://x.exemplo/a.jpg', ['samba'], at(11 * H).getTime()]);
+        assert.equal((await h.places.findEvent(other.id))!.event.title, 'De outro');
+        assert.equal(await h.places.deleteEvent(v.id, other.id), false);
+        assert.equal(await h.places.deleteEvent(v.id, e2.id), true);
+        assert.equal(await h.places.deleteEvent(v.id, e2.id), false);
+        assert.deepEqual((await h.places.listVenueEvents(v.id)).map((e) => e.id), [e1.id]);
+        await h.places.setVenueOwner(v.id, null);
+        assert.deepEqual(await h.places.listVenuesByOwner(ana), []);
+      });
+
+      it('reivindicações: criar, listar, decidir uma vez só e guardar o documento', async () => {
+        const ana = await newUser('ana');
+        const adm = await newUser('adm');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: 0, lng: 0, isSample: false };
+        await h.places.createVenue(v);
+        const claim = (userId: string, n: number): VenueClaimRecord => ({ id: randomUUID(), venueId: v.id, userId, status: 'PENDING', note: n === 0 ? null : 'oi', documentMime: 'application/pdf', reviewNote: null, reviewedBy: null, reviewedAt: null, createdAt: at(n) });
+        const c1 = claim(ana, 1);
+        await h.claims.create(c1, new Uint8Array([37, 80, 68, 70, 45]));
+        assert.equal(await h.claims.hasPending(v.id, ana), true);
+        assert.equal(await h.claims.hasPending(v.id, adm), false);
+        const got = (await h.claims.findById(c1.id))!;
+        assert.deepEqual([got.status, got.note, got.documentMime, got.reviewedAt], ['PENDING', 'oi', 'application/pdf', null]);
+        assert.deepEqual(Array.from((await h.claims.findDocument(c1.id))!.data), [37, 80, 68, 70, 45]);
+        assert.equal((await h.claims.findDocument(c1.id))!.mime, 'application/pdf');
+        assert.equal(await h.claims.findDocument(randomUUID()), undefined);
+        assert.equal(await h.claims.findById('nao-e-uuid'), undefined);
+        assert.deepEqual((await h.claims.listByUser(ana)).map((c) => c.id), [c1.id]);
+        assert.deepEqual((await h.claims.listByStatus('PENDING', 10)).map((c) => c.id), [c1.id]);
+        assert.equal(await h.claims.review(c1.id, 'REJECTED', adm, 'ilegível', at(5)), true);
+        assert.equal(await h.claims.review(c1.id, 'APPROVED', adm, null, at(6)), false, 'decidido não muda de novo');
+        const done = (await h.claims.findById(c1.id))!;
+        assert.deepEqual([done.status, done.reviewNote, done.reviewedBy, done.reviewedAt?.getTime()], ['REJECTED', 'ilegível', adm, at(5).getTime()]);
+        assert.equal(await h.claims.hasPending(v.id, ana), false);
+        assert.deepEqual(await h.claims.listByStatus('PENDING', 10), []);
+        const c2 = claim(ana, 7);
+        await h.claims.create(c2, new Uint8Array([1]));
+        assert.deepEqual((await h.claims.listByUser(ana)).map((c) => c.id), [c2.id, c1.id], 'mais novo primeiro');
       });
     });
 

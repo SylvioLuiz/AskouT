@@ -207,6 +207,27 @@ export interface VenueRecord {
   lat: number;
   lng: number;
   isSample: boolean;
+  /** Quem administra o local (reivindicação aprovada). */
+  ownerId?: string | null;
+}
+
+export type ClaimStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export const CLAIM_DOCUMENT_MIMES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'] as const;
+export type ClaimDocumentMime = (typeof CLAIM_DOCUMENT_MIMES)[number];
+
+/** Pedido de uma pessoa para administrar um local. O documento (CNPJ, alvará) só o admin vê. */
+export interface VenueClaimRecord {
+  id: string;
+  venueId: string;
+  userId: string;
+  status: ClaimStatus;
+  note: string | null;
+  documentMime: ClaimDocumentMime;
+  /** Motivo da recusa, escrito pelo admin. */
+  reviewNote: string | null;
+  reviewedBy: string | null;
+  reviewedAt: Date | null;
+  createdAt: Date;
 }
 
 export type EventKind = 'DIGITAL' | 'SHOW' | 'CINEMA' | 'THEATER' | 'EXHIBITION' | 'GASTRONOMY' | 'NIGHT' | 'OUTDOOR' | 'SPORT' | 'OTHER';
@@ -274,7 +295,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM';
 
 /** Aviso guardado para a pessoa. `url` é um caminho dentro do app; `dedupeKey` evita avisos repetidos enquanto o anterior não foi lido. */
 export interface NotificationRecord {

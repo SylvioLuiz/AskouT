@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+import { isUuid } from './helpers.ts';
 import { boundingBox, distanceMeters } from '../../core/geo.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../../core/explore-match.ts';
 import type { EventSearchQuery, PlaceRepository } from '../../core/ports.ts';
@@ -15,7 +16,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
   }
 
   async createVenue(v: VenueRecord): Promise<void> {
-    await this.prisma.venue.create({ data: { id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample } });
+    await this.prisma.venue.create({ data: { id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample, ownerId: v.ownerId ?? null } });
   }
 
   async createEvent(e: PlaceEventRecord): Promise<void> {
@@ -25,6 +26,42 @@ export class PrismaPlaceRepository implements PlaceRepository {
         kind: e.kind, isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, isSample: e.isSample,
       },
     });
+  }
+
+  async findVenue(id: string) {
+    if (!isUuid(id)) return undefined;
+    const r = await this.prisma.venue.findUnique({ where: { id } });
+    return r ? toVenue(r) : undefined;
+  }
+
+  async listVenuesByOwner(ownerId: string) {
+    const rows = await this.prisma.venue.findMany({ where: { ownerId }, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
+    return rows.map(toVenue);
+  }
+
+  async listVenueEvents(venueId: string) {
+    if (!isUuid(venueId)) return [];
+    const rows = await this.prisma.placeEvent.findMany({ where: { venueId }, orderBy: [{ startsAt: 'desc' }, { id: 'asc' }], take: 500 });
+    return rows.map(toEvent);
+  }
+
+  async updateEvent(venueId: string, e: PlaceEventRecord) {
+    if (!isUuid(venueId) || !isUuid(e.id)) return false;
+    const res = await this.prisma.placeEvent.updateMany({
+      where: { id: e.id, venueId },
+      data: { title: e.title, description: e.description, startsAt: e.startsAt, endsAt: e.endsAt, kind: e.kind, isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags },
+    });
+    return res.count > 0;
+  }
+
+  async deleteEvent(venueId: string, eventId: string) {
+    if (!isUuid(venueId) || !isUuid(eventId)) return false;
+    const res = await this.prisma.placeEvent.deleteMany({ where: { id: eventId, venueId } });
+    return res.count > 0;
+  }
+
+  async setVenueOwner(venueId: string, ownerId: string | null) {
+    await this.prisma.venue.updateMany({ where: { id: venueId }, data: { ownerId } });
   }
 
   async findEventsNear(center: { lat: number; lng: number }, radiusM: number, from: Date, to: Date, limit: number) {
@@ -73,6 +110,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
   }
 
   async findEvent(id: string) {
+    if (!isUuid(id)) return undefined;
     const r = await this.prisma.placeEvent.findUnique({ where: { id }, include: { venue: true } });
     return r ? { event: toEvent(r), venue: toVenue(r.venue) } : undefined;
   }
@@ -103,12 +141,12 @@ export class PrismaPlaceRepository implements PlaceRepository {
 }
 
 interface EventRow { id: string; venueId: string; title: string; description: string | null; startsAt: Date; endsAt: Date; kind: PlaceEventRecord['kind']; isFree: boolean; imageUrl: string | null; tags: string[]; isSample: boolean }
-interface VenueRow { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; isSample: boolean }
+interface VenueRow { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; isSample: boolean; ownerId?: string | null }
 
 function toEvent(r: EventRow): PlaceEventRecord {
   return { id: r.id, venueId: r.venueId, title: r.title, description: r.description, startsAt: r.startsAt, endsAt: r.endsAt, kind: r.kind, isFree: r.isFree, imageUrl: r.imageUrl, tags: [...r.tags], isSample: r.isSample };
 }
 
 function toVenue(v: VenueRow): VenueRecord {
-  return { id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample };
+  return { id: v.id, name: v.name, address: v.address, category: v.category, lat: v.lat, lng: v.lng, isSample: v.isSample, ownerId: v.ownerId ?? null };
 }

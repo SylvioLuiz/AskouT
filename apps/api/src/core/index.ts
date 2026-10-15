@@ -9,6 +9,7 @@ import { ProfileEventService } from './profile-event-service.ts';
 import { PostService } from './post-service.ts';
 import { EventPageService } from './event-page-service.ts';
 import { ExploreService } from './explore-service.ts';
+import { VenueService } from './venue-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
 import { NotificationService, StoredNotifier } from './notification-service.ts';
@@ -36,6 +37,7 @@ export function createCore(input: CoreInput) {
     suggestions: new SuggestionService(deps, flash),
     explore: new ExploreService(deps, profiles),
     eventPages: new EventPageService(deps, profiles),
+    venues: new VenueService(deps),
     meetups: new MeetupService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
     posts: new PostService(deps, profiles),

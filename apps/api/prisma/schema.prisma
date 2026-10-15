@@ -163,6 +163,9 @@ model User {
   conversationReports  ConversationReport[] @relation("ConversationReports")
   conversationReported ConversationReport[] @relation("ConversationReported")
   postHidden        PostHidden[]  @relation("PostHidden")
+  ownedVenues       Venue[]       @relation("VenueOwner")
+  venueClaims       VenueClaim[]  @relation("ClaimUser")
+  reviewedClaims    VenueClaim[]  @relation("ClaimReviewer")
 }
 
 model Profile {
@@ -548,12 +551,46 @@ model Venue {
   lng       Float
   /// Dado de teste, nunca apresentado como real.
   isSample  Boolean  @default(false)
+  /// Quem administra o local (pedido de reivindicação aprovado por um admin).
+  ownerId   String?  @db.Uuid
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  owner  User?        @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   events PlaceEvent[]
+  claims VenueClaim[]
 
   @@index([lat, lng])
+  @@index([ownerId])
+}
+
+enum ClaimStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// Pedido de uma pessoa para administrar um local. O documento (PDF ou imagem, até 2 MB) só o admin vê.
+model VenueClaim {
+  id           String      @id @default(uuid()) @db.Uuid
+  venueId      String      @db.Uuid
+  userId       String      @db.Uuid
+  status       ClaimStatus @default(PENDING)
+  note         String?
+  documentMime String
+  document     Bytes
+  reviewNote   String?
+  reviewedBy   String?     @db.Uuid
+  reviewedAt   DateTime?
+  createdAt    DateTime    @default(now())
+
+  venue    Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user     User  @relation("ClaimUser", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("ClaimReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([venueId, status])
+  @@index([status, createdAt])
 }
 
 /// Evento num local, com data e hora. Chamado PlaceEvent para não colidir com a palavra "Event" em outros contextos.

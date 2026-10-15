@@ -12,6 +12,7 @@ import type {
   PushSubscriptionRepository,
   ProfileEventRepository,
   PlaceRepository,
+  VenueClaimRepository,
   PlaceSource,
   AvailabilityRepository,
   FlashRepository,
@@ -26,7 +27,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueClaimRecord, ClaimStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -693,7 +694,39 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   readonly events = new Map<string, PlaceEventRecord>();
 
   async createVenue(venue: VenueRecord): Promise<void> {
-    this.venues.set(venue.id, { ...venue });
+    this.venues.set(venue.id, { ...venue, ownerId: venue.ownerId ?? null });
+  }
+
+  async findVenue(id: string) {
+    const v = this.venues.get(id);
+    return v ? { ...v } : undefined;
+  }
+
+  async listVenuesByOwner(ownerId: string) {
+    return [...this.venues.values()].filter((v) => v.ownerId === ownerId).map((v) => ({ ...v })).sort((a, b) => a.name.localeCompare(b.name) || (a.id < b.id ? -1 : 1));
+  }
+
+  async listVenueEvents(venueId: string) {
+    return [...this.events.values()].filter((e) => e.venueId === venueId).map((e) => ({ ...e, tags: [...e.tags] })).sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime() || (a.id < b.id ? -1 : 1));
+  }
+
+  async updateEvent(venueId: string, event: PlaceEventRecord) {
+    const current = this.events.get(event.id);
+    if (!current || current.venueId !== venueId) return false;
+    this.events.set(event.id, { ...event, venueId, isSample: current.isSample, tags: [...event.tags] });
+    return true;
+  }
+
+  async deleteEvent(venueId: string, eventId: string) {
+    const current = this.events.get(eventId);
+    if (!current || current.venueId !== venueId) return false;
+    this.events.delete(eventId);
+    return true;
+  }
+
+  async setVenueOwner(venueId: string, ownerId: string | null) {
+    const v = this.venues.get(venueId);
+    if (v) this.venues.set(venueId, { ...v, ownerId });
   }
 
   async createEvent(event: PlaceEventRecord): Promise<void> {
@@ -743,6 +776,45 @@ export class InMemoryPlaceRepository implements PlaceRepository {
       if (m) out.push(m);
     }
     return out.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0) || (a.venue.id < b.venue.id ? -1 : 1)).slice(0, limit);
+  }
+}
+
+export class InMemoryVenueClaimRepository implements VenueClaimRepository {
+  readonly claims = new Map<string, VenueClaimRecord>();
+  readonly documents = new Map<string, { mime: string; data: Uint8Array }>();
+
+  async create(claim: VenueClaimRecord, document: Uint8Array): Promise<void> {
+    this.claims.set(claim.id, { ...claim });
+    this.documents.set(claim.id, { mime: claim.documentMime, data: new Uint8Array(document) });
+  }
+
+  async findById(id: string) {
+    const c = this.claims.get(id);
+    return c ? { ...c } : undefined;
+  }
+
+  async listByUser(userId: string) {
+    return [...this.claims.values()].filter((c) => c.userId === userId).map((c) => ({ ...c })).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : 1));
+  }
+
+  async listByStatus(status: ClaimStatus, limit: number) {
+    return [...this.claims.values()].filter((c) => c.status === status).map((c) => ({ ...c })).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1)).slice(0, limit);
+  }
+
+  async hasPending(venueId: string, userId: string) {
+    return [...this.claims.values()].some((c) => c.venueId === venueId && c.userId === userId && c.status === 'PENDING');
+  }
+
+  async review(id: string, status: 'APPROVED' | 'REJECTED', reviewerId: string, reviewNote: string | null, at: Date) {
+    const c = this.claims.get(id);
+    if (!c || c.status !== 'PENDING') return false;
+    this.claims.set(id, { ...c, status, reviewedBy: reviewerId, reviewNote, reviewedAt: at });
+    return true;
+  }
+
+  async findDocument(id: string) {
+    const d = this.documents.get(id);
+    return d ? { mime: d.mime, data: new Uint8Array(d.data) } : undefined;
   }
 }
 

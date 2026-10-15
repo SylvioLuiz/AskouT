@@ -390,6 +390,27 @@ try {
 
   }
 
+  console.log('\nLocais (reivindicação e painel)');
+  const myVenues = await call('GET', '/me/venues', { token: a.token });
+  check('meus locais: lista vazia no começo', myVenues.status === 200 && myVenues.body.venues.length === 0 && myVenues.body.claims.length === 0, myVenues.body);
+  check('buscar local para reivindicar', (await call('GET', '/venues/claimable?q=ex', { token: a.token })).status === 200);
+  check('reivindicar local inexistente: 404', (await call('POST', '/venues/nao-existe/claims', { token: a.token, body: { document: 'x' } })).status === 404);
+  check('painel de local sem ser dono: 404', (await call('GET', '/me/venues/nao-existe', { token: a.token })).status === 404);
+  check('criar evento em local sem ser dono: 404', (await call('POST', '/me/venues/nao-existe/events', { token: a.token, body: { title: 'X' } })).status === 404);
+  const claimable = (await call('GET', '/venues/claimable?q=exemplo', { token: a.token })).body;
+  if (Array.isArray(claimable) && claimable.length > 0) {
+    const vid = claimable[0].id;
+    check('reivindicar com documento inválido: 400', (await call('POST', `/venues/${vid}/claims`, { token: a.token, body: { document: 'data:text/html;base64,PGI+' } })).status === 400);
+    const pdf = `data:application/pdf;base64,${Buffer.from('%PDF-1.4 teste').toString('base64')}`;
+    const claim = await call('POST', `/venues/${vid}/claims`, { token: a.token, body: { document: pdf, note: 'Sou o responsável' } });
+    check('pedido de reivindicação criado', claim.status === 200 && claim.body.status === 'PENDING', claim.body);
+    check('pedido repetido: 409', (await call('POST', `/venues/${vid}/claims`, { token: a.token, body: { document: pdf } })).status === 409);
+    const mineNow = await call('GET', '/me/venues', { token: a.token });
+    check('o pedido aparece em Meus locais', mineNow.body.claims.length === 1 && mineNow.body.claims[0].status === 'PENDING', mineNow.body);
+    check('painel segue negado até aprovarem: 404', (await call('GET', `/me/venues/${vid}`, { token: a.token })).status === 404);
+    check('desistir do pedido', (await call('DELETE', `/venue-claims/${claim.body.id}`, { token: a.token })).status === 200);
+  }
+
   console.log('\nBloqueio');
   const block = await call('POST', `/users/${b.id}/block`, { token: a.token });
   check('bloquear', block.status === 200, block.body);
