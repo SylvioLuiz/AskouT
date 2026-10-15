@@ -88,6 +88,8 @@ export class MeetupService {
       participants: [{ userId: actorId, status: 'CONFIRMED', respondedAt: now }, ...guests.map((userId) => ({ userId, status: 'INVITED' as const, respondedAt: null }))],
     };
     await meetups.create(meetup);
+    // Quem organiza o encontro também vai ao evento: aparece em "quem vai" na página dele.
+    await this.deps.eventRoom.addGoing({ source: 'PLACE', id: found.event.id }, actorId, now);
 
     const card = (conversationId: string): MessageRecord => ({
       id: ids.next(),
@@ -244,6 +246,8 @@ export class MeetupService {
     if (status === 'CONFIRMED') {
       const conversation = await conversations.findById(meetup.conversationId);
       if (conversation?.type === 'GROUP') await conversations.addParticipant(conversation.id, actorId, now);
+      // Aceitar o encontro é dizer "eu vou": a pessoa passa a aparecer em "quem vai" na página do evento.
+      if (meetup.eventId) await this.deps.eventRoom.addGoing({ source: 'PLACE', id: meetup.eventId }, actorId, now);
     }
     if (status === 'CONFIRMED') {
       await this.deps.notifier.notify({ userId: meetup.organizerId, type: 'MEETUP_ACCEPTED', title: meetup.title, body: `${await this.nameOf(actorId)} vai ao encontro`, url: `/conversas/${meetup.conversationId}`, dedupeKey: `meetup-accepted:${meetupId}` });

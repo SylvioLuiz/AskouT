@@ -149,3 +149,18 @@ test('não responde a encontro que já aconteceu nem de quem bloqueou', async ()
   await rejectsWith(w.core.meetups.respond(bia, one.id, 'accept'), 'CONFLICT');
   await rejectsWith(w.core.meetups.respond(bia, one.id, 'talvez'), 'VALIDATION');
 });
+
+test('aceitar o encontro põe a pessoa em "quem vai" na página do evento (e quem organiza também)', async () => {
+  const { w, users, ana } = await setup();
+  const bia = users['bia']!;
+  const caio = users['caio']!;
+  const view = await w.core.meetups.create(ana, { eventId: 'e1', guestIds: [bia, caio] });
+  const going = async (viewer: string) => (await w.core.eventPages.get(viewer, 'e1')).attendees.map((a) => a.username);
+  assert.deepEqual(await going(ana), ['ana'], 'quem organiza já vai');
+  await w.core.meetups.respond(bia, view.id, 'accept');
+  assert.deepEqual((await going(ana)).sort(), ['ana', 'bia']);
+  assert.equal((await w.core.eventPages.get(bia, 'e1')).going, true);
+  await w.core.meetups.respond(caio, view.id, 'decline');
+  assert.deepEqual((await going(ana)).sort(), ['ana', 'bia'], 'recusar não entra na lista');
+  assert.equal((await w.core.eventPages.get(caio, 'e1')).going, false);
+});
