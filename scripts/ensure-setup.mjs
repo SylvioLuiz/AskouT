@@ -29,7 +29,7 @@ function listFiles(dir) {
 
 function stamp() {
   return {
-    deps: hashFiles([join(root, 'package-lock.json')]),
+    deps: hashFiles([join(root, 'package-lock.json'), ...['admin', 'api', 'web'].map((a) => join(root, 'apps', a, 'package.json'))]),
     db: hashFiles([join(api, 'prisma/schema.prisma'), ...listFiles(join(api, 'prisma/migrations')), ...listFiles(join(api, 'prisma/sql'))]),
   };
 }

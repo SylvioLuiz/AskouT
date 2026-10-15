@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueClaimRecord, ClaimStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -266,6 +266,30 @@ export interface VenueClaimRepository {
   findDocument(id: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
 }
 
+/** Consultas e ações de gestão que cruzam várias tabelas. Só o painel admin usa. */
+export interface AdminRepository {
+  stats(): Promise<AdminStats>;
+  /** Busca em e-mail, @usuário e nome. Mais novos primeiro. */
+  searchUsers(text: string, status: UserStatus | undefined, page: Page): Promise<AdminUserRow[]>;
+  setUserStatus(userId: string, status: UserStatus): Promise<boolean>;
+  searchVenues(text: string, page: Page): Promise<AdminVenueRow[]>;
+  searchPlaceEvents(text: string, page: Page): Promise<AdminPlaceEventRow[]>;
+  deletePlaceEvent(id: string): Promise<boolean>;
+  /** Posts (inclusive os que são eventos de pessoas). `onlyEvents`: só os com dados de evento. */
+  searchPosts(text: string, onlyEvents: boolean, page: Page): Promise<AdminPostRow[]>;
+  findPostRow(id: string): Promise<AdminPostRow | undefined>;
+  deletePost(id: string): Promise<boolean>;
+  listPostReports(open: boolean, page: Page): Promise<AdminPostReportRow[]>;
+  listConversationReports(open: boolean, page: Page): Promise<AdminConversationReportRow[]>;
+  findPostReport(id: string): Promise<{ id: string; postId: string; resolvedAt: Date | null } | undefined>;
+  findConversationReport(id: string): Promise<{ id: string; reportedUserId: string | null; resolvedAt: Date | null } | undefined>;
+  /** Só encerra denúncia em aberto; false se já foi decidida. */
+  resolvePostReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean>;
+  resolveConversationReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean>;
+  addAudit(record: AuditRecord): Promise<void>;
+  listAudit(page: Page): Promise<AuditRow[]>;
+}
+
 export interface EventSearchQuery {
   center?: { lat: number; lng: number };
   radiusM?: number;
@@ -399,6 +423,7 @@ export interface CoreDeps {
   eventRoom: EventRoomRepository;
   places: PlaceRepository;
   claims: VenueClaimRepository;
+  admin: AdminRepository;
   placeSource: PlaceSource;
   pending: PendingSignupRepository;
   mailer: EmailSender;

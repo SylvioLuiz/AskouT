@@ -247,7 +247,7 @@ export class PrismaConversationRepository implements ConversationRepository {
     await this.prisma.conversationReport.upsert({
       where: { conversationId_reporterId: { conversationId: report.conversationId, reporterId: report.reporterId } },
       create: { id: report.id, conversationId: report.conversationId, reporterId: report.reporterId, reportedUserId: report.reportedUserId, reason: report.reason, details: report.details, evidence: report.evidence, createdAt: report.createdAt },
-      update: { reason: report.reason, details: report.details, evidence: report.evidence },
+      update: { reason: report.reason, details: report.details, evidence: report.evidence, resolvedAt: null, resolvedBy: null, resolution: null, resolutionNote: null },
     });
   }
 

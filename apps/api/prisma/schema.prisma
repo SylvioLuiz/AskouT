@@ -372,6 +372,10 @@ model ConversationReport {
   details        String?
   evidence       String   @default("")
   createdAt      DateTime @default(now())
+  resolvedAt     DateTime?
+  resolvedBy     String?  @db.Uuid
+  resolution     String?
+  resolutionNote String?
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   reporter     User         @relation("ConversationReports", fields: [reporterId], references: [id], onDelete: Cascade)
@@ -379,6 +383,7 @@ model ConversationReport {
 
   @@unique([conversationId, reporterId])
   @@index([createdAt])
+  @@index([resolvedAt])
 }
 
 model Message {
@@ -702,12 +707,18 @@ model PostReport {
   reason     String
   details    String?
   createdAt  DateTime @default(now())
+  /// Decisão da gestão: DISMISSED (sem problema) ou ACTIONED (providência tomada).
+  resolvedAt     DateTime?
+  resolvedBy     String?   @db.Uuid
+  resolution     String?
+  resolutionNote String?
 
   post     Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   reporter User @relation("PostReports", fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@unique([postId, reporterId])
   @@index([createdAt])
+  @@index([resolvedAt])
 }
 
 /// "Não tenho interesse": o post some das listas dessa pessoa.
@@ -767,4 +778,17 @@ model EventPost {
   author User @relation("EventPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
+}
+
+/// Registro de tudo que a gestão decidiu. Só cresce; `adminId` não tem chave estrangeira para sobreviver à remoção da conta.
+model AdminAudit {
+  id         String   @id @default(uuid()) @db.Uuid
+  adminId    String   @db.Uuid
+  action     String
+  targetType String
+  targetId   String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
 }

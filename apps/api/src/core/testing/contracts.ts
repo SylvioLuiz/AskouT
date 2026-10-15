@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
 import type { MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
@@ -21,6 +21,7 @@ export interface RepoHarness {
   conversations: ConversationRepository;
   places: PlaceRepository;
   claims: VenueClaimRepository;
+  admin: AdminRepository;
   meetups: MeetupRepository;
   profileEvents: ProfileEventRepository;
   posts: PostRepository;
@@ -900,6 +901,150 @@ export function defineRepositoryContract(
         assert.deepEqual((await h.places.searchVenues('BAR', undefined, 0, 10)).map((r) => r.venue.name), ['Bar Alfa']);
         assert.deepEqual((await h.places.searchVenues('bot', centre, 5000, 10)).map((r) => r.venue.name), []);
         assert.deepEqual((await h.places.searchVenues('bot', centre, 30000, 10)).map((r) => r.venue.name), ['Boteco Beta']);
+      });
+    });
+
+    describe('gestão (painel admin)', () => {
+      const H = 3600;
+      const page = { limit: 50, offset: 0 };
+      const mkPost = (id: string, authorId: string, caption: string, t: number, event?: { title: string }) => ({
+        id, authorId, caption, placeName: null, placeAddress: null, eventTitle: event?.title ?? null, eventStartsAt: event ? at(t + 100) : null,
+        eventEndsAt: event ? at(t + 200) : null, eventKind: 'OTHER' as const, eventPostsPublic: false, archivedAt: null, editedAt: null, createdAt: at(t),
+      });
+      const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]);
+
+      it('pessoas: busca por e-mail, @ e nome, filtra por situação, pagina e conta posts e denúncias', async () => {
+        const ana = await newUser('ana', { displayName: 'Ana Souza' });
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const postId = randomUUID();
+        await h.posts.create(mkPost(postId, ana, 'oi', 1), [{ id: randomUUID(), postId, position: 0, mime: 'image/jpeg', data: jpeg, placePhotoRef: null, placePhotoAuthor: null }]);
+        await h.posts.report({ id: randomUUID(), postId, reporterId: bia, reason: 'SPAM', details: null, createdAt: at(2) });
+        const conv = await h.conversations.getOrCreateDirect(bia, ana, randomUUID(), at(0));
+        await h.conversations.addReport({ id: randomUUID(), conversationId: conv.id, reporterId: bia, reportedUserId: ana, reason: 'OTHER', details: null, evidence: 'x', createdAt: at(3) });
+
+        const all = await h.admin.searchUsers('', undefined, page);
+        assert.equal(all.length, 3);
+        const row = all.find((r) => r.id === ana)!;
+        assert.deepEqual([row.username, row.displayName, row.email, row.status, row.role, row.postsCount, row.reportsCount], ['ana', 'Ana Souza', 'ana@exemplo.com', 'ACTIVE', 'USER', 1, 2]);
+        assert.deepEqual((await h.admin.searchUsers('souza', undefined, page)).map((r) => r.id), [ana]);
+        assert.deepEqual((await h.admin.searchUsers('CAIO@exemplo', undefined, page)).map((r) => r.id), [caio]);
+        assert.equal((await h.admin.searchUsers('', undefined, { limit: 2, offset: 0 })).length, 2);
+        assert.equal((await h.admin.searchUsers('', undefined, { limit: 2, offset: 2 })).length, 1);
+        assert.equal(await h.admin.setUserStatus(bia, 'SUSPENDED'), true);
+        assert.equal(await h.admin.setUserStatus(randomUUID(), 'SUSPENDED'), false);
+        assert.equal(await h.admin.setUserStatus('nao-e-uuid', 'SUSPENDED'), false);
+        assert.deepEqual((await h.admin.searchUsers('', 'SUSPENDED', page)).map((r) => r.id), [bia]);
+        assert.equal((await h.admin.stats()).suspendedUsers, 1);
+      });
+
+      it('locais e eventos: busca, dono, remoção e contagem', async () => {
+        const ana = await newUser('ana');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar do Ze', address: 'Rua das Flores', category: 'bar', lat: 0, lng: 0, isSample: false };
+        const w: VenueRecord = { ...v, id: randomUUID(), name: 'Casa Azul', address: null };
+        await h.places.createVenue(v);
+        await h.places.createVenue(w);
+        await h.places.setVenueOwner(v.id, ana);
+        const ev: PlaceEventRecord = { id: randomUUID(), venueId: v.id, title: 'Samba de Roda', description: null, kind: 'SHOW', isFree: true, imageUrl: null, tags: [], startsAt: at(10 * H), endsAt: at(12 * H), isSample: false };
+        await h.places.createEvent(ev);
+        const rows = await h.admin.searchVenues('', page);
+        assert.deepEqual(rows.map((r) => r.name), ['Bar do Ze', 'Casa Azul']);
+        assert.deepEqual([rows[0]!.owner, rows[0]!.eventsCount, rows[1]!.owner, rows[1]!.eventsCount], [{ id: ana, username: 'ana' }, 1, null, 0]);
+        assert.deepEqual((await h.admin.searchVenues('flores', page)).map((r) => r.id), [v.id]);
+        const events = await h.admin.searchPlaceEvents('', page);
+        assert.deepEqual([events.length, events[0]!.title, events[0]!.venue.name], [1, 'Samba de Roda', 'Bar do Ze']);
+        assert.deepEqual((await h.admin.searchPlaceEvents('ze', page)).map((e) => e.id), [ev.id], 'acha pelo nome do local');
+        assert.deepEqual(await h.admin.searchPlaceEvents('xyz', page), []);
+        const s = await h.admin.stats();
+        assert.deepEqual([s.venues, s.venuesWithOwner, s.placeEvents], [2, 1, 1]);
+        assert.equal(await h.admin.deletePlaceEvent('nao-e-uuid'), false);
+        assert.equal(await h.admin.deletePlaceEvent(ev.id), true);
+        assert.equal(await h.admin.deletePlaceEvent(ev.id), false);
+        assert.equal((await h.admin.stats()).placeEvents, 0);
+      });
+
+      it('posts: busca (texto, @, só eventos), linha com foto e denúncias, e remoção', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const p1 = randomUUID();
+        const p2 = randomUUID();
+        const img = randomUUID();
+        await h.posts.create(mkPost(p1, ana, 'Pôr do sol lindo', 1), [{ id: img, postId: p1, position: 0, mime: 'image/jpeg', data: jpeg, placePhotoRef: null, placePhotoAuthor: null }]);
+        await h.posts.create(mkPost(p2, bia, 'Vem!', 2, { title: 'Corrida de rua' }), []);
+        await h.posts.report({ id: randomUUID(), postId: p1, reporterId: bia, reason: 'SPAM', details: null, createdAt: at(3) });
+        assert.deepEqual((await h.admin.searchPosts('', false, page)).map((r) => r.id), [p2, p1], 'mais novo primeiro');
+        assert.deepEqual((await h.admin.searchPosts('', true, page)).map((r) => r.id), [p2]);
+        assert.deepEqual((await h.admin.searchPosts('corrida', false, page)).map((r) => r.id), [p2]);
+        assert.deepEqual((await h.admin.searchPosts('ANA', false, page)).map((r) => r.id), [p1], 'acha pelo @ do autor');
+        const row = (await h.admin.findPostRow(p1))!;
+        assert.deepEqual([row.author.username, row.imagesCount, row.firstImageId, row.reportsCount, row.eventTitle, row.archived], ['ana', 1, img, 1, null, false]);
+        assert.equal((await h.admin.findPostRow(p2))!.firstImageId, null);
+        assert.equal(await h.admin.findPostRow('nao-e-uuid'), undefined);
+        assert.equal(await h.admin.findPostRow(randomUUID()), undefined);
+        const s = await h.admin.stats();
+        assert.deepEqual([s.posts, s.userEvents], [2, 1]);
+        assert.equal(await h.admin.deletePost('nao-e-uuid'), false);
+        assert.equal(await h.admin.deletePost(p1), true);
+        assert.equal(await h.admin.deletePost(p1), false);
+        assert.deepEqual((await h.admin.searchPosts('', false, page)).map((r) => r.id), [p2]);
+        assert.deepEqual(await h.admin.listPostReports(true, page), [], 'a denúncia sai junto com o post');
+      });
+
+      it('denúncias: fila em aberto (mais antiga primeiro), decisão uma vez só, histórico e reabertura', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const p1 = randomUUID();
+        await h.posts.create(mkPost(p1, ana, 'ofensivo', 1), []);
+        const r1 = randomUUID();
+        const r2 = randomUUID();
+        await h.posts.report({ id: r2, postId: p1, reporterId: caio, reason: 'OTHER', details: 'depois', createdAt: at(6) });
+        await h.posts.report({ id: r1, postId: p1, reporterId: bia, reason: 'SPAM', details: 'x', createdAt: at(5) });
+        const open = await h.admin.listPostReports(true, page);
+        assert.deepEqual(open.map((r) => r.id), [r1, r2]);
+        assert.deepEqual([open[0]!.reporter.username, open[0]!.post.author.username, open[0]!.post.caption, open[0]!.resolvedAt, open[0]!.resolution], ['bia', 'ana', 'ofensivo', null, null]);
+        assert.deepEqual(await h.admin.listPostReports(false, page), []);
+        assert.equal((await h.admin.findPostReport(r1))?.postId, p1);
+        assert.equal(await h.admin.findPostReport('nao-e-uuid'), undefined);
+        assert.equal(await h.admin.resolvePostReport('nao-e-uuid', ana, 'DISMISSED', null, at(7)), false);
+        assert.equal(await h.admin.resolvePostReport(r1, ana, 'ACTIONED', 'Post removido', at(7)), true);
+        assert.equal(await h.admin.resolvePostReport(r1, ana, 'DISMISSED', null, at(8)), false, 'só decide uma vez');
+        assert.deepEqual((await h.admin.listPostReports(true, page)).map((r) => r.id), [r2]);
+        const done = (await h.admin.listPostReports(false, page))[0]!;
+        assert.deepEqual([done.id, done.resolution, done.resolutionNote, done.resolvedAt?.getTime()], [r1, 'ACTIONED', 'Post removido', at(7).getTime()]);
+        assert.equal((await h.admin.findPostReport(r1))?.resolvedAt?.getTime(), at(7).getTime());
+        assert.equal((await h.admin.stats()).openPostReports, 1);
+        // denunciar de novo reabre
+        await h.posts.report({ id: randomUUID(), postId: p1, reporterId: bia, reason: 'OTHER', details: 'de novo', createdAt: at(9) });
+        assert.equal((await h.admin.listPostReports(true, page)).length, 2);
+        assert.deepEqual(await h.admin.listPostReports(false, page), []);
+
+        // conversas
+        const conv = await h.conversations.getOrCreateDirect(bia, ana, randomUUID(), at(0));
+        const c1 = randomUUID();
+        await h.conversations.addReport({ id: c1, conversationId: conv.id, reporterId: bia, reportedUserId: ana, reason: 'OTHER', details: 'me xingou', evidence: 'trecho da conversa', createdAt: at(10) });
+        const copen = await h.admin.listConversationReports(true, page);
+        assert.deepEqual([copen.length, copen[0]!.reporter.username, copen[0]!.reported?.username, copen[0]!.reported?.status, copen[0]!.evidence, copen[0]!.conversationId], [1, 'bia', 'ana', 'ACTIVE', 'trecho da conversa', conv.id]);
+        assert.equal((await h.admin.findConversationReport(c1))?.reportedUserId, ana);
+        assert.equal(await h.admin.findConversationReport('nao-e-uuid'), undefined);
+        assert.equal(await h.admin.resolveConversationReport(c1, caio, 'DISMISSED', null, at(11)), true);
+        assert.equal(await h.admin.resolveConversationReport(c1, caio, 'ACTIONED', null, at(12)), false);
+        assert.deepEqual(await h.admin.listConversationReports(true, page), []);
+        assert.equal((await h.admin.listConversationReports(false, page))[0]!.resolution, 'DISMISSED');
+        assert.equal((await h.admin.stats()).openConversationReports, 0);
+      });
+
+      it('auditoria: guarda quem fez o quê, mais novo primeiro, e pagina', async () => {
+        const adm = await newUser('adm');
+        const target = randomUUID();
+        const rec = (action: 'USER_SUSPENDED' | 'POST_REMOVED' | 'CLAIM_APPROVED', t: number, note: string | null) => ({ id: randomUUID(), adminId: adm, action, targetType: 'USER' as const, targetId: target, note, createdAt: at(t) });
+        await h.admin.addAudit(rec('USER_SUSPENDED', 1, 'Spam'));
+        await h.admin.addAudit(rec('POST_REMOVED', 2, null));
+        await h.admin.addAudit(rec('CLAIM_APPROVED', 3, 'ok'));
+        const list = await h.admin.listAudit(page);
+        assert.deepEqual(list.map((r) => r.action), ['CLAIM_APPROVED', 'POST_REMOVED', 'USER_SUSPENDED']);
+        assert.deepEqual([list[0]!.adminUsername, list[0]!.targetId, list[0]!.note, list[2]!.note], ['adm', target, 'ok', 'Spam']);
+        assert.deepEqual((await h.admin.listAudit({ limit: 1, offset: 1 })).map((r) => r.action), ['POST_REMOVED']);
       });
     });
 

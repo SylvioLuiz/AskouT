@@ -411,6 +411,12 @@ try {
     check('desistir do pedido', (await call('DELETE', `/venue-claims/${claim.body.id}`, { token: a.token })).status === 200);
   }
 
+  console.log('\nGestão (admin)');
+  check('rotas /admin exigem login: 401', (await call('GET', '/admin/stats')).status === 401);
+  check('conta comum não acessa /admin: 403', (await call('GET', '/admin/stats', { token: a.token })).status === 403);
+  check('login do painel com conta comum: 401', (await call('POST', '/admin/login', { body: { identifier: a.username ?? 'x', password: 'qualquer-senha-1' } })).status === 401);
+  check('conta comum não decide pedido: 403', (await call('POST', '/admin/claims/x/review', { token: a.token, body: { decision: 'APPROVED' } })).status === 403);
+
   console.log('\nBloqueio');
   const block = await call('POST', `/users/${b.id}/block`, { token: a.token });
   check('bloquear', block.status === 200, block.body);

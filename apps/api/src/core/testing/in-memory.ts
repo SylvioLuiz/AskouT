@@ -13,6 +13,7 @@ import type {
   ProfileEventRepository,
   PlaceRepository,
   VenueClaimRepository,
+  AdminRepository,
   PlaceSource,
   AvailabilityRepository,
   FlashRepository,
@@ -25,9 +26,9 @@ import type {
   UserRepository,
   EventSearchQuery,
 } from '../ports.ts';
-import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
+import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueClaimRecord, ClaimStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -1196,5 +1197,201 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     if (!post || post.authorId !== ownerId || post.eventTitle === null) return false;
     post.eventPostsPublic = value;
     return true;
+  }
+}
+
+/** Gestão em memória: lê e age direto nos outros repositórios em memória. */
+export class InMemoryAdminRepository implements AdminRepository {
+  readonly audit = new Map<string, AuditRecord>();
+  private readonly users: InMemoryUserRepository;
+  private readonly posts: InMemoryPostRepository;
+  private readonly conversations: InMemoryConversationRepository;
+  private readonly places: InMemoryPlaceRepository;
+  private readonly claims: InMemoryVenueClaimRepository;
+
+  constructor(parts: { users: InMemoryUserRepository; posts: InMemoryPostRepository; conversations: InMemoryConversationRepository; places: InMemoryPlaceRepository; claims: InMemoryVenueClaimRepository }) {
+    this.users = parts.users;
+    this.posts = parts.posts;
+    this.conversations = parts.conversations;
+    this.places = parts.places;
+    this.claims = parts.claims;
+  }
+
+  private username(id: string): string {
+    return this.users.profiles.get(id)?.username ?? '(removido)';
+  }
+
+  private reportsAgainst(userId: string): number {
+    let n = 0;
+    for (const r of this.posts.reports.values()) if (this.posts.posts.get(r.postId)?.authorId === userId) n += 1;
+    for (const r of this.conversations.reports.values()) if (r.reportedUserId === userId) n += 1;
+    return n;
+  }
+
+  async stats() {
+    const posts = [...this.posts.posts.values()];
+    return {
+      users: this.users.users.size,
+      suspendedUsers: [...this.users.users.values()].filter((u) => u.status === 'SUSPENDED').length,
+      venues: this.places.venues.size,
+      venuesWithOwner: [...this.places.venues.values()].filter((v) => v.ownerId).length,
+      placeEvents: this.places.events.size,
+      userEvents: posts.filter((p) => p.eventTitle !== null).length,
+      posts: posts.length,
+      pendingClaims: [...this.claims.claims.values()].filter((c) => c.status === 'PENDING').length,
+      openPostReports: [...this.posts.reports.values()].filter((r) => !r.resolvedAt).length,
+      openConversationReports: [...this.conversations.reports.values()].filter((r) => !r.resolvedAt).length,
+    };
+  }
+
+  async searchUsers(text: string, status: UserStatus | undefined, page: Page) {
+    const q = fold(text.trim());
+    const rows: AdminUserRow[] = [];
+    for (const u of this.users.users.values()) {
+      const p = this.users.profiles.get(u.id);
+      if (!p) continue;
+      if (status && u.status !== status) continue;
+      if (q && !fold(`${u.email} ${p.username} ${p.displayName}`).includes(q)) continue;
+      rows.push({ id: u.id, email: u.email, username: p.username, displayName: p.displayName, status: u.status, role: u.role, createdAt: u.createdAt, postsCount: [...this.posts.posts.values()].filter((x) => x.authorId === u.id).length, reportsCount: this.reportsAgainst(u.id) });
+    }
+    rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  async setUserStatus(userId: string, status: UserStatus) {
+    const u = this.users.users.get(userId);
+    if (!u) return false;
+    this.users.users.set(userId, { ...u, status });
+    return true;
+  }
+
+  async searchVenues(text: string, page: Page) {
+    const q = fold(text.trim());
+    const rows: AdminVenueRow[] = [];
+    for (const v of this.places.venues.values()) {
+      if (q && !fold(`${v.name} ${v.address ?? ''}`).includes(q)) continue;
+      rows.push({ id: v.id, name: v.name, address: v.address, category: v.category, isSample: v.isSample, owner: v.ownerId ? { id: v.ownerId, username: this.username(v.ownerId) } : null, eventsCount: [...this.places.events.values()].filter((e) => e.venueId === v.id).length });
+    }
+    rows.sort((a, b) => a.name.localeCompare(b.name) || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  async searchPlaceEvents(text: string, page: Page) {
+    const q = fold(text.trim());
+    const rows: AdminPlaceEventRow[] = [];
+    for (const e of this.places.events.values()) {
+      const v = this.places.venues.get(e.venueId);
+      if (!v) continue;
+      if (q && !fold(`${e.title} ${v.name}`).includes(q)) continue;
+      rows.push({ id: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, kind: e.kind, isSample: e.isSample, venue: { id: v.id, name: v.name } });
+    }
+    rows.sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime() || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  async deletePlaceEvent(id: string) {
+    return this.places.events.delete(id);
+  }
+
+  private postRow(p: PostRecord): AdminPostRow {
+    const images = [...this.posts.images.values()].filter((i) => i.postId === p.id).sort((a, b) => a.position - b.position);
+    return {
+      id: p.id, caption: p.caption, author: { id: p.authorId, username: this.username(p.authorId) }, imagesCount: images.length,
+      firstImageId: images.find((i) => i.data !== null)?.id ?? null, eventTitle: p.eventTitle, eventStartsAt: p.eventStartsAt, archived: p.archivedAt !== null,
+      reportsCount: [...this.posts.reports.values()].filter((r) => r.postId === p.id).length, createdAt: p.createdAt,
+    };
+  }
+
+  async searchPosts(text: string, onlyEvents: boolean, page: Page) {
+    const q = fold(text.trim());
+    const rows: AdminPostRow[] = [];
+    for (const p of this.posts.posts.values()) {
+      if (onlyEvents && p.eventTitle === null) continue;
+      if (q && !fold(`${p.caption ?? ''} ${p.eventTitle ?? ''} ${p.placeName ?? ''} ${this.username(p.authorId)}`).includes(q)) continue;
+      rows.push(this.postRow(p));
+    }
+    rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  async findPostRow(id: string) {
+    const p = this.posts.posts.get(id);
+    return p ? this.postRow(p) : undefined;
+  }
+
+  async deletePost(id: string) {
+    const p = this.posts.posts.get(id);
+    return p ? this.posts.delete(id, p.authorId) : false;
+  }
+
+  async listPostReports(open: boolean, page: Page) {
+    const rows: AdminPostReportRow[] = [];
+    for (const r of this.posts.reports.values()) {
+      if (open === (r.resolvedAt !== null && r.resolvedAt !== undefined)) continue;
+      const p = this.posts.posts.get(r.postId);
+      if (!p) continue;
+      rows.push({ id: r.id, reason: r.reason, details: r.details, createdAt: r.createdAt, reporter: { id: r.reporterId, username: this.username(r.reporterId) }, post: this.postRow(p), resolvedAt: r.resolvedAt ?? null, resolution: r.resolution ?? null, resolutionNote: r.resolutionNote ?? null });
+    }
+    rows.sort((a, b) => (open ? a.createdAt.getTime() - b.createdAt.getTime() : (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0)) || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  async listConversationReports(open: boolean, page: Page) {
+    const rows: AdminConversationReportRow[] = [];
+    for (const r of this.conversations.reports.values()) {
+      if (open === (r.resolvedAt !== null && r.resolvedAt !== undefined)) continue;
+      const reported = r.reportedUserId ? this.users.users.get(r.reportedUserId) : undefined;
+      rows.push({
+        id: r.id, conversationId: r.conversationId, reason: r.reason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
+        reporter: { id: r.reporterId, username: this.username(r.reporterId) },
+        reported: r.reportedUserId && reported ? { id: r.reportedUserId, username: this.username(r.reportedUserId), status: reported.status } : null,
+        resolvedAt: r.resolvedAt ?? null, resolution: r.resolution ?? null, resolutionNote: r.resolutionNote ?? null,
+      });
+    }
+    rows.sort((a, b) => (open ? a.createdAt.getTime() - b.createdAt.getTime() : (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0)) || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  async findPostReport(id: string) {
+    for (const r of this.posts.reports.values()) if (r.id === id) return { id: r.id, postId: r.postId, resolvedAt: r.resolvedAt ?? null };
+    return undefined;
+  }
+
+  async findConversationReport(id: string) {
+    for (const r of this.conversations.reports.values()) if (r.id === id) return { id: r.id, reportedUserId: r.reportedUserId, resolvedAt: r.resolvedAt ?? null };
+    return undefined;
+  }
+
+  async resolvePostReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date) {
+    for (const [key, r] of this.posts.reports) {
+      if (r.id !== id) continue;
+      if (r.resolvedAt) return false;
+      this.posts.reports.set(key, { ...r, resolvedAt: at, resolvedBy: adminId, resolution, resolutionNote: note });
+      return true;
+    }
+    return false;
+  }
+
+  async resolveConversationReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date) {
+    for (const [key, r] of this.conversations.reports) {
+      if (r.id !== id) continue;
+      if (r.resolvedAt) return false;
+      this.conversations.reports.set(key, { ...r, resolvedAt: at, resolvedBy: adminId, resolution, resolutionNote: note });
+      return true;
+    }
+    return false;
+  }
+
+  async addAudit(record: AuditRecord) {
+    this.audit.set(record.id, { ...record });
+  }
+
+  async listAudit(page: Page) {
+    return [...this.audit.values()]
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) => b.r.createdAt.getTime() - a.r.createdAt.getTime() || b.i - a.i)
+      .map((x) => x.r)
+      .slice(page.offset, page.offset + page.limit)
+      .map((r) => ({ ...r, adminUsername: this.username(r.adminId) }));
   }
 }

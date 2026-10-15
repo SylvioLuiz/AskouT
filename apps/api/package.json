@@ -14,7 +14,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/http/main.js",
     "smoke": "node scripts/smoke.mjs",
-    "seed:places": "tsx scripts/seed-sample-places.ts"
+    "seed:places": "tsx scripts/seed-sample-places.ts",
+    "admin:promote": "tsx scripts/make-admin.ts"
   },
   "dependencies": {
     "@askout/availability-engine": "*",

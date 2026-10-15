@@ -270,8 +270,20 @@ Dentro do perfil: **Meus locais** (`/locais`). A pessoa busca um local já cadas
 
 - Rotas: `GET /me/venues`, `GET /venues/claimable?q=`, `POST /venues/:id/claims`, `DELETE /venue-claims/:id`, `GET /me/venues/:id`, `POST|PUT|DELETE /me/venues/:id/events[/:eventId]`.
 - Quem não é dono recebe 404 (não revela quais locais têm dono). No máximo 5 pedidos em análise por pessoa.
-- **Ainda sem tela de admin**: aprovar/recusar existe no núcleo e está testado, mas não há rota HTTP nem tela até o painel admin existir.
+- Aprovar e recusar pedidos é feito na plataforma de gestão (seção abaixo).
 - Migration `20261025120000_venue_claims` e `prisma/sql/014_venue_claim_constraints.sql` (rodar `npm run prisma:generate` depois de baixar).
+
+### Plataforma de gestão (`apps/admin`)
+
+Aplicativo separado, **só para computador**, em outro endereço: `http://localhost:5174` (o app dos usuários fica em `:5173`). Tem login próprio (`POST /admin/login`): só entra conta com papel ADMIN; conta comum e senha errada recebem a mesma resposta. Em tela estreita (< 1024 px) mostra um aviso de que o acesso é só pelo computador.
+
+- **Criar o primeiro administrador**: cadastre-se no app, depois `cd apps/api && npm run admin:promote -- seu@email.com`. `--remove` tira o acesso; `--list` lista. Não existe outro jeito de virar admin.
+- **Páginas**: Painel (contagens e filas), Pedidos de donos (vê o documento, aprova ou recusa com nota), Denúncias (posts e conversas; "Sem problema" ou "Providência tomada"), Pessoas (busca por e-mail, @ ou nome; suspender com motivo e reativar), Locais (busca; tirar o responsável), Eventos (de locais e de pessoas) e Posts (busca; apagar com motivo), Auditoria (quem decidiu o quê, quando e por quê).
+- **Suspender** bloqueia o login e derruba a sessão na hora (a API confere o status a cada pedido). Não dá para suspender a si mesmo nem outro admin.
+- Apagar post, evento ou tirar o dono exige motivo e fica na auditoria (`AdminAudit`, só cresce). Nova denúncia sobre um item já decidido reabre a denúncia.
+- Rotas `/admin/*` (todas exigem ADMIN, o serviço confere): `stats`, `claims`, `claims/:id/document`, `claims/:id/review`, `users`, `users/:id/status`, `venues`, `venues/:id/owner`, `place-events`, `posts`, `reports/posts|conversations` (+ `/:id/resolve`), `audit`.
+- Migration `20261026120000_admin` e `prisma/sql/015_admin_constraints.sql`.
+- Limites: no Postgres a busca por texto ignora maiúsculas mas **não** acentos (na memória ignora os dois); o documento do pedido é lido inteiro do banco (até 2 MB); sem moderação automática de imagens; sem desfazer uma suspensão além de reativar; a auditoria não tem busca/filtro; Postgres/Prisma e `smoke.mjs` só rodam no seu Mac; nada testado em navegador real além do Chromium simulado.
 
 ## App web (`apps/web`)
 

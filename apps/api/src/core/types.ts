@@ -390,7 +390,16 @@ export interface PostReportRecord {
   reason: PostReportReason;
   details: string | null;
   createdAt: Date;
+  /** Preenchidos quando um admin decide a denúncia. */
+  resolvedAt?: Date | null;
+  resolvedBy?: string | null;
+  resolution?: ReportResolution | null;
+  resolutionNote?: string | null;
 }
+
+/** Como um admin encerrou uma denúncia: sem ação (DISMISSED) ou com providência (ACTIONED). */
+export type ReportResolution = 'DISMISSED' | 'ACTIONED';
+export const REPORT_RESOLUTIONS: readonly ReportResolution[] = ['DISMISSED', 'ACTIONED'];
 
 /** Campos que a edição troca (a pessoa autora é quem edita). */
 /** Qual evento: um do local (Explorar) ou um criado por uma pessoa (post com dados de evento). */
@@ -465,4 +474,121 @@ export interface ConversationReportRecord {
   details: string | null;
   evidence: string;
   createdAt: Date;
+  resolvedAt?: Date | null;
+  resolvedBy?: string | null;
+  resolution?: ReportResolution | null;
+  resolutionNote?: string | null;
+}
+
+// ---------- Gestão (painel admin) ----------
+
+export interface AdminStats {
+  users: number;
+  suspendedUsers: number;
+  venues: number;
+  venuesWithOwner: number;
+  placeEvents: number;
+  userEvents: number;
+  posts: number;
+  pendingClaims: number;
+  openPostReports: number;
+  openConversationReports: number;
+}
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  username: string;
+  displayName: string;
+  status: UserStatus;
+  role: UserRole;
+  createdAt: Date;
+  postsCount: number;
+  /** Denúncias recebidas (em posts da pessoa e em conversas). */
+  reportsCount: number;
+}
+
+export interface AdminVenueRow {
+  id: string;
+  name: string;
+  address: string | null;
+  category: string | null;
+  isSample: boolean;
+  owner: { id: string; username: string } | null;
+  eventsCount: number;
+}
+
+export interface AdminPlaceEventRow {
+  id: string;
+  title: string;
+  startsAt: Date;
+  endsAt: Date;
+  kind: EventKind;
+  isSample: boolean;
+  venue: { id: string; name: string };
+}
+
+export interface AdminPostRow {
+  id: string;
+  caption: string | null;
+  author: { id: string; username: string };
+  imagesCount: number;
+  firstImageId: string | null;
+  eventTitle: string | null;
+  eventStartsAt: Date | null;
+  archived: boolean;
+  reportsCount: number;
+  createdAt: Date;
+}
+
+export interface AdminPostReportRow {
+  id: string;
+  reason: PostReportReason;
+  details: string | null;
+  createdAt: Date;
+  reporter: { id: string; username: string };
+  post: AdminPostRow;
+  resolvedAt: Date | null;
+  resolution: ReportResolution | null;
+  resolutionNote: string | null;
+}
+
+export interface AdminConversationReportRow {
+  id: string;
+  conversationId: string;
+  reason: PostReportReason;
+  details: string | null;
+  /** O que a pessoa que denunciou enviou junto (trecho da conversa). */
+  evidence: string;
+  createdAt: Date;
+  reporter: { id: string; username: string };
+  reported: { id: string; username: string; status: UserStatus } | null;
+  resolvedAt: Date | null;
+  resolution: ReportResolution | null;
+  resolutionNote: string | null;
+}
+
+export type AuditAction =
+  | 'USER_SUSPENDED'
+  | 'USER_REACTIVATED'
+  | 'CLAIM_APPROVED'
+  | 'CLAIM_REJECTED'
+  | 'VENUE_OWNER_REMOVED'
+  | 'POST_REMOVED'
+  | 'PLACE_EVENT_REMOVED'
+  | 'REPORT_DISMISSED'
+  | 'REPORT_ACTIONED';
+
+export interface AuditRecord {
+  id: string;
+  adminId: string;
+  action: AuditAction;
+  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT';
+  targetId: string;
+  note: string | null;
+  createdAt: Date;
+}
+
+export interface AuditRow extends AuditRecord {
+  adminUsername: string;
 }

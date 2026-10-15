@@ -234,7 +234,7 @@ export class PrismaPostRepository implements PostRepository {
     await this.prisma.postReport.upsert({
       where: { postId_reporterId: { postId: report.postId, reporterId: report.reporterId } },
       create: { id: report.id, postId: report.postId, reporterId: report.reporterId, reason: report.reason, details: report.details, createdAt: report.createdAt },
-      update: { reason: report.reason, details: report.details },
+      update: { reason: report.reason, details: report.details, resolvedAt: null, resolvedBy: null, resolution: null, resolutionNote: null },
     });
   }
 

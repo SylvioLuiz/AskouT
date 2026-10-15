@@ -12,3 +12,4 @@ export { PrismaNotificationRepository, PrismaPushSubscriptionRepository } from '
 export { PrismaProfileEventRepository } from './prisma-profile-event.repository.ts';
 export { PrismaEventRoomRepository } from './prisma-event-room.repository.ts';
 export { PrismaPostRepository } from './prisma-post.repository.ts';
+export { PrismaAdminRepository } from './prisma-admin.repository.ts';
