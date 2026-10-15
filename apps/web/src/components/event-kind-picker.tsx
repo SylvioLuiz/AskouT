@@ -1,22 +1,31 @@
+import { useId } from 'react';
 import { KINDS } from '../lib/explore.ts';
 import type { EventKind } from '../lib/types.ts';
-import { EventKindIcon } from './icons.tsx';
+import { ChevronDownIcon, EventKindIcon } from './icons.tsx';
 
-/** Escolha do tipo do evento: decide o ícone no círculo da capa. */
+/** Escolha do tipo do evento (lista suspensa): decide o ícone no círculo da capa. */
 export function EventKindPicker({ value, onChange }: { value: EventKind; onChange: (kind: EventKind) => void }) {
+  const id = useId();
   return (
-    <fieldset className="kindpick">
-      <legend className="kindpick__legend">Tipo do evento</legend>
-      <ul className="kindpick__list">
-        {KINDS.map((k) => (
-          <li key={k.id}>
-            <button type="button" className="fchip kindpick__chip" aria-pressed={value === k.id} onClick={() => onChange(k.id)}>
-              <EventKindIcon kind={k.id} />
+    <div className="field kindpick">
+      <label className="field__label" htmlFor={id}>
+        Tipo do evento
+      </label>
+      <div className="field__control kindpick__control">
+        <span className="kindpick__icon" aria-hidden="true">
+          <EventKindIcon kind={value} />
+        </span>
+        <select id={id} className="field__input kindpick__select" value={value} onChange={(e) => onChange(e.target.value as EventKind)}>
+          {KINDS.map((k) => (
+            <option key={k.id} value={k.id}>
               {k.label}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </fieldset>
+            </option>
+          ))}
+        </select>
+        <span className="kindpick__chev" aria-hidden="true">
+          <ChevronDownIcon />
+        </span>
+      </div>
+    </div>
   );
 }

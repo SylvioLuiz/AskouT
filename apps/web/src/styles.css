@@ -3335,11 +3335,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evpost__preview { position: relative; }
 .evpost__preview img { width: 100%; max-height: 280px; object-fit: cover; border-radius: 12px; }
 .evpost__remove { position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; border-radius: 50%; background: rgb(10 12 40 / 0.55); color: #fff; }
-.kindpick { margin: 0; padding: 0; border: 0; min-width: 0; }
-.kindpick__legend { padding: 0; margin-bottom: 6px; font-weight: 700; color: var(--ink); }
-.kindpick__list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.kindpick__chip { display: inline-flex; align-items: center; gap: 6px; }
-.kindpick__chip .icon { width: 18px; height: 18px; }
 .radiolist { display: flex; flex-direction: column; gap: 10px; }
 .radiolist__item { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); cursor: pointer; }
 .radiolist__item input { width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--brand); flex: none; }
@@ -3605,3 +3600,11 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .cover__input { width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; font: inherit; font-size: 16px; }
 .cover__row { display: flex; gap: 8px; justify-content: center; }
 .cover__link .btn--quiet { color: #fff; }
+
+/* Tipo do evento: lista suspensa */
+.kindpick__control { position: relative; align-items: center; }
+.kindpick__icon { display: grid; place-items: center; padding-left: 14px; color: var(--brand); }
+.kindpick__icon svg { width: 20px; height: 20px; }
+.kindpick__select { appearance: none; -webkit-appearance: none; padding-right: 40px; cursor: pointer; }
+.kindpick__chev { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: grid; pointer-events: none; color: var(--muted); }
+.kindpick__chev svg { width: 20px; height: 20px; }
