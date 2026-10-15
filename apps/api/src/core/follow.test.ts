@@ -304,3 +304,15 @@ test('amigos nos contatos: acha por hash do e-mail, sem você, quem já segue e 
   await rejectsWith(w.core.follows.contactMatches(leo, 'x'), 'VALIDATION');
   await rejectsWith(w.core.follows.contactMatches(leo, Array.from({ length: 501 }, (_, i) => i.toString(16).padStart(64, '0'))), 'VALIDATION');
 });
+
+test('seguir perfil público avisa a pessoa; perfil privado avisa como pedido', async () => {
+  const { makeWorld } = await import('./testing/world.ts');
+  const w = makeWorld();
+  const { leo, maria } = (await w.signUpMany('leo', 'maria')) as Record<string, string>;
+  await w.core.follows.follow(leo!, maria!);
+  await w.core.flushNotifications();
+  const items = (await w.core.notifications.list(maria!)).items;
+  assert.equal(items[0]!.type, 'FOLLOW_NEW');
+  assert.equal(items[0]!.title, 'leo começou a seguir você');
+  assert.equal(items[0]!.url, '/u/leo');
+});

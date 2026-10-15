@@ -99,7 +99,7 @@ test('compartilhar evento numa conversa 1 a 1 e em grupo', async () => {
   const chat = await w.core.conversations.messages(bia, id);
   assert.equal(chat.messages[0]!.event?.venueName, 'Parque Ibirapuera');
   assert.equal(chat.messages[0]!.event?.id, 'e1');
-  assert.match((await w.core.notifications.list(bia)).items[0]!.body, /compartilhou um evento/i);
+  assert.ok((await w.core.notifications.list(bia)).items.some((n) => /compartilhou um evento/i.test(n.body)));
   assert.equal((await w.core.conversations.list(bia))[0]!.lastMessage?.kind, 'EVENT');
   await rejectsWith(w.core.conversations.send(ana, id, { eventId: 'nao-existe' }), 'NOT_FOUND');
   await rejectsWith(w.core.conversations.send(ana, id, { eventId: 'e1', body: 'oi' }), 'VALIDATION');

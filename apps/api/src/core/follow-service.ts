@@ -46,6 +46,7 @@ export class FollowService {
     const status: FollowStatus = target.isPrivate ? 'PENDING' : 'ACCEPTED';
     await follows.save({ followerId: actorId, followeeId: targetId, status, createdAt: clock.now() });
     if (status === 'PENDING') await this.deps.notifier.notify({ userId: targetId, type: 'FOLLOW_REQUEST', title: `${await this.nameOf(actorId)} quer seguir você`, body: 'Toque para ver o pedido', url: '/atividades', dedupeKey: `follow-request:${actorId}` });
+    else await this.deps.notifier.notify({ userId: targetId, type: 'FOLLOW_NEW', title: `${await this.nameOf(actorId)} começou a seguir você`, body: 'Toque para ver o perfil', url: `/u/${await this.nameOf(actorId)}`, dedupeKey: `follow-new:${actorId}` });
     return { status, isFriend: await this.areFriends(actorId, targetId) };
   }
 

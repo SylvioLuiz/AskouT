@@ -6,6 +6,8 @@ async function friends(w: ReturnType<typeof makeWorld>, ...names: string[]) {
   const ids = await w.signUpMany(...names);
   const all = Object.values(ids);
   for (const a of all) for (const b of all) if (a !== b) await w.core.follows.follow(a, b);
+  await w.core.flushNotifications();
+  for (const id of all) await w.core.notifications.markRead(id); // os avisos de "começou a seguir" não interessam a estes testes
   return ids as Record<string, string>;
 }
 
@@ -20,7 +22,7 @@ describe('avisos', () => {
     await w.core.profiles.updateOwn(ana!, { displayName: 'Ana Maria Souza' });
     await w.core.conversations.send(ana!, id, { body: 'oi de novo' });
     await w.core.flushNotifications();
-    const titles = (await w.core.notifications.list(bia!)).items.map((n) => n.title);
+    const titles = (await w.core.notifications.list(bia!)).items.filter((n) => n.type === 'MESSAGE').map((n) => n.title);
     assert.ok(titles.length > 0 && titles.every((t) => t === 'ana'), titles.join(','));
     assert.equal(item.title, 'ana');
   });
