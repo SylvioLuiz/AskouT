@@ -264,6 +264,15 @@ O botão **(+)** fica no meio da barra de baixo (no computador, "Criar post" no 
 - Migração `20261024120000_event_page`; o `AskouT.command` aplica o SQL sozinho.
 - Limites: posts do evento não têm curtida/comentário; mostra só os 30 mais recentes; "Criar encontro" fica só nos eventos do local (o encontro depende de um evento do local); sem aviso (sino) de confirmação ou post; Postgres/Prisma e `smoke.mjs` só rodam no seu Mac; nada testado em celular real.
 
+### Locais com dono (painel do local)
+
+Dentro do perfil: **Meus locais** (`/locais`). A pessoa busca um local já cadastrado, envia um documento (PDF/JPEG/PNG/WebP até 2 MB, guardado no banco e só visível a admin) e fica com um pedido **em análise**. Quando um admin aprova (`VenuesService.reviewClaim`), ela vira dona (`Venue.ownerId`) e passa a criar, editar e apagar os eventos do local em `/locais/:id`; eles aparecem no Explorar e na página do evento como qualquer outro.
+
+- Rotas: `GET /me/venues`, `GET /venues/claimable?q=`, `POST /venues/:id/claims`, `DELETE /venue-claims/:id`, `GET /me/venues/:id`, `POST|PUT|DELETE /me/venues/:id/events[/:eventId]`.
+- Quem não é dono recebe 404 (não revela quais locais têm dono). No máximo 5 pedidos em análise por pessoa.
+- **Ainda sem tela de admin**: aprovar/recusar existe no núcleo e está testado, mas não há rota HTTP nem tela até o painel admin existir.
+- Migration `20261025120000_venue_claims` e `prisma/sql/014_venue_claim_constraints.sql` (rodar `npm run prisma:generate` depois de baixar).
+
 ## App web (`apps/web`)
 
 React 19 + Vite 7 + TypeScript. Telas: entrar, criar conta (2 passos com código por e-mail), Home (amigos), Explorar (busca), Atividades (pedidos para seguir), perfil de outras pessoas (seguir, pedir, deixar de seguir, bloquear), Meu perfil (editar, privacidade), Amigos, Bloqueados. Agenda (faixa de 28 dias, folha "Marcar horário", agenda do amigo) e "Encontrar melhor data" (escolher amigos, período, duração e horário de início). Flash (raio no topo e botão grande na Home): ligar por 1/2/3 h, mapa na tela do Flash com você e os amigos que aceitaram sair com você, livres agora, convidar, aceitar/recusar, encontro com mapa, distância e bloquear. Conversas: lista com não lidas e chat 1 a 1 entre amigos; ao aceitar um convite do Flash a conversa abre, com o botão "Sugerir um lugar" (mini carrossel de eventos e lugares perto do ponto médio entre os dois).

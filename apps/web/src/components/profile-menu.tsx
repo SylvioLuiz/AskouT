@@ -6,6 +6,7 @@ import { Link } from '../router.tsx';
 export const PROFILE_MENU: { to: string; label: string }[] = [
   { to: '/configuracao', label: 'Configuração' },
   { to: '/privacidade', label: 'Privacidade' },
+  { to: '/locais', label: 'Meus locais' },
   { to: '/arquivados', label: 'Arquivados' },
   { to: '/interacoes', label: 'Suas interações' },
   { to: '/ajuda', label: 'Ajuda' },

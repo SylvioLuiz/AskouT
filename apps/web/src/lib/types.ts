@@ -227,7 +227,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM';
 
 export interface NotificationItem {
   id: string;
@@ -556,3 +556,63 @@ export interface PostsPage {
 
 /** Foto de um post a criar: enviada (data URL já reduzida) ou a foto de um lugar. */
 export type PostImageInput = string | { photoPath: string; photoAuthor: string | null };
+
+// ---------- Locais (painel do local) ----------
+
+export type ClaimState = 'FREE' | 'MINE' | 'TAKEN' | 'PENDING';
+export type ClaimStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface VenueSummary {
+  id: string;
+  name: string;
+  address: string | null;
+  category: string | null;
+  sample: boolean;
+}
+
+export interface ClaimableVenue extends VenueSummary {
+  state: ClaimState;
+}
+
+export interface VenueClaim {
+  id: string;
+  venue: VenueSummary;
+  status: ClaimStatus;
+  reviewNote: string | null;
+  createdAt: string;
+}
+
+export interface MyVenues {
+  venues: VenueSummary[];
+  claims: VenueClaim[];
+}
+
+export interface VenueEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  kind: EventKind;
+  startsAt: string;
+  endsAt: string;
+  isFree: boolean;
+  imageUrl: string | null;
+  tags: string[];
+  phase: 'UPCOMING' | 'LIVE' | 'PAST';
+  sample: boolean;
+}
+
+export interface VenuePanel {
+  venue: VenueSummary;
+  events: VenueEvent[];
+}
+
+export interface VenueEventBody {
+  title: string;
+  description: string | null;
+  kind: EventKind;
+  startsAt: string;
+  endsAt: string | null;
+  isFree: boolean;
+  imageUrl: string | null;
+  tags: string[];
+}

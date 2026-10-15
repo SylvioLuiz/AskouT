@@ -1,5 +1,11 @@
 import { errorFromResponse, networkError } from './errors.ts';
 import type {
+  ClaimableVenue,
+  MyVenues,
+  VenueClaim,
+  VenueEvent,
+  VenueEventBody,
+  VenuePanel,
   AuthResult,
   AvailableFriend,
   ChatMessage,
@@ -233,6 +239,16 @@ export function createApi(deps: ApiDeps) {
     eventPostsPublic: (eventId: string, value: boolean) => request<EventPage>('PUT', `/events/${id(eventId)}/posts-public`, { body: { public: value } }),
     createEventPost: (eventId: string, input: { caption: string; image?: string }) => request<EventPost>('POST', `/events/${id(eventId)}/posts`, { body: input }),
     deleteEventPost: (eventId: string, postId: string) => request<{ deleted: true }>('DELETE', `/events/${id(eventId)}/posts/${id(postId)}`),
+
+    // Locais (painel do local)
+    myVenues: () => request<MyVenues>('GET', '/me/venues'),
+    claimableVenues: (q: string) => request<ClaimableVenue[]>('GET', `/venues/claimable?q=${encodeURIComponent(q)}`),
+    claimVenue: (venueId: string, input: { document: string; note?: string }) => request<VenueClaim>('POST', `/venues/${id(venueId)}/claims`, { body: input }),
+    cancelClaim: (claimId: string) => request<{ cancelled: true }>('DELETE', `/venue-claims/${id(claimId)}`),
+    venuePanel: (venueId: string) => request<VenuePanel>('GET', `/me/venues/${id(venueId)}`),
+    createVenueEvent: (venueId: string, body: VenueEventBody) => request<VenueEvent>('POST', `/me/venues/${id(venueId)}/events`, { body }),
+    updateVenueEvent: (venueId: string, eventId: string, body: VenueEventBody) => request<VenueEvent>('PUT', `/me/venues/${id(venueId)}/events/${id(eventId)}`, { body }),
+    deleteVenueEvent: (venueId: string, eventId: string) => request<{ deleted: true }>('DELETE', `/me/venues/${id(venueId)}/events/${id(eventId)}`),
 
     // Conversas
     conversations: () => request<{ items: ConversationItem[] }>('GET', '/conversations'),

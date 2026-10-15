@@ -3370,3 +3370,28 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .fchip { border-width: 0; background: var(--surface); box-shadow: 0 0 0 0.5px var(--line-strong); font-weight: 500; }
 .fchip--on, .fchip[aria-pressed='true'] { box-shadow: none; }
 :root[data-theme='dark'] .evcard, :root[data-theme='dark'] .welcome { box-shadow: none; }
+
+/* ---------- Painel do local ---------- */
+.venuelist { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
+.venuerow { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 56px; padding: 12px 16px; color: var(--ink); text-align: left; text-decoration: none; background: var(--surface); border: 0; border-radius: var(--radius-control); cursor: pointer; font: inherit; }
+.venuerow:disabled { opacity: 0.6; cursor: not-allowed; }
+.venuerow:hover:not(:disabled) { color: var(--ink); background: var(--brand-soft); }
+.venuerow__name { font-weight: 600; }
+.venuerow__sub, .venuerow__state { color: var(--muted); font-size: 0.875rem; }
+.claim { display: flex; flex-direction: column; gap: 14px; }
+.claim__file { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
+.claim__actions { display: flex; flex-direction: column; gap: 8px; }
+.claimlist, .velist { display: flex; flex-direction: column; gap: 10px; margin: 8px 0 0; padding: 0; list-style: none; }
+.claimrow, .vevent { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius-control); }
+.claimrow__main { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.claimrow__status--pending { background: #fff3d6; color: #6b4500; }
+.claimrow__status--approved { background: #dff5e6; color: #14522a; }
+.claimrow__status--rejected { background: var(--danger-soft); color: var(--danger); }
+.vevent--past { opacity: 0.7; }
+.vevent__main { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+.vevent__title { font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.vevent__when { color: var(--ink-2); }
+.vevent__meta { color: var(--muted); font-size: 0.875rem; }
+.vevent__actions { display: flex; gap: 8px; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 500; }
+.check input { width: 22px; height: 22px; accent-color: var(--brand); }

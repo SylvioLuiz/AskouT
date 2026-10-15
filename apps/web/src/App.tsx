@@ -13,6 +13,7 @@ import { ChatScreen, ConversationsScreen } from './screens/conversations.tsx';
 import { FlashScreen, MatchScreen } from './screens/flash.tsx';
 import { ChatInfoScreen } from './screens/chat-info.tsx';
 import { GroupScreen } from './screens/group.tsx';
+import { VenuePanelScreen, VenuesScreen } from './screens/venues.tsx';
 import { EventScreen } from './screens/event.tsx';
 import { ExploreScreen } from './screens/explore.tsx';
 import { HomeScreen } from './screens/main-tabs.tsx';
@@ -55,6 +56,8 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/interacoes', render: () => <InteractionsScreen /> },
   { path: '/ajuda', render: () => <HelpScreen /> },
   { path: '/tema', render: () => <ThemeScreen /> },
+  { path: '/locais', render: () => <VenuesScreen /> },
+  { path: '/locais/:id', render: (p) => <VenuePanelScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/amigos', render: () => <FriendsScreen /> },
   { path: '/bloqueados', render: () => <BlockedScreen /> },
   { path: '/u/:username', render: (p) => <ProfileScreen username={p['username'] ?? ''} /> },
