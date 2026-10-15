@@ -1,12 +1,11 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import { Button, Field, Notice } from './ui.tsx';
+import { Button, Notice } from './ui.tsx';
 import { safeImage } from '../lib/explore.ts';
 import { resizeEventCover, resizeVenueLogo } from '../lib/image.ts';
 
-/** Imagem de capa (evento ou estabelecimento): botão "Adicionar imagem" com as duas origens (aparelho ou link da web). */
+/** Imagem de capa (evento ou estabelecimento): um quadro que mostra a imagem e, dentro dele, os botões das duas origens (aparelho ou link da web). */
 export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem, a capa usa a foto do lugar.', logo = false }: { imageUrl: string; imageData: string; onChange: (patch: { imageUrl?: string; imageData?: string }) => void; hint?: string; logo?: boolean }) {
-  const [menu, setMenu] = useState(false);
   const [linking, setLinking] = useState(false);
   const [link, setLink] = useState('');
   const [error, setError] = useState<string | undefined>();
@@ -23,7 +22,6 @@ export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem,
     setError(undefined);
     try {
       onChange({ imageData: await (logo ? resizeVenueLogo(file) : resizeEventCover(file)), imageUrl: '' });
-      setMenu(false);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Não foi possível usar essa imagem.');
     } finally {
@@ -40,42 +38,43 @@ export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem,
     setError(undefined);
     onChange({ imageUrl: v, imageData: '' });
     setLinking(false);
-    setMenu(false);
     setLink('');
   }
 
   return (
     <div className="cover">
-      {current ? <img className={logo ? 'cover__preview cover__preview--logo' : 'cover__preview'} src={current} alt={logo ? 'Logo' : 'Capa'} /> : null}
-      <Button variant="secondary" full loading={reading} aria-expanded={menu} onClick={() => { setMenu(!menu); setLinking(false); setError(undefined); }}>
-        {has ? (logo ? 'Trocar logo' : 'Trocar imagem') : logo ? 'Adicionar logo' : 'Adicionar imagem'}
-      </Button>
-      {menu ? (
-        <div className="cover__menu" role="group" aria-label="Origem da imagem">
-          <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-            Fotos do aparelho
-          </Button>
-          <Button variant="secondary" onClick={() => { setLinking(true); setError(undefined); }}>
-            Link da web
-          </Button>
-          {has ? (
-            <Button variant="quiet" onClick={() => { onChange({ imageUrl: '', imageData: '' }); setMenu(false); }}>
-              {logo ? 'Remover logo' : 'Remover imagem'}
+      <div className={`cover__frame${logo ? ' cover__frame--logo' : ''}${current ? ' cover__frame--has' : ''}`}>
+        {current ? <img className="cover__img" src={current} alt={logo ? 'Logo' : 'Capa'} /> : <p className="cover__empty">{hint}</p>}
+        {linking ? (
+          <div className="cover__link">
+            <input className="cover__input" type="url" inputMode="url" value={link} placeholder="https://" aria-label="Endereço da imagem" autoFocus maxLength={500} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); useLink(); } }} />
+            <div className="cover__row">
+              <Button small onClick={useLink}>
+                Usar este link
+              </Button>
+              <Button small variant="quiet" onClick={() => { setLinking(false); setError(undefined); }}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="cover__actions" role="group" aria-label="Origem da imagem">
+            <Button small variant="secondary" loading={reading} onClick={() => fileRef.current?.click()}>
+              Fotos do aparelho
             </Button>
-          ) : null}
-        </div>
-      ) : null}
+            <Button small variant="secondary" onClick={() => { setLinking(true); setError(undefined); }}>
+              Link da web
+            </Button>
+            {has ? (
+              <Button small variant="secondary" onClick={() => { onChange({ imageUrl: '', imageData: '' }); setError(undefined); }}>
+                Remover
+              </Button>
+            ) : null}
+          </div>
+        )}
+      </div>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={pick} aria-label="Escolher foto do aparelho" />
-      {linking ? (
-        <div className="cover__link">
-          <Field label="Endereço da imagem" value={link} onChange={setLink} type="url" placeholder="https://" autoFocus />
-          <Button small onClick={useLink}>
-            Usar este link
-          </Button>
-        </div>
-      ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {!has ? <p className="cover__hint">{hint}</p> : null}
     </div>
   );
 }
