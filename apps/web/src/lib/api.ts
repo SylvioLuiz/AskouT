@@ -63,6 +63,7 @@ export type FetchLike = (
   status: number;
   headers: { get(name: string): string | null };
   json(): Promise<unknown>;
+  blob(): Promise<Blob>;
 }>;
 
 export interface ApiDeps {

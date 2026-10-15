@@ -4,7 +4,7 @@ import { liveEvents, timeRange } from './live-events.ts';
 import type { ExploreEvent } from './types.ts';
 
 const ev = (id: string, start: string, end: string, distanceM: number | null): ExploreEvent =>
-  ({ id, title: id, startsAt: start, endsAt: end, distanceM, kind: 'MUSIC', isFree: false, imageUrl: null, tags: [], sample: false, description: null, venue: { id: 'v', name: 'V', address: null, category: null, lat: 0, lng: 0, logoUrl: null } }) as ExploreEvent;
+  ({ id, title: id, startsAt: start, endsAt: end, distanceM, kind: 'SHOW', isFree: false, imageUrl: null, tags: [], sample: false, description: null, venue: { id: 'v', name: 'V', address: null, category: null, lat: 0, lng: 0, logoUrl: null } }) as unknown as ExploreEvent;
 
 test('só eventos em andamento, do mais perto ao mais longe', () => {
   const now = new Date('2026-10-15T22:00:00-03:00');

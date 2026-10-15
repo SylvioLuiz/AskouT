@@ -42,7 +42,7 @@ test('linhas da página: segunda a domingo, hoje marcado', () => {
   assert.deepEqual(hoursLines(null, at(3, 12)), []);
 });
 
-const PROFILE: VenueProfile = { id: 'v1', name: 'Bar do Zé', address: 'Rua A', category: 'bar', description: null, hours: NIGHT, coverUrl: '/venues/v1/cover?v=1', logoUrl: null, photoPath: null, photoAuthor: null, lat: 0, lng: 0, sample: false, claimed: true, isOwner: true, following: false, followerCount: 0, upcomingEvents: [] };
+const PROFILE: VenueProfile = { id: 'v1', name: 'Bar do Zé', address: 'Rua A', category: 'bar', description: null, hours: NIGHT, coverUrl: '/venues/v1/cover?v=1', logoUrl: null, photoPath: null, photoAuthor: null, lat: 0, lng: 0, sample: false, claimed: true, isOwner: true, following: false, rating: { average: null, count: 0, mine: null }, followerCount: 0, upcomingEvents: [] };
 
 test('rascunho do perfil: ida e volta e validações', () => {
   const d = draftFromProfile(PROFILE);

@@ -407,7 +407,7 @@ export interface ExploreEvent {
   tags: string[];
   /** Dado de exemplo para teste, nunca um evento real. */
   sample: boolean;
-  venue: { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number };
+  venue: { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; logoUrl: string | null };
   distanceM: number | null;
   /** Você já postou este evento no seu perfil. */
   postedByMe?: boolean;

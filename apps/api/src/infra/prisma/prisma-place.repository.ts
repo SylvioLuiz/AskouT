@@ -8,6 +8,11 @@ import type { PlaceEventRecord, VenueHours, VenueProfilePatch, VenueRecord } fro
 /** Teto de linhas trazidas da caixa antes do filtro exato; evita ler a cidade inteira. */
 const PREFILTER_CAP = 500;
 
+/** Chave estrangeira violada (P2003): o local não existe mais. */
+function isForeignKeyViolation(failure: unknown): boolean {
+  return typeof failure === 'object' && failure !== null && (failure as { code?: unknown }).code === 'P2003';
+}
+
 export class PrismaPlaceRepository implements PlaceRepository {
   private readonly prisma: PrismaClient;
 
@@ -74,7 +79,11 @@ export class PrismaPlaceRepository implements PlaceRepository {
 
   async followVenue(userId: string, venueId: string, at: Date): Promise<void> {
     if (!isUuid(userId) || !isUuid(venueId)) return;
-    await this.prisma.venueFollow.createMany({ data: [{ userId, venueId, createdAt: at }], skipDuplicates: true });
+    try {
+      await this.prisma.venueFollow.createMany({ data: [{ userId, venueId, createdAt: at }], skipDuplicates: true });
+    } catch (failure) {
+      if (!isForeignKeyViolation(failure)) throw failure; // local apagado no meio do caminho: nada a seguir
+    }
   }
 
   async unfollowVenue(userId: string, venueId: string): Promise<void> {
@@ -94,11 +103,15 @@ export class PrismaPlaceRepository implements PlaceRepository {
 
   async rateVenue(userId: string, venueId: string, stars: number, at: Date): Promise<void> {
     if (!isUuid(userId) || !isUuid(venueId)) return;
-    await this.prisma.venueRating.upsert({
-      where: { userId_venueId: { userId, venueId } },
-      create: { userId, venueId, stars, createdAt: at, updatedAt: at },
-      update: { stars, updatedAt: at },
-    });
+    try {
+      await this.prisma.venueRating.upsert({
+        where: { userId_venueId: { userId, venueId } },
+        create: { userId, venueId, stars, createdAt: at, updatedAt: at },
+        update: { stars, updatedAt: at },
+      });
+    } catch (failure) {
+      if (!isForeignKeyViolation(failure)) throw failure;
+    }
   }
 
   async clearVenueRating(userId: string, venueId: string): Promise<void> {

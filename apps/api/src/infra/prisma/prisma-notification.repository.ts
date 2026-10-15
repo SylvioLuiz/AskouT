@@ -1,4 +1,4 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import type { NotificationRepository, PushSubscriptionRepository } from '../../core/ports.ts';
 import type { NotificationRecord, NotificationType, PushSubscriptionRecord } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
@@ -19,7 +19,7 @@ export class PrismaNotificationRepository implements NotificationRepository {
 
   async create(record: NotificationRecord): Promise<void> {
     const payload: Payload = { title: record.title, body: record.body, url: record.url, dedupeKey: record.dedupeKey };
-    await this.prisma.notification.create({ data: { id: record.id, userId: record.userId, type: record.type, payload, readAt: record.readAt, createdAt: record.createdAt } });
+    await this.prisma.notification.create({ data: { id: record.id, userId: record.userId, type: record.type, payload: payload as unknown as Prisma.InputJsonObject, readAt: record.readAt, createdAt: record.createdAt } });
   }
 
   async listForUser(userId: string, limit: number): Promise<NotificationRecord[]> {

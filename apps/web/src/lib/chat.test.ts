@@ -47,7 +47,7 @@ test('toCard leva só os campos do cartão', () => {
   assert.equal(card.externalId, 'osm:node/1');
 });
 
-const msg = (id: string, createdAt: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ id, senderId: 'u', mine: false, senderName: null, kind: 'TEXT', body: id, suggestion: null, audio: null, meetup: null, response: null, respondedAt: null, distances: null, createdAt, ...extra });
+const msg = (id: string, createdAt: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ id, senderId: 'u', mine: false, senderName: null, kind: 'TEXT', body: id, suggestion: null, audio: null, meetup: null, response: null, respondedAt: null, distances: null, createdAt, ...extra }) as ChatMessage;
 
 test('mergeMessages: sem repetir, em ordem, a versão mais nova vence', () => {
   const a = [msg('1', '2026-10-13T10:00:00.000Z'), msg('2', '2026-10-13T10:01:00.000Z')];
