@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
 import type { MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 
 /**
@@ -23,6 +23,7 @@ export interface RepoHarness {
   claims: VenueClaimRepository;
   admin: AdminRepository;
   meetups: MeetupRepository;
+  scheduling: SchedulingRepository;
   profileEvents: ProfileEventRepository;
   posts: PostRepository;
   eventRoom: EventRoomRepository;
@@ -1625,6 +1626,60 @@ export function defineRepositoryContract(
         assert.deepEqual((await h.meetups.listForUser(ana, 10)).map((x) => x.id), [m2.id, m1.id]);
         assert.deepEqual((await h.meetups.listForUser(bia, 1)).map((x) => x.id), [m2.id]);
         assert.deepEqual(await h.meetups.listForUser(caio, 10), []);
+      });
+
+      it('votação de datas: votos únicos, edição, propostas, uma aberta por vez e confirmações', async () => {
+        const { ana, bia, caio } = await setup();
+        const g = await h.conversations.createGroup({ id: randomUUID(), name: 'G', ownerId: ana, now: at(1) });
+        const poll = {
+          id: randomUUID(), conversationId: g.id, organizerId: ana, title: 'Churrasco', schedulingMode: 'BEST_DATE' as const,
+          rangeStart: '2026-11-01', rangeEnd: '2026-11-10', durationMinutes: 180, preferredTimeStart: '19:00', timezone: 'America/Sao_Paulo',
+          votingDeadline: at(5 * H), confirmationPolicy: 'MAJORITY' as const, greenMin: 80, orangeMin: 50, minCoverage: 50,
+          status: 'VOTING' as const, finalProposalId: null, meetupId: null, createdAt: at(1),
+        };
+        await h.scheduling.create(poll, [ana, bia, caio], at(1));
+        const found = (await h.scheduling.find(poll.id))!;
+        assert.equal(found.title, 'Churrasco');
+        assert.equal(found.rangeStart, '2026-11-01');
+        assert.equal(found.preferredTimeStart, '19:00');
+        assert.deepEqual(found.votingDeadline, at(5 * H));
+        assert.equal(await h.scheduling.find(randomUUID()), undefined);
+        assert.equal(await h.scheduling.find('nao-e-uuid'), undefined);
+        assert.deepEqual((await h.scheduling.listParticipants(poll.id)).map((p) => p.userId).sort(), [ana, bia, caio].sort());
+        assert.deepEqual((await h.scheduling.listForConversation(g.id)).map((p) => p.id), [poll.id]);
+        assert.deepEqual((await h.scheduling.listOpenForUser(bia, 10)).map((p) => p.id), [poll.id]);
+
+        await h.scheduling.setVotes(poll.id, bia, ['2026-11-02', '2026-11-03'], 'YES', at(2));
+        await h.scheduling.setVotes(poll.id, bia, ['2026-11-03'], 'MAYBE', at(3));
+        await h.scheduling.setVotes(poll.id, caio, ['2026-11-03'], 'NO', at(3));
+        const votes = (await h.scheduling.listVotes(poll.id)).map((v) => `${v.userId === bia ? 'bia' : 'caio'} ${v.date} ${v.status}`);
+        assert.deepEqual(votes, ['bia 2026-11-02 YES', 'bia 2026-11-03 MAYBE', 'caio 2026-11-03 NO']);
+        await h.scheduling.setVotes(poll.id, bia, ['2026-11-02'], null, at(4));
+        assert.equal((await h.scheduling.listVotes(poll.id)).length, 2);
+
+        await h.scheduling.setFinished(poll.id, bia, at(5));
+        assert.deepEqual((await h.scheduling.listParticipants(poll.id)).find((p) => p.userId === bia)!.finishedAt, at(5));
+        await h.scheduling.setFinished(poll.id, bia, null);
+        assert.equal((await h.scheduling.listParticipants(poll.id)).find((p) => p.userId === bia)!.finishedAt, null);
+
+        const proposal = { id: randomUUID(), pollId: poll.id, candidateDate: '2026-11-03', candidateStartAt: at(10 * H), candidateEndAt: at(13 * H), compatibilityScore: 25, coverageScore: 67, availableCount: 0, maybeCount: 1, unavailableCount: 1, unansweredCount: 1, status: 'OPEN' as const, createdAt: at(6) };
+        await h.scheduling.createProposal(proposal);
+        await assert.rejects(h.scheduling.createProposal({ ...proposal, id: randomUUID(), candidateDate: '2026-11-04' }), (e: unknown) => e instanceof DomainError && e.code === 'CONFLICT');
+        const p1 = (await h.scheduling.findProposal(proposal.id))!;
+        assert.equal(p1.compatibilityScore, 25);
+        assert.deepEqual(p1.candidateStartAt, at(10 * H));
+        await h.scheduling.setConfirmation(proposal.id, poll.id, bia, 'ADJUST', at(7));
+        await h.scheduling.setConfirmation(proposal.id, poll.id, bia, 'CONFIRMED', at(8));
+        await h.scheduling.setConfirmation(proposal.id, poll.id, caio, 'DECLINED', at(8));
+        assert.deepEqual((await h.scheduling.listConfirmations(proposal.id)).map((c) => [c.userId === bia ? 'bia' : 'caio', c.status]), [['bia', 'CONFIRMED'], ['caio', 'DECLINED']].sort((a, b) => ((a[0] === 'bia' ? bia : caio) < (b[0] === 'bia' ? bia : caio) ? -1 : 1)));
+        await h.scheduling.updateProposal(proposal.id, { status: 'REJECTED' });
+        await h.scheduling.createProposal({ ...proposal, id: randomUUID(), candidateDate: '2026-11-04', createdAt: at(9) });
+        assert.deepEqual((await h.scheduling.listProposals(poll.id)).map((p) => p.status), ['OPEN', 'REJECTED']);
+        await h.scheduling.updatePoll(poll.id, { status: 'FINALIZED', finalProposalId: proposal.id, meetupId: null });
+        const done = (await h.scheduling.find(poll.id))!;
+        assert.equal(done.status, 'FINALIZED');
+        assert.equal(done.finalProposalId, proposal.id);
+        assert.deepEqual(await h.scheduling.listOpenForUser(bia, 10), []);
       });
     });
   });

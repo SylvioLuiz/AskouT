@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Sheet } from './agenda.tsx';
 import { ChevronLeftIcon, MoreIcon } from './icons.tsx';
+import { DatePollCreateSheet } from './date-poll-create.tsx';
 import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Confirm, GroupAvatar, Notice } from './ui.tsx';
 import { api } from '../client.ts';
@@ -8,7 +9,7 @@ import { toApiError } from '../lib/errors.ts';
 import type { PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 
-type Step = 'menu' | 'clear' | 'block' | 'report';
+type Step = 'menu' | 'clear' | 'block' | 'report' | 'poll';
 
 /** Topo da conversa: voltar, foto e nome (preso ao rolar) e o menu ⋯ no canto oposto. */
 export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void }) {
@@ -52,6 +53,8 @@ function ChatMenu({ conversationId, other, onClose, onCleared }: { conversationI
       setBusy(false);
     }
   }
+
+  if (step === 'poll') return <DatePollCreateSheet conversationId={conversationId} onClose={onClose} />;
 
   if (step === 'report') {
     return (
@@ -97,6 +100,7 @@ function ChatMenu({ conversationId, other, onClose, onCleared }: { conversationI
         />
       ) : (
         <ul className="sharelist">
+          {row('Encontrar a melhor data', 'Todos votam nos dias em que podem e o app mostra a melhor.', () => setStep('poll'))}
           {row('Limpar conversa', 'Apaga as mensagens só para você.', () => setStep('clear'))}
           {other ? row('Bloquear', 'Ela deixa de ver seu perfil e vocês param de se seguir.', () => setStep('block'), true) : null}
           {row('Denunciar', other ? 'Avise a equipe sobre esta pessoa.' : 'Avise a equipe sobre este grupo.', () => setStep('report'), true)}

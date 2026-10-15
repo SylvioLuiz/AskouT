@@ -5,6 +5,7 @@ import { FlashService } from './flash-service.ts';
 import { ConversationService } from './conversation-service.ts';
 import { FollowService } from './follow-service.ts';
 import { MeetupService } from './meetup-service.ts';
+import { SchedulingService } from './scheduling-service.ts';
 import { ProfileEventService } from './profile-event-service.ts';
 import { PostService } from './post-service.ts';
 import { EventPageService } from './event-page-service.ts';
@@ -43,6 +44,7 @@ export function createCore(input: CoreInput) {
     venues,
     admin: new AdminService(deps, venues, auth),
     meetups: new MeetupService(deps),
+    scheduling: new SchedulingService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
     posts: new PostService(deps, profiles),
     notifications: new NotificationService(input),

@@ -1,4 +1,4 @@
-import type { AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -167,6 +167,32 @@ export interface MeetupRepository {
   listForUser(userId: string, limit: number): Promise<MeetupRecord[]>;
   /** Quantos encontros a pessoa criou desde `since` (limite de criação). */
   countCreatedSince(userId: string, since: Date): Promise<number>;
+}
+
+/** Votação de datas: votação, participantes, votos, propostas e confirmações. */
+export interface SchedulingRepository {
+  /** Grava a votação com os participantes (quem organiza inclusive). */
+  create(poll: PollRecord, participantIds: string[], at: Date): Promise<void>;
+  find(id: string): Promise<PollRecord | undefined>;
+  /** Votações de uma conversa, a mais recente primeiro. */
+  listForConversation(conversationId: string): Promise<PollRecord[]>;
+  /** Votações abertas (votando ou confirmando) em que a pessoa participa, a mais recente primeiro. */
+  listOpenForUser(userId: string, limit: number): Promise<PollRecord[]>;
+  listParticipants(pollId: string): Promise<PollParticipantRecord[]>;
+  listVotes(pollId: string): Promise<PollVoteRecord[]>;
+  /** Define (ou, com `null`, apaga) o voto da pessoa nos dias. Um voto por pessoa, votação e dia. */
+  setVotes(pollId: string, userId: string, dates: string[], status: 'YES' | 'MAYBE' | 'NO' | null, at: Date): Promise<void>;
+  /** "Concluí minha votação" (ou `null` para reabrir). */
+  setFinished(pollId: string, userId: string, at: Date | null): Promise<void>;
+  updatePoll(pollId: string, patch: { status?: PollStatus; finalProposalId?: string | null; meetupId?: string | null }): Promise<void>;
+  createProposal(proposal: PollProposalRecord): Promise<void>;
+  findProposal(id: string): Promise<PollProposalRecord | undefined>;
+  /** Propostas da votação, a mais recente primeiro. */
+  listProposals(pollId: string): Promise<PollProposalRecord[]>;
+  updateProposal(id: string, patch: { status: PollProposalStatus }): Promise<void>;
+  /** Uma resposta por pessoa e proposta (a nova substitui a anterior). */
+  setConfirmation(proposalId: string, pollId: string, userId: string, status: 'CONFIRMED' | 'ADJUST' | 'DECLINED', at: Date): Promise<void>;
+  listConfirmations(proposalId: string): Promise<PollConfirmationRecord[]>;
 }
 
 /** Eventos que a pessoa decidiu postar no próprio perfil. */
@@ -447,6 +473,7 @@ export interface CoreDeps {
   flash: FlashRepository;
   conversations: ConversationRepository;
   meetups: MeetupRepository;
+  scheduling: SchedulingRepository;
   profileEvents: ProfileEventRepository;
   posts: PostRepository;
   eventRoom: EventRoomRepository;

@@ -1,4 +1,5 @@
 import { errorFromResponse, networkError } from './errors.ts';
+import type { ConfirmationAnswer, PollInput, PollSummary, PollView, VoteStatus } from './date-poll.ts';
 import type { SuggestedPerson } from './suggested-people.ts';
 import type {
   ClaimableVenue,
@@ -316,6 +317,17 @@ export function createApi(deps: ApiDeps) {
     inviteMeetup: (meetupId: string, guestIds: string[]) => request<MeetupView>('POST', `/meetups/${id(meetupId)}/invite`, { body: { guestIds } }),
     renameMeetup: (meetupId: string, title: string) => request<MeetupView>('PATCH', `/meetups/${id(meetupId)}`, { body: { title } }),
     cancelMeetup: (meetupId: string) => request<MeetupView>('POST', `/meetups/${id(meetupId)}/cancel`),
+    datePolls: () => request<{ items: PollSummary[] }>('GET', '/date-polls'),
+    conversationPolls: (conversationId: string) => request<{ items: PollSummary[] }>('GET', `/date-polls/conversation/${id(conversationId)}`),
+    createPoll: (input: PollInput) => request<PollView>('POST', '/date-polls', { body: input }),
+    poll: (pollId: string) => request<PollView>('GET', `/date-polls/${id(pollId)}`),
+    votePoll: (pollId: string, status: VoteStatus | 'CLEAR', dates: string[]) => request<PollView>('POST', `/date-polls/${id(pollId)}/votes`, { body: { status, dates } }),
+    finishPoll: (pollId: string, finished: boolean) => request<PollView>('POST', `/date-polls/${id(pollId)}/finish`, { body: { finished } }),
+    proposePoll: (pollId: string, date: string) => request<PollView>('POST', `/date-polls/${id(pollId)}/propose`, { body: { date } }),
+    withdrawPoll: (pollId: string) => request<PollView>('POST', `/date-polls/${id(pollId)}/withdraw`),
+    respondPoll: (pollId: string, status: ConfirmationAnswer) => request<PollView>('POST', `/date-polls/${id(pollId)}/respond`, { body: { status } }),
+    finalizePoll: (pollId: string) => request<PollView>('POST', `/date-polls/${id(pollId)}/finalize`),
+    cancelPoll: (pollId: string) => request<PollView>('POST', `/date-polls/${id(pollId)}/cancel`),
     respondMeetup: (meetupId: string, action: 'accept' | 'decline') => request<MeetupView>('POST', `/meetups/${id(meetupId)}/respond`, { body: { action } }),
 
     // Avisos

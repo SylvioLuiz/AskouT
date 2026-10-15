@@ -1,3 +1,4 @@
+import { DatePollScreen } from './screens/date-poll.tsx';
 import { useEffect } from 'react';
 import { FlashPresenceProvider } from './components/flash-presence.tsx';
 import { AuthProvider, useAuthContext, useUser } from './auth.tsx';
@@ -45,6 +46,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/conversas/:id/info', render: (p) => <ChatInfoScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/conversas/:id/grupo', render: (p) => <GroupScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/conversas/:id', render: (p) => <ChatScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
+  { path: '/planejar/:id', render: (p) => <DatePollScreen key={p['id']} pollId={p['id'] ?? ''} /> },
   { path: '/agenda', render: () => <AgendaScreen /> },
   { path: '/agenda/comparar', render: () => <CompareScreen /> },
   { path: '/flash', render: () => <FlashScreen /> },

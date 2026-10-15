@@ -630,3 +630,65 @@ export interface AuditRecord {
 export interface AuditRow extends AuditRecord {
   adminUsername: string;
 }
+
+// ---------- Votação de datas ("Encontrar a melhor data") ----------
+
+export type PollStatus = 'VOTING' | 'CONFIRMING' | 'FINALIZED' | 'CANCELLED';
+export type PollProposalStatus = 'OPEN' | 'CONFIRMED' | 'REJECTED' | 'WITHDRAWN';
+
+export interface PollRecord {
+  id: string;
+  conversationId: string;
+  organizerId: string;
+  title: string;
+  schedulingMode: 'BEST_DATE';
+  /** Dias do calendário (AAAA-MM-DD) no fuso `timezone`. */
+  rangeStart: string;
+  rangeEnd: string;
+  durationMinutes: number;
+  /** Início preferido (HH:MM); nulo = 19:00. */
+  preferredTimeStart: string | null;
+  timezone: string;
+  votingDeadline: Date | null;
+  confirmationPolicy: 'UNANIMITY' | 'MAJORITY' | 'MANUAL';
+  greenMin: number;
+  orangeMin: number;
+  minCoverage: number;
+  status: PollStatus;
+  finalProposalId: string | null;
+  meetupId: string | null;
+  createdAt: Date;
+}
+
+export interface PollParticipantRecord {
+  userId: string;
+  finishedAt: Date | null;
+}
+
+export interface PollVoteRecord {
+  userId: string;
+  date: string;
+  status: 'YES' | 'MAYBE' | 'NO';
+}
+
+export interface PollProposalRecord {
+  id: string;
+  pollId: string;
+  candidateDate: string;
+  candidateStartAt: Date;
+  candidateEndAt: Date;
+  compatibilityScore: number | null;
+  coverageScore: number;
+  availableCount: number;
+  maybeCount: number;
+  unavailableCount: number;
+  unansweredCount: number;
+  status: PollProposalStatus;
+  createdAt: Date;
+}
+
+export interface PollConfirmationRecord {
+  userId: string;
+  status: 'CONFIRMED' | 'ADJUST' | 'DECLINED';
+  respondedAt: Date;
+}

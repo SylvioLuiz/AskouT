@@ -5,6 +5,7 @@ import { Avatar, Button, EmptyState, ErrorState, GroupAvatar, Loading, Notice, P
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
 import { ArrowUpIcon, MicIcon, PlusIcon } from '../components/icons.tsx';
+import { PollStrip } from '../components/date-poll-strip.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
 import { EventBubble } from '../components/share-event.tsx';
 import { peopleLabel } from '../lib/meetup.ts';
@@ -235,6 +236,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           view.reload();
         }}
       />
+
+      <PollStrip conversationId={conversationId} />
 
       <div className="chat__thread" aria-live="polite">
         {older.hasMore ? (

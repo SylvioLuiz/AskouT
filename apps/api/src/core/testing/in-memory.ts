@@ -6,6 +6,7 @@ import type {
   EventRoomRepository,
   ConversationRepository,
   MeetupRepository,
+  SchedulingRepository,
   NotificationRepository,
   PushMessage,
   PushResult,
@@ -29,7 +30,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -1505,5 +1506,100 @@ export class InMemoryAdminRepository implements AdminRepository {
       .map((x) => x.r)
       .slice(page.offset, page.offset + page.limit)
       .map((r) => ({ ...r, adminUsername: this.username(r.adminId) }));
+  }
+}
+
+export class InMemorySchedulingRepository implements SchedulingRepository {
+  private readonly polls = new Map<string, PollRecord>();
+  private readonly participants = new Map<string, Map<string, Date | null>>();
+  private readonly votes = new Map<string, Map<string, PollVoteRecord>>(); // pollId -> "user|date"
+  private readonly proposals = new Map<string, PollProposalRecord>();
+  private readonly confirmations = new Map<string, Map<string, PollConfirmationRecord>>();
+
+  async create(poll: PollRecord, participantIds: string[], at: Date): Promise<void> {
+    void at;
+    this.polls.set(poll.id, { ...poll });
+    this.participants.set(poll.id, new Map(participantIds.map((id) => [id, null] as const)));
+    this.votes.set(poll.id, new Map());
+  }
+
+  async find(id: string): Promise<PollRecord | undefined> {
+    const p = this.polls.get(id);
+    return p ? { ...p } : undefined;
+  }
+
+  async listForConversation(conversationId: string): Promise<PollRecord[]> {
+    return [...this.polls.values()]
+      .filter((p) => p.conversationId === conversationId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map((p) => ({ ...p }));
+  }
+
+  async listOpenForUser(userId: string, limit: number): Promise<PollRecord[]> {
+    return [...this.polls.values()]
+      .filter((p) => (p.status === 'VOTING' || p.status === 'CONFIRMING') && this.participants.get(p.id)?.has(userId))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .slice(0, limit)
+      .map((p) => ({ ...p }));
+  }
+
+  async listParticipants(pollId: string): Promise<PollParticipantRecord[]> {
+    return [...(this.participants.get(pollId) ?? new Map<string, Date | null>()).entries()].map(([userId, finishedAt]) => ({ userId, finishedAt })).sort((a, b) => (a.userId < b.userId ? -1 : 1));
+  }
+
+  async listVotes(pollId: string): Promise<PollVoteRecord[]> {
+    return [...(this.votes.get(pollId)?.values() ?? [])].map((v) => ({ ...v })).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.userId < b.userId ? -1 : 1));
+  }
+
+  async setVotes(pollId: string, userId: string, dates: string[], status: 'YES' | 'MAYBE' | 'NO' | null, at: Date): Promise<void> {
+    void at;
+    const m = this.votes.get(pollId);
+    if (!m) return;
+    for (const date of dates) {
+      if (status === null) m.delete(`${userId}|${date}`);
+      else m.set(`${userId}|${date}`, { userId, date, status });
+    }
+  }
+
+  async setFinished(pollId: string, userId: string, at: Date | null): Promise<void> {
+    const m = this.participants.get(pollId);
+    if (m?.has(userId)) m.set(userId, at);
+  }
+
+  async updatePoll(pollId: string, patch: { status?: PollStatus; finalProposalId?: string | null; meetupId?: string | null }): Promise<void> {
+    const p = this.polls.get(pollId);
+    if (p) this.polls.set(pollId, { ...p, ...patch });
+  }
+
+  async createProposal(proposal: PollProposalRecord): Promise<void> {
+    if (proposal.status === 'OPEN' && [...this.proposals.values()].some((p) => p.pollId === proposal.pollId && p.status === 'OPEN')) throw conflict('Já existe uma proposta aberta');
+    this.proposals.set(proposal.id, { ...proposal });
+    this.confirmations.set(proposal.id, new Map());
+  }
+
+  async findProposal(id: string): Promise<PollProposalRecord | undefined> {
+    const p = this.proposals.get(id);
+    return p ? { ...p } : undefined;
+  }
+
+  async listProposals(pollId: string): Promise<PollProposalRecord[]> {
+    return [...this.proposals.values()]
+      .filter((p) => p.pollId === pollId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map((p) => ({ ...p }));
+  }
+
+  async updateProposal(id: string, patch: { status: PollProposalStatus }): Promise<void> {
+    const p = this.proposals.get(id);
+    if (p) this.proposals.set(id, { ...p, ...patch });
+  }
+
+  async setConfirmation(proposalId: string, pollId: string, userId: string, status: 'CONFIRMED' | 'ADJUST' | 'DECLINED', at: Date): Promise<void> {
+    void pollId;
+    this.confirmations.get(proposalId)?.set(userId, { userId, status, respondedAt: at });
+  }
+
+  async listConfirmations(proposalId: string): Promise<PollConfirmationRecord[]> {
+    return [...(this.confirmations.get(proposalId)?.values() ?? [])].map((c) => ({ ...c })).sort((a, b) => (a.userId < b.userId ? -1 : 1));
   }
 }
