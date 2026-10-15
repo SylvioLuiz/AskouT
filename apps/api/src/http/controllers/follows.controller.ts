@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
@@ -68,6 +68,13 @@ export class FollowsController {
   async removeFollower(@CurrentActor() actor: Actor, @Param('userId', uuid()) userId: string) {
     await this.core.follows.removeFollower(actor.userId, userId);
     return { ok: true };
+  }
+
+  /** `{hashes: string[]}`: SHA-256 (hex) dos e-mails dos contatos, só do aparelho. */
+  @Post('me/contact-matches')
+  @HttpCode(200)
+  contactMatches(@CurrentActor() actor: Actor, @Body() body: { hashes?: unknown }) {
+    return this.core.follows.contactMatches(actor.userId, body?.hashes);
   }
 
   @Get('me/suggested-people')

@@ -10,6 +10,8 @@ export interface UserRepository {
   create(user: User, profile: Profile): Promise<void>;
   findById(id: string): Promise<User | undefined>;
   findByEmail(email: string): Promise<User | undefined>;
+  /** Contas ativas cujo e-mail (minúsculo, UTF-8) tem esse SHA-256 em hexadecimal. Para achar amigos nos contatos sem receber e-mails em claro. */
+  findIdsByEmailHashes(hashes: string[]): Promise<string[]>;
   findProfileById(userId: string): Promise<Profile | undefined>;
   findProfileByUsername(username: string): Promise<Profile | undefined>;
   /** Mantém a ordem de `ids`; ignora ausentes e usuários suspensos. */

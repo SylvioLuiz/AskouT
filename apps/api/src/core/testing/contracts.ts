@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
 import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
@@ -122,6 +122,16 @@ export function defineRepositoryContract(
           isPrivate: true,
         });
         assert.deepEqual(await h.users.findProfileByUsername('ana.silva'), profile);
+      });
+
+      it('acha contas pelo SHA-256 do e-mail em minúsculas, sem suspensas', async () => {
+        const hash = (e: string) => createHash('sha256').update(e.toLowerCase(), 'utf8').digest('hex');
+        const a = randomUUID();
+        const b = randomUUID();
+        await h.users.create({ id: a, email: 'maiusc.ula@exemplo.com', passwordHash: 'x', status: 'ACTIVE', role: 'USER', createdAt: at(1) }, { userId: a, username: 'hash.a', displayName: 'A', bio: null, avatarUrl: null, isPrivate: false });
+        await h.users.create({ id: b, email: 'suspenso.hash@exemplo.com', passwordHash: 'x', status: 'SUSPENDED', role: 'USER', createdAt: at(1) }, { userId: b, username: 'hash.b', displayName: 'B', bio: null, avatarUrl: null, isPrivate: false });
+        assert.deepEqual(await h.users.findIdsByEmailHashes([hash('MAIUSC.ULA@exemplo.com'), hash('suspenso.hash@exemplo.com'), hash('nenhum@exemplo.com')]), [a]);
+        assert.deepEqual(await h.users.findIdsByEmailHashes([]), []);
       });
 
       it('devolve undefined para inexistentes e para ids que não são UUID', async () => {

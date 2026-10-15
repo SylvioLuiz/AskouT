@@ -4,6 +4,8 @@ import type { CoreDeps } from './ports.ts';
 import type { Direction, FollowStatus, Page, Profile, PublicProfile } from './types.ts';
 import { MAX_PAGE_LIMIT, normalizePage, toPublicProfile } from './types.ts';
 
+const CONTACT_HASHES_MAX = 500;
+
 export interface FollowResult {
   status: FollowStatus;
   isFriend: boolean;
@@ -115,6 +117,34 @@ export class FollowService {
       .sort((a, b) => a.username.localeCompare(b.username, 'pt-BR') || a.userId.localeCompare(b.userId));
   }
 
+  /** Quem a pessoa já segue ou pediu para seguir. */
+  private async followedIds(actorId: string): Promise<Set<string>> {
+    const out = new Set<string>();
+    for (const status of ['ACCEPTED', 'PENDING'] as const) {
+      for (let offset = 0; offset < 2000; offset += MAX_PAGE_LIMIT) {
+        const rows = await this.deps.follows.list(actorId, 'following', status, { limit: MAX_PAGE_LIMIT, offset });
+        for (const r of rows) out.add(r.followeeId);
+        if (rows.length < MAX_PAGE_LIMIT) break;
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Amigos nos contatos: o app manda só o SHA-256 (hex) do e-mail em minúsculas de cada contato; o servidor não recebe nem guarda e-mails em claro.
+   * Devolve quem tem conta, menos você, quem você já segue e quem tem bloqueio com você.
+   */
+  async contactMatches(actorId: string, hashes: unknown): Promise<{ items: PublicProfile[] }> {
+    if (!Array.isArray(hashes) || hashes.length > CONTACT_HASHES_MAX) throw validationError('Contatos inválidos', { hashes: `Envie até ${CONTACT_HASHES_MAX} contatos` });
+    const clean = [...new Set(hashes.map((h) => (typeof h === 'string' ? h.toLowerCase() : '')))];
+    if (clean.some((h) => !/^[0-9a-f]{64}$/.test(h))) throw validationError('Contatos inválidos', { hashes: 'Formato inválido' });
+    const { users, blocks } = this.deps;
+    const [ids, related, followed] = await Promise.all([users.findIdsByEmailHashes(clean), blocks.listRelatedIds(actorId), this.followedIds(actorId)]);
+    const hidden = new Set([actorId, ...related, ...followed]);
+    const profiles = await users.findProfilesByIds(ids.filter((id) => !hidden.has(id)));
+    return { items: profiles.map(toPublicProfile).sort((a, b) => a.username.localeCompare(b.username, 'pt-BR') || a.userId.localeCompare(b.userId)) };
+  }
+
   /**
    * "Pessoas que você talvez conheça": amigos dos seus amigos, quem tem mais amigos em comum primeiro.
    * Fora: você, seus amigos, quem você já segue (ou pediu para seguir) e quem tem bloqueio com você.
@@ -123,14 +153,7 @@ export class FollowService {
     const { follows, blocks, users } = this.deps;
     const friends = await follows.listFriendIds(actorId);
     const [followingCount, related] = await Promise.all([follows.count(actorId, 'following', 'ACCEPTED'), blocks.listRelatedIds(actorId)]);
-    const skip = new Set<string>([actorId, ...friends, ...related]);
-    for (const status of ['ACCEPTED', 'PENDING'] as const) {
-      for (let offset = 0; offset < 2000; offset += MAX_PAGE_LIMIT) {
-        const rows = await follows.list(actorId, 'following', status, { limit: MAX_PAGE_LIMIT, offset });
-        for (const r of rows) skip.add(r.followeeId);
-        if (rows.length < MAX_PAGE_LIMIT) break;
-      }
-    }
+    const skip = new Set<string>([actorId, ...friends, ...related, ...(await this.followedIds(actorId))]);
     const mutual = new Map<string, number>();
     for (const friendId of friends.slice(0, 100)) {
       for (const candidate of await follows.listFriendIds(friendId)) {

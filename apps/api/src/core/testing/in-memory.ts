@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { conflict } from '../errors.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
@@ -72,6 +73,16 @@ export class InMemoryUserRepository implements UserRepository {
   async findByEmail(email: string): Promise<User | undefined> {
     for (const u of this.users.values()) if (u.email === email) return { ...u };
     return undefined;
+  }
+
+  async findIdsByEmailHashes(hashes: string[]): Promise<string[]> {
+    const wanted = new Set(hashes);
+    const out: string[] = [];
+    for (const u of this.users.values()) {
+      if (u.status === 'SUSPENDED') continue;
+      if (wanted.has(createHash('sha256').update(u.email.toLowerCase(), 'utf8').digest('hex'))) out.push(u.id);
+    }
+    return out;
   }
 
   async findProfileById(userId: string): Promise<Profile | undefined> {

@@ -328,7 +328,7 @@ export function FriendsScreen() {
   const friends = useAsync(() => api.friends(), []);
   return (
     <>
-      <PageHead title="Amigos" back="/perfil" subtitle="Pessoas que seguem você e que você segue" />
+      <PageHead title="Amigos" back="/perfil" subtitle="Pessoas que seguem você e que você segue" action={<Link to="/amigos/contatos">Achar nos contatos</Link>} />
       {friends.loading && !friends.data ? <Loading /> : null}
       {friends.error ? <ErrorState message={friends.error.message} onRetry={friends.reload} /> : null}
       {friends.data && friends.data.length === 0 ? (

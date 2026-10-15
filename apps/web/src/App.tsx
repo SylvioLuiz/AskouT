@@ -19,6 +19,7 @@ import { EventScreen } from './screens/event.tsx';
 import { ExploreScreen } from './screens/explore.tsx';
 import { EventsMapScreen } from './screens/events-map.tsx';
 import { HomeScreen } from './screens/main-tabs.tsx';
+import { ContactsScreen } from './screens/contacts.tsx';
 import { BlockedScreen, EditProfileScreen, FriendsScreen, HelpScreen, InteractionsScreen, PrivacyScreen, SettingsScreen, ThemeScreen } from './screens/me.tsx';
 import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
 import { ArchivedScreen, CreatePostScreen, PostScreen } from './screens/posts.tsx';
@@ -63,6 +64,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/bares/:id', render: (p) => <VenuePageScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/locais/:id', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}`} /> },
   { path: '/amigos', render: () => <FriendsScreen /> },
+  { path: '/amigos/contatos', render: () => <ContactsScreen /> },
   { path: '/bloqueados', render: () => <BlockedScreen /> },
   { path: '/u/:username', render: (p) => <ProfileScreen username={p['username'] ?? ''} /> },
   { path: '/u/:username/agenda', render: (p) => <FriendAgendaScreen username={p['username'] ?? ''} /> },

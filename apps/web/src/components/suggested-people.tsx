@@ -24,6 +24,7 @@ export function SuggestedPeople() {
         <h2 id="talvez-titulo" className="section__title">
           Pessoas que você talvez conheça
         </h2>
+        <Link to="/amigos/contatos">Achar nos contatos</Link>
       </div>
       <ul className="suggest__track">
         {items.map((p) => (

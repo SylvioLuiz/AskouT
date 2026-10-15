@@ -95,6 +95,14 @@ export class PrismaUserRepository implements UserRepository {
     return row ? toUser(row) : undefined;
   }
 
+  async findIdsByEmailHashes(hashes: string[]): Promise<string[]> {
+    if (hashes.length === 0) return [];
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id::text AS id FROM "User"
+      WHERE status <> 'SUSPENDED' AND encode(sha256(convert_to(lower(email), 'UTF8')), 'hex') = ANY(${hashes}::text[])`;
+    return rows.map((r) => r.id);
+  }
+
   async findProfileById(userId: string): Promise<Profile | undefined> {
     if (!isUuid(userId)) return undefined;
     const row = await this.prisma.profile.findUnique({ where: { userId } });

@@ -286,3 +286,21 @@ test('pessoas que você talvez conheça: amigos de amigos, sem quem já é amigo
   await w.core.blocks.block(eu, duda);
   assert.deepEqual((await w.core.follows.suggestedPeople(eu)).items.map((p) => p.username), ['caio']);
 });
+
+test('amigos nos contatos: acha por hash do e-mail, sem você, quem já segue e bloqueados', async () => {
+  const { createHash } = await import('node:crypto');
+  const h = (email: string) => createHash('sha256').update(email.trim().toLowerCase(), 'utf8').digest('hex');
+  const w = makeWorld();
+  const u = await w.signUpMany('leo', 'ana', 'bia', 'caio');
+  const leo = u['leo']!;
+  const mail = (name: string) => `${name}@exemplo.com`;
+  const all = ['leo', 'ana', 'bia', 'caio', 'ninguem'].map((n) => h(mail(n)));
+  const first = await w.core.follows.contactMatches(leo, all);
+  assert.deepEqual(first.items.map((p) => p.username), ['ana', 'bia', 'caio']);
+  await w.core.follows.follow(leo, u['ana']!);
+  await w.core.blocks.block(leo, u['bia']!);
+  assert.deepEqual((await w.core.follows.contactMatches(leo, all)).items.map((p) => p.username), ['caio']);
+  await rejectsWith(w.core.follows.contactMatches(leo, ['joao@x.com']), 'VALIDATION');
+  await rejectsWith(w.core.follows.contactMatches(leo, 'x'), 'VALIDATION');
+  await rejectsWith(w.core.follows.contactMatches(leo, Array.from({ length: 501 }, (_, i) => i.toString(16).padStart(64, '0'))), 'VALIDATION');
+});

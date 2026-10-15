@@ -187,6 +187,7 @@ export function createApi(deps: ApiDeps) {
       request<{ isFriend: boolean }>('POST', `/me/follow-requests/${id(userId)}/approve`),
     rejectRequest: (userId: string) => request<{ ok: true }>('POST', `/me/follow-requests/${id(userId)}/reject`),
     removeFollower: (userId: string) => request<{ ok: true }>('DELETE', `/me/followers/${id(userId)}`),
+    contactMatches: (hashes: string[]) => request<{ items: PublicProfile[] }>('POST', '/me/contact-matches', { body: { hashes } }),
     suggestedPeople: () => request<{ items: SuggestedPerson[]; followingCount: number }>('GET', '/me/suggested-people'),
     friends: () => request<PublicProfile[]>('GET', '/me/friends'),
 
