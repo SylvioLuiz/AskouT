@@ -167,7 +167,7 @@ test('evento: título, lugar e início no futuro; fim padrão 3 h depois; post c
   assert.equal(ev.event?.title, 'Pagode de sábado');
   assert.equal(new Date(ev.event!.endsAt).getTime() - new Date(ev.event!.startsAt).getTime(), 3 * 3_600_000);
   assert.equal((await w.core.posts.get(ana, ev.id)).event?.title, 'Pagode de sábado');
-  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], event: { title: 'Sem lugar', startsAt: start } }), 'VALIDATION');
+  assert.equal((await w.core.posts.create(ana, { images: [JPEG()], event: { title: 'Sem lugar', startsAt: start } })).event?.title, 'Sem lugar', 'o lugar é opcional');
   await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'X', event: { title: '', startsAt: start } }), 'VALIDATION');
   await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'X', event: { title: 'Passado', startsAt: new Date(w.clock.now().getTime() - 3_600_000).toISOString() } }), 'VALIDATION');
   await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'X', event: { title: 'Fim antes', startsAt: start, endsAt: new Date(new Date(start).getTime() - 1000).toISOString() } }), 'VALIDATION');
@@ -264,7 +264,7 @@ test('editar: legenda, lugar e evento; só o autor; evento mantém o início se 
   assert.equal((await w.core.posts.update(ana, post.id, { event: { title: 'Show 3', startsAt: start } })).event?.title, 'Show 3', 'mesmo início, mesmo no passado');
   await rejectsWith(w.core.posts.update(ana, post.id, { event: { title: 'Outro', startsAt: new Date(w.clock.now().getTime() - 2 * 86_400_000).toISOString() } }), 'VALIDATION');
   assert.equal((await w.core.posts.update(ana, post.id, { event: null })).event, null, 'tirar o evento vira post comum');
-  await rejectsWith(w.core.posts.update(ana, post.id, { placeName: '', event: { title: 'X', startsAt: new Date(w.clock.now().getTime() + 3_600_000).toISOString() } }), 'VALIDATION');
+  assert.equal((await w.core.posts.update(ana, post.id, { placeName: '', event: { title: 'X', startsAt: new Date(w.clock.now().getTime() + 3_600_000).toISOString() } })).event?.title, 'X', 'tirar o lugar do evento é permitido');
   await rejectsWith(w.core.posts.update(bia, post.id, { caption: 'invadi' }), 'FORBIDDEN');
   await rejectsWith(w.core.posts.update(ana, post.id, { caption: 'x'.repeat(501) }), 'VALIDATION');
 });

@@ -45,7 +45,7 @@ it('evento: pede nome, lugar e início no futuro; corpo leva o evento em ISO', (
   const ok = { title: 'Pagode', startsAt: '2026-10-20T20:00', endsAt: '' };
   assert.equal(eventProblem(ok, place, now), null);
   assert.match(eventProblem({ ...ok, title: ' ' }, place, now) ?? '', /nome/);
-  assert.match(eventProblem(ok, null, now) ?? '', /lugar/);
+  assert.equal(eventProblem(ok, null, now), null, 'o lugar é opcional');
   assert.match(eventProblem({ ...ok, startsAt: '2026-10-01T20:00' }, place, now) ?? '', /futuro/);
   assert.match(eventProblem({ ...ok, startsAt: '' }, place, now) ?? '', /início/);
   assert.match(eventProblem({ ...ok, endsAt: '2026-10-20T19:00' }, place, now) ?? '', /depois/);

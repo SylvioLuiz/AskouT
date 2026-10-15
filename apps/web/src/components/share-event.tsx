@@ -135,9 +135,11 @@ export function EventBubble({ event }: { event: EventCard }) {
       </span>
       <strong className="evbubble__title">{event.title}</strong>
       <span className="evbubble__sub">{formatWhen(event.startsAt, event.endsAt, new Date())}</span>
-      <span className="evbubble__sub">
-        <VenueLink venueId={event.venueId} name={event.venueName} nested />
-      </span>
+      {event.venueName ? (
+        <span className="evbubble__sub">
+          <VenueLink venueId={event.venueId} name={event.venueName} nested />
+        </span>
+      ) : null}
       {event.sample ? <span className="tag tag--sample">Exemplo de teste</span> : null}
     </Link>
   );

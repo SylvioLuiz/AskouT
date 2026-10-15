@@ -28,7 +28,7 @@ export interface PostInput {
   placeAddress?: unknown;
   /** Amigos marcados (até 10). Cada um precisa aceitar para o post entrar no feed e no perfil dele. */
   tagUserIds?: unknown;
-  /** Evento criado pela pessoa: `{title, startsAt, endsAt?}` (ISO). Pede o nome do lugar. */
+  /** Evento criado pela pessoa: `{title, startsAt, endsAt?}` (ISO). O lugar é opcional. */
   event?: unknown;
 }
 
@@ -333,7 +333,6 @@ export class PostService {
     let event: { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null;
     if (input.event === undefined) {
       event = post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, startsAt: post.eventStartsAt, endsAt: post.eventEndsAt, kind: post.eventKind } : null;
-      if (event && !placeName) throw validationError('Evento inválido', { event: 'Um evento precisa de um lugar' });
     } else {
       event = this.parseEvent(input.event, placeName, post.eventStartsAt, post.eventKind);
     }
@@ -437,7 +436,7 @@ export class PostService {
     return this.deps.posts.findImage(imageId);
   }
 
-  /** Evento: título, início no futuro (até 2 anos), fim opcional (padrão: 3 h depois; no máximo 30 dias) e lugar obrigatório. */
+  /** Evento: título, início no futuro (até 2 anos), fim opcional (padrão: 3 h depois; no máximo 30 dias). O lugar é opcional. */
   private parseEvent(raw: unknown, placeName: string | null, keepStart?: Date | null, keepKind?: EventKind): { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null {
     if (raw === undefined || raw === null) return null;
     if (typeof raw !== 'object' || Array.isArray(raw)) throw validationError('Evento inválido', { event: 'Dados do evento inválidos' });
@@ -449,7 +448,6 @@ export class PostService {
     }
     const title = optionalText(e.title, 120, 'event', 'Título do evento');
     if (!title) throw validationError('Evento inválido', { event: 'Dê um nome ao evento' });
-    if (!placeName) throw validationError('Evento inválido', { event: 'Escolha o lugar do evento' });
     const date = (v: unknown, label: string): Date => {
       const d = typeof v === 'string' && v.length <= 40 ? new Date(v) : new Date(Number.NaN);
       if (Number.isNaN(d.getTime())) throw validationError('Evento inválido', { event: `${label} inválido` });

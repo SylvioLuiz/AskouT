@@ -79,9 +79,8 @@ export function isoToLocalInput(iso: string): string {
 export const POST_EVENT_MAX_DAYS = 30;
 
 /** O que falta para publicar como evento (null = tudo certo). */
-export function eventProblem(event: EventDraft, place: LinkedPlace | null, now: Date): string | null {
+export function eventProblem(event: EventDraft, _place: LinkedPlace | null, now: Date): string | null {
   if (!event.title.trim()) return 'Dê um nome ao evento.';
-  if (!place) return 'Escolha o lugar do evento.';
   const start = localToIso(event.startsAt);
   if (!start) return 'Escolha o dia e a hora de início.';
   if (new Date(start).getTime() < now.getTime() - 5 * 60_000) return 'O início precisa ser no futuro.';

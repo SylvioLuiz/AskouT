@@ -267,7 +267,7 @@ export function CreatePostScreen() {
             <Field label="Nome do evento" value={eventTitle} onChange={setEventTitle} maxLength={120} />
             <EventKindPicker value={eventKind} onChange={setEventKind} />
             <EventDates starts={eventStart} ends={eventEnd} onStarts={setEventStart} onEnds={setEventEnd} />
-            <p className="muted">Um evento precisa de um lugar. Escolha abaixo.</p>
+            <p className="muted">O lugar é opcional: escolha abaixo se quiser.</p>
             <label className="check">
               <input type="checkbox" checked={eventPrivate} onChange={(e) => setEventPrivate(e.target.checked)} />
               <span>

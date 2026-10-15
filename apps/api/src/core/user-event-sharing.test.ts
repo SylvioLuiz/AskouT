@@ -95,3 +95,14 @@ test('só o dono envia evento de pessoa sem ter recebido; id inválido é recusa
   await w.core.conversations.send(bia, chat.id, { eventId: post.id });
   await rejectsWith(w.core.conversations.send(bia, chat.id, { eventId: 'nao-existe' }), 'NOT_FOUND');
 });
+
+test('evento sem lugar vale, e o cartão leva a foto de capa enviada', async () => {
+  const { w, ana, bia, group } = await setup();
+  const start = new Date(w.clock.now().getTime() + 24 * H).toISOString();
+  const post = await w.core.posts.create(ana, { images: [JPEG], event: { title: 'Pizza em casa', startsAt: start } });
+  assert.equal(post.placeName, null);
+  await w.core.conversations.send(ana, group.id, { eventId: post.id });
+  const card = (await w.core.conversations.messages(bia, group.id)).messages.find((m) => m.kind === 'EVENT')!.event!;
+  assert.equal(card.venueName, '');
+  assert.equal(card.imageUrl, `/posts/images/${post.images[0]!.id}`);
+});

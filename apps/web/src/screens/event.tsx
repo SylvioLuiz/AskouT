@@ -291,6 +291,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <span className="visually-hidden">{kindLabel(e.kind)}</span>
               </span>
               <h1 className="evhero__title">{e.title}</h1>
+              {e.venue.name || e.venue.address ? (
               <p className="evhero__place">
                 {e.venue.id ? (
                   <Link to={`/bares/${encodeURIComponent(e.venue.id)}`} className="evhero__placelink">
@@ -300,6 +301,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   venueLine(e.venue)
                 )}
               </p>
+              ) : null}
             </div>
           </section>
 
@@ -393,9 +395,11 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   Rota até lá
                 </a>
               ) : null}
-              <a className="btn btn--quiet btn--small" href={e.venue.lat !== null && e.venue.lng !== null ? mapLink(e.venue.lat, e.venue.lng) : venueMapLink(e.venue)} target="_blank" rel="noopener noreferrer">
-                Mapa
-              </a>
+              {e.venue.name || e.venue.address || e.venue.lat !== null ? (
+                <a className="btn btn--quiet btn--small" href={e.venue.lat !== null && e.venue.lng !== null ? mapLink(e.venue.lat, e.venue.lng) : venueMapLink(e.venue)} target="_blank" rel="noopener noreferrer">
+                  Mapa
+                </a>
+              ) : null}
             </div>
           </div>
         </article>
