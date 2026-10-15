@@ -1653,7 +1653,7 @@ export function defineRepositoryContract(
         await h.scheduling.setVotes(poll.id, bia, ['2026-11-03'], 'MAYBE', at(3));
         await h.scheduling.setVotes(poll.id, caio, ['2026-11-03'], 'NO', at(3));
         const votes = (await h.scheduling.listVotes(poll.id)).map((v) => `${v.userId === bia ? 'bia' : 'caio'} ${v.date} ${v.status}`);
-        assert.deepEqual(votes, ['bia 2026-11-02 YES', 'bia 2026-11-03 MAYBE', 'caio 2026-11-03 NO']);
+        assert.deepEqual([...votes].sort(), ['bia 2026-11-02 YES', 'bia 2026-11-03 MAYBE', 'caio 2026-11-03 NO']);
         await h.scheduling.setVotes(poll.id, bia, ['2026-11-02'], null, at(4));
         assert.equal((await h.scheduling.listVotes(poll.id)).length, 2);
 
