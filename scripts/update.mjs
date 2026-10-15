@@ -1,7 +1,7 @@
 // Atualiza e confere o ambiente inteiro com UM comando:  npm run update
 //
 //   git pull → npm install → migrações e SQL nos bancos (principal e de teste) → testes da API (com Postgres real)
-//   → typecheck da API → typecheck e testes da web.
+//   → typecheck da API → typecheck e testes da web e da gestão.
 //
 // Pode rodar quantas vezes quiser (tudo é idempotente). O relatório completo fica em .askout-update.log na raiz:
 // é só mandar "li o relatório" para o Claude, que lê o arquivo sozinho — sem copiar e colar a saída.
@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const api = join(root, 'apps/api');
 const web = join(root, 'apps/web');
+const admin = join(root, 'apps/admin');
 const logFile = join(root, '.askout-update.log');
 writeFileSync(logFile, `AskouT update — ${new Date().toISOString()}\n`);
 
@@ -111,6 +112,8 @@ if (!urls) {
 step('API: typecheck completo', api, 'npm', ['run', 'typecheck:full']);
 step('Web: typecheck', web, 'npm', ['run', 'typecheck']);
 step('Web: testes', web, 'npm', ['test']);
+step('Gestão: typecheck', admin, 'npm', ['run', 'typecheck']);
+step('Gestão: testes', admin, 'npm', ['test']);
 
 const failed = results.filter((r) => !r.ok && !r.optional);
 console.log(failed.length === 0 ? '\n✔ Tudo certo.' : `\n✘ ${failed.length} etapa(s) com problema: ${failed.map((r) => r.title).join('; ')}`);

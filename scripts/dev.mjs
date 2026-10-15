@@ -1,9 +1,9 @@
 // Sobe tudo para desenvolver, com um comando só:  npm run dev:all   (ou  npm run dev:all -- --https)
 //
 //  1. confere se o Postgres está rodando (no macOS tenta abrir o Postgres.app e espera);
-//  2. libera as portas 3000 (API) e 5173 (web) se sobrou processo de antes;
-//  3. sobe a API e o app web, com a saída da API gravada em ~/askout-api.log (o smoke test lê o código de cadastro de lá);
-//  4. Ctrl+C encerra os dois.
+//  2. libera as portas 3000 (API), 5173 (web) e 5174 (gestão) se sobrou processo de antes;
+//  3. sobe a API, o app web e a plataforma de gestão (só computador), com a saída da API gravada em ~/askout-api.log (o smoke test lê o código de cadastro de lá);
+//  4. Ctrl+C encerra tudo.
 //
 // Com --update: antes de subir, busca novidades no GitHub e, se houver, roda o `npm run update` (pull, instalação,
 // migrações, testes). Sem internet ou sem novidades, segue direto. É o que o AskouT.command usa.
@@ -121,6 +121,7 @@ if (process.argv.includes('--update')) {
 }
 freePort(3000);
 freePort(5173);
+freePort(5174);
 await sleep(500);
 
 console.log(`[dev] API → http://localhost:3000   (log em ${logPath})`);
@@ -128,4 +129,6 @@ children.push(start('api', join(root, 'apps/api'), 'npm', ['run', 'dev'], {}, lo
 await sleep(2500);
 console.log(`[dev] Web → ${useHttps ? 'https' : 'http'}://localhost:5173${useHttps ? '   (celular: https://IP-DO-MAC:5173)' : ''}`);
 children.push(start('web', join(root, 'apps/web'), 'npm', ['run', useHttps ? 'dev:https' : 'dev'], {}));
+console.log('[dev] Gestão (só computador) → http://localhost:5174   (criar admin: cd apps/api && npm run admin:promote -- seu@email.com)');
+children.push(start('gestao', join(root, 'apps/admin'), 'npm', ['run', 'dev'], {}));
 console.log('[dev] Tudo no ar. Ctrl+C para encerrar.');
