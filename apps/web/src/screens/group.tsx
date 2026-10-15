@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { ManageMeetupSheet } from '../components/meetup.tsx';
+import { GroupPolls } from '../components/date-poll-summary.tsx';
 import { GroupEvent, SharedLinks, SharedMedia } from '../components/shared-tabs.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { Button, EmptyState, ErrorState, Field, GroupAvatar, Loading, PageHead, PersonRow } from '../components/ui.tsx';
@@ -128,6 +129,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         </>
       ) : null}
 
+      {tab === 'events' ? <GroupPolls conversationId={conversationId} /> : null}
       {tab === 'events' ? (
         data.meetups.length === 0 ? (
           <EmptyState title="Nenhum evento no grupo">Os encontros marcados com este grupo aparecem aqui.</EmptyState>

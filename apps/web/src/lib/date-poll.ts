@@ -74,6 +74,11 @@ export interface PollSummary {
   finalDate: string | null;
   needsMyVote: boolean;
   needsMyConfirmation: boolean;
+  participantCount: number;
+  finishedCount: number;
+  best: { date: string; compatibility: number | null; coverage: number } | null;
+  proposedDate: string | null;
+  votingDeadline: string | null;
 }
 
 export interface PollInput {

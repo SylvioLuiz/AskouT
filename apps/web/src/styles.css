@@ -3680,3 +3680,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .chips--fill .chip { flex: 1 1 0; min-width: 0; padding: 0 6px; font-size: 0.875rem; white-space: normal; line-height: 1.15; text-align: center; }
 .chips--fill { flex-wrap: nowrap; gap: 6px; }
 .chips--fill .chip { flex: 1 1 0; min-width: 0; padding: 0 6px; font-size: 0.875rem; white-space: normal; line-height: 1.15; text-align: center; }
+.dpsum { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.dpsum__item { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius-control); text-decoration: none; font-size: 0.9375rem; }
+.dpsum__item.is-todo { border-color: var(--brand); }
+.dpsum__todo { font-weight: 700; color: var(--brand); }

@@ -1,0 +1,51 @@
+import { Link } from '../router.tsx';
+import { api } from '../client.ts';
+import { useAsync } from '../hooks.ts';
+import { longDay, percent, shortDay } from '../lib/date-poll.ts';
+import type { PollSummary } from '../lib/date-poll.ts';
+
+function line(p: PollSummary): string {
+  if (p.status === 'FINALIZED') return p.finalDate ? `Data definida: ${longDay(p.finalDate)}` : 'Data definida';
+  if (p.status === 'CONFIRMING') return p.proposedDate ? `Confirmando ${longDay(p.proposedDate)}` : 'Data em confirmação';
+  if (p.best) return `Melhor até agora: ${longDay(p.best.date)} (${percent(p.best.compatibility)} de compatibilidade, ${percent(p.best.coverage)} votaram)`;
+  return 'Faltam votos para sugerir uma data';
+}
+
+function todo(p: PollSummary): string | null {
+  if (p.needsMyConfirmation) return 'Confirme a data proposta';
+  if (p.needsMyVote) return 'Falta você votar';
+  return null;
+}
+
+/** Resumo das votações de data do grupo: progresso, melhor data até agora e o que falta de você. */
+export function GroupPolls({ conversationId, reloadKey }: { conversationId: string; reloadKey?: number }) {
+  const list = useAsync(() => api.conversationPolls(conversationId), [conversationId, reloadKey]);
+  const items = list.data?.items ?? [];
+  if (items.length === 0) return null;
+  return (
+    <section aria-labelledby="grp-polls">
+      <h2 id="grp-polls" className="dpoll__h">
+        Votações de data
+      </h2>
+      <ul className="dpsum">
+        {items.map((p) => {
+          const action = todo(p);
+          return (
+            <li key={p.id}>
+              <Link to={`/planejar/${p.id}`} className={`dpsum__item${action ? ' is-todo' : ''}`}>
+                <strong>{p.title}</strong>
+                <span className="muted">
+                  {shortDay(p.rangeStart)} a {shortDay(p.rangeEnd)}
+                  {p.status === 'VOTING' ? ` · ${p.finishedCount} de ${p.participantCount} concluíram` : ''}
+                </span>
+                <span>{line(p)}</span>
+                {p.status === 'VOTING' && p.votingDeadline ? <span className="muted">Votação até {new Date(p.votingDeadline).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span> : null}
+                {action ? <span className="dpsum__todo">{action}</span> : null}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}

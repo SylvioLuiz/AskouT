@@ -90,6 +90,14 @@ export interface PollSummary {
   needsMyVote: boolean;
   /** Proposta esperando a sua confirmação. */
   needsMyConfirmation: boolean;
+  participantCount: number;
+  /** Quantas pessoas marcaram "concluí minha votação". */
+  finishedCount: number;
+  /** Melhor data até agora (nula sem votos suficientes). */
+  best: { date: string; compatibility: number | null; coverage: number } | null;
+  /** Data proposta, enquanto espera confirmação. */
+  proposedDate: string | null;
+  votingDeadline: string | null;
 }
 
 function parseThresholds(raw: unknown): Thresholds {
@@ -456,16 +464,25 @@ export class SchedulingService {
     const { scheduling } = this.deps;
     const out: PollSummary[] = [];
     for (const p of polls) {
-      const mine = (await scheduling.listParticipants(p.id)).find((x) => x.userId === actorId);
+      const participants = await scheduling.listParticipants(p.id);
+      const mine = participants.find((x) => x.userId === actorId);
       if (!mine) continue;
+      let best: PollSummary['best'] = null;
+      if (p.status === 'VOTING') {
+        const days = computeDateStats(dateRange(p.rangeStart, p.rangeEnd), await scheduling.listVotes(p.id), participants.map((x) => x.userId), this.thresholds(p));
+        const top = rankDates(days)[0];
+        if (top && hasEnoughData([top])) best = { date: top.date, compatibility: top.compatibility, coverage: top.coverage };
+      }
+      let proposedDate: string | null = null;
       let needsMyConfirmation = false;
       let finalDate: string | null = null;
       if (p.status === 'CONFIRMING') {
         const open = await this.openProposal(p.id);
+        proposedDate = open?.candidateDate ?? null;
         if (open) needsMyConfirmation = !(await scheduling.listConfirmations(open.id)).some((c) => c.userId === actorId);
       }
       if (p.status === 'FINALIZED' && p.finalProposalId) finalDate = (await scheduling.findProposal(p.finalProposalId))?.candidateDate ?? null;
-      out.push({ id: p.id, conversationId: p.conversationId, title: p.title, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && mine.finishedAt === null, needsMyConfirmation });
+      out.push({ id: p.id, conversationId: p.conversationId, title: p.title, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && mine.finishedAt === null, needsMyConfirmation, participantCount: participants.length, finishedCount: participants.filter((x) => x.finishedAt !== null).length, best, proposedDate, votingDeadline: p.votingDeadline ? p.votingDeadline.toISOString() : null });
     }
     return out;
   }

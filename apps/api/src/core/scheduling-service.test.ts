@@ -137,3 +137,23 @@ test('prazo de votação encerra os votos; eventos do mesmo grupo são independe
   const list = await w.core.scheduling.listForConversation(ana, group.id);
   assert.equal(list.items.length, 2);
 });
+
+test('resumo da conversa: progresso, melhor data até agora e proposta', async () => {
+  const { w, ana, bia, caio, dani, group, poll } = await setup('MANUAL');
+  let s = (await w.core.scheduling.listForConversation(ana, group.id)).items[0]!;
+  assert.equal(s.participantCount, 4);
+  assert.equal(s.finishedCount, 0);
+  assert.equal(s.best, null);
+  assert.equal(s.needsMyVote, true);
+  for (const u of [ana, bia, caio, dani]) await w.core.scheduling.vote(u, poll.id, { status: 'YES', dates: ['2026-10-24'] });
+  await w.core.scheduling.finish(bia, poll.id, true);
+  s = (await w.core.scheduling.listForConversation(ana, group.id)).items[0]!;
+  assert.equal(s.finishedCount, 1);
+  assert.equal(s.best?.date, '2026-10-24');
+  assert.equal(s.best?.compatibility, 100);
+  await w.core.scheduling.propose(ana, poll.id, '2026-10-24');
+  s = (await w.core.scheduling.listForConversation(bia, group.id)).items[0]!;
+  assert.equal(s.proposedDate, '2026-10-24');
+  assert.equal(s.needsMyConfirmation, true);
+  assert.equal(s.best, null);
+});
