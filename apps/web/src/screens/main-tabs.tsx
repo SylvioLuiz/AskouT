@@ -6,6 +6,7 @@ import { useAsync, useTitle } from '../hooks.ts';
 import { formatRemaining, minutesLeft } from '../lib/flash.ts';
 import { PostList } from '../components/post.tsx';
 import { Link } from '../router.tsx';
+import { EventCard } from './explore.tsx';
 
 export function HomeScreen() {
   useTitle('Home');
@@ -14,6 +15,9 @@ export function HomeScreen() {
   const count = friends.data?.length ?? 0;
   const flash = useAsync(() => api.flashStatus(), []);
   const flashOn = flash.data?.active === true;
+  const followed = useAsync(() => api.followedEvents(), []);
+  const followedEvents = followed.data?.events ?? [];
+  const now = new Date();
 
   return (
     <>
@@ -32,6 +36,21 @@ export function HomeScreen() {
           </span>
         </span>
       </Link>
+
+      {followedEvents.length > 0 ? (
+        <section className="section" aria-labelledby="seguindo-titulo">
+          <div className="section__head">
+            <h2 id="seguindo-titulo" className="section__title">
+              Eventos dos bares que você segue
+            </h2>
+          </div>
+          <ul className="evgrid">
+            {followedEvents.map((event) => (
+              <EventCard key={event.id} event={event} now={now} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="section" aria-labelledby="posts-titulo">
         <div className="section__head">

@@ -236,6 +236,7 @@ export function createApi(deps: ApiDeps) {
       const text = query.toString();
       return request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
     },
+    followedEvents: () => request<{ events: ExploreEvent[] }>('GET', '/explore/followed-events'),
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
       request<EventPage>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
     eventGo: (eventId: string) => request<EventPage>('POST', `/events/${id(eventId)}/going`),

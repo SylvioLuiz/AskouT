@@ -90,7 +90,7 @@ function EventCover({ event, shape }: { event: ExploreEvent; shape: string }) {
   );
 }
 
-function EventCard({ event, now }: { event: ExploreEvent; now: Date }) {
+export function EventCard({ event, now }: { event: ExploreEvent; now: Date }) {
   return (
     <li className="evcard">
       <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link">

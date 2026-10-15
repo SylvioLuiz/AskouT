@@ -23,6 +23,7 @@ export function matchEvent(event: PlaceEventRecord, venue: VenueRecord, q: Event
   if (!(event.endsAt > q.from && event.startsAt < q.to)) return undefined;
   if (q.kind && event.kind !== q.kind) return undefined;
   if (q.freeOnly && !event.isFree) return undefined;
+  if (q.venueIds && !q.venueIds.includes(event.venueId)) return undefined;
   if (q.tagPrefix && !event.tags.some((t) => t.startsWith(q.tagPrefix as string))) return undefined;
   if (q.text) {
     const needle = fold(q.text);

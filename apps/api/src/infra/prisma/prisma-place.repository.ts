@@ -208,6 +208,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
         startsAt: { lt: q.to },
         ...(q.kind ? { kind: q.kind } : {}),
         ...(q.freeOnly ? { isFree: true } : {}),
+        ...(q.venueIds ? { venueId: { in: q.venueIds.filter(isUuid) } } : {}),
         ...(box ? { venue: { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } } } : {}),
       },
       include: { venue: true },

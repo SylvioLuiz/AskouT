@@ -266,3 +266,15 @@ test('busca de locais traz a nota do estabelecimento', async () => {
   assert.equal(item.rating, 4.5);
   assert.equal(item.ratingCount, 2);
 });
+
+test('feed: eventos de quem o bar segue aparecem para quem segue, só os que ainda não acabaram', async () => {
+  const { w, dono, ana, bia } = await setup();
+  const now = w.clock.now().getTime();
+  await w.core.venues.follow(ana, 'v1');
+  assert.deepEqual((await w.core.explore.followedEvents(ana)).events, []);
+  await w.core.venues.createEvent(dono, 'v1', { title: 'Roda de Samba', kind: 'SHOW', startsAt: new Date(now + 2 * H).toISOString(), endsAt: new Date(now + 5 * H).toISOString(), isFree: true });
+  const mine = await w.core.explore.followedEvents(ana);
+  assert.deepEqual(mine.events.map((e) => e.title), ['Roda de Samba']);
+  assert.equal(mine.events[0]?.venue.id, 'v1');
+  assert.deepEqual((await w.core.explore.followedEvents(bia)).events, []);
+});

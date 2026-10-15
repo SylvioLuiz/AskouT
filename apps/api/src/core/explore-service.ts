@@ -138,6 +138,16 @@ export class ExploreService {
     this.profiles = profiles;
   }
 
+  /** Eventos que ainda não acabaram nos locais que a pessoa segue, para o feed. */
+  async followedEvents(actorId: string): Promise<{ events: ExploreEventItem[] }> {
+    const venueIds = await this.deps.places.listFollowedVenueIds(actorId);
+    if (venueIds.length === 0) return { events: [] };
+    const from = this.deps.clock.now();
+    const to = new Date(from.getTime() + EXPLORE_DEFAULT_SPAN_DAYS * DAY_MS);
+    const found = await this.deps.places.searchEvents({ from, to, venueIds, limit: 10 });
+    return { events: found.map((r) => toEventItem(r.event, r.venue, null)) };
+  }
+
   /**
    * Explorar: sem texto devolve os eventos perto; com texto busca eventos, lugares, pessoas e hashtags (`#texto` só hashtags e eventos).
    * A posição vale só para esta consulta; nada é guardado.

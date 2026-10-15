@@ -327,6 +327,8 @@ export interface EventSearchQuery {
   tagPrefix?: string;
   /** Texto: qualquer parte do título, do nome do local ou de uma hashtag. */
   text?: string;
+  /** Só eventos destes locais. */
+  venueIds?: string[];
   limit: number;
 }
 

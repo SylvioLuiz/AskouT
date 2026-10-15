@@ -17,6 +17,12 @@ export class ExploreController {
     this.photos = photos;
   }
 
+  /** Eventos que ainda vão acontecer nos locais que você segue (feed). */
+  @Get('explore/followed-events')
+  async followedEvents(@CurrentActor() actor: Actor) {
+    return this.core.explore.followedEvents(actor.userId);
+  }
+
   /** Explorar: eventos perto (sem q) ou busca de eventos, locais, pessoas e #. A posição só vale para esta consulta. */
   @Get('explore')
   async explore(@CurrentActor() actor: Actor, @Query() query: Record<string, unknown>) {
