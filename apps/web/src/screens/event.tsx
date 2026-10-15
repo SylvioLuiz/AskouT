@@ -3,14 +3,13 @@ import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { ChevronLeftIcon, EventKindIcon, MoreIcon, ShareIcon, TrashIcon, XIcon } from '../components/icons.tsx';
-import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { mapLink, routeLink } from '../lib/chat.ts';
-import { attendeeStrip, eventDateLabel, eventLink, eventTimeLabel, venueLine, venueMapLink } from '../lib/event-page.ts';
+import { attendeeStrip, eventDateLabel, eventTimeLabel, venueLine, venueMapLink } from '../lib/event-page.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -402,11 +401,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
         </article>
       ) : null}
       {sharing && e ? (
-        e.source === 'PLACE' ? (
-          <ShareEventSheet eventId={e.id} title={e.title} posted={isPosted} onPostedChange={setPosted} onClose={() => setSharing(false)} />
-        ) : (
-          <ShareLinkSheet url={eventLink(window.location.origin, e.id)} text={`Evento ${e.title}`} onClose={() => setSharing(false)} />
-        )
+        <ShareEventSheet
+          eventId={e.id}
+          title={e.title}
+          posted={isPosted}
+          onPostedChange={setPosted}
+          profile={e.source === 'PLACE' ? 'toggle' : e.isPrivate ? 'private' : e.isOwner ? 'owner' : 'toggle'}
+          outside={!e.isPrivate}
+          onClose={() => setSharing(false)}
+        />
       ) : null}
       {menu && e ? <EventMenuSheet page={e} onChange={setFresh} onShare={() => { setMenu(false); setSharing(true); }} onClose={() => setMenu(false)} /> : null}
       {planning && e ? <CreateMeetupSheet event={{ id: e.id, title: e.title }} onClose={() => setPlanning(false)} /> : null}

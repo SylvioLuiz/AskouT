@@ -14,7 +14,7 @@ import { Link } from '../router.tsx';
 type Step = 'menu' | 'chat';
 
 /** Compartilhar um evento: no perfil (feed), numa conversa, ou fora do app. */
-export function ShareEventSheet({ eventId, title, posted, onPostedChange, onClose }: { eventId: string; title: string; posted: boolean; onPostedChange: (posted: boolean) => void; onClose: () => void }) {
+export function ShareEventSheet({ eventId, title, posted, onPostedChange, profile = 'toggle', outside: allowOutside = true, onClose }: { eventId: string; title: string; posted: boolean; onPostedChange: (posted: boolean) => void; profile?: 'toggle' | 'owner' | 'private'; outside?: boolean; onClose: () => void }) {
   const [step, setStep] = useState<Step>('menu');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
@@ -73,24 +73,32 @@ export function ShareEventSheet({ eventId, title, posted, onPostedChange, onClos
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {step === 'menu' ? (
         <ul className="sharelist">
-          <li>
-            <button type="button" className="sharelist__item" onClick={togglePost} disabled={busy}>
-              <strong>{posted ? 'Tirar do meu perfil' : 'Postar no meu perfil'}</strong>
-              <span>{posted ? 'O evento deixa de aparecer na sua grade.' : 'Aparece na grade do seu perfil para quem pode ver.'}</span>
-            </button>
-          </li>
+          {profile === 'toggle' ? (
+            <li>
+              <button type="button" className="sharelist__item" onClick={togglePost} disabled={busy}>
+                <strong>{posted ? 'Tirar do meu perfil' : 'Postar no meu perfil'}</strong>
+                <span>{posted ? 'O evento deixa de aparecer na sua grade.' : 'Aparece na grade do seu perfil para quem pode ver.'}</span>
+              </button>
+            </li>
+          ) : (
+            <li>
+              <p className="muted sharelist__note">{profile === 'private' ? 'Evento privado: só vai para as conversas que você escolher, e ninguém posta no perfil.' : 'Seu evento já aparece na aba Eventos do seu perfil.'}</p>
+            </li>
+          )}
           <li>
             <button type="button" className="sharelist__item" onClick={() => setStep('chat')} disabled={busy}>
               <strong>Enviar em uma conversa</strong>
               <span>Mande para um amigo ou um grupo.</span>
             </button>
           </li>
-          <li>
-            <button type="button" className="sharelist__item" onClick={outside} disabled={busy}>
-              <strong>Fora do app</strong>
-              <span>WhatsApp, redes sociais ou copiar o link.</span>
-            </button>
-          </li>
+          {allowOutside ? (
+            <li>
+              <button type="button" className="sharelist__item" onClick={outside} disabled={busy}>
+                <strong>Fora do app</strong>
+                <span>WhatsApp, redes sociais ou copiar o link.</span>
+              </button>
+            </li>
+          ) : null}
         </ul>
       ) : (
         <>

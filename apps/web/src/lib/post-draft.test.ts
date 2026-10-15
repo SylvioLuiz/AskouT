@@ -63,3 +63,13 @@ it('data/hora: ida e volta entre ISO e o campo do formulário', () => {
   assert.equal(localToIso(isoToLocalInput('2026-03-01T09:30:00.000Z')), new Date(new Date('2026-03-01T09:30:00.000Z').setSeconds(0, 0)).toISOString());
   assert.equal(isoToLocalInput('lixo'), '');
 });
+
+describe('evento privado', () => {
+  it('só manda "private" quando marcado', () => {
+    const base = { title: 'Festa', startsAt: '2026-11-05T20:00', endsAt: '' };
+    const open = buildPostBody([], '', null, [], { ...base, private: false });
+    const secret = buildPostBody([], '', null, [], { ...base, private: true });
+    assert.equal('private' in (open.event ?? {}), false);
+    assert.equal((secret.event as { private?: boolean }).private, true);
+  });
+});

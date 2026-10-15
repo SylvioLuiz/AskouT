@@ -620,6 +620,10 @@ export class InMemoryConversationRepository implements ConversationRepository {
   async countSentSince(userId: string, since: Date): Promise<number> {
     return this.messages.filter((m) => m.senderId === userId && m.createdAt >= since).length;
   }
+
+  async hasPostEventAccess(userId: string, postId: string): Promise<boolean> {
+    return this.messages.some((m) => m.postEventId === postId && this.participants.get(m.conversationId)?.has(userId));
+  }
 }
 
 export class InMemoryMeetupRepository implements MeetupRepository {
@@ -963,16 +967,33 @@ export class InMemoryProfileEventRepository implements ProfileEventRepository {
     return this.rows.has(this.key(userId, eventId));
   }
 
-  async list(userId: string, page: Page): Promise<{ eventId: string; createdAt: Date }[]> {
-    return [...this.rows.values()]
-      .filter((r) => r.userId === userId)
+  readonly postRows = new Map<string, { userId: string; postId: string; createdAt: Date }>();
+
+  async addPost(userId: string, postId: string, at: Date): Promise<boolean> {
+    const key = this.key(userId, postId);
+    if (this.postRows.has(key)) return false;
+    this.postRows.set(key, { userId, postId, createdAt: at });
+    return true;
+  }
+
+  async removePost(userId: string, postId: string): Promise<boolean> {
+    return this.postRows.delete(this.key(userId, postId));
+  }
+
+  async hasPost(userId: string, postId: string): Promise<boolean> {
+    return this.postRows.has(this.key(userId, postId));
+  }
+
+  async list(userId: string, page: Page): Promise<{ eventId: string; postId?: string; createdAt: Date }[]> {
+    const places = [...this.rows.values()].filter((r) => r.userId === userId).map((r) => ({ eventId: r.eventId, createdAt: r.createdAt }));
+    const people = [...this.postRows.values()].filter((r) => r.userId === userId).map((r) => ({ eventId: r.postId, postId: r.postId, createdAt: r.createdAt }));
+    return [...places, ...people]
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.eventId < b.eventId ? 1 : -1))
-      .slice(page.offset ?? 0, (page.offset ?? 0) + (page.limit ?? 50))
-      .map((r) => ({ eventId: r.eventId, createdAt: r.createdAt }));
+      .slice(page.offset ?? 0, (page.offset ?? 0) + (page.limit ?? 50));
   }
 
   async count(userId: string): Promise<number> {
-    return [...this.rows.values()].filter((r) => r.userId === userId).length;
+    return [...this.rows.values()].filter((r) => r.userId === userId).length + [...this.postRows.values()].filter((r) => r.userId === userId).length;
   }
 }
 

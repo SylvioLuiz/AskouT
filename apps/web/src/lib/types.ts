@@ -443,6 +443,8 @@ export interface EventPage {
   tags: string[];
   distanceM: number | null;
   postedByMe: boolean;
+  /** Evento privado: só abre por cartão numa conversa e não pode ser repostado. */
+  isPrivate?: boolean;
   confirmedCount: number;
   going: boolean;
   attendees: PublicProfile[];

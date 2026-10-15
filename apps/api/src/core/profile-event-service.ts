@@ -42,7 +42,8 @@ export class ProfileEventService {
   async post(actorId: string, eventId: unknown): Promise<{ posted: true }> {
     const { places, profileEvents, clock } = this.deps;
     if (typeof eventId !== 'string' || eventId === '' || eventId.length > 64) throw notFound('Evento não encontrado');
-    if (!(await places.findEvent(eventId))) throw notFound('Evento não encontrado');
+    const isPlace = (await places.findEvent(eventId)) !== undefined;
+    if (!isPlace) return this.postUserEvent(actorId, eventId);
     if ((await profileEvents.count(actorId)) >= POSTED_EVENTS_MAX && !(await profileEvents.has(actorId, eventId))) {
       throw conflict(`Você já postou ${POSTED_EVENTS_MAX} eventos. Tire algum do perfil para postar outro.`);
     }
@@ -53,7 +54,26 @@ export class ProfileEventService {
   async unpost(actorId: string, eventId: unknown): Promise<{ posted: false }> {
     if (typeof eventId !== 'string' || eventId === '' || eventId.length > 64) throw notFound('Evento não encontrado');
     await this.deps.profileEvents.remove(actorId, eventId);
+    await this.deps.profileEvents.removePost(actorId, eventId);
     return { posted: false };
+  }
+
+  /** Repostar no próprio perfil um evento criado por outra pessoa. Evento privado, arquivado ou seu não entram. */
+  private async postUserEvent(actorId: string, postId: string): Promise<{ posted: true }> {
+    const { posts, profileEvents, conversations, blocks, follows, clock } = this.deps;
+    const found = await posts.findById(postId);
+    const post = found?.post;
+    if (!post || !post.eventTitle || post.archivedAt) throw notFound('Evento não encontrado');
+    if (post.authorId === actorId) throw conflict('Este evento já é seu: ele aparece no seu perfil sem precisar repostar');
+    if (await blocks.existsEitherWay(actorId, post.authorId)) throw notFound('Evento não encontrado');
+    if (post.eventPrivate) throw forbidden('O organizador marcou este evento como privado: ele não pode ser compartilhado no perfil');
+    const reachable = (await conversations.hasPostEventAccess(actorId, postId)) || (await follows.get(actorId, post.authorId))?.status === 'ACCEPTED';
+    if (!reachable) throw notFound('Evento não encontrado');
+    if ((await profileEvents.count(actorId)) >= POSTED_EVENTS_MAX && !(await profileEvents.hasPost(actorId, postId))) {
+      throw conflict(`Você já postou ${POSTED_EVENTS_MAX} eventos. Tire algum do perfil para postar outro.`);
+    }
+    await profileEvents.addPost(actorId, postId, clock.now());
+    return { posted: true };
   }
 
   /** Eventos postados por `username`, vistos por `viewerId`. Perfil privado só para quem segue (ou o próprio). */
@@ -65,9 +85,12 @@ export class ProfileEventService {
     const { profileEvents } = this.deps;
     const [rows, total] = await Promise.all([profileEvents.list(view.profile.userId, page), profileEvents.count(view.profile.userId)]);
     const cards = await buildEventCards(this.deps, rows.map((r) => r.eventId));
+    const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
     const items: PostedEventView[] = rows.flatMap((r) => {
       const card = cards.get(r.eventId);
-      return card ? [{ ...card, postedAt: r.createdAt.toISOString() }] : [];
+      // Evento de pessoa que virou privado depois, ou do qual o visitante está bloqueado, sai da grade.
+      if (!card || card.private || (card.ownerId && hidden.has(card.ownerId))) return [];
+      return [{ ...card, postedAt: r.createdAt.toISOString() }];
     });
     return { items, total, ...page };
   }

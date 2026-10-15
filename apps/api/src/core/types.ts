@@ -185,6 +185,8 @@ export interface MessageRecord {
   meetupId: string | null;
   /** Evento compartilhado (kind EVENT). Ausente = nulo. */
   eventId?: string | null;
+  /** Evento criado por uma pessoa (um post) compartilhado (kind EVENT, no lugar de eventId). */
+  postEventId?: string | null;
   /** Duração da mensagem de voz em ms (kind AUDIO). O áudio em si fica à parte. */
   audioMs?: number | null;
   createdAt: Date;
@@ -372,6 +374,8 @@ export interface PostRecord {
   eventKind: EventKind;
   /** Evento público: o dono e quem confirmou presença postam no evento. Privado (padrão): só o dono. */
   eventPostsPublic: boolean;
+  /** Evento privado: só o dono vê nas listas; os demais chegam por cartão numa conversa. */
+  eventPrivate?: boolean;
   /** Arquivado: some do feed e do perfil, só a própria pessoa vê. */
   archivedAt: Date | null;
   editedAt: Date | null;

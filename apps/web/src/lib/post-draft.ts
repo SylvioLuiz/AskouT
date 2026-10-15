@@ -56,6 +56,8 @@ export interface EventDraft {
   /** Valor de <input type="datetime-local">, na hora do aparelho. */
   startsAt: string;
   endsAt: string;
+  /** Evento privado: só vai para as conversas escolhidas e ninguém posta no perfil. */
+  private?: boolean;
 }
 
 /** Converte o valor do campo de data/hora (hora local do aparelho) para ISO; vazio ou inválido vira null. */
@@ -99,6 +101,6 @@ export function buildPostBody(images: readonly DraftImage[], caption: string, li
     ...(caption.trim() ? { caption: caption.trim() } : {}),
     ...(place ? { placeName: place.name, ...(place.address ? { placeAddress: place.address } : {}) } : {}),
     ...(tagUserIds.length > 0 ? { tagUserIds: [...tagUserIds] } : {}),
-    ...(event ? { event: { title: event.title.trim(), kind: event.kind ?? 'OTHER', startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}) } } : {}),
+    ...(event ? { event: { title: event.title.trim(), kind: event.kind ?? 'OTHER', startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}), ...(event.private ? { private: true } : {}) } } : {}),
   };
 }

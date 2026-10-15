@@ -3,6 +3,7 @@ import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CropIcon, XIcon } from '../components/icons.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
+import { ConversationPick } from '../components/conversation-pick.tsx';
 import { CropEditor } from '../components/crop.tsx';
 import { EventDates } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
@@ -122,6 +123,9 @@ export function CreatePostScreen() {
   const [eventKind, setEventKind] = useState<EventKind>('OTHER');
   const [eventStart, setEventStart] = useState('');
   const [eventEnd, setEventEnd] = useState('');
+  const [eventPrivate, setEventPrivate] = useState(false);
+  const [shareTo, setShareTo] = useState<string[]>([]);
+  const [createdId, setCreatedId] = useState<string | undefined>();
   const friends = useAsync(() => api.friends(), []);
 
   const room = POST_IMAGES_MAX - items.length;
@@ -191,9 +195,10 @@ export function CreatePostScreen() {
   }
 
   async function publish() {
+    if (createdId) return navigate(`/eventos/${encodeURIComponent(createdId)}`);
     setBusy(true);
     setMessage(undefined);
-    const eventDraft = kind === 'EVENT' ? { title: eventTitle, kind: eventKind, startsAt: eventStart, endsAt: eventEnd } : null;
+    const eventDraft = kind === 'EVENT' ? { title: eventTitle, kind: eventKind, startsAt: eventStart, endsAt: eventEnd, private: eventPrivate } : null;
     const problem = eventDraft ? eventProblem(eventDraft, effectivePlace(items, linked), new Date()) : null;
     if (problem) {
       setMessage({ tone: 'error', text: problem });
@@ -202,7 +207,17 @@ export function CreatePostScreen() {
     }
     try {
       const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft));
-      navigate(created.event ? '/perfil?aba=eventos' : `/posts/${encodeURIComponent(created.id)}`);
+      if (created.event && shareTo.length > 0) {
+        const results = await Promise.allSettled(shareTo.map((conversationId) => api.sendEvent(conversationId, created.id)));
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        if (failed > 0) {
+          setCreatedId(created.id);
+          setMessage({ tone: 'error', text: `O evento foi criado, mas não consegui enviar para ${failed === 1 ? '1 conversa' : `${failed} conversas`}. Abra o evento e use Compartilhar.` });
+          setBusy(false);
+          return;
+        }
+      }
+      navigate(created.event ? (eventPrivate ? `/eventos/${encodeURIComponent(created.id)}` : '/perfil?aba=eventos') : `/posts/${encodeURIComponent(created.id)}`);
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
       setBusy(false);
@@ -224,6 +239,11 @@ export function CreatePostScreen() {
           </Button>
         </header>
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+        {createdId ? (
+          <Link to={`/eventos/${encodeURIComponent(createdId)}`} className="btn btn--secondary">
+            Abrir o evento criado
+          </Link>
+        ) : null}
         <ul className="composestrip" aria-label="Fotos do post">
           {items.map((item, i) => (
             <li key={item.key}>
@@ -245,6 +265,16 @@ export function CreatePostScreen() {
             <EventKindPicker value={eventKind} onChange={setEventKind} />
             <EventDates starts={eventStart} ends={eventEnd} onStarts={setEventStart} onEnds={setEventEnd} />
             <p className="muted">Um evento precisa de um lugar. Escolha abaixo.</p>
+            <label className="check">
+              <input type="checkbox" checked={eventPrivate} onChange={(e) => setEventPrivate(e.target.checked)} />
+              <span>
+                <strong>Evento privado</strong>
+                <span className="muted"> Não aparece no seu perfil nem no feed, e ninguém o posta no próprio perfil. Só chega a quem receber nas conversas.</span>
+              </span>
+            </label>
+            <h3 className="compose__h">Enviar para conversas e grupos</h3>
+            <ConversationPick selected={shareTo} onChange={setShareTo} label="Conversas que vão receber o evento" />
+            <p className="muted">{eventPrivate ? 'Escolha com quem compartilhar.' : 'Opcional. Quem estiver no grupo poderá postar o evento no próprio perfil.'}</p>
           </section>
         ) : null}
         <Field label="Descrição (opcional)" value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />

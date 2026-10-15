@@ -49,6 +49,8 @@ export interface EventPageView {
   distanceM: number | null;
   /** Só em evento do local: o visitante já postou no próprio perfil. */
   postedByMe: boolean;
+  /** Evento privado: só chega por cartão numa conversa e não pode ser repostado. */
+  isPrivate: boolean;
   /** Confirmados, contando o dono (que está confirmado por ser dono). */
   confirmedCount: number;
   /** O visitante confirmou (o dono sempre está). */
@@ -118,7 +120,9 @@ export class EventPageService {
       } catch {
         canSee = false;
       }
-      if (!canSee) throw notFound('Evento não encontrado');
+      // Quem recebeu o cartão numa conversa abre o evento mesmo sem seguir o dono; evento privado só abre assim.
+      if (post.eventPrivate) canSee = false;
+      if (!canSee && !(await this.deps.conversations.hasPostEventAccess(viewerId, post.id))) throw notFound('Evento não encontrado');
     }
     const authorProfile = await this.deps.users.findProfileById(post.authorId);
     return { ref: { source: 'USER', id }, owner: authorProfile ? toPublicProfile(authorProfile) : null };
@@ -182,6 +186,7 @@ export class EventPageService {
           tags: [...event.tags],
           distanceM: distance,
           postedByMe: await this.deps.profileEvents.has(viewerId, event.id),
+          isPrivate: false,
         },
       };
     }
@@ -209,7 +214,8 @@ export class EventPageService {
         venue: { name: post.placeName ?? '', address: post.placeAddress, lat: null, lng: null },
         tags: [],
         distanceM: null,
-        postedByMe: false,
+        postedByMe: await this.deps.profileEvents.hasPost(viewerId, post.id),
+        isPrivate: post.eventPrivate === true,
       },
     };
   }

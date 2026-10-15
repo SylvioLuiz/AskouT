@@ -1442,6 +1442,29 @@ export function defineRepositoryContract(
         assert.equal(await h.profileEvents.remove(ana, e2.id), true);
         assert.equal(await h.profileEvents.remove(ana, e2.id), false);
         assert.equal(await h.profileEvents.count(ana), 2);
+
+        // Evento criado por outra pessoa e repostado no perfil.
+        const postId = randomUUID();
+        await h.posts.create({ id: postId, authorId: bia, caption: null, placeName: 'Praça', placeAddress: null, eventTitle: 'Corrida', eventStartsAt: at(100), eventEndsAt: at(103), eventKind: 'OTHER', eventPostsPublic: false, eventPrivate: true, archivedAt: null, editedAt: null, createdAt: at(1) }, []);
+        assert.equal((await h.posts.findById(postId))?.post.eventPrivate, true);
+        assert.equal(await h.profileEvents.addPost(ana, postId, at(20)), true);
+        assert.equal(await h.profileEvents.addPost(ana, postId, at(21)), false);
+        assert.equal(await h.profileEvents.hasPost(ana, postId), true);
+        assert.equal(await h.profileEvents.hasPost(bia, postId), false);
+        assert.equal(await h.profileEvents.count(ana), 3);
+        const mixed = await h.profileEvents.list(ana, { limit: 10, offset: 0 });
+        assert.equal(mixed[0]!.eventId, postId, 'o repost mais recente vem primeiro');
+        assert.equal(mixed[0]!.postId, postId);
+        assert.equal(mixed.length, 3);
+        assert.equal(await h.profileEvents.removePost(ana, postId), true);
+        assert.equal(await h.profileEvents.count(ana), 2);
+
+        // Cartão do evento numa conversa: quem está nela tem acesso; quem não está, não.
+        const convo = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(30));
+        await h.conversations.addMessage({ id: randomUUID(), conversationId: convo.id, senderId: bia, kind: 'EVENT', body: 'Evento: Corrida', suggestion: null, response: null, respondedAt: null, meetupId: null, eventId: null, postEventId: postId, createdAt: at(31) });
+        assert.equal(await h.conversations.hasPostEventAccess(ana, postId), true);
+        const stranger = await newUser('estranho');
+        assert.equal(await h.conversations.hasPostEventAccess(stranger, postId), false);
       });
 
       it('posts: criar com fotos enviadas e do lugar, listar por autores, contar, apagar só do autor', async () => {

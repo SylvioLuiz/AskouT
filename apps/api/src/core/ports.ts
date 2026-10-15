@@ -147,6 +147,8 @@ export interface ConversationRepository {
   markRead(conversationId: string, userId: string, now: Date): Promise<void>;
   /** Quantas mensagens `userId` enviou desde `since` (limite de envio). */
   countSentSince(userId: string, since: Date): Promise<number>;
+  /** A pessoa está numa conversa em que o evento (post) foi compartilhado: pode abri-lo mesmo sem seguir o dono. */
+  hasPostEventAccess(userId: string, postId: string): Promise<boolean>;
 }
 
 export interface MeetupRepository {
@@ -201,9 +203,14 @@ export interface ProfileEventRepository {
   add(userId: string, eventId: string, at: Date): Promise<boolean>;
   remove(userId: string, eventId: string): Promise<boolean>;
   has(userId: string, eventId: string): Promise<boolean>;
-  /** Mais recentes primeiro. */
-  list(userId: string, page: Page): Promise<{ eventId: string; createdAt: Date }[]>;
+  /** Mais recentes primeiro. `postId` vem quando o item é um evento criado por outra pessoa e repostado. */
+  list(userId: string, page: Page): Promise<{ eventId: string; postId?: string; createdAt: Date }[]>;
+  /** Conta eventos de local e de pessoas repostados. */
   count(userId: string): Promise<number>;
+  /** Repostar um evento criado por outra pessoa (um post). Devolve false se já estava. */
+  addPost(userId: string, postId: string, at: Date): Promise<boolean>;
+  removePost(userId: string, postId: string): Promise<boolean>;
+  hasPost(userId: string, postId: string): Promise<boolean>;
 }
 
 export interface PostRepository {

@@ -157,6 +157,7 @@ model User {
   notifications Notification[]
   pushSubscriptions PushSubscription[]
   postedEvents      PostedEvent[]
+  postedUserEvents  PostedUserEvent[] @relation("UserPostedUserEvents")
   photo             ProfilePhoto?
   posts             Post[]
   eventAttendances  EventAttendance[]
@@ -409,6 +410,8 @@ model Message {
   meetupId       String?  @db.Uuid
   /// Evento compartilhado na conversa (kind = EVENT).
   eventId        String?  @db.Uuid
+  /// Evento criado por uma pessoa (um post), compartilhado na conversa (kind = EVENT, no lugar de eventId).
+  postEventId    String?  @db.Uuid
   /// Duração da mensagem de voz em ms (kind = AUDIO); os bytes ficam em MessageAudio.
   audioMs        Int?
   createdAt      DateTime @default(now())
@@ -418,8 +421,10 @@ model Message {
   sender       User         @relation(fields: [senderId], references: [id])
   meetup       Meeting?     @relation(fields: [meetupId], references: [id], onDelete: Cascade)
   event        PlaceEvent?  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  postEvent    Post?        @relation("MessagePostEvent", fields: [postEventId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
+  @@index([postEventId])
   @@index([eventId])
   @@index([meetupId])
 }
@@ -511,6 +516,19 @@ model ProfilePhoto {
 }
 
 // Evento que a pessoa decidiu postar no próprio perfil.
+// Evento criado por outra pessoa que alguém repostou no próprio perfil.
+model PostedUserEvent {
+  userId    String   @db.Uuid
+  postId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user User @relation("UserPostedUserEvents", fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
+  @@index([userId, createdAt])
+}
+
 model PostedEvent {
   userId    String   @db.Uuid
   eventId   String   @db.Uuid
@@ -668,6 +686,8 @@ model Post {
   eventKind     EventKind @default(OTHER)
   /// false (padrão): só o dono posta no evento; true: o dono e quem confirmou presença.
   eventPostsPublic Boolean @default(false)
+  /// Evento privado: some das listas e do perfil de quem não é o dono; só chega por cartão enviado numa conversa e ninguém o reposta.
+  eventPrivate     Boolean @default(false)
   archivedAt    DateTime?
   editedAt      DateTime?
   createdAt    DateTime @default(now())
@@ -684,6 +704,8 @@ model Post {
   hiddenBy PostHidden[]
   attendees EventAttendance[]
   eventPosts EventPost[]
+  sharedInMessages Message[] @relation("MessagePostEvent")
+  repostedBy PostedUserEvent[]
 
   @@index([authorId, createdAt])
   @@index([venueId, createdAt])

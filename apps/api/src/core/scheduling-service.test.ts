@@ -46,7 +46,7 @@ test('votar: um voto por dia, edição, limpar, fora do intervalo e permissões'
   assert.equal(v.myVotes['2026-10-24'], undefined);
   await rejectsWith(w.core.scheduling.vote(bia, poll.id, { status: 'YES', dates: ['2026-10-27'] }), 'VALIDATION');
   await rejectsWith(w.core.scheduling.vote(bia, poll.id, { status: 'XX', dates: ['2026-10-23'] }), 'VALIDATION');
-  const out = (await w.signUp('zeca'));
+  const out = (await w.signUp('zeca')).user.id;
   await rejectsWith(w.core.scheduling.get(out, poll.id), 'NOT_FOUND');
   await rejectsWith(w.core.scheduling.vote(out, poll.id, { status: 'YES', dates: ['2026-10-23'] }), 'NOT_FOUND');
   // sem resposta não conta como "não posso"

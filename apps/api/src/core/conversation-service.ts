@@ -332,7 +332,7 @@ export class ConversationService {
     const meetupIds = [...new Set(items.flatMap((m) => (m.meetupId ? [m.meetupId] : [])))];
     const records = (await Promise.all(meetupIds.map((id) => this.deps.meetups.find(id)))).filter((m) => m !== undefined);
     const meetupViews = new Map((await buildMeetupViews(this.deps, actorId, records)).map((v) => [v.id, v] as const));
-    const eventCards = await buildEventCards(this.deps, items.flatMap((m) => (m.eventId ? [m.eventId] : [])));
+    const eventCards = await buildEventCards(this.deps, items.flatMap((m) => (m.eventId ? [m.eventId] : m.postEventId ? [m.postEventId] : [])));
     const names = isGroup ? new Map((await this.deps.users.findProfilesByIds([...new Set(items.map((m) => m.senderId))])).map((p) => [p.userId, p.displayName] as const)) : null;
 
     return {
@@ -350,7 +350,7 @@ export class ConversationService {
           distances: m.suggestion && otherId ? this.distancesOf(m.suggestion, positions) : null,
           senderName: names ? (names.get(m.senderId) ?? null) : null,
           meetup: m.meetupId ? (meetupViews.get(m.meetupId) ?? null) : null,
-          event: m.eventId ? (eventCards.get(m.eventId) ?? null) : null,
+          event: m.eventId || m.postEventId ? (eventCards.get((m.eventId ?? m.postEventId) as string) ?? null) : null,
         }),
       ),
       hasMore,
@@ -371,6 +371,7 @@ export class ConversationService {
     let body = '';
     let suggestion: SuggestionCard | null = null;
     let eventId: string | null = null;
+    let postEventId: string | null = null;
     let eventCard: EventCardView | null = null;
     let audio: { mime: string; data: Uint8Array } | undefined;
     let audioMs: number | null = null;
@@ -384,7 +385,16 @@ export class ConversationService {
       if (typeof input.eventId !== 'string' || input.eventId === '' || input.eventId.length > 64) throw notFound('Evento não encontrado');
       eventCard = (await buildEventCards(this.deps, [input.eventId])).get(input.eventId) ?? null;
       if (!eventCard) throw notFound('Evento não encontrado');
-      eventId = eventCard.id;
+      if (eventCard.userEvent) {
+        // Evento de pessoa: o dono envia; outros só reencaminham o que receberam, e nunca um evento privado.
+        if (eventCard.ownerId !== actorId) {
+          if (eventCard.private) throw forbidden('Este evento é privado: só quem criou pode enviar');
+          if (!(await conversations.hasPostEventAccess(actorId, eventCard.id)) && !(await follows.get(actorId, eventCard.ownerId ?? ''))) throw notFound('Evento não encontrado');
+        }
+        postEventId = eventCard.id;
+      } else {
+        eventId = eventCard.id;
+      }
       kind = 'EVENT';
       body = `Evento: ${eventCard.title}`;
     } else if (hasSuggestion) {
@@ -404,7 +414,7 @@ export class ConversationService {
     const recent = await conversations.countSentSince(actorId, new Date(now.getTime() - 60_000));
     if (recent >= MESSAGES_PER_MINUTE) throw rateLimited('Você está enviando mensagens rápido demais. Espere um instante.', 30);
 
-    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, audioMs, createdAt: now };
+    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, createdAt: now };
     await conversations.addMessage(message, audio);
     await conversations.markRead(conversationId, actorId, now);
     const positions = suggestion && otherId ? await this.livePositions(actorId, otherId, now) : null;

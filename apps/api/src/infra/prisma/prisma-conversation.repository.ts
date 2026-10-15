@@ -15,6 +15,7 @@ type MessageRow = {
   respondedAt: Date | null;
   meetupId: string | null;
   eventId: string | null;
+  postEventId: string | null;
   audioMs: number | null;
   createdAt: Date;
 };
@@ -30,6 +31,7 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   respondedAt: r.respondedAt,
   meetupId: r.meetupId,
   eventId: r.eventId,
+  postEventId: r.postEventId,
   audioMs: r.audioMs,
   createdAt: r.createdAt,
 });
@@ -202,6 +204,7 @@ export class PrismaConversationRepository implements ConversationRepository {
         ...(m.suggestion ? { suggestion: m.suggestion as unknown as Prisma.InputJsonValue } : {}),
         ...(m.meetupId ? { meetupId: m.meetupId } : {}),
         ...(m.eventId ? { eventId: m.eventId } : {}),
+        ...(m.postEventId ? { postEventId: m.postEventId } : {}),
         ...(m.audioMs ? { audioMs: m.audioMs } : {}),
         ...(audio ? { audio: { create: { mime: audio.mime, data: Buffer.from(audio.data) } } } : {}),
         createdAt: m.createdAt,
@@ -274,5 +277,14 @@ export class PrismaConversationRepository implements ConversationRepository {
   async countSentSince(userId: string, since: Date): Promise<number> {
     if (!isUuid(userId)) return 0;
     return this.prisma.message.count({ where: { senderId: userId, createdAt: { gte: since } } });
+  }
+
+  async hasPostEventAccess(userId: string, postId: string): Promise<boolean> {
+    if (!isUuid(userId) || !isUuid(postId)) return false;
+    const rows = await this.prisma.message.findMany({ where: { postEventId: postId }, select: { conversationId: true }, distinct: ['conversationId'], take: 50 });
+    for (const row of rows) {
+      if ((await this.participantIds(row.conversationId))?.includes(userId)) return true;
+    }
+    return false;
   }
 }

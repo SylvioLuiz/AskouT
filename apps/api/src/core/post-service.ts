@@ -45,6 +45,8 @@ export interface PostEventView {
   kind: EventKind;
   startsAt: string;
   endsAt: string;
+  /** Evento privado: só o dono e quem recebeu o cartão numa conversa. */
+  private: boolean;
 }
 
 export interface PostTagView {
@@ -171,6 +173,7 @@ export class PostService {
     const placeName = venue ? venue.name : optionalText(input.placeName, 120, 'placeName', 'Nome do lugar');
     const placeAddress = venue ? venue.address : optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
     const event = this.parseEvent(input.event, placeName);
+    const eventPrivate = event !== null && this.parsePrivate(input.event);
     const raw = input.images;
     if (!Array.isArray(raw) || raw.length < 1 || raw.length > POST_IMAGES_MAX) {
       throw validationError('Fotos inválidas', { images: `Envie de 1 a ${POST_IMAGES_MAX} fotos` });
@@ -193,7 +196,7 @@ export class PostService {
     });
     if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do lugar por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
-    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPostsPublic: false, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null }, images);
+    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPostsPublic: false, eventPrivate, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null }, images);
     if (tagIds.length > 0) {
       await posts.createTags(postId, tagIds, clock.now());
       const me = await this.deps.users.findProfileById(actorId);
@@ -212,7 +215,8 @@ export class PostService {
     if (!found) throw notFound('Post não encontrado');
     if (found.post.archivedAt !== null && found.post.authorId !== viewerId) throw notFound('Post não encontrado');
     if (found.post.venueId === null || found.post.venueId === undefined) {
-      if (!(await this.canSee(viewerId, found.post.authorId))) throw notFound('Post não encontrado');
+      const open = !found.post.eventPrivate && (await this.canSee(viewerId, found.post.authorId));
+      if (!open && found.post.authorId !== viewerId && !(await this.openedByCard(viewerId, found.post))) throw notFound('Post não encontrado');
     }
     return (await this.views(viewerId, [found]))[0] as PostView;
   }
@@ -221,7 +225,7 @@ export class PostService {
   private async seeable(viewerId: string, postId: unknown): Promise<PostWithImages> {
     if (typeof postId !== 'string' || postId === '' || postId.length > 64) throw notFound('Post não encontrado');
     const found = await this.deps.posts.findById(postId);
-    if (!found || (found.post.archivedAt !== null && found.post.authorId !== viewerId) || (!found.post.venueId && !(await this.canSee(viewerId, found.post.authorId)))) throw notFound('Post não encontrado');
+    if (!found || (found.post.archivedAt !== null && found.post.authorId !== viewerId) || (!found.post.venueId && !(!found.post.eventPrivate && (await this.canSee(viewerId, found.post.authorId))) && found.post.authorId !== viewerId && !(await this.openedByCard(viewerId, found.post)))) throw notFound('Post não encontrado');
     return found;
   }
 
@@ -462,6 +466,19 @@ export class PostService {
     return { title, startsAt, endsAt, kind };
   }
 
+  /** `event.private` só vale ao criar: true marca o evento como privado. */
+  private parsePrivate(raw: unknown): boolean {
+    const value = (raw as { private?: unknown }).private;
+    if (value === undefined || value === null) return false;
+    if (typeof value !== 'boolean') throw validationError('Evento inválido', { event: 'Privado precisa ser sim ou não' });
+    return value;
+  }
+
+  /** Quem recebeu o cartão do evento numa conversa abre o post, mesmo sem seguir o dono. */
+  private async openedByCard(viewerId: string, post: { id: string; eventTitle?: string | null }): Promise<boolean> {
+    return post.eventTitle ? this.deps.conversations.hasPostEventAccess(viewerId, post.id) : false;
+  }
+
   private async validTags(actorId: string, raw: unknown): Promise<string[]> {
     if (raw === undefined || raw === null) return [];
     if (!Array.isArray(raw) || raw.some((v) => typeof v !== 'string') || raw.length > POST_TAGS_MAX) {
@@ -484,6 +501,8 @@ export class PostService {
         continue;
       }
       const author = row.post.authorId;
+      // Evento privado não aparece em listas (feed, perfil) de ninguém além do dono.
+      if (row.post.eventPrivate && author !== viewerId) continue;
       if (!memo.has(author)) memo.set(author, await this.canSee(viewerId, author));
       if (memo.get(author)) out.push(row);
     }
@@ -523,7 +542,7 @@ export class PostService {
           caption: post.caption,
           placeName: post.placeName,
           placeAddress: post.placeAddress,
-          event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString() } : null,
+          event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString(), private: post.eventPrivate === true } : null,
           createdAt: post.createdAt.toISOString(),
           mine: post.authorId === viewerId,
           likeCount: likes.get(post.id)?.count ?? 0,
