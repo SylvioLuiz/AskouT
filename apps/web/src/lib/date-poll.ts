@@ -181,3 +181,16 @@ export function pollLine(p: PollSummary, now: Date): { name: string; status: str
   const share = p.participantCount > 0 ? Math.round((p.votedCount / p.participantCount) * 100) : 0;
   return { name: p.title, status: `em votação: ${share}% dos votos` };
 }
+
+/** Dia (AAAA-MM-DD) de um instante no fuso da votação. */
+export function dayInZone(iso: string, timeZone = 'America/Sao_Paulo'): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+}
+
+/** Com um evento escolhido, o período não passa do dia dele: devolve início e fim ajustados. */
+export function clampRange(start: string, end: string, lastDay: string | undefined): { start: string; end: string } {
+  if (!lastDay) return { start, end };
+  const s = start !== '' && start > lastDay ? lastDay : start;
+  const e = end !== '' && end > lastDay ? lastDay : end;
+  return { start: s, end: e };
+}

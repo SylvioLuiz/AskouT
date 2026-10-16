@@ -6,7 +6,7 @@ import { LEVEL_LABEL, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLa
 import type { ConfirmationAnswer, DateStats, PollView, VoteStatus } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
-import { Link } from '../router.tsx';
+import { Link, navigate } from '../router.tsx';
 
 const WEEK_HEAD = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const BRUSHES: VoteStatus[] = ['YES', 'MAYBE', 'NO'];
@@ -283,7 +283,11 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
       {poll.isOrganizer && (poll.status === 'VOTING' || poll.status === 'CONFIRMING') ? (
         confirming === 'cancel' ? (
-          <Confirm danger question="Cancelar esta votação? Os votos ficam guardados, mas ninguém mais pode votar." confirmLabel="Cancelar votação" busy={busy} onCancel={() => setConfirming(undefined)} onConfirm={() => void act(() => api.cancelPoll(poll.id)).then(() => setConfirming(undefined))} />
+          <Confirm danger question="Cancelar esta votação? Os votos ficam guardados, mas ninguém mais pode votar." confirmLabel="Cancelar votação" busy={busy} onCancel={() => setConfirming(undefined)} onConfirm={() => void act(async () => {
+            const next = await api.cancelPoll(poll.id);
+            navigate(`/conversas/${poll.conversationId}`);
+            return next;
+          }).then(() => setConfirming(undefined))} />
         ) : (
           <Button variant="quiet" onClick={() => setConfirming('cancel')}>
             Cancelar votação

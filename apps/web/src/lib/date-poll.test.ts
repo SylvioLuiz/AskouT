@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calendarWeeks, durationLabel, longDay, percent, shortDay, weekdayOf } from './date-poll.ts';
+import { calendarWeeks, clampRange, dayInZone, durationLabel, longDay, percent, shortDay, weekdayOf } from './date-poll.ts';
 
 test('dia da semana e textos em português', () => {
   assert.equal(weekdayOf('2026-10-23'), 5);
@@ -29,4 +29,11 @@ test('linha da conversa: em votação, marcado e some depois da data', async () 
   assert.deepEqual(pollLine(done, now), { name: 'Churrasco', status: 'marcado para sábado, 24/10' });
   assert.equal(pollLine(done, new Date('2026-10-26T00:00:00Z')), null);
   assert.equal(pollLine({ ...base, status: 'CANCELLED' }, now), null);
+});
+
+test('período com evento não passa do dia do evento', () => {
+  assert.equal(dayInZone('2026-11-15T02:30:00Z'), '2026-11-14');
+  assert.deepEqual(clampRange('2026-11-01', '2026-11-30', '2026-11-14'), { start: '2026-11-01', end: '2026-11-14' });
+  assert.deepEqual(clampRange('2026-11-20', '2026-11-30', '2026-11-14'), { start: '2026-11-14', end: '2026-11-14' });
+  assert.deepEqual(clampRange('2026-11-01', '', undefined), { start: '2026-11-01', end: '' });
 });

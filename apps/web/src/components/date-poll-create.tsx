@@ -7,7 +7,8 @@ import { api } from '../client.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
 import { formatWhen } from '../lib/chat.ts';
 import type { ExploreEvent } from '../lib/types.ts';
-import { POLICY_HINT, POLICY_LABEL } from '../lib/date-poll.ts';
+import { POLICY_HINT, POLICY_LABEL, clampRange, dayInZone } from '../lib/date-poll.ts';
+import { isoToLocalInput } from '../lib/post-draft.ts';
 import type { Policy } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import { navigate } from '../router.tsx';
@@ -22,14 +23,20 @@ export function DatePollCreateSheet({ conversationId, onClose }: { conversationI
   const [deadline, setDeadline] = useState('');
   const [policy, setPolicy] = useState<Policy>('MAJORITY');
   const [picking, setPicking] = useState(false);
+  const [event, setEvent] = useState<ExploreEvent | undefined>();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  const lastDay = event?.startsAt ? dayInZone(event.startsAt) : undefined;
+  const deadlineMax = event?.startsAt ? isoToLocalInput(event.startsAt) : undefined;
+
+  async function submit(form: FormEvent) {
+    form.preventDefault();
     setProblem(undefined);
     if (title.trim() === '') return setProblem('Dê um nome ao encontro.');
     if (start === '' || end === '') return setProblem('Escolha a data inicial e a final.');
+    if (lastDay && end > lastDay) return setProblem('A data final não pode ser depois do dia do evento.');
+    if (deadlineMax && deadline > deadlineMax) return setProblem('O prazo para votar não pode ser depois do início do evento.');
     setBusy(true);
     try {
       const poll = await api.createPoll({
@@ -53,8 +60,15 @@ export function DatePollCreateSheet({ conversationId, onClose }: { conversationI
     return (
       <Sheet title="Escolher um evento" onClose={onClose}>
         <EventPick
-          onPick={(event) => {
-            setTitle(event.title.slice(0, 120));
+          onPick={(picked) => {
+            setTitle(picked.title.slice(0, 120));
+            setEvent(picked);
+            if (picked.startsAt) {
+              const range = clampRange(start, end, dayInZone(picked.startsAt));
+              setStart(range.start);
+              setEnd(range.end);
+              if (deadline > isoToLocalInput(picked.startsAt)) setDeadline('');
+            }
             setPicking(false);
           }}
           onBack={() => setPicking(false)}
@@ -79,12 +93,13 @@ export function DatePollCreateSheet({ conversationId, onClose }: { conversationI
             </button>
           }
         />
+        {event && lastDay ? <p className="muted">A data final vai até o dia do evento “{event.title}”.</p> : null}
         <div className="form__pair">
-          <Field label="De" type="date" value={start} onChange={(v) => { setStart(v); if (end === '' || end < v) setEnd(v); }} />
-          <Field label="Até" type="date" value={end} onChange={setEnd} />
+          <Field label="De" type="date" value={start} max={lastDay} onChange={(v) => { setStart(v); if (end === '' || end < v) setEnd(v); }} />
+          <Field label="Até" type="date" value={end} min={start || undefined} max={lastDay} onChange={setEnd} />
         </div>
         <Field label="Horário preferido" type="time" value={time} onChange={setTime} hint="Usado ao propor a data. Dá para ajustar depois." />
-        <Field label="Prazo para votar (opcional)" type="datetime-local" value={deadline} onChange={setDeadline} />
+        <Field label="Prazo para votar (opcional)" type="datetime-local" value={deadline} max={deadlineMax} onChange={setDeadline} hint={event ? 'Não pode passar do início do evento.' : undefined} />
         <div className="optgroup" role="group" aria-label="Como a data é confirmada">
           <span className="field__label">Como a data é confirmada</span>
           <div className="chips chips--fill">

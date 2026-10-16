@@ -48,9 +48,11 @@ interface FieldProps {
   placeholder?: string;
   /** O rótulo continua para leitores de tela, mas não aparece. */
   hideLabel?: boolean;
+  min?: string;
+  max?: string;
 }
 
-export function Field({ label, value, onChange, type = 'text', error, hint, autoComplete, inputMode, prefix, maxLength, autoFocus, multiline, trailing, name, placeholder, hideLabel }: FieldProps) {
+export function Field({ label, value, onChange, type = 'text', error, hint, autoComplete, inputMode, prefix, maxLength, autoFocus, multiline, trailing, name, placeholder, hideLabel, min, max }: FieldProps) {
   const id = useId();
   const messageId = `${id}-msg`;
   const message = error ?? hint;
@@ -63,6 +65,8 @@ export function Field({ label, value, onChange, type = 'text', error, hint, auto
     autoComplete,
     inputMode,
     placeholder,
+    min,
+    max,
     'aria-invalid': error ? true : undefined,
     'aria-describedby': message ? messageId : undefined,
     className: 'field__input',
