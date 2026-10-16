@@ -208,10 +208,7 @@ export function FlashScreen() {
             </svg>
             {['a', 'b', 'c', 'd'].map((k) => (
               <span key={k} className={`flashhero__person flashhero__person--${k}`}>
-                <svg viewBox="0 0 40 40" focusable="false">
-                  <circle cx="20" cy="15" r="7" />
-                  <path d="M6 38c1-8 7-12 14-12s13 4 14 12z" />
-                </svg>
+                <img src={`/flash/${k}.jpg`} alt="" width="60" height="60" loading="lazy" decoding="async" />
               </span>
             ))}
             {['a', 'b', 'c', 'd', 'e'].map((k) => (

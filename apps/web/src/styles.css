@@ -3972,17 +3972,17 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .flashoff__how svg { width: 20px; height: 20px; }
 .flashoff__how:focus-visible, .flashdur__opt:focus-visible, .flashinvite:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 
-.flashhero { position: relative; width: 100%; max-width: 300px; aspect-ratio: 1 / 0.66; align-self: center; overflow: hidden; }
+.flashhero { position: relative; width: 100%; max-width: 315px; aspect-ratio: 1 / 0.66; align-self: center; overflow: hidden; }
 .flashhero__ring { position: absolute; left: 50%; top: 50%; aspect-ratio: 1; border: 1.5px solid var(--brand); border-radius: 50%; transform: translate(-50%, -50%); }
-.flashhero__ring--1 { width: 34%; opacity: 0.85; }
+.flashhero__ring--1 { width: 32.4%; opacity: 0.85; }
 .flashhero__ring--2 { width: 49%; opacity: 0.5; }
 .flashhero__ring--3 { width: 63%; opacity: 0.32; }
 .flashhero__ring--4 { width: 80%; opacity: 0.2; }
 .flashhero__ring--5 { width: 96%; opacity: 0.1; }
-.flashhero__glow { position: absolute; left: 50%; top: 50%; width: 46%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, var(--brand) 0, transparent 68%); opacity: 0.38; filter: blur(6px); transform: translate(-50%, -50%); }
-.flashhero__bolt { position: absolute; left: 50%; top: 50%; width: 24%; aspect-ratio: 1; transform: translate(-50%, -50%); fill: var(--brand); stroke: var(--brand); stroke-width: 6; stroke-linejoin: round; filter: drop-shadow(0 0 12px var(--brand)); }
+.flashhero__glow { position: absolute; left: 50%; top: 50%; width: 43.8%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, var(--brand) 0, transparent 68%); opacity: 0.38; filter: blur(6px); transform: translate(-50%, -50%); }
+.flashhero__bolt { position: absolute; left: 50%; top: 50%; width: 22.9%; aspect-ratio: 1; transform: translate(-50%, -50%); fill: var(--brand); stroke: var(--brand); stroke-width: 6; stroke-linejoin: round; filter: drop-shadow(0 0 12px var(--brand)); }
 .flashhero__person { position: absolute; overflow: hidden; aspect-ratio: 1; border: 2px solid var(--brand); border-radius: 50%; background: var(--brand-soft); }
-.flashhero__person svg { display: block; width: 100%; height: 100%; fill: var(--brand); }
+.flashhero__person img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .flashhero__person--a { left: 12%; top: 16%; width: 16.5%; }
 .flashhero__person--b { left: 68%; top: 6%; width: 14%; }
 .flashhero__person--c { left: 77%; top: 45%; width: 14%; }
@@ -3995,7 +3995,18 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .flashhero__dot--e { left: 26%; top: 93%; width: 4px; height: 4px; }
 @media (prefers-reduced-motion: no-preference) {
   .flashhero__glow { animation: flashglow 3.2s ease-in-out infinite; }
+  .flashhero__ring { animation: flashring 4.8s ease-in-out infinite; }
+  .flashhero__ring--2 { animation-delay: -0.9s; }
+  .flashhero__ring--3 { animation-delay: -1.8s; }
+  .flashhero__ring--4 { animation-delay: -2.7s; }
+  .flashhero__ring--5 { animation-delay: -3.6s; }
+  .flashhero__person { animation: flashfloat 5.6s ease-in-out infinite; }
+  .flashhero__person--b { animation-delay: -1.4s; }
+  .flashhero__person--c { animation-delay: -2.8s; }
+  .flashhero__person--d { animation-delay: -4.2s; }
 }
+@keyframes flashring { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.045); } }
+@keyframes flashfloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes flashglow { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.46; } }
 
 .flashoff__lead { margin: 0; font-family: var(--font-display); font-size: clamp(1.1875rem, 5.4vw, 1.375rem); line-height: 1.2; font-weight: 700; text-align: center; text-wrap: balance; }
