@@ -3879,3 +3879,25 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
   :root:not([data-theme='light']) .evcover { background: linear-gradient(150deg, #b56efc, #fa72c9 90%); }
   :root:not([data-theme='light']) .tabbar { background: var(--nav); }
 }
+
+/* Conversa: imagem de fundo escolhida por quem usa (só neste aparelho). */
+.chat--bg { background: linear-gradient(color-mix(in srgb, var(--bg) 40%, transparent), color-mix(in srgb, var(--bg) 40%, transparent)), var(--chat-bg) center / cover no-repeat; border-radius: 16px; }
+.chatbgprev { width: 120px; height: 160px; object-fit: cover; border-radius: 16px; border: 1px solid var(--line); }
+
+/* Dentro da conversa o tema escuro mantém o azul (o degradê roxo-rosa fica para o resto do app). */
+:root[data-theme='dark'] .chat {
+  --brand: #4da3ff;
+  --brand-hover: #7ab8ff;
+  --brand-ink: #000000;
+  --brand-soft: #14304f;
+  --brand-grad: linear-gradient(90deg, #4da3ff, #4da3ff);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .chat {
+    --brand: #4da3ff;
+    --brand-hover: #7ab8ff;
+    --brand-ink: #000000;
+    --brand-soft: #14304f;
+    --brand-grad: linear-gradient(90deg, #4da3ff, #4da3ff);
+  }
+}

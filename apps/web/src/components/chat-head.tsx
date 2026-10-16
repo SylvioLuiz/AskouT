@@ -4,6 +4,7 @@ import { Sheet } from './agenda.tsx';
 import { ChevronLeftIcon, MoreIcon } from './icons.tsx';
 import { DatePollCreateSheet } from './date-poll-create.tsx';
 import { ChatPrefsSheet } from './chat-prefs.tsx';
+import { ChatBackgroundSheet } from './chat-background.tsx';
 import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Confirm, GroupAvatar, Notice } from './ui.tsx';
 import { api } from '../client.ts';
@@ -11,7 +12,7 @@ import { toApiError } from '../lib/errors.ts';
 import type { PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 
-type Step = 'menu' | 'clear' | 'block' | 'report' | 'poll' | 'prefs';
+type Step = 'menu' | 'clear' | 'block' | 'report' | 'poll' | 'prefs' | 'background';
 
 /** Topo da conversa: voltar, foto e nome (preso ao rolar) e o menu ⋯ no canto oposto. */
 export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared, below, pinned, muted, onPrefsChanged }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode; pinned: boolean; muted: boolean; onPrefsChanged: () => void }) {
@@ -58,6 +59,7 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
   }
 
   if (step === 'poll') return <DatePollCreateSheet conversationId={conversationId} onClose={onClose} />;
+  if (step === 'background') return <ChatBackgroundSheet conversationId={conversationId} onClose={onClose} />;
   if (step === 'prefs') return <ChatPrefsSheet conversationId={conversationId} title={title} pinned={pinned} muted={muted} onClose={onClose} onChanged={onPrefsChanged} />;
 
   if (step === 'report') {
@@ -73,11 +75,10 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
     );
   }
 
-  const row = (label: string, hint: string, onClick: () => void, danger?: boolean) => (
+  const row = (label: string, onClick: () => void, danger?: boolean) => (
     <li>
       <button type="button" className={`sharelist__item${danger ? ' sharelist__item--danger' : ''}`} onClick={onClick}>
         <strong>{label}</strong>
-        <span>{hint}</span>
       </button>
     </li>
   );
@@ -104,11 +105,12 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
         />
       ) : (
         <ul className="sharelist">
-          {row('Encontrar a melhor data', 'Todos votam nos dias em que podem e o app mostra a melhor.', () => setStep('poll'))}
-          {row(pinned || muted ? 'Fixar e silenciar (ativo)' : 'Fixar e silenciar', pinned && muted ? 'Fixada no topo e com avisos silenciados.' : pinned ? 'Fixada no topo.' : muted ? 'Avisos silenciados.' : 'Fixe no topo da lista ou silencie os avisos.', () => setStep('prefs'))}
-          {row('Limpar conversa', 'Apaga as mensagens só para você.', () => setStep('clear'))}
-          {other ? row('Bloquear', 'Ela deixa de ver seu perfil e vocês param de se seguir.', () => setStep('block'), true) : null}
-          {row('Denunciar', other ? 'Avise a equipe sobre esta pessoa.' : 'Avise a equipe sobre este grupo.', () => setStep('report'), true)}
+          {row('Encontrar a melhor data', () => setStep('poll'))}
+          {row(pinned || muted ? 'Fixar e silenciar (ativo)' : 'Fixar e silenciar', () => setStep('prefs'))}
+          {row('Imagem de fundo', () => setStep('background'))}
+          {row('Limpar conversa', () => setStep('clear'))}
+          {other ? row('Bloquear', () => setStep('block'), true) : null}
+          {row('Denunciar', () => setStep('report'), true)}
         </ul>
       )}
     </Sheet>

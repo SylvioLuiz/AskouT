@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
@@ -9,6 +10,7 @@ import { MediaBubble } from '../components/chat-media.tsx';
 import { MessagePopup, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { SwipeRow } from '../components/swipe-reply.tsx';
+import { useChatBackground } from '../lib/chat-bg.ts';
 import { ChatPrefsSheet } from '../components/chat-prefs.tsx';
 import { PollLine } from '../components/date-poll-strip.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
@@ -153,6 +155,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [problem, setProblem] = useState<string | undefined>();
   const [suggesting, setSuggesting] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | undefined>();
+  const background = useChatBackground(conversationId);
   const [actionsFor, setActionsFor] = useState<ChatMessage | undefined>();
   const [uploading, setUploading] = useState(false);
   const [selected, setSelected] = useState<string[] | undefined>();
@@ -401,7 +404,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
 
   let lastDay = '';
   return (
-    <div className="chat">
+    <div className={`chat${background ? ' chat--bg' : ''}`} style={background ? ({ '--chat-bg': `url(${background})` } as CSSProperties) : undefined}>
       {selected ? (
         <header className="selectbar">
           <p className="selectbar__count" role="status">

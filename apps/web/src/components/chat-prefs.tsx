@@ -31,14 +31,12 @@ export function ChatPrefsSheet({ conversationId, title, pinned, muted, onClose, 
           <button type="button" className="sharelist__item sharelist__item--icon" disabled={busy} onClick={() => void change({ pinned: !pinned })}>
             <PinIcon />
             <strong>{pinned ? 'Desafixar conversa' : 'Fixar no topo'}</strong>
-            <span>{pinned ? 'Volta para a ordem normal.' : 'Fica no topo da lista. Só você vê.'}</span>
           </button>
         </li>
         <li>
           <button type="button" className="sharelist__item sharelist__item--icon" disabled={busy} onClick={() => void change({ muted: !muted })}>
             <BellOffIcon />
             <strong>{muted ? 'Reativar avisos' : 'Silenciar avisos'}</strong>
-            <span>{muted ? 'Você volta a receber avisos desta conversa.' : 'As mensagens chegam, mas sem aviso. Só você é afetado.'}</span>
           </button>
         </li>
       </ul>
