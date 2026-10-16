@@ -130,3 +130,13 @@ test('filterConversations ignora acento e procura na última mensagem', () => {
   assert.deepEqual(filterConversations(items, 'quinta bora').map((c) => c.id), ['1']);
   assert.equal(filterConversations(items, '  ').length, 2);
 });
+
+test('puxar para responder: curva de borracha e ponto de disparo', async () => {
+  const { rubberOffset, swipeTriggered } = await import('./swipe.ts');
+  assert.equal(rubberOffset(-20), 0);
+  assert.equal(rubberOffset(0), 0);
+  assert.ok(rubberOffset(30) > 20 && rubberOffset(30) < 30);
+  assert.ok(rubberOffset(2000) < 96);
+  assert.equal(swipeTriggered(rubberOffset(20)), false);
+  assert.equal(swipeTriggered(rubberOffset(120)), true);
+});

@@ -3754,3 +3754,11 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .convrow__flag { flex: none; display: inline-grid; place-items: center; margin-right: auto; margin-left: 6px; color: var(--muted); }
 .convrow__flag .icon { width: 14px; height: 14px; }
 .convrow__count--muted { background: var(--line-strong); color: var(--ink); }
+
+/* Puxar a mensagem para a direita responde (volta como mola). */
+.msg--swipeable { touch-action: pan-y; will-change: transform; }
+.msg__swipe { position: absolute; left: -40px; top: 50%; display: grid; place-items: center; width: 32px; height: 32px; margin-top: -16px; border-radius: 50%; background: var(--line); color: var(--muted); opacity: 0; pointer-events: none; }
+.msg__swipe.is-ready { background: var(--brand); color: #fff; }
+.msg__swipe .icon, .msg__swipe svg { width: 18px; height: 18px; }
+@media (prefers-reduced-motion: reduce) { .msg--swipeable { will-change: auto; } }
+.chat__thread { overflow-x: clip; }

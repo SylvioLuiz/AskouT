@@ -7,6 +7,7 @@ import { NewConversationSheet } from '../components/new-conversation.tsx';
 import { ArrowUpIcon, BellOffIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble } from '../components/chat-media.tsx';
 import { MessageActionsSheet, hasActions } from '../components/message-actions.tsx';
+import { SwipeRow } from '../components/swipe-reply.tsx';
 import { ChatPrefsSheet } from '../components/chat-prefs.tsx';
 import { PollLine } from '../components/date-poll-strip.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
@@ -389,7 +390,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 </>
               ) : (
                 <>
-                  <div className={`msg${m.mine ? ' msg--mine' : ''}`} id={`msg-${m.id}`}>
+                  <SwipeRow className={`msg${m.mine ? ' msg--mine' : ''}`} id={`msg-${m.id}`} enabled={data.canSend && hasActions(m)} onReply={() => setReplyTo(m)}>
                     {m.mine && hasActions(m) ? moreButton(m) : null}
                     <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} {...pressHandlers(m)}>
                       {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
@@ -417,7 +418,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                       <span className="bubble__time">{formatClock(m.createdAt)}</span>
                     </div>
                     {!m.mine && hasActions(m) ? moreButton(m) : null}
-                  </div>
+                  </SwipeRow>
                   {m.reactions.length > 0 ? (
                     <div className={`reactions${m.mine ? ' reactions--mine' : ''}`}>
                       {m.reactions.map((r) => (
