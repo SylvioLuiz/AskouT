@@ -21,7 +21,7 @@ test('semanas cobrem o intervalo e deixam vazio o que está fora', () => {
 
 test('linha da conversa: em votação, marcado e some depois da data', async () => {
   const { pollLine } = await import('./date-poll.ts');
-  const base = { id: 'p', conversationId: 'c', title: 'Churrasco', rangeStart: '2026-10-20', rangeEnd: '2026-10-26', finalDate: null, finalEndsAt: null, needsMyVote: false, needsMyConfirmation: false, participantCount: 4, votedCount: 3, finishedCount: 1, best: null, proposedDate: null, votingDeadline: null };
+  const base = { id: 'p', conversationId: 'c', title: 'Churrasco', rangeStart: '2026-10-20', rangeEnd: '2026-10-26', finalDate: null, finalEndsAt: null, needsMyVote: false, needsMyConfirmation: false, participantCount: 4, votedCount: 3, finishedCount: 1, best: null, proposedDate: null, votingDeadline: null, meetupId: null, event: null };
   const now = new Date('2026-10-22T12:00:00Z');
   assert.deepEqual(pollLine({ ...base, status: 'VOTING' }, now), { name: 'Churrasco', status: 'em votação: 75% dos votos' });
   assert.deepEqual(pollLine({ ...base, status: 'CONFIRMING', proposedDate: '2026-10-24' }, now), { name: 'Churrasco', status: 'confirmando 24/10' });

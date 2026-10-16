@@ -93,7 +93,7 @@ export interface PollInput {
   title: string;
   rangeStart: string;
   rangeEnd: string;
-  durationMinutes: number;
+  durationMinutes?: number;
   preferredTimeStart?: string;
   votingDeadline?: string;
   confirmationPolicy: Policy;
