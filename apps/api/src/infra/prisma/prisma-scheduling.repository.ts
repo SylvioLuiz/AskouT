@@ -16,6 +16,7 @@ type PollRow = {
   timezone: string;
   votingDeadline: Date | null;
   votingClosedAt: Date | null;
+  deadlineNotifiedAt: Date | null;
   confirmationPolicy: string;
   greenMin: number;
   orangeMin: number;
@@ -57,6 +58,7 @@ function toPoll(r: PollRow): PollRecord {
     timezone: r.timezone,
     votingDeadline: r.votingDeadline,
     votingClosedAt: r.votingClosedAt,
+    deadlineNotifiedAt: r.deadlineNotifiedAt,
     confirmationPolicy: r.confirmationPolicy as PollRecord['confirmationPolicy'],
     greenMin: r.greenMin,
     orangeMin: r.orangeMin,
@@ -135,6 +137,11 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
     return row ? toPoll(row) : undefined;
   }
 
+  async listDeadlinePassed(now: Date, limit: number): Promise<PollRecord[]> {
+    const rows = await this.prisma.datePoll.findMany({ where: { status: 'VOTING', votingDeadline: { lte: now }, votingClosedAt: null, deadlineNotifiedAt: null }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: limit });
+    return rows.map(toPoll);
+  }
+
   async listForConversation(conversationId: string): Promise<PollRecord[]> {
     if (!isUuid(conversationId)) return [];
     const rows = await this.prisma.datePoll.findMany({ where: { conversationId }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], take: 100 });
@@ -185,7 +192,7 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
     await this.prisma.datePollParticipant.updateMany({ where: { pollId, userId }, data: { finishedAt: at } });
   }
 
-  async updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null }): Promise<void> {
+  async updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null; deadlineNotifiedAt?: Date | null }): Promise<void> {
     if (!isUuid(pollId)) return;
     await this.prisma.datePoll.updateMany({ where: { id: pollId }, data: patch });
   }

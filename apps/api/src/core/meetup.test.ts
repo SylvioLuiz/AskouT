@@ -61,7 +61,7 @@ test('vários convidados: cria o grupo e cada um só entra ao aceitar', async ()
   assert.equal(group.name, 'Grupo da fofoca');
   assert.deepEqual(group.members.map((m) => [m.profile.username, m.role]), [['ana', 'OWNER']]);
   assert.equal(group.meetups.length, 1);
-  assert.equal(group.mediaAvailable, false);
+  assert.equal(group.mediaAvailable, true);
 
   // Os convidados ainda não estão no grupo: não o veem nem leem.
   await rejectsWith(w.core.conversations.messages(bia, view.conversationId), 'NOT_FOUND');

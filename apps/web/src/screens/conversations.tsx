@@ -1,10 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { ArrowUpIcon, MicIcon, PlusIcon } from '../components/icons.tsx';
+import { ArrowUpIcon, BellOffIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { MediaBubble } from '../components/chat-media.tsx';
+import { MessageActionsSheet, hasActions } from '../components/message-actions.tsx';
+import { ChatPrefsSheet } from '../components/chat-prefs.tsx';
 import { PollLine } from '../components/date-poll-strip.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
 import { EventBubble } from '../components/share-event.tsx';
@@ -12,10 +15,11 @@ import { peopleLabel } from '../lib/meetup.ts';
 import { SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
-import { announceChatsChanged, dayLabel, formatClock, listTimeLabel, mergeMessages, previewOf } from '../lib/chat.ts';
+import { announceChatsChanged, dayLabel, filterConversations, formatClock, listTimeLabel, mergeMessages, previewOf, replyPreview } from '../lib/chat.ts';
+import { mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
 import { toApiError } from '../lib/errors.ts';
 import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
-import type { ChatMessage } from '../lib/types.ts';
+import type { ChatMessage, ConversationItem } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 
 export const MESSAGE_MAX = 2000;
@@ -30,11 +34,15 @@ export function ConversationsScreen() {
     if (list.data) announceChatsChanged();
   }, [list.data]);
   const [creating, setCreating] = useState(false);
+  const [query, setQuery] = useState('');
+  const [prefsFor, setPrefsFor] = useState<ConversationItem | undefined>();
   const now = new Date();
 
   if (list.loading && !list.data) return <Loading />;
   if (list.error && !list.data) return <ErrorState message={list.error.message} onRetry={list.reload} />;
   const items = list.data?.items ?? [];
+  const shown = filterConversations(items, query);
+  const searching = query.trim() !== '';
 
   return (
     <>
@@ -59,28 +67,68 @@ export function ConversationsScreen() {
           Quando um convite do Flash for aceito, a conversa com a pessoa abre aqui. Você também pode escrever para qualquer amigo pelo perfil dele ou criar um encontro a partir de um evento.
         </EmptyState>
       ) : (
-        <ul className="list convlist">
-          {items.map((c) => (
-            <li key={c.id}>
-              <Link to={`/conversas/${c.id}`} className={`convrow${c.unread > 0 ? ' convrow--unread' : ''}`}>
-                {c.other ? <Avatar profile={c.other} size={48} /> : <GroupAvatar name={c.name ?? 'Grupo'} size={48} imageUrl={c.imageUrl} />}
-                <span className="convrow__body">
-                  <span className="convrow__top">
-                    <span className="convrow__name">{c.other ? c.other.displayName : (c.name ?? 'Grupo')}</span>
-                    {c.lastMessage ? <span className="convrow__time">{listTimeLabel(c.lastMessage.createdAt, now)}</span> : null}
-                  </span>
-                  <span className="convrow__preview">{previewOf(c.lastMessage)}</span>
-                </span>
-                {c.unread > 0 ? (
-                  <span className="convrow__count" aria-label={`${c.unread} não lida${c.unread === 1 ? '' : 's'}`}>
-                    {c.unread > 9 ? '9+' : c.unread}
-                  </span>
-                ) : null}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="search search--convs" role="search">
+            <span className="search__icon" aria-hidden="true">
+              <SearchIcon />
+            </span>
+            <label className="visually-hidden" htmlFor="busca-conversas">
+              Buscar nas conversas
+            </label>
+            <input id="busca-conversas" className="search__input search__input--icon" type="search" placeholder="Buscar nas conversas" value={query} maxLength={60} autoComplete="off" onChange={(e) => setQuery(e.target.value)} />
+          </div>
+          {shown.length === 0 ? (
+            <EmptyState title="Nenhuma conversa encontrada">Procure pelo nome da pessoa ou do grupo, pelo @usuário ou por um trecho da última mensagem.</EmptyState>
+          ) : (
+            <ul className="list convlist">
+              {shown.map((c) => (
+                <li key={c.id} className="convitem">
+                  <Link to={`/conversas/${c.id}`} className={`convrow${c.unread > 0 ? ' convrow--unread' : ''}`}>
+                    {c.other ? <Avatar profile={c.other} size={48} /> : <GroupAvatar name={c.name ?? 'Grupo'} size={48} imageUrl={c.imageUrl} />}
+                    <span className="convrow__body">
+                      <span className="convrow__top">
+                        <span className="convrow__name">{c.other ? c.other.displayName : (c.name ?? 'Grupo')}</span>
+                        {c.pinned && !searching ? (
+                          <span className="convrow__flag" title="Fixada no topo">
+                            <PinIcon />
+                            <span className="visually-hidden">Fixada no topo</span>
+                          </span>
+                        ) : null}
+                        {c.muted ? (
+                          <span className="convrow__flag" title="Avisos silenciados">
+                            <BellOffIcon />
+                            <span className="visually-hidden">Avisos silenciados</span>
+                          </span>
+                        ) : null}
+                        {c.lastMessage ? <span className="convrow__time">{listTimeLabel(c.lastMessage.createdAt, now)}</span> : null}
+                      </span>
+                      <span className="convrow__preview">{previewOf(c.lastMessage)}</span>
+                    </span>
+                    {c.unread > 0 ? (
+                      <span className={`convrow__count${c.muted ? ' convrow__count--muted' : ''}`} aria-label={`${c.unread} não lida${c.unread === 1 ? '' : 's'}`}>
+                        {c.unread > 9 ? '9+' : c.unread}
+                      </span>
+                    ) : null}
+                  </Link>
+                  <button type="button" className="iconbtn convitem__more" aria-label={`Opções de ${c.other ? c.other.displayName : (c.name ?? 'Grupo')}`} onClick={() => setPrefsFor(c)}>
+                    <MoreIcon />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
+      {prefsFor ? (
+        <ChatPrefsSheet
+          conversationId={prefsFor.id}
+          title={prefsFor.other ? prefsFor.other.displayName : (prefsFor.name ?? 'Grupo')}
+          pinned={prefsFor.pinned}
+          muted={prefsFor.muted}
+          onClose={() => setPrefsFor(undefined)}
+          onChanged={() => list.reload()}
+        />
+      ) : null}
     </>
   );
 }
@@ -102,6 +150,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [recording, setRecording] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [suggesting, setSuggesting] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | undefined>();
+  const [actionsFor, setActionsFor] = useState<ChatMessage | undefined>();
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const typingSentAt = useRef(0);
+  const pressTimer = useRef<number | undefined>(undefined);
   const endRef = useRef<HTMLDivElement>(null);
   const stickToEnd = useRef(true);
   const loadedFirst = useRef(false);
@@ -112,6 +166,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   useEffect(() => {
     loadedFirst.current = false;
     setMessages([]);
+    setReplyTo(undefined);
+    setActionsFor(undefined);
   }, [conversationId]);
 
   useEffect(() => {
@@ -179,10 +235,71 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     }
   }
 
+  function patchMessage(messageId: string, patch: Partial<ChatMessage>) {
+    setMessages((current) => current.map((x) => (x.id === messageId ? { ...x, ...patch } : x)));
+  }
+
   async function sendVoice(audio: string, durationMs: number) {
-    const message = await api.sendAudio(conversationId, audio, durationMs);
+    const message = await api.sendAudio(conversationId, audio, durationMs, replyTo?.id);
     stickToEnd.current = true;
+    setReplyTo(undefined);
     setMessages((current) => mergeMessages(current, [message]));
+  }
+
+  async function pickMedia(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || uploading) return;
+    const trouble = mediaProblem(file);
+    if (trouble) {
+      setProblem(trouble);
+      return;
+    }
+    setUploading(true);
+    setProblem(undefined);
+    try {
+      const blob = mediaKind(file) === 'IMAGE' ? await prepareImage(file) : file;
+      const message = await api.sendMedia(conversationId, blob, replyTo?.id);
+      stickToEnd.current = true;
+      setReplyTo(undefined);
+      setMessages((current) => mergeMessages(current, [message]));
+    } catch (failure) {
+      setProblem(failure instanceof Error && failure.message === 'grande' ? 'Não consegui reduzir a foto para o tamanho permitido.' : toApiError(failure).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function toggleReaction(m: ChatMessage, emoji: string) {
+    try {
+      const result = await api.reactMessage(conversationId, m.id, emoji);
+      patchMessage(m.id, { reactions: result.reactions });
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    }
+  }
+
+  function noteTyping(text: string) {
+    if (text.trim() === '' || Date.now() - typingSentAt.current < 3_000) return;
+    typingSentAt.current = Date.now();
+    void api.sendTyping(conversationId).catch(() => undefined);
+  }
+
+  // Segurar a mensagem (celular) ou clicar com o botão direito (computador) abre as opções.
+  function pressHandlers(m: ChatMessage) {
+    if (!hasActions(m)) return {};
+    return {
+      onContextMenu: (e: MouseEvent) => {
+        e.preventDefault();
+        setActionsFor(m);
+      },
+      onTouchStart: () => {
+        window.clearTimeout(pressTimer.current);
+        pressTimer.current = window.setTimeout(() => setActionsFor(m), 450);
+      },
+      onTouchEnd: () => window.clearTimeout(pressTimer.current),
+      onTouchMove: () => window.clearTimeout(pressTimer.current),
+    };
   }
 
   async function send(event: FormEvent) {
@@ -192,10 +309,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     setSending(true);
     setProblem(undefined);
     try {
-      const message = await api.sendText(conversationId, text);
+      const message = await api.sendText(conversationId, text, replyTo?.id);
       stickToEnd.current = true;
       setMessages((current) => mergeMessages(current, [message]));
       setDraft('');
+      setReplyTo(undefined);
+      typingSentAt.current = 0;
     } catch (failure) {
       setProblem(toApiError(failure).message);
     } finally {
@@ -221,6 +340,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     </div>
   ) : null;
 
+  const moreButton = (m: ChatMessage) => (
+    <button type="button" className="msg__more" aria-label="Opções da mensagem" onClick={() => setActionsFor(m)}>
+      <MoreIcon />
+    </button>
+  );
+
   let lastDay = '';
   return (
     <div className="chat">
@@ -230,6 +355,9 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         groupName={data.name}
         groupImageUrl={data.imageUrl}
         below={<PollLine conversationId={conversationId} />}
+        pinned={data.pinned}
+        muted={data.muted}
+        onPrefsChanged={view.reload}
         subtitle={isGroup ? `${peopleLabel(data.memberCount)} · toque para ver o grupo` : data.other ? `@${data.other.username}` : undefined}
         onCleared={() => {
           setMessages([]);
@@ -260,36 +388,91 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                   {match && m.id === matchMessageId ? matchCard : null}
                 </>
               ) : (
-              <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.kind === 'AUDIO' ? ' bubble--voice' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`}>
-                {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
-                {m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
-                  <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} />
-                ) : m.kind === 'MEETUP' && m.meetup ? (
-                  <MeetupBubble meetup={m.meetup} nowIso={data.now} onUpdated={(updated) => setMessages((current) => current.map((x) => (x.id === m.id || x.meetup?.id === updated.id ? { ...x, meetup: updated } : x)))} />
-                ) : m.kind === 'AUDIO' && m.audio ? (
-                  <VoiceBubble message={m} conversationId={conversationId} />
-                ) : m.kind === 'EVENT' && m.event ? (
-                  <EventBubble event={m.event} />
-                ) : (
-                  <p className="bubble__text">{m.body}</p>
-                )}
-                <span className="bubble__time">{formatClock(m.createdAt)}</span>
-              </div>
+                <>
+                  <div className={`msg${m.mine ? ' msg--mine' : ''}`} id={`msg-${m.id}`}>
+                    {m.mine && hasActions(m) ? moreButton(m) : null}
+                    <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} {...pressHandlers(m)}>
+                      {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
+                      {m.replyTo && !m.deleted ? (
+                        <button type="button" className="bubble__quote" aria-label={`Ir para a mensagem respondida de ${m.replyTo.mine ? 'você' : m.replyTo.senderName}`} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+                          <strong>{m.replyTo.mine ? 'Você' : m.replyTo.senderName}</strong>
+                          <span>{m.replyTo.deleted ? 'Mensagem apagada' : m.replyTo.preview}</span>
+                        </button>
+                      ) : null}
+                      {m.deleted ? (
+                        <p className="bubble__text bubble__text--deleted">{m.mine ? 'Você apagou esta mensagem' : 'Mensagem apagada'}</p>
+                      ) : m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
+                        <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} />
+                      ) : m.kind === 'MEETUP' && m.meetup ? (
+                        <MeetupBubble meetup={m.meetup} nowIso={data.now} onUpdated={(updated) => setMessages((current) => current.map((x) => (x.id === m.id || x.meetup?.id === updated.id ? { ...x, meetup: updated } : x)))} />
+                      ) : m.kind === 'AUDIO' && m.audio ? (
+                        <VoiceBubble message={m} conversationId={conversationId} />
+                      ) : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? (
+                        <MediaBubble message={m} conversationId={conversationId} />
+                      ) : m.kind === 'EVENT' && m.event ? (
+                        <EventBubble event={m.event} />
+                      ) : (
+                        <p className="bubble__text">{m.body}</p>
+                      )}
+                      <span className="bubble__time">{formatClock(m.createdAt)}</span>
+                    </div>
+                    {!m.mine && hasActions(m) ? moreButton(m) : null}
+                  </div>
+                  {m.reactions.length > 0 ? (
+                    <div className={`reactions${m.mine ? ' reactions--mine' : ''}`}>
+                      {m.reactions.map((r) => (
+                        <button key={r.emoji} type="button" className={`reactions__chip${r.mine ? ' is-mine' : ''}`} aria-pressed={r.mine} aria-label={`${r.emoji} ${r.count} ${r.count === 1 ? 'reação' : 'reações'}${r.mine ? ', sua. Toque para tirar' : ''}`} disabled={!data.canSend} onClick={() => void toggleReaction(m, r.emoji)}>
+                          <span aria-hidden="true">{r.emoji}</span>
+                          {r.count > 1 ? <span className="reactions__n">{r.count}</span> : null}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
               )}
             </div>
           );
         })}
         {match && !matchMessageId ? matchCard : null}
+        {data.typing.length > 0 ? (
+          <p className="chat__typing" role="status">
+            {typingLabel(data.typing)}
+          </p>
+        ) : null}
         <div ref={endRef} />
       </div>
 
       {problem ? <Notice tone="error">{problem}</Notice> : null}
+      {uploading ? (
+        <p className="muted chat__sending" role="status">
+          Enviando…
+        </p>
+      ) : null}
+      {replyTo && data.canSend ? (
+        <div className="replybar">
+          <div className="replybar__text">
+            <strong>Respondendo a {replyTo.mine ? 'você' : (replyTo.senderName ?? data.other?.displayName ?? 'mensagem')}</strong>
+            <span>{replyPreview(replyTo)}</span>
+          </div>
+          <button type="button" className="iconbtn" aria-label="Cancelar resposta" onClick={() => setReplyTo(undefined)}>
+            <XIcon />
+          </button>
+        </div>
+      ) : null}
 
       {data.canSend ? (
         <form className="composer" onSubmit={send}>
           <label className="visually-hidden" htmlFor="msg">
             Mensagem para {chatName}
           </label>
+          {recording ? null : (
+            <>
+              <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" aria-label="Escolher foto ou vídeo" tabIndex={-1} onChange={(e) => void pickMedia(e)} />
+              <button type="button" className="iconbtn composer__attach" aria-label="Enviar foto ou vídeo" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                <PhotoIcon />
+              </button>
+            </>
+          )}
           {recording ? (
             <VoiceRecorderBar onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
           ) : (
@@ -301,7 +484,10 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 value={draft}
                 maxLength={MESSAGE_MAX}
                 placeholder="Escreva uma mensagem"
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  noteTyping(e.target.value);
+                }}
                 onKeyDown={(e) => {
                   // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
                   if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
@@ -325,6 +511,18 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       ) : (
         <Notice>Vocês não são mais amigos. O histórico continua aqui, mas não dá para enviar novas mensagens.</Notice>
       )}
+
+      {actionsFor ? (
+        <MessageActionsSheet
+          message={actionsFor}
+          conversationId={conversationId}
+          canSend={data.canSend}
+          onClose={() => setActionsFor(undefined)}
+          onReply={() => setReplyTo(actionsFor)}
+          onReacted={(reactions) => patchMessage(actionsFor.id, { reactions })}
+          onDeleted={(updated) => setMessages((current) => mergeMessages(current, [updated]))}
+        />
+      ) : null}
 
       {suggesting && match ? (
         <SuggestionsSheet

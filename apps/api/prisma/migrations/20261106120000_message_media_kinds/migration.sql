@@ -1,0 +1,2 @@
+ALTER TYPE "MessageKind" ADD VALUE 'IMAGE';
+ALTER TYPE "MessageKind" ADD VALUE 'VIDEO';

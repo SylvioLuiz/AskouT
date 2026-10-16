@@ -15,6 +15,7 @@ import type {
   AuthResult,
   AvailableFriend,
   ChatMessage,
+  ChatReaction,
   ChatView,
   ConversationItem,
   SuggestionCard,
@@ -279,10 +280,54 @@ export function createApi(deps: ApiDeps) {
       if (options.limit !== undefined) params.push(`limit=${options.limit}`);
       return request<ChatView>('GET', `/conversations/${id(conversationId)}/messages${params.length > 0 ? `?${params.join('&')}` : ''}`);
     },
-    sendText: (conversationId: string, body: string) =>
-      request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { body } }),
-    sendAudio: (conversationId: string, audio: string, audioMs: number) =>
-      request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { audio, audioMs } }),
+    sendText: (conversationId: string, body: string, replyToId?: string) =>
+      request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { body, ...(replyToId ? { replyToId } : {}) } }),
+    sendAudio: (conversationId: string, audio: string, audioMs: number, replyToId?: string) =>
+      request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { audio, audioMs, ...(replyToId ? { replyToId } : {}) } }),
+    /** Foto ou vídeo: o arquivo vai cru no corpo (sem base64), com o tipo no Content-Type. */
+    sendMedia: async (conversationId: string, file: Blob, replyToId?: string): Promise<ChatMessage> => {
+      const token = deps.getToken();
+      const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
+      if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/conversations/${id(conversationId)}/media${replyToId ? `?replyTo=${id(replyToId)}` : ''}`, { method: 'POST', headers, body: file });
+      } catch {
+        throw networkError();
+      }
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+      if (response.ok) return payload as ChatMessage;
+      const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+      if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+      throw error;
+    },
+    /** Baixa a foto ou o vídeo de uma mensagem (a rota exige o token, então não dá para usar <img src>). */
+    messageMedia: async (conversationId: string, messageId: string): Promise<Blob> => {
+      const token = deps.getToken();
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/conversations/${id(conversationId)}/messages/${id(messageId)}/media`, { method: 'GET', headers: token !== undefined ? { Authorization: `Bearer ${token}` } : {} });
+      } catch {
+        throw networkError();
+      }
+      if (!response.ok) throw errorFromResponse(response.status, undefined, response.headers.get('Retry-After'));
+      return response.blob();
+    },
+    /** Reage com um emoji; o mesmo emoji de novo (ou `null`) tira a reação. */
+    reactMessage: (conversationId: string, messageId: string, emoji: string | null) =>
+      request<{ reactions: ChatReaction[] }>('PUT', `/conversations/${id(conversationId)}/messages/${id(messageId)}/reaction`, { body: { emoji } }),
+    /** Apaga a própria mensagem para todos. */
+    deleteMessage: (conversationId: string, messageId: string) => request<ChatMessage>('DELETE', `/conversations/${id(conversationId)}/messages/${id(messageId)}`),
+    /** Fixar no topo e silenciar os avisos (só para você). */
+    setChatPrefs: (conversationId: string, prefs: { pinned?: boolean; muted?: boolean }) =>
+      request<{ pinned: boolean; muted: boolean }>('PUT', `/conversations/${id(conversationId)}/preferences`, { body: prefs }),
+    /** Sinal de "digitando…". */
+    sendTyping: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/typing`),
     /** Baixa o áudio de uma mensagem de voz (a rota exige o token, então não dá para usar <audio src>). */
     messageAudio: async (conversationId: string, messageId: string): Promise<Blob> => {
       const token = deps.getToken();

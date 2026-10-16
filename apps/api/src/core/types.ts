@@ -138,7 +138,7 @@ export interface FlashPositionRecord {
 
 // ---------- Conversas ----------
 
-export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO';
+export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO';
 export type SuggestionResponse = 'ACCEPTED' | 'DECLINED';
 
 /**
@@ -189,7 +189,24 @@ export interface MessageRecord {
   postEventId?: string | null;
   /** Duração da mensagem de voz em ms (kind AUDIO). O áudio em si fica à parte. */
   audioMs?: number | null;
+  /** Mensagem que esta responde (na mesma conversa). */
+  replyToId?: string | null;
+  /** Apagada por quem enviou: some para todos, vira "Mensagem apagada". */
+  deletedAt?: Date | null;
   createdAt: Date;
+}
+
+/** Uma reação por pessoa e mensagem. */
+export interface MessageReactionRecord {
+  messageId: string;
+  userId: string;
+  emoji: string;
+}
+
+export interface ConversationPrefsRecord {
+  /** Quando a pessoa fixou a conversa; nulo = não fixada. */
+  pinnedAt: Date | null;
+  muted: boolean;
 }
 
 export interface ConversationSummaryRecord {
@@ -197,6 +214,9 @@ export interface ConversationSummaryRecord {
   participantIds: string[];
   lastMessage: MessageRecord | null;
   unread: number;
+  /** Preferências de quem pediu a lista. */
+  pinnedAt?: Date | null;
+  muted?: boolean;
 }
 
 // ---------- Lugares e eventos ----------
@@ -656,6 +676,8 @@ export interface PollRecord {
   votingDeadline: Date | null;
   /** Quem organiza encerrou os votos antes do prazo. */
   votingClosedAt?: Date | null;
+  /** Quando o aviso de prazo encerrado foi enviado. */
+  deadlineNotifiedAt?: Date | null;
   confirmationPolicy: 'UNANIMITY' | 'MAJORITY' | 'MANUAL';
   greenMin: number;
   orangeMin: number;

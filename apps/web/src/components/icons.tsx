@@ -324,3 +324,47 @@ export const LocationIcon = () => (
     <circle cx="12" cy="10" r="2.3" />
   </Svg>
 );
+
+const Line = ({ children }: { children: ReactNode }) => (
+  <svg className="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    {children}
+  </svg>
+);
+
+export const ReplyIcon = () => (
+  <Line>
+    <path d="M9 7 4 12l5 5" />
+    <path d="M4 12h10a6 6 0 0 1 6 6v1" />
+  </Line>
+);
+
+export const PinIcon = () => (
+  <Line>
+    <path d="M9 4h6l-1 6 3 3H7l3-3z" />
+    <path d="M12 13v7" />
+  </Line>
+);
+
+export const BellOffIcon = () => (
+  <Line>
+    <path d="M6 9a6 6 0 0 1 9.5-4.9M18 9c0 4 1.5 5.5 2 6.5H8" />
+    <path d="M4 15.5c.8-.8 1.7-2 1.9-4.2" />
+    <path d="M10 19a2 2 0 0 0 4 0" />
+    <path d="M3 3l18 18" />
+  </Line>
+);
+
+export const PhotoIcon = () => (
+  <Line>
+    <rect x="3" y="5" width="18" height="14" rx="3" />
+    <circle cx="9" cy="10" r="1.6" />
+    <path d="m21 16-5-5-9 8" />
+  </Line>
+);
+
+export const CopyIcon = () => (
+  <Line>
+    <rect x="8" y="8" width="12" height="12" rx="2.5" />
+    <path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8" />
+  </Line>
+);

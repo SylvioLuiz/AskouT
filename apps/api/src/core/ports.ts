@@ -1,4 +1,4 @@
-import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -126,8 +126,21 @@ export interface ConversationRepository {
   updateGroup(conversationId: string, patch: { name?: string; imageUrl?: string | null; ownerId?: string }): Promise<void>;
   /** Conversas do usuário, da mais recente para a mais antiga (por última mensagem, depois criação). */
   listForUser(userId: string, hiddenSenderIds?: readonly string[]): Promise<ConversationSummaryRecord[]>;
-  /** Com `audio`, grava os bytes da mensagem de voz junto (mesma operação). */
-  addMessage(message: MessageRecord, audio?: { mime: string; data: Uint8Array }): Promise<void>;
+  /** Com `attachment`, grava junto os bytes (áudio, foto ou vídeo) na mesma operação. */
+  addMessage(message: MessageRecord, attachment?: { mime: string; data: Uint8Array }): Promise<void>;
+  /** Bytes de uma foto ou vídeo (kind IMAGE ou VIDEO). */
+  findMedia(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+  /** Apaga para todos: marca `deletedAt`, limpa o texto, os bytes e as reações. Devolve false se já estava apagada. */
+  softDeleteMessage(messageId: string, at: Date): Promise<boolean>;
+  /** Define a reação da pessoa à mensagem; `emoji` nulo remove. Uma por pessoa. */
+  setReaction(messageId: string, userId: string, emoji: string | null, at: Date): Promise<void>;
+  listReactions(messageIds: readonly string[]): Promise<MessageReactionRecord[]>;
+  /** Fixar e silenciar são só de quem pediu. */
+  setPrefs(conversationId: string, userId: string, patch: { pinnedAt?: Date | null; muted?: boolean }): Promise<void>;
+  getPrefs(conversationId: string, userId: string): Promise<ConversationPrefsRecord>;
+  countPinned(userId: string): Promise<number>;
+  /** Quem silenciou a conversa (não recebe aviso das mensagens dela). */
+  mutedUserIds(conversationId: string): Promise<string[]>;
   /** Bytes da mensagem de voz (só de mensagens kind AUDIO). */
   findAudio(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
   findMessage(id: string): Promise<MessageRecord | undefined>;
@@ -135,7 +148,7 @@ export interface ConversationRepository {
   setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean>;
   /** Mensagens em ordem cronológica. `before` pagina para trás (só as anteriores a esse instante). */
   listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds?: readonly string[], after?: Date): Promise<MessageRecord[]>;
-  /** Mensagens de voz e textos com link (http/https), da mais recente para a mais antiga. */
+  /** Mensagens de voz, fotos, vídeos e textos com link (http/https), da mais recente para a mais antiga. Sem as apagadas. */
   listShared(conversationId: string, limit: number, excludeSenderIds?: readonly string[], after?: Date): Promise<MessageRecord[]>;
   /** "Limpar conversa": só para `userId`. Mensagens até `at` deixam de aparecer para ele (listas, não lidas e prévia). */
   setCleared(conversationId: string, userId: string, at: Date): Promise<void>;
@@ -180,6 +193,8 @@ export interface SchedulingRepository {
   findByEventPost(postId: string): Promise<PollRecord | undefined>;
   /** Votações de uma conversa, a mais recente primeiro. */
   listForConversation(conversationId: string): Promise<PollRecord[]>;
+  /** Votações ainda em votação cujo prazo já passou e que ainda não avisaram ninguém. */
+  listDeadlinePassed(now: Date, limit: number): Promise<PollRecord[]>;
   /** Votações abertas (votando ou confirmando) em que a pessoa participa, a mais recente primeiro. */
   listOpenForUser(userId: string, limit: number): Promise<PollRecord[]>;
   listParticipants(pollId: string): Promise<PollParticipantRecord[]>;
@@ -188,7 +203,7 @@ export interface SchedulingRepository {
   setVotes(pollId: string, userId: string, dates: string[], status: 'YES' | 'MAYBE' | 'NO' | null, at: Date): Promise<void>;
   /** "Concluí minha votação" (ou `null` para reabrir). */
   setFinished(pollId: string, userId: string, at: Date | null): Promise<void>;
-  updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null }): Promise<void>;
+  updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null; deadlineNotifiedAt?: Date | null }): Promise<void>;
   createProposal(proposal: PollProposalRecord): Promise<void>;
   findProposal(id: string): Promise<PollProposalRecord | undefined>;
   /** Propostas da votação, a mais recente primeiro. */

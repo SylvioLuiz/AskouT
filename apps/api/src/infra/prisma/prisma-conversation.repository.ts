@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { ConversationRepository } from '../../core/ports.ts';
-import type { ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
+import type { ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, MessageReactionRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
 import { isUuid, uniqueViolationTargets } from './helpers.ts';
 
 type MessageRow = {
   id: string;
   conversationId: string;
   senderId: string;
-  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO';
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO';
   body: string;
   suggestion: unknown;
   response: 'ACCEPTED' | 'DECLINED' | null;
@@ -17,6 +17,8 @@ type MessageRow = {
   eventId: string | null;
   postEventId: string | null;
   audioMs: number | null;
+  replyToId: string | null;
+  deletedAt: Date | null;
   createdAt: Date;
 };
 
@@ -33,6 +35,8 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   eventId: r.eventId,
   postEventId: r.postEventId,
   audioMs: r.audioMs,
+  replyToId: r.replyToId,
+  deletedAt: r.deletedAt,
   createdAt: r.createdAt,
 });
 
@@ -180,6 +184,8 @@ export class PrismaConversationRepository implements ConversationRepository {
         participantIds: ids,
         lastMessage: last ? toMessage(last as MessageRow) : null,
         unread,
+        pinnedAt: p.pinnedAt,
+        muted: p.muted,
       });
     }
     const stamp = (s: ConversationSummaryRecord) => (s.lastMessage ?? s.conversation).createdAt.getTime();
@@ -192,7 +198,7 @@ export class PrismaConversationRepository implements ConversationRepository {
     return row ? { mime: row.mime, data: new Uint8Array(row.data) } : undefined;
   }
 
-  async addMessage(m: MessageRecord, audio?: { mime: string; data: Uint8Array }): Promise<void> {
+  async addMessage(m: MessageRecord, attachment?: { mime: string; data: Uint8Array }): Promise<void> {
     await this.prisma.message.create({
       data: {
         id: m.id,
@@ -206,10 +212,69 @@ export class PrismaConversationRepository implements ConversationRepository {
         ...(m.eventId ? { eventId: m.eventId } : {}),
         ...(m.postEventId ? { postEventId: m.postEventId } : {}),
         ...(m.audioMs ? { audioMs: m.audioMs } : {}),
-        ...(audio ? { audio: { create: { mime: audio.mime, data: Buffer.from(audio.data) } } } : {}),
+        ...(m.replyToId ? { replyToId: m.replyToId } : {}),
+        ...(attachment && m.kind === 'AUDIO' ? { audio: { create: { mime: attachment.mime, data: Buffer.from(attachment.data) } } } : {}),
+        ...(attachment && m.kind !== 'AUDIO' ? { media: { create: { mime: attachment.mime, data: Buffer.from(attachment.data) } } } : {}),
         createdAt: m.createdAt,
       },
     });
+  }
+
+  async findMedia(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (!isUuid(messageId)) return undefined;
+    const row = await this.prisma.messageMedia.findUnique({ where: { messageId } });
+    return row ? { mime: row.mime, data: new Uint8Array(row.data) } : undefined;
+  }
+
+  async softDeleteMessage(messageId: string, at: Date): Promise<boolean> {
+    if (!isUuid(messageId)) return false;
+    return this.prisma.$transaction(async (tx) => {
+      // Só apaga uma vez; o texto e os bytes vão embora junto.
+      const result = await tx.message.updateMany({ where: { id: messageId, deletedAt: null }, data: { deletedAt: at, body: '' } });
+      if (result.count === 0) return false;
+      await tx.messageAudio.deleteMany({ where: { messageId } });
+      await tx.messageMedia.deleteMany({ where: { messageId } });
+      await tx.messageReaction.deleteMany({ where: { messageId } });
+      return true;
+    });
+  }
+
+  async setReaction(messageId: string, userId: string, emoji: string | null, at: Date): Promise<void> {
+    if (!isUuid(messageId) || !isUuid(userId)) return;
+    if (emoji === null) {
+      await this.prisma.messageReaction.deleteMany({ where: { messageId, userId } });
+      return;
+    }
+    await this.prisma.messageReaction.upsert({ where: { messageId_userId: { messageId, userId } }, create: { messageId, userId, emoji, createdAt: at }, update: { emoji, createdAt: at } });
+  }
+
+  async listReactions(messageIds: readonly string[]): Promise<MessageReactionRecord[]> {
+    const valid = messageIds.filter(isUuid);
+    if (valid.length === 0) return [];
+    const rows = await this.prisma.messageReaction.findMany({ where: { messageId: { in: valid } }, orderBy: [{ userId: 'asc' }] });
+    return rows.map((r) => ({ messageId: r.messageId, userId: r.userId, emoji: r.emoji }));
+  }
+
+  async setPrefs(conversationId: string, userId: string, patch: { pinnedAt?: Date | null; muted?: boolean }): Promise<void> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return;
+    await this.prisma.conversationParticipant.updateMany({ where: { conversationId, userId }, data: { ...(patch.pinnedAt !== undefined ? { pinnedAt: patch.pinnedAt } : {}), ...(patch.muted !== undefined ? { muted: patch.muted } : {}) } });
+  }
+
+  async getPrefs(conversationId: string, userId: string): Promise<ConversationPrefsRecord> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return { pinnedAt: null, muted: false };
+    const row = await this.prisma.conversationParticipant.findUnique({ where: { conversationId_userId: { conversationId, userId } }, select: { pinnedAt: true, muted: true } });
+    return { pinnedAt: row?.pinnedAt ?? null, muted: row?.muted ?? false };
+  }
+
+  async countPinned(userId: string): Promise<number> {
+    if (!isUuid(userId)) return 0;
+    return this.prisma.conversationParticipant.count({ where: { userId, pinnedAt: { not: null } } });
+  }
+
+  async mutedUserIds(conversationId: string): Promise<string[]> {
+    if (!isUuid(conversationId)) return [];
+    const rows = await this.prisma.conversationParticipant.findMany({ where: { conversationId, muted: true }, select: { userId: true } });
+    return rows.map((r) => r.userId);
   }
 
   async findMessage(id: string): Promise<MessageRecord | undefined> {
@@ -260,7 +325,8 @@ export class PrismaConversationRepository implements ConversationRepository {
       where: {
         conversationId,
         ...(after ? { createdAt: { gt: after } } : {}),
-        OR: [{ kind: 'AUDIO' }, { kind: 'TEXT', body: { contains: 'http', mode: 'insensitive' } }],
+        deletedAt: null,
+        OR: [{ kind: { in: ['AUDIO', 'IMAGE', 'VIDEO'] } }, { kind: 'TEXT', body: { contains: 'http', mode: 'insensitive' } }],
         ...(excludeSenderIds.length > 0 ? { senderId: { notIn: [...excludeSenderIds] } } : {}),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],

@@ -97,6 +97,28 @@ enum SuggestionResponse {
 }
 
 /// Bytes de uma mensagem de voz (até 600 KB; a API confere antes). Só quem está na conversa consegue ouvir.
+/// Foto ou vídeo enviado na conversa (kind IMAGE ou VIDEO).
+model MessageMedia {
+  messageId String @id @db.Uuid
+  mime      String
+  data      Bytes
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+/// Reação com emoji a uma mensagem: uma por pessoa.
+model MessageReaction {
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  emoji     String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+}
+
 model MessageAudio {
   messageId String @id @db.Uuid
   mime      String
@@ -112,6 +134,8 @@ enum MessageKind {
   SYSTEM
   EVENT
   AUDIO
+  IMAGE
+  VIDEO
 }
 
 model User {
@@ -147,6 +171,7 @@ model User {
 
   conversationParticipations ConversationParticipant[]
   messages                   Message[]
+  messageReactions           MessageReaction[]
 
   flashSessions       FlashSession[]
   flashInvitesSent    FlashInvite[]   @relation("FlashInviteFrom")
@@ -363,6 +388,10 @@ model ConversationParticipant {
   lastReadAt     DateTime?
   /// "Limpar conversa": mensagens até esse instante não aparecem para essa pessoa.
   clearedAt      DateTime?
+  /// Conversa fixada no topo da lista (só para essa pessoa).
+  pinnedAt       DateTime?
+  /// Sem avisos de mensagem nova (só para essa pessoa).
+  muted          Boolean   @default(false)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -414,9 +443,17 @@ model Message {
   postEventId    String?  @db.Uuid
   /// Duração da mensagem de voz em ms (kind = AUDIO); os bytes ficam em MessageAudio.
   audioMs        Int?
+  /// Mensagem respondida (na mesma conversa).
+  replyToId      String?  @db.Uuid
+  /// Apagada por quem enviou: some para todos.
+  deletedAt      DateTime?
   createdAt      DateTime @default(now())
 
   audio        MessageAudio?
+  media        MessageMedia?
+  reactions    MessageReaction[]
+  replyTo      Message?     @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      Message[]    @relation("MessageReply")
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation(fields: [senderId], references: [id])
   meetup       Meeting?     @relation(fields: [meetupId], references: [id], onDelete: Cascade)
@@ -925,6 +962,8 @@ model DatePoll {
   votingDeadline     DateTime?
   /// Votação encerrada à mão por quem organiza (ou já passou do prazo). Nulo = aberta.
   votingClosedAt     DateTime?
+  /// Quando os participantes foram avisados de que o prazo acabou. Nulo = ainda não avisou.
+  deadlineNotifiedAt DateTime?
   /// UNANIMITY, MAJORITY ou MANUAL.
   confirmationPolicy String
   greenMin           Int       @default(80)

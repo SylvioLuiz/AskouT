@@ -2,12 +2,14 @@ import { buildEventCards } from './event-card.ts';
 import type { EventCardView } from './event-card.ts';
 import { decodeAudioDataUrl, parseAudioDuration } from './audio.ts';
 import { decodeImageDataUrl } from './image.ts';
+import { parseChatMedia } from './media.ts';
+import type { ChatMedia } from './media.ts';
 import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import { distanceMeters } from './geo.ts';
 import { buildMeetupViews } from './meetup-view.ts';
 import type { MeetupView } from './meetup-view.ts';
-import type { ConversationRecord, MessageKind, MessageRecord, PostReportReason, PublicProfile, SuggestionCard } from './types.ts';
+import type { ConversationRecord, MessageKind, MessageReactionRecord, MessageRecord, PostReportReason, PublicProfile, SuggestionCard } from './types.ts';
 import { POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
 export const MESSAGE_MAX = 2000;
@@ -16,6 +18,13 @@ export const PAGE_DEFAULT = 50;
 export const PAGE_MAX = 100;
 export const GROUP_NAME_MAX = 60;
 export const GROUP_IMAGE_MAX_BYTES = 40 * 1024;
+/** Reações disponíveis. Uma por pessoa e mensagem; tocar na mesma tira. */
+export const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const;
+/** Conversas fixadas por pessoa. */
+export const PINNED_MAX = 5;
+/** "Digitando…" some sozinho depois disso sem novo sinal. */
+export const TYPING_TTL_MS = 8_000;
+const REPLY_PREVIEW_MAX = 100;
 
 // Tudo menos tab, nova linha e retorno de carro.
 // eslint-disable-next-line no-control-regex
@@ -36,6 +45,12 @@ export interface MessageView {
   event: EventCardView | null;
   /** Mensagem de voz (kind AUDIO): só a duração; o áudio vem de `GET .../messages/:id/audio`. */
   audio: { durationMs: number } | null;
+  /** Apagada por quem enviou: o conteúdo some para todos. */
+  deleted: boolean;
+  /** Mensagem a que esta responde. */
+  replyTo: ReplyView | null;
+  /** Reações agrupadas por emoji. */
+  reactions: ReactionView[];
   /** Resposta de quem recebeu o cartão: aceitou ou recusou o lugar. */
   response: 'ACCEPTED' | 'DECLINED' | null;
   respondedAt: string | null;
@@ -45,6 +60,22 @@ export interface MessageView {
    */
   distances: { meM: number; themM: number } | null;
   createdAt: string;
+}
+
+export interface ReplyView {
+  id: string;
+  senderName: string;
+  mine: boolean;
+  kind: MessageKind;
+  /** Trecho do texto (ou "Foto", "Vídeo", "Mensagem de voz"); vazio se a original foi apagada. */
+  preview: string;
+  deleted: boolean;
+}
+
+export interface ReactionView {
+  emoji: string;
+  count: number;
+  mine: boolean;
 }
 
 export interface ConversationListItem {
@@ -61,6 +92,10 @@ export interface ConversationListItem {
   unread: number;
   /** Na 1 a 1, só amigos conversam: se deixaram de ser, o histórico continua legível, mas sem enviar. */
   canSend: boolean;
+  /** Fixada no topo da lista (só para você). */
+  pinned: boolean;
+  /** Sem avisos de mensagem nova (só para você). */
+  muted: boolean;
 }
 
 export interface ConversationView {
@@ -73,6 +108,10 @@ export interface ConversationView {
   canSend: boolean;
   /** Você é quem criou o grupo (pode renomear, trocar a foto e remover pessoas). */
   isOwner: boolean;
+  pinned: boolean;
+  muted: boolean;
+  /** Nomes de quem está digitando agora. */
+  typing: string[];
   /** Relógio do servidor. */
   now: string;
   /** Em ordem cronológica. */
@@ -83,6 +122,14 @@ export interface ConversationView {
 export interface SharedLink {
   messageId: string;
   url: string;
+  senderName: string;
+  mine: boolean;
+  createdAt: string;
+}
+
+export interface SharedMedia {
+  messageId: string;
+  kind: 'IMAGE' | 'VIDEO';
   senderName: string;
   mine: boolean;
   createdAt: string;
@@ -106,6 +153,7 @@ export interface SharedView {
   meetups: MeetupView[];
   links: SharedLink[];
   voice: SharedVoice[];
+  media: SharedMedia[];
 }
 
 export const CONVERSATION_REPORT_DETAILS_MAX = 300;
@@ -126,8 +174,8 @@ export interface GroupDetails {
   imageUrl: string | null;
   members: { profile: PublicProfile; role: 'OWNER' | 'MEMBER' }[];
   meetups: MeetupView[];
-  /** Fotos e vídeos ainda não existem no AskouT. */
-  mediaAvailable: false;
+  /** Fotos e vídeos da conversa ficam na aba Mídia (`GET .../shared`). */
+  mediaAvailable: true;
 }
 
 export interface SendInput {
@@ -138,6 +186,10 @@ export interface SendInput {
   /** Mensagem de voz: data URL do áudio gravado e `audioMs` (duração). */
   audio?: unknown;
   audioMs?: unknown;
+  /** Foto ou vídeo já lido do corpo da requisição (bytes e tipo). */
+  media?: { mime: unknown; data: unknown };
+  /** Responde a esta mensagem (junto de qualquer conteúdo). */
+  replyToId?: unknown;
 }
 
 interface ViewExtras {
@@ -145,26 +197,53 @@ interface ViewExtras {
   senderName?: string | null;
   meetup?: MeetupView | null;
   event?: EventCardView | null;
+  replyTo?: ReplyView | null;
+  reactions?: ReactionView[];
 }
 
 function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {}): MessageView {
   const distances = extras.distances ?? null;
+  const gone = m.deletedAt != null;
   return {
     id: m.id,
     senderId: m.senderId,
     mine: m.senderId === actorId,
     senderName: extras.senderName ?? null,
     kind: m.kind,
-    body: m.body,
-    suggestion: m.suggestion,
-    meetup: extras.meetup ?? null,
-    event: extras.event ?? null,
-    audio: m.kind === 'AUDIO' && m.audioMs ? { durationMs: m.audioMs } : null,
+    body: gone ? '' : m.body,
+    suggestion: gone ? null : m.suggestion,
+    meetup: gone ? null : (extras.meetup ?? null),
+    event: gone ? null : (extras.event ?? null),
+    audio: !gone && m.kind === 'AUDIO' && m.audioMs ? { durationMs: m.audioMs } : null,
+    deleted: gone,
+    replyTo: gone ? null : (extras.replyTo ?? null),
+    reactions: gone ? [] : (extras.reactions ?? []),
     response: m.response,
     respondedAt: m.respondedAt ? m.respondedAt.toISOString() : null,
-    distances: m.suggestion ? distances : null,
+    distances: m.suggestion && !gone ? distances : null,
     createdAt: m.createdAt.toISOString(),
   };
+}
+
+const PREVIEW_BY_KIND: Partial<Record<MessageKind, string>> = { AUDIO: 'Mensagem de voz', IMAGE: 'Foto', VIDEO: 'Vídeo' };
+
+function previewOf(m: MessageRecord): string {
+  if (m.deletedAt) return '';
+  return PREVIEW_BY_KIND[m.kind] ?? Array.from(m.body.replace(/\s+/g, ' ')).slice(0, REPLY_PREVIEW_MAX).join('');
+}
+
+function groupReactions(rows: MessageReactionRecord[], actorId: string): Map<string, ReactionView[]> {
+  const by = new Map<string, Map<string, ReactionView>>();
+  for (const r of rows) {
+    const perMessage = by.get(r.messageId) ?? new Map<string, ReactionView>();
+    const cur = perMessage.get(r.emoji) ?? { emoji: r.emoji, count: 0, mine: false };
+    cur.count += 1;
+    if (r.userId === actorId) cur.mine = true;
+    perMessage.set(r.emoji, cur);
+    by.set(r.messageId, perMessage);
+  }
+  const order = (e: string) => REACTIONS.indexOf(e as (typeof REACTIONS)[number]);
+  return new Map([...by].map(([id, m]) => [id, [...m.values()].sort((a, b) => b.count - a.count || order(a.emoji) - order(b.emoji))] as const));
 }
 
 function parseText(value: unknown): string {
@@ -227,6 +306,8 @@ const GROUP_MAX_MEMBERS = 15;
 
 export class ConversationService {
   private readonly deps: CoreDeps;
+  /** Quem está digitando: `conversa|pessoa` → instante em que o sinal expira. Fica só na memória (é efêmero). */
+  private readonly typingUntil = new Map<string, number>();
 
   constructor(deps: CoreDeps) {
     this.deps = deps;
@@ -288,6 +369,7 @@ export class ConversationService {
       .filter(({ s, otherId }) => s.conversation.type === 'GROUP' || (otherId !== null && !hidden.has(otherId)));
     const profiles = new Map((await users.findProfilesByIds(rows.flatMap((v) => (v.otherId ? [v.otherId] : [])))).map((p) => [p.userId, p] as const));
     const items: ConversationListItem[] = [];
+    const pins = new Map<string, number>();
     for (const { s, otherId } of rows) {
       const profile = otherId ? profiles.get(otherId) : undefined;
       if (s.conversation.type === 'DIRECT' && !profile) continue;
@@ -301,9 +383,16 @@ export class ConversationService {
         lastMessage: s.lastMessage ? toMessageView(s.lastMessage, actorId) : null,
         unread: s.unread,
         canSend: s.conversation.type === 'GROUP' ? true : otherId !== null && friends.includes(otherId),
+        pinned: s.pinnedAt != null,
+        muted: s.muted === true,
       });
+      if (s.pinnedAt) pins.set(s.conversation.id, s.pinnedAt.getTime());
     }
-    return items;
+    // Fixadas primeiro (a fixada há menos tempo no topo); o resto segue a ordem do repositório (última mensagem).
+    return items
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => Number(b.item.pinned) - Number(a.item.pinned) || (b.item.pinned ? (pins.get(b.item.id) ?? 0) - (pins.get(a.item.id) ?? 0) : 0) || a.index - b.index)
+      .map(({ item }) => item);
   }
 
   /** Mensagens da conversa. A primeira página (sem `before`) também marca a conversa como lida. */
@@ -334,6 +423,8 @@ export class ConversationService {
     const meetupViews = new Map((await buildMeetupViews(this.deps, actorId, records)).map((v) => [v.id, v] as const));
     const eventCards = await buildEventCards(this.deps, items.flatMap((m) => (m.eventId ? [m.eventId] : m.postEventId ? [m.postEventId] : [])));
     const names = isGroup ? new Map((await this.deps.users.findProfilesByIds([...new Set(items.map((m) => m.senderId))])).map((p) => [p.userId, p.displayName] as const)) : null;
+    const decor = await this.decorate(actorId, items);
+    const prefs = await conversations.getPrefs(conversationId, actorId);
 
     return {
       id: conversationId,
@@ -343,6 +434,9 @@ export class ConversationService {
       imageUrl: conversation.imageUrl,
       memberCount: memberIds.filter((id) => !hiddenIds.includes(id)).length,
       isOwner: conversation.ownerId === actorId,
+      pinned: prefs.pinnedAt !== null,
+      muted: prefs.muted,
+      typing: await this.typingNames(actorId, conversationId, memberIds, hiddenIds, now),
       canSend: isGroup ? true : otherId !== null && friends.includes(otherId),
       now: now.toISOString(),
       messages: items.map((m) =>
@@ -351,6 +445,8 @@ export class ConversationService {
           senderName: names ? (names.get(m.senderId) ?? null) : null,
           meetup: m.meetupId ? (meetupViews.get(m.meetupId) ?? null) : null,
           event: m.eventId || m.postEventId ? (eventCards.get((m.eventId ?? m.postEventId) as string) ?? null) : null,
+          replyTo: decor.replies.get(m.id) ?? null,
+          reactions: decor.reactions.get(m.id) ?? [],
         }),
       ),
       hasMore,
@@ -364,7 +460,8 @@ export class ConversationService {
     const hasSuggestion = input.suggestion !== undefined && input.suggestion !== null;
     const hasEvent = input.eventId !== undefined && input.eventId !== null;
     const hasAudio = input.audio !== undefined && input.audio !== null;
-    if ([hasText, hasSuggestion, hasEvent, hasAudio].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento ou um áudio', { body: 'Envie um texto, uma sugestão, um evento ou um áudio' });
+    const hasMedia = input.media !== undefined && input.media !== null;
+    if ([hasText, hasSuggestion, hasEvent, hasAudio, hasMedia].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo', { body: 'Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo' });
     if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de lugar só em conversas 1 a 1', { suggestion: 'Sugestões de lugar só em conversas 1 a 1' });
 
     let kind: MessageKind = 'TEXT';
@@ -374,8 +471,13 @@ export class ConversationService {
     let postEventId: string | null = null;
     let eventCard: EventCardView | null = null;
     let audio: { mime: string; data: Uint8Array } | undefined;
+    let media: ChatMedia | undefined;
     let audioMs: number | null = null;
-    if (hasAudio) {
+    if (hasMedia) {
+      media = parseChatMedia((input.media as { mime: unknown }).mime, (input.media as { data: unknown }).data);
+      kind = media.kind;
+      body = media.kind === 'IMAGE' ? 'Foto' : 'Vídeo';
+    } else if (hasAudio) {
       const decoded = decodeAudioDataUrl(input.audio);
       audioMs = parseAudioDuration(input.audioMs);
       audio = { mime: decoded.mime, data: new Uint8Array(decoded.bytes) };
@@ -414,16 +516,126 @@ export class ConversationService {
     const recent = await conversations.countSentSince(actorId, new Date(now.getTime() - 60_000));
     if (recent >= MESSAGES_PER_MINUTE) throw rateLimited('Você está enviando mensagens rápido demais. Espere um instante.', 30);
 
-    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, createdAt: now };
-    await conversations.addMessage(message, audio);
+    const replyToId = await this.parseReply(conversationId, input.replyToId);
+    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, createdAt: now };
+    await conversations.addMessage(message, audio ?? (media ? { mime: media.mime, data: media.data } : undefined));
+    this.typingUntil.delete(`${conversationId}|${actorId}`);
     await conversations.markRead(conversationId, actorId, now);
     const positions = suggestion && otherId ? await this.livePositions(actorId, otherId, now) : null;
     const actorProfile = (await this.deps.users.findProfilesByIds([actorId]))[0];
     const actorName = actorProfile?.username ?? 'Alguém';
     // Dentro da conversa aparece o nome real; o aviso (sino/push) usa só o usuário.
     const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
-    await this.notifyMembers(actorId, actorName, conversation, memberIds, audio ? 'enviou um áudio' : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um lugar' : 'enviou uma mensagem');
-    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard });
+    await this.notifyMembers(actorId, actorName, conversation, memberIds, audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um lugar' : 'enviou uma mensagem');
+    const decor = await this.decorate(actorId, [message]);
+    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard, replyTo: decor.replies.get(message.id) ?? null });
+  }
+
+  /** Bytes de uma foto ou vídeo, só para quem está na conversa. */
+  async media(actorId: string, conversationId: string, messageId: string): Promise<{ mime: string; data: Uint8Array }> {
+    await this.access(actorId, conversationId);
+    const message = typeof messageId === 'string' && messageId.length <= 64 ? await this.deps.conversations.findMessage(messageId) : undefined;
+    if (!message || message.conversationId !== conversationId || (message.kind !== 'IMAGE' && message.kind !== 'VIDEO') || message.deletedAt) throw notFound('Arquivo não encontrado');
+    const found = await this.deps.conversations.findMedia(messageId);
+    if (!found) throw notFound('Arquivo não encontrado');
+    return found;
+  }
+
+  /** Reage com um emoji da lista; mandar o mesmo de novo (ou `null`) tira a reação. */
+  async react(actorId: string, conversationId: string, messageId: string, emoji: unknown): Promise<{ reactions: ReactionView[] }> {
+    const { conversations, follows, clock } = this.deps;
+    const { otherId } = await this.access(actorId, conversationId);
+    if (emoji !== null && (typeof emoji !== 'string' || !(REACTIONS as readonly string[]).includes(emoji))) throw validationError('Reação inválida', { emoji: `Use uma destas: ${REACTIONS.join(' ')}` });
+    const message = await this.visibleMessage(actorId, conversationId, messageId);
+    if (message.deletedAt || message.kind === 'SYSTEM') throw notFound('Mensagem não encontrada');
+    if (otherId && !(await follows.listFriendIds(actorId)).includes(otherId)) throw forbidden('Vocês não são mais amigos.');
+    const current = (await conversations.listReactions([messageId])).find((r) => r.userId === actorId)?.emoji ?? null;
+    await conversations.setReaction(messageId, actorId, emoji === current ? null : (emoji as string | null), clock.now());
+    const rows = await conversations.listReactions([messageId]);
+    return { reactions: groupReactions(rows, actorId).get(messageId) ?? [] };
+  }
+
+  /** Apaga a própria mensagem para todos (vira "Mensagem apagada"). Cartões do sistema, encontros e sugestões não se apagam. */
+  async deleteMessage(actorId: string, conversationId: string, messageId: string): Promise<MessageView> {
+    const { conversations, clock } = this.deps;
+    await this.access(actorId, conversationId);
+    const message = await this.visibleMessage(actorId, conversationId, messageId);
+    if (message.senderId !== actorId) throw forbidden('Só quem enviou apaga a mensagem');
+    if (!['TEXT', 'AUDIO', 'IMAGE', 'VIDEO', 'EVENT'].includes(message.kind)) throw validationError('Esta mensagem não pode ser apagada', { message: 'Só texto, áudio, foto, vídeo e evento' });
+    const now = clock.now();
+    if (!(await conversations.softDeleteMessage(messageId, now))) throw conflict('Esta mensagem já foi apagada');
+    return toMessageView({ ...message, body: '', deletedAt: now }, actorId);
+  }
+
+  /** Fixar no topo da lista e silenciar os avisos: só valem para quem pediu. */
+  async setPreferences(actorId: string, conversationId: string, input: { pinned?: unknown; muted?: unknown }): Promise<{ pinned: boolean; muted: boolean }> {
+    const { conversations, clock } = this.deps;
+    await this.access(actorId, conversationId);
+    if ((input.pinned !== undefined && typeof input.pinned !== 'boolean') || (input.muted !== undefined && typeof input.muted !== 'boolean')) throw validationError('Valor inválido', { pinned: 'Use verdadeiro ou falso' });
+    if (input.pinned === undefined && input.muted === undefined) throw validationError('Nada para mudar', { pinned: 'Envie pinned e/ou muted' });
+    const before = await conversations.getPrefs(conversationId, actorId);
+    const patch: { pinnedAt?: Date | null; muted?: boolean } = {};
+    if (input.pinned === true && before.pinnedAt === null) {
+      if ((await conversations.countPinned(actorId)) >= PINNED_MAX) throw conflict(`Você pode fixar até ${PINNED_MAX} conversas. Solte uma para fixar esta.`);
+      patch.pinnedAt = clock.now();
+    }
+    if (input.pinned === false) patch.pinnedAt = null;
+    if (typeof input.muted === 'boolean') patch.muted = input.muted;
+    await conversations.setPrefs(conversationId, actorId, patch);
+    const after = await conversations.getPrefs(conversationId, actorId);
+    return { pinned: after.pinnedAt !== null, muted: after.muted };
+  }
+
+  /** "Digitando…": sinal efêmero (some em poucos segundos) guardado só na memória do servidor. */
+  async typing(actorId: string, conversationId: string): Promise<{ ok: true }> {
+    await this.access(actorId, conversationId);
+    this.typingUntil.set(`${conversationId}|${actorId}`, this.deps.clock.now().getTime() + TYPING_TTL_MS);
+    return { ok: true };
+  }
+
+  private async typingNames(actorId: string, conversationId: string, memberIds: string[], hiddenIds: string[], now: Date): Promise<string[]> {
+    const typists = memberIds.filter((id) => id !== actorId && !hiddenIds.includes(id) && (this.typingUntil.get(`${conversationId}|${id}`) ?? 0) > now.getTime());
+    for (const [key, until] of this.typingUntil) if (until <= now.getTime()) this.typingUntil.delete(key);
+    if (typists.length === 0) return [];
+    return (await this.deps.users.findProfilesByIds(typists)).map((p) => p.displayName);
+  }
+
+  private async visibleMessage(actorId: string, conversationId: string, messageId: string): Promise<MessageRecord> {
+    const message = typeof messageId === 'string' && messageId.length <= 64 ? await this.deps.conversations.findMessage(messageId) : undefined;
+    if (!message || message.conversationId !== conversationId) throw notFound('Mensagem não encontrada');
+    const cleared = await this.deps.conversations.getCleared(conversationId, actorId);
+    if (cleared && message.createdAt <= cleared) throw notFound('Mensagem não encontrada');
+    return message;
+  }
+
+  /** `replyToId` opcional: tem que ser uma mensagem de conteúdo desta conversa, ainda não apagada. */
+  private async parseReply(conversationId: string, value: unknown): Promise<string | null> {
+    if (value === undefined || value === null || value === '') return null;
+    const target = typeof value === 'string' && value.length <= 64 ? await this.deps.conversations.findMessage(value) : undefined;
+    if (!target || target.conversationId !== conversationId || target.deletedAt || target.kind === 'SYSTEM') throw notFound('Mensagem a responder não encontrada');
+    return target.id;
+  }
+
+  /** Respostas (trecho da original) e reações de um grupo de mensagens. */
+  private async decorate(actorId: string, items: MessageRecord[]): Promise<{ replies: Map<string, ReplyView>; reactions: Map<string, ReactionView[]> }> {
+    const { conversations, users } = this.deps;
+    const reactions = groupReactions(await conversations.listReactions(items.map((m) => m.id)), actorId);
+    const replies = new Map<string, ReplyView>();
+    const withReply = items.filter((m) => m.replyToId);
+    if (withReply.length > 0) {
+      const originals = new Map<string, MessageRecord>();
+      for (const id of new Set(withReply.map((m) => m.replyToId as string))) {
+        const found = items.find((m) => m.id === id) ?? (await conversations.findMessage(id));
+        if (found) originals.set(id, found);
+      }
+      const names = new Map((await users.findProfilesByIds([...new Set([...originals.values()].map((m) => m.senderId))])).map((p) => [p.userId, p.displayName] as const));
+      for (const m of withReply) {
+        const o = originals.get(m.replyToId as string);
+        if (!o) continue;
+        replies.set(m.id, { id: o.id, senderName: names.get(o.senderId) ?? 'Alguém', mine: o.senderId === actorId, kind: o.kind, preview: previewOf(o), deleted: o.deletedAt != null });
+      }
+    }
+    return { replies, reactions };
   }
 
   /** Bytes de uma mensagem de voz, só para quem está na conversa. */
@@ -439,10 +651,11 @@ export class ConversationService {
   /** Avisa os outros membros (menos quem bloqueou ou foi bloqueado por quem escreveu). O texto da mensagem não vai no aviso. */
   private async notifyMembers(actorId: string, actorName: string, conversation: ConversationRecord, memberIds: string[], what: string): Promise<void> {
     const hidden = new Set(await this.deps.blocks.listRelatedIds(actorId));
+    const muted = new Set(await this.deps.conversations.mutedUserIds(conversation.id));
     const title = conversation.type === 'GROUP' ? (conversation.name ?? 'Grupo') : actorName;
     const body = conversation.type === 'GROUP' ? `${actorName} ${what}` : what.charAt(0).toUpperCase() + what.slice(1);
     for (const id of memberIds) {
-      if (id === actorId || hidden.has(id)) continue;
+      if (id === actorId || hidden.has(id) || muted.has(id)) continue;
       await this.deps.notifier.notify({ userId: id, type: 'MESSAGE', title, body, url: `/conversas/${conversation.id}`, dedupeKey: `msg:${conversation.id}` });
     }
   }
@@ -506,8 +719,14 @@ export class ConversationService {
     const names = new Map((await users.findProfilesByIds([...new Set(rows.map((r) => r.senderId))])).map((p) => [p.userId, p.displayName] as const));
     const links: SharedLink[] = [];
     const voice: SharedVoice[] = [];
+    const media: SharedMedia[] = [];
     for (const m of rows) {
+      if (m.deletedAt) continue;
       const base = { messageId: m.id, senderName: names.get(m.senderId) ?? 'Alguém', mine: m.senderId === actorId, createdAt: m.createdAt.toISOString() };
+      if (m.kind === 'IMAGE' || m.kind === 'VIDEO') {
+        media.push({ ...base, kind: m.kind });
+        continue;
+      }
       if (m.kind === 'AUDIO') {
         if (m.audioMs != null) voice.push({ ...base, durationMs: m.audioMs });
         continue;
@@ -515,7 +734,7 @@ export class ConversationService {
       for (const url of extractLinks(m.body)) links.push({ ...base, url });
     }
     const views = await buildMeetupViews(this.deps, actorId, await meetups.listForConversation(conversationId));
-    return { type: conversation.type, other: other ? toPublicProfile(other) : null, name: conversation.name, imageUrl: conversation.imageUrl, meetups: views, links, voice };
+    return { type: conversation.type, other: other ? toPublicProfile(other) : null, name: conversation.name, imageUrl: conversation.imageUrl, meetups: views, links, voice, media };
   }
 
   /** Detalhes do grupo (tocar no nome): pessoas, eventos e mídia. Só quem está no grupo. */
@@ -533,7 +752,7 @@ export class ConversationService {
       })
       .sort((a, b) => (a.role === b.role ? a.profile.displayName.localeCompare(b.profile.displayName, 'pt-BR') : a.role === 'OWNER' ? -1 : 1));
     const meetups = await buildMeetupViews(this.deps, actorId, await this.deps.meetups.listForConversation(conversationId));
-    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl, members, meetups, mediaAvailable: false };
+    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl, members, meetups, mediaAvailable: true };
   }
 
   // ---------- Gestão do grupo ----------

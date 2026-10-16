@@ -343,6 +343,29 @@ export class SchedulingService {
     return this.view(actorId, { ...poll, votingClosedAt: now });
   }
 
+  /**
+   * Avisa que o prazo da votação acabou (uma vez só por votação): mensagem no chat e aviso para cada participante.
+   * Quem organiza recebe o convite a escolher a data. Roda num job periódico; devolve quantas votações avisou.
+   */
+  async notifyDeadlines(): Promise<number> {
+    const { scheduling, clock } = this.deps;
+    const now = clock.now();
+    const due = await scheduling.listDeadlinePassed(now, 50);
+    let done = 0;
+    for (const poll of due) {
+      // Marca antes de avisar: se duas instâncias rodarem juntas, o pior caso é não avisar, nunca avisar em dobro.
+      await scheduling.updatePoll(poll.id, { deadlineNotifiedAt: now });
+      const participants = await scheduling.listParticipants(poll.id);
+      const ids = participants.map((p) => p.userId);
+      const finished = participants.filter((p) => p.finishedAt !== null).length;
+      await this.postSystem(poll.conversationId, poll.organizerId, `O prazo da votação "${poll.title}" acabou. ${finished} de ${ids.length} concluíram. Falta escolher a data.`, now);
+      await this.notifyAll(poll.organizerId, ids.filter((id) => id !== poll.organizerId), poll, 'Votação encerrada', `O prazo de "${poll.title}" acabou. Quem organiza escolhe a data agora.`);
+      await this.deps.notifier.notify({ userId: poll.organizerId, type: 'MEETUP_INVITE', title: 'Sua votação encerrou', body: `O prazo de "${poll.title}" acabou. Escolha a data com base nos votos.`, url: `/planejar/${poll.id}`, dedupeKey: `poll:${poll.id}:deadline-organizer` });
+      done += 1;
+    }
+    return done;
+  }
+
   /** Quem organiza desiste da data proposta e a votação volta a ficar aberta. */
   async withdraw(actorId: string, pollId: unknown): Promise<PollView> {
     const { scheduling } = this.deps;

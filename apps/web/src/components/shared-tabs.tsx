@@ -1,8 +1,9 @@
 import { VenueLink } from './venue-link.tsx';
 import { MeetupCover } from './meetup.tsx';
+import { MediaThumb } from './chat-media.tsx';
 import { VoiceBubble } from './voice.tsx';
 import { Button, EmptyState } from './ui.tsx';
-import type { ChatMessage, MeetupView, SharedLink, SharedVoice } from '../lib/types.ts';
+import type { ChatMessage, MeetupView, SharedLink, SharedMedia as SharedMediaItem, SharedVoice } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 
 const dateFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -67,22 +68,37 @@ export function SharedEvents({ meetups }: { meetups: MeetupView[] }) {
   );
 }
 
-/** Mídia da conversa: por enquanto, as mensagens de voz (fotos e vídeos ainda não existem no AskouT). */
-export function SharedMedia({ voice, conversationId }: { voice: SharedVoice[]; conversationId: string }) {
-  if (voice.length === 0) return <EmptyState title="Nenhuma mídia ainda">As mensagens de voz enviadas aqui aparecem nesta aba. Fotos e vídeos ainda não existem no AskouT.</EmptyState>;
+/** Mídia da conversa: fotos e vídeos em grade e as mensagens de voz em lista. */
+export function SharedMedia({ voice, media, conversationId }: { voice: SharedVoice[]; media: SharedMediaItem[]; conversationId: string }) {
+  if (voice.length === 0 && media.length === 0) return <EmptyState title="Nenhuma mídia ainda">As fotos, os vídeos e as mensagens de voz enviados aqui aparecem nesta aba.</EmptyState>;
   return (
-    <ul className="sharedlist">
-      {voice.map((v) => (
-        <li key={v.messageId} className="sharedlist__item">
-          <p className="sharedlist__meta">
-            {v.mine ? 'Você' : v.senderName} · {dateFmt.format(new Date(v.createdAt))} {timeFmt.format(new Date(v.createdAt))}
-          </p>
-          <div className={`bubble bubble--voice${v.mine ? ' bubble--mine' : ''}`}>
-            <VoiceBubble message={{ id: v.messageId, audio: { durationMs: v.durationMs } } as unknown as ChatMessage} conversationId={conversationId} />
-          </div>
-        </li>
-      ))}
-    </ul>
+    <>
+      {media.length > 0 ? (
+        <section aria-label="Fotos e vídeos">
+          <ul className="mediagrid">
+            {media.map((m) => (
+              <li key={m.messageId}>
+                <MediaThumb conversationId={conversationId} messageId={m.messageId} kind={m.kind} label={`${m.kind === 'VIDEO' ? 'Vídeo' : 'Foto'} de ${m.mine ? 'você' : m.senderName}, ${dateFmt.format(new Date(m.createdAt))}`} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {voice.length > 0 ? (
+        <ul className="sharedlist">
+          {voice.map((v) => (
+            <li key={v.messageId} className="sharedlist__item">
+              <p className="sharedlist__meta">
+                {v.mine ? 'Você' : v.senderName} · {dateFmt.format(new Date(v.createdAt))} {timeFmt.format(new Date(v.createdAt))}
+              </p>
+              <div className={`bubble bubble--voice${v.mine ? ' bubble--mine' : ''}`}>
+                <VoiceBubble message={{ id: v.messageId, audio: { durationMs: v.durationMs } } as unknown as ChatMessage} conversationId={conversationId} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </>
   );
 }
 

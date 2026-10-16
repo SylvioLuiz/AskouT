@@ -30,7 +30,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -503,6 +503,9 @@ export class InMemoryConversationRepository implements ConversationRepository {
   readonly cleared = new Map<string, Date>();
   readonly reports = new Map<string, ConversationReportRecord>();
   readonly messages: MessageRecord[] = [];
+  readonly prefs = new Map<string, ConversationPrefsRecord>();
+  readonly reactions = new Map<string, MessageReactionRecord>();
+  private medias = new Map<string, { mime: string; data: Uint8Array }>();
 
   async getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord> {
     const directKey = a < b ? `${a}:${b}` : `${b}:${a}`;
@@ -556,7 +559,8 @@ export class InMemoryConversationRepository implements ConversationRepository {
       const msgs = this.messages.filter((m) => m.conversationId === id && !hiddenSenderIds.includes(m.senderId) && (clearedAt === null || m.createdAt > clearedAt));
       const lastRead = p.get(userId) ?? null;
       const unread = msgs.filter((m) => m.senderId !== userId && (lastRead === null || m.createdAt > lastRead)).length;
-      out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [...p.keys()], lastMessage: msgs.at(-1) ?? null, unread });
+      const pref = this.prefs.get(`${id}|${userId}`);
+      out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [...p.keys()], lastMessage: msgs.at(-1) ?? null, unread, pinnedAt: pref?.pinnedAt ?? null, muted: pref?.muted ?? false });
     }
     const stamp = (s: ConversationSummaryRecord) => (s.lastMessage ?? s.conversation).createdAt.getTime();
     return out.sort((a, b) => stamp(b) - stamp(a));
@@ -564,9 +568,59 @@ export class InMemoryConversationRepository implements ConversationRepository {
 
   private audios = new Map<string, { mime: string; data: Uint8Array }>();
 
-  async addMessage(message: MessageRecord, audio?: { mime: string; data: Uint8Array }): Promise<void> {
+  async addMessage(message: MessageRecord, attachment?: { mime: string; data: Uint8Array }): Promise<void> {
     this.messages.push({ ...message });
-    if (audio) this.audios.set(message.id, { mime: audio.mime, data: new Uint8Array(audio.data) });
+    if (!attachment) return;
+    const copy = { mime: attachment.mime, data: new Uint8Array(attachment.data) };
+    if (message.kind === 'AUDIO') this.audios.set(message.id, copy);
+    else this.medias.set(message.id, copy);
+  }
+
+  async findMedia(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    const a = this.medias.get(messageId);
+    return a ? { mime: a.mime, data: new Uint8Array(a.data) } : undefined;
+  }
+
+  async softDeleteMessage(messageId: string, at: Date): Promise<boolean> {
+    const m = this.messages.find((x) => x.id === messageId);
+    if (!m || m.deletedAt) return false;
+    m.deletedAt = at;
+    m.body = '';
+    this.audios.delete(messageId);
+    this.medias.delete(messageId);
+    for (const key of [...this.reactions.keys()]) if (key.startsWith(`${messageId}|`)) this.reactions.delete(key);
+    return true;
+  }
+
+  async setReaction(messageId: string, userId: string, emoji: string | null, at: Date): Promise<void> {
+    void at;
+    const key = `${messageId}|${userId}`;
+    if (emoji === null) this.reactions.delete(key);
+    else this.reactions.set(key, { messageId, userId, emoji });
+  }
+
+  async listReactions(messageIds: readonly string[]): Promise<MessageReactionRecord[]> {
+    const wanted = new Set(messageIds);
+    return [...this.reactions.values()].filter((r) => wanted.has(r.messageId)).map((r) => ({ ...r })).sort((a, b) => (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0));
+  }
+
+  async setPrefs(conversationId: string, userId: string, patch: { pinnedAt?: Date | null; muted?: boolean }): Promise<void> {
+    if (!this.participants.get(conversationId)?.has(userId)) return;
+    const key = `${conversationId}|${userId}`;
+    const current = this.prefs.get(key) ?? { pinnedAt: null, muted: false };
+    this.prefs.set(key, { pinnedAt: patch.pinnedAt === undefined ? current.pinnedAt : patch.pinnedAt, muted: patch.muted ?? current.muted });
+  }
+
+  async getPrefs(conversationId: string, userId: string): Promise<ConversationPrefsRecord> {
+    return { ...(this.prefs.get(`${conversationId}|${userId}`) ?? { pinnedAt: null, muted: false }) };
+  }
+
+  async countPinned(userId: string): Promise<number> {
+    return [...this.prefs.entries()].filter(([key, v]) => key.endsWith(`|${userId}`) && v.pinnedAt !== null && this.participants.get(key.split('|')[0] as string)?.has(userId)).length;
+  }
+
+  async mutedUserIds(conversationId: string): Promise<string[]> {
+    return [...this.prefs.entries()].filter(([key, v]) => key.startsWith(`${conversationId}|`) && v.muted).map(([key]) => key.split('|')[1] as string);
   }
 
   async findAudio(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
@@ -606,7 +660,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
 
   async listShared(conversationId: string, limit: number, excludeSenderIds: readonly string[] = [], after?: Date): Promise<MessageRecord[]> {
     return this.messages
-      .filter((m) => m.conversationId === conversationId && !excludeSenderIds.includes(m.senderId) && (after === undefined || m.createdAt > after) && (m.kind === 'AUDIO' || (m.kind === 'TEXT' && /https?:\/\//i.test(m.body))))
+      .filter((m) => m.conversationId === conversationId && !excludeSenderIds.includes(m.senderId) && (after === undefined || m.createdAt > after) && !m.deletedAt && (m.kind === 'AUDIO' || m.kind === 'IMAGE' || m.kind === 'VIDEO' || (m.kind === 'TEXT' && /https?:\/\//i.test(m.body))))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit)
       .map((m) => ({ ...m }));
@@ -1561,6 +1615,14 @@ export class InMemorySchedulingRepository implements SchedulingRepository {
       .map((p) => ({ ...p }));
   }
 
+  async listDeadlinePassed(now: Date, limit: number): Promise<PollRecord[]> {
+    return [...this.polls.values()]
+      .filter((p) => p.status === 'VOTING' && p.votingDeadline !== null && p.votingDeadline <= now && !p.votingClosedAt && !p.deadlineNotifiedAt)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .slice(0, limit)
+      .map((p) => ({ ...p }));
+  }
+
   async listOpenForUser(userId: string, limit: number): Promise<PollRecord[]> {
     return [...this.polls.values()]
       .filter((p) => (p.status === 'VOTING' || p.status === 'CONFIRMING') && this.participants.get(p.id)?.has(userId))
@@ -1592,7 +1654,7 @@ export class InMemorySchedulingRepository implements SchedulingRepository {
     if (m?.has(userId)) m.set(userId, at);
   }
 
-  async updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null }): Promise<void> {
+  async updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null; deadlineNotifiedAt?: Date | null }): Promise<void> {
     const p = this.polls.get(pollId);
     if (p) this.polls.set(pollId, { ...p, ...patch });
   }

@@ -1,7 +1,7 @@
 // Contas das conversas que não dependem de tela: horários, rótulos e junção de mensagens.
 import { formatDistance } from './flash.ts';
 import { formatVoiceTime } from './voice.ts';
-import type { ChatMessage, SuggestionCard, SuggestionItem } from './types.ts';
+import type { ChatMessage, ConversationItem, SuggestionCard, SuggestionItem } from './types.ts';
 
 const clock = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
 const dayMonth = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
@@ -117,12 +117,47 @@ export function mapLink(lat: number, lng: number): string {
 export function previewOf(m: ChatMessage | null): string {
   if (!m) return 'Nenhuma mensagem ainda';
   const prefix = m.mine ? 'Você: ' : '';
+  const who = m.senderName && !m.mine ? `${m.senderName}: ` : prefix;
+  if (m.deleted) return `${who}Mensagem apagada`;
+  if (m.kind === 'IMAGE') return `${who}Foto`;
+  if (m.kind === 'VIDEO') return `${who}Vídeo`;
   if (m.kind === 'SUGGESTION' && m.suggestion) return `${prefix}Sugeriu ${m.suggestion.venueName}`;
   if (m.kind === 'AUDIO') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}Mensagem de voz${m.audio ? ` (${formatVoiceTime(m.audio.durationMs)})` : ''}`;
   if (m.kind === 'MEETUP') return `${prefix}${m.body}`;
   if (m.kind === 'EVENT') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}Compartilhou ${m.event?.title ?? 'um evento'}`;
   if (m.senderName && !m.mine) return `${m.senderName}: ${m.body.replace(/\s+/g, ' ')}`;
   return `${prefix}${m.body.replace(/\s+/g, ' ')}`;
+}
+
+/** Trecho da mensagem para a barra "Respondendo a…". */
+export function replyPreview(m: ChatMessage): string {
+  if (m.deleted) return 'Mensagem apagada';
+  if (m.kind === 'AUDIO') return 'Mensagem de voz';
+  if (m.kind === 'IMAGE') return 'Foto';
+  if (m.kind === 'VIDEO') return 'Vídeo';
+  if (m.kind === 'EVENT') return `Evento: ${m.event?.title ?? 'compartilhado'}`;
+  if (m.kind === 'SUGGESTION' && m.suggestion) return `Sugestão: ${m.suggestion.venueName}`;
+  return Array.from(m.body.replace(/\s+/g, ' ')).slice(0, 100).join('');
+}
+
+/** Sem acento e em minúsculas, para a busca não depender de como a pessoa digita. */
+function fold(text: string): string {
+  return text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+}
+
+/** Nome mostrado na lista: a pessoa (1 a 1) ou o nome do grupo. */
+export function conversationTitle(c: Pick<ConversationItem, 'other' | 'name'>): string {
+  return c.other ? c.other.displayName : (c.name ?? 'Grupo');
+}
+
+/** Busca na lista de conversas: nome, @usuário e a última mensagem. Sem texto, devolve tudo na mesma ordem. */
+export function filterConversations(items: readonly ConversationItem[], query: string): ConversationItem[] {
+  const terms = fold(query).split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return [...items];
+  return items.filter((c) => {
+    const haystack = fold(`${conversationTitle(c)} ${c.other?.username ?? ''} ${c.lastMessage && !c.lastMessage.deleted ? previewOf(c.lastMessage) : ''}`);
+    return terms.every((t) => haystack.includes(t));
+  });
 }
 
 /** Avisa o resto do app (a bolinha da aba Conversas) que as não lidas podem ter mudado. */

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dayLabel, formatDistances, formatWhen, listTimeLabel, mergeMessages, previewOf, toCard } from './chat.ts';
-import type { ChatMessage, SuggestionItem } from './types.ts';
+import { dayLabel, filterConversations, formatDistances, formatWhen, listTimeLabel, mergeMessages, previewOf, replyPreview, toCard } from './chat.ts';
+import { fitWithin, mediaKind, mediaProblem, typingLabel } from './chat-media.ts';
+import type { ChatMessage, ConversationItem, SuggestionItem } from './types.ts';
 
 const at = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m);
 const iso = (d: Date) => d.toISOString();
@@ -47,7 +48,7 @@ test('toCard leva só os campos do cartão', () => {
   assert.equal(card.externalId, 'osm:node/1');
 });
 
-const msg = (id: string, createdAt: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ id, senderId: 'u', mine: false, senderName: null, kind: 'TEXT', body: id, suggestion: null, audio: null, meetup: null, response: null, respondedAt: null, distances: null, createdAt, ...extra }) as ChatMessage;
+const msg = (id: string, createdAt: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({ id, senderId: 'u', mine: false, senderName: null, kind: 'TEXT', body: id, suggestion: null, audio: null, meetup: null, response: null, respondedAt: null, distances: null, deleted: false, replyTo: null, reactions: [], createdAt, ...extra }) as ChatMessage;
 
 test('mergeMessages: sem repetir, em ordem, a versão mais nova vence', () => {
   const a = [msg('1', '2026-10-13T10:00:00.000Z'), msg('2', '2026-10-13T10:01:00.000Z')];
@@ -86,4 +87,46 @@ test('previewOf: mensagem de voz mostra a duração', () => {
   const m = msg('a', '2026-10-14T10:00:00Z', { kind: 'AUDIO', body: 'Mensagem de voz', audio: { durationMs: 7400 }, mine: true });
   assert.equal(previewOf(m), 'Você: Mensagem de voz (0:07)');
   assert.equal(previewOf({ ...m, mine: false, senderName: 'Bia' }), 'Bia: Mensagem de voz (0:07)');
+});
+
+test('previewOf e replyPreview: apagada, foto e vídeo', () => {
+  assert.equal(previewOf(msg('1', 'x', { deleted: true, mine: true })), 'Você: Mensagem apagada');
+  assert.equal(previewOf(msg('2', 'x', { kind: 'IMAGE', senderName: 'Bia' })), 'Bia: Foto');
+  assert.equal(previewOf(msg('3', 'x', { kind: 'VIDEO', mine: true })), 'Você: Vídeo');
+  assert.equal(replyPreview(msg('4', 'x', { deleted: true })), 'Mensagem apagada');
+  assert.equal(replyPreview(msg('5', 'x', { kind: 'IMAGE' })), 'Foto');
+  assert.equal(replyPreview(msg('6', 'x', { body: 'a'.repeat(300) })).length, 100);
+});
+
+test('fitWithin reduz sem ampliar e mantém a proporção', () => {
+  assert.deepEqual(fitWithin(4000, 2000, 1600), { width: 1600, height: 800 });
+  assert.deepEqual(fitWithin(800, 600, 1600), { width: 800, height: 600 });
+  assert.deepEqual(fitWithin(0, 10, 1600), { width: 0, height: 0 });
+});
+
+test('mediaProblem e mediaKind', () => {
+  assert.equal(mediaProblem({ type: 'image/jpeg', size: 9_000_000 }), null);
+  assert.equal(mediaProblem({ type: 'image/gif', size: 10 }) !== null, true);
+  assert.equal(mediaProblem({ type: 'video/mp4', size: 21 * 1024 * 1024 }) !== null, true);
+  assert.equal(mediaProblem({ type: 'video/mp4', size: 1024 }), null);
+  assert.equal(mediaProblem({ type: 'application/pdf', size: 10 }) !== null, true);
+  assert.equal(mediaProblem({ type: 'image/png', size: 0 }) !== null, true);
+  assert.equal(mediaKind({ type: 'video/webm' }), 'VIDEO');
+  assert.equal(mediaKind({ type: 'text/plain' }), null);
+});
+
+test('typingLabel', () => {
+  assert.equal(typingLabel([]), '');
+  assert.equal(typingLabel(['Bia']), 'Bia está digitando…');
+  assert.equal(typingLabel(['Bia', 'Caio']), 'Bia e Caio estão digitando…');
+  assert.equal(typingLabel(['a', 'b', 'c']), '3 pessoas estão digitando…');
+});
+
+test('filterConversations ignora acento e procura na última mensagem', () => {
+  const conv = (id: string, name: string, last: string): ConversationItem => ({ id, type: 'GROUP', other: null, name, imageUrl: null, memberCount: 3, lastMessage: msg(id, 'x', { body: last }), unread: 0, canSend: true, pinned: false, muted: false });
+  const items = [conv('1', 'Futebol de quinta', 'bora?'), conv('2', 'Família', 'almoço domingo')];
+  assert.deepEqual(filterConversations(items, 'familia').map((c) => c.id), ['2']);
+  assert.deepEqual(filterConversations(items, 'ALMOCO').map((c) => c.id), ['2']);
+  assert.deepEqual(filterConversations(items, 'quinta bora').map((c) => c.id), ['1']);
+  assert.equal(filterConversations(items, '  ').length, 2);
 });

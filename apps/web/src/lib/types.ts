@@ -279,6 +279,14 @@ export interface SharedLink {
   createdAt: string;
 }
 
+export interface SharedMedia {
+  messageId: string;
+  kind: 'IMAGE' | 'VIDEO';
+  senderName: string;
+  mine: boolean;
+  createdAt: string;
+}
+
 export interface SharedVoice {
   messageId: string;
   durationMs: number;
@@ -296,6 +304,7 @@ export interface SharedView {
   meetups: MeetupView[];
   links: SharedLink[];
   voice: SharedVoice[];
+  media: SharedMedia[];
 }
 
 export interface GroupDetails {
@@ -305,7 +314,22 @@ export interface GroupDetails {
   imageUrl: string | null;
   members: { profile: PublicProfile; role: 'OWNER' | 'MEMBER' }[];
   meetups: MeetupView[];
-  mediaAvailable: false;
+  mediaAvailable: true;
+}
+
+export interface ChatReply {
+  id: string;
+  senderName: string;
+  mine: boolean;
+  kind: ChatMessage['kind'];
+  preview: string;
+  deleted: boolean;
+}
+
+export interface ChatReaction {
+  emoji: string;
+  count: number;
+  mine: boolean;
 }
 
 export interface ChatMessage {
@@ -314,11 +338,16 @@ export interface ChatMessage {
   mine: boolean;
   /** Nome de quem enviou; só em grupo. */
   senderName: string | null;
-  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO';
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO';
   body: string;
   suggestion: SuggestionCard | null;
   /** Mensagem de voz (kind AUDIO): só a duração; o áudio é baixado ao tocar. */
   audio: { durationMs: number } | null;
+  /** Apagada por quem enviou: no lugar do conteúdo aparece "Mensagem apagada". */
+  deleted: boolean;
+  /** Mensagem a que esta responde. */
+  replyTo: ChatReply | null;
+  reactions: ChatReaction[];
   /** Evento compartilhado (kind EVENT). */
   event: EventCard | null;
   /** Cartão do encontro (kind MEETUP). */
@@ -342,6 +371,8 @@ export interface ConversationItem {
   lastMessage: ChatMessage | null;
   unread: number;
   canSend: boolean;
+  pinned: boolean;
+  muted: boolean;
 }
 
 export interface ChatView {
@@ -353,6 +384,10 @@ export interface ChatView {
   isOwner: boolean;
   memberCount: number;
   canSend: boolean;
+  pinned: boolean;
+  muted: boolean;
+  /** Nomes de quem está digitando agora. */
+  typing: string[];
   /** Relógio do servidor. */
   now: string;
   messages: ChatMessage[];

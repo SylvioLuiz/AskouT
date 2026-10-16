@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put, Query, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Headers, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put, Query, StreamableFile } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
@@ -46,7 +46,52 @@ export class ConversationsController {
   @Post(':id/messages')
   send(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.conversations.send(actor.userId, id, { body: b.body, suggestion: b.suggestion, eventId: b.eventId, audio: b.audio, audioMs: b.audioMs });
+    return this.core.conversations.send(actor.userId, id, { body: b.body, suggestion: b.suggestion, eventId: b.eventId, audio: b.audio, audioMs: b.audioMs, replyToId: b.replyToId });
+  }
+
+  /**
+   * Foto ou vídeo: o corpo é o arquivo cru (`Content-Type: image/jpeg`, `video/mp4`...), sem base64.
+   * `?replyTo=<id da mensagem>` responde a uma mensagem.
+   */
+  @Post(':id/media')
+  upload(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Headers('content-type') contentType: string | undefined, @Body() body: unknown, @Query('replyTo') replyTo?: string) {
+    return this.core.conversations.send(actor.userId, id, { media: { mime: contentType, data: Buffer.isBuffer(body) ? new Uint8Array(body.buffer, body.byteOffset, body.byteLength) : undefined }, replyToId: replyTo });
+  }
+
+  /** Foto ou vídeo de uma mensagem. Exige o token: o app baixa e mostra a partir de um blob. */
+  @Get(':id/messages/:messageId/media')
+  @Header('Cache-Control', 'private, max-age=86400')
+  @Header('X-Content-Type-Options', 'nosniff')
+  async media(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Param('messageId', new ParseUUIDPipe()) messageId: string) {
+    const found = await this.core.conversations.media(actor.userId, id, messageId);
+    return new StreamableFile(found.data, { type: found.mime });
+  }
+
+  /** `{emoji}` reage (o mesmo emoji de novo ou `null` tira). */
+  @Put(':id/messages/:messageId/reaction')
+  react(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Param('messageId', new ParseUUIDPipe()) messageId: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.conversations.react(actor.userId, id, messageId, b.emoji === undefined ? 'ausente' : b.emoji);
+  }
+
+  /** Apaga a própria mensagem para todos. */
+  @Delete(':id/messages/:messageId')
+  deleteMessage(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Param('messageId', new ParseUUIDPipe()) messageId: string) {
+    return this.core.conversations.deleteMessage(actor.userId, id, messageId);
+  }
+
+  /** `{pinned?, muted?}`: fixar no topo e silenciar os avisos (só para você). */
+  @Put(':id/preferences')
+  preferences(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.conversations.setPreferences(actor.userId, id, { pinned: b.pinned, muted: b.muted });
+  }
+
+  /** Sinal de "digitando…". */
+  @Post(':id/typing')
+  @HttpCode(200)
+  typing(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.conversations.typing(actor.userId, id);
   }
 
   /** Áudio de uma mensagem de voz. Exige o token (só quem está na conversa): o app baixa e toca a partir de um blob. */

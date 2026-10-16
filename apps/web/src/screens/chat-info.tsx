@@ -54,7 +54,7 @@ export function ChatInfoScreen({ conversationId }: { conversationId: string }) {
         ))}
       </div>
       {tab === 'events' ? <SharedEvents meetups={data.meetups} /> : null}
-      {tab === 'media' ? <SharedMedia voice={data.voice} conversationId={conversationId} /> : null}
+      {tab === 'media' ? <SharedMedia voice={data.voice} media={data.media} conversationId={conversationId} /> : null}
       {tab === 'links' ? <SharedLinks links={data.links} /> : null}
     </>
   );

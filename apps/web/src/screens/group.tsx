@@ -148,7 +148,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
 
       {tab === 'media' || tab === 'links' ? (
         shared.data ? (
-          tab === 'media' ? <SharedMedia voice={shared.data.voice} conversationId={conversationId} /> : <SharedLinks links={shared.data.links} />
+          tab === 'media' ? <SharedMedia voice={shared.data.voice} media={shared.data.media} conversationId={conversationId} /> : <SharedLinks links={shared.data.links} />
         ) : shared.error ? (
           <ErrorState message={shared.error.message} onRetry={shared.reload} />
         ) : (

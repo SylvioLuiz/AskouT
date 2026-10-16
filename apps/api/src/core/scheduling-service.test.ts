@@ -228,3 +228,32 @@ test('evento criado a partir da votação: confirmados já vão, nome sincroniza
   assert.equal(after.title, 'Churras renomeado');
   assert.equal((await w.core.meetups.get(ana, after.meetupId!)).title, 'Churras renomeado');
 });
+
+test('prazo acabou: avisa todos uma única vez (chat + notificação) e o organizador escolhe a data', async () => {
+  const { w, ana, bia, caio, group } = await setup();
+  const deadline = new Date(w.clock.now().getTime() + 3_600_000).toISOString();
+  const p = await w.core.scheduling.create(ana, group.id, { title: 'Cinema', rangeStart: '2026-10-21', rangeEnd: '2026-10-23', votingDeadline: deadline });
+  assert.equal(await w.core.scheduling.notifyDeadlines(), 0);
+  w.clock.tick(2 * 3_600_000);
+  assert.equal(await w.core.scheduling.notifyDeadlines(), 1);
+  assert.equal(await w.core.scheduling.notifyDeadlines(), 0);
+  const titles = async (id: string) => (await w.core.notifications.list(id)).items.filter((n) => n.url === `/planejar/${p.id}` && /encerrou|encerrada/i.test(n.title)).map((n) => n.title);
+  assert.deepEqual(await titles(bia), ['Votação encerrada']);
+  assert.deepEqual(await titles(caio), ['Votação encerrada']);
+  assert.deepEqual(await titles(ana), ['Sua votação encerrou']);
+  const chat = await w.core.conversations.messages(bia, group.id);
+  assert.ok(chat.messages.some((m) => m.kind === 'SYSTEM' && m.body.includes('prazo da votação "Cinema" acabou')));
+});
+
+test('prazo: votação já encerrada à mão, proposta ou cancelada não avisa', async () => {
+  const { w, ana, bia, caio, dani, group } = await setup();
+  const deadline = new Date(w.clock.now().getTime() + 3_600_000).toISOString();
+  const mk = (title: string) => w.core.scheduling.create(ana, group.id, { title, rangeStart: '2026-10-21', rangeEnd: '2026-10-23', votingDeadline: deadline });
+  const closed = await mk('A');
+  for (const u of [ana, bia, caio, dani]) await w.core.scheduling.finish(u, closed.id, true);
+  await w.core.scheduling.closeVoting(ana, closed.id);
+  const cancelled = await mk('B');
+  await w.core.scheduling.cancel(ana, cancelled.id);
+  w.clock.tick(2 * 3_600_000);
+  assert.equal(await w.core.scheduling.notifyDeadlines(), 0);
+});

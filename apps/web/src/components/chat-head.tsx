@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
 import { ChevronLeftIcon, MoreIcon } from './icons.tsx';
 import { DatePollCreateSheet } from './date-poll-create.tsx';
+import { ChatPrefsSheet } from './chat-prefs.tsx';
 import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Confirm, GroupAvatar, Notice } from './ui.tsx';
 import { api } from '../client.ts';
@@ -10,10 +11,10 @@ import { toApiError } from '../lib/errors.ts';
 import type { PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 
-type Step = 'menu' | 'clear' | 'block' | 'report' | 'poll';
+type Step = 'menu' | 'clear' | 'block' | 'report' | 'poll' | 'prefs';
 
 /** Topo da conversa: voltar, foto e nome (preso ao rolar) e o menu ⋯ no canto oposto. */
-export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared, below }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode }) {
+export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared, below, pinned, muted, onPrefsChanged }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode; pinned: boolean; muted: boolean; onPrefsChanged: () => void }) {
   const isGroup = !other;
   const name = other ? other.displayName : (groupName ?? 'Grupo');
   const to = isGroup ? `/conversas/${conversationId}/grupo` : `/conversas/${conversationId}/info`;
@@ -34,12 +35,12 @@ export function ChatHead({ conversationId, other, groupName, groupImageUrl, subt
         <MoreIcon />
       </button>
       {below ? <div className="chathead__below">{below}</div> : null}
-      {open ? <ChatMenu conversationId={conversationId} other={other} onClose={() => setOpen(false)} onCleared={onCleared} /> : null}
+      {open ? <ChatMenu conversationId={conversationId} title={name} other={other} pinned={pinned} muted={muted} onPrefsChanged={onPrefsChanged} onClose={() => setOpen(false)} onCleared={onCleared} /> : null}
     </header>
   );
 }
 
-function ChatMenu({ conversationId, other, onClose, onCleared }: { conversationId: string; other: PublicProfile | null; onClose: () => void; onCleared: () => void }) {
+function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged, onClose, onCleared }: { conversationId: string; title: string; other: PublicProfile | null; pinned: boolean; muted: boolean; onPrefsChanged: () => void; onClose: () => void; onCleared: () => void }) {
   const [step, setStep] = useState<Step>('menu');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -57,6 +58,7 @@ function ChatMenu({ conversationId, other, onClose, onCleared }: { conversationI
   }
 
   if (step === 'poll') return <DatePollCreateSheet conversationId={conversationId} onClose={onClose} />;
+  if (step === 'prefs') return <ChatPrefsSheet conversationId={conversationId} title={title} pinned={pinned} muted={muted} onClose={onClose} onChanged={onPrefsChanged} />;
 
   if (step === 'report') {
     return (
@@ -103,6 +105,7 @@ function ChatMenu({ conversationId, other, onClose, onCleared }: { conversationI
       ) : (
         <ul className="sharelist">
           {row('Encontrar a melhor data', 'Todos votam nos dias em que podem e o app mostra a melhor.', () => setStep('poll'))}
+          {row(pinned || muted ? 'Fixar e silenciar (ativo)' : 'Fixar e silenciar', pinned && muted ? 'Fixada no topo e com avisos silenciados.' : pinned ? 'Fixada no topo.' : muted ? 'Avisos silenciados.' : 'Fixe no topo da lista ou silencie os avisos.', () => setStep('prefs'))}
           {row('Limpar conversa', 'Apaga as mensagens só para você.', () => setStep('clear'))}
           {other ? row('Bloquear', 'Ela deixa de ver seu perfil e vocês param de se seguir.', () => setStep('block'), true) : null}
           {row('Denunciar', other ? 'Avise a equipe sobre esta pessoa.' : 'Avise a equipe sobre este grupo.', () => setStep('report'), true)}

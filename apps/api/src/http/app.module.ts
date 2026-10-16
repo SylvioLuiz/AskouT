@@ -18,6 +18,7 @@ import { ProfilesController, AvatarController } from './controllers/profiles.con
 import { PlacesController } from './controllers/places.controller.ts';
 import { coreProvider, googleProvider, placePhotosProvider } from './core.provider.ts';
 import { FlashPurge } from './flash-purge.ts';
+import { PollDeadlines } from './poll-deadlines.ts';
 import { PrismaShutdown, prismaProvider } from './prisma.provider.ts';
 import { loadConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
@@ -32,6 +33,7 @@ import { CONFIG } from './tokens.ts';
     coreProvider,
     PrismaShutdown,
     FlashPurge,
+    PollDeadlines,
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
 })

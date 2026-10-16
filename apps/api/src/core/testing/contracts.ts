@@ -762,6 +762,76 @@ export function defineRepositoryContract(
         assert.ok(!text.audioMs, 'texto não tem duração');
       });
 
+      it('foto/vídeo: bytes à parte; resposta; apagar para todos limpa texto, bytes e reações; compartilhados sem apagadas', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const c = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        const photo = randomUUID();
+        const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+        await h.conversations.addMessage({ ...msg(c.id, ana, 'Foto', 1), id: photo, kind: 'IMAGE' }, { mime: 'image/jpeg', data: bytes });
+        const video = randomUUID();
+        await h.conversations.addMessage({ ...msg(c.id, bia, 'Vídeo', 2), id: video, kind: 'VIDEO', replyToId: photo }, { mime: 'video/mp4', data: new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70]) });
+        const media = await h.conversations.findMedia(photo);
+        assert.equal(media!.mime, 'image/jpeg');
+        assert.deepEqual(Array.from(media!.data), Array.from(bytes));
+        assert.equal(await h.conversations.findMedia(randomUUID()), undefined);
+        assert.equal(await h.conversations.findAudio(photo), undefined, 'foto não é áudio');
+        const [first, second] = await h.conversations.listMessages(c.id, 10);
+        assert.equal(first!.kind, 'IMAGE');
+        assert.equal(first!.replyToId ?? null, null);
+        assert.equal(second!.replyToId, photo);
+        assert.deepEqual((await h.conversations.listShared(c.id, 10)).map((m) => m.kind).sort(), ['IMAGE', 'VIDEO']);
+
+        await h.conversations.setReaction(photo, bia, '❤️', at(3));
+        await h.conversations.setReaction(photo, ana, '😂', at(3));
+        await h.conversations.setReaction(photo, bia, '👍', at(4));
+        assert.deepEqual((await h.conversations.listReactions([photo, video])).map((r) => [r.userId, r.emoji]).sort(), [[ana, '😂'], [bia, '👍']].sort());
+        await h.conversations.setReaction(photo, ana, null, at(5));
+        assert.equal((await h.conversations.listReactions([photo])).length, 1);
+        assert.deepEqual(await h.conversations.listReactions([]), []);
+
+        assert.equal(await h.conversations.softDeleteMessage(photo, at(6)), true);
+        assert.equal(await h.conversations.softDeleteMessage(photo, at(7)), false, 'só apaga uma vez');
+        assert.equal(await h.conversations.softDeleteMessage(randomUUID(), at(7)), false);
+        const gone = await h.conversations.findMessage(photo);
+        assert.deepEqual(gone!.deletedAt, at(6));
+        assert.equal(gone!.body, '');
+        assert.equal(await h.conversations.findMedia(photo), undefined);
+        assert.deepEqual(await h.conversations.listReactions([photo]), []);
+        assert.deepEqual((await h.conversations.listShared(c.id, 10)).map((m) => m.kind), ['VIDEO']);
+        // A resposta continua apontando para a mensagem apagada (o app mostra "apagada").
+        assert.equal((await h.conversations.findMessage(video))!.replyToId, photo);
+      });
+
+      it('fixar e silenciar: por pessoa; contagem de fixadas; quem silenciou', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const cia = await newUser('cia');
+        const c1 = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        const c2 = await h.conversations.getOrCreateDirect(ana, cia, randomUUID(), at(1));
+        assert.deepEqual(await h.conversations.getPrefs(c1.id, ana), { pinnedAt: null, muted: false });
+        await h.conversations.setPrefs(c1.id, ana, { pinnedAt: at(5) });
+        await h.conversations.setPrefs(c2.id, ana, { pinnedAt: at(6), muted: true });
+        await h.conversations.setPrefs(c1.id, bia, { muted: true });
+        assert.deepEqual(await h.conversations.getPrefs(c1.id, ana), { pinnedAt: at(5), muted: false });
+        assert.deepEqual(await h.conversations.getPrefs(c2.id, ana), { pinnedAt: at(6), muted: true });
+        assert.equal(await h.conversations.countPinned(ana), 2);
+        assert.equal(await h.conversations.countPinned(bia), 0);
+        assert.deepEqual(await h.conversations.mutedUserIds(c1.id), [bia]);
+        const list = await h.conversations.listForUser(ana);
+        const byId = new Map(list.map((s) => [s.conversation.id, s] as const));
+        assert.deepEqual(byId.get(c1.id)!.pinnedAt, at(5));
+        assert.equal(byId.get(c2.id)!.muted, true);
+        assert.equal((await h.conversations.listForUser(bia))[0]!.pinnedAt ?? null, null);
+        await h.conversations.setPrefs(c1.id, ana, { pinnedAt: null });
+        assert.equal(await h.conversations.countPinned(ana), 1);
+        assert.deepEqual(await h.conversations.getPrefs(c1.id, ana), { pinnedAt: null, muted: false }, 'soltar não mexe no silêncio');
+        // Quem não participa não ganha preferências.
+        await h.conversations.setPrefs(c1.id, cia, { muted: true });
+        assert.deepEqual(await h.conversations.mutedUserIds(c1.id), [bia]);
+        assert.deepEqual(await h.conversations.getPrefs(randomUUID(), ana), { pinnedAt: null, muted: false });
+      });
+
       it('guarda o cartão de sugestão e devolve igual', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');
@@ -1671,6 +1741,12 @@ export function defineRepositoryContract(
         assert.deepEqual((await h.scheduling.listParticipants(poll.id)).map((p) => p.userId).sort(), [ana, bia, caio].sort());
         assert.deepEqual((await h.scheduling.listForConversation(g.id)).map((p) => p.id), [poll.id]);
         assert.deepEqual((await h.scheduling.listOpenForUser(bia, 10)).map((p) => p.id), [poll.id]);
+        // Prazo vencido e ainda sem aviso: aparece uma vez; depois de marcada, não volta.
+        assert.deepEqual(await h.scheduling.listDeadlinePassed(at(4 * H), 10), []);
+        assert.deepEqual((await h.scheduling.listDeadlinePassed(at(6 * H), 10)).map((p) => p.id), [poll.id]);
+        await h.scheduling.updatePoll(poll.id, { deadlineNotifiedAt: at(6 * H) });
+        assert.deepEqual(await h.scheduling.listDeadlinePassed(at(7 * H), 10), []);
+        assert.deepEqual((await h.scheduling.find(poll.id))!.deadlineNotifiedAt, at(6 * H));
 
         await h.scheduling.setVotes(poll.id, bia, ['2026-11-02', '2026-11-03'], 'YES', at(2));
         await h.scheduling.setVotes(poll.id, bia, ['2026-11-03'], 'MAYBE', at(3));
