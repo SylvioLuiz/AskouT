@@ -36,6 +36,9 @@ describe('contraste dos tokens', () => {
     it(`${name}: cor da marca como texto passa de 4,5:1`, () => {
       assert.ok(ratio(t['brand']!, t['bg']!) >= 4.5, `${t['brand']} sobre ${t['bg']}`);
     });
+    it(`${name}: texto sobre o botão de marca passa de 4,5:1`, () => {
+      assert.ok(ratio(t['brand-ink']!, t['brand']!) >= 4.5, `${t['brand-ink']} sobre ${t['brand']}`);
+    });
     it(`${name}: bordas de controles passam de 3:1 sobre o cartão`, () => {
       assert.ok(ratio(t['control-border']!, t['surface']!) >= 3, `${t['control-border']} sobre ${t['surface']}`);
     });
