@@ -3881,7 +3881,8 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 }
 
 /* Conversa: imagem de fundo escolhida por quem usa (só neste aparelho). */
-.chat--bg { background: linear-gradient(color-mix(in srgb, var(--bg) 40%, transparent), color-mix(in srgb, var(--bg) 40%, transparent)), var(--chat-bg) center / cover no-repeat; border-radius: 16px; }
+.chat--bg { position: relative; isolation: isolate; }
+.chat--bg::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(color-mix(in srgb, var(--bg) 35%, transparent), color-mix(in srgb, var(--bg) 35%, transparent)), var(--chat-bg) center / cover no-repeat; }
 .chatbgprev { width: 120px; height: 160px; object-fit: cover; border-radius: 16px; border: 1px solid var(--line); }
 
 /* Dentro da conversa o tema escuro mantém o azul (o degradê roxo-rosa fica para o resto do app). */
