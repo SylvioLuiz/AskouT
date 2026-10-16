@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
 import { Button, EmptyState, Field, Notice, PageHead } from './ui.tsx';
-import { ChevronLeftIcon, ChevronRightIcon, MoonIcon, SunIcon, SunriseIcon } from './icons.tsx';
+import { ChevronLeftIcon, ChevronRightIcon, MoonIcon, PlusIcon, SunIcon, SunriseIcon } from './icons.tsx';
 import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { formatWhen } from '../lib/chat.ts';
@@ -85,10 +85,12 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
               maxLength={120}
               placeholder="Ex.: Churrasco de aniversário"
               autoComplete="off"
+              trailing={
+                <button type="button" className="iconbtn" aria-label="Usar um evento que já existe" onClick={() => setPicking(true)}>
+                  <PlusIcon />
+                </button>
+              }
             />
-            <button type="button" className="pollcard__link" onClick={() => setPicking(true)}>
-              Usar um evento que já existe
-            </button>
           </div>
         </section>
 
