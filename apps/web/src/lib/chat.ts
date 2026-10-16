@@ -165,3 +165,25 @@ export const CHATS_CHANGED_EVENT = 'askout:chats-changed';
 export function announceChatsChanged(): void {
   window.dispatchEvent(new Event(CHATS_CHANGED_EVENT));
 }
+
+/** Tipos que a pessoa pode apagar para todos (só as próprias mensagens). */
+export const DELETABLE_KINDS: readonly ChatMessage['kind'][] = ['TEXT', 'AUDIO', 'IMAGE', 'VIDEO', 'EVENT'];
+
+/** Mensagens sem opções: avisos do sistema e as já apagadas. */
+export function selectable(m: ChatMessage): boolean {
+  return m.kind !== 'SYSTEM' && !m.deleted;
+}
+
+/** Dá para apagar todas as escolhidas? Só se forem todas suas e de tipo apagável. */
+export function allDeletable(messages: readonly ChatMessage[]): boolean {
+  return messages.length > 0 && messages.every((m) => m.mine && !m.deleted && DELETABLE_KINDS.includes(m.kind));
+}
+
+/** Texto para copiar: uma mensagem sai pura; várias saem como "[hh:mm] Nome: texto", na ordem da conversa. Só texto entra. */
+export function copyText(messages: readonly ChatMessage[]): string {
+  const texts = messages.filter((m) => m.kind === 'TEXT' && !m.deleted && m.body.trim() !== '');
+  if (texts.length === 0) return '';
+  const first = texts[0];
+  if (messages.length === 1 && first) return first.body;
+  return texts.map((m) => `[${formatClock(m.createdAt)}] ${m.mine ? 'Você' : (m.senderName ?? 'Contato')}: ${m.body}`).join('\n');
+}

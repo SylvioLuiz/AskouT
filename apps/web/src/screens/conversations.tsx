@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { ChatHead } from '../components/chat-head.tsx';
-import { Avatar, Button, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { ArrowUpIcon, BellOffIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { ArrowUpIcon, BellOffIcon, CheckIcon, CopyIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble } from '../components/chat-media.tsx';
-import { MessageActionsSheet, hasActions } from '../components/message-actions.tsx';
+import { MessagePopup, hasActions } from '../components/message-actions.tsx';
+import { Sheet } from '../components/agenda.tsx';
 import { SwipeRow } from '../components/swipe-reply.tsx';
 import { ChatPrefsSheet } from '../components/chat-prefs.tsx';
 import { PollLine } from '../components/date-poll-strip.tsx';
@@ -16,7 +17,7 @@ import { peopleLabel } from '../lib/meetup.ts';
 import { SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
-import { announceChatsChanged, dayLabel, filterConversations, formatClock, listTimeLabel, mergeMessages, previewOf, replyPreview } from '../lib/chat.ts';
+import { allDeletable, announceChatsChanged, copyText, dayLabel, filterConversations, formatClock, listTimeLabel, mergeMessages, previewOf, replyPreview } from '../lib/chat.ts';
 import { mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
 import { toApiError } from '../lib/errors.ts';
 import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
@@ -154,6 +155,9 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [replyTo, setReplyTo] = useState<ChatMessage | undefined>();
   const [actionsFor, setActionsFor] = useState<ChatMessage | undefined>();
   const [uploading, setUploading] = useState(false);
+  const [selected, setSelected] = useState<string[] | undefined>();
+  const [deleting, setDeleting] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const typingSentAt = useRef(0);
   const pressTimer = useRef<number | undefined>(undefined);
@@ -169,7 +173,19 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     setMessages([]);
     setReplyTo(undefined);
     setActionsFor(undefined);
+    setSelected(undefined);
+    setDeleting(false);
   }, [conversationId]);
+
+  // Esc sai da seleção.
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelected(undefined);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected]);
 
   useEffect(() => {
     if (!view.data) return;
@@ -288,7 +304,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
 
   // Segurar a mensagem (celular) ou clicar com o botão direito (computador) abre as opções.
   function pressHandlers(m: ChatMessage) {
-    if (!hasActions(m)) return {};
+    if (selected || !hasActions(m)) return {};
     return {
       onContextMenu: (e: MouseEvent) => {
         e.preventDefault();
@@ -341,6 +357,42 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     </div>
   ) : null;
 
+  const chosen = selected ? messages.filter((m) => selected.includes(m.id)) : [];
+  function toggleChosen(id: string) {
+    setSelected((current) => {
+      if (!current) return current;
+      const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+      return next.length === 0 ? undefined : next;
+    });
+  }
+  async function copyChosen() {
+    const text = copyText(chosen);
+    if (text === '') return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setSelected(undefined);
+    } catch {
+      setProblem('Não consegui copiar. Tente de novo.');
+    }
+  }
+  async function deleteChosen() {
+    setBulkBusy(true);
+    setProblem(undefined);
+    try {
+      for (const m of chosen) {
+        const updated = await api.deleteMessage(conversationId, m.id);
+        setMessages((current) => mergeMessages(current, [updated]));
+      }
+      setDeleting(false);
+      setSelected(undefined);
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      setDeleting(false);
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   const moreButton = (m: ChatMessage) => (
     <button type="button" className="msg__more" aria-label="Opções da mensagem" onClick={() => setActionsFor(m)}>
       <MoreIcon />
@@ -350,6 +402,16 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   let lastDay = '';
   return (
     <div className="chat">
+      {selected ? (
+        <header className="selectbar">
+          <p className="selectbar__count" role="status">
+            {selected.length === 1 ? '1 selecionada' : `${selected.length} selecionadas`}
+          </p>
+          <button type="button" className="iconbtn selectbar__close" aria-label="Cancelar seleção" onClick={() => setSelected(undefined)}>
+            <XIcon />
+          </button>
+        </header>
+      ) : (
       <ChatHead
         conversationId={conversationId}
         other={data.other}
@@ -366,6 +428,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           view.reload();
         }}
       />
+      )}
 
       <div className="chat__thread" aria-live="polite">
         {older.hasMore ? (
@@ -390,8 +453,13 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 </>
               ) : (
                 <>
-                  <SwipeRow className={`msg${m.mine ? ' msg--mine' : ''}`} id={`msg-${m.id}`} enabled={data.canSend && hasActions(m)} onReply={() => setReplyTo(m)}>
-                    {m.mine && hasActions(m) ? moreButton(m) : null}
+                  <SwipeRow className={`msg${m.mine ? ' msg--mine' : ''}${selected ? ' msg--selecting' : ''}${selected?.includes(m.id) ? ' msg--selected' : ''}`} id={`msg-${m.id}`} enabled={data.canSend && hasActions(m) && !selected} onReply={() => setReplyTo(m)}>
+                    {selected && hasActions(m) ? (
+                      <button type="button" className="msg__pick" role="checkbox" aria-checked={selected.includes(m.id)} aria-label={`Selecionar mensagem de ${m.mine ? 'você' : (m.senderName ?? 'contato')}, ${formatClock(m.createdAt)}`} onClick={() => toggleChosen(m.id)}>
+                        <span className={`msg__check${selected.includes(m.id) ? ' is-on' : ''}`} aria-hidden="true">{selected.includes(m.id) ? <CheckIcon /> : null}</span>
+                      </button>
+                    ) : null}
+                    {!selected && m.mine && hasActions(m) ? moreButton(m) : null}
                     <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} {...pressHandlers(m)}>
                       {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
                       {m.replyTo && !m.deleted ? (
@@ -417,7 +485,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                       )}
                       <span className="bubble__time">{formatClock(m.createdAt)}</span>
                     </div>
-                    {!m.mine && hasActions(m) ? moreButton(m) : null}
+                    {!selected && !m.mine && hasActions(m) ? moreButton(m) : null}
                   </SwipeRow>
                   {m.reactions.length > 0 ? (
                     <div className={`reactions${m.mine ? ' reactions--mine' : ''}`}>
@@ -461,7 +529,22 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         </div>
       ) : null}
 
-      {data.canSend ? (
+      {selected ? (
+        <div className="selectactions" role="toolbar" aria-label="Ações para as mensagens selecionadas">
+          <button type="button" className="selectactions__btn" disabled={selected.length !== 1 || !data.canSend} onClick={() => { const only = chosen[0]; if (only) { setReplyTo(only); setSelected(undefined); } }}>
+            <ReplyIcon />
+            <span>Responder</span>
+          </button>
+          <button type="button" className="selectactions__btn" disabled={copyText(chosen) === ''} onClick={() => void copyChosen()}>
+            <CopyIcon />
+            <span>Copiar</span>
+          </button>
+          <button type="button" className="selectactions__btn selectactions__btn--danger" disabled={!allDeletable(chosen)} onClick={() => setDeleting(true)}>
+            <TrashIcon />
+            <span>Apagar</span>
+          </button>
+        </div>
+      ) : data.canSend ? (
         <form className="composer" onSubmit={send}>
           <label className="visually-hidden" htmlFor="msg">
             Mensagem para {chatName}
@@ -514,15 +597,22 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       )}
 
       {actionsFor ? (
-        <MessageActionsSheet
+        <MessagePopup
           message={actionsFor}
           conversationId={conversationId}
           canSend={data.canSend}
           onClose={() => setActionsFor(undefined)}
           onReply={() => setReplyTo(actionsFor)}
+          onSelect={() => setSelected([actionsFor.id])}
           onReacted={(reactions) => patchMessage(actionsFor.id, { reactions })}
           onDeleted={(updated) => setMessages((current) => mergeMessages(current, [updated]))}
         />
+      ) : null}
+
+      {deleting ? (
+        <Sheet title="Apagar mensagens" onClose={() => (bulkBusy ? undefined : setDeleting(false))}>
+          <Confirm danger question={chosen.length === 1 ? 'Apagar esta mensagem para todos? Não dá para desfazer.' : `Apagar ${chosen.length} mensagens para todos? Não dá para desfazer.`} confirmLabel="Apagar para todos" busy={bulkBusy} onCancel={() => setDeleting(false)} onConfirm={() => void deleteChosen()} />
+        </Sheet>
       ) : null}
 
       {suggesting && match ? (

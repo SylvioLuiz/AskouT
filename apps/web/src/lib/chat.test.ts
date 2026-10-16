@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dayLabel, filterConversations, formatDistances, formatWhen, listTimeLabel, mergeMessages, previewOf, replyPreview, toCard } from './chat.ts';
+import { allDeletable, copyText, dayLabel, filterConversations, formatDistances, formatWhen, listTimeLabel, mergeMessages, previewOf, replyPreview, selectable, toCard } from './chat.ts';
 import { fitWithin, mediaKind, mediaProblem, typingLabel } from './chat-media.ts';
 import type { ChatMessage, ConversationItem, SuggestionItem } from './types.ts';
 
@@ -139,4 +139,20 @@ test('puxar para responder: curva de borracha e ponto de disparo', async () => {
   assert.ok(rubberOffset(2000) < 96);
   assert.equal(swipeTriggered(rubberOffset(20)), false);
   assert.equal(swipeTriggered(rubberOffset(120)), true);
+});
+
+test('selecionar várias: copiar e apagar', () => {
+  const a = msg('1', '2026-10-14T13:00:00Z', { body: 'oi', mine: true });
+  const b = msg('2', '2026-10-14T13:01:00Z', { body: 'tudo bem?', senderName: 'Bia' });
+  const foto = msg('3', '2026-10-14T13:02:00Z', { kind: 'IMAGE', mine: true });
+  assert.equal(copyText([a]), 'oi');
+  assert.match(copyText([a, b]), /^\[\d\d:\d\d\] Você: oi\n\[\d\d:\d\d\] Bia: tudo bem\?$/);
+  assert.match(copyText([a, foto]), /Você: oi$/);
+  assert.equal(copyText([foto]), '');
+  assert.equal(allDeletable([a, foto]), true);
+  assert.equal(allDeletable([a, b]), false);
+  assert.equal(allDeletable([]), false);
+  assert.equal(allDeletable([msg('4', 'x', { mine: true, deleted: true })]), false);
+  assert.equal(selectable(msg('5', 'x', { kind: 'SYSTEM' })), false);
+  assert.equal(selectable(a), true);
 });

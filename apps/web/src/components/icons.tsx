@@ -368,3 +368,10 @@ export const CopyIcon = () => (
     <path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8" />
   </Line>
 );
+
+export const CheckCircleIcon = () => (
+  <Line>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m8 12.5 2.8 2.8L16 9.8" />
+  </Line>
+);
