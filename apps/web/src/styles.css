@@ -3913,3 +3913,21 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 /* Os três botões ocupam a largura toda (cada um do tamanho do seu texto) e o texto fica no centro. */
 .chips.chips--fill { display: flex; flex-wrap: nowrap; gap: 6px; width: 100%; }
 .chips.chips--fill .chip { display: flex; align-items: center; justify-content: center; flex: 1 1 auto; width: auto; min-width: 0; min-height: 44px; padding: 6px 10px; text-align: center; white-space: normal; line-height: 1.15; }
+
+/* Folhas (menus e formulários) abertas de dentro da conversa seguem as cores novas, só a conversa em si fica azul. */
+:root[data-theme='dark'] .chat .sheet {
+  --brand: #fa72c9;
+  --brand-hover: #ff9ad9;
+  --brand-ink: #15162a;
+  --brand-soft: #38214a;
+  --brand-grad: linear-gradient(90deg, #b56efc, #fa72c9);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .chat .sheet {
+    --brand: #fa72c9;
+    --brand-hover: #ff9ad9;
+    --brand-ink: #15162a;
+    --brand-soft: #38214a;
+    --brand-grad: linear-gradient(90deg, #b56efc, #fa72c9);
+  }
+}
