@@ -409,3 +409,37 @@ export const RefreshIcon = () => (
     <path d="M5 16a7.500 7.500 0 0 0 13.200 1.500M19 20v-3h-3" />
   </Svg>
 );
+
+export const PartyIcon = () => (
+  <Svg>
+    <path d="m4 20 4.500-12.500 8 8z" />
+    <path d="M13 4v2M18 6.500l-1.200 1.200M20 11h-2M9 4.500l.5 1.500" />
+  </Svg>
+);
+export const SunriseIcon = () => (
+  <Svg>
+    <path d="M4 18h16M7.500 18a4.500 4.500 0 0 1 9 0M12 6v3M5.500 10.500l1.500 1.500M18.500 10.500 17 12" />
+  </Svg>
+);
+export const SunIcon = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.600 5.600 7 7M17 17l1.400 1.400M5.600 18.400 7 17M17 7l1.400-1.400" />
+  </Svg>
+);
+export const MoonIcon = () => (
+  <Svg>
+    <path d="M19 14.500A7.500 7.500 0 0 1 9.500 5 7.500 7.500 0 1 0 19 14.500Z" />
+  </Svg>
+);
+export const CalendarPlusIcon = () => (
+  <Svg>
+    <rect x="4" y="5.500" width="16" height="14.500" rx="2" />
+    <path d="M4 10h16M8.500 3.500v4M15.500 3.500v4M12 12.500v5M9.500 15h5" />
+  </Svg>
+);
+export const ArrowRightIcon = () => (
+  <Svg>
+    <path d="M4.500 12h15M14 6.500l5.500 5.500-5.500 5.500" />
+  </Svg>
+);

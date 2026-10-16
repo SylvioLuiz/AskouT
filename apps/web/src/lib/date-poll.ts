@@ -194,3 +194,33 @@ export function clampRange(start: string, end: string, lastDay: string | undefin
   const e = end !== '' && end > lastDay ? lastDay : end;
   return { start: s, end: e };
 }
+
+const MONTHS_SHORT = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
+
+/** "2026-10-20" -> "20 de out.". */
+export function chipDay(day: string): string {
+  return `${Number(day.slice(8, 10))} de ${MONTHS_SHORT[Number(day.slice(5, 7)) - 1]}`;
+}
+
+/** Semanas (domingo a sábado) de um mês (`month` de 1 a 12), com `null` fora dele. */
+export function monthWeeks(year: number, month: number): (string | null)[][] {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const count = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const lead = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const cells: (string | null)[] = Array.from({ length: lead }, () => null);
+  for (let d = 1; d <= count; d += 1) cells.push(`${year}-${pad(month)}-${pad(d)}`);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+}
+
+/** Soma `delta` meses a (ano, mês 1-12). */
+export function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
+  const index = year * 12 + (month - 1) + delta;
+  return { year: Math.floor(index / 12), month: (index % 12) + 1 };
+}
+
+/** Parte do dia escolhida na criação da votação -> horário usado ao propor a data. */
+export type DaySlot = 'MORNING' | 'AFTERNOON' | 'NIGHT';
+export const SLOT_TIME: Record<DaySlot, string> = { MORNING: '09:00', AFTERNOON: '14:00', NIGHT: '19:00' };

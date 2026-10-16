@@ -1,32 +1,47 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
-import { Button, EmptyState, Field, Notice } from './ui.tsx';
-import { PlusIcon } from './icons.tsx';
+import { Button, EmptyState, Field, Notice, PageHead } from './ui.tsx';
+import { CalendarIcon, CalendarPlusIcon, ChevronLeftIcon, ChevronRightIcon, MoonIcon, PartyIcon, PlusIcon, SunIcon, SunriseIcon, UsersIcon, ClockIcon } from './icons.tsx';
 import { api } from '../client.ts';
-import { useAsync, useDebounced } from '../hooks.ts';
+import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { formatWhen } from '../lib/chat.ts';
 import type { ExploreEvent } from '../lib/types.ts';
-import { POLICY_HINT, POLICY_LABEL, clampRange, dayInZone } from '../lib/date-poll.ts';
-import { isoToLocalInput } from '../lib/post-draft.ts';
-import type { Policy } from '../lib/date-poll.ts';
+import { SLOT_TIME, chipDay, clampRange, dayInZone, longDay, monthTitle, monthWeeks, shiftMonth } from '../lib/date-poll.ts';
+import type { DaySlot, Policy } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
+import { isoToLocalInput } from '../lib/post-draft.ts';
 import { navigate } from '../router.tsx';
 
+const WEEK_HEAD = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+const SLOTS: readonly { id: DaySlot; label: string; icon: ReactNode; tone: string }[] = [
+  { id: 'MORNING', label: 'Manhã', icon: <SunriseIcon />, tone: 'sunrise' },
+  { id: 'AFTERNOON', label: 'Tarde', icon: <SunIcon />, tone: 'sun' },
+  { id: 'NIGHT', label: 'Noite', icon: <MoonIcon />, tone: 'moon' },
+];
+const POLICY_TEXT: Record<Policy, string> = {
+  MAJORITY: 'A data será aprovada quando mais da metade confirmar.',
+  MANUAL: 'Você escolhe a data entre as mais votadas.',
+  UNANIMITY: 'A data só fecha quando todos confirmam.',
+};
 
-/** "Encontrar a melhor data": o organizador define o período e a regra; quem está na conversa vota. */
-export function DatePollCreateSheet({ conversationId, onClose }: { conversationId: string; onClose: () => void }) {
+/** "Combinar uma data": nome, período e pronto. O resto é opcional. */
+export function DatePollCreateScreen({ conversationId }: { conversationId: string }) {
+  useTitle('Combinar uma data');
   const [title, setTitle] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
-  const [time, setTime] = useState('19:00');
+  const [slot, setSlot] = useState<DaySlot | undefined>();
   const [deadline, setDeadline] = useState('');
   const [policy, setPolicy] = useState<Policy>('MAJORITY');
-  const [picking, setPicking] = useState(false);
   const [event, setEvent] = useState<ExploreEvent | undefined>();
+  const [picking, setPicking] = useState(false);
+  const [calendar, setCalendar] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
 
+  const today = dayInZone(new Date().toISOString());
+  // Com um evento escolhido, o período não passa do dia dele.
   const lastDay = event?.startsAt ? dayInZone(event.startsAt) : undefined;
   const deadlineMax = event?.startsAt ? isoToLocalInput(event.startsAt) : undefined;
 
@@ -34,7 +49,7 @@ export function DatePollCreateSheet({ conversationId, onClose }: { conversationI
     form.preventDefault();
     setProblem(undefined);
     if (title.trim() === '') return setProblem('Dê um nome ao encontro.');
-    if (start === '' || end === '') return setProblem('Escolha a data inicial e a final.');
+    if (start === '' || end === '') return setProblem('Escolha o período de datas.');
     if (lastDay && end > lastDay) return setProblem('A data final não pode ser depois do dia do evento.');
     if (deadlineMax && deadline > deadlineMax) return setProblem('O prazo para votar não pode ser depois do início do evento.');
     setBusy(true);
@@ -44,79 +59,213 @@ export function DatePollCreateSheet({ conversationId, onClose }: { conversationI
         title: title.trim(),
         rangeStart: start,
         rangeEnd: end,
-        ...(time ? { preferredTimeStart: time } : {}),
+        ...(slot ? { preferredTimeStart: SLOT_TIME[slot] } : {}),
         ...(deadline ? { votingDeadline: new Date(deadline).toISOString() } : {}),
         confirmationPolicy: policy,
       });
-      onClose();
-      navigate(`/planejar/${poll.id}`);
+      navigate(`/planejar/${poll.id}`, { replace: true });
     } catch (failure) {
       setProblem(toApiError(failure).message);
       setBusy(false);
     }
   }
 
-  if (picking) {
-    return (
-      <Sheet title="Escolher um evento" onClose={onClose}>
-        <EventPick
-          onPick={(picked) => {
-            setTitle(picked.title.slice(0, 120));
-            setEvent(picked);
-            if (picked.startsAt) {
-              const range = clampRange(start, end, dayInZone(picked.startsAt));
-              setStart(range.start);
-              setEnd(range.end);
-              if (deadline > isoToLocalInput(picked.startsAt)) setDeadline('');
-            }
-            setPicking(false);
-          }}
-          onBack={() => setPicking(false)}
-        />
-      </Sheet>
-    );
-  }
-
   return (
-    <Sheet title="Encontrar a melhor data" onClose={onClose}>
-      <form className="form" onSubmit={(e) => void submit(e)} noValidate>
+    <div className="pollform">
+      <PageHead title="Combinar uma data" back={`/conversas/${conversationId}`} subtitle="Crie uma votação e encontre o melhor dia para reunir a galera." />
+      <form className="pollform__form" onSubmit={(e) => void submit(e)} noValidate>
         {problem ? <Notice tone="error">{problem}</Notice> : null}
-        <Field
-          label="Nome do encontro"
-          value={title}
-          onChange={setTitle}
-          maxLength={120}
-          placeholder="Churrasco de aniversário"
-          trailing={
-            <button type="button" className="iconbtn" aria-label="Escolher um evento para o nome" onClick={() => setPicking(true)}>
-              <PlusIcon />
+
+        <section className="pollcard">
+          <span className="pollcard__icon">
+            <PartyIcon />
+          </span>
+          <div className="pollcard__body">
+            <Field
+              label="Nome do encontro"
+              value={title}
+              onChange={setTitle}
+              maxLength={120}
+              placeholder="Ex.: Churrasco de aniversário"
+              autoComplete="off"
+              trailing={
+                <button type="button" className="iconbtn" aria-label="Usar um evento existente" onClick={() => setPicking(true)}>
+                  <PlusIcon />
+                </button>
+              }
+            />
+          </div>
+        </section>
+
+        <section className="pollcard">
+          <span className="pollcard__icon">
+            <CalendarIcon />
+          </span>
+          <div className="pollcard__body">
+            <p className="pollcard__label">Período de datas</p>
+            <button type="button" className="pollrange" onClick={() => setCalendar(true)} aria-label={start && end ? `Período: ${longDay(start)} a ${longDay(end)}. Alterar` : 'Escolher o período de datas'}>
+              <CalendarIcon />
+              {start && end ? (
+                <span className="pollrange__value">
+                  {chipDay(start)}
+                  <span className="pollrange__arrow" aria-hidden="true">
+                    →
+                  </span>
+                  {chipDay(end)}
+                </span>
+              ) : (
+                <span className="pollrange__empty">Escolha as datas</span>
+              )}
+              <ChevronRightIcon />
             </button>
-          }
-        />
-        {event && lastDay ? <p className="muted">A data final vai até o dia do evento “{event.title}”.</p> : null}
-        <div className="form__pair">
-          <Field label="De" type="date" value={start} max={lastDay} onChange={(v) => { setStart(v); if (end === '' || end < v) setEnd(v); }} />
-          <Field label="Até" type="date" value={end} min={start || undefined} max={lastDay} onChange={setEnd} />
-        </div>
-        <Field label="Horário preferido" type="time" value={time} onChange={setTime} hint="Usado ao propor a data. Dá para ajustar depois." />
-        <Field label="Prazo para votar (opcional)" type="datetime-local" value={deadline} max={deadlineMax} onChange={setDeadline} hint={event ? 'Não pode passar do início do evento.' : undefined} />
-        <div className="optgroup" role="group" aria-label="Como a data é confirmada">
-          <span className="field__label">Como a data é confirmada</span>
-          <div className="chips chips--fill">
-            {(Object.keys(POLICY_LABEL) as Policy[]).map((p) => (
-              <button key={p} type="button" className="chip" aria-pressed={policy === p} onClick={() => setPolicy(p)}>
-                {POLICY_LABEL[p]}
+            {event && lastDay ? <p className="pollcard__hint">Até o dia do evento “{event.title}”.</p> : null}
+          </div>
+        </section>
+
+        <section className="pollcard">
+          <span className="pollcard__icon">
+            <ClockIcon />
+          </span>
+          <div className="pollcard__body">
+            <p className="pollcard__label">
+              Melhor horário <span className="pollcard__opt">(opcional)</span>
+            </p>
+          </div>
+          <div className="pollslots" role="group" aria-label="Melhor horário">
+            {SLOTS.map((o) => (
+              <button key={o.id} type="button" className={`pollslot pollslot--${o.tone}`} aria-pressed={slot === o.id} onClick={() => setSlot(slot === o.id ? undefined : o.id)}>
+                {o.icon}
+                {o.label}
               </button>
             ))}
           </div>
-          <p className="muted">{POLICY_HINT[policy]}</p>
-        </div>
-        <p className="muted">Todos desta conversa podem votar. Os fusos são tratados em horário de Brasília.</p>
+        </section>
+
+        <section className="pollcard">
+          <span className="pollcard__icon">
+            <UsersIcon />
+          </span>
+          <div className="pollcard__body">
+            <p className="pollcard__label">Como escolher a data?</p>
+          </div>
+          <div className="pollpolicy" role="group" aria-label="Como escolher a data">
+            <button type="button" className="pollpolicy__opt" aria-pressed={policy !== 'MANUAL'} onClick={() => setPolicy('MAJORITY')}>
+              Maioria
+            </button>
+            <button type="button" className="pollpolicy__opt" aria-pressed={policy === 'MANUAL'} onClick={() => setPolicy('MANUAL')}>
+              Eu decido
+            </button>
+          </div>
+          <p className="pollcard__hint pollcard__hint--wide">{POLICY_TEXT[policy]}</p>
+        </section>
+
+        <details className="pollmore">
+          <summary>Mais opções</summary>
+          <div className="pollmore__body">
+            <Field label="Prazo para votar" type="datetime-local" value={deadline} max={deadlineMax} onChange={setDeadline} hint={deadlineMax ? 'Não pode passar do início do evento.' : 'Sem prazo, a votação fica aberta até alguém encerrar.'} />
+            <button type="button" className="chip pollmore__chip" aria-pressed={policy === 'UNANIMITY'} onClick={() => setPolicy(policy === 'UNANIMITY' ? 'MAJORITY' : 'UNANIMITY')}>
+              Exigir que todos confirmem
+            </button>
+          </div>
+        </details>
+
         <Button type="submit" full loading={busy}>
-          Abrir votação
+          <CalendarPlusIcon />
+          Criar votação
         </Button>
+        <p className="pollform__note">Quem está na conversa vota. A melhor data é só uma sugestão: ela vale depois que as pessoas confirmam.</p>
       </form>
-    </Sheet>
+
+      {calendar ? (
+        <Sheet title="Período de datas" onClose={() => setCalendar(false)}>
+          <RangeCalendar
+            start={start}
+            end={end}
+            min={today}
+            max={lastDay}
+            onPick={(a, b) => {
+              setStart(a);
+              setEnd(b);
+              setCalendar(false);
+            }}
+          />
+        </Sheet>
+      ) : null}
+      {picking ? (
+        <Sheet title="Escolher um evento" onClose={() => setPicking(false)}>
+          <EventPick
+            onPick={(picked) => {
+              setTitle(picked.title.slice(0, 120));
+              setEvent(picked);
+              if (picked.startsAt) {
+                const range = clampRange(start, end, dayInZone(picked.startsAt));
+                setStart(range.start);
+                setEnd(range.end);
+                if (deadline > isoToLocalInput(picked.startsAt)) setDeadline('');
+              }
+              setPicking(false);
+            }}
+            onBack={() => setPicking(false)}
+          />
+        </Sheet>
+      ) : null}
+    </div>
+  );
+}
+
+/** Toque no primeiro dia e depois no último (o mesmo dia duas vezes vale um dia só). */
+function RangeCalendar({ start, end, min, max, onPick }: { start: string; end: string; min: string; max: string | undefined; onPick: (start: string, end: string) => void }) {
+  const base = start || min;
+  const [view, setView] = useState({ year: Number(base.slice(0, 4)), month: Number(base.slice(5, 7)) });
+  const [anchor, setAnchor] = useState<string | undefined>();
+  const first = `${view.year}-${String(view.month).padStart(2, '0')}-01`;
+  const minView = { year: Number(min.slice(0, 4)), month: Number(min.slice(5, 7)) };
+  const canBack = view.year * 12 + view.month > minView.year * 12 + minView.month;
+  const canNext = !max || view.year * 12 + view.month < Number(max.slice(0, 4)) * 12 + Number(max.slice(5, 7));
+  const from = anchor ?? start;
+  const to = anchor ?? end;
+
+  function tap(day: string) {
+    if (!anchor) {
+      setAnchor(day);
+      return;
+    }
+    onPick(day < anchor ? day : anchor, day < anchor ? anchor : day);
+  }
+
+  return (
+    <div className="pollcal">
+      <div className="pollcal__nav">
+        <button type="button" className="pollcal__arrow" aria-label="Mês anterior" disabled={!canBack} onClick={() => setView(shiftMonth(view.year, view.month, -1))}>
+          <ChevronLeftIcon />
+        </button>
+        <strong aria-live="polite">{monthTitle(first)}</strong>
+        <button type="button" className="pollcal__arrow" aria-label="Próximo mês" disabled={!canNext} onClick={() => setView(shiftMonth(view.year, view.month, 1))}>
+          <ChevronRightIcon />
+        </button>
+      </div>
+      <div className="pollcal__grid" role="grid">
+        {WEEK_HEAD.map((d, i) => (
+          <span key={i} className="pollcal__head" aria-hidden="true">
+            {d}
+          </span>
+        ))}
+        {monthWeeks(view.year, view.month).flat().map((day, i) => {
+          if (!day) return <span key={i} />;
+          const off = day < min || (max !== undefined && day > max);
+          const edge = day === from || day === to;
+          const inside = from !== '' && to !== '' && day > from && day < to;
+          return (
+            <button key={day} type="button" className={`pollcal__day${edge ? ' is-edge' : ''}${inside ? ' is-inside' : ''}`} disabled={off} aria-pressed={edge || inside} aria-label={longDay(day)} onClick={() => tap(day)}>
+              {Number(day.slice(8, 10))}
+            </button>
+          );
+        })}
+      </div>
+      <p className="pollcal__hint" role="status">
+        {anchor ? 'Agora toque no último dia.' : 'Toque no primeiro e no último dia.'}
+      </p>
+    </div>
   );
 }
 

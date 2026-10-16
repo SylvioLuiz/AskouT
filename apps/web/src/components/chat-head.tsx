@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
 import { ChevronLeftIcon, MoreIcon } from './icons.tsx';
-import { DatePollCreateSheet } from './date-poll-create.tsx';
 import { ChatPrefsSheet } from './chat-prefs.tsx';
 import { ChatBackgroundSheet } from './chat-background.tsx';
 import { ReasonSheet } from './post-actions.tsx';
@@ -12,7 +11,7 @@ import { toApiError } from '../lib/errors.ts';
 import type { PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 
-type Step = 'menu' | 'clear' | 'block' | 'report' | 'poll' | 'prefs' | 'background';
+type Step = 'menu' | 'clear' | 'block' | 'report' | 'prefs' | 'background';
 
 /** Topo da conversa: voltar, foto e nome (preso ao rolar) e o menu ⋯ no canto oposto. */
 export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared, below, pinned, muted, onPrefsChanged }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode; pinned: boolean; muted: boolean; onPrefsChanged: () => void }) {
@@ -58,7 +57,6 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
     }
   }
 
-  if (step === 'poll') return <DatePollCreateSheet conversationId={conversationId} onClose={onClose} />;
   if (step === 'background') return <ChatBackgroundSheet conversationId={conversationId} onClose={onClose} />;
   if (step === 'prefs') return <ChatPrefsSheet conversationId={conversationId} title={title} pinned={pinned} muted={muted} onClose={onClose} onChanged={onPrefsChanged} />;
 
@@ -105,7 +103,10 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
         />
       ) : (
         <ul className="sharelist">
-          {row('Encontrar a melhor data', () => setStep('poll'))}
+          {row('Encontrar a melhor data', () => {
+            onClose();
+            navigate(`/planejar/nova/${conversationId}`);
+          })}
           {row(pinned || muted ? 'Fixar e silenciar (ativo)' : 'Fixar e silenciar', () => setStep('prefs'))}
           {row('Imagem de fundo', () => setStep('background'))}
           {row('Limpar conversa', () => setStep('clear'))}

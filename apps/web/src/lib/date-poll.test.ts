@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calendarWeeks, clampRange, dayInZone, durationLabel, longDay, percent, shortDay, weekdayOf } from './date-poll.ts';
+import { calendarWeeks, chipDay, clampRange, dayInZone, monthWeeks, shiftMonth, durationLabel, longDay, percent, shortDay, weekdayOf } from './date-poll.ts';
 
 test('dia da semana e textos em português', () => {
   assert.equal(weekdayOf('2026-10-23'), 5);
@@ -36,4 +36,15 @@ test('período com evento não passa do dia do evento', () => {
   assert.deepEqual(clampRange('2026-11-01', '2026-11-30', '2026-11-14'), { start: '2026-11-01', end: '2026-11-14' });
   assert.deepEqual(clampRange('2026-11-20', '2026-11-30', '2026-11-14'), { start: '2026-11-14', end: '2026-11-14' });
   assert.deepEqual(clampRange('2026-11-01', '', undefined), { start: '2026-11-01', end: '' });
+});
+
+test('calendário do mês e rótulo curto', () => {
+  assert.equal(chipDay('2026-10-20'), '20 de out.');
+  const weeks = monthWeeks(2026, 10);
+  assert.equal(weeks[0]!.filter((d) => d === null).length, 4);
+  assert.equal(weeks[0]![4], '2026-10-01');
+  assert.equal(weeks.at(-1)!.includes('2026-10-31'), true);
+  assert.ok(weeks.every((w) => w.length === 7));
+  assert.deepEqual(shiftMonth(2026, 12, 1), { year: 2027, month: 1 });
+  assert.deepEqual(shiftMonth(2026, 1, -1), { year: 2025, month: 12 });
 });
