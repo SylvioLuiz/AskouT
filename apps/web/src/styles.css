@@ -3751,7 +3751,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .mediathumb { display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 8px; background: var(--line); color: var(--ink); cursor: pointer; overflow: hidden; }
 .mediathumb__img { width: 100%; height: 100%; object-fit: cover; }
 .mediathumb__wait { color: var(--muted); }
-.search--convs { margin: 0 0 8px; }
+.search--convs { position: relative; margin: 0 0 8px; }
 .convitem { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); }
 .convitem .convrow { flex: 1; min-width: 0; border-bottom: 0; }
 .convitem__more { flex: none; color: var(--muted); }
