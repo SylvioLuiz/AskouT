@@ -56,10 +56,14 @@ export function FlashScreen() {
     () => (active && matchIds.length > 0 ? Promise.all(matchIds.map((id) => api.flashMatch(id).catch(() => undefined))).then((r) => r.filter((m): m is FlashMatch => m !== undefined)) : Promise.resolve([] as FlashMatch[])),
     [active, matchKey],
   );
-  const share = useShareLocation(matchIds, () => {
-    invites.reload();
-    matchViews.reload();
-  });
+  const share = useShareLocation(
+    matchIds,
+    () => {
+      invites.reload();
+      matchViews.reload();
+    },
+    active && matchIds.length > 0,
+  );
   const [mapFailed, setMapFailed] = useState(false);
 
   const [minutes, setMinutes] = useState(FLASH_DEFAULT_MINUTES);
@@ -207,6 +211,7 @@ export function FlashScreen() {
           <p className="muted">Sua localização só vai para quem aceitou sair com você, enquanto este Flash estiver ligado.</p>
         </>
       )}
+      <p className="muted">Quando alguém aceita um convite, vocês dois passam a compartilhar a localização automaticamente. Dá para parar quando quiser.</p>
     </section>
   );
 
@@ -750,8 +755,8 @@ function InviteRow({ invite, canAccept, onChanged, onFeedback }: { invite: Flash
       const result = await api.flashRespond(invite.id, action);
       if (action === 'accept') {
         announceFlashChange();
-        // Aceitou: abre a conversa com a pessoa. O mapa do encontro fica a um toque dali.
-        navigate(result.conversationId ? `/conversas/${result.conversationId}` : `/flash/encontro/${invite.id}`);
+        // Aceitou: abre o encontro, onde o envio da localização começa sozinho. A conversa fica a um toque dali.
+        navigate(`/flash/encontro/${invite.id}`);
         return;
       }
       onChanged();
@@ -799,7 +804,7 @@ type ShareState =
 const SEND_EVERY_MS = 10_000;
 
 /** Acompanha a posição do aparelho e envia a cada encontro aceito. Só começa quando a pessoa toca no botão. */
-function useShareLocation(inviteIds: readonly string[], onEnded: () => void) {
+function useShareLocation(inviteIds: readonly string[], onEnded: () => void, auto = false) {
   const [state, setState] = useState<ShareState>({ phase: 'idle' });
   const [mine, setMine] = useState<{ lat: number; lng: number } | undefined>();
   const watchId = useRef<number | undefined>(undefined);
@@ -808,8 +813,11 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void) {
   endedRef.current = onEnded;
   const idsRef = useRef(inviteIds);
   idsRef.current = inviteIds;
+  // Quem pede para parar não é religado sozinho.
+  const stoppedByUser = useRef(false);
 
   function stop() {
+    stoppedByUser.current = true;
     if (watchId.current !== undefined) navigator.geolocation.clearWatch(watchId.current);
     watchId.current = undefined;
     setMine(undefined);
@@ -817,6 +825,7 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void) {
   }
 
   function start() {
+    stoppedByUser.current = false;
     if (!('geolocation' in navigator)) {
       setState({ phase: 'error', message: geolocationMessage(undefined, window.isSecureContext) });
       return;
@@ -852,6 +861,12 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void) {
     );
   }
 
+  // Com um encontro aceito, o envio começa sozinho (o navegador ainda pede a permissão do aparelho).
+  useEffect(() => {
+    if (auto && !stoppedByUser.current && state.phase === 'idle') start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto, state.phase]);
+
   useEffect(
     () => () => {
       if (watchId.current !== undefined) navigator.geolocation.clearWatch(watchId.current);
@@ -874,7 +889,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>();
-  const share = useShareLocation([inviteId], match.reload);
+  const share = useShareLocation([inviteId], match.reload, match.data !== undefined);
   const [mapFailed, setMapFailed] = useState(false);
 
   if (match.loading && !match.data && !match.error) return <Loading />;
@@ -975,7 +990,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         ) : (
           <>
             <p className="sharebox__title">Mostrar onde estou</p>
-            <p className="muted">Só {data.other.username} vê sua localização, só durante este encontro, e ela some quando ele acabar.</p>
+            <p className="muted">Só {data.other.username} vê sua localização, só durante este encontro, e ela some quando ele acabar. Ao aceitar o convite, o envio começa sozinho.</p>
             {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
             <Button full loading={share.state.phase === 'asking'} onClick={share.start}>
               Compartilhar minha localização
