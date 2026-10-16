@@ -317,7 +317,7 @@ export function CreatePostScreen() {
           {tagged.length > 0 ? (
             <ul className="chips" aria-label="Pessoas marcadas">
               {tagged.map((f) => (
-                <li key={f.userId} className="chip">
+                <li key={f.userId} className="tagchip">
                   <Avatar profile={f} size={24} />
                   <span>{f.username}</span>
                   <button type="button" onClick={() => setTags((c) => c.filter((id) => id !== f.userId))} aria-label={`Tirar a marcação de ${f.username}`}>

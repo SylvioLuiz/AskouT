@@ -11,6 +11,7 @@ import { MessagePopup, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { SwipeRow } from '../components/swipe-reply.tsx';
 import { useChatBackground } from '../lib/chat-bg.ts';
+import { readDraft, saveDraft } from '../lib/chat-draft.ts';
 import { ChatPrefsSheet } from '../components/chat-prefs.tsx';
 import { PollLine } from '../components/date-poll-strip.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
@@ -29,6 +30,8 @@ import { Link } from '../router.tsx';
 export const MESSAGE_MAX = 2000;
 
 // ---------- Lista ----------
+
+const UNDO_MS = 6000;
 
 export function ConversationsScreen() {
   useTitle('Conversas');
@@ -82,7 +85,17 @@ export function ConversationsScreen() {
             <input id="busca-conversas" className="search__input search__input--icon" type="search" placeholder="Buscar nas conversas" value={query} maxLength={60} autoComplete="off" onChange={(e) => setQuery(e.target.value)} />
           </div>
           {shown.length === 0 ? (
-            <EmptyState title="Nenhuma conversa encontrada">Procure pelo nome da pessoa ou do grupo, pelo @usuário ou por um trecho da última mensagem.</EmptyState>
+            <EmptyState title={searching ? `Nada encontrado para "${query.trim()}"` : 'Nenhuma conversa encontrada'}>
+              Procure pelo nome da pessoa ou do grupo, pelo @usuário ou por um trecho da última mensagem.
+              {searching ? (
+                <>
+                  {' '}
+                  <button type="button" className="linkbtn" onClick={() => setQuery('')}>
+                    Limpar busca
+                  </button>
+                </>
+              ) : null}
+            </EmptyState>
           ) : (
             <ul className="list convlist">
               {shown.map((c) => (
@@ -149,7 +162,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [older, setOlder] = useState<{ hasMore: boolean; loading: boolean }>({ hasMore: false, loading: false });
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(() => readDraft(conversationId));
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -161,6 +174,9 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [selected, setSelected] = useState<string[] | undefined>();
   const [deleting, setDeleting] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<string[] | undefined>();
+  const deleteTimer = useRef<number | undefined>(undefined);
+  const deleteIds = useRef<string[] | undefined>(undefined);
   const fileRef = useRef<HTMLInputElement>(null);
   const typingSentAt = useRef(0);
   const pressTimer = useRef<number | undefined>(undefined);
@@ -178,7 +194,22 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     setActionsFor(undefined);
     setSelected(undefined);
     setDeleting(false);
+    setDraft(readDraft(conversationId));
   }, [conversationId]);
+
+  useEffect(
+    () => () => {
+      // Saiu da conversa com um "desfazer" em espera: apaga agora, para não perder o pedido.
+      const ids = deleteIds.current;
+      if (ids) void commitDelete(ids);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [conversationId],
+  );
+
+  useEffect(() => {
+    saveDraft(conversationId, draft);
+  }, [conversationId, draft]);
 
   // Esc sai da seleção.
   useEffect(() => {
@@ -378,22 +409,36 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       setProblem('Não consegui copiar. Tente de novo.');
     }
   }
-  async function deleteChosen() {
-    setBulkBusy(true);
-    setProblem(undefined);
+  /** Apaga de verdade no servidor. Falhando, a mensagem volta para a tela e o aviso explica. */
+  async function commitDelete(ids: string[]) {
+    deleteIds.current = undefined;
+    window.clearTimeout(deleteTimer.current);
     try {
-      for (const m of chosen) {
-        const updated = await api.deleteMessage(conversationId, m.id);
+      for (const id of ids) {
+        const updated = await api.deleteMessage(conversationId, id);
         setMessages((current) => mergeMessages(current, [updated]));
       }
-      setDeleting(false);
-      setSelected(undefined);
     } catch (failure) {
       setProblem(toApiError(failure).message);
-      setDeleting(false);
     } finally {
-      setBulkBusy(false);
+      setPendingDelete(undefined);
     }
+  }
+  /** As mensagens somem da tela na hora; só são apagadas no servidor depois de alguns segundos, para dar tempo de desfazer. */
+  function deleteChosen() {
+    if (deleteIds.current) void commitDelete(deleteIds.current);
+    const ids = chosen.map((m) => m.id);
+    setProblem(undefined);
+    deleteIds.current = ids;
+    setPendingDelete(ids);
+    setDeleting(false);
+    setSelected(undefined);
+    deleteTimer.current = window.setTimeout(() => void commitDelete(ids), UNDO_MS);
+  }
+  function undoDelete() {
+    window.clearTimeout(deleteTimer.current);
+    deleteIds.current = undefined;
+    setPendingDelete(undefined);
   }
 
   const moreButton = (m: ChatMessage) => (
@@ -442,7 +487,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           </div>
         ) : null}
         {messages.length === 0 ? <p className="muted chat__empty">Nenhuma mensagem ainda. Diga oi{data.other ? ` para ${data.other.displayName}` : ' para o grupo'}.</p> : null}
-        {messages.map((m) => {
+        {messages.filter((m) => !pendingDelete?.includes(m.id)).map((m) => {
           const day = dayLabel(m.createdAt, new Date(serverNow));
           const showDay = day !== lastDay;
           lastDay = day;
@@ -612,9 +657,18 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         />
       ) : null}
 
+      {pendingDelete ? (
+        <div className="undobar" role="status">
+          <span>{pendingDelete.length === 1 ? 'Mensagem apagada' : `${pendingDelete.length} mensagens apagadas`}</span>
+          <button type="button" onClick={undoDelete}>
+            Desfazer
+          </button>
+        </div>
+      ) : null}
+
       {deleting ? (
         <Sheet title="Apagar mensagens" onClose={() => (bulkBusy ? undefined : setDeleting(false))}>
-          <Confirm danger question={chosen.length === 1 ? 'Apagar esta mensagem para todos? Não dá para desfazer.' : `Apagar ${chosen.length} mensagens para todos? Não dá para desfazer.`} confirmLabel="Apagar para todos" busy={bulkBusy} onCancel={() => setDeleting(false)} onConfirm={() => void deleteChosen()} />
+          <Confirm danger question={chosen.length === 1 ? 'Apagar esta mensagem para todos? Você terá alguns segundos para desfazer.' : `Apagar ${chosen.length} mensagens para todos? Você terá alguns segundos para desfazer.`} confirmLabel="Apagar para todos" busy={bulkBusy} onCancel={() => setDeleting(false)} onConfirm={deleteChosen} />
         </Sheet>
       ) : null}
 

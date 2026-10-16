@@ -16,11 +16,44 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
+const scrolls = new Map<string, number>();
+const here = () => window.location.pathname + window.location.search;
+
+/** Depois de trocar de tela, leva o foco ao título (leitor de tela anuncia a tela nova), sem tirar o de um campo já focado. */
+function focusContent(): void {
+  window.requestAnimationFrame(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body && active.closest('#conteudo') && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return;
+    const target = document.querySelector<HTMLElement>('#conteudo h1, #conteudo [role="heading"], #conteudo') ?? null;
+    if (!target) return;
+    if (!target.hasAttribute('tabindex')) target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+  });
+}
+
+/** Ao voltar, devolve a rolagem que a tela tinha; o conteúdo pode chegar depois, então tenta por alguns instantes. */
+function restoreScroll(top: number): void {
+  const started = Date.now();
+  const attempt = () => {
+    window.scrollTo(0, top);
+    if (Math.abs(window.scrollY - top) > 2 && Date.now() - started < 800) window.requestAnimationFrame(attempt);
+  };
+  window.requestAnimationFrame(attempt);
+}
+
+window.addEventListener('popstate', () => {
+  const top = scrolls.get(here());
+  if (top !== undefined) restoreScroll(top);
+  focusContent();
+});
+
 export function navigate(to: string, options: { replace?: boolean } = {}): void {
+  scrolls.set(here(), window.scrollY);
   if (options.replace) window.history.replaceState(null, '', to);
   else window.history.pushState(null, '', to);
   window.scrollTo(0, 0);
   listeners.forEach((listener) => listener());
+  focusContent();
 }
 
 export function usePathname(): string {

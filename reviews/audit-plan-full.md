@@ -194,3 +194,17 @@ A base é boa: HTML semântico, rótulos em quase tudo, folhas (sheets) com foco
 3. **Navegação** (um dia): restaurar rolagem, mover foco, pausar polling com aba oculta.
 4. **Feedback** (um a dois dias): esqueletos, desfazer, rascunhos.
 5. **Organização do CSS** (dois dias): dividir, consolidar, teste de cor fora dos tokens.
+
+---
+
+## Correções aplicadas (2026-10-16)
+
+Feitas: bordas de controles (`--control-border`), semáforo por tema com `--ok-ink`, alvos de toque de 44 px, rolagem restaurada ao voltar e foco no título ao trocar de tela, "⋯" sempre visível no desktop (mobile inalterado), `.chip` separado de `.tagchip`, esqueletos de carregamento, "Desfazer" ao apagar mensagens, rascunho por conversa, busca sem resultado com "Limpar busca", degradê só nas ações principais, tokens de sombra e listras, testes de contraste e de cores fixas.
+
+Não feitas, por decisão ou porque a auditoria estava errada:
+- Dica de gestos no chat: dispensada pelo dono do produto.
+- "⋯" no mobile: dispensado; só o desktop mudou.
+- Pausar polling com aba oculta: `usePolling` já fazia isso (a auditoria errou).
+- `span role="link"` em `venue-link.tsx`: é intencional, porque vai dentro de outro link e `<a>` dentro de `<a>` é inválido.
+- Explicar a melhor data na votação: o resumo já mostra compatibilidade e cobertura.
+- Ficaram para depois (risco maior sem ver no aparelho): dividir `conversations.tsx` e o CSS, unificar o polling de conversas, reduzir a escala de fontes, escala nomeada de `z-index`, padronizar raios.

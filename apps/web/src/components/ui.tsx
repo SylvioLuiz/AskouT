@@ -126,11 +126,23 @@ export function EmptyState({ title, children, action }: { title: string; childre
   );
 }
 
+/** Enquanto carrega, mostra a forma da tela (linhas com foto e texto) em vez de só uma palavra. */
 export function Loading({ label = 'Carregando' }: { label?: string }) {
   return (
-    <p className="loading" role="status">
-      {label}…
-    </p>
+    <div className="loading" role="status" aria-live="polite">
+      <span className="visually-hidden">{label}…</span>
+      <div className="skeleton" aria-hidden="true">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="skeleton__row">
+            <span className="skeleton__avatar" />
+            <span className="skeleton__lines">
+              <span className="skeleton__line skeleton__line--wide" />
+              <span className="skeleton__line" />
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
