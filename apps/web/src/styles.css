@@ -3809,3 +3809,5 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 @media (hover: none) {
   .chat__thread, .chat__thread * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 }
+/* O popup da mensagem não é texto: nada nele é selecionável (emojis, opções). */
+.msgpop, .msgpop * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
