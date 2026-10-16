@@ -34,8 +34,11 @@ function step(title, cwd, command, args, { env = {}, tolerate, optional = false 
     ok = true;
     note = ' (já aplicado)';
   }
-  const tail = output.trim().split('\n').slice(-3).join(' | ');
-  console.log(ok ? `ok${note}` : `FALHOU\n    ${tail}`);
+  // Em falha, mostra as linhas que dizem o que quebrou (erros do TypeScript, testes que falharam); sem elas, o fim da saída.
+  const lines = output.trim().split('\n');
+  const hits = lines.filter((l) => /error TS\d+|^\s*not ok |✖|AssertionError|Error:/.test(l) && !/^npm error/.test(l));
+  const detail = hits.length > 0 ? hits.slice(0, 12).map((l) => l.trim().slice(0, 240)).join('\n    ') + (hits.length > 12 ? `\n    … e mais ${hits.length - 12} (veja o relatório)` : '') : lines.slice(-3).join(' | ');
+  console.log(ok ? `ok${note}` : `FALHOU\n    ${detail}`);
   results.push({ title, ok, optional });
   return { ok, output };
 }
