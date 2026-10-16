@@ -3017,19 +3017,21 @@ button {
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #000000;
-  --surface: #1c1c1e;
+  --bg: #1b1c26;
+  --surface: #262833;
   --ink: #f5f5f7;
-  --ink-2: #d1d1d6;
-  --muted: #98989f;
-  --line: #38383a;
-  --line-strong: #545458;
-  --brand: #4da3ff;
-  --brand-hover: #7ab8ff;
-  --brand-ink: #000000;
-  --brand-soft: #14304f;
-  --danger: #ff8a8a;
+  --ink-2: #d4d6e0;
+  --muted: #a0a3b4;
+  --line: #363948;
+  --line-strong: #4d5164;
+  --brand: #ff4d86;
+  --brand-hover: #ff7aa5;
+  --brand-ink: #ffffff;
+  --brand-soft: #3a1a2e;
+  --brand-grad: linear-gradient(90deg, #e5195a, #d6249f);
+  --danger: #ff8a9a;
   --danger-soft: #4a1f26;
+  --nav: #15162a;
 }
 :root[data-theme='dark'] .notice--error { border-color: #7d3340; color: #ffd0d0; }
 :root[data-theme='dark'] .notice--ok { background: #12382b; border-color: #1f6b50; color: #bdf0d7; }
@@ -3042,19 +3044,21 @@ button {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --bg: #000000;
-    --surface: #1c1c1e;
+    --bg: #1b1c26;
+    --surface: #262833;
     --ink: #f5f5f7;
-    --ink-2: #d1d1d6;
-    --muted: #98989f;
-    --line: #38383a;
-    --line-strong: #545458;
-    --brand: #4da3ff;
-    --brand-hover: #7ab8ff;
-    --brand-ink: #000000;
-    --brand-soft: #14304f;
-    --danger: #ff8a8a;
+    --ink-2: #d4d6e0;
+    --muted: #a0a3b4;
+    --line: #363948;
+    --line-strong: #4d5164;
+    --brand: #ff4d86;
+    --brand-hover: #ff7aa5;
+    --brand-ink: #ffffff;
+    --brand-soft: #3a1a2e;
+    --brand-grad: linear-gradient(90deg, #e5195a, #d6249f);
+    --danger: #ff8a9a;
     --danger-soft: #4a1f26;
+    --nav: #15162a;
   }
   :root:not([data-theme='light']) .notice--error { border-color: #7d3340; color: #ffd0d0; }
   :root:not([data-theme='light']) .notice--ok { background: #12382b; border-color: #1f6b50; color: #bdf0d7; }
@@ -3824,3 +3828,17 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .groupedit__actions { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .groupedit__actions .btn { min-width: 160px; justify-content: center; }
 .groupedit__form { display: flex; flex-direction: column; gap: 12px; }
+
+/* Referência de design (tema escuro): fundo grafite-azulado, rosa/magenta como cor de ação, roxo e azul neon de apoio. */
+:root[data-theme='dark'] .btn--primary { background: var(--brand-grad); }
+:root[data-theme='dark'] .btn--primary:hover:not(:disabled) { background: linear-gradient(90deg, #f0286a, #e22fb0); }
+:root[data-theme='dark'] .evcover { background: linear-gradient(150deg, #a855f7, #3b1d7a); }
+:root[data-theme='dark'] .tabbar { background: var(--nav); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .btn--primary { background: var(--brand-grad); }
+  :root:not([data-theme='light']) .btn--primary:hover:not(:disabled) { background: linear-gradient(90deg, #f0286a, #e22fb0); }
+  :root:not([data-theme='light']) .evcover { background: linear-gradient(150deg, #a855f7, #3b1d7a); }
+  :root:not([data-theme='light']) .tabbar { background: var(--nav); }
+}
+:root[data-theme='dark'] .tabbar__create { background: var(--brand-grad); box-shadow: 0 6px 18px rgb(229 25 90 / 0.4); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .tabbar__create { background: var(--brand-grad); box-shadow: 0 6px 18px rgb(229 25 90 / 0.4); } }
