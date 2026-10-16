@@ -460,7 +460,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                       </button>
                     ) : null}
                     {!selected && m.mine && hasActions(m) ? moreButton(m) : null}
-                    <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} {...pressHandlers(m)}>
+                    <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.reactions.length > 0 ? ' bubble--reacted' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} {...pressHandlers(m)}>
                       {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
                       {m.replyTo && !m.deleted ? (
                         <button type="button" className="bubble__quote" aria-label={`Ir para a mensagem respondida de ${m.replyTo.mine ? 'você' : m.replyTo.senderName}`} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
@@ -484,19 +484,19 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                         <p className="bubble__text">{m.body}</p>
                       )}
                       <span className="bubble__time">{formatClock(m.createdAt)}</span>
+                      {m.reactions.length > 0 ? (
+                        <div className="reactions">
+                          {m.reactions.map((r) => (
+                            <button key={r.emoji} type="button" className={`reactions__chip${r.mine ? ' is-mine' : ''}`} aria-pressed={r.mine} aria-label={`${r.emoji} ${r.count} ${r.count === 1 ? 'reação' : 'reações'}${r.mine ? ', sua. Toque para tirar' : ''}`} disabled={!data.canSend} onClick={() => void toggleReaction(m, r.emoji)}>
+                              <span aria-hidden="true">{r.emoji}</span>
+                              {r.count > 1 ? <span className="reactions__n">{r.count}</span> : null}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                     {!selected && !m.mine && hasActions(m) ? moreButton(m) : null}
                   </SwipeRow>
-                  {m.reactions.length > 0 ? (
-                    <div className={`reactions${m.mine ? ' reactions--mine' : ''}`}>
-                      {m.reactions.map((r) => (
-                        <button key={r.emoji} type="button" className={`reactions__chip${r.mine ? ' is-mine' : ''}`} aria-pressed={r.mine} aria-label={`${r.emoji} ${r.count} ${r.count === 1 ? 'reação' : 'reações'}${r.mine ? ', sua. Toque para tirar' : ''}`} disabled={!data.canSend} onClick={() => void toggleReaction(m, r.emoji)}>
-                          <span aria-hidden="true">{r.emoji}</span>
-                          {r.count > 1 ? <span className="reactions__n">{r.count}</span> : null}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
                 </>
               )}
             </div>

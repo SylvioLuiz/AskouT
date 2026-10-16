@@ -3713,9 +3713,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .bubble__quote { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; margin: 0 0 6px; padding: 4px 8px; border: 0; border-left: 3px solid var(--brand); border-radius: 6px; background: rgba(0, 0, 0, 0.05); color: inherit; font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; }
 .bubble__quote strong { font-size: 0.75rem; color: var(--brand-hover); }
 .bubble__quote span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
-.reactions { display: flex; flex-wrap: wrap; gap: 4px; margin: -4px 12px 2px; }
-.reactions--mine { justify-content: flex-end; }
-.reactions__chip { display: inline-flex; align-items: center; gap: 3px; min-height: 24px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font: inherit; font-size: 0.875rem; line-height: 1; cursor: pointer; }
+.reactions { position: absolute; left: 10px; bottom: -14px; display: flex; flex-wrap: nowrap; gap: 4px; z-index: 1; }
+.bubble--reacted { overflow: visible; min-width: 88px; margin-bottom: 16px; }
+.reactions__chip { display: inline-flex; align-items: center; gap: 3px; min-height: 24px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); font: inherit; font-size: 0.875rem; line-height: 1; cursor: pointer; }
 .reactions__chip.is-mine { border-color: var(--brand); background: var(--brand-soft); }
 .reactions__chip:disabled { cursor: default; }
 .reactions__n { font-size: 0.75rem; color: var(--muted); }
