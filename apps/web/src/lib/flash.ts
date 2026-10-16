@@ -91,3 +91,22 @@ export function geolocationMessage(code: number | undefined, secure: boolean): s
   if (code === 3) return 'A localização demorou demais. Toque em compartilhar para tentar de novo.';
   return 'Este aparelho não consegue informar a localização.';
 }
+
+/** Contagem regressiva: "1h 58min" (de uma hora para cima) ou "42min 07s". */
+export function formatCountdown(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return 'acabou';
+  const total = Math.ceil(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const two = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}h ${two(m)}min` : `${m}min ${two(sec)}s`;
+}
+
+/** Quanto do tempo do Flash ainda resta, de 0 a 1. */
+export function flashRemainingShare(startsAt: string | null, expiresAt: string, nowMs: number): number {
+  const end = Date.parse(expiresAt);
+  const start = startsAt ? Date.parse(startsAt) : Number.NaN;
+  if (Number.isNaN(end) || Number.isNaN(start) || end <= start) return 0;
+  return Math.min(1, Math.max(0, (end - nowMs) / (end - start)));
+}

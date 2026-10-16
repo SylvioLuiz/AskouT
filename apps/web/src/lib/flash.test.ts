@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { distanceMeters, flashNoteProblem, formatAge, formatDistance, formatRemaining, geolocationMessage, minutesLeft } from './flash.ts';
+import { distanceMeters, flashNoteProblem, flashRemainingShare, formatCountdown, formatAge, formatDistance, formatRemaining, geolocationMessage, minutesLeft } from './flash.ts';
 
 describe('distanceMeters', () => {
   it('é zero para o mesmo ponto', () => {
@@ -64,5 +64,19 @@ describe('recado e permissões', () => {
     assert.match(geolocationMessage(1, true), /bloqueada/);
     assert.match(geolocationMessage(undefined, false), /https/);
     assert.match(geolocationMessage(2, true), /sinal/);
+  });
+});
+
+describe('contagem regressiva', () => {
+  it('formata o tempo e a parte restante', () => {
+    assert.equal(formatCountdown(118 * 60_000), '1h 58min');
+    assert.equal(formatCountdown(65 * 60_000), '1h 05min');
+    assert.equal(formatCountdown(42 * 60_000 + 7_000), '42min 07s');
+    assert.equal(formatCountdown(0), 'acabou');
+    const start = '2026-10-16T10:00:00Z';
+    const end = '2026-10-16T12:00:00Z';
+    assert.equal(flashRemainingShare(start, end, Date.parse('2026-10-16T10:30:00Z')), 0.75);
+    assert.equal(flashRemainingShare(start, end, Date.parse('2026-10-16T13:00:00Z')), 0);
+    assert.equal(flashRemainingShare(null, end, Date.parse(start)), 0);
   });
 });

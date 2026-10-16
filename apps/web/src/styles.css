@@ -3959,9 +3959,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 
 /* ---------- Flash desligado (tela de ativação) ---------- */
 /* Fundo mais azulado, como na referência (só no escuro). */
-:root[data-theme='dark']:has(.flashoff) { --bg: #0b0e1a; --surface: #151829; --nav: #0f1220; --line: #232741; --line-strong: #333957; --brand-soft: #2b1a42; }
+:root[data-theme='dark']:has(.flashoff, .flashlive) { --bg: #0b0e1a; --surface: #151829; --nav: #0f1220; --line: #232741; --line-strong: #333957; --brand-soft: #2b1a42; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']):has(.flashoff) { --bg: #0b0e1a; --surface: #151829; --nav: #0f1220; --line: #232741; --line-strong: #333957; --brand-soft: #2b1a42; }
+  :root:not([data-theme='light']):has(.flashoff, .flashlive) { --bg: #0b0e1a; --surface: #151829; --nav: #0f1220; --line: #232741; --line-strong: #333957; --brand-soft: #2b1a42; }
 }
 .flashoff { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
 .flashoff__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -4049,3 +4049,60 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .flashtoast__bolt svg { width: 28px; height: 28px; }
 @keyframes flashtoastin { from { opacity: 0; transform: translate(-50%, -46%); } to { opacity: 1; transform: translate(-50%, -50%); } }
 @media (prefers-reduced-motion: reduce) { .flashtoast { animation: none; } }
+
+/* ---------- Flash ligado, com amigos livres ---------- */
+.flashlive { position: relative; display: flex; flex-direction: column; gap: 22px; margin-bottom: 24px; }
+.flashlive::before { content: ''; position: absolute; right: -60px; top: -40px; z-index: -1; width: 300px; height: 200px; border-top: 1.5px solid var(--brand); border-radius: 50% 50% 0 0 / 100% 100% 0 0; opacity: 0.18; transform: rotate(-12deg); pointer-events: none; }
+.flashlive__head { display: flex; flex-direction: column; gap: 4px; }
+.flashlive__title { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--font-display); font-size: 2.5rem; line-height: 1.05; font-weight: 700; }
+.flashlive__title svg { width: 34px; height: 34px; color: var(--brand); filter: drop-shadow(0 0 8px var(--brand)); }
+.flashlive__sub { margin: 0; color: var(--ink-2); font-size: clamp(1rem, 4.6vw, 1.1875rem); }
+.flashlive__section { display: flex; flex-direction: column; gap: 14px; }
+.flashlive__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.flashlive__h2 { margin: 0; font-family: var(--font-display); font-size: clamp(1.0625rem, 5vw, 1.5rem); line-height: 1.2; font-weight: 700; }
+.flashlive__refresh { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--brand); font: inherit; font-size: 1rem; cursor: pointer; }
+.flashlive__refresh svg { width: 22px; height: 22px; }
+.flashlive__map { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; border: 1.5px solid var(--brand); border-radius: 999px; background: transparent; color: var(--brand); font: inherit; font-size: 1.0625rem; font-weight: 600; cursor: pointer; }
+.flashlive__map svg { width: 22px; height: 22px; }
+.flashlive__refresh:focus-visible, .flashlive__map:focus-visible, .flashfriend:focus-visible, .flashquick__item:focus-visible, .flashprivacy:focus-visible, .flashcard__off:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+.flashcard { position: relative; display: flex; flex-direction: column; gap: 16px; padding: 18px; border: 1.5px solid var(--brand); border-radius: 26px; background: linear-gradient(160deg, var(--brand-soft), var(--surface) 70%); box-shadow: 0 0 28px rgb(250 114 201 / 0.2), inset 0 0 24px rgb(181 110 252 / 0.1); }
+.flashcard__top { display: flex; align-items: center; gap: 16px; }
+.flashcard__icon { flex: none; display: grid; place-items: center; width: 58px; height: 58px; border-radius: 17px; background: var(--brand-grad, var(--brand)); color: var(--brand-ink); box-shadow: var(--shadow-brand); }
+.flashcard__icon svg { width: 30px; height: 30px; }
+.flashcard__text { min-width: 0; }
+.flashcard__title { margin: 0; font-family: var(--font-display); font-size: 1.375rem; line-height: 1.2; font-weight: 700; }
+.flashcard__status { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; color: var(--ink-2); font-size: 1.0625rem; font-variant-numeric: tabular-nums; }
+.flashcard__dot { flex: none; width: 11px; height: 11px; margin-right: 2px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.flashbar { height: 11px; overflow: hidden; border-radius: 999px; background: var(--line-strong); }
+.flashbar__fill { display: block; height: 100%; border-radius: 999px; background: var(--brand-grad, var(--brand)); transition: width 1s linear; }
+.flashcard__note { margin: 0; color: var(--ink-2); font-size: 0.9375rem; }
+.flashcard__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.flashcard__visible { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 0.875rem; line-height: 1.2; }
+.flashcard__visible svg { flex: none; width: 24px; height: 24px; color: var(--brand); }
+.flashcard__off { flex: none; display: inline-flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 20px; border: 1.5px solid var(--ink-2); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 1.0625rem; font-weight: 650; cursor: pointer; }
+.flashcard__stop { width: 15px; height: 15px; border-radius: 3px; background: var(--ink); }
+
+.flashfriends { display: flex; justify-content: space-between; gap: 14px; margin: 0; padding: 4px 2px 2px; list-style: none; overflow-x: auto; scrollbar-width: none; }
+.flashfriends::-webkit-scrollbar { display: none; }
+.flashfriends > li { flex: 1 0 70px; min-width: 70px; max-width: 96px; }
+.flashfriend { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.flashfriend__ring { position: relative; display: block; width: 100%; max-width: 76px; aspect-ratio: 1; padding: 3px; border-radius: 50%; background: var(--brand-grad, var(--brand)); }
+.flashfriend__img { display: grid; place-items: center; width: 100%; height: 100%; border: 2px solid var(--bg); border-radius: 50%; object-fit: cover; font-weight: 700; font-size: 1.25rem; }
+.flashfriend__on { position: absolute; right: -1px; bottom: 2px; width: 20px; height: 20px; border: 3px solid var(--bg); border-radius: 50%; background: var(--ok); box-sizing: border-box; }
+.flashfriend__name { max-width: 100%; overflow: hidden; font-size: 1.0625rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.flashfriend__detail { max-width: 100%; overflow: hidden; color: var(--muted); font-size: 0.9375rem; text-overflow: ellipsis; white-space: nowrap; }
+
+.flashquick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.flashquick__item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 92px; padding: 12px 8px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink); font: inherit; font-size: 1rem; line-height: 1.2; text-align: center; text-decoration: none; cursor: pointer; }
+.flashquick__item svg { width: 30px; height: 30px; color: var(--brand); }
+.flashquick__item:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.flashprivacy { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); color: var(--ink); font: inherit; font-size: 1rem; line-height: 1.35; text-align: left; cursor: pointer; }
+.flashprivacy > svg:first-child { flex: none; width: 34px; height: 34px; color: var(--brand); }
+.flashprivacy > span { flex: 1; }
+.flashprivacy > svg:last-child { flex: none; width: 22px; height: 22px; color: var(--muted); }
+
+.flashcall { margin: 0 0 12px; padding-left: 20px; color: var(--ink-2); }
+@media (max-width: 359px) { .flashquick { grid-template-columns: 1fr; } .flashquick__item { flex-direction: row; min-height: 56px; justify-content: flex-start; padding-left: 16px; } }
+@media (prefers-reduced-motion: reduce) { .flashbar__fill { transition: none; } }

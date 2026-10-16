@@ -396,3 +396,16 @@ export const ChevronRightIcon = () => (
     <path d="M9.5 5.5 16 12l-6.5 6.5" />
   </Svg>
 );
+
+export const ShieldIcon = () => (
+  <Svg>
+    <path d="M12 3.2 5 6v5.5c0 4.2 2.9 7.6 7 9.3 4.1-1.7 7-5.100 7-9.300V6l-7-2.800Z" />
+    <path d="m9 12 2.2 2.200L15.200 10" />
+  </Svg>
+);
+export const RefreshIcon = () => (
+  <Svg>
+    <path d="M19 8a7.500 7.500 0 0 0-13.200-1.500M5 4v3h3" />
+    <path d="M5 16a7.500 7.500 0 0 0 13.200 1.500M19 20v-3h-3" />
+  </Svg>
+);

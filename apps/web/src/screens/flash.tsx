@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { BoltIcon, ChevronRightIcon, ClockIcon, HelpIcon, LockIcon, UsersIcon } from '../components/icons.tsx';
+import { BoltIcon, CalendarIcon, ChatIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, RefreshIcon, ShieldIcon, UsersIcon } from '../components/icons.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { ChatButton } from '../components/chat-button.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
@@ -12,13 +12,15 @@ import {
   formatFlashDuration,
   FLASH_NOTE_MAX,
   flashNoteProblem,
+  flashRemainingShare,
   formatAge,
+  formatCountdown,
   formatDistance,
   formatRemaining,
   geolocationMessage,
   minutesLeft,
 } from '../lib/flash.ts';
-import { initials } from '../lib/avatar.ts';
+import { initials, tintIndex } from '../lib/avatar.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { OtherPin } from '../components/match-map.tsx';
 import type { AvailableFriend, FlashInvite, FlashMatch, PublicProfile } from '../lib/types.ts';
@@ -68,6 +70,10 @@ export function FlashScreen() {
   const [confirmOff, setConfirmOff] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>();
   const [started, setStarted] = useState<string | undefined>();
+  const [mapOpen, setMapOpen] = useState(false);
+  const [friendOpen, setFriendOpen] = useState<string | undefined>();
+  const [callAllOpen, setCallAllOpen] = useState(false);
+  const [callingAll, setCallingAll] = useState(false);
 
   // O aviso de "Flash ativado" some sozinho depois de 3 segundos.
   useEffect(() => {
@@ -141,6 +147,277 @@ export function FlashScreen() {
   const mapOthers: OtherPin[] = (matchViews.data ?? []).flatMap((m) =>
     m.them ? [{ id: m.inviteId, lat: m.them.lat, lng: m.them.lng, stale: m.them.stale, initials: initials(m.other.username) }] : [],
   );
+
+  const friends = available.data ?? [];
+  // Tela nova: Flash ligado e com ao menos um amigo livre. Os outros estados seguem como estavam.
+  const rich = active && friends.length > 0;
+  const eligible = friends.filter((f) => f.invite === null);
+  // Distância só quando os dois lados autorizaram: eu compartilhando e a pessoa com posição enviada.
+  const distanceById = new Map<string, string>();
+  if (share.mine) {
+    for (const m of matchViews.data ?? []) {
+      if (m.them) distanceById.set(m.other.userId, formatDistance(distanceMeters(share.mine, m.them)));
+    }
+  }
+  const friendInSheet = friends.find((f) => f.profile.userId === friendOpen);
+
+  async function callAll() {
+    setCallingAll(true);
+    setFeedback(undefined);
+    const results = await Promise.allSettled(eligible.map((f) => api.flashInvite(f.profile.userId)));
+    const sent = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - sent;
+    setCallingAll(false);
+    setCallAllOpen(false);
+    setFeedback(
+      failed === 0
+        ? { tone: 'ok', text: sent === 1 ? 'Convite enviado. Vale por 15 minutos.' : `${sent} convites enviados. Valem por 15 minutos.` }
+        : { tone: 'error', text: `${sent} de ${results.length} convites enviados. Os outros não puderam ser enviados agora.` },
+    );
+    reloadAll();
+  }
+
+  const mapSection = (
+    <section className="section" aria-labelledby="mapa-titulo">
+      <h2 id="mapa-titulo" className="section__title">
+        No mapa
+      </h2>
+      {!mapFailed && (share.mine || mapOthers.length > 0) ? (
+        <Suspense fallback={<div className="matchmap matchmap--loading" role="status">Carregando o mapa…</div>}>
+          <MatchMap me={share.mine} others={mapOthers} onFail={() => setMapFailed(true)} />
+        </Suspense>
+      ) : null}
+      <p className="muted">
+        {matches.length === 0
+          ? 'Só aparecem aqui você e os amigos que aceitaram sair com você. Convide alguém da lista abaixo.'
+          : mapOthers.length === 0
+            ? 'Seus amigos aparecem no mapa quando compartilharem a localização.'
+            : 'Amigos que aceitaram sair com você, atualizados a cada poucos segundos.'}
+      </p>
+      {share.state.phase === 'sharing' ? (
+        <Button variant="secondary" full onClick={share.stop}>
+          Parar de compartilhar
+        </Button>
+      ) : (
+        <>
+          {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
+          <Button full loading={share.state.phase === 'asking'} onClick={share.start}>
+            Compartilhar minha localização
+          </Button>
+          <p className="muted">Sua localização só vai para quem aceitou sair com você, enquanto este Flash estiver ligado.</p>
+        </>
+      )}
+    </section>
+  );
+
+  const receivedBlock =
+    received.length > 0 ? (
+      <section className="section" aria-labelledby="recebidos-titulo">
+        <h2 id="recebidos-titulo" className="section__title">
+          Convites para você
+        </h2>
+        <ul className="list">
+          {received.map((invite) => (
+            <InviteRow key={invite.id} invite={invite} canAccept={active} onChanged={reloadAll} onFeedback={setFeedback} />
+          ))}
+        </ul>
+      </section>
+    ) : null;
+
+  const matchesBlock =
+    matches.length > 0 ? (
+      <section className="section" aria-labelledby="encontros-titulo">
+        <h2 id="encontros-titulo" className="section__title">
+          Encontros em andamento
+        </h2>
+        <ul className="list">
+          {matches.map((invite) => (
+            <li key={invite.id} className="person">
+              <Link to={`/flash/encontro/${invite.id}`} className="person__link">
+                <Avatar profile={invite.other} />
+                <span className="person__body">
+                  <span className="person__name">{invite.other.username}</span>
+                  <span className="person__handle">Aceitou sair com você</span>
+                </span>
+              </Link>
+              <div className="person__aside row-actions">
+                <ChatButton userId={invite.other.userId} variant="primary" small />
+                <Link to={`/flash/encontro/${invite.id}`} className="btn btn--secondary btn--small">
+                  Mapa
+                </Link>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null;
+
+  if (rich) {
+    return (
+      <div className="flashlive">
+        {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
+        {started ? (
+          <div className="flashtoast" role="status">
+            <span className="flashtoast__bolt">
+              <BoltIcon filled />
+            </span>
+            <strong>Flash ativado</strong>
+            <span>{started}</span>
+          </div>
+        ) : null}
+        <header className="flashlive__head">
+          <h1 className="flashlive__title">
+            Flash <BoltIcon filled />
+          </h1>
+          <p className="flashlive__sub">Encontre amigos para sair agora!</p>
+        </header>
+
+        <section className="flashcard" aria-label="Seu Flash">
+          <div className="flashcard__top">
+            <span className="flashcard__icon">
+              <BoltIcon filled />
+            </span>
+            <div className="flashcard__text">
+              <p className="flashcard__title">Você está disponível!</p>
+              <p className="flashcard__status">
+                <span className="flashcard__dot" aria-hidden="true" />
+                Flash ativo
+                {status.data?.expiresAt ? (
+                  <>
+                    {' · '}
+                    <Countdown expiresAt={status.data.expiresAt} />
+                  </>
+                ) : null}
+              </p>
+            </div>
+          </div>
+          {status.data?.expiresAt ? <FlashBar startsAt={status.data.startsAt} expiresAt={status.data.expiresAt} /> : null}
+          {status.data?.note ? <p className="flashcard__note">“{status.data.note}”</p> : null}
+          {confirmOff ? (
+            <Confirm question="Desligar o Flash? Convites abertos e encontros em andamento serão encerrados." confirmLabel="Desligar" onConfirm={turnOff} onCancel={() => setConfirmOff(false)} busy={busy} danger />
+          ) : (
+            <div className="flashcard__foot">
+              <span className="flashcard__visible">
+                <UsersIcon />
+                Visível para seus amigos
+              </span>
+              <button type="button" className="flashcard__off" onClick={() => setConfirmOff(true)}>
+                <span className="flashcard__stop" aria-hidden="true" />
+                Desligar
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="flashlive__section" aria-labelledby="livres-titulo">
+          <div className="flashlive__row">
+            <h2 id="livres-titulo" className="flashlive__h2">
+              Amigos livres agora ({friends.length})
+            </h2>
+            <button type="button" className="flashlive__refresh" onClick={reloadAll}>
+              <RefreshIcon />
+              Atualizar
+            </button>
+          </div>
+          <ul className="flashfriends">
+            {friends.map((f) => {
+              const dir = f.invite?.direction;
+              const detail = distanceById.get(f.profile.userId) ?? (dir === 'MATCHED' ? 'Encontro' : dir === 'SENT' ? 'Convidado' : dir === 'RECEIVED' ? 'Convidou você' : '');
+              return (
+                <li key={f.profile.userId}>
+                  <button type="button" className="flashfriend" onClick={() => setFriendOpen(f.profile.userId)}>
+                    <span className="flashfriend__ring">
+                      {f.profile.avatarUrl ? (
+                        <img className="flashfriend__img" src={f.profile.avatarUrl.startsWith('/') ? api.assetUrl(f.profile.avatarUrl) : f.profile.avatarUrl} alt="" referrerPolicy="no-referrer" />
+                      ) : (
+                        <span className={`flashfriend__img avatar--tint-${tintIndex(f.profile.username)}`} aria-hidden="true">
+                          {initials(f.profile.username)}
+                        </span>
+                      )}
+                      <span className="flashfriend__on" aria-hidden="true" />
+                    </span>
+                    <span className="flashfriend__name">{f.profile.username}</span>
+                    <span className="flashfriend__detail">{detail || ' '}</span>
+                    <span className="visually-hidden">Livre agora. Abrir opções.</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <button type="button" className="flashlive__map" onClick={() => setMapOpen(true)}>
+            <LocationIcon />
+            Ver no mapa
+          </button>
+        </section>
+
+        <section className="flashlive__section" aria-labelledby="acoes-titulo">
+          <h2 id="acoes-titulo" className="flashlive__h2">
+            Ações rápidas
+          </h2>
+          <div className="flashquick">
+            <button type="button" className="flashquick__item" disabled={eligible.length === 0} onClick={() => setCallAllOpen(true)}>
+              <UsersIcon />
+              Chamar todos
+            </button>
+            <Link to="/criar" className="flashquick__item">
+              <CalendarIcon />
+              Criar evento agora
+            </Link>
+            <Link to="/conversas" className="flashquick__item">
+              <ChatIcon />
+              Ver conversas
+            </Link>
+          </div>
+        </section>
+
+        <button type="button" className="flashprivacy" onClick={() => setInfoOpen(true)}>
+          <ShieldIcon />
+          <span>Sua localização é compartilhada apenas com amigos que você autorizar.</span>
+          <ChevronRightIcon />
+        </button>
+
+        {receivedBlock}
+        {matchesBlock}
+
+        {infoOpen ? (
+          <Sheet title="Como o Flash funciona" onClose={() => setInfoOpen(false)}>
+            <p>Seus amigos que também estiverem com Flash ligado veem seu nome e sua foto.</p>
+            <p>Sua localização só é compartilhada com quem aceitar sair com você.</p>
+          </Sheet>
+        ) : null}
+        {mapOpen ? (
+          <Sheet title="Ver no mapa" onClose={() => setMapOpen(false)}>
+            {mapSection}
+          </Sheet>
+        ) : null}
+        {friendInSheet ? (
+          <Sheet title={friendInSheet.profile.username} onClose={() => setFriendOpen(undefined)}>
+            <ul className="list">
+              <AvailableRow friend={friendInSheet} onChanged={reloadAll} onFeedback={setFeedback} />
+            </ul>
+          </Sheet>
+        ) : null}
+        {callAllOpen ? (
+          <Sheet title="Chamar todos" onClose={() => (callingAll ? undefined : setCallAllOpen(false))}>
+            <p>
+              Enviar convite para {eligible.length === 1 ? '1 amigo que está livre' : `${eligible.length} amigos que estão livres`} agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.
+            </p>
+            <ul className="flashcall">
+              {eligible.map((f) => (
+                <li key={f.profile.userId}>{f.profile.username}</li>
+              ))}
+            </ul>
+            <Button full loading={callingAll} onClick={() => void callAll()}>
+              Enviar convites
+            </Button>
+            <Button full variant="quiet" disabled={callingAll} onClick={() => setCallAllOpen(false)}>
+              Cancelar
+            </Button>
+          </Sheet>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -293,78 +570,11 @@ export function FlashScreen() {
         </section>
       )}
 
-      {active ? (
-        <section className="section" aria-labelledby="mapa-titulo">
-          <h2 id="mapa-titulo" className="section__title">
-            No mapa
-          </h2>
-          {!mapFailed && (share.mine || mapOthers.length > 0) ? (
-            <Suspense fallback={<div className="matchmap matchmap--loading" role="status">Carregando o mapa…</div>}>
-              <MatchMap me={share.mine} others={mapOthers} onFail={() => setMapFailed(true)} />
-            </Suspense>
-          ) : null}
-          <p className="muted">
-            {matches.length === 0
-              ? 'Só aparecem aqui você e os amigos que aceitaram sair com você. Convide alguém da lista abaixo.'
-              : mapOthers.length === 0
-                ? 'Seus amigos aparecem no mapa quando compartilharem a localização.'
-                : 'Amigos que aceitaram sair com você, atualizados a cada poucos segundos.'}
-          </p>
-          {share.state.phase === 'sharing' ? (
-            <Button variant="secondary" full onClick={share.stop}>
-              Parar de compartilhar
-            </Button>
-          ) : (
-            <>
-              {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
-              <Button full loading={share.state.phase === 'asking'} onClick={share.start}>
-                Compartilhar minha localização
-              </Button>
-              <p className="muted">Sua localização só vai para quem aceitou sair com você, enquanto este Flash estiver ligado.</p>
-            </>
-          )}
-        </section>
-      ) : null}
+      {active ? mapSection : null}
 
-      {received.length > 0 ? (
-        <section className="section" aria-labelledby="recebidos-titulo">
-          <h2 id="recebidos-titulo" className="section__title">
-            Convites para você
-          </h2>
-          <ul className="list">
-            {received.map((invite) => (
-              <InviteRow key={invite.id} invite={invite} canAccept={active} onChanged={reloadAll} onFeedback={setFeedback} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      {receivedBlock}
 
-      {matches.length > 0 ? (
-        <section className="section" aria-labelledby="encontros-titulo">
-          <h2 id="encontros-titulo" className="section__title">
-            Encontros em andamento
-          </h2>
-          <ul className="list">
-            {matches.map((invite) => (
-              <li key={invite.id} className="person">
-                <Link to={`/flash/encontro/${invite.id}`} className="person__link">
-                  <Avatar profile={invite.other} />
-                  <span className="person__body">
-                    <span className="person__name">{invite.other.username}</span>
-                    <span className="person__handle">Aceitou sair com você</span>
-                  </span>
-                </Link>
-                <div className="person__aside row-actions">
-                  <ChatButton userId={invite.other.userId} variant="primary" small />
-                  <Link to={`/flash/encontro/${invite.id}`} className="btn btn--secondary btn--small">
-                    Mapa
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      {matchesBlock}
 
       <section className="section" aria-labelledby="livres-titulo">
         <h2 id="livres-titulo" className="section__title">
@@ -389,6 +599,33 @@ export function FlashScreen() {
         ) : null}
       </section>
     </>
+  );
+}
+
+// ---------- Cartão do Flash ligado ----------
+
+/** Relógio que anda de segundo em segundo sem refazer a tela toda. */
+function useNow(everyMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), everyMs);
+    return () => window.clearInterval(timer);
+  }, [everyMs]);
+  return now;
+}
+
+function Countdown({ expiresAt }: { expiresAt: string }) {
+  const now = useNow(1000);
+  return <span className="flashcard__time">{formatCountdown(Date.parse(expiresAt) - now)}</span>;
+}
+
+function FlashBar({ startsAt, expiresAt }: { startsAt: string | null; expiresAt: string }) {
+  const now = useNow(1000);
+  const share = flashRemainingShare(startsAt, expiresAt, now);
+  return (
+    <div className="flashbar" role="progressbar" aria-label="Tempo restante do Flash" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}>
+      <span className="flashbar__fill" style={{ width: `${Math.round(share * 100)}%` }} />
+    </div>
   );
 }
 
