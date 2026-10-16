@@ -3765,9 +3765,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 
 /* Segurar a mensagem: destaque, reações e opções (como no WhatsApp). */
 .msg--lifted { position: relative; z-index: 95; }
-.msgpop { position: fixed; inset: 0; z-index: 90; }
-.msgpop__scrim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: msgpop-fade 140ms ease-out; }
-.msgpop__bar, .msgpop__menu { position: absolute; z-index: 96; animation: msgpop-in 160ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+.msgpop { display: contents; }
+.msgpop__scrim { position: fixed; inset: 0; z-index: 90; touch-action: none; overscroll-behavior: contain; background: rgba(0, 0, 0, 0.45); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); animation: msgpop-fade 140ms ease-out; }
+.msgpop__bar, .msgpop__menu { position: fixed; z-index: 96; animation: msgpop-in 160ms cubic-bezier(0.34, 1.4, 0.64, 1); }
 .msgpop--mine .msgpop__bar, .msgpop--mine .msgpop__menu { right: 12px; transform-origin: right center; }
 .msgpop--theirs .msgpop__bar, .msgpop--theirs .msgpop__menu { left: 12px; transform-origin: left center; }
 .msgpop__bar { display: flex; gap: 2px; padding: 4px 6px; border-radius: 999px; background: var(--surface); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22); }

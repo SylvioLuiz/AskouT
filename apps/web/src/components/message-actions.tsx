@@ -27,6 +27,22 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
   const mine = message.reactions.find((r) => r.mine)?.emoji;
   const canDelete = allDeletable([message]);
 
+  // Trava a rolagem da página enquanto o menu está aberto (senão a mensagem sai de baixo dele).
+  useLayoutEffect(() => {
+    const y = window.scrollY;
+    const body = document.body;
+    const before = { position: body.style.position, top: body.style.top, width: body.style.width };
+    body.style.position = 'fixed';
+    body.style.top = `-${y}px`;
+    body.style.width = '100%';
+    return () => {
+      body.style.position = before.position;
+      body.style.top = before.top;
+      body.style.width = before.width;
+      window.scrollTo(0, y);
+    };
+  }, []);
+
   // Destaca a própria mensagem acima do fundo escurecido e mede onde ficam a barra e o menu.
   useLayoutEffect(() => {
     const el = document.getElementById(`msg-${message.id}`);
