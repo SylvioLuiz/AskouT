@@ -353,6 +353,7 @@ export function createApi(deps: ApiDeps) {
     leaveGroup: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/leave`),
     setGroupAdmin: (conversationId: string, userId: string, admin: boolean) =>
       request<{ role: 'ADMIN' | 'MEMBER' }>('PUT', `/conversations/${id(conversationId)}/members/${id(userId)}/admin`, { body: { admin } }),
+    addGroupMembers: (conversationId: string, userIds: string[]) => request<{ added: number }>('POST', `/conversations/${id(conversationId)}/members`, { body: { userIds } }),
     removeMember: (conversationId: string, userId: string) => request<{ ok: true }>('DELETE', `/conversations/${id(conversationId)}/members/${id(userId)}`),
     renameGroup: (conversationId: string, name: string) => request<{ name: string }>('PUT', `/conversations/${id(conversationId)}/group/name`, { body: { name } }),
     setGroupPhoto: (conversationId: string, image: string | null) => request<{ imageUrl: string | null }>('PUT', `/conversations/${id(conversationId)}/group/photo`, { body: { image } }),

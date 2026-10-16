@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { ManageMeetupSheet } from '../components/meetup.tsx';
+import { FriendPicker, ManageMeetupSheet } from '../components/meetup.tsx';
 import { GroupPolls } from '../components/date-poll-summary.tsx';
 import { GroupEvent, SharedLinks, SharedMedia } from '../components/shared-tabs.tsx';
 import { Sheet } from '../components/agenda.tsx';
@@ -10,7 +10,7 @@ import { toApiError } from '../lib/errors.ts';
 import { resizeGroupPhoto } from '../lib/image.ts';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
-import { peopleLabel } from '../lib/meetup.ts';
+import { peopleLabel, toggleId } from '../lib/meetup.ts';
 import type { MeetupView } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 
@@ -24,9 +24,10 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   const polls = useAsync(() => api.conversationPolls(conversationId), [conversationId]);
   const me = useUser();
   const [tab, setTab] = useState<Tab>('people');
-  const [sheet, setSheet] = useState<'edit' | 'leave' | { member: string } | { remove: string } | { block: string } | { meetup: MeetupView } | undefined>();
+  const [sheet, setSheet] = useState<'edit' | 'leave' | 'add' | { member: string } | { remove: string } | { block: string } | { meetup: MeetupView } | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
   const [name, setName] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   useTitle(group.data?.name ?? 'Grupo');
@@ -106,7 +107,12 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
 
       {tab === 'people' ? (
         <>
-          <h2 className="results__h">Participantes</h2>
+          <div className="grouphead">
+            <h2 className="results__h">Participantes</h2>
+            <button type="button" className="grouphead__add" onClick={() => { setProblem(undefined); setPicked([]); setSheet('add'); }}>
+              Adicionar
+            </button>
+          </div>
           <ul className="list">
             {data.members.map((m) => (
               <PersonRow key={m.profile.userId} profile={m.profile} realName aside={
@@ -122,7 +128,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
               />
             ))}
           </ul>
-          <p className="muted">Entra no grupo quem aceita o convite do encontro.</p>
+          <p className="muted">Entra no grupo quem aceita o convite do encontro ou quem um participante adiciona.</p>
           <button type="button" className="groupleave" onClick={() => { setProblem(undefined); setSheet('leave'); }}>
             Sair do grupo
           </button>
@@ -233,6 +239,16 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
           {problem ? <p className="sugcard__problem" role="alert">{problem}</p> : null}
           <Button full variant="danger" loading={busy} onClick={() => void act(() => api.block(sheet.block))}>
             Bloquear
+          </Button>
+        </Sheet>
+      ) : null}
+
+      {sheet === 'add' ? (
+        <Sheet title="Adicionar ao grupo" onClose={() => setSheet(undefined)}>
+          <FriendPicker picked={picked} onToggle={(userId) => setPicked((cur) => toggleId(cur, userId))} exclude={data.members.map((m) => m.profile.userId)} />
+          {problem ? <p className="sugcard__problem">{problem}</p> : null}
+          <Button full loading={busy} disabled={picked.length === 0} onClick={() => void act(() => api.addGroupMembers(conversationId, picked))}>
+            {picked.length > 1 ? `Adicionar ${picked.length} pessoas` : 'Adicionar'}
           </Button>
         </Sheet>
       ) : null}

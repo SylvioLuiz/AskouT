@@ -825,6 +825,31 @@ export class ConversationService {
     return { imageUrl };
   }
 
+  /** Qualquer pessoa do grupo adiciona amigos seus (seguimento mútuo, sem bloqueio) que ainda não estão. Limite de 15 pessoas além de quem criou. */
+  async addMembers(actorId: string, conversationId: string, userIds: unknown): Promise<{ added: number }> {
+    const { conversations, follows, blocks, clock } = this.deps;
+    const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
+    if (!Array.isArray(userIds) || userIds.length === 0) throw validationError('Escolha as pessoas', { userIds: 'Escolha ao menos uma pessoa' });
+    const targets = [...new Set(userIds)];
+    for (const t of targets) if (typeof t !== 'string' || t === '' || t.length > 64) throw validationError('Pessoa inválida', { userIds: 'Pessoa inválida' });
+    const wanted = (targets as string[]).filter((t) => !memberIds.includes(t));
+    if (wanted.length === 0) return { added: 0 };
+    if (memberIds.length + wanted.length > GROUP_MAX_MEMBERS + 1) throw validationError(`O grupo comporta ${GROUP_MAX_MEMBERS + 1} pessoas`, { userIds: `O grupo comporta ${GROUP_MAX_MEMBERS + 1} pessoas` });
+    const [friends, related] = await Promise.all([follows.listFriendIds(actorId), blocks.listRelatedIds(actorId)]);
+    for (const t of wanted) {
+      if (related.includes(t)) throw notFound('Pessoa não encontrada');
+      if (!friends.includes(t)) throw forbidden('Só amigos podem entrar no grupo');
+    }
+    const now = clock.now();
+    const actorName = await this.nameOf(actorId);
+    for (const t of wanted) {
+      await conversations.addParticipant(conversationId, t, now);
+      await this.postSystem(conversationId, actorId, `${actorName} adicionou ${await this.nameOf(t)}`, now);
+    }
+    await this.notifyMembers(actorId, actorName, conversation, wanted, 'adicionou você ao grupo');
+    return { added: wanted.length };
+  }
+
   /** Faz ou desfaz um administrador. Quem criou o grupo faz os dois; um administrador só promove membros. */
   async setAdmin(actorId: string, conversationId: string, targetId: unknown, admin: unknown): Promise<{ role: GroupRoleView }> {
     const { conversations, clock } = this.deps;

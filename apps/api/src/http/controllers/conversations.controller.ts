@@ -147,6 +147,12 @@ export class ConversationsController {
     return this.core.conversations.removeMember(actor.userId, id, userId);
   }
 
+  /** `{userIds: string[]}`: adiciona amigos ao grupo. */
+  @Post(':id/members')
+  addMembers(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
+    return this.core.conversations.addMembers(actor.userId, id, asBody(body).userIds);
+  }
+
   /** `{admin: true|false}`: faz ou desfaz um administrador do grupo. */
   @Put(':id/members/:userId/admin')
   setAdmin(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Param('userId', new ParseUUIDPipe()) userId: string, @Body() body: unknown) {

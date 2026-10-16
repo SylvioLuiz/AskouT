@@ -202,3 +202,21 @@ test('detalhe do grupo diz quem eu já sigo', async () => {
   assert.deepEqual(await follow(), { ana: 'NONE', bia: 'FOLLOWING', caio: 'NONE' });
   void bia;
 });
+
+test('adicionar pessoas ao grupo: só amigos de quem adiciona, sem repetir, com aviso', async () => {
+  const { w, u, ana, bia, caio, dani, eva, cid } = await group();
+  const conv = w.core.conversations;
+  await w.core.follows.follow(bia, dani);
+  await w.core.follows.follow(dani, bia);
+  await rejectsWith(conv.addMembers(ana, cid, []), 'VALIDATION');
+  await rejectsWith(conv.addMembers(bia, cid, [eva]), 'FORBIDDEN');
+  assert.deepEqual(await conv.addMembers(bia, cid, [dani, bia, caio]), { added: 1 });
+  assert.deepEqual(await conv.addMembers(ana, cid, [dani]), { added: 0 });
+  const names = (await conv.group(ana, cid)).members.map((m) => m.profile.username).sort();
+  assert.deepEqual(names, ['ana', 'bia', 'caio', 'dani']);
+  const sys = (await conv.messages(ana, cid)).messages.filter((m) => m.kind === 'SYSTEM').map((m) => m.body);
+  assert.ok(sys.some((b) => b.includes('adicionou')));
+  await w.core.blocks.block(ana, u['eva']!);
+  await rejectsWith(conv.addMembers(ana, cid, [eva]), 'NOT_FOUND');
+  await rejectsWith(conv.addMembers(eva, cid, [dani]), 'NOT_FOUND');
+});
