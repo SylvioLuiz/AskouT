@@ -3956,3 +3956,70 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 
 /* O título que recebe o foco ao trocar de tela não ganha contorno de foco. */
 #conteudo:focus, #conteudo [tabindex='-1']:focus { outline: none; }
+
+/* ---------- Flash desligado (tela de ativação) ---------- */
+.flashoff { display: flex; flex-direction: column; gap: 18px; margin-bottom: 28px; }
+.flashoff__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.flashoff__title { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--font-display); font-size: 2.125rem; line-height: 1.1; font-weight: 700; }
+.flashoff__title svg { width: 30px; height: 30px; color: var(--brand); }
+.flashoff__sub { margin: 6px 0 0; color: var(--muted); font-size: 1.0625rem; line-height: 1.3; text-wrap: balance; }
+.flashoff__how { flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--control-border); border-radius: 999px; background: transparent; color: var(--ink-2); font: inherit; font-size: 0.875rem; cursor: pointer; }
+.flashoff__how svg { width: 20px; height: 20px; }
+.flashoff__how:focus-visible, .flashdur__opt:focus-visible, .flashinvite:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+.flashhero { position: relative; background: radial-gradient(circle at 50% 50%, var(--brand-soft) 0, transparent 62%); width: 100%; max-width: 360px; aspect-ratio: 1 / 0.88; align-self: center; }
+.flashhero__ring { position: absolute; left: 50%; top: 50%; aspect-ratio: 1; border: 1.5px solid var(--brand); border-radius: 50%; transform: translate(-50%, -50%); }
+.flashhero__ring--1 { width: 50%; opacity: 0.9; }
+.flashhero__ring--2 { width: 68%; opacity: 0.55; }
+.flashhero__ring--3 { width: 86%; opacity: 0.3; }
+.flashhero__core { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 36%; aspect-ratio: 1; border: 1.5px solid var(--brand); border-radius: 50%; background: var(--brand-soft); color: var(--brand); box-shadow: var(--shadow-brand); transform: translate(-50%, -50%); }
+.flashhero__core svg { width: 52%; height: 52%; }
+.flashhero__person { position: absolute; width: 19%; aspect-ratio: 1; overflow: hidden; border: 2px solid var(--brand); border-radius: 50%; background: var(--brand-soft); }
+.flashhero__person svg { display: block; width: 100%; height: 100%; fill: var(--brand); }
+.flashhero__person--a { left: 9%; top: 15%; }
+.flashhero__person--b { right: 15%; top: 3%; }
+.flashhero__person--c { right: 2%; top: 44%; }
+.flashhero__person--d { left: 10%; top: 62%; }
+.flashhero__dot { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--brand); }
+.flashhero__dot--a { left: 28%; top: 6%; }
+.flashhero__dot--b { right: 5%; top: 30%; width: 7px; height: 7px; background: transparent; border: 1.5px solid var(--brand); }
+.flashhero__dot--c { left: 2%; top: 42%; width: 14px; height: 14px; background: transparent; border: 1.5px solid var(--brand); }
+.flashhero__dot--d { right: 24%; top: 76%; }
+@media (prefers-reduced-motion: no-preference) {
+  .flashhero__ring { animation: flashring 3.2s ease-in-out infinite; }
+  .flashhero__ring--2 { animation-delay: 0.4s; }
+  .flashhero__ring--3 { animation-delay: 0.8s; }
+}
+@keyframes flashring { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.03); } }
+
+.flashoff__lead { margin: 0; font-family: var(--font-display); font-size: clamp(1.25rem, 5.6vw, 1.5rem); line-height: 1.2; font-weight: 700; text-align: center; text-wrap: balance; }
+.flashoff__lead em { font-style: normal; color: var(--brand); }
+
+.flashperks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.flashperks li { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 0.8125rem; line-height: 1.25; }
+.flashperks__icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); }
+.flashperks__icon svg { width: 18px; height: 18px; }
+
+.flashdur { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 4px; border: 1.5px solid var(--control-border); border-radius: 22px; background: var(--surface); }
+.flashdur__opt { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60px; padding: 6px 4px; border: 0; border-radius: 18px; background: transparent; color: var(--ink-2); font: inherit; line-height: 1.15; cursor: pointer; }
+.flashdur__value { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.flashdur__unit { font-size: 1rem; }
+.flashdur__opt[aria-checked='true'] { background: var(--brand-grad, var(--brand)); color: var(--brand-ink); box-shadow: var(--shadow-brand); }
+.flashdur__opt[aria-checked='true'] .flashdur__value { font-weight: 800; }
+
+.flashoff > .btn { gap: 10px; min-height: 56px; border-radius: 999px; font-size: 1.1875rem; box-shadow: var(--shadow-brand); }
+.flashoff > .btn svg { width: 24px; height: 24px; }
+.flashoff__privacy { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0; color: var(--muted); font-size: 0.9375rem; line-height: 1.3; }
+.flashoff__privacy svg { flex: none; width: 20px; height: 20px; }
+
+.flashinvite { display: flex; align-items: center; gap: 14px; padding: 14px; border: 1.5px solid var(--brand); border-radius: var(--radius-panel); background: var(--brand-soft); color: var(--ink); text-decoration: none; }
+.flashinvite__art { position: relative; flex: none; width: 84px; height: 76px; }
+.flashinvite__p { position: absolute; width: 42px; height: 42px; border: 2px solid var(--brand); border-radius: 50%; background: var(--surface); }
+.flashinvite__p--a { left: 28px; top: 0; }
+.flashinvite__p--b { left: 0; top: 30px; }
+.flashinvite__plus { position: absolute; right: 0; bottom: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--brand-grad, var(--brand)); color: var(--brand-ink); font-size: 1.5rem; font-weight: 600; line-height: 1; }
+.flashinvite__body { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.flashinvite__body strong { font-size: 1.0625rem; line-height: 1.25; }
+.flashinvite__body span { color: var(--ink-2); font-size: 0.875rem; line-height: 1.3; }
+.flashinvite > svg { flex: none; width: 22px; height: 22px; color: var(--muted); }
+@media (max-width: 359px) { .flashperks { grid-template-columns: 1fr; } .flashinvite__art { display: none; } }

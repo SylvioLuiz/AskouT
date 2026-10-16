@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { BoltIcon, InfoIcon } from '../components/icons.tsx';
+import { BoltIcon, ChevronRightIcon, ClockIcon, HelpIcon, LockIcon, UsersIcon } from '../components/icons.tsx';
 import { Sheet } from '../components/agenda.tsx';
-import { Wheel } from '../components/wheel.tsx';
 import { ChatButton } from '../components/chat-button.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -10,7 +9,6 @@ import {
   announceFlashChange,
   distanceMeters,
   FLASH_DEFAULT_MINUTES,
-  clampFlashMinutes,
   formatFlashDuration,
   FLASH_NOTE_MAX,
   flashNoteProblem,
@@ -27,7 +25,13 @@ import type { AvailableFriend, FlashInvite, FlashMatch, PublicProfile } from '..
 import { Link, navigate } from '../router.tsx';
 
 const POLL_MS = 10_000;
-const MINUTE_STEPS: readonly number[] = Array.from({ length: 12 }, (_, i) => i * 5);
+/** Durações oferecidas ao ligar o Flash (a API aceita de 5 min a 3 h). */
+const DURATIONS: readonly { minutes: number; value: string; unit: string; label: string }[] = [
+  { minutes: 30, value: '30', unit: 'min', label: '30 minutos' },
+  { minutes: 60, value: '1', unit: 'hora', label: '1 hora' },
+  { minutes: 120, value: '2', unit: 'horas', label: '2 horas' },
+  { minutes: 180, value: '3', unit: 'horas', label: '3 horas' },
+];
 
 // O mapa (MapLibre) é pesado: só é baixado quando alguém abre um encontro.
 const MatchMap = lazy(() => import('../components/match-map.tsx'));
@@ -129,7 +133,7 @@ export function FlashScreen() {
 
   return (
     <>
-      <PageHead title="Flash" subtitle="Estou livre agora. Para o futuro, use a Agenda." />
+      {active ? <PageHead title="Flash" subtitle="Estou livre agora. Para o futuro, use a Agenda." /> : null}
       {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
 
       {active ? (
@@ -161,12 +165,76 @@ export function FlashScreen() {
           )}
         </section>
       ) : (
-        <section className="flashpanel" aria-label="Ligar o Flash">
-          <p className="flashpanel__lead">Por quanto tempo você fica disponível?</p>
-          <div className="wheels" role="group" aria-label="Duração do Flash">
-            <Wheel label="Horas" values={[0, 1, 2, 3]} value={Math.floor(minutes / 60)} format={(v) => `${v} h`} onChange={(h) => setMinutes((cur) => clampFlashMinutes(h * 60 + (cur % 60)))} />
-            <Wheel label="Minutos" values={MINUTE_STEPS} value={minutes % 60} format={(v) => `${String(v).padStart(2, '0')} min`} onChange={(m) => setMinutes((cur) => clampFlashMinutes(Math.floor(cur / 60) * 60 + m))} />
-            <div className="wheels__band" aria-hidden="true" />
+        <section className="flashoff" aria-label="Ligar o Flash">
+          <header className="flashoff__head">
+            <div>
+              <h1 className="flashoff__title">
+                Flash <BoltIcon filled />
+              </h1>
+              <p className="flashoff__sub">Livre agora? Encontre alguém para sair.</p>
+            </div>
+            <button type="button" className="flashoff__how" onClick={() => setInfoOpen(true)}>
+              <HelpIcon />
+              Como funciona?
+            </button>
+          </header>
+
+          {/* Ilustração decorativa: os perfis são silhuetas e não indicam amigos disponíveis. */}
+          <div className="flashhero" aria-hidden="true">
+            <span className="flashhero__ring flashhero__ring--3" />
+            <span className="flashhero__ring flashhero__ring--2" />
+            <span className="flashhero__ring flashhero__ring--1" />
+            <span className="flashhero__core">
+              <BoltIcon filled />
+            </span>
+            {['a', 'b', 'c', 'd'].map((k) => (
+              <span key={k} className={`flashhero__person flashhero__person--${k}`}>
+                <svg viewBox="0 0 40 40" focusable="false">
+                  <circle cx="20" cy="15" r="7" />
+                  <path d="M6 38c1-8 7-12 14-12s13 4 14 12z" />
+                </svg>
+              </span>
+            ))}
+            <span className="flashhero__dot flashhero__dot--a" />
+            <span className="flashhero__dot flashhero__dot--b" />
+            <span className="flashhero__dot flashhero__dot--c" />
+            <span className="flashhero__dot flashhero__dot--d" />
+          </div>
+
+          <h2 className="flashoff__lead">
+            Encontre amigos
+            <br />
+            que também estão <em>livres agora.</em>
+          </h2>
+
+          <ul className="flashperks">
+            <li>
+              <span className="flashperks__icon">
+                <UsersIcon />
+              </span>
+              Apenas seus amigos
+            </li>
+            <li>
+              <span className="flashperks__icon">
+                <ClockIcon />
+              </span>
+              Tempo limitado
+            </li>
+            <li>
+              <span className="flashperks__icon">
+                <LockIcon />
+              </span>
+              Você controla a sua localização
+            </li>
+          </ul>
+
+          <div className="flashdur" role="radiogroup" aria-label="Duração do Flash">
+            {DURATIONS.map((d) => (
+              <button key={d.minutes} type="button" role="radio" aria-checked={minutes === d.minutes} aria-label={d.label} className="flashdur__opt" onClick={() => setMinutes(d.minutes)}>
+                <span className="flashdur__value">{d.value}</span>
+                <span className="flashdur__unit">{d.unit}</span>
+              </button>
+            ))}
           </div>
           <p className="flashpanel__until" aria-live="polite">
             {formatFlashDuration(minutes)}, até {new Date(Date.now() + minutes * 60_000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -182,14 +250,28 @@ export function FlashScreen() {
             maxLength={FLASH_NOTE_MAX + 20}
             autoComplete="off"
           />
-          <div className="flashpanel__go">
-            <Button full loading={busy} onClick={turnOn}>
-              Ligar Flash
-            </Button>
-            <button type="button" className="flashpanel__info" aria-label="Como o Flash funciona" onClick={() => setInfoOpen(true)}>
-              <InfoIcon />
-            </button>
-          </div>
+          <Button full loading={busy} onClick={turnOn}>
+            <BoltIcon filled />
+            Ativar Flash
+          </Button>
+          <p className="flashoff__privacy">
+            <LockIcon />
+            <span>Sua localização só será compartilhada com amigos que você autorizar, enquanto o Flash estiver ativo.</span>
+          </p>
+
+          <Link to="/amigos/contatos" className="flashinvite">
+            <span className="flashinvite__art" aria-hidden="true">
+              <span className="flashinvite__p flashinvite__p--a" />
+              <span className="flashinvite__p flashinvite__p--b" />
+              <span className="flashinvite__plus">+</span>
+            </span>
+            <span className="flashinvite__body">
+              <strong>Chame seus amigos para ativar o Flash também!</strong>
+              <span>Quanto mais amigos ativos, maiores as chances de encontrar alguém para sair.</span>
+            </span>
+            <ChevronRightIcon />
+          </Link>
+
           {infoOpen ? (
             <Sheet title="Como o Flash funciona" onClose={() => setInfoOpen(false)}>
               <p>Seus amigos que também estiverem com Flash ligado veem seu nome e sua foto.</p>

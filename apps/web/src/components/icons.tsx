@@ -375,3 +375,24 @@ export const CheckCircleIcon = () => (
     <path d="m8 12.5 2.8 2.8L16 9.8" />
   </Line>
 );
+
+export const UsersIcon = () => (
+  <Svg>
+    <circle cx="9" cy="9" r="3" />
+    <path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+    <circle cx="17" cy="8" r="2.4" />
+    <path d="M16.5 13.2c2.6.1 4.5 1.8 4.5 4.3" />
+  </Svg>
+);
+export const HelpIcon = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2.9-1.2 1.8" />
+    <path d="M12 16.8h.01" />
+  </Svg>
+);
+export const ChevronRightIcon = () => (
+  <Svg>
+    <path d="M9.5 5.5 16 12l-6.5 6.5" />
+  </Svg>
+);
