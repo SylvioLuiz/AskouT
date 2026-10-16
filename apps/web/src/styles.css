@@ -4110,7 +4110,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 /* ---------- Combinar uma data (criar votação) ---------- */
 .pollform { --sun: #ffb020; --sunrise: #ff9f0a; }
 .pollform__form { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
-.pollcard { display: grid; grid-template-columns: 52px 1fr; column-gap: 14px; row-gap: 12px; align-items: start; padding: 16px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); }
+.pollcard { display: grid; grid-template-columns: 1fr; row-gap: 12px; align-items: start; padding: 16px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); }
 .pollcard__icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 15px; background: var(--brand-soft); color: var(--brand); }
 .pollcard__icon svg { width: 28px; height: 28px; }
 .pollcard__body { min-width: 0; align-self: center; }
@@ -4118,9 +4118,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .pollcard__body .field__label, .pollcard__label { margin: 0; font-size: 1.0625rem; font-weight: 600; }
 .pollcard__opt { color: var(--muted); font-weight: 400; }
 .pollcard__hint { margin: 6px 0 0; color: var(--muted); font-size: 0.875rem; }
-.pollcard__hint--wide { grid-column: 1 / -1; margin: 0; padding: 0 4px; font-size: 0.9375rem; }
-.pollcard > .pollslots, .pollcard > .pollpolicy { grid-column: 1 / -1; }
-.pollcard:has(> .pollcard__body .pollrange), .pollcard:has(> .pollcard__body .field) { grid-template-rows: auto; }
+.pollcard__hint--wide { margin: 0; font-size: 0.9375rem; }
 
 .pollrange { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 54px; margin-top: 10px; padding: 0 14px; border: 1.5px solid var(--control-border); border-radius: 16px; background: var(--bg); color: var(--ink); font: inherit; font-size: 1.125rem; cursor: pointer; }
 .pollrange > svg:first-child { flex: none; width: 24px; height: 24px; color: var(--ink-2); }
@@ -4162,3 +4160,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .pollcal__day.is-inside { background: var(--brand-soft); }
 .pollcal__day.is-edge { border-radius: 14px; background: var(--brand-grad, var(--brand)); color: var(--brand-ink); font-weight: 700; }
 .pollcal__hint { margin: 0; color: var(--muted); font-size: 0.9375rem; text-align: center; }
+
+.pollcard__link { min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--brand); font: inherit; font-size: 0.9375rem; text-align: left; cursor: pointer; }
+.pollcard__link:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }

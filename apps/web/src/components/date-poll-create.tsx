@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
 import { Button, EmptyState, Field, Notice, PageHead } from './ui.tsx';
-import { CalendarIcon, CalendarPlusIcon, ChevronLeftIcon, ChevronRightIcon, MoonIcon, PartyIcon, PlusIcon, SunIcon, SunriseIcon, UsersIcon, ClockIcon } from './icons.tsx';
+import { ChevronLeftIcon, ChevronRightIcon, MoonIcon, SunIcon, SunriseIcon } from './icons.tsx';
 import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { formatWhen } from '../lib/chat.ts';
@@ -77,9 +77,6 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
         {problem ? <Notice tone="error">{problem}</Notice> : null}
 
         <section className="pollcard">
-          <span className="pollcard__icon">
-            <PartyIcon />
-          </span>
           <div className="pollcard__body">
             <Field
               label="Nome do encontro"
@@ -88,23 +85,17 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
               maxLength={120}
               placeholder="Ex.: Churrasco de aniversário"
               autoComplete="off"
-              trailing={
-                <button type="button" className="iconbtn" aria-label="Usar um evento existente" onClick={() => setPicking(true)}>
-                  <PlusIcon />
-                </button>
-              }
             />
+            <button type="button" className="pollcard__link" onClick={() => setPicking(true)}>
+              Usar um evento que já existe
+            </button>
           </div>
         </section>
 
         <section className="pollcard">
-          <span className="pollcard__icon">
-            <CalendarIcon />
-          </span>
           <div className="pollcard__body">
             <p className="pollcard__label">Período de datas</p>
             <button type="button" className="pollrange" onClick={() => setCalendar(true)} aria-label={start && end ? `Período: ${longDay(start)} a ${longDay(end)}. Alterar` : 'Escolher o período de datas'}>
-              <CalendarIcon />
               {start && end ? (
                 <span className="pollrange__value">
                   {chipDay(start)}
@@ -116,16 +107,12 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
               ) : (
                 <span className="pollrange__empty">Escolha as datas</span>
               )}
-              <ChevronRightIcon />
             </button>
             {event && lastDay ? <p className="pollcard__hint">Até o dia do evento “{event.title}”.</p> : null}
           </div>
         </section>
 
         <section className="pollcard">
-          <span className="pollcard__icon">
-            <ClockIcon />
-          </span>
           <div className="pollcard__body">
             <p className="pollcard__label">
               Melhor horário <span className="pollcard__opt">(opcional)</span>
@@ -142,9 +129,6 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
         </section>
 
         <section className="pollcard">
-          <span className="pollcard__icon">
-            <UsersIcon />
-          </span>
           <div className="pollcard__body">
             <p className="pollcard__label">Como escolher a data?</p>
           </div>
@@ -170,7 +154,6 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
         </details>
 
         <Button type="submit" full loading={busy}>
-          <CalendarPlusIcon />
           Criar votação
         </Button>
         <p className="pollform__note">Quem está na conversa vota. A melhor data é só uma sugestão: ela vale depois que as pessoas confirmam.</p>
