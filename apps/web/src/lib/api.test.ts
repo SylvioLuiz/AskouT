@@ -15,7 +15,7 @@ function setup(reply: { status?: number; body?: unknown; headers?: Record<string
   const calls: Call[] = [];
   let unauthorized = 0;
   const fetchStub: FetchLike = async (url, init) => {
-    calls.push({ url, method: init?.method, headers: init?.headers ?? {}, body: init?.body });
+    calls.push({ url, method: init?.method, headers: init?.headers ?? {}, body: typeof init?.body === 'string' ? init.body : undefined });
     if (reply.throws) throw new TypeError('Failed to fetch');
     const status = reply.status ?? 200;
     return {
