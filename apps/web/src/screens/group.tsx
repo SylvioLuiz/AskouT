@@ -109,9 +109,11 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         <>
           <div className="grouphead">
             <h2 className="results__h">Participantes</h2>
-            <button type="button" className="grouphead__add" onClick={() => { setProblem(undefined); setPicked([]); setSheet('add'); }}>
-              Adicionar
-            </button>
+            {data.canManage ? (
+              <button type="button" className="grouphead__add" onClick={() => { setProblem(undefined); setPicked([]); setSheet('add'); }}>
+                Adicionar
+              </button>
+            ) : null}
           </div>
           <ul className="list">
             {data.members.map((m) => (
@@ -128,7 +130,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
               />
             ))}
           </ul>
-          <p className="muted">Entra no grupo quem aceita o convite do encontro ou quem um participante adiciona.</p>
+          <p className="muted">Entra no grupo quem aceita o convite do encontro ou quem o criador ou um administrador adiciona.</p>
           <button type="button" className="groupleave" onClick={() => { setProblem(undefined); setSheet('leave'); }}>
             Sair do grupo
           </button>

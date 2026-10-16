@@ -825,10 +825,11 @@ export class ConversationService {
     return { imageUrl };
   }
 
-  /** Qualquer pessoa do grupo adiciona amigos seus (seguimento mútuo, sem bloqueio) que ainda não estão. Limite de 15 pessoas além de quem criou. */
+  /** Quem criou o grupo e os administradores adicionam amigos seus (seguimento mútuo, sem bloqueio) que ainda não estão. Limite de 15 pessoas além de quem criou. */
   async addMembers(actorId: string, conversationId: string, userIds: unknown): Promise<{ added: number }> {
     const { conversations, follows, blocks, clock } = this.deps;
     const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
+    await this.requireManager(actorId, conversationId, conversation.ownerId, 'adicionar pessoas');
     if (!Array.isArray(userIds) || userIds.length === 0) throw validationError('Escolha as pessoas', { userIds: 'Escolha ao menos uma pessoa' });
     const targets = [...new Set(userIds)];
     for (const t of targets) if (typeof t !== 'string' || t === '' || t.length > 64) throw validationError('Pessoa inválida', { userIds: 'Pessoa inválida' });

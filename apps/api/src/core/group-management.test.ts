@@ -203,12 +203,14 @@ test('detalhe do grupo diz quem eu já sigo', async () => {
   void bia;
 });
 
-test('adicionar pessoas ao grupo: só amigos de quem adiciona, sem repetir, com aviso', async () => {
+test('adicionar pessoas ao grupo: só dono/administrador, só amigos de quem adiciona, sem repetir, com aviso', async () => {
   const { w, u, ana, bia, caio, dani, eva, cid } = await group();
   const conv = w.core.conversations;
   await w.core.follows.follow(bia, dani);
   await w.core.follows.follow(dani, bia);
   await rejectsWith(conv.addMembers(ana, cid, []), 'VALIDATION');
+  await rejectsWith(conv.addMembers(bia, cid, [dani]), 'FORBIDDEN');
+  await conv.setAdmin(ana, cid, bia, true);
   await rejectsWith(conv.addMembers(bia, cid, [eva]), 'FORBIDDEN');
   assert.deepEqual(await conv.addMembers(bia, cid, [dani, bia, caio]), { added: 1 });
   assert.deepEqual(await conv.addMembers(ana, cid, [dani]), { added: 0 });
