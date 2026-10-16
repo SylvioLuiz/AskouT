@@ -4163,3 +4163,21 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 
 .pollcard__link { min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--brand); font: inherit; font-size: 0.9375rem; text-align: left; cursor: pointer; }
 .pollcard__link:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+/* Votação: pódio das melhores datas */
+.dpoll__podium { list-style: none; margin: 4px 0 0; padding: 0 0 3px; display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 8px; align-items: end; border-bottom: 3px solid var(--line); }
+.dpoll__pcol { min-width: 0; }
+.dpoll__pbtn { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; font: inherit; color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; border-radius: 14px 14px 0 0; }
+.dpoll__pbtn:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+.dpoll__crown { font-size: 1.4rem; line-height: 1; }
+.dpoll__ppos { font-size: 0.75rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--line); color: var(--ink-2); }
+.dpoll__pday { font-size: 0.875rem; font-weight: 700; line-height: 1.2; }
+.dpoll__ppct { font-size: 0.75rem; color: var(--muted); }
+.dpoll__pcol--1 .dpoll__ppct { color: var(--ink); }
+.dpoll__pblock { width: 100%; display: flex; justify-content: center; font-weight: 800; line-height: 1; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-bottom: 0; border-radius: 14px 14px 0 0; margin-top: 4px; }
+.dpoll__pcol--1 .dpoll__pblock { height: 104px; align-items: center; font-size: 3.2rem; color: var(--brand-ink); border: 0; background: var(--brand-grad, var(--brand)); box-shadow: 0 10px 30px var(--shadow-brand); }
+.dpoll__pcol--2 .dpoll__pblock, .dpoll__pcol--3 .dpoll__pblock { align-items: flex-end; padding-bottom: 9px; font-size: 2.4rem; }
+.dpoll__pcol--2 .dpoll__pblock { height: 78px; }
+.dpoll__pcol--3 .dpoll__pblock { height: 60px; }
+.dpoll__psum { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px; padding: 12px; font-size: 0.875rem; color: var(--ink-2); background: var(--surface); border-radius: var(--radius-control); }
+.dpoll__psum .dpoll__badge { flex: none; }

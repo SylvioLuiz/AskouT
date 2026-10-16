@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Avatar, Button, Confirm, ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
-import { LEVEL_LABEL, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLabel, longDay, monthTitle, percent, shortDay } from '../lib/date-poll.ts';
+import { LEVEL_LABEL, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLabel, longDay, monthTitle, percent, podiumDay, shortDay } from '../lib/date-poll.ts';
 import type { ConfirmationAnswer, DateStats, PollView, VoteStatus } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
@@ -68,8 +68,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
   }
 
   const selectedStats = selected ? byDate.get(selected) : undefined;
-  const ranking = showAll ? poll.ranking : poll.ranking.slice(0, 3);
-  const finished = poll.participants.filter((p) => p.finished).length;
+    const finished = poll.participants.filter((p) => p.finished).length;
   const weeks = calendarWeeks(poll.rangeStart, poll.rangeEnd);
   const allDays = poll.days.map((d) => d.date);
 
@@ -226,22 +225,48 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           <p className="muted">Ainda faltam respostas para sugerir uma data. Peça para o pessoal votar.</p>
         ) : (
           <>
-            <ol className="dpoll__rank">
-              {ranking.map((d, i) => (
-                <li key={d.date}>
-                  <button type="button" className="dpoll__rankrow" onClick={() => { setSelected(d.date); setTab('group'); }}>
-                    <span className="dpoll__pos">{i + 1}º</span>
-                    <span className="dpoll__rankmain">
-                      <strong>{longDay(d.date)}</strong>
-                      <span className="muted">
-                        {percent(d.compatibility)} de compatibilidade · {percent(d.coverage)} votaram · {d.yes} posso, {d.maybe} talvez, {d.no} não posso
-                      </span>
-                    </span>
-                    <span className={`dpoll__badge dpoll__badge--${d.level}`}>{LEVEL_LABEL[d.level]}</span>
-                  </button>
-                </li>
-              ))}
+            <ol className="dpoll__podium" aria-label="Três melhores datas">
+              {[1, 0, 2].map((i) => {
+                const d = poll.ranking[i];
+                if (!d) return <li key={i} className="dpoll__pcol dpoll__pcol--empty" aria-hidden="true" />;
+                return (
+                  <li key={d.date} className={`dpoll__pcol dpoll__pcol--${i + 1}`}>
+                    <button type="button" className="dpoll__pbtn" onClick={() => { setSelected(d.date); setTab('group'); }} aria-label={`${i + 1}º lugar: ${longDay(d.date)}, ${percent(d.compatibility)} de compatibilidade`}>
+                      {i === 0 ? <span className="dpoll__crown" aria-hidden="true">👑</span> : <span className="dpoll__ppos" aria-hidden="true">{i + 1}º</span>}
+                      <span className="dpoll__pday">{podiumDay(d.date)}</span>
+                      <span className="dpoll__ppct">{percent(d.compatibility)}{i === 0 ? ' compatível' : ''}</span>
+                      <span className="dpoll__pblock" aria-hidden="true">{i + 1}</span>
+                    </button>
+                  </li>
+                );
+              })}
             </ol>
+            {poll.ranking[0] ? (
+              <p className="dpoll__psum">
+                <span className={`dpoll__badge dpoll__badge--${poll.ranking[0].level}`}>{LEVEL_LABEL[poll.ranking[0].level]}</span>
+                <span>
+                  {poll.ranking[0].yes} posso, {poll.ranking[0].maybe} talvez, {poll.ranking[0].no} não posso. Toque em uma data para ver quem pode.
+                </span>
+              </p>
+            ) : null}
+            {showAll && poll.ranking.length > 3 ? (
+              <ol className="dpoll__rank" start={4}>
+                {poll.ranking.slice(3).map((d, i) => (
+                  <li key={d.date}>
+                    <button type="button" className="dpoll__rankrow" onClick={() => { setSelected(d.date); setTab('group'); }}>
+                      <span className="dpoll__pos">{i + 4}º</span>
+                      <span className="dpoll__rankmain">
+                        <strong>{longDay(d.date)}</strong>
+                        <span className="muted">
+                          {percent(d.compatibility)} de compatibilidade · {percent(d.coverage)} votaram · {d.yes} posso, {d.maybe} talvez, {d.no} não posso
+                        </span>
+                      </span>
+                      <span className={`dpoll__badge dpoll__badge--${d.level}`}>{LEVEL_LABEL[d.level]}</span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
             {poll.ranking.length > 3 ? (
               <Button small variant="quiet" onClick={() => setShowAll((v) => !v)}>
                 {showAll ? 'Ver só as 3 melhores' : 'Ver todas as datas'}

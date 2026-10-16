@@ -224,3 +224,10 @@ export function shiftMonth(year: number, month: number, delta: number): { year: 
 /** Parte do dia escolhida na criação da votação -> horário usado ao propor a data. */
 export type DaySlot = 'MORNING' | 'AFTERNOON' | 'NIGHT';
 export const SLOT_TIME: Record<DaySlot, string> = { MORNING: '09:00', AFTERNOON: '14:00', NIGHT: '19:00' };
+
+const WEEKDAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+/** "2026-10-24" -> "Sáb, 24 out" (rótulo curto do pódio). */
+export function podiumDay(day: string): string {
+  return `${WEEKDAYS_SHORT[weekdayOf(day)]}, ${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1]!.slice(0, 3)}`;
+}

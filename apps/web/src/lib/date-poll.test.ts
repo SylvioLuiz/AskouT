@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calendarWeeks, chipDay, clampRange, dayInZone, monthWeeks, shiftMonth, durationLabel, longDay, percent, shortDay, weekdayOf } from './date-poll.ts';
+import { calendarWeeks, chipDay, podiumDay, clampRange, dayInZone, monthWeeks, shiftMonth, durationLabel, longDay, percent, shortDay, weekdayOf } from './date-poll.ts';
 
 test('dia da semana e textos em português', () => {
   assert.equal(weekdayOf('2026-10-23'), 5);
@@ -47,4 +47,9 @@ test('calendário do mês e rótulo curto', () => {
   assert.ok(weeks.every((w) => w.length === 7));
   assert.deepEqual(shiftMonth(2026, 12, 1), { year: 2027, month: 1 });
   assert.deepEqual(shiftMonth(2026, 1, -1), { year: 2025, month: 12 });
+});
+
+test('podiumDay abrevia dia da semana e mês', () => {
+  assert.equal(podiumDay('2026-10-24'), 'Sáb, 24 out');
+  assert.equal(podiumDay('2026-03-01'), 'Dom, 1 mar');
 });
