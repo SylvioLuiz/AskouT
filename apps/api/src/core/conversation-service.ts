@@ -166,13 +166,17 @@ export function extractLinks(text: string): string[] {
   return [...new Set(found)];
 }
 
+export type GroupRoleView = 'OWNER' | 'ADMIN' | 'MEMBER';
+
 export interface GroupDetails {
   id: string;
   name: string;
   ownerId: string;
   /** Foto do grupo (data URL) ou nula. */
   imageUrl: string | null;
-  members: { profile: PublicProfile; role: 'OWNER' | 'MEMBER' }[];
+  members: { profile: PublicProfile; role: GroupRoleView; follow: 'NONE' | 'PENDING' | 'FOLLOWING' }[];
+  /** Você é o dono ou administrador: pode editar nome e foto e remover membros. */
+  canManage: boolean;
   meetups: MeetupView[];
   /** Fotos e vídeos da conversa ficam na aba Mídia (`GET .../shared`). */
   mediaAvailable: true;
@@ -745,14 +749,19 @@ export class ConversationService {
     const visibleIds = memberIds.filter((id) => !hiddenIds.includes(id));
     const profiles = new Map((await this.deps.users.findProfilesByIds(visibleIds)).map((p) => [p.userId, p] as const));
     const ownerId = conversation.ownerId;
-    const members = visibleIds
-      .flatMap((id) => {
-        const p = profiles.get(id);
-        return p ? [{ profile: toPublicProfile(p), role: id === ownerId ? ('OWNER' as const) : ('MEMBER' as const) }] : [];
-      })
-      .sort((a, b) => (a.role === b.role ? a.profile.displayName.localeCompare(b.profile.displayName, 'pt-BR') : a.role === 'OWNER' ? -1 : 1));
+    const admins = new Set(await this.deps.conversations.adminIds(conversationId));
+    const roleOf = (id: string): GroupRoleView => (id === ownerId ? 'OWNER' : admins.has(id) ? 'ADMIN' : 'MEMBER');
+    const rank: Record<GroupRoleView, number> = { OWNER: 0, ADMIN: 1, MEMBER: 2 };
+    const members: GroupDetails['members'] = [];
+    for (const id of visibleIds) {
+      const p = profiles.get(id);
+      if (!p) continue;
+      const follow = id === actorId ? undefined : await this.deps.follows.get(actorId, id);
+      members.push({ profile: toPublicProfile(p), role: roleOf(id), follow: follow ? (follow.status === 'ACCEPTED' ? 'FOLLOWING' : 'PENDING') : 'NONE' });
+    }
+    members.sort((a, b) => (a.role === b.role ? a.profile.displayName.localeCompare(b.profile.displayName, 'pt-BR') : rank[a.role] - rank[b.role]));
     const meetups = await buildMeetupViews(this.deps, actorId, await this.deps.meetups.listForConversation(conversationId));
-    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl, members, meetups, mediaAvailable: true };
+    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl, members, canManage: roleOf(actorId) !== 'MEMBER', meetups, mediaAvailable: true };
   }
 
   // ---------- Gestão do grupo ----------
@@ -773,13 +782,17 @@ export class ConversationService {
     return { ok: true };
   }
 
-  /** Só quem criou o grupo remove alguém. A pessoa fica fora dos encontros do grupo; pode ser convidada de novo. */
+  /** Quem criou o grupo e os administradores removem membros; só o dono remove um administrador. A pessoa fica fora dos encontros do grupo; pode ser convidada de novo. */
   async removeMember(actorId: string, conversationId: string, targetId: unknown): Promise<{ ok: true }> {
     const { conversations, meetups, clock } = this.deps;
     const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
-    if (conversation.ownerId !== actorId) throw forbidden('Só quem criou o grupo pode remover pessoas');
+    const admins = await conversations.adminIds(conversationId);
+    const actorIsOwner = conversation.ownerId === actorId;
+    if (!actorIsOwner && !admins.includes(actorId)) throw forbidden('Só quem criou o grupo ou administra pode remover pessoas');
     if (typeof targetId !== 'string' || targetId.length > 64 || !memberIds.includes(targetId)) throw notFound('Essa pessoa não está no grupo');
     if (targetId === actorId) throw validationError('Para sair do grupo, use "Sair do grupo"');
+    if (targetId === conversation.ownerId) throw forbidden('Quem criou o grupo não pode ser removido');
+    if (!actorIsOwner && admins.includes(targetId)) throw forbidden('Só quem criou o grupo pode remover um administrador');
     const now = clock.now();
     await conversations.removeParticipant(conversationId, targetId);
     await meetups.declineAllFor(conversationId, targetId, now);
@@ -791,7 +804,7 @@ export class ConversationService {
   async renameGroup(actorId: string, conversationId: string, rawName: unknown): Promise<{ name: string }> {
     const { conversations, clock } = this.deps;
     const { conversation } = await this.groupAccess(actorId, conversationId);
-    if (conversation.ownerId !== actorId) throw forbidden('Só quem criou o grupo pode trocar o nome');
+    await this.requireManager(actorId, conversationId, conversation.ownerId, 'trocar o nome');
     if (typeof rawName !== 'string' || rawName.trim() === '' || Array.from(rawName.trim()).length > GROUP_NAME_MAX || CONTROL_CHARS_RE.test(rawName)) {
       throw validationError('Nome inválido', { name: `Use de 1 a ${GROUP_NAME_MAX} caracteres` });
     }
@@ -805,11 +818,37 @@ export class ConversationService {
   async setGroupPhoto(actorId: string, conversationId: string, image: unknown): Promise<{ imageUrl: string | null }> {
     const { conversations, clock } = this.deps;
     const { conversation } = await this.groupAccess(actorId, conversationId);
-    if (conversation.ownerId !== actorId) throw forbidden('Só quem criou o grupo pode trocar a foto');
+    await this.requireManager(actorId, conversationId, conversation.ownerId, 'trocar a foto');
     const imageUrl = image === null ? null : parseGroupImage(image);
     await conversations.updateGroup(conversationId, { imageUrl });
     await this.postSystem(conversationId, actorId, `${await this.nameOf(actorId)} ${imageUrl ? 'trocou' : 'removeu'} a foto do grupo`, clock.now());
     return { imageUrl };
+  }
+
+  /** Faz ou desfaz um administrador. Quem criou o grupo faz os dois; um administrador só promove membros. */
+  async setAdmin(actorId: string, conversationId: string, targetId: unknown, admin: unknown): Promise<{ role: GroupRoleView }> {
+    const { conversations, clock } = this.deps;
+    const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
+    if (typeof admin !== 'boolean') throw validationError('Informe se a pessoa deve ser administradora', { admin: 'true ou false' });
+    const admins = await conversations.adminIds(conversationId);
+    const actorIsOwner = conversation.ownerId === actorId;
+    if (!actorIsOwner && !admins.includes(actorId)) throw forbidden('Só quem criou o grupo ou administra pode escolher administradores');
+    if (typeof targetId !== 'string' || targetId.length > 64 || !memberIds.includes(targetId)) throw notFound('Essa pessoa não está no grupo');
+    if (targetId === conversation.ownerId) throw validationError('Quem criou o grupo já tem todos os poderes');
+    if (!admin && !actorIsOwner) throw forbidden('Só quem criou o grupo pode tirar um administrador');
+    const already = admins.includes(targetId);
+    if (admin !== already) {
+      await conversations.setAdmin(conversationId, targetId, admin);
+      const name = await this.nameOf(targetId);
+      await this.postSystem(conversationId, actorId, admin ? `${name} agora é administrador(a) do grupo` : `${name} deixou de ser administrador(a) do grupo`, clock.now());
+    }
+    return { role: admin ? 'ADMIN' : 'MEMBER' };
+  }
+
+  private async requireManager(actorId: string, conversationId: string, ownerId: string | null, what: string): Promise<void> {
+    if (ownerId === actorId) return;
+    if ((await this.deps.conversations.adminIds(conversationId)).includes(actorId)) return;
+    throw forbidden(`Só quem criou o grupo ou administra pode ${what}`);
   }
 
   private async groupAccess(actorId: string, conversationId: string) {

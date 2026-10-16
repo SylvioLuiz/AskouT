@@ -1391,6 +1391,17 @@ export function defineRepositoryContract(
         await h.conversations.addParticipant(g.id, caio, at(2));
         await h.conversations.addParticipant(g.id, bia, at(3));
         assert.deepEqual(await h.conversations.participantIds(g.id), [ana, caio, bia], 'ordem de entrada');
+        // Administradores: só membros viram admin; o dono não; sair ou virar dono limpa o papel.
+        assert.deepEqual(await h.conversations.adminIds(g.id), []);
+        await h.conversations.setAdmin(g.id, bia, true);
+        await h.conversations.setAdmin(g.id, ana, true);
+        assert.deepEqual(await h.conversations.adminIds(g.id), [bia], 'o dono não vira admin');
+        await h.conversations.setAdmin(g.id, bia, false);
+        assert.deepEqual(await h.conversations.adminIds(g.id), []);
+        await h.conversations.setAdmin(g.id, caio, true);
+        await h.conversations.updateGroup(g.id, { ownerId: caio });
+        assert.deepEqual(await h.conversations.adminIds(g.id), [], 'quem vira dono deixa de ser admin');
+        await h.conversations.updateGroup(g.id, { ownerId: ana });
         await h.conversations.updateGroup(g.id, { name: 'Novo', imageUrl: 'data:image/jpeg;base64,/9j/4A==', ownerId: caio });
         const got = (await h.conversations.findById(g.id))!;
         assert.equal(got.name, 'Novo');

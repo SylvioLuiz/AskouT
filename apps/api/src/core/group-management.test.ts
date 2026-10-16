@@ -159,3 +159,46 @@ test('novo grupo direto: só amigos, 2 a 15 pessoas, dono é quem criou', async 
   await rejectsWith(w.core.conversations.createGroup(ana, { name: 'X', memberIds: [u['bia']!, u['dani']!] }), 'FORBIDDEN');
   await rejectsWith(w.core.conversations.createGroup(ana, { name: 'X', memberIds: [u['bia']!, ana] }), 'VALIDATION');
 });
+
+test('administradores: dono e admin editam e removem; só o dono tira admin ou remove admin', async () => {
+  const { w, ana, bia, caio, dani, cid } = await group();
+  const conv = w.core.conversations;
+  const roles = async (id: string) => Object.fromEntries((await conv.group(id, cid)).members.map((m) => [m.profile.username, m.role]));
+  assert.deepEqual(await roles(ana), { ana: 'OWNER', bia: 'MEMBER', caio: 'MEMBER' });
+  assert.equal((await conv.group(ana, cid)).canManage, true);
+  assert.equal((await conv.group(bia, cid)).canManage, false);
+  await rejectsWith(conv.renameGroup(bia, cid, 'Novo'), 'FORBIDDEN');
+  await rejectsWith(conv.setAdmin(bia, cid, caio, true), 'FORBIDDEN');
+
+  assert.deepEqual(await conv.setAdmin(ana, cid, bia, true), { role: 'ADMIN' });
+  assert.deepEqual(await roles(ana), { ana: 'OWNER', bia: 'ADMIN', caio: 'MEMBER' });
+  assert.equal((await conv.group(bia, cid)).canManage, true);
+  await conv.renameGroup(bia, cid, 'Turma nova');
+  await conv.setGroupPhoto(bia, cid, null);
+  const sys = (await conv.messages(ana, cid)).messages.filter((m) => m.kind === 'SYSTEM').map((m) => m.body);
+  assert.ok(sys.some((b) => b.includes('bia') || b.toLowerCase().includes('administrador')));
+
+  await rejectsWith(conv.setAdmin(ana, cid, ana, true), 'VALIDATION');
+  await rejectsWith(conv.setAdmin(ana, cid, dani, true), 'NOT_FOUND');
+  await rejectsWith(conv.setAdmin(ana, cid, caio, 'sim' as unknown as boolean), 'VALIDATION');
+  // um admin promove membros, mas não tira admin
+  await conv.setAdmin(bia, cid, caio, true);
+  await rejectsWith(conv.setAdmin(bia, cid, caio, false), 'FORBIDDEN');
+  // admin remove membro comum, não admin nem o dono
+  await rejectsWith(conv.removeMember(bia, cid, caio), 'FORBIDDEN');
+  await rejectsWith(conv.removeMember(bia, cid, ana), 'FORBIDDEN');
+  await conv.setAdmin(ana, cid, caio, false);
+  await conv.removeMember(bia, cid, caio);
+  assert.deepEqual(await roles(ana), { ana: 'OWNER', bia: 'ADMIN' });
+  // o dono sai: o mais antigo vira dono e deixa de ser admin
+  await conv.leave(ana, cid);
+  assert.deepEqual(await roles(bia), { bia: 'OWNER' });
+});
+
+test('detalhe do grupo diz quem eu já sigo', async () => {
+  const { w, ana, bia, caio, cid } = await group();
+  await w.core.follows.unfollow(ana, caio);
+  const follow = async () => Object.fromEntries((await w.core.conversations.group(ana, cid)).members.map((m) => [m.profile.username, m.follow]));
+  assert.deepEqual(await follow(), { ana: 'NONE', bia: 'FOLLOWING', caio: 'NONE' });
+  void bia;
+});

@@ -147,6 +147,12 @@ export class ConversationsController {
     return this.core.conversations.removeMember(actor.userId, id, userId);
   }
 
+  /** `{admin: true|false}`: faz ou desfaz um administrador do grupo. */
+  @Put(':id/members/:userId/admin')
+  setAdmin(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Param('userId', new ParseUUIDPipe()) userId: string, @Body() body: unknown) {
+    return this.core.conversations.setAdmin(actor.userId, id, userId, asBody(body).admin);
+  }
+
   @Put(':id/group/name')
   renameGroup(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
     return this.core.conversations.renameGroup(actor.userId, id, asBody(body).name);

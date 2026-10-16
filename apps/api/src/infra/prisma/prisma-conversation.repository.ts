@@ -134,6 +134,22 @@ export class PrismaConversationRepository implements ConversationRepository {
     });
   }
 
+  async adminIds(conversationId: string): Promise<string[]> {
+    if (!isUuid(conversationId)) return [];
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
+    if (!conversation?.groupId) return [];
+    const rows = await this.prisma.groupMember.findMany({ where: { groupId: conversation.groupId, role: 'ADMIN' }, select: { userId: true } });
+    return rows.map((r) => r.userId);
+  }
+
+  async setAdmin(conversationId: string, userId: string, admin: boolean): Promise<void> {
+    if (!isUuid(conversationId) || !isUuid(userId)) return;
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
+    if (!conversation?.groupId) return;
+    // O dono nunca vira administrador nem volta a membro por aqui.
+    await this.prisma.groupMember.updateMany({ where: { groupId: conversation.groupId, userId, role: { in: admin ? ['MEMBER'] : ['ADMIN'] } }, data: { role: admin ? 'ADMIN' : 'MEMBER' } });
+  }
+
   async updateGroup(conversationId: string, patch: { name?: string; imageUrl?: string | null; ownerId?: string }): Promise<void> {
     if (!isUuid(conversationId)) return;
     const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });

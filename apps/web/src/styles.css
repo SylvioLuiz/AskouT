@@ -3811,3 +3811,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 }
 /* O popup da mensagem não é texto: nada nele é selecionável (emojis, opções). */
 .msgpop, .msgpop * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+.person__aside { display: flex; align-items: center; gap: 4px; }
+.groupleave { display: block; width: 100%; margin: 8px 0 24px; padding: 14px; border: 0; border-radius: var(--radius-panel); background: transparent; color: var(--danger); font: inherit; font-weight: 600; cursor: pointer; }
+.groupleave:hover, .groupleave:focus-visible { background: var(--surface); }

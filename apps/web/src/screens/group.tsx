@@ -3,6 +3,7 @@ import { ManageMeetupSheet } from '../components/meetup.tsx';
 import { GroupPolls } from '../components/date-poll-summary.tsx';
 import { GroupEvent, SharedLinks, SharedMedia } from '../components/shared-tabs.tsx';
 import { Sheet } from '../components/agenda.tsx';
+import { EditIcon, MoreIcon } from '../components/icons.tsx';
 import { Button, EmptyState, ErrorState, Field, GroupAvatar, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { useUser } from '../auth.tsx';
 import { toApiError } from '../lib/errors.ts';
@@ -23,7 +24,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   const polls = useAsync(() => api.conversationPolls(conversationId), [conversationId]);
   const me = useUser();
   const [tab, setTab] = useState<Tab>('people');
-  const [sheet, setSheet] = useState<'rename' | 'leave' | { remove: string } | { meetup: MeetupView } | undefined>();
+  const [sheet, setSheet] = useState<'edit' | 'leave' | { member: string } | { remove: string } | { block: string } | { meetup: MeetupView } | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
@@ -48,6 +49,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   const pollMeetups = new Set((polls.data?.items ?? []).flatMap((p) => (p.meetupId ? [p.meetupId] : [])));
   const visibleMeetups = data.meetups.filter((m) => !pollMeetups.has(m.id));
   const isOwner = data.ownerId === me.id;
+  const memberOf = (userId: string) => data.members.find((m) => m.profile.userId === userId);
 
   async function act(work: () => Promise<unknown>, after?: () => void) {
     setBusy(true);
@@ -78,30 +80,20 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
 
   return (
     <>
-      <PageHead title={data.name} back={`/conversas/${conversationId}`} subtitle={peopleLabel(data.members.length)} />
+      <PageHead
+        title={data.name}
+        back={`/conversas/${conversationId}`}
+        subtitle={peopleLabel(data.members.length)}
+        action={
+          data.canManage ? (
+            <button type="button" className="iconbtn" aria-label="Editar nome e foto do grupo" onClick={() => { setName(data.name); setProblem(undefined); setSheet('edit'); }}>
+              <EditIcon />
+            </button>
+          ) : undefined
+        }
+      />
       <div className="grouphead">
         <GroupAvatar name={data.name} size={96} imageUrl={data.imageUrl} />
-      </div>
-      <div className="groupmanage">
-        {isOwner ? (
-          <>
-            <Button small variant="secondary" onClick={() => { setName(data.name); setProblem(undefined); setSheet('rename'); }}>
-              Mudar nome
-            </Button>
-            <span className="btn btn--secondary btn--small filebtn">
-              Trocar foto
-              <input ref={fileRef} type="file" accept="image/*" aria-label="Trocar foto do grupo" onChange={(e) => void pickPhoto(e.target.files?.[0])} />
-            </span>
-            {data.imageUrl ? (
-              <Button small variant="quiet" onClick={() => void act(() => api.setGroupPhoto(conversationId, null))}>
-                Remover foto
-              </Button>
-            ) : null}
-          </>
-        ) : null}
-        <Button small variant="quiet" onClick={() => { setProblem(undefined); setSheet('leave'); }}>
-          Sair do grupo
-        </Button>
       </div>
       {problem && !sheet ? <p className="sugcard__problem" role="alert">{problem}</p> : null}
       <div className="segtabs segtabs--fill" role="tablist" aria-label="Detalhes do grupo">
@@ -118,18 +110,22 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
           <ul className="list">
             {data.members.map((m) => (
               <PersonRow key={m.profile.userId} profile={m.profile} realName aside={
-                  m.role === 'OWNER' ? (
-                    <span className="tag tag--event">Criou o grupo</span>
-                  ) : isOwner ? (
-                    <Button small variant="quiet" onClick={() => { setProblem(undefined); setSheet({ remove: m.profile.userId }); }}>
-                      Remover
-                    </Button>
-                  ) : undefined
+                  <>
+                    {m.role === 'OWNER' ? <span className="tag tag--event">Criou o grupo</span> : m.role === 'ADMIN' ? <span className="tag tag--event">Administrador</span> : null}
+                    {m.profile.userId !== me.id ? (
+                      <button type="button" className="iconbtn" aria-label={`Opções de ${m.profile.displayName}`} onClick={() => { setProblem(undefined); setSheet({ member: m.profile.userId }); }}>
+                        <MoreIcon />
+                      </button>
+                    ) : null}
+                  </>
                 }
               />
             ))}
           </ul>
           <p className="muted">Entra no grupo quem aceita o convite do encontro.</p>
+          <button type="button" className="groupleave" onClick={() => { setProblem(undefined); setSheet('leave'); }}>
+            Sair do grupo
+          </button>
         </>
       ) : null}
 
@@ -156,12 +152,87 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         )
       ) : null}
 
-      {sheet === 'rename' ? (
-        <Sheet title="Mudar nome do grupo" onClose={() => setSheet(undefined)}>
+      {sheet === 'edit' ? (
+        <Sheet title="Editar grupo" onClose={() => setSheet(undefined)}>
           <Field label="Nome do grupo" value={name} onChange={setName} maxLength={60} />
-          {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full loading={busy} disabled={name.trim() === '' || name.trim() === data.name} onClick={() => void act(() => api.renameGroup(conversationId, name.trim()))}>
             Salvar nome
+          </Button>
+          <div className="groupmanage">
+            <span className="btn btn--secondary btn--small filebtn">
+              Trocar foto
+              <input ref={fileRef} type="file" accept="image/*" aria-label="Trocar foto do grupo" onChange={(e) => void pickPhoto(e.target.files?.[0])} />
+            </span>
+            {data.imageUrl ? (
+              <Button small variant="quiet" onClick={() => void act(() => api.setGroupPhoto(conversationId, null))}>
+                Remover foto
+              </Button>
+            ) : null}
+          </div>
+          {problem ? <p className="sugcard__problem" role="alert">{problem}</p> : null}
+        </Sheet>
+      ) : null}
+
+      {sheet && typeof sheet === 'object' && 'member' in sheet ? (
+        (() => {
+          const target = memberOf(sheet.member);
+          if (!target) return null;
+          const canPromote = data.canManage && target.role === 'MEMBER';
+          const canDemote = isOwner && target.role === 'ADMIN';
+          const canRemove = data.canManage && target.role !== 'OWNER' && (isOwner || target.role === 'MEMBER');
+          const targetId = target.profile.userId;
+          return (
+            <Sheet title={target.profile.displayName} onClose={() => setSheet(undefined)}>
+              {problem ? <p className="sugcard__problem" role="alert">{problem}</p> : null}
+              <ul className="sharelist">
+                {canPromote ? (
+                  <li>
+                    <button type="button" className="sharelist__item" disabled={busy} onClick={() => void act(() => api.setGroupAdmin(conversationId, targetId, true))}>
+                      <strong>Tornar administrador</strong>
+                      <span>Pode editar o grupo e remover participantes.</span>
+                    </button>
+                  </li>
+                ) : null}
+                {canDemote ? (
+                  <li>
+                    <button type="button" className="sharelist__item" disabled={busy} onClick={() => void act(() => api.setGroupAdmin(conversationId, targetId, false))}>
+                      <strong>Remover como administrador</strong>
+                    </button>
+                  </li>
+                ) : null}
+                {target.follow === 'NONE' ? (
+                  <li>
+                    <button type="button" className="sharelist__item" disabled={busy} onClick={() => void act(() => api.follow(targetId))}>
+                      <strong>Seguir</strong>
+                    </button>
+                  </li>
+                ) : null}
+                {canRemove ? (
+                  <li>
+                    <button type="button" className="sharelist__item sharelist__item--danger" onClick={() => { setProblem(undefined); setSheet({ remove: targetId }); }}>
+                      <strong>Remover do grupo</strong>
+                    </button>
+                  </li>
+                ) : null}
+                <li>
+                  <button type="button" className="sharelist__item sharelist__item--danger" onClick={() => { setProblem(undefined); setSheet({ block: targetId }); }}>
+                    <strong>Bloquear</strong>
+                  </button>
+                </li>
+              </ul>
+            </Sheet>
+          );
+        })()
+      ) : null}
+
+      {sheet && typeof sheet === 'object' && 'block' in sheet ? (
+        <Sheet title="Bloquear" onClose={() => setSheet(undefined)}>
+          <p className="muted">
+            {memberOf(sheet.block)?.profile.displayName ?? 'Essa pessoa'} deixa de ver você e você deixa de ver essa pessoa, inclusive neste grupo. Vocês deixam de se seguir. Dá para desbloquear depois nas configurações.
+          </p>
+          {problem ? <p className="sugcard__problem" role="alert">{problem}</p> : null}
+          <Button full variant="danger" loading={busy} onClick={() => void act(() => api.block(sheet.block))}>
+            Bloquear
           </Button>
         </Sheet>
       ) : null}

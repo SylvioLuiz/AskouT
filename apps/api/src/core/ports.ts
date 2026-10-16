@@ -122,6 +122,10 @@ export interface ConversationRepository {
   addParticipant(conversationId: string, userId: string, now: Date): Promise<void>;
   /** Tira a pessoa do grupo (idempotente). Quem entrou primeiro vem primeiro em `participantIds`. */
   removeParticipant(conversationId: string, userId: string): Promise<void>;
+  /** Quem é administrador (não inclui o dono) no grupo da conversa. */
+  adminIds(conversationId: string): Promise<string[]>;
+  /** Faz ou desfaz um administrador. Só vale para quem é membro e não é o dono. */
+  setAdmin(conversationId: string, userId: string, admin: boolean): Promise<void>;
   /** Muda nome, foto (nula apaga) e/ou dono do grupo. */
   updateGroup(conversationId: string, patch: { name?: string; imageUrl?: string | null; ownerId?: string }): Promise<void>;
   /** Conversas do usuário, da mais recente para a mais antiga (por última mensagem, depois criação). */

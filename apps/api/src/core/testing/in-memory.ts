@@ -540,8 +540,24 @@ export class InMemoryConversationRepository implements ConversationRepository {
     void now;
   }
 
+  private readonly groupAdmins = new Map<string, Set<string>>();
+
   async removeParticipant(conversationId: string, userId: string): Promise<void> {
     this.participants.get(conversationId)?.delete(userId);
+    this.groupAdmins.get(conversationId)?.delete(userId);
+  }
+
+  async adminIds(conversationId: string): Promise<string[]> {
+    return [...(this.groupAdmins.get(conversationId) ?? [])];
+  }
+
+  async setAdmin(conversationId: string, userId: string, admin: boolean): Promise<void> {
+    const c = this.conversations.get(conversationId);
+    if (!c || c.type !== 'GROUP' || c.ownerId === userId || !this.participants.get(conversationId)?.has(userId)) return;
+    const set = this.groupAdmins.get(conversationId) ?? new Set<string>();
+    if (admin) set.add(userId);
+    else set.delete(userId);
+    this.groupAdmins.set(conversationId, set);
   }
 
   async updateGroup(conversationId: string, patch: { name?: string; imageUrl?: string | null; ownerId?: string }): Promise<void> {
@@ -549,7 +565,10 @@ export class InMemoryConversationRepository implements ConversationRepository {
     if (!c || c.type !== 'GROUP') return;
     if (patch.name !== undefined) c.name = patch.name;
     if (patch.imageUrl !== undefined) c.imageUrl = patch.imageUrl;
-    if (patch.ownerId !== undefined) c.ownerId = patch.ownerId;
+    if (patch.ownerId !== undefined) {
+      c.ownerId = patch.ownerId;
+      this.groupAdmins.get(conversationId)?.delete(patch.ownerId);
+    }
   }
 
   async listForUser(userId: string, hiddenSenderIds: readonly string[] = []): Promise<ConversationSummaryRecord[]> {

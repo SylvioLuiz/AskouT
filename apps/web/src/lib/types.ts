@@ -312,7 +312,9 @@ export interface GroupDetails {
   name: string;
   ownerId: string;
   imageUrl: string | null;
-  members: { profile: PublicProfile; role: 'OWNER' | 'MEMBER' }[];
+  members: { profile: PublicProfile; role: 'OWNER' | 'ADMIN' | 'MEMBER'; follow: 'NONE' | 'PENDING' | 'FOLLOWING' }[];
+  /** Você é dono ou administrador: pode editar nome e foto e remover pessoas. */
+  canManage: boolean;
   meetups: MeetupView[];
   mediaAvailable: true;
 }
