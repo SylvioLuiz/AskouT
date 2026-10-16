@@ -67,6 +67,14 @@ export function FlashScreen() {
   const [busy, setBusy] = useState(false);
   const [confirmOff, setConfirmOff] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>();
+  const [started, setStarted] = useState<string | undefined>();
+
+  // O aviso de "Flash ativado" some sozinho depois de 3 segundos.
+  useEffect(() => {
+    if (!started) return undefined;
+    const timer = window.setTimeout(() => setStarted(undefined), 3000);
+    return () => window.clearTimeout(timer);
+  }, [started]);
 
   // O tempo restante e as listas se atualizam sozinhos.
   const [, setTick] = useState(0);
@@ -91,7 +99,10 @@ export function FlashScreen() {
     setBusy(true);
     setFeedback(undefined);
     try {
-      status.setData(await api.flashOn(minutes, note.trim()));
+      const next = await api.flashOn(minutes, note.trim());
+      status.setData(next);
+      const until = next.expiresAt ? new Date(next.expiresAt) : new Date(Date.now() + minutes * 60_000);
+      setStarted(`${formatFlashDuration(minutes)}, até ${until.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
       available.reload();
       announceFlashChange();
     } catch (failure) {
@@ -135,6 +146,15 @@ export function FlashScreen() {
     <>
       {active ? <PageHead title="Flash" subtitle="Estou livre agora. Para o futuro, use a Agenda." /> : null}
       {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
+      {started ? (
+        <div className="flashtoast" role="status">
+          <span className="flashtoast__bolt">
+            <BoltIcon filled />
+          </span>
+          <strong>Flash ativado</strong>
+          <span>{started}</span>
+        </div>
+      ) : null}
 
       {active ? (
         <section className="flashpanel flashpanel--on" aria-label="Seu Flash">
@@ -167,26 +187,25 @@ export function FlashScreen() {
       ) : (
         <section className="flashoff" aria-label="Ligar o Flash">
           <header className="flashoff__head">
-            <div>
-              <h1 className="flashoff__title">
-                Flash <BoltIcon filled />
-              </h1>
-              <p className="flashoff__sub">Livre agora? Encontre alguém para sair.</p>
-            </div>
+            <h1 className="flashoff__title">
+              Flash <BoltIcon filled />
+            </h1>
             <button type="button" className="flashoff__how" onClick={() => setInfoOpen(true)}>
               <HelpIcon />
               Como funciona?
             </button>
           </header>
+          <p className="flashoff__sub">Livre agora? Encontre alguém para sair.</p>
 
           {/* Ilustração decorativa: os perfis são silhuetas e não indicam amigos disponíveis. */}
           <div className="flashhero" aria-hidden="true">
-            <span className="flashhero__ring flashhero__ring--3" />
-            <span className="flashhero__ring flashhero__ring--2" />
-            <span className="flashhero__ring flashhero__ring--1" />
-            <span className="flashhero__core">
-              <BoltIcon filled />
-            </span>
+            {['5', '4', '3', '2', '1'].map((n) => (
+              <span key={n} className={`flashhero__ring flashhero__ring--${n}`} />
+            ))}
+            <span className="flashhero__glow" />
+            <svg className="flashhero__bolt" viewBox="0 0 100 100" focusable="false">
+              <path d="M63 3 21 56h25l-8 41 42-55H55z" />
+            </svg>
             {['a', 'b', 'c', 'd'].map((k) => (
               <span key={k} className={`flashhero__person flashhero__person--${k}`}>
                 <svg viewBox="0 0 40 40" focusable="false">
@@ -195,10 +214,9 @@ export function FlashScreen() {
                 </svg>
               </span>
             ))}
-            <span className="flashhero__dot flashhero__dot--a" />
-            <span className="flashhero__dot flashhero__dot--b" />
-            <span className="flashhero__dot flashhero__dot--c" />
-            <span className="flashhero__dot flashhero__dot--d" />
+            {['a', 'b', 'c', 'd', 'e'].map((k) => (
+              <span key={k} className={`flashhero__dot flashhero__dot--${k}`} />
+            ))}
           </div>
 
           <h2 className="flashoff__lead">
@@ -236,9 +254,6 @@ export function FlashScreen() {
               </button>
             ))}
           </div>
-          <p className="flashpanel__until" aria-live="polite">
-            {formatFlashDuration(minutes)}, até {new Date(Date.now() + minutes * 60_000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-          </p>
           <Field
             label="Recado (opcional)"
             hideLabel
