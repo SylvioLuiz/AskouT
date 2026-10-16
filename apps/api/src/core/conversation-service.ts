@@ -10,7 +10,7 @@ import { distanceMeters } from './geo.ts';
 import { buildMeetupViews } from './meetup-view.ts';
 import type { MeetupView } from './meetup-view.ts';
 import type { ConversationRecord, MessageKind, MessageReactionRecord, MessageRecord, PostReportReason, PublicProfile, SuggestionCard } from './types.ts';
-import { POST_REPORT_REASONS, toPublicProfile } from './types.ts';
+import { DELETED_BODY, POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
 export const MESSAGE_MAX = 2000;
 export const MESSAGES_PER_MINUTE = 30;
@@ -564,7 +564,7 @@ export class ConversationService {
     if (!['TEXT', 'AUDIO', 'IMAGE', 'VIDEO', 'EVENT'].includes(message.kind)) throw validationError('Esta mensagem não pode ser apagada', { message: 'Só texto, áudio, foto, vídeo e evento' });
     const now = clock.now();
     if (!(await conversations.softDeleteMessage(messageId, now))) throw conflict('Esta mensagem já foi apagada');
-    return toMessageView({ ...message, body: '', deletedAt: now }, actorId);
+    return toMessageView({ ...message, body: DELETED_BODY, deletedAt: now }, actorId);
   }
 
   /** Fixar no topo da lista e silenciar os avisos: só valem para quem pediu. */

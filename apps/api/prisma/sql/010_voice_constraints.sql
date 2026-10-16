@@ -1,14 +1,23 @@
 -- Aplicar depois da migration voice_messages. Pode ser rodado de novo sem erro.
 
 -- Forma de cada tipo de mensagem, agora com mensagem de voz: sem cartão, sem encontro, sem evento e com duração.
-ALTER TABLE "Message" DROP CONSTRAINT IF EXISTS message_suggestion_shape;
-ALTER TABLE "Message" ADD CONSTRAINT message_suggestion_shape CHECK (
-  (kind = 'SUGGESTION' AND suggestion IS NOT NULL AND "meetupId" IS NULL AND "eventId" IS NULL AND "audioMs" IS NULL)
-  OR (kind IN ('TEXT', 'SYSTEM') AND suggestion IS NULL AND "meetupId" IS NULL AND "eventId" IS NULL AND "audioMs" IS NULL)
-  OR (kind = 'MEETUP' AND suggestion IS NULL AND "meetupId" IS NOT NULL AND "eventId" IS NULL AND "audioMs" IS NULL)
-  OR (kind = 'EVENT' AND suggestion IS NULL AND "meetupId" IS NULL AND "eventId" IS NOT NULL AND "audioMs" IS NULL)
-  OR (kind = 'AUDIO' AND suggestion IS NULL AND "meetupId" IS NULL AND "eventId" IS NULL AND "audioMs" BETWEEN 1000 AND 90000)
-);
+-- Só cria se ainda não houver: as versões mais novas (022, 023) trocam esta regra, e recriar a antiga
+-- falharia num banco que já tem mensagens de evento de pessoa, foto ou vídeo.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'message_suggestion_shape' AND conrelid = '"Message"'::regclass AND pg_get_constraintdef(oid) LIKE '%audioMs%') THEN
+    RETURN;
+  END IF;
+  ALTER TABLE "Message" DROP CONSTRAINT IF EXISTS message_suggestion_shape;
+  ALTER TABLE "Message" ADD CONSTRAINT message_suggestion_shape CHECK (
+    (kind = 'SUGGESTION' AND suggestion IS NOT NULL AND "meetupId" IS NULL AND "eventId" IS NULL AND "audioMs" IS NULL)
+    OR (kind IN ('TEXT', 'SYSTEM') AND suggestion IS NULL AND "meetupId" IS NULL AND "eventId" IS NULL AND "audioMs" IS NULL)
+    OR (kind = 'MEETUP' AND suggestion IS NULL AND "meetupId" IS NOT NULL AND "eventId" IS NULL AND "audioMs" IS NULL)
+    OR (kind = 'EVENT' AND suggestion IS NULL AND "meetupId" IS NULL AND "eventId" IS NOT NULL AND "audioMs" IS NULL)
+    OR (kind = 'AUDIO' AND suggestion IS NULL AND "meetupId" IS NULL AND "eventId" IS NULL AND "audioMs" BETWEEN 1000 AND 90000)
+  );
+END
+$$;
 
 -- Áudio: até 600 KB e só formatos de gravação de navegador (a API confere antes; o banco é a segunda trava).
 DO $$

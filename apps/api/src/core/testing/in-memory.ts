@@ -31,6 +31,7 @@ import type {
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
 import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import { DELETED_BODY } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -585,7 +586,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
     const m = this.messages.find((x) => x.id === messageId);
     if (!m || m.deletedAt) return false;
     m.deletedAt = at;
-    m.body = '';
+    m.body = DELETED_BODY;
     this.audios.delete(messageId);
     this.medias.delete(messageId);
     for (const key of [...this.reactions.keys()]) if (key.startsWith(`${messageId}|`)) this.reactions.delete(key);

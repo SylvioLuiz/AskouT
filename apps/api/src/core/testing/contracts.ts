@@ -4,6 +4,7 @@ import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
 import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
 import type { MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
+import { DELETED_BODY } from '../types.ts';
 
 /**
  * Suíte de contrato das portas de dados. Roda contra QUALQUER implementação:
@@ -795,7 +796,7 @@ export function defineRepositoryContract(
         assert.equal(await h.conversations.softDeleteMessage(randomUUID(), at(7)), false);
         const gone = await h.conversations.findMessage(photo);
         assert.deepEqual(gone!.deletedAt, at(6));
-        assert.equal(gone!.body, '');
+        assert.equal(gone!.body, DELETED_BODY);
         assert.equal(await h.conversations.findMedia(photo), undefined);
         assert.deepEqual(await h.conversations.listReactions([photo]), []);
         assert.deepEqual((await h.conversations.listShared(c.id, 10)).map((m) => m.kind), ['VIDEO']);

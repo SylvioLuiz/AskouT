@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { ConversationRepository } from '../../core/ports.ts';
 import type { ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, MessageReactionRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
+import { DELETED_BODY } from '../../core/types.ts';
 import { isUuid, uniqueViolationTargets } from './helpers.ts';
 
 type MessageRow = {
@@ -230,7 +231,7 @@ export class PrismaConversationRepository implements ConversationRepository {
     if (!isUuid(messageId)) return false;
     return this.prisma.$transaction(async (tx) => {
       // Só apaga uma vez; o texto e os bytes vão embora junto.
-      const result = await tx.message.updateMany({ where: { id: messageId, deletedAt: null }, data: { deletedAt: at, body: '' } });
+      const result = await tx.message.updateMany({ where: { id: messageId, deletedAt: null }, data: { deletedAt: at, body: DELETED_BODY } });
       if (result.count === 0) return false;
       await tx.messageAudio.deleteMany({ where: { messageId } });
       await tx.messageMedia.deleteMany({ where: { messageId } });

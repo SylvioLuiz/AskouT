@@ -722,3 +722,6 @@ export interface PollConfirmationRecord {
   status: 'CONFIRMED' | 'ADJUST' | 'DECLINED';
   respondedAt: Date;
 }
+
+/** Texto guardado no lugar do conteúdo de uma mensagem apagada (o banco exige 1 a 2000 caracteres no corpo). A visão da API nunca o mostra. */
+export const DELETED_BODY = 'Mensagem apagada';

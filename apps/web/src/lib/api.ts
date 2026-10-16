@@ -61,7 +61,7 @@ import type {
 /** O mínimo de `fetch` que o cliente usa (facilita testar sem navegador). */
 export type FetchLike = (
   input: string,
-  init?: { method?: string; headers?: Record<string, string>; body?: string },
+  init?: { method?: string; headers?: Record<string, string>; body?: string | Blob },
 ) => Promise<{
   ok: boolean;
   status: number;
