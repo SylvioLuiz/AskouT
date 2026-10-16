@@ -3906,3 +3906,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 /* Conversa: o topo do grupo/pessoa encosta no cabeçalho do app, sem faixa entre os dois (nem ao puxar a tela para baixo). */
 .chat { margin-top: -20px; }
 .chathead, .selectbar { top: calc(var(--topbar-h, 0px) - 1px); }
+
+/* Conversa: sem efeito de mola na tela (nem em cima nem embaixo), para o campo de mensagem e o topo ficarem sempre colados. */
+:root:has(.chat), :root:has(.chat) body { overscroll-behavior-y: none; }
