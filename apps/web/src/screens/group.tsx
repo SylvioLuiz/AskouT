@@ -107,10 +107,10 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
 
       {tab === 'people' ? (
         <>
-          <div className="grouphead">
+          <div className="peoplehead">
             <h2 className="results__h">Participantes</h2>
             {data.canManage ? (
-              <button type="button" className="grouphead__add" onClick={() => { setProblem(undefined); setPicked([]); setSheet('add'); }}>
+              <button type="button" className="peoplehead__add" onClick={() => { setProblem(undefined); setPicked([]); setSheet('add'); }}>
                 Adicionar
               </button>
             ) : null}
@@ -162,20 +162,27 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
 
       {sheet === 'edit' ? (
         <Sheet title="Editar grupo" onClose={() => setSheet(undefined)}>
-          <Field label="Nome do grupo" value={name} onChange={setName} maxLength={60} />
-          <Button full loading={busy} disabled={name.trim() === '' || name.trim() === data.name} onClick={() => void act(() => api.renameGroup(conversationId, name.trim()))}>
-            Salvar nome
-          </Button>
-          <div className="groupmanage">
-            <span className="btn btn--secondary btn--small filebtn">
-              Trocar foto
-              <input ref={fileRef} type="file" accept="image/*" aria-label="Trocar foto do grupo" onChange={(e) => void pickPhoto(e.target.files?.[0])} />
-            </span>
-            {data.imageUrl ? (
-              <Button small variant="quiet" onClick={() => void act(() => api.setGroupPhoto(conversationId, null))}>
-                Remover foto
+          <div className="groupedit">
+            <div className="groupedit__photo">
+              <GroupAvatar name={data.name} size={96} imageUrl={data.imageUrl} />
+              <div className="groupedit__actions">
+                <span className="btn btn--secondary btn--small filebtn">
+                  {data.imageUrl ? 'Trocar foto' : 'Adicionar foto'}
+                  <input ref={fileRef} type="file" accept="image/*" aria-label={data.imageUrl ? 'Trocar foto do grupo' : 'Adicionar foto do grupo'} onChange={(e) => void pickPhoto(e.target.files?.[0])} />
+                </span>
+                {data.imageUrl ? (
+                  <Button small variant="quiet" onClick={() => void act(() => api.setGroupPhoto(conversationId, null))}>
+                    Remover foto
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            <div className="groupedit__form">
+              <Field label="Nome do grupo" value={name} onChange={setName} maxLength={60} />
+              <Button full loading={busy} disabled={name.trim() === '' || name.trim() === data.name} onClick={() => void act(() => api.renameGroup(conversationId, name.trim()))}>
+                Salvar nome
               </Button>
-            ) : null}
+            </div>
           </div>
           {problem ? <p className="sugcard__problem" role="alert">{problem}</p> : null}
         </Sheet>
