@@ -10,7 +10,7 @@
   --line-strong: #c7c7cc;
   --brand: #0066cc;
   --brand-hover: #0055aa;
-  --brand-ink: #ffffff;
+  --brand-ink: #15162a;
   --brand-soft: #e5f0fd;
   --danger: #d70015;
   --danger-soft: #ffe5e3;
@@ -3024,11 +3024,11 @@ button {
   --muted: #a0a3b4;
   --line: #363948;
   --line-strong: #4d5164;
-  --brand: #ff4d86;
-  --brand-hover: #ff7aa5;
-  --brand-ink: #ffffff;
-  --brand-soft: #3a1a2e;
-  --brand-grad: linear-gradient(90deg, #e5195a, #d6249f);
+  --brand: #fa72c9;
+  --brand-hover: #ff9ad9;
+  --brand-ink: #15162a;
+  --brand-soft: #38214a;
+  --brand-grad: linear-gradient(90deg, #b56efc, #fa72c9);
   --danger: #ff8a9a;
   --danger-soft: #4a1f26;
   --nav: #15162a;
@@ -3051,11 +3051,11 @@ button {
     --muted: #a0a3b4;
     --line: #363948;
     --line-strong: #4d5164;
-    --brand: #ff4d86;
-    --brand-hover: #ff7aa5;
-    --brand-ink: #ffffff;
-    --brand-soft: #3a1a2e;
-    --brand-grad: linear-gradient(90deg, #e5195a, #d6249f);
+    --brand: #fa72c9;
+    --brand-hover: #ff9ad9;
+    --brand-ink: #15162a;
+    --brand-soft: #38214a;
+    --brand-grad: linear-gradient(90deg, #b56efc, #fa72c9);
     --danger: #ff8a9a;
     --danger-soft: #4a1f26;
     --nav: #15162a;
@@ -3829,16 +3829,53 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .groupedit__actions .btn { min-width: 160px; justify-content: center; }
 .groupedit__form { display: flex; flex-direction: column; gap: 12px; }
 
-/* Referência de design (tema escuro): fundo grafite-azulado, rosa/magenta como cor de ação, roxo e azul neon de apoio. */
-:root[data-theme='dark'] .btn--primary { background: var(--brand-grad); }
-:root[data-theme='dark'] .btn--primary:hover:not(:disabled) { background: linear-gradient(90deg, #f0286a, #e22fb0); }
-:root[data-theme='dark'] .evcover { background: linear-gradient(150deg, #a855f7, #3b1d7a); }
+
+/* Degradê da marca (roxo → rosa) no tema escuro. */
+:root[data-theme='dark'] .btn--primary,
+:root[data-theme='dark'] .fab,
+:root[data-theme='dark'] .flashcta,
+:root[data-theme='dark'] .chip[aria-pressed='true'],
+:root[data-theme='dark'] .fchip[aria-pressed='true'],
+:root[data-theme='dark'] .optlist__item[aria-pressed='true'],
+:root[data-theme='dark'] .pin--me,
+:root[data-theme='dark'] .convrow__count,
+:root[data-theme='dark'] .navlink__badge,
+:root[data-theme='dark'] .daychip--selected,
+:root[data-theme='dark'] .friendpick__check--on,
+:root[data-theme='dark'] .switch[aria-checked='true'],
+:root[data-theme='dark'] .tabbar__create,
+:root[data-theme='dark'] .flashpanel__bolt,
+:root[data-theme='dark'] .commentbox__send,
+:root[data-theme='dark'] .voice__btn,
+:root[data-theme='dark'] .msg__check.is-on,
+:root[data-theme='dark'] .post__eventbadge,
+:root[data-theme='dark'] .postgrid__event { background: var(--brand-grad); color: var(--brand-ink); }
+:root[data-theme='dark'] .btn--primary:hover:not(:disabled) { background: linear-gradient(90deg, #c488ff, #ff8ad4); }
+:root[data-theme='dark'] .tabbar__create { box-shadow: 0 6px 18px rgb(181 110 252 / 0.4); }
+:root[data-theme='dark'] .evcover { background: linear-gradient(150deg, #b56efc, #fa72c9 90%); }
 :root[data-theme='dark'] .tabbar { background: var(--nav); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .btn--primary { background: var(--brand-grad); }
-  :root:not([data-theme='light']) .btn--primary:hover:not(:disabled) { background: linear-gradient(90deg, #f0286a, #e22fb0); }
-  :root:not([data-theme='light']) .evcover { background: linear-gradient(150deg, #a855f7, #3b1d7a); }
+  :root:not([data-theme='light']) .btn--primary,
+  :root:not([data-theme='light']) .fab,
+  :root:not([data-theme='light']) .flashcta,
+  :root:not([data-theme='light']) .chip[aria-pressed='true'],
+  :root:not([data-theme='light']) .fchip[aria-pressed='true'],
+  :root:not([data-theme='light']) .optlist__item[aria-pressed='true'],
+  :root:not([data-theme='light']) .pin--me,
+  :root:not([data-theme='light']) .convrow__count,
+  :root:not([data-theme='light']) .navlink__badge,
+  :root:not([data-theme='light']) .daychip--selected,
+  :root:not([data-theme='light']) .friendpick__check--on,
+  :root:not([data-theme='light']) .switch[aria-checked='true'],
+  :root:not([data-theme='light']) .tabbar__create,
+  :root:not([data-theme='light']) .flashpanel__bolt,
+  :root:not([data-theme='light']) .commentbox__send,
+  :root:not([data-theme='light']) .voice__btn,
+  :root:not([data-theme='light']) .msg__check.is-on,
+  :root:not([data-theme='light']) .post__eventbadge,
+  :root:not([data-theme='light']) .postgrid__event { background: var(--brand-grad); color: var(--brand-ink); }
+  :root:not([data-theme='light']) .btn--primary:hover:not(:disabled) { background: linear-gradient(90deg, #c488ff, #ff8ad4); }
+  :root:not([data-theme='light']) .tabbar__create { box-shadow: 0 6px 18px rgb(181 110 252 / 0.4); }
+  :root:not([data-theme='light']) .evcover { background: linear-gradient(150deg, #b56efc, #fa72c9 90%); }
   :root:not([data-theme='light']) .tabbar { background: var(--nav); }
 }
-:root[data-theme='dark'] .tabbar__create { background: var(--brand-grad); box-shadow: 0 6px 18px rgb(229 25 90 / 0.4); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .tabbar__create { background: var(--brand-grad); box-shadow: 0 6px 18px rgb(229 25 90 / 0.4); } }
