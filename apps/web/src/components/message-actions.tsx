@@ -29,6 +29,7 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
 
   // Trava a rolagem da página enquanto o menu está aberto (senão a mensagem sai de baixo dele).
   useLayoutEffect(() => {
+    window.getSelection()?.removeAllRanges(); // tira qualquer texto que o toque longo tenha selecionado
     const y = window.scrollY;
     const body = document.body;
     const before = { position: body.style.position, top: body.style.top, width: body.style.width };

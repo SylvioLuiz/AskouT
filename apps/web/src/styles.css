@@ -3805,3 +3805,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 @media (hover: none) {
   .msg .bubble { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 }
+/* Segurar na conversa não seleciona texto (as opções de copiar ficam no menu da mensagem). */
+@media (hover: none) {
+  .chat__thread, .chat__thread * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+}
