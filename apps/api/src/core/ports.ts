@@ -177,7 +177,9 @@ export interface MeetupRepository {
   /** Responde ao convite só se ainda estiver INVITED. Devolve false se já respondeu (ou não foi convidado). */
   respond(meetupId: string, userId: string, status: 'CONFIRMED' | 'DECLINED', at: Date): Promise<boolean>;
   /** Muda o título e/ou o estado (cancelar). */
-  update(meetupId: string, patch: { title?: string; status?: 'ACTIVE' | 'CANCELLED' }): Promise<void>;
+  update(meetupId: string, patch: { title?: string; status?: 'ACTIVE' | 'CANCELLED'; eventPostId?: string }): Promise<void>;
+  /** O evento criado por uma pessoa mudou de nome: os encontros ligados a ele (pelo ID) passam a usar o nome novo. */
+  renameForEventPost(postId: string, title: string): Promise<void>;
   /** Convida (ou convida de novo quem recusou). Quem já confirmou ou está convidado fica como está. Devolve os que ficaram INVITED agora. */
   invite(meetupId: string, userIds: string[]): Promise<string[]>;
   /** Quem sai ou é removido do grupo deixa de constar nos encontros dele: CONFIRMED e INVITED viram DECLINED (menos quem organiza). */

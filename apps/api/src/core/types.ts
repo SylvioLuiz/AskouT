@@ -338,6 +338,8 @@ export interface MeetupRecord {
   /** Conversa onde o encontro vive: a 1 a 1 (um convidado) ou a do grupo (vários). */
   conversationId: string;
   eventId: string | null;
+  /** Evento criado por uma pessoa (post) de onde o encontro saiu. Liga pelo ID: o nome do evento pode mudar. */
+  eventPostId: string | null;
   title: string;
   startsAt: Date;
   endsAt: Date;

@@ -146,6 +146,14 @@ describe('encontros em que você vai', () => {
     assert.deepEqual(day.map((e) => [e.title, e.to]), [['Corrida', '/eventos/ev2'], ['com-evento', '/conversas/c']]);
   });
 
+  it('encontro de votação ligada a evento criado por pessoa não duplica nem com o nome mudado', () => {
+    const fromPoll = { ...meetup('Nome antigo', new Date(2026, 9, 24, 19, 0), 'CONFIRMED'), eventRef: 'post1', event: null } as MeetupView;
+    const going: GoingEvent[] = [{ id: 'post1', source: 'USER', title: 'Nome novo', startsAt: new Date(2026, 9, 24, 19, 0).toISOString(), endsAt: new Date(2026, 9, 24, 23, 0).toISOString(), venueName: null }];
+    const day = agendaEventsOnDay(agendaEvents([fromPoll], going), '2026-10-24');
+    assert.equal(day.length, 1);
+    assert.equal(day[0]!.title, 'Nome antigo');
+  });
+
   it('evento de vários dias aparece em todos; o que acaba de madrugada fica no dia de início', () => {
     const festival: GoingEvent = { id: 'f', source: 'PLACE', title: 'Festival', startsAt: new Date(2026, 9, 23, 18, 0).toISOString(), endsAt: new Date(2026, 9, 25, 22, 0).toISOString(), venueName: null };
     const balada: GoingEvent = { id: 'b', source: 'PLACE', title: 'Balada', startsAt: new Date(2026, 9, 24, 22, 0).toISOString(), endsAt: new Date(2026, 9, 25, 3, 0).toISOString(), venueName: null };

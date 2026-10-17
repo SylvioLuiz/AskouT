@@ -204,6 +204,8 @@ export interface MeetupView {
   startsAt: string;
   endsAt: string;
   organizer: PublicProfile;
+  /** ID oculto do evento de origem: o mesmo evento tem sempre o mesmo ID, mesmo com o nome mudado. */
+  eventRef: string | null;
   event: {
     id: string;
     venueId: string;

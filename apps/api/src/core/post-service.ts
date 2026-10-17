@@ -228,7 +228,7 @@ export class PostService {
     await scheduling.updatePoll(poll.id, { eventPostId: postId, title });
     const meetup = poll.meetupId ? await meetups.find(poll.meetupId) : undefined;
     if (meetup) {
-      await meetups.update(meetup.id, { title });
+      await meetups.update(meetup.id, { title, eventPostId: postId });
       const going = new Set([actorId, ...meetup.participants.filter((p) => p.status === 'CONFIRMED').map((p) => p.userId)]);
       for (const userId of going) await eventRoom.addGoing({ source: 'USER', id: postId }, userId, clock.now());
     } else {
@@ -238,11 +238,10 @@ export class PostService {
 
   /** O nome do evento é o nome da votação (e do encontro dela). */
   private async syncPollTitle(postId: string, title: string): Promise<void> {
-    const { scheduling, meetups } = this.deps;
+    const { scheduling } = this.deps;
     const poll = await scheduling.findByEventPost(postId);
     if (!poll) return;
     if (poll.title !== title) await scheduling.updatePoll(poll.id, { title });
-    if (poll.meetupId) await meetups.update(poll.meetupId, { title });
   }
 
   async get(viewerId: string, postId: unknown): Promise<PostView> {
@@ -374,7 +373,10 @@ export class PostService {
     }
     const patch: PostPatch = { caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', editedAt: this.deps.clock.now() };
     if (!(await this.deps.posts.update(post.id, actorId, patch))) throw notFound('Post não encontrado');
-    if (event) await this.syncPollTitle(post.id, event.title);
+    if (event) {
+      await this.syncPollTitle(post.id, event.title);
+      await this.deps.meetups.renameForEventPost(post.id, event.title);
+    }
     return this.get(actorId, post.id);
   }
 

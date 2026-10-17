@@ -80,6 +80,7 @@ export class MeetupService {
       organizerId: actorId,
       conversationId: conversation.id,
       eventId: found.event.id,
+      eventPostId: null,
       title,
       startsAt: found.event.startsAt,
       endsAt: found.event.endsAt,

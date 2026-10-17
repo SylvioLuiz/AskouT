@@ -8,6 +8,8 @@ export interface MeetupView {
   startsAt: string;
   endsAt: string;
   organizer: PublicProfile;
+  /** ID oculto do evento de origem (de bar ou criado por pessoa), para o app saber que é o mesmo evento mesmo que o nome mude. Nulo se não veio de evento. */
+  eventRef: string | null;
   /** Evento do AskouT de onde o encontro saiu; nulo se foi apagado. */
   event: {
     id: string;
@@ -60,6 +62,7 @@ export async function buildMeetupViews(deps: CoreDeps, actorId: string, records:
       startsAt: r.startsAt.toISOString(),
       endsAt: r.endsAt.toISOString(),
       organizer: toPublicProfile(organizer),
+      eventRef: r.eventPostId ?? r.eventId,
       event: found
         ? {
             id: found.event.id,

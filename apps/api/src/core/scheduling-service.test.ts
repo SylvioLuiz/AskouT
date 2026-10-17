@@ -222,6 +222,9 @@ test('evento criado a partir da votação: confirmados já vão, nome sincroniza
   const [item] = (await w.core.scheduling.listForConversation(ana, group.id)).items;
   assert.equal(item!.title, 'Churras na laje');
   assert.equal(item!.event?.id, post.id);
+  const linked = await w.meetups.find(item!.meetupId!);
+  assert.equal(linked?.eventPostId, post.id, 'o encontro guarda o ID do evento');
+  assert.equal((await w.core.meetups.get(ana, item!.meetupId!)).eventRef, post.id);
   await rejectsWith(w.core.posts.create(ana, { images: [JPEG], event: { title: 'Outro', startsAt: '2026-10-24T22:00:00.000Z' }, datePollId: poll.id }), 'CONFLICT');
   await w.core.posts.update(ana, post.id, { event: { title: 'Churras renomeado', startsAt: '2026-10-24T22:00:00.000Z' } });
   const after = (await w.core.scheduling.listForConversation(ana, group.id)).items[0]!;

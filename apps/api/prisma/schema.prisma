@@ -325,9 +325,12 @@ model Meeting {
   eventId        String?    @db.Uuid
   /// Conversa onde o encontro vive: a 1 a 1 (um convidado) ou a do grupo (vários).
   conversationId String?    @db.Uuid
+  /// Evento criado por uma pessoa (post) de onde o encontro saiu. Liga pelo ID, nunca pelo nome: o nome pode mudar.
+  eventPostId    String?    @db.Uuid
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  eventPost    Post?                @relation("MeetingEventPost", fields: [eventPostId], references: [id], onDelete: SetNull)
   organizer    User                 @relation("MeetingOrganizer", fields: [organizerId], references: [id])
   group        Group?               @relation(fields: [groupId], references: [id], onDelete: SetNull)
   event        PlaceEvent?          @relation(fields: [eventId], references: [id], onDelete: SetNull)
@@ -339,6 +342,7 @@ model Meeting {
   @@index([organizerId])
   @@index([groupId])
   @@index([eventId])
+  @@index([eventPostId])
   @@index([conversationId])
 }
 
@@ -744,6 +748,7 @@ model Post {
   sharedInMessages Message[] @relation("MessagePostEvent")
   repostedBy PostedUserEvent[]
   datePolls  DatePoll[] @relation("PollEventPost")
+  meetings   Meeting[]  @relation("MeetingEventPost")
 
   @@index([authorId, createdAt])
   @@index([venueId, createdAt])

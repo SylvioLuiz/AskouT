@@ -186,7 +186,7 @@ export interface AgendaEvent {
 /** Junta os encontros e os eventos confirmados; quando o encontro é do mesmo evento, fica só o encontro (abre a conversa). */
 export function agendaEvents(meetups: readonly MeetupView[], going: readonly GoingEvent[]): AgendaEvent[] {
   const mine = confirmedMeetups(meetups);
-  const taken = new Set(mine.flatMap((m) => (m.event ? [m.event.id] : [])));
+  const taken = new Set(mine.flatMap((m) => (m.eventRef ? [m.eventRef] : m.event ? [m.event.id] : [])));
   const fromMeetups = mine.map((m) => ({ key: `m:${m.id}`, title: m.title, startsAt: m.startsAt, endsAt: m.endsAt, venueName: m.event?.venueName ?? null, to: `/conversas/${m.conversationId}` }));
   const fromGoing = going.filter((g) => !taken.has(g.id)).map((g) => ({ key: `e:${g.id}`, title: g.title, startsAt: g.startsAt, endsAt: g.endsAt, venueName: g.venueName, to: `/eventos/${g.id}` }));
   return [...fromMeetups, ...fromGoing];

@@ -475,6 +475,7 @@ export class SchedulingService {
       organizerId: poll.organizerId,
       conversationId: poll.conversationId,
       eventId: null,
+      eventPostId: poll.eventPostId ?? null,
       title: poll.title,
       startsAt: proposal.candidateStartAt,
       endsAt: proposal.candidateEndAt,

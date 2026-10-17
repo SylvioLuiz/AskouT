@@ -1320,7 +1320,7 @@ export function defineRepositoryContract(
         return { ana, bia, caio, e };
       };
       const meetup = (organizerId: string, conversationId: string, eventId: string, guests: string[]): MeetupRecord => ({
-        id: randomUUID(), organizerId, conversationId, eventId, title: 'Piquenique', startsAt: at(2 * H), endsAt: at(5 * H), status: 'ACTIVE', createdAt: at(0),
+        id: randomUUID(), organizerId, conversationId, eventId, eventPostId: null, title: 'Piquenique', startsAt: at(2 * H), endsAt: at(5 * H), status: 'ACTIVE', createdAt: at(0),
         participants: [{ userId: organizerId, status: 'CONFIRMED', respondedAt: at(0) }, ...guests.map((userId) => ({ userId, status: 'INVITED' as const, respondedAt: null }))],
       });
 

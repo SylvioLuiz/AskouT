@@ -8,6 +8,7 @@ type Row = {
   organizerId: string;
   conversationId: string | null;
   eventId: string | null;
+  eventPostId: string | null;
   title: string;
   startsAt: Date | null;
   endsAt: Date | null;
@@ -23,6 +24,7 @@ const toRecord = (r: Row): MeetupRecord | undefined =>
         organizerId: r.organizerId,
         conversationId: r.conversationId,
         eventId: r.eventId,
+        eventPostId: r.eventPostId,
         title: r.title,
         startsAt: r.startsAt,
         endsAt: r.endsAt,
@@ -50,6 +52,7 @@ export class PrismaMeetupRepository implements MeetupRepository {
         groupId: conversation?.groupId ?? null,
         conversationId: m.conversationId,
         eventId: m.eventId,
+        eventPostId: m.eventPostId,
         title: m.title,
         startsAt: m.startsAt,
         endsAt: m.endsAt,
@@ -78,12 +81,17 @@ export class PrismaMeetupRepository implements MeetupRepository {
     return result.count > 0;
   }
 
-  async update(meetupId: string, patch: { title?: string; status?: 'ACTIVE' | 'CANCELLED' }): Promise<void> {
+  async update(meetupId: string, patch: { title?: string; status?: 'ACTIVE' | 'CANCELLED'; eventPostId?: string }): Promise<void> {
     if (!isUuid(meetupId)) return;
     await this.prisma.meeting.update({
       where: { id: meetupId },
-      data: { ...(patch.title !== undefined ? { title: patch.title } : {}), ...(patch.status !== undefined ? { status: patch.status === 'CANCELLED' ? 'CANCELLED' : 'PLANNING' } : {}) },
+      data: { ...(patch.title !== undefined ? { title: patch.title } : {}), ...(patch.eventPostId !== undefined ? { eventPostId: patch.eventPostId } : {}), ...(patch.status !== undefined ? { status: patch.status === 'CANCELLED' ? 'CANCELLED' : 'PLANNING' } : {}) },
     });
+  }
+
+  async renameForEventPost(postId: string, title: string): Promise<void> {
+    if (!isUuid(postId)) return;
+    await this.prisma.meeting.updateMany({ where: { eventPostId: postId }, data: { title } });
   }
 
   async invite(meetupId: string, userIds: string[]): Promise<string[]> {

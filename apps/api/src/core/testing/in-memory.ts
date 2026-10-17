@@ -731,11 +731,16 @@ export class InMemoryMeetupRepository implements MeetupRepository {
     return true;
   }
 
-  async update(meetupId: string, patch: { title?: string; status?: 'ACTIVE' | 'CANCELLED' }): Promise<void> {
+  async update(meetupId: string, patch: { title?: string; status?: 'ACTIVE' | 'CANCELLED'; eventPostId?: string }): Promise<void> {
     const m = this.meetups.get(meetupId);
     if (!m) return;
+    if (patch.eventPostId !== undefined) m.eventPostId = patch.eventPostId;
     if (patch.title !== undefined) m.title = patch.title;
     if (patch.status !== undefined) m.status = patch.status;
+  }
+
+  async renameForEventPost(postId: string, title: string): Promise<void> {
+    for (const m of this.meetups.values()) if (m.eventPostId === postId) m.title = title;
   }
 
   async invite(meetupId: string, userIds: string[]): Promise<string[]> {
