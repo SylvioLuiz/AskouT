@@ -302,6 +302,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
   const [items, setItems] = useState<PostView[]>([]);
   const [error, setError] = useState<ApiError | undefined>();
   const [loading, setLoading] = useState(false);
+  const sentinel = useRef<HTMLDivElement>(null);
   async function more(offset: number) {
     setLoading(true);
     setError(undefined);
@@ -321,6 +322,21 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
     void more(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey]);
+  // Rolar até perto do fim carrega a próxima página sozinho. Depois de um erro, só o "Tentar de novo" continua.
+  const hasMore = page?.hasMore === true;
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || !hasMore || loading || error || typeof IntersectionObserver === 'undefined') return;
+    const watcher = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void more(items.length);
+      },
+      { rootMargin: '400px 0px' },
+    );
+    watcher.observe(node);
+    return () => watcher.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, loading, error, items.length]);
   if (error && items.length === 0) return <ErrorState message={error.message} onRetry={() => void more(0)} />;
   if (!page) return <Loading />;
   if (items.length === 0) {
@@ -341,10 +357,8 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
       ))}
       {error ? <ErrorState message={error.message} onRetry={() => void more(items.length)} /> : null}
       {page.hasMore ? (
-        <div className="more">
-          <Button variant="secondary" loading={loading} onClick={() => void more(items.length)}>
-            Carregar mais
-          </Button>
+        <div className="more" ref={sentinel}>
+          {loading ? <Loading /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => void more(items.length)}>Carregar mais</Button> : null}
         </div>
       ) : null}
     </div>
