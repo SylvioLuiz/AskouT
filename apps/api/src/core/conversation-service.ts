@@ -426,6 +426,10 @@ export class ConversationService {
     const records = (await Promise.all(meetupIds.map((id) => this.deps.meetups.find(id)))).filter((m) => m !== undefined);
     const meetupViews = new Map((await buildMeetupViews(this.deps, actorId, records)).map((v) => [v.id, v] as const));
     const eventCards = await buildEventCards(this.deps, items.flatMap((m) => (m.eventId ? [m.eventId] : m.postEventId ? [m.postEventId] : [])));
+    // O cartão já chega marcado para quem confirmou presença antes de receber o evento na conversa.
+    for (const [id, card] of eventCards) {
+      card.going = card.ownerId === actorId || (await this.deps.eventRoom.isGoing({ source: card.userEvent ? 'USER' : 'PLACE', id }, actorId));
+    }
     const names = isGroup ? new Map((await this.deps.users.findProfilesByIds([...new Set(items.map((m) => m.senderId))])).map((p) => [p.userId, p.displayName] as const)) : null;
     const decor = await this.decorate(actorId, items);
     const prefs = await conversations.getPrefs(conversationId, actorId);
@@ -491,6 +495,7 @@ export class ConversationService {
       if (typeof input.eventId !== 'string' || input.eventId === '' || input.eventId.length > 64) throw notFound('Evento não encontrado');
       eventCard = (await buildEventCards(this.deps, [input.eventId])).get(input.eventId) ?? null;
       if (!eventCard) throw notFound('Evento não encontrado');
+      eventCard.going = eventCard.ownerId === actorId || (await this.deps.eventRoom.isGoing({ source: eventCard.userEvent ? 'USER' : 'PLACE', id: eventCard.id }, actorId));
       if (eventCard.userEvent) {
         // Evento de pessoa: o dono envia; outros só reencaminham o que receberam, e nunca um evento privado.
         if (eventCard.ownerId !== actorId) {

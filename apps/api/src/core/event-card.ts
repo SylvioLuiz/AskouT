@@ -20,6 +20,8 @@ export interface EventCardView {
   ownerId?: string;
   /** Evento privado criado por uma pessoa. */
   private?: boolean;
+  /** Só nos cartões da conversa: quem está vendo já confirmou presença (ou é o dono do evento). */
+  going?: boolean;
 }
 
 export async function buildEventCards(deps: CoreDeps, ids: string[]): Promise<Map<string, EventCardView>> {

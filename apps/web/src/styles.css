@@ -3016,6 +3016,7 @@ button {
 .evbubble:hover { color: inherit; }
 .evbubble__title { overflow-wrap: anywhere; }
 .evbubble__sub { font-size: 0.8125rem; opacity: 0.85; }
+.evbubble__going { align-self: flex-start; font-size: 0.75rem; font-weight: 600; padding: 2px 10px; border-radius: 999px; border: 1px solid currentColor; color: var(--ok-ink); }
 
 /* ---------- Tema escuro ---------- */
 

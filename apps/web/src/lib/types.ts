@@ -260,6 +260,8 @@ export interface EventCard {
   startsAt: string;
   endsAt: string;
   sample: boolean;
+  /** Nos cartões da conversa: você já confirmou presença neste evento. */
+  going?: boolean;
 }
 
 export interface PostedEvent extends EventCard {

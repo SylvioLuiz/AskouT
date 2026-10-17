@@ -140,6 +140,7 @@ export function EventBubble({ event }: { event: EventCard }) {
           <VenueLink venueId={event.venueId} name={event.venueName} nested />
         </span>
       ) : null}
+      {event.going ? <span className="evbubble__going">Você vai</span> : null}
       {event.sample ? <span className="tag tag--sample">Exemplo de teste</span> : null}
     </Link>
   );
