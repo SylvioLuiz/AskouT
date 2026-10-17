@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { calendarWeeks, chipDay, podiumDay, clampRange, dayInZone, monthWeeks, shiftMonth, durationLabel, longDay, percent, shortDay, weekdayOf } from './date-poll.ts';
+import { calendarWeeks, chipDay, eventDays, podiumDay, clampRange, dayInZone, monthWeeks, shiftMonth, durationLabel, longDay, percent, shortDay, weekdayOf } from './date-poll.ts';
 
 test('dia da semana e textos em português', () => {
   assert.equal(weekdayOf('2026-10-23'), 5);
@@ -52,4 +52,12 @@ test('calendário do mês e rótulo curto', () => {
 test('podiumDay abrevia dia da semana e mês', () => {
   assert.equal(podiumDay('2026-10-24'), 'Sáb, 24 out');
   assert.equal(podiumDay('2026-03-01'), 'Dom, 1 mar');
+});
+
+test('eventDays: evento de um dia, de madrugada e de vários dias', () => {
+  assert.deepEqual(eventDays('2026-10-24T22:00:00Z', '2026-10-25T02:00:00Z', '2026-10-17'), { start: '2026-10-24', end: '2026-10-24' });
+  assert.deepEqual(eventDays('2026-10-24T22:00:00Z', '2026-10-25T08:00:00Z', '2026-10-17'), { start: '2026-10-24', end: '2026-10-24' });
+  assert.deepEqual(eventDays('2026-10-24T13:00:00Z', null, '2026-10-17'), { start: '2026-10-24', end: '2026-10-24' });
+  assert.deepEqual(eventDays('2026-10-23T15:00:00Z', '2026-10-25T20:00:00Z', '2026-10-17'), { start: '2026-10-23', end: '2026-10-25' });
+  assert.deepEqual(eventDays('2026-10-15T15:00:00Z', '2026-10-18T20:00:00Z', '2026-10-17'), { start: '2026-10-17', end: '2026-10-18' });
 });

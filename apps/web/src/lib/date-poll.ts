@@ -195,6 +195,16 @@ export function clampRange(start: string, end: string, lastDay: string | undefin
   return { start: s, end: e };
 }
 
+/** Dias em que um evento acontece (da data de início à de término, no fuso dado). Evento de um dia só devolve start = end; o que termina de madrugada conta como a noite do dia de início. Evento que já começou parte de hoje. */
+export function eventDays(startsAt: string, endsAt: string | null | undefined, today: string, timeZone?: string): { start: string; end: string } {
+  const first = dayInZone(startsAt, timeZone);
+  // Termina de madrugada (até 6h): ainda é a noite do dia de início.
+  const last = endsAt ? dayInZone(new Date(new Date(endsAt).getTime() - 6 * 3_600_000).toISOString(), timeZone) : first;
+  const end = last < first ? first : last;
+  const start = first < today && end >= today ? today : first;
+  return { start, end };
+}
+
 const MONTHS_SHORT = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
 
 /** "2026-10-20" -> "20 de out.". */

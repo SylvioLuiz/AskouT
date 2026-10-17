@@ -4193,3 +4193,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .dpoll__count--NO dd { background: var(--bad); }
 .dpoll__note { margin: 12px 0 0; font-size: 0.8125rem; }
 .dpoll__detail > .btn { margin-top: 14px; }
+.pollrange:disabled { cursor: default; opacity: 1; }
+.pollcard__unlink { padding: 0; font: inherit; font-weight: 600; color: var(--brand); background: none; border: 0; text-decoration: underline; cursor: pointer; }
+.pollrange:disabled > svg:last-child { display: none; }

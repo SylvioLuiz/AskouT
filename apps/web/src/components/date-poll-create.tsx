@@ -7,7 +7,7 @@ import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { formatWhen } from '../lib/chat.ts';
 import type { ExploreEvent } from '../lib/types.ts';
-import { SLOT_TIME, chipDay, clampRange, dayInZone, longDay, monthTitle, monthWeeks, shiftMonth } from '../lib/date-poll.ts';
+import { SLOT_TIME, chipDay, dayInZone, eventDays, longDay, monthTitle, monthWeeks, shiftMonth } from '../lib/date-poll.ts';
 import type { DaySlot, Policy } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
@@ -41,8 +41,8 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
   const [problem, setProblem] = useState<string | undefined>();
 
   const today = dayInZone(new Date().toISOString());
-  // Com um evento escolhido, o período não passa do dia dele.
-  const lastDay = event?.startsAt ? dayInZone(event.startsAt) : undefined;
+  // Com um evento escolhido, só dá para votar nos dias dele: o período fica travado.
+  const eventRange = event?.startsAt ? eventDays(event.startsAt, event.endsAt, today) : undefined;
   const deadlineMax = event?.startsAt ? isoToLocalInput(event.startsAt) : undefined;
 
   async function submit(form: FormEvent) {
@@ -50,7 +50,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
     setProblem(undefined);
     if (title.trim() === '') return setProblem('Dê um nome ao encontro.');
     if (start === '' || end === '') return setProblem('Escolha o período de datas.');
-    if (lastDay && end > lastDay) return setProblem('A data final não pode ser depois do dia do evento.');
+    if (eventRange && (start !== eventRange.start || end !== eventRange.end)) return setProblem('Com um evento, só dá para votar nos dias dele.');
     if (deadlineMax && deadline > deadlineMax) return setProblem('O prazo para votar não pode ser depois do início do evento.');
     setBusy(true);
     try {
@@ -97,20 +97,31 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
         <section className="pollcard">
           <div className="pollcard__body">
             <p className="pollcard__label">Período de datas</p>
-            <button type="button" className="pollrange" onClick={() => setCalendar(true)} aria-label={start && end ? `Período: ${longDay(start)} a ${longDay(end)}. Alterar` : 'Escolher o período de datas'}>
+            <button type="button" className="pollrange" disabled={eventRange !== undefined} onClick={() => setCalendar(true)} aria-label={eventRange ? `Período do evento: ${longDay(start)}${end !== start ? ` a ${longDay(end)}` : ''}` : start && end ? `Período: ${longDay(start)} a ${longDay(end)}. Alterar` : 'Escolher o período de datas'}>
               {start && end ? (
                 <span className="pollrange__value">
                   {chipDay(start)}
-                  <span className="pollrange__arrow" aria-hidden="true">
-                    →
-                  </span>
-                  {chipDay(end)}
+                  {end !== start ? (
+                    <>
+                      <span className="pollrange__arrow" aria-hidden="true">
+                        →
+                      </span>
+                      {chipDay(end)}
+                    </>
+                  ) : null}
                 </span>
               ) : (
                 <span className="pollrange__empty">Escolha as datas</span>
               )}
             </button>
-            {event && lastDay ? <p className="pollcard__hint">Até o dia do evento “{event.title}”.</p> : null}
+            {event && eventRange ? (
+              <p className="pollcard__hint">
+                {eventRange.start === eventRange.end ? `Só no dia do evento “${event.title}”.` : `Só nos dias do evento “${event.title}”.`}{' '}
+                <button type="button" className="pollcard__unlink" onClick={() => setEvent(undefined)}>
+                  Não usar este evento
+                </button>
+              </p>
+            ) : null}
           </div>
         </section>
 
@@ -167,7 +178,6 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
             start={start}
             end={end}
             min={today}
-            max={lastDay}
             onPick={(a, b) => {
               setStart(a);
               setEnd(b);
@@ -183,7 +193,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
               setTitle(picked.title.slice(0, 120));
               setEvent(picked);
               if (picked.startsAt) {
-                const range = clampRange(start, end, dayInZone(picked.startsAt));
+                const range = eventDays(picked.startsAt, picked.endsAt, today);
                 setStart(range.start);
                 setEnd(range.end);
                 if (deadline > isoToLocalInput(picked.startsAt)) setDeadline('');
@@ -199,7 +209,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
 }
 
 /** Toque no primeiro dia e depois no último (o mesmo dia duas vezes vale um dia só). */
-function RangeCalendar({ start, end, min, max, onPick }: { start: string; end: string; min: string; max: string | undefined; onPick: (start: string, end: string) => void }) {
+function RangeCalendar({ start, end, min, max, onPick }: { start: string; end: string; min: string; max?: string; onPick: (start: string, end: string) => void }) {
   const base = start || min;
   const [view, setView] = useState({ year: Number(base.slice(0, 4)), month: Number(base.slice(5, 7)) });
   const [anchor, setAnchor] = useState<string | undefined>();
