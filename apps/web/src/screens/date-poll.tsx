@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Sheet } from '../components/agenda.tsx';
 import { Avatar, Button, Confirm, ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
+import { agendaEvents, agendaEventsOnDay } from '../lib/agenda.ts';
+import type { AgendaEvent } from '../lib/agenda.ts';
 import { LEVEL_LABEL, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLabel, longDay, monthTitle, percent, podiumDay, shortDay } from '../lib/date-poll.ts';
 import type { ConfirmationAnswer, DateStats, PollView, VoteStatus } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -37,6 +40,13 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<'cancel' | undefined>();
   const [showAll, setShowAll] = useState(false);
+  // Dias em que você já tem compromisso (encontros e eventos confirmados ou criados por você).
+  const myMeetups = useAsync(() => api.myMeetups(), []);
+  const myGoing = useAsync(() => api.myGoingEvents(), []);
+  const commitments = useMemo(() => agendaEvents(myMeetups.data?.items ?? [], myGoing.data?.items ?? []), [myMeetups.data, myGoing.data]);
+  const eventsOn = (date: string): AgendaEvent[] => agendaEventsOnDay(commitments, date);
+  // Aviso antes de dizer "posso" num dia que já tem compromisso.
+  const [conflict, setConflict] = useState<{ dates: string[]; busyDays: { date: string; events: AgendaEvent[] }[] } | undefined>();
   // Os toques viram pedidos em fila, para a resposta mais velha não apagar a mais nova.
   const queue = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -62,9 +72,15 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
     setBusy(false);
   }
 
+  function askOrPaint(dates: string[]) {
+    const busyDays = brush === 'YES' ? dates.flatMap((date) => { const events = eventsOn(date); return events.length > 0 ? [{ date, events }] : []; }) : [];
+    if (busyDays.length === 0) paint(dates);
+    else setConflict({ dates, busyDays });
+  }
+
   function tapDay(date: string) {
     setSelected(date);
-    if (tab === 'mine' && canVote) paint([date]);
+    if (tab === 'mine' && canVote) askOrPaint([date]);
   }
 
   const selectedStats = selected ? byDate.get(selected) : undefined;
@@ -146,7 +162,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
       ) : null}
       {tab === 'mine' && canVote ? (
         <div className="row-actions">
-          <Button small variant="quiet" onClick={() => paint(allDays)}>
+          <Button small variant="quiet" onClick={() => askOrPaint(allDays)}>
             Aplicar a todos os dias
           </Button>
         </div>
@@ -167,12 +183,14 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
               if (!date) return <span key={di} className="dpcal__cell dpcal__cell--out" role="gridcell" />;
               const stats = byDate.get(date)!;
               const mine = poll.myVotes[date];
+              const busyEvents = eventsOn(date);
               const cls =
                 tab === 'mine'
                   ? `dpcal__cell dpcal__cell--${mine ?? 'NONE'}`
                   : `dpcal__cell dpcal__cell--L${stats.level}`;
               return (
-                <button key={di} type="button" role="gridcell" className={`${cls}${selected === date ? ' is-selected' : ''}`} aria-label={cellLabel(stats, mine)} aria-selected={selected === date} onClick={() => tapDay(date)}>
+                <button key={di} type="button" role="gridcell" className={`${cls}${selected === date ? ' is-selected' : ''}`} aria-label={`${cellLabel(stats, mine)}${busyEvents.length > 0 ? `, você já tem compromisso: ${busyEvents.map((e) => e.title).join(', ')}` : ''}`} aria-selected={selected === date} onClick={() => tapDay(date)}>
+                  {busyEvents.length > 0 ? <span className="dpcal__busy" aria-hidden="true" /> : null}
                   <span className="dpcal__day">{Number(date.slice(8, 10))}</span>
                   {tab === 'mine' ? (
                     <span className="dpcal__mark" aria-hidden="true">
@@ -197,6 +215,12 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
       ) : (
         <p className="dpoll__legend muted">Dia sem marca fica “sem resposta” e não conta como “não posso”.</p>
       )}
+
+      {allDays.some((d) => eventsOn(d).length > 0) ? (
+        <p className="dpoll__legend muted">
+          <span className="dpoll__busyicon" aria-hidden="true" /> Você já tem evento ou compromisso neste dia.
+        </p>
+      ) : null}
 
       {selectedStats ? <DayDetail stats={selectedStats} poll={poll} busy={busy} onPropose={() => void act(() => api.proposePoll(poll.id, selectedStats.date))} /> : null}
 
@@ -318,6 +342,48 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
             Cancelar votação
           </Button>
         )
+      ) : null}
+      {conflict ? (
+        <Sheet title={conflict.busyDays.length === 1 ? 'Você já tem um evento nesse dia' : 'Você já tem eventos nesses dias'} onClose={() => setConflict(undefined)}>
+          <div className="dpconflict">
+            <ul className="dpconflict__list">
+              {conflict.busyDays.map(({ date, events }) => (
+                <li key={date}>
+                  <strong>{longDay(date)}</strong>
+                  <span>{events.map((e) => e.title).join(', ')}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="muted">Quer dizer que pode mesmo assim?</p>
+            <Button
+              full
+              onClick={() => {
+                const dates = conflict.dates;
+                setConflict(undefined);
+                paint(dates);
+              }}
+            >
+              Confirmar presença mesmo assim
+            </Button>
+            {conflict.dates.length > conflict.busyDays.length ? (
+              <Button
+                full
+                variant="secondary"
+                onClick={() => {
+                  const busy = new Set(conflict.busyDays.map((d) => d.date));
+                  const free = conflict.dates.filter((d) => !busy.has(d));
+                  setConflict(undefined);
+                  paint(free);
+                }}
+              >
+                Só nos dias livres
+              </Button>
+            ) : null}
+            <Button full variant="quiet" onClick={() => setConflict(undefined)}>
+              Cancelar
+            </Button>
+          </div>
+        </Sheet>
       ) : null}
     </div>
   );
