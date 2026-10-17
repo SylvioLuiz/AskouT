@@ -3671,10 +3671,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .dpoll__finish { display: flex; flex-direction: column; gap: 8px; }
 .dpoll__done { margin: 0; font-weight: 600; color: var(--ok-ink); }
 .dpoll__detail { background: var(--surface); border-radius: var(--radius-panel); padding: 14px; }
-.dpoll__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 8px; }
-.dpoll__stats div { background: var(--bg); border-radius: 12px; padding: 8px; text-align: center; }
-.dpoll__stats dt { font-size: 0.75rem; color: var(--muted); }
-.dpoll__stats dd { margin: 0; font-size: 1.125rem; font-weight: 700; }
 .dpoll__rank { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .dpoll__rankrow { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; font: inherit; color: var(--ink); background: var(--surface); border: 0; border-radius: var(--radius-control); padding: 12px; cursor: pointer; }
 .dpoll__pos { font-weight: 800; font-size: 1.125rem; min-width: 2ch; }
@@ -4181,3 +4177,17 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .dpoll__pcol--3 .dpoll__pblock { height: 60px; }
 .dpoll__psum { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px; padding: 12px; font-size: 0.875rem; color: var(--ink-2); background: var(--surface); border-radius: var(--radius-control); }
 .dpoll__psum .dpoll__badge { flex: none; }
+
+/* Votação: detalhe da data (anel de compatibilidade + contadores) */
+.dpoll__ring { width: 128px; height: 128px; margin: 14px auto 0; border-radius: 50%; background: conic-gradient(transparent calc(var(--v) * 1%), var(--line) 0), var(--brand-grad, var(--brand)); display: grid; place-items: center; }
+.dpoll__ring span { width: 104px; height: 104px; border-radius: 50%; background: var(--surface); display: grid; place-content: center; text-align: center; font-size: 1.9rem; font-weight: 800; line-height: 1; }
+.dpoll__ring small { display: block; margin-top: 4px; font-size: 0.75rem; font-weight: 500; color: var(--muted); }
+.dpoll__counts { display: flex; justify-content: space-around; margin: 16px 0 0; }
+.dpoll__count { display: flex; flex-direction: column-reverse; align-items: center; gap: 5px; }
+.dpoll__count dd { margin: 0; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.2rem; font-weight: 800; color: var(--brand-ink); }
+.dpoll__count dt { font-size: 0.75rem; color: var(--muted); }
+.dpoll__count--YES dd { background: var(--ok); }
+.dpoll__count--MAYBE dd { background: var(--warn); }
+.dpoll__count--NO dd { background: var(--bad); }
+.dpoll__foot { margin: 12px 0 0; text-align: center; font-size: 0.8125rem; color: var(--muted); }
+.dpoll__note { margin: 6px 0 12px; text-align: center; font-size: 0.8125rem; }

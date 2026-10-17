@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Avatar, Button, Confirm, ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
@@ -327,35 +327,32 @@ function DayDetail({ stats, poll, busy, onPropose }: { stats: DateStats; poll: P
   return (
     <section className="dpoll__detail" aria-label={`Detalhes de ${longDay(stats.date)}`}>
       <h2 className="dpoll__h">{longDay(stats.date)}</h2>
-      <dl className="dpoll__stats">
-        <div>
-          <dt>Compatibilidade</dt>
-          <dd>{percent(stats.compatibility)}</dd>
-        </div>
-        <div>
-          <dt>Votaram</dt>
-          <dd>{percent(stats.coverage)}</dd>
-        </div>
-        <div>
-          <dt>✓ Posso</dt>
+      <div className="dpoll__ring" style={{ '--v': Math.max(0, Math.min(100, stats.compatibility ?? 0)) } as CSSProperties} role="img" aria-label={stats.compatibility === null ? 'Compatibilidade: sem votos' : `Compatibilidade: ${percent(stats.compatibility)}`}>
+        <span>
+          {percent(stats.compatibility)}
+          <small>compatível</small>
+        </span>
+      </div>
+      <dl className="dpoll__counts">
+        <div className="dpoll__count dpoll__count--YES">
+          <dt>Posso</dt>
           <dd>{stats.yes}</dd>
         </div>
-        <div>
-          <dt>? Talvez</dt>
+        <div className="dpoll__count dpoll__count--MAYBE">
+          <dt>Talvez</dt>
           <dd>{stats.maybe}</dd>
         </div>
-        <div>
-          <dt>✕ Não posso</dt>
+        <div className="dpoll__count dpoll__count--NO">
+          <dt>Não posso</dt>
           <dd>{stats.no}</dd>
         </div>
-        <div>
-          <dt>Sem resposta</dt>
-          <dd>{stats.unanswered}</dd>
-        </div>
       </dl>
-      <p className="muted">{stats.lowCoverage ? 'Poucas pessoas responderam esta data. Ainda não dá para tratar como consenso.' : `Nível: ${LEVEL_LABEL[stats.level]}`}</p>
+      <p className="dpoll__foot">
+        {percent(stats.coverage)} votaram · {stats.unanswered} sem resposta
+      </p>
+      <p className="muted dpoll__note">{stats.lowCoverage ? 'Poucas pessoas responderam esta data. Ainda não dá para tratar como consenso.' : `Nível: ${LEVEL_LABEL[stats.level]}`}</p>
       {poll.isOrganizer && poll.status === 'VOTING' ? (
-        <Button small loading={busy} onClick={onPropose}>
+        <Button full loading={busy} onClick={onPropose}>
           Propor esta data
         </Button>
       ) : null}
