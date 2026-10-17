@@ -327,28 +327,28 @@ function DayDetail({ stats, poll, busy, onPropose }: { stats: DateStats; poll: P
   return (
     <section className="dpoll__detail" aria-label={`Detalhes de ${longDay(stats.date)}`}>
       <h2 className="dpoll__h">{longDay(stats.date)}</h2>
-      <div className="dpoll__ring" style={{ '--v': Math.max(0, Math.min(100, stats.compatibility ?? 0)) } as CSSProperties} role="img" aria-label={stats.compatibility === null ? 'Compatibilidade: sem votos' : `Compatibilidade: ${percent(stats.compatibility)}`}>
-        <span>
-          {percent(stats.compatibility)}
-          <small>compatível</small>
-        </span>
+      <div className="dpoll__top">
+        <div className="dpoll__ring" style={{ '--v': Math.max(0, Math.min(100, stats.compatibility ?? 0)) } as CSSProperties} role="img" aria-label={stats.compatibility === null ? 'Compatibilidade: sem votos' : `Compatibilidade: ${percent(stats.compatibility)}`}>
+          <span>
+            {percent(stats.compatibility)}
+            <small>compatível</small>
+          </span>
+        </div>
+        <ul className="dpoll__pills">
+          <li className="dpoll__pill dpoll__pill--YES">
+            <strong>{stats.yes}</strong> Posso
+          </li>
+          <li className="dpoll__pill dpoll__pill--MAYBE">
+            <strong>{stats.maybe}</strong> Talvez
+          </li>
+          <li className="dpoll__pill dpoll__pill--NO">
+            <strong>{stats.no}</strong> Não posso
+          </li>
+        </ul>
       </div>
-      <dl className="dpoll__counts">
-        <div className="dpoll__count dpoll__count--YES">
-          <dt>Posso</dt>
-          <dd>{stats.yes}</dd>
-        </div>
-        <div className="dpoll__count dpoll__count--MAYBE">
-          <dt>Talvez</dt>
-          <dd>{stats.maybe}</dd>
-        </div>
-        <div className="dpoll__count dpoll__count--NO">
-          <dt>Não posso</dt>
-          <dd>{stats.no}</dd>
-        </div>
-      </dl>
       <p className="dpoll__foot">
-        {percent(stats.coverage)} votaram · {stats.unanswered} sem resposta
+        <span>{percent(stats.coverage)} votaram</span>
+        <span>{stats.unanswered} sem resposta</span>
       </p>
       <p className="muted dpoll__note">{stats.lowCoverage ? 'Poucas pessoas responderam esta data. Ainda não dá para tratar como consenso.' : `Nível: ${LEVEL_LABEL[stats.level]}`}</p>
       {poll.isOrganizer && poll.status === 'VOTING' ? (

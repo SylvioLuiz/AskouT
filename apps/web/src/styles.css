@@ -4178,16 +4178,16 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .dpoll__psum { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px; padding: 12px; font-size: 0.875rem; color: var(--ink-2); background: var(--surface); border-radius: var(--radius-control); }
 .dpoll__psum .dpoll__badge { flex: none; }
 
-/* Votação: detalhe da data (anel de compatibilidade + contadores) */
-.dpoll__ring { width: 128px; height: 128px; margin: 14px auto 0; border-radius: 50%; background: conic-gradient(transparent calc(var(--v) * 1%), var(--line) 0), var(--brand-grad, var(--brand)); display: grid; place-items: center; }
-.dpoll__ring span { width: 104px; height: 104px; border-radius: 50%; background: var(--surface); display: grid; place-content: center; text-align: center; font-size: 1.9rem; font-weight: 800; line-height: 1; }
-.dpoll__ring small { display: block; margin-top: 4px; font-size: 0.75rem; font-weight: 500; color: var(--muted); }
-.dpoll__counts { display: flex; justify-content: space-around; margin: 16px 0 0; }
-.dpoll__count { display: flex; flex-direction: column-reverse; align-items: center; gap: 5px; }
-.dpoll__count dd { margin: 0; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 1.2rem; font-weight: 800; color: var(--brand-ink); }
-.dpoll__count dt { font-size: 0.75rem; color: var(--muted); }
-.dpoll__count--YES dd { background: var(--ok); }
-.dpoll__count--MAYBE dd { background: var(--warn); }
-.dpoll__count--NO dd { background: var(--bad); }
-.dpoll__foot { margin: 12px 0 0; text-align: center; font-size: 0.8125rem; color: var(--muted); }
-.dpoll__note { margin: 6px 0 12px; text-align: center; font-size: 0.8125rem; }
+/* Votação: detalhe da data (anel de compatibilidade + pílulas de respostas) */
+.dpoll__top { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
+.dpoll__ring { flex: none; width: 112px; height: 112px; border-radius: 50%; background: conic-gradient(transparent calc(var(--v) * 1%), var(--line) 0), var(--brand-grad, var(--brand)); display: grid; place-items: center; }
+.dpoll__ring span { width: 90px; height: 90px; border-radius: 50%; background: var(--surface); display: grid; place-content: center; text-align: center; font-size: 1.6rem; font-weight: 800; line-height: 1; }
+.dpoll__ring small { display: block; margin-top: 4px; font-size: 0.6875rem; font-weight: 500; color: var(--muted); }
+.dpoll__pills { flex: 1; min-width: 0; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.dpoll__pill { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; font-size: 0.8125rem; background: var(--bg); border-radius: 999px; }
+.dpoll__pill strong { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 0.75rem; font-weight: 800; color: var(--brand-ink); }
+.dpoll__pill--YES strong { background: var(--ok); }
+.dpoll__pill--MAYBE strong { background: var(--warn); }
+.dpoll__pill--NO strong { background: var(--bad); }
+.dpoll__foot { display: flex; justify-content: space-between; gap: 8px; margin: 12px 0 0; font-size: 0.8125rem; color: var(--muted); }
+.dpoll__note { margin: 6px 0 12px; font-size: 0.8125rem; }
