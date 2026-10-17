@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type { AgendaEvent } from '../lib/agenda.ts';
 import type { FormEvent } from 'react';
 import { DayStrip, Sheet, StateMark } from '../components/agenda.tsx';
+import { CalendarSyncSheet, syncedCount } from '../components/calendar-sync.tsx';
 import { PlusIcon } from '../components/icons.tsx';
 import { Button, Confirm, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -167,6 +168,8 @@ export function AgendaScreen() {
   const { today, days, range } = useDayWindow();
   const [selected, setSelected] = useState(today);
   const [adding, setAdding] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncedN, setSyncedN] = useState(syncedCount);
   const [removing, setRemoving] = useState<Slot | undefined>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
@@ -196,6 +199,12 @@ export function AgendaScreen() {
   return (
     <>
       <PageHead title="Agenda" subtitle="Só você vê esta agenda. Marque quando topa sair." />
+
+      <div className="agsync">
+        <Button variant="quiet" small onClick={() => setSyncing(true)}>
+          {syncedN > 0 ? `Sincronizar · ${syncedN} ${syncedN === 1 ? 'ligada' : 'ligadas'}` : 'Sincronizar'}
+        </Button>
+      </div>
 
       <DayStrip days={days} selected={selected} today={today} onSelect={(key) => { setSelected(key); setMessage(undefined); setRemoving(undefined); }} statesOf={(key) => statesOnDay(all, key)} eventsOf={(key) => agendaEventsOnDay(events, key).length} />
 
@@ -230,6 +239,8 @@ export function AgendaScreen() {
         <PlusIcon />
         Marcar horário
       </button>
+
+      {syncing ? <CalendarSyncSheet onClose={() => setSyncing(false)} onChange={(list) => setSyncedN(list.length)} /> : null}
 
       {adding ? (
         <AddSlotSheet
