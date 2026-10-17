@@ -55,6 +55,12 @@ export class ExploreController {
     return this.presentPage(await this.core.eventPages.get(actor.userId, id, lat !== undefined && lng !== undefined ? { lat, lng } : {}));
   }
 
+  /** Eventos em que você confirmou presença e que ainda não acabaram (alimenta a agenda). */
+  @Get('me/events/going')
+  async myGoing(@CurrentActor() actor: Actor) {
+    return { items: await this.core.eventPages.listMyGoing(actor.userId) };
+  }
+
   /** "Eu vou". */
   @Post('events/:id/going')
   @HttpCode(200)

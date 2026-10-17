@@ -1368,6 +1368,14 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     return out;
   }
 
+  async listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date }[]> {
+    return [...this.going.values()]
+      .filter((r) => r.userId === userId && this.alive(r.ref))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limit)
+      .map((r) => ({ ref: { ...r.ref }, createdAt: r.createdAt }));
+  }
+
   async addPost(post: EventPostRecord): Promise<void> {
     this.eventPosts.set(post.id, { ...post, data: post.data ? new Uint8Array(post.data) : null });
   }

@@ -482,6 +482,8 @@ export interface EventRoomRepository {
   listGoing(ref: EventRef): Promise<EventAttendanceRecord[]>;
   /** Números de confirmados de vários eventos de uma vez. */
   countGoing(refs: EventRef[]): Promise<Map<string, number>>;
+  /** Eventos em que a pessoa confirmou presença, do confirmado mais recentemente para o mais antigo. */
+  listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date }[]>;
   addPost(post: EventPostRecord): Promise<void>;
   /** Mais recentes primeiro, sem os bytes da foto. */
   listPosts(eventId: string, page: Page): Promise<(Omit<EventPostRecord, 'data'> & { hasImage: boolean })[]>;

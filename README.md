@@ -114,6 +114,7 @@ Sem token: `POST /auth/signup`, `POST /auth/signup/resend`, `POST /auth/signup/c
 | `GET/POST /conversations/:id/messages` · `POST /conversations/:id/read` | mensagens (`limit`, `before`) / enviar `{body}` ou `{suggestion}` / marcar como lida |
 | `GET /explore?q=&lat=&lng=&radiusKm=&from=&to=&kind=&free=` | Explorar: sem `q`, eventos perto; com `q`, eventos, locais, pessoas e `#`. `kind`: DIGITAL, SHOW, CINEMA, THEATER, EXHIBITION, GASTRONOMY, NIGHT, OTHER |
 | `GET /events/:id?lat=&lng=` | um evento (com distância se enviar a posição) |
+| `GET /me/events/going` | eventos em que você confirmou presença e que ainda não acabaram (alimenta a Agenda) |
 | `GET /flash/matches/:id` · `PUT /flash/matches/:id/location` | encontro aceito: posição dos dois / enviar a minha (`{lat, lng, accuracyM?}`) |
 
 Erros: `{ "error": { "code", "message", "details?" } }` com status 400/401/403/404/409/429 (429 envia `Retry-After`). Erro inesperado vira 500 genérico, sem vazar detalhes.

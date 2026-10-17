@@ -128,3 +128,20 @@ test('apagar o evento leva presença e posts; arquivado some para os outros', as
   await rejectsWith(w.core.eventPages.get(ana, ev.id), 'NOT_FOUND');
   await rejectsWith(w.core.eventPages.go(bia, ev.id), 'NOT_FOUND');
 });
+
+test('meus eventos confirmados: só os que ainda vão acontecer, do mais próximo ao mais distante', async () => {
+  const { w, ana, bia, ev } = await setup();
+  assert.deepEqual(await w.core.eventPages.listMyGoing(bia), [], 'sem confirmação, lista vazia');
+  await w.core.eventPages.go(bia, 'e1');
+  await w.core.eventPages.go(bia, ev.id);
+  const mine = await w.core.eventPages.listMyGoing(bia);
+  assert.equal(mine.length, 2);
+  assert.ok(Date.parse(mine[0]!.startsAt) <= Date.parse(mine[1]!.startsAt), 'ordem por início');
+  assert.deepEqual(mine.map((e) => e.id).sort(), ['e1', ev.id].sort());
+  assert.equal(mine.find((e) => e.id === 'e1')?.venueName, 'Parque Ibirapuera');
+  assert.deepEqual(await w.core.eventPages.listMyGoing(ana), [], 'o dono não confirmou presença: não entra');
+  await w.core.eventPages.cancel(bia, 'e1');
+  assert.deepEqual((await w.core.eventPages.listMyGoing(bia)).map((e) => e.id), [ev.id], 'cancelar tira da lista');
+  w.clock.tick(400 * 24 * H);
+  assert.deepEqual(await w.core.eventPages.listMyGoing(bia), [], 'evento que já acabou sai da lista');
+});

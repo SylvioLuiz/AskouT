@@ -1,4 +1,4 @@
-import type { CompatibilityLevel, MeetupView, ParticipantStatus, Slot, SlotState } from './types.ts';
+import type { CompatibilityLevel, GoingEvent, MeetupView, ParticipantStatus, Slot, SlotState } from './types.ts';
 
 // Tudo aqui trabalha no fuso do aparelho: a pessoa marca "20h" e é isso que ela espera ver.
 // A API guarda e devolve instantes em UTC; estas funções fazem a ida e a volta.
@@ -172,9 +172,36 @@ export function confirmedMeetups(meetups: readonly MeetupView[]): MeetupView[] {
   return meetups.filter((m) => m.status === 'ACTIVE' && (m.myStatus === 'ORGANIZER' || m.myStatus === 'CONFIRMED'));
 }
 
-/** Dos encontros em que você vai, os que começam no dia (data local do aparelho), por horário. */
-export function meetupsOnDay(meetups: readonly MeetupView[], key: string): MeetupView[] {
-  return confirmedMeetups(meetups)
-    .filter((m) => localDateKey(new Date(m.startsAt)) === key)
+/** Algo em que você vai e que a agenda marca: encontro confirmado ou evento com "Confirmar presença". */
+export interface AgendaEvent {
+  key: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  venueName: string | null;
+  /** Para onde o toque leva. */
+  to: string;
+}
+
+/** Junta os encontros e os eventos confirmados; quando o encontro é do mesmo evento, fica só o encontro (abre a conversa). */
+export function agendaEvents(meetups: readonly MeetupView[], going: readonly GoingEvent[]): AgendaEvent[] {
+  const mine = confirmedMeetups(meetups);
+  const taken = new Set(mine.flatMap((m) => (m.event ? [m.event.id] : [])));
+  const fromMeetups = mine.map((m) => ({ key: `m:${m.id}`, title: m.title, startsAt: m.startsAt, endsAt: m.endsAt, venueName: m.event?.venueName ?? null, to: `/conversas/${m.conversationId}` }));
+  const fromGoing = going.filter((g) => !taken.has(g.id)).map((g) => ({ key: `e:${g.id}`, title: g.title, startsAt: g.startsAt, endsAt: g.endsAt, venueName: g.venueName, to: `/eventos/${g.id}` }));
+  return [...fromMeetups, ...fromGoing];
+}
+
+const NIGHT_MS = 6 * 3_600_000;
+
+/** Os que acontecem no dia (data local do aparelho), por horário. Evento de vários dias aparece em todos eles; o que termina de madrugada (até 6h) não invade o dia seguinte. */
+export function agendaEventsOnDay(events: readonly AgendaEvent[], key: string): AgendaEvent[] {
+  return events
+    .filter((e) => {
+      const first = localDateKey(new Date(e.startsAt));
+      const endMs = Date.parse(e.endsAt) - NIGHT_MS;
+      const last = endMs > Date.parse(e.startsAt) ? localDateKey(new Date(endMs)) : first;
+      return key >= first && key <= last;
+    })
     .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
 }

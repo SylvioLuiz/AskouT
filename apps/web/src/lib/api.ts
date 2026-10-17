@@ -33,6 +33,7 @@ import type {
   EventPage,
   EventPost,
   GroupDetails,
+  GoingEvent,
   MeetupView,
   NotificationList,
   PostedEventsPage,
@@ -167,6 +168,7 @@ export function createApi(deps: ApiDeps) {
     postsFeed: (page?: PageRequest) => request<PostsPage>('GET', `/posts/feed${pageQuery(page)}`),
     userPosts: (username: string, page?: PageRequest, kind?: 'event' | 'post') => request<PostsPage>('GET', `/profiles/${id(username)}/posts${pageQuery(page)}${kind ? `${page ? '&' : '?'}kind=${kind}` : ''}`),
     myMeetups: () => request<{ items: MeetupView[] }>('GET', '/meetups'),
+    myGoingEvents: () => request<{ items: GoingEvent[] }>('GET', '/me/events/going'),
     updateProfile: (patch: ProfilePatch) => request<Profile>('PATCH', '/profiles/me', { body: patch }),
     setPrivacy: (isPrivate: boolean) =>
       request<{ isPrivate: boolean; acceptedPending: number }>('PATCH', '/profiles/me/privacy', {

@@ -55,6 +55,16 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
     return out;
   }
 
+  async listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date }[]> {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.eventAttendance.findMany({ where: { userId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit });
+    return rows.flatMap((r) => {
+      if (r.placeEventId) return [{ ref: { source: 'PLACE' as const, id: r.placeEventId }, createdAt: r.createdAt }];
+      if (r.postId) return [{ ref: { source: 'USER' as const, id: r.postId }, createdAt: r.createdAt }];
+      return [];
+    });
+  }
+
   async addPost(post: EventPostRecord): Promise<void> {
     await this.prisma.eventPost.create({
       data: { id: post.id, eventId: post.eventId, authorId: post.authorId, caption: post.caption, mime: post.mime, data: post.data ? Buffer.from(post.data) : null, createdAt: post.createdAt },

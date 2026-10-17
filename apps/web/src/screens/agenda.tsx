@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { AgendaEvent } from '../lib/agenda.ts';
 import type { FormEvent } from 'react';
 import { DayStrip, Sheet, StateMark } from '../components/agenda.tsx';
 import { PlusIcon } from '../components/icons.tsx';
@@ -9,19 +10,20 @@ import {
   PRESETS,
   STATE_HELP,
   addDays,
+  agendaEvents,
+  agendaEventsOnDay,
   buildSlot,
   dayLongLabel,
   daysFrom,
   deviceTimeZone,
   localDateKey,
-  meetupsOnDay,
   rangeForDays,
   slotsOnDay,
   statesOnDay,
   timeRangeLabel,
 } from '../lib/agenda.ts';
 import { toApiError } from '../lib/errors.ts';
-import type { MeetupView, Slot, SlotState } from '../lib/types.ts';
+import type { Slot, SlotState } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 
 /** Quantos dias a faixa mostra a partir de hoje. */
@@ -36,18 +38,18 @@ function useDayWindow() {
   return { today, days, range };
 }
 
-function EventList({ meetups }: { meetups: MeetupView[] }) {
+function EventList({ events }: { events: AgendaEvent[] }) {
   return (
     <div className="agevents">
       <h3 className="agevents__title">Eventos que você vai</h3>
       <ul className="agevents__list">
-        {meetups.map((m) => (
-          <li key={m.id}>
-            <Link to={`/conversas/${m.conversationId}`} className="agevent">
-              <span className="agevent__time">{new Date(m.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+        {events.map((e) => (
+          <li key={e.key}>
+            <Link to={e.to} className="agevent">
+              <span className="agevent__time">{new Date(e.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
               <span className="agevent__main">
-                <strong>{m.title}</strong>
-                {m.event?.venueName ? <span className="muted">{m.event.venueName}</span> : null}
+                <strong>{e.title}</strong>
+                {e.venueName ? <span className="muted">{e.venueName}</span> : null}
               </span>
             </Link>
           </li>
@@ -172,8 +174,9 @@ export function AgendaScreen() {
   const all = slots.data ?? [];
   const ofDay = slotsOnDay(all, selected);
   const meetups = useAsync(() => api.myMeetups(), []);
-  const going = meetups.data?.items ?? [];
-  const eventsToday = meetupsOnDay(going, selected);
+  const goingEvents = useAsync(() => api.myGoingEvents(), []);
+  const events = useMemo(() => agendaEvents(meetups.data?.items ?? [], goingEvents.data?.items ?? []), [meetups.data, goingEvents.data]);
+  const eventsToday = agendaEventsOnDay(events, selected);
 
   async function remove(slot: Slot) {
     setBusy(true);
@@ -194,7 +197,7 @@ export function AgendaScreen() {
     <>
       <PageHead title="Agenda" subtitle="Só você vê esta agenda. Marque quando topa sair." />
 
-      <DayStrip days={days} selected={selected} today={today} onSelect={(key) => { setSelected(key); setMessage(undefined); setRemoving(undefined); }} statesOf={(key) => statesOnDay(all, key)} eventsOf={(key) => meetupsOnDay(going, key).length} />
+      <DayStrip days={days} selected={selected} today={today} onSelect={(key) => { setSelected(key); setMessage(undefined); setRemoving(undefined); }} statesOf={(key) => statesOnDay(all, key)} eventsOf={(key) => agendaEventsOnDay(events, key).length} />
 
       <section className="section" aria-labelledby="dia-titulo">
         <h2 id="dia-titulo" className="section__title section__title--day">
@@ -210,7 +213,7 @@ export function AgendaScreen() {
           <p className="muted">Nenhum horário marcado neste dia.</p>
         ) : null}
         {ofDay.length > 0 ? <SlotList slots={ofDay} day={selected} onRemove={(slot) => setRemoving(slot)} /> : null}
-        {eventsToday.length > 0 ? <EventList meetups={eventsToday} /> : null}
+        {eventsToday.length > 0 ? <EventList events={eventsToday} /> : null}
         {removing ? (
           <Confirm
             question={`Remover o horário ${timeRangeLabel(removing, selected)}?`}

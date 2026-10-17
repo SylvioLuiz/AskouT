@@ -1,6 +1,6 @@
 import { decodeImageDataUrl } from './image.ts';
 import { distanceMeters } from './geo.ts';
-import { forbidden, notFound, validationError } from './errors.ts';
+import { DomainError, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
 import type { EventKind, EventRef, PublicProfile } from './types.ts';
@@ -66,6 +66,19 @@ export interface EventPageView {
   canPost: boolean;
   posts: EventPostView[];
 }
+
+/** Evento em que a pessoa confirmou presença, no formato curto que a agenda usa. */
+export interface GoingEventView {
+  id: string;
+  source: 'PLACE' | 'USER';
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  venueName: string | null;
+}
+
+/** Quantos eventos confirmados a agenda recebe, no máximo. */
+export const MY_GOING_LIMIT = 100;
 
 export interface EventPostInput {
   caption?: unknown;
@@ -230,6 +243,24 @@ export class EventPageService {
       if (!author) return [];
       return [{ id: r.id, author, caption: r.caption, hasImage: r.hasImage, createdAt: r.createdAt.toISOString(), mine: r.authorId === viewerId, canDelete: r.authorId === viewerId || ownerId === viewerId }];
     });
+  }
+
+  /** Eventos que ainda não acabaram e em que a pessoa confirmou presença ("Eu vou"), do mais próximo ao mais distante. Os que sumiram, foram arquivados ou ficaram inacessíveis (bloqueio) não entram. */
+  async listMyGoing(viewerId: string): Promise<GoingEventView[]> {
+    const now = this.deps.clock.now().getTime();
+    const rows = await this.deps.eventRoom.listGoingByUser(viewerId, MY_GOING_LIMIT);
+    const out: GoingEventView[] = [];
+    for (const row of rows) {
+      try {
+        await this.resolve(viewerId, row.ref.id);
+        const { view } = await this.base(viewerId, row.ref, {});
+        if (Date.parse(view.endsAt) < now) continue;
+        out.push({ id: view.id, source: view.source, title: view.title, startsAt: view.startsAt, endsAt: view.endsAt, venueName: view.venue.name === '' ? null : view.venue.name });
+      } catch (failure) {
+        if (!(failure instanceof DomainError)) throw failure;
+      }
+    }
+    return out.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
   }
 
   /** "Eu vou". O dono já conta como confirmado: confirmar de novo não muda nada. */

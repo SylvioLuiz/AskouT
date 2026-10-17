@@ -432,6 +432,16 @@ export interface Suggestions {
 
 export type EventKind = 'DIGITAL' | 'SHOW' | 'CINEMA' | 'THEATER' | 'EXHIBITION' | 'GASTRONOMY' | 'NIGHT' | 'OUTDOOR' | 'SPORT' | 'OTHER';
 
+/** Evento em que você confirmou presença ("Eu vou"), no formato curto da agenda. */
+export interface GoingEvent {
+  id: string;
+  source: 'PLACE' | 'USER';
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  venueName: string | null;
+}
+
 export interface ExploreEvent {
   id: string;
   title: string;

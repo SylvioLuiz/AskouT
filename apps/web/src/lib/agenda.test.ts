@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import {
   PRESETS,
   addDays,
+  agendaEvents,
+  agendaEventsOnDay,
   buildSlot,
   confirmedMeetups,
   dayChip,
@@ -10,14 +12,13 @@ import {
   daysFrom,
   instantRangeLabel,
   localDateKey,
-  meetupsOnDay,
   rangeForDays,
   slotsOnDay,
   startOfDay,
   statesOnDay,
   timeRangeLabel,
 } from './agenda.ts';
-import type { MeetupView, Slot } from './types.ts';
+import type { GoingEvent, MeetupView, Slot } from './types.ts';
 
 // Estes testes dependem do fuso (o app usa o do aparelho); o script de teste fixa TZ=America/Sao_Paulo.
 const NOW = new Date(2026, 9, 13, 12, 0); // 13/out/2026 12:00 local
@@ -130,7 +131,25 @@ describe('encontros em que você vai', () => {
   });
 
   it('lista os do dia por horário', () => {
-    assert.deepEqual(meetupsOnDay(list, '2026-10-24').map((m) => m.id), ['organizo', 'confirmei']);
-    assert.deepEqual(meetupsOnDay(list, '2026-10-26'), []);
+    const events = agendaEvents(list, []);
+    assert.deepEqual(agendaEventsOnDay(events, '2026-10-24').map((e) => e.title), ['organizo', 'confirmei']);
+    assert.deepEqual(agendaEventsOnDay(events, '2026-10-26'), []);
+  });
+
+  it('junta eventos com "Confirmar presença"; o encontro do mesmo evento não duplica', () => {
+    const withEvent = { ...meetup('com-evento', new Date(2026, 9, 24, 19, 0), 'CONFIRMED'), event: { id: 'ev1', venueName: 'Bar do Zé' } } as MeetupView;
+    const going: GoingEvent[] = [
+      { id: 'ev1', source: 'PLACE', title: 'Samba', startsAt: new Date(2026, 9, 24, 19, 0).toISOString(), endsAt: new Date(2026, 9, 24, 23, 0).toISOString(), venueName: 'Bar do Zé' },
+      { id: 'ev2', source: 'USER', title: 'Corrida', startsAt: new Date(2026, 9, 24, 8, 0).toISOString(), endsAt: new Date(2026, 9, 24, 10, 0).toISOString(), venueName: null },
+    ];
+    const day = agendaEventsOnDay(agendaEvents([withEvent], going), '2026-10-24');
+    assert.deepEqual(day.map((e) => [e.title, e.to]), [['Corrida', '/eventos/ev2'], ['com-evento', '/conversas/c']]);
+  });
+
+  it('evento de vários dias aparece em todos; o que acaba de madrugada fica no dia de início', () => {
+    const festival: GoingEvent = { id: 'f', source: 'PLACE', title: 'Festival', startsAt: new Date(2026, 9, 23, 18, 0).toISOString(), endsAt: new Date(2026, 9, 25, 22, 0).toISOString(), venueName: null };
+    const balada: GoingEvent = { id: 'b', source: 'PLACE', title: 'Balada', startsAt: new Date(2026, 9, 24, 22, 0).toISOString(), endsAt: new Date(2026, 9, 25, 3, 0).toISOString(), venueName: null };
+    const events = agendaEvents([], [festival, balada]);
+    assert.deepEqual([23, 24, 25, 26].map((d) => agendaEventsOnDay(events, `2026-10-${d}`).map((e) => e.title)), [['Festival'], ['Festival', 'Balada'], ['Festival'], []]);
   });
 });
