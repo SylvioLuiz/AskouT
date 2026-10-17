@@ -245,7 +245,7 @@ export class EventPageService {
     });
   }
 
-  /** Eventos que ainda não acabaram e em que a pessoa confirmou presença ("Eu vou"), do mais próximo ao mais distante. Os que sumiram, foram arquivados ou ficaram inacessíveis (bloqueio) não entram. */
+  /** Eventos que ainda não acabaram e em que a pessoa vai: os que confirmou ("Eu vou") e os que ela criou, do mais próximo ao mais distante. Os que sumiram, foram arquivados ou ficaram inacessíveis (bloqueio) não entram. */
   async listMyGoing(viewerId: string): Promise<GoingEventView[]> {
     const now = this.deps.clock.now().getTime();
     const rows = await this.deps.eventRoom.listGoingByUser(viewerId, MY_GOING_LIMIT);
@@ -259,6 +259,14 @@ export class EventPageService {
       } catch (failure) {
         if (!(failure instanceof DomainError)) throw failure;
       }
+    }
+    // Os que ela criou: o dono já conta como confirmado.
+    const seen = new Set(out.map((e) => e.id));
+    const created = await this.deps.posts.listFor([viewerId], [], { limit: MY_GOING_LIMIT, offset: 0 }, 'EVENT');
+    for (const { post } of created) {
+      if (post.authorId !== viewerId || post.archivedAt !== null || seen.has(post.id)) continue;
+      if (post.eventTitle === null || !post.eventStartsAt || !post.eventEndsAt || post.eventEndsAt.getTime() < now) continue;
+      out.push({ id: post.id, source: 'USER', title: post.eventTitle, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString(), venueName: post.placeName });
     }
     return out.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
   }

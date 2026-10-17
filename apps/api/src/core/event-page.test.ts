@@ -139,9 +139,13 @@ test('meus eventos confirmados: só os que ainda vão acontecer, do mais próxim
   assert.ok(Date.parse(mine[0]!.startsAt) <= Date.parse(mine[1]!.startsAt), 'ordem por início');
   assert.deepEqual(mine.map((e) => e.id).sort(), ['e1', ev.id].sort());
   assert.equal(mine.find((e) => e.id === 'e1')?.venueName, 'Parque Ibirapuera');
-  assert.deepEqual(await w.core.eventPages.listMyGoing(ana), [], 'o dono não confirmou presença: não entra');
+  assert.deepEqual((await w.core.eventPages.listMyGoing(ana)).map((e) => e.id), [ev.id], 'o dono vê o evento que criou, sem confirmar presença');
+  await w.core.eventPages.go(ana, ev.id);
+  assert.equal((await w.core.eventPages.listMyGoing(ana)).length, 1, 'dono que também confirma não duplica');
   await w.core.eventPages.cancel(bia, 'e1');
   assert.deepEqual((await w.core.eventPages.listMyGoing(bia)).map((e) => e.id), [ev.id], 'cancelar tira da lista');
+  await w.core.posts.archive(ana, ev.id);
+  assert.deepEqual(await w.core.eventPages.listMyGoing(ana), [], 'evento arquivado sai da lista do dono');
   w.clock.tick(400 * 24 * H);
   assert.deepEqual(await w.core.eventPages.listMyGoing(bia), [], 'evento que já acabou sai da lista');
 });
