@@ -104,9 +104,6 @@ Sem token: `POST /auth/signup`, `POST /auth/signup/resend`, `POST /auth/signup/c
 | `DELETE /me/followers/:userId` · `GET /me/friends` | remover seguidor, amigos |
 | `POST/DELETE /users/:userId/block` · `GET /me/blocks` | bloqueios |
 | `GET/POST /me/availability` · `DELETE /me/availability/:slotId` | meus horários (disponível, parcial, indisponível); não podem se sobrepor |
-| `GET /users/:userId/availability?from=&to=` | agenda de um amigo (só amigos; 403 para os demais) |
-| `POST /compatibility` | compatibilidade de um horário entre você e até 9 amigos |
-| `POST /compatibility/best-dates` | "Encontrar melhor data": o melhor horário de cada dia, do mais ao menos compatível |
 | `GET/POST/DELETE /me/flash` | estado do meu Flash, ligar (`{hours: 1\|2\|3, note?}`), desligar |
 | `GET /flash/available` | amigos com Flash ligado (exige o seu ligado); sem localização |
 | `GET/POST /flash/invites` | meus convites (recebidos, enviados, encontros) / convidar (`{userId}`) |

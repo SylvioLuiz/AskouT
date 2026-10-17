@@ -7,7 +7,7 @@ import { Button, EmptyState } from './components/ui.tsx';
 import { useTitle } from './hooks.ts';
 import { Link, navigate, resolveRoute, usePathname } from './router.tsx';
 import type { RouteDef } from './router.tsx';
-import { AgendaScreen, CompareScreen, FriendAgendaScreen } from './screens/agenda.tsx';
+import { AgendaScreen } from './screens/agenda.tsx';
 import { ActivityScreen } from './screens/activity.tsx';
 import { LoginScreen, SignupScreen } from './screens/auth.tsx';
 import { ChatScreen, ConversationsScreen } from './screens/conversations.tsx';
@@ -50,7 +50,6 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/planejar/nova/:id', render: (p) => <DatePollCreateScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/planejar/:id', render: (p) => <DatePollScreen key={p['id']} pollId={p['id'] ?? ''} /> },
   { path: '/agenda', render: () => <AgendaScreen /> },
-  { path: '/agenda/comparar', render: () => <CompareScreen /> },
   { path: '/flash', render: () => <FlashScreen /> },
   { path: '/flash/encontro/:id', render: (p) => <MatchScreen inviteId={p['id'] ?? ''} /> },
   { path: '/atividades', render: () => <ActivityScreen /> },
@@ -71,7 +70,6 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/amigos/contatos', render: () => <ContactsScreen /> },
   { path: '/bloqueados', render: () => <BlockedScreen /> },
   { path: '/u/:username', render: (p) => <ProfileScreen username={p['username'] ?? ''} /> },
-  { path: '/u/:username/agenda', render: (p) => <FriendAgendaScreen username={p['username'] ?? ''} /> },
   { path: '/u/:username/seguidores', render: (p) => <ConnectionsScreen username={p['username'] ?? ''} direction="followers" /> },
   { path: '/u/:username/seguindo', render: (p) => <ConnectionsScreen username={p['username'] ?? ''} direction="following" /> },
 ];

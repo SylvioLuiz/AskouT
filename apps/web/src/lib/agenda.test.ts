@@ -4,18 +4,20 @@ import {
   PRESETS,
   addDays,
   buildSlot,
+  confirmedMeetups,
   dayChip,
   dayLongLabel,
   daysFrom,
   instantRangeLabel,
   localDateKey,
+  meetupsOnDay,
   rangeForDays,
   slotsOnDay,
   startOfDay,
   statesOnDay,
   timeRangeLabel,
 } from './agenda.ts';
-import type { Slot } from './types.ts';
+import type { MeetupView, Slot } from './types.ts';
 
 // Estes testes dependem do fuso (o app usa o do aparelho); o script de teste fixa TZ=America/Sao_Paulo.
 const NOW = new Date(2026, 9, 13, 12, 0); // 13/out/2026 12:00 local
@@ -108,5 +110,27 @@ describe('horários por dia', () => {
     assert.equal(timeRangeLabel(a, '2026-10-20'), '19:00 – 23:00');
     assert.equal(timeRangeLabel(night, '2026-10-20'), '18:00 – 24:00');
     assert.equal(instantRangeLabel(a.start, a.end), 'ter., 20 de out. · 19:00 – 23:00');
+  });
+});
+
+describe('encontros em que você vai', () => {
+  const meetup = (id: string, startsAt: Date, myStatus: MeetupView['myStatus'], status: MeetupView['status'] = 'ACTIVE'): MeetupView =>
+    ({ id, title: id, startsAt: startsAt.toISOString(), endsAt: startsAt.toISOString(), myStatus, status, conversationId: 'c' }) as MeetupView;
+  const list = [
+    meetup('confirmei', new Date(2026, 9, 24, 20, 0), 'CONFIRMED'),
+    meetup('organizo', new Date(2026, 9, 24, 12, 0), 'ORGANIZER'),
+    meetup('convidado', new Date(2026, 9, 24, 21, 0), 'INVITED'),
+    meetup('recusei', new Date(2026, 9, 24, 22, 0), 'DECLINED'),
+    meetup('cancelado', new Date(2026, 9, 24, 23, 0), 'CONFIRMED', 'CANCELLED'),
+    meetup('outro-dia', new Date(2026, 9, 25, 20, 0), 'CONFIRMED'),
+  ];
+
+  it('só conta os que você organiza ou confirmou e que não foram cancelados', () => {
+    assert.deepEqual(confirmedMeetups(list).map((m) => m.id), ['confirmei', 'organizo', 'outro-dia']);
+  });
+
+  it('lista os do dia por horário', () => {
+    assert.deepEqual(meetupsOnDay(list, '2026-10-24').map((m) => m.id), ['organizo', 'confirmei']);
+    assert.deepEqual(meetupsOnDay(list, '2026-10-26'), []);
   });
 });

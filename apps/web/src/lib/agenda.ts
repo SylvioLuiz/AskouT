@@ -1,4 +1,4 @@
-import type { CompatibilityLevel, ParticipantStatus, Slot, SlotState } from './types.ts';
+import type { CompatibilityLevel, MeetupView, ParticipantStatus, Slot, SlotState } from './types.ts';
 
 // Tudo aqui trabalha no fuso do aparelho: a pessoa marca "20h" e é isso que ela espera ver.
 // A API guarda e devolve instantes em UTC; estas funções fazem a ida e a volta.
@@ -165,4 +165,16 @@ export function deviceTimeZone(): string {
   } catch {
     return 'America/Sao_Paulo';
   }
+}
+
+/** Encontros em que você vai: organiza ou confirmou, e que não foram cancelados. */
+export function confirmedMeetups(meetups: readonly MeetupView[]): MeetupView[] {
+  return meetups.filter((m) => m.status === 'ACTIVE' && (m.myStatus === 'ORGANIZER' || m.myStatus === 'CONFIRMED'));
+}
+
+/** Dos encontros em que você vai, os que começam no dia (data local do aparelho), por horário. */
+export function meetupsOnDay(meetups: readonly MeetupView[], key: string): MeetupView[] {
+  return confirmedMeetups(meetups)
+    .filter((m) => localDateKey(new Date(m.startsAt)) === key)
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
 }

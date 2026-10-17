@@ -66,10 +66,12 @@ interface DayStripProps {
   onSelect: (key: string) => void;
   /** Estados com horário marcado em cada dia (viram as marcas embaixo do número). */
   statesOf: (key: string) => readonly SlotState[];
+  /** Quantos eventos em que você vai caem no dia (viram uma marca própria no dia). */
+  eventsOf?: (key: string) => number;
 }
 
 /** Faixa horizontal que rola com o dedo; o dia escolhido sempre fica visível. */
-export function DayStrip({ days, selected, today, onSelect, statesOf }: DayStripProps) {
+export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf }: DayStripProps) {
   const selectedRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -82,13 +84,15 @@ export function DayStrip({ days, selected, today, onSelect, statesOf }: DayStrip
         const chip = dayChip(key);
         const states = statesOf(key);
         const isSelected = key === selected;
-        const summary = states.length === 0 ? 'sem horários' : states.map((s) => STATE_LABEL[s].toLowerCase()).join(', ');
+        const events = eventsOf?.(key) ?? 0;
+        const slotSummary = states.length === 0 ? 'sem horários' : states.map((s) => STATE_LABEL[s].toLowerCase()).join(', ');
+        const summary = events > 0 ? `${slotSummary}, ${events === 1 ? '1 evento' : `${events} eventos`} confirmado${events === 1 ? '' : 's'}` : slotSummary;
         return (
           <button
             key={key}
             ref={isSelected ? selectedRef : undefined}
             type="button"
-            className={`daychip${isSelected ? ' daychip--selected' : ''}${key === today ? ' daychip--today' : ''}`}
+            className={`daychip${isSelected ? ' daychip--selected' : ''}${key === today ? ' daychip--today' : ''}${events > 0 ? ' daychip--event' : ''}`}
             aria-pressed={isSelected}
             aria-label={`${dayLongLabel(key)}${key === today ? ', hoje' : ''}: ${summary}`}
             onClick={() => onSelect(key)}
@@ -96,6 +100,7 @@ export function DayStrip({ days, selected, today, onSelect, statesOf }: DayStrip
             <span className="daychip__weekday">{chip.weekday}</span>
             <span className="daychip__day">{chip.day}</span>
             <span className="daychip__marks" aria-hidden="true">
+              {events > 0 ? <span className="daymark daymark--event" /> : null}
               {states.map((s) => (
                 <span key={s} className={`daymark daymark--${STATE_TONE[s]}`} />
               ))}

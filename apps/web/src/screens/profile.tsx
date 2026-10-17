@@ -211,17 +211,6 @@ export function ProfileScreen({ username }: { username: string }) {
         </EmptyState>
       ) : (
         <>
-          {relationship.isFriend ? (
-            <Link to={`/u/${encodeURIComponent(profile.username)}/agenda`} className="callout callout--link">
-              <span className="callout__text">
-                <strong>Ver agenda de {profile.displayName}</strong>
-                <br />
-                Veja os horários e compare com os seus.
-              </span>
-            </Link>
-          ) : relationship.isSelf ? null : (
-            <p className="muted profile__soon">A agenda é visível só para amigos, quando vocês se seguem.</p>
-          )}
           <div className="tabs" role="tablist" aria-label="Conteúdo do perfil">
             <button type="button" role="tab" id="aba-eventos" aria-selected={tab === 'events'} aria-controls="painel-perfil" className={`tabs__tab${tab === 'events' ? ' tabs__tab--on' : ''}`} onClick={() => setTab('events')}>
               Eventos
