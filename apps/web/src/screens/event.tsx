@@ -260,9 +260,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const cover = e && !coverFailed ? coverSrc(e.coverPath) : null;
   const date = e ? eventDateLabel(e.startsAt, e.endsAt) : null;
   const time = e ? eventTimeLabel(e.startsAt, e.endsAt) : null;
-  const canStory = e ? (e.going || e.isOwner) && !ended : false;
   const strip = e ? attendeeStrip(e.attendees, e.confirmedCount, STRIP_MAX) : null;
   const ended = e ? Date.parse(e.endsAt) <= Date.now() : false;
+  const canStory = e ? (e.going || e.isOwner) && !ended : false;
   const isPosted = posted ?? e?.postedByMe ?? false;
 
   return (
