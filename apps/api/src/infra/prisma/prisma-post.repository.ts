@@ -115,6 +115,16 @@ export class PrismaPostRepository implements PostRepository {
     return rows.map(PrismaPostRepository.toView);
   }
 
+  async listEventsStartingBetween(from: Date, to: Date, limit: number): Promise<PostWithImages[]> {
+    const rows = await this.prisma.post.findMany({
+      where: { archivedAt: null, eventStartsAt: { gt: from, lte: to } },
+      orderBy: [{ eventStartsAt: 'asc' }, { id: 'asc' }],
+      take: limit,
+      include: PrismaPostRepository.include,
+    });
+    return rows.map(PrismaPostRepository.toView);
+  }
+
   async countFor(userId: string, only?: PostKindFilter): Promise<number> {
     if (!isUuid(userId)) return 0;
     return this.prisma.post.count({ where: { AND: [{ OR: [{ authorId: userId }, PrismaPostRepository.viaTag([userId])] }, { venueId: null }, PrismaPostRepository.kindWhere(only), { archivedAt: null }] } });

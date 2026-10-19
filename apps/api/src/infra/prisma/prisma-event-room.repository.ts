@@ -22,6 +22,12 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
     return result.count > 0;
   }
 
+  async markReminded(ref: EventRef, userId: string, at: Date): Promise<boolean> {
+    if (!isUuid(ref.id) || !isUuid(userId)) return false;
+    const result = await this.prisma.eventReminder.createMany({ data: [{ userId, source: ref.source, eventId: ref.id, sentAt: at }], skipDuplicates: true });
+    return result.count > 0;
+  }
+
   async removeGoing(ref: EventRef, userId: string): Promise<boolean> {
     if (!isUuid(ref.id) || !isUuid(userId)) return false;
     const result = await this.prisma.eventAttendance.deleteMany({ where: { userId, ...PrismaEventRoomRepository.where(ref) } });

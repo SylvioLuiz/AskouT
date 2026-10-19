@@ -1199,6 +1199,14 @@ export class InMemoryPostRepository implements PostRepository {
     return { post: { ...post }, images };
   }
 
+  async listEventsStartingBetween(from: Date, to: Date, limit: number): Promise<PostWithImages[]> {
+    return [...this.posts.values()]
+      .filter((p) => p.archivedAt === null && p.eventStartsAt !== null && p.eventStartsAt > from && p.eventStartsAt <= to)
+      .sort((a, b) => (a.eventStartsAt as Date).getTime() - (b.eventStartsAt as Date).getTime() || (a.id < b.id ? -1 : 1))
+      .slice(0, limit)
+      .map((p) => this.withImages(p));
+  }
+
   async findById(id: string): Promise<PostWithImages | undefined> {
     const post = this.posts.get(id);
     return post ? this.withImages(post) : undefined;
@@ -1401,6 +1409,7 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
   private readonly postsRepo: InMemoryPostRepository;
   readonly going = new Map<string, { ref: EventRef; userId: string; createdAt: Date }>();
   readonly eventPosts = new Map<string, EventPostRecord>();
+  readonly reminded = new Set<string>();
 
   constructor(postsRepo: InMemoryPostRepository) {
     this.postsRepo = postsRepo;
@@ -1414,6 +1423,13 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     const key = `${InMemoryEventRoomRepository.key(ref)}|${userId}`;
     if (this.going.has(key)) return false;
     this.going.set(key, { ref: { ...ref }, userId, createdAt: at });
+    return true;
+  }
+
+  async markReminded(ref: EventRef, userId: string): Promise<boolean> {
+    const key = `${InMemoryEventRoomRepository.key(ref)}|${userId}`;
+    if (this.reminded.has(key)) return false;
+    this.reminded.add(key);
     return true;
   }
 

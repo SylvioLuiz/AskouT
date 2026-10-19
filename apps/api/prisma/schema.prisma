@@ -1154,3 +1154,15 @@ model ExternalIdentity {
   @@id([provider, subject])
   @@index([userId])
 }
+
+/// Lembrete "o evento começa em 30 minutos" já mandado a uma pessoa (uma vez por pessoa e evento). Sem chave estrangeira: guarda só o marcador.
+model EventReminder {
+  id      String   @id @default(uuid()) @db.Uuid
+  userId  String   @db.Uuid
+  source  String
+  eventId String   @db.Uuid
+  sentAt  DateTime
+
+  @@unique([userId, source, eventId])
+  @@index([sentAt])
+}

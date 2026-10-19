@@ -38,3 +38,8 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 - [ ] Duração do vídeo (até 3 minutos) só é conferida no app, como nos posts.
 - [ ] Denúncias de story já aparecem no painel da gestão (Denúncias > Stories), com a foto/vídeo para conferir, e a gestão pode apagar o story. Falta decidir se o story deve sair do ar para todos depois de N denúncias.
 - [ ] Sem lista de quem viu e sem aviso (notificação) quando alguém posta story.
+
+## Lembrete de evento (push 30 min antes)
+- Job `EventReminders` roda a cada minuto dentro da API (sem fila externa). Se rodar mais de uma instância, o marcador `EventReminder` evita aviso em dobro; o pior caso é não avisar.
+- Migration `20261115120000_event_reminders` precisa rodar no banco.
+- Push real exige as chaves VAPID configuradas e o aparelho com "Avisos no aparelho" ligado.

@@ -9,6 +9,7 @@ import { SchedulingService } from './scheduling-service.ts';
 import { ProfileEventService } from './profile-event-service.ts';
 import { PostService } from './post-service.ts';
 import { EventPageService } from './event-page-service.ts';
+import { EventReminderService } from './event-reminder-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { VenueService } from './venue-service.ts';
 import { AdminService } from './admin-service.ts';
@@ -41,6 +42,7 @@ export function createCore(input: CoreInput) {
     suggestions: new SuggestionService(deps, flash),
     explore: new ExploreService(deps, profiles),
     eventPages: new EventPageService(deps, profiles),
+    eventReminders: new EventReminderService(deps),
     venues,
     admin: new AdminService(deps, venues, auth),
     meetups: new MeetupService(deps),
@@ -107,6 +109,7 @@ export type { ConversationListItem, ConversationView, GroupDetails, MessageView 
 export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_APART_M } from './suggestion-service.ts';
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { EventPageService } from './event-page-service.ts';
+export { EventReminderService } from './event-reminder-service.ts';
 export type { EventPageView, EventPostView, EventCoverView } from './event-page-service.ts';
 export { ExploreService, EXPLORE_DEFAULT_RADIUS_KM, EXPLORE_MAX_RADIUS_KM } from './explore-service.ts';
 export type { ExploreEventItem, ExplorePlaceItem, ExploreView } from './explore-service.ts';

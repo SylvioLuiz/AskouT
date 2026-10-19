@@ -255,6 +255,8 @@ export interface PostRepository {
   findById(id: string): Promise<PostWithImages | undefined>;
   /** Posts escritos por qualquer um de `authorIds` OU em que alguém de `taggedIds` aceitou a marcação. Mais recentes primeiro. */
   listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter, scope?: PostScope): Promise<PostWithImages[]>;
+  /** Eventos de pessoa (não arquivados) que começam depois de `from` e até `to`. Mais cedo primeiro. */
+  listEventsStartingBetween(from: Date, to: Date, limit: number): Promise<PostWithImages[]>;
   /** Mesma regra de `listFor`, para uma pessoa só (escritos por ela ou em que ela aceitou a marcação). */
   countFor(userId: string, only?: PostKindFilter): Promise<number>;
   createTags(postId: string, userIds: string[], at: Date): Promise<void>;
@@ -520,6 +522,8 @@ export interface EventRoomRepository {
   countGoingByUser(refs: EventRef[]): Promise<{ userId: string; count: number }[]>;
   /** Eventos em que a pessoa confirmou presença, do confirmado mais recentemente para o mais antigo. */
   listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date }[]>;
+  /** Marca que o lembrete de começo deste evento já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
+  markReminded(ref: EventRef, userId: string, at: Date): Promise<boolean>;
   addPost(post: EventPostRecord): Promise<void>;
   /** Mais recentes primeiro, sem os bytes da foto. */
   listPosts(eventId: string, page: Page): Promise<(Omit<EventPostRecord, 'data'> & { hasImage: boolean })[]>;

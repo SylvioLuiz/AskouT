@@ -1713,6 +1713,9 @@ export function defineRepositoryContract(
         assert.equal(perUser.find((r) => r.userId === bia)?.count, 2);
         assert.deepEqual(await h.eventRoom.countGoingByUser([place]), [{ userId: bia, count: 1 }]);
         assert.deepEqual(await h.eventRoom.countGoingByUser([]), []);
+        assert.equal(await h.eventRoom.markReminded(place, ana, at(1)), true, 'primeiro lembrete marca');
+        assert.equal(await h.eventRoom.markReminded(place, ana, at(2)), false, 'o segundo não repete');
+        assert.equal(await h.eventRoom.markReminded(user, ana, at(1)), true, 'outro evento, outro lembrete');
         // stories: só os que ainda estão no ar, do mais antigo ao mais novo; a mídia vem à parte
         const storyA = { id: randomUUID(), ref: user, userId: bia, mime: 'image/jpeg', video: false, data: new Uint8Array([1, 2, 3]), createdAt: at(1), expiresAt: at(30) };
         const storyB = { id: randomUUID(), ref: user, userId: ana, mime: 'video/mp4', video: true, data: new Uint8Array([4, 5]), createdAt: at(2), expiresAt: at(3) };

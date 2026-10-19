@@ -10,7 +10,7 @@ const KEY_MAX = 200;
 /** A que grupo de silenciar cada tipo de aviso pertence. Os demais (curtidas, seguidores, Flash...) só calam com "todas". */
 export function muteGroup(type: NotificationType): 'chats' | 'events' | null {
   if (type === 'MESSAGE' || type === 'GROUP_REMOVED') return 'chats';
-  if (type === 'MEETUP_INVITE' || type === 'MEETUP_ACCEPTED' || type === 'MEETUP_CANCELLED') return 'events';
+  if (type === 'MEETUP_INVITE' || type === 'MEETUP_ACCEPTED' || type === 'MEETUP_CANCELLED' || type === 'EVENT_REMINDER') return 'events';
   return null;
 }
 
