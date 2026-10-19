@@ -1437,6 +1437,15 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     return out;
   }
 
+  async countGoingByUser(refs: EventRef[]): Promise<{ userId: string; count: number }[]> {
+    const out = new Map<string, number>();
+    for (const r of this.going.values()) {
+      if (!this.alive(r.ref) || !refs.some((x) => x.source === r.ref.source && x.id === r.ref.id)) continue;
+      out.set(r.userId, (out.get(r.userId) ?? 0) + 1);
+    }
+    return [...out].map(([userId, count]) => ({ userId, count }));
+  }
+
   async listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date }[]> {
     return [...this.going.values()]
       .filter((r) => r.userId === userId && this.alive(r.ref))

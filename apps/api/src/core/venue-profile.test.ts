@@ -278,3 +278,33 @@ test('feed: eventos de quem o bar segue aparecem para quem segue, só os que ain
   assert.equal(mine.events[0]?.venue.id, 'v1');
   assert.deepEqual((await w.core.explore.followedEvents(bia)).events, []);
 });
+
+test('ranking de frequentadores: conta presença em eventos que já começaram, respeita privacidade e bloqueio', async () => {
+  const { w, ana, bia } = await setup();
+  const u = await w.signUpMany('caio', 'dedo');
+  const caio = u['caio']!, dedo = u['dedo']!;
+  const now = w.clock.now().getTime();
+  const ev = (id: string, startsAt: number, venueId = 'v1') => ({ id, venueId, title: id, description: null, startsAt: new Date(startsAt), endsAt: new Date(startsAt + 3 * H), kind: 'OTHER' as const, isFree: false, imageUrl: null, tags: [], isSample: false });
+  await w.places.createEvent(ev('e1', now - 72 * H));
+  await w.places.createEvent(ev('e2', now - 48 * H));
+  await w.places.createEvent(ev('e3', now - 24 * H));
+  await w.places.createEvent(ev('futuro', now + 24 * H));
+  await w.places.createEvent(ev('outro', now - 24 * H, 'v2'));
+  const go = (id: string, userId: string) => w.eventRoom.addGoing({ source: 'PLACE', id }, userId, new Date(now));
+  for (const id of ['e1', 'e2', 'e3']) await go(id, ana);
+  for (const id of ['e1', 'e2']) await go(id, bia);
+  await go('e1', caio);
+  await go('futuro', caio);
+  await go('outro', caio);
+  await go('e1', dedo);
+  const names = async (viewer: string) => (await w.core.venues.profile(viewer, 'v1')).regulars.map((r) => [r.rank, r.user.username, r.visits]);
+  assert.deepEqual(await names(bia), [[1, 'ana', 3], [2, 'bia', 2], [3, 'caio', 1], [4, 'dedo', 1]], 'só eventos do local que já começaram; empate pelo nome');
+  await w.core.profiles.setPrivacy(caio, true);
+  assert.deepEqual((await names(bia)).map((r) => r[1]), ['ana', 'bia', 'dedo'], 'perfil privado some para quem não segue');
+  await w.core.follows.follow(bia, caio);
+  await w.core.follows.approve(caio, bia);
+  assert.deepEqual((await names(bia)).map((r) => r[1]), ['ana', 'bia', 'caio', 'dedo'], 'e aparece para quem segue');
+  await w.core.blocks.block(bia, dedo);
+  assert.deepEqual((await names(bia)).map((r) => r[1]), ['ana', 'bia', 'caio'], 'bloqueio some nos dois sentidos');
+  assert.deepEqual((await w.core.venues.profile(ana, 'v2')).regulars, [], 'local sem presença não tem ranking');
+});

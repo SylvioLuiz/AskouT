@@ -2,8 +2,8 @@ import { decodeImageDataUrl } from './image.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import { normalizeTag } from './explore-match.ts';
 import type { CoreDeps } from './ports.ts';
-import type { ClaimDocumentMime, ClaimStatus, EventKind, PlaceEventRecord, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
-import { EVENT_KINDS } from './types.ts';
+import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, PlaceEventRecord, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
+import { EVENT_KINDS, toPublicProfile } from './types.ts';
 
 export const CLAIM_DOCUMENT_MAX_BYTES = 2 * 1024 * 1024;
 export const CLAIM_NOTE_MAX = 300;
@@ -134,7 +134,18 @@ export interface VenueProfileView {
   rating: VenueRatingView;
   /** Eventos que ainda vão acontecer ou estão acontecendo, do mais cedo ao mais tarde. */
   upcomingEvents: VenueEventView[];
+  /** Ranking de quem mais frequenta (só perfis que o visitante pode ver). */
+  regulars: VenueRegularView[];
 }
+
+/** Quem mais frequenta o local: presenças confirmadas em eventos que já começaram. */
+export interface VenueRegularView {
+  rank: number;
+  user: PublicProfile;
+  visits: number;
+}
+
+export const VENUE_REGULARS_LIMIT = 10;
 
 /** Nota do estabelecimento: média de 1 a 5 (uma casa decimal), quantas pessoas avaliaram e a nota de quem consulta. */
 export interface VenueRatingView {
@@ -405,7 +416,37 @@ export class VenueService {
       followerCount,
       rating: ratingView(rating),
       upcomingEvents: upcoming,
+      regulars: await this.regulars(viewerId, venue.id, events, now),
     };
+  }
+
+  /**
+   * Ranking de quem mais confirmou presença em eventos do local que já começaram (eventos do Explorar e posts de evento feitos em nome do local).
+   * Perfil privado só aparece para quem já o segue; bloqueio em qualquer sentido e conta suspensa ficam de fora. Empate: ordem alfabética do nome de usuário.
+   */
+  private async regulars(viewerId: string, venueId: string, events: PlaceEventRecord[], now: number): Promise<VenueRegularView[]> {
+    const posts = await this.deps.posts.listFor([], [], { limit: 200, offset: 0 }, undefined, { venueIds: [venueId] });
+    const refs: EventRef[] = [
+      ...events.filter((e) => e.startsAt.getTime() <= now).map((e) => ({ source: 'PLACE' as const, id: e.id })),
+      ...posts.filter((p) => p.post.venueId === venueId && p.post.eventStartsAt && p.post.eventStartsAt.getTime() <= now && p.post.archivedAt === null).map((p) => ({ source: 'USER' as const, id: p.post.id })),
+    ];
+    if (refs.length === 0) return [];
+    const counts = await this.deps.eventRoom.countGoingByUser(refs);
+    const profiles = new Map((await this.deps.users.findProfilesByIds(counts.map((c) => c.userId))).map((p) => [p.userId, p] as const));
+    const rows: { user: PublicProfile; visits: number }[] = [];
+    for (const c of counts) {
+      const profile = profiles.get(c.userId);
+      if (!profile) continue;
+      if (c.userId !== viewerId) {
+        const account = await this.deps.users.findById(c.userId);
+        if (!account || account.status !== 'ACTIVE') continue;
+        if (await this.deps.blocks.existsEitherWay(viewerId, c.userId)) continue;
+        if (profile.isPrivate && (await this.deps.follows.get(viewerId, c.userId))?.status !== 'ACCEPTED') continue;
+      }
+      rows.push({ user: toPublicProfile(profile), visits: c.count });
+    }
+    rows.sort((a, b) => b.visits - a.visits || (a.user.username < b.user.username ? -1 : 1));
+    return rows.slice(0, VENUE_REGULARS_LIMIT).map((r, i) => ({ rank: i + 1, ...r }));
   }
 
   /** Dono edita nome, endereço, categoria, descrição, horários e capa. Só o que vier muda; vazio apaga o que é opcional. */

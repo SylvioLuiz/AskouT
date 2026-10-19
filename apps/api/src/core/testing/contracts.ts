@@ -1703,6 +1703,11 @@ export function defineRepositoryContract(
         assert.equal(await h.eventRoom.isGoing(user, caio), false);
         const counts = await h.eventRoom.countGoing([user, place]);
         assert.deepEqual([counts.get(postId), counts.get(e.id)], [2, 1]);
+        const perUser = (await h.eventRoom.countGoingByUser([user, place])).sort((a, b) => b.count - a.count || (a.userId < b.userId ? -1 : 1));
+        assert.deepEqual(perUser.map((r) => r.count).sort(), [1, 2], 'bia foi a 2, ana a 1; caio não aparece');
+        assert.equal(perUser.find((r) => r.userId === bia)?.count, 2);
+        assert.deepEqual(await h.eventRoom.countGoingByUser([place]), [{ userId: bia, count: 1 }]);
+        assert.deepEqual(await h.eventRoom.countGoingByUser([]), []);
         const mine = await h.eventRoom.listGoingByUser(bia, 10);
         assert.deepEqual(mine.map((r) => [r.ref.source, r.ref.id]), [['PLACE', e.id], ['USER', postId]], 'do confirmado mais recente ao mais antigo');
         assert.equal((await h.eventRoom.listGoingByUser(bia, 1)).length, 1, 'respeita o limite');

@@ -3446,6 +3446,15 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .vhours__row { display: flex; justify-content: space-between; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
 .vhours__row:last-child { border-bottom: 0; }
 .vhours__row--today { font-weight: 700; color: var(--brand); }
+.vrank { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+.vrank__row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); }
+.vrank__pos { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--surface-2, var(--line)); color: var(--muted); font-weight: 700; font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.vrank__row--top .vrank__pos { background: var(--brand); color: var(--brand-ink); }
+.vrank__who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; }
+.vrank__name { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.vrank__name > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrank__n { flex: none; color: var(--muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.vrank__note { margin: 12px 0 0; font-size: 0.8125rem; }
 .vagenda { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
 .vagenda__link { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; background: var(--surface); border-radius: var(--radius-control); color: inherit; text-decoration: none; }
 .vagenda__title { font-size: 16px; }

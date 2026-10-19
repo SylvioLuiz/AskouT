@@ -6,7 +6,7 @@ import { PostList } from '../components/post.tsx';
 import { PlacePhoto, SampleBadge } from '../components/suggestions.tsx';
 import { ChevronDownIcon, ChevronLeftIcon, ClockIcon, LocationIcon, ShareIcon, StarIcon } from '../components/icons.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
-import { Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { formatRating, formatWhen, routeLink, starPercent } from '../lib/chat.ts';
@@ -21,7 +21,7 @@ import type { VenueProfileDraft } from '../lib/venue-profile.ts';
 import { Link, navigate } from '../router.tsx';
 import { VenueEventRow, VenueEventSheet } from './venues.tsx';
 
-type Tab = 'about' | 'events' | 'posts';
+type Tab = 'about' | 'events' | 'regulars' | 'posts';
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -473,6 +473,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const tabs: { id: Tab; label: string; n?: number }[] = [
     { id: 'about', label: 'Sobre' },
     { id: 'events', label: 'Eventos', n: v.upcomingEvents.length },
+    { id: 'regulars', label: 'Ranking' },
     { id: 'posts', label: 'Posts' },
   ];
 
@@ -552,6 +553,35 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
               <AgendaRow key={e.id} event={e} now={now} />
             ))}
           </ul>
+        )
+      ) : null}
+
+      {tab === 'regulars' ? (
+        v.regulars.length === 0 ? (
+          <EmptyState title="O ranking ainda está vazio">Quem confirmar presença nos eventos de {v.name} e for aparece aqui.</EmptyState>
+        ) : (
+          <>
+            <ol className="vrank" aria-label="Quem mais frequenta">
+              {v.regulars.map((r) => (
+                <li key={r.user.userId} className={`vrank__row${r.rank <= 3 ? ' vrank__row--top' : ''}`}>
+                  <span className="vrank__pos" aria-label={`${r.rank}º lugar`}>
+                    {r.rank}
+                  </span>
+                  <Link to={`/u/${encodeURIComponent(r.user.username)}`} className="vrank__who">
+                    <Avatar profile={r.user} size={40} />
+                    <span className="vrank__name">
+                      <strong>{r.user.username}</strong>
+                      {r.user.displayName ? <span className="muted">{r.user.displayName}</span> : null}
+                    </span>
+                  </Link>
+                  <span className="vrank__n">
+                    {r.visits} {r.visits === 1 ? 'presença' : 'presenças'}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <p className="muted vrank__note">Conta as presenças confirmadas em eventos do local que já aconteceram. Perfis privados só aparecem para quem os segue.</p>
+          </>
         )
       ) : null}
 

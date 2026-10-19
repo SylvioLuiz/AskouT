@@ -506,6 +506,8 @@ export interface EventRoomRepository {
   listGoing(ref: EventRef): Promise<EventAttendanceRecord[]>;
   /** Números de confirmados de vários eventos de uma vez. */
   countGoing(refs: EventRef[]): Promise<Map<string, number>>;
+  /** Quantos desses eventos cada pessoa confirmou presença (só quem tem ao menos 1). */
+  countGoingByUser(refs: EventRef[]): Promise<{ userId: string; count: number }[]>;
   /** Eventos em que a pessoa confirmou presença, do confirmado mais recentemente para o mais antigo. */
   listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date }[]>;
   addPost(post: EventPostRecord): Promise<void>;

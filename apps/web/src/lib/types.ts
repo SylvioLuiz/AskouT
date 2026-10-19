@@ -727,6 +727,14 @@ export interface VenueProfile {
   followerCount: number;
   rating: VenueRating;
   upcomingEvents: VenueEvent[];
+  /** Quem mais frequenta, por presenças confirmadas em eventos do local. */
+  regulars: VenueRegular[];
+}
+
+export interface VenueRegular {
+  rank: number;
+  user: PublicProfile;
+  visits: number;
 }
 
 export interface VenueProfileBody {
