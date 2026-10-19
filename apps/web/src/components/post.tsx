@@ -264,6 +264,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster }: { post: Pos
       ) : null}
       {cartaz ? (
         <div className={`poster poster--post${hasVideo ? ' poster--video' : ''}${post.images.length > 1 ? ' poster--multi' : ''}`}>
+          <div className="poster__stage">
           <div className="poster__media">
             <Carousel key={post.images.map((i) => i.id).join()} images={post.images} />
           </div>
@@ -318,22 +319,25 @@ export function PostCard({ post: initial, onGone, asEvent, poster }: { post: Pos
                 ) : null}
               </div>
             ) : null}
+          </div>
+          </div>
+          <div className="poster__foot">
             <div className="poster__row" role="group" aria-label="Ações do post">
-              <div className="poster__glass poster__glass--actions">
-                <button type="button" className={`poster__act${post.likedByMe ? ' poster__act--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
-                  <HeartIcon filled={post.likedByMe} />
-                  <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
-                </button>
-                <button type="button" className="poster__act" onClick={() => setSheet('comments')} aria-label={post.commentCount > 0 ? `Comentários (${post.commentCount})` : 'Comentar'}>
-                  <CommentIcon />
-                  <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
-                </button>
-              </div>
-              <button type="button" className="poster__cta poster__cta--icon" onClick={() => setSheet('share')} aria-label="Compartilhar">
-                <SendIcon />
-                <span>Compartilhar</span>
-              </button>
-            </div>
+      <div className="poster__glass poster__glass--actions">
+          <button type="button" className={`poster__act${post.likedByMe ? ' poster__act--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
+            <HeartIcon filled={post.likedByMe} />
+            <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
+          </button>
+          <button type="button" className="poster__act" onClick={() => setSheet('comments')} aria-label={post.commentCount > 0 ? `Comentários (${post.commentCount})` : 'Comentar'}>
+            <CommentIcon />
+            <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
+          </button>
+        </div>
+        <button type="button" className="poster__cta poster__cta--icon" onClick={() => setSheet('share')} aria-label="Compartilhar">
+          <SendIcon />
+          <span>Compartilhar</span>
+        </button>
+      </div>
           </div>
         </div>
       ) : null}
