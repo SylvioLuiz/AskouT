@@ -312,3 +312,34 @@ test('evento: pode durar mais de 24 h, até 30 dias', async () => {
   const err = await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], placeName: 'Parque', event: { title: 'Longo demais', startsAt: start.toISOString(), endsAt: at(31) } }), 'VALIDATION');
   assert.match(JSON.stringify(err.details), /30 dias/);
 });
+
+const MP4 = (n = 64) => new Uint8Array(Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypmp42'), Buffer.alloc(n, 1)]));
+
+test('vídeo no post: entra no item da capa, um por post, só do autor, com o tamanho e o tipo conferidos', async () => {
+  const w = makeWorld();
+  const { ana, bia } = await w.signUpMany('ana', 'bia');
+  await w.core.follows.follow(ana, bia);
+  await w.core.follows.follow(bia, ana);
+  const post = await w.core.posts.create(ana, { images: [JPEG(), JPEG(2)] });
+  assert.equal(post.images.some((i) => i.video), false);
+  const [cover, other] = post.images;
+
+  await rejectsWith(w.core.posts.attachVideo(bia, post.id, cover!.id, 'video/mp4', MP4()), 'FORBIDDEN');
+  await rejectsWith(w.core.posts.attachVideo(ana, post.id, 'nao-existe', 'video/mp4', MP4()), 'NOT_FOUND');
+  await rejectsWith(w.core.posts.attachVideo(ana, post.id, cover!.id, 'image/jpeg', MP4()), 'VALIDATION');
+  await rejectsWith(w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9])), 'VALIDATION');
+  await rejectsWith(w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', new Uint8Array(21 * 1024 * 1024)), 'VALIDATION');
+
+  const withVideo = await w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', MP4());
+  assert.deepEqual(withVideo.images.map((i) => i.video), [true, false]);
+  await rejectsWith(w.core.posts.attachVideo(ana, post.id, other!.id, 'video/mp4', MP4()), 'CONFLICT');
+
+  const file = await w.core.posts.video(cover!.id);
+  assert.equal(file?.mime, 'video/mp4');
+  assert.equal(file?.data.byteLength, MP4().byteLength);
+  assert.equal(await w.core.posts.video(other!.id), undefined, 'foto comum não tem vídeo');
+  assert.ok(await w.core.posts.image(cover!.id), 'a capa continua sendo uma imagem');
+  // Quem vê o feed enxerga que é vídeo.
+  const feed = await w.core.posts.feed(bia, {});
+  assert.equal(feed.items[0]!.images[0]!.video, true);
+});

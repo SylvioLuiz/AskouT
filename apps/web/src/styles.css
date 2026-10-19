@@ -4237,3 +4237,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .social__or::before, .social__or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .social__google { display: flex; justify-content: center; min-height: 44px; }
 .social__choose { margin-top: 16px; }
+
+/* ---------- Vídeo no post ---------- */
+/* Mesma regra da foto: o quadro nunca passa de 60% da altura da tela; o vídeo cabe inteiro dentro dele. */
+.pcarousel__slide video { width: 100%; height: 100%; min-height: 0; max-height: 100%; object-fit: contain; display: block; background: black; }
+.stage__video { position: absolute; left: 8px; top: 8px; padding: 2px 10px; border-radius: 999px; background: rgb(0 0 0 / 0.6); color: white; font-size: 0.75rem; font-weight: 700; }
+.composegrid__video { position: absolute; left: 6px; bottom: 6px; color: white; font-size: 0.75rem; text-shadow: 0 1px 2px rgb(0 0 0 / 0.7); }

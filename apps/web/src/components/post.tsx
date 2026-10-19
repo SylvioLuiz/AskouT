@@ -17,8 +17,20 @@ import { Link } from '../router.tsx';
 function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: number; total: number; onFirstLoad?: (w: number, h: number) => void }) {
   const [failed, setFailed] = useState(false);
   return (
-    <figure className="pcarousel__slide" aria-label={`Foto ${index + 1} de ${total}`}>
-      {image.path && !failed ? (
+    <figure className="pcarousel__slide" aria-label={`${image.videoPath ? 'Vídeo' : 'Foto'} ${index + 1} de ${total}`}>
+      {image.videoPath ? (
+        <video
+          src={api.assetUrl(image.videoPath)}
+          poster={image.path ? api.assetUrl(image.path) : undefined}
+          controls
+          playsInline
+          preload="metadata"
+          aria-label={`Vídeo ${index + 1} de ${total}`}
+          onLoadedMetadata={(event) => {
+            if (index === 0) onFirstLoad?.(event.currentTarget.videoWidth, event.currentTarget.videoHeight);
+          }}
+        />
+      ) : image.path && !failed ? (
         <img
           src={api.assetUrl(image.path)}
           alt=""
@@ -53,7 +65,7 @@ export function Carousel({ images }: { images: PostImage[] }) {
   }
   return (
     <div className="pcarousel" style={{ '--carousel-ratio': String(ratio) } as CSSProperties}>
-      <div className="pcarousel__track" ref={ref} onScroll={onScroll} role="group" aria-label="Fotos do post" tabIndex={images.length > 1 ? 0 : undefined}>
+      <div className="pcarousel__track" ref={ref} onScroll={onScroll} role="group" aria-label="Fotos e vídeo do post" tabIndex={images.length > 1 ? 0 : undefined}>
         {images.map((image, i) => (
           <Slide key={image.id} image={image} index={i} total={images.length} onFirstLoad={(w, h) => setRatio(feedRatio(w, h))} />
         ))}

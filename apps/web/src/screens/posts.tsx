@@ -15,7 +15,8 @@ import { toApiError } from '../lib/errors.ts';
 import { cropPostPhoto, readPostSource, resizePostPhoto } from '../lib/image.ts';
 import type { CropRect } from '../lib/crop.ts';
 import { toggleId } from '../lib/meetup.ts';
-import { addImages, buildPostBody, effectivePlace, eventProblem, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
+import { addImages, buildPostBody, effectivePlace, eventProblem, videoOf, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
+import { isVideoFile, videoPoster, videoProblem } from '../lib/post-video.ts';
 import type { DraftImage, LinkedPlace } from '../lib/post-draft.ts';
 import type { EventKind, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
@@ -146,8 +147,18 @@ export function CreatePostScreen() {
     setReading(true);
     const added: DraftImage[] = [];
     const skipped: string[] = [];
+    let hasVideo = videoOf(items) !== undefined;
     for (const file of files.slice(0, Math.max(room, 0))) {
       try {
+        if (isVideoFile(file)) {
+          if (hasVideo) throw new Error('Só cabe um vídeo por publicação.');
+          const problem = videoProblem(file);
+          if (problem) throw new Error(problem);
+          const poster = await videoPoster(file);
+          added.push({ key: nextKey(), kind: 'UPLOAD', preview: poster, dataUrl: poster, video: file });
+          hasVideo = true;
+          continue;
+        }
         const dataUrl = await resizePostPhoto(file);
         const source = await readPostSource(file).catch(() => undefined);
         added.push({ key: nextKey(), kind: 'UPLOAD', preview: dataUrl, dataUrl, ...(source ? { source } : {}) });
@@ -158,7 +169,7 @@ export function CreatePostScreen() {
     setItems((current) => addImages(current, added));
     if (added[0]) setFocusKey(added[0].key);
     const extra = files.length - Math.max(room, 0);
-    if (extra > 0) skipped.push(`Só cabem ${POST_IMAGES_MAX} fotos: ${extra} ficou de fora.`);
+    if (extra > 0) skipped.push(`Só cabem ${POST_IMAGES_MAX} itens: ${extra} ficou de fora.`);
     if (skipped.length > 0) setMessage({ tone: 'error', text: skipped.join(' ') });
     setReading(false);
   }
@@ -210,6 +221,18 @@ export function CreatePostScreen() {
     }
     try {
       const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft, prefill.get('votacao')));
+      const video = videoOf(items);
+      if (video) {
+        // O vídeo segue logo depois do post, no item da capa. Se falhar, o post não fica pela metade (só com a capa).
+        const target = created.images[video.index];
+        try {
+          if (!target) throw new Error('Não foi possível anexar o vídeo.');
+          await api.attachPostVideo(created.id, target.id, video.file);
+        } catch (failure) {
+          await api.deletePost(created.id).catch(() => undefined);
+          throw failure;
+        }
+      }
       if (created.event && shareTo.length > 0) {
         const results = await Promise.allSettled(shareTo.map((conversationId) => api.sendEvent(conversationId, created.id)));
         const failed = results.filter((r) => r.status === 'rejected').length;
@@ -227,7 +250,7 @@ export function CreatePostScreen() {
     }
   }
 
-  const fileInput = <input ref={fileRef} type="file" accept="image/*" multiple className="visually-hidden" aria-label="Escolher fotos" id="fotos-post" onChange={addFiles} />;
+  const fileInput = <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="visually-hidden" aria-label="Escolher fotos ou vídeo" id="fotos-post" onChange={addFiles} />;
 
   if (step === 'details') {
     return (
@@ -385,7 +408,10 @@ export function CreatePostScreen() {
       ) : (
       <div className="compose__stage">
         {focused ? (
-          <img src={focused.preview} alt="Foto em destaque" referrerPolicy="no-referrer" />
+          <>
+            <img src={focused.preview} alt={focused.kind === 'UPLOAD' && focused.video ? 'Capa do vídeo' : 'Foto em destaque'} referrerPolicy="no-referrer" />
+            {focused.kind === 'UPLOAD' && focused.video ? <span className="stage__video" aria-label="Vídeo">▶ Vídeo</span> : null}
+          </>
         ) : source === 'photos' ? (
           <button type="button" className="compose__empty" onClick={() => fileRef.current?.click()} disabled={reading}>
             {reading ? 'Preparando as fotos…' : 'Toque para abrir a galeria'}
@@ -405,8 +431,9 @@ export function CreatePostScreen() {
         <ul className="composegrid" aria-label="Fotos escolhidas">
           {items.map((item, i) => (
             <li key={item.key} className={`composegrid__item${item.key === focused?.key ? ' composegrid__item--on' : ''}`}>
-              <button type="button" className="composegrid__pick" onClick={() => { if (cropKey === undefined) setFocusKey(item.key); }} disabled={cropKey !== undefined && item.key !== cropKey} aria-label={`Ver foto ${i + 1}`} aria-pressed={item.key === focused?.key}>
+              <button type="button" className="composegrid__pick" onClick={() => { if (cropKey === undefined) setFocusKey(item.key); }} disabled={cropKey !== undefined && item.key !== cropKey} aria-label={`Ver item ${i + 1}`} aria-pressed={item.key === focused?.key}>
                 <img src={item.preview} alt="" referrerPolicy="no-referrer" />
+                {item.kind === 'UPLOAD' && item.video ? <span className="composegrid__video" aria-hidden="true">▶</span> : null}
                 <span className="composegrid__n">{i + 1}</span>
               </button>
               <button type="button" className="composegrid__remove" onClick={() => remove(item.key)} aria-label={`Remover foto ${i + 1}`}>

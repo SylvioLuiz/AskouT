@@ -156,6 +156,28 @@ export function createApi(deps: ApiDeps) {
     sendEvent: (conversationId: string, eventId: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { eventId } }),
     createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
     post: (postId: string) => request<PostView>('GET', `/posts/${id(postId)}`),
+    /** Anexa o vídeo ao item de foto que serve de capa: o arquivo vai cru no corpo, com o tipo no Content-Type. */
+    attachPostVideo: async (postId: string, imageId: string, file: Blob): Promise<PostView> => {
+      const token = deps.getToken();
+      const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
+      if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/posts/${id(postId)}/images/${id(imageId)}/video`, { method: 'POST', headers, body: file });
+      } catch {
+        throw networkError();
+      }
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+      if (response.ok) return payload as PostView;
+      const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+      if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+      throw error;
+    },
     deletePost: (postId: string) => request<{ deleted: true }>('DELETE', `/posts/${id(postId)}`),
     pendingTags: (page?: PageRequest) => request<PostsPage>('GET', `/posts/pending-tags${pageQuery(page)}`),
     respondTag: (postId: string, action: 'accept' | 'decline') => request<{ status: 'ACCEPTED' | 'DECLINED' }>('POST', `/posts/${id(postId)}/tag`, { body: { action } }),

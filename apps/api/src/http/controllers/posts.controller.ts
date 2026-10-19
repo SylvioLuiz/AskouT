@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Delete, Get, Header, HttpCode, Inject, NotFoundException, Param, Patch, Post, Put, Query, StreamableFile } from '@nestjs/common';
+import { BadRequestException, Controller, Delete, Get, Header, Headers, HttpCode, Inject, NotFoundException, Param, Patch, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
 import { Body } from '@nestjs/common';
 import type { PlacePhotos } from './places.controller.ts';
 import type { Core } from '../../core/index.ts';
@@ -36,6 +36,7 @@ export class PostsController {
       images: post.images.map(({ photoRef, ...i }) => ({
         ...i,
         path: i.kind === 'UPLOAD' ? `/posts/images/${i.id}` : photoRef && this.photos.google ? this.photos.signer.path(photoRef) : null,
+        videoPath: i.video ? `/posts/videos/${i.id}` : null,
       })),
     };
   }
@@ -96,6 +97,34 @@ export class PostsController {
     return new StreamableFile(photo.data, { type: photo.mime });
   }
 
+  /**
+   * Vídeo enviado, para o <video> (que não manda o token). Aceita `Range`, que o Safari exige para tocar.
+   * O id é aleatório, como o da foto.
+   */
+  @Public()
+  @Get('posts/videos/:imageId')
+  @Header('Cache-Control', 'public, max-age=86400')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('Accept-Ranges', 'bytes')
+  async video(@Param('imageId') imageId: string, @Headers('range') range: string | undefined, @Res({ passthrough: true }) res: { status(code: number): unknown; setHeader(name: string, value: string): unknown }) {
+    const video = await this.core.posts.video(imageId);
+    if (!video) throw new NotFoundException();
+    const total = video.data.byteLength;
+    const m = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null;
+    if (!m || (m[1] === '' && m[2] === '')) return new StreamableFile(video.data, { type: video.mime, length: total });
+    const suffix = m[1] === '';
+    const start = suffix ? Math.max(0, total - Number(m[2])) : Number(m[1]);
+    const end = suffix || m[2] === '' ? total - 1 : Math.min(Number(m[2]), total - 1);
+    if (start >= total || start > end) {
+      res.status(416);
+      res.setHeader('Content-Range', `bytes */${total}`);
+      return new StreamableFile(new Uint8Array(0), { type: video.mime });
+    }
+    res.status(206);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`);
+    return new StreamableFile(video.data.subarray(start, end + 1), { type: video.mime, length: end - start + 1 });
+  }
+
   @Get('posts/:id')
   async get(@CurrentActor() actor: Actor, @Param('id') id: string) {
     return this.present(await this.core.posts.get(actor.userId, id));
@@ -117,6 +146,14 @@ export class PostsController {
   @Put('posts/:id/images/:imageId')
   async adjustImage(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('imageId') imageId: string, @Body() body: unknown) {
     return this.present(await this.core.posts.replaceImage(actor.userId, id, imageId, asBody(body).image));
+  }
+
+  /** Vídeo do post: o corpo é o arquivo cru (`Content-Type: video/mp4`...), no item de foto que serve de capa. */
+  @Post('posts/:id/images/:imageId/video')
+  @HttpCode(200)
+  async attachVideo(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('imageId') imageId: string, @Headers('content-type') contentType: string | undefined, @Body() body: unknown) {
+    const data = Buffer.isBuffer(body) ? new Uint8Array(body.buffer, body.byteOffset, body.byteLength) : undefined;
+    return this.present(await this.core.posts.attachVideo(actor.userId, id, imageId, contentType, data));
   }
 
   @Post('posts/:id/archive')

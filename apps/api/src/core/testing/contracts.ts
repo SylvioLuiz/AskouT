@@ -1650,6 +1650,14 @@ export function defineRepositoryContract(
         const swapped = (await h.posts.findImage(newImg))!;
         assert.deepEqual([swapped.mime, Array.from(swapped.data)], ['image/png', [9, 9, 9]]);
         assert.deepEqual((await h.posts.findById(postId))!.images.map((i) => i.id), [newImg], 'continua na mesma posição');
+        // vídeo no item da foto
+        assert.equal(await h.posts.attachVideo(postId, randomUUID(), 'video/mp4', new Uint8Array([1])), false);
+        assert.equal(await h.posts.attachVideo(randomUUID(), newImg, 'video/mp4', new Uint8Array([1])), false, 'item de outro post não vale');
+        assert.equal(await h.posts.attachVideo(postId, newImg, 'video/mp4', new Uint8Array([7, 8, 9])), true);
+        const vid = (await h.posts.findVideo(newImg))!;
+        assert.deepEqual([vid.mime, Array.from(vid.data)], ['video/mp4', [7, 8, 9]]);
+        assert.equal((await h.posts.findById(postId))!.images[0]!.videoMime, 'video/mp4');
+        assert.equal((await h.posts.findImage(newImg))!.mime, 'image/png', 'a capa continua sendo a imagem');
         // arquivar
         assert.equal(await h.posts.setArchived(postId, bia, at(10)), false, 'só o autor arquiva');
         assert.equal(await h.posts.setArchived(postId, ana, at(10)), true);

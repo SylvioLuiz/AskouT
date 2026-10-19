@@ -292,6 +292,9 @@ export interface PostRepository {
   report(report: PostReportRecord): Promise<void>;
   /** Bytes de uma foto enviada (fotos de lugar não têm bytes). */
   findImage(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+  /** Anexa um vídeo a um item de foto enviada do post. Falso se o item não existe, não é do post ou não é foto enviada. */
+  attachVideo(postId: string, imageId: string, mime: string, data: Uint8Array): Promise<boolean>;
+  findVideo(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
 }
 
 export interface PlaceRepository {

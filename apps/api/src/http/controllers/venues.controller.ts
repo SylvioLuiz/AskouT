@@ -27,7 +27,7 @@ export class VenuesController {
   }
 
   private presentPost(post: PostView) {
-    return { ...post, images: post.images.map(({ photoRef, ...i }) => ({ ...i, path: i.kind === 'UPLOAD' ? `/posts/images/${i.id}` : photoRef && this.photos.google ? this.photos.signer.path(photoRef) : null })) };
+    return { ...post, images: post.images.map(({ photoRef, ...i }) => ({ ...i, path: i.kind === 'UPLOAD' ? `/posts/images/${i.id}` : photoRef && this.photos.google ? this.photos.signer.path(photoRef) : null, videoPath: i.video ? `/posts/videos/${i.id}` : null })) };
   }
 
   private presentPage(page: PostsPage) {

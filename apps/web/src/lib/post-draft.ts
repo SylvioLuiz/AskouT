@@ -12,6 +12,8 @@ export interface DraftUpload {
   /** Cópia de trabalho (até 1600 px) para recortar de novo sem perder qualidade. */
   source?: string;
   crop?: CropRect;
+  /** Item de vídeo: `preview`/`dataUrl` são a capa e o arquivo segue para a API depois que o post é criado. */
+  video?: File;
 }
 
 export interface DraftPlacePhoto {
@@ -40,6 +42,13 @@ export function addImages(current: readonly DraftImage[], added: readonly DraftI
     next.push(image);
   }
   return next;
+}
+
+/** O vídeo do rascunho (no máximo um) e a posição dele entre os itens. */
+export function videoOf(images: readonly DraftImage[]): { index: number; file: File } | undefined {
+  const index = images.findIndex((i) => i.kind === 'UPLOAD' && i.video !== undefined);
+  const item = images[index];
+  return item && item.kind === 'UPLOAD' && item.video ? { index, file: item.video } : undefined;
 }
 
 /** O lugar do post: o da foto do lugar (fixo) ou o que a pessoa vinculou quando só tem fotos próprias. */

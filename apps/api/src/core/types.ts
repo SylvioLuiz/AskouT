@@ -428,6 +428,9 @@ export interface PostImageRecord {
   data: Uint8Array | null;
   placePhotoRef: string | null;
   placePhotoAuthor: string | null;
+  /** Vídeo do item (a capa fica em `mime`/`data`). */
+  videoMime?: string | null;
+  videoData?: Uint8Array | null;
 }
 
 /** Imagem sem os bytes (a lista não carrega as fotos, só o endereço delas). */
@@ -437,6 +440,8 @@ export interface PostImageMeta {
   isUpload: boolean;
   placePhotoRef: string | null;
   placePhotoAuthor: string | null;
+  /** Tem vídeo anexado (o tipo; os bytes não vêm nas listas). */
+  videoMime?: string | null;
 }
 
 export interface PostWithImages {

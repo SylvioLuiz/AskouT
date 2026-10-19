@@ -28,3 +28,5 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 - [ ] Chave do Google Places (sem cartão cadastrado por enquanto; o app usa só OpenStreetMap).
 - [ ] Avisos de novos seguidores.
 - [ ] Votação de datas, fase 2.
+- [ ] Vídeo nos posts: hoje o vídeo (até 20 MB) fica no próprio Postgres e é servido pela API. Para valer em escala, mover para armazenamento de arquivos (com CDN) e comprimir/gerar versões leves no servidor.
+- [ ] Vídeo nos posts: limitar a duração (hoje só o tamanho em MB é limitado) e testar em iPhone/Android de verdade.

@@ -764,6 +764,9 @@ model PostImage {
   data             Bytes?
   placePhotoRef    String?
   placePhotoAuthor String?
+  /// Quando o item é um vídeo: `mime`/`data` guardam a imagem de capa (assim toda tela que mostra foto continua valendo) e o vídeo fica aqui.
+  videoMime        String?
+  videoData        Bytes?
 
   post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 

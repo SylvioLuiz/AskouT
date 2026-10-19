@@ -1,4 +1,5 @@
 import { decodeImageDataUrl } from './image.ts';
+import { parseChatMedia } from './media.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
@@ -37,6 +38,8 @@ export interface PostInput {
 export interface PostImageView {
   id: string;
   kind: 'UPLOAD' | 'PLACE';
+  /** O item é um vídeo (a imagem de capa continua valendo como foto). */
+  video: boolean;
   /** Só em foto do lugar: referência para montar o endereço assinado. */
   photoRef: string | null;
   photoAuthor: string | null;
@@ -469,6 +472,28 @@ export class PostService {
     return { status };
   }
 
+  /**
+   * Vídeo do post (curto, até 20 MB, o mesmo teto do chat). Entra num item de foto enviada, que serve de capa.
+   * Só o autor, e no máximo um vídeo por post.
+   */
+  async attachVideo(actorId: string, postId: unknown, imageId: unknown, mime: unknown, bytes: unknown): Promise<PostView> {
+    const { post, images } = await this.seeable(actorId, postId);
+    if (post.authorId !== actorId) throw forbidden('Só quem publicou anexa vídeo');
+    const target = typeof imageId === 'string' ? images.find((i) => i.id === imageId) : undefined;
+    if (!target || !target.isUpload) throw notFound('Item não encontrado');
+    if (images.some((i) => i.videoMime)) throw conflict('Este post já tem um vídeo');
+    const media = parseChatMedia(mime, bytes);
+    if (media.kind !== 'VIDEO') throw validationError('Envie um vídeo (MP4, WebM ou MOV)', { media: 'Envie um vídeo (MP4, WebM ou MOV)' });
+    if (!(await this.deps.posts.attachVideo(post.id, target.id, media.mime, media.data))) throw notFound('Item não encontrado');
+    return this.get(actorId, post.id);
+  }
+
+  /** Vídeo enviado, para o <video>. Quem tem o endereço (id aleatório) vê, como na foto. */
+  async video(imageId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (typeof imageId !== 'string' || imageId === '' || imageId.length > 64) return undefined;
+    return this.deps.posts.findVideo(imageId);
+  }
+
   /** Foto enviada, para o <img>. Quem tem o endereço (id aleatório) vê, como na foto de perfil. */
   async image(imageId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
     if (typeof imageId !== 'string' || imageId === '' || imageId.length > 64) return undefined;
@@ -596,7 +621,7 @@ export class PostService {
           }),
           images: [...images]
             .sort((a, b) => a.position - b.position)
-            .map((i): PostImageView => ({ id: i.id, kind: i.isUpload ? 'UPLOAD' : 'PLACE', photoRef: i.placePhotoRef, photoAuthor: i.placePhotoAuthor })),
+            .map((i): PostImageView => ({ id: i.id, kind: i.isUpload ? 'UPLOAD' : 'PLACE', photoRef: i.placePhotoRef, photoAuthor: i.placePhotoAuthor, video: Boolean(i.videoMime) })),
         },
       ];
     });

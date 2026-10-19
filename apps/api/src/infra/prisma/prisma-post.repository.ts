@@ -36,6 +36,8 @@ export class PrismaPostRepository implements PostRepository {
             data: i.data ? Buffer.from(i.data) : null,
             placePhotoRef: i.placePhotoRef,
             placePhotoAuthor: i.placePhotoAuthor,
+            videoMime: i.videoMime ?? null,
+            videoData: i.videoData ? Buffer.from(i.videoData) : null,
           })),
         },
       },
@@ -58,17 +60,17 @@ export class PrismaPostRepository implements PostRepository {
     editedAt: Date | null;
     createdAt: Date;
     venueId?: string | null;
-    images: { id: string; position: number; mime: string | null; placePhotoRef: string | null; placePhotoAuthor: string | null }[];
+    images: { id: string; position: number; mime: string | null; placePhotoRef: string | null; placePhotoAuthor: string | null; videoMime: string | null }[];
   }): PostWithImages {
     return {
       post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, eventKind: row.eventKind, eventPostsPublic: row.eventPostsPublic, eventPrivate: row.eventPrivate, archivedAt: row.archivedAt, editedAt: row.editedAt, createdAt: row.createdAt, venueId: row.venueId ?? null },
-      images: row.images.map((i) => ({ id: i.id, position: i.position, isUpload: i.mime !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor })),
+      images: row.images.map((i) => ({ id: i.id, position: i.position, isUpload: i.mime !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor, videoMime: i.videoMime })),
     };
   }
 
-  // Não traz os bytes das fotos: só os campos de metadados.
+  // Não traz os bytes das fotos nem dos vídeos: só os campos de metadados.
   private static readonly include = {
-    images: { select: { id: true, position: true, mime: true, placePhotoRef: true, placePhotoAuthor: true }, orderBy: { position: 'asc' as const } },
+    images: { select: { id: true, position: true, mime: true, placePhotoRef: true, placePhotoAuthor: true, videoMime: true }, orderBy: { position: 'asc' as const } },
   };
 
   async findById(id: string): Promise<PostWithImages | undefined> {
@@ -246,6 +248,18 @@ export class PrismaPostRepository implements PostRepository {
       create: { id: report.id, postId: report.postId, reporterId: report.reporterId, reason: report.reason, details: report.details, createdAt: report.createdAt },
       update: { reason: report.reason, details: report.details, resolvedAt: null, resolvedBy: null, resolution: null, resolutionNote: null },
     });
+  }
+
+  async attachVideo(postId: string, imageId: string, mime: string, data: Uint8Array): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(imageId)) return false;
+    const result = await this.prisma.postImage.updateMany({ where: { id: imageId, postId, data: { not: null } }, data: { videoMime: mime, videoData: Buffer.from(data) } });
+    return result.count > 0;
+  }
+
+  async findVideo(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (!isUuid(imageId)) return undefined;
+    const row = await this.prisma.postImage.findUnique({ where: { id: imageId }, select: { videoMime: true, videoData: true } });
+    return row && row.videoMime && row.videoData ? { mime: row.videoMime, data: new Uint8Array(row.videoData) } : undefined;
   }
 
   async findImage(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {

@@ -572,6 +572,9 @@ export interface PostImage {
   /** Caminho na API (foto enviada ou foto do lugar assinada); nulo se a foto do lugar não está disponível. */
   path: string | null;
   photoAuthor: string | null;
+  /** Item de vídeo: `path` é a capa e `videoPath` o vídeo. */
+  video?: boolean;
+  videoPath?: string | null;
 }
 
 export interface PostView {

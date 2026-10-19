@@ -1186,7 +1186,7 @@ export class InMemoryPostRepository implements PostRepository {
     const images = [...this.images.values()]
       .filter((i) => i.postId === post.id)
       .sort((a, b) => a.position - b.position)
-      .map((i) => ({ id: i.id, position: i.position, isUpload: i.data !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor }));
+      .map((i) => ({ id: i.id, position: i.position, isUpload: i.data !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor, videoMime: i.videoMime ?? null }));
     return { post: { ...post }, images };
   }
 
@@ -1353,6 +1353,18 @@ export class InMemoryPostRepository implements PostRepository {
   async findImage(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
     const i = this.images.get(imageId);
     return i && i.data && i.mime ? { mime: i.mime, data: new Uint8Array(i.data) } : undefined;
+  }
+
+  async attachVideo(postId: string, imageId: string, mime: string, data: Uint8Array): Promise<boolean> {
+    const i = this.images.get(imageId);
+    if (!i || i.postId !== postId || i.data === null) return false;
+    this.images.set(imageId, { ...i, videoMime: mime, videoData: new Uint8Array(data) });
+    return true;
+  }
+
+  async findVideo(imageId: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    const i = this.images.get(imageId);
+    return i && i.videoData && i.videoMime ? { mime: i.videoMime, data: new Uint8Array(i.videoData) } : undefined;
   }
 }
 
