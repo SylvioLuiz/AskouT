@@ -82,9 +82,9 @@ export function PushCard() {
 }
 
 const MUTE_ROWS: { key: 'all' | 'chats' | 'events'; title: string; help: string }[] = [
-  { key: 'all', title: 'Todas', help: 'Não avisa nada: nem no sino, nem no aparelho.' },
-  { key: 'chats', title: 'Conversas', help: 'Mensagens e avisos de grupos.' },
-  { key: 'events', title: 'Eventos', help: 'Convites e mudanças dos encontros marcados.' },
+  { key: 'all', title: 'Todas', help: 'Nenhum aviso toca no aparelho. Eles continuam aparecendo no sino.' },
+  { key: 'chats', title: 'Conversas', help: 'Sem push de mensagens e avisos de grupos. Continuam no sino.' },
+  { key: 'events', title: 'Eventos', help: 'Sem push de convites e mudanças dos encontros marcados. Continuam no sino.' },
 ];
 
 /** Chaves para silenciar avisos: tudo, só conversas ou só eventos. */

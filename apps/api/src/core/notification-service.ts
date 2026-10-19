@@ -53,9 +53,9 @@ export class StoredNotifier implements Notifier {
 
   async notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string }): Promise<void> {
     const { notifications, clock, ids } = this.deps;
+    let muted = false;
     try {
-      // Silenciado não chega: nem no sino nem no push.
-      if (isMuted(await notifications.getMuteSettings(input.userId), input.type)) return;
+      muted = isMuted(await notifications.getMuteSettings(input.userId), input.type);
       if (input.dedupeKey && (await notifications.hasUnread(input.userId, input.dedupeKey))) return;
       await notifications.create({
         id: ids.next(),
@@ -71,6 +71,8 @@ export class StoredNotifier implements Notifier {
     } catch {
       return;
     }
+    // Silenciado: o aviso fica no sino, mas o aparelho não recebe push.
+    if (muted) return;
     const job = this.pushTo(input).catch(() => undefined);
     this.inFlight.add(job);
     void job.finally(() => this.inFlight.delete(job));

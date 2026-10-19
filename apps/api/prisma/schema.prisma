@@ -551,7 +551,7 @@ model Notification {
   @@index([userId, readAt, createdAt])
 }
 
-/// O que a pessoa silenciou: tudo, só conversas ou só eventos (encontros). Silenciado não chega (nem no sino, nem no push).
+/// O que a pessoa silenciou no push: tudo, só conversas ou só eventos (encontros). O aviso continua no sino.
 model NotificationSetting {
   userId     String   @id @db.Uuid
   muteAll    Boolean  @default(false)

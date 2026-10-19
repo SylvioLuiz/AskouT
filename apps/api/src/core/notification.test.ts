@@ -179,27 +179,34 @@ describe('silenciar avisos', () => {
     await assert.rejects(w.core.notifications.setMuteSettings(ana!, { all: 'sim' }), (e: { code?: string }) => e.code === 'VALIDATION');
   });
 
-  it('silenciado não chega: conversas calam só mensagens; "todas" cala tudo; desligar volta a avisar', async () => {
+  it('silenciado não manda push mas continua no sino: conversas calam só mensagens; "todas" cala tudo; desligar volta', async () => {
     const w = makeWorld();
     const { ana, bia } = await friends(w, 'ana', 'bia');
+    await w.core.notifications.subscribe(bia!, { endpoint: 'https://push.example/bia', keys: { p256dh: 'abc', auth: 'def' } });
     const { id } = await w.core.conversations.open(ana!, bia!);
-    const count = async (type?: string) => (await w.core.notifications.list(bia!)).items.filter((n) => !type || n.type === type).length;
+    const count = async (type: string) => (await w.core.notifications.list(bia!)).items.filter((n) => n.type === type).length;
+    const pushes = () => w.push.sent.length;
     await w.core.notifications.setMuteSettings(bia!, { chats: true });
+    const before = pushes();
     await w.core.conversations.send(ana!, id, { body: 'oi' });
     await w.core.flushNotifications();
-    assert.equal(await count('MESSAGE'), 0, 'mensagem silenciada não vira aviso');
+    assert.equal(await count('MESSAGE'), 1, 'a mensagem continua no sino');
+    assert.equal(pushes(), before, 'mas o push foi silenciado');
     const post = await w.core.posts.create(bia!, { images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64')}`] });
     await w.core.posts.like(ana!, post.id);
     await w.core.flushNotifications();
-    assert.equal(await count('POST_LIKE'), 1, 'só conversas silenciadas: curtida ainda chega');
+    assert.equal(await count('POST_LIKE'), 1);
+    assert.equal(pushes(), before + 1, 'só conversas silenciadas: o push da curtida sai');
     await w.core.notifications.setMuteSettings(bia!, { all: true });
     const other = await w.core.posts.create(bia!, { images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 4, 5, 6]).toString('base64')}`] });
     await w.core.posts.like(ana!, other.id);
     await w.core.flushNotifications();
-    assert.equal(await count('POST_LIKE'), 1, 'todas silenciadas: nada novo chega');
+    assert.equal(await count('POST_LIKE'), 2, 'todas silenciadas: chega no sino');
+    assert.equal(pushes(), before + 1, 'e nenhum push novo');
+    await w.core.notifications.markRead(bia!);
     await w.core.notifications.setMuteSettings(bia!, { all: false, chats: false });
     await w.core.conversations.send(ana!, id, { body: 'voltei' });
     await w.core.flushNotifications();
-    assert.equal(await count('MESSAGE'), 1, 'desligou o silêncio: volta a avisar');
+    assert.equal(pushes(), before + 2, 'desligou o silêncio: o push volta');
   });
 });

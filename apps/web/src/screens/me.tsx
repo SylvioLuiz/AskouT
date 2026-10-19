@@ -146,7 +146,7 @@ export function SettingsScreen() {
       <p className="muted">Ainda não dá para trocar o e-mail ou a senha por aqui. Isso entra numa próxima etapa.</p>
       <h2 className="profile__section">Avisos no aparelho</h2>
       <PushCard />
-      <h2 className="profile__section">Silenciar notificações</h2>
+      <h2 className="profile__section">Silenciar push</h2>
       <MuteCard />
       <nav className="linklist" aria-label="Sua conta">
         <Link to="/amigos">Amigos</Link>
