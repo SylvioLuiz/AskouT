@@ -121,6 +121,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .card__value--alert { color: var(--danger); }
 .thumb { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; background: color-mix(in srgb, var(--ink) 8%, transparent); display: block; }
 .thumbcell { width: 80px; }
+.thumb--story { width: 120px; height: 180px; object-fit: contain; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; flex: none; }
 .clip { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; max-width: 60ch; }
 
 /* Denúncias */

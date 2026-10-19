@@ -166,3 +166,41 @@ test('painel: contagens e páginas', async () => {
   assert.deepEqual([p1.items.length, p1.hasMore, p2.items.length, p2.hasMore], [3, true, 1, false]);
   await rejectsWith(w.core.admin.searchUsers(A, { q: 'x'.repeat(81) }), 'VALIDATION');
 });
+
+test('denúncias de story: fila da gestão, mídia mesmo vencida, decisão uma vez e remoção do story', async () => {
+  const { w, A, U, ana, bia, caio } = await setup();
+  const now = w.clock.now().getTime();
+  await w.places.createEvent({ id: 'e9', venueId: 'v1', title: 'Noite do Samba', description: null, kind: 'SHOW', isFree: false, imageUrl: null, tags: [], startsAt: new Date(now + H), endsAt: new Date(now + 5 * H), isSample: false });
+  for (const u of [ana, bia, caio]) await w.core.eventPages.go(u, 'e9');
+  const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+  const s1 = (await w.core.eventPages.createStory(ana, 'e9', 'image/jpeg', jpg)).items[0]!.id;
+  const s2 = (await w.core.eventPages.createStory(ana, 'e9', 'image/jpeg', jpg)).items[0]!.id;
+  await w.core.eventPages.reportStory(bia, 'e9', s1, 'NUDITY', 'Imagem imprópria');
+  w.clock.tick(1000);
+  await w.core.eventPages.reportStory(caio, 'e9', s1, 'SPAM');
+  w.clock.tick(1000);
+  await w.core.eventPages.reportStory(caio, 'e9', s2, 'OTHER');
+  await rejectsWith(w.core.admin.storyReports(U(ana), {}), 'FORBIDDEN');
+  assert.equal((await w.core.admin.stats(A)).openStoryReports, 3);
+  const open = (await w.core.admin.storyReports(A, {})).items;
+  assert.equal(open.length, 3);
+  const first = open[0]!;
+  assert.deepEqual([first.reason, first.details, first.reporter.username, first.story.author.username, first.story.eventTitle, first.story.kind, first.story.reportsCount], ['NUDITY', 'Imagem imprópria', 'bia', 'ana', 'Noite do Samba', 'IMAGE', 2]);
+  // a gestão ainda vê a mídia depois de vencida
+  w.clock.tick(6 * H);
+  assert.equal(await w.core.eventPages.storyMedia(s1), undefined);
+  assert.equal((await w.core.admin.storyMedia(A, s1))?.mime, 'image/jpeg');
+  await rejectsWith(w.core.admin.storyMedia(U(ana), s1), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.resolveStoryReport(A, first.id, 'TALVEZ', null), 'VALIDATION');
+  await rejectsWith(w.core.admin.resolveStoryReport(A, 'nao-existe', 'DISMISSED', null), 'NOT_FOUND');
+  await w.core.admin.resolveStoryReport(A, first.id, 'DISMISSED', 'Sem problema');
+  await rejectsWith(w.core.admin.resolveStoryReport(A, first.id, 'ACTIONED', null), 'CONFLICT');
+  assert.equal((await w.core.admin.storyReports(A, {})).items.length, 2);
+  assert.equal((await w.core.admin.storyReports(A, { status: 'resolved' })).items[0]!.resolution, 'DISMISSED');
+  await rejectsWith(w.core.admin.deleteStory(A, s2, ''), 'VALIDATION');
+  await w.core.admin.deleteStory(A, s2, 'Fora das regras');
+  await rejectsWith(w.core.admin.deleteStory(A, s2, 'de novo'), 'NOT_FOUND');
+  assert.equal((await w.core.admin.stats(A)).openStoryReports, 1, 'a denúncia do story apagado sai junto');
+  const actions = (await w.core.admin.audit(A, {})).items.map((r) => r.action);
+  assert.deepEqual(actions, ['STORY_REMOVED', 'REPORT_DISMISSED']);
+});

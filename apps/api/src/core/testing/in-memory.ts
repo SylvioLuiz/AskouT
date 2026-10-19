@@ -32,7 +32,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { EventStoryMeta, EventStoryRecord, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -1544,8 +1544,10 @@ export class InMemoryAdminRepository implements AdminRepository {
   private readonly conversations: InMemoryConversationRepository;
   private readonly places: InMemoryPlaceRepository;
   private readonly claims: InMemoryVenueClaimRepository;
+  private readonly eventRoom: InMemoryEventRoomRepository;
 
-  constructor(parts: { users: InMemoryUserRepository; posts: InMemoryPostRepository; conversations: InMemoryConversationRepository; places: InMemoryPlaceRepository; claims: InMemoryVenueClaimRepository }) {
+  constructor(parts: { users: InMemoryUserRepository; posts: InMemoryPostRepository; conversations: InMemoryConversationRepository; places: InMemoryPlaceRepository; claims: InMemoryVenueClaimRepository; eventRoom: InMemoryEventRoomRepository }) {
+    this.eventRoom = parts.eventRoom;
     this.users = parts.users;
     this.posts = parts.posts;
     this.conversations = parts.conversations;
@@ -1578,6 +1580,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       approvedClaims: [...this.claims.claims.values()].filter((c) => c.status === 'APPROVED').length,
       openPostReports: [...this.posts.reports.values()].filter((r) => !r.resolvedAt).length,
       openConversationReports: [...this.conversations.reports.values()].filter((r) => !r.resolvedAt).length,
+      openStoryReports: [...this.eventRoom.storyReports.values()].filter((r) => !r.resolvedAt).length,
     };
   }
 
@@ -1688,6 +1691,50 @@ export class InMemoryAdminRepository implements AdminRepository {
     }
     rows.sort((a, b) => (open ? a.createdAt.getTime() - b.createdAt.getTime() : (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0)) || (a.id < b.id ? -1 : 1));
     return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  async listStoryReports(open: boolean, page: Page) {
+    const rows: AdminStoryReportRow[] = [];
+    for (const r of this.eventRoom.storyReports.values()) {
+      if (open === (r.resolvedAt !== null && r.resolvedAt !== undefined)) continue;
+      const s = this.eventRoom.stories.get(r.storyId);
+      if (!s) continue;
+      const title = s.ref.source === 'PLACE' ? this.places.events.get(s.ref.id)?.title ?? null : this.posts.posts.get(s.ref.id)?.eventTitle ?? null;
+      const reportsCount = [...this.eventRoom.storyReports.values()].filter((x) => x.storyId === s.id).length;
+      rows.push({
+        id: r.id, reason: r.reason, details: r.details, createdAt: r.createdAt, reporter: { id: r.reporterId, username: this.username(r.reporterId) },
+        story: { id: s.id, kind: s.video ? 'VIDEO' : 'IMAGE', author: { id: s.userId, username: this.username(s.userId) }, eventId: s.ref.id, eventTitle: title, createdAt: s.createdAt, expiresAt: s.expiresAt, reportsCount },
+        resolvedAt: r.resolvedAt ?? null, resolution: r.resolution ?? null, resolutionNote: r.resolutionNote ?? null,
+      });
+    }
+    rows.sort((a, b) => (open ? a.createdAt.getTime() - b.createdAt.getTime() : (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0)) || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  async findStoryReport(id: string) {
+    for (const r of this.eventRoom.storyReports.values()) if (r.id === id) return { id: r.id, storyId: r.storyId, resolvedAt: r.resolvedAt ?? null };
+    return undefined;
+  }
+
+  async resolveStoryReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date) {
+    for (const [key, r] of this.eventRoom.storyReports) {
+      if (r.id !== id) continue;
+      if (r.resolvedAt) return false;
+      this.eventRoom.storyReports.set(key, { ...r, resolvedAt: at, resolvedBy: adminId, resolution, resolutionNote: note });
+      return true;
+    }
+    return false;
+  }
+
+  async findStoryMedia(id: string) {
+    const s = this.eventRoom.stories.get(id);
+    return s ? { mime: s.mime, data: new Uint8Array(s.data) } : undefined;
+  }
+
+  async deleteStory(id: string) {
+    if (!this.eventRoom.stories.has(id)) return false;
+    await this.eventRoom.deleteStory(id);
+    return true;
   }
 
   async findPostReport(id: string) {

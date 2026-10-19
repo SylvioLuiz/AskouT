@@ -36,5 +36,5 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 - [ ] Fotos e vídeos dos stories ficam dentro do Postgres (até 60 MB cada, 10 por pessoa por evento). Antes de ter muita gente, mover para armazenamento de arquivos (S3/R2) com expiração automática.
 - [ ] Story expirado só some da tela: a linha continua no banco até o evento ser apagado. Criar uma tarefa que apague os vencidos.
 - [ ] Duração do vídeo (até 3 minutos) só é conferida no app, como nos posts.
-- [ ] Denúncias de story ficam guardadas no banco (tabela EventStoryReport), mas a gestão ainda não tem tela para vê-las e decidir. Fazer essa tela (e, se quiser, esconder o story de todos após N denúncias) antes do lançamento.
+- [ ] Denúncias de story já aparecem no painel da gestão (Denúncias > Stories), com a foto/vídeo para conferir, e a gestão pode apagar o story. Falta decidir se o story deve sair do ar para todos depois de N denúncias.
 - [ ] Sem lista de quem viu e sem aviso (notificação) quando alguém posta story.

@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, Claim, ClaimStatus, ConversationReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, Claim, ClaimStatus, ConversationReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -115,6 +115,15 @@ export const api = {
 
   postReports: (p: { resolved: boolean; offset: number }) => request<Page<PostReportRow>>('GET', `/admin/reports/posts${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
   conversationReports: (p: { resolved: boolean; offset: number }) => request<Page<ConversationReportRow>>('GET', `/admin/reports/conversations${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
+  storyReports: (p: { resolved: boolean; offset: number }) => request<Page<StoryReportRow>>('GET', `/admin/reports/stories${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
+  resolveStoryReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/stories/${encodeURIComponent(id)}/resolve`, { resolution, note }),
+  deleteStory: (id: string, note: string) => request<unknown>('DELETE', `/admin/stories/${encodeURIComponent(id)}`, { note }),
+  /** Baixa a mídia do story com o token e devolve um endereço temporário para exibir. */
+  async storyMedia(id: string): Promise<{ url: string; mime: string }> {
+    const response = await send('GET', `/admin/stories/${encodeURIComponent(id)}/media`);
+    const blob = await response.blob();
+    return { url: URL.createObjectURL(blob), mime: blob.type };
+  },
   resolvePostReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/posts/${encodeURIComponent(id)}/resolve`, { resolution, note }),
   resolveConversationReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/conversations/${encodeURIComponent(id)}/resolve`, { resolution, note }),
 

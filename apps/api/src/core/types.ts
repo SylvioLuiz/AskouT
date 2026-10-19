@@ -522,6 +522,10 @@ export interface EventStoryReportRecord {
   reason: PostReportReason;
   details: string | null;
   createdAt: Date;
+  resolvedAt?: Date | null;
+  resolvedBy?: string | null;
+  resolution?: ReportResolution | null;
+  resolutionNote?: string | null;
 }
 
 export type EventStoryMeta = Omit<EventStoryRecord, 'data'>;
@@ -598,6 +602,7 @@ export interface AdminStats {
   approvedClaims: number;
   openPostReports: number;
   openConversationReports: number;
+  openStoryReports: number;
 }
 
 export interface AdminUserRow {
@@ -658,6 +663,18 @@ export interface AdminPostReportRow {
   resolutionNote: string | null;
 }
 
+export interface AdminStoryReportRow {
+  id: string;
+  reason: PostReportReason;
+  details: string | null;
+  createdAt: Date;
+  reporter: { id: string; username: string };
+  story: { id: string; kind: 'IMAGE' | 'VIDEO'; author: { id: string; username: string }; eventId: string; eventTitle: string | null; createdAt: Date; expiresAt: Date; reportsCount: number };
+  resolvedAt: Date | null;
+  resolution: ReportResolution | null;
+  resolutionNote: string | null;
+}
+
 export interface AdminConversationReportRow {
   id: string;
   conversationId: string;
@@ -681,6 +698,7 @@ export type AuditAction =
   | 'VENUE_OWNER_REMOVED'
   | 'POST_REMOVED'
   | 'PLACE_EVENT_REMOVED'
+  | 'STORY_REMOVED'
   | 'REPORT_DISMISSED'
   | 'REPORT_ACTIONED';
 
@@ -688,7 +706,7 @@ export interface AuditRecord {
   id: string;
   adminId: string;
   action: AuditAction;
-  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT';
+  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'STORY' | 'STORY_REPORT';
   targetId: string;
   note: string | null;
   createdAt: Date;

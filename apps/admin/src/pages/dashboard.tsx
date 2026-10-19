@@ -33,6 +33,7 @@ export function DashboardPage() {
             <div className="cards">
               <Card label="Pedidos de donos em análise" value={s.pendingClaims} to="/pedidos" alert />
               <Card label="Denúncias de posts abertas" value={s.openPostReports} to="/denuncias" alert />
+              <Card label="Denúncias de stories abertas" value={s.openStoryReports ?? 0} to="/denuncias" alert />
               <Card label="Denúncias de conversas abertas" value={s.openConversationReports} to="/denuncias" alert />
             </div>
             <h2 className="section">O app em números</h2>

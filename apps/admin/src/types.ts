@@ -35,6 +35,7 @@ export interface Stats {
   approvedClaims: number;
   openPostReports: number;
   openConversationReports: number;
+  openStoryReports: number;
 }
 
 export interface Claim {
@@ -101,6 +102,18 @@ export interface PostReportRow {
   createdAt: string;
   reporter: { id: string; username: string };
   post: PostRow;
+  resolvedAt: string | null;
+  resolution: Resolution | null;
+  resolutionNote: string | null;
+}
+
+export interface StoryReportRow {
+  id: string;
+  reason: ReportReason;
+  details: string | null;
+  createdAt: string;
+  reporter: { id: string; username: string };
+  story: { id: string; kind: 'IMAGE' | 'VIDEO'; author: { id: string; username: string }; eventId: string; eventTitle: string | null; createdAt: string; expiresAt: string; reportsCount: number };
   resolvedAt: string | null;
   resolution: Resolution | null;
   resolutionNote: string | null;

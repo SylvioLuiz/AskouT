@@ -97,6 +97,33 @@ export class AdminController {
     return this.core.admin.postReports(actor, q);
   }
 
+  @Get('reports/stories')
+  storyReports(@CurrentActor() actor: Actor, @Query() q: { status?: unknown; limit?: unknown; offset?: unknown }) {
+    return this.core.admin.storyReports(actor, q);
+  }
+
+  @Post('reports/stories/:id/resolve')
+  @HttpCode(200)
+  resolveStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.resolveStoryReport(actor, id, b.resolution, b.note);
+  }
+
+  @Delete('stories/:id')
+  deleteStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.admin.deleteStory(actor, id, asBody(body).note);
+  }
+
+  @Get('stories/:id/media')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('Content-Disposition', 'inline')
+  async storyMedia(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    const media = await this.core.admin.storyMedia(actor, id);
+    if (!media) throw new NotFoundException();
+    return new StreamableFile(media.data, { type: media.mime });
+  }
+
   @Get('reports/conversations')
   conversationReports(@CurrentActor() actor: Actor, @Query() q: { status?: unknown; limit?: unknown; offset?: unknown }) {
     return this.core.admin.conversationReports(actor, q);

@@ -1,4 +1,4 @@
-import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -386,6 +386,13 @@ export interface AdminRepository {
   deletePost(id: string): Promise<boolean>;
   listPostReports(open: boolean, page: Page): Promise<AdminPostReportRow[]>;
   listConversationReports(open: boolean, page: Page): Promise<AdminConversationReportRow[]>;
+  /** Denúncias de story (as mais antigas primeiro nas abertas). Traz só dados, nunca os bytes. */
+  listStoryReports(open: boolean, page: Page): Promise<AdminStoryReportRow[]>;
+  findStoryReport(id: string): Promise<{ id: string; storyId: string; resolvedAt: Date | null } | undefined>;
+  resolveStoryReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean>;
+  /** A mídia do story para a gestão ver, mesmo depois de vencido (enquanto a linha existir). */
+  findStoryMedia(id: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+  deleteStory(id: string): Promise<boolean>;
   findPostReport(id: string): Promise<{ id: string; postId: string; resolvedAt: Date | null } | undefined>;
   findConversationReport(id: string): Promise<{ id: string; reportedUserId: string | null; resolvedAt: Date | null } | undefined>;
   /** Só encerra denúncia em aberto; false se já foi decidida. */

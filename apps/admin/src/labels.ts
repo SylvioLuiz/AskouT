@@ -34,6 +34,7 @@ export const ACTION_LABEL: Record<string, string> = {
   VENUE_OWNER_REMOVED: 'Tirou o responsável do local',
   POST_REMOVED: 'Apagou um post',
   PLACE_EVENT_REMOVED: 'Apagou um evento do local',
+  STORY_REMOVED: 'Apagou um story',
   REPORT_DISMISSED: 'Denúncia: sem problema',
   REPORT_ACTIONED: 'Denúncia: providência tomada',
 };
@@ -44,6 +45,8 @@ export const TARGET_LABEL: Record<string, string> = {
   VENUE: 'Local',
   POST: 'Post',
   PLACE_EVENT: 'Evento do local',
+  STORY: 'Story',
+  STORY_REPORT: 'Denúncia de story',
   POST_REPORT: 'Denúncia de post',
   CONVERSATION_REPORT: 'Denúncia de conversa',
 };

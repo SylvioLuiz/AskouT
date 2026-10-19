@@ -934,12 +934,18 @@ model EventStoryReport {
   reason     String
   details    String?
   createdAt  DateTime @default(now())
+  /// Decisão da gestão: DISMISSED (sem problema) ou ACTIONED (providência tomada).
+  resolvedAt     DateTime?
+  resolvedBy     String?   @db.Uuid
+  resolution     String?
+  resolutionNote String?
 
   story    EventStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
   reporter User       @relation("EventStoryReports", fields: [reporterId], references: [id], onDelete: Cascade)
 
   @@unique([storyId, reporterId])
   @@index([reporterId])
+  @@index([resolvedAt])
 }
 
 /// Registro de tudo que a gestão decidiu. Só cresce; `adminId` não tem chave estrangeira para sobreviver à remoção da conta.

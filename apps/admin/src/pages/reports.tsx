@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import { REASON_LABEL, RESOLUTION_LABEL, formatDateTime } from '../labels.ts';
-import type { ConversationReportRow, PostReportRow } from '../types.ts';
+import type { ConversationReportRow, PostReportRow, StoryReportRow } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead, Pager, Tabs } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
 import { PostThumb, deletePostAction } from './posts.tsx';
 
-type Kind = 'posts' | 'conversations';
+type Kind = 'posts' | 'stories' | 'conversations';
 
 function Outcome({ r }: { r: { resolution: PostReportRow['resolution']; resolutionNote: string | null; resolvedAt: string | null } }) {
   if (!r.resolution) return null;
@@ -48,6 +48,71 @@ function PostReportCard({ r, onAction }: { r: PostReportRow; onAction: (a: Actio
           </button>
           <button type="button" className="btn btn--small btn--danger-quiet" onClick={() => onAction(deletePostAction(r.post))}>
             Apagar post
+          </button>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function StoryPreview({ r }: { r: StoryReportRow }) {
+  const [media, setMedia] = useState<{ url: string; mime: string } | undefined>();
+  const [problem, setProblem] = useState<string | undefined>();
+  useEffect(() => () => { if (media) URL.revokeObjectURL(media.url); }, [media]);
+  if (media) return media.mime.startsWith('video/') ? <video className="thumb thumb--story" src={media.url} controls playsInline /> : <img className="thumb thumb--story" src={media.url} alt="Story denunciado" />;
+  return (
+    <div className="thumb thumb--empty thumb--story">
+      <button type="button" className="btn btn--small" onClick={() => { setProblem(undefined); api.storyMedia(r.story.id).then(setMedia).catch(() => setProblem('Não foi possível abrir.')); }}>
+        Ver {r.story.kind === 'VIDEO' ? 'vídeo' : 'foto'}
+      </button>
+      {problem ? <div className="small">{problem}</div> : null}
+    </div>
+  );
+}
+
+function StoryReportCard({ r, onAction }: { r: StoryReportRow; onAction: (a: ActionSpec) => void }) {
+  const open = r.resolution === null;
+  return (
+    <article className="report">
+      <StoryPreview r={r} />
+      <div className="report__main">
+        <div>
+          <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge> <span className="muted small">denunciado por @{r.reporter.username} em {formatDateTime(r.createdAt)}</span>
+        </div>
+        {r.details ? <p className="pre">“{r.details}”</p> : null}
+        <div className="postbox">
+          <div className="muted small">
+            Story de <span className="handle">@{r.story.author.username}</span> · {r.story.reportsCount} denúncia(s) no total
+          </div>
+          {r.story.eventTitle ? <strong>Evento: {r.story.eventTitle}</strong> : null}
+          <div className="muted small">Publicado em {formatDateTime(r.story.createdAt)} · no ar até {formatDateTime(r.story.expiresAt)}</div>
+        </div>
+        <Outcome r={r} />
+      </div>
+      {open ? (
+        <div className="report__actions">
+          <button type="button" className="btn btn--small" onClick={() => onAction({ title: 'Denúncia sem problema', description: <p>O story continua no ar e a denúncia sai da fila.</p>, confirmLabel: 'Marcar sem problema', noteLabel: 'Nota', run: (n) => api.resolveStoryReport(r.id, 'DISMISSED', n) })}>
+            Sem problema
+          </button>
+          <button type="button" className="btn btn--small" onClick={() => onAction({ title: 'Providência tomada', description: <p>Use quando você já agiu por outro caminho (ex.: falou com a pessoa).</p>, confirmLabel: 'Registrar providência', noteLabel: 'O que foi feito', noteRequired: true, run: (n) => api.resolveStoryReport(r.id, 'ACTIONED', n) })}>
+            Providência tomada
+          </button>
+          <button
+            type="button"
+            className="btn btn--small btn--danger-quiet"
+            onClick={() =>
+              onAction({
+                title: 'Apagar story',
+                description: <p>O story de @{r.story.author.username} sai do ar e as denúncias dele saem da fila. Isso não pode ser desfeito.</p>,
+                confirmLabel: 'Apagar story',
+                danger: true,
+                noteLabel: 'Motivo',
+                noteRequired: true,
+                run: (n) => api.deleteStory(r.story.id, n),
+              })
+            }
+          >
+            Apagar story
           </button>
         </div>
       ) : null}
@@ -123,10 +188,12 @@ export function ReportsPage() {
   const [action, setAction] = useState<ActionSpec>();
   const stats = useAsync(() => api.stats(), []);
   const posts = useAsync(() => (kind === 'posts' ? api.postReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
+  const stories = useAsync(() => (kind === 'stories' ? api.storyReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
   const convs = useAsync(() => (kind === 'conversations' ? api.conversationReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
 
   const reload = () => {
     posts.reload();
+    stories.reload();
     convs.reload();
     stats.reload();
   };
@@ -140,6 +207,7 @@ export function ReportsPage() {
           onChange={(k) => { setKind(k); setOffset(0); }}
           options={[
             { value: 'posts', label: 'Posts', count: stats.data?.openPostReports },
+            { value: 'stories', label: 'Stories', count: stats.data?.openStoryReports },
             { value: 'conversations', label: 'Conversas', count: stats.data?.openConversationReports },
           ]}
         />
@@ -151,6 +219,17 @@ export function ReportsPage() {
             page ? (
               <>
                 <div className="reports">{page.items.map((r) => <PostReportCard key={r.id} r={r} onAction={setAction} />)}</div>
+                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+              </>
+            ) : null
+          }
+        </Loadable>
+      ) : kind === 'stories' ? (
+        <Loadable state={stories} empty={resolved ? 'Nenhuma denúncia decidida ainda.' : 'Nenhuma denúncia aberta. 🎉'} isEmpty={(d) => d === undefined || d.items.length === 0}>
+          {(page) =>
+            page ? (
+              <>
+                <div className="reports">{page.items.map((r) => <StoryReportCard key={r.id} r={r} onAction={setAction} />)}</div>
                 <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
               </>
             ) : null

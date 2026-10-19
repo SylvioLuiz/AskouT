@@ -35,7 +35,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let profileEvents = new InMemoryProfileEventRepository();
   let posts = new InMemoryPostRepository();
   let eventRoom = new InMemoryEventRoomRepository(posts);
-  let admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims });
+  let admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom });
   let notifications = new InMemoryNotificationRepository();
   let pushSubscriptions = new InMemoryPushSubscriptionRepository();
 
@@ -111,7 +111,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
       profileEvents = new InMemoryProfileEventRepository();
       posts = new InMemoryPostRepository();
       eventRoom = new InMemoryEventRoomRepository(posts);
-      admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims });
+      admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom });
       notifications = new InMemoryNotificationRepository();
       pushSubscriptions = new InMemoryPushSubscriptionRepository();
     },

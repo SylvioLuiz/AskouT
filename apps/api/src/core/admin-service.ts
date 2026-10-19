@@ -2,7 +2,7 @@ import { conflict, forbidden, notFound, unauthorized, validationError } from './
 import type { AuthResult, AuthService, LoginInput } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
 import type { VenueService } from './venue-service.ts';
-import type { Actor, AdminConversationReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
+import type { Actor, AdminConversationReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
 import { REPORT_RESOLUTIONS } from './types.ts';
 
 export const ADMIN_PAGE_DEFAULT = 25;
@@ -198,6 +198,38 @@ export class AdminService {
     this.assertAdmin(actor);
     const open = query.status !== 'resolved';
     return this.paged(query, (page) => this.deps.admin.listPostReports(open, page));
+  }
+
+  async storyReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminStoryReportRow>> {
+    this.assertAdmin(actor);
+    const open = query.status !== 'resolved';
+    return this.paged(query, (page) => this.deps.admin.listStoryReports(open, page));
+  }
+
+  async resolveStoryReport(actor: Actor, reportId: unknown, resolution: unknown, note: unknown): Promise<{ resolved: true }> {
+    this.assertAdmin(actor);
+    const res = this.parseResolution(resolution);
+    const text = noteText(note, false);
+    const report = typeof reportId === 'string' && reportId.length <= 64 ? await this.deps.admin.findStoryReport(reportId) : undefined;
+    if (!report) throw notFound('Denúncia não encontrada');
+    if (!(await this.deps.admin.resolveStoryReport(report.id, actor.userId, res, text, this.deps.clock.now()))) throw conflict('Esta denúncia já foi decidida');
+    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'STORY_REPORT', report.id, text);
+    return { resolved: true };
+  }
+
+  /** Tira um story do ar (some também para quem o denunciou e leva as denúncias dele). */
+  async deleteStory(actor: Actor, storyId: unknown, note: unknown): Promise<{ deleted: true }> {
+    this.assertAdmin(actor);
+    const text = noteText(note, true);
+    if (typeof storyId !== 'string' || storyId.length > 64 || !(await this.deps.admin.deleteStory(storyId))) throw notFound('Story não encontrado');
+    await this.log(actor.userId, 'STORY_REMOVED', 'STORY', storyId, text);
+    return { deleted: true };
+  }
+
+  /** A foto ou o vídeo denunciado, para a gestão conferir (vale mesmo depois de vencido, enquanto existir). */
+  async storyMedia(actor: Actor, storyId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    this.assertAdmin(actor);
+    return typeof storyId === 'string' && storyId.length <= 64 ? this.deps.admin.findStoryMedia(storyId) : undefined;
   }
 
   async conversationReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminConversationReportRow>> {

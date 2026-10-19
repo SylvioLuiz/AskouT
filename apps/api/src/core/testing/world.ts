@@ -49,7 +49,7 @@ export function makeWorld() {
   const claims = new InMemoryVenueClaimRepository();
   const placeSource = new FakePlaceSource();
   const users = new InMemoryUserRepository();
-  const admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims });
+  const admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom });
   const pending = new InMemoryPendingSignupRepository();
   const identities = new InMemoryIdentityRepository();
   const verifier = new FakeIdentityVerifier();
