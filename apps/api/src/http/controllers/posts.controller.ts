@@ -190,6 +190,17 @@ export class PostsController {
     return this.core.posts.addComment(actor.userId, id, asBody(body).body);
   }
 
+  @Post('posts/:id/comments/:commentId/like')
+  @HttpCode(200)
+  likeComment(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('commentId') commentId: string) {
+    return this.core.posts.likeComment(actor.userId, id, commentId, true);
+  }
+
+  @Delete('posts/:id/comments/:commentId/like')
+  unlikeComment(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('commentId') commentId: string) {
+    return this.core.posts.likeComment(actor.userId, id, commentId, false);
+  }
+
   @Delete('posts/:id/comments/:commentId')
   deleteComment(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('commentId') commentId: string) {
     return this.core.posts.deleteComment(actor.userId, id, commentId);

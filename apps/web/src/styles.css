@@ -3242,6 +3242,13 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .comment__del { flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .comment__del:hover:not(:disabled) { color: #d92d20; }
 .comment__del:disabled { opacity: 0.5; }
+.comment__mention { color: var(--brand); font-weight: 600; text-decoration: none; }
+.comment__like { flex: none; display: flex; flex-direction: column; align-items: center; gap: 0; min-width: 36px; min-height: 36px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 0.75rem; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.comment__like svg { width: 18px; height: 18px; }
+.comment__like--on { color: var(--brand); }
+.mentionlist { display: flex; flex-direction: column; margin: 0 0 8px; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-panel); }
+.mentionlist__item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 4px 8px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.mentionlist__item:hover, .mentionlist__item:focus-visible { background: var(--brand-soft); outline: none; }
 .comments__form { margin-top: 8px; }
 .comments__empty { margin: 8px 0 16px; text-align: center; color: var(--muted); }
 .commentbox { position: relative; display: flex; align-items: center; }

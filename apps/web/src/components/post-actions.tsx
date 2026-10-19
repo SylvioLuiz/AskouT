@@ -3,18 +3,19 @@ import { Sheet } from './agenda.tsx';
 import { CropEditor } from './crop.tsx';
 import { EventDates } from './event-dates.tsx';
 import { EventKindPicker } from './event-kind-picker.tsx';
-import { ArrowUpIcon, CropIcon, TrashIcon } from './icons.tsx';
+import { ArrowUpIcon, CropIcon, HeartIcon, TrashIcon } from './icons.tsx';
 import { VenueLogo } from './venue-logo.tsx';
 import { Avatar, Button, Confirm, ErrorState, Field, GroupAvatar, Loading, Notice } from './ui.tsx';
 import { api } from '../client.ts';
-import { useAsync } from '../hooks.ts';
+import { useAsync, useDebounced } from '../hooks.ts';
 import { cropPostPhoto } from '../lib/image.ts';
 import type { CropRect } from '../lib/crop.ts';
 import { toApiError } from '../lib/errors.ts';
 import { timeAgo } from '../lib/format.ts';
+import { applyMention, mentionQueryAt, splitMentions } from '../lib/mentions.ts';
 import { eventProblem, isoToLocalInput, localToIso, POST_CAPTION_MAX } from '../lib/post-draft.ts';
 import { postLink, postShareText } from '../lib/share.ts';
-import type { ConversationItem, EventKind, PostComment, PostView, ReportReason } from '../lib/types.ts';
+import type { ConversationItem, EventKind, PostComment, PostView, PublicProfile, ReportReason } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 
 export type PostGone = 'deleted' | 'hidden' | 'archived';
@@ -150,7 +151,7 @@ export function ReasonSheet({ title, doneText, extra, submit, onClose, onDone }:
 
 // ---------- Comentários ----------
 
-function CommentRow({ comment, onDelete, busy }: { comment: PostComment; onDelete: () => void; busy: boolean }) {
+function CommentRow({ comment, onDelete, onLike, busy }: { comment: PostComment; onDelete: () => void; onLike: () => void; busy: boolean }) {
   return (
     <li className="comment">
       {comment.venue ? (
@@ -175,8 +176,22 @@ function CommentRow({ comment, onDelete, busy }: { comment: PostComment; onDelet
           )}{' '}
           <span className="muted">{timeAgo(comment.createdAt, new Date())}</span>
         </p>
-        <p className="comment__text">{comment.body}</p>
+        <p className="comment__text">
+          {splitMentions(comment.body, comment.mentions ?? []).map((part, index) =>
+            part.mention ? (
+              <Link key={index} to={`/u/${encodeURIComponent(part.mention)}`} className="comment__mention">
+                {part.text}
+              </Link>
+            ) : (
+              <span key={index}>{part.text}</span>
+            ),
+          )}
+        </p>
       </div>
+      <button type="button" className={`comment__like${comment.likedByMe ? ' comment__like--on' : ''}`} onClick={onLike} aria-pressed={comment.likedByMe} aria-label={comment.likedByMe ? 'Descurtir comentário' : 'Curtir comentário'}>
+        <HeartIcon filled={comment.likedByMe} />
+        {comment.likeCount > 0 ? <span>{comment.likeCount}</span> : null}
+      </button>
       {comment.canDelete ? (
         <button type="button" className="comment__del" onClick={onDelete} disabled={busy} aria-label="Apagar comentário">
           <TrashIcon />
@@ -195,6 +210,33 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<string | undefined>();
   const endRef = useRef<HTMLDivElement>(null);
+  const query = mentionQueryAt(text);
+  const debouncedQuery = useDebounced(query, 250);
+  const [people, setPeople] = useState<PublicProfile[]>([]);
+  useEffect(() => {
+    if (debouncedQuery === undefined || debouncedQuery.length === 0) {
+      setPeople([]);
+      return;
+    }
+    let live = true;
+    api.searchProfiles(debouncedQuery, 5).then((found) => live && setPeople(found)).catch(() => live && setPeople([]));
+    return () => {
+      live = false;
+    };
+  }, [debouncedQuery]);
+
+  async function toggleLike(comment: PostComment) {
+    const next = !comment.likedByMe;
+    const patch = (liked: boolean, count: number) => setItems((current) => current.map((c) => (c.id === comment.id ? { ...c, likedByMe: liked, likeCount: count } : c)));
+    patch(next, Math.max(0, comment.likeCount + (next ? 1 : -1)));
+    try {
+      const result = await api.likeComment(postId, comment.id, next);
+      patch(result.liked, result.likeCount);
+    } catch (failure) {
+      patch(comment.likedByMe, comment.likeCount);
+      setError(toApiError(failure).message);
+    }
+  }
 
   async function load(offset: number) {
     setError(undefined);
@@ -252,7 +294,7 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
       {loaded && items.length === 0 && !error ? <p className="comments__empty">Ainda não há nenhum comentário.</p> : null}
       <ul className="comments">
         {items.map((c) => (
-          <CommentRow key={c.id} comment={c} busy={deleting === c.id} onDelete={() => void remove(c)} />
+          <CommentRow key={c.id} comment={c} busy={deleting === c.id} onDelete={() => void remove(c)} onLike={() => void toggleLike(c)} />
         ))}
       </ul>
       {hasMore ? (
@@ -271,6 +313,21 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
         <label className="visually-hidden" htmlFor="comment-input">
           Escreva um comentário
         </label>
+        {query !== undefined && query.length > 0 && people.length > 0 ? (
+          <ul className="mentionlist" aria-label="Pessoas para marcar">
+            {people.map((person) => (
+              <li key={person.userId}>
+                <button type="button" className="mentionlist__item" onClick={() => setText((current) => applyMention(current, person.username))}>
+                  <Avatar profile={person} size={28} />
+                  <span>
+                    <strong>{person.username}</strong>
+                    {person.displayName ? <span className="muted"> {person.displayName}</span> : null}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <div className="commentbox">
           <input id="comment-input" className="commentbox__input" value={text} onChange={(event) => setText(event.target.value)} maxLength={520} placeholder="Escreva um comentário" autoComplete="off" enterKeyHint="send" />
           {text.trim() !== '' ? (

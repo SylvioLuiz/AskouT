@@ -163,6 +163,7 @@ model User {
   availabilitySlots   AvailabilitySlot[]
   calendarConnections CalendarConnection[]
   externalIdentities  ExternalIdentity[]
+  commentLikes        PostCommentLike[]    @relation("PostCommentLikes")
 
   organizedMeetings     Meeting[]            @relation("MeetingOrganizer")
   meetingParticipations MeetingParticipant[]
@@ -799,7 +800,22 @@ model PostComment {
   venue  Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
   author User @relation("PostComments", fields: [authorId], references: [id], onDelete: Cascade)
 
+  likes  PostCommentLike[]
+
   @@index([postId, createdAt])
+}
+
+/// Curtida em comentário: uma por pessoa.
+model PostCommentLike {
+  commentId String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  comment PostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User        @relation("PostCommentLikes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
 }
 
 /// Denúncia de post: uma por pessoa e post. Quem revisa é o painel de administração (fase seguinte).

@@ -234,6 +234,26 @@ export class PrismaPostRepository implements PostRepository {
     await this.prisma.postComment.deleteMany({ where: { id } });
   }
 
+  async likeComment(commentId: string, userId: string, at: Date): Promise<void> {
+    if (!isUuid(commentId) || !isUuid(userId)) return;
+    await this.prisma.postCommentLike.createMany({ data: [{ commentId, userId, createdAt: at }], skipDuplicates: true });
+  }
+
+  async unlikeComment(commentId: string, userId: string): Promise<void> {
+    if (!isUuid(commentId) || !isUuid(userId)) return;
+    await this.prisma.postCommentLike.deleteMany({ where: { commentId, userId } });
+  }
+
+  async commentLikeStats(commentIds: string[], viewerId: string): Promise<{ commentId: string; count: number; liked: boolean }[]> {
+    const ids = commentIds.filter(isUuid);
+    if (ids.length === 0) return [];
+    const groups = await this.prisma.postCommentLike.groupBy({ by: ['commentId'], where: { commentId: { in: ids } }, _count: { _all: true } });
+    const counts = new Map(groups.map((g) => [g.commentId, g._count._all]));
+    const mine = isUuid(viewerId) ? await this.prisma.postCommentLike.findMany({ where: { commentId: { in: ids }, userId: viewerId }, select: { commentId: true } }) : [];
+    const liked = new Set(mine.map((m) => m.commentId));
+    return ids.map((commentId) => ({ commentId, count: counts.get(commentId) ?? 0, liked: liked.has(commentId) }));
+  }
+
   async commentCounts(postIds: string[]): Promise<{ postId: string; count: number }[]> {
     const ids = postIds.filter(isUuid);
     if (ids.length === 0) return [];

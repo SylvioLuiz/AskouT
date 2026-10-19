@@ -1623,8 +1623,19 @@ export function defineRepositoryContract(
         assert.deepEqual((await h.posts.listComments(postId, { limit: 1, offset: 1 })).map((c) => c.body), ['segundo']);
         assert.equal((await h.posts.findComment(c1.id))?.authorId, bia);
         assert.deepEqual(await h.posts.commentCounts([postId]), [{ postId, count: 2 }]);
+        // curtidas de comentário: sem duplicar, contagem e "eu curti"
+        await h.posts.likeComment(c1.id, ana, at(5));
+        await h.posts.likeComment(c1.id, ana, at(5));
+        await h.posts.likeComment(c1.id, bia, at(5));
+        const byId = (rows: { commentId: string; count: number; liked: boolean }[], id: string) => rows.find((r) => r.commentId === id);
+        const stats = await h.posts.commentLikeStats([c1.id, c2.id], ana);
+        assert.deepEqual([byId(stats, c1.id)?.count, byId(stats, c1.id)?.liked], [2, true]);
+        assert.deepEqual([byId(stats, c2.id)?.count ?? 0, byId(stats, c2.id)?.liked ?? false], [0, false]);
+        await h.posts.unlikeComment(c1.id, ana);
+        assert.deepEqual([byId(await h.posts.commentLikeStats([c1.id], ana), c1.id)?.count, byId(await h.posts.commentLikeStats([c1.id], ana), c1.id)?.liked], [1, false]);
         await h.posts.deleteComment(c1.id);
         assert.equal(await h.posts.findComment(c1.id), undefined);
+        assert.equal((await h.posts.commentLikeStats([c1.id], bia)).filter((r) => r.count > 0).length, 0, 'curtidas saem junto');
         // denúncia: uma por pessoa
         await h.posts.report({ id: randomUUID(), postId, reporterId: bia, reason: 'SPAM', details: null, createdAt: at(7) });
         await h.posts.report({ id: randomUUID(), postId, reporterId: bia, reason: 'OTHER', details: 'x', createdAt: at(8) });

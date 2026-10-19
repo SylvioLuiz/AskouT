@@ -1338,8 +1338,28 @@ export class InMemoryPostRepository implements PostRepository {
       .map((c) => ({ ...c }));
   }
 
+  readonly commentLikes = new Map<string, Date>();
+
   async deleteComment(id: string): Promise<void> {
     this.comments.delete(id);
+    for (const key of [...this.commentLikes.keys()]) if (key.startsWith(`${id}|`)) this.commentLikes.delete(key);
+  }
+
+  async likeComment(commentId: string, userId: string, at: Date): Promise<void> {
+    const key = `${commentId}|${userId}`;
+    if (!this.commentLikes.has(key)) this.commentLikes.set(key, at);
+  }
+
+  async unlikeComment(commentId: string, userId: string): Promise<void> {
+    this.commentLikes.delete(`${commentId}|${userId}`);
+  }
+
+  async commentLikeStats(commentIds: string[], viewerId: string): Promise<{ commentId: string; count: number; liked: boolean }[]> {
+    return commentIds.map((commentId) => ({
+      commentId,
+      count: [...this.commentLikes.keys()].filter((k) => k.startsWith(`${commentId}|`)).length,
+      liked: this.commentLikes.has(`${commentId}|${viewerId}`),
+    }));
   }
 
   async commentCounts(postIds: string[]): Promise<{ postId: string; count: number }[]> {

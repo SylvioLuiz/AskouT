@@ -1,9 +1,10 @@
 import { decodeImageDataUrl } from './image.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
+import { extractMentions } from './mentions.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
-import type { PollRecord, PostCommentRecord, PostPatch, PostReportReason, PostKindFilter, PostImageRecord, PostTagStatus, PostWithImages, PublicProfile } from './types.ts';
+import type { PollRecord, PostCommentRecord, PostPatch, PostReportReason, PostKindFilter, PostImageRecord, PostRecord, PostTagStatus, PostWithImages, PublicProfile } from './types.ts';
 import type { EventKind } from './types.ts';
 import { EVENT_KINDS, POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
@@ -102,6 +103,10 @@ export interface PostCommentView {
   mine: boolean;
   /** Quem escreveu e o dono do post podem apagar. */
   canDelete: boolean;
+  likeCount: number;
+  likedByMe: boolean;
+  /** Nomes de usuário marcados com @ que existem (a tela só faz link para estes). */
+  mentions: string[];
 }
 
 export interface PostCommentsPage {
@@ -305,11 +310,45 @@ export class PostService {
     }
     const record: PostCommentRecord = { id: this.deps.ids.next(), postId: post.id, authorId: viewerId, body: text, createdAt: this.deps.clock.now(), venueId: asVenue };
     await this.deps.posts.addComment(record);
-    if (post.authorId !== viewerId) {
-      const me = await this.deps.users.findProfileById(viewerId);
+    const me = await this.deps.users.findProfileById(viewerId);
+    const mentioned = await this.notifyMentions(viewerId, me?.username ?? 'Alguém', post, record.id, text);
+    if (post.authorId !== viewerId && !mentioned.has(post.authorId)) {
       await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_COMMENT', title: `${me?.username ?? 'Alguém'} comentou no seu post`, body: text.slice(0, 80), url: `/posts/${post.id}`, dedupeKey: `post-comment:${record.id}` });
     }
     return (await this.commentViews(viewerId, post.authorId, [record]))[0] as PostCommentView;
+  }
+
+  /** Avisa quem foi marcado com @, só se a pessoa pode ver o post e não há bloqueio. Devolve quem foi avisado. */
+  private async notifyMentions(viewerId: string, viewerName: string, post: PostRecord, commentId: string, text: string): Promise<Set<string>> {
+    const notified = new Set<string>();
+    for (const username of extractMentions(text)) {
+      const target = await this.deps.users.findProfileByUsername(username);
+      if (!target || target.userId === viewerId) continue;
+      if (await this.deps.blocks.existsEitherWay(viewerId, target.userId)) continue;
+      const canOpen = post.venueId !== null && post.venueId !== undefined ? true : target.userId === post.authorId || (!post.eventPrivate && (await this.canSee(target.userId, post.authorId)));
+      if (!canOpen) continue;
+      await this.deps.notifier.notify({ userId: target.userId, type: 'POST_COMMENT', title: `${viewerName} mencionou você num comentário`, body: text.slice(0, 80), url: `/posts/${post.id}`, dedupeKey: `comment-mention:${commentId}:${target.userId}` });
+      notified.add(target.userId);
+    }
+    return notified;
+  }
+
+  /** Curtir (ou, com `liked: false`, tirar a curtida de) um comentário. Curtir de novo não duplica. */
+  async likeComment(viewerId: string, postId: unknown, commentId: unknown, liked = true): Promise<{ liked: boolean; likeCount: number }> {
+    const { post } = await this.seeable(viewerId, postId);
+    const comment = typeof commentId === 'string' && commentId.length <= 64 ? await this.deps.posts.findComment(commentId) : undefined;
+    if (!comment || comment.postId !== post.id) throw notFound('Comentário não encontrado');
+    if (liked) {
+      await this.deps.posts.likeComment(comment.id, viewerId, this.deps.clock.now());
+      if (comment.authorId !== viewerId) {
+        const me = await this.deps.users.findProfileById(viewerId);
+        await this.deps.notifier.notify({ userId: comment.authorId, type: 'POST_LIKE', title: `${me?.username ?? 'Alguém'} curtiu seu comentário`, body: comment.body.slice(0, 80), url: `/posts/${post.id}`, dedupeKey: `comment-like:${comment.id}:${viewerId}` });
+      }
+    } else {
+      await this.deps.posts.unlikeComment(comment.id, viewerId);
+    }
+    const [stat] = await this.deps.posts.commentLikeStats([comment.id], viewerId);
+    return { liked: stat?.liked ?? false, likeCount: stat?.count ?? 0 };
   }
 
   async deleteComment(viewerId: string, postId: unknown, commentId: unknown): Promise<{ deleted: true }> {
@@ -326,6 +365,17 @@ export class PostService {
     const byId = new Map(profiles.map((p) => [p.userId, toPublicProfile(p)]));
     const memo = new Map<string, boolean>();
     const out: PostCommentView[] = [];
+    const stats = new Map((await this.deps.posts.commentLikeStats(rows.map((r) => r.id), viewerId)).map((s) => [s.commentId, s] as const));
+    const known = new Map<string, boolean>();
+    const mentionsOf = async (text: string): Promise<string[]> => {
+      const valid: string[] = [];
+      for (const name of extractMentions(text)) {
+        if (!known.has(name)) known.set(name, (await this.deps.users.findProfileByUsername(name)) !== undefined);
+        if (known.get(name)) valid.push(name);
+      }
+      return valid;
+    };
+    const extra = async (row: PostCommentRecord) => ({ likeCount: stats.get(row.id)?.count ?? 0, likedByMe: stats.get(row.id)?.liked ?? false, mentions: await mentionsOf(row.body) });
     const venueIds = [...new Set(rows.flatMap((r) => (r.venueId ? [r.venueId] : [])))];
     const venues = new Map((await Promise.all(venueIds.map((id) => this.deps.places.findVenue(id)))).flatMap((v) => (v ? [[v.id, { id: v.id, name: v.name, logoUrl: v.logoUrl ?? null }] as const] : [])));
     for (const row of rows) {
@@ -333,12 +383,12 @@ export class PostService {
       if (!author) continue;
       const venue = (row.venueId ? venues.get(row.venueId) : undefined) ?? null;
       if (venue) {
-        out.push({ id: row.id, author, venue, body: row.body, createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId });
+        out.push({ id: row.id, author, venue, body: row.body, createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId, ...(await extra(row)) });
         continue;
       }
       if (!memo.has(row.authorId)) memo.set(row.authorId, row.authorId === viewerId || (await this.canSee(viewerId, row.authorId)));
       if (!memo.get(row.authorId)) continue;
-      out.push({ id: row.id, author, venue: null, body: row.body, createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId });
+      out.push({ id: row.id, author, venue: null, body: row.body, createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId, ...(await extra(row)) });
     }
     return out;
   }

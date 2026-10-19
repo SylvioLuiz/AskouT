@@ -185,6 +185,8 @@ export function createApi(deps: ApiDeps) {
     unlikePost: (postId: string) => request<{ liked: false; likeCount: number }>('DELETE', `/posts/${id(postId)}/like`),
     postComments: (postId: string, page?: PageRequest) => request<PostCommentsPage>('GET', `/posts/${id(postId)}/comments${pageQuery(page)}`),
     addComment: (postId: string, body: string) => request<PostComment>('POST', `/posts/${id(postId)}/comments`, { body: { body } }),
+    likeComment: (postId: string, commentId: string, liked: boolean) =>
+      request<{ liked: boolean; likeCount: number }>(liked ? 'POST' : 'DELETE', `/posts/${id(postId)}/comments/${id(commentId)}/like`),
     deleteComment: (postId: string, commentId: string) => request<{ deleted: true }>('DELETE', `/posts/${id(postId)}/comments/${id(commentId)}`),
     reportPost: (postId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/posts/${id(postId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
     notInterested: (postId: string) => request<{ hidden: true }>('POST', `/posts/${id(postId)}/not-interested`),

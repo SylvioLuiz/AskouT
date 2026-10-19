@@ -609,6 +609,10 @@ export interface PostComment {
   createdAt: string;
   mine: boolean;
   canDelete: boolean;
+  likeCount: number;
+  likedByMe: boolean;
+  /** Nomes marcados com @ que existem de verdade. */
+  mentions: string[];
 }
 
 export interface PostCommentsPage {

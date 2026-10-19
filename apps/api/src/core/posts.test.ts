@@ -346,3 +346,44 @@ test('vídeo no post: entra no item da capa, um por post, só do autor, com o ta
   const feed = await w.core.posts.feed(bia, {});
   assert.equal(feed.items[0]!.images[0]!.video, true);
 });
+
+test('comentário: curtir e descurtir (sem duplicar), contagem, aviso ao autor e some junto com o comentário', async () => {
+  const { w, ana, bia, caio } = await setup();
+  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const c = await w.core.posts.addComment(bia, post.id, 'Boa!');
+  assert.deepEqual([c.likeCount, c.likedByMe], [0, false]);
+  assert.deepEqual(await w.core.posts.likeComment(ana, post.id, c.id), { liked: true, likeCount: 1 });
+  assert.deepEqual(await w.core.posts.likeComment(ana, post.id, c.id), { liked: true, likeCount: 1 }, 'curtir de novo não duplica');
+  const asAna = (await w.core.posts.comments(ana, post.id)).items[0]!;
+  assert.deepEqual([asAna.likeCount, asAna.likedByMe], [1, true]);
+  const asBia = (await w.core.posts.comments(bia, post.id)).items[0]!;
+  assert.deepEqual([asBia.likeCount, asBia.likedByMe], [1, false]);
+  assert.equal((await w.core.notifications.list(bia)).items.filter((n) => n.type === 'POST_LIKE').length, 1);
+  await w.core.posts.likeComment(bia, post.id, c.id);
+  assert.equal((await w.core.notifications.list(bia)).items.filter((n) => n.type === 'POST_LIKE').length, 1, 'curtir o próprio comentário não avisa');
+  assert.deepEqual(await w.core.posts.likeComment(ana, post.id, c.id, false), { liked: false, likeCount: 1 });
+  await rejectsWith(w.core.posts.likeComment(ana, post.id, 'nao-existe'), 'NOT_FOUND');
+  const other = await w.core.posts.create(ana, { images: [JPEG()] });
+  await rejectsWith(w.core.posts.likeComment(ana, other.id, c.id), 'NOT_FOUND');
+  await w.core.profiles.setPrivacy(ana, true);
+  await rejectsWith(w.core.posts.likeComment(caio, post.id, c.id), 'NOT_FOUND');
+});
+
+test('comentário: @usuario avisa quem foi marcado, ignora a si mesmo, bloqueio e quem não existe', async () => {
+  const { w, ana, bia, caio } = await setup();
+  await w.core.follows.follow(caio, ana);
+  await w.core.follows.follow(ana, caio);
+  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const count = async (id: string) => (await w.core.notifications.list(id)).items.filter((n) => n.type === 'POST_COMMENT').length;
+  const c = await w.core.posts.addComment(bia, post.id, 'Vem @caio e @bia, falou @fantasma_x');
+  assert.deepEqual(c.mentions, ['caio', 'bia'], 'só nomes que existem');
+  assert.equal(await count(caio), 1);
+  assert.equal(await count(bia), 0, 'marcar a si mesmo não avisa');
+  assert.equal(await count(ana), 1, 'o dono do post é avisado do comentário');
+  const d = await w.core.posts.addComment(bia, post.id, '@ana olha isso');
+  assert.equal(await count(ana), 2, 'marcado e dono: um aviso só, não dois');
+  assert.deepEqual(d.mentions, ['ana']);
+  await w.core.blocks.block(caio, bia);
+  await w.core.posts.addComment(bia, post.id, 'Oi de novo @caio');
+  assert.equal(await count(caio), 1, 'não avisa quem bloqueou ou foi bloqueado por quem comenta');
+});

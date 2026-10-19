@@ -287,6 +287,11 @@ export interface PostRepository {
   /** Mais antigos primeiro. */
   listComments(postId: string, page: Page): Promise<PostCommentRecord[]>;
   deleteComment(id: string): Promise<void>;
+  /** Curtir comentário (de novo não duplica) e tirar a curtida. */
+  likeComment(commentId: string, userId: string, at: Date): Promise<void>;
+  unlikeComment(commentId: string, userId: string): Promise<void>;
+  /** Curtidas de cada comentário e se `viewerId` curtiu. */
+  commentLikeStats(commentIds: string[], viewerId: string): Promise<{ commentId: string; count: number; liked: boolean }[]>;
   commentCounts(postIds: string[]): Promise<{ postId: string; count: number }[]>;
   /** Uma denúncia por pessoa e post (denunciar de novo troca o motivo). */
   report(report: PostReportRecord): Promise<void>;
