@@ -43,3 +43,10 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 - Job `EventReminders` roda a cada minuto dentro da API (sem fila externa). Se rodar mais de uma instância, o marcador `EventReminder` evita aviso em dobro; o pior caso é não avisar.
 - Migration `20261115120000_event_reminders` precisa rodar no banco.
 - Push real exige as chaves VAPID configuradas e o aparelho com "Avisos no aparelho" ligado.
+
+## Recuperar senha
+- Hoje o código vai por e-mail. Em produção falta o provedor real de e-mail (hoje `ConsoleEmailSender` só imprime no log, igual ao cadastro).
+- Migration `20261116120000_password_reset` precisa rodar no banco.
+- Por celular (SMS): a tabela já tem `channel`; falta guardar o número verificado na conta (item "verificação de telefone") e um provedor de SMS.
+- As sessões já abertas (token) continuam valendo depois da troca de senha; só dá para derrubá-las com revogação de token, ainda não existe.
+- Falta limite por IP nas rotas públicas (item "rate limit"): o limite atual é por conta (1 código/min, 5 por pedido, 5 tentativas).

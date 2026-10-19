@@ -13,6 +13,7 @@ import type {
   VenueProfileBody,
   VenuePanel,
   AuthResult,
+  PasswordResetStarted,
   AvailableFriend,
   ChatMessage,
   ChatReaction,
@@ -137,6 +138,10 @@ export function createApi(deps: ApiDeps) {
       request<SignupStarted>('POST', '/auth/signup/resend', { body: { email }, auth: false }),
     confirmSignup: (email: string, code: string) =>
       request<AuthResult>('POST', '/auth/signup/confirm', { body: { email, code }, auth: false }),
+    requestPasswordReset: (identifier: string) =>
+      request<PasswordResetStarted>('POST', '/auth/password-reset', { body: { identifier }, auth: false }),
+    confirmPasswordReset: (identifier: string, code: string, password: string) =>
+      request<AuthResult>('POST', '/auth/password-reset/confirm', { body: { identifier, code, password }, auth: false }),
     login: (identifier: string, password: string) =>
       request<AuthResult>('POST', '/auth/login', { body: { identifier, password }, auth: false }),
     socialProviders: () => request<{ items: SocialProvider[] }>('GET', '/auth/providers', { auth: false }),

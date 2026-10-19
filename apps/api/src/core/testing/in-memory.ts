@@ -24,6 +24,7 @@ import type {
   EmailSender,
   FollowRepository,
   IdGenerator,
+  PasswordResetRepository,
   PendingSignupRepository,
   IdentityRepository,
   IdentityVerifier,
@@ -32,7 +33,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -107,6 +108,11 @@ export class InMemoryUserRepository implements UserRepository {
       if (p && this.users.get(id)?.status !== 'SUSPENDED') out.push({ ...p });
     }
     return out;
+  }
+
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+    const u = this.users.get(userId);
+    if (u) this.users.set(userId, { ...u, passwordHash });
   }
 
   async updateProfile(profile: Profile): Promise<void> {
@@ -482,10 +488,48 @@ export class InMemoryPendingSignupRepository implements PendingSignupRepository 
   }
 }
 
+export class InMemoryPasswordResetRepository implements PasswordResetRepository {
+  readonly rows = new Map<string, PasswordReset>();
+
+  async find(userId: string): Promise<PasswordReset | undefined> {
+    const r = this.rows.get(userId);
+    return r ? { ...r } : undefined;
+  }
+
+  async save(reset: PasswordReset): Promise<void> {
+    this.rows.set(reset.userId, { ...reset });
+  }
+
+  async delete(userId: string): Promise<void> {
+    this.rows.delete(userId);
+  }
+
+  async incrementAttempts(userId: string): Promise<number | undefined> {
+    const r = this.rows.get(userId);
+    if (!r) return undefined;
+    r.attempts += 1;
+    return r.attempts;
+  }
+}
+
 /** Guarda os e-mails "enviados" para os testes lerem o código. */
 export class FakeEmailSender implements EmailSender {
   readonly sent: { to: string; code: string; expiresInMinutes: number }[] = [];
+  readonly sentReset: { to: string; code: string; expiresInMinutes: number }[] = [];
   failNext = false;
+
+  async sendPasswordResetCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void> {
+    if (this.failNext) {
+      this.failNext = false;
+      throw new Error('falha simulada no envio de e-mail');
+    }
+    this.sentReset.push({ ...input });
+  }
+
+  lastResetCodeFor(email: string): string {
+    for (let i = this.sentReset.length - 1; i >= 0; i -= 1) if (this.sentReset[i]!.to === email) return this.sentReset[i]!.code;
+    return '';
+  }
 
   async sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void> {
     if (this.failNext) {

@@ -12,6 +12,7 @@ export { PrismaVenueClaimRepository } from './prisma-venue-claim.repository.ts';
 export { PrismaNotificationRepository, PrismaPushSubscriptionRepository } from './prisma-notification.repository.ts';
 export { PrismaProfileEventRepository } from './prisma-profile-event.repository.ts';
 export { PrismaEventRoomRepository } from './prisma-event-room.repository.ts';
+export { PrismaPasswordResetRepository } from './prisma-password-reset.repository.ts';
 export { PrismaPostRepository } from './prisma-post.repository.ts';
 export { PrismaAdminRepository } from './prisma-admin.repository.ts';
 export { PrismaIdentityRepository } from './prisma-identity.repository.ts';

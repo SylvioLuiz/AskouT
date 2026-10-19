@@ -9,7 +9,7 @@ import { Link, navigate, resolveRoute, usePathname } from './router.tsx';
 import type { RouteDef } from './router.tsx';
 import { AgendaScreen } from './screens/agenda.tsx';
 import { ActivityScreen } from './screens/activity.tsx';
-import { LoginScreen, SignupScreen } from './screens/auth.tsx';
+import { ForgotPasswordScreen, LoginScreen, SignupScreen } from './screens/auth.tsx';
 import { ChatScreen, ConversationsScreen } from './screens/conversations.tsx';
 import { FlashScreen, MatchScreen } from './screens/flash.tsx';
 import { DatePollCreateScreen } from './components/date-poll-create.tsx';
@@ -30,6 +30,7 @@ import { ArchivedScreen, CreatePostScreen, PostScreen } from './screens/posts.ts
 const GUEST_ROUTES: RouteDef[] = [
   { path: '/entrar', render: () => <LoginScreen /> },
   { path: '/cadastro', render: () => <SignupScreen /> },
+  { path: '/esqueci-senha', render: () => <ForgotPasswordScreen /> },
 ];
 
 function OwnProfile() {

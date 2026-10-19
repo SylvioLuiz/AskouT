@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, UserRepository } from '../ports.ts';
+import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -17,6 +17,7 @@ export interface RepoHarness {
   follows: FollowRepository;
   blocks: BlockRepository;
   pending: PendingSignupRepository;
+  passwordResets: PasswordResetRepository;
   availability: AvailabilityRepository;
   flash: FlashRepository;
   conversations: ConversationRepository;
@@ -400,6 +401,24 @@ export function defineRepositoryContract(
         await h.pending.delete('ana@exemplo.com');
         await h.pending.delete('ana@exemplo.com');
         assert.equal(await h.pending.find('ana@exemplo.com'), undefined);
+      });
+
+      it('pedido de nova senha: salva, soma tentativas e apaga', async () => {
+        const user = await newUser('reset');
+        const rec = { userId: user, channel: 'EMAIL' as const, codeHash: 'h1', expiresAt: new Date(Date.UTC(2030, 0, 1)), attempts: 0, sendCount: 1, lastSentAt: new Date(Date.UTC(2029, 0, 1)) };
+        assert.equal(await h.passwordResets.find(user), undefined);
+        await h.passwordResets.save(rec);
+        assert.deepEqual(await h.passwordResets.find(user), rec);
+        assert.equal(await h.passwordResets.incrementAttempts(user), 1);
+        assert.equal(await h.passwordResets.incrementAttempts(user), 2);
+        await h.passwordResets.save({ ...rec, codeHash: 'h2', sendCount: 2 });
+        assert.deepEqual([(await h.passwordResets.find(user))?.codeHash, (await h.passwordResets.find(user))?.attempts], ['h2', 0], 'novo envio substitui tudo, inclusive zera as tentativas');
+        await h.users.updatePasswordHash(user, 'novo-hash');
+        assert.equal((await h.users.findById(user))?.passwordHash, 'novo-hash');
+        await h.passwordResets.delete(user);
+        await h.passwordResets.delete(user);
+        assert.equal(await h.passwordResets.find(user), undefined);
+        assert.equal(await h.passwordResets.incrementAttempts(user), undefined);
       });
 
       it('incrementAttempts soma 1, devolve o total e é atômico', async () => {

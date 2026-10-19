@@ -12,6 +12,17 @@ export interface User {
   createdAt: Date;
 }
 
+/** Pedido de nova senha em andamento: um por pessoa. `channel` deixa pronto o envio por celular (SMS) no futuro. */
+export interface PasswordReset {
+  userId: string;
+  channel: 'EMAIL';
+  codeHash: string;
+  expiresAt: Date;
+  attempts: number;
+  sendCount: number;
+  lastSentAt: Date;
+}
+
 export interface Profile {
   userId: string;
   username: string; // sempre minúsculo

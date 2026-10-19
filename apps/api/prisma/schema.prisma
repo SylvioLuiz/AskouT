@@ -149,6 +149,7 @@ model User {
 
   profile  Profile?
   settings UserSettings?
+  passwordReset PasswordReset?
 
   following Follow[] @relation("Follower")
   followers Follow[] @relation("Followee")
@@ -613,6 +614,19 @@ model PushSubscription {
 
 // Cadastro aguardando o código enviado por e-mail. A conta (User + Profile) só nasce na confirmação.
 // Guarda hashes: nunca a senha nem o código. Linhas expiradas devem ser limpas por uma rotina periódica.
+/// Pedido de nova senha em andamento (um por pessoa). `channel` prepara o envio por SMS no futuro.
+model PasswordReset {
+  userId     String   @id @db.Uuid
+  channel    String   @default("EMAIL")
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int      @default(0)
+  sendCount  Int      @default(1)
+  lastSentAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model PendingSignup {
   email        String   @id // minúsculo
   username     String

@@ -145,6 +145,7 @@ export type {
   IdGenerator,
   OneTimeCodes,
   PasswordHasher,
+  PasswordResetRepository,
   PendingSignupRepository,
   TokenClaims,
   TokenService,

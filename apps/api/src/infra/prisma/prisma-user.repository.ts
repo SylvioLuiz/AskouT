@@ -149,6 +149,11 @@ export class PrismaUserRepository implements UserRepository {
     return row ? { mime: row.mime as ProfilePhotoRecord['mime'], data: new Uint8Array(row.data), updatedAt: row.updatedAt } : undefined;
   }
 
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
+    if (!isUuid(userId)) return;
+    await this.prisma.user.updateMany({ where: { id: userId }, data: { passwordHash } });
+  }
+
   async updateProfile(profile: Profile): Promise<void> {
     await this.prisma.profile.update({
       where: { userId: profile.userId },

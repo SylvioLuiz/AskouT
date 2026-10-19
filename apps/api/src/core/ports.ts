@@ -1,4 +1,4 @@
-import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -12,6 +12,8 @@ export interface UserRepository {
   findByEmail(email: string): Promise<User | undefined>;
   /** Contas ativas cujo e-mail (minúsculo, UTF-8) tem esse SHA-256 em hexadecimal. Para achar amigos nos contatos sem receber e-mails em claro. */
   findIdsByEmailHashes(hashes: string[]): Promise<string[]>;
+  /** Troca o hash da senha. */
+  updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
   findProfileById(userId: string): Promise<Profile | undefined>;
   findProfileByUsername(username: string): Promise<Profile | undefined>;
   /** Mantém a ordem de `ids`; ignora ausentes e usuários suspensos. */
@@ -76,6 +78,15 @@ export interface PendingSignupRepository {
    * simultâneas não furem o limite.
    */
   incrementAttempts(email: string): Promise<number | undefined>;
+}
+
+export interface PasswordResetRepository {
+  find(userId: string): Promise<PasswordReset | undefined>;
+  /** Insere ou substitui o pedido da pessoa. */
+  save(reset: PasswordReset): Promise<void>;
+  delete(userId: string): Promise<void>;
+  /** Soma 1 às tentativas erradas de forma ATÔMICA e devolve o total (undefined se não existe mais). */
+  incrementAttempts(userId: string): Promise<number | undefined>;
 }
 
 export interface AvailabilityRepository {
@@ -429,6 +440,8 @@ export interface PlaceSource {
 export interface EmailSender {
   /** Falha com erro comum se o e-mail não puder ser enviado. */
   sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void>;
+  /** Código para criar uma nova senha. */
+  sendPasswordResetCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void>;
 }
 
 export interface OneTimeCodes {
@@ -562,6 +575,7 @@ export interface CoreDeps {
   admin: AdminRepository;
   placeSource: PlaceSource;
   pending: PendingSignupRepository;
+  passwordResets: PasswordResetRepository;
   identities: IdentityRepository;
   verifier: IdentityVerifier;
   mailer: EmailSender;

@@ -42,6 +42,21 @@ export class AuthController {
   }
 
   @Public()
+  @Post('password-reset')
+  @HttpCode(200)
+  passwordReset(@Body() body: unknown) {
+    return this.core.auth.requestPasswordReset(asBody(body).identifier);
+  }
+
+  @Public()
+  @Post('password-reset/confirm')
+  @HttpCode(200)
+  passwordResetConfirm(@Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.auth.confirmPasswordReset({ identifier: b.identifier, code: b.code, password: b.password });
+  }
+
+  @Public()
   @Post('login')
   @HttpCode(200)
   login(@Body() body: unknown) {

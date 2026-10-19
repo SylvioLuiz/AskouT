@@ -72,6 +72,11 @@ export interface SocialNeedsProfile {
   displayName: string;
 }
 
+export interface PasswordResetStarted {
+  expiresInMinutes: number;
+  resendAvailableAt: Date;
+}
+
 const INVALID_CODE = 'Código inválido ou expirado';
 
 /**
@@ -284,6 +289,83 @@ export class AuthService {
       if (!usernameProblem(candidate) && !(await this.deps.users.findProfileByUsername(candidate))) return candidate;
     }
     return '';
+  }
+
+  /**
+   * Esqueci a senha: manda um código de 6 números para o e-mail da conta. A resposta é sempre a mesma,
+   * exista a conta ou não (e mesmo quando o envio é recusado por limite), para ninguém descobrir quem tem conta aqui.
+   */
+  async requestPasswordReset(rawIdentifier: unknown): Promise<PasswordResetStarted> {
+    const { passwordResets, codes, clock, mailer } = this.deps;
+    const identifier = asString(rawIdentifier).trim();
+    if (identifier.length === 0 || identifier.length > 254) throw validationError('Informe seu e-mail ou @usuário', { identifier: 'Informe seu e-mail ou @usuário' });
+    const now = clock.now();
+    const started: PasswordResetStarted = { expiresInMinutes: CODE_TTL_MINUTES, resendAvailableAt: addMs(now, RESEND_COOLDOWN_SECONDS * 1000) };
+
+    const user = await this.findByIdentifier(identifier);
+    if (!user || user.status === 'SUSPENDED') return started;
+    const existing = await passwordResets.find(user.id);
+    const active = existing && existing.expiresAt.getTime() > now.getTime() ? existing : undefined;
+    if (active) {
+      const cooling = active.lastSentAt.getTime() + RESEND_COOLDOWN_SECONDS * 1000 > now.getTime();
+      if (cooling || active.sendCount >= MAX_CODE_SENDS) return started;
+    }
+
+    const code = codes.generate();
+    await passwordResets.save({
+      userId: user.id,
+      channel: 'EMAIL',
+      codeHash: codes.hash(`reset:${user.id}`, code),
+      expiresAt: addMs(now, CODE_TTL_MINUTES * 60_000),
+      attempts: 0,
+      sendCount: (active?.sendCount ?? 0) + 1,
+      lastSentAt: now,
+    });
+    try {
+      await mailer.sendPasswordResetCode({ to: user.email, code, expiresInMinutes: CODE_TTL_MINUTES });
+    } catch {
+      // Falhou o envio: descarta o pedido para poder tentar de novo, sem contar o erro a quem pediu.
+      await passwordResets.delete(user.id);
+    }
+    return started;
+  }
+
+  /** Confere o código, grava a nova senha e já entra na conta. */
+  async confirmPasswordReset(input: { identifier: unknown; code: unknown; password: unknown }): Promise<AuthResult> {
+    const { users, passwordResets, codes, hasher, clock } = this.deps;
+    const identifier = asString(input.identifier).trim();
+    const code = asString(input.code).trim();
+    const password = asString(input.password);
+    if (!/^\d{6}$/.test(code)) throw validationError('Código inválido', { code: 'O código tem 6 números' });
+
+    const user = identifier.length > 0 && identifier.length <= 254 ? await this.findByIdentifier(identifier) : undefined;
+    const profile = user ? await users.findProfileById(user.id) : undefined;
+    assertNoProblems({ password: passwordProblem(password, user?.email ?? '', profile?.username ?? '') });
+
+    const now = clock.now();
+    const record = user ? await passwordResets.find(user.id) : undefined;
+    if (!user || !profile || user.status === 'SUSPENDED' || !record || record.expiresAt.getTime() <= now.getTime()) {
+      if (user && record) await passwordResets.delete(user.id);
+      throw validationError(INVALID_CODE, { code: INVALID_CODE });
+    }
+    if (record.attempts >= MAX_CODE_ATTEMPTS) {
+      await passwordResets.delete(user.id);
+      throw rateLimited('Muitas tentativas incorretas. Peça um novo código.');
+    }
+    if (!codes.matches(`reset:${user.id}`, code, record.codeHash)) {
+      const attempts = await passwordResets.incrementAttempts(user.id);
+      if (attempts === undefined) throw validationError(INVALID_CODE, { code: INVALID_CODE });
+      if (attempts >= MAX_CODE_ATTEMPTS) {
+        await passwordResets.delete(user.id);
+        throw rateLimited('Muitas tentativas incorretas. Peça um novo código.');
+      }
+      throw validationError('Código incorreto', { code: 'Código incorreto' });
+    }
+
+    const passwordHash = await hasher.hash(password);
+    await users.updatePasswordHash(user.id, passwordHash);
+    await passwordResets.delete(user.id);
+    return this.session({ ...user, passwordHash }, profile);
   }
 
   /** Login por e-mail ou por nome de usuário (com ou sem @). */

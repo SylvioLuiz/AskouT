@@ -8,7 +8,7 @@ import { useAuthContext } from '../auth.tsx';
 import { useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { formatCountdown, secondsUntil } from '../lib/format.ts';
-import type { SignupStarted } from '../lib/types.ts';
+import type { PasswordResetStarted, SignupStarted } from '../lib/types.ts';
 import {
   codeProblem,
   compact,
@@ -72,6 +72,9 @@ export function LoginScreen() {
         <Button type="submit" full loading={busy}>
           Entrar
         </Button>
+        <p className="form__switch">
+          <Link to="/esqueci-senha">Esqueci minha senha</Link>
+        </p>
         <p className="form__switch">
           Ainda não tem conta? <Link to="/cadastro">Criar conta</Link>
         </p>
@@ -223,6 +226,115 @@ export function SignupScreen() {
         </p>
       </form>
       <SocialLogin />
+    </AuthLayout>
+  );
+}
+
+/** Esqueci a senha: 1) e-mail ou @usuário -> 2) código recebido + nova senha. */
+export function ForgotPasswordScreen() {
+  useTitle('Recuperar senha');
+  const { signIn } = useAuthContext();
+  const [started, setStarted] = useState<PasswordResetStarted | undefined>();
+  const [identifier, setIdentifier] = useState('');
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | undefined>();
+  const [info, setInfo] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+  const now = useNow();
+
+  async function request(event?: FormEvent) {
+    event?.preventDefault();
+    const found = compact({ identifier: loginIdentifierProblem(identifier) });
+    setErrors(found);
+    setFormError(undefined);
+    setInfo(undefined);
+    if (Object.keys(found).length > 0) return;
+    setBusy(true);
+    try {
+      setStarted(await api.requestPasswordReset(identifier.trim()));
+      setCode('');
+      setPassword('');
+    } catch (failure) {
+      const error = toApiError(failure);
+      setErrors(error.fields);
+      setFormError(Object.keys(error.fields).length === 0 ? error.message : undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirm(event: FormEvent) {
+    event.preventDefault();
+    const found = compact({ code: codeProblem(code), password: passwordProblem(password) });
+    setErrors(found);
+    setFormError(undefined);
+    setInfo(undefined);
+    if (Object.keys(found).length > 0) return;
+    setBusy(true);
+    try {
+      signIn(await api.confirmPasswordReset(identifier.trim(), code.trim(), password));
+    } catch (failure) {
+      const error = toApiError(failure);
+      setErrors(error.fields);
+      setFormError(Object.keys(error.fields).length === 0 ? error.message : undefined);
+      setBusy(false);
+    }
+  }
+
+  if (started) {
+    const wait = secondsUntil(started.resendAvailableAt, now);
+    return (
+      <AuthLayout>
+        <form className="form" onSubmit={confirm} noValidate>
+          <h2 className="form__title">Criar nova senha</h2>
+          <p className="form__text">
+            Se existir uma conta com esse dado, enviamos um código de 6 números para o e-mail dela. Ele vale por {started.expiresInMinutes} minutos.
+          </p>
+          {import.meta.env.DEV ? <Notice tone="info">Ambiente de desenvolvimento: o código não chega por e-mail, aparece no log da API.</Notice> : null}
+          {info ? <Notice tone="ok">{info}</Notice> : null}
+          {formError ? <Notice tone="error">{formError}</Notice> : null}
+          <Field label="Código" value={code} onChange={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))} error={errors['code']} inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus />
+          <PasswordField label="Nova senha" value={password} onChange={setPassword} error={errors['password']} hint="Pelo menos 8 caracteres." autoComplete="new-password" />
+          <Button type="submit" full loading={busy}>
+            Salvar e entrar
+          </Button>
+          <div className="form__row">
+            <Button
+              variant="quiet"
+              small
+              onClick={async () => {
+                await request();
+                setInfo('Se a conta existir, enviamos um novo código. O anterior deixou de valer.');
+              }}
+              disabled={busy || wait > 0}
+            >
+              {wait > 0 ? `Reenviar código em ${formatCountdown(wait)}` : 'Reenviar código'}
+            </Button>
+            <Button variant="quiet" small onClick={() => setStarted(undefined)} disabled={busy}>
+              Usar outro e-mail
+            </Button>
+          </div>
+        </form>
+      </AuthLayout>
+    );
+  }
+
+  return (
+    <AuthLayout>
+      <form className="form" onSubmit={request} noValidate>
+        <h2 className="form__title">Recuperar senha</h2>
+        <p className="form__text">Informe seu e-mail ou @usuário. Vamos mandar um código para o e-mail da conta.</p>
+        {formError ? <Notice tone="error">{formError}</Notice> : null}
+        <Field label="E-mail ou @usuário" value={identifier} onChange={setIdentifier} error={errors['identifier']} autoComplete="username" autoFocus />
+        <Button type="submit" full loading={busy}>
+          Enviar código
+        </Button>
+        <p className="form__switch">
+          Lembrou? <Link to="/entrar">Entrar</Link>
+        </p>
+      </form>
     </AuthLayout>
   );
 }

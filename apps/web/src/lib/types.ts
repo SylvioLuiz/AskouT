@@ -60,6 +60,11 @@ export interface SocialNeedsProfile {
   displayName: string;
 }
 
+export interface PasswordResetStarted {
+  expiresInMinutes: number;
+  resendAvailableAt: string;
+}
+
 export interface SignupStarted {
   email: string;
   expiresAt: string;

@@ -17,6 +17,7 @@ import {
   PrismaAdminRepository,
   PrismaFlashRepository,
   PrismaFollowRepository,
+  PrismaPasswordResetRepository,
   PrismaPendingSignupRepository,
   PrismaUserRepository,
 } from './index.ts';
@@ -57,6 +58,7 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     follows: new PrismaFollowRepository(prisma),
     blocks: new PrismaBlockRepository(prisma),
     pending: new PrismaPendingSignupRepository(prisma),
+    passwordResets: new PrismaPasswordResetRepository(prisma),
     availability: new PrismaAvailabilityRepository(prisma),
     flash: new PrismaFlashRepository(prisma),
     conversations: new PrismaConversationRepository(prisma),
