@@ -18,13 +18,30 @@ import { Link } from '../router.tsx';
 
 function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: number; total: number; onFirstLoad?: (w: number, h: number) => void }) {
   const [failed, setFailed] = useState(false);
-  const [muted, setMuted] = useState(false);
+  // O navegador só deixa o vídeo começar sozinho sem som; quem quiser o som toca no botão.
+  const [muted, setMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const toggleSound = () => {
     const next = !muted;
     if (videoRef.current) videoRef.current.muted = next;
     setMuted(next);
   };
+  // Toca sozinho quando o vídeo aparece na tela (e é o item visível do carrossel) e pausa quando sai.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !image.videoPath) return;
+    video.muted = muted;
+    if (typeof IntersectionObserver === 'undefined' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) void video.play().catch(() => undefined);
+        else video.pause();
+      },
+      { threshold: 0.6 },
+    );
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, [image.videoPath]);
   return (
     <figure className="pcarousel__slide" aria-label={`${image.videoPath ? 'Vídeo' : 'Foto'} ${index + 1} de ${total}`}>
       {image.videoPath ? (
@@ -33,8 +50,10 @@ function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: 
           src={api.assetUrl(image.videoPath)}
           poster={image.path ? api.assetUrl(image.path) : undefined}
           controls
+          muted
+          loop
           playsInline
-          preload="metadata"
+          preload="auto"
           aria-label={`Vídeo ${index + 1} de ${total}`}
           onLoadedMetadata={(event) => {
             if (index === 0) onFirstLoad?.(event.currentTarget.videoWidth, event.currentTarget.videoHeight);
