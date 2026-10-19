@@ -53,9 +53,9 @@ export function HomeScreen() {
               Eventos dos bares que você segue
             </h2>
           </div>
-          <ul className="evgrid">
+          <ul className="evposters">
             {followedEvents.map((event) => (
-              <EventCard key={event.id} event={event} now={now} />
+              <EventCard key={event.id} event={event} now={now} poster />
             ))}
           </ul>
         </section>

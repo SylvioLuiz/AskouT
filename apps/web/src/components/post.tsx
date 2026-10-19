@@ -6,6 +6,7 @@ import { hasSound } from '../lib/sound.ts';
 import { AdjustSheet, CommentsSheet, EditPostSheet, PostMenuSheet, ReportSheet, SharePostSheet } from './post-actions.tsx';
 import type { PostGone } from './post-actions.tsx';
 import { VenueLogo } from './venue-logo.tsx';
+import { PosterEvent } from './poster.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Loading } from './ui.tsx';
 import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -116,29 +117,23 @@ export function Carousel({ images }: { images: PostImage[] }) {
   );
 }
 
-/** Evento publicado como post, no mesmo desenho de um evento do Explorar: capa, nome, lugar e horário. */
+/** Evento publicado como post, em formato de cartaz: foto, nome, lugar, horário e "Eu vou". */
 function EventPostCard({ post, event }: { post: PostView; event: NonNullable<PostView['event']> }) {
-  const [failed, setFailed] = useState(false);
   const first = post.images[0];
-  const image = first?.path && !failed ? api.assetUrl(first.path) : null;
   return (
-    <div className="evcard evcard--post">
-      <Link to={`/eventos/${encodeURIComponent(post.id)}`} className="evcard__link">
-        <div className="evcover evcover--hero">
-          {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="evcover__kind" aria-hidden="true">Evento</span>}
-          {post.images.length > 1 ? <span className="postgrid__multi" aria-label={`${post.images.length} fotos`}><CarouselIcon /></span> : null}
-        </div>
-        <div className="evcard__body">
-          <h3 className="evcard__title">{event.title}</h3>
-          {post.placeName ? <p className="evcard__venue">{post.placeName}</p> : null}
-          <p className="evcard__when">{formatWhen(event.startsAt, event.endsAt, new Date())}</p>
-        </div>
-      </Link>
-    </div>
+    <PosterEvent
+      eventId={post.id}
+      title={event.title}
+      startsAt={event.startsAt}
+      whenText={formatWhen(event.startsAt, event.endsAt, new Date())}
+      venue={post.placeName ?? 'Evento'}
+      image={first?.path ? api.assetUrl(first.path) : null}
+      fallback={<span className="poster__kind" aria-hidden="true">Evento</span>}
+    />
   );
 }
 
-export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean }) {
+export function PostCard({ post: initial, onGone, asEvent, poster }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean; poster?: boolean }) {
   const [post, setPost] = useState(initial);
   const [sheet, setSheet] = useState<'menu' | 'edit' | 'adjust' | 'report' | 'comments' | 'share' | undefined>();
   const [busy, setBusy] = useState(false);
@@ -209,8 +204,11 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
   }
 
   const eventCard = post.event && asEvent;
+  const cartaz = poster === true && !eventCard;
+  const hasVideo = post.images.some((i) => i.videoPath);
   return (
     <article className="post">
+      {cartaz ? null : (
       <header className="post__head">
         {post.venue ? (
           <Link to={`/bares/${encodeURIComponent(post.venue.id)}`} className="post__author">
@@ -231,6 +229,7 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
           <MoreIcon />
         </button>
       </header>
+      )}
       {post.archived ? <p className="muted">Arquivado: só você vê este post.</p> : null}
       {problem ? <p className="field__error">{problem}</p> : null}
       {myTag === 'PENDING' ? (
@@ -263,7 +262,78 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
           <span className="muted"> · {eventWhen(post.event.startsAt)}</span>
         </p>
       ) : null}
-      {eventCard ? null : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} />}
+      {cartaz ? (
+        <div className={`poster poster--post${hasVideo ? ' poster--video' : ''}${post.images.length > 1 ? ' poster--multi' : ''}`}>
+          <div className="poster__media">
+            <Carousel key={post.images.map((i) => i.id).join()} images={post.images} />
+          </div>
+          <div className="poster__scrim poster__scrim--post" aria-hidden="true" />
+          <div className="poster__top">
+            <div className="poster__who">
+              {post.venue ? (
+                <Link to={`/bares/${encodeURIComponent(post.venue.id)}`} aria-label={`Página de ${post.venue.name}`} className="poster__avatar">
+                  <VenueLogo name={post.venue.name} logoUrl={post.venue.logoUrl} size={32} />
+                </Link>
+              ) : (
+                <Link to={`/u/${encodeURIComponent(post.author.username)}`} aria-label={`Perfil de ${post.author.username}`} className="poster__avatar">
+                  <Avatar profile={post.author} size={32} />
+                </Link>
+              )}
+              <span className="poster__whotext">
+                {post.venue ? (
+                  <Link to={`/bares/${encodeURIComponent(post.venue.id)}`} className="poster__name">{post.venue.name}</Link>
+                ) : (
+                  <Link to={`/u/${encodeURIComponent(post.author.username)}`} className="poster__name">{post.author.username}</Link>
+                )}
+                <Link to={`/posts/${encodeURIComponent(post.id)}`} className="poster__sub">
+                  {post.placeName && !post.venue ? `${post.placeName} · ` : ''}
+                  {timeAgo(post.createdAt, new Date())}
+                  {post.edited ? ' · editado' : ''}
+                </Link>
+              </span>
+            </div>
+            <button type="button" className="poster__round" onClick={() => setSheet('menu')} aria-label="Mais opções do post" aria-haspopup="dialog">
+              <MoreIcon />
+            </button>
+          </div>
+          <div className="poster__rail" role="group" aria-label="Ações do post">
+            <button type="button" className={`poster__railbtn${post.likedByMe ? ' poster__railbtn--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
+              <HeartIcon filled={post.likedByMe} />
+              <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
+            </button>
+            <button type="button" className="poster__railbtn" onClick={() => setSheet('comments')} aria-label={post.commentCount > 0 ? `Comentários (${post.commentCount})` : 'Comentar'}>
+              <CommentIcon />
+              <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
+            </button>
+            <button type="button" className="poster__railbtn poster__railbtn--round" onClick={() => setSheet('share')} aria-label="Compartilhar">
+              <SendIcon />
+            </button>
+          </div>
+          {post.caption || post.tags.length > 0 ? (
+            <div className="poster__caption">
+              {post.caption ? (
+                <p className="poster__text">
+                  <strong>{post.venue ? post.venue.name : post.author.username}</strong> {post.caption}
+                </p>
+              ) : null}
+              {post.tags.length > 0 ? (
+                <p className="poster__with">
+                  Com{' '}
+                  {post.tags.map((t, i) => (
+                    <span key={t.user.userId}>
+                      {i > 0 ? ', ' : ''}
+                      <Link to={`/u/${encodeURIComponent(t.user.username)}`}>{t.user.username}</Link>
+                      {t.status === 'PENDING' ? ' (aguardando)' : ''}
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {eventCard || cartaz ? null : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} />}
+      {cartaz ? null : (
       <div className="post__actions" role="group" aria-label="Ações do post">
         <button type="button" className={`post__action${post.likedByMe ? ' post__action--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
           <HeartIcon filled={post.likedByMe} />
@@ -277,13 +347,14 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
           <SendIcon />
         </button>
       </div>
-      {post.placeName && !eventCard ? (
+      )}
+      {post.placeName && !eventCard && !cartaz ? (
         <p className="post__place">
           <strong>{post.placeName}</strong>
           {post.placeAddress ? <span> · {post.placeAddress}</span> : null}
         </p>
       ) : null}
-      {post.tags.length > 0 ? (
+      {post.tags.length > 0 && !cartaz ? (
         <p className="post__tags">
           Com{' '}
           {post.tags.map((t, i) => (
@@ -295,7 +366,7 @@ export function PostCard({ post: initial, onGone, asEvent }: { post: PostView; o
           ))}
         </p>
       ) : null}
-      {post.caption ? <p className="post__caption">{post.caption}</p> : null}
+      {post.caption && !cartaz ? <p className="post__caption">{post.caption}</p> : null}
 
       {sheet === 'menu' ? (
         <PostMenuSheet
@@ -393,7 +464,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
     <div className="postlist">
       {items.map((post, index) => (
         <Fragment key={post.id}>
-          <PostCard post={post} asEvent onGone={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
+          <PostCard post={post} asEvent poster onGone={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
           {inject && index === Math.min(inject.after, items.length) - 1 ? inject.node : null}
         </Fragment>
       ))}

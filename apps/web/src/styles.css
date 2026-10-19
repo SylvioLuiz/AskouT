@@ -4303,3 +4303,76 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .ptr__spinner--busy svg { animation: ptr-spin 800ms linear infinite; }
 @keyframes ptr-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ptr__spinner--busy svg { animation: none; } }
+
+/* ---------- Cartaz: evento e post em foto inteira (Home) ---------- */
+.evposters { display: flex; flex-direction: column; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.poster { position: relative; isolation: isolate; border-radius: 28px; overflow: hidden; color: #fff; background: rgb(32 32 44); }
+.poster--event { min-height: 440px; display: flex; flex-direction: column; justify-content: flex-end; }
+.poster__bg { position: absolute; inset: 0; z-index: -2; }
+.poster__bg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.poster__fallback { position: absolute; inset: 0; width: 100%; height: 100%; padding-top: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: rgb(255 255 255 / 0.95); }
+.poster__fallback svg { width: 56px; height: 56px; }
+.poster__kind { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; background: linear-gradient(150deg, rgb(77 163 255), rgb(0 88 184)); }
+.poster__scrim { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgb(10 10 25 / 0) 38%, rgb(10 10 25 / 0.86) 100%); pointer-events: none; }
+.poster__scrim--post { background: linear-gradient(180deg, rgb(10 10 25 / 0.35) 0, rgb(10 10 25 / 0) 22%, rgb(10 10 25 / 0) 55%, rgb(10 10 25 / 0.82) 100%); z-index: 1; }
+.poster__date { position: absolute; top: 14px; left: 14px; display: flex; flex-direction: column; align-items: center; min-width: 58px; padding: 8px 6px 9px; border-radius: 18px; background: rgb(20 20 35 / 0.6); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); line-height: 1; }
+.poster__date-w, .poster__date-m { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em; }
+.poster__date-d { margin: 3px 0; font-size: 1.75rem; font-weight: 800; }
+.poster__tags { position: absolute; top: 14px; right: 14px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 55%; }
+.poster__info { position: relative; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+.poster__meta { font-size: 0.8125rem; font-weight: 600; text-shadow: 0 1px 2px rgb(0 0 0 / 0.4); }
+.poster__venue { position: relative; z-index: 2; }
+.poster__venue a, .poster__venue .venuelink { color: #fff; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.poster__title { margin: 0; font-family: var(--font-display); font-size: 1.75rem; line-height: 1.08; font-weight: 800; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.poster__link { color: #fff; text-decoration: none; }
+.poster__link::after { content: ''; position: absolute; inset: 0; z-index: 1; }
+.poster__link:focus-visible { outline: 3px solid #fff; outline-offset: 4px; border-radius: 6px; }
+.poster__problem { margin: 0; padding: 6px 10px; border-radius: 10px; background: rgb(215 0 21 / 0.85); font-size: 0.8125rem; position: relative; z-index: 2; }
+.poster__row { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.poster__glass { padding: 9px 14px; border-radius: 999px; background: rgb(20 20 35 / 0.6); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); font-size: 0.8125rem; font-weight: 600; }
+.poster__cta { min-height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: #fff; color: var(--ink); font: inherit; font-size: 0.9375rem; font-weight: 800; cursor: pointer; }
+.poster__cta[aria-pressed='true'] { background: rgb(255 255 255 / 0.22); color: #fff; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.poster__cta:disabled { opacity: 0.7; cursor: default; }
+.poster__cta:focus-visible, .poster__round:focus-visible, .poster__railbtn:focus-visible, .poster__who a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* Post em cartaz */
+.poster--post { background: rgb(20 20 31); }
+.poster--post .poster__media .pcarousel { border-radius: 0; }
+.poster--post .pcarousel__slide { max-height: 72vh; max-height: 72dvh; }
+.poster--post .pcarousel__count { top: 18px; right: 66px; z-index: 3; }
+.poster--post .pcarousel__dots { bottom: 6px; z-index: 3; }
+.poster__top { position: absolute; top: 12px; left: 12px; right: 12px; z-index: 3; display: flex; align-items: center; justify-content: space-between; gap: 10px; pointer-events: none; }
+.poster__top > * { pointer-events: auto; }
+.poster__who { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 5px 14px 5px 5px; border-radius: 999px; background: rgb(20 20 35 / 0.6); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+.poster__avatar { display: block; flex: none; border-radius: 50%; }
+.poster__whotext { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.poster__name { color: #fff; font-size: 0.875rem; font-weight: 700; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poster__sub { color: rgb(255 255 255 / 0.92); font-size: 0.75rem; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poster__round { flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgb(20 20 35 / 0.6); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.poster__rail { position: absolute; right: 12px; bottom: 96px; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.poster--multi .poster__rail { bottom: 104px; }
+.poster__railbtn { width: 48px; min-height: 64px; padding: 8px 0 6px; border: 0; border-radius: 24px; background: rgb(20 20 35 / 0.6); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+.poster__railbtn--round { min-height: 48px; border-radius: 50%; }
+.poster__railbtn .icon { width: 24px; height: 24px; }
+.poster__railbtn--on { color: rgb(255 122 209); }
+.poster__caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 18px 76px 18px 18px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.poster--multi .poster__caption { padding-bottom: 26px; }
+.poster__caption a { pointer-events: auto; }
+.poster__text { margin: 0; font-size: 1rem; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; text-shadow: 0 1px 3px rgb(0 0 0 / 0.5); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.poster__with { margin: 0; font-size: 0.8125rem; }
+.poster__with a { color: #fff; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+/* Vídeo: os controles do player ficam livres; a legenda desce para fora da imagem. */
+.poster--video { display: flex; flex-direction: column; }
+.poster--video .poster__scrim--post { display: none; }
+.poster--video .poster__caption { position: static; padding: 12px 18px 16px; pointer-events: auto; }
+.poster--video .poster__rail { bottom: auto; top: 70px; }
+
+/* Botão principal em degradê no escuro */
+:root[data-theme='dark'] .poster__cta:not([aria-pressed='true']) { background: var(--brand-grad); color: var(--brand-ink); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .poster__cta:not([aria-pressed='true']) { background: var(--brand-grad); color: var(--brand-ink); }
+}
+@media (min-width: 720px) {
+  .evposters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) { .poster * { transition: none !important; } }

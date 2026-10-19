@@ -32,6 +32,7 @@ import { pluralize } from '../lib/format.ts';
 import type { EventKind, ExploreEvent, ExplorePlace, ExploreResult } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
+import { PosterEvent } from '../components/poster.tsx';
 import { VenueLogo } from '../components/venue-logo.tsx';
 import { openStatus } from '../lib/venue-profile.ts';
 
@@ -91,7 +92,8 @@ function EventCover({ event, shape }: { event: ExploreEvent; shape: string }) {
   );
 }
 
-export function EventCard({ event, now }: { event: ExploreEvent; now: Date }) {
+export function EventCard({ event, now, poster }: { event: ExploreEvent; now: Date; poster?: boolean }) {
+  if (poster) return <PosterEventCard event={event} now={now} />;
   return (
     <li className="evcard">
       <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link">
@@ -106,6 +108,35 @@ export function EventCard({ event, now }: { event: ExploreEvent; now: Date }) {
           {event.distanceM !== null ? <p className="evcard__dist">a {formatDistance(event.distanceM)}</p> : null}
         </div>
       </Link>
+    </li>
+  );
+}
+
+/** Evento em formato de cartaz (Home): foto inteira, data em destaque e "Eu vou". */
+function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
+  return (
+    <li className="poster-item">
+      <PosterEvent
+        eventId={event.id}
+        title={event.title}
+        startsAt={event.startsAt}
+        whenText={formatWhen(event.startsAt, event.endsAt, now)}
+        venue={<VenueLink venueId={event.venue.id} name={event.venue.name} />}
+        image={safeImage(event.imageUrl)}
+        fallback={
+          <span className={`evcover evcover--${event.kind.toLowerCase()} poster__fallback`} aria-hidden="true">
+            <EventKindIcon kind={event.kind} />
+            <span className="evcover__kind">{kindLabel(event.kind)}</span>
+          </span>
+        }
+        count={event.goingCount}
+        tags={
+          <>
+            {event.isFree ? <span className="tag tag--free">Grátis</span> : null}
+            {event.sample ? <SampleBadge /> : null}
+          </>
+        }
+      />
     </li>
   );
 }
