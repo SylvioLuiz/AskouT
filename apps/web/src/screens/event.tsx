@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { Sheet } from '../components/agenda.tsx';
-import { ChevronLeftIcon, EventKindIcon, MoreIcon, ShareIcon, TrashIcon, XIcon } from '../components/icons.tsx';
+import { ChevronLeftIcon, EventKindIcon, MoreIcon, PlusIcon, ShareIcon, TrashIcon, XIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
@@ -239,6 +239,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [planning, setPlanning] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [storySoon, setStorySoon] = useState(false);
   const [posted, setPosted] = useState<boolean | undefined>();
   const [goBusy, setGoBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -259,6 +260,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const cover = e && !coverFailed ? coverSrc(e.coverPath) : null;
   const date = e ? eventDateLabel(e.startsAt, e.endsAt) : null;
   const time = e ? eventTimeLabel(e.startsAt, e.endsAt) : null;
+  const canStory = e ? (e.going || e.isOwner) && !ended : false;
   const strip = e ? attendeeStrip(e.attendees, e.confirmedCount, STRIP_MAX) : null;
   const ended = e ? Date.parse(e.endsAt) <= Date.now() : false;
   const isPosted = posted ?? e?.postedByMe ?? false;
@@ -324,8 +326,18 @@ export function EventScreen({ eventId }: { eventId: string }) {
           </dl>
 
           <section className="evgoing" aria-label="Quem confirmou">
-            {strip.shown.length > 0 ? (
+            {strip.shown.length > 0 || canStory ? (
               <ul className="evgoing__faces">
+                {canStory ? (
+                  <li>
+                    <button type="button" className="evgoing__story" onClick={() => setStorySoon(true)} aria-label="Criar story neste evento">
+                      <span className="evgoing__storyring">
+                        <PlusIcon />
+                      </span>
+                      <span className="evgoing__storylabel">Seu story</span>
+                    </button>
+                  </li>
+                ) : null}
                 {strip.shown.map((p) => (
                   <li key={p.userId}>
                     <Link to={`/u/${encodeURIComponent(p.username)}`} aria-label={`Perfil de ${p.username}`}>
@@ -416,6 +428,14 @@ export function EventScreen({ eventId }: { eventId: string }) {
         />
       ) : null}
       {menu && e ? <EventMenuSheet page={e} onChange={setFresh} onShare={() => { setMenu(false); setSharing(true); }} onClose={() => setMenu(false)} /> : null}
+      {storySoon ? (
+        <Sheet title="Story do evento" onClose={() => setStorySoon(false)}>
+          <p>Os stories do evento chegam em breve. Quem confirmou presença poderá publicar um, e o seu avatar ganha um círculo enquanto ele estiver no ar.</p>
+          <Button full variant="secondary" onClick={() => setStorySoon(false)}>
+            Entendi
+          </Button>
+        </Sheet>
+      ) : null}
       {planning && e ? <CreateMeetupSheet event={{ id: e.id, title: e.title }} onClose={() => setPlanning(false)} /> : null}
     </>
   );

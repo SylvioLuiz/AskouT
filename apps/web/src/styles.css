@@ -3350,6 +3350,11 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evgoing { display: flex; flex-direction: column; gap: 12px; }
 .evgoing__faces { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .evgoing__faces li { display: block; }
+.evgoing__story { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.evgoing__storyring { display: grid; place-items: center; width: 44px; height: 44px; border: 2px dashed var(--brand); border-radius: 50%; color: var(--brand); }
+.evgoing__storyring svg { width: 20px; height: 20px; }
+.evgoing__storylabel { font-size: 0.6875rem; color: var(--muted); }
+.evgoing__story:focus-visible .evgoing__storyring { outline: 2px solid var(--brand); outline-offset: 2px; }
 .evgoing__more { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-weight: 700; font-size: 0.875rem; }
 .evgoing__note { margin: 0; color: var(--ink-2); }
 .evactions { display: flex; flex-direction: column; gap: 10px; }
