@@ -2,7 +2,9 @@ import { BoltIcon } from '../components/icons.tsx';
 import { EmptyState, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
+import { useState } from 'react';
 import { useAsync, useTitle } from '../hooks.ts';
+import { PullRefresh } from '../components/pull-refresh.tsx';
 import { formatRemaining, minutesLeft } from '../lib/flash.ts';
 import { PostList } from '../components/post.tsx';
 import { Link } from '../router.tsx';
@@ -17,9 +19,17 @@ export function HomeScreen() {
   const followed = useAsync(() => api.followedEvents(), []);
   const followedEvents = followed.data?.events ?? [];
   const now = new Date();
+  const [feedKey, setFeedKey] = useState(0);
 
   return (
-    <>
+    <PullRefresh
+      onRefresh={async () => {
+        setFeedKey((k) => k + 1);
+        flash.reload();
+        followed.reload();
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }}
+    >
       <PageHead title={`Olá, ${user.profile.displayName}`} />
 
       <Link to="/flash" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
@@ -58,9 +68,9 @@ export function HomeScreen() {
           </h2>
           <Link to="/criar">Criar post</Link>
         </div>
-        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint="Seus posts e os dos seus amigos aparecem aqui." inject={{ after: 5, node: <SuggestedPeople /> }} />
+        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint="Seus posts e os dos seus amigos aparecem aqui." inject={{ after: 5, node: <SuggestedPeople /> }} reloadKey={String(feedKey)} />
       </section>
-    </>
+    </PullRefresh>
   );
 }
 

@@ -4294,3 +4294,12 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .storyview .soundtoggle { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 4; }
 .storyview__error { position: absolute; left: 16px; right: 16px; bottom: 80px; z-index: 4; margin: 0; padding: 10px 14px; border-radius: 12px; background: rgb(0 0 0 / 0.7); text-align: center; }
 .storyview__btn--quiet { background: transparent; color: rgb(255 255 255 / 0.8); }
+
+/* Puxar para atualizar */
+:root:has(.ptr), :root:has(.ptr) body { overscroll-behavior-y: contain; }
+.ptr { position: relative; }
+.ptr__spinner { position: absolute; top: -40px; left: 50%; width: 32px; height: 32px; margin-left: -16px; display: grid; place-items: center; border-radius: 50%; background: var(--surface, #fff); color: var(--ink); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18); pointer-events: none; }
+.ptr__spinner svg { width: 18px; height: 18px; }
+.ptr__spinner--busy svg { animation: ptr-spin 800ms linear infinite; }
+@keyframes ptr-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ptr__spinner--busy svg { animation: none; } }
