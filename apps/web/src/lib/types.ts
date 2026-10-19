@@ -493,6 +493,20 @@ export interface EventPost {
 }
 
 /** Página do evento: do local (PLACE) ou criado por uma pessoa (USER). */
+export interface EventStoryItem {
+  id: string;
+  kind: 'IMAGE' | 'VIDEO';
+  createdAt: string;
+  expiresAt: string;
+  canDelete: boolean;
+}
+
+export interface EventStoryGroup {
+  author: PublicProfile;
+  mine: boolean;
+  items: EventStoryItem[];
+}
+
 export interface EventPage {
   id: string;
   source: 'PLACE' | 'USER';
@@ -516,6 +530,10 @@ export interface EventPage {
   confirmedCount: number;
   going: boolean;
   attendees: PublicProfile[];
+  /** Quem tem story no ar neste evento (círculo no avatar). */
+  storyUserIds: string[];
+  /** Pode publicar story: confirmou presença (ou é dono) e o evento não acabou. */
+  canStory: boolean;
   owner: PublicProfile | null;
   isOwner: boolean;
   postsEnabled: boolean;

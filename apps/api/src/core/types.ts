@@ -503,6 +503,20 @@ export interface EventPostRecord {
   createdAt: Date;
 }
 
+/** Story de evento: foto ou vídeo. Vale 24 h ou até o fim do evento, o que vier primeiro. */
+export interface EventStoryRecord {
+  id: string;
+  ref: EventRef;
+  userId: string;
+  mime: string;
+  video: boolean;
+  data: Uint8Array;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+export type EventStoryMeta = Omit<EventStoryRecord, 'data'>;
+
 export interface PostPatch {
   caption: string | null;
   placeName: string | null;

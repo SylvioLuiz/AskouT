@@ -3355,6 +3355,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evgoing__storyring svg { width: 20px; height: 20px; }
 .evgoing__storylabel { font-size: 0.6875rem; color: var(--muted); }
 .evgoing__story:focus-visible .evgoing__storyring { outline: 2px solid var(--brand); outline-offset: 2px; }
+.evgoing__face { display: block; padding: 0; border: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.evgoing__face--story { padding: 2px; border-radius: 50%; box-shadow: 0 0 0 2px var(--brand); background: var(--bg, transparent); }
+.evgoing__face:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 50%; }
 .evgoing__more { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-weight: 700; font-size: 0.875rem; }
 .evgoing__note { margin: 0; color: var(--ink-2); }
 .evactions { display: flex; flex-direction: column; gap: 10px; }
@@ -4270,3 +4273,23 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .soundtoggle { position: absolute; top: 10px; right: 10px; z-index: 2; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: rgb(0 0 0 / 0.55); color: white; cursor: pointer; }
 .soundtoggle--shifted { top: 44px; }
 .soundtoggle:focus-visible { outline: 2px solid white; outline-offset: 2px; }
+
+/* ---------- Story do evento ---------- */
+.storysheet__preview { margin: 12px 0; border-radius: var(--radius-panel); overflow: hidden; background: var(--surface); }
+.storysheet__preview img, .storysheet__preview video { display: block; width: 100%; max-height: 60vh; object-fit: contain; }
+.storysheet__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.storyview { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; background: #000; color: #fff; }
+.storyview__bars { position: absolute; top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; z-index: 3; display: flex; gap: 4px; }
+.storyview__bar { flex: 1; height: 3px; border-radius: 2px; background: rgb(255 255 255 / 0.35); overflow: hidden; }
+.storyview__fill { display: block; height: 100%; background: #fff; }
+.storyview__head { position: absolute; top: calc(max(8px, env(safe-area-inset-top)) + 10px); left: 8px; right: 8px; z-index: 3; display: flex; align-items: center; gap: 4px; }
+.storyview__who { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; }
+.storyview__who span { color: rgb(255 255 255 / 0.75); font-size: 0.8125rem; }
+.storyview__btn { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / 0.4); color: #fff; cursor: pointer; }
+.storyview__stage { position: relative; flex: 1; display: grid; place-items: center; min-height: 0; }
+.storyview__media { max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; }
+.storyview__tap { position: absolute; top: 64px; bottom: 0; width: 40%; padding: 0; border: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.storyview__tap--prev { left: 0; }
+.storyview__tap--next { right: 0; width: 60%; }
+.storyview .soundtoggle { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 4; }
+.storyview__error { position: absolute; left: 16px; right: 16px; bottom: 80px; z-index: 4; margin: 0; padding: 10px 14px; border-radius: 12px; background: rgb(0 0 0 / 0.7); text-align: center; }

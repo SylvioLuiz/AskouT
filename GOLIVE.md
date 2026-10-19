@@ -30,3 +30,11 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 - [ ] Votação de datas, fase 2.
 - [ ] Vídeo nos posts: hoje o vídeo (até 60 MB) fica no próprio Postgres e é servido pela API. Para valer em escala, mover para armazenamento de arquivos (com CDN) e comprimir/gerar versões leves no servidor.
 - [ ] Vídeo nos posts: a duração máxima (3 minutos) é conferida só no app; conferir também no servidor. Testar em iPhone/Android de verdade.
+
+## Stories de evento
+
+- [ ] Fotos e vídeos dos stories ficam dentro do Postgres (até 60 MB cada, 10 por pessoa por evento). Antes de ter muita gente, mover para armazenamento de arquivos (S3/R2) com expiração automática.
+- [ ] Story expirado só some da tela: a linha continua no banco até o evento ser apagado. Criar uma tarefa que apague os vencidos.
+- [ ] Duração do vídeo (até 3 minutos) só é conferida no app, como nos posts.
+- [ ] Sem denúncia/moderação de story e sem lista de quem viu. Como é público, vale ter "Denunciar story" antes do lançamento.
+- [ ] Sem aviso (notificação) quando alguém posta story.

@@ -1,4 +1,5 @@
 import { decodeImageDataUrl } from './image.ts';
+import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
 import { distanceMeters } from './geo.ts';
 import { DomainError, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
@@ -12,6 +13,25 @@ export const EVENT_POST_IMAGE_MAX_BYTES = 100 * 1024;
 /** Quantos posts e quantos avatares a página traz de uma vez. */
 export const EVENT_POSTS_LIMIT = 30;
 export const EVENT_ATTENDEES_LIMIT = 60;
+/** Quanto tempo um story fica no ar (ou até o fim do evento, o que vier primeiro). */
+export const EVENT_STORY_HOURS = 24;
+/** Quantos stories no ar uma pessoa pode ter no mesmo evento. */
+export const EVENT_STORY_MAX_PER_USER = 10;
+
+export interface EventStoryItemView {
+  id: string;
+  kind: 'IMAGE' | 'VIDEO';
+  createdAt: string;
+  expiresAt: string;
+  canDelete: boolean;
+}
+
+/** Os stories de uma pessoa no evento. */
+export interface EventStoryGroupView {
+  author: PublicProfile;
+  mine: boolean;
+  items: EventStoryItemView[];
+}
 
 /** A capa: o que o dono enviou, a foto que o Google deu para o lugar ou a imagem do evento do local. */
 export type EventCoverView =
@@ -59,6 +79,10 @@ export interface EventPageView {
   attendees: PublicProfile[];
   owner: PublicProfile | null;
   isOwner: boolean;
+  /** Quem tem story no ar neste evento (para o círculo no avatar). */
+  storyUserIds: string[];
+  /** O visitante pode publicar story: confirmou presença (ou é o dono) e o evento não acabou. */
+  canStory: boolean;
   /** Evento de pessoa tem área de posts; evento do local ainda não (não tem dono). */
   postsEnabled: boolean;
   /** true: o dono e quem confirmou postam; false: só o dono. */
@@ -169,6 +193,8 @@ export class EventPageService {
       attendees,
       owner,
       isOwner,
+      storyUserIds: [...new Set((await this.deps.eventRoom.listStories(ref, this.deps.clock.now())).map((s) => s.userId))].filter((u) => u === viewerId || !hidden.has(u)),
+      canStory: (isOwner || iGo) && Date.parse(base.view.endsAt) > this.deps.clock.now().getTime(),
       postsEnabled,
       postsPublic,
       canPost: postsEnabled && (isOwner || (postsPublic && iGo)),
@@ -176,7 +202,7 @@ export class EventPageService {
     };
   }
 
-  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'postsEnabled' | 'postsPublic' | 'canPost' | 'posts'>; postsPublic: boolean }> {
+  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'postsEnabled' | 'postsPublic' | 'canPost' | 'posts'>; postsPublic: boolean }> {
     if (ref.source === 'PLACE') {
       const found = await this.deps.places.findEvent(ref.id);
       if (!found) throw notFound('Evento não encontrado');
@@ -330,6 +356,61 @@ export class EventPageService {
     if (post.authorId !== viewerId && owner?.userId !== viewerId) throw forbidden('Só quem escreveu ou o dono do evento apaga o post');
     await this.deps.eventRoom.deletePost(post.id);
     return { deleted: true };
+  }
+
+  /** Stories no ar, agrupados por pessoa (os seus primeiro). Quem tem bloqueio com você não aparece. */
+  async stories(viewerId: string, rawId: unknown): Promise<EventStoryGroupView[]> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
+    const rows = (await this.deps.eventRoom.listStories(ref, this.deps.clock.now())).filter((s) => s.userId === viewerId || !hidden.has(s.userId));
+    const profiles = await this.deps.users.findProfilesByIds([...new Set(rows.map((r) => r.userId))]);
+    const byId = new Map(profiles.map((p) => [p.userId, toPublicProfile(p)]));
+    const groups = new Map<string, EventStoryGroupView>();
+    for (const r of rows) {
+      const author = byId.get(r.userId);
+      if (!author) continue;
+      const group = groups.get(r.userId) ?? { author, mine: r.userId === viewerId, items: [] };
+      group.items.push({ id: r.id, kind: r.video ? 'VIDEO' : 'IMAGE', createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), canDelete: r.userId === viewerId || owner?.userId === viewerId });
+      groups.set(r.userId, group);
+    }
+    const last = (g: EventStoryGroupView) => g.items[g.items.length - 1]!.createdAt;
+    return [...groups.values()].sort((a, b) => Number(b.mine) - Number(a.mine) || (last(a) < last(b) ? 1 : last(a) > last(b) ? -1 : 0));
+  }
+
+  /** Publica um story. Só quem confirmou presença (ou o dono), enquanto o evento não acabou. Foto até 2 MB ou vídeo até 60 MB. */
+  async createStory(viewerId: string, rawId: unknown, contentType: unknown, bytes: unknown): Promise<EventStoryGroupView> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    const isOwner = owner?.userId === viewerId;
+    if (!isOwner && !(await this.deps.eventRoom.isGoing(ref, viewerId))) throw forbidden('Confirme presença para publicar um story neste evento');
+    const { view } = await this.base(viewerId, ref, {});
+    const now = this.deps.clock.now();
+    const endsAt = Date.parse(view.endsAt);
+    if (endsAt <= now.getTime()) throw forbidden('Esse evento já terminou');
+    const mine = (await this.deps.eventRoom.listStories(ref, now)).filter((s) => s.userId === viewerId);
+    if (mine.length >= EVENT_STORY_MAX_PER_USER) throw validationError('Muitos stories', { media: `Você já tem ${EVENT_STORY_MAX_PER_USER} stories no ar neste evento` });
+    const media = parseChatMedia(contentType, bytes, POST_VIDEO_MAX_BYTES);
+    const expiresAt = new Date(Math.min(now.getTime() + EVENT_STORY_HOURS * 3_600_000, endsAt));
+    const record = { id: this.deps.ids.next(), ref, userId: viewerId, mime: media.mime, video: media.kind === 'VIDEO', data: media.data, createdAt: now, expiresAt };
+    await this.deps.eventRoom.addStory(record);
+    const me = await this.deps.users.findProfileById(viewerId);
+    return { author: toPublicProfile(me!), mine: true, items: [{ id: record.id, kind: media.kind, createdAt: now.toISOString(), expiresAt: expiresAt.toISOString(), canDelete: true }] };
+  }
+
+  async deleteStory(viewerId: string, rawId: unknown, storyId: unknown): Promise<{ deleted: true }> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    const story = typeof storyId === 'string' && storyId.length <= 64 ? await this.deps.eventRoom.findStory(storyId) : undefined;
+    if (!story || story.ref.id !== ref.id) throw notFound('Story não encontrado');
+    if (story.userId !== viewerId && owner?.userId !== viewerId) throw forbidden('Só quem publicou ou o dono do evento apaga o story');
+    await this.deps.eventRoom.deleteStory(story.id);
+    return { deleted: true };
+  }
+
+  /** A mídia de um story, para <img>/<video>. Público (como os stories), mas só enquanto está no ar. */
+  async storyMedia(storyId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    if (typeof storyId !== 'string' || storyId === '' || storyId.length > 64) return undefined;
+    const media = await this.deps.eventRoom.findStoryMedia(storyId);
+    if (!media || media.expiresAt.getTime() <= this.deps.clock.now().getTime()) return undefined;
+    return { mime: media.mime, data: media.data };
   }
 
   /** Foto de um post de evento, para o <img>. Quem tem o endereço (id aleatório) vê, como nas fotos dos posts. */

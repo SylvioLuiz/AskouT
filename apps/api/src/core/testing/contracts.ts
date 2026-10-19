@@ -1708,6 +1708,19 @@ export function defineRepositoryContract(
         assert.equal(perUser.find((r) => r.userId === bia)?.count, 2);
         assert.deepEqual(await h.eventRoom.countGoingByUser([place]), [{ userId: bia, count: 1 }]);
         assert.deepEqual(await h.eventRoom.countGoingByUser([]), []);
+        // stories: só os que ainda estão no ar, do mais antigo ao mais novo; a mídia vem à parte
+        const storyA = { id: randomUUID(), ref: user, userId: bia, mime: 'image/jpeg', video: false, data: new Uint8Array([1, 2, 3]), createdAt: at(1), expiresAt: at(30) };
+        const storyB = { id: randomUUID(), ref: user, userId: ana, mime: 'video/mp4', video: true, data: new Uint8Array([4, 5]), createdAt: at(2), expiresAt: at(3) };
+        const storyP = { id: randomUUID(), ref: place, userId: bia, mime: 'image/png', video: false, data: new Uint8Array([6]), createdAt: at(1), expiresAt: at(30) };
+        for (const st of [storyB, storyA, storyP]) await h.eventRoom.addStory(st);
+        assert.deepEqual((await h.eventRoom.listStories(user, at(2))).map((x) => x.id), [storyA.id, storyB.id], 'no ar: expiresAt depois de agora');
+        assert.deepEqual((await h.eventRoom.listStories(user, at(4))).map((x) => x.id), [storyA.id], 'o que expirou sai da lista');
+        assert.deepEqual((await h.eventRoom.listStories(place, at(4))).map((x) => [x.id, x.userId, x.video]), [[storyP.id, bia, false]]);
+        assert.deepEqual((await h.eventRoom.findStory(storyB.id))?.video, true);
+        assert.deepEqual([...(await h.eventRoom.findStoryMedia(storyA.id))!.data], [1, 2, 3]);
+        assert.equal((await h.eventRoom.findStoryMedia(storyA.id))!.mime, 'image/jpeg');
+        await h.eventRoom.deleteStory(storyP.id);
+        assert.equal(await h.eventRoom.findStory(storyP.id), undefined);
         const mine = await h.eventRoom.listGoingByUser(bia, 10);
         assert.deepEqual(mine.map((r) => [r.ref.source, r.ref.id]), [['PLACE', e.id], ['USER', postId]], 'do confirmado mais recente ao mais antigo');
         assert.equal((await h.eventRoom.listGoingByUser(bia, 1)).length, 1, 'respeita o limite');

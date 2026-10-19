@@ -164,6 +164,7 @@ model User {
   calendarConnections CalendarConnection[]
   externalIdentities  ExternalIdentity[]
   commentLikes        PostCommentLike[]    @relation("PostCommentLikes")
+  eventStories        EventStory[]         @relation("EventStoryAuthor")
 
   organizedMeetings     Meeting[]            @relation("MeetingOrganizer")
   meetingParticipations MeetingParticipant[]
@@ -708,6 +709,7 @@ model PlaceEvent {
   messages Message[]
   posts    PostedEvent[]
   attendees EventAttendance[]
+  stories   EventStory[]
   cover    PlaceEventCover?
 
   @@index([startsAt])
@@ -746,6 +748,7 @@ model Post {
   reports  PostReport[]
   hiddenBy PostHidden[]
   attendees EventAttendance[]
+  stories   EventStory[]
   eventPosts EventPost[]
   sharedInMessages Message[] @relation("MessagePostEvent")
   repostedBy PostedUserEvent[]
@@ -897,6 +900,27 @@ model EventPost {
   author User @relation("EventPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([eventId, createdAt])
+}
+
+/// Story de um evento: foto ou vídeo, 24 h no ar e some junto com o evento (o fim do evento vira `expiresAt` se vier antes).
+model EventStory {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  placeEventId String?  @db.Uuid
+  postId       String?  @db.Uuid
+  mime         String
+  isVideo      Boolean  @default(false)
+  data         Bytes
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  user       User        @relation("EventStoryAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  placeEvent PlaceEvent? @relation(fields: [placeEventId], references: [id], onDelete: Cascade)
+  post       Post?       @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([placeEventId, expiresAt])
+  @@index([postId, expiresAt])
+  @@index([userId])
 }
 
 /// Registro de tudo que a gestão decidiu. Só cresce; `adminId` não tem chave estrangeira para sobreviver à remoção da conta.

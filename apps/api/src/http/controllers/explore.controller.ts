@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, Inject, NotFoundException, Param, Post, Put, Query, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Headers, HttpCode, Inject, NotFoundException, Param, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
 import type { PlacePhotos } from './places.controller.ts';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
@@ -53,6 +53,50 @@ export class ExploreController {
     const lat = num(query.lat);
     const lng = num(query.lng);
     return this.presentPage(await this.core.eventPages.get(actor.userId, id, lat !== undefined && lng !== undefined ? { lat, lng } : {}));
+  }
+
+  /** Stories no ar do evento, agrupados por pessoa. */
+  @Get('events/:id/stories')
+  stories(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.eventPages.stories(actor.userId, id).then((groups) => ({ groups }));
+  }
+
+  /** Publica um story: o corpo é o arquivo cru (`Content-Type: image/jpeg`, `video/mp4`...). */
+  @Post('events/:id/stories')
+  @HttpCode(200)
+  async createStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Headers('content-type') contentType: string | undefined, @Body() body: unknown) {
+    const data = Buffer.isBuffer(body) ? new Uint8Array(body.buffer, body.byteOffset, body.byteLength) : undefined;
+    return this.core.eventPages.createStory(actor.userId, id, contentType, data);
+  }
+
+  @Delete('events/:id/stories/:storyId')
+  deleteStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('storyId') storyId: string) {
+    return this.core.eventPages.deleteStory(actor.userId, id, storyId);
+  }
+
+  /** Foto ou vídeo do story (com Range para o vídeo). O id é aleatório; some quando o story acaba. */
+  @Public()
+  @Get('stories/media/:storyId')
+  @Header('Cache-Control', 'private, max-age=300')
+  @Header('X-Content-Type-Options', 'nosniff')
+  @Header('Accept-Ranges', 'bytes')
+  async storyMedia(@Param('storyId') storyId: string, @Headers('range') range: string | undefined, @Res({ passthrough: true }) res: { status(code: number): unknown; setHeader(name: string, value: string): unknown }) {
+    const media = await this.core.eventPages.storyMedia(storyId);
+    if (!media) throw new NotFoundException();
+    const total = media.data.byteLength;
+    const m = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null;
+    if (!m || (m[1] === '' && m[2] === '')) return new StreamableFile(media.data, { type: media.mime, length: total });
+    const suffix = m[1] === '';
+    const start = suffix ? Math.max(0, total - Number(m[2])) : Number(m[1]);
+    const end = suffix || m[2] === '' ? total - 1 : Math.min(Number(m[2]), total - 1);
+    if (start >= total || start > end) {
+      res.status(416);
+      res.setHeader('Content-Range', `bytes */${total}`);
+      return new StreamableFile(new Uint8Array(0), { type: media.mime });
+    }
+    res.status(206);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`);
+    return new StreamableFile(media.data.subarray(start, end + 1), { type: media.mime, length: end - start + 1 });
   }
 
   /** Eventos em que você confirmou presença e que ainda não acabaram (alimenta a agenda). */

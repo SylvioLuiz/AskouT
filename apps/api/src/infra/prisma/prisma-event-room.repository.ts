@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type { EventRoomRepository } from '../../core/ports.ts';
-import type { EventAttendanceRecord, EventPostRecord, EventRef, Page } from '../../core/types.ts';
+import type { EventAttendanceRecord, EventPostRecord, EventRef, EventStoryMeta, EventStoryRecord, Page } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 type PostMeta = Omit<EventPostRecord, 'data'> & { hasImage: boolean };
@@ -72,6 +72,48 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
       if (r.postId) return [{ ref: { source: 'USER' as const, id: r.postId }, createdAt: r.createdAt }];
       return [];
     });
+  }
+
+  async addStory(story: EventStoryRecord): Promise<void> {
+    await this.prisma.eventStory.create({
+      data: { id: story.id, userId: story.userId, mime: story.mime, isVideo: story.video, data: Buffer.from(story.data), createdAt: story.createdAt, expiresAt: story.expiresAt, ...PrismaEventRoomRepository.where(story.ref) },
+    });
+  }
+
+  private static storyMeta(r: { id: string; userId: string; placeEventId: string | null; postId: string | null; mime: string; isVideo: boolean; createdAt: Date; expiresAt: Date }): EventStoryMeta | undefined {
+    const ref: EventRef | undefined = r.placeEventId ? { source: 'PLACE', id: r.placeEventId } : r.postId ? { source: 'USER', id: r.postId } : undefined;
+    return ref ? { id: r.id, ref, userId: r.userId, mime: r.mime, video: r.isVideo, createdAt: r.createdAt, expiresAt: r.expiresAt } : undefined;
+  }
+
+  async listStories(ref: EventRef, now: Date): Promise<EventStoryMeta[]> {
+    if (!isUuid(ref.id)) return [];
+    const rows = await this.prisma.eventStory.findMany({
+      where: { ...PrismaEventRoomRepository.where(ref), expiresAt: { gt: now } },
+      select: { id: true, userId: true, placeEventId: true, postId: true, mime: true, isVideo: true, createdAt: true, expiresAt: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: 500,
+    });
+    return rows.flatMap((r) => {
+      const meta = PrismaEventRoomRepository.storyMeta(r);
+      return meta ? [meta] : [];
+    });
+  }
+
+  async findStory(id: string): Promise<EventStoryMeta | undefined> {
+    if (!isUuid(id)) return undefined;
+    const r = await this.prisma.eventStory.findUnique({ where: { id }, select: { id: true, userId: true, placeEventId: true, postId: true, mime: true, isVideo: true, createdAt: true, expiresAt: true } });
+    return r ? PrismaEventRoomRepository.storyMeta(r) : undefined;
+  }
+
+  async findStoryMedia(id: string): Promise<{ mime: string; data: Uint8Array; expiresAt: Date } | undefined> {
+    if (!isUuid(id)) return undefined;
+    const r = await this.prisma.eventStory.findUnique({ where: { id }, select: { mime: true, data: true, expiresAt: true } });
+    return r ? { mime: r.mime, data: new Uint8Array(r.data), expiresAt: r.expiresAt } : undefined;
+  }
+
+  async deleteStory(id: string): Promise<void> {
+    if (!isUuid(id)) return;
+    await this.prisma.eventStory.deleteMany({ where: { id } });
   }
 
   async addPost(post: EventPostRecord): Promise<void> {

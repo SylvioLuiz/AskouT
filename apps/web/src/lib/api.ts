@@ -31,6 +31,7 @@ import type {
   ConnectionsPage,
   EventKind,
   EventPage,
+  EventStoryGroup,
   EventPost,
   GroupDetails,
   GoingEvent,
@@ -269,6 +270,30 @@ export function createApi(deps: ApiDeps) {
     followedEvents: () => request<{ events: ExploreEvent[] }>('GET', '/explore/followed-events'),
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
       request<EventPage>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
+    eventStories: (eventId: string) => request<{ groups: EventStoryGroup[] }>('GET', `/events/${id(eventId)}/stories`),
+    createEventStory: async (eventId: string, file: Blob): Promise<EventStoryGroup> => {
+      const token = deps.getToken();
+      const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
+      if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/stories`, { method: 'POST', headers, body: file });
+      } catch {
+        throw networkError();
+      }
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+      if (response.ok) return payload as EventStoryGroup;
+      const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+      if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+      throw error;
+    },
+    deleteEventStory: (eventId: string, storyId: string) => request<{ deleted: true }>('DELETE', `/events/${id(eventId)}/stories/${id(storyId)}`),
+    storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
     eventGo: (eventId: string) => request<EventPage>('POST', `/events/${id(eventId)}/going`),
     eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),
     eventPostsPublic: (eventId: string, value: boolean) => request<EventPage>('PUT', `/events/${id(eventId)}/posts-public`, { body: { public: value } }),

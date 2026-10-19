@@ -33,7 +33,7 @@ import type {
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
 import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
-import type { ExternalProvider, IdentityClaims } from '../types.ts';
+import type { EventStoryMeta, EventStoryRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -1452,6 +1452,36 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit)
       .map((r) => ({ ref: { ...r.ref }, createdAt: r.createdAt }));
+  }
+
+  readonly stories = new Map<string, EventStoryRecord>();
+
+  async addStory(story: EventStoryRecord): Promise<void> {
+    this.stories.set(story.id, { ...story, ref: { ...story.ref }, data: new Uint8Array(story.data) });
+  }
+
+  async listStories(ref: EventRef, now: Date): Promise<EventStoryMeta[]> {
+    if (!this.alive(ref)) return [];
+    return [...this.stories.values()]
+      .filter((s) => s.ref.source === ref.source && s.ref.id === ref.id && s.expiresAt.getTime() > now.getTime())
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map(({ data: _data, ...meta }) => ({ ...meta, ref: { ...meta.ref } }));
+  }
+
+  async findStory(id: string): Promise<EventStoryMeta | undefined> {
+    const s = this.stories.get(id);
+    if (!s || !this.alive(s.ref)) return undefined;
+    const { data: _data, ...meta } = s;
+    return { ...meta, ref: { ...meta.ref } };
+  }
+
+  async findStoryMedia(id: string): Promise<{ mime: string; data: Uint8Array; expiresAt: Date } | undefined> {
+    const s = this.stories.get(id);
+    return s && this.alive(s.ref) ? { mime: s.mime, data: new Uint8Array(s.data), expiresAt: s.expiresAt } : undefined;
+  }
+
+  async deleteStory(id: string): Promise<void> {
+    this.stories.delete(id);
   }
 
   async addPost(post: EventPostRecord): Promise<void> {
