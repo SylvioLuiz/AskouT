@@ -296,40 +296,45 @@ export function PostCard({ post: initial, onGone, asEvent, poster }: { post: Pos
               <MoreIcon />
             </button>
           </div>
-          <div className="poster__rail" role="group" aria-label="Ações do post">
-            <button type="button" className={`poster__railbtn${post.likedByMe ? ' poster__railbtn--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
-              <HeartIcon filled={post.likedByMe} />
-              <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
-            </button>
-            <button type="button" className="poster__railbtn" onClick={() => setSheet('comments')} aria-label={post.commentCount > 0 ? `Comentários (${post.commentCount})` : 'Comentar'}>
-              <CommentIcon />
-              <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
-            </button>
-            <button type="button" className="poster__railbtn poster__railbtn--round" onClick={() => setSheet('share')} aria-label="Compartilhar">
-              <SendIcon />
-            </button>
-          </div>
-          {post.caption || post.tags.length > 0 ? (
-            <div className="poster__caption">
-              {post.caption ? (
-                <p className="poster__text">
-                  <strong>{post.venue ? post.venue.name : post.author.username}</strong> {post.caption}
-                </p>
-              ) : null}
-              {post.tags.length > 0 ? (
-                <p className="poster__with">
-                  Com{' '}
-                  {post.tags.map((t, i) => (
-                    <span key={t.user.userId}>
-                      {i > 0 ? ', ' : ''}
-                      <Link to={`/u/${encodeURIComponent(t.user.username)}`}>{t.user.username}</Link>
-                      {t.status === 'PENDING' ? ' (aguardando)' : ''}
-                    </span>
-                  ))}
-                </p>
-              ) : null}
+          <div className="poster__bottom">
+            {post.caption || post.tags.length > 0 ? (
+              <div className="poster__caption">
+                {post.caption ? (
+                  <p className="poster__text">
+                    <strong>{post.venue ? post.venue.name : post.author.username}</strong> {post.caption}
+                  </p>
+                ) : null}
+                {post.tags.length > 0 ? (
+                  <p className="poster__with">
+                    Com{' '}
+                    {post.tags.map((t, i) => (
+                      <span key={t.user.userId}>
+                        {i > 0 ? ', ' : ''}
+                        <Link to={`/u/${encodeURIComponent(t.user.username)}`}>{t.user.username}</Link>
+                        {t.status === 'PENDING' ? ' (aguardando)' : ''}
+                      </span>
+                    ))}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="poster__row" role="group" aria-label="Ações do post">
+              <div className="poster__glass poster__glass--actions">
+                <button type="button" className={`poster__act${post.likedByMe ? ' poster__act--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
+                  <HeartIcon filled={post.likedByMe} />
+                  <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
+                </button>
+                <button type="button" className="poster__act" onClick={() => setSheet('comments')} aria-label={post.commentCount > 0 ? `Comentários (${post.commentCount})` : 'Comentar'}>
+                  <CommentIcon />
+                  <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
+                </button>
+              </div>
+              <button type="button" className="poster__cta poster__cta--icon" onClick={() => setSheet('share')} aria-label="Compartilhar">
+                <SendIcon />
+                <span>Compartilhar</span>
+              </button>
             </div>
-          ) : null}
+          </div>
         </div>
       ) : null}
       {eventCard || cartaz ? null : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} />}

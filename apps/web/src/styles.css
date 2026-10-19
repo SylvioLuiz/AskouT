@@ -4333,7 +4333,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .poster__cta { min-height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: #fff; color: var(--ink); font: inherit; font-size: 0.9375rem; font-weight: 800; cursor: pointer; }
 .poster__cta[aria-pressed='true'] { background: rgb(255 255 255 / 0.22); color: #fff; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
 .poster__cta:disabled { opacity: 0.7; cursor: default; }
-.poster__cta:focus-visible, .poster__round:focus-visible, .poster__railbtn:focus-visible, .poster__who a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.poster__cta:focus-visible, .poster__round:focus-visible, .poster__who a:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 
 /* Post em cartaz */
 .poster--post { background: rgb(20 20 31); }
@@ -4349,23 +4349,25 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .poster__name { color: #fff; font-size: 0.875rem; font-weight: 700; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .poster__sub { color: rgb(255 255 255 / 0.92); font-size: 0.75rem; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .poster__round { flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgb(20 20 35 / 0.6); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #fff; display: grid; place-items: center; cursor: pointer; }
-.poster__rail { position: absolute; right: 12px; bottom: 96px; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.poster--multi .poster__rail { bottom: 104px; }
-.poster__railbtn { width: 48px; min-height: 64px; padding: 8px 0 6px; border: 0; border-radius: 24px; background: rgb(20 20 35 / 0.6); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
-.poster__railbtn--round { min-height: 48px; border-radius: 50%; }
-.poster__railbtn .icon { width: 24px; height: 24px; }
-.poster__railbtn--on { color: rgb(255 122 209); }
-.poster__caption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 18px 76px 18px 18px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
-.poster--multi .poster__caption { padding-bottom: 26px; }
+.poster__bottom { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; padding: 18px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+.poster__bottom > .poster__row { pointer-events: auto; margin-top: 2px; }
+.poster--multi .poster__bottom { padding-bottom: 30px; }
+.poster__caption { display: flex; flex-direction: column; gap: 6px; }
 .poster__caption a { pointer-events: auto; }
+.poster__glass--actions { display: flex; align-items: center; gap: 2px; padding: 0 6px; }
+.poster__act { min-width: 44px; min-height: 44px; padding: 0 8px; border: 0; background: transparent; color: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
+.poster__act .icon { width: 22px; height: 22px; }
+.poster__act--on { color: rgb(255 122 209); }
+.poster__act:focus-visible { outline: 3px solid #fff; outline-offset: -2px; border-radius: 999px; }
+.poster__cta--icon { display: inline-flex; align-items: center; gap: 8px; }
+.poster__cta--icon .icon { width: 20px; height: 20px; }
 .poster__text { margin: 0; font-size: 1rem; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; text-shadow: 0 1px 3px rgb(0 0 0 / 0.5); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .poster__with { margin: 0; font-size: 0.8125rem; }
 .poster__with a { color: #fff; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 /* Vídeo: os controles do player ficam livres; a legenda desce para fora da imagem. */
 .poster--video { display: flex; flex-direction: column; }
+.poster--video .poster__bottom { position: static; pointer-events: auto; }
 .poster--video .poster__scrim--post { display: none; }
-.poster--video .poster__caption { position: static; padding: 12px 18px 16px; pointer-events: auto; }
-.poster--video .poster__rail { bottom: auto; top: 70px; }
 
 /* Botão principal em degradê no escuro */
 :root[data-theme='dark'] .poster__cta:not([aria-pressed='true']) { background: var(--brand-grad); color: var(--brand-ink); }
