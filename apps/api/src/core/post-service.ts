@@ -1,5 +1,5 @@
 import { decodeImageDataUrl } from './image.ts';
-import { parseChatMedia } from './media.ts';
+import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
@@ -473,7 +473,7 @@ export class PostService {
   }
 
   /**
-   * Vídeo do post (curto, até 20 MB, o mesmo teto do chat). Entra num item de foto enviada, que serve de capa.
+   * Vídeo do post (até 60 MB; a duração, até 3 minutos, o app confere antes de enviar). Entra num item de foto enviada, que serve de capa.
    * Só o autor, e no máximo um vídeo por post.
    */
   async attachVideo(actorId: string, postId: unknown, imageId: unknown, mime: unknown, bytes: unknown): Promise<PostView> {
@@ -482,7 +482,7 @@ export class PostService {
     const target = typeof imageId === 'string' ? images.find((i) => i.id === imageId) : undefined;
     if (!target || !target.isUpload) throw notFound('Item não encontrado');
     if (images.some((i) => i.videoMime)) throw conflict('Este post já tem um vídeo');
-    const media = parseChatMedia(mime, bytes);
+    const media = parseChatMedia(mime, bytes, POST_VIDEO_MAX_BYTES);
     if (media.kind !== 'VIDEO') throw validationError('Envie um vídeo (MP4, WebM ou MOV)', { media: 'Envie um vídeo (MP4, WebM ou MOV)' });
     if (!(await this.deps.posts.attachVideo(post.id, target.id, media.mime, media.data))) throw notFound('Item não encontrado');
     return this.get(actorId, post.id);

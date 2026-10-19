@@ -328,15 +328,18 @@ test('vídeo no post: entra no item da capa, um por post, só do autor, com o ta
   await rejectsWith(w.core.posts.attachVideo(ana, post.id, 'nao-existe', 'video/mp4', MP4()), 'NOT_FOUND');
   await rejectsWith(w.core.posts.attachVideo(ana, post.id, cover!.id, 'image/jpeg', MP4()), 'VALIDATION');
   await rejectsWith(w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9])), 'VALIDATION');
-  await rejectsWith(w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', new Uint8Array(21 * 1024 * 1024)), 'VALIDATION');
+  await rejectsWith(w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', new Uint8Array(61 * 1024 * 1024)), 'VALIDATION');
 
-  const withVideo = await w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', MP4());
+  // Acima dos 20 MB do chat ainda vale em post (o teto é 60 MB).
+  const big = new Uint8Array(30 * 1024 * 1024);
+  big.set(MP4(), 0);
+  const withVideo = await w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', big);
   assert.deepEqual(withVideo.images.map((i) => i.video), [true, false]);
   await rejectsWith(w.core.posts.attachVideo(ana, post.id, other!.id, 'video/mp4', MP4()), 'CONFLICT');
 
   const file = await w.core.posts.video(cover!.id);
   assert.equal(file?.mime, 'video/mp4');
-  assert.equal(file?.data.byteLength, MP4().byteLength);
+  assert.equal(file?.data.byteLength, big.byteLength);
   assert.equal(await w.core.posts.video(other!.id), undefined, 'foto comum não tem vídeo');
   assert.ok(await w.core.posts.image(cover!.id), 'a capa continua sendo uma imagem');
   // Quem vê o feed enxerga que é vídeo.

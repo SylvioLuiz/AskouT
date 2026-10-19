@@ -154,7 +154,7 @@ export function CreatePostScreen() {
           if (hasVideo) throw new Error('Só cabe um vídeo por publicação.');
           const problem = videoProblem(file);
           if (problem) throw new Error(problem);
-          const poster = await videoPoster(file);
+          const { poster } = await videoPoster(file);
           added.push({ key: nextKey(), kind: 'UPLOAD', preview: poster, dataUrl: poster, video: file });
           hasVideo = true;
           continue;
