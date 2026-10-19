@@ -333,9 +333,8 @@ export function PostCard({ post: initial, onGone, asEvent, poster }: { post: Pos
             <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
           </button>
         </div>
-        <button type="button" className="poster__cta poster__cta--icon" onClick={() => setSheet('share')} aria-label="Compartilhar">
+        <button type="button" className="poster__act poster__share" onClick={() => setSheet('share')} aria-label="Compartilhar">
           <SendIcon />
-          <span>Compartilhar</span>
         </button>
       </div>
           </div>

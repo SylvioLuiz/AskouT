@@ -4365,8 +4365,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .poster__act .icon { width: 22px; height: 22px; }
 .poster__act--on { color: rgb(255 122 209); }
 .poster__act:focus-visible { outline: 3px solid #fff; outline-offset: -2px; border-radius: 999px; }
-.poster__cta--icon { display: inline-flex; align-items: center; gap: 8px; }
-.poster__cta--icon .icon { width: 20px; height: 20px; }
+.poster__share { flex: none; }
 .poster__text { margin: 0; font-size: 1rem; line-height: 1.35; white-space: pre-wrap; overflow-wrap: anywhere; text-shadow: 0 1px 3px rgb(0 0 0 / 0.5); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .poster__with { margin: 0; font-size: 0.8125rem; }
 .poster__with a { color: #fff; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
