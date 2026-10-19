@@ -157,3 +157,49 @@ describe('avisos', () => {
     assert.equal((await w.core.notifications.list(ana!)).items.some((n) => n.type === 'MESSAGE'), true);
   });
 });
+
+describe('silenciar avisos', () => {
+  it('cada tipo cai no seu grupo: conversas, eventos, ou só em "todas"', async () => {
+    const { isMuted, muteGroup } = await import('./notification-service.ts');
+    assert.deepEqual(['MESSAGE', 'GROUP_REMOVED', 'MEETUP_INVITE', 'MEETUP_ACCEPTED', 'MEETUP_CANCELLED', 'POST_LIKE', 'FOLLOW_NEW'].map((t) => muteGroup(t as never)), ['chats', 'chats', 'events', 'events', 'events', null, null]);
+    assert.equal(isMuted({ all: false, chats: true, events: false }, 'MESSAGE'), true);
+    assert.equal(isMuted({ all: false, chats: true, events: false }, 'MEETUP_INVITE'), false);
+    assert.equal(isMuted({ all: false, chats: false, events: true }, 'MEETUP_INVITE'), true);
+    assert.equal(isMuted({ all: false, chats: true, events: true }, 'POST_LIKE'), false, 'curtida só cala com "todas"');
+    assert.equal(isMuted({ all: true, chats: false, events: false }, 'POST_LIKE'), true);
+  });
+
+  it('padrão tudo ligado; muda só o que vier; valor que não é true/false é recusado', async () => {
+    const w = makeWorld();
+    const { ana } = await friends(w, 'ana', 'bia');
+    assert.deepEqual(await w.core.notifications.muteSettings(ana!), { all: false, chats: false, events: false });
+    assert.deepEqual(await w.core.notifications.setMuteSettings(ana!, { chats: true }), { all: false, chats: true, events: false });
+    assert.deepEqual(await w.core.notifications.setMuteSettings(ana!, { events: true }), { all: false, chats: true, events: true });
+    assert.deepEqual(await w.core.notifications.muteSettings(ana!), { all: false, chats: true, events: true });
+    await assert.rejects(w.core.notifications.setMuteSettings(ana!, { all: 'sim' }), (e: { code?: string }) => e.code === 'VALIDATION');
+  });
+
+  it('silenciado não chega: conversas calam só mensagens; "todas" cala tudo; desligar volta a avisar', async () => {
+    const w = makeWorld();
+    const { ana, bia } = await friends(w, 'ana', 'bia');
+    const { id } = await w.core.conversations.open(ana!, bia!);
+    const count = async (type?: string) => (await w.core.notifications.list(bia!)).items.filter((n) => !type || n.type === type).length;
+    await w.core.notifications.setMuteSettings(bia!, { chats: true });
+    await w.core.conversations.send(ana!, id, { body: 'oi' });
+    await w.core.flushNotifications();
+    assert.equal(await count('MESSAGE'), 0, 'mensagem silenciada não vira aviso');
+    const post = await w.core.posts.create(bia!, { images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64')}`] });
+    await w.core.posts.like(ana!, post.id);
+    await w.core.flushNotifications();
+    assert.equal(await count('POST_LIKE'), 1, 'só conversas silenciadas: curtida ainda chega');
+    await w.core.notifications.setMuteSettings(bia!, { all: true });
+    const other = await w.core.posts.create(bia!, { images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 4, 5, 6]).toString('base64')}`] });
+    await w.core.posts.like(ana!, other.id);
+    await w.core.flushNotifications();
+    assert.equal(await count('POST_LIKE'), 1, 'todas silenciadas: nada novo chega');
+    await w.core.notifications.setMuteSettings(bia!, { all: false, chats: false });
+    await w.core.conversations.send(ana!, id, { body: 'voltei' });
+    await w.core.flushNotifications();
+    assert.equal(await count('MESSAGE'), 1, 'desligou o silêncio: volta a avisar');
+  });
+});

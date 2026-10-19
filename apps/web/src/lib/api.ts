@@ -31,6 +31,7 @@ import type {
   ConnectionsPage,
   EventKind,
   EventPage,
+  NotificationMute,
   EventStoryGroup,
   EventPost,
   GroupDetails,
@@ -249,6 +250,9 @@ export function createApi(deps: ApiDeps) {
       request<{ ok: true }>('PUT', `/flash/matches/${id(inviteId)}/location`, { body: position }),
 
     flashSuggestions: (inviteId: string) => request<Suggestions>('GET', `/flash/matches/${id(inviteId)}/suggestions`),
+
+    notificationMute: () => request<NotificationMute>('GET', '/notifications/settings'),
+    setNotificationMute: (patch: Partial<NotificationMute>) => request<NotificationMute>('PUT', '/notifications/settings', { body: patch }),
 
     // Explorar
     explore: (params: ExploreParams) => {

@@ -166,6 +166,7 @@ model User {
   commentLikes        PostCommentLike[]    @relation("PostCommentLikes")
   eventStories        EventStory[]         @relation("EventStoryAuthor")
   storyReports        EventStoryReport[]   @relation("EventStoryReports")
+  notificationSetting NotificationSetting? @relation("NotificationSettingUser")
 
   organizedMeetings     Meeting[]            @relation("MeetingOrganizer")
   meetingParticipations MeetingParticipant[]
@@ -548,6 +549,17 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt, createdAt])
+}
+
+/// O que a pessoa silenciou: tudo, só conversas ou só eventos (encontros). Silenciado não chega (nem no sino, nem no push).
+model NotificationSetting {
+  userId     String   @id @db.Uuid
+  muteAll    Boolean  @default(false)
+  muteChats  Boolean  @default(false)
+  muteEvents Boolean  @default(false)
+  updatedAt  DateTime @default(now())
+
+  user User @relation("NotificationSettingUser", fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // Foto de perfil enviada pela pessoa (já reduzida pelo app). `Profile.avatarUrl` aponta para /users/:id/avatar.

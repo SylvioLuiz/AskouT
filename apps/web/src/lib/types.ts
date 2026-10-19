@@ -493,6 +493,13 @@ export interface EventPost {
 }
 
 /** Página do evento: do local (PLACE) ou criado por uma pessoa (USER). */
+/** O que a pessoa silenciou: tudo, só conversas ou só eventos. */
+export interface NotificationMute {
+  all: boolean;
+  chats: boolean;
+  events: boolean;
+}
+
 export interface EventStoryItem {
   id: string;
   kind: 'IMAGE' | 'VIDEO';

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
-import { PushCard } from '../components/notifications.tsx';
+import { MuteCard, PushCard } from '../components/notifications.tsx';
 import { api } from '../client.ts';
 import { useAuthContext, useUser } from '../auth.tsx';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -146,6 +146,8 @@ export function SettingsScreen() {
       <p className="muted">Ainda não dá para trocar o e-mail ou a senha por aqui. Isso entra numa próxima etapa.</p>
       <h2 className="profile__section">Avisos no aparelho</h2>
       <PushCard />
+      <h2 className="profile__section">Silenciar notificações</h2>
+      <MuteCard />
       <nav className="linklist" aria-label="Sua conta">
         <Link to="/amigos">Amigos</Link>
         <Link to="/bloqueados">Pessoas bloqueadas</Link>

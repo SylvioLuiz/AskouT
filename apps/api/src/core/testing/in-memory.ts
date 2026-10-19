@@ -33,7 +33,7 @@ import type {
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
 import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
-import type { EventStoryMeta, EventStoryRecord, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
+import type { EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -1110,6 +1110,15 @@ export class InMemoryProfileEventRepository implements ProfileEventRepository {
 
 export class InMemoryNotificationRepository implements NotificationRepository {
   readonly rows: NotificationRecord[] = [];
+  readonly muted = new Map<string, NotificationMuteSettings>();
+
+  async getMuteSettings(userId: string): Promise<NotificationMuteSettings> {
+    return { all: false, chats: false, events: false, ...this.muted.get(userId) };
+  }
+
+  async setMuteSettings(userId: string, settings: NotificationMuteSettings): Promise<void> {
+    this.muted.set(userId, { ...settings });
+  }
 
   async create(record: NotificationRecord): Promise<void> {
     this.rows.push({ ...record });

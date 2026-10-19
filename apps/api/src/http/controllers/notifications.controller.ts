@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Post, Put } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
@@ -31,6 +31,19 @@ export class NotificationsController {
   read(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = body === undefined || body === null ? {} : asBody(body);
     return this.core.notifications.markRead(actor.userId, typeof b.id === 'string' ? b.id : undefined);
+  }
+
+  /** O que está silenciado: `{all, chats, events}`. */
+  @Get('settings')
+  settings(@CurrentActor() actor: Actor) {
+    return this.core.notifications.muteSettings(actor.userId);
+  }
+
+  /** `{all?, chats?, events?}`: muda só o que vier. */
+  @Put('settings')
+  setSettings(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.notifications.setMuteSettings(actor.userId, { all: b.all, chats: b.chats, events: b.events });
   }
 
   /** Chave pública VAPID (ou `null` se o push não está configurado). */

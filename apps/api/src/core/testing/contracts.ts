@@ -1464,6 +1464,11 @@ export function defineRepositoryContract(
         assert.equal(await h.notifications.unreadCount(ana), 3);
         assert.equal(await h.notifications.hasUnread(ana, 'k1'), true);
         assert.equal(await h.notifications.hasUnread(ana, 'k9'), false);
+        assert.deepEqual(await h.notifications.getMuteSettings(ana), { all: false, chats: false, events: false }, 'padrão: nada silenciado');
+        await h.notifications.setMuteSettings(ana, { all: false, chats: true, events: false }, at(9));
+        await h.notifications.setMuteSettings(ana, { all: false, chats: true, events: true }, at(9));
+        assert.deepEqual(await h.notifications.getMuteSettings(ana), { all: false, chats: true, events: true });
+        assert.deepEqual(await h.notifications.getMuteSettings(bia), { all: false, chats: false, events: false }, 'é de cada pessoa');
         assert.equal(await h.notifications.markRead(ana, at(10), [ids[0]!, ids[3]!]), 1, 'só marca o que é da pessoa');
         assert.equal(await h.notifications.hasUnread(ana, 'k1'), false, 'lido não segura novos avisos');
         assert.equal(await h.notifications.hasUnread(bia, 'k1'), true);

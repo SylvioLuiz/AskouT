@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Button, Notice } from './ui.tsx';
+import { Button, ErrorState, Loading, Notice } from './ui.tsx';
 import { api } from '../client.ts';
+import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { currentSubscription, disablePush, enablePush, pushState, readEnvironment } from '../lib/push.ts';
 import type { PushState } from '../lib/push.ts';
+import type { NotificationMute } from '../lib/types.ts';
 
 const COPY: Record<Exclude<PushState, 'off' | 'on'>, string> = {
   unsupported: 'Este navegador não permite avisos fora do app. Os avisos continuam aparecendo aqui dentro.',
@@ -78,3 +80,59 @@ export function PushCard() {
     </div>
   );
 }
+
+const MUTE_ROWS: { key: 'all' | 'chats' | 'events'; title: string; help: string }[] = [
+  { key: 'all', title: 'Todas', help: 'Não avisa nada: nem no sino, nem no aparelho.' },
+  { key: 'chats', title: 'Conversas', help: 'Mensagens e avisos de grupos.' },
+  { key: 'events', title: 'Eventos', help: 'Convites e mudanças dos encontros marcados.' },
+];
+
+/** Chaves para silenciar avisos: tudo, só conversas ou só eventos. */
+export function MuteCard() {
+  const current = useAsync(() => api.notificationMute(), []);
+  const [override, setOverride] = useState<NotificationMute | undefined>();
+  const [problem, setProblem] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+  const value = override ?? current.data;
+
+  async function toggle(key: 'all' | 'chats' | 'events') {
+    if (!value || busy) return;
+    const next = { ...value, [key]: !value[key] };
+    setOverride(next);
+    setProblem(undefined);
+    setBusy(true);
+    try {
+      setOverride(await api.setNotificationMute({ [key]: next[key] }));
+    } catch (failure) {
+      setOverride(value);
+      setProblem(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (current.error) return <ErrorState message={current.error.message} onRetry={current.reload} />;
+  if (!value) return <Loading />;
+  return (
+    <>
+      {problem ? <Notice tone="error">{problem}</Notice> : null}
+      {MUTE_ROWS.map((row) => {
+        const forced = row.key !== 'all' && value.all;
+        return (
+          <section className="setting" key={row.key}>
+            <div className="setting__text">
+              <h3 className="setting__title" id={`mute-${row.key}`}>
+                {row.title}
+              </h3>
+              <p className="setting__help">{row.help}</p>
+            </div>
+            <button type="button" role="switch" aria-checked={value[row.key] || forced} aria-labelledby={`mute-${row.key}`} className="switch" onClick={() => void toggle(row.key)} disabled={busy || forced}>
+              <span className="switch__thumb" />
+            </button>
+          </section>
+        );
+      })}
+    </>
+  );
+}
+

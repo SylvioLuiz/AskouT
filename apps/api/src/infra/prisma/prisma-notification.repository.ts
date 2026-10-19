@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { NotificationRepository, PushSubscriptionRepository } from '../../core/ports.ts';
-import type { NotificationRecord, NotificationType, PushSubscriptionRecord } from '../../core/types.ts';
+import type { NotificationMuteSettings, NotificationRecord, NotificationType, PushSubscriptionRecord } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 interface Payload {
@@ -40,6 +40,21 @@ export class PrismaNotificationRepository implements NotificationRepository {
     if (!isUuid(userId)) return false;
     const count = await this.prisma.notification.count({ where: { userId, readAt: null, payload: { path: ['dedupeKey'], equals: dedupeKey } } });
     return count > 0;
+  }
+
+  async getMuteSettings(userId: string): Promise<NotificationMuteSettings> {
+    if (!isUuid(userId)) return { all: false, chats: false, events: false };
+    const row = await this.prisma.notificationSetting.findUnique({ where: { userId } });
+    return { all: row?.muteAll ?? false, chats: row?.muteChats ?? false, events: row?.muteEvents ?? false };
+  }
+
+  async setMuteSettings(userId: string, settings: NotificationMuteSettings, at: Date): Promise<void> {
+    if (!isUuid(userId)) return;
+    await this.prisma.notificationSetting.upsert({
+      where: { userId },
+      create: { userId, muteAll: settings.all, muteChats: settings.chats, muteEvents: settings.events, updatedAt: at },
+      update: { muteAll: settings.all, muteChats: settings.chats, muteEvents: settings.events, updatedAt: at },
+    });
   }
 
   async markRead(userId: string, now: Date, ids?: string[]): Promise<number> {

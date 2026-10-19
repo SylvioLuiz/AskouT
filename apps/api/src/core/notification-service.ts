@@ -1,11 +1,24 @@
 import { conflict, validationError } from './errors.ts';
 import type { Clock, IdGenerator, Notifier, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
-import type { NotificationRecord, NotificationType } from './types.ts';
+import type { NotificationMuteSettings, NotificationRecord, NotificationType } from './types.ts';
 
 export const NOTIFICATIONS_PAGE = 30;
 export const MAX_PUSH_SUBSCRIPTIONS = 10;
 const ENDPOINT_MAX = 1000;
 const KEY_MAX = 200;
+
+/** A que grupo de silenciar cada tipo de aviso pertence. Os demais (curtidas, seguidores, Flash...) só calam com "todas". */
+export function muteGroup(type: NotificationType): 'chats' | 'events' | null {
+  if (type === 'MESSAGE' || type === 'GROUP_REMOVED') return 'chats';
+  if (type === 'MEETUP_INVITE' || type === 'MEETUP_ACCEPTED' || type === 'MEETUP_CANCELLED') return 'events';
+  return null;
+}
+
+export function isMuted(settings: NotificationMuteSettings, type: NotificationType): boolean {
+  if (settings.all) return true;
+  const group = muteGroup(type);
+  return group === 'chats' ? settings.chats : group === 'events' ? settings.events : false;
+}
 
 export interface NotificationView {
   id: string;
@@ -41,6 +54,8 @@ export class StoredNotifier implements Notifier {
   async notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string }): Promise<void> {
     const { notifications, clock, ids } = this.deps;
     try {
+      // Silenciado não chega: nem no sino nem no push.
+      if (isMuted(await notifications.getMuteSettings(input.userId), input.type)) return;
       if (input.dedupeKey && (await notifications.hasUnread(input.userId, input.dedupeKey))) return;
       await notifications.create({
         id: ids.next(),
@@ -106,6 +121,21 @@ export class NotificationService {
 
   unreadCount(userId: string): Promise<number> {
     return this.deps.notifications.unreadCount(userId);
+  }
+
+  muteSettings(userId: string): Promise<NotificationMuteSettings> {
+    return this.deps.notifications.getMuteSettings(userId);
+  }
+
+  /** Muda só o que vier (`all`, `chats`, `events`, cada um true/false). */
+  async setMuteSettings(userId: string, patch: { all?: unknown; chats?: unknown; events?: unknown }): Promise<NotificationMuteSettings> {
+    for (const key of ['all', 'chats', 'events'] as const) {
+      if (patch[key] !== undefined && typeof patch[key] !== 'boolean') throw validationError('Dados inválidos', { [key]: 'Use true ou false' });
+    }
+    const current = await this.deps.notifications.getMuteSettings(userId);
+    const next: NotificationMuteSettings = { all: (patch.all as boolean | undefined) ?? current.all, chats: (patch.chats as boolean | undefined) ?? current.chats, events: (patch.events as boolean | undefined) ?? current.events };
+    await this.deps.notifications.setMuteSettings(userId, next, this.deps.clock.now());
+    return next;
   }
 
   /** Marca um aviso (ou todos, sem `id`) como lido. */
