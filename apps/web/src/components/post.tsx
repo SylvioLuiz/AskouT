@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { CarouselIcon, CommentIcon, HeartIcon, MoreIcon, SendIcon } from './icons.tsx';
+import { SoundToggle } from './sound-toggle.tsx';
+import { hasSound } from '../lib/sound.ts';
 import { AdjustSheet, CommentsSheet, EditPostSheet, PostMenuSheet, ReportSheet, SharePostSheet } from './post-actions.tsx';
 import type { PostGone } from './post-actions.tsx';
 import { VenueLogo } from './venue-logo.tsx';
@@ -16,10 +18,18 @@ import { Link } from '../router.tsx';
 
 function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: number; total: number; onFirstLoad?: (w: number, h: number) => void }) {
   const [failed, setFailed] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const toggleSound = () => {
+    const next = !muted;
+    if (videoRef.current) videoRef.current.muted = next;
+    setMuted(next);
+  };
   return (
     <figure className="pcarousel__slide" aria-label={`${image.videoPath ? 'Vídeo' : 'Foto'} ${index + 1} de ${total}`}>
       {image.videoPath ? (
         <video
+          ref={videoRef}
           src={api.assetUrl(image.videoPath)}
           poster={image.path ? api.assetUrl(image.path) : undefined}
           controls
@@ -44,6 +54,7 @@ function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: 
       ) : (
         <span className="pcarousel__missing">Foto indisponível</span>
       )}
+      {hasSound(image) ? <SoundToggle muted={muted} onToggle={toggleSound} shifted={total > 1} /> : null}
       {image.kind === 'PLACE' ? <figcaption>Foto: {image.photoAuthor ? `${image.photoAuthor} · ` : ''}Google</figcaption> : null}
     </figure>
   );
