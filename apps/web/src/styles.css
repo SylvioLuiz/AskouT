@@ -4230,3 +4230,10 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .calsync__pick { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
 .calsync__pick[aria-pressed='true'] { border-color: var(--brand); color: var(--brand); }
 .calsync__note { font-size: 0.8125rem; margin-bottom: 12px; }
+
+/* ---------- Entrar com Google / Apple ---------- */
+.social { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-top: 16px; }
+.social__or { display: flex; align-items: center; gap: 12px; margin: 0; color: var(--muted, inherit); font-size: 0.8125rem; text-align: center; }
+.social__or::before, .social__or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.social__google { display: flex; justify-content: center; min-height: 44px; }
+.social__choose { margin-top: 16px; }

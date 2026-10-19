@@ -162,6 +162,7 @@ model User {
 
   availabilitySlots   AvailabilitySlot[]
   calendarConnections CalendarConnection[]
+  externalIdentities  ExternalIdentity[]
 
   organizedMeetings     Meeting[]            @relation("MeetingOrganizer")
   meetingParticipations MeetingParticipant[]
@@ -1059,4 +1060,17 @@ model DatePollConfirmation {
 
   @@id([proposalId, userId])
   @@index([pollId])
+}
+
+/// Conta de outra plataforma (Google, Apple) ligada a uma conta do AskouT. Liga pelo ID fixo da plataforma (`subject`), nunca pelo e-mail ou nome.
+model ExternalIdentity {
+  provider  String
+  subject   String
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, subject])
+  @@index([userId])
 }

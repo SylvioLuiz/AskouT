@@ -25,12 +25,15 @@ import type {
   FollowRepository,
   IdGenerator,
   PendingSignupRepository,
+  IdentityRepository,
+  IdentityVerifier,
   UserRepository,
   EventSearchQuery,
 } from '../ports.ts';
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
 import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type { ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -423,6 +426,35 @@ export class InMemoryFollowRepository implements FollowRepository {
     return [...this.rows.values()].filter(
       (f) => f.status === status && (direction === 'followers' ? f.followeeId === userId : f.followerId === userId),
     );
+  }
+}
+
+export class InMemoryIdentityRepository implements IdentityRepository {
+  readonly rows = new Map<string, string>();
+
+  async find(provider: ExternalProvider, subject: string): Promise<string | undefined> {
+    return this.rows.get(`${provider}|${subject}`);
+  }
+
+  async link(provider: ExternalProvider, subject: string, userId: string): Promise<void> {
+    this.rows.set(`${provider}|${subject}`, userId);
+  }
+}
+
+/** Verificador falso: o "token" é um JSON com as informações; "invalido" é recusado. */
+export class FakeIdentityVerifier implements IdentityVerifier {
+  providers() {
+    return [{ provider: 'GOOGLE' as const, clientId: 'google-teste' }, { provider: 'APPLE' as const, clientId: 'apple-teste' }];
+  }
+
+  async verify(provider: ExternalProvider, idToken: string): Promise<IdentityClaims | undefined> {
+    try {
+      const v = JSON.parse(idToken) as { provider?: string; sub?: string; email?: string | null; verified?: boolean; name?: string | null };
+      if (v.provider !== provider || typeof v.sub !== 'string') return undefined;
+      return { subject: v.sub, email: v.email ?? null, emailVerified: v.verified === true, name: v.name ?? null };
+    } catch {
+      return undefined;
+    }
   }
 }
 

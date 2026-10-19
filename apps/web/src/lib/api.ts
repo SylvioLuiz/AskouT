@@ -54,6 +54,9 @@ import type {
   SessionUser,
   SignupInput,
   SignupStarted,
+  SocialNeedsProfile,
+  SocialProvider,
+  SocialProviderId,
 } from './types.ts';
 
 /** O mínimo de `fetch` que o cliente usa (facilita testar sem navegador). */
@@ -134,6 +137,9 @@ export function createApi(deps: ApiDeps) {
       request<AuthResult>('POST', '/auth/signup/confirm', { body: { email, code }, auth: false }),
     login: (identifier: string, password: string) =>
       request<AuthResult>('POST', '/auth/login', { body: { identifier, password }, auth: false }),
+    socialProviders: () => request<{ items: SocialProvider[] }>('GET', '/auth/providers', { auth: false }),
+    socialLogin: (input: { provider: SocialProviderId; idToken: string; username?: string; displayName?: string }) =>
+      request<AuthResult | SocialNeedsProfile>('POST', '/auth/social', { body: input, auth: false }),
     me: () => request<SessionUser>('GET', '/auth/me'),
 
     // Perfis

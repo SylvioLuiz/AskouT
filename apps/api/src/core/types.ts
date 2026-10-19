@@ -32,6 +32,19 @@ export interface Follow {
  * Cadastro aguardando o código enviado por e-mail. A conta (User + Profile) só é
  * criada depois da confirmação. Guarda o hash da senha, nunca a senha nem o código.
  */
+/** Plataformas de login externo. Cada conta externa liga a uma conta do AskouT pelo ID dela, nunca pelo nome. */
+export type ExternalProvider = 'GOOGLE' | 'APPLE';
+
+/** O que a plataforma garante sobre quem entrou (já com a assinatura do token conferida). */
+export interface IdentityClaims {
+  /** ID fixo da pessoa naquela plataforma. */
+  subject: string;
+  email: string | null;
+  /** Só um e-mail verificado pela plataforma pode ligar a uma conta que já existe. */
+  emailVerified: boolean;
+  name: string | null;
+}
+
 export interface PendingSignup {
   email: string; // chave; sempre minúsculo
   username: string;

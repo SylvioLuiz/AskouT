@@ -45,6 +45,21 @@ export interface AuthResult {
   token: string;
 }
 
+export type SocialProviderId = 'GOOGLE' | 'APPLE';
+
+export interface SocialProvider {
+  provider: SocialProviderId;
+  /** ID público do aplicativo na plataforma. */
+  clientId: string;
+}
+
+/** A conta da plataforma é nova: falta escolher o nome de usuário. */
+export interface SocialNeedsProfile {
+  needsProfile: true;
+  suggestedUsername: string;
+  displayName: string;
+}
+
 export interface SignupStarted {
   email: string;
   expiresAt: string;

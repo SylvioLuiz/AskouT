@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { AuthLayout } from '../components/AuthLayout.tsx';
+import { SocialLogin } from '../components/social-login.tsx';
 import { Button, Field, Notice, PasswordField } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAuthContext } from '../auth.tsx';
@@ -75,6 +76,7 @@ export function LoginScreen() {
           Ainda não tem conta? <Link to="/cadastro">Criar conta</Link>
         </p>
       </form>
+      <SocialLogin />
     </AuthLayout>
   );
 }
@@ -220,6 +222,7 @@ export function SignupScreen() {
           Já tem conta? <Link to="/entrar">Entrar</Link>
         </p>
       </form>
+      <SocialLogin />
     </AuthLayout>
   );
 }

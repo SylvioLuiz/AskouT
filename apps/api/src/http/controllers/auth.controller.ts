@@ -49,6 +49,20 @@ export class AuthController {
     return this.core.auth.login({ identifier: b.identifier, password: b.password });
   }
 
+  @Public()
+  @Get('providers')
+  providers() {
+    return { items: this.core.auth.socialProviders() };
+  }
+
+  @Public()
+  @Post('social')
+  @HttpCode(200)
+  social(@Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.auth.socialLogin({ provider: b.provider, idToken: b.idToken, username: b.username, displayName: b.displayName });
+  }
+
   @Get('me')
   me(@CurrentActor() actor: Actor) {
     return this.core.auth.me(actor);

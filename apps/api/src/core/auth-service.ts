@@ -1,6 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import { DomainError, conflict, forbidden, notFound, rateLimited, unauthorized, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
-import type { Actor, PendingSignup, Profile, PublicProfile, User, UserRole } from './types.ts';
+import type { Actor, ExternalProvider, PendingSignup, Profile, PublicProfile, User, UserRole } from './types.ts';
 import { toPublicProfile } from './types.ts';
 import {
   PASSWORD_MAX,
@@ -54,6 +55,21 @@ export interface LoginInput {
   /** E-mail, "usuario" ou "@usuario". */
   identifier: unknown;
   password: unknown;
+}
+
+export interface SocialLoginInput {
+  provider: unknown;
+  idToken: unknown;
+  /** Só na primeira vez: o nome de usuário escolhido para a conta nova. */
+  username?: unknown;
+  displayName?: unknown;
+}
+
+/** A conta externa é nova: falta a pessoa escolher o nome de usuário. */
+export interface SocialNeedsProfile {
+  needsProfile: true;
+  suggestedUsername: string;
+  displayName: string;
 }
 
 const INVALID_CODE = 'Código inválido ou expirado';
@@ -195,6 +211,79 @@ export class AuthService {
     }
     await pending.delete(email);
     return this.session(user, profile);
+  }
+
+  /** Plataformas de login configuradas, com o ID público do aplicativo (o navegador precisa dele). */
+  socialProviders(): { provider: ExternalProvider; clientId: string }[] {
+    return this.deps.verifier.providers();
+  }
+
+  /**
+   * Entrar com Google ou Apple. A plataforma garante quem é a pessoa; aqui:
+   *  1. conta externa já ligada -> entra;
+   *  2. e-mail verificado igual ao de uma conta existente -> liga e entra;
+   *  3. senão é conta nova: pede o nome de usuário (`needsProfile`) e cria quando ele vem.
+   * Conta criada assim não tem senha utilizável; o acesso é sempre pela plataforma.
+   */
+  async socialLogin(input: SocialLoginInput): Promise<AuthResult | SocialNeedsProfile> {
+    const { users, identities, verifier, hasher, clock, ids } = this.deps;
+    const provider = asString(input.provider).toUpperCase();
+    if (provider !== 'GOOGLE' && provider !== 'APPLE') throw validationError('Plataforma inválida', { provider: 'Plataforma inválida' });
+    if (!verifier.providers().some((p) => p.provider === provider)) throw validationError('Esse tipo de login não está disponível', { provider: 'Indisponível' });
+    const idToken = asString(input.idToken);
+    const claims = idToken !== '' ? await verifier.verify(provider, idToken) : undefined;
+    if (!claims) throw unauthorized('Não foi possível entrar com essa conta');
+
+    const now = clock.now();
+    const linkedId = await identities.find(provider, claims.subject);
+    if (linkedId) return this.sessionFor(linkedId);
+
+    const email = claims.email && claims.emailVerified ? normalizeEmail(claims.email) : '';
+    if (email === '' || emailProblem(email)) throw validationError('A conta não trouxe um e-mail verificado', { provider: 'Use uma conta com e-mail verificado' });
+
+    // Só e-mail verificado pela plataforma pode se juntar a uma conta que já existe.
+    const existing = await users.findByEmail(email);
+    if (existing) {
+      await identities.link(provider, claims.subject, existing.id, now);
+      return this.sessionFor(existing.id);
+    }
+
+    const rawUsername = asString(input.username);
+    const displayName0 = normalizeDisplayName(asString(input.displayName) || claims.name || '');
+    if (rawUsername.trim() === '') {
+      return { needsProfile: true, suggestedUsername: await this.freeUsername(email), displayName: displayName0 };
+    }
+    const username = normalizeUsername(rawUsername);
+    const displayName = displayName0 === '' ? username : displayName0;
+    assertNoProblems({ username: usernameProblem(username), displayName: displayNameProblem(displayName) });
+    if (await users.findProfileByUsername(username)) {
+      throw conflict('Este nome de usuário já está em uso', { username: 'Este nome de usuário já está em uso' });
+    }
+
+    const user: User = { id: ids.next(), email, passwordHash: await hasher.hash(randomBytes(32).toString('hex')), status: 'ACTIVE', role: 'USER', createdAt: now };
+    const profile: Profile = { userId: user.id, username, displayName, bio: null, avatarUrl: null, isPrivate: false };
+    await users.create(user, profile);
+    await identities.link(provider, claims.subject, user.id, now);
+    return this.session(user, profile);
+  }
+
+  private async sessionFor(userId: string): Promise<AuthResult> {
+    const user = await this.deps.users.findById(userId);
+    const profile = user ? await this.deps.users.findProfileById(user.id) : undefined;
+    if (!user || !profile) throw unauthorized();
+    if (user.status === 'SUSPENDED') throw forbidden('Conta suspensa');
+    return this.session(user, profile);
+  }
+
+  /** Sugere um nome de usuário livre a partir do e-mail. */
+  private async freeUsername(email: string): Promise<string> {
+    const base = (email.split('@')[0] ?? '').toLowerCase().replace(/[^a-z0-9._]/g, '').replace(/^\.+|\.+$/g, '').replace(/\.{2,}/g, '.').slice(0, 24);
+    const root = base.length >= 3 ? base : `${base}user`.slice(0, 24);
+    for (let i = 0; i < 20; i += 1) {
+      const candidate = i === 0 ? root : `${root}${i + 1}`;
+      if (!usernameProblem(candidate) && !(await this.deps.users.findProfileByUsername(candidate))) return candidate;
+    }
+    return '';
   }
 
   /** Login por e-mail ou por nome de usuário (com ou sem @). */

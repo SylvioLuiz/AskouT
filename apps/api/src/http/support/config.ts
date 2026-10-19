@@ -15,6 +15,10 @@ export interface AppConfig {
   googlePlacesKey: string | undefined;
   /** Teto de buscas ao Google por dia, para não estourar o crédito gratuito sem perceber. */
   googleDailyLimit: number;
+  /** ID do aplicativo Google (client ID web) para "Entrar com Google". Sem ele, o botão não aparece. */
+  googleClientId: string | undefined;
+  /** ID de serviço da Apple (Services ID) para "Entrar com a Apple". Sem ele, o botão não aparece. */
+  appleClientId: string | undefined;
   /** Chaves VAPID do Web Push. Sem as duas, o aviso fora do app fica desligado (o sino dentro do app continua). */
   vapid: { publicKey: string; privateKey: string; subject: string } | undefined;
 }
@@ -84,5 +88,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, vapid };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, vapid };
 }

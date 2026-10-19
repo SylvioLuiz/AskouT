@@ -1,4 +1,4 @@
-import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -49,6 +49,20 @@ export interface BlockRepository {
   listBlockedBy(blockerId: string): Promise<string[]>;
   /** Todos os usuários com bloqueio em qualquer sentido com `userId`. */
   listRelatedIds(userId: string): Promise<string[]>;
+}
+
+export interface IdentityRepository {
+  /** Conta do AskouT ligada a essa conta externa. */
+  find(provider: ExternalProvider, subject: string): Promise<string | undefined>;
+  link(provider: ExternalProvider, subject: string, userId: string, at: Date): Promise<void>;
+}
+
+/** Confere o token que a plataforma entrega ao navegador (assinatura, emissor, público e validade). */
+export interface IdentityVerifier {
+  /** Plataformas configuradas, com o ID público do aplicativo (o navegador precisa dele para abrir o login). */
+  providers(): { provider: ExternalProvider; clientId: string }[];
+  /** undefined se o token for inválido, adulterado, expirado ou de outro aplicativo. */
+  verify(provider: ExternalProvider, idToken: string): Promise<IdentityClaims | undefined>;
 }
 
 export interface PendingSignupRepository {
@@ -514,6 +528,8 @@ export interface CoreDeps {
   admin: AdminRepository;
   placeSource: PlaceSource;
   pending: PendingSignupRepository;
+  identities: IdentityRepository;
+  verifier: IdentityVerifier;
   mailer: EmailSender;
   codes: OneTimeCodes;
   hasher: PasswordHasher;
