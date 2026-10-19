@@ -25,6 +25,9 @@ export const KINDS: readonly { id: EventKind; label: string }[] = [
   { id: 'OTHER', label: 'Outros' },
 ];
 
+/** Igual ao da API: quantas pessoas confirmadas para um evento de agora ser "Bombando". */
+export const HOT_MIN_GOING = 5;
+
 export const RADIUS_MIN_KM = 1;
 export const RADIUS_MAX_KM = 50;
 export const RADIUS_DEFAULT_KM = 10;
@@ -97,6 +100,7 @@ export function safeImage(url: string | null): string | null {
   return null;
 }
 
-export function activeFilterCount(f: { range: RangeId; kind: EventKind | null; free: boolean; radiusKm: number }): number {
-  return (f.range !== 'today' ? 1 : 0) + (f.kind ? 1 : 0) + (f.free ? 1 : 0) + (f.radiusKm !== RADIUS_DEFAULT_KM ? 1 : 0);
+export function activeFilterCount(f: { range: RangeId; kind: EventKind | null; free: boolean; radiusKm: number; hot?: boolean }): number {
+  // Com "Bombando" ligado o período não vale, então não conta como filtro.
+  return (f.hot ? 1 : f.range !== 'today' ? 1 : 0) + (f.kind ? 1 : 0) + (f.free ? 1 : 0) + (f.radiusKm !== RADIUS_DEFAULT_KM ? 1 : 0);
 }

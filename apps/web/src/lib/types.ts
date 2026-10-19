@@ -477,6 +477,8 @@ export interface ExploreEvent {
   distanceM: number | null;
   /** Você já postou este evento no seu perfil. */
   postedByMe?: boolean;
+  /** Pessoas com presença confirmada (só no filtro "Bombando"). */
+  goingCount?: number;
 }
 
 export interface EventPost {
@@ -564,6 +566,7 @@ export interface ExploreParams {
   to?: string;
   kind?: EventKind;
   free?: boolean;
+  hot?: boolean;
 }
 
 export interface PostImage {

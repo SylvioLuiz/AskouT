@@ -262,6 +262,7 @@ export function createApi(deps: ApiDeps) {
       if (params.to) query.set('to', params.to);
       if (params.kind) query.set('kind', params.kind);
       if (params.free) query.set('free', 'true');
+      if (params.hot) query.set('hot', 'true');
       const text = query.toString();
       return request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
     },

@@ -114,3 +114,29 @@ test('pessoas bloqueadas não aparecem na busca; evento por id com distância', 
   await rejectsWith(w.core.explore.event(ana!, 'nao-existe'), 'NOT_FOUND');
   await rejectsWith(w.core.explore.event(ana!, 'e1', { lat: 1 }), 'VALIDATION');
 });
+
+test('bombando: só eventos acontecendo agora com muita gente confirmada, do mais cheio ao menos', async () => {
+  const w = makeWorld();
+  const u = await w.signUpMany('ana', 'pessoa1', 'pessoa2', 'pessoa3', 'pessoa4', 'pessoa5', 'pessoa6');
+  const ana = u['ana']!;
+  await seed(w);
+  const now = w.clock.now().getTime();
+  const live = (id: string, venueId: string, title: string, startH: number, endH: number) =>
+    w.places.createEvent({ id, venueId, title, description: null, kind: 'NIGHT', isFree: false, imageUrl: null, tags: [], startsAt: new Date(now + startH * H), endsAt: new Date(now + endH * H), isSample: false });
+  await live('agora-cheio', 'v-near', 'Pagode Lotado', -1, 3);
+  await live('agora-vazio', 'v-near', 'Sarau Calmo', -1, 3);
+  await live('agora-mais', 'v-far', 'Baile Gigante', -2, 2);
+  await live('acabou', 'v-near', 'Já Acabou', -5, -1);
+  const going = async (id: string, names: string[]) => { for (const n of names) await w.eventRoom.addGoing({ source: 'PLACE', id }, u[n]!, new Date(now)); };
+  await going('agora-cheio', ['pessoa1', 'pessoa2', 'pessoa3', 'pessoa4', 'pessoa5']);
+  await going('agora-mais', ['pessoa1', 'pessoa2', 'pessoa3', 'pessoa4', 'pessoa5', 'pessoa6']);
+  await going('agora-vazio', ['pessoa1', 'pessoa2']);
+  await going('acabou', ['pessoa1', 'pessoa2', 'pessoa3', 'pessoa4', 'pessoa5', 'pessoa6']);
+  await going('e1', ['pessoa1', 'pessoa2', 'pessoa3', 'pessoa4', 'pessoa5', 'pessoa6']);
+  const all = await w.core.explore.search(ana, { hot: 'true' });
+  assert.deepEqual(all.events.map((e) => [e.id, e.goingCount]), [['agora-mais', 6], ['agora-cheio', 5]], 'sem os que acabaram, os que ainda vão começar e os com poucos confirmados');
+  const near = await w.core.explore.search(ana, { hot: 'true', lat: HERE.lat, lng: HERE.lng });
+  assert.deepEqual(near.events.map((e) => e.id), ['agora-cheio'], 'respeita o raio');
+  const plain = await w.core.explore.search(ana, {});
+  assert.equal(plain.events.some((e) => e.goingCount !== undefined), false, 'sem o filtro, não mostra contagem');
+});

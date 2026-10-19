@@ -12,6 +12,8 @@ export const EXPLORE_MAX_RADIUS_KM = 50;
 export const EXPLORE_MAX_SPAN_DAYS = 62;
 export const EXPLORE_DEFAULT_SPAN_DAYS = 30;
 export const EXPLORE_QUERY_MAX = 80;
+/** "Bombando": mínimo de pessoas com presença confirmada num evento que está acontecendo agora. */
+export const EXPLORE_HOT_MIN_GOING = 5;
 /** Raio máximo para a busca de lugares em fontes externas (OpenStreetMap/Google). */
 export const EXPLORE_EXTERNAL_MAX_RADIUS_M = 10_000;
 const EVENT_LIMIT = 40;
@@ -29,6 +31,8 @@ export interface ExploreInput {
   to?: unknown;
   kind?: unknown;
   free?: unknown;
+  /** "Bombando": só eventos acontecendo agora com muita gente confirmada. */
+  hot?: unknown;
 }
 
 export interface ExploreEventItem {
@@ -47,6 +51,8 @@ export interface ExploreEventItem {
   distanceM: number | null;
   /** Quem consulta já postou este evento no próprio perfil (só na consulta de um evento). */
   postedByMe?: boolean;
+  /** Quantas pessoas confirmaram presença (só no filtro "Bombando"). */
+  goingCount?: number;
 }
 
 export interface ExplorePlaceItem {
@@ -170,8 +176,10 @@ export class ExploreService {
     const radiusM = Math.round(radiusKm * 1000);
 
     const now = clock.now();
-    const from = parseDate(input.from, 'from') ?? now;
-    const to = parseDate(input.to, 'to') ?? new Date(from.getTime() + EXPLORE_DEFAULT_SPAN_DAYS * DAY_MS);
+    const hot = parseBool(input.hot);
+    // "Bombando" olha só o que está acontecendo agora: o período escolhido não vale.
+    const from = hot ? now : (parseDate(input.from, 'from') ?? now);
+    const to = hot ? new Date(now.getTime() + 1) : (parseDate(input.to, 'to') ?? new Date(from.getTime() + EXPLORE_DEFAULT_SPAN_DAYS * DAY_MS));
     if (to <= from) throw validationError('Período inválido', { to: 'O fim precisa ser depois do início' });
     if (to.getTime() - from.getTime() > EXPLORE_MAX_SPAN_DAYS * DAY_MS) throw validationError('Período longo demais', { to: `No máximo ${EXPLORE_MAX_SPAN_DAYS} dias` });
 
@@ -186,6 +194,16 @@ export class ExploreService {
     const tag = isTag ? normalizeTag(rawQ) : '';
     const text = isTag ? '' : rawQ;
     const base = { center, radiusM: center ? radiusM : undefined, from, to, kind, freeOnly, limit: EVENT_LIMIT };
+
+    const toItems = async (rows: { event: PlaceEventRecord; venue: VenueRecord; distanceM: number | null }[]): Promise<ExploreEventItem[]> => {
+      const items = rows.map((r) => toEventItem(r.event, r.venue, r.distanceM));
+      if (!hot) return items;
+      const counts = await this.deps.eventRoom.countGoing(items.map((i) => ({ source: 'PLACE' as const, id: i.id })));
+      return items
+        .map((i) => ({ ...i, goingCount: counts.get(i.id) ?? 0 }))
+        .filter((i) => i.goingCount >= EXPLORE_HOT_MIN_GOING)
+        .sort((a, b) => b.goingCount - a.goingCount || (a.startsAt < b.startsAt ? -1 : 1));
+    };
 
     const empty: ExploreView = {
       mode: rawQ === '' ? 'NEARBY' : isTag ? 'TAG' : 'SEARCH',
@@ -203,7 +221,7 @@ export class ExploreService {
 
     if (rawQ === '') {
       const found = await places.searchEvents(base);
-      return { ...empty, events: found.map((r) => toEventItem(r.event, r.venue, r.distanceM)) };
+      return { ...empty, events: await toItems(found) };
     }
 
     if (isTag) {
@@ -211,7 +229,7 @@ export class ExploreService {
         tag ? places.searchEvents({ ...base, tagPrefix: tag }) : Promise.resolve([]),
         places.listTags(tag, from, to, TAG_LIMIT),
       ]);
-      return { ...empty, events: found.map((r) => toEventItem(r.event, r.venue, r.distanceM)), tags };
+      return { ...empty, events: await toItems(found), tags };
     }
 
     // Texto livre: eventos, hashtags, lugares e pessoas.
@@ -282,7 +300,7 @@ export class ExploreService {
       }
     }
 
-    return { ...empty, events: found.map((r) => toEventItem(r.event, r.venue, r.distanceM)), places: placeItems, people, tags, placesAvailable };
+    return { ...empty, events: await toItems(found), places: placeItems, people, tags, placesAvailable };
   }
 
   /** Um evento pelo id. Com posição, inclui a distância (usada só nesta resposta). */

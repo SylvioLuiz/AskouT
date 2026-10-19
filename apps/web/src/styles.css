@@ -2490,6 +2490,7 @@ button {
 
 .evcard__venue,
 .evcard__when,
+.evcard__hot { margin: 2px 0 0; color: var(--brand); font-weight: 700; font-size: 0.8125rem; }
 .evcard__dist {
   margin: 0;
   color: var(--ink-2);

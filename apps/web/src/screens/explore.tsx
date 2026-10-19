@@ -17,6 +17,7 @@ import {
   RADIUS_MIN_KM,
   RANGES,
   activeFilterCount,
+  HOT_MIN_GOING,
   coverShape,
   effectiveQuery,
   kindLabel,
@@ -101,6 +102,7 @@ export function EventCard({ event, now }: { event: ExploreEvent; now: Date }) {
             <VenueLink venueId={event.venue.id} name={event.venue.name} nested />
           </p>
           <p className="evcard__when">{formatWhen(event.startsAt, event.endsAt, now)}</p>
+          {event.goingCount !== undefined ? <p className="evcard__hot">{event.goingCount} confirmados agora</p> : null}
           {event.distanceM !== null ? <p className="evcard__dist">a {formatDistance(event.distanceM)}</p> : null}
         </div>
       </Link>
@@ -220,6 +222,7 @@ export function ExploreScreen() {
   const [range, setRange] = useState<RangeId>('today');
   const [kind, setKind] = useState<EventKind | null>(null);
   const [free, setFree] = useState(false);
+  const [hot, setHot] = useState(false);
   const [radiusKm, setRadiusKm] = useState(RADIUS_DEFAULT_KM);
   const [sheet, setSheet] = useState<'range' | 'kind' | 'radius' | null>(null);
   const [tab, setTab] = useState<Tab>('all');
@@ -242,18 +245,20 @@ export function ExploreScreen() {
       to: to.toISOString(),
       kind: kind ?? undefined,
       free,
+      hot,
     });
-  }, [q, range, kind, free, radiusKm, position?.lat, position?.lng, waiting]);
+  }, [q, range, kind, free, hot, radiusKm, position?.lat, position?.lng, waiting]);
 
   const data = result.data;
   const now = useMemo(() => new Date(), [data]);
   const searching = q !== '';
-  const filters = activeFilterCount({ range, kind, free, radiusKm });
+  const filters = activeFilterCount({ range, kind, free, radiusKm, hot });
 
   function clearFilters() {
     setRange('today');
     setKind(null);
     setFree(false);
+    setHot(false);
     setRadiusKm(RADIUS_DEFAULT_KM);
   }
 
@@ -308,7 +313,10 @@ export function ExploreScreen() {
       </div>
 
       <div className="filters" role="group" aria-label="Filtros">
-        <button type="button" className={`fchip${range !== 'today' ? ' fchip--on' : ''}`} onClick={() => setSheet('range')} aria-haspopup="dialog">
+        <button type="button" className={`fchip fchip--hot${hot ? ' fchip--on' : ''}`} aria-pressed={hot} onClick={() => setHot((v) => !v)}>
+          Bombando
+        </button>
+        <button type="button" className={`fchip${range !== 'today' && !hot ? ' fchip--on' : ''}`} onClick={() => setSheet('range')} aria-haspopup="dialog" disabled={hot}>
           {rangeLabel(range)} <span aria-hidden="true">▾</span>
         </button>
         <button type="button" className={`fchip${kind ? ' fchip--on' : ''}`} onClick={() => setSheet('kind')} aria-haspopup="dialog">
@@ -354,7 +362,7 @@ export function ExploreScreen() {
           {!searching ? (
             data.events.length === 0 ? (
               <EmptyState
-                title="Nenhum evento por aqui"
+                title={hot ? 'Nada bombando agora' : 'Nenhum evento por aqui'}
                 action={
                   filters > 0 || range !== 'any' ? (
                     <Button small variant="secondary" onClick={() => (filters > 0 ? clearFilters() : setRange('any'))}>
@@ -363,12 +371,14 @@ export function ExploreScreen() {
                   ) : undefined
                 }
               >
-                Ainda não há eventos cadastrados {data.located ? `a até ${data.radiusKm} km ` : ''}neste período. Busque por um bar, uma pessoa ou uma #.
+                {hot
+                  ? `Nenhum evento acontecendo agora tem ${HOT_MIN_GOING} ou mais pessoas confirmadas${data.located ? ` a até ${data.radiusKm} km` : ''}.`
+                  : `Ainda não há eventos cadastrados ${data.located ? `a até ${data.radiusKm} km ` : ''}neste período. Busque por um bar, uma pessoa ou uma #.`}
               </EmptyState>
             ) : (
               <>
                 <p className="muted" aria-live="polite">
-                  {pluralize(data.events.length, 'evento', 'eventos')} {data.located ? `a até ${data.radiusKm} km` : 'no período'}
+                  {pluralize(data.events.length, 'evento', 'eventos')} {hot ? 'bombando agora' : data.located ? `a até ${data.radiusKm} km` : 'no período'}
                 </p>
                 <ul className="evgrid">
                   {data.events.map((e) => (

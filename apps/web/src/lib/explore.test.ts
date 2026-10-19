@@ -56,6 +56,7 @@ test('coverShape é estável; safeImage só aceita https; contagem de filtros', 
   assert.equal(safeImage(null), null);
   assert.equal(activeFilterCount({ range: 'today', kind: null, free: false, radiusKm: 10 }), 0);
   assert.equal(activeFilterCount({ range: 'week', kind: 'SHOW', free: true, radiusKm: 5 }), 4);
+  assert.equal(activeFilterCount({ range: 'week', kind: null, free: false, radiusKm: 10, hot: true }), 1, 'Bombando conta uma vez e ignora o período');
 });
 
 test('safeImage aceita capas servidas pela API com o endereço base', async () => {
