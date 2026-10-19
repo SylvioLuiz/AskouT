@@ -515,6 +515,15 @@ export interface EventStoryRecord {
   expiresAt: Date;
 }
 
+export interface EventStoryReportRecord {
+  id: string;
+  storyId: string;
+  reporterId: string;
+  reason: PostReportReason;
+  details: string | null;
+  createdAt: Date;
+}
+
 export type EventStoryMeta = Omit<EventStoryRecord, 'data'>;
 
 export interface PostPatch {

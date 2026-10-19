@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from './agenda.tsx';
 import { SoundToggle } from './sound-toggle.tsx';
-import { TrashIcon, XIcon } from './icons.tsx';
+import { MoreIcon, TrashIcon, XIcon } from './icons.tsx';
+import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Button, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -93,6 +94,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [progress, setProgress] = useState(0);
+  const [reporting, setReporting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const group = groups[pos.group];
   const item = group?.items[pos.item];
@@ -109,7 +111,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
   useEffect(() => {
     setProgress(0);
     setError(undefined);
-    if (!item || item.kind !== 'IMAGE') return;
+    if (!item || item.kind !== 'IMAGE' || reporting) return;
     const startedAt = Date.now();
     const timer = window.setInterval(() => {
       const spent = Date.now() - startedAt;
@@ -117,7 +119,12 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
       if (spent >= STORY_PHOTO_MS) advanceRef.current();
     }, 100);
     return () => window.clearInterval(timer);
-  }, [item?.id]);
+  }, [item?.id, reporting]);
+
+  useEffect(() => {
+    if (reporting) videoRef.current?.pause();
+    else void videoRef.current?.play().catch(() => undefined);
+  }, [reporting]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -160,6 +167,11 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
           <strong>{group.author.username}</strong>
           <span>{timeAgo(item.createdAt, new Date())}</span>
         </Link>
+        {!group.mine ? (
+          <button type="button" className="storyview__btn storyview__btn--quiet" onClick={() => setReporting(true)} aria-label="Mais opções do story" aria-haspopup="dialog">
+            <MoreIcon />
+          </button>
+        ) : null}
         {item.canDelete ? (
           <button type="button" className="storyview__btn" onClick={() => void remove()} disabled={busy} aria-label="Apagar este story">
             <TrashIcon />
@@ -191,6 +203,18 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
         {item.kind === 'VIDEO' ? <SoundToggle muted={muted} onToggle={() => setMuted((m) => !m)} /> : null}
       </div>
       {error ? <p className="storyview__error">{error}</p> : null}
+      {reporting ? (
+        <ReasonSheet
+          title="Denunciar story"
+          doneText="Denúncia enviada. Você não verá mais este story."
+          submit={(reason, details) => api.reportEventStory(eventId, item.id, reason, details)}
+          onClose={() => setReporting(false)}
+          onDone={() => {
+            setReporting(false);
+            onChanged();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -214,3 +214,23 @@ test('story de evento: depois do fim não publica; apagar é do autor ou do dono
   w.clock.tick(40 * H);
   await rejectsWith(w.core.eventPages.createStory(bia, ev.id, 'image/jpeg', JPG_BYTES()), 'FORBIDDEN');
 });
+
+test('denunciar story: uma vez por pessoa, não o próprio, e quem denunciou deixa de vê-lo', async () => {
+  const { w, ana, bia, caio } = await setup();
+  await w.core.eventPages.go(bia, 'e1');
+  await w.core.eventPages.go(caio, 'e1');
+  const story = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES());
+  const id = story.items[0]!.id;
+  await rejectsWith(w.core.eventPages.reportStory(bia, 'e1', id, 'SPAM'), 'FORBIDDEN');
+  await rejectsWith(w.core.eventPages.reportStory(caio, 'e1', id, 'NADA'), 'VALIDATION');
+  await rejectsWith(w.core.eventPages.reportStory(caio, 'e1', id, 'SPAM', 'x'.repeat(301)), 'VALIDATION');
+  await rejectsWith(w.core.eventPages.reportStory(caio, 'e1', 'nao-existe', 'SPAM'), 'NOT_FOUND');
+  assert.deepEqual(await w.core.eventPages.reportStory(caio, 'e1', id, 'OFFENSIVE', '  ofensivo  '), { reported: true });
+  assert.deepEqual(await w.core.eventPages.reportStory(caio, 'e1', id, 'OFFENSIVE'), { reported: true }, 'denunciar de novo não dá erro nem duplica');
+  assert.equal(w.eventRoom.storyReports.size, 1);
+  assert.deepEqual(await w.core.eventPages.stories(caio, 'e1'), [], 'quem denunciou não vê mais');
+  assert.deepEqual((await w.core.eventPages.get(caio, 'e1')).storyUserIds, []);
+  assert.equal((await w.core.eventPages.stories(ana, 'e1')).length, 1, 'os outros continuam vendo');
+  await w.core.eventPages.deleteStory(bia, 'e1', id);
+  assert.equal(w.eventRoom.storyReports.size, 0, 'apagou o story, a denúncia some junto (como o cascade do banco)');
+});

@@ -74,6 +74,13 @@ export class ExploreController {
     return this.core.eventPages.deleteStory(actor.userId, id, storyId);
   }
 
+  @Post('events/:id/stories/:storyId/report')
+  @HttpCode(200)
+  reportStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('storyId') storyId: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.eventPages.reportStory(actor.userId, id, storyId, b.reason, b.details);
+  }
+
   /** Foto ou vídeo do story (com Range para o vídeo). O id é aleatório; some quando o story acaba. */
   @Public()
   @Get('stories/media/:storyId')

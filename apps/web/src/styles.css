@@ -4278,7 +4278,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .storysheet__preview { margin: 12px 0; border-radius: var(--radius-panel); overflow: hidden; background: var(--surface); }
 .storysheet__preview img, .storysheet__preview video { display: block; width: 100%; max-height: 60vh; object-fit: contain; }
 .storysheet__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
-.storyview { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; background: #000; color: #fff; }
+.storyview { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; background: #000; color: #fff; }
 .storyview__bars { position: absolute; top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px; z-index: 3; display: flex; gap: 4px; }
 .storyview__bar { flex: 1; height: 3px; border-radius: 2px; background: rgb(255 255 255 / 0.35); overflow: hidden; }
 .storyview__fill { display: block; height: 100%; background: #fff; }
@@ -4293,3 +4293,4 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .storyview__tap--next { right: 0; width: 60%; }
 .storyview .soundtoggle { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 4; }
 .storyview__error { position: absolute; left: 16px; right: 16px; bottom: 80px; z-index: 4; margin: 0; padding: 10px 14px; border-radius: 12px; background: rgb(0 0 0 / 0.7); text-align: center; }
+.storyview__btn--quiet { background: transparent; color: rgb(255 255 255 / 0.8); }

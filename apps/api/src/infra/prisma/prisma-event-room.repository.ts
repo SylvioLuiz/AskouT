@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type { EventRoomRepository } from '../../core/ports.ts';
-import type { EventAttendanceRecord, EventPostRecord, EventRef, EventStoryMeta, EventStoryRecord, Page } from '../../core/types.ts';
+import type { EventAttendanceRecord, EventPostRecord, EventRef, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, Page } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 type PostMeta = Omit<EventPostRecord, 'data'> & { hasImage: boolean };
@@ -114,6 +114,19 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
   async deleteStory(id: string): Promise<void> {
     if (!isUuid(id)) return;
     await this.prisma.eventStory.deleteMany({ where: { id } });
+  }
+
+  async reportStory(report: EventStoryReportRecord): Promise<boolean> {
+    if (!isUuid(report.storyId) || !isUuid(report.reporterId)) return false;
+    const result = await this.prisma.eventStoryReport.createMany({ data: [{ id: report.id, storyId: report.storyId, reporterId: report.reporterId, reason: report.reason, details: report.details, createdAt: report.createdAt }], skipDuplicates: true });
+    return result.count > 0;
+  }
+
+  async reportedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>> {
+    const ids = storyIds.filter(isUuid);
+    if (!isUuid(userId) || ids.length === 0) return new Set();
+    const rows = await this.prisma.eventStoryReport.findMany({ where: { reporterId: userId, storyId: { in: ids } }, select: { storyId: true } });
+    return new Set(rows.map((r) => r.storyId));
   }
 
   async addPost(post: EventPostRecord): Promise<void> {

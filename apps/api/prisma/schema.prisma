@@ -165,6 +165,7 @@ model User {
   externalIdentities  ExternalIdentity[]
   commentLikes        PostCommentLike[]    @relation("PostCommentLikes")
   eventStories        EventStory[]         @relation("EventStoryAuthor")
+  storyReports        EventStoryReport[]   @relation("EventStoryReports")
 
   organizedMeetings     Meeting[]            @relation("MeetingOrganizer")
   meetingParticipations MeetingParticipant[]
@@ -918,9 +919,27 @@ model EventStory {
   placeEvent PlaceEvent? @relation(fields: [placeEventId], references: [id], onDelete: Cascade)
   post       Post?       @relation(fields: [postId], references: [id], onDelete: Cascade)
 
+  reports    EventStoryReport[]
+
   @@index([placeEventId, expiresAt])
   @@index([postId, expiresAt])
   @@index([userId])
+}
+
+/// Denúncia de story: uma por pessoa. Fica guardada para a gestão; quem denunciou deixa de ver aquele story.
+model EventStoryReport {
+  id         String   @id @default(uuid()) @db.Uuid
+  storyId    String   @db.Uuid
+  reporterId String   @db.Uuid
+  reason     String
+  details    String?
+  createdAt  DateTime @default(now())
+
+  story    EventStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  reporter User       @relation("EventStoryReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, reporterId])
+  @@index([reporterId])
 }
 
 /// Registro de tudo que a gestão decidiu. Só cresce; `adminId` não tem chave estrangeira para sobreviver à remoção da conta.

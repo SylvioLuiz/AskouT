@@ -1719,6 +1719,11 @@ export function defineRepositoryContract(
         assert.deepEqual((await h.eventRoom.findStory(storyB.id))?.video, true);
         assert.deepEqual([...(await h.eventRoom.findStoryMedia(storyA.id))!.data], [1, 2, 3]);
         assert.equal((await h.eventRoom.findStoryMedia(storyA.id))!.mime, 'image/jpeg');
+        const rep = { id: randomUUID(), storyId: storyA.id, reporterId: ana, reason: 'SPAM' as const, details: null, createdAt: at(3) };
+        assert.equal(await h.eventRoom.reportStory(rep), true);
+        assert.equal(await h.eventRoom.reportStory({ ...rep, id: randomUUID() }), false, 'uma denúncia por pessoa');
+        assert.deepEqual([...(await h.eventRoom.reportedStoryIds(ana, [storyA.id, storyP.id]))], [storyA.id]);
+        assert.deepEqual([...(await h.eventRoom.reportedStoryIds(bia, [storyA.id]))], []);
         await h.eventRoom.deleteStory(storyP.id);
         assert.equal(await h.eventRoom.findStory(storyP.id), undefined);
         const mine = await h.eventRoom.listGoingByUser(bia, 10);

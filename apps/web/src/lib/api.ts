@@ -293,6 +293,8 @@ export function createApi(deps: ApiDeps) {
       throw error;
     },
     deleteEventStory: (eventId: string, storyId: string) => request<{ deleted: true }>('DELETE', `/events/${id(eventId)}/stories/${id(storyId)}`),
+    reportEventStory: (eventId: string, storyId: string, reason: ReportReason, details?: string) =>
+      request<{ reported: true }>('POST', `/events/${id(eventId)}/stories/${id(storyId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
     eventGo: (eventId: string) => request<EventPage>('POST', `/events/${id(eventId)}/going`),
     eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),

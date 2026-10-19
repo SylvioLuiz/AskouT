@@ -33,7 +33,7 @@ import type {
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
 import type { PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
-import type { EventStoryMeta, EventStoryRecord, ExternalProvider, IdentityClaims } from '../types.ts';
+import type { EventStoryMeta, EventStoryRecord, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -1482,6 +1482,20 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
 
   async deleteStory(id: string): Promise<void> {
     this.stories.delete(id);
+    for (const [key, r] of this.storyReports) if (r.storyId === id) this.storyReports.delete(key);
+  }
+
+  readonly storyReports = new Map<string, EventStoryReportRecord>();
+
+  async reportStory(report: EventStoryReportRecord): Promise<boolean> {
+    const key = `${report.storyId}|${report.reporterId}`;
+    if (this.storyReports.has(key) || !this.stories.has(report.storyId)) return false;
+    this.storyReports.set(key, { ...report });
+    return true;
+  }
+
+  async reportedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>> {
+    return new Set(storyIds.filter((id) => this.storyReports.has(`${id}|${userId}`)));
   }
 
   async addPost(post: EventPostRecord): Promise<void> {

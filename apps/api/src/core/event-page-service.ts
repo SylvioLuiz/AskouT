@@ -4,8 +4,8 @@ import { distanceMeters } from './geo.ts';
 import { DomainError, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
-import type { EventKind, EventRef, PublicProfile } from './types.ts';
-import { toPublicProfile } from './types.ts';
+import type { EventKind, EventRef, EventStoryMeta, PostReportReason, PublicProfile } from './types.ts';
+import { POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
 export const EVENT_POST_CAPTION_MAX = 500;
 /** Foto do post do evento: chega já reduzida pelo app, até 100 KB. */
@@ -17,6 +17,7 @@ export const EVENT_ATTENDEES_LIMIT = 60;
 export const EVENT_STORY_HOURS = 24;
 /** Quantos stories no ar uma pessoa pode ter no mesmo evento. */
 export const EVENT_STORY_MAX_PER_USER = 10;
+export const EVENT_STORY_REPORT_DETAILS_MAX = 300;
 
 export interface EventStoryItemView {
   id: string;
@@ -193,7 +194,7 @@ export class EventPageService {
       attendees,
       owner,
       isOwner,
-      storyUserIds: [...new Set((await this.deps.eventRoom.listStories(ref, this.deps.clock.now())).map((s) => s.userId))].filter((u) => u === viewerId || !hidden.has(u)),
+      storyUserIds: [...new Set((await this.visibleStories(viewerId, ref, hidden)).map((s) => s.userId))],
       canStory: (isOwner || iGo) && Date.parse(base.view.endsAt) > this.deps.clock.now().getTime(),
       postsEnabled,
       postsPublic,
@@ -358,11 +359,30 @@ export class EventPageService {
     return { deleted: true };
   }
 
+  /** Os stories no ar que `viewerId` pode ver: sem quem tem bloqueio com ele e sem os que ele denunciou. */
+  private async visibleStories(viewerId: string, ref: EventRef, hidden: Set<string>): Promise<EventStoryMeta[]> {
+    const rows = (await this.deps.eventRoom.listStories(ref, this.deps.clock.now())).filter((s) => s.userId === viewerId || !hidden.has(s.userId));
+    const reported = await this.deps.eventRoom.reportedStoryIds(viewerId, rows.map((r) => r.id));
+    return rows.filter((r) => !reported.has(r.id));
+  }
+
+  /** Denuncia um story. Fica guardado para a gestão e quem denunciou deixa de vê-lo. */
+  async reportStory(viewerId: string, rawId: unknown, storyId: unknown, reason: unknown, details?: unknown): Promise<{ reported: true }> {
+    const { ref } = await this.resolve(viewerId, rawId);
+    const story = typeof storyId === 'string' && storyId.length <= 64 ? await this.deps.eventRoom.findStory(storyId) : undefined;
+    if (!story || story.ref.id !== ref.id || story.expiresAt.getTime() <= this.deps.clock.now().getTime()) throw notFound('Story não encontrado');
+    if (story.userId === viewerId) throw forbidden('Este story é seu: apague-o se não quiser mais');
+    if (typeof reason !== 'string' || !(POST_REPORT_REASONS as readonly string[]).includes(reason)) throw validationError('Motivo inválido', { reason: 'Escolha um motivo da lista' });
+    const text = optionalText(details, EVENT_STORY_REPORT_DETAILS_MAX, 'details', 'Detalhes');
+    await this.deps.eventRoom.reportStory({ id: this.deps.ids.next(), storyId: story.id, reporterId: viewerId, reason: reason as PostReportReason, details: text, createdAt: this.deps.clock.now() });
+    return { reported: true };
+  }
+
   /** Stories no ar, agrupados por pessoa (os seus primeiro). Quem tem bloqueio com você não aparece. */
   async stories(viewerId: string, rawId: unknown): Promise<EventStoryGroupView[]> {
     const { ref, owner } = await this.resolve(viewerId, rawId);
     const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
-    const rows = (await this.deps.eventRoom.listStories(ref, this.deps.clock.now())).filter((s) => s.userId === viewerId || !hidden.has(s.userId));
+    const rows = await this.visibleStories(viewerId, ref, hidden);
     const profiles = await this.deps.users.findProfilesByIds([...new Set(rows.map((r) => r.userId))]);
     const byId = new Map(profiles.map((p) => [p.userId, toPublicProfile(p)]));
     const groups = new Map<string, EventStoryGroupView>();
