@@ -18,6 +18,7 @@ export interface DwellInput {
   targetId?: unknown;
   ms?: unknown;
   source?: unknown;
+  clicked?: unknown;
 }
 
 /** Recebe quanto tempo cada conteúdo ficou na tela e deixa a pessoa apagar tudo. */
@@ -37,14 +38,16 @@ export class DwellService {
     const records: DwellRecord[] = [];
     for (const raw of items as DwellInput[]) {
       if (typeof raw !== 'object' || raw === null) throw validationError('Medição inválida', { items: 'Medição inválida' });
-      const { targetType, targetId, ms, source } = raw;
+      const { targetType, targetId, ms, source, clicked } = raw;
       if (typeof targetType !== 'string' || !(TARGETS as readonly string[]).includes(targetType)) throw validationError('Medição inválida', { targetType: 'Use POST ou EVENT' });
       if (typeof targetId !== 'string' || targetId === '' || targetId.length > 64) throw validationError('Medição inválida', { targetId: 'Identificador inválido' });
       if (typeof ms !== 'number' || !Number.isFinite(ms)) throw validationError('Medição inválida', { ms: 'Tempo inválido' });
       const src = source === undefined ? 'OTHER' : source;
       if (typeof src !== 'string' || !(SOURCES as readonly string[]).includes(src)) throw validationError('Medição inválida', { source: 'Origem inválida' });
-      if (ms < DWELL_MIN_MS) continue;
-      records.push({ id: this.deps.ids.next(), userId, targetType: targetType as DwellTarget, targetId, ms: Math.min(DWELL_MAX_MS, Math.round(ms)), source: src as DwellSource, createdAt: now });
+      if (clicked !== undefined && typeof clicked !== 'boolean') throw validationError('Medição inválida', { clicked: 'Use true ou false' });
+      // O clique vale mesmo sem tempo de tela.
+      if (ms < DWELL_MIN_MS && clicked !== true) continue;
+      records.push({ id: this.deps.ids.next(), userId, targetType: targetType as DwellTarget, targetId, ms: Math.max(0, Math.min(DWELL_MAX_MS, Math.round(ms))), source: src as DwellSource, clicked: clicked === true, createdAt: now });
     }
     await this.deps.dwell.addMany(records);
     await this.deps.dwell.deleteOlderThan(userId, new Date(now.getTime() - DWELL_RETENTION_DAYS * 86_400_000));

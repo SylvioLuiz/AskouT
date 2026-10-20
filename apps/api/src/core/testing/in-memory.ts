@@ -38,6 +38,7 @@ import type {
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
 import type {
+  DirectActivityRow,
   DwellRecord,
   EngagementRow, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
@@ -533,6 +534,14 @@ export class InMemoryDwellRepository implements DwellRepository {
       .map((r) => ({ ...r }));
   }
 
+  async listAllSince(since: Date, limit: number): Promise<DwellRecord[]> {
+    return this.rows
+      .filter((r) => r.createdAt >= since)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+      .slice(0, limit)
+      .map((r) => ({ ...r }));
+  }
+
   async deleteByUser(userId: string): Promise<number> {
     return this.removeWhere((r) => r.userId === userId);
   }
@@ -880,6 +889,19 @@ export class InMemoryConversationRepository implements ConversationRepository {
   async markRead(conversationId: string, userId: string, now: Date): Promise<void> {
     const p = this.participants.get(conversationId);
     if (p?.has(userId)) p.set(userId, now);
+  }
+
+  async directActivity(userId: string, since: Date, limit: number): Promise<DirectActivityRow[]> {
+    const rows: DirectActivityRow[] = [];
+    for (const m of this.messages) {
+      if (m.createdAt < since || m.deletedAt || m.kind === 'SYSTEM') continue;
+      const conversation = this.conversations.get(m.conversationId);
+      const people = this.participants.get(m.conversationId);
+      if (!conversation || conversation.type !== 'DIRECT' || !people?.has(userId)) continue;
+      const otherId = [...people.keys()].find((id) => id !== userId);
+      if (otherId) rows.push({ otherId, at: m.createdAt, mine: m.senderId === userId });
+    }
+    return rows.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, limit);
   }
 
   async countSentSince(userId: string, since: Date): Promise<number> {

@@ -852,6 +852,8 @@ export interface DwellRecord {
   /** Milissegundos visível. */
   ms: number;
   source: DwellSource;
+  /** A pessoa abriu o conteúdo a partir daqui (clique no bloco "Para você"). */
+  clicked?: boolean;
   createdAt: Date;
 }
 
@@ -860,4 +862,12 @@ export interface EngagementRow {
   postId: string;
   kind: 'LIKE' | 'COMMENT';
   at: Date;
+}
+
+/** Uma mensagem numa conversa 1 a 1: só quando, com quem e quem mandou. Nunca o conteúdo. */
+export interface DirectActivityRow {
+  otherId: string;
+  at: Date;
+  /** Foi a própria pessoa quem mandou. */
+  mine: boolean;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Avatar } from './ui.tsx';
 import { PostCard } from './post.tsx';
-import { useDwell } from './dwell.tsx';
+import { trackClick, useDwell } from './dwell.tsx';
 import { EventKindIcon } from './icons.tsx';
 import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
@@ -31,7 +31,7 @@ function EventReco({ item }: { item: RecommendationItem }) {
   const image = safeImage(e.imageUrl);
   return (
     <li ref={ref} className="foryou__card">
-      <Link to={`/eventos/${encodeURIComponent(e.id)}`} className="foryou__link">
+      <Link to={`/eventos/${encodeURIComponent(e.id)}`} className="foryou__link" onClick={() => trackClick('EVENT', e.id, 'RECO')}>
         <span className={`foryou__cover evcover--${e.kind.toLowerCase()}`}>
           {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <EventKindIcon kind={e.kind} />}
         </span>
@@ -47,7 +47,7 @@ function EventReco({ item }: { item: RecommendationItem }) {
 function PostReco({ item }: { item: RecommendationItem }) {
   const ref = useDwell<HTMLLIElement>('POST', item.post!.id, 'RECO');
   return (
-    <li ref={ref} className="foryou__post">
+    <li ref={ref} className="foryou__post" onClickCapture={(ev) => { if ((ev.target as Element).closest('a')) trackClick('POST', item.post!.id, 'RECO'); }}>
       <PostCard post={item.post!} asEvent poster />
       <Reasons item={item} />
     </li>

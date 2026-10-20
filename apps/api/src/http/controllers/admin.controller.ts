@@ -27,6 +27,11 @@ export class AdminController {
     return this.core.admin.stats(actor);
   }
 
+  @Get('retention')
+  retention(@CurrentActor() actor: Actor, @Query() q: { days?: unknown }) {
+    return this.core.admin.retention(actor, q);
+  }
+
   @Get('claims')
   claims(@CurrentActor() actor: Actor, @Query() q: { status?: unknown; limit?: unknown }) {
     return this.core.admin.listClaims(actor, q);

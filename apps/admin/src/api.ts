@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, Claim, ClaimStatus, ConversationReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, RetentionReport, Claim, ClaimStatus, ConversationReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -91,6 +91,7 @@ export const api = {
   login: (identifier: string, password: string) => request<AuthResult>('POST', '/admin/login', { identifier, password }, false),
   me: () => request<SessionUser>('GET', '/auth/me'),
   stats: () => request<Stats>('GET', '/admin/stats'),
+  retention: (days: number) => request<RetentionReport>('GET', `/admin/retention${query({ days })}`),
 
   claims: (status: ClaimStatus) => request<Claim[]>('GET', `/admin/claims${query({ status })}`),
   /** Baixa o documento com o token e devolve um endereço temporário para exibir. */

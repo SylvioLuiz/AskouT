@@ -8,6 +8,7 @@ import { ClaimsPage } from './pages/claims.tsx';
 import { DashboardPage } from './pages/dashboard.tsx';
 import { EventsPage } from './pages/events.tsx';
 import { PostsPage } from './pages/posts.tsx';
+import { RetentionPage } from './pages/retention.tsx';
 import { ReportsPage } from './pages/reports.tsx';
 import { UsersPage } from './pages/users.tsx';
 import { VenuesPage } from './pages/venues.tsx';
@@ -84,6 +85,8 @@ function Page({ route }: { route: RoutePath }) {
       return <EventsPage />;
     case '/posts':
       return <PostsPage />;
+    case '/retencao':
+      return <RetentionPage />;
     case '/auditoria':
       return <AuditPage />;
     default:

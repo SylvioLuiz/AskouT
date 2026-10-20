@@ -260,7 +260,7 @@ function PersonalizeSetting({ userId }: { userId: string }) {
           <h2 className="setting__title" id="personalizar-titulo">
             Recomendações personalizadas
           </h2>
-          <p className="setting__help">O app mede quanto tempo você fica em cada post ou evento e usa isso, junto com o que seus amigos mais próximos foram ou curtiram, para montar o bloco “Para você”. Guardamos por 60 dias e ninguém vê.</p>
+          <p className="setting__help">O app mede quanto tempo você fica em cada post ou evento e com quem você mais conversa (só quando e com quem, nunca o texto). Usa isso, junto com o que seus amigos mais próximos foram ou curtiram, para montar o bloco “Para você”. As medições ficam 60 dias e ninguém vê. A equipe vê apenas totais, nunca o seu histórico.</p>
         </div>
         <button type="button" role="switch" aria-checked={on} aria-labelledby="personalizar-titulo" className="switch" onClick={() => void change()} disabled={busy}>
           <span className="switch__thumb" />

@@ -25,6 +25,14 @@ describe('medição de permanência (web)', () => {
     q.add({ targetType: 'POST', targetId: 'x', ms: -5, source: 'FEED' });
     assert.deepEqual(q.drain(), []);
   });
+  it('o clique vale mesmo sem tempo, e junta com o tempo medido', () => {
+    const q = new DwellQueue();
+    q.add({ targetType: 'EVENT', targetId: 'e', ms: 0, source: 'RECO', clicked: true });
+    q.add({ targetType: 'EVENT', targetId: 'solto', ms: 0, source: 'RECO' });
+    q.add({ targetType: 'EVENT', targetId: 'junto', ms: 3000, source: 'RECO' });
+    q.add({ targetType: 'EVENT', targetId: 'junto', ms: 0, source: 'RECO', clicked: true });
+    assert.deepEqual(q.drain().map((e) => [e.targetId, e.ms, e.clicked]), [['e', 0, true], ['junto', 3000, true]]);
+  });
   it('entrega em lotes do tamanho do servidor', () => {
     const q = new DwellQueue();
     for (let i = 0; i < DWELL_BATCH_MAX + 5; i += 1) q.add({ targetType: 'EVENT', targetId: `e${i}`, ms: 2000, source: 'FEED' });

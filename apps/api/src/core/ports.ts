@@ -1,4 +1,4 @@
-import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -94,6 +94,8 @@ export interface DwellRepository {
   addMany(records: DwellRecord[]): Promise<void>;
   /** Medições desde `since`, mais recentes primeiro. */
   listByUser(userId: string, since: Date, limit: number): Promise<DwellRecord[]>;
+  /** Medições de todas as pessoas desde `since` (para o painel de retenção), mais recentes primeiro, até `limit`. */
+  listAllSince(since: Date, limit: number): Promise<DwellRecord[]>;
   /** Apaga tudo da pessoa. Devolve quantas. */
   deleteByUser(userId: string): Promise<number>;
   /** Apaga as da pessoa anteriores a `before`. Devolve quantas. */
@@ -233,6 +235,11 @@ export interface ConversationRepository {
   addReport(report: ConversationReportRecord): Promise<void>;
   /** Marca como lida até `now` para `userId`. */
   markRead(conversationId: string, userId: string, now: Date): Promise<void>;
+  /**
+   * Mensagens das conversas 1 a 1 de `userId` desde `since` (sem as apagadas e sem as do sistema), mais recentes primeiro.
+   * Só quem e quando: serve para medir a proximidade entre amigos, nunca lê o texto.
+   */
+  directActivity(userId: string, since: Date, limit: number): Promise<DirectActivityRow[]>;
   /** Quantas mensagens `userId` enviou desde `since` (limite de envio). */
   countSentSince(userId: string, since: Date): Promise<number>;
   /** A pessoa está numa conversa em que o evento (post) foi compartilhado: pode abri-lo mesmo sem seguir o dono. */

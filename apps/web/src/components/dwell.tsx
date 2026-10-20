@@ -72,3 +72,10 @@ export function useDwell<T extends Element>(targetType: DwellTarget, targetId: s
   }, [me, targetType, targetId, source]);
   return ref;
 }
+
+/** Registra que a pessoa abriu um conteúdo a partir do bloco "Para você" (entra no próximo lote). */
+export function trackClick(targetType: DwellTarget, targetId: string, source: DwellSource): void {
+  if (!userId || !readPersonalize(userId)) return;
+  ensureScheduler();
+  queue.add({ targetType, targetId, ms: 0, source, clicked: true });
+}

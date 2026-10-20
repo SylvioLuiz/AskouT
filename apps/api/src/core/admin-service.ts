@@ -1,3 +1,5 @@
+import { buildRetentionReport } from './retention.ts';
+import type { RetentionReport } from './retention.ts';
 import { conflict, forbidden, notFound, unauthorized, validationError } from './errors.ts';
 import type { AuthResult, AuthService, LoginInput } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
@@ -46,6 +48,9 @@ function noteText(value: unknown, required: boolean): string | null {
 }
 
 /** Gestão do aplicativo. Todo método exige papel ADMIN (vindo do banco a cada requisição) e as ações ficam no registro de auditoria. */
+/** Teto de linhas lidas por consulta do painel. Acima disso, o painel avisa que cortou os dados mais antigos. */
+export const RETENTION_MAX_ROWS = 200_000;
+
 export class AdminService {
   private readonly deps: CoreDeps;
   private readonly venues: VenueService;
@@ -84,6 +89,18 @@ export class AdminService {
   async stats(actor: Actor): Promise<AdminStats> {
     this.assertAdmin(actor);
     return this.deps.admin.stats();
+  }
+
+  /** Painel de retenção: bloco "Para você" contra o feed, e quem volta depois de um dia com atividade. */
+  async retention(actor: Actor, query: { days?: unknown }): Promise<RetentionReport> {
+    this.assertAdmin(actor);
+    const days = query.days === undefined ? 14 : Number(query.days);
+    if (!Number.isInteger(days) || days < 1 || days > 60) throw validationError('Período inválido', { days: 'Entre 1 e 60 dias' });
+    const now = this.deps.clock.now();
+    // Margem de um dia por causa do fuso; o corte exato é feito na montagem.
+    const rows = await this.deps.dwell.listAllSince(new Date(now.getTime() - (days + 1) * 86_400_000), RETENTION_MAX_ROWS + 1);
+    const truncated = rows.length > RETENTION_MAX_ROWS;
+    return buildRetentionReport(truncated ? rows.slice(0, RETENTION_MAX_ROWS) : rows, now, days, truncated);
   }
 
   // ---------- Pedidos de donos ----------

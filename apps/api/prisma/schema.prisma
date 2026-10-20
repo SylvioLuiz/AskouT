@@ -1224,9 +1224,12 @@ model ContentDwell {
   ms         Int
   /// 'FEED', 'RECO' ou 'OTHER'.
   source     String
+  /// Abriu o conteúdo a partir da exibição (clique no bloco "Para você").
+  clicked    Boolean  @default(false)
   createdAt  DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([createdAt])
 }

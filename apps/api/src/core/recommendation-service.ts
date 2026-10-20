@@ -3,7 +3,7 @@ import type { EventCardView } from './event-card.ts';
 import { fold, normalizeTag } from './explore-match.ts';
 import type { PostService, PostView } from './post-service.ts';
 import type { CoreDeps } from './ports.ts';
-import type { DwellRecord, EventKind, PostRecord, PublicProfile } from './types.ts';
+import type { DirectActivityRow, DwellRecord, EventKind, PostRecord, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
 import { validationError } from './errors.ts';
 
@@ -92,6 +92,29 @@ export function stickyWeight(ms: number, threshold: number): number {
   return ms > threshold ? Math.min(2, 1 + Math.log(ms / threshold)) : 0;
 }
 
+/** Quanto as conversas 1 a 1 pesam na proximidade, frente a curtida (1) e comentário (2). */
+export const RECO_DM_WEIGHT = 1.5;
+export const RECO_DM_ROWS = 3000;
+
+/**
+ * Proximidade por mensagens diretas, por amigo. Conta por dia (o 20º "oi" do dia vale pouco mais que o 2º: log),
+ * quem manda pesa mais que quem recebe, e dia antigo vale menos. Nunca lê o texto.
+ */
+export function directCloseness(rows: readonly DirectActivityRow[], now: Date): Map<string, number> {
+  const days = new Map<string, { otherId: string; at: Date; sent: number; received: number }>();
+  for (const r of rows) {
+    const day = r.at.toISOString().slice(0, 10);
+    const key = `${r.otherId}|${day}`;
+    const d = days.get(key) ?? { otherId: r.otherId, at: r.at, sent: 0, received: 0 };
+    if (r.mine) d.sent += 1;
+    else d.received += 1;
+    days.set(key, d);
+  }
+  const out = new Map<string, number>();
+  for (const d of days.values()) out.set(d.otherId, (out.get(d.otherId) ?? 0) + RECO_DM_WEIGHT * decay(d.at, now) * (Math.log1p(d.sent) + 0.5 * Math.log1p(d.received)));
+  return out;
+}
+
 export function hashtagsOf(caption: string | null): string[] {
   if (!caption) return [];
   const found = caption.match(/#[\p{L}\p{N}_]+/gu) ?? [];
@@ -136,7 +159,7 @@ interface Candidate {
 
 /**
  * Motor de recomendação da Home ("Para você").
- *  1. Proximidade: quem são os amigos com quem a pessoa mais interage (curtidas, comentários e tempo olhando os posts deles; as mais recentes pesam mais).
+ *  1. Proximidade: quem são os amigos com quem a pessoa mais interage (mensagens diretas, curtidas, comentários e tempo olhando os posts deles; as mais recentes pesam mais).
  *  2. Social: eventos a que esses amigos vão e posts que curtiram ou comentaram, pesados pela proximidade.
  *  3. Gosto: o que prendeu a pessoa (ficou mais tempo na tela que a média dela) vira hashtags, tipo de evento, local e autor preferidos;
  *     eventos parecidos entram mesmo sem amigos.
@@ -188,6 +211,7 @@ export class RecommendationService {
       const w = d.targetType === 'POST' ? stickyWeight(d.ms, threshold) : 0;
       if (w > 0) add((await postOf(d.targetId))?.post.authorId, 1.5 * w * decay(d.createdAt, now));
     }
+    if (personalize) for (const [id, w] of directCloseness(await this.deps.conversations.directActivity(viewerId, since, RECO_DM_ROWS), now)) add(id, w);
     const maxRaw = Math.max(0, ...raw.values());
     const closeness = (id: string) => 0.1 + (maxRaw > 0 ? 0.9 * ((raw.get(id) ?? 0) / maxRaw) : 0);
     const circle = [...friendIds].sort((a, b) => closeness(b) - closeness(a) || (a < b ? -1 : 1)).slice(0, RECO_MAX_FRIENDS);

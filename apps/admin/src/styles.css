@@ -157,3 +157,5 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .side .btn { background: transparent; color: var(--side-ink); border-color: rgba(255, 255, 255, 0.3); }
 .side .btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.5); }
 .tab__count--quiet { background: var(--ok-bg); color: var(--ok); }
+
+.seg { display: inline-flex; gap: 6px; flex-wrap: wrap; }

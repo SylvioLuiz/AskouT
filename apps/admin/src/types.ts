@@ -143,3 +143,47 @@ export interface AuditRow {
   note: string | null;
   createdAt: string;
 }
+
+// ---------- Retenção ----------
+
+export interface RetentionSource {
+  impressions: number;
+  clicks: number;
+  ctr: number | null;
+  avgDwellMs: number | null;
+  users: number;
+}
+
+export interface RetentionDay {
+  day: string;
+  activeUsers: number;
+  feedImpressions: number;
+  recoImpressions: number;
+  recoClicks: number;
+  feedAvgDwellMs: number | null;
+  recoAvgDwellMs: number | null;
+}
+
+export interface ReturnRate {
+  sample: number;
+  returned: number;
+  rate: number | null;
+}
+
+export interface ReturnGroup {
+  all: ReturnRate;
+  withReco: ReturnRate;
+  withoutReco: ReturnRate;
+}
+
+export interface RetentionReport {
+  days: number;
+  from: string;
+  to: string;
+  truncated: boolean;
+  sources: { FEED: RetentionSource; RECO: RetentionSource };
+  daily: RetentionDay[];
+  d1: ReturnGroup;
+  d7: ReturnGroup;
+  minSample: number;
+}

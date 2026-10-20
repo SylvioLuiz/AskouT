@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { ConversationRepository } from '../../core/ports.ts';
-import type { ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, MessageReactionRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
+import type { DirectActivityRow, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, MessageReactionRecord, MessageRecord, SuggestionCard, SuggestionResponse } from '../../core/types.ts';
 import { DELETED_BODY } from '../../core/types.ts';
 import { isUuid, uniqueViolationTargets } from './helpers.ts';
 
@@ -355,6 +355,27 @@ export class PrismaConversationRepository implements ConversationRepository {
   async markRead(conversationId: string, userId: string, now: Date): Promise<void> {
     if (!isUuid(conversationId) || !isUuid(userId)) return;
     await this.prisma.conversationParticipant.updateMany({ where: { conversationId, userId }, data: { lastReadAt: now } });
+  }
+
+  async directActivity(userId: string, since: Date, limit: number): Promise<DirectActivityRow[]> {
+    if (!isUuid(userId)) return [];
+    const conversations = await this.prisma.conversation.findMany({
+      where: { type: 'DIRECT', participants: { some: { userId } } },
+      select: { id: true, participants: { select: { userId: true } } },
+    });
+    const otherOf = new Map<string, string>();
+    for (const c of conversations) {
+      const other = c.participants.find((p) => p.userId !== userId);
+      if (other) otherOf.set(c.id, other.userId);
+    }
+    if (otherOf.size === 0) return [];
+    const messages = await this.prisma.message.findMany({
+      where: { conversationId: { in: [...otherOf.keys()] }, createdAt: { gte: since }, deletedAt: null, kind: { not: 'SYSTEM' } },
+      select: { conversationId: true, senderId: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+    return messages.map((m) => ({ otherId: otherOf.get(m.conversationId) as string, at: m.createdAt, mine: m.senderId === userId }));
   }
 
   async countSentSince(userId: string, since: Date): Promise<number> {

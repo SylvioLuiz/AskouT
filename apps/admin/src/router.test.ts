@@ -7,5 +7,6 @@ test('matchRoute: reconhece páginas, ignora barra final e cai no painel', () =>
   assert.equal(matchRoute('/pedidos'), '/pedidos');
   assert.equal(matchRoute('/pedidos/'), '/pedidos');
   assert.equal(matchRoute('/auditoria'), '/auditoria');
+  assert.equal(matchRoute('/retencao'), '/retencao');
   assert.equal(matchRoute('/nada'), '/');
 });

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DWELL_BATCH_MAX, DWELL_MAX_MS, DWELL_RETENTION_DAYS } from './dwell-service.ts';
-import { addFeatures, decay, emptyTaste, finalScore, hashtagsOf, RECO_MIN_STICKY_MS, stickyThreshold, stickyWeight, tasteSimilarity } from './recommendation-service.ts';
+import { addFeatures, decay, directCloseness, emptyTaste, finalScore, hashtagsOf, RECO_MIN_STICKY_MS, stickyThreshold, stickyWeight, tasteSimilarity } from './recommendation-service.ts';
 import { rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
 
@@ -45,6 +45,21 @@ describe('motor de recomendação', () => {
     assert.ok(r.items[0]!.score > r.items[1]!.score);
     assert.deepEqual(r.items[0]!.friendsGoing.map((p) => p.username), ['bia']);
     assert.equal(r.items[0]!.reasons[0], 'bia vai');
+  });
+
+  it('quem você mais conversa 1 a 1 pesa mais, sem ler o texto; com a personalização desligada não conta', async () => {
+    const { w, ana, bia, caio } = await setup();
+    await event(w, 'e-bia', 'v1', 30);
+    await event(w, 'e-caio', 'v2', 30);
+    await w.eventRoom.addGoing({ source: 'PLACE', id: 'e-bia' }, bia, w.clock.now());
+    await w.eventRoom.addGoing({ source: 'PLACE', id: 'e-caio' }, caio, w.clock.now());
+    const chat = await w.core.conversations.open(ana, caio);
+    for (const body of ['oi', 'bora?', 'vamos sim']) await w.core.conversations.send(ana, chat.id, { body });
+    await w.core.conversations.send(caio, chat.id, { body: 'fechou' });
+    const r = await w.core.recommendations.recommend(ana);
+    assert.deepEqual(ids(r), ['e-caio', 'e-bia']);
+    const off = await w.core.recommendations.recommend(ana, { personalize: false });
+    assert.equal(off.items[0]!.score, off.items[1]!.score, 'sem personalizar, os dois valem igual');
   });
 
   it('post que amigo curtiu aparece, sem dizer quem curtiu', async () => {
@@ -193,6 +208,21 @@ describe('contas do motor de recomendação', () => {
     assert.equal(stickyWeight(10_000, 10_000), 0);
     assert.ok(stickyWeight(20_000, 10_000) > 1);
     assert.equal(stickyWeight(10_000_000, 10_000), 2);
+  });
+  it('proximidade por mensagens: log por dia, quem manda pesa mais, antigo vale menos', () => {
+    const now = new Date('2026-10-20T12:00:00Z');
+    const row = (otherId: string, at: string, mine: boolean) => ({ otherId, at: new Date(at), mine });
+    const sentTwenty = directCloseness(Array.from({ length: 20 }, () => row('a', '2026-10-20T10:00:00Z', true)), now).get('a')!;
+    const sentTwo = directCloseness([row('a', '2026-10-20T10:00:00Z', true), row('a', '2026-10-20T11:00:00Z', true)], now).get('a')!;
+    assert.ok(sentTwenty > sentTwo && sentTwenty < sentTwo * 3, 'cresce devagar');
+    const received = directCloseness([row('a', '2026-10-20T10:00:00Z', false)], now).get('a')!;
+    const sent = directCloseness([row('a', '2026-10-20T10:00:00Z', true)], now).get('a')!;
+    assert.ok(sent > received);
+    const old = directCloseness([row('a', '2026-09-22T10:00:00Z', true)], now).get('a')!;
+    assert.ok(old < sent / 3);
+    const spread = directCloseness([row('a', '2026-10-19T10:00:00Z', true), row('a', '2026-10-20T10:00:00Z', true)], now).get('a')!;
+    assert.ok(spread > sentTwo, 'dias diferentes somam mais que o mesmo dia');
+    assert.equal(directCloseness([], now).size, 0);
   });
   it('hashtags da legenda', () => {
     assert.deepEqual(hashtagsOf('Noite #Samba e #samba com #Pagode_Raiz'), ['samba', 'pagode_raiz']);

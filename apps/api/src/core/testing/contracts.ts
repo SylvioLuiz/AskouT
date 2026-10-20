@@ -427,13 +427,16 @@ export function defineRepositoryContract(
         const ana = await newUser('dwell_ana');
         const bia = await newUser('dwell_bia');
         const t0 = new Date(Date.UTC(2030, 0, 10, 12));
-        const mk = (userId: string, n: number, over: Partial<DwellRecord> = {}): DwellRecord => ({ id: randomUUID(), userId, targetType: 'POST', targetId: `p${n}`, ms: 4000 + n, source: 'FEED', createdAt: new Date(t0.getTime() + n * 1000), ...over });
-        await h.dwell.addMany([mk(ana, 1), mk(ana, 2, { targetType: 'EVENT', source: 'RECO' }), mk(ana, 3), mk(bia, 4)]);
+        const mk = (userId: string, n: number, over: Partial<DwellRecord> = {}): DwellRecord => ({ id: randomUUID(), userId, targetType: 'POST', targetId: `p${n}`, ms: 4000 + n, source: 'FEED', clicked: false, createdAt: new Date(t0.getTime() + n * 1000), ...over });
+        await h.dwell.addMany([mk(ana, 1), mk(ana, 2, { targetType: 'EVENT', source: 'RECO', clicked: true }), mk(ana, 3), mk(bia, 4)]);
         await h.dwell.addMany([]);
         const all = await h.dwell.listByUser(ana, new Date(t0.getTime() - 1000), 10);
         assert.deepEqual(all.map((r) => r.targetId), ['p3', 'p2', 'p1'], 'mais novo primeiro');
         assert.equal(all[1]!.targetType, 'EVENT');
         assert.equal(all[1]!.source, 'RECO');
+        assert.deepEqual(all.map((r) => r.clicked), [false, true, false], 'guarda o clique');
+        assert.deepEqual((await h.dwell.listAllSince(new Date(t0.getTime() + 1500), 10)).map((r) => r.targetId), ['p4', 'p3', 'p2'], 'todas as pessoas, mais novo primeiro');
+        assert.equal((await h.dwell.listAllSince(t0, 2)).length, 2);
         assert.deepEqual((await h.dwell.listByUser(ana, new Date(t0.getTime() + 1500), 10)).map((r) => r.targetId), ['p3', 'p2'], 'respeita o prazo');
         assert.equal((await h.dwell.listByUser(ana, t0, 1)).length, 1, 'respeita o limite');
         assert.equal(await h.dwell.deleteOlderThan(ana, new Date(t0.getTime() + 2500)), 2);
@@ -783,6 +786,26 @@ export function defineRepositoryContract(
         assert.deepEqual((await h.conversations.listMessages(c.id, 3)).map((m) => m.body), ['m3', 'm4', 'm5']);
         assert.deepEqual((await h.conversations.listMessages(c.id, 10, at(3))).map((m) => m.body), ['m1', 'm2']);
         assert.deepEqual(await h.conversations.listMessages(randomUUID(), 10), []);
+      });
+
+      it('atividade direta: só conversas 1 a 1, sem apagadas nem do sistema, com quem e quem mandou', async () => {
+        const ana = await newUser('da_ana');
+        const bia = await newUser('da_bia');
+        const caio = await newUser('da_caio');
+        const direct = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        const other = await h.conversations.getOrCreateDirect(bia, caio, randomUUID(), at(0));
+        const m1 = msg(direct.id, ana, 'oi', 1);
+        const m2 = msg(direct.id, bia, 'oi!', 2);
+        const m3 = msg(direct.id, bia, 'apagada', 3);
+        const m4 = { ...msg(direct.id, ana, 'sistema', 4), kind: 'SYSTEM' as const };
+        for (const m of [m1, m2, m3, m4, msg(other.id, bia, 'de outra dupla', 5)]) await h.conversations.addMessage(m);
+        await h.conversations.softDeleteMessage(m3.id, at(6));
+        const rows = await h.conversations.directActivity(ana, at(0), 10);
+        assert.deepEqual(rows.map((r) => [r.otherId, r.mine]), [[bia, false], [bia, true]], 'mais novo primeiro');
+        assert.deepEqual((await h.conversations.directActivity(ana, at(2), 10)).map((r) => r.mine), [false], 'respeita o prazo');
+        assert.equal((await h.conversations.directActivity(ana, at(0), 1)).length, 1, 'respeita o limite');
+        assert.deepEqual(await h.conversations.directActivity(caio, at(0), 10), [{ otherId: bia, at: at(5), mine: false }]);
+        assert.deepEqual(await h.conversations.directActivity('nao-e-uuid', at(0), 10), []);
       });
 
       it('compartilhados: só voz e textos com link, mais recentes primeiro, respeitando o limite e quem ocultar', async () => {
