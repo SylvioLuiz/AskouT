@@ -59,11 +59,11 @@ function Report({ r }: { r: RetentionReport }) {
           <tr><td>Conteúdos mostrados (por pessoa e dia)</td><td className="num">{feed.impressions}</td><td className="num">{reco.impressions}</td></tr>
           <tr><td>Pessoas que viram</td><td className="num">{feed.users}</td><td className="num">{reco.users}</td></tr>
           <tr><td>Tempo médio na tela</td><td className="num">{seconds(feed.avgDwellMs)}</td><td className="num">{seconds(reco.avgDwellMs)}</td></tr>
-          <tr><td>Abertos a partir dali</td><td className="num">{feed.clicks > 0 ? feed.clicks : '—'}</td><td className="num">{reco.clicks}</td></tr>
-          <tr><td>Taxa de abertura</td><td className="num">{feed.clicks > 0 ? pct(feed.ctr) : '—'}</td><td className="num">{pct(reco.ctr)}</td></tr>
+          <tr><td>Abertos a partir dali</td><td className="num">{feed.clicks}</td><td className="num">{reco.clicks}</td></tr>
+          <tr><td>Taxa de abertura</td><td className="num">{pct(feed.ctr)}</td><td className="num">{pct(reco.ctr)}</td></tr>
         </tbody>
       </table>
-      <p className="muted small">O feed não registra abertura, só o bloco “Para você”. Por isso a taxa de abertura do feed aparece vazia.</p>
+      <p className="muted small">Abertura é tocar num post ou evento e ir para a página dele. Vale para o feed da Home, o Explorar e os posts de um local. Cliques só passaram a ser gravados no feed depois desta versão; dias anteriores mostram 0 e não servem de comparação.</p>
 
       <h2 className="section">Quem volta</h2>
       <p className="muted small">Para cada dia em que a pessoa usou o app, vemos se ela voltou 1 dia e 7 dias depois. Só contam dias cujo retorno já passou.</p>

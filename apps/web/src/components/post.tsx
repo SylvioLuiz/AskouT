@@ -13,7 +13,7 @@ import { toApiError } from '../lib/errors.ts';
 import type { ApiError } from '../lib/errors.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { feedRatio } from '../lib/crop.ts';
-import { useDwell } from './dwell.tsx';
+import { trackClick, useDwell } from './dwell.tsx';
 import type { DwellSource } from '../lib/dwell.ts';
 import { timeAgo } from '../lib/format.ts';
 import type { PostImage, PostView, PostsPage } from '../lib/types.ts';
@@ -210,7 +210,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
   const cartaz = poster === true && !eventCard;
   const hasVideo = post.images.some((i) => i.videoPath);
   return (
-    <article className="post" ref={dwellRef}>
+    <article className="post" ref={dwellRef} onClickCapture={track ? (ev) => { if ((ev.target as Element).closest('a')) trackClick('POST', initial.id, track); } : undefined}>
       {cartaz ? null : (
       <header className="post__head">
         {post.venue ? (

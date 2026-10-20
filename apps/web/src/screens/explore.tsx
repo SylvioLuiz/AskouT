@@ -35,7 +35,7 @@ import type { RangeId } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { pluralize } from '../lib/format.ts';
 import type { EventKind, ExploreEvent, ExplorePlace, ExploreResult } from '../lib/types.ts';
-import { useDwell } from '../components/dwell.tsx';
+import { trackClick, useDwell } from '../components/dwell.tsx';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
 import { DateBadge, PosterEvent } from '../components/poster.tsx';
@@ -124,7 +124,7 @@ export function EventCard({ event, now, poster }: { event: ExploreEvent; now: Da
 function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
   const dwellRef = useDwell<HTMLLIElement>('EVENT', event.id, 'FEED');
   return (
-    <li className="poster-item" ref={dwellRef}>
+    <li className="poster-item" ref={dwellRef} onClickCapture={(ev) => { if ((ev.target as Element).closest('a')) trackClick('EVENT', event.id, 'FEED'); }}>
       <PosterEvent
         eventId={event.id}
         title={event.title}
