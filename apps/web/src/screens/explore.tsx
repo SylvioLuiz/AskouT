@@ -3,12 +3,13 @@ import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
-import { EventKindIcon, MapIcon, SearchIcon } from '../components/icons.tsx';
+import { ClockIcon, EventKindIcon, MapIcon, SearchIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
 import { Button, EmptyState, ErrorState, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
 import { safeStorage } from '../lib/hints.ts';
+import { addRecent, buildSuggestions, readRecent, removeRecent, saveRecent } from '../lib/recent-searches.ts';
 import { filterByThemes, readThemes, THEMES, themeOfCategory, themeOfEvent } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
@@ -260,6 +261,22 @@ export function ExploreScreen() {
   const [free, setFree] = useState(false);
   const [hot, setHot] = useState(false);
   const me = useUser();
+  const [focused, setFocused] = useState(false);
+  const [recent, setRecent] = useState<string[]>(() => readRecent(safeStorage(), me.id));
+  function commitSearch(term: string) {
+    setRecent((current) => {
+      const next = addRecent(current, term);
+      saveRecent(safeStorage(), me.id, next);
+      return next;
+    });
+  }
+  function forgetSearch(term?: string) {
+    setRecent((current) => {
+      const next = term === undefined ? [] : removeRecent(current, term);
+      saveRecent(safeStorage(), me.id, next);
+      return next;
+    });
+  }
   const [themes, setThemes] = useState<ReadonlySet<ThemeId>>(() => {
     // O que a pessoa escolheu no começo vira o filtro inicial, a não ser que ela tenha marcado todos (aí não filtra nada).
     const saved = readThemes(safeStorage(), me.id);
@@ -332,6 +349,22 @@ export function ExploreScreen() {
     inputRef.current?.focus();
   }
 
+  const hasResults = data !== undefined && data !== null && data.events.length + data.places.length + data.people.length > 0;
+  // Buscou, achou e ficou na tela: entra nas recentes (sem salvar cada letra digitada).
+  useEffect(() => {
+    if (q === '' || !hasResults) return;
+    const timer = setTimeout(() => commitSearch(q), 1500);
+    return () => clearTimeout(timer);
+    // commitSearch só usa o setter e o id do usuário.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q, hasResults]);
+  const suggestions = buildSuggestions({ tags: raw?.tags ?? [], places: raw?.places ?? [], recent });
+  const showPanel = focused && query.trim() === '' && (recent.length > 0 || suggestions.length > 0);
+  function pick(term: string) {
+    setQuery(term);
+    commitSearch(term);
+  }
+
   const counts = data ? { events: data.events.length, places: data.places.length, people: data.people.length, tags: data.tags.length } : null;
   const tabs: { id: Tab; label: string; n: number | null }[] = [
     { id: 'all', label: 'Tudo', n: null },
@@ -369,12 +402,60 @@ export function ExploreScreen() {
           placeholder="Eventos, rolês, pessoas ou #"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') commitSearch(query);
+          }}
           autoComplete="off"
           autoCapitalize="none"
           spellCheck={false}
           maxLength={80}
         />
       </div>
+
+      {showPanel ? (
+        // onPointerDown evita que o campo perca o foco (e o painel suma) antes do toque valer.
+        <div className="searchpanel" onPointerDown={(event) => event.preventDefault()}>
+          {recent.length > 0 ? (
+            <section aria-label="Buscas recentes">
+              <div className="searchpanel__head">
+                <h2 className="searchpanel__h">Recentes</h2>
+                <button type="button" className="searchpanel__clear" onClick={() => forgetSearch()}>
+                  Limpar
+                </button>
+              </div>
+              <ul className="searchpanel__list">
+                {recent.map((term) => (
+                  <li key={term} className="searchpanel__row">
+                    <button type="button" className="searchpanel__item" onClick={() => pick(term)}>
+                      <ClockIcon />
+                      <span>{term}</span>
+                    </button>
+                    <button type="button" className="searchpanel__x" aria-label={`Apagar a busca ${term}`} onClick={() => forgetSearch(term)}>
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {suggestions.length > 0 ? (
+            <section aria-label="Sugestões">
+              <h2 className="searchpanel__h">Sugestões</h2>
+              <ul className="tagchips">
+                {suggestions.map((term) => (
+                  <li key={term}>
+                    <button type="button" className="fchip" onClick={() => pick(term)}>
+                      {term}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="filters" role="group" aria-label="Filtros">
         {THEMES.map((theme) => (
