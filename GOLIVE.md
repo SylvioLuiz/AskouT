@@ -79,3 +79,13 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 - Onde aparece: primeiro nos resultados do Explorar (fora do filtro "Bombando") e até 2 eventos na Home ("Rolês em destaque"), com rodízio por hora. Sempre com a etiqueta "Patrocinado" (exigência de transparência publicitária; revisar com advogado, CONAR/CDC).
 - Antes de cobrar de verdade: termos de uso do anunciante, política de reembolso, emissão de nota fiscal e CNPJ/regime da empresa. Nada disso está feito.
 - Migração `20261117120000_boosts` escrita à mão e **nunca rodada em Postgres**; rodar `prisma migrate deploy` + `prisma generate` e testar o `PrismaBoostRepository` antes de publicar.
+
+## Rolê para o grupo (motor de inteligência social)
+- Tela `/sugestoes` (botão na Agenda) e rota `POST /explore/group-match` (só lê). Você escolhe até 9 amigos (seguimento mútuo) e um período de 7, 14 ou 30 dias.
+- Gosto de cada pessoa = locais que segue + eventos em que confirmou presença (últimos 50): local, tipo de evento, categoria do local e hashtags. Nota do grupo = metade média, metade pior caso (agrada a todos, não só a um). Nota final = 60% gosto + 40% data. Pesos em `core/group-match-service.ts`.
+- Data: usa a agenda de cada um. Quem marcou "não posso" tira o evento da lista. Quem não preencheu agenda não bloqueia, mas o evento perde pontos ("Ninguém marcou que está ocupado").
+- Privacidade: a resposta traz só o resultado do grupo e motivos genéricos; nunca diz quem segue o quê nem a agenda de alguém. Citar na política de privacidade que o app cruza locais seguidos, presenças e agenda dos amigos escolhidos.
+- Limite honesto: é regra de pontuação, não aprendizado de máquina. Só considera eventos do AskouT (não lugares do Google/OSM) e não usa distância. Com pouca gente seguindo rolês, a lista vem vazia ("Ainda não dá para sugerir").
+
+## Contador de segundos nos posts
+- O tempo do post anda sozinho: "há 12 s" no 1º minuto (atualiza a cada 1 s), "há 5 min" até 1 h (a cada 30 s) e depois fica parado. Só nos posts (lista e página do post), não em comentários.

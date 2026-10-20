@@ -16,6 +16,7 @@ import { FlashScreen, MatchScreen } from './screens/flash.tsx';
 import { DatePollCreateScreen } from './components/date-poll-create.tsx';
 import { ChatInfoScreen } from './screens/chat-info.tsx';
 import { GroupScreen } from './screens/group.tsx';
+import { GroupMatchScreen } from './screens/group-match.tsx';
 import { BoostScreen } from './screens/boost.tsx';
 import { VenuePageScreen } from './screens/venue-page.tsx';
 import { VenuesScreen } from './screens/venues.tsx';
@@ -52,6 +53,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/conversas/:id', render: (p) => <ChatScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/planejar/nova/:id', render: (p) => <DatePollCreateScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/planejar/:id', render: (p) => <DatePollScreen key={p['id']} pollId={p['id'] ?? ''} /> },
+  { path: '/sugestoes', render: () => <GroupMatchScreen /> },
   { path: '/agenda', render: () => <AgendaScreen /> },
   { path: '/flash', render: () => <FlashScreen /> },
   { path: '/flash/encontro/:id', render: (p) => <MatchScreen inviteId={p['id'] ?? ''} /> },

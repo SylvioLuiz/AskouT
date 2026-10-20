@@ -25,14 +25,26 @@ export function pluralize(count: number, singular: string, plural: string): stri
 }
 
 /** "agora", "há 5 min", "há 3 h", "há 2 dias" ou a data, para posts. */
-export function timeAgo(iso: string, now: Date): string {
+export function timeAgo(iso: string, now: Date, options: { seconds?: boolean } = {}): string {
   const diff = Math.max(0, now.getTime() - Date.parse(iso));
   const min = Math.floor(diff / 60_000);
-  if (min < 1) return 'agora';
+  if (min < 1) {
+    const sec = Math.floor(diff / 1000);
+    return options.seconds && sec >= 1 ? `há ${sec} s` : 'agora';
+  }
   if (min < 60) return `há ${min} min`;
   const h = Math.floor(min / 60);
   if (h < 24) return `há ${h} h`;
   const d = Math.floor(h / 24);
   if (d < 7) return `há ${d} ${d === 1 ? 'dia' : 'dias'}`;
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}
+
+/** Quando a tela precisa se atualizar de novo: a cada segundo no 1º minuto, a cada 30 s até 1 h, depois nunca (null). */
+export function nextTickMs(iso: string, nowMs: number): number | null {
+  const age = nowMs - Date.parse(iso);
+  if (Number.isNaN(age)) return null;
+  if (age < 60_000) return 1000;
+  if (age < 3_600_000) return 30_000;
+  return null;
 }

@@ -13,7 +13,7 @@ import { toApiError } from '../lib/errors.ts';
 import type { ApiError } from '../lib/errors.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { feedRatio } from '../lib/crop.ts';
-import { timeAgo } from '../lib/format.ts';
+import { LiveAgo } from './live-ago.tsx';
 import type { PostImage, PostView, PostsPage } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 
@@ -222,7 +222,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster }: { post: Pos
           </Link>
         )}
         <Link to={`/posts/${encodeURIComponent(post.id)}`} className="post__when">
-          {timeAgo(post.createdAt, new Date())}
+          <LiveAgo iso={post.createdAt} />
           {post.edited ? ' · editado' : ''}
         </Link>
         <button type="button" className="iconbtn post__more" onClick={() => setSheet('menu')} aria-label="Mais opções do post" aria-haspopup="dialog">
@@ -288,7 +288,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster }: { post: Pos
                 )}
                 <Link to={`/posts/${encodeURIComponent(post.id)}`} className="poster__sub">
                   {post.placeName && !post.venue ? `${post.placeName} · ` : ''}
-                  {timeAgo(post.createdAt, new Date())}
+                  <LiveAgo iso={post.createdAt} />
                   {post.edited ? ' · editado' : ''}
                 </Link>
               </span>

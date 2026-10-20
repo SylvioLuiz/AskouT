@@ -826,3 +826,20 @@ export interface BoostView {
   endsAt: string | null;
   payment: { pixCode: string | null; checkoutUrl: string | null } | null;
 }
+
+// ---------- Sugestões para o grupo ----------
+
+export type GroupDateFit = 'ALL_FREE' | 'MOST_FREE' | 'UNKNOWN';
+
+export interface GroupSuggestion {
+  event: { id: string; title: string; kind: EventKind; isFree: boolean; imageUrl: string | null; venueId: string; venueName: string; startsAt: string; endsAt: string; sample: boolean };
+  score: number;
+  reasons: string[];
+  dateFit: GroupDateFit;
+}
+
+export interface GroupSuggestions {
+  people: number;
+  hasTaste: boolean;
+  items: GroupSuggestion[];
+}

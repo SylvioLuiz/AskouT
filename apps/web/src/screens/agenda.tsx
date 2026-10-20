@@ -201,6 +201,9 @@ export function AgendaScreen() {
       <PageHead title="Agenda" subtitle="Só você vê esta agenda. Marque quando topa sair." />
 
       <div className="agsync">
+        <Link className="btn btn--secondary btn--small" to="/sugestoes">
+          Sugerir rolê para o grupo
+        </Link>
         <Button variant="quiet" small onClick={() => setSyncing(true)}>
           {syncedN > 0 ? `Sincronizar · ${syncedN} ${syncedN === 1 ? 'ligada' : 'ligadas'}` : 'Sincronizar'}
         </Button>
