@@ -826,3 +826,31 @@ export interface BoostView {
   endsAt: string | null;
   payment: { pixCode: string | null; checkoutUrl: string | null } | null;
 }
+
+// ---------- Recomendações ----------
+
+export interface RecommendationItem {
+  type: 'EVENT' | 'POST';
+  score: number;
+  reasons: string[];
+  friendsGoing: PublicProfile[];
+  friendsEngaged: number;
+  event: {
+    id: string;
+    title: string;
+    kind: EventKind;
+    isFree: boolean;
+    imageUrl: string | null;
+    venueId: string;
+    venueName: string;
+    startsAt: string;
+    endsAt: string;
+    sample: boolean;
+  } | null;
+  post: PostView | null;
+}
+
+export interface Recommendations {
+  personalized: boolean;
+  items: RecommendationItem[];
+}

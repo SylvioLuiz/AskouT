@@ -13,6 +13,8 @@ import { toApiError } from '../lib/errors.ts';
 import type { ApiError } from '../lib/errors.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { feedRatio } from '../lib/crop.ts';
+import { useDwell } from './dwell.tsx';
+import type { DwellSource } from '../lib/dwell.ts';
 import { timeAgo } from '../lib/format.ts';
 import type { PostImage, PostView, PostsPage } from '../lib/types.ts';
 import { Link } from '../router.tsx';
@@ -133,7 +135,8 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
   );
 }
 
-export function PostCard({ post: initial, onGone, asEvent, poster }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean; poster?: boolean }) {
+export function PostCard({ post: initial, onGone, asEvent, poster, track }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean; poster?: boolean; track?: DwellSource }) {
+  const dwellRef = useDwell<HTMLElement>('POST', initial.id, track ?? false);
   const [post, setPost] = useState(initial);
   const [sheet, setSheet] = useState<'menu' | 'edit' | 'adjust' | 'report' | 'comments' | 'share' | undefined>();
   const [busy, setBusy] = useState(false);
@@ -207,7 +210,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster }: { post: Pos
   const cartaz = poster === true && !eventCard;
   const hasVideo = post.images.some((i) => i.videoPath);
   return (
-    <article className="post">
+    <article className="post" ref={dwellRef}>
       {cartaz ? null : (
       <header className="post__head">
         {post.venue ? (
@@ -418,12 +421,13 @@ export function PostCard({ post: initial, onGone, asEvent, poster }: { post: Pos
 
 /** Lista de posts com "Carregar mais". `load` busca uma página a partir de um deslocamento. */
 /** `inject`: bloco que entra depois de `after` posts (ou no fim, se houver menos). */
-export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { load: (offset: number) => Promise<PostsPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } }) {
+export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { load: (offset: number) => Promise<PostsPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } | { after: number; node: ReactNode }[] }) {
   const [page, setPage] = useState<PostsPage | undefined>();
   const [items, setItems] = useState<PostView[]>([]);
   const [error, setError] = useState<ApiError | undefined>();
   const [loading, setLoading] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
+  const injected = inject === undefined ? [] : Array.isArray(inject) ? inject : [inject];
   async function more(offset: number) {
     setLoading(true);
     setError(undefined);
@@ -464,7 +468,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
     return (
       <>
         <EmptyState title={emptyTitle}>{emptyHint}</EmptyState>
-        {inject?.node}
+        {injected.map((i) => (<Fragment key={i.after}>{i.node}</Fragment>))}
       </>
     );
   }
@@ -472,8 +476,8 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
     <div className="postlist">
       {items.map((post, index) => (
         <Fragment key={post.id}>
-          <PostCard post={post} asEvent poster onGone={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
-          {inject && index === Math.min(inject.after, items.length) - 1 ? inject.node : null}
+          <PostCard post={post} asEvent poster track="FEED" onGone={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
+          {injected.filter((i) => index === Math.min(i.after, items.length) - 1).map((i) => (<Fragment key={i.after}>{i.node}</Fragment>))}
         </Fragment>
       ))}
       {error ? <ErrorState message={error.message} onRetry={() => void more(items.length)} /> : null}

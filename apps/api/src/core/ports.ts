@@ -1,4 +1,4 @@
-import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -87,6 +87,17 @@ export interface PasswordResetRepository {
   delete(userId: string): Promise<void>;
   /** Soma 1 às tentativas erradas de forma ATÔMICA e devolve o total (undefined se não existe mais). */
   incrementAttempts(userId: string): Promise<number | undefined>;
+}
+
+/** Tempo que cada conteúdo ficou na tela de cada pessoa. Dado de comportamento: tem prazo e a pessoa pode apagar. */
+export interface DwellRepository {
+  addMany(records: DwellRecord[]): Promise<void>;
+  /** Medições desde `since`, mais recentes primeiro. */
+  listByUser(userId: string, since: Date, limit: number): Promise<DwellRecord[]>;
+  /** Apaga tudo da pessoa. Devolve quantas. */
+  deleteByUser(userId: string): Promise<number>;
+  /** Apaga as da pessoa anteriores a `before`. Devolve quantas. */
+  deleteOlderThan(userId: string, before: Date): Promise<number>;
 }
 
 export interface BoostRepository {
@@ -330,6 +341,8 @@ export interface PostRepository {
   unlike(postId: string, userId: string): Promise<void>;
   /** Curtidas de cada post e se `viewerId` curtiu. */
   likeStats(postIds: string[], viewerId: string): Promise<{ postId: string; count: number; liked: boolean }[]>;
+  /** Curtidas e comentários da pessoa desde `since`, mais recentes primeiro. Alimenta as recomendações. */
+  listEngagement(userId: string, since: Date, limit: number): Promise<EngagementRow[]>;
   addComment(comment: PostCommentRecord): Promise<void>;
   findComment(id: string): Promise<PostCommentRecord | undefined>;
   /** Mais antigos primeiro. */
@@ -612,6 +625,7 @@ export interface CoreDeps {
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
   boosts: BoostRepository;
+  dwell: DwellRepository;
   payments: PaymentGateway;
   identities: IdentityRepository;
   verifier: IdentityVerifier;

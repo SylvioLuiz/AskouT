@@ -1,8 +1,10 @@
 import { errorFromResponse, networkError } from './errors.ts';
 import type { ConfirmationAnswer, PollInput, PollSummary, PollView, VoteStatus } from './date-poll.ts';
+import type { DwellEntry } from './dwell.ts';
 import type { SuggestedPerson } from './suggested-people.ts';
 import type {
   BoostPricing,
+  Recommendations,
   BoostView,
   ClaimableVenue,
   ExploreEvent,
@@ -278,6 +280,9 @@ export function createApi(deps: ApiDeps) {
       const text = query.toString();
       return request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
     },
+    recommendations: (personalize: boolean) => request<Recommendations>('GET', `/me/recommendations?personalize=${personalize ? 'true' : 'false'}`),
+    recordDwell: (items: DwellEntry[]) => request<{ saved: number }>('POST', '/me/dwell', { body: { items } }),
+    eraseDwell: () => request<{ removed: number }>('DELETE', '/me/dwell'),
     boostPricing: () => request<BoostPricing>('GET', '/boosts/pricing'),
     venueBoosts: (venueId: string) => request<{ items: BoostView[] }>('GET', `/me/venues/${id(venueId)}/boosts`),
     createBoost: (venueId: string, body: { target: 'VENUE' | 'EVENT'; eventId?: string; days: number }) => request<BoostView>('POST', `/me/venues/${id(venueId)}/boosts`, { body }),

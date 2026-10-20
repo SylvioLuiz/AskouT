@@ -35,6 +35,7 @@ import type { RangeId } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { pluralize } from '../lib/format.ts';
 import type { EventKind, ExploreEvent, ExplorePlace, ExploreResult } from '../lib/types.ts';
+import { useDwell } from '../components/dwell.tsx';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
 import { DateBadge, PosterEvent } from '../components/poster.tsx';
@@ -121,8 +122,9 @@ export function EventCard({ event, now, poster }: { event: ExploreEvent; now: Da
 
 /** Evento em formato de cartaz (Home): foto inteira, data em destaque e "Eu vou". */
 function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
+  const dwellRef = useDwell<HTMLLIElement>('EVENT', event.id, 'FEED');
   return (
-    <li className="poster-item">
+    <li className="poster-item" ref={dwellRef}>
       <PosterEvent
         eventId={event.id}
         title={event.title}

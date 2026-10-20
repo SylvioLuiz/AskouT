@@ -15,6 +15,8 @@ import { VenueService } from './venue-service.ts';
 import { BoostService } from './boost-service.ts';
 import { AdminService } from './admin-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
+import { DwellService } from './dwell-service.ts';
+import { RecommendationService } from './recommendation-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
 import { NotificationService, StoredNotifier } from './notification-service.ts';
 import { ProfileService } from './profile-service.ts';
@@ -34,6 +36,7 @@ export function createCore(input: CoreInput) {
   const profiles = new ProfileService(deps);
   const venues = new VenueService(deps);
   const auth = new AuthService(deps);
+  const posts = new PostService(deps, profiles);
   const boosts = new BoostService(deps, input.boostPricePerDayCents === undefined ? {} : { pricePerDayCents: input.boostPricePerDayCents });
   return {
     boosts,
@@ -53,7 +56,9 @@ export function createCore(input: CoreInput) {
     meetups: new MeetupService(deps),
     scheduling: new SchedulingService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
-    posts: new PostService(deps, profiles),
+    posts,
+    dwell: new DwellService(deps),
+    recommendations: new RecommendationService(deps, posts),
     notifications: new NotificationService(input),
     /** Espera os pushes em andamento (testes e desligamento). */
     flushNotifications: () => notifier.flush(),
@@ -111,6 +116,9 @@ export type {
 } from './flash-service.ts';
 export { ConversationService, MESSAGE_MAX, MESSAGES_PER_MINUTE, parseSuggestion } from './conversation-service.ts';
 export type { ConversationListItem, ConversationView, GroupDetails, MessageView } from './conversation-service.ts';
+export { RecommendationService } from './recommendation-service.ts';
+export type { RecommendationItem, RecommendationsView } from './recommendation-service.ts';
+export { DwellService } from './dwell-service.ts';
 export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_APART_M } from './suggestion-service.ts';
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { EventPageService } from './event-page-service.ts';

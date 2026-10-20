@@ -26,6 +26,7 @@ import type {
   IdGenerator,
   PasswordResetRepository,
   BoostRepository,
+  DwellRepository,
   PaymentCharge,
   PaymentGateway,
   PendingSignupRepository,
@@ -36,7 +37,9 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
-import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+import type {
+  DwellRecord,
+  EngagementRow, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -512,6 +515,38 @@ export class InMemoryPasswordResetRepository implements PasswordResetRepository 
     if (!r) return undefined;
     r.attempts += 1;
     return r.attempts;
+  }
+}
+
+export class InMemoryDwellRepository implements DwellRepository {
+  readonly rows: DwellRecord[] = [];
+
+  async addMany(records: DwellRecord[]): Promise<void> {
+    for (const r of records) this.rows.push({ ...r });
+  }
+
+  async listByUser(userId: string, since: Date, limit: number): Promise<DwellRecord[]> {
+    return this.rows
+      .filter((r) => r.userId === userId && r.createdAt >= since)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+      .slice(0, limit)
+      .map((r) => ({ ...r }));
+  }
+
+  async deleteByUser(userId: string): Promise<number> {
+    return this.removeWhere((r) => r.userId === userId);
+  }
+
+  async deleteOlderThan(userId: string, before: Date): Promise<number> {
+    return this.removeWhere((r) => r.userId === userId && r.createdAt < before);
+  }
+
+  private removeWhere(test: (r: DwellRecord) => boolean): number {
+    const keep = this.rows.filter((r) => !test(r));
+    const removed = this.rows.length - keep.length;
+    this.rows.length = 0;
+    this.rows.push(...keep);
+    return removed;
   }
 }
 
@@ -1460,6 +1495,16 @@ export class InMemoryPostRepository implements PostRepository {
       count: [...this.likes.keys()].filter((k) => k.startsWith(`${postId}|`)).length,
       liked: this.likes.has(`${postId}|${viewerId}`),
     }));
+  }
+
+  async listEngagement(userId: string, since: Date, limit: number): Promise<EngagementRow[]> {
+    const rows: EngagementRow[] = [];
+    for (const [key, at] of this.likes) {
+      const [postId, who] = key.split('|');
+      if (who === userId && at >= since && this.posts.has(postId!)) rows.push({ postId: postId!, kind: 'LIKE', at });
+    }
+    for (const c of this.comments.values()) if (c.authorId === userId && c.createdAt >= since && this.posts.has(c.postId)) rows.push({ postId: c.postId, kind: 'COMMENT', at: c.createdAt });
+    return rows.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, limit);
   }
 
   async addComment(comment: PostCommentRecord): Promise<void> {

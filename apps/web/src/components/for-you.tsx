@@ -1,0 +1,78 @@
+import { useEffect, useState } from 'react';
+import { Avatar } from './ui.tsx';
+import { PostCard } from './post.tsx';
+import { useDwell } from './dwell.tsx';
+import { EventKindIcon } from './icons.tsx';
+import { useUser } from '../auth.tsx';
+import { api } from '../client.ts';
+import { readPersonalize } from '../lib/dwell.ts';
+import { kindLabel, safeImage } from '../lib/explore.ts';
+import type { RecommendationItem } from '../lib/types.ts';
+import { Link } from '../router.tsx';
+
+const when = (iso: string) => new Date(iso).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+function Reasons({ item }: { item: RecommendationItem }) {
+  return (
+    <ul className="foryou__reasons">
+      {item.friendsGoing.length > 0 ? (
+        <li className="foryou__faces" aria-hidden="true">
+          {item.friendsGoing.map((p) => (<Avatar key={p.userId} profile={p} size={22} />))}
+        </li>
+      ) : null}
+      {item.reasons.map((r) => (<li key={r}>{r}</li>))}
+    </ul>
+  );
+}
+
+function EventReco({ item }: { item: RecommendationItem }) {
+  const e = item.event!;
+  const ref = useDwell<HTMLLIElement>('EVENT', e.id, 'RECO');
+  const image = safeImage(e.imageUrl);
+  return (
+    <li ref={ref} className="foryou__card">
+      <Link to={`/eventos/${encodeURIComponent(e.id)}`} className="foryou__link">
+        <span className={`foryou__cover evcover--${e.kind.toLowerCase()}`}>
+          {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <EventKindIcon kind={e.kind} />}
+        </span>
+        <strong className="foryou__title">{e.title}</strong>
+        <span className="foryou__meta">{e.venueName} · {kindLabel(e.kind)}</span>
+        <span className="foryou__meta">{when(e.startsAt)}</span>
+      </Link>
+      <Reasons item={item} />
+    </li>
+  );
+}
+
+function PostReco({ item }: { item: RecommendationItem }) {
+  const ref = useDwell<HTMLLIElement>('POST', item.post!.id, 'RECO');
+  return (
+    <li ref={ref} className="foryou__post">
+      <PostCard post={item.post!} asEvent poster />
+      <Reasons item={item} />
+    </li>
+  );
+}
+
+/** Bloco no meio da Home: o que seus amigos mais próximos foram ou curtiram e o que combina com o que te prende. */
+export function ForYou({ reloadKey }: { reloadKey?: string }) {
+  const me = useUser().profile.userId;
+  const [items, setItems] = useState<RecommendationItem[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    api.recommendations(readPersonalize(me)).then(
+      (r) => { if (!cancelled) setItems(r.items); },
+      () => { if (!cancelled) setItems([]); },
+    );
+    return () => { cancelled = true; };
+  }, [me, reloadKey]);
+  if (items.length === 0) return null;
+  return (
+    <section className="foryou" aria-labelledby="foryou-titulo">
+      <h2 id="foryou-titulo" className="section__title">Para você</h2>
+      <ul className="foryou__list">
+        {items.map((item) => (item.type === 'EVENT' && item.event ? <EventReco key={`e${item.event.id}`} item={item} /> : item.post ? <PostReco key={`p${item.post.id}`} item={item} /> : null))}
+      </ul>
+    </section>
+  );
+}

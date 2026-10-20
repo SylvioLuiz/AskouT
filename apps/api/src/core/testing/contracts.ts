@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { BoostRepository, EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
-import type { BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
+import type { DwellRepository, BoostRepository, EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
+import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -19,6 +19,7 @@ export interface RepoHarness {
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
   boosts: BoostRepository;
+  dwell: DwellRepository;
   availability: AvailabilityRepository;
   flash: FlashRepository;
   conversations: ConversationRepository;
@@ -420,6 +421,45 @@ export function defineRepositoryContract(
         await h.passwordResets.delete(user);
         assert.equal(await h.passwordResets.find(user), undefined);
         assert.equal(await h.passwordResets.incrementAttempts(user), undefined);
+      });
+
+      it('permanência: grava, lista só o prazo pedido, apaga por pessoa e por data', async () => {
+        const ana = await newUser('dwell_ana');
+        const bia = await newUser('dwell_bia');
+        const t0 = new Date(Date.UTC(2030, 0, 10, 12));
+        const mk = (userId: string, n: number, over: Partial<DwellRecord> = {}): DwellRecord => ({ id: randomUUID(), userId, targetType: 'POST', targetId: `p${n}`, ms: 4000 + n, source: 'FEED', createdAt: new Date(t0.getTime() + n * 1000), ...over });
+        await h.dwell.addMany([mk(ana, 1), mk(ana, 2, { targetType: 'EVENT', source: 'RECO' }), mk(ana, 3), mk(bia, 4)]);
+        await h.dwell.addMany([]);
+        const all = await h.dwell.listByUser(ana, new Date(t0.getTime() - 1000), 10);
+        assert.deepEqual(all.map((r) => r.targetId), ['p3', 'p2', 'p1'], 'mais novo primeiro');
+        assert.equal(all[1]!.targetType, 'EVENT');
+        assert.equal(all[1]!.source, 'RECO');
+        assert.deepEqual((await h.dwell.listByUser(ana, new Date(t0.getTime() + 1500), 10)).map((r) => r.targetId), ['p3', 'p2'], 'respeita o prazo');
+        assert.equal((await h.dwell.listByUser(ana, t0, 1)).length, 1, 'respeita o limite');
+        assert.equal(await h.dwell.deleteOlderThan(ana, new Date(t0.getTime() + 2500)), 2);
+        assert.deepEqual((await h.dwell.listByUser(ana, t0, 10)).map((r) => r.targetId), ['p3']);
+        assert.equal(await h.dwell.deleteByUser(ana), 1);
+        assert.equal((await h.dwell.listByUser(bia, t0, 10)).length, 1, 'não mexe em outra pessoa');
+        assert.equal(await h.dwell.deleteByUser('nao-e-uuid'), 0);
+      });
+
+      it('engajamento: curtidas e comentários de uma pessoa, do mais novo ao mais antigo', async () => {
+        const ana = await newUser('eng_ana');
+        const bia = await newUser('eng_bia');
+        const t0 = new Date(Date.UTC(2030, 0, 10, 12));
+        const mk = (id: string): PostRecord => ({ id, authorId: bia, caption: 'x', placeName: null, placeAddress: null, eventTitle: null, eventStartsAt: null, eventEndsAt: null, eventKind: 'OTHER', eventPostsPublic: false, archivedAt: null, editedAt: null, createdAt: t0 });
+        const p1 = randomUUID();
+        const p2 = randomUUID();
+        await h.posts.create(mk(p1), []);
+        await h.posts.create(mk(p2), []);
+        await h.posts.like(p1, ana, new Date(t0.getTime() + 1000));
+        await h.posts.addComment({ id: randomUUID(), postId: p2, authorId: ana, body: 'oi', createdAt: new Date(t0.getTime() + 2000) });
+        await h.posts.like(p2, bia, new Date(t0.getTime() + 3000));
+        const rows = await h.posts.listEngagement(ana, t0, 10);
+        assert.deepEqual(rows.map((r) => [r.postId, r.kind]), [[p2, 'COMMENT'], [p1, 'LIKE']]);
+        assert.deepEqual((await h.posts.listEngagement(ana, new Date(t0.getTime() + 1500), 10)).map((r) => r.postId), [p2], 'respeita o prazo');
+        assert.equal((await h.posts.listEngagement(ana, t0, 1)).length, 1, 'respeita o limite');
+        assert.deepEqual(await h.posts.listEngagement('nao-e-uuid', t0, 10), []);
       });
 
       it('impulsionamento: cria, confirma o pagamento uma única vez e lista só os ativos', async () => {

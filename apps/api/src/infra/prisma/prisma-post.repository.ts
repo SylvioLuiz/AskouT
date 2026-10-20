@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type { PostRepository } from '../../core/ports.ts';
-import type { Page, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages } from '../../core/types.ts';
+import type { EngagementRow, Page, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 export class PrismaPostRepository implements PostRepository {
@@ -222,6 +222,19 @@ export class PrismaPostRepository implements PostRepository {
     const counts = new Map(groups.map((g) => [g.postId, g._count._all]));
     const liked = new Set(mine.map((m) => m.postId));
     return ids.map((postId) => ({ postId, count: counts.get(postId) ?? 0, liked: liked.has(postId) }));
+  }
+
+  async listEngagement(userId: string, since: Date, limit: number): Promise<EngagementRow[]> {
+    if (!isUuid(userId)) return [];
+    const [likes, comments] = await Promise.all([
+      this.prisma.postLike.findMany({ where: { userId, createdAt: { gte: since } }, orderBy: { createdAt: 'desc' }, take: limit }),
+      this.prisma.postComment.findMany({ where: { authorId: userId, createdAt: { gte: since } }, orderBy: { createdAt: 'desc' }, take: limit }),
+    ]);
+    const rows: EngagementRow[] = [
+      ...likes.map((l) => ({ postId: l.postId, kind: 'LIKE' as const, at: l.createdAt })),
+      ...comments.map((c) => ({ postId: c.postId, kind: 'COMMENT' as const, at: c.createdAt })),
+    ];
+    return rows.sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, limit);
   }
 
   async addComment(comment: PostCommentRecord): Promise<void> {

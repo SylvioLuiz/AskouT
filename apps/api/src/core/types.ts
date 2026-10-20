@@ -836,3 +836,28 @@ export interface BoostRecord {
   startsAt: Date | null;
   endsAt: Date | null;
 }
+
+// ---------- Recomendação ----------
+
+export type DwellTarget = 'POST' | 'EVENT';
+/** De onde veio a exibição: feed normal, bloco "Para você" ou outro lugar. */
+export type DwellSource = 'FEED' | 'RECO' | 'OTHER';
+
+/** Quanto tempo um conteúdo ficou visível na tela da pessoa (uma medição). */
+export interface DwellRecord {
+  id: string;
+  userId: string;
+  targetType: DwellTarget;
+  targetId: string;
+  /** Milissegundos visível. */
+  ms: number;
+  source: DwellSource;
+  createdAt: Date;
+}
+
+/** Curtida ou comentário de uma pessoa num post. */
+export interface EngagementRow {
+  postId: string;
+  kind: 'LIKE' | 'COMMENT';
+  at: Date;
+}

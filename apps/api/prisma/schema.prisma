@@ -151,6 +151,7 @@ model User {
   settings UserSettings?
   passwordReset PasswordReset?
   boosts        Boost[]
+  dwells        ContentDwell[]
 
   following Follow[] @relation("Follower")
   followers Follow[] @relation("Followee")
@@ -1209,4 +1210,23 @@ model Boost {
 
   @@index([venueId, createdAt])
   @@index([status, startsAt, endsAt])
+}
+
+/// Quanto tempo um conteúdo ficou visível na tela da pessoa. Alimenta as recomendações da Home.
+/// Dado de comportamento (LGPD): guardado por 60 dias, a pessoa pode desligar e apagar.
+model ContentDwell {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  /// 'POST' ou 'EVENT'.
+  targetType String
+  /// Sem chave estrangeira: o conteúdo pode sumir e a medição continua até vencer o prazo.
+  targetId   String
+  ms         Int
+  /// 'FEED', 'RECO' ou 'OTHER'.
+  source     String
+  createdAt  DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

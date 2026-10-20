@@ -6,6 +6,7 @@ import { api } from '../client.ts';
 import { useAuthContext, useUser } from '../auth.tsx';
 import { useAsync, useTitle } from '../hooks.ts';
 import { formatWhen } from '../lib/chat.ts';
+import { readPersonalize, savePersonalize } from '../lib/dwell.ts';
 import { toApiError } from '../lib/errors.ts';
 import { pluralize } from '../lib/format.ts';
 import { resizeProfilePhoto } from '../lib/image.ts';
@@ -203,11 +204,73 @@ export function PrivacyScreen() {
           <span className="switch__thumb" />
         </button>
       </section>
+      <PersonalizeSetting userId={user.profile.userId} />
       <nav className="linklist" aria-label="Privacidade">
         <Link to="/atividades">Pedidos para seguir</Link>
         <Link to="/bloqueados">Pessoas bloqueadas</Link>
         <Link to={`/u/${encodeURIComponent(user.profile.username)}`}>Ver como os outros veem</Link>
       </nav>
+    </>
+  );
+}
+
+/** Recomendações que usam o tempo que você fica em cada conteúdo. Ligado por padrão; dá para desligar e apagar o histórico. */
+function PersonalizeSetting({ userId }: { userId: string }) {
+  const [on, setOn] = useState(() => readPersonalize(userId));
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Message>();
+
+  async function change() {
+    const next = !on;
+    setOn(next);
+    savePersonalize(userId, next);
+    if (next) {
+      setMessage({ tone: 'ok', text: 'Recomendações personalizadas ligadas.' });
+      return;
+    }
+    // Desligar também apaga o que já foi medido.
+    setBusy(true);
+    try {
+      await api.eraseDwell();
+      setMessage({ tone: 'ok', text: 'Desligado. Apagamos o seu histórico de tempo na tela. Você ainda vê o que os amigos fizeram, mas sem usar o seu comportamento.' });
+    } catch (failure) {
+      setMessage({ tone: 'error', text: `Desligamos, mas não deu para apagar o histórico agora: ${toApiError(failure).message}` });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function erase() {
+    setBusy(true);
+    try {
+      const r = await api.eraseDwell();
+      setMessage({ tone: 'ok', text: r.removed > 0 ? 'Histórico apagado.' : 'Não havia nada para apagar.' });
+    } catch (failure) {
+      setMessage({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      <section className="setting">
+        <div className="setting__text">
+          <h2 className="setting__title" id="personalizar-titulo">
+            Recomendações personalizadas
+          </h2>
+          <p className="setting__help">O app mede quanto tempo você fica em cada post ou evento e usa isso, junto com o que seus amigos mais próximos foram ou curtiram, para montar o bloco “Para você”. Guardamos por 60 dias e ninguém vê.</p>
+        </div>
+        <button type="button" role="switch" aria-checked={on} aria-labelledby="personalizar-titulo" className="switch" onClick={() => void change()} disabled={busy}>
+          <span className="switch__thumb" />
+        </button>
+      </section>
+      <div className="setting__actions">
+        <Button variant="quiet" small loading={busy} onClick={() => void erase()}>
+          Apagar meu histórico de tempo na tela
+        </Button>
+      </div>
     </>
   );
 }

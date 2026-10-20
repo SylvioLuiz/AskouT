@@ -20,6 +20,7 @@ import {
   InMemoryFollowRepository,
   InMemoryPasswordResetRepository,
   InMemoryBoostRepository,
+  InMemoryDwellRepository,
   FakePaymentGateway,
   InMemoryPendingSignupRepository,
   InMemoryIdentityRepository,
@@ -56,6 +57,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway } = {}) {
   const pending = new InMemoryPendingSignupRepository();
   const passwordResets = new InMemoryPasswordResetRepository();
   const boosts = new InMemoryBoostRepository();
+  const dwell = new InMemoryDwellRepository();
   const payments = options.payments ?? new FakePaymentGateway();
   const identities = new InMemoryIdentityRepository();
   const verifier = new FakeIdentityVerifier();
@@ -67,7 +69,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway } = {}) {
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, notifications, pushSubscriptions, push, places, claims, admin, placeSource, pending, passwordResets, boosts, payments, identities, verifier, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, notifications, pushSubscriptions, push, places, claims, admin, placeSource, pending, passwordResets, boosts, dwell, payments, identities, verifier, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string } = {}): Promise<AuthResult> {
@@ -84,5 +86,5 @@ export function makeWorld(options: { payments?: FakePaymentGateway } = {}) {
     return out;
   }
 
-  return { core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, notifications, pushSubscriptions, push, places, claims, admin, placeSource, pending, passwordResets, boosts, payments, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+  return { core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, notifications, pushSubscriptions, push, places, claims, admin, placeSource, pending, passwordResets, boosts, dwell, payments, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
 }

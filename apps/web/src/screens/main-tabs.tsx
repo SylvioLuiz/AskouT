@@ -2,6 +2,7 @@ import { BoltIcon, CalendarIcon } from '../components/icons.tsx';
 import { EmptyState, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
+import { ForYou } from '../components/for-you.tsx';
 import { useMemo, useState } from 'react';
 import { agendaEvents, nextPlan, planWhenLabel } from '../lib/agenda.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -104,7 +105,7 @@ export function HomeScreen() {
           </h2>
           <Link to="/criar">Criar post</Link>
         </div>
-        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint="Seus posts e os dos seus amigos aparecem aqui." inject={{ after: 5, node: <SuggestedPeople /> }} reloadKey={String(feedKey)} />
+        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint="Seus posts e os dos seus amigos aparecem aqui." inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
       </section>
     </PullRefresh>
   );
