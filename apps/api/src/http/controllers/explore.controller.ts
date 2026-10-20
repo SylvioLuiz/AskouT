@@ -23,6 +23,12 @@ export class ExploreController {
     return this.core.explore.followedEvents(actor.userId);
   }
 
+  /** Anúncios da Home (eventos impulsionados). Sempre marcados como patrocinados. */
+  @Get('explore/sponsored')
+  sponsored(@CurrentActor() actor: Actor) {
+    return this.core.explore.sponsored(actor.userId);
+  }
+
   /** Explorar: eventos perto (sem q) ou busca de eventos, locais, pessoas e #. A posição só vale para esta consulta. */
   @Get('explore')
   async explore(@CurrentActor() actor: Actor, @Query() query: Record<string, unknown>) {

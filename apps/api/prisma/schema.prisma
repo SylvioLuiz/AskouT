@@ -150,6 +150,7 @@ model User {
   profile  Profile?
   settings UserSettings?
   passwordReset PasswordReset?
+  boosts        Boost[]
 
   following Follow[] @relation("Follower")
   followers Follow[] @relation("Followee")
@@ -682,6 +683,7 @@ model Venue {
 
   @@index([lat, lng])
   @@index([ownerId])
+  boosts Boost[]
 }
 
 enum ClaimStatus {
@@ -1179,4 +1181,32 @@ model EventReminder {
 
   @@unique([userId, source, eventId])
   @@index([sentAt])
+}
+
+/// Impulsionamento: anúncio pago por quem administra o local (a página ou um evento dele).
+model Boost {
+  id          String    @id @default(uuid()) @db.Uuid
+  venueId     String    @db.Uuid
+  ownerId     String    @db.Uuid
+  /// 'VENUE' ou 'EVENT'.
+  target      String
+  /// Só quando target = EVENT. Sem chave estrangeira: se o evento sumir, o pedido pago continua registrado.
+  eventId     String?   @db.Uuid
+  days        Int
+  amountCents Int
+  /// 'PENDING_PAYMENT', 'PAID', 'CANCELLED' ou 'PAUSED'.
+  status      String
+  chargeId    String?   @unique
+  payCode     String?
+  payUrl      String?
+  createdAt   DateTime
+  paidAt      DateTime?
+  startsAt    DateTime?
+  endsAt      DateTime?
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  owner User  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, createdAt])
+  @@index([status, startsAt, endsAt])
 }

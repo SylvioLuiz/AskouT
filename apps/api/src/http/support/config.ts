@@ -21,6 +21,10 @@ export interface AppConfig {
   appleClientId: string | undefined;
   /** Chaves VAPID do Web Push. Sem as duas, o aviso fora do app fica desligado (o sino dentro do app continua). */
   vapid: { publicKey: string; privateKey: string; subject: string } | undefined;
+  /** Provedor de pagamento do impulsionamento. “sandbox” é só de teste (não cobra); sem valor, o impulsionamento recusa criar pedidos. */
+  paymentProvider: 'sandbox' | undefined;
+  /** Valor do impulsionamento por dia, em centavos de real. */
+  boostPricePerDayCents: number;
 }
 
 const MIN_SECRET = 32;
@@ -84,9 +88,26 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     else vapid = { publicKey: vapidPublic, privateKey: vapidPrivate, subject: vapidSubject };
   }
 
+  const paymentRaw = env.PAYMENT_PROVIDER?.trim() ?? '';
+  let paymentProvider: AppConfig['paymentProvider'];
+  if (paymentRaw === 'sandbox') {
+    if (nodeEnv === 'production') problems.push('PAYMENT_PROVIDER=sandbox é só de teste e é recusado em produção (não cobra de verdade)');
+    else paymentProvider = 'sandbox';
+  } else if (paymentRaw !== '') {
+    problems.push('PAYMENT_PROVIDER: só "sandbox" está implementado (ainda não há provedor real de pagamento)');
+  } else if (nodeEnv !== 'production') {
+    // Em desenvolvimento o teste sem dinheiro já vem ligado, para o fluxo funcionar sem configurar nada.
+    paymentProvider = 'sandbox';
+  }
+
+  const boostPricePerDayCents = Number(env.BOOST_PRICE_PER_DAY_CENTS ?? '1500');
+  if (!Number.isInteger(boostPricePerDayCents) || boostPricePerDayCents < 100 || boostPricePerDayCents > 1_000_000) {
+    problems.push('BOOST_PRICE_PER_DAY_CENTS deve ser um inteiro de 100 a 1000000 (centavos)');
+  }
+
   if (problems.length > 0) {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, vapid };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, vapid, paymentProvider, boostPricePerDayCents };
 }

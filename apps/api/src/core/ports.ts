@@ -1,4 +1,4 @@
-import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, ConversationReportRecord, ConversationSummaryRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -87,6 +87,41 @@ export interface PasswordResetRepository {
   delete(userId: string): Promise<void>;
   /** Soma 1 às tentativas erradas de forma ATÔMICA e devolve o total (undefined se não existe mais). */
   incrementAttempts(userId: string): Promise<number | undefined>;
+}
+
+export interface BoostRepository {
+  create(boost: BoostRecord): Promise<void>;
+  find(id: string): Promise<BoostRecord | undefined>;
+  findByChargeId(chargeId: string): Promise<BoostRecord | undefined>;
+  /** Do mais novo para o mais antigo. */
+  listByVenue(venueId: string): Promise<BoostRecord[]>;
+  /**
+   * Confirma o pagamento SÓ se ainda estiver aguardando (idempotente: um aviso repetido do provedor devolve false).
+   * Define a janela em que o anúncio aparece.
+   */
+  markPaid(id: string, paid: { paidAt: Date; startsAt: Date; endsAt: Date }): Promise<boolean>;
+  /** Muda o estado só se o atual estiver em `from`. Devolve se mudou. */
+  transition(id: string, from: BoostStatus[], to: BoostStatus): Promise<boolean>;
+  /** Pagos cuja janela inclui `now`. */
+  listActive(now: Date): Promise<BoostRecord[]>;
+}
+
+/** Cobrança criada no provedor de pagamento. */
+export interface PaymentCharge {
+  chargeId: string;
+  /** Pix copia e cola. */
+  pixCode: string | null;
+  /** Página de pagamento do provedor (cartão, boleto etc.). */
+  checkoutUrl: string | null;
+}
+
+/** Porta do provedor de pagamento (Pix, cartão…). O núcleo não conhece nenhum provedor em particular. */
+export interface PaymentGateway {
+  /** Só o ambiente de teste permite “simular pagamento”. */
+  readonly sandbox: boolean;
+  createCharge(input: { reference: string; amountCents: number; description: string }): Promise<PaymentCharge>;
+  /** Confere a autenticidade do aviso do provedor (assinatura) e devolve a cobrança e se foi paga; `undefined` se não for válido. */
+  parseWebhook(headers: Record<string, string | undefined>, rawBody: string): Promise<{ chargeId: string; paid: boolean } | undefined>;
 }
 
 export interface AvailabilityRepository {
@@ -576,6 +611,8 @@ export interface CoreDeps {
   placeSource: PlaceSource;
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
+  boosts: BoostRepository;
+  payments: PaymentGateway;
   identities: IdentityRepository;
   verifier: IdentityVerifier;
   mailer: EmailSender;

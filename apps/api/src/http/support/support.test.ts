@@ -51,6 +51,15 @@ describe('loadConfig', () => {
     assert.throws(() => loadConfig({ ...good, VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: 'ftp://x' }), /VAPID_SUBJECT/);
   });
 
+  it('pagamento: teste ligado por padrão fora de produção; produção recusa o teste e exige provedor real', () => {
+    assert.equal(loadConfig(good).paymentProvider, 'sandbox');
+    assert.equal(loadConfig(good).boostPricePerDayCents, 1500);
+    assert.throws(() => loadConfig({ ...good, PAYMENT_PROVIDER: 'stripe' }), /PAYMENT_PROVIDER/);
+    assert.throws(() => loadConfig({ ...good, NODE_ENV: 'production', PAYMENT_PROVIDER: 'sandbox' }), /produção/);
+    assert.throws(() => loadConfig({ ...good, BOOST_PRICE_PER_DAY_CENTS: '5' }), /BOOST_PRICE_PER_DAY_CENTS/);
+    assert.equal(loadConfig({ ...good, BOOST_PRICE_PER_DAY_CENTS: '2500' }).boostPricePerDayCents, 2500);
+  });
+
   it('lê lista de origens CORS', () => {
     assert.deepEqual(loadConfig({ ...good, CORS_ORIGINS: 'http://a.com, http://b.com ,' }).corsOrigins, ['http://a.com', 'http://b.com']);
   });

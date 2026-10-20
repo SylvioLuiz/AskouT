@@ -19,6 +19,8 @@ import {
   InMemoryBlockRepository,
   InMemoryFollowRepository,
   InMemoryPasswordResetRepository,
+  InMemoryBoostRepository,
+  FakePaymentGateway,
   InMemoryPendingSignupRepository,
   InMemoryIdentityRepository,
   FakeIdentityVerifier,
@@ -32,7 +34,7 @@ export const TEST_SECRET = 'segredo-de-teste-com-mais-de-32-caracteres';
 export const PASSWORD = 'uma-senha-forte-123';
 
 /** Monta o núcleo com repositórios em memória e hash rápido (custo baixo, só para testes). */
-export function makeWorld() {
+export function makeWorld(options: { payments?: FakePaymentGateway } = {}) {
   const blocks = new InMemoryBlockRepository();
   const follows = new InMemoryFollowRepository(blocks);
   const availability = new InMemoryAvailabilityRepository();
@@ -53,6 +55,8 @@ export function makeWorld() {
   const admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom });
   const pending = new InMemoryPendingSignupRepository();
   const passwordResets = new InMemoryPasswordResetRepository();
+  const boosts = new InMemoryBoostRepository();
+  const payments = options.payments ?? new FakePaymentGateway();
   const identities = new InMemoryIdentityRepository();
   const verifier = new FakeIdentityVerifier();
   const mailer = new FakeEmailSender();
@@ -63,7 +67,7 @@ export function makeWorld() {
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, notifications, pushSubscriptions, push, places, claims, admin, placeSource, pending, passwordResets, identities, verifier, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, notifications, pushSubscriptions, push, places, claims, admin, placeSource, pending, passwordResets, boosts, payments, identities, verifier, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string } = {}): Promise<AuthResult> {
@@ -80,5 +84,5 @@ export function makeWorld() {
     return out;
   }
 
-  return { core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, notifications, pushSubscriptions, push, places, claims, admin, placeSource, pending, passwordResets, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+  return { core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, notifications, pushSubscriptions, push, places, claims, admin, placeSource, pending, passwordResets, boosts, payments, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
 }

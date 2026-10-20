@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
-import type { MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
+import type { BoostRepository, EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
+import type { BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -18,6 +18,7 @@ export interface RepoHarness {
   blocks: BlockRepository;
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
+  boosts: BoostRepository;
   availability: AvailabilityRepository;
   flash: FlashRepository;
   conversations: ConversationRepository;
@@ -419,6 +420,32 @@ export function defineRepositoryContract(
         await h.passwordResets.delete(user);
         assert.equal(await h.passwordResets.find(user), undefined);
         assert.equal(await h.passwordResets.incrementAttempts(user), undefined);
+      });
+
+      it('impulsionamento: cria, confirma o pagamento uma única vez e lista só os ativos', async () => {
+        const owner = await newUser('impulsiona');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar Boost', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: owner };
+        await h.places.createVenue(v);
+        const t0 = new Date(Date.UTC(2030, 0, 10, 12));
+        const mk = (n: number, over: Partial<BoostRecord> = {}): BoostRecord => ({ id: randomUUID(), venueId: v.id, ownerId: owner, target: 'VENUE', eventId: null, days: 3, amountCents: 4500, status: 'PENDING_PAYMENT', chargeId: `ch_${n}_${v.id}`, payCode: 'PIX', payUrl: null, createdAt: new Date(t0.getTime() + n), paidAt: null, startsAt: null, endsAt: null, ...over });
+        const a = mk(1);
+        const b = mk(2);
+        await h.boosts.create(a);
+        await h.boosts.create(b);
+        assert.deepEqual((await h.boosts.listByVenue(v.id)).map((x) => x.id), [b.id, a.id], 'mais novo primeiro');
+        assert.equal((await h.boosts.findByChargeId(a.chargeId!))?.id, a.id);
+        assert.equal(await h.boosts.findByChargeId('nao-existe'), undefined);
+        assert.deepEqual(await h.boosts.listActive(t0), [], 'sem pagamento não aparece');
+        const window = { paidAt: t0, startsAt: t0, endsAt: new Date(t0.getTime() + 3 * 86_400_000) };
+        assert.equal(await h.boosts.markPaid(a.id, window), true);
+        assert.equal(await h.boosts.markPaid(a.id, window), false, 'aviso repetido não paga de novo');
+        const paid = await h.boosts.find(a.id);
+        assert.deepEqual([paid?.status, paid?.startsAt?.getTime(), paid?.endsAt?.getTime(), paid?.payCode], ['PAID', window.startsAt.getTime(), window.endsAt.getTime(), null]);
+        assert.deepEqual((await h.boosts.listActive(new Date(t0.getTime() + 86_400_000))).map((x) => x.id), [a.id]);
+        assert.deepEqual(await h.boosts.listActive(new Date(t0.getTime() + 4 * 86_400_000)), [], 'depois do fim some');
+        assert.equal(await h.boosts.transition(b.id, ['PAID'], 'CANCELLED'), false, 'estado de origem errado não muda');
+        assert.equal(await h.boosts.transition(b.id, ['PENDING_PAYMENT'], 'CANCELLED'), true);
+        assert.equal(await h.boosts.markPaid(b.id, window), false, 'cancelado não paga');
       });
 
       it('incrementAttempts soma 1, devolve o total e é atômico', async () => {

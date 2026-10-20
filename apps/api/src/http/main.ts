@@ -11,7 +11,7 @@ import { CONFIG } from './tokens.ts';
 // têm prioridade, então em produção valem as do servidor.
 if (existsSync('.env')) process.loadEnvFile('.env');
 
-const app = await NestFactory.create<NestExpressApplication>(AppModule);
+const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 const config = app.get<AppConfig>(CONFIG);
 
 // Posts levam até 5 fotos já reduzidas (≤100 KB cada, em base64) e o pedido de reivindicação leva um documento de até 2 MB (~2,7 MB em base64):

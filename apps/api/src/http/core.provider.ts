@@ -19,6 +19,7 @@ import {
   PrismaFlashRepository,
   PrismaFollowRepository,
   PrismaPasswordResetRepository,
+  PrismaBoostRepository,
   PrismaPendingSignupRepository,
   PrismaIdentityRepository,
   PrismaUserRepository,
@@ -28,6 +29,7 @@ import { OidcIdentityVerifier } from '../infra/identity/oidc-verifier.ts';
 import { GooglePlaceSource } from '../infra/google/google-place-source.ts';
 import { FallbackPlaceSource } from '../infra/places/fallback-place-source.ts';
 import { OverpassPlaceSource } from '../infra/overpass/overpass-place-source.ts';
+import { SandboxPaymentGateway, UnconfiguredPaymentGateway } from '../infra/payments/sandbox-payment-gateway.ts';
 import { ConsoleEmailSender } from './console-email-sender.ts';
 import type { AppConfig } from './support/config.ts';
 import { PhotoSigner } from './support/photo-signing.ts';
@@ -73,6 +75,9 @@ export const coreProvider = {
       placeSource: google ? new FallbackPlaceSource(google, new OverpassPlaceSource({ contact: config.osmContact })) : new OverpassPlaceSource({ contact: config.osmContact }),
       pending: new PrismaPendingSignupRepository(prisma),
       passwordResets: new PrismaPasswordResetRepository(prisma),
+      boosts: new PrismaBoostRepository(prisma),
+      payments: config.paymentProvider === 'sandbox' ? new SandboxPaymentGateway() : new UnconfiguredPaymentGateway(),
+      boostPricePerDayCents: config.boostPricePerDayCents,
       identities: new PrismaIdentityRepository(prisma),
       verifier: new OidcIdentityVerifier({ googleClientId: config.googleClientId, appleClientId: config.appleClientId }),
       mailer: new ConsoleEmailSender(),

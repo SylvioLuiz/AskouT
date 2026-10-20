@@ -12,6 +12,7 @@ import { EventPageService } from './event-page-service.ts';
 import { EventReminderService } from './event-reminder-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { VenueService } from './venue-service.ts';
+import { BoostService } from './boost-service.ts';
 import { AdminService } from './admin-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
@@ -19,6 +20,8 @@ import { NotificationService, StoredNotifier } from './notification-service.ts';
 import { ProfileService } from './profile-service.ts';
 
 export type CoreInput = Omit<CoreDeps, 'notifier'> & {
+  /** Valor do impulsionamento por dia, em centavos. */
+  boostPricePerDayCents?: number;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
   push: PushSender;
@@ -31,7 +34,9 @@ export function createCore(input: CoreInput) {
   const profiles = new ProfileService(deps);
   const venues = new VenueService(deps);
   const auth = new AuthService(deps);
+  const boosts = new BoostService(deps, input.boostPricePerDayCents === undefined ? {} : { pricePerDayCents: input.boostPricePerDayCents });
   return {
+    boosts,
     auth,
     profiles,
     follows: new FollowService(deps),
@@ -40,7 +45,7 @@ export function createCore(input: CoreInput) {
     flash,
     conversations: new ConversationService(deps),
     suggestions: new SuggestionService(deps, flash),
-    explore: new ExploreService(deps, profiles),
+    explore: new ExploreService(deps, profiles, boosts),
     eventPages: new EventPageService(deps, profiles),
     eventReminders: new EventReminderService(deps),
     venues,
@@ -111,6 +116,8 @@ export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { EventPageService } from './event-page-service.ts';
 export { EventReminderService } from './event-reminder-service.ts';
 export type { EventPageView, EventPostView, EventCoverView } from './event-page-service.ts';
+export { BoostService, BOOST_DAY_OPTIONS, BOOST_DEFAULT_PRICE_PER_DAY_CENTS, boostPhase } from './boost-service.ts';
+export type { BoostPricing, BoostView, BoostPhase } from './boost-service.ts';
 export { ExploreService, EXPLORE_DEFAULT_RADIUS_KM, EXPLORE_MAX_RADIUS_KM } from './explore-service.ts';
 export type { ExploreEventItem, ExplorePlaceItem, ExploreView } from './explore-service.ts';
 export { MeetupService, MEETUP_MAX_GUESTS } from './meetup-service.ts';

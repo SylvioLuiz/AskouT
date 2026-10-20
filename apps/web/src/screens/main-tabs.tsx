@@ -19,6 +19,8 @@ export function HomeScreen() {
   const flashOn = flash.data?.active === true;
   const followed = useAsync(() => api.followedEvents(), []);
   const followedEvents = followed.data?.events ?? [];
+  const sponsored = useAsync(() => api.sponsoredEvents(), []);
+  const sponsoredEvents = sponsored.data?.events ?? [];
   const now = new Date();
   const [feedKey, setFeedKey] = useState(0);
   const meetups = useAsync(() => api.myMeetups(), []);
@@ -31,6 +33,7 @@ export function HomeScreen() {
         setFeedKey((k) => k + 1);
         flash.reload();
         followed.reload();
+        sponsored.reload();
         meetups.reload();
         going.reload();
         await new Promise((resolve) => setTimeout(resolve, 700));
@@ -72,6 +75,22 @@ export function HomeScreen() {
           </div>
           <ul className="evposters">
             {followedEvents.map((event) => (
+              <EventCard key={event.id} event={event} now={now} poster />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {sponsoredEvents.length > 0 ? (
+        <section className="section" aria-labelledby="patrocinado-titulo">
+          <div className="section__head">
+            <h2 id="patrocinado-titulo" className="section__title">
+              Rolês em destaque
+            </h2>
+            <span className="tag-sponsored">Patrocinado</span>
+          </div>
+          <ul className="evposters">
+            {sponsoredEvents.map((event) => (
               <EventCard key={event.id} event={event} now={now} poster />
             ))}
           </ul>

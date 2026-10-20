@@ -804,3 +804,35 @@ export interface PollConfirmationRecord {
 
 /** Texto guardado no lugar do conteúdo de uma mensagem apagada (o banco exige 1 a 2000 caracteres no corpo). A visão da API nunca o mostra. */
 export const DELETED_BODY = 'Mensagem apagada';
+
+// ---------- Impulsionamento (anúncio pago por quem administra o local) ----------
+
+/** O que é impulsionado: a página do local ou um evento dele. */
+export type BoostTarget = 'VENUE' | 'EVENT';
+
+/** Estado guardado. “Ativo”, “agendado” e “encerrado” são deduzidos de `startsAt`/`endsAt` e do relógio. */
+export type BoostStatus = 'PENDING_PAYMENT' | 'PAID' | 'CANCELLED' | 'PAUSED';
+
+export interface BoostRecord {
+  id: string;
+  venueId: string;
+  /** Quem pediu e pagou (o responsável pelo local). */
+  ownerId: string;
+  target: BoostTarget;
+  /** Só quando `target` é EVENT: o evento do local. */
+  eventId: string | null;
+  days: number;
+  /** Valor total em centavos de real. */
+  amountCents: number;
+  status: BoostStatus;
+  /** Identificador da cobrança no provedor de pagamento. */
+  chargeId: string | null;
+  /** Pix copia e cola e/ou link de pagamento, enquanto aguarda. */
+  payCode: string | null;
+  payUrl: string | null;
+  createdAt: Date;
+  paidAt: Date | null;
+  /** Só depois de pago: a janela em que o anúncio aparece. */
+  startsAt: Date | null;
+  endsAt: Date | null;
+}

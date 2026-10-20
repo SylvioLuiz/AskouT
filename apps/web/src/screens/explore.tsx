@@ -91,6 +91,7 @@ function EventCover({ event, shape, badge = false }: { event: ExploreEvent; shap
       {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="evcover__fallback" aria-hidden="true"><EventKindIcon kind={event.kind} /><span className="evcover__kind">{kindLabel(event.kind)}</span></span>}
       {badge ? <DateBadge startsAt={event.startsAt} mini /> : null}
       <span className="evcover__tags">
+        {event.sponsored ? <span className="tag-sponsored">Patrocinado</span> : null}
         {event.isFree ? <span className="tag tag--free">Grátis</span> : null}
         {event.sample ? <SampleBadge /> : null}
       </span>
@@ -138,6 +139,7 @@ function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
         count={event.goingCount}
         tags={
           <>
+            {event.sponsored ? <span className="tag-sponsored">Patrocinado</span> : null}
             {event.isFree ? <span className="tag tag--free">Grátis</span> : null}
             {event.sample ? <SampleBadge /> : null}
           </>
@@ -194,7 +196,7 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
         <button type="button" className="placerow__profile" onClick={() => void openPage()} aria-label={`Abrir página de ${place.name}`}>
           <VenueLogo name={place.name} logoUrl={venue.logoUrl} size={48} />
           <span className="placerow__info">
-            <span className="placerow__name">{place.name}</span>
+            <span className="placerow__name">{place.name}{place.sponsored ? <span className="tag-sponsored"> Patrocinado</span> : null}</span>
             <span className="placerow__line">
               {[place.category ?? 'Local', place.rating !== null ? `★ ${formatRating(place.rating)}${place.ratingCount ? ` (${place.ratingCount})` : ''}` : null, pluralize(followers, 'seguidor', 'seguidores'), status?.short, place.distanceM !== null ? `a ${formatDistance(place.distanceM)}` : null]
                 .filter(Boolean)

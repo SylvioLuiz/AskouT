@@ -3,6 +3,7 @@ import { notFound, validationError } from './errors.ts';
 import { fold, normalizeTag } from './explore-match.ts';
 import { distanceMeters } from './geo.ts';
 import type { CoreDeps } from './ports.ts';
+import type { BoostService } from './boost-service.ts';
 import type { ProfileService } from './profile-service.ts';
 import type { EventKind, PlaceEventRecord, VenueHours, VenueRecord } from './types.ts';
 import { EVENT_KINDS } from './types.ts';
@@ -53,6 +54,8 @@ export interface ExploreEventItem {
   postedByMe?: boolean;
   /** Quantas pessoas confirmaram presença (só no filtro "Bombando"). */
   goingCount?: number;
+  /** Impulsionado (anúncio pago) pelo responsável do local. A tela mostra “Patrocinado”. */
+  sponsored?: boolean;
 }
 
 export interface ExplorePlaceItem {
@@ -72,6 +75,8 @@ export interface ExplorePlaceItem {
   mapsUri: string | null;
   /** Só em local do AskouT: o que a lista mostra do perfil (logo, seguidores, horários) e se a pessoa já segue. */
   venue: ExplorePlaceVenue | null;
+  /** Local impulsionado (anúncio pago). A tela mostra “Patrocinado”. */
+  sponsored?: boolean;
 }
 
 export interface ExplorePlaceVenue {
@@ -135,11 +140,16 @@ function toEventItem(event: PlaceEventRecord, venue: VenueRecord, distanceM: num
   };
 }
 
+/** Quantos anúncios a Home mostra de uma vez. */
+export const EXPLORE_SPONSORED_LIMIT = 2;
+
 export class ExploreService {
   private readonly deps: CoreDeps;
   private readonly profiles: ProfileService;
+  private readonly boosts: BoostService;
 
-  constructor(deps: CoreDeps, profiles: ProfileService) {
+  constructor(deps: CoreDeps, profiles: ProfileService, boosts: BoostService) {
+    this.boosts = boosts;
     this.deps = deps;
     this.profiles = profiles;
   }
@@ -152,6 +162,37 @@ export class ExploreService {
     const to = new Date(from.getTime() + EXPLORE_DEFAULT_SPAN_DAYS * DAY_MS);
     const found = await this.deps.places.searchEvents({ from, to, venueIds, limit: 10 });
     return { events: found.map((r) => toEventItem(r.event, r.venue, null)) };
+  }
+
+  /**
+   * Anúncios para a Home: eventos impulsionados (ou o próximo evento de um local impulsionado) que ainda não acabaram.
+   * Não usa dados da pessoa para escolher: a lista só gira com o passar das horas. Quem bloqueou o anunciante, ou foi bloqueado por ele, não vê.
+   */
+  async sponsored(actorId: string): Promise<{ events: ExploreEventItem[] }> {
+    const now = this.deps.clock.now();
+    const active = await this.boosts.activeTargets(now);
+    const ordered = [...active.boosts].sort((a, b) => (a.id < b.id ? -1 : 1));
+    const shift = ordered.length === 0 ? 0 : Math.floor(now.getTime() / 3_600_000) % ordered.length;
+    const rotated = [...ordered.slice(shift), ...ordered.slice(0, shift)];
+    const out: ExploreEventItem[] = [];
+    const seen = new Set<string>();
+    for (const boost of rotated) {
+      if (out.length >= EXPLORE_SPONSORED_LIMIT) break;
+      if (await this.deps.blocks.existsEitherWay(actorId, boost.ownerId)) continue;
+      let pick: { event: PlaceEventRecord; venue: VenueRecord } | undefined;
+      if (boost.target === 'EVENT' && boost.eventId) {
+        const found = await this.deps.places.findEvent(boost.eventId);
+        if (found && found.event.endsAt.getTime() > now.getTime()) pick = found;
+      } else if (boost.target === 'VENUE') {
+        const venue = await this.deps.places.findVenue(boost.venueId);
+        const next = (await this.deps.places.listVenueEvents(boost.venueId)).filter((e) => e.endsAt.getTime() > now.getTime()).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
+        if (venue && next) pick = { event: next, venue };
+      }
+      if (!pick || seen.has(pick.event.id)) continue;
+      seen.add(pick.event.id);
+      out.push({ ...toEventItem(pick.event, pick.venue, null), sponsored: true });
+    }
+    return { events: out };
   }
 
   /**
@@ -197,7 +238,12 @@ export class ExploreService {
 
     const toItems = async (rows: { event: PlaceEventRecord; venue: VenueRecord; distanceM: number | null }[]): Promise<ExploreEventItem[]> => {
       const items = rows.map((r) => toEventItem(r.event, r.venue, r.distanceM));
-      if (!hot) return items;
+      if (!hot) {
+        // Impulsionados sobem para o começo da lista (a ordem entre os demais não muda) e levam o selo “Patrocinado”.
+        const active = await this.boosts.activeTargets(now);
+        const marked = items.map((i) => (active.eventIds.has(i.id) || active.venueIds.has(i.venue.id) ? { ...i, sponsored: true } : i));
+        return [...marked.filter((i) => i.sponsored), ...marked.filter((i) => !i.sponsored)];
+      }
       const counts = await this.deps.eventRoom.countGoing(items.map((i) => ({ source: 'PLACE' as const, id: i.id })));
       return items
         .map((i) => ({ ...i, goingCount: counts.get(i.id) ?? 0 }))
@@ -262,6 +308,12 @@ export class ExploreService {
       mapsUri: null,
       venue: { id: venue.id, logoUrl: venue.logoUrl ?? null, hours: venue.hours ?? null, followerCount: profileById.get(venue.id)?.followerCount ?? 0, following: profileById.get(venue.id)?.following ?? false, claimed: (venue.ownerId ?? null) !== null },
     }));
+
+    {
+      const active = await this.boosts.activeTargets(now);
+      const marked = placeItems.map((p) => (p.venue && active.venueIds.has(p.venue.id) ? { ...p, sponsored: true } : p));
+      placeItems.splice(0, placeItems.length, ...marked.filter((p) => p.sponsored), ...marked.filter((p) => !p.sponsored));
+    }
 
     let placesAvailable = true;
     // Lugares de fora (Google/OSM) só quando há posição e nenhum filtro de evento (tipo/grátis) escondendo-os.

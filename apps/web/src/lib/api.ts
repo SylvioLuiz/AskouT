@@ -2,6 +2,8 @@ import { errorFromResponse, networkError } from './errors.ts';
 import type { ConfirmationAnswer, PollInput, PollSummary, PollView, VoteStatus } from './date-poll.ts';
 import type { SuggestedPerson } from './suggested-people.ts';
 import type {
+  BoostPricing,
+  BoostView,
   ClaimableVenue,
   ExploreEvent,
   MyVenues,
@@ -276,6 +278,12 @@ export function createApi(deps: ApiDeps) {
       const text = query.toString();
       return request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
     },
+    boostPricing: () => request<BoostPricing>('GET', '/boosts/pricing'),
+    venueBoosts: (venueId: string) => request<{ items: BoostView[] }>('GET', `/me/venues/${id(venueId)}/boosts`),
+    createBoost: (venueId: string, body: { target: 'VENUE' | 'EVENT'; eventId?: string; days: number }) => request<BoostView>('POST', `/me/venues/${id(venueId)}/boosts`, { body }),
+    cancelBoost: (boostId: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/cancel`),
+    simulateBoostPayment: (boostId: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/simulate-payment`),
+    sponsoredEvents: () => request<{ events: ExploreEvent[] }>('GET', '/explore/sponsored'),
     followedEvents: () => request<{ events: ExploreEvent[] }>('GET', '/explore/followed-events'),
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
       request<EventPage>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),

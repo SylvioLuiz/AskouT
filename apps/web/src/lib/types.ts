@@ -484,6 +484,8 @@ export interface ExploreEvent {
   postedByMe?: boolean;
   /** Pessoas com presença confirmada (só no filtro "Bombando"). */
   goingCount?: number;
+  /** Anúncio pago pelo responsável do local. Sempre mostrar “Patrocinado”. */
+  sponsored?: boolean;
 }
 
 export interface EventPost {
@@ -571,6 +573,8 @@ export interface ExplorePlace {
   mapsUri: string | null;
   /** Só em local do AskouT: dados do perfil para a lista. */
   venue: { id: string; logoUrl: string | null; hours: VenueHours | null; followerCount: number; following: boolean; claimed: boolean } | null;
+  /** Anúncio pago pelo responsável do local. Sempre mostrar “Patrocinado”. */
+  sponsored?: boolean;
 }
 
 export interface ExploreResult {
@@ -794,4 +798,31 @@ export interface VenueEventBody {
   imageUrl?: string | null;
   imageData?: string;
   tags: string[];
+}
+
+// ---------- Impulsionamento ----------
+
+export interface BoostPricing {
+  currency: 'BRL';
+  pricePerDayCents: number;
+  dayOptions: number[];
+  /** Pagamento de teste: não cobra de verdade. */
+  sandbox: boolean;
+}
+
+export type BoostPhase = 'PENDING_PAYMENT' | 'SCHEDULED' | 'ACTIVE' | 'ENDED' | 'CANCELLED' | 'PAUSED';
+
+export interface BoostView {
+  id: string;
+  venueId: string;
+  target: 'VENUE' | 'EVENT';
+  eventId: string | null;
+  eventTitle: string | null;
+  days: number;
+  amountCents: number;
+  phase: BoostPhase;
+  createdAt: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  payment: { pixCode: string | null; checkoutUrl: string | null } | null;
 }

@@ -13,6 +13,7 @@ export { PrismaNotificationRepository, PrismaPushSubscriptionRepository } from '
 export { PrismaProfileEventRepository } from './prisma-profile-event.repository.ts';
 export { PrismaEventRoomRepository } from './prisma-event-room.repository.ts';
 export { PrismaPasswordResetRepository } from './prisma-password-reset.repository.ts';
+export { PrismaBoostRepository } from './prisma-boost.repository.ts';
 export { PrismaPostRepository } from './prisma-post.repository.ts';
 export { PrismaAdminRepository } from './prisma-admin.repository.ts';
 export { PrismaIdentityRepository } from './prisma-identity.repository.ts';

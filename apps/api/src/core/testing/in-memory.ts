@@ -25,6 +25,9 @@ import type {
   FollowRepository,
   IdGenerator,
   PasswordResetRepository,
+  BoostRepository,
+  PaymentCharge,
+  PaymentGateway,
   PendingSignupRepository,
   IdentityRepository,
   IdentityVerifier,
@@ -34,7 +37,7 @@ import type {
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
 import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
-import type { EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
+import type { BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -509,6 +512,83 @@ export class InMemoryPasswordResetRepository implements PasswordResetRepository 
     if (!r) return undefined;
     r.attempts += 1;
     return r.attempts;
+  }
+}
+
+export class InMemoryBoostRepository implements BoostRepository {
+  readonly rows = new Map<string, BoostRecord>();
+
+  async create(boost: BoostRecord): Promise<void> {
+    this.rows.set(boost.id, { ...boost });
+  }
+
+  async find(id: string): Promise<BoostRecord | undefined> {
+    const r = this.rows.get(id);
+    return r ? { ...r } : undefined;
+  }
+
+  async findByChargeId(chargeId: string): Promise<BoostRecord | undefined> {
+    const r = [...this.rows.values()].find((b) => b.chargeId === chargeId);
+    return r ? { ...r } : undefined;
+  }
+
+  async listByVenue(venueId: string): Promise<BoostRecord[]> {
+    return [...this.rows.values()]
+      .filter((b) => b.venueId === venueId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+      .map((b) => ({ ...b }));
+  }
+
+  async markPaid(id: string, paid: { paidAt: Date; startsAt: Date; endsAt: Date }): Promise<boolean> {
+    const r = this.rows.get(id);
+    if (!r || r.status !== 'PENDING_PAYMENT') return false;
+    Object.assign(r, { status: 'PAID', paidAt: paid.paidAt, startsAt: paid.startsAt, endsAt: paid.endsAt, payCode: null, payUrl: null });
+    return true;
+  }
+
+  async transition(id: string, from: BoostStatus[], to: BoostStatus): Promise<boolean> {
+    const r = this.rows.get(id);
+    if (!r || !from.includes(r.status)) return false;
+    r.status = to;
+    return true;
+  }
+
+  async listActive(now: Date): Promise<BoostRecord[]> {
+    return [...this.rows.values()]
+      .filter((b) => b.status === 'PAID' && b.startsAt !== null && b.endsAt !== null && b.startsAt.getTime() <= now.getTime() && b.endsAt.getTime() > now.getTime())
+      .map((b) => ({ ...b }));
+  }
+}
+
+/** Provedor de pagamento de mentira: guarda as cobranças e aceita avisos com um “segredo” combinado. */
+export class FakePaymentGateway implements PaymentGateway {
+  readonly sandbox: boolean;
+  readonly charges: { chargeId: string; reference: string; amountCents: number; description: string }[] = [];
+  failNext = false;
+  static readonly SECRET = 'segredo-de-teste';
+
+  constructor(sandbox = true) {
+    this.sandbox = sandbox;
+  }
+
+  async createCharge(input: { reference: string; amountCents: number; description: string }): Promise<PaymentCharge> {
+    if (this.failNext) {
+      this.failNext = false;
+      throw new Error('provedor fora do ar');
+    }
+    const chargeId = `ch_${this.charges.length + 1}`;
+    this.charges.push({ chargeId, ...input });
+    return { chargeId, pixCode: `PIX-${chargeId}`, checkoutUrl: null };
+  }
+
+  async parseWebhook(headers: Record<string, string | undefined>, rawBody: string): Promise<{ chargeId: string; paid: boolean } | undefined> {
+    if (headers['x-signature'] !== FakePaymentGateway.SECRET) return undefined;
+    try {
+      const body = JSON.parse(rawBody) as { chargeId?: unknown; status?: unknown };
+      return typeof body.chargeId === 'string' ? { chargeId: body.chargeId, paid: body.status === 'paid' } : undefined;
+    } catch {
+      return undefined;
+    }
   }
 }
 

@@ -71,3 +71,11 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 ## Buscas recentes (Explorar)
 - As buscas recentes ficam só no navegador da pessoa (até 8, por usuário), com botão de apagar uma ou todas. Não vão para o servidor. Citar isso na política de privacidade.
 - Uma busca entra nas recentes ao apertar Enter, ao tocar numa sugestão ou depois de achar resultados e ficar 1,5 s na tela.
+
+## Impulsionamento (anúncios pagos pelos donos)
+- **Não há provedor de pagamento real.** O gateway é só uma porta (`PaymentGateway`); hoje existe o `SandboxPaymentGateway` (Pix falso + botão "Simular pagamento"). Em produção, `PAYMENT_PROVIDER=sandbox` é recusado e criar um pedido responde "pagamento ainda não disponível". Para abrir: escolher provedor (Pix), implementar `PaymentGateway` (`createCharge` e `parseWebhook`), validar a **assinatura do webhook** (`POST /payments/webhook`, público, corpo cru) e ligar em `http/core.provider.ts`.
+- Preço: R$ 15,00 por dia (`BOOST_PRICE_PER_DAY_CENTS`, de 100 a 1.000.000); pacotes de 1, 3, 7 ou 14 dias. O anúncio começa na confirmação do pagamento.
+- Só o responsável pelo local cria. Um pedido em aberto por alvo (rolê ou evento). Cancelar só antes do pagamento; **não há reembolso nem cancelamento depois de pago**, nem métricas (alcance, cliques) e nem tela de admin para pausar (o estado PAUSED existe no banco).
+- Onde aparece: primeiro nos resultados do Explorar (fora do filtro "Bombando") e até 2 eventos na Home ("Rolês em destaque"), com rodízio por hora. Sempre com a etiqueta "Patrocinado" (exigência de transparência publicitária; revisar com advogado, CONAR/CDC).
+- Antes de cobrar de verdade: termos de uso do anunciante, política de reembolso, emissão de nota fiscal e CNPJ/regime da empresa. Nada disso está feito.
+- Migração `20261117120000_boosts` escrita à mão e **nunca rodada em Postgres**; rodar `prisma migrate deploy` + `prisma generate` e testar o `PrismaBoostRepository` antes de publicar.
