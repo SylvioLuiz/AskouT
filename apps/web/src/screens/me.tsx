@@ -13,6 +13,7 @@ import { statusLabel } from '../lib/meetup.ts';
 import { applyTheme, readTheme, saveTheme, THEME_LABELS } from '../lib/theme.ts';
 import type { ThemeChoice } from '../lib/theme.ts';
 import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validation.ts';
+import { supportMailto } from '../lib/help-mailto.ts';
 import { Link } from '../router.tsx';
 
 type Message = { tone: 'ok' | 'error'; text: string } | undefined;
@@ -237,7 +238,7 @@ export function InteractionsScreen() {
           <span className="callout__text">
             <strong>{pluralize(requests.data?.total ?? 0, 'pedido para seguir', 'pedidos para seguir')}</strong>
             <br />
-            Aprove ou recuse em Atividades.
+            Aprove ou recuse em Notificações.
           </span>
         </Link>
       ) : null}
@@ -280,12 +281,17 @@ const FAQ: { q: string; a: string }[] = [
   { q: 'Como posto um evento no meu perfil?', a: 'Abra o evento em Explorar, toque em Compartilhar e escolha Postar no meu perfil. Para tirar, use o mesmo botão ou Tirar do perfil na grade.' },
   { q: 'Como compartilho um evento?', a: 'No evento, toque em Compartilhar: poste no perfil, envie numa conversa ou copie o link para mandar fora do app, por exemplo no WhatsApp.' },
   { q: 'Como marco um encontro?', a: 'No evento, toque em Criar encontro e escolha quem convidar. Quem aceitar vê o encontro na Agenda.' },
+  { q: 'O que é o Flash?', a: 'É o botão para avisar seus amigos que você está livre agora. Quem também estiver livre pode te chamar, e a conversa abre na hora. Ele fica na barra de baixo.' },
+  { q: 'Onde ficam minhas conversas?', a: 'No ícone de balão, no topo da tela. Um número mostra quantas conversas têm mensagem nova.' },
+  { q: 'Para que serve a Agenda?', a: 'Ela mostra os eventos em que você confirmou presença e os encontros marcados. Você também pode marcar quando está livre. Só você vê.' },
   { q: 'Os eventos de exemplo são reais?', a: 'Não. Eventos marcados como Exemplo de teste existem só para testar o app.' },
   { q: 'Como troco foto, nome ou descrição?', a: 'No seu perfil, toque no lápis.' },
 ];
 
 export function HelpScreen() {
   useTitle('Ajuda');
+  const user = useUser();
+  const mailto = supportMailto(import.meta.env.VITE_SUPPORT_EMAIL as string | undefined, user.profile.username);
   return (
     <>
       <PageHead title="Ajuda" back="/perfil" />
@@ -297,7 +303,13 @@ export function HelpScreen() {
           </details>
         ))}
       </div>
-      <p className="muted">Ainda não há um canal de suporte dentro do app. Ele entra numa próxima etapa.</p>
+      {mailto ? (
+        <a className="btn btn--secondary btn--full" href={mailto}>
+          Falar com o suporte
+        </a>
+      ) : (
+        <p className="muted">O canal de suporte por e-mail ainda não foi ativado.</p>
+      )}
     </>
   );
 }

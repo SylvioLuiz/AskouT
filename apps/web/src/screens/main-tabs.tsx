@@ -1,8 +1,9 @@
-import { BoltIcon } from '../components/icons.tsx';
+import { BoltIcon, CalendarIcon } from '../components/icons.tsx';
 import { EmptyState, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { agendaEvents, nextPlan, planWhenLabel } from '../lib/agenda.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { PullRefresh } from '../components/pull-refresh.tsx';
 import { formatRemaining, minutesLeft } from '../lib/flash.ts';
@@ -20,6 +21,9 @@ export function HomeScreen() {
   const followedEvents = followed.data?.events ?? [];
   const now = new Date();
   const [feedKey, setFeedKey] = useState(0);
+  const meetups = useAsync(() => api.myMeetups(), []);
+  const going = useAsync(() => api.myGoingEvents(), []);
+  const plan = useMemo(() => nextPlan(agendaEvents(meetups.data?.items ?? [], going.data?.items ?? []), new Date()), [meetups.data, going.data]);
 
   return (
     <PullRefresh
@@ -27,10 +31,23 @@ export function HomeScreen() {
         setFeedKey((k) => k + 1);
         flash.reload();
         followed.reload();
+        meetups.reload();
+        going.reload();
         await new Promise((resolve) => setTimeout(resolve, 700));
       }}
     >
       <PageHead title={`Olá, ${user.profile.displayName}`} />
+
+      {plan ? (
+        <Link to="/agenda" className="nextplan" aria-label={`Seu próximo plano: ${planWhenLabel(plan, now)}, ${plan.title}. Abrir a agenda`}>
+          <span className="nextplan__icon" aria-hidden="true">
+            <CalendarIcon />
+          </span>
+          <span className="nextplan__text">
+            <strong>{planWhenLabel(plan, now)}</strong> · {plan.title}
+          </span>
+        </Link>
+      ) : null}
 
       <Link to="/flash" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
         <span className="flashcta__icon">

@@ -12,7 +12,7 @@ import { pluralize } from '../lib/format.ts';
 import type { PublicProfile } from '../lib/types.ts';
 
 export function ActivityScreen() {
-  useTitle('Atividades');
+  useTitle('Notificações');
   const requests = useAsync(() => api.followRequests({ limit: 50 }), []);
   const news = useAsync(() => api.notifications(), []);
   const tagReqs = useAsync(() => api.pendingTags({ limit: 20 }), []);
@@ -112,7 +112,7 @@ export function ActivityScreen() {
   const now = new Date();
   return (
     <>
-      <PageHead title="Atividades" subtitle="Novidades e pedidos para seguir você" />
+      <PageHead title="Notificações" subtitle="Novidades e pedidos para seguir você" />
       <PushCard />
       {news.data && news.data.items.length > 0 ? (
         <>

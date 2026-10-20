@@ -205,3 +205,23 @@ export function agendaEventsOnDay(events: readonly AgendaEvent[], key: string): 
     })
     .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
 }
+
+/** O próximo plano: o que já começou e ainda não terminou, ou o que vem primeiro. */
+export function nextPlan(events: readonly AgendaEvent[], now: Date): AgendaEvent | undefined {
+  return [...events]
+    .filter((e) => Date.parse(e.endsAt) > now.getTime())
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt))[0];
+}
+
+/** "Agora", "Hoje 20h", "Amanhã 20h30", "sáb. 20h" (na semana) ou "25/10 20h". */
+export function planWhenLabel(event: Pick<AgendaEvent, 'startsAt'>, now: Date): string {
+  const start = new Date(event.startsAt);
+  const hm = `${start.getHours()}h${start.getMinutes() === 0 ? '' : String(start.getMinutes()).padStart(2, '0')}`;
+  if (start.getTime() <= now.getTime()) return 'Agora';
+  const today = localDateKey(now);
+  const key = localDateKey(start);
+  if (key === today) return `Hoje ${hm}`;
+  if (key === addDays(today, 1)) return `Amanhã ${hm}`;
+  if (key < addDays(today, 7)) return `${start.toLocaleDateString('pt-BR', { weekday: 'short' })} ${hm}`;
+  return `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')} ${hm}`;
+}

@@ -13,6 +13,7 @@ import type { ApiError } from '../lib/errors.ts';
 import { formatCount, pluralize } from '../lib/format.ts';
 import { hasIncomingRequest, profileAction, relationNote } from '../lib/relations.ts';
 import type { ConnectionsPage } from '../lib/types.ts';
+import { FOLLOW_HINT, safeStorage, takeFirstFollowHint } from '../lib/hints.ts';
 import { Link, useSearch } from '../router.tsx';
 
 type Pending = 'unfollow' | undefined;
@@ -56,12 +57,13 @@ export function ProfileScreen({ username }: { username: string }) {
     setEventTotal(undefined);
   }, [username]);
 
-  async function run(action: () => Promise<unknown>, success?: string) {
+  async function run<R>(action: () => Promise<R>, success?: string | ((result: R) => string | undefined)) {
     setBusy(true);
     setMessage(undefined);
     try {
-      await action();
-      if (success) setMessage({ tone: 'ok', text: success });
+      const result = await action();
+      const text = typeof success === 'function' ? success(result) : success;
+      if (text) setMessage({ tone: 'ok', text });
       setPending(undefined);
       view.reload();
     } catch (failure) {
@@ -171,7 +173,7 @@ export function ProfileScreen({ username }: { username: string }) {
 
       <div className="profile__actions">
         {action.kind === 'follow' ? (
-          <Button loading={busy} onClick={() => run(() => api.follow(profile.userId))}>
+          <Button loading={busy} onClick={() => run(() => api.follow(profile.userId), (r) => (!r.isFriend && takeFirstFollowHint(safeStorage()) ? FOLLOW_HINT : undefined))}>
             {action.label}
           </Button>
         ) : null}

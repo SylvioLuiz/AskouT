@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { FlashPresenceProvider } from './components/flash-presence.tsx';
 import { AuthProvider, useAuthContext, useUser } from './auth.tsx';
 import { Shell } from './components/Shell.tsx';
+import { Onboarding } from './components/onboarding.tsx';
 import { Button, EmptyState } from './components/ui.tsx';
 import { useTitle } from './hooks.ts';
 import { Link, navigate, resolveRoute, usePathname } from './router.tsx';
@@ -134,6 +135,7 @@ function AppRoutes() {
   return (
     <FlashPresenceProvider>
       <Shell>{priv ? priv.route.render(priv.params) : <NotFoundScreen />}</Shell>
+      <Onboarding />
     </FlashPresenceProvider>
   );
 }
