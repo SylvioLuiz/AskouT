@@ -284,7 +284,7 @@ export function parseSuggestion(value: unknown): SuggestionCard {
   const lat = v.lat;
   const lng = v.lng;
   if (typeof lat !== 'number' || !Number.isFinite(lat) || lat < -90 || lat > 90 || typeof lng !== 'number' || !Number.isFinite(lng) || lng < -180 || lng > 180) {
-    throw validationError('Sugestão inválida', { suggestion: 'Localização do lugar inválida' });
+    throw validationError('Sugestão inválida', { suggestion: 'Localização do rolê inválida' });
   }
   if (typeof v.sample !== 'boolean') throw validationError('Sugestão inválida', { suggestion: 'Campo sample inválido' });
   return {
@@ -470,7 +470,7 @@ export class ConversationService {
     const hasAudio = input.audio !== undefined && input.audio !== null;
     const hasMedia = input.media !== undefined && input.media !== null;
     if ([hasText, hasSuggestion, hasEvent, hasAudio, hasMedia].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo', { body: 'Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo' });
-    if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de lugar só em conversas 1 a 1', { suggestion: 'Sugestões de lugar só em conversas 1 a 1' });
+    if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de rolê só em conversas 1 a 1', { suggestion: 'Sugestões de rolê só em conversas 1 a 1' });
 
     let kind: MessageKind = 'TEXT';
     let body = '';
@@ -535,7 +535,7 @@ export class ConversationService {
     const actorName = actorProfile?.username ?? 'Alguém';
     // Dentro da conversa aparece o nome real; o aviso (sino/push) usa só o usuário.
     const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
-    await this.notifyMembers(actorId, actorName, conversation, memberIds, audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um lugar' : 'enviou uma mensagem');
+    await this.notifyMembers(actorId, actorName, conversation, memberIds, audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um rolê' : 'enviou uma mensagem');
     const decor = await this.decorate(actorId, [message]);
     return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard, replyTo: decor.replies.get(message.id) ?? null });
   }

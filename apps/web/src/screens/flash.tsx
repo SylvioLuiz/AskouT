@@ -1001,7 +1001,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
 
       <div className="stack">
         <Link to={`/conversas/${data.conversationId}`} className="btn btn--primary btn--full">
-          Conversar e sugerir um lugar
+          Conversar e sugerir um rolê
         </Link>
         {confirmEnd ? (
           <Confirm question="Encerrar o encontro? A localização dos dois deixa de ser compartilhada." confirmLabel="Encerrar" onConfirm={endMatch} onCancel={() => setConfirmEnd(false)} busy={busy} danger />

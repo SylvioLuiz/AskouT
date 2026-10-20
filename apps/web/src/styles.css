@@ -4414,3 +4414,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .onb__placeinfo { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .onb__placeinfo strong, .onb__placeinfo .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .onb__progress { margin: 0; font-weight: 700; color: var(--brand); }
+
+.onb__themes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.onb__theme { display: flex; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box; min-height: 64px; padding: 12px 14px; border: 2px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.onb__theme span { font-size: 0.875rem; color: var(--muted); }
+.onb__theme--on { border-color: var(--brand); background: var(--brand-soft); }
+:root[data-theme='dark'] .onb__theme--on { background: var(--brand-soft); border-color: var(--brand); }

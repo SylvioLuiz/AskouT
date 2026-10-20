@@ -39,7 +39,7 @@ function usePlaceSearch(q: string, withPhoto: boolean) {
 }
 
 function LocationNotice({ status }: { status: string }) {
-  return status === 'denied' || status === 'unavailable' ? <Notice tone="error">Para achar lugares perto de você, permita a localização no navegador.</Notice> : null;
+  return status === 'denied' || status === 'unavailable' ? <Notice tone="error">Para achar rolês perto de você, permita a localização no navegador.</Notice> : null;
 }
 
 /** Escolher o lugar a vincular ao post (qualquer lugar, com ou sem foto). */
@@ -47,14 +47,14 @@ function LinkPlaceSheet({ onPick, onClose }: { onPick: (place: LinkedPlace) => v
   const [q, setQ] = useState('');
   const { term, where, result, places } = usePlaceSearch(q, false);
   return (
-    <Sheet title="Vincular um lugar" onClose={onClose}>
-      <Field label="Buscar lugar" type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint="Ex.: bar, café, parque" />
+    <Sheet title="Vincular um rolê" onClose={onClose}>
+      <Field label="Buscar rolê" type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint="Ex.: bar, balada, show" />
       <LocationNotice status={where.status} />
-      {term.length < 2 ? <p className="muted">Digite o nome ou o tipo do lugar.</p> : null}
+      {term.length < 2 ? <p className="muted">Digite o nome ou o tipo do rolê.</p> : null}
       {result.loading && !result.data ? <Loading /> : null}
       {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
-      {result.data && !result.data.placesAvailable ? <Notice>A busca de lugares ainda não está ligada neste ambiente.</Notice> : null}
-      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">Nenhum lugar encontrado.</p> : null}
+      {result.data && !result.data.placesAvailable ? <Notice>A busca de rolês ainda não está ligada neste ambiente.</Notice> : null}
+      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">Nenhum rolê encontrado.</p> : null}
       <ul className="placepick">
         {places.map((p) => (
           <li key={p.key}>
@@ -77,14 +77,14 @@ function PlacePhotoGrid({ picked, onPick }: { picked: string | undefined; onPick
   const { term, where, result, places } = usePlaceSearch(q, true);
   return (
     <>
-      <Field label="Buscar lugar" type="search" value={q} onChange={setQ} autoComplete="off" hint="Ex.: bar, café, parque" />
+      <Field label="Buscar rolê" type="search" value={q} onChange={setQ} autoComplete="off" hint="Ex.: bar, balada, show" />
       <LocationNotice status={where.status} />
-      {term.length < 2 ? <p className="muted">Digite o nome ou o tipo do lugar para ver as fotos.</p> : null}
+      {term.length < 2 ? <p className="muted">Digite o nome ou o tipo do rolê para ver as fotos.</p> : null}
       {result.loading && !result.data ? <Loading /> : null}
       {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
-      {result.data && !result.data.placesAvailable ? <Notice>A busca de lugares com foto ainda não está ligada neste ambiente.</Notice> : null}
-      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">Nenhum lugar com foto para essa busca.</p> : null}
-      <ul className="placegrid" aria-label="Fotos de lugares">
+      {result.data && !result.data.placesAvailable ? <Notice>A busca de rolês com foto ainda não está ligada neste ambiente.</Notice> : null}
+      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">Nenhum rolê com foto para essa busca.</p> : null}
+      <ul className="placegrid" aria-label="Fotos de rolês">
         {places.map((p) => (
           <li key={p.key}>
             <button type="button" className="placegrid__item" aria-pressed={picked === p.name} onClick={() => onPick(p)}>
@@ -94,7 +94,7 @@ function PlacePhotoGrid({ picked, onPick }: { picked: string | undefined; onPick
           </li>
         ))}
       </ul>
-      <p className="muted">Fotos de lugares são do Google, com o crédito de quem tirou.</p>
+      <p className="muted">Fotos de rolês são do Google, com o crédito de quem tirou.</p>
     </>
   );
 }
@@ -179,7 +179,7 @@ export function CreatePostScreen() {
     const image: DraftImage = { key: nextKey(), kind: 'PLACE', preview: api.assetUrl(p.photoPath), photoPath: p.photoPath, author: p.photoAuthor, placeName: p.name, placeAddress: p.address };
     const next = addImages(items, [image]);
     if (!next.includes(image)) {
-      setMessage({ tone: 'error', text: `Já são ${POST_IMAGES_MAX} fotos. Remova uma para usar a foto do lugar.` });
+      setMessage({ tone: 'error', text: `Já são ${POST_IMAGES_MAX} fotos. Remova uma para usar a foto do rolê.` });
       return;
     }
     setItems(next);
@@ -290,7 +290,7 @@ export function CreatePostScreen() {
             <Field label="Nome do evento" value={eventTitle} onChange={setEventTitle} maxLength={120} />
             <EventKindPicker value={eventKind} onChange={setEventKind} />
             <EventDates starts={eventStart} ends={eventEnd} onStarts={setEventStart} onEnds={setEventEnd} />
-            <p className="muted">O lugar é opcional: escolha abaixo se quiser.</p>
+            <p className="muted">O rolê é opcional: escolha abaixo se quiser.</p>
             <label className="check">
               <input type="checkbox" checked={eventPrivate} onChange={(e) => setEventPrivate(e.target.checked)} />
               <span>
@@ -307,7 +307,7 @@ export function CreatePostScreen() {
 
         <section className="compose__row" aria-labelledby="lugar-titulo">
           <h2 id="lugar-titulo" className="compose__h">
-            Lugar
+            Rolê
           </h2>
           {place ? (
             <p className="compose__value">
@@ -315,14 +315,14 @@ export function CreatePostScreen() {
               {place.address ? <span className="muted"> {place.address}</span> : null}
             </p>
           ) : (
-            <p className="muted">Nenhum lugar vinculado.</p>
+            <p className="muted">Nenhum rolê vinculado.</p>
           )}
           {placeFromPhoto ? (
-            <p className="muted">O lugar vem da foto do lugar que você escolheu.</p>
+            <p className="muted">O rolê vem da foto do rolê que você escolheu.</p>
           ) : (
             <div className="row-actions">
               <Button variant="secondary" small onClick={() => setLinking(true)}>
-                {linked ? 'Trocar lugar' : 'Vincular um lugar'}
+                {linked ? 'Trocar rolê' : 'Vincular um rolê'}
               </Button>
               {linked ? (
                 <Button variant="quiet" small onClick={() => setLinked(null)}>
@@ -397,7 +397,7 @@ export function CreatePostScreen() {
           Escolher fotos
         </button>
         <button type="button" role="tab" aria-selected={source === 'place'} className={`segmented__tab${source === 'place' ? ' segmented__tab--on' : ''}`} onClick={() => setSource('place')}>
-          Foto de um lugar
+          Foto de um rolê
         </button>
       </div>
 
@@ -417,7 +417,7 @@ export function CreatePostScreen() {
             {reading ? 'Preparando as fotos…' : 'Toque para abrir a galeria'}
           </button>
         ) : (
-          <p className="compose__empty">Busque um lugar abaixo para usar a foto dele.</p>
+          <p className="compose__empty">Busque um rolê abaixo para usar a foto dele.</p>
         )}
         {focused && focused.kind === 'UPLOAD' && focused.source ? (
           <button type="button" className="stage__crop" onClick={() => setCropKey(focused.key)} aria-label="Recortar foto" title="Recortar">

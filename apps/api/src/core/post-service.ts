@@ -180,7 +180,7 @@ export class PostService {
   async create(actorId: string, input: PostInput, venue?: { id: string; name: string; address: string | null }): Promise<PostView> {
     const { posts, ids, clock } = this.deps;
     const caption = optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
-    const placeName = venue ? venue.name : optionalText(input.placeName, 120, 'placeName', 'Nome do lugar');
+    const placeName = venue ? venue.name : optionalText(input.placeName, 120, 'placeName', 'Nome do rolê');
     const placeAddress = venue ? venue.address : optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
     const event = this.parseEvent(input.event, placeName);
     const eventPrivate = event !== null && this.parsePrivate(input.event);
@@ -205,7 +205,7 @@ export class PostService {
       const author = optionalText(place.placePhotoAuthor, 100, 'images', 'Autor da foto');
       return { id, postId, position, mime: null, data: null, placePhotoRef: place.placePhotoRef, placePhotoAuthor: author };
     });
-    if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do lugar por post' });
+    if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do rolê por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
     await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPostsPublic: false, eventPrivate, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null }, images);
     if (tagIds.length > 0) {
@@ -416,7 +416,7 @@ export class PostService {
     const { post } = await this.seeable(actorId, postId);
     if (post.authorId !== actorId) throw forbidden('Só quem publicou edita o post');
     const caption = input.caption === undefined ? post.caption : optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
-    const placeName = input.placeName === undefined ? post.placeName : optionalText(input.placeName, 120, 'placeName', 'Nome do lugar');
+    const placeName = input.placeName === undefined ? post.placeName : optionalText(input.placeName, 120, 'placeName', 'Nome do rolê');
     const placeAddress = input.placeAddress === undefined ? post.placeAddress : optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
     let event: { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null;
     if (input.event === undefined) {

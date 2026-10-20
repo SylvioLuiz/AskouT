@@ -59,7 +59,7 @@ export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArc
         <Confirm danger question="Excluir este post? As fotos, curtidas e comentários são removidos." confirmLabel="Excluir" busy={busy} onCancel={() => setConfirming(false)} onConfirm={onDelete} />
       ) : post.mine ? (
         <ul className="sharelist">
-          {item('Editar', 'Legenda, lugar e dados do evento.', onEdit)}
+          {item('Editar', 'Legenda, rolê e dados do evento.', onEdit)}
           {item('Ajustar', 'Recortar as fotos que você enviou.', onAdjust, { icon: true })}
           {item(post.archived ? 'Desarquivar' : 'Arquivar', post.archived ? 'O post volta para o seu perfil e o feed.' : 'Só você vê. Sai do feed e do seu perfil.', onArchiveToggle)}
           {item('Excluir', 'Apaga o post para sempre.', () => setConfirming(true), { danger: true })}
@@ -167,7 +167,7 @@ function CommentRow({ comment, onDelete, onLike, busy }: { comment: PostComment;
         <p>
           {comment.venue ? (
             <Link to={`/bares/${encodeURIComponent(comment.venue.id)}`} className="comment__name">
-              {comment.venue.name} <span className="tag tag--event">Bar</span>
+              {comment.venue.name} <span className="tag tag--event">Rolê</span>
             </Link>
           ) : (
             <Link to={`/u/${encodeURIComponent(comment.author.username)}`} className="comment__name">
@@ -401,7 +401,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
         </>
       ) : null}
       <Field label="Descrição" value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />
-      <Field label={kind === 'EVENT' ? 'Lugar (obrigatório no evento)' : 'Lugar (opcional)'} value={placeName} onChange={setPlaceName} maxLength={120} />
+      <Field label={kind === 'EVENT' ? 'Rolê (obrigatório no evento)' : 'Rolê (opcional)'} value={placeName} onChange={setPlaceName} maxLength={120} />
       {placeName.trim() ? <Field label="Endereço (opcional)" value={placeAddress} onChange={setPlaceAddress} maxLength={200} /> : null}
       <Button full loading={busy} disabled={Array.from(caption).length > POST_CAPTION_MAX} onClick={() => void save()}>
         Salvar
@@ -465,7 +465,7 @@ export function AdjustSheet({ post, onClose, onSaved }: { post: PostView; onClos
   return (
     <Sheet title="Ajustar foto" onClose={onClose}>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      {uploads.length === 0 ? <p className="muted">Só fotos que você enviou podem ser ajustadas. A foto de um lugar não pode ser recortada.</p> : null}
+      {uploads.length === 0 ? <p className="muted">Só fotos que você enviou podem ser ajustadas. A foto de um rolê não pode ser recortada.</p> : null}
       {uploads.length > 1 ? (
         <>
           <p className="muted">Escolha a foto para recortar.</p>

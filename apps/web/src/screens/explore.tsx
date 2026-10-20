@@ -7,6 +7,10 @@ import { EventKindIcon, MapIcon, SearchIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
 import { Button, EmptyState, ErrorState, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
+import { useUser } from '../auth.tsx';
+import { safeStorage } from '../lib/hints.ts';
+import { filterByThemes, readThemes, THEMES, themeOfCategory, themeOfEvent } from '../lib/themes.ts';
+import type { ThemeId } from '../lib/themes.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { formatRating, formatWhen, mapLink, routeLink } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -254,6 +258,12 @@ export function ExploreScreen() {
   const [kind, setKind] = useState<EventKind | null>(null);
   const [free, setFree] = useState(false);
   const [hot, setHot] = useState(false);
+  const me = useUser();
+  const [themes, setThemes] = useState<ReadonlySet<ThemeId>>(() => {
+    // O que a pessoa escolheu no começo vira o filtro inicial, a não ser que ela tenha marcado todos (aí não filtra nada).
+    const saved = readThemes(safeStorage(), me.id);
+    return saved.length === THEMES.length ? new Set() : new Set(saved);
+  });
   const [radiusKm, setRadiusKm] = useState(RADIUS_DEFAULT_KM);
   const [sheet, setSheet] = useState<'range' | 'kind' | 'radius' | null>(null);
   const [tab, setTab] = useState<Tab>('all');
@@ -280,12 +290,34 @@ export function ExploreScreen() {
     });
   }, [q, range, kind, free, hot, radiusKm, position?.lat, position?.lng, waiting]);
 
-  const data = result.data;
+  const raw = result.data;
+  // Tema é filtro de tela: a API devolve tudo e aqui fica só o que é de Bares e/ou Baladas.
+  const data = useMemo(
+    () =>
+      raw
+        ? {
+            ...raw,
+            events: filterByThemes(raw.events, themes, themeOfEvent),
+            places: filterByThemes(raw.places, themes, (p) => themeOfCategory(p.category ?? p.venue?.category ?? null)),
+          }
+        : raw,
+    [raw, themes],
+  );
   const now = useMemo(() => new Date(), [data]);
   const searching = q !== '';
-  const filters = activeFilterCount({ range, kind, free, radiusKm, hot });
+  const filters = activeFilterCount({ range, kind, free, radiusKm, hot }) + (themes.size > 0 ? 1 : 0);
+
+  function toggleTheme(id: ThemeId) {
+    setThemes((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function clearFilters() {
+    setThemes(new Set());
     setRange('today');
     setKind(null);
     setFree(false);
@@ -326,14 +358,14 @@ export function ExploreScreen() {
           <SearchIcon />
         </span>
         <label className="visually-hidden" htmlFor="busca">
-          Buscar eventos, bares, pessoas ou #
+          Buscar eventos, rolês, pessoas ou #
         </label>
         <input
           id="busca"
           ref={inputRef}
           className="search__input search__input--icon"
           type="search"
-          placeholder="Eventos, bares, pessoas ou #"
+          placeholder="Eventos, rolês, pessoas ou #"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           autoComplete="off"
@@ -344,6 +376,11 @@ export function ExploreScreen() {
       </div>
 
       <div className="filters" role="group" aria-label="Filtros">
+        {THEMES.map((theme) => (
+          <button key={theme.id} type="button" className={`fchip fchip--theme${themes.has(theme.id) ? ' fchip--on' : ''}`} aria-pressed={themes.has(theme.id)} onClick={() => toggleTheme(theme.id)}>
+            {theme.label}
+          </button>
+        ))}
         <button type="button" className={`fchip fchip--hot${hot ? ' fchip--on' : ''}`} aria-pressed={hot} onClick={() => setHot((v) => !v)}>
           Bombando
         </button>
@@ -404,7 +441,7 @@ export function ExploreScreen() {
               >
                 {hot
                   ? `Nenhum evento acontecendo agora tem ${HOT_MIN_GOING} ou mais pessoas confirmadas${data.located ? ` a até ${data.radiusKm} km` : ''}.`
-                  : `Ainda não há eventos cadastrados ${data.located ? `a até ${data.radiusKm} km ` : ''}neste período. Busque por um bar, uma pessoa ou uma #.`}
+                  : `Ainda não há eventos cadastrados ${data.located ? `a até ${data.radiusKm} km ` : ''}neste período. Busque por um rolê, uma pessoa ou uma #.`}
               </EmptyState>
             ) : (
               <>
@@ -420,7 +457,7 @@ export function ExploreScreen() {
             )
           ) : nothing ? (
             <EmptyState title="Nada encontrado">
-              {q.startsWith('#') ? 'Nenhum evento com essa #.' : 'Confira o que digitou ou aumente o raio. Lugares de fora só aparecem com a sua localização liberada.'}
+              {q.startsWith('#') ? 'Nenhum evento com essa #.' : 'Confira o que digitou ou aumente o raio. Rolês de fora só aparecem com a sua localização liberada.'}
             </EmptyState>
           ) : (
             <div className="results">
@@ -450,7 +487,7 @@ export function ExploreScreen() {
               ) : null}
               {show('places') && data.places.length > 0 ? (
                 <section aria-label="Locais">
-                  <h2 className="results__h">Bares e locais</h2>
+                  <h2 className="results__h">Rolês</h2>
                   <ul className="placelist">
                     {data.places.map((p) => (
                       <PlaceRow key={p.key} place={p} />
@@ -458,7 +495,7 @@ export function ExploreScreen() {
                   </ul>
                 </section>
               ) : null}
-              {show('places') && !data.placesAvailable ? <p className="muted">A fonte de lugares de fora não respondeu agora. Os locais do AskouT aparecem normalmente.</p> : null}
+              {show('places') && !data.placesAvailable ? <p className="muted">A fonte de rolês de fora não respondeu agora. Os locais do AskouT aparecem normalmente.</p> : null}
               {show('people') && data.people.length > 0 ? (
                 <section aria-label="Pessoas">
                   <h2 className="results__h">Pessoas</h2>

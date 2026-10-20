@@ -75,7 +75,7 @@ function ClaimSheet({ onClose, onSent }: { onClose: () => void; onSent: () => vo
     <Sheet title="Reivindicar um local" onClose={onClose}>
       {!picked ? (
         <div className="claim">
-          <Field label="Nome do local" value={query} onChange={setQuery} placeholder="Ex.: Bar do Zé" autoFocus />
+          <Field label="Nome do local" value={query} onChange={setQuery} placeholder="Ex.: Bar do Zé ou Balada Nova" autoFocus />
           {debounced.length < 2 ? <p className="muted">Digite pelo menos 2 letras. Só aparecem locais já cadastrados no AskouT.</p> : null}
           {found.loading ? <Loading /> : null}
           {found.error ? <ErrorState message={found.error.message} onRetry={found.reload} /> : null}
@@ -167,7 +167,7 @@ export function VenuesScreen() {
 
   return (
     <>
-      <PageHead title="Meus locais" back="/perfil" subtitle="Bares e casas que você administra no AskouT." />
+      <PageHead title="Meus locais" back="/perfil" subtitle="Rolês que você administra no AskouT." />
       {sent ? <Notice tone="ok">Pedido enviado. Um administrador vai analisar o documento e você recebe um aviso com a resposta.</Notice> : null}
       {mine.loading && !mine.data ? <Loading /> : null}
       {mine.error && !mine.data ? <ErrorState message={mine.error.message} onRetry={mine.reload} /> : null}
@@ -186,7 +186,7 @@ export function VenuesScreen() {
             </section>
           ) : null}
           {mine.data.venues.length === 0 && mine.data.claims.length === 0 ? (
-            <EmptyState title="Você ainda não administra nenhum local">Reivindique o seu bar ou casa para criar os eventos dele. O pedido é analisado por um administrador.</EmptyState>
+            <EmptyState title="Você ainda não administra nenhum local">Reivindique o seu rolê (bar, balada ou casa) para criar os eventos dele. O pedido é analisado por um administrador.</EmptyState>
           ) : mine.data.venues.length === 0 ? null : (
             <ul className="venuelist" aria-label="Locais que você administra">
               {mine.data.venues.map((v) => (

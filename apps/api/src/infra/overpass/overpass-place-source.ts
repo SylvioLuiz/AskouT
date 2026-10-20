@@ -53,7 +53,7 @@ export class OverpassPlaceSource implements PlaceSource {
     if (hit && this.now() - hit.at < CACHE_TTL_MS) return { available: true, places: hit.places.slice(0, limit) };
 
     try {
-      const query = `[out:json][timeout:6];nwr(around:${Math.round(radiusM)},${lat},${lng})[amenity~"^(bar|pub|cafe|restaurant|biergarten)$"][name];out center ${Math.max(1, Math.min(limit, 60))};`;
+      const query = `[out:json][timeout:6];nwr(around:${Math.round(radiusM)},${lat},${lng})[amenity~"^(bar|pub|nightclub|cafe|restaurant|biergarten)$"][name];out center ${Math.max(1, Math.min(limit, 60))};`;
       const response = await this.fetchImpl(this.endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/x-www-form-urlencoded', 'user-agent': `AskouT/0.1 (${this.contact})` },

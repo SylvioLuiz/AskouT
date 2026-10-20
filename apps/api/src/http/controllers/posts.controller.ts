@@ -20,7 +20,7 @@ export class PostsController {
 
   /** Foto do lugar vem do app como o endereço assinado que a API mesmo emitiu; aqui vira a referência (conferida). */
   private placeRef(photoPath: unknown): string {
-    const bad = () => new BadRequestException({ code: 'VALIDATION', message: 'Foto do lugar inválida ou vencida. Escolha o lugar de novo.', fields: { images: 'Foto do lugar inválida' } });
+    const bad = () => new BadRequestException({ code: 'VALIDATION', message: 'Foto do rolê inválida ou vencida. Escolha o rolê de novo.', fields: { images: 'Foto do rolê inválida' } });
     if (typeof photoPath !== 'string' || photoPath.length > 1500 || !photoPath.startsWith('/places/photo?')) throw bad();
     const url = new URL(photoPath, 'http://api.local');
     const ref = url.searchParams.get('ref');

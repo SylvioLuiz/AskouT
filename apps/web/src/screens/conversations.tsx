@@ -382,7 +382,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       </p>
       <div className="row-actions">
         <Button small onClick={() => setSuggesting(true)}>
-          Sugerir um lugar
+          Sugerir um rolê
         </Button>
         <Link to={`/flash/encontro/${match.id}`} className="btn btn--secondary btn--small">
           Ver no mapa

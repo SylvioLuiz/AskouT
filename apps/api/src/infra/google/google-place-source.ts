@@ -67,7 +67,7 @@ export class GooglePlaceSource implements PlaceSource {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey, 'x-goog-fieldmask': FIELDS },
         body: JSON.stringify({
-          includedTypes: ['bar', 'restaurant', 'cafe'],
+          includedTypes: ['bar', 'night_club', 'restaurant', 'cafe'],
           maxResultCount: Math.max(1, Math.min(limit, 20)),
           rankPreference: 'POPULARITY',
           languageCode: 'pt-BR',

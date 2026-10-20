@@ -67,7 +67,7 @@ export function HomeScreen() {
         <section className="section" aria-labelledby="seguindo-titulo">
           <div className="section__head">
             <h2 id="seguindo-titulo" className="section__title">
-              Eventos dos bares que você segue
+              Eventos dos rolês que você segue
             </h2>
           </div>
           <ul className="evposters">

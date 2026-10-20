@@ -80,7 +80,7 @@ test('nota do Google: texto, rótulo acessível e estrelas em meias unidades', (
 
 test('rota e fonte', () => {
   assert.equal(routeLink(-23.5, -46.6), 'https://www.google.com/maps/dir/?api=1&destination=-23.5,-46.6&travelmode=walking');
-  assert.equal(sourceLabel('GOOGLE'), 'Lugar do Google');
+  assert.equal(sourceLabel('GOOGLE'), 'Rolê do Google');
 });
 
 test('previewOf: mensagem de voz mostra a duração', () => {

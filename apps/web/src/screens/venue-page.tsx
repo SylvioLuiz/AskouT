@@ -42,7 +42,7 @@ function goBack() {
 }
 
 /** Topo da página: capa (a fachada) ao fundo, logo em círculo, nome, localização e os três números. */
-/** Estrelas para avaliar o bar, na própria linha da nota: toque na nota; tocar de novo na mesma tira a avaliação. Cinco estrelas ganham uma animação sutil. */
+/** Estrelas para avaliar o rolê, na própria linha da nota: toque na nota; tocar de novo na mesma tira a avaliação. Cinco estrelas ganham uma animação sutil. */
 function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -110,7 +110,7 @@ function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
   const lines = hoursLines(venue.hours, now);
   const status = openStatus(venue.hours, now);
   if (lines.length === 0) {
-    return <InfoRow icon={<ClockIcon />}><span className="muted">{venue.isOwner ? 'Informe os horários em Editar perfil.' : 'O bar ainda não informou os horários.'}</span></InfoRow>;
+    return <InfoRow icon={<ClockIcon />}><span className="muted">{venue.isOwner ? 'Informe os horários em Editar perfil.' : 'O rolê ainda não informou os horários.'}</span></InfoRow>;
   }
   const today = lines.find((l) => l.today);
   return (
@@ -133,7 +133,7 @@ function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
   );
 }
 
-/** Nota do bar: média, estrelas e quantas avaliações; quem não é dono avalia na mesma linha. */
+/** Nota do rolê: média, estrelas e quantas avaliações; quem não é dono avalia na mesma linha. */
 function RatingInfo({ venue, onChanged }: { venue: VenueProfile; onChanged: () => void }) {
   const r = venue.rating;
   return (
@@ -175,7 +175,7 @@ function VenueHero({ venue, now, onShare }: { venue: VenueProfile; now: Date; on
       <button type="button" className="vhero__back" onClick={goBack} aria-label="Voltar">
         <ChevronLeftIcon />
       </button>
-      <button type="button" className="vhero__share" onClick={onShare} aria-label="Compartilhar página do bar">
+      <button type="button" className="vhero__share" onClick={onShare} aria-label="Compartilhar página do rolê">
         <ShareIcon />
       </button>
       <div className="vhero__body">
@@ -300,14 +300,14 @@ function ProfileEditSheet({ venue, onClose, onSaved }: { venue: VenueProfile; on
   }
 
   return (
-    <Sheet title="Editar perfil do bar" onClose={onClose}>
+    <Sheet title="Editar perfil do rolê" onClose={onClose}>
       <div className="claim">
-        <CoverPicker imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} hint="Foto de fundo da página, de preferência a fachada do bar." />
+        <CoverPicker imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} hint="Foto de fundo da página, de preferência a fachada do rolê." />
         <CoverPicker logo imageUrl={draft.logoUrl} imageData={draft.logoData} onChange={(patch) => setDraft((d) => ({ ...d, ...(patch.imageUrl !== undefined ? { logoUrl: patch.imageUrl } : {}), ...(patch.imageData !== undefined ? { logoData: patch.imageData } : {}) }))} hint="Aparece em círculo sobre a capa." />
-        <Field label="Nome do bar" value={draft.name} onChange={(v) => set('name', v)} maxLength={VENUE_NAME_MAX} />
-        <Field label="Tipo de lugar (opcional)" value={draft.category} onChange={(v) => set('category', v)} maxLength={VENUE_CATEGORY_MAX} placeholder="Bar, boteco, casa de shows…" />
+        <Field label="Nome do rolê" value={draft.name} onChange={(v) => set('name', v)} maxLength={VENUE_NAME_MAX} />
+        <Field label="Tipo de rolê (opcional)" value={draft.category} onChange={(v) => set('category', v)} maxLength={VENUE_CATEGORY_MAX} placeholder="Bar, balada, casa de shows…" />
         <Field label="Endereço (opcional)" value={draft.address} onChange={(v) => set('address', v)} maxLength={VENUE_ADDRESS_MAX} />
-        <Field label="Sobre o bar (opcional)" value={draft.description} onChange={(v) => set('description', v)} multiline maxLength={VENUE_DESCRIPTION_MAX} hint="O que as pessoas encontram aí: música, comida, ambiente." />
+        <Field label="Sobre o rolê (opcional)" value={draft.description} onChange={(v) => set('description', v)} multiline maxLength={VENUE_DESCRIPTION_MAX} hint="O que as pessoas encontram aí: música, comida, ambiente." />
         <HoursEditor draft={draft} onChange={(days) => set('days', days)} />
         {message ? <Notice tone="error">{message}</Notice> : null}
         <Button full loading={busy} onClick={save}>
@@ -360,7 +360,7 @@ function VenuePostSheet({ venueId, onClose, onSaved }: { venueId: string; onClos
   }
 
   return (
-    <Sheet title="Novo post do bar" onClose={onClose}>
+    <Sheet title="Novo post do rolê" onClose={onClose}>
       <div className="claim">
         {photos.length > 0 ? (
           <ul className="vpost__thumbs" aria-label="Fotos do post">
@@ -402,7 +402,7 @@ function OwnerEvents({ venueId, now, reloadKey, onNew, onEdit, onChanged }: { ve
       {panel.error && !panel.data ? <ErrorState message={panel.error.message} onRetry={panel.reload} /> : null}
       {panel.data && panel.data.events.length === 0 ? <EmptyState title="Nenhum evento ainda">Os eventos que você criar aparecem aqui e no Explorar para quem está perto.</EmptyState> : null}
       {panel.data && panel.data.events.length > 0 ? (
-        <ul className="velist" aria-label="Eventos do bar">
+        <ul className="velist" aria-label="Eventos do rolê">
           {panel.data.events.map((e) => (
             <VenueEventRow
               key={e.id}
@@ -425,7 +425,7 @@ function OwnerEvents({ venueId, now, reloadKey, onNew, onEdit, onChanged }: { ve
 export function VenuePageScreen({ venueId }: { venueId: string }) {
   const page = useAsync(() => api.venueProfile(venueId), [venueId]);
   const v = page.data;
-  useTitle(v?.name ?? 'Bar');
+  useTitle(v?.name ?? 'Rolê');
   const [tab, setTab] = useState<Tab>('about');
   const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | undefined>();
   const [followBusy, setFollowBusy] = useState(false);
@@ -455,7 +455,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   if (page.loading && !v) {
     return (
       <>
-        <PageHead title="Bar" back="/explorar" />
+        <PageHead title="Rolê" back="/explorar" />
         <Loading />
       </>
     );
@@ -463,7 +463,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   if (!v) {
     return (
       <>
-        <PageHead title="Bar" back="/explorar" />
+        <PageHead title="Rolê" back="/explorar" />
         <ErrorState message={page.error?.message ?? 'Não foi possível abrir esta página.'} onRetry={page.reload} />
       </>
     );
@@ -546,7 +546,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         v.isOwner ? (
           <OwnerEvents venueId={v.id} now={now} reloadKey={eventsKey} onNew={() => setSheet('event')} onEdit={(e) => setEditing(e)} onChanged={page.reload} />
         ) : v.upcomingEvents.length === 0 ? (
-          <EmptyState title="Nenhum evento marcado">Quando o bar divulgar eventos, eles aparecem aqui.</EmptyState>
+          <EmptyState title="Nenhum evento marcado">Quando o rolê divulgar eventos, eles aparecem aqui.</EmptyState>
         ) : (
           <ul className="vagenda" aria-label="Próximos eventos">
             {v.upcomingEvents.map((e) => (
@@ -585,7 +585,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         )
       ) : null}
 
-      {tab === 'posts' ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint={v.isOwner ? 'Toque em Novo post para publicar fotos do bar.' : 'Os posts do bar aparecem aqui e no seu feed se você seguir.'} reloadKey={String(postsKey)} /> : null}
+      {tab === 'posts' ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint={v.isOwner ? 'Toque em Novo post para publicar fotos do rolê.' : 'Os posts do rolê aparecem aqui e no seu feed se você seguir.'} reloadKey={String(postsKey)} /> : null}
 
       {sheet === 'edit' ? (
         <ProfileEditSheet

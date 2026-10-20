@@ -9,7 +9,7 @@ function memory() {
 
 describe('onboarding', () => {
   it('tem as 3 telas combinadas', () => {
-    assert.deepEqual(ONBOARDING_SLIDES.map((s) => s.title), ['Siga bares, veja eventos', 'Amigo é quem se segue', 'Flash: encontre quem quer sair agora']);
+    assert.deepEqual(ONBOARDING_SLIDES.map((s) => s.title), ['Siga bares e baladas, veja eventos', 'Amigo é quem se segue', 'Flash: encontre quem quer sair agora']);
   });
   it('lembra por usuário', () => {
     const s = memory();
@@ -24,8 +24,8 @@ describe('onboarding', () => {
     assert.equal(onboardingDone({ getItem: () => { throw new Error('x'); } }, 'a'), false);
   });
   it('progresso do follow', () => {
-    assert.equal(followProgressLabel(0), 'Siga mais 3 bares (0 de 3)');
-    assert.equal(followProgressLabel(2), 'Siga mais 1 bar (2 de 3)');
+    assert.equal(followProgressLabel(0), 'Siga mais 3 rolês (0 de 3)');
+    assert.equal(followProgressLabel(2), 'Siga mais 1 rolê (2 de 3)');
     assert.match(followProgressLabel(3), /Pronto/);
   });
 });

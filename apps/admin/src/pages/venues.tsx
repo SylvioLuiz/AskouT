@@ -13,7 +13,7 @@ export function VenuesPage() {
   const list = useAsync(() => api.venues({ q, offset }), [q, offset]);
   return (
     <>
-      <PageHead title="Locais" hint="Bares, casas e outros lugares cadastrados. Tire o responsável se o pedido foi indevido.">
+      <PageHead title="Locais" hint="Rolês cadastrados: bares, baladas e casas. Tire o responsável se o pedido foi indevido.">
         <SearchBox value={text} onChange={(v) => { setText(v); setOffset(0); }} placeholder="Buscar por nome ou endereço…" label="Buscar local" />
       </PageHead>
       <Loadable state={list} empty="Nenhum local encontrado." isEmpty={(d) => d.items.length === 0}>

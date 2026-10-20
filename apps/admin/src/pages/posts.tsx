@@ -31,7 +31,7 @@ export function PostsPage() {
   const list = useAsync(() => api.posts({ q, events: onlyEvents, offset }), [q, onlyEvents, offset]);
   return (
     <>
-      <PageHead title="Posts" hint="Posts e eventos criados por pessoas. Busque por legenda, evento, lugar ou @autor.">
+      <PageHead title="Posts" hint="Posts e eventos criados por pessoas. Busque por legenda, evento, rolê ou @autor.">
         <SearchBox value={text} onChange={(v) => { setText(v); setOffset(0); }} placeholder="Buscar post…" label="Buscar post" />
         <label className="check">
           <input type="checkbox" checked={onlyEvents} onChange={(e) => { setOnlyEvents(e.target.checked); setOffset(0); }} /> Só eventos

@@ -47,7 +47,7 @@ export function PlacePhoto({ path, author }: { path: string; author: string | nu
 
 function Distances({ distances, otherName }: { distances: { meM: number; themM: number }; otherName: string }) {
   return (
-    <ul className="sugcard__routes" aria-label="Distância até o lugar, em linha reta">
+    <ul className="sugcard__routes" aria-label="Distância até o rolê, em linha reta">
       <li>
         <strong>Você</strong> a {formatDistance(distances.meM)}
       </li>
@@ -152,10 +152,10 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
   const hasGoogle = data?.items.some((i) => i.source === 'GOOGLE') ?? false;
 
   return (
-    <Sheet title="Sugerir um lugar" onClose={onClose}>
+    <Sheet title="Sugerir um rolê" onClose={onClose}>
       <p className="muted sheet__lead">Perto do ponto médio entre você e {otherName}, até {data ? Math.round(data.radiusM / 1000) : 3} km.</p>
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {result.loading && !data ? <Loading label="Buscando lugares" /> : null}
+      {result.loading && !data ? <Loading label="Buscando rolês" /> : null}
       {result.error && !data ? (
         result.error.code === 'CONFLICT' ? (
           <Notice>Os dois precisam compartilhar a localização no encontro para ver sugestões perto de vocês.</Notice>
@@ -165,7 +165,7 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
       ) : null}
       {data?.reason === 'TOO_FAR' ? <Notice>Vocês estão longe demais um do outro para achar algo no meio do caminho.</Notice> : null}
       {data && data.reason === null && data.items.length === 0 ? (
-        <Notice>Nenhum evento ou lugar encontrado por perto agora.</Notice>
+        <Notice>Nenhum evento ou rolê encontrado por perto agora.</Notice>
       ) : null}
       {data && data.items.length > 0 ? (
         <ul className="carousel" aria-label="Sugestões">
@@ -202,7 +202,7 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
           ))}
         </ul>
       ) : null}
-      {data && !data.placesAvailable ? <p className="muted sheet__foot">Não foi possível buscar lugares agora. Mostrando só eventos do AskouT.</p> : null}
+      {data && !data.placesAvailable ? <p className="muted sheet__foot">Não foi possível buscar rolês agora. Mostrando só eventos do AskouT.</p> : null}
       {hasGoogle ? <p className="muted sheet__foot">Notas, fotos e lugares: Google.</p> : null}
       {hasOsm ? <p className="muted sheet__foot">Lugares: © colaboradores do OpenStreetMap.</p> : null}
     </Sheet>

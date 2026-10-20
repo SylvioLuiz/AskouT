@@ -4,6 +4,8 @@ import { useUser } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { followProgressLabel, markOnboardingDone, ONBOARDING_FOLLOW_GOAL, ONBOARDING_SLIDES, onboardingDone } from '../lib/onboarding.ts';
+import { filterByThemes, saveThemes, THEMES, themeOfCategory } from '../lib/themes.ts';
+import type { ThemeId } from '../lib/themes.ts';
 import type { ExplorePlace } from '../lib/types.ts';
 import { BoltIcon, HomeIcon, UserIcon } from './icons.tsx';
 import { Button, Loading } from './ui.tsx';
@@ -18,12 +20,15 @@ function storage(): Storage | undefined {
   }
 }
 
-function FollowStep({ onDone }: { onDone: () => void }) {
+function FollowStep({ themes, onDone }: { themes: ReadonlySet<ThemeId>; onDone: () => void }) {
   const places = useAsync(() => api.explore({}), []);
   const [followed, setFollowed] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState<string | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
-  const list = (places.data?.places ?? []).slice(0, 12);
+  const all = places.data?.places ?? [];
+  const byTheme = filterByThemes(all, themes, (p) => themeOfCategory(p.category ?? p.venue?.category ?? null));
+  // Se nada bate com o tema escolhido (fonte de fora fora do ar, locais sem tipo), mostra o que houver em vez de uma tela vazia.
+  const list = (byTheme.length > 0 ? byTheme : all).slice(0, 12);
 
   async function follow(place: ExplorePlace) {
     setBusy(place.key);
@@ -42,11 +47,11 @@ function FollowStep({ onDone }: { onDone: () => void }) {
   const ready = followed.size >= ONBOARDING_FOLLOW_GOAL;
   return (
     <>
-      <h2 id="onb-titulo" className="onb__title">Siga 3 bares para começar</h2>
+      <h2 id="onb-titulo" className="onb__title">Siga 3 rolês para começar</h2>
       <p className="onb__text">É assim que a sua Home ganha eventos. Você pode seguir e deixar de seguir quando quiser.</p>
       {places.loading ? <Loading /> : null}
-      {places.error ? <p className="muted">Não deu para listar bares agora. Você pode seguir depois, em Explorar.</p> : null}
-      {!places.loading && !places.error && list.length === 0 ? <p className="muted">Ainda não há bares por aqui. Você pode procurar depois, em Explorar.</p> : null}
+      {places.error ? <p className="muted">Não deu para listar rolês agora. Você pode seguir depois, em Explorar.</p> : null}
+      {!places.loading && !places.error && list.length === 0 ? <p className="muted">Ainda não há rolês por aqui. Você pode procurar depois, em Explorar.</p> : null}
       <ul className="onb__places">
         {list.map((place) => {
           const on = followed.has(place.key);
@@ -72,12 +77,45 @@ function FollowStep({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Primeira abertura: 3 telas curtas e o passo “siga 3 bares”. Aparece uma vez por usuário. */
+function ThemeStep({ chosen, onToggle, onNext }: { chosen: ReadonlySet<ThemeId>; onToggle: (id: ThemeId) => void; onNext: () => void }) {
+  return (
+    <>
+      <h2 id="onb-titulo" className="onb__title">O que você curte?</h2>
+      <p className="onb__text">Escolha um ou mais. Vamos sugerir rolês do seu jeito.</p>
+      <ul className="onb__themes">
+        {THEMES.map((theme) => {
+          const on = chosen.has(theme.id);
+          return (
+            <li key={theme.id}>
+              <button type="button" className={`onb__theme${on ? ' onb__theme--on' : ''}`} aria-pressed={on} onClick={() => onToggle(theme.id)}>
+                <strong>{theme.label}</strong>
+                <span>{theme.hint}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="onb__actions">
+        <Button full onClick={onNext}>{chosen.size > 0 ? 'Continuar' : 'Gosto de tudo'}</Button>
+      </div>
+    </>
+  );
+}
+
+/** Primeira abertura: 3 telas curtas e o passo “siga 3 rolês”. Aparece uma vez por usuário. */
 export function Onboarding() {
   const user = useUser();
   const [open, setOpen] = useState(() => !onboardingDone(storage(), user.id));
   const [step, setStep] = useState(0);
+  const [chosen, setChosen] = useState<ReadonlySet<ThemeId>>(new Set());
   if (!open) return null;
+  const toggle = (id: ThemeId) =>
+    setChosen((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const finish = () => {
     markOnboardingDone(storage(), user.id);
     setOpen(false);
@@ -97,12 +135,21 @@ export function Onboarding() {
               ))}
             </div>
             <div className="onb__actions">
-              <Button full onClick={() => setStep(step + 1)}>{step === ONBOARDING_SLIDES.length - 1 ? 'Escolher meus bares' : 'Próximo'}</Button>
+              <Button full onClick={() => setStep(step + 1)}>{step === ONBOARDING_SLIDES.length - 1 ? 'Escolher meus rolês' : 'Próximo'}</Button>
               <Button full variant="quiet" onClick={finish}>Pular</Button>
             </div>
           </>
+        ) : step === ONBOARDING_SLIDES.length ? (
+          <ThemeStep
+            chosen={chosen}
+            onToggle={toggle}
+            onNext={() => {
+              saveThemes(storage(), user.id, [...chosen]);
+              setStep(step + 1);
+            }}
+          />
         ) : (
-          <FollowStep onDone={finish} />
+          <FollowStep themes={chosen.size === THEMES.length ? new Set() : chosen} onDone={finish} />
         )}
       </div>
     </div>

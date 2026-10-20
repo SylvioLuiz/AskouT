@@ -62,7 +62,7 @@ export function formatDistances(item: Pick<SuggestionItem, 'distanceFromMeM' | '
 }
 
 export function sourceLabel(source: SuggestionCard['source']): string {
-  return source === 'EVENT' ? 'Evento no AskouT' : source === 'GOOGLE' ? 'Lugar do Google' : 'Lugar do OpenStreetMap';
+  return source === 'EVENT' ? 'Evento no AskouT' : source === 'GOOGLE' ? 'Rolê do Google' : 'Rolê do OpenStreetMap';
 }
 
 /** 4.62 -> "4,6" */
