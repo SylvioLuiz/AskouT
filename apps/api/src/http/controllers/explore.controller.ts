@@ -29,14 +29,6 @@ export class ExploreController {
     return this.core.explore.sponsored(actor.userId);
   }
 
-  /** Motor de inteligência social: eventos que o grupo (você e os amigos escolhidos) deve curtir, em data que dá para todos. Só lê. */
-  @Post('explore/group-match')
-  @HttpCode(200)
-  groupMatch(@CurrentActor() actor: Actor, @Body() body: unknown) {
-    const b = asBody(body);
-    return this.core.groupMatch.suggest(actor.userId, { friendIds: b.friendIds, days: b.days, limit: b.limit });
-  }
-
   /** Explorar: eventos perto (sem q) ou busca de eventos, locais, pessoas e #. A posição só vale para esta consulta. */
   @Get('explore')
   async explore(@CurrentActor() actor: Actor, @Query() query: Record<string, unknown>) {

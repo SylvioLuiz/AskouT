@@ -3,7 +3,6 @@ import type { ConfirmationAnswer, PollInput, PollSummary, PollView, VoteStatus }
 import type { SuggestedPerson } from './suggested-people.ts';
 import type {
   BoostPricing,
-  GroupSuggestions,
   BoostView,
   ClaimableVenue,
   ExploreEvent,
@@ -279,7 +278,6 @@ export function createApi(deps: ApiDeps) {
       const text = query.toString();
       return request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
     },
-    groupMatch: (friendIds: string[], days = 14) => request<GroupSuggestions>('POST', '/explore/group-match', { body: { friendIds, days, limit: 6 } }),
     boostPricing: () => request<BoostPricing>('GET', '/boosts/pricing'),
     venueBoosts: (venueId: string) => request<{ items: BoostView[] }>('GET', `/me/venues/${id(venueId)}/boosts`),
     createBoost: (venueId: string, body: { target: 'VENUE' | 'EVENT'; eventId?: string; days: number }) => request<BoostView>('POST', `/me/venues/${id(venueId)}/boosts`, { body }),

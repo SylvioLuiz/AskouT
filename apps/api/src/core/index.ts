@@ -15,7 +15,6 @@ import { VenueService } from './venue-service.ts';
 import { BoostService } from './boost-service.ts';
 import { AdminService } from './admin-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
-import { GroupMatchService } from './group-match-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
 import { NotificationService, StoredNotifier } from './notification-service.ts';
 import { ProfileService } from './profile-service.ts';
@@ -46,7 +45,6 @@ export function createCore(input: CoreInput) {
     flash,
     conversations: new ConversationService(deps),
     suggestions: new SuggestionService(deps, flash),
-    groupMatch: new GroupMatchService(deps),
     explore: new ExploreService(deps, profiles, boosts),
     eventPages: new EventPageService(deps, profiles),
     eventReminders: new EventReminderService(deps),
@@ -113,8 +111,6 @@ export type {
 } from './flash-service.ts';
 export { ConversationService, MESSAGE_MAX, MESSAGES_PER_MINUTE, parseSuggestion } from './conversation-service.ts';
 export type { ConversationListItem, ConversationView, GroupDetails, MessageView } from './conversation-service.ts';
-export { GroupMatchService } from './group-match-service.ts';
-export type { GroupSuggestion, GroupSuggestionsView } from './group-match-service.ts';
 export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_APART_M } from './suggestion-service.ts';
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { EventPageService } from './event-page-service.ts';
