@@ -8,6 +8,8 @@ export interface DwellEntry {
   source: DwellSource;
   /** Abriu o conteúdo a partir daqui. Vale mesmo sem tempo de tela. */
   clicked?: boolean;
+  /** Compartilhou o conteúdo. Vale mesmo sem tempo de tela. */
+  shared?: boolean;
 }
 
 /** Mesmos limites do servidor. Abaixo do mínimo foi só passar a tela. */
@@ -19,10 +21,10 @@ export class DwellQueue {
   private readonly map = new Map<string, DwellEntry>();
 
   add(entry: DwellEntry): void {
-    if (!entry.targetId || !Number.isFinite(entry.ms) || entry.ms < 0 || (entry.ms === 0 && entry.clicked !== true)) return;
+    if (!entry.targetId || !Number.isFinite(entry.ms) || entry.ms < 0 || (entry.ms === 0 && entry.clicked !== true && entry.shared !== true)) return;
     const key = `${entry.targetType}|${entry.targetId}|${entry.source}`;
     const current = this.map.get(key);
-    this.map.set(key, { ...entry, ms: Math.round((current?.ms ?? 0) + entry.ms), clicked: current?.clicked === true || entry.clicked === true });
+    this.map.set(key, { ...entry, ms: Math.round((current?.ms ?? 0) + entry.ms), clicked: current?.clicked === true || entry.clicked === true, shared: current?.shared === true || entry.shared === true });
   }
 
   get size(): number {
@@ -35,7 +37,7 @@ export class DwellQueue {
     for (const [key, entry] of this.map) {
       if (out.length >= max) break;
       this.map.delete(key);
-      if (entry.ms >= DWELL_MIN_MS || entry.clicked === true) out.push(entry);
+      if (entry.ms >= DWELL_MIN_MS || entry.clicked === true || entry.shared === true) out.push(entry);
     }
     return out;
   }

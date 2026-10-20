@@ -79,3 +79,10 @@ export function trackClick(targetType: DwellTarget, targetId: string, source: Dw
   ensureScheduler();
   queue.add({ targetType, targetId, ms: 0, source, clicked: true });
 }
+
+/** Registra que a pessoa compartilhou um post ou evento (conversa, fora do app ou no próprio perfil). */
+export function trackShare(targetType: DwellTarget, targetId: string): void {
+  if (!userId || !readPersonalize(userId)) return;
+  ensureScheduler();
+  queue.add({ targetType, targetId, ms: 0, source: 'OTHER', shared: true });
+}

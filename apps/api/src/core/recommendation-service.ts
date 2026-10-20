@@ -23,6 +23,10 @@ export const RECO_MIN_STICKY_MS = 3000;
 export const RECO_SEEN_MS = 1500;
 /** O mesmo evento aparecendo tantas vezes no bloco sem clique cansa: para de mostrar. */
 export const RECO_MAX_IMPRESSIONS = 3;
+/** Quanto cada gesto explícito pesa no gosto (tempo na tela vai de 1 a 2). Compartilhar é o mais forte. */
+export const RECO_TASTE_LIKE = 1.5;
+export const RECO_TASTE_COMMENT = 2;
+export const RECO_TASTE_SHARE = 2.5;
 export const RECO_MAX_FRIENDS = 30;
 export const RECO_MAX_PER_SOURCE = 2;
 export const RECO_WEIGHTS = { social: 0.55, taste: 0.35, fresh: 0.1 } as const;
@@ -197,7 +201,8 @@ export class RecommendationService {
 
     // Medições de permanência (só se a pessoa não desligou).
     const dwell: DwellRecord[] = personalize ? await this.deps.dwell.listByUser(viewerId, since, 1000) : [];
-    const threshold = stickyThreshold(dwell);
+    // Cliques e compartilhamentos sem tempo (0 ms) não entram na média de tempo da pessoa.
+    const threshold = stickyThreshold(dwell.filter((d) => d.ms > 0));
 
     // 1. Proximidade com cada amigo.
     const raw = new Map<string, number>();
@@ -219,6 +224,22 @@ export class RecommendationService {
     // 2. Gosto a partir do que prendeu.
     const taste = emptyTaste();
     if (personalize) {
+      // Gestos explícitos: o que a pessoa curtiu, comentou ou compartilhou diz mais que o tempo na tela.
+      for (const row of mine) {
+        const p = await postOf(row.postId);
+        if (p) addFeatures(taste, postFeatures(p.post), (row.kind === 'COMMENT' ? RECO_TASTE_COMMENT : RECO_TASTE_LIKE) * decay(row.at, now, 30));
+      }
+      for (const d of dwell) {
+        if (d.shared !== true) continue;
+        const w = RECO_TASTE_SHARE * decay(d.createdAt, now, 30);
+        if (d.targetType === 'POST') {
+          const p = await postOf(d.targetId);
+          if (p) addFeatures(taste, postFeatures(p.post), w);
+        } else {
+          const e = await places.findEvent(d.targetId);
+          if (e) addFeatures(taste, eventFeatures(e.event, e.venue.category), w);
+        }
+      }
       for (const d of dwell) {
         const w = stickyWeight(d.ms, threshold) * decay(d.createdAt, now, 30);
         if (w <= 0) continue;
@@ -233,9 +254,10 @@ export class RecommendationService {
     }
 
     // O que ela já viu ou já fez não volta.
-    const seenPosts = new Set(dwell.filter((d) => d.targetType === 'POST' && d.ms >= RECO_SEEN_MS).map((d) => d.targetId));
+    const seenPosts = new Set(dwell.filter((d) => d.targetType === 'POST' && (d.ms >= RECO_SEEN_MS || d.shared === true)).map((d) => d.targetId));
+    const sharedEvents = new Set(dwell.filter((d) => d.targetType === 'EVENT' && d.shared === true).map((d) => d.targetId));
     const impressions = new Map<string, number>();
-    for (const d of dwell) if (d.targetType === 'EVENT' && d.source === 'RECO') impressions.set(d.targetId, (impressions.get(d.targetId) ?? 0) + 1);
+    for (const d of dwell) if (d.targetType === 'EVENT' && d.source === 'RECO' && d.ms > 0) impressions.set(d.targetId, (impressions.get(d.targetId) ?? 0) + 1);
 
     // 3. Candidatos.
     const cands = new Map<string, Candidate>();
@@ -288,7 +310,7 @@ export class RecommendationService {
     const scored: { c: Candidate; score: number; sim: number }[] = [];
     for (const c of cands.values()) {
       if (c.type === 'POST' && (seenPosts.has(c.id) || viewerEngaged.has(c.id))) continue;
-      if (c.type === 'EVENT' && ((impressions.get(c.id) ?? 0) >= RECO_MAX_IMPRESSIONS || (await eventRoom.isGoing({ source: 'PLACE', id: c.id }, viewerId)))) continue;
+      if (c.type === 'EVENT' && (sharedEvents.has(c.id) || (impressions.get(c.id) ?? 0) >= RECO_MAX_IMPRESSIONS || (await eventRoom.isGoing({ source: 'PLACE', id: c.id }, viewerId)))) continue;
       if (c.type === 'POST' && (await eventRoom.isGoing({ source: 'USER', id: c.id }, viewerId))) continue;
       const sim = personalize ? tasteSimilarity(taste, c.features) : 0;
       if (c.social === 0 && sim === 0) continue;

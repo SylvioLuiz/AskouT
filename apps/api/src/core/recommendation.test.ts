@@ -109,6 +109,48 @@ describe('motor de recomendação', () => {
     assert.ok(r.items.find((i) => i.event?.id === 'parecido')!.reasons.includes('Tem a ver com #samba'));
   });
 
+  it('post curtido ou comentado vira gosto: traz eventos da mesma # mesmo sem amigos', async () => {
+    const { w, ana, eva } = await setup();
+    await event(w, 'samba', 'v1', 40, 'OTHER', ['samba']);
+    await event(w, 'rock', 'v2', 40, 'OTHER', ['rock']);
+    const liked = await w.core.posts.create(eva, { caption: 'roda #samba', images: [JPEG] });
+    assert.deepEqual((await w.core.recommendations.recommend(ana)).items, []);
+    await w.core.posts.like(ana, liked.id);
+    const r = await w.core.recommendations.recommend(ana);
+    assert.deepEqual(ids(r), ['samba']);
+    assert.ok(r.items[0]!.reasons.includes('Tem a ver com #samba'));
+    assert.deepEqual((await w.core.recommendations.recommend(ana, { personalize: false })).items, [], 'desligado, curtida não vira gosto');
+  });
+
+  it('compartilhar pesa mais que curtir, vale para evento e post, e o post compartilhado não volta', async () => {
+    const { w, ana, bia, eva } = await setup();
+    await event(w, 'visto', 'v1', 30, 'OTHER', ['samba']);
+    await event(w, 'samba2', 'v1', 50, 'OTHER', ['samba']);
+    await event(w, 'rock', 'v2', 50, 'OTHER', ['rock']);
+    await w.core.dwell.record(ana, [{ targetType: 'EVENT', targetId: 'visto', ms: 0, source: 'OTHER', shared: true }]);
+    assert.ok(ids(await w.core.recommendations.recommend(ana)).includes('samba2'));
+    assert.ok(!ids(await w.core.recommendations.recommend(ana)).includes('visto'), 'o evento compartilhado não volta');
+    const rock = await w.core.posts.create(eva, { caption: 'noite #rock', images: [JPEG] });
+    await w.core.posts.like(ana, rock.id);
+    const both = (await w.core.recommendations.recommend(ana)).items.filter((i) => i.event);
+    assert.equal(both[0]!.event!.id, 'samba2', 'o compartilhado vence a curtida');
+    const friendLiked = await w.core.posts.create(eva, { caption: 'outro', images: [JPEG] });
+    await w.core.posts.like(bia, friendLiked.id);
+    assert.ok(ids(await w.core.recommendations.recommend(ana)).includes(friendLiked.id));
+    await w.core.dwell.record(ana, [{ targetType: 'POST', targetId: friendLiked.id, ms: 0, source: 'OTHER', shared: true }]);
+    assert.ok(!ids(await w.core.recommendations.recommend(ana)).includes(friendLiked.id));
+  });
+
+  it('clique sem tempo não derruba a média de tempo da pessoa', async () => {
+    const { w, ana } = await setup();
+    await event(w, 'curto', 'v1', 30, 'SHOW', ['samba']);
+    await event(w, 'parecido', 'v1', 50, 'SHOW', ['samba']);
+    await w.core.dwell.record(ana, Array.from({ length: 9 }, (_, i) => ({ targetType: 'POST', targetId: `p${i}`, ms: 40_000, source: 'FEED' })));
+    await w.core.dwell.record(ana, Array.from({ length: 20 }, (_, i) => ({ targetType: 'POST', targetId: `c${i}`, ms: 0, source: 'FEED', clicked: true })));
+    await w.core.dwell.record(ana, [{ targetType: 'EVENT', targetId: 'curto', ms: 6000, source: 'FEED' }]);
+    assert.deepEqual((await w.core.recommendations.recommend(ana)).items, [], '6 s continua abaixo da média de 40 s');
+  });
+
   it('tempo abaixo da média da pessoa não conta como gosto', async () => {
     const { w, ana } = await setup();
     await event(w, 'curto', 'v1', 30, 'SHOW', ['samba']);
@@ -188,6 +230,7 @@ describe('medição de permanência', () => {
     await rejectsWith(w.core.dwell.record(ana, [{ targetType: 'POST', targetId: '', ms: 2000 }]), 'VALIDATION');
     await rejectsWith(w.core.dwell.record(ana, [{ targetType: 'POST', targetId: 'x', ms: 'muito' }]), 'VALIDATION');
     await rejectsWith(w.core.dwell.record(ana, [{ targetType: 'POST', targetId: 'x', ms: 2000, source: 'AMIGO' }]), 'VALIDATION');
+    await rejectsWith(w.core.dwell.record(ana, [{ targetType: 'POST', targetId: 'x', ms: 2000, shared: 'sim' }]), 'VALIDATION');
   });
 });
 

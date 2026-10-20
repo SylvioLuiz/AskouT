@@ -427,14 +427,15 @@ export function defineRepositoryContract(
         const ana = await newUser('dwell_ana');
         const bia = await newUser('dwell_bia');
         const t0 = new Date(Date.UTC(2030, 0, 10, 12));
-        const mk = (userId: string, n: number, over: Partial<DwellRecord> = {}): DwellRecord => ({ id: randomUUID(), userId, targetType: 'POST', targetId: `p${n}`, ms: 4000 + n, source: 'FEED', clicked: false, createdAt: new Date(t0.getTime() + n * 1000), ...over });
-        await h.dwell.addMany([mk(ana, 1), mk(ana, 2, { targetType: 'EVENT', source: 'RECO', clicked: true }), mk(ana, 3), mk(bia, 4)]);
+        const mk = (userId: string, n: number, over: Partial<DwellRecord> = {}): DwellRecord => ({ id: randomUUID(), userId, targetType: 'POST', targetId: `p${n}`, ms: 4000 + n, source: 'FEED', clicked: false, shared: false, createdAt: new Date(t0.getTime() + n * 1000), ...over });
+        await h.dwell.addMany([mk(ana, 1), mk(ana, 2, { targetType: 'EVENT', source: 'RECO', clicked: true }), mk(ana, 3, { shared: true }), mk(bia, 4)]);
         await h.dwell.addMany([]);
         const all = await h.dwell.listByUser(ana, new Date(t0.getTime() - 1000), 10);
         assert.deepEqual(all.map((r) => r.targetId), ['p3', 'p2', 'p1'], 'mais novo primeiro');
         assert.equal(all[1]!.targetType, 'EVENT');
         assert.equal(all[1]!.source, 'RECO');
         assert.deepEqual(all.map((r) => r.clicked), [false, true, false], 'guarda o clique');
+        assert.deepEqual(all.map((r) => r.shared), [true, false, false], 'guarda o compartilhamento');
         assert.deepEqual((await h.dwell.listAllSince(new Date(t0.getTime() + 1500), 10)).map((r) => r.targetId), ['p4', 'p3', 'p2'], 'todas as pessoas, mais novo primeiro');
         assert.equal((await h.dwell.listAllSince(t0, 2)).length, 2);
         assert.deepEqual((await h.dwell.listByUser(ana, new Date(t0.getTime() + 1500), 10)).map((r) => r.targetId), ['p3', 'p2'], 'respeita o prazo');

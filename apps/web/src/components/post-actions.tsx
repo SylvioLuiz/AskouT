@@ -11,6 +11,7 @@ import { useAsync, useDebounced } from '../hooks.ts';
 import { cropPostPhoto } from '../lib/image.ts';
 import type { CropRect } from '../lib/crop.ts';
 import { toApiError } from '../lib/errors.ts';
+import { trackShare } from './dwell.tsx';
 import { timeAgo } from '../lib/format.ts';
 import { applyMention, mentionQueryAt, splitMentions } from '../lib/mentions.ts';
 import { eventProblem, isoToLocalInput, localToIso, POST_CAPTION_MAX } from '../lib/post-draft.ts';
@@ -491,11 +492,11 @@ export function AdjustSheet({ post, onClose, onSaved }: { post: PostView; onClos
 // ---------- Compartilhar ----------
 
 export function SharePostSheet({ post, onClose }: { post: PostView; onClose: () => void }) {
-  return <ShareLinkSheet url={postLink(window.location.origin, post.id)} text={postShareText(post.author.username)} onClose={onClose} />;
+  return <ShareLinkSheet url={postLink(window.location.origin, post.id)} text={postShareText(post.author.username)} onShared={() => trackShare('POST', post.id)} onClose={onClose} />;
 }
 
 /** Compartilhar um link: numa conversa do app (amigo ou grupo) ou fora dele (compartilhar do aparelho / copiar). */
-export function ShareLinkSheet({ url, text, onClose }: { url: string; text: string; onClose: () => void }) {
+export function ShareLinkSheet({ url, text, onShared, onClose }: { url: string; text: string; onShared?: () => void; onClose: () => void }) {
   const [step, setStep] = useState<'menu' | 'chat'>('menu');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
@@ -506,9 +507,11 @@ export function ShareLinkSheet({ url, text, onClose }: { url: string; text: stri
     try {
       if (typeof navigator.share === 'function') {
         await navigator.share({ title: 'AskouT', text, url });
+        onShared?.();
         return;
       }
       await navigator.clipboard.writeText(url);
+      onShared?.();
       setMessage({ tone: 'ok', text: 'Link copiado. Cole onde quiser, por exemplo no WhatsApp.' });
     } catch (failure) {
       if (failure instanceof DOMException && failure.name === 'AbortError') return;
@@ -521,6 +524,7 @@ export function ShareLinkSheet({ url, text, onClose }: { url: string; text: stri
     setMessage(undefined);
     try {
       await api.sendText(conversation.id, `${text}: ${url}`);
+      onShared?.();
       setMessage({ tone: 'ok', text: `Enviado para ${conversation.type === 'GROUP' ? (conversation.name ?? 'o grupo') : (conversation.other?.username ?? 'a conversa')}.` });
       setStep('menu');
     } catch (failure) {

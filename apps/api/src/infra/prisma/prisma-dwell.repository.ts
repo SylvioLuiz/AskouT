@@ -3,8 +3,8 @@ import type { DwellRepository } from '../../core/ports.ts';
 import type { DwellRecord, DwellSource, DwellTarget } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
-type Row = { id: string; userId: string; targetType: string; targetId: string; ms: number; source: string; clicked: boolean; createdAt: Date };
-const toRecord = (r: Row): DwellRecord => ({ id: r.id, userId: r.userId, targetType: r.targetType as DwellTarget, targetId: r.targetId, ms: r.ms, source: r.source as DwellSource, clicked: r.clicked, createdAt: r.createdAt });
+type Row = { id: string; userId: string; targetType: string; targetId: string; ms: number; source: string; clicked: boolean; shared: boolean; createdAt: Date };
+const toRecord = (r: Row): DwellRecord => ({ id: r.id, userId: r.userId, targetType: r.targetType as DwellTarget, targetId: r.targetId, ms: r.ms, source: r.source as DwellSource, clicked: r.clicked, shared: r.shared, createdAt: r.createdAt });
 
 export class PrismaDwellRepository implements DwellRepository {
   private readonly prisma: PrismaClient;
@@ -15,7 +15,7 @@ export class PrismaDwellRepository implements DwellRepository {
 
   async addMany(records: DwellRecord[]): Promise<void> {
     if (records.length === 0) return;
-    await this.prisma.contentDwell.createMany({ data: records.map((r) => ({ ...r, clicked: r.clicked === true })) });
+    await this.prisma.contentDwell.createMany({ data: records.map((r) => ({ ...r, clicked: r.clicked === true, shared: r.shared === true })) });
   }
 
   async listByUser(userId: string, since: Date, limit: number): Promise<DwellRecord[]> {

@@ -440,6 +440,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
       {sharing && e ? (
         <ShareEventSheet
           eventId={e.id}
+          source={e.source}
           title={e.title}
           posted={isPosted}
           onPostedChange={setPosted}

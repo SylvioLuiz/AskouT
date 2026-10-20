@@ -1,4 +1,5 @@
 import { VenueLink } from './venue-link.tsx';
+import { trackShare } from './dwell.tsx';
 import { useState } from 'react';
 import { Sheet } from './agenda.tsx';
 import { Avatar, Button, ErrorState, GroupAvatar, Loading, Notice } from './ui.tsx';
@@ -14,11 +15,14 @@ import { Link } from '../router.tsx';
 type Step = 'menu' | 'chat';
 
 /** Compartilhar um evento: no perfil (feed), numa conversa, ou fora do app. */
-export function ShareEventSheet({ eventId, title, posted, onPostedChange, profile = 'toggle', outside: allowOutside = true, onClose }: { eventId: string; title: string; posted: boolean; onPostedChange: (posted: boolean) => void; profile?: 'toggle' | 'owner' | 'private'; outside?: boolean; onClose: () => void }) {
+export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPostedChange, profile = 'toggle', outside: allowOutside = true, onClose }: { eventId: string; source?: 'PLACE' | 'USER'; title: string; posted: boolean; onPostedChange: (posted: boolean) => void; profile?: 'toggle' | 'owner' | 'private'; outside?: boolean; onClose: () => void }) {
   const [step, setStep] = useState<Step>('menu');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const chats = useAsync(() => (step === 'chat' ? api.conversations() : Promise.resolve(null)), [step]);
+
+  /** Conta como compartilhamento para as recomendações (evento de local é EVENT; evento de pessoa é um post). */
+  const shared = () => trackShare(source === 'USER' ? 'POST' : 'EVENT', eventId);
 
   async function togglePost() {
     setBusy(true);
@@ -27,6 +31,7 @@ export function ShareEventSheet({ eventId, title, posted, onPostedChange, profil
       if (posted) await api.unpostEvent(eventId);
       else await api.postEvent(eventId);
       onPostedChange(!posted);
+      if (!posted) shared();
       setMessage({ tone: 'ok', text: posted ? 'Evento tirado do seu perfil.' : 'Evento postado no seu perfil.' });
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
@@ -40,6 +45,7 @@ export function ShareEventSheet({ eventId, title, posted, onPostedChange, profil
     setMessage(undefined);
     try {
       await api.sendEvent(conversation.id, eventId);
+      shared();
       setMessage({ tone: 'ok', text: `Enviado para ${conversation.type === 'GROUP' ? (conversation.name ?? 'o grupo') : (conversation.other?.username ?? 'a conversa')}.` });
       setStep('menu');
     } catch (failure) {
@@ -56,9 +62,11 @@ export function ShareEventSheet({ eventId, title, posted, onPostedChange, profil
     try {
       if (typeof navigator.share === 'function') {
         await navigator.share({ title, text, url });
+        shared();
         return;
       }
       await navigator.clipboard.writeText(url);
+      shared();
       setMessage({ tone: 'ok', text: 'Link copiado. Cole onde quiser, por exemplo no WhatsApp.' });
     } catch (failure) {
       if (failure instanceof DOMException && failure.name === 'AbortError') return;

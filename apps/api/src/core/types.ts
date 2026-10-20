@@ -854,6 +854,8 @@ export interface DwellRecord {
   source: DwellSource;
   /** A pessoa abriu o conteúdo a partir daqui (clique no bloco "Para você"). */
   clicked?: boolean;
+  /** A pessoa compartilhou o conteúdo (conversa, fora do app ou no próprio perfil). */
+  shared?: boolean;
   createdAt: Date;
 }
 

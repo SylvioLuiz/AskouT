@@ -7,6 +7,7 @@ CREATE TABLE "ContentDwell" (
     "ms" INTEGER NOT NULL,
     "source" TEXT NOT NULL,
     "clicked" BOOLEAN NOT NULL DEFAULT false,
+    "shared" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "ContentDwell_pkey" PRIMARY KEY ("id")

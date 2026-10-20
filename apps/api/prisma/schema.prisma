@@ -1226,6 +1226,8 @@ model ContentDwell {
   source     String
   /// Abriu o conteúdo a partir da exibição (clique no bloco "Para você").
   clicked    Boolean  @default(false)
+  /// Compartilhou o conteúdo (conversa, fora do app ou no próprio perfil).
+  shared     Boolean  @default(false)
   createdAt  DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
