@@ -6,11 +6,11 @@ import { confirmedLabel, dateTile } from '../lib/poster.ts';
 import { Link } from '../router.tsx';
 
 /** Selo com o dia do evento ("SÁB 25 OUT"), em vidro sobre a foto. */
-export function DateBadge({ startsAt }: { startsAt: string }) {
+export function DateBadge({ startsAt, mini = false }: { startsAt: string; mini?: boolean }) {
   const tile = dateTile(startsAt);
   if (!tile) return null;
   return (
-    <div className="poster__date" aria-hidden="true">
+    <div className={`poster__date${mini ? ' poster__date--mini' : ''}`} aria-hidden="true">
       <span className="poster__date-w">{tile.weekday}</span>
       <span className="poster__date-d">{tile.day}</span>
       <span className="poster__date-m">{tile.month}</span>

@@ -136,6 +136,8 @@ export interface VenueProfileView {
   upcomingEvents: VenueEventView[];
   /** Ranking de quem mais frequenta (só perfis que o visitante pode ver). */
   regulars: VenueRegularView[];
+  /** Amigos (quem você segue e te segue de volta) que já confirmaram presença aqui: quantos são e até 3 para mostrar. */
+  friendsWent: { count: number; sample: PublicProfile[] };
 }
 
 /** Quem mais frequenta o local: presenças confirmadas em eventos que já começaram. */
@@ -416,7 +418,7 @@ export class VenueService {
       followerCount,
       rating: ratingView(rating),
       upcomingEvents: upcoming,
-      regulars: await this.regulars(viewerId, venue.id, events, now),
+      ...(await this.visitors(viewerId, venue.id, events, now)),
     };
   }
 
@@ -424,16 +426,16 @@ export class VenueService {
    * Ranking de quem mais confirmou presença em eventos do local que já começaram (eventos do Explorar e posts de evento feitos em nome do local).
    * Perfil privado só aparece para quem já o segue; bloqueio em qualquer sentido e conta suspensa ficam de fora. Empate: ordem alfabética do nome de usuário.
    */
-  private async regulars(viewerId: string, venueId: string, events: PlaceEventRecord[], now: number): Promise<VenueRegularView[]> {
+  private async visitors(viewerId: string, venueId: string, events: PlaceEventRecord[], now: number): Promise<{ regulars: VenueRegularView[]; friendsWent: { count: number; sample: PublicProfile[] } }> {
     const posts = await this.deps.posts.listFor([], [], { limit: 200, offset: 0 }, undefined, { venueIds: [venueId] });
     const refs: EventRef[] = [
       ...events.filter((e) => e.startsAt.getTime() <= now).map((e) => ({ source: 'PLACE' as const, id: e.id })),
       ...posts.filter((p) => p.post.venueId === venueId && p.post.eventStartsAt && p.post.eventStartsAt.getTime() <= now && p.post.archivedAt === null).map((p) => ({ source: 'USER' as const, id: p.post.id })),
     ];
-    if (refs.length === 0) return [];
+    if (refs.length === 0) return { regulars: [], friendsWent: { count: 0, sample: [] } };
     const counts = await this.deps.eventRoom.countGoingByUser(refs);
     const profiles = new Map((await this.deps.users.findProfilesByIds(counts.map((c) => c.userId))).map((p) => [p.userId, p] as const));
-    const rows: { user: PublicProfile; visits: number }[] = [];
+    const rows: { user: PublicProfile; visits: number; friend: boolean }[] = [];
     for (const c of counts) {
       const profile = profiles.get(c.userId);
       if (!profile) continue;
@@ -443,10 +445,15 @@ export class VenueService {
         if (await this.deps.blocks.existsEitherWay(viewerId, c.userId)) continue;
         if (profile.isPrivate && (await this.deps.follows.get(viewerId, c.userId))?.status !== 'ACCEPTED') continue;
       }
-      rows.push({ user: toPublicProfile(profile), visits: c.count });
+      const friend = c.userId !== viewerId && (await this.deps.follows.get(viewerId, c.userId))?.status === 'ACCEPTED' && (await this.deps.follows.get(c.userId, viewerId))?.status === 'ACCEPTED';
+      rows.push({ user: toPublicProfile(profile), visits: c.count, friend });
     }
     rows.sort((a, b) => b.visits - a.visits || (a.user.username < b.user.username ? -1 : 1));
-    return rows.slice(0, VENUE_REGULARS_LIMIT).map((r, i) => ({ rank: i + 1, ...r }));
+    const friends = rows.filter((r) => r.friend);
+    return {
+      regulars: rows.slice(0, VENUE_REGULARS_LIMIT).map((r, i) => ({ rank: i + 1, user: r.user, visits: r.visits })),
+      friendsWent: { count: friends.length, sample: friends.slice(0, 3).map((r) => r.user) },
+    };
   }
 
   /** Dono edita nome, endereço, categoria, descrição, horários e capa. Só o que vier muda; vazio apaga o que é opcional. */

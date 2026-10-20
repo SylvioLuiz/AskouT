@@ -13,6 +13,7 @@ import { statusLabel } from '../lib/meetup.ts';
 import { applyTheme, readTheme, saveTheme, THEME_LABELS } from '../lib/theme.ts';
 import type { ThemeChoice } from '../lib/theme.ts';
 import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validation.ts';
+import { InviteSheet } from '../components/invite.tsx';
 import { supportMailto } from '../lib/help-mailto.ts';
 import { Link } from '../router.tsx';
 
@@ -340,9 +341,14 @@ export function ThemeScreen() {
 export function FriendsScreen() {
   useTitle('Amigos');
   const friends = useAsync(() => api.friends(), []);
+  const [inviting, setInviting] = useState(false);
   return (
     <>
       <PageHead title="Amigos" back="/perfil" subtitle="Pessoas que seguem você e que você segue" action={<Link to="/amigos/contatos">Achar nos contatos</Link>} />
+      <Button full variant="secondary" onClick={() => setInviting(true)}>
+        Convidar amigos para o AskouT
+      </Button>
+      {inviting ? <InviteSheet onClose={() => setInviting(false)} /> : null}
       {friends.loading && !friends.data ? <Loading /> : null}
       {friends.error ? <ErrorState message={friends.error.message} onRetry={friends.reload} /> : null}
       {friends.data && friends.data.length === 0 ? (

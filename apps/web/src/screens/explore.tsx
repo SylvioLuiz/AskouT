@@ -36,7 +36,7 @@ import { pluralize } from '../lib/format.ts';
 import type { EventKind, ExploreEvent, ExplorePlace, ExploreResult } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
-import { PosterEvent } from '../components/poster.tsx';
+import { DateBadge, PosterEvent } from '../components/poster.tsx';
 import { VenueLogo } from '../components/venue-logo.tsx';
 import { openStatus } from '../lib/venue-profile.ts';
 
@@ -82,12 +82,13 @@ export function useCurrentPosition(): LocationState {
 
 // ---------- Peças de tela ----------
 
-function EventCover({ event, shape }: { event: ExploreEvent; shape: string }) {
+function EventCover({ event, shape, badge = false }: { event: ExploreEvent; shape: string; badge?: boolean }) {
   const [failed, setFailed] = useState(false);
   const image = failed ? null : safeImage(event.imageUrl);
   return (
     <div className={`evcover evcover--${shape} evcover--${event.kind.toLowerCase()}`}>
       {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="evcover__fallback" aria-hidden="true"><EventKindIcon kind={event.kind} /><span className="evcover__kind">{kindLabel(event.kind)}</span></span>}
+      {badge ? <DateBadge startsAt={event.startsAt} mini /> : null}
       <span className="evcover__tags">
         {event.isFree ? <span className="tag tag--free">Grátis</span> : null}
         {event.sample ? <SampleBadge /> : null}
@@ -101,7 +102,7 @@ export function EventCard({ event, now, poster }: { event: ExploreEvent; now: Da
   return (
     <li className="evcard">
       <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link">
-        <EventCover event={event} shape={coverShape(event.id)} />
+        <EventCover event={event} shape={coverShape(event.id)} badge />
         <div className="evcard__body">
           <h3 className="evcard__title">{event.title}</h3>
           <p className="evcard__venue">

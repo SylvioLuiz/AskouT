@@ -19,6 +19,8 @@ import {
   passwordProblem,
   usernameProblem,
 } from '../lib/validation.ts';
+import { parseInvite, rememberInvite } from '../lib/invite.ts';
+import { safeStorage } from '../lib/hints.ts';
 import { Link, useSearch } from '../router.tsx';
 
 function useNow(intervalMs = 1000): number {
@@ -87,6 +89,11 @@ export function LoginScreen() {
 export function SignupScreen() {
   useTitle('Criar conta');
   const { signIn } = useAuthContext();
+  // Link de convite (?convite=usuario): guarda quem convidou; o onboarding passa a seguir essa pessoa depois do cadastro.
+  const invitedBy = parseInvite(useSearch().get('convite'));
+  useEffect(() => {
+    if (invitedBy) rememberInvite(safeStorage(), invitedBy);
+  }, [invitedBy]);
   const [started, setStarted] = useState<SignupStarted | undefined>();
 
   const [email, setEmail] = useState('');
@@ -213,6 +220,7 @@ export function SignupScreen() {
     <AuthLayout>
       <form className="form" onSubmit={submitDetails} noValidate>
         <h2 className="form__title">Criar conta</h2>
+        {invitedBy ? <Notice>Você foi convidado por @{invitedBy}. Ao entrar, você já passa a seguir essa pessoa.</Notice> : null}
         {formError ? <Notice tone="error">{formError}</Notice> : null}
         <Field label="E-mail" type="email" value={email} onChange={setEmail} error={errors['email']} autoComplete="email" inputMode="email" autoFocus />
         <Field label="Nome de usuário" value={username} onChange={(v) => setUsername(v.toLowerCase())} error={errors['username']} hint="Letras minúsculas, números, ponto e sublinhado. Não dá para trocar depois." prefix="@" autoComplete="username" maxLength={31} />

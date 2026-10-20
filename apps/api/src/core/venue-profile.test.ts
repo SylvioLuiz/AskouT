@@ -308,3 +308,21 @@ test('ranking de frequentadores: conta presença em eventos que já começaram, 
   assert.deepEqual((await names(bia)).map((r) => r[1]), ['ana', 'bia', 'caio'], 'bloqueio some nos dois sentidos');
   assert.deepEqual((await w.core.venues.profile(ana, 'v2')).regulars, [], 'local sem presença não tem ranking');
 });
+
+test('amigos que já foram: só quem se segue de volta, sem o próprio visitante', async () => {
+  const { w, ana, bia } = await setup();
+  const u = await w.signUpMany('caio');
+  const caio = u['caio']!;
+  const now = w.clock.now().getTime();
+  await w.places.createEvent({ id: 'p1', venueId: 'v1', title: 'p1', description: null, startsAt: new Date(now - 48 * H), endsAt: new Date(now - 45 * H), kind: 'OTHER' as const, isFree: false, imageUrl: null, tags: [], isSample: false });
+  for (const id of [ana, bia, caio]) await w.eventRoom.addGoing({ source: 'PLACE', id: 'p1' }, id, new Date(now));
+  await w.core.follows.follow(ana, bia);
+  await w.core.follows.follow(bia, ana);
+  await w.core.follows.follow(ana, caio); // caio não segue de volta: não é amigo
+  const seen = (await w.core.venues.profile(ana, 'v1')).friendsWent;
+  assert.equal(seen.count, 1);
+  assert.deepEqual(seen.sample.map((p) => p.username), ['bia']);
+  const alone = (await w.core.venues.profile(caio, 'v1')).friendsWent;
+  assert.deepEqual([alone.count, alone.sample.length], [0, 0], 'sem amigos: zero');
+  assert.deepEqual((await w.core.venues.profile(ana, 'v2')).friendsWent, { count: 0, sample: [] });
+});

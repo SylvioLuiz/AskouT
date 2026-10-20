@@ -20,3 +20,29 @@ export function safeStorage(): Storage | undefined {
     return undefined;
   }
 }
+
+const FLASH_KEY = 'askout.hint.flash';
+
+/** O que a pessoa precisa saber antes de ligar o Flash pela primeira vez. */
+export const FLASH_PRIVACY_POINTS: readonly string[] = [
+  'Só amigos (quem se segue de volta) que também estão com o Flash ligado veem que você está livre.',
+  'Você escolhe por quanto tempo. Passou o tempo, o Flash desliga sozinho, e você pode desligar quando quiser.',
+  'Se você escrever um recado, os mesmos amigos veem.',
+  'Sua localização só é compartilhada depois que você aceita um convite e abre o encontro, e só com a pessoa do encontro. Quando o Flash ou o encontro termina, ela deixa de ser enviada.',
+];
+
+export function flashNoticeSeen(storage: Pick<Storage, 'getItem'> | undefined): boolean {
+  try {
+    return storage?.getItem(FLASH_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markFlashNoticeSeen(storage: Pick<Storage, 'setItem'> | undefined): void {
+  try {
+    storage?.setItem(FLASH_KEY, '1');
+  } catch {
+    // sem armazenamento: o aviso pode voltar numa próxima vez
+  }
+}

@@ -22,6 +22,7 @@ import {
 } from '../lib/flash.ts';
 import { initials, tintIndex } from '../lib/avatar.ts';
 import { toApiError } from '../lib/errors.ts';
+import { FLASH_PRIVACY_POINTS, flashNoticeSeen, markFlashNoticeSeen, safeStorage } from '../lib/hints.ts';
 import type { OtherPin } from '../components/match-map.tsx';
 import type { AvailableFriend, FlashInvite, FlashMatch, PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
@@ -102,10 +103,21 @@ export function FlashScreen() {
     available.reload();
   }
 
-  async function turnOn() {
+  const [explaining, setExplaining] = useState(false);
+
+  // Primeira vez: explica quem vê e o que é compartilhado antes de ligar.
+  function turnOn() {
     const problem = flashNoteProblem(note);
     setNoteError(problem);
     if (problem) return;
+    if (!flashNoticeSeen(safeStorage())) {
+      setExplaining(true);
+      return;
+    }
+    void doTurnOn();
+  }
+
+  async function doTurnOn() {
     setBusy(true);
     setFeedback(undefined);
     try {
@@ -548,6 +560,25 @@ export function FlashScreen() {
             <BoltIcon filled />
             Ativar Flash
           </Button>
+          {explaining ? (
+            <Sheet title="Antes de ligar o Flash" onClose={() => setExplaining(false)}>
+              <ul className="flashnotice">
+                {FLASH_PRIVACY_POINTS.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+              <Button
+                full
+                onClick={() => {
+                  markFlashNoticeSeen(safeStorage());
+                  setExplaining(false);
+                  void doTurnOn();
+                }}
+              >
+                Entendi, ligar o Flash
+              </Button>
+            </Sheet>
+          ) : null}
           <p className="flashoff__privacy">
             <LockIcon />
             <span>Sua localização só será compartilhada com amigos que você autorizar, enquanto o Flash estiver ativo.</span>

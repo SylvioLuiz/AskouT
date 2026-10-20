@@ -16,7 +16,7 @@ import { toApiError } from '../lib/errors.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { resizePostPhoto } from '../lib/image.ts';
 import type { VenueEvent, VenueProfile } from '../lib/types.ts';
-import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX, VENUE_NAME_MAX, VENUE_POST_CAPTION_MAX, VENUE_POST_PHOTOS_MAX, applyToAll, daysSummary, draftFromProfile, hoursLines, openStatus, profileBody, profileProblem } from '../lib/venue-profile.ts';
+import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX, VENUE_NAME_MAX, VENUE_POST_CAPTION_MAX, VENUE_POST_PHOTOS_MAX, applyToAll, daysSummary, draftFromProfile, friendsWentLabel, hoursLines, openStatus, profileBody, profileProblem } from '../lib/venue-profile.ts';
 import type { VenueProfileDraft } from '../lib/venue-profile.ts';
 import { Link, navigate } from '../router.tsx';
 import { VenueEventRow, VenueEventSheet } from './venues.tsx';
@@ -203,6 +203,16 @@ function VenueHero({ venue, now, onShare }: { venue: VenueProfile; now: Date; on
             <span aria-hidden="true">Ainda sem avaliações</span>
           )}
         </p>
+        {venue.friendsWent.count > 0 ? (
+          <p className="vhero__friends">
+            <span className="vhero__faces" aria-hidden="true">
+              {venue.friendsWent.sample.map((p) => (
+                <Avatar key={p.userId} profile={p} size={24} />
+              ))}
+            </span>
+            <span>{friendsWentLabel(venue.friendsWent)}</span>
+          </p>
+        ) : null}
         {venue.sample ? <SampleBadge /> : null}
       </div>
       <dl className="vstats">

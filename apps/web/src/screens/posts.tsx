@@ -493,7 +493,7 @@ export function PostScreen({ postId }: { postId: string }) {
   return (
     <>
       <PageHead title="Post" back={`/u/${encodeURIComponent(post.data.author.username)}`} />
-      <PostCard post={post.data} onGone={(_id, why) => navigate(why === 'hidden' ? '/' : '/perfil')} />
+      <PostCard poster post={post.data} onGone={(_id, why) => navigate(why === 'hidden' ? '/' : '/perfil')} />
     </>
   );
 }

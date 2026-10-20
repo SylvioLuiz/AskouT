@@ -4420,3 +4420,24 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .onb__theme span { font-size: 0.875rem; color: var(--muted); }
 .onb__theme--on { border-color: var(--brand); background: var(--brand-soft); }
 :root[data-theme='dark'] .onb__theme--on { background: var(--brand-soft); border-color: var(--brand); }
+
+/* Cartaz também na grade do Explorar: mesmo tamanho dos cards, só o visual muda */
+.evcard { border: 0; border-radius: 22px; background: rgb(20 20 31); color: #fff; }
+.evcard .evcover { border-radius: 0; }
+.evcard .evcover::after { content: ''; position: absolute; inset: auto 0 0 0; height: 45%; background: linear-gradient(180deg, rgb(10 10 25 / 0), rgb(20 20 31 / 0.9)); pointer-events: none; }
+.evcard .evcover__tags { position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; max-width: 60%; }
+.evcard__link:focus-visible { outline: 3px solid #fff; outline-offset: -3px; border-radius: 22px; }
+.evcard__body { background: rgb(20 20 31); }
+.evcard__title { color: #fff; font-family: var(--font-display); font-weight: 800; letter-spacing: -0.01em; }
+.evcard__venue, .evcard__when { color: rgb(255 255 255 / 0.9); }
+.evcard__hot { color: rgb(255 140 214); }
+.evcard__dist { color: rgb(255 255 255 / 0.75); }
+.evcard .venuelink, .evcard__venue a { color: rgb(255 255 255 / 0.95); }
+.poster__date--mini { top: 8px; left: 8px; min-width: 44px; padding: 5px 4px 6px; border-radius: 14px; z-index: 2; }
+.poster__date--mini .poster__date-d { margin: 2px 0; font-size: 1.25rem; }
+.poster__date--mini .poster__date-w, .poster__date--mini .poster__date-m { font-size: 0.625rem; }
+.onb__invited { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--brand-soft); color: var(--ink); font-size: 0.9375rem; font-weight: 600; }
+.vhero__friends { display: flex; align-items: center; gap: 8px; margin: 0; color: #fff; font-size: 0.875rem; font-weight: 600; text-shadow: 0 1px 6px rgb(0 0 0 / 0.5); }
+.vhero__faces { display: inline-flex; }
+.vhero__faces > * + * { margin-left: -8px; }
+.flashnotice { margin: 0 0 14px; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; line-height: 1.4; }

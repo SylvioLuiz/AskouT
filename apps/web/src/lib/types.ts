@@ -762,6 +762,8 @@ export interface VenueProfile {
   upcomingEvents: VenueEvent[];
   /** Quem mais frequenta, por presenças confirmadas em eventos do local. */
   regulars: VenueRegular[];
+  /** Amigos que já confirmaram presença aqui. */
+  friendsWent: { count: number; sample: PublicProfile[] };
 }
 
 export interface VenueRegular {

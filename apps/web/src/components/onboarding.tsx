@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
+import { takeInvite } from '../lib/invite.ts';
 import { followProgressLabel, markOnboardingDone, ONBOARDING_FOLLOW_GOAL, ONBOARDING_SLIDES, onboardingDone } from '../lib/onboarding.ts';
 import { filterByThemes, saveThemes, THEMES, themeOfCategory } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
@@ -108,6 +109,20 @@ export function Onboarding() {
   const [open, setOpen] = useState(() => !onboardingDone(storage(), user.id));
   const [step, setStep] = useState(0);
   const [chosen, setChosen] = useState<ReadonlySet<ThemeId>>(new Set());
+  const [invited, setInvited] = useState<string | undefined>();
+  // Cadastro por link de convite: segue quem convidou (a pessoa só vira amiga quando seguir de volta).
+  useEffect(() => {
+    if (!open) return;
+    const who = takeInvite(storage());
+    if (!who || who === user.profile.username) return;
+    api
+      .getProfile(who)
+      .then((view) => api.follow(view.profile.userId))
+      .then(() => setInvited(who))
+      .catch(() => undefined);
+    // Roda uma vez, ao abrir pela primeira vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   if (!open) return null;
   const toggle = (id: ThemeId) =>
     setChosen((current) => {
@@ -129,6 +144,7 @@ export function Onboarding() {
             <div className="onb__art" aria-hidden="true">{SLIDE_ICONS[step]}</div>
             <h2 id="onb-titulo" className="onb__title">{slide.title}</h2>
             <p className="onb__text">{slide.text}</p>
+            {invited && step === 0 ? <p className="onb__invited" role="status">Você entrou pelo convite de @{invited} e já segue essa pessoa.</p> : null}
             <div className="onb__dots" aria-hidden="true">
               {ONBOARDING_SLIDES.map((s, i) => (
                 <span key={s.title} className={`onb__dot${i === step ? ' onb__dot--on' : ''}`} />

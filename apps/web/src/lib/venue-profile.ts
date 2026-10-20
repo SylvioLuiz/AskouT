@@ -176,3 +176,12 @@ export function applyToAll(days: DayDraft[], from: number): DayDraft[] {
   const base = days[from]!;
   return days.map(() => ({ open: base.open, from: base.from, to: base.to }));
 }
+
+/** “Marina e mais 2 amigos já foram aqui”. Vazio quando nenhum amigo foi. */
+export function friendsWentLabel(friends: { count: number; sample: readonly { username: string }[] }): string {
+  if (friends.count <= 0) return '';
+  const first = friends.sample[0]?.username;
+  if (friends.count === 1) return first ? `@${first} já foi aqui` : '1 amigo já foi aqui';
+  const others = friends.count - 1;
+  return first ? `@${first} e mais ${others} ${others === 1 ? 'amigo' : 'amigos'} já foram aqui` : `${friends.count} amigos já foram aqui`;
+}
