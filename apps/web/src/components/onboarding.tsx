@@ -26,7 +26,7 @@ function FollowStep({ themes, onDone }: { themes: ReadonlySet<ThemeId>; onDone: 
   const [busy, setBusy] = useState<string | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const all = places.data?.places ?? [];
-  const byTheme = filterByThemes(all, themes, (p) => themeOfCategory(p.category ?? p.venue?.category ?? null));
+  const byTheme = filterByThemes(all, themes, (p) => themeOfCategory(p.category));
   // Se nada bate com o tema escolhido (fonte de fora fora do ar, locais sem tipo), mostra o que houver em vez de uma tela vazia.
   const list = (byTheme.length > 0 ? byTheme : all).slice(0, 12);
 

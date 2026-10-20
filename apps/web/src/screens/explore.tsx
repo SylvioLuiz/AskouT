@@ -298,7 +298,7 @@ export function ExploreScreen() {
         ? {
             ...raw,
             events: filterByThemes(raw.events, themes, themeOfEvent),
-            places: filterByThemes(raw.places, themes, (p) => themeOfCategory(p.category ?? p.venue?.category ?? null)),
+            places: filterByThemes(raw.places, themes, (p) => themeOfCategory(p.category)),
           }
         : raw,
     [raw, themes],
