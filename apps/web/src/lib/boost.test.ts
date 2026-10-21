@@ -4,7 +4,7 @@ import { boostTitle, boostTotalCents, canCancelBoost, daysLabel, distanceText, f
 import type { BoostPhase, BoostView } from './types.ts';
 
 function boost(id: string, phase: BoostPhase, createdAt: string): BoostView {
-  return { id, venueId: 'v', target: 'VENUE', eventId: null, eventTitle: null, days: 3, amountCents: 4500, audience: 'ALL', radiusKm: null, matchTags: [], phase, createdAt, startsAt: null, endsAt: null, payment: null };
+  return { id, venueId: 'v', channel: 'WEB', storeProductId: null, target: 'VENUE', eventId: null, eventTitle: null, days: 3, amountCents: 4500, audience: 'ALL', radiusKm: null, matchTags: [], phase, createdAt, startsAt: null, endsAt: null, payment: null };
 }
 
 describe('impulsionamento (web)', () => {

@@ -21,10 +21,19 @@ export interface AppConfig {
   appleClientId: string | undefined;
   /** Chaves VAPID do Web Push. Sem as duas, o aviso fora do app fica desligado (o sino dentro do app continua). */
   vapid: { publicKey: string; privateKey: string; subject: string } | undefined;
-  /** Provedor de pagamento do impulsionamento. “sandbox” é só de teste (não cobra); sem valor, o impulsionamento recusa criar pedidos. */
-  paymentProvider: 'sandbox' | undefined;
+  /** Provedor de pagamento do impulsionamento. “sandbox” é só de teste (não cobra); “stripe” cobra de verdade; sem valor, recusa criar pedidos. */
+  paymentProvider: 'sandbox' | 'stripe' | undefined;
+  /** Dados da Stripe, só quando `paymentProvider` é “stripe”. */
+  stripe: { secretKey: string; webhookSecret: string; webBaseUrl: string } | undefined;
+  /**
+   * Chave geral do impulsionamento pago. Desligada por padrão: sem `PAYMENTS_ENABLED=true` nenhum pedido novo é aceito
+   * (anúncios já pagos continuam valendo). Ligar só depois do lançamento nas lojas.
+   */
+  paymentsEnabled: boolean;
   /** Valor do impulsionamento por dia, em centavos de real. */
   boostPricePerDayCents: number;
+  /** Valor por dia na compra dentro do app (iOS/Android), em centavos. Padrão: o mesmo da web. */
+  boostStorePricePerDayCents: number;
 }
 
 const MIN_SECRET = 32;
@@ -88,13 +97,33 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     else vapid = { publicKey: vapidPublic, privateKey: vapidPrivate, subject: vapidSubject };
   }
 
+  const enabledRaw = env.PAYMENTS_ENABLED?.trim().toLowerCase() ?? '';
+  let paymentsEnabled = false;
+  if (enabledRaw === 'true' || enabledRaw === '1') paymentsEnabled = true;
+  else if (enabledRaw !== '' && enabledRaw !== 'false' && enabledRaw !== '0') problems.push('PAYMENTS_ENABLED deve ser true ou false');
+
   const paymentRaw = env.PAYMENT_PROVIDER?.trim() ?? '';
   let paymentProvider: AppConfig['paymentProvider'];
+  let stripe: AppConfig['stripe'];
   if (paymentRaw === 'sandbox') {
     if (nodeEnv === 'production') problems.push('PAYMENT_PROVIDER=sandbox é só de teste e é recusado em produção (não cobra de verdade)');
     else paymentProvider = 'sandbox';
+  } else if (paymentRaw === 'stripe') {
+    const secretKey = env.STRIPE_SECRET_KEY?.trim() ?? '';
+    const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim() ?? '';
+    const webBaseUrl = env.PUBLIC_WEB_URL?.trim() ?? '';
+    const before = problems.length;
+    if (!/^(sk|rk)_(test|live)_[A-Za-z0-9]+$/.test(secretKey)) problems.push('STRIPE_SECRET_KEY deve ser a chave secreta da Stripe (sk_test_… ou sk_live_…)');
+    else if (nodeEnv === 'production' && !secretKey.includes('_live_')) problems.push('Em produção a Stripe exige a chave real (sk_live_…); chave de teste é recusada');
+    if (!/^whsec_[A-Za-z0-9]+$/.test(webhookSecret)) problems.push('STRIPE_WEBHOOK_SECRET deve ser o segredo do webhook da Stripe (whsec_…)');
+    if (!/^https?:\/\/[^\s/]+$/.test(webBaseUrl)) problems.push('PUBLIC_WEB_URL deve ser o endereço do site, sem barra no fim (ex.: https://askout.com.br)');
+    else if (nodeEnv === 'production' && !webBaseUrl.startsWith('https://')) problems.push('Em produção PUBLIC_WEB_URL precisa ser https');
+    if (problems.length === before) {
+      paymentProvider = 'stripe';
+      stripe = { secretKey, webhookSecret, webBaseUrl };
+    }
   } else if (paymentRaw !== '') {
-    problems.push('PAYMENT_PROVIDER: só "sandbox" está implementado (ainda não há provedor real de pagamento)');
+    problems.push('PAYMENT_PROVIDER deve ser "sandbox" ou "stripe"');
   } else if (nodeEnv !== 'production') {
     // Em desenvolvimento o teste sem dinheiro já vem ligado, para o fluxo funcionar sem configurar nada.
     paymentProvider = 'sandbox';
@@ -105,9 +134,19 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     problems.push('BOOST_PRICE_PER_DAY_CENTS deve ser um inteiro de 100 a 1000000 (centavos)');
   }
 
+  if (paymentsEnabled && paymentProvider === undefined) {
+    problems.push('PAYMENTS_ENABLED=true exige um provedor de pagamento: defina PAYMENT_PROVIDER (e, para a Stripe, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET e PUBLIC_WEB_URL)');
+  }
+
+  const storePriceRaw = env.BOOST_STORE_PRICE_PER_DAY_CENTS?.trim() ?? '';
+  const boostStorePricePerDayCents = storePriceRaw === '' ? boostPricePerDayCents : Number(storePriceRaw);
+  if (!Number.isInteger(boostStorePricePerDayCents) || boostStorePricePerDayCents < 100 || boostStorePricePerDayCents > 1_000_000) {
+    problems.push('BOOST_STORE_PRICE_PER_DAY_CENTS deve ser um inteiro de 100 a 1000000 (centavos)');
+  }
+
   if (problems.length > 0) {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, vapid, paymentProvider, boostPricePerDayCents };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, vapid, paymentProvider, stripe, paymentsEnabled, boostPricePerDayCents, boostStorePricePerDayCents };
 }

@@ -808,10 +808,16 @@ export interface VenueEventBody {
 
 // ---------- Impulsionamento ----------
 
+export type BoostChannel = 'WEB' | 'APPLE' | 'GOOGLE';
+
 export interface BoostPricing {
   currency: 'BRL';
+  /** Chave geral: com false não se cria pedido novo (a tela mostra “em breve”). */
+  enabled: boolean;
   pricePerDayCents: number;
   dayOptions: number[];
+  /** Compra dentro do app (iOS/Android). `products` mapeia dias → produto da loja. */
+  store: { available: boolean; pricePerDayCents: number; products: Record<string, string> };
   /** Raios (km) e número máximo de hashtags do Match. */
   match: { radiusKmOptions: number[]; maxTags: number };
   /** Pagamento de teste: não cobra de verdade. */
@@ -823,6 +829,9 @@ export type BoostPhase = 'PENDING_PAYMENT' | 'SCHEDULED' | 'ACTIVE' | 'ENDED' | 
 export interface BoostView {
   id: string;
   venueId: string;
+  channel: BoostChannel;
+  /** Pedido da loja aguardando a compra: o produto que o app precisa comprar. */
+  storeProductId: string | null;
   target: 'VENUE' | 'EVENT';
   eventId: string | null;
   eventTitle: string | null;

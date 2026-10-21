@@ -54,10 +54,44 @@ describe('loadConfig', () => {
   it('pagamento: teste ligado por padrão fora de produção; produção recusa o teste e exige provedor real', () => {
     assert.equal(loadConfig(good).paymentProvider, 'sandbox');
     assert.equal(loadConfig(good).boostPricePerDayCents, 1500);
-    assert.throws(() => loadConfig({ ...good, PAYMENT_PROVIDER: 'stripe' }), /PAYMENT_PROVIDER/);
+    assert.throws(() => loadConfig({ ...good, PAYMENT_PROVIDER: 'outro' }), /PAYMENT_PROVIDER/);
     assert.throws(() => loadConfig({ ...good, NODE_ENV: 'production', PAYMENT_PROVIDER: 'sandbox' }), /produção/);
     assert.throws(() => loadConfig({ ...good, BOOST_PRICE_PER_DAY_CENTS: '5' }), /BOOST_PRICE_PER_DAY_CENTS/);
     assert.equal(loadConfig({ ...good, BOOST_PRICE_PER_DAY_CENTS: '2500' }).boostPricePerDayCents, 2500);
+  });
+
+  it('pagamentos vêm DESLIGADOS por padrão e só ligam com um provedor configurado', () => {
+    assert.equal(loadConfig(good).paymentsEnabled, false);
+    assert.equal(loadConfig({ ...good, PAYMENTS_ENABLED: 'false' }).paymentsEnabled, false);
+    // Em desenvolvimento o teste sem dinheiro já existe, então ligar basta.
+    assert.equal(loadConfig({ ...good, PAYMENTS_ENABLED: 'true' }).paymentsEnabled, true);
+    assert.throws(() => loadConfig({ ...good, PAYMENTS_ENABLED: 'talvez' }), /PAYMENTS_ENABLED deve ser/);
+    // Em produção sem provedor, ligar é recusado (senão o app prometeria cobrar sem conseguir).
+    const prod = { ...good, NODE_ENV: 'production', EMAIL_TRANSPORT: 'console' };
+    assert.throws(() => loadConfig({ ...prod, PAYMENTS_ENABLED: 'true' }), /PAYMENTS_ENABLED=true exige/);
+  });
+
+  it('Stripe: exige chaves e site, e em produção só a chave real e https', () => {
+    const stripe = { ...good, PAYMENT_PROVIDER: 'stripe', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', PUBLIC_WEB_URL: 'https://askout.com.br' };
+    const cfg = loadConfig(stripe);
+    assert.equal(cfg.paymentProvider, 'stripe');
+    assert.deepEqual(cfg.stripe, { secretKey: 'sk_test_abc123', webhookSecret: 'whsec_abc123', webBaseUrl: 'https://askout.com.br' });
+    assert.throws(() => loadConfig({ ...good, PAYMENT_PROVIDER: 'stripe' }), /STRIPE_SECRET_KEY/);
+    assert.throws(() => loadConfig({ ...stripe, STRIPE_SECRET_KEY: 'chave-qualquer' }), /STRIPE_SECRET_KEY/);
+    assert.throws(() => loadConfig({ ...stripe, STRIPE_WEBHOOK_SECRET: 'x' }), /STRIPE_WEBHOOK_SECRET/);
+    assert.throws(() => loadConfig({ ...stripe, PUBLIC_WEB_URL: 'askout.com.br' }), /PUBLIC_WEB_URL/);
+    assert.throws(() => loadConfig({ ...stripe, PUBLIC_WEB_URL: 'https://askout.com.br/' }), /PUBLIC_WEB_URL/);
+    // Produção também exige o resto da configuração (e-mail real), então só conferimos as mensagens da Stripe.
+    const prod = (extra: Record<string, string>) => () => loadConfig({ ...stripe, NODE_ENV: 'production', ...extra });
+    assert.throws(prod({}), /sk_live_/);
+    assert.throws(prod({ STRIPE_SECRET_KEY: 'sk_live_abc123', PUBLIC_WEB_URL: 'http://askout.com.br' }), /precisa ser https/);
+  });
+
+  it('preço na loja: igual ao da web se não for informado', () => {
+    assert.equal(loadConfig(good).boostStorePricePerDayCents, 1500);
+    assert.equal(loadConfig({ ...good, BOOST_PRICE_PER_DAY_CENTS: '2000' }).boostStorePricePerDayCents, 2000);
+    assert.equal(loadConfig({ ...good, BOOST_STORE_PRICE_PER_DAY_CENTS: '2200' }).boostStorePricePerDayCents, 2200);
+    assert.throws(() => loadConfig({ ...good, BOOST_STORE_PRICE_PER_DAY_CENTS: '1' }), /BOOST_STORE_PRICE_PER_DAY_CENTS/);
   });
 
   it('lê lista de origens CORS', () => {

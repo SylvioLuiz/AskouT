@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { Boost } from '@prisma/client';
 import type { BoostRepository } from '../../core/ports.ts';
-import type { BoostRecord, BoostStatus, BoostTarget } from '../../core/types.ts';
+import type { BoostChannel, BoostRecord, BoostStatus, BoostTarget } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 function toRecord(row: Boost): BoostRecord {
@@ -9,6 +9,7 @@ function toRecord(row: Boost): BoostRecord {
     id: row.id,
     venueId: row.venueId,
     ownerId: row.ownerId,
+    channel: row.channel === 'APPLE' || row.channel === 'GOOGLE' ? (row.channel as BoostChannel) : 'WEB',
     target: row.target as BoostTarget,
     eventId: row.eventId,
     days: row.days,
@@ -55,14 +56,20 @@ export class PrismaBoostRepository implements BoostRepository {
     return rows.map(toRecord);
   }
 
-  async markPaid(id: string, paid: { paidAt: Date; startsAt: Date; endsAt: Date }): Promise<boolean> {
+  async markPaid(id: string, paid: { paidAt: Date; startsAt: Date; endsAt: Date; chargeId?: string }): Promise<boolean> {
     if (!isUuid(id)) return false;
-    // O filtro por estado faz a confirmação valer uma única vez, mesmo com avisos repetidos ao mesmo tempo.
-    const result = await this.prisma.boost.updateMany({
-      where: { id, status: 'PENDING_PAYMENT' },
-      data: { status: 'PAID', paidAt: paid.paidAt, startsAt: paid.startsAt, endsAt: paid.endsAt, payCode: null, payUrl: null },
-    });
-    return result.count === 1;
+    try {
+      // O filtro por estado faz a confirmação valer uma única vez, mesmo com avisos repetidos ao mesmo tempo.
+      const result = await this.prisma.boost.updateMany({
+        where: { id, status: 'PENDING_PAYMENT' },
+        data: { status: 'PAID', paidAt: paid.paidAt, startsAt: paid.startsAt, endsAt: paid.endsAt, payCode: null, payUrl: null, ...(paid.chargeId === undefined ? {} : { chargeId: paid.chargeId }) },
+      });
+      return result.count === 1;
+    } catch (failure) {
+      // chargeId é único: o mesmo recibo da loja não paga um segundo pedido.
+      if (paid.chargeId !== undefined && (failure as { code?: unknown }).code === 'P2002') return false;
+      throw failure;
+    }
   }
 
   async transition(id: string, from: BoostStatus[], to: BoostStatus): Promise<boolean> {

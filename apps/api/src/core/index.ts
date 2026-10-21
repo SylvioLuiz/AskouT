@@ -27,6 +27,10 @@ import { ProfileService } from './profile-service.ts';
 export type CoreInput = Omit<CoreDeps, 'notifier'> & {
   /** Valor do impulsionamento por dia, em centavos. */
   boostPricePerDayCents?: number;
+  /** Valor por dia na compra dentro do app (tabela de preços da loja), em centavos. Padrão: o mesmo da web. */
+  boostStorePricePerDayCents?: number;
+  /** Chave geral dos pedidos novos de impulsionamento. Padrão: ligada (o app liga/desliga por configuração). */
+  boostsEnabled?: boolean;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
   push: PushSender;
@@ -42,7 +46,15 @@ export function createCore(input: CoreInput) {
   const posts = new PostService(deps, profiles);
   const interests = new InterestService(deps);
   const match = new MatchService(deps, interests);
-  const boosts = new BoostService(deps, input.boostPricePerDayCents === undefined ? {} : { pricePerDayCents: input.boostPricePerDayCents }, match);
+  const boosts = new BoostService(
+    deps,
+    {
+      ...(input.boostPricePerDayCents === undefined ? {} : { pricePerDayCents: input.boostPricePerDayCents }),
+      ...(input.boostStorePricePerDayCents === undefined ? {} : { storePricePerDayCents: input.boostStorePricePerDayCents }),
+      ...(input.boostsEnabled === undefined ? {} : { enabled: input.boostsEnabled }),
+    },
+    match,
+  );
   return {
     boosts,
     auth,
@@ -130,7 +142,7 @@ export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { EventPageService } from './event-page-service.ts';
 export { EventReminderService } from './event-reminder-service.ts';
 export type { EventPageView, EventPostView, EventCoverView } from './event-page-service.ts';
-export { BoostService, BOOST_DAY_OPTIONS, BOOST_DEFAULT_PRICE_PER_DAY_CENTS, boostPhase } from './boost-service.ts';
+export { BoostService, BOOST_DAY_OPTIONS, BOOST_DEFAULT_PRICE_PER_DAY_CENTS, boostPhase, boostProductId } from './boost-service.ts';
 export type { BoostPricing, BoostView, BoostPhase } from './boost-service.ts';
 export { ExploreService, EXPLORE_DEFAULT_RADIUS_KM, EXPLORE_MAX_RADIUS_KM } from './explore-service.ts';
 export type { ExploreEventItem, ExplorePlaceItem, ExploreView } from './explore-service.ts';

@@ -821,9 +821,16 @@ export type BoostStatus = 'PENDING_PAYMENT' | 'PAID' | 'CANCELLED' | 'PAUSED';
  */
 export type BoostAudience = 'ALL' | 'MATCH';
 
+/**
+ * Por onde o pedido é pago. WEB: Pix ou cartão no provedor de pagamento (sem comissão das lojas).
+ * APPLE e GOOGLE: compra dentro do app, obrigatória nas lojas para bens digitais; o recibo é conferido no servidor.
+ */
+export type BoostChannel = 'WEB' | 'APPLE' | 'GOOGLE';
+
 export interface BoostRecord {
   id: string;
   venueId: string;
+  channel: BoostChannel;
   /** Quem pediu e pagou (o responsável pelo local). */
   ownerId: string;
   target: BoostTarget;

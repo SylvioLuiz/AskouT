@@ -4,6 +4,7 @@ import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { BOOST_PHASE_LABEL, boostTitle, boostTotalCents, canCancelBoost, daysLabel, formatBrl, matchLabel, reachText, sortBoosts, toggleTag } from '../lib/boost.ts';
 import { toApiError } from '../lib/errors.ts';
+import { buyInStore, paymentReturn, pricePerDayCents, purchaseChannel, safePaymentUrl, STORE_LABEL, storeBridge } from '../lib/purchase.ts';
 import type { BoostView, MatchReach } from '../lib/types.ts';
 
 function formatWhen(iso: string): string {
@@ -11,7 +12,7 @@ function formatWhen(iso: string): string {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-/** Tela do responsável pelo local: escolhe o que impulsionar, por quantos dias, e paga por Pix. */
+/** Tela do responsável pelo local: escolhe o que impulsionar, por quantos dias, e paga (Pix/cartão no site, compra da loja no aplicativo). */
 export function BoostScreen({ venueId }: { venueId: string }) {
   useTitle('Impulsionar');
   const back = `/bares/${encodeURIComponent(venueId)}`;
@@ -28,6 +29,8 @@ export function BoostScreen({ venueId }: { venueId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [copied, setCopied] = useState<string | undefined>(undefined);
+  const channel = purchaseChannel();
+  const returned = paymentReturn(window.location.search);
 
   const eventTarget = target === 'VENUE' ? undefined : profile.data?.upcomingEvents.find((e) => e.id === target);
   const matching = audience === 'MATCH' && eventTarget !== undefined;
@@ -49,6 +52,14 @@ export function BoostScreen({ venueId }: { venueId: string }) {
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [matching, eventTarget?.id, radiusKm, tags.join(','), venueId]);
 
+  // Volta da página de pagamento: o aviso do provedor pode levar alguns instantes (o Pix, alguns minutos), então confere de tempos em tempos.
+  const waiting = returned === 'ok' && (boosts.data?.items.some((b) => b.phase === 'PENDING_PAYMENT') ?? false);
+  useEffect(() => {
+    if (!waiting) return undefined;
+    const timer = window.setInterval(() => boosts.reload(), 5000);
+    return () => window.clearInterval(timer);
+  }, [waiting]);
+
   if (profile.loading || pricing.loading || boosts.loading) return (<><PageHead title="Impulsionar" back={back} /><Loading /></>);
   if (profile.error || pricing.error || boosts.error || !profile.data || !pricing.data || !boosts.data) {
     const e = profile.error ?? pricing.error ?? boosts.error;
@@ -60,7 +71,11 @@ export function BoostScreen({ venueId }: { venueId: string }) {
   }
   const price = pricing.data;
   const items = sortBoosts(boosts.data.items);
-  const total = boostTotalCents(price.pricePerDayCents, days);
+  const onStore = channel !== 'WEB';
+  const storeName = onStore ? STORE_LABEL[channel] : '';
+  const total = boostTotalCents(pricePerDayCents(price, channel), days);
+  // Na loja a compra precisa da casca nativa do aplicativo; sem ela o botão fica desligado e explicado.
+  const storeReady = !onStore || (price.store.available && storeBridge() !== undefined);
 
   async function run(action: () => Promise<unknown>): Promise<void> {
     setBusy(true);
@@ -75,8 +90,25 @@ export function BoostScreen({ venueId }: { venueId: string }) {
     }
   }
 
+  /** Compra da loja: abre o pagamento nativo e manda o recibo para o servidor conferir. */
+  async function finishStorePurchase(boost: BoostView): Promise<void> {
+    if (!boost.storeProductId) return;
+    const receipt = await buyInStore(boost.storeProductId);
+    await api.confirmStorePurchase(boost.id, receipt);
+  }
+
   const create = () =>
-    run(() => api.createBoost(venueId, target === 'VENUE' ? { target: 'VENUE', days } : matching ? { target: 'EVENT', eventId: target, days, audience: 'MATCH', radiusKm, tags } : { target: 'EVENT', eventId: target, days }));
+    run(async () => {
+      const base = target === 'VENUE' ? { target: 'VENUE' as const, days } : matching ? { target: 'EVENT' as const, eventId: target, days, audience: 'MATCH' as const, radiusKm, tags } : { target: 'EVENT' as const, eventId: target, days };
+      const created = await api.createBoost(venueId, onStore ? { ...base, channel } : base);
+      if (onStore) {
+        await finishStorePurchase(created);
+        return;
+      }
+      // No site: leva direto para a página de pagamento (Pix ou cartão). Sem link, o Pix aparece abaixo, no pedido.
+      const url = safePaymentUrl(created.payment?.checkoutUrl);
+      if (url) window.location.assign(url);
+    });
 
   function pickTarget(id: string): void {
     setTarget(id);
@@ -96,12 +128,63 @@ export function BoostScreen({ venueId }: { venueId: string }) {
     }
   }
 
+  const listBlock = (
+    <>
+    <h2 className="boost__h">Seus impulsionamentos</h2>
+    {items.length === 0 ? <p className="boost__hint">Nada por aqui ainda.</p> : null}
+    <ul className="boost__list">
+      {items.map((b) => (
+        <li key={b.id} className="boost__item">
+          <div className="boost__row">
+            <strong>{boostTitle(b)}</strong>
+            <span className={`boost__phase boost__phase--${b.phase.toLowerCase()}`}>{BOOST_PHASE_LABEL[b.phase]}</span>
+          </div>
+          <div className="boost__meta">
+            {matchLabel(b) ? `${matchLabel(b)} · ` : ''}{daysLabel(b.days)} · {formatBrl(b.amountCents)}
+            {b.endsAt && b.phase === 'ACTIVE' ? ` · até ${formatWhen(b.endsAt)}` : ''}
+          </div>
+          {b.phase === 'PENDING_PAYMENT' && b.payment ? (
+            <div className="boost__pay">
+              {b.payment.pixCode ? (
+                <>
+                  <label className="boost__code-label" htmlFor={`pix-${b.id}`}>Pix copia e cola</label>
+                  <textarea id={`pix-${b.id}`} className="boost__code" readOnly rows={3} value={b.payment.pixCode} onFocus={(e) => e.currentTarget.select()} />
+                  <Button small variant="secondary" onClick={() => void copy(b)}>{copied === b.id ? 'Copiado' : 'Copiar código'}</Button>
+                </>
+              ) : null}
+              {safePaymentUrl(b.payment.checkoutUrl) ? <a className="btn btn--secondary btn--small" href={safePaymentUrl(b.payment.checkoutUrl)} target="_blank" rel="noopener noreferrer">Abrir pagamento</a> : null}
+              {price.sandbox && b.channel === 'WEB' ? <Button small loading={busy} onClick={() => void run(() => api.simulateBoostPayment(b.id))}>Simular pagamento</Button> : null}
+            </div>
+          ) : null}
+          {b.phase === 'PENDING_PAYMENT' && b.storeProductId && storeReady ? <Button small loading={busy} onClick={() => void run(() => finishStorePurchase(b))}>Concluir compra</Button> : null}
+          {canCancelBoost(b) ? <Button small variant="quiet" disabled={busy} onClick={() => void run(() => api.cancelBoost(b.id))}>Cancelar pedido</Button> : null}
+        </li>
+      ))}
+    </ul>
+    </>
+  );
+
+  if (!price.enabled) {
+    return (
+      <>
+        <PageHead title="Impulsionar" back={back} subtitle={v.name} />
+        <div className="boost">
+          <EmptyState title="Impulsionar chega em breve">Em breve você poderá destacar seu rolê e seus eventos aqui. Avisaremos quando abrir.</EmptyState>
+          {items.length > 0 ? listBlock : null}
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <PageHead title="Impulsionar" back={back} subtitle={v.name} />
       <div className="boost">
         <p className="boost__lead">Seu rolê aparece primeiro na busca e na Home de quem segue bares como o seu, sempre com a etiqueta “Patrocinado”.</p>
-        {price.sandbox ? <Notice tone="info">Modo de teste: nenhum valor é cobrado de verdade. Depois de gerar o Pix, use “Simular pagamento”.</Notice> : null}
+        {returned === 'ok' ? <Notice tone="ok">Pagamento enviado. Assim que for confirmado, seu impulsionamento começa. O Pix pode levar alguns minutos.</Notice> : null}
+        {returned === 'cancelado' ? <Notice tone="info">O pagamento foi cancelado e nada foi cobrado. Você pode tentar de novo quando quiser.</Notice> : null}
+        {price.sandbox && !onStore ? <Notice tone="info">Modo de teste: nenhum valor é cobrado de verdade. Depois de criar o pedido, use “Simular pagamento”.</Notice> : null}
+        {onStore && !storeReady ? <Notice tone="info">A compra pelo aplicativo ainda não está disponível nesta versão.</Notice> : null}
         {error ? <Notice tone="error">{error}</Notice> : null}
 
         <section className="boost__block" aria-labelledby="boost-what">
@@ -183,42 +266,15 @@ export function BoostScreen({ venueId }: { venueId: string }) {
         </section>
 
         <div className="boost__total">
-          <span>{formatBrl(price.pricePerDayCents)} por dia × {daysLabel(days)}</span>
+          <span>{formatBrl(pricePerDayCents(price, channel))} por dia × {daysLabel(days)}</span>
           <strong>{formatBrl(total)}</strong>
         </div>
-        <Button full loading={busy} disabled={matching && (tags.length === 0 || eventTarget?.tags.length === 0)} onClick={() => void create()}>Gerar Pix de {formatBrl(total)}</Button>
-        <p className="boost__hint">O anúncio começa assim que o pagamento for confirmado. Depois de pago, não há cancelamento.</p>
+        <Button full loading={busy} disabled={!storeReady || (matching && (tags.length === 0 || eventTarget?.tags.length === 0))} onClick={() => void create()}>{onStore ? `Comprar por ${formatBrl(total)}` : `Pagar ${formatBrl(total)}`}</Button>
+        <p className="boost__hint">
+          {onStore ? `A compra é cobrada pela ${storeName}. ` : 'Pague com Pix ou cartão. '}O anúncio começa assim que o pagamento for confirmado. Depois de pago, não há cancelamento.
+        </p>
 
-        <h2 className="boost__h">Seus impulsionamentos</h2>
-        {items.length === 0 ? <p className="boost__hint">Nada por aqui ainda.</p> : null}
-        <ul className="boost__list">
-          {items.map((b) => (
-            <li key={b.id} className="boost__item">
-              <div className="boost__row">
-                <strong>{boostTitle(b)}</strong>
-                <span className={`boost__phase boost__phase--${b.phase.toLowerCase()}`}>{BOOST_PHASE_LABEL[b.phase]}</span>
-              </div>
-              <div className="boost__meta">
-                {matchLabel(b) ? `${matchLabel(b)} · ` : ''}{daysLabel(b.days)} · {formatBrl(b.amountCents)}
-                {b.endsAt && b.phase === 'ACTIVE' ? ` · até ${formatWhen(b.endsAt)}` : ''}
-              </div>
-              {b.phase === 'PENDING_PAYMENT' && b.payment ? (
-                <div className="boost__pay">
-                  {b.payment.pixCode ? (
-                    <>
-                      <label className="boost__code-label" htmlFor={`pix-${b.id}`}>Pix copia e cola</label>
-                      <textarea id={`pix-${b.id}`} className="boost__code" readOnly rows={3} value={b.payment.pixCode} onFocus={(e) => e.currentTarget.select()} />
-                      <Button small variant="secondary" onClick={() => void copy(b)}>{copied === b.id ? 'Copiado' : 'Copiar código'}</Button>
-                    </>
-                  ) : null}
-                  {b.payment.checkoutUrl ? <a className="btn btn--secondary btn--small" href={b.payment.checkoutUrl} target="_blank" rel="noopener noreferrer">Abrir pagamento</a> : null}
-                  {price.sandbox ? <Button small loading={busy} onClick={() => void run(() => api.simulateBoostPayment(b.id))}>Simular pagamento</Button> : null}
-                </div>
-              ) : null}
-              {canCancelBoost(b) ? <Button small variant="quiet" disabled={busy} onClick={() => void run(() => api.cancelBoost(b.id))}>Cancelar pedido</Button> : null}
-            </li>
-          ))}
-        </ul>
+        {listBlock}
       </div>
     </>
   );

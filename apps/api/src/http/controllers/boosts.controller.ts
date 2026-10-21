@@ -35,7 +35,7 @@ export class BoostsController {
     });
   }
 
-  /** Cria o pedido e a cobrança: `{target: 'VENUE' | 'EVENT', eventId?, days, audience?: 'ALL' | 'MATCH', radiusKm?, tags?}`. */
+  /** Cria o pedido e a cobrança: `{target: 'VENUE' | 'EVENT', eventId?, days, audience?: 'ALL' | 'MATCH', radiusKm?, tags?, channel?: 'WEB' | 'APPLE' | 'GOOGLE'}`. */
   @Post('me/venues/:venueId/boosts')
   create(@CurrentActor() actor: Actor, @Param('venueId') venueId: string, @Body() body: unknown) {
     return this.core.boosts.create(actor.userId, venueId, asBody(body));
@@ -45,6 +45,13 @@ export class BoostsController {
   @HttpCode(200)
   cancel(@CurrentActor() actor: Actor, @Param('id') id: string) {
     return this.core.boosts.cancel(actor.userId, id);
+  }
+
+  /** Compra dentro do app: o app envia o recibo da loja `{receipt}` e o servidor confere antes de liberar. */
+  @Post('me/boosts/:id/store-purchase')
+  @HttpCode(200)
+  storePurchase(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.boosts.confirmStorePurchase(actor.userId, id, asBody(body));
   }
 
   /** Só no ambiente de teste: libera o anúncio sem pagar. Fora dele responde 403. */

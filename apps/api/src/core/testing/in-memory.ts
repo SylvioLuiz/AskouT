@@ -30,6 +30,9 @@ import type {
   DwellRepository,
   PaymentCharge,
   PaymentGateway,
+  StoreName,
+  StorePurchaseVerifier,
+  VerifiedStorePurchase,
   PendingSignupRepository,
   IdentityRepository,
   IdentityVerifier,
@@ -609,10 +612,12 @@ export class InMemoryBoostRepository implements BoostRepository {
       .map((b) => ({ ...b }));
   }
 
-  async markPaid(id: string, paid: { paidAt: Date; startsAt: Date; endsAt: Date }): Promise<boolean> {
+  async markPaid(id: string, paid: { paidAt: Date; startsAt: Date; endsAt: Date; chargeId?: string }): Promise<boolean> {
     const r = this.rows.get(id);
     if (!r || r.status !== 'PENDING_PAYMENT') return false;
-    Object.assign(r, { status: 'PAID', paidAt: paid.paidAt, startsAt: paid.startsAt, endsAt: paid.endsAt, payCode: null, payUrl: null });
+    // A cobrança é única: o mesmo recibo da loja não paga dois pedidos.
+    if (paid.chargeId !== undefined && [...this.rows.values()].some((b) => b.id !== id && b.chargeId === paid.chargeId)) return false;
+    Object.assign(r, { status: 'PAID', paidAt: paid.paidAt, startsAt: paid.startsAt, endsAt: paid.endsAt, payCode: null, payUrl: null, ...(paid.chargeId === undefined ? {} : { chargeId: paid.chargeId }) });
     return true;
   }
 
@@ -633,7 +638,7 @@ export class InMemoryBoostRepository implements BoostRepository {
 /** Provedor de pagamento de mentira: guarda as cobranças e aceita avisos com um “segredo” combinado. */
 export class FakePaymentGateway implements PaymentGateway {
   readonly sandbox: boolean;
-  readonly charges: { chargeId: string; reference: string; amountCents: number; description: string }[] = [];
+  readonly charges: { chargeId: string; reference: string; amountCents: number; description: string; returnPath?: string }[] = [];
   failNext = false;
   static readonly SECRET = 'segredo-de-teste';
 
@@ -641,7 +646,7 @@ export class FakePaymentGateway implements PaymentGateway {
     this.sandbox = sandbox;
   }
 
-  async createCharge(input: { reference: string; amountCents: number; description: string }): Promise<PaymentCharge> {
+  async createCharge(input: { reference: string; amountCents: number; description: string; returnPath?: string }): Promise<PaymentCharge> {
     if (this.failNext) {
       this.failNext = false;
       throw new Error('provedor fora do ar');
@@ -651,14 +656,31 @@ export class FakePaymentGateway implements PaymentGateway {
     return { chargeId, pixCode: `PIX-${chargeId}`, checkoutUrl: null };
   }
 
-  async parseWebhook(headers: Record<string, string | undefined>, rawBody: string): Promise<{ chargeId: string; paid: boolean } | undefined> {
+  async parseWebhook(headers: Record<string, string | undefined>, rawBody: string): Promise<{ chargeId: string; paid: boolean; amountCents?: number } | undefined> {
     if (headers['x-signature'] !== FakePaymentGateway.SECRET) return undefined;
     try {
-      const body = JSON.parse(rawBody) as { chargeId?: unknown; status?: unknown };
-      return typeof body.chargeId === 'string' ? { chargeId: body.chargeId, paid: body.status === 'paid' } : undefined;
+      const body = JSON.parse(rawBody) as { chargeId?: unknown; status?: unknown; amountCents?: unknown };
+      if (typeof body.chargeId !== 'string') return undefined;
+      return { chargeId: body.chargeId, paid: body.status === 'paid', ...(typeof body.amountCents === 'number' ? { amountCents: body.amountCents } : {}) };
     } catch {
       return undefined;
     }
+  }
+}
+
+/** Loja de mentira: reconhece recibos no formato `produto|transação|ativo` que o teste monta. */
+export class FakeStoreVerifier implements StorePurchaseVerifier {
+  readonly calls: { store: string; receipt: string }[] = [];
+
+  static receipt(productId: string, transactionId: string, active = true): string {
+    return `${productId}|${transactionId}|${active ? 'ativo' : 'devolvido'}`;
+  }
+
+  async verify(input: { store: StoreName; receipt: string }): Promise<VerifiedStorePurchase | undefined> {
+    this.calls.push({ ...input });
+    const [productId, transactionId, state] = input.receipt.split('|');
+    if (!productId || !transactionId || (state !== 'ativo' && state !== 'devolvido')) return undefined;
+    return { productId, transactionId, active: state === 'ativo' };
   }
 }
 

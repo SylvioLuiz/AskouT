@@ -121,7 +121,7 @@ export interface BoostRepository {
    * Confirma o pagamento SÓ se ainda estiver aguardando (idempotente: um aviso repetido do provedor devolve false).
    * Define a janela em que o anúncio aparece.
    */
-  markPaid(id: string, paid: { paidAt: Date; startsAt: Date; endsAt: Date }): Promise<boolean>;
+  markPaid(id: string, paid: { paidAt: Date; startsAt: Date; endsAt: Date; chargeId?: string }): Promise<boolean>;
   /** Muda o estado só se o atual estiver em `from`. Devolve se mudou. */
   transition(id: string, from: BoostStatus[], to: BoostStatus): Promise<boolean>;
   /** Pagos cuja janela inclui `now`. */
@@ -141,9 +141,35 @@ export interface PaymentCharge {
 export interface PaymentGateway {
   /** Só o ambiente de teste permite “simular pagamento”. */
   readonly sandbox: boolean;
-  createCharge(input: { reference: string; amountCents: number; description: string }): Promise<PaymentCharge>;
-  /** Confere a autenticidade do aviso do provedor (assinatura) e devolve a cobrança e se foi paga; `undefined` se não for válido. */
-  parseWebhook(headers: Record<string, string | undefined>, rawBody: string): Promise<{ chargeId: string; paid: boolean } | undefined>;
+  /** `returnPath`: página do app para onde o provedor devolve a pessoa depois do pagamento (ex.: /bares/ID/impulsionar). */
+  createCharge(input: { reference: string; amountCents: number; description: string; returnPath?: string }): Promise<PaymentCharge>;
+  /**
+   * Confere a autenticidade do aviso do provedor (assinatura) e devolve a cobrança e se foi paga; `undefined` se não for válido.
+   * `amountCents`, quando o provedor informa, é o valor que ele recebeu: o núcleo recusa liberar se não bater com o pedido.
+   */
+  parseWebhook(headers: Record<string, string | undefined>, rawBody: string): Promise<{ chargeId: string; paid: boolean; amountCents?: number } | undefined>;
+}
+
+/** Loja onde a compra dentro do app foi feita. */
+export type StoreName = 'APPLE' | 'GOOGLE';
+
+/** Compra dentro do app já conferida na loja. */
+export interface VerifiedStorePurchase {
+  /** Identificador único da compra na loja (impede usar o mesmo recibo duas vezes). */
+  transactionId: string;
+  /** Produto comprado, por exemplo `askout.boost.3d`. */
+  productId: string;
+  /** false se a loja já devolveu o dinheiro ou cancelou a compra. */
+  active: boolean;
+}
+
+/**
+ * Porta que confere, no servidor, o recibo de uma compra dentro do app (App Store ou Google Play).
+ * O aplicativo nunca decide sozinho que pagou: só a resposta desta porta libera o anúncio.
+ */
+export interface StorePurchaseVerifier {
+  /** `undefined` se o recibo for falso, de outro app ou ilegível. */
+  verify(input: { store: StoreName; receipt: string }): Promise<VerifiedStorePurchase | undefined>;
 }
 
 export interface AvailabilityRepository {
@@ -644,6 +670,8 @@ export interface CoreDeps {
   dwell: DwellRepository;
   regions: RegionRepository;
   payments: PaymentGateway;
+  /** Conferência das compras dentro do app. Sem ela, só a compra pela web funciona. */
+  storeVerifier?: StorePurchaseVerifier;
   identities: IdentityRepository;
   verifier: IdentityVerifier;
   mailer: EmailSender;

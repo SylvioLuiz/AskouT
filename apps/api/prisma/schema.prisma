@@ -1192,6 +1192,8 @@ model Boost {
   id          String    @id @default(uuid()) @db.Uuid
   venueId     String    @db.Uuid
   ownerId     String    @db.Uuid
+  /// 'WEB' (Pix/cartão no provedor), 'APPLE' ou 'GOOGLE' (compra dentro do app, recibo conferido no servidor).
+  channel     String    @default("WEB")
   /// 'VENUE' ou 'EVENT'.
   target      String
   /// Só quando target = EVENT. Sem chave estrangeira: se o evento sumir, o pedido pago continua registrado.

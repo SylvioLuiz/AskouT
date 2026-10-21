@@ -472,7 +472,7 @@ export function defineRepositoryContract(
         const v: VenueRecord = { id: randomUUID(), name: 'Bar Boost', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: owner };
         await h.places.createVenue(v);
         const t0 = new Date(Date.UTC(2030, 0, 10, 12));
-        const mk = (n: number, over: Partial<BoostRecord> = {}): BoostRecord => ({ id: randomUUID(), venueId: v.id, ownerId: owner, target: 'VENUE', eventId: null, days: 3, amountCents: 4500, status: 'PENDING_PAYMENT', chargeId: `ch_${n}_${v.id}`, payCode: 'PIX', payUrl: null, createdAt: new Date(t0.getTime() + n), paidAt: null, startsAt: null, endsAt: null, audience: 'ALL', radiusM: null, matchTags: [], ...over });
+        const mk = (n: number, over: Partial<BoostRecord> = {}): BoostRecord => ({ id: randomUUID(), venueId: v.id, channel: 'WEB', ownerId: owner, target: 'VENUE', eventId: null, days: 3, amountCents: 4500, status: 'PENDING_PAYMENT', chargeId: `ch_${n}_${v.id}`, payCode: 'PIX', payUrl: null, createdAt: new Date(t0.getTime() + n), paidAt: null, startsAt: null, endsAt: null, audience: 'ALL', radiusM: null, matchTags: [], ...over });
         const a = mk(1);
         const b = mk(2, { target: 'EVENT', eventId: randomUUID(), audience: 'MATCH', radiusM: 5000, matchTags: ['rock', 'metal'] });
         await h.boosts.create(a);
@@ -494,6 +494,25 @@ export function defineRepositoryContract(
         assert.equal(await h.boosts.transition(b.id, ['PAID'], 'CANCELLED'), false, 'estado de origem errado não muda');
         assert.equal(await h.boosts.transition(b.id, ['PENDING_PAYMENT'], 'CANCELLED'), true);
         assert.equal(await h.boosts.markPaid(b.id, window), false, 'cancelado não paga');
+      });
+
+      it('impulsionamento pela loja: guarda o canal e o mesmo recibo não paga dois pedidos', async () => {
+        const owner = await newUser('impulsiona_loja');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar Loja', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: owner };
+        await h.places.createVenue(v);
+        const t0 = new Date(Date.UTC(2030, 0, 10, 12));
+        const mk = (n: number): BoostRecord => ({ id: randomUUID(), venueId: v.id, channel: 'APPLE', ownerId: owner, target: 'VENUE', eventId: null, days: 1, amountCents: 1500, status: 'PENDING_PAYMENT', chargeId: null, payCode: null, payUrl: null, createdAt: new Date(t0.getTime() + n), paidAt: null, startsAt: null, endsAt: null, audience: 'ALL', radiusM: null, matchTags: [] });
+        const a = mk(1);
+        const b = mk(2);
+        await h.boosts.create(a);
+        await h.boosts.create(b);
+        assert.equal((await h.boosts.find(a.id))?.channel, 'APPLE');
+        const window = { paidAt: t0, startsAt: t0, endsAt: new Date(t0.getTime() + 86_400_000) };
+        const receipt = `apple:${randomUUID()}`;
+        assert.equal(await h.boosts.markPaid(a.id, { ...window, chargeId: receipt }), true);
+        assert.equal((await h.boosts.findByChargeId(receipt))?.id, a.id, 'a compra fica registrada como cobrança');
+        assert.equal(await h.boosts.markPaid(b.id, { ...window, chargeId: receipt }), false, 'o mesmo recibo não paga outro pedido');
+        assert.equal((await h.boosts.find(b.id))?.status, 'PENDING_PAYMENT', 'o outro pedido continua aguardando');
       });
 
       it('região: guarda uma por pessoa, troca, apaga e filtra pela caixa', async () => {

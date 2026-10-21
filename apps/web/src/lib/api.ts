@@ -318,7 +318,7 @@ export function createApi(deps: ApiDeps) {
     eraseDwell: () => request<{ removed: number }>('DELETE', '/me/dwell'),
     boostPricing: () => request<BoostPricing>('GET', '/boosts/pricing'),
     venueBoosts: (venueId: string) => request<{ items: BoostView[] }>('GET', `/me/venues/${id(venueId)}/boosts`),
-    createBoost: (venueId: string, body: { target: 'VENUE' | 'EVENT'; eventId?: string; days: number; audience?: 'ALL' | 'MATCH'; radiusKm?: number; tags?: string[] }) => request<BoostView>('POST', `/me/venues/${id(venueId)}/boosts`, { body }),
+    createBoost: (venueId: string, body: { target: 'VENUE' | 'EVENT'; eventId?: string; days: number; audience?: 'ALL' | 'MATCH'; radiusKm?: number; tags?: string[]; channel?: 'WEB' | 'APPLE' | 'GOOGLE' }) => request<BoostView>('POST', `/me/venues/${id(venueId)}/boosts`, { body }),
     matchReach: (venueId: string, q: { eventId: string; radiusKm: number; tags: string[] }) =>
       request<MatchReach>('GET', `/me/venues/${id(venueId)}/boosts/estimate?eventId=${encodeURIComponent(q.eventId)}&radiusKm=${q.radiusKm}&tags=${q.tags.map(encodeURIComponent).join(',')}`),
     region: () => request<{ region: RegionView | null }>('GET', '/me/region'),
@@ -326,6 +326,7 @@ export function createApi(deps: ApiDeps) {
     clearRegion: () => request<{ removed: boolean }>('DELETE', '/me/region'),
     cancelBoost: (boostId: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/cancel`),
     simulateBoostPayment: (boostId: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/simulate-payment`),
+    confirmStorePurchase: (boostId: string, receipt: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/store-purchase`, { body: { receipt } }),
     sponsoredEvents: () => request<{ events: ExploreEvent[] }>('GET', '/explore/sponsored'),
     followedEvents: () => request<{ events: ExploreEvent[] }>('GET', '/explore/followed-events'),
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>

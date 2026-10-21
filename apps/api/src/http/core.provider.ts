@@ -31,6 +31,7 @@ import { GooglePlaceSource } from '../infra/google/google-place-source.ts';
 import { FallbackPlaceSource } from '../infra/places/fallback-place-source.ts';
 import { OverpassPlaceSource } from '../infra/overpass/overpass-place-source.ts';
 import { SandboxPaymentGateway, UnconfiguredPaymentGateway } from '../infra/payments/sandbox-payment-gateway.ts';
+import { StripePaymentGateway } from '../infra/payments/stripe-payment-gateway.ts';
 import { ConsoleEmailSender } from './console-email-sender.ts';
 import type { AppConfig } from './support/config.ts';
 import { PhotoSigner } from './support/photo-signing.ts';
@@ -79,8 +80,10 @@ export const coreProvider = {
       boosts: new PrismaBoostRepository(prisma),
       dwell: new PrismaDwellRepository(prisma),
       regions: new PrismaRegionRepository(prisma),
-      payments: config.paymentProvider === 'sandbox' ? new SandboxPaymentGateway() : new UnconfiguredPaymentGateway(),
+      payments: config.stripe ? new StripePaymentGateway(config.stripe) : config.paymentProvider === 'sandbox' ? new SandboxPaymentGateway() : new UnconfiguredPaymentGateway(),
       boostPricePerDayCents: config.boostPricePerDayCents,
+      boostStorePricePerDayCents: config.boostStorePricePerDayCents,
+      boostsEnabled: config.paymentsEnabled,
       identities: new PrismaIdentityRepository(prisma),
       verifier: new OidcIdentityVerifier({ googleClientId: config.googleClientId, appleClientId: config.appleClientId }),
       mailer: new ConsoleEmailSender(),

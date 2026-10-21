@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { BOOST_DEFAULT_PRICE_PER_DAY_CENTS } from './boost-service.ts';
-import { FakePaymentGateway } from './testing/in-memory.ts';
+import { FakePaymentGateway, FakeStoreVerifier } from './testing/in-memory.ts';
 import { rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
 
@@ -28,7 +28,15 @@ const pay = (w: Awaited<ReturnType<typeof setup>>['w'], chargeId: string) =>
 
 test('preço e opções vêm da configuração', async () => {
   const { w } = await setup();
-  assert.deepEqual(w.core.boosts.pricing(), { currency: 'BRL', pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS, dayOptions: [1, 3, 7, 14], match: { radiusKmOptions: [2, 5, 10, 25], maxTags: 5 }, sandbox: true });
+  assert.deepEqual(w.core.boosts.pricing(), {
+    currency: 'BRL',
+    enabled: true,
+    pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS,
+    dayOptions: [1, 3, 7, 14],
+    store: { available: false, pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS, products: { '1': 'askout.boost.1d', '3': 'askout.boost.3d', '7': 'askout.boost.7d', '14': 'askout.boost.14d' } },
+    match: { radiusKmOptions: [2, 5, 10, 25], maxTags: 5 },
+    sandbox: true,
+  });
 });
 
 test('criar: só o responsável, com duração válida, e cobra dias × valor', async () => {
@@ -154,4 +162,131 @@ test('Home: anúncios só de eventos que ainda não acabaram, sem repetir, e res
   assert.deepEqual(mine.map((e) => e.title).sort(), ['Eletrônica', 'Samba'], 'o local mostra o próximo evento, que ainda não passou');
   await w.core.blocks.block(bia, dono);
   assert.deepEqual((await w.core.explore.sponsored(bia)).events.map((e) => e.title), ['Eletrônica'], 'quem bloqueou o anunciante não vê o anúncio dele');
+});
+
+// ---------- Chave geral (pagamentos desligados) ----------
+
+async function setupWith(options: Parameters<typeof makeWorld>[0]) {
+  const w = makeWorld(options);
+  const u = await w.signUpMany('dono');
+  await w.places.createVenue({ id: 'v1', name: 'Bar do Zé', address: 'Rua A, 1', category: 'bar', lat: -23.58, lng: -46.65, isSample: false, ownerId: u['dono']! });
+  return { w, dono: u['dono']! };
+}
+
+test('desligado: nenhum pedido novo, nenhuma cobrança, e o preço avisa a tela', async () => {
+  const { w, dono } = await setupWith({ boostsEnabled: false });
+  assert.equal(w.core.boosts.pricing().enabled, false);
+  await rejectsWith(w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 1 }), 'CONFLICT');
+  assert.equal(w.payments.charges.length, 0, 'desligado não chega ao provedor');
+  assert.deepEqual(await w.core.boosts.list(dono, 'v1'), []);
+});
+
+test('desligado: o que já estava pago continua no ar e o aviso de pagamento em andamento ainda é confirmado', async () => {
+  // Pedido gravado antes de desligar: o aviso de um pagamento que a pessoa já fez não pode se perder.
+  const off = makeWorld({ boostsEnabled: false });
+  const u = await off.signUpMany('dono');
+  await off.places.createVenue({ id: 'v1', name: 'Bar', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: u['dono']! });
+  await off.boosts.create({ id: 'pedido-1', venueId: 'v1', channel: 'WEB', ownerId: u['dono']!, target: 'VENUE', eventId: null, days: 1, amountCents: 1500, status: 'PENDING_PAYMENT', chargeId: 'ch_9', payCode: null, payUrl: null, createdAt: off.clock.now(), paidAt: null, startsAt: null, endsAt: null, audience: 'ALL', radiusM: null, matchTags: [] });
+  await off.core.boosts.handleWebhook({ 'x-signature': FakePaymentGateway.SECRET }, JSON.stringify({ chargeId: 'ch_9', status: 'paid' }));
+  assert.equal((await off.core.boosts.list(u['dono']!, 'v1'))[0]?.phase, 'ACTIVE');
+  assert.equal((await off.core.boosts.activeTargets(off.clock.now())).venueIds.has('v1'), true, 'anúncio pago segue valendo');
+});
+
+test('desligado: “simular pagamento” também fica bloqueado', async () => {
+  const on = await setupWith({});
+  const pedido = await on.w.core.boosts.create(on.dono, 'v1', { target: 'VENUE', days: 1 });
+  assert.equal(pedido.phase, 'PENDING_PAYMENT');
+  const off = await setupWith({ boostsEnabled: false });
+  await rejectsWith(off.w.core.boosts.simulatePayment(off.dono, 'qualquer'), 'CONFLICT');
+});
+
+// ---------- Valor recebido ----------
+
+test('aviso com valor diferente do pedido não libera o anúncio', async () => {
+  const { w, dono } = await setup();
+  const b = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 3 });
+  const send = (amountCents: number) => w.core.boosts.handleWebhook({ 'x-signature': FakePaymentGateway.SECRET }, JSON.stringify({ chargeId: 'ch_1', status: 'paid', amountCents }));
+  await send(100);
+  assert.equal((await w.core.boosts.list(dono, 'v1'))[0]?.phase, 'PENDING_PAYMENT', 'valor menor não paga');
+  await send(b.amountCents);
+  assert.equal((await w.core.boosts.list(dono, 'v1'))[0]?.phase, 'ACTIVE');
+});
+
+test('o retorno do provedor volta para a tela de impulsionar do próprio local', async () => {
+  const { w, dono } = await setup();
+  await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 1 });
+  assert.equal(w.payments.charges[0]?.returnPath, '/bares/v1/impulsionar');
+});
+
+// ---------- Compra dentro do app (App Store / Google Play) ----------
+
+async function setupStore() {
+  const store = new FakeStoreVerifier();
+  const { w, dono } = await setupWith({ store, storePricePerDayCents: 2000 });
+  return { w, dono, store };
+}
+
+test('loja: o pedido usa o preço da loja, não cria cobrança e diz qual produto o app deve comprar', async () => {
+  const { w, dono } = await setupStore();
+  assert.equal(w.core.boosts.pricing().store.available, true);
+  const b = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 3, channel: 'APPLE' });
+  assert.deepEqual([b.channel, b.amountCents, b.storeProductId, b.payment], ['APPLE', 6000, 'askout.boost.3d', { pixCode: null, checkoutUrl: null }]);
+  assert.equal(w.payments.charges.length, 0, 'a loja cobra; o provedor da web não é chamado');
+  await rejectsWith(w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 3, channel: 'OUTRA' }), 'VALIDATION');
+});
+
+test('loja: sem verificador configurado não dá para criar pedido pela loja', async () => {
+  const { w, dono } = await setupWith({});
+  await rejectsWith(w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 1, channel: 'GOOGLE' }), 'CONFLICT');
+});
+
+test('loja: recibo válido libera uma vez; repetir a chamada devolve o pedido; recibo reaproveitado é recusado', async () => {
+  const { w, dono, store } = await setupStore();
+  const a = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 1, channel: 'APPLE' });
+  const receipt = FakeStoreVerifier.receipt('askout.boost.1d', 'T-1');
+  const paid = await w.core.boosts.confirmStorePurchase(dono, a.id, { receipt });
+  assert.deepEqual([paid.phase, paid.storeProductId], ['ACTIVE', null]);
+  assert.equal(store.calls[0]?.store, 'APPLE');
+  const again = await w.core.boosts.confirmStorePurchase(dono, a.id, { receipt });
+  assert.equal(again.startsAt, paid.startsAt, 'repetir não reinicia a contagem');
+  assert.equal(store.calls.length, 1, 'pedido já pago nem consulta a loja de novo');
+  w.clock.tick(2 * DAY);
+  const c = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 1, channel: 'APPLE' });
+  await rejectsWith(w.core.boosts.confirmStorePurchase(dono, c.id, { receipt }), 'CONFLICT', 'o mesmo recibo não paga outro pedido');
+  assert.equal((await w.core.boosts.list(dono, 'v1')).find((x) => x.id === c.id)?.phase, 'PENDING_PAYMENT');
+});
+
+test('loja: recibo falso, de outro produto ou devolvido não libera nada', async () => {
+  const { w, dono } = await setupStore();
+  const a = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 3, channel: 'GOOGLE' });
+  await rejectsWith(w.core.boosts.confirmStorePurchase(dono, a.id, { receipt: 'lixo' }), 'CONFLICT');
+  await rejectsWith(w.core.boosts.confirmStorePurchase(dono, a.id, { receipt: FakeStoreVerifier.receipt('askout.boost.1d', 'T-2') }), 'CONFLICT', 'comprou 1 dia, o pedido é de 3');
+  await rejectsWith(w.core.boosts.confirmStorePurchase(dono, a.id, { receipt: FakeStoreVerifier.receipt('askout.boost.3d', 'T-3', false) }), 'CONFLICT', 'a loja já devolveu');
+  await rejectsWith(w.core.boosts.confirmStorePurchase(dono, a.id, {}), 'VALIDATION');
+  await rejectsWith(w.core.boosts.confirmStorePurchase(dono, a.id, { receipt: 'x'.repeat(20_001) }), 'VALIDATION');
+  assert.equal((await w.core.boosts.list(dono, 'v1'))[0]?.phase, 'PENDING_PAYMENT');
+});
+
+test('loja: só o dono do pedido confirma, e pedido da web não é pago pela loja (nem o contrário)', async () => {
+  const { w, dono } = await setupStore();
+  const outro = (await w.signUpMany('intruso'))['intruso']!;
+  const a = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 1, channel: 'APPLE' });
+  await rejectsWith(w.core.boosts.confirmStorePurchase(outro, a.id, { receipt: FakeStoreVerifier.receipt('askout.boost.1d', 'T-9') }), 'NOT_FOUND');
+  await rejectsWith(w.core.boosts.simulatePayment(dono, a.id), 'CONFLICT', 'pedido da loja não é simulado pela web');
+  await w.core.boosts.cancel(dono, a.id);
+  const web = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 1 });
+  await rejectsWith(w.core.boosts.confirmStorePurchase(dono, web.id, { receipt: FakeStoreVerifier.receipt('askout.boost.1d', 'T-10') }), 'CONFLICT');
+});
+
+test('loja: com a chave geral desligada, quem já pagou na loja ainda consegue confirmar', async () => {
+  const store = new FakeStoreVerifier();
+  const { w, dono } = await setupWith({ store });
+  const a = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 1, channel: 'APPLE' });
+  // Desligamento depois do pedido: outro mundo, desligado, com o mesmo pedido já gravado.
+  const off = makeWorld({ store, boostsEnabled: false });
+  const u = await off.signUpMany('dono');
+  await off.places.createVenue({ id: 'v1', name: 'Bar', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: u['dono']! });
+  await off.boosts.create({ id: a.id, venueId: 'v1', channel: 'APPLE', ownerId: u['dono']!, target: 'VENUE', eventId: null, days: 1, amountCents: 1500, status: 'PENDING_PAYMENT', chargeId: null, payCode: null, payUrl: null, createdAt: off.clock.now(), paidAt: null, startsAt: null, endsAt: null, audience: 'ALL', radiusM: null, matchTags: [] });
+  const paid = await off.core.boosts.confirmStorePurchase(u['dono']!, a.id, { receipt: FakeStoreVerifier.receipt('askout.boost.1d', 'T-11') });
+  assert.equal(paid.phase, 'ACTIVE');
 });
