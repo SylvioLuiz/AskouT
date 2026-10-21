@@ -348,4 +348,23 @@ describe('contas do motor de recomendação', () => {
     assert.equal(finalScore(2, 0, 0, true), 0.55, 'social passa de 1 mas é cortado');
     assert.equal(finalScore(1, 1, 0, false), 0.9);
   });
+
+  it('diz quem fez o post ou o evento e se a pessoa já segue (pessoa, perfil privado e estabelecimento)', async () => {
+    const { w, ana, bia, eva } = await setup();
+    const post = await w.core.posts.create(eva, { caption: 'noite boa', images: [JPEG] });
+    await w.core.posts.like(bia, post.id);
+    await event(w, 'e-bia', 'v1', 30);
+    await w.eventRoom.addGoing({ source: 'PLACE', id: 'e-bia' }, bia, w.clock.now());
+    const find = async () => (await w.core.recommendations.recommend(ana)).items;
+    let items = await find();
+    const byPost = items.find((i) => i.post?.id === post.id)!;
+    const byEvent = items.find((i) => i.event?.id === 'e-bia')!;
+    assert.deepEqual(byPost.source, { kind: 'PERSON', id: eva, name: 'eva', username: 'eva', follow: 'NONE' });
+    assert.deepEqual(byEvent.source, { kind: 'VENUE', id: 'v1', name: 'Casa do Samba', username: null, follow: 'NONE' });
+    await w.core.follows.follow(ana, eva);
+    await w.core.venues.follow(ana, 'v1');
+    items = await find();
+    assert.equal(items.find((i) => i.post?.id === post.id)!.source?.follow, 'FOLLOWING');
+    assert.equal(items.find((i) => i.event?.id === 'e-bia')!.source?.follow, 'FOLLOWING');
+  });
 });

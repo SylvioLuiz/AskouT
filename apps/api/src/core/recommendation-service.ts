@@ -145,6 +145,19 @@ export function finalScore(social: number, taste: number, fresh: number, persona
   return personalize ? w.social * s + w.taste * taste + w.fresh * fresh : (w.social + w.taste) * s + w.fresh * fresh;
 }
 
+/** Quem fez o post ou o evento (pessoa ou estabelecimento) e se a pessoa que vê já segue. A Home mostra o botão Seguir. */
+export interface RecommendationSource {
+  kind: 'PERSON' | 'VENUE';
+  /** Id do usuário (pessoa) ou do local (estabelecimento). */
+  id: string;
+  /** Pessoa: @usuário. Local: nome. */
+  name: string;
+  /** Só pessoa: para abrir o perfil. */
+  username: string | null;
+  /** NONE: pode seguir. PENDING: pedido enviado (perfil privado). FOLLOWING: já segue. */
+  follow: 'NONE' | 'PENDING' | 'FOLLOWING';
+}
+
 export interface RecommendationItem {
   type: 'EVENT' | 'POST';
   /** 0 a 1. */
@@ -160,6 +173,8 @@ export interface RecommendationItem {
   sponsored: boolean;
   /** Só no Match: por que combina com a pessoa. Nunca revela dados de outras pessoas. */
   match: { tag: string; distanceKm: number } | null;
+  /** Quem fez o conteúdo. */
+  source: RecommendationSource | null;
 }
 
 export interface RecommendationsView {
@@ -196,6 +211,19 @@ export class RecommendationService {
     this.deps = deps;
     this.postService = postService;
     this.matchService = matchService;
+  }
+
+  /** Quem fez o post/evento e se a pessoa já segue: estabelecimento (evento de local, post de local) ou pessoa (post comum). */
+  private async sourceOf(viewerId: string, event: EventCardView | null, post: PostView | null): Promise<RecommendationSource | null> {
+    if (post && !post.venue) {
+      if (post.author.userId === viewerId) return null;
+      const f = await this.deps.follows.get(viewerId, post.author.userId);
+      return { kind: 'PERSON', id: post.author.userId, name: post.author.username, username: post.author.username, follow: f ? (f.status === 'ACCEPTED' ? 'FOLLOWING' : 'PENDING') : 'NONE' };
+    }
+    const venue = post?.venue ? { id: post.venue.id, name: post.venue.name } : event && event.venueId ? { id: event.venueId, name: event.venueName } : null;
+    if (!venue) return null;
+    const following = await this.deps.places.isFollowingVenue(viewerId, venue.id);
+    return { kind: 'VENUE', id: venue.id, name: venue.name, username: null, follow: following ? 'FOLLOWING' : 'NONE' };
   }
 
   async recommend(viewerId: string, input: { personalize?: unknown; limit?: unknown } = {}): Promise<RecommendationsView> {
@@ -415,7 +443,7 @@ export class RecommendationService {
         const tag = c.features.tags.find((t) => taste.tags.has(t));
         reasons.push(tag ? `Tem a ver com #${tag}` : c.features.venueId && taste.venues.has(c.features.venueId) ? 'De um rolê que você curte' : 'Parecido com o que você curte');
       }
-      items.push({ type: c.type, score: Math.round(score * 100) / 100, reasons, friendsGoing, friendsEngaged: c.engaged.size, event, post, sponsored: false, match: null });
+      items.push({ type: c.type, score: Math.round(score * 100) / 100, reasons, friendsGoing, friendsEngaged: c.engaged.size, event, post, sponsored: false, match: null, source: await this.sourceOf(viewerId, event, post) });
     }
 
     // 6. Anúncios Match (pagos): só para quem tem região salva, mora no raio e tem o gosto validado. Entram em segundo lugar.
@@ -444,6 +472,7 @@ export class RecommendationService {
           post: null,
           sponsored: true,
           match: { tag: pick.tag, distanceKm: km },
+          source: await this.sourceOf(viewerId, event, null),
         };
         items.splice(Math.min(1, items.length), 0, sponsoredItem);
       }

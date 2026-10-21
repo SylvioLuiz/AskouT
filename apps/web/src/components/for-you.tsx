@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Avatar } from './ui.tsx';
+import { Avatar, Button } from './ui.tsx';
 import { PostCard } from './post.tsx';
 import { trackClick, useDwell } from './dwell.tsx';
 import { EventKindIcon } from './icons.tsx';
@@ -7,7 +7,7 @@ import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
 import { readPersonalize } from '../lib/dwell.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
-import type { RecommendationItem } from '../lib/types.ts';
+import type { RecommendationItem, RecommendationSource } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 
 const when = (iso: string) => new Date(iso).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -22,6 +22,45 @@ function Reasons({ item }: { item: RecommendationItem }) {
       ) : null}
       {item.reasons.map((r) => (<li key={r}>{r}</li>))}
     </ul>
+  );
+}
+
+/** Botão Seguir de quem fez o post ou o evento (pessoa ou estabelecimento). Some quando você já segue. */
+function FollowSource({ source }: { source: RecommendationSource | null }) {
+  const [state, setState] = useState<RecommendationSource['follow']>(source?.follow ?? 'FOLLOWING');
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  if (!source || state === 'FOLLOWING') return null;
+  async function follow(): Promise<void> {
+    if (!source) return;
+    setBusy(true);
+    setFailed(false);
+    try {
+      if (source.kind === 'VENUE') {
+        await api.followVenue(source.id);
+        setState('FOLLOWING');
+      } else {
+        const r = await api.follow(source.id);
+        setState(r.status === 'ACCEPTED' ? 'FOLLOWING' : 'PENDING');
+      }
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const label = source.kind === 'VENUE' ? source.name : `@${source.name}`;
+  return (
+    <div className="foryou__follow">
+      {state === 'PENDING' ? (
+        <span className="foryou__followed">Pedido enviado para {label}</span>
+      ) : (
+        <Button small variant="secondary" loading={busy} onClick={() => void follow()} aria-label={`Seguir ${label}`}>
+          Seguir {label}
+        </Button>
+      )}
+      {failed ? <span className="foryou__followerr" role="alert">Não deu para seguir agora.</span> : null}
+    </div>
   );
 }
 
@@ -41,6 +80,7 @@ function EventReco({ item }: { item: RecommendationItem }) {
       </Link>
       {item.sponsored ? <span className="tag-sponsored foryou__ad">Patrocinado</span> : null}
       <Reasons item={item} />
+      <FollowSource source={item.source} />
     </li>
   );
 }
@@ -51,6 +91,7 @@ function PostReco({ item }: { item: RecommendationItem }) {
     <li ref={ref} className="foryou__post" onClickCapture={(ev) => { if ((ev.target as Element).closest('a')) trackClick('POST', item.post!.id, 'RECO'); }}>
       <PostCard post={item.post!} asEvent poster />
       <Reasons item={item} />
+      <FollowSource source={item.source} />
     </li>
   );
 }

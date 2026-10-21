@@ -873,6 +873,16 @@ export interface RecommendationItem {
   /** Anúncio pago (Match): mostrar “Patrocinado”. */
   sponsored: boolean;
   match: { tag: string; distanceKm: number } | null;
+  /** Quem fez o post ou o evento (pessoa ou estabelecimento) e se você já segue. */
+  source: RecommendationSource | null;
+}
+
+export interface RecommendationSource {
+  kind: 'PERSON' | 'VENUE';
+  id: string;
+  name: string;
+  username: string | null;
+  follow: 'NONE' | 'PENDING' | 'FOLLOWING';
 }
 
 export interface Recommendations {

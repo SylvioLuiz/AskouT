@@ -4482,6 +4482,8 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .boost__rule { color: var(--muted); font-size: 0.875rem; }
 .boost__rule summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 .boost__rule p { margin: 0 0 8px; }
+.foryou__follow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.foryou__followed, .foryou__followerr { font-size: 0.8125rem; color: var(--muted); }
 .foryou__ad { align-self: flex-start; }
 .tag-sponsored { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.6875rem; font-weight: 700; color: var(--ink-2); background: var(--brand-soft); }
 .sponsored-sec { display: flex; flex-direction: column; gap: 8px; }
