@@ -290,7 +290,7 @@ export function FlashScreen() {
           <h1 className="flashlive__title">
             Flash <BoltIcon filled />
           </h1>
-          <p className="flashlive__sub">{empty ? 'Você está disponível agora.' : 'Encontre amigos para sair agora!'}</p>
+          <p className="flashlive__sub">Você está disponível agora.</p>
         </header>
 
         <section className="flashcard" aria-label="Seu Flash">
@@ -299,32 +299,14 @@ export function FlashScreen() {
               <BoltIcon filled />
             </span>
             <div className="flashcard__text">
-              {empty ? (
-                <>
-                  <p className="flashcard__title">Flash ativo</p>
-                  <p className="flashcard__status">
-                    {status.data?.expiresAt ? (
-                      <>
-                        Faltam <Countdown expiresAt={status.data.expiresAt} />
-                      </>
-                    ) : null}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="flashcard__title">Você está disponível!</p>
-                  <p className="flashcard__status">
-                    <span className="flashcard__dot" aria-hidden="true" />
-                    Flash ativo
-                    {status.data?.expiresAt ? (
-                      <>
-                        {' · '}
-                        <Countdown expiresAt={status.data.expiresAt} />
-                      </>
-                    ) : null}
-                  </p>
-                </>
-              )}
+              <p className="flashcard__title">Flash ativo</p>
+              <p className="flashcard__status">
+                {status.data?.expiresAt ? (
+                  <>
+                    Faltam <Countdown expiresAt={status.data.expiresAt} />
+                  </>
+                ) : null}
+              </p>
             </div>
           </div>
           {status.data?.expiresAt ? <FlashBar startsAt={status.data.startsAt} expiresAt={status.data.expiresAt} /> : null}

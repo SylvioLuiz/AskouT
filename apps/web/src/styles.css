@@ -4099,6 +4099,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .flashcard__text { min-width: 0; }
 .flashcard__title { margin: 0; font-family: var(--font-display); font-size: 1.375rem; line-height: 1.2; font-weight: 700; }
 .flashcard__status { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; color: var(--ink-2); font-size: 1.0625rem; font-variant-numeric: tabular-nums; }
+.flashcard__time { color: var(--ink); font-weight: 700; }
 .flashcard__dot { flex: none; width: 11px; height: 11px; margin-right: 2px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 .flashbar { height: 11px; overflow: hidden; border-radius: 999px; background: var(--line-strong); }
 .flashbar__fill { display: block; height: 100%; border-radius: 999px; background: var(--brand-grad, var(--brand)); transition: width 1s linear; }
