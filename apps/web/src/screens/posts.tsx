@@ -16,7 +16,7 @@ import { cropPostPhoto, readPostSource, resizePostPhoto } from '../lib/image.ts'
 import type { CropRect } from '../lib/crop.ts';
 import { toggleId } from '../lib/meetup.ts';
 import { addImages, buildPostBody, effectivePlace, eventProblem, videoOf, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
-import { isVideoFile, videoPoster, videoProblem } from '../lib/post-video.ts';
+import { isVideoFile, uploadProgressText, videoPoster, videoProblem } from '../lib/post-video.ts';
 import type { DraftImage, LinkedPlace } from '../lib/post-draft.ts';
 import type { EventKind, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
@@ -113,6 +113,7 @@ export function CreatePostScreen() {
   const [linked, setLinked] = useState<LinkedPlace | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [upload, setUpload] = useState<{ sent: number; total: number } | undefined>();
   const [reading, setReading] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const [linking, setLinking] = useState(false);
@@ -227,7 +228,8 @@ export function CreatePostScreen() {
         const target = created.images[video.index];
         try {
           if (!target) throw new Error('Não foi possível anexar o vídeo.');
-          await api.attachPostVideo(created.id, target.id, video.file);
+          setUpload({ sent: 0, total: video.file.size });
+          await api.attachPostVideo(created.id, target.id, video.file, (sent, total) => setUpload({ sent, total }));
         } catch (failure) {
           await api.deletePost(created.id).catch(() => undefined);
           throw failure;
@@ -243,9 +245,11 @@ export function CreatePostScreen() {
           return;
         }
       }
+      setUpload(undefined);
       navigate(created.event ? (eventPrivate ? `/eventos/${encodeURIComponent(created.id)}` : '/perfil?aba=eventos') : `/posts/${encodeURIComponent(created.id)}`);
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
+      setUpload(undefined);
       setBusy(false);
     }
   }
@@ -265,6 +269,13 @@ export function CreatePostScreen() {
           </Button>
         </header>
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+        {busy && upload ? (
+          <div className="uploadbar" role="status" aria-live="polite">
+            <progress className="uploadbar__bar" max={upload.total} value={upload.sent} aria-label="Envio do vídeo" />
+            <p className="uploadbar__text">{uploadProgressText(upload.sent, upload.total)}</p>
+            <p className="uploadbar__hint">Mantenha esta tela aberta até terminar.</p>
+          </div>
+        ) : null}
         {createdId ? (
           <Link to={`/eventos/${encodeURIComponent(createdId)}`} className="btn btn--secondary">
             Abrir o evento criado

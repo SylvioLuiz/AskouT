@@ -57,3 +57,11 @@ export async function videoPoster(file: File): Promise<{ poster: string; seconds
     URL.revokeObjectURL(url);
   }
 }
+
+/** "Enviando o vídeo: 25 de 60 MB (42%)". Sem total conhecido, só o que já foi. */
+export function uploadProgressText(sent: number, total: number): string {
+  const mb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1).replace('.', ',');
+  if (!Number.isFinite(total) || total <= 0) return `Enviando o vídeo: ${mb(Math.max(0, sent))} MB`;
+  const done = Math.min(Math.max(0, sent), total);
+  return `Enviando o vídeo: ${mb(done)} de ${mb(total)} MB (${Math.min(100, Math.floor((done / total) * 100))}%)`;
+}

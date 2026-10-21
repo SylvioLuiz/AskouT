@@ -170,24 +170,55 @@ export function createApi(deps: ApiDeps) {
     createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
     post: (postId: string) => request<PostView>('GET', `/posts/${id(postId)}`),
     /** Anexa o vídeo ao item de foto que serve de capa: o arquivo vai cru no corpo, com o tipo no Content-Type. */
-    attachPostVideo: async (postId: string, imageId: string, file: Blob): Promise<PostView> => {
+    attachPostVideo: async (postId: string, imageId: string, file: Blob, onProgress?: (sent: number, total: number) => void): Promise<PostView> => {
       const token = deps.getToken();
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
       if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
-      let response;
-      try {
-        response = await deps.fetch(`${deps.baseUrl}/posts/${id(postId)}/images/${id(imageId)}/video`, { method: 'POST', headers, body: file });
-      } catch {
-        throw networkError();
-      }
+      const url = `${deps.baseUrl}/posts/${id(postId)}/images/${id(imageId)}/video`;
+      let status: number;
       let payload: unknown;
-      try {
-        payload = await response.json();
-      } catch {
-        payload = undefined;
+      let retryAfter: string | null = null;
+      if (onProgress && typeof XMLHttpRequest !== 'undefined') {
+        // O fetch não informa quanto já foi enviado; o XMLHttpRequest informa, e a tela mostra a porcentagem.
+        try {
+          const result = await new Promise<{ status: number; body: string; retryAfter: string | null }>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url);
+            for (const [name, value] of Object.entries(headers)) xhr.setRequestHeader(name, value);
+            xhr.upload.onprogress = (e) => onProgress(e.lengthComputable ? e.loaded : 0, e.lengthComputable ? e.total : file.size);
+            xhr.onload = () => resolve({ status: xhr.status, body: xhr.responseText, retryAfter: xhr.getResponseHeader('Retry-After') });
+            xhr.onerror = () => reject(new Error('rede'));
+            xhr.ontimeout = () => reject(new Error('rede'));
+            xhr.onabort = () => reject(new Error('rede'));
+            xhr.send(file);
+          });
+          status = result.status;
+          retryAfter = result.retryAfter;
+          try {
+            payload = JSON.parse(result.body);
+          } catch {
+            payload = undefined;
+          }
+        } catch {
+          throw networkError();
+        }
+      } else {
+        let response;
+        try {
+          response = await deps.fetch(url, { method: 'POST', headers, body: file });
+        } catch {
+          throw networkError();
+        }
+        status = response.status;
+        retryAfter = response.headers.get('Retry-After');
+        try {
+          payload = await response.json();
+        } catch {
+          payload = undefined;
+        }
       }
-      if (response.ok) return payload as PostView;
-      const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+      if (status >= 200 && status < 300) return payload as PostView;
+      const error = errorFromResponse(status, payload, retryAfter);
       if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
       throw error;
     },

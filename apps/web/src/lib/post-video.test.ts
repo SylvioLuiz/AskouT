@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { addImages, videoOf } from './post-draft.ts';
 import type { DraftImage } from './post-draft.ts';
-import { POST_VIDEO_MAX_BYTES, durationProblem, videoProblem } from './post-video.ts';
+import { POST_VIDEO_MAX_BYTES, durationProblem, uploadProgressText, videoProblem } from './post-video.ts';
 
 test('aceita MP4, WebM e MOV até 60 MB; recusa outros tipos, vazio e grande demais', () => {
   assert.equal(videoProblem({ type: 'video/mp4', size: 1000 }), undefined);
@@ -29,4 +29,12 @@ test('o rascunho acha o vídeo e a posição dele entre as fotos', () => {
   const items = addImages([photo('a')], [withVideo, photo('c')]);
   assert.deepEqual(videoOf(items), { index: 1, file });
   assert.equal(videoOf([photo('a')]), undefined);
+});
+
+test('texto do progresso do envio', () => {
+  assert.equal(uploadProgressText(0, 60 * 1024 * 1024), 'Enviando o vídeo: 0,0 de 60 MB (0%)');
+  assert.equal(uploadProgressText(25 * 1024 * 1024, 60 * 1024 * 1024), 'Enviando o vídeo: 25 de 60 MB (41%)');
+  assert.equal(uploadProgressText(5.5 * 1024 * 1024, 6 * 1024 * 1024), 'Enviando o vídeo: 5,5 de 6,0 MB (91%)');
+  assert.equal(uploadProgressText(70 * 1024 * 1024, 60 * 1024 * 1024), 'Enviando o vídeo: 60 de 60 MB (100%)', 'nunca passa de 100%');
+  assert.equal(uploadProgressText(3 * 1024 * 1024, 0), 'Enviando o vídeo: 3,0 MB');
 });

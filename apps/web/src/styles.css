@@ -4526,3 +4526,11 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evticket__link { display: inline-flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; }
 .evticket__link svg { width: 22px; height: 22px; }
 .evticket__note { margin: 0; color: var(--muted); font-size: 0.8125rem; line-height: 1.35; text-align: center; }
+
+.uploadbar { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.uploadbar__bar { width: 100%; height: 10px; border: 0; border-radius: 999px; overflow: hidden; appearance: none; background: var(--line-strong); accent-color: var(--brand); }
+.uploadbar__bar::-webkit-progress-bar { background: var(--line-strong); border-radius: 999px; }
+.uploadbar__bar::-webkit-progress-value { background: var(--brand-grad, var(--brand)); border-radius: 999px; transition: width 0.3s linear; }
+.uploadbar__bar::-moz-progress-bar { background: var(--brand); border-radius: 999px; }
+.uploadbar__text { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.uploadbar__hint { margin: 0; color: var(--muted); font-size: 0.875rem; }
