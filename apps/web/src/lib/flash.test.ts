@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { distanceMeters, flashNoteProblem, flashRemainingShare, formatCountdown, formatAge, formatDistance, formatRemaining, geolocationMessage, minutesLeft } from './flash.ts';
+import { distanceMeters, flashNoteProblem, flashRemainingShare, formatCountdown, formatAge, formatDistance, formatKm, formatRemaining, geolocationMessage, minutesLeft } from './flash.ts';
 
 describe('distanceMeters', () => {
   it('é zero para o mesmo ponto', () => {
@@ -78,5 +78,19 @@ describe('contagem regressiva', () => {
     assert.equal(flashRemainingShare(start, end, Date.parse('2026-10-16T10:30:00Z')), 0.75);
     assert.equal(flashRemainingShare(start, end, Date.parse('2026-10-16T13:00:00Z')), 0);
     assert.equal(flashRemainingShare(null, end, Date.parse(start)), 0);
+  });
+});
+
+describe('formatKm', () => {
+  it('mostra sempre em km', () => {
+    assert.equal(formatKm(800), '0,8 km');
+    assert.equal(formatKm(2000), '2 km');
+    assert.equal(formatKm(2600), '2,6 km');
+    assert.equal(formatKm(14600), '15 km');
+  });
+  it('nunca mostra 0 km e recusa valor inválido', () => {
+    assert.equal(formatKm(20), '0,1 km');
+    assert.equal(formatKm(-1), '—');
+    assert.equal(formatKm(Number.NaN), '—');
   });
 });

@@ -26,6 +26,15 @@ export function formatDistance(meters: number): string {
   return `${km < 10 ? km.toFixed(1).replace('.', ',') : Math.round(km)} km`;
 }
 
+/** Sempre em km, como na lista de amigos livres: 800 -> "0,8 km"; 2000 -> "2 km"; 2600 -> "2,6 km"; 15000 -> "15 km". */
+export function formatKm(meters: number): string {
+  if (!Number.isFinite(meters) || meters < 0) return '—';
+  const km = meters / 1000;
+  if (km >= 10) return `${Math.round(km)} km`;
+  const text = (Math.max(0.1, Math.round(km * 10) / 10)).toFixed(1).replace('.', ',');
+  return `${text.endsWith(',0') ? text.slice(0, -2) : text} km`;
+}
+
 /** Minutos restantes até `iso`: 0 quando já passou, arredondando para cima. */
 export function minutesLeft(iso: string, nowMs: number): number {
   const target = Date.parse(iso);

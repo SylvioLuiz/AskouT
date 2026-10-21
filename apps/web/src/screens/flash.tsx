@@ -17,6 +17,7 @@ import {
   formatAge,
   formatCountdown,
   formatDistance,
+  formatKm,
   formatRemaining,
   geolocationMessage,
   minutesLeft,
@@ -172,12 +173,12 @@ export function FlashScreen() {
   // Flash ligado e a lista já chegou vazia: mostra o estado "ninguém por enquanto" (e não o painel antigo).
   const empty = active && available.data !== undefined && friends.length === 0;
   const eligible = friends.filter((f) => f.invite === null);
-  // Distância só quando os dois lados autorizaram: eu compartilhando e a pessoa com posição enviada.
+  // Distância só de quem aceitou o convite e já enviou a posição. Parte da minha posição enviada ao encontro
+  // (ou da que o aparelho está lendo agora); sem as duas pontas, nada é mostrado.
   const distanceById = new Map<string, string>();
-  if (share.mine) {
-    for (const m of matchViews.data ?? []) {
-      if (m.them) distanceById.set(m.other.userId, formatDistance(distanceMeters(share.mine, m.them)));
-    }
+  for (const m of matchViews.data ?? []) {
+    const origin = m.me ?? share.mine;
+    if (m.them && origin) distanceById.set(m.other.userId, formatKm(distanceMeters(origin, m.them)));
   }
   const friendInSheet = friends.find((f) => f.profile.userId === friendOpen);
 
