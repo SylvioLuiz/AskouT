@@ -106,13 +106,8 @@ process.on('SIGTERM', () => shutdown(0));
 
 await ensurePostgres();
 if (process.argv.includes('--update')) {
-  // Internet lenta derruba a primeira tentativa (ETIMEDOUT): tenta de novo com mais tempo antes de desistir.
-  const fetchOnce = (timeout) => spawnSync('git', ['fetch', '-q'], { cwd: root, encoding: 'utf8', timeout, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
-  let fetched = fetchOnce(30_000);
-  if (fetched.status !== 0) {
-    console.log('[dev] Não consegui falar com o GitHub; tentando de novo com mais tempo…');
-    fetched = fetchOnce(90_000);
-  }
+  // Sem internet o git fica pendurado até estourar o tempo; 10 s bastam para saber, e a subida não espera mais que isso.
+  const fetched = spawnSync('git', ['fetch', '-q'], { cwd: root, encoding: 'utf8', timeout: 10_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
   const behind = fetched.status === 0 ? Number(spawnSync('git', ['rev-list', '--count', 'HEAD..@{u}'], { cwd: root, encoding: 'utf8' }).stdout.trim() || '0') : 0;
   if (fetched.status !== 0) console.log(`[dev] Sem acesso ao GitHub agora (${(fetched.stderr || fetched.error?.message || 'sem detalhe').trim().split('\n')[0]}); subindo com o código que já está aqui, que pode estar desatualizado (rode de novo quando a internet voltar).`);
   else if (behind > 0) {
