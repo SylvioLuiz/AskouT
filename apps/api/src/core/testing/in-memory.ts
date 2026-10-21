@@ -30,6 +30,8 @@ import type {
   DwellRepository,
   PaymentCharge,
   PaymentGateway,
+  AppSettingRecord,
+  AppSettingsRepository,
   StoreName,
   StorePurchaseVerifier,
   VerifiedStorePurchase,
@@ -637,6 +639,7 @@ export class InMemoryBoostRepository implements BoostRepository {
 
 /** Provedor de pagamento de mentira: guarda as cobranças e aceita avisos com um “segredo” combinado. */
 export class FakePaymentGateway implements PaymentGateway {
+  provider: 'sandbox' | 'stripe' | 'none' = 'stripe';
   readonly sandbox: boolean;
   readonly charges: { chargeId: string; reference: string; amountCents: number; description: string; returnPath?: string }[] = [];
   failNext = false;
@@ -665,6 +668,19 @@ export class FakePaymentGateway implements PaymentGateway {
     } catch {
       return undefined;
     }
+  }
+}
+
+export class InMemoryAppSettingsRepository implements AppSettingsRepository {
+  readonly rows = new Map<string, AppSettingRecord>();
+
+  async get(key: string): Promise<AppSettingRecord | undefined> {
+    const r = this.rows.get(key);
+    return r ? { ...r } : undefined;
+  }
+
+  async set(setting: AppSettingRecord): Promise<void> {
+    this.rows.set(setting.key, { ...setting });
   }
 }
 

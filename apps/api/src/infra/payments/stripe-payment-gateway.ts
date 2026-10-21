@@ -29,6 +29,7 @@ export interface StripeOptions {
  * Escrito conforme a documentação da Stripe, mas ainda NÃO exercitado contra a conta real (ver GOLIVE.md).
  */
 export class StripePaymentGateway implements PaymentGateway {
+  readonly provider = 'stripe' as const;
   readonly sandbox = false;
   private readonly secretKey: string;
   private readonly webhookSecret: string;

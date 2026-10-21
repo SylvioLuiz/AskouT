@@ -7,6 +7,7 @@ import type { PaymentCharge, PaymentGateway } from '../../core/ports.ts';
  * O “Pix” gerado é só um texto de mentira e o pedido é pago pelo botão “simular pagamento”.
  */
 export class SandboxPaymentGateway implements PaymentGateway {
+  readonly provider = 'sandbox' as const;
   readonly sandbox = true;
 
   async createCharge(input: { reference: string; amountCents: number; description: string }): Promise<PaymentCharge> {
@@ -21,6 +22,7 @@ export class SandboxPaymentGateway implements PaymentGateway {
 
 /** Sem provedor configurado: recusa criar cobrança em vez de fingir que cobrou. */
 export class UnconfiguredPaymentGateway implements PaymentGateway {
+  readonly provider = 'none' as const;
   readonly sandbox = false;
 
   async createCharge(): Promise<PaymentCharge> {

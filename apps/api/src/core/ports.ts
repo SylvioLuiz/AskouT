@@ -139,6 +139,8 @@ export interface PaymentCharge {
 
 /** Porta do provedor de pagamento (Pix, cartão…). O núcleo não conhece nenhum provedor em particular. */
 export interface PaymentGateway {
+  /** Qual provedor está de fato configurado neste servidor (“none”: nenhum, então não dá para ligar o pagamento). */
+  readonly provider: 'sandbox' | 'stripe' | 'none';
   /** Só o ambiente de teste permite “simular pagamento”. */
   readonly sandbox: boolean;
   /** `returnPath`: página do app para onde o provedor devolve a pessoa depois do pagamento (ex.: /bares/ID/impulsionar). */
@@ -148,6 +150,21 @@ export interface PaymentGateway {
    * `amountCents`, quando o provedor informa, é o valor que ele recebeu: o núcleo recusa liberar se não bater com o pedido.
    */
   parseWebhook(headers: Record<string, string | undefined>, rawBody: string): Promise<{ chargeId: string; paid: boolean; amountCents?: number } | undefined>;
+}
+
+/** Configurações do aplicativo que a gestão liga e desliga pelo painel, sem reiniciar nada. */
+export interface AppSettingRecord {
+  key: string;
+  value: string;
+  updatedAt: Date;
+  /** Quem mudou por último (sem chave estrangeira: sobrevive à remoção da conta). */
+  updatedBy: string | null;
+}
+
+export interface AppSettingsRepository {
+  get(key: string): Promise<AppSettingRecord | undefined>;
+  /** Grava ou troca o valor. */
+  set(setting: AppSettingRecord): Promise<void>;
 }
 
 /** Loja onde a compra dentro do app foi feita. */
@@ -670,6 +687,7 @@ export interface CoreDeps {
   dwell: DwellRepository;
   regions: RegionRepository;
   payments: PaymentGateway;
+  settings: AppSettingsRepository;
   /** Conferência das compras dentro do app. Sem ela, só a compra pela web funciona. */
   storeVerifier?: StorePurchaseVerifier;
   identities: IdentityRepository;

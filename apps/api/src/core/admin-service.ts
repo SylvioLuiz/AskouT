@@ -4,6 +4,7 @@ import { conflict, forbidden, notFound, unauthorized, validationError } from './
 import type { AuthResult, AuthService, LoginInput } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
 import type { VenueService } from './venue-service.ts';
+import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
 import type { Actor, AdminConversationReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
 import { REPORT_RESOLUTIONS } from './types.ts';
 
@@ -55,11 +56,13 @@ export class AdminService {
   private readonly deps: CoreDeps;
   private readonly venues: VenueService;
   private readonly auth: AuthService;
+  private readonly paymentsSwitch: PaymentsSwitch;
 
-  constructor(deps: CoreDeps, venues: VenueService, auth: AuthService) {
+  constructor(deps: CoreDeps, venues: VenueService, auth: AuthService, paymentsSwitch: PaymentsSwitch) {
     this.deps = deps;
     this.venues = venues;
     this.auth = auth;
+    this.paymentsSwitch = paymentsSwitch;
   }
 
   /**
@@ -158,6 +161,29 @@ export class AdminService {
     if (!(await this.deps.admin.setUserStatus(target.id, status))) throw notFound('Usuário não encontrado');
     await this.log(actor.userId, status === 'SUSPENDED' ? 'USER_SUSPENDED' : 'USER_REACTIVATED', 'USER', target.id, reason);
     return { id: target.id, status };
+  }
+
+  // ---------- Pagamentos (chave geral do impulsionamento) ----------
+
+  async payments(actor: Actor): Promise<PaymentsState> {
+    this.assertAdmin(actor);
+    return this.paymentsSwitch.state();
+  }
+
+  /**
+   * Liga ou desliga o impulsionamento pago, na hora. Ligar só é possível com um provedor de pagamento configurado no servidor.
+   * Desligar não derruba anúncios já pagos nem pagamentos em andamento; só bloqueia pedidos novos.
+   */
+  async setPayments(actor: Actor, enabled: unknown, note: unknown): Promise<PaymentsState> {
+    this.assertAdmin(actor);
+    if (typeof enabled !== 'boolean') throw validationError('Dados inválidos', { enabled: 'Use true ou false' });
+    const reason = noteText(note, false);
+    const before = await this.paymentsSwitch.state();
+    if (enabled && !before.canEnable) throw conflict(before.blocker ?? 'Não é possível ligar o pagamento agora');
+    if (before.enabled === enabled) throw conflict(enabled ? 'O pagamento já está ligado' : 'O pagamento já está desligado');
+    await this.paymentsSwitch.set(enabled, actor.userId);
+    await this.log(actor.userId, enabled ? 'PAYMENTS_ENABLED' : 'PAYMENTS_DISABLED', 'SETTING', 'payments', reason);
+    return this.paymentsSwitch.state();
   }
 
   // ---------- Locais, eventos e posts ----------

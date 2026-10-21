@@ -144,6 +144,22 @@ export interface AuditRow {
   createdAt: string;
 }
 
+// ---------- Pagamentos ----------
+
+export interface PaymentsState {
+  /** O que vale agora: ligado só se escolhido E com provedor configurado. */
+  enabled: boolean;
+  /** O que a gestão escolheu; null se ainda não escolheu (vale o valor inicial do servidor). */
+  chosen: boolean | null;
+  initial: boolean;
+  provider: 'sandbox' | 'stripe' | 'none';
+  canEnable: boolean;
+  blocker: string | null;
+  storeAvailable: boolean;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
 // ---------- Retenção ----------
 
 export interface RetentionSource {

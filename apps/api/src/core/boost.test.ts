@@ -28,7 +28,7 @@ const pay = (w: Awaited<ReturnType<typeof setup>>['w'], chargeId: string) =>
 
 test('preço e opções vêm da configuração', async () => {
   const { w } = await setup();
-  assert.deepEqual(w.core.boosts.pricing(), {
+  assert.deepEqual(await w.core.boosts.pricing(), {
     currency: 'BRL',
     enabled: true,
     pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS,
@@ -175,7 +175,7 @@ async function setupWith(options: Parameters<typeof makeWorld>[0]) {
 
 test('desligado: nenhum pedido novo, nenhuma cobrança, e o preço avisa a tela', async () => {
   const { w, dono } = await setupWith({ boostsEnabled: false });
-  assert.equal(w.core.boosts.pricing().enabled, false);
+  assert.equal((await w.core.boosts.pricing()).enabled, false);
   await rejectsWith(w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 1 }), 'CONFLICT');
   assert.equal(w.payments.charges.length, 0, 'desligado não chega ao provedor');
   assert.deepEqual(await w.core.boosts.list(dono, 'v1'), []);
@@ -228,7 +228,7 @@ async function setupStore() {
 
 test('loja: o pedido usa o preço da loja, não cria cobrança e diz qual produto o app deve comprar', async () => {
   const { w, dono } = await setupStore();
-  assert.equal(w.core.boosts.pricing().store.available, true);
+  assert.equal((await w.core.boosts.pricing()).store.available, true);
   const b = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 3, channel: 'APPLE' });
   assert.deepEqual([b.channel, b.amountCents, b.storeProductId, b.payment], ['APPLE', 6000, 'askout.boost.3d', { pixCode: null, checkoutUrl: null }]);
   assert.equal(w.payments.charges.length, 0, 'a loja cobra; o provedor da web não é chamado');

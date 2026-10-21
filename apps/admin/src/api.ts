@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, RetentionReport, Claim, ClaimStatus, ConversationReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -91,6 +91,8 @@ export const api = {
   login: (identifier: string, password: string) => request<AuthResult>('POST', '/admin/login', { identifier, password }, false),
   me: () => request<SessionUser>('GET', '/auth/me'),
   stats: () => request<Stats>('GET', '/admin/stats'),
+  payments: () => request<PaymentsState>('GET', '/admin/payments'),
+  setPayments: (enabled: boolean, note: string) => request<PaymentsState>('PUT', '/admin/payments', { enabled, note }),
   retention: (days: number) => request<RetentionReport>('GET', `/admin/retention${query({ days })}`),
 
   claims: (status: ClaimStatus) => request<Claim[]>('GET', `/admin/claims${query({ status })}`),

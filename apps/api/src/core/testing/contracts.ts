@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
+import type { AppSettingsRepository, DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -19,6 +19,7 @@ export interface RepoHarness {
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
   boosts: BoostRepository;
+  settings: AppSettingsRepository;
   dwell: DwellRepository;
   regions: RegionRepository;
   availability: AvailabilityRepository;
@@ -494,6 +495,19 @@ export function defineRepositoryContract(
         assert.equal(await h.boosts.transition(b.id, ['PAID'], 'CANCELLED'), false, 'estado de origem errado não muda');
         assert.equal(await h.boosts.transition(b.id, ['PENDING_PAYMENT'], 'CANCELLED'), true);
         assert.equal(await h.boosts.markPaid(b.id, window), false, 'cancelado não paga');
+      });
+
+      it('configurações: sem valor devolve nada; grava, troca e guarda quem mudou', async () => {
+        const key = `teste.${randomUUID()}`;
+        assert.equal(await h.settings.get(key), undefined);
+        const t0 = new Date(Date.UTC(2030, 0, 10, 12));
+        const admin = await newUser('config_admin');
+        await h.settings.set({ key, value: 'true', updatedAt: t0, updatedBy: admin });
+        const first = await h.settings.get(key);
+        assert.deepEqual([first?.value, first?.updatedAt.getTime(), first?.updatedBy], ['true', t0.getTime(), admin]);
+        await h.settings.set({ key, value: 'false', updatedAt: new Date(t0.getTime() + 1000), updatedBy: null });
+        const second = await h.settings.get(key);
+        assert.deepEqual([second?.value, second?.updatedAt.getTime(), second?.updatedBy], ['false', t0.getTime() + 1000, null], 'a segunda gravação troca a primeira');
       });
 
       it('impulsionamento pela loja: guarda o canal e o mesmo recibo não paga dois pedidos', async () => {

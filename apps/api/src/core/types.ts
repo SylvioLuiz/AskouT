@@ -720,13 +720,15 @@ export type AuditAction =
   | 'PLACE_EVENT_REMOVED'
   | 'STORY_REMOVED'
   | 'REPORT_DISMISSED'
-  | 'REPORT_ACTIONED';
+  | 'REPORT_ACTIONED'
+  | 'PAYMENTS_ENABLED'
+  | 'PAYMENTS_DISABLED';
 
 export interface AuditRecord {
   id: string;
   adminId: string;
   action: AuditAction;
-  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'STORY' | 'STORY_REPORT';
+  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'STORY' | 'STORY_REPORT' | 'SETTING';
   targetId: string;
   note: string | null;
   createdAt: Date;

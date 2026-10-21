@@ -2,6 +2,7 @@ import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { MatchReach, MatchService } from './match-service.ts';
 import { MATCH_MAX_TAGS, MATCH_RADIUS_KM_OPTIONS } from './match.ts';
 import type { CoreDeps } from './ports.ts';
+import type { PaymentsSwitch } from './payments-switch.ts';
 import type { BoostAudience, BoostChannel, BoostRecord, BoostTarget, PlaceEventRecord, VenueRecord } from './types.ts';
 
 /** Quantos dias o responsável pode comprar de uma vez. */
@@ -19,7 +20,7 @@ export function boostProductId(days: number): string {
 export interface BoostPricing {
   currency: 'BRL';
   /**
-   * Chave geral: com `false` nenhum pedido novo é aceito (nem pela web, nem pelas lojas).
+   * Chave geral (ligada e desligada pelo painel da gestão): com `false` nenhum pedido novo é aceito (nem pela web, nem pelas lojas).
    * Anúncios já pagos continuam aparecendo até o fim, e pagamentos em andamento ainda são confirmados.
    */
   enabled: boolean;
@@ -73,23 +74,23 @@ export class BoostService {
   private readonly deps: CoreDeps;
   private readonly pricePerDayCents: number;
   private readonly storePricePerDayCents: number;
-  private readonly enabled: boolean;
+  private readonly paymentsSwitch: PaymentsSwitch;
   private readonly match: MatchService;
 
-  constructor(deps: CoreDeps, options: { pricePerDayCents?: number; storePricePerDayCents?: number; enabled?: boolean } = {}, match: MatchService) {
+  constructor(deps: CoreDeps, options: { pricePerDayCents?: number; storePricePerDayCents?: number } = {}, match: MatchService, paymentsSwitch: PaymentsSwitch) {
     this.deps = deps;
     this.match = match;
+    this.paymentsSwitch = paymentsSwitch;
     this.pricePerDayCents = options.pricePerDayCents ?? BOOST_DEFAULT_PRICE_PER_DAY_CENTS;
     this.storePricePerDayCents = options.storePricePerDayCents ?? this.pricePerDayCents;
-    this.enabled = options.enabled ?? true;
   }
 
-  pricing(): BoostPricing {
+  async pricing(): Promise<BoostPricing> {
     const products: Record<string, string> = {};
     for (const d of BOOST_DAY_OPTIONS) products[String(d)] = boostProductId(d);
     return {
       currency: 'BRL',
-      enabled: this.enabled,
+      enabled: await this.paymentsSwitch.isEnabled(),
       pricePerDayCents: this.pricePerDayCents,
       dayOptions: [...BOOST_DAY_OPTIONS],
       store: { available: this.deps.storeVerifier !== undefined, pricePerDayCents: this.storePricePerDayCents, products },
@@ -99,8 +100,8 @@ export class BoostService {
   }
 
   /** Novos pedidos só com a chave ligada. Pagamentos que já estavam a caminho continuam sendo confirmados. */
-  private ensureEnabled(): void {
-    if (!this.enabled) throw conflict('O impulsionamento ainda não está disponível. Em breve!');
+  private async ensureEnabled(): Promise<void> {
+    if (!(await this.paymentsSwitch.isEnabled())) throw conflict('O impulsionamento ainda não está disponível. Em breve!');
   }
 
   /** O local precisa existir e ser administrado por quem pede (senão “não encontrado”, sem revelar que existe). */
@@ -167,7 +168,7 @@ export class BoostService {
 
   async create(ownerId: string, venueId: unknown, input: { target?: unknown; eventId?: unknown; days?: unknown; audience?: unknown; radiusKm?: unknown; tags?: unknown; channel?: unknown }): Promise<BoostView> {
     const venue = await this.ownedVenue(ownerId, venueId);
-    this.ensureEnabled();
+    await this.ensureEnabled();
     const now = this.deps.clock.now();
 
     if (input.channel !== undefined && input.channel !== 'WEB' && input.channel !== 'APPLE' && input.channel !== 'GOOGLE') {
@@ -276,7 +277,7 @@ export class BoostService {
   /** Só no ambiente de teste do provedor: marca o pedido como pago, para experimentar o fluxo sem dinheiro. */
   async simulatePayment(ownerId: string, boostId: unknown): Promise<BoostView> {
     if (!this.deps.payments.sandbox) throw forbidden('Simular pagamento só existe no ambiente de teste');
-    this.ensureEnabled();
+    await this.ensureEnabled();
     const boost = await this.ownedBoost(ownerId, boostId);
     if (boost.channel !== 'WEB') throw conflict('Este pedido é pago pela loja do aplicativo');
     if (boost.chargeId) await this.confirmCharge(boost.chargeId);

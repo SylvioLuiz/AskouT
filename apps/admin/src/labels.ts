@@ -37,10 +37,13 @@ export const ACTION_LABEL: Record<string, string> = {
   STORY_REMOVED: 'Apagou um story',
   REPORT_DISMISSED: 'Denúncia: sem problema',
   REPORT_ACTIONED: 'Denúncia: providência tomada',
+  PAYMENTS_ENABLED: 'Ligou o pagamento do impulsionamento',
+  PAYMENTS_DISABLED: 'Desligou o pagamento do impulsionamento',
 };
 
 export const TARGET_LABEL: Record<string, string> = {
   USER: 'Pessoa',
+  SETTING: 'Configuração',
   CLAIM: 'Pedido',
   VENUE: 'Local',
   POST: 'Post',
@@ -87,3 +90,9 @@ export function query(params: Record<string, string | number | boolean | undefin
 
 /** Largura mínima para usar a gestão. */
 export const MIN_DESKTOP_WIDTH = 1024;
+
+export const PAYMENT_PROVIDER_LABEL: Record<'sandbox' | 'stripe' | 'none', string> = {
+  sandbox: 'Teste (não cobra de verdade)',
+  stripe: 'Stripe (Pix e cartão)',
+  none: 'Nenhum configurado',
+};

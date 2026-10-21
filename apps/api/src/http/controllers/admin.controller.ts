@@ -27,6 +27,19 @@ export class AdminController {
     return this.core.admin.stats(actor);
   }
 
+  /** Estado da chave geral do pagamento do impulsionamento. */
+  @Get('payments')
+  payments(@CurrentActor() actor: Actor) {
+    return this.core.admin.payments(actor);
+  }
+
+  /** `{enabled: boolean, note?}`: liga ou desliga na hora (ligar exige provedor configurado). */
+  @Put('payments')
+  setPayments(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.setPayments(actor, b.enabled, b.note);
+  }
+
   @Get('retention')
   retention(@CurrentActor() actor: Actor, @Query() q: { days?: unknown }) {
     return this.core.admin.retention(actor, q);

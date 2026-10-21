@@ -18,6 +18,7 @@ import { SuggestionService } from './suggestion-service.ts';
 import { DwellService } from './dwell-service.ts';
 import { InterestService } from './interest-service.ts';
 import { MatchService } from './match-service.ts';
+import { PaymentsSwitch } from './payments-switch.ts';
 import { RegionService } from './region-service.ts';
 import { RecommendationService } from './recommendation-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
@@ -29,7 +30,7 @@ export type CoreInput = Omit<CoreDeps, 'notifier'> & {
   boostPricePerDayCents?: number;
   /** Valor por dia na compra dentro do app (tabela de preços da loja), em centavos. Padrão: o mesmo da web. */
   boostStorePricePerDayCents?: number;
-  /** Chave geral dos pedidos novos de impulsionamento. Padrão: ligada (o app liga/desliga por configuração). */
+  /** Valor inicial da chave de pagamento, até a gestão escolher pelo painel. Padrão: ligada (a configuração do servidor define o valor real). */
   boostsEnabled?: boolean;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
@@ -46,14 +47,15 @@ export function createCore(input: CoreInput) {
   const posts = new PostService(deps, profiles);
   const interests = new InterestService(deps);
   const match = new MatchService(deps, interests);
+  const paymentsSwitch = new PaymentsSwitch(deps, input.boostsEnabled ?? true);
   const boosts = new BoostService(
     deps,
     {
       ...(input.boostPricePerDayCents === undefined ? {} : { pricePerDayCents: input.boostPricePerDayCents }),
       ...(input.boostStorePricePerDayCents === undefined ? {} : { storePricePerDayCents: input.boostStorePricePerDayCents }),
-      ...(input.boostsEnabled === undefined ? {} : { enabled: input.boostsEnabled }),
     },
     match,
+    paymentsSwitch,
   );
   return {
     boosts,
@@ -69,7 +71,7 @@ export function createCore(input: CoreInput) {
     eventPages: new EventPageService(deps, profiles),
     eventReminders: new EventReminderService(deps),
     venues,
-    admin: new AdminService(deps, venues, auth),
+    admin: new AdminService(deps, venues, auth, paymentsSwitch),
     meetups: new MeetupService(deps),
     scheduling: new SchedulingService(deps),
     profileEvents: new ProfileEventService(deps, profiles),

@@ -980,6 +980,15 @@ model EventStoryReport {
   @@index([resolvedAt])
 }
 
+/// Chaves que a gestão liga e desliga pelo painel, sem reiniciar o servidor (ex.: `payments.enabled`).
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime
+  /// Quem mudou por último. Sem chave estrangeira: sobrevive à remoção da conta.
+  updatedBy String?  @db.Uuid
+}
+
 /// Registro de tudo que a gestão decidiu. Só cresce; `adminId` não tem chave estrangeira para sobreviver à remoção da conta.
 model AdminAudit {
   id         String   @id @default(uuid()) @db.Uuid
