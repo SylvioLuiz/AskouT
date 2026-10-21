@@ -4076,9 +4076,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 
 /* ---------- Flash ligado, com amigos livres ---------- */
 .flashlive { position: relative; display: flex; flex-direction: column; gap: 22px; margin-bottom: 24px; }
-/* O arco decorativo passa da borda direita: sem isto a página ganha rolagem lateral e o topo e o menu ficam desalinhados. */
-.content:has(.flashlive) { overflow-x: clip; }
-.flashlive::before { content: ''; position: absolute; right: -60px; top: -40px; z-index: -1; width: 300px; height: 200px; border-top: 1.5px solid var(--brand); border-radius: 50% 50% 0 0 / 100% 100% 0 0; opacity: 0.18; transform: rotate(-12deg); pointer-events: none; }
+/* O arco decorativo não pode passar da borda direita: isso dava rolagem lateral e deixava o topo e o menu desalinhados (o corte é só reforço para o Safari do iPhone). */
+.content:has(.flashlive) { overflow-x: hidden; overflow-x: clip; }
+.flashlive::before { content: ''; position: absolute; right: 4px; top: -40px; z-index: -1; width: 280px; height: 200px; border-top: 1.5px solid var(--brand); border-radius: 50% 50% 0 0 / 100% 100% 0 0; opacity: 0.18; transform: rotate(-12deg); pointer-events: none; }
 .flashlive__head { display: flex; flex-direction: column; gap: 4px; }
 .flashlive__title { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--font-display); font-size: 2.5rem; line-height: 1.05; font-weight: 700; }
 .flashlive__title svg { width: 34px; height: 34px; color: var(--brand); filter: drop-shadow(0 0 8px var(--brand)); }
@@ -4110,9 +4110,12 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .flashcard__off { flex: none; display: inline-flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 20px; border: 1.5px solid var(--ink-2); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 1.0625rem; font-weight: 650; cursor: pointer; }
 .flashcard__stop { width: 15px; height: 15px; border-radius: 3px; background: var(--ink); }
 
-.flashfriends { display: flex; justify-content: space-between; gap: 14px; margin: 0; padding: 4px 2px 2px; list-style: none; overflow-x: auto; scrollbar-width: none; }
+.flashfriends { display: flex; gap: 14px; margin: 0; padding: 4px 2px 2px; list-style: none; overflow-x: auto; scrollbar-width: none; }
 .flashfriends::-webkit-scrollbar { display: none; }
-.flashfriends > li { flex: 1 0 70px; min-width: 70px; max-width: 96px; }
+/* Colunas fixas e centralizadas: com 1 a 3 amigos a fileira não fica encostada à esquerda; com muitos, rola para o lado. */
+.flashfriends > li { flex: 0 0 76px; }
+.flashfriends > li:first-child { margin-left: auto; }
+.flashfriends > li:last-child { margin-right: auto; }
 .flashfriend { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
 .flashfriend__ring { position: relative; display: block; width: 100%; max-width: 76px; aspect-ratio: 1; padding: 3px; border-radius: 50%; background: var(--brand-grad, var(--brand)); }
 .flashfriend__img { display: grid; place-items: center; width: 100%; height: 100%; border: 2px solid var(--bg); border-radius: 50%; object-fit: cover; font-weight: 700; font-size: 1.25rem; }
