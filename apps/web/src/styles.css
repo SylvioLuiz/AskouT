@@ -4076,6 +4076,8 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 
 /* ---------- Flash ligado, com amigos livres ---------- */
 .flashlive { position: relative; display: flex; flex-direction: column; gap: 22px; margin-bottom: 24px; }
+/* O arco decorativo passa da borda direita: sem isto a página ganha rolagem lateral e o topo e o menu ficam desalinhados. */
+.content:has(.flashlive) { overflow-x: clip; }
 .flashlive::before { content: ''; position: absolute; right: -60px; top: -40px; z-index: -1; width: 300px; height: 200px; border-top: 1.5px solid var(--brand); border-radius: 50% 50% 0 0 / 100% 100% 0 0; opacity: 0.18; transform: rotate(-12deg); pointer-events: none; }
 .flashlive__head { display: flex; flex-direction: column; gap: 4px; }
 .flashlive__title { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--font-display); font-size: 2.5rem; line-height: 1.05; font-weight: 700; }
