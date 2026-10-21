@@ -4127,6 +4127,21 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .flashprivacy > span { flex: 1; }
 .flashprivacy > svg:last-child { flex: none; width: 22px; height: 22px; color: var(--muted); }
 
+.flashempty { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 26px 20px 20px; border: 1px solid var(--line); border-radius: 26px; background: var(--surface); text-align: center; }
+.flashempty__icon { display: grid; place-items: center; width: 84px; height: 84px; margin-bottom: 6px; border: 1.5px solid var(--line-strong); border-radius: 50%; background: var(--brand-soft); color: var(--brand); }
+.flashempty__icon svg { width: 40px; height: 40px; }
+.flashempty__title { margin: 0; font-family: var(--font-display); font-size: 1.25rem; line-height: 1.2; font-weight: 700; }
+.flashempty__text { margin: 0; max-width: 28ch; color: var(--ink-2); font-size: 1rem; line-height: 1.4; }
+.flashempty__cta { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 54px; margin-top: 10px; border: 0; border-radius: 999px; background: var(--brand-grad, var(--brand)); color: var(--brand-ink); font: inherit; font-size: 1.0625rem; font-weight: 650; box-shadow: var(--shadow-brand); cursor: pointer; }
+.flashempty__cta svg { width: 24px; height: 24px; }
+.flashempty__cta:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
+.flashtip { display: flex; align-items: flex-start; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
+.flashtip__icon { flex: none; display: grid; place-items: center; width: 34px; height: 34px; color: rgb(251 191 36); }
+.flashtip__icon svg { width: 28px; height: 28px; }
+.flashtip__title { margin: 0 0 2px; font-weight: 700; }
+.flashtip__text { margin: 0; color: var(--ink-2); font-size: 0.9375rem; line-height: 1.4; }
+.flashtip__text strong { color: var(--ink); }
+
 .flashcall { margin: 0 0 12px; padding-left: 20px; color: var(--ink-2); }
 @media (max-width: 359px) { .flashquick { grid-template-columns: 1fr; } .flashquick__item { flex-direction: row; min-height: 56px; justify-content: flex-start; padding-left: 16px; } }
 @media (prefers-reduced-motion: reduce) { .flashbar__fill { transition: none; } }

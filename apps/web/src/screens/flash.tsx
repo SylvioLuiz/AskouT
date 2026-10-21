@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { BoltIcon, CalendarIcon, ChatIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, RefreshIcon, ShieldIcon, UsersIcon } from '../components/icons.tsx';
+import { BoltIcon, CalendarIcon, ChatIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, RefreshIcon, ShieldIcon, UserPlusIcon, UsersIcon, BulbIcon } from '../components/icons.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { ChatButton } from '../components/chat-button.tsx';
+import { InviteSheet } from '../components/invite.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
@@ -79,6 +80,7 @@ export function FlashScreen() {
   const [friendOpen, setFriendOpen] = useState<string | undefined>();
   const [callAllOpen, setCallAllOpen] = useState(false);
   const [callingAll, setCallingAll] = useState(false);
+  const [inviting, setInviting] = useState(false);
 
   // O aviso de "Flash ativado" some sozinho depois de 3 segundos.
   useEffect(() => {
@@ -167,6 +169,8 @@ export function FlashScreen() {
   const friends = available.data ?? [];
   // Tela nova: Flash ligado e com ao menos um amigo livre. Os outros estados seguem como estavam.
   const rich = active && friends.length > 0;
+  // Flash ligado e a lista já chegou vazia: mostra o estado "ninguém por enquanto" (e não o painel antigo).
+  const empty = active && available.data !== undefined && friends.length === 0;
   const eligible = friends.filter((f) => f.invite === null);
   // Distância só quando os dois lados autorizaram: eu compartilhando e a pessoa com posição enviada.
   const distanceById = new Map<string, string>();
@@ -269,7 +273,7 @@ export function FlashScreen() {
       </section>
     ) : null;
 
-  if (rich) {
+  if (rich || empty) {
     return (
       <div className="flashlive">
         {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
@@ -286,7 +290,7 @@ export function FlashScreen() {
           <h1 className="flashlive__title">
             Flash <BoltIcon filled />
           </h1>
-          <p className="flashlive__sub">Encontre amigos para sair agora!</p>
+          <p className="flashlive__sub">{empty ? 'Você está disponível agora.' : 'Encontre amigos para sair agora!'}</p>
         </header>
 
         <section className="flashcard" aria-label="Seu Flash">
@@ -295,17 +299,32 @@ export function FlashScreen() {
               <BoltIcon filled />
             </span>
             <div className="flashcard__text">
-              <p className="flashcard__title">Você está disponível!</p>
-              <p className="flashcard__status">
-                <span className="flashcard__dot" aria-hidden="true" />
-                Flash ativo
-                {status.data?.expiresAt ? (
-                  <>
-                    {' · '}
-                    <Countdown expiresAt={status.data.expiresAt} />
-                  </>
-                ) : null}
-              </p>
+              {empty ? (
+                <>
+                  <p className="flashcard__title">Flash ativo</p>
+                  <p className="flashcard__status">
+                    {status.data?.expiresAt ? (
+                      <>
+                        Faltam <Countdown expiresAt={status.data.expiresAt} />
+                      </>
+                    ) : null}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="flashcard__title">Você está disponível!</p>
+                  <p className="flashcard__status">
+                    <span className="flashcard__dot" aria-hidden="true" />
+                    Flash ativo
+                    {status.data?.expiresAt ? (
+                      <>
+                        {' · '}
+                        <Countdown expiresAt={status.data.expiresAt} />
+                      </>
+                    ) : null}
+                  </p>
+                </>
+              )}
             </div>
           </div>
           {status.data?.expiresAt ? <FlashBar startsAt={status.data.startsAt} expiresAt={status.data.expiresAt} /> : null}
@@ -329,73 +348,104 @@ export function FlashScreen() {
         <section className="flashlive__section" aria-labelledby="livres-titulo">
           <div className="flashlive__row">
             <h2 id="livres-titulo" className="flashlive__h2">
-              Amigos livres agora ({friends.length})
+              {empty ? 'Amigos livres agora' : `Amigos livres agora (${friends.length})`}
             </h2>
             <button type="button" className="flashlive__refresh" onClick={reloadAll}>
               <RefreshIcon />
               Atualizar
             </button>
           </div>
-          <ul className="flashfriends">
-            {friends.map((f) => {
-              const dir = f.invite?.direction;
-              const detail = distanceById.get(f.profile.userId) ?? (dir === 'MATCHED' ? 'Encontro' : dir === 'SENT' ? 'Convidado' : dir === 'RECEIVED' ? 'Convidou você' : '');
-              return (
-                <li key={f.profile.userId}>
-                  <button type="button" className="flashfriend" onClick={() => setFriendOpen(f.profile.userId)}>
-                    <span className="flashfriend__ring">
-                      {f.profile.avatarUrl ? (
-                        <img className="flashfriend__img" src={f.profile.avatarUrl.startsWith('/') ? api.assetUrl(f.profile.avatarUrl) : f.profile.avatarUrl} alt="" referrerPolicy="no-referrer" />
-                      ) : (
-                        <span className={`flashfriend__img avatar--tint-${tintIndex(f.profile.username)}`} aria-hidden="true">
-                          {initials(f.profile.username)}
-                        </span>
-                      )}
-                      <span className="flashfriend__on" aria-hidden="true" />
-                    </span>
-                    <span className="flashfriend__name">{f.profile.username}</span>
-                    <span className="flashfriend__detail">{detail || ' '}</span>
-                    <span className="visually-hidden">Livre agora. Abrir opções.</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <button type="button" className="flashlive__map" onClick={() => setMapOpen(true)}>
-            <LocationIcon />
-            Ver no mapa
-          </button>
-        </section>
-
-        <section className="flashlive__section" aria-labelledby="acoes-titulo">
-          <h2 id="acoes-titulo" className="flashlive__h2">
-            Ações rápidas
-          </h2>
-          <div className="flashquick">
-            <button type="button" className="flashquick__item" disabled={eligible.length === 0} onClick={() => setCallAllOpen(true)}>
-              <UsersIcon />
-              Chamar todos
-            </button>
-            <Link to="/criar" className="flashquick__item">
-              <CalendarIcon />
-              Criar evento agora
-            </Link>
-            <Link to="/conversas" className="flashquick__item">
-              <ChatIcon />
-              Ver conversas
-            </Link>
+          {empty ? (
+          <div className="flashempty">
+              <span className="flashempty__icon" aria-hidden="true">
+                <UsersIcon />
+              </span>
+              <h3 className="flashempty__title">Ninguém disponível por enquanto</h3>
+              <p className="flashempty__text">Que tal chamar seus amigos para ligar o Flash também?</p>
+              <button type="button" className="flashempty__cta" onClick={() => setInviting(true)}>
+                <UserPlusIcon />
+                Convidar amigos
+              </button>
           </div>
+          ) : (
+            <>
+              <ul className="flashfriends">
+                {friends.map((f) => {
+                  const dir = f.invite?.direction;
+                  const detail = distanceById.get(f.profile.userId) ?? (dir === 'MATCHED' ? 'Encontro' : dir === 'SENT' ? 'Convidado' : dir === 'RECEIVED' ? 'Convidou você' : '');
+                  return (
+                    <li key={f.profile.userId}>
+                      <button type="button" className="flashfriend" onClick={() => setFriendOpen(f.profile.userId)}>
+                        <span className="flashfriend__ring">
+                          {f.profile.avatarUrl ? (
+                            <img className="flashfriend__img" src={f.profile.avatarUrl.startsWith('/') ? api.assetUrl(f.profile.avatarUrl) : f.profile.avatarUrl} alt="" referrerPolicy="no-referrer" />
+                          ) : (
+                            <span className={`flashfriend__img avatar--tint-${tintIndex(f.profile.username)}`} aria-hidden="true">
+                              {initials(f.profile.username)}
+                            </span>
+                          )}
+                          <span className="flashfriend__on" aria-hidden="true" />
+                        </span>
+                        <span className="flashfriend__name">{f.profile.username}</span>
+                        <span className="flashfriend__detail">{detail || ' '}</span>
+                        <span className="visually-hidden">Livre agora. Abrir opções.</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <button type="button" className="flashlive__map" onClick={() => setMapOpen(true)}>
+                <LocationIcon />
+                Ver no mapa
+              </button>
+            </>
+          )}
         </section>
 
-        <button type="button" className="flashprivacy" onClick={() => setInfoOpen(true)}>
-          <ShieldIcon />
-          <span>Sua localização é compartilhada apenas com amigos que você autorizar.</span>
-          <ChevronRightIcon />
-        </button>
+        {!empty ? (
+          <>
+            <section className="flashlive__section" aria-labelledby="acoes-titulo">
+              <h2 id="acoes-titulo" className="flashlive__h2">
+                Ações rápidas
+              </h2>
+              <div className="flashquick">
+                <button type="button" className="flashquick__item" disabled={eligible.length === 0} onClick={() => setCallAllOpen(true)}>
+                  <UsersIcon />
+                  Chamar todos
+                </button>
+                <Link to="/criar" className="flashquick__item">
+                  <CalendarIcon />
+                  Criar evento agora
+                </Link>
+                <Link to="/conversas" className="flashquick__item">
+                  <ChatIcon />
+                  Ver conversas
+                </Link>
+              </div>
+            </section>
+
+            <button type="button" className="flashprivacy" onClick={() => setInfoOpen(true)}>
+              <ShieldIcon />
+              <span>Sua localização é compartilhada apenas com amigos que você autorizar.</span>
+              <ChevronRightIcon />
+            </button>
+          </>
+        ) : (
+          <div className="flashtip">
+            <span className="flashtip__icon" aria-hidden="true">
+              <BulbIcon />
+            </span>
+            <div>
+              <p className="flashtip__title">Dica</p>
+              <p className="flashtip__text">Quanto mais amigos usarem o Flash, maiores as <strong>chances</strong> de encontrar alguém para sair.</p>
+            </div>
+          </div>
+        )}
 
         {receivedBlock}
         {matchesBlock}
 
+        {inviting ? <InviteSheet onClose={() => setInviting(false)} /> : null}
         {infoOpen ? (
           <Sheet title="Como o Flash funciona" onClose={() => setInfoOpen(false)}>
             <p>Seus amigos que também estiverem com Flash ligado veem seu nome e sua foto.</p>

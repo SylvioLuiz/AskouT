@@ -384,6 +384,19 @@ export const UsersIcon = () => (
     <path d="M16.5 13.2c2.6.1 4.5 1.8 4.5 4.3" />
   </Svg>
 );
+export const UserPlusIcon = () => (
+  <Svg>
+    <circle cx="9.5" cy="8.5" r="3.2" />
+    <path d="M3.5 19.5c0-3.2 2.7-5.2 6-5.2 1.3 0 2.5.3 3.4.9" />
+    <path d="M18 14v6M15 17h6" />
+  </Svg>
+);
+export const BulbIcon = () => (
+  <Svg>
+    <path d="M9 18h6M10 21h4" />
+    <path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z" />
+  </Svg>
+);
 export const HelpIcon = () => (
   <Svg>
     <circle cx="12" cy="12" r="9" />
