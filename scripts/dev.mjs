@@ -106,9 +106,15 @@ process.on('SIGTERM', () => shutdown(0));
 
 await ensurePostgres();
 if (process.argv.includes('--update')) {
-  const fetched = spawnSync('git', ['fetch', '-q'], { cwd: root, encoding: 'utf8', timeout: 30_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+  // Internet lenta derruba a primeira tentativa (ETIMEDOUT): tenta de novo com mais tempo antes de desistir.
+  const fetchOnce = (timeout) => spawnSync('git', ['fetch', '-q'], { cwd: root, encoding: 'utf8', timeout, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
+  let fetched = fetchOnce(30_000);
+  if (fetched.status !== 0) {
+    console.log('[dev] Não consegui falar com o GitHub; tentando de novo com mais tempo…');
+    fetched = fetchOnce(90_000);
+  }
   const behind = fetched.status === 0 ? Number(spawnSync('git', ['rev-list', '--count', 'HEAD..@{u}'], { cwd: root, encoding: 'utf8' }).stdout.trim() || '0') : 0;
-  if (fetched.status !== 0) console.log(`[dev] Sem acesso ao GitHub agora (${(fetched.stderr || fetched.error?.message || 'sem detalhe').trim().split('\n')[0]}); subindo com o código que já está aqui.`);
+  if (fetched.status !== 0) console.log(`[dev] Sem acesso ao GitHub agora (${(fetched.stderr || fetched.error?.message || 'sem detalhe').trim().split('\n')[0]}); subindo com o código que já está aqui, que pode estar desatualizado (rode de novo quando a internet voltar).`);
   else if (behind > 0) {
     console.log(`[dev] Há ${behind} novidade(s) no GitHub: rodando o update antes de subir (pode levar alguns minutos)…`);
     const result = spawnSync(process.execPath, [join(root, 'scripts/update.mjs')], { cwd: root, stdio: 'inherit' });
