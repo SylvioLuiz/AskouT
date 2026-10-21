@@ -27,6 +27,18 @@ export const RECO_MAX_IMPRESSIONS = 3;
 export const RECO_TASTE_LIKE = 1.5;
 export const RECO_TASTE_COMMENT = 2;
 export const RECO_TASTE_SHARE = 2.5;
+/** Confirmar presença é um compromisso: pesa como compartilhar. */
+export const RECO_TASTE_GOING = 2.5;
+/** Quantos eventos confirmados da própria pessoa entram no gosto. */
+export const RECO_GOING_HISTORY = 50;
+/**
+ * O gosto dos amigos mais próximos também puxa as recomendações, mas menos que as ações da própria pessoa:
+ * o gesto de um amigo vale (peso do gesto) x (proximidade, de 0,1 a 1) x este fator. Um amigo no máximo de proximidade
+ * pesa 60% do mesmo gesto feito pela própria pessoa.
+ */
+export const RECO_FRIEND_TASTE_FACTOR = 0.6;
+/** Só os amigos mais próximos influenciam o gosto. */
+export const RECO_TASTE_FRIENDS = 10;
 export const RECO_MAX_FRIENDS = 30;
 export const RECO_MAX_PER_SOURCE = 2;
 export const RECO_WEIGHTS = { social: 0.55, taste: 0.35, fresh: 0.1 } as const;
@@ -229,6 +241,16 @@ export class RecommendationService {
         const p = await postOf(row.postId);
         if (p) addFeatures(taste, postFeatures(p.post), (row.kind === 'COMMENT' ? RECO_TASTE_COMMENT : RECO_TASTE_LIKE) * decay(row.at, now, 30));
       }
+      for (const { ref, createdAt } of await eventRoom.listGoingByUser(viewerId, RECO_GOING_HISTORY)) {
+        const w = RECO_TASTE_GOING * decay(createdAt, now, 30);
+        if (ref.source === 'PLACE') {
+          const e = await places.findEvent(ref.id);
+          if (e) addFeatures(taste, eventFeatures(e.event, e.venue.category), w);
+        } else {
+          const p = await postOf(ref.id);
+          if (p && p.post.eventTitle) addFeatures(taste, postFeatures(p.post), w);
+        }
+      }
       for (const d of dwell) {
         if (d.shared !== true) continue;
         const w = RECO_TASTE_SHARE * decay(d.createdAt, now, 30);
@@ -276,9 +298,44 @@ export class RecommendationService {
     };
     const postFreshness = (createdAt: Date) => 0.5 ** ((now.getTime() - createdAt.getTime()) / 86_400_000 / 3);
 
+    // O que cada amigo próximo foi ou curtiu, lido uma vez só: serve de candidato e de gosto.
+    const friendData = new Map<string, { going: Awaited<ReturnType<typeof eventRoom.listGoingByUser>>; engaged: Awaited<ReturnType<typeof posts.listEngagement>> }>();
+    for (const friendId of circle) {
+      friendData.set(friendId, {
+        going: await eventRoom.listGoingByUser(friendId, 20),
+        engaged: await posts.listEngagement(friendId, new Date(now.getTime() - RECO_FRIEND_DAYS * 86_400_000), 30),
+      });
+    }
+
+    // Gosto dos amigos mais próximos, com peso menor que o das ações da própria pessoa.
+    if (personalize) {
+      const close = circle.slice(0, RECO_TASTE_FRIENDS);
+      const postIds = close.flatMap((f) => [...(friendData.get(f)?.engaged.map((r) => r.postId) ?? []), ...(friendData.get(f)?.going.filter((g) => g.ref.source === 'USER').map((g) => g.ref.id) ?? [])]);
+      const visible = await this.postService.visibleIds(viewerId, postIds);
+      for (const friendId of close) {
+        const k = closeness(friendId) * RECO_FRIEND_TASTE_FACTOR;
+        const data = friendData.get(friendId)!;
+        for (const row of data.engaged) {
+          const p = visible.has(row.postId) ? await postOf(row.postId) : undefined;
+          if (p) addFeatures(taste, postFeatures(p.post), k * (row.kind === 'COMMENT' ? RECO_TASTE_COMMENT : RECO_TASTE_LIKE) * decay(row.at, now, 30));
+        }
+        for (const { ref, createdAt } of data.going) {
+          const w = k * RECO_TASTE_GOING * decay(createdAt, now, 30);
+          if (ref.source === 'PLACE') {
+            const e = await places.findEvent(ref.id);
+            if (e) addFeatures(taste, eventFeatures(e.event, e.venue.category), w);
+          } else if (visible.has(ref.id)) {
+            const p = await postOf(ref.id);
+            if (p) addFeatures(taste, postFeatures(p.post), w);
+          }
+        }
+      }
+    }
+
     for (const friendId of circle) {
       const w = closeness(friendId);
-      for (const { ref } of await eventRoom.listGoingByUser(friendId, 20)) {
+      const data = friendData.get(friendId)!;
+      for (const { ref } of data.going) {
         if (ref.source === 'PLACE') {
           const e = await places.findEvent(ref.id);
           if (!e || e.event.endsAt <= now) continue;
@@ -293,7 +350,7 @@ export class RecommendationService {
           c.going.add(friendId);
         }
       }
-      for (const row of await posts.listEngagement(friendId, new Date(now.getTime() - RECO_FRIEND_DAYS * 86_400_000), 30)) {
+      for (const row of data.engaged) {
         const p = await postOf(row.postId);
         if (!p || p.post.archivedAt || p.post.authorId === viewerId || p.post.authorId === friendId) continue;
         const c = candidate('POST', p.post.id, postFeatures(p.post), postFreshness(p.post.createdAt));

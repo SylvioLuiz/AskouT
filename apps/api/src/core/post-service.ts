@@ -604,6 +604,16 @@ export class PostService {
   }
 
   /** Posts de outras pessoas só entram numa lista se quem vê também pode ver o autor. */
+  /** Dos ids dados, os posts que `viewerId` pode ver (existem, não estão arquivados, perfil e evento visíveis). Sem montar a tela. */
+  async visibleIds(viewerId: string, ids: string[]): Promise<Set<string>> {
+    const rows: PostWithImages[] = [];
+    for (const id of new Set(ids)) {
+      const found = await this.deps.posts.findById(id);
+      if (found && found.post.archivedAt === null) rows.push(found);
+    }
+    return new Set((await this.onlySeeable(viewerId, rows)).map((r) => r.post.id));
+  }
+
   /** Posts pelos ids (na mesma ordem), só os que `viewerId` pode ver e que não estão arquivados. Usado nas recomendações. */
   async viewsByIds(viewerId: string, ids: string[]): Promise<PostView[]> {
     const rows: PostWithImages[] = [];

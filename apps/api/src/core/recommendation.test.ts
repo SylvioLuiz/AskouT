@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DWELL_BATCH_MAX, DWELL_MAX_MS, DWELL_RETENTION_DAYS } from './dwell-service.ts';
-import { addFeatures, decay, directCloseness, emptyTaste, finalScore, hashtagsOf, RECO_MIN_STICKY_MS, stickyThreshold, stickyWeight, tasteSimilarity } from './recommendation-service.ts';
+import { RECO_FRIEND_TASTE_FACTOR, RECO_TASTE_COMMENT, RECO_TASTE_GOING, RECO_TASTE_LIKE, RECO_TASTE_SHARE, addFeatures, decay, directCloseness, emptyTaste, finalScore, hashtagsOf, RECO_MIN_STICKY_MS, stickyThreshold, stickyWeight, tasteSimilarity } from './recommendation-service.ts';
 import { rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
 
@@ -141,6 +141,63 @@ describe('motor de recomendação', () => {
     assert.ok(!ids(await w.core.recommendations.recommend(ana)).includes(friendLiked.id));
   });
 
+  it('confirmar presença vira gosto (e o evento a que já vai não volta)', async () => {
+    const { w, ana } = await setup();
+    await event(w, 'vou', 'v1', 30, 'OTHER', ['samba']);
+    await event(w, 'parecido', 'v1', 60, 'OTHER', ['samba']);
+    await event(w, 'rock', 'v2', 60, 'OTHER', ['rock']);
+    await w.eventRoom.addGoing({ source: 'PLACE', id: 'vou' }, ana, w.clock.now());
+    const r = await w.core.recommendations.recommend(ana);
+    assert.deepEqual(ids(r), ['parecido']);
+    assert.ok(r.items[0]!.reasons.includes('Tem a ver com #samba'));
+    assert.deepEqual((await w.core.recommendations.recommend(ana, { personalize: false })).items, []);
+  });
+
+  it('o gosto do amigo próximo puxa recomendações, mais que o de um amigo distante', async () => {
+    const { w, ana, bia, caio, eva } = await setup();
+    await w.places.createVenue({ id: 'v3', name: 'Neutro', address: null, category: null, lat: 0, lng: 0, isSample: false });
+    await event(w, 'samba', 'v3', 40, 'OTHER', ['samba']);
+    await event(w, 'rock', 'v3', 40, 'OTHER', ['rock']);
+    // ana interage com a bia (fica próxima), nunca com o caio.
+    const biaPost = await w.core.posts.create(bia, { caption: 'oi', images: [JPEG] });
+    await w.core.posts.like(ana, biaPost.id);
+    await w.core.posts.addComment(ana, biaPost.id, 'top');
+    const s = await w.core.posts.create(eva, { caption: 'roda #samba', images: [JPEG] });
+    const r = await w.core.posts.create(eva, { caption: 'noite #rock', images: [JPEG] });
+    await w.core.posts.like(bia, s.id);
+    await w.core.posts.like(caio, r.id);
+    const events = (await w.core.recommendations.recommend(ana)).items.filter((i) => i.event);
+    assert.deepEqual(events.map((i) => i.event!.id), ['samba', 'rock']);
+    assert.ok(events[0]!.score > events[1]!.score);
+    assert.ok(events[0]!.reasons.includes('Tem a ver com #samba'));
+  });
+
+  it('o que a própria pessoa curtiu pesa mais que o gosto do amigo mais próximo', async () => {
+    const { w, ana, bia, eva } = await setup();
+    await w.places.createVenue({ id: 'v3', name: 'Neutro', address: null, category: null, lat: 0, lng: 0, isSample: false });
+    await event(w, 'samba', 'v3', 40, 'OTHER', ['samba']);
+    await event(w, 'rock', 'v3', 40, 'OTHER', ['rock']);
+    const biaPost = await w.core.posts.create(bia, { caption: 'oi', images: [JPEG] });
+    await w.core.posts.like(ana, biaPost.id);
+    await w.core.posts.addComment(ana, biaPost.id, 'top');
+    const bySamba = await w.core.posts.create(eva, { caption: 'roda #samba', images: [JPEG] });
+    await w.core.posts.like(bia, bySamba.id);
+    const byRock = await w.core.posts.create(eva, { caption: 'noite #rock', images: [JPEG] });
+    await w.core.posts.like(ana, byRock.id);
+    const events = (await w.core.recommendations.recommend(ana)).items.filter((i) => i.event);
+    assert.deepEqual(events.map((i) => i.event!.id), ['rock', 'samba'], 'curtida própria > amigo no máximo de proximidade');
+  });
+
+  it('o gosto do amigo não vaza por post que a pessoa não pode ver', async () => {
+    const { w, ana, bia, eva } = await setup();
+    await w.places.createVenue({ id: 'v3', name: 'Neutro', address: null, category: null, lat: 0, lng: 0, isSample: false });
+    await event(w, 'samba', 'v3', 40, 'OTHER', ['samba']);
+    await w.core.profiles.setPrivacy(eva, true);
+    const hidden = await w.core.posts.create(eva, { caption: 'roda #samba', images: [JPEG] });
+    await w.core.posts.like(bia, hidden.id);
+    assert.deepEqual((await w.core.recommendations.recommend(ana)).items, []);
+  });
+
   it('clique sem tempo não derruba a média de tempo da pessoa', async () => {
     const { w, ana } = await setup();
     await event(w, 'curto', 'v1', 30, 'SHOW', ['samba']);
@@ -235,6 +292,11 @@ describe('medição de permanência', () => {
 });
 
 describe('contas do motor de recomendação', () => {
+  it('pesos: gesto explícito > tempo na tela; amigo próximo < própria pessoa', () => {
+    assert.ok(RECO_TASTE_SHARE > RECO_TASTE_COMMENT && RECO_TASTE_COMMENT > RECO_TASTE_LIKE);
+    assert.equal(RECO_TASTE_GOING, RECO_TASTE_SHARE);
+    assert.ok(RECO_FRIEND_TASTE_FACTOR < 1 && RECO_FRIEND_TASTE_FACTOR > 0.3, 'um pouco menor, não irrelevante');
+  });
   it('interação antiga vale menos (meia-vida de 14 dias)', () => {
     const now = new Date('2026-10-20T00:00:00Z');
     assert.equal(decay(now, now), 1);
