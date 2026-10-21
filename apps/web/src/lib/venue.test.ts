@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { EMPTY_VENUE_EVENT, claimStatusLabel, documentProblem, parseTags, venueEventBody, venueEventProblem } from './venue.ts';
+import { EMPTY_VENUE_EVENT, claimStatusLabel, documentProblem, parseTags, ticketHost, ticketUrlProblem, venueEventBody, venueEventProblem } from './venue.ts';
 import type { VenueEventDraft } from './venue.ts';
 
 const NOW = new Date('2026-10-14T12:00:00');
@@ -57,4 +57,22 @@ test('capa: foto do aparelho vai como imageData; capa já enviada é mantida', (
   assert.equal(venueEventProblem(own, new Date('2026-11-01T00:00:00Z'), true), null);
   assert.equal(venueEventBody(own).imageUrl, '/place-events/abc-1/cover?v=123');
   assert.match(venueEventProblem({ ...base, imageUrl: '/outra/coisa' }, new Date('2026-11-01T00:00:00Z'), true) ?? '', /https/);
+});
+
+test('link de ingresso: vazio vale, só https com domínio de verdade', () => {
+  assert.equal(ticketUrlProblem(''), null);
+  assert.equal(ticketUrlProblem('   '), null);
+  assert.equal(ticketUrlProblem('https://www.sympla.com.br/evento/samba?utm=askout'), null);
+  for (const bad of ['http://sympla.com.br/x', 'sympla.com.br/x', 'javascript:alert(1)', 'https://localhost/x', 'https://10.0.0.1/x', 'https://u:p@sympla.com.br/x', 'https://a b.com', `https://x.com/${'a'.repeat(500)}`]) {
+    assert.ok(ticketUrlProblem(bad), bad);
+  }
+});
+
+test('link de ingresso: vai no corpo, vazio remove, e o botão mostra só o site', () => {
+  assert.equal(venueEventBody(draft({ ticketUrl: ' https://ingresso.com/a ' })).ticketUrl, 'https://ingresso.com/a');
+  assert.equal(venueEventBody(draft({ ticketUrl: '' })).ticketUrl, null);
+  assert.ok(venueEventProblem(draft({ ticketUrl: 'http://x.com' }), NOW, false));
+  assert.equal(venueEventProblem(draft({ ticketUrl: 'https://x.com/y' }), NOW, false), null);
+  assert.equal(ticketHost('https://www.sympla.com.br/evento/1'), 'sympla.com.br');
+  assert.equal(ticketHost('lixo'), '');
 });

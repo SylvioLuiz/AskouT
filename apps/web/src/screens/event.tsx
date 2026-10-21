@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { StoryCreateSheet, StoryViewer } from '../components/event-story.tsx';
 import { Sheet } from '../components/agenda.tsx';
-import { ChevronLeftIcon, EventKindIcon, MoreIcon, PlusIcon, ShareIcon, TrashIcon, XIcon } from '../components/icons.tsx';
+import { ChevronLeftIcon, EventKindIcon, MoreIcon, PlusIcon, ShareIcon, TicketIcon, TrashIcon, XIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
@@ -15,6 +15,7 @@ import { mapLink, routeLink } from '../lib/chat.ts';
 import { attendeeStrip, eventDateLabel, eventTimeLabel, venueLine, venueMapLink } from '../lib/event-page.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
+import { ticketHost } from '../lib/venue.ts';
 import { toApiError } from '../lib/errors.ts';
 import { resizePostPhoto } from '../lib/image.ts';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
@@ -377,6 +378,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
             ) : (
               <p className="muted">Ninguém confirmou ainda. Seja o primeiro.</p>
             )}
+            {e.ticketUrl && !ended ? (
+              <div className="evticket">
+                <a className="btn btn--secondary btn--full evticket__link" href={e.ticketUrl} target="_blank" rel="noopener noreferrer nofollow sponsored">
+                  <TicketIcon />
+                  Comprar ingresso
+                </a>
+                <p className="evticket__note">Abre {ticketHost(e.ticketUrl) || 'o site de venda'}. A venda é feita lá: o AskouT não cobra nem entrega o ingresso.</p>
+              </div>
+            ) : null}
             {e.isOwner ? null : ended ? (
               <p className="muted">Esse evento já terminou.</p>
             ) : (

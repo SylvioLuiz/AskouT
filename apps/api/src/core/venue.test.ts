@@ -184,3 +184,41 @@ test('capa do evento: enviar do aparelho, manter, trocar por link e remover', as
   assert.equal(await w.core.venues.eventCover(created.id), undefined);
   assert.equal(await w.core.venues.eventCover('nao-existe'), undefined);
 });
+
+test('link de ingresso: só https com domínio de verdade, aparece na página do evento e dá para remover', async () => {
+  const { w, ana, bia, adm, start } = await setup();
+  const claim = await w.core.venues.requestClaim(ana, 'v1', { document: JPEG() });
+  await w.core.venues.reviewClaim(adm, claim.id, 'APPROVED');
+  const bad = (ticketUrl: unknown) => rejectsWith(w.core.venues.createEvent(ana, 'v1', { title: 'Ok', startsAt: start(), ticketUrl }), 'VALIDATION');
+  await bad('http://sympla.com.br/evento');
+  await bad('javascript:alert(1)');
+  await bad('ftp://sympla.com.br/x');
+  await bad('sympla.com.br/evento');
+  await bad('https://exemplo.com/a b');
+  await bad('https://localhost/x');
+  await bad('https://127.0.0.1/x');
+  await bad('https://192.168.0.10/x');
+  await bad('https://[::1]/x');
+  await bad('https://usuario:senha@sympla.com.br/x');
+  await bad('https://impressora.local/x');
+  await bad(`https://exemplo.com/${'a'.repeat(500)}`);
+  await bad(42);
+
+  const semLink = await w.core.venues.createEvent(ana, 'v1', { title: 'Sem link', startsAt: start() });
+  assert.equal(semLink.ticketUrl, null);
+
+  const url = 'https://www.sympla.com.br/evento/samba-123?utm=askout';
+  const created = await w.core.venues.createEvent(ana, 'v1', { title: 'Com link', startsAt: start(), ticketUrl: `  ${url}  ` });
+  assert.equal(created.ticketUrl, url, 'espaços nas pontas são tirados');
+  assert.equal((await w.core.eventPages.get(bia, created.id, {})).ticketUrl, url, 'qualquer pessoa vê o link na página do evento');
+  assert.equal((await w.core.eventPages.get(bia, semLink.id, {})).ticketUrl, null);
+
+  const kept = await w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'Com link 2', startsAt: created.startsAt });
+  assert.equal(kept.ticketUrl, url, 'ausente mantém o link');
+  const changed = await w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'Com link 2', startsAt: created.startsAt, ticketUrl: 'https://ingresso.com/novo' });
+  assert.equal(changed.ticketUrl, 'https://ingresso.com/novo');
+  const removed = await w.core.venues.updateEvent(ana, 'v1', created.id, { title: 'Com link 2', startsAt: created.startsAt, ticketUrl: '' });
+  assert.equal(removed.ticketUrl, null, 'vazio remove');
+  assert.equal((await w.core.eventPages.get(bia, created.id, {})).ticketUrl, null);
+  assert.equal((await w.core.venues.panel(ana, 'v1')).events.find((e) => e.id === semLink.id)?.ticketUrl, null);
+});

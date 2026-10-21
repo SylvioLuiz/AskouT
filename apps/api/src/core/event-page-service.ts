@@ -67,6 +67,8 @@ export interface EventPageView {
   /** Só em evento de um local: abre a página do estabelecimento. */
   venue: { id?: string; name: string; address: string | null; lat: number | null; lng: number | null };
   tags: string[];
+  /** Só em evento do local: link https para comprar ingresso, quando o local informou. */
+  ticketUrl: string | null;
   distanceM: number | null;
   /** Só em evento do local: o visitante já postou no próprio perfil. */
   postedByMe: boolean;
@@ -224,6 +226,7 @@ export class EventPageService {
           cover: event.imageUrl ? { kind: 'URL', url: event.imageUrl } : null,
           venue: { id: venue.id, name: venue.name, address: venue.address, lat: venue.lat, lng: venue.lng },
           tags: [...event.tags],
+          ticketUrl: event.ticketUrl ?? null,
           distanceM: distance,
           postedByMe: await this.deps.profileEvents.has(viewerId, event.id),
           isPrivate: false,
@@ -253,6 +256,7 @@ export class EventPageService {
         cover,
         venue: { name: post.placeName ?? '', address: post.placeAddress, lat: null, lng: null },
         tags: [],
+        ticketUrl: null,
         distanceM: null,
         postedByMe: await this.deps.profileEvents.hasPost(viewerId, post.id),
         isPrivate: post.eventPrivate === true,

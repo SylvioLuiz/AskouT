@@ -537,6 +537,8 @@ export interface EventPage {
   coverAuthor: string | null;
   venue: { id?: string; name: string; address: string | null; lat: number | null; lng: number | null };
   tags: string[];
+  /** Só em evento do local: link https para comprar ingresso. */
+  ticketUrl?: string | null;
   distanceM: number | null;
   postedByMe: boolean;
   /** Evento privado: só abre por cartão numa conversa e não pode ser repostado. */
@@ -719,6 +721,8 @@ export interface VenueEvent {
   isFree: boolean;
   imageUrl: string | null;
   tags: string[];
+  /** Link https para comprar ingresso, se foi informado. */
+  ticketUrl?: string | null;
   phase: 'UPCOMING' | 'LIVE' | 'PAST';
   sample: boolean;
 }
@@ -798,6 +802,8 @@ export interface VenueEventBody {
   imageUrl?: string | null;
   imageData?: string;
   tags: string[];
+  /** Vazio/nulo remove o link; ausente mantém. */
+  ticketUrl?: string | null;
 }
 
 // ---------- Impulsionamento ----------

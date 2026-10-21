@@ -111,3 +111,11 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 - **Limites conhecidos:** a estimativa examina no máximo 1000 pessoas da região por consulta (a tela avisa quando é parcial) e calcula o gosto na hora, o que não escala; com muitos usuários, calcular os gostos em lote (ex.: de madrugada) e guardar. O dono pode variar raio e hashtags para tentar isolar pessoas; a faixa mínima de 10 e o arredondamento reduzem isso, mas vale limitar o número de consultas por dono.
 - Não há ainda relatório para o dono (quantas vezes o anúncio foi exibido e aberto) nem cobrança diferente por resultado. A exibição já é medida como as demais do "Para você" (fonte RECO).
 - O Match só existe no "Para você" da Home; não aparece no Explorar nem fora do app.
+
+## Link de ingresso nos eventos dos locais
+
+- Rodar a migração `20261201120000_event_ticket_url` (coluna `PlaceEvent.ticketUrl`). O `npm run update` do ambiente de teste já faz isso.
+- O AskouT só leva a pessoa até o site de venda (botão "Comprar ingresso" na página do evento, com o nome do site embaixo). Não vende, não cobra e não entrega ingresso: o texto da tela diz isso. Revisar o texto com o jurídico (responsabilidade por link de terceiros, Código de Defesa do Consumidor).
+- Regras do link: só `https://`, até 500 caracteres, com domínio (sem IP, `localhost`, `.local`, `.internal` nem usuário/senha no endereço). O botão abre em outra aba com `noopener noreferrer nofollow sponsored`.
+- Falta decidir: denunciar link suspeito (golpe de ingresso falso) e o painel de gestão poder remover o link; contar cliques para o dono do local ver quantas pessoas foram ao site de venda.
+- Só eventos de locais (`PlaceEvent`). Eventos criados por pessoas (posts de evento) ainda não têm link de ingresso.

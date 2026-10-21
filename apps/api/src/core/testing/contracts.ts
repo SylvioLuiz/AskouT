@@ -1077,6 +1077,18 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.places.findEventsNear(centre, 1000, at(0), at(12 * H), 10), []);
       });
 
+      it('link de ingresso: grava, lê, troca e remove', async () => {
+        const v = venue('Com ingresso', centre.lat, centre.lng);
+        await h.places.createVenue(v);
+        const e = { ...event(v.id, 'Show', 1 * H, 2 * H), ticketUrl: 'https://www.sympla.com.br/evento/1' };
+        await h.places.createEvent(e);
+        assert.equal((await h.places.findEvent(e.id))?.event.ticketUrl, 'https://www.sympla.com.br/evento/1');
+        assert.equal(await h.places.updateEvent(v.id, { ...e, ticketUrl: 'https://ingresso.com/2' }), true);
+        assert.equal((await h.places.findEvent(e.id))?.event.ticketUrl, 'https://ingresso.com/2');
+        await h.places.updateEvent(v.id, { ...e, ticketUrl: null });
+        assert.equal((await h.places.findEvent(e.id))?.event.ticketUrl ?? null, null);
+      });
+
       it('searchEvents: tipo, grátis, hashtag, texto sem acento, raio opcional e ordem por horário', async () => {
         const bar = venue('Bar do Zé', -23.5515, -46.6333);
         const far = venue('Casa Distante', -23.6505, -46.6333); // ~11 km

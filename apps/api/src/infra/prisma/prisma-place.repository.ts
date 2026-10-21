@@ -136,7 +136,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
     await this.prisma.placeEvent.create({
       data: {
         id: e.id, venueId: e.venueId, title: e.title, description: e.description, startsAt: e.startsAt, endsAt: e.endsAt,
-        kind: e.kind, isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, isSample: e.isSample,
+        kind: e.kind, isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, ticketUrl: e.ticketUrl ?? null, isSample: e.isSample,
       },
     });
   }
@@ -162,7 +162,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
     if (!isUuid(venueId) || !isUuid(e.id)) return false;
     const res = await this.prisma.placeEvent.updateMany({
       where: { id: e.id, venueId },
-      data: { title: e.title, description: e.description, startsAt: e.startsAt, endsAt: e.endsAt, kind: e.kind, isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags },
+      data: { title: e.title, description: e.description, startsAt: e.startsAt, endsAt: e.endsAt, kind: e.kind, isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, ticketUrl: e.ticketUrl ?? null },
     });
     return res.count > 0;
   }
@@ -249,7 +249,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
   async listTags(prefix: string, from: Date, to: Date, limit: number) {
     const rows = await this.prisma.placeEvent.findMany({
       where: { endsAt: { gt: from }, startsAt: { lt: to }, tags: { isEmpty: false } },
-      select: { id: true, venueId: true, title: true, description: true, startsAt: true, endsAt: true, kind: true, isFree: true, imageUrl: true, tags: true, isSample: true },
+      select: { id: true, venueId: true, title: true, description: true, startsAt: true, endsAt: true, kind: true, isFree: true, imageUrl: true, tags: true, ticketUrl: true, isSample: true },
       take: PREFILTER_CAP,
     });
     return countTags(rows.map((r) => toEvent(r)), prefix, limit);
@@ -271,11 +271,11 @@ export class PrismaPlaceRepository implements PlaceRepository {
   }
 }
 
-interface EventRow { id: string; venueId: string; title: string; description: string | null; startsAt: Date; endsAt: Date; kind: PlaceEventRecord['kind']; isFree: boolean; imageUrl: string | null; tags: string[]; isSample: boolean }
+interface EventRow { id: string; venueId: string; title: string; description: string | null; startsAt: Date; endsAt: Date; kind: PlaceEventRecord['kind']; isFree: boolean; imageUrl: string | null; tags: string[]; ticketUrl: string | null; isSample: boolean }
 interface VenueRow { id: string; name: string; address: string | null; category: string | null; lat: number; lng: number; isSample: boolean; ownerId?: string | null; description?: string | null; hoursJson?: string | null; coverUrl?: string | null; logoUrl?: string | null; externalKey?: string | null; photoRef?: string | null; photoAuthor?: string | null }
 
 function toEvent(r: EventRow): PlaceEventRecord {
-  return { id: r.id, venueId: r.venueId, title: r.title, description: r.description, startsAt: r.startsAt, endsAt: r.endsAt, kind: r.kind, isFree: r.isFree, imageUrl: r.imageUrl, tags: [...r.tags], isSample: r.isSample };
+  return { id: r.id, venueId: r.venueId, title: r.title, description: r.description, startsAt: r.startsAt, endsAt: r.endsAt, kind: r.kind, isFree: r.isFree, imageUrl: r.imageUrl, tags: [...r.tags], ticketUrl: r.ticketUrl, isSample: r.isSample };
 }
 
 function toVenue(v: VenueRow): VenueRecord {

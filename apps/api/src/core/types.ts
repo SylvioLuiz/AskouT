@@ -323,6 +323,8 @@ export interface PlaceEventRecord {
   imageUrl: string | null;
   /** Hashtags em minúsculas, sem "#" e sem acento. */
   tags: string[];
+  /** Link https para comprar ingresso (site do próprio local ou de uma bilheteria). Ausente/nulo: sem link. */
+  ticketUrl?: string | null;
   isSample: boolean;
 }
 

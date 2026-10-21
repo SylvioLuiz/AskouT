@@ -64,6 +64,8 @@ export interface VenueEventView {
   isFree: boolean;
   imageUrl: string | null;
   tags: string[];
+  /** Link https para comprar ingresso, se o local informou. */
+  ticketUrl: string | null;
   /** Para a lista do painel: ainda vai acontecer, está acontecendo ou já passou. */
   phase: 'UPCOMING' | 'LIVE' | 'PAST';
   sample: boolean;
@@ -175,6 +177,32 @@ export interface VenueProfileInput {
   logoData?: unknown;
 }
 
+export const TICKET_URL_MAX = 500;
+
+/**
+ * Link de compra de ingresso. Só https, com domínio de verdade (nada de IP, localhost nem login embutido no
+ * endereço), para o botão do evento nunca levar para um endereço de rede interna nem esconder o destino.
+ * Ausente mantém o atual; vazio ou nulo remove.
+ */
+export function parseTicketUrl(value: unknown, current: string | null): string | null {
+  if (value === undefined) return current;
+  if (value === null) return null;
+  const bad = () => validationError('Evento inválido', { ticketUrl: 'Use o endereço completo do ingresso, começando com https://' });
+  if (typeof value !== 'string') throw bad();
+  const raw = value.trim();
+  if (raw === '') return null;
+  if (raw.length > TICKET_URL_MAX || !/^https:\/\/[^\s]+$/.test(raw)) throw bad();
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw bad();
+  }
+  const host = url.hostname;
+  if (url.protocol !== 'https:' || url.username !== '' || url.password !== '' || !host.includes('.') || /^[\d.]+$/.test(host) || host.startsWith('[') || host.endsWith('.local') || host.endsWith('.internal')) throw bad();
+  return raw;
+}
+
 function parseHours(value: unknown): VenueHours | null {
   if (value === undefined || value === null) return null;
   const bad = () => validationError('Horários inválidos', { hours: 'Use 7 dias, de domingo a sábado, com abre e fecha em HH:MM' });
@@ -209,6 +237,8 @@ export interface VenueEventInput {
   /** Data URL (JPEG, PNG ou WebP, até 256 KB) de uma foto enviada do aparelho. */
   imageData?: unknown;
   tags?: unknown;
+  /** Link https para comprar ingresso; vazio/nulo remove; ausente mantém o atual. */
+  ticketUrl?: unknown;
 }
 
 export interface ClaimInput {
@@ -579,7 +609,7 @@ export class VenueService {
   private eventView(e: PlaceEventRecord): VenueEventView {
     const now = this.deps.clock.now().getTime();
     const phase = e.endsAt.getTime() <= now ? 'PAST' : e.startsAt.getTime() <= now ? 'LIVE' : 'UPCOMING';
-    return { id: e.id, title: e.title, description: e.description, kind: e.kind, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, phase, sample: e.isSample };
+    return { id: e.id, title: e.title, description: e.description, kind: e.kind, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), isFree: e.isFree, imageUrl: e.imageUrl, tags: e.tags, ticketUrl: e.ticketUrl ?? null, phase, sample: e.isSample };
   }
 
   private parseEvent(input: VenueEventInput, keepStart?: Date, current?: PlaceEventRecord): Omit<PlaceEventRecord, 'id' | 'venueId' | 'isSample' | 'imageUrl'> & { cover: CoverChange } {
@@ -624,6 +654,7 @@ export class VenueService {
     const endsAt = input.endsAt === undefined || input.endsAt === null || input.endsAt === '' ? new Date(startsAt.getTime() + 3 * 3_600_000) : date(input.endsAt, 'Fim', 'endsAt');
     if (endsAt.getTime() <= startsAt.getTime()) throw validationError('Evento inválido', { endsAt: 'O fim precisa ser depois do início' });
     if (endsAt.getTime() - startsAt.getTime() > VENUE_EVENT_MAX_DAYS * 24 * 3_600_000) throw validationError('Evento inválido', { endsAt: `O evento pode durar até ${VENUE_EVENT_MAX_DAYS} dias` });
-    return { title, description, kind, startsAt, endsAt, isFree, tags, cover };
+    const ticketUrl = parseTicketUrl(input.ticketUrl, current?.ticketUrl ?? null);
+    return { title, description, kind, startsAt, endsAt, isFree, tags, ticketUrl, cover };
   }
 }

@@ -65,12 +65,41 @@ export interface VenueEventDraft {
   /** Foto nova escolhida no aparelho (data URL já reduzida). */
   imageData: string;
   tags: string;
+  /** Link para comprar ingresso (opcional). */
+  ticketUrl: string;
 }
 
 /** Capa enviada antes, servida pela própria API. */
 export const isOwnCoverPath = (v: string): boolean => /^\/(place-events|venues)\/[\w-]+\/(cover|logo)(\?v=\d+)?$/.test(v);
 
-export const EMPTY_VENUE_EVENT: VenueEventDraft = { title: '', description: '', kind: 'OTHER', starts: '', ends: '', isFree: false, imageUrl: '', imageData: '', tags: '' };
+export const EMPTY_VENUE_EVENT: VenueEventDraft = { title: '', description: '', kind: 'OTHER', starts: '', ends: '', isFree: false, imageUrl: '', imageData: '', tags: '', ticketUrl: '' };
+
+export const TICKET_URL_MAX = 500;
+
+/** Problema do link de ingresso (ou null). Vazio é válido: o evento fica sem link. Espelha a regra da API. */
+export function ticketUrlProblem(value: string): string | null {
+  const raw = value.trim();
+  if (raw === '') return null;
+  const message = 'Use o endereço completo do ingresso, começando com https://';
+  if (raw.length > TICKET_URL_MAX || !/^https:\/\/\S+$/.test(raw)) return message;
+  try {
+    const url = new URL(raw);
+    const host = url.hostname;
+    if (url.username !== '' || url.password !== '' || !host.includes('.') || /^[\d.]+$/.test(host) || host.startsWith('[') || host.endsWith('.local') || host.endsWith('.internal')) return message;
+  } catch {
+    return message;
+  }
+  return null;
+}
+
+/** Só o site do link, para o botão dizer para onde vai: "https://www.sympla.com.br/x" -> "sympla.com.br". */
+export function ticketHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+}
 
 /** Texto do primeiro problema do rascunho, ou null. `editing`: o início de um evento já existente pode estar no passado. */
 export function venueEventProblem(d: VenueEventDraft, now: Date, editing: boolean): string | null {
@@ -88,7 +117,7 @@ export function venueEventProblem(d: VenueEventDraft, now: Date, editing: boolea
   }
   if (d.imageData === '' && d.imageUrl.trim() !== '' && !isOwnCoverPath(d.imageUrl.trim()) && !/^https:\/\/\S+$/.test(d.imageUrl.trim())) return 'O endereço da imagem precisa começar com https://';
   if (parseTags(d.tags).length > VENUE_EVENT_TAGS_MAX) return `Use até ${VENUE_EVENT_TAGS_MAX} hashtags.`;
-  return null;
+  return ticketUrlProblem(d.ticketUrl);
 }
 
 export function venueEventBody(d: VenueEventDraft): VenueEventBody {
@@ -101,11 +130,12 @@ export function venueEventBody(d: VenueEventDraft): VenueEventBody {
     isFree: d.isFree,
     ...(d.imageData !== '' ? { imageData: d.imageData } : { imageUrl: d.imageUrl.trim() === '' ? null : d.imageUrl.trim() }),
     tags: parseTags(d.tags),
+    ticketUrl: d.ticketUrl.trim() === '' ? null : d.ticketUrl.trim(),
   };
 }
 
 export function draftFromEvent(e: VenueEvent, isoToLocalInput: (iso: string) => string): VenueEventDraft {
-  return { title: e.title, description: e.description ?? '', kind: e.kind, starts: isoToLocalInput(e.startsAt), ends: isoToLocalInput(e.endsAt), isFree: e.isFree, imageUrl: e.imageUrl ?? '', imageData: '', tags: e.tags.map((t) => `#${t}`).join(' ') };
+  return { title: e.title, description: e.description ?? '', kind: e.kind, starts: isoToLocalInput(e.startsAt), ends: isoToLocalInput(e.endsAt), isFree: e.isFree, imageUrl: e.imageUrl ?? '', imageData: '', tags: e.tags.map((t) => `#${t}`).join(' '), ticketUrl: e.ticketUrl ?? '' };
 }
 
 export function phaseLabel(phase: VenueEvent['phase']): string {

@@ -397,6 +397,12 @@ export const BulbIcon = () => (
     <path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z" />
   </Svg>
 );
+export const TicketIcon = () => (
+  <Svg>
+    <path d="M4 8.5V6a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2.5a2 2 0 0 0 0 4V15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2.5a2 2 0 0 0 0-4z" transform="translate(0 1.5)" />
+    <path d="M14 6.5v1.5M14 11v1.5M14 15.5V17" transform="translate(0 0)" />
+  </Svg>
+);
 export const HelpIcon = () => (
   <Svg>
     <circle cx="12" cy="12" r="9" />

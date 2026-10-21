@@ -257,6 +257,16 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved }: { venueId:
         </label>
         <Field label="Descrição (opcional)" value={draft.description} onChange={(v) => set('description', v)} multiline maxLength={VENUE_EVENT_DESCRIPTION_MAX} />
         <Field label="Hashtags (opcional)" value={draft.tags} onChange={(v) => set('tags', v)} placeholder="#samba #happyhour" hint="Até 5, separadas por espaço" />
+        <Field
+          label="Link para comprar ingresso (opcional)"
+          type="url"
+          inputMode="url"
+          autoComplete="off"
+          value={draft.ticketUrl}
+          onChange={(v) => set('ticketUrl', v)}
+          placeholder="https://"
+          hint="Site do local ou de uma bilheteria. O AskouT só leva a pessoa até lá: não vende nem cobra o ingresso."
+        />
         {message ? <Notice tone="error">{message}</Notice> : null}
         <Button full loading={busy} onClick={save}>
           {event ? 'Salvar' : 'Criar evento'}

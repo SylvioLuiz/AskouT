@@ -4521,3 +4521,8 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .foryou__reasons li { padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; color: var(--ink-2); background: var(--brand-soft); }
 .foryou__reasons .foryou__faces { display: flex; padding: 0; background: transparent; }
 .setting__actions { padding: 0 16px 8px; }
+
+.evticket { display: flex; flex-direction: column; gap: 6px; }
+.evticket__link { display: inline-flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; }
+.evticket__link svg { width: 22px; height: 22px; }
+.evticket__note { margin: 0; color: var(--muted); font-size: 0.8125rem; line-height: 1.35; text-align: center; }

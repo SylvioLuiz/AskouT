@@ -38,7 +38,7 @@ interface FieldProps {
   error?: string | undefined;
   hint?: string;
   autoComplete?: string;
-  inputMode?: 'text' | 'numeric' | 'email';
+  inputMode?: 'text' | 'numeric' | 'email' | 'url';
   prefix?: string;
   maxLength?: number;
   autoFocus?: boolean;

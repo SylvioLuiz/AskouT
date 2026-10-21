@@ -731,6 +731,8 @@ model PlaceEvent {
   imageUrl    String?
   /// Hashtags em minúsculas, sem "#" e sem acento.
   tags        String[]  @default([])
+  /// Link https para comprar ingresso (informado por quem criou o evento).
+  ticketUrl   String?
   isSample    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
