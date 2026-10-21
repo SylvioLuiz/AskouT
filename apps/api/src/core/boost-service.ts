@@ -1,6 +1,8 @@
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
+import type { MatchReach, MatchService } from './match-service.ts';
+import { MATCH_MAX_TAGS, MATCH_RADIUS_KM_OPTIONS } from './match.ts';
 import type { CoreDeps } from './ports.ts';
-import type { BoostRecord, BoostTarget, VenueRecord } from './types.ts';
+import type { BoostAudience, BoostRecord, BoostTarget, PlaceEventRecord, VenueRecord } from './types.ts';
 
 /** Quantos dias o responsável pode comprar de uma vez. */
 export const BOOST_DAY_OPTIONS: readonly number[] = [1, 3, 7, 14];
@@ -13,6 +15,8 @@ export interface BoostPricing {
   currency: 'BRL';
   pricePerDayCents: number;
   dayOptions: number[];
+  /** Raios (km) e limite de hashtags do Match. */
+  match: { radiusKmOptions: number[]; maxTags: number };
   /** Pagamento de teste: não cobra de verdade (a tela mostra “simular pagamento”). */
   sandbox: boolean;
 }
@@ -29,6 +33,10 @@ export interface BoostView {
   eventTitle: string | null;
   days: number;
   amountCents: number;
+  audience: BoostAudience;
+  /** Só no Match. */
+  radiusKm: number | null;
+  matchTags: string[];
   phase: BoostPhase;
   createdAt: string;
   startsAt: string | null;
@@ -49,14 +57,16 @@ export function boostPhase(boost: BoostRecord, now: Date): BoostPhase {
 export class BoostService {
   private readonly deps: CoreDeps;
   private readonly pricePerDayCents: number;
+  private readonly match: MatchService;
 
-  constructor(deps: CoreDeps, options: { pricePerDayCents?: number } = {}) {
+  constructor(deps: CoreDeps, options: { pricePerDayCents?: number } = {}, match: MatchService) {
     this.deps = deps;
+    this.match = match;
     this.pricePerDayCents = options.pricePerDayCents ?? BOOST_DEFAULT_PRICE_PER_DAY_CENTS;
   }
 
   pricing(): BoostPricing {
-    return { currency: 'BRL', pricePerDayCents: this.pricePerDayCents, dayOptions: [...BOOST_DAY_OPTIONS], sandbox: this.deps.payments.sandbox };
+    return { currency: 'BRL', pricePerDayCents: this.pricePerDayCents, dayOptions: [...BOOST_DAY_OPTIONS], match: { radiusKmOptions: [...MATCH_RADIUS_KM_OPTIONS], maxTags: MATCH_MAX_TAGS }, sandbox: this.deps.payments.sandbox };
   }
 
   /** O local precisa existir e ser administrado por quem pede (senão “não encontrado”, sem revelar que existe). */
@@ -80,6 +90,9 @@ export class BoostService {
       eventTitle,
       days: boost.days,
       amountCents: boost.amountCents,
+      audience: boost.audience,
+      radiusKm: boost.radiusM === null ? null : boost.radiusM / 1000,
+      matchTags: [...boost.matchTags],
       phase: boostPhase(boost, now),
       createdAt: boost.createdAt.toISOString(),
       startsAt: boost.startsAt?.toISOString() ?? null,
@@ -89,7 +102,34 @@ export class BoostService {
   }
 
   /** Cria o pedido e a cobrança. O anúncio só passa a aparecer depois que o pagamento é confirmado. */
-  async create(ownerId: string, venueId: unknown, input: { target?: unknown; eventId?: unknown; days?: unknown }): Promise<BoostView> {
+  /**
+   * Confere o Match de um evento: raio da lista e de 1 a 5 hashtags que o próprio evento tem.
+   * Sem hashtags no evento não há como alcançar ninguém por gosto.
+   */
+  private matchInput(event: PlaceEventRecord, input: { radiusKm?: unknown; tags?: unknown }): { radiusM: number; tags: string[] } {
+    const radiusKm = input.radiusKm;
+    if (typeof radiusKm !== 'number' || !MATCH_RADIUS_KM_OPTIONS.includes(radiusKm)) throw validationError('Raio inválido', { radiusKm: `Escolha ${MATCH_RADIUS_KM_OPTIONS.join(', ')} km` });
+    if (event.tags.length === 0) throw validationError('Este evento não tem hashtags', { tags: 'Adicione hashtags ao evento (por exemplo #rock) para usar o Match' });
+    const tags = input.tags;
+    if (!Array.isArray(tags) || tags.length === 0 || tags.length > MATCH_MAX_TAGS || tags.some((t) => typeof t !== 'string')) {
+      throw validationError('Escolha as hashtags', { tags: `Escolha de 1 a ${MATCH_MAX_TAGS} hashtags do evento` });
+    }
+    const unique = [...new Set(tags as string[])];
+    if (unique.some((t) => !event.tags.includes(t))) throw validationError('Hashtag que o evento não tem', { tags: 'Use só hashtags do próprio evento' });
+    return { radiusM: radiusKm * 1000, tags: unique };
+  }
+
+  /** Quantas pessoas combinam hoje com um Match, só como número agregado (nunca quem). */
+  async estimate(ownerId: string, venueId: unknown, input: { eventId?: unknown; radiusKm?: unknown; tags?: unknown }): Promise<MatchReach> {
+    const venue = await this.ownedVenue(ownerId, venueId);
+    if (typeof input.eventId !== 'string' || input.eventId === '' || input.eventId.length > 64) throw validationError('Escolha o evento', { eventId: 'Informe o evento' });
+    const found = await this.deps.places.findEvent(input.eventId);
+    if (!found || found.venue.id !== venue.id) throw notFound('Evento não encontrado');
+    const { radiusM, tags } = this.matchInput(found.event, input);
+    return this.match.reach({ venue, radiusM, tags, ownerId });
+  }
+
+  async create(ownerId: string, venueId: unknown, input: { target?: unknown; eventId?: unknown; days?: unknown; audience?: unknown; radiusKm?: unknown; tags?: unknown }): Promise<BoostView> {
     const venue = await this.ownedVenue(ownerId, venueId);
     const now = this.deps.clock.now();
 
@@ -97,6 +137,10 @@ export class BoostService {
     if (typeof days !== 'number' || !BOOST_DAY_OPTIONS.includes(days)) throw validationError('Duração inválida', { days: `Escolha ${BOOST_DAY_OPTIONS.join(', ')} dias` });
     if (input.target !== 'VENUE' && input.target !== 'EVENT') throw validationError('Escolha o que impulsionar', { target: 'Use VENUE ou EVENT' });
     const target: BoostTarget = input.target;
+    if (input.audience !== undefined && input.audience !== 'ALL' && input.audience !== 'MATCH') throw validationError('Alcance inválido', { audience: 'Use ALL ou MATCH' });
+    const audience: BoostAudience = input.audience === 'MATCH' ? 'MATCH' : 'ALL';
+    if (audience === 'MATCH' && target !== 'EVENT') throw validationError('O Match vale para eventos', { audience: 'Escolha um evento para usar o Match' });
+    let match: { radiusM: number; tags: string[] } | null = null;
 
     let eventId: string | null = null;
     let description = `Impulsionamento de ${venue.name}`;
@@ -106,6 +150,7 @@ export class BoostService {
       if (!found || found.venue.id !== venue.id) throw notFound('Evento não encontrado');
       if (found.event.endsAt.getTime() <= now.getTime()) throw conflict('Este evento já terminou', { eventId: 'Evento encerrado' });
       eventId = found.event.id;
+      if (audience === 'MATCH') match = this.matchInput(found.event, input);
       description = `Impulsionamento do evento ${found.event.title}`;
     }
 
@@ -133,6 +178,9 @@ export class BoostService {
       paidAt: null,
       startsAt: null,
       endsAt: null,
+      audience,
+      radiusM: match?.radiusM ?? null,
+      matchTags: match?.tags ?? [],
     };
     await this.deps.boosts.create(boost);
     return this.view(boost, now);
@@ -187,9 +235,12 @@ export class BoostService {
     return this.view(fresh, this.deps.clock.now());
   }
 
-  /** Alvos impulsionados agora, para o Explorar marcar “Patrocinado” e subir na lista. */
+  /**
+   * Alvos impulsionados agora para TODOS, para o Explorar marcar “Patrocinado” e subir na lista.
+   * Anúncios Match ficam de fora: só aparecem para quem combina, no “Para você”.
+   */
   async activeTargets(now: Date): Promise<{ venueIds: Set<string>; eventIds: Set<string>; boosts: BoostRecord[] }> {
-    const boosts = await this.deps.boosts.listActive(now);
+    const boosts = (await this.deps.boosts.listActive(now)).filter((b) => b.audience !== 'MATCH');
     return {
       venueIds: new Set(boosts.filter((b) => b.target === 'VENUE').map((b) => b.venueId)),
       eventIds: new Set(boosts.filter((b) => b.target === 'EVENT' && b.eventId).map((b) => b.eventId as string)),

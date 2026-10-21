@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post, Query, Req } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { asBody } from '../support/parse.ts';
@@ -25,7 +25,17 @@ export class BoostsController {
     return this.core.boosts.list(actor.userId, venueId).then((items) => ({ items }));
   }
 
-  /** Cria o pedido e a cobrança: `{target: 'VENUE' | 'EVENT', eventId?, days}`. */
+  /** Quantas pessoas combinam hoje com um Match (só o número, arredondado; nunca quem). */
+  @Get('me/venues/:venueId/boosts/estimate')
+  estimate(@CurrentActor() actor: Actor, @Param('venueId') venueId: string, @Query('eventId') eventId?: string, @Query('radiusKm') radiusKm?: string, @Query('tags') tags?: string) {
+    return this.core.boosts.estimate(actor.userId, venueId, {
+      eventId,
+      radiusKm: radiusKm === undefined ? undefined : Number(radiusKm),
+      tags: (tags ?? '').split(',').filter((t) => t !== ''),
+    });
+  }
+
+  /** Cria o pedido e a cobrança: `{target: 'VENUE' | 'EVENT', eventId?, days, audience?: 'ALL' | 'MATCH', radiusKm?, tags?}`. */
   @Post('me/venues/:venueId/boosts')
   create(@CurrentActor() actor: Actor, @Param('venueId') venueId: string, @Body() body: unknown) {
     return this.core.boosts.create(actor.userId, venueId, asBody(body));

@@ -8,9 +8,11 @@ import { useAsync, useTitle } from '../hooks.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { readPersonalize, savePersonalize } from '../lib/dwell.ts';
 import { toApiError } from '../lib/errors.ts';
+import { roundCoordinate } from '../lib/boost.ts';
 import { pluralize } from '../lib/format.ts';
 import { resizeProfilePhoto } from '../lib/image.ts';
 import { statusLabel } from '../lib/meetup.ts';
+import type { RegionView } from '../lib/types.ts';
 import { applyTheme, readTheme, saveTheme, THEME_LABELS } from '../lib/theme.ts';
 import type { ThemeChoice } from '../lib/theme.ts';
 import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validation.ts';
@@ -166,6 +168,8 @@ export function PrivacyScreen() {
   const [isPrivate, setIsPrivate] = useState(user.profile.isPrivate);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message>();
+  /** Muda quando as recomendações personalizadas são ligadas ou desligadas, para a região refletir isso. */
+  const [personalizeRev, setPersonalizeRev] = useState(0);
 
   async function toggle() {
     setBusy(true);
@@ -204,7 +208,8 @@ export function PrivacyScreen() {
           <span className="switch__thumb" />
         </button>
       </section>
-      <PersonalizeSetting userId={user.profile.userId} />
+      <PersonalizeSetting userId={user.profile.userId} onChange={() => setPersonalizeRev((n) => n + 1)} />
+      <RegionSetting key={personalizeRev} userId={user.profile.userId} />
       <nav className="linklist" aria-label="Privacidade">
         <Link to="/atividades">Pedidos para seguir</Link>
         <Link to="/bloqueados">Pessoas bloqueadas</Link>
@@ -215,7 +220,7 @@ export function PrivacyScreen() {
 }
 
 /** Recomendações que usam o tempo que você fica em cada conteúdo. Ligado por padrão; dá para desligar e apagar o histórico. */
-function PersonalizeSetting({ userId }: { userId: string }) {
+function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: () => void }) {
   const [on, setOn] = useState(() => readPersonalize(userId));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message>();
@@ -226,17 +231,19 @@ function PersonalizeSetting({ userId }: { userId: string }) {
     savePersonalize(userId, next);
     if (next) {
       setMessage({ tone: 'ok', text: 'Recomendações personalizadas ligadas.' });
+      onChange();
       return;
     }
-    // Desligar também apaga o que já foi medido.
+    // Desligar também apaga o que já foi medido e a região (sem comportamento, não há Match).
     setBusy(true);
     try {
-      await api.eraseDwell();
-      setMessage({ tone: 'ok', text: 'Desligado. Apagamos o seu histórico de tempo na tela. Você ainda vê o que os amigos fizeram, mas sem usar o seu comportamento.' });
+      await Promise.all([api.eraseDwell(), api.clearRegion()]);
+      setMessage({ tone: 'ok', text: 'Desligado. Apagamos o seu histórico de tempo na tela e a sua região. Você ainda vê o que os amigos fizeram, mas sem usar o seu comportamento.' });
     } catch (failure) {
       setMessage({ tone: 'error', text: `Desligamos, mas não deu para apagar o histórico agora: ${toApiError(failure).message}` });
     } finally {
       setBusy(false);
+      onChange();
     }
   }
 
@@ -270,6 +277,77 @@ function PersonalizeSetting({ userId }: { userId: string }) {
         <Button variant="quiet" small loading={busy} onClick={() => void erase()}>
           Apagar meu histórico de tempo na tela
         </Button>
+      </div>
+    </>
+  );
+}
+
+/**
+ * "Minha região" (opcional): a pessoa informa mais ou menos onde mora para receber rolês patrocinados que combinam com o gosto dela (Match).
+ * Usa a localização uma única vez, guarda só a posição aproximada (~1 km) e a pessoa remove quando quiser.
+ */
+function RegionSetting({ userId }: { userId: string }) {
+  const personalizing = readPersonalize(userId);
+  const saved = useAsync(() => api.region(), []);
+  const [region, setRegion] = useState<RegionView | null | undefined>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Message>();
+  const current = region === undefined ? (saved.data?.region ?? null) : region;
+
+  function useHere() {
+    if (!('geolocation' in navigator)) {
+      setMessage({ tone: 'error', text: 'Este aparelho não informa a localização.' });
+      return;
+    }
+    setBusy(true);
+    setMessage(undefined);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        api.saveRegion(roundCoordinate(pos.coords.latitude), roundCoordinate(pos.coords.longitude)).then(
+          (r) => { setRegion(r.region); setMessage({ tone: 'ok', text: 'Região salva. Guardamos só uma posição aproximada, de cerca de 1 km.' }); },
+          (failure) => setMessage({ tone: 'error', text: toApiError(failure).message }),
+        ).finally(() => setBusy(false));
+      },
+      () => {
+        setBusy(false);
+        setMessage({ tone: 'error', text: 'Não consegui pegar a sua localização. Permita o acesso no navegador e tente de novo.' });
+      },
+      { enableHighAccuracy: false, maximumAge: 0, timeout: 15000 },
+    );
+  }
+
+  async function remove() {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await api.clearRegion();
+      setRegion(null);
+      setMessage({ tone: 'ok', text: 'Região apagada. Você deixa de receber anúncios Match.' });
+    } catch (failure) {
+      setMessage({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      <section className="setting">
+        <div className="setting__text">
+          <h2 className="setting__title">Minha região</h2>
+          <p className="setting__help">
+            Opcional. Se você informar mais ou menos onde mora, bares e casas de show perto de você podem mostrar, no “Para você”, rolês com a etiqueta “Patrocinado” que combinam com o que você curte (por exemplo, rock). Usamos a localização uma vez e guardamos só uma posição aproximada, de cerca de 1 km. Quem anuncia vê apenas um número aproximado de pessoas, nunca quem você é. Funciona só com as recomendações personalizadas ligadas.
+          </p>
+          {current ? <p className="setting__help"><strong>Região salva.</strong> Atualizada em {new Date(current.updatedAt).toLocaleDateString('pt-BR')}.</p> : null}
+          {!personalizing ? <p className="setting__help">Ligue as recomendações personalizadas para poder informar a região.</p> : null}
+        </div>
+      </section>
+      <div className="setting__actions">
+        <Button variant="secondary" small loading={busy} disabled={!personalizing} onClick={useHere}>
+          {current ? 'Atualizar com minha localização atual' : 'Usar minha localização atual'}
+        </Button>
+        {current ? <Button variant="quiet" small disabled={busy} onClick={() => void remove()}>Apagar minha região</Button> : null}
       </div>
     </>
   );

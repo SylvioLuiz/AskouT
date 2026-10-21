@@ -16,6 +16,9 @@ import { BoostService } from './boost-service.ts';
 import { AdminService } from './admin-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
 import { DwellService } from './dwell-service.ts';
+import { InterestService } from './interest-service.ts';
+import { MatchService } from './match-service.ts';
+import { RegionService } from './region-service.ts';
 import { RecommendationService } from './recommendation-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
 import { NotificationService, StoredNotifier } from './notification-service.ts';
@@ -37,7 +40,9 @@ export function createCore(input: CoreInput) {
   const venues = new VenueService(deps);
   const auth = new AuthService(deps);
   const posts = new PostService(deps, profiles);
-  const boosts = new BoostService(deps, input.boostPricePerDayCents === undefined ? {} : { pricePerDayCents: input.boostPricePerDayCents });
+  const interests = new InterestService(deps);
+  const match = new MatchService(deps, interests);
+  const boosts = new BoostService(deps, input.boostPricePerDayCents === undefined ? {} : { pricePerDayCents: input.boostPricePerDayCents }, match);
   return {
     boosts,
     auth,
@@ -58,7 +63,8 @@ export function createCore(input: CoreInput) {
     profileEvents: new ProfileEventService(deps, profiles),
     posts,
     dwell: new DwellService(deps),
-    recommendations: new RecommendationService(deps, posts),
+    recommendations: new RecommendationService(deps, posts, match),
+    regions: new RegionService(deps),
     notifications: new NotificationService(input),
     /** Espera os pushes em andamento (testes e desligamento). */
     flushNotifications: () => notifier.flush(),

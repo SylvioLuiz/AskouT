@@ -1,4 +1,4 @@
-import type { BoostPhase, BoostView } from './types.ts';
+import type { BoostPhase, BoostView, MatchReach } from './types.ts';
 
 /** Valor em reais, no formato brasileiro (R$ 15,00). */
 export function formatBrl(cents: number): string {
@@ -36,4 +36,33 @@ export function sortBoosts(items: BoostView[]): BoostView[] {
 
 export function boostTitle(boost: Pick<BoostView, 'target' | 'eventTitle'>): string {
   return boost.target === 'EVENT' ? (boost.eventTitle ?? 'Evento') : 'O rolê (página do local)';
+}
+
+/** Marca ou desmarca uma hashtag, sem passar do máximo. */
+export function toggleTag(tags: readonly string[], tag: string, max: number): string[] {
+  if (tags.includes(tag)) return tags.filter((t) => t !== tag);
+  return tags.length >= max ? [...tags] : [...tags, tag];
+}
+
+/** “Match · 5 km · #rock #metal” para o anúncio que usa Match; nada para o destaque comum. */
+export function matchLabel(boost: Pick<BoostView, 'audience' | 'radiusKm' | 'matchTags'>): string | null {
+  if (boost.audience !== 'MATCH') return null;
+  const parts = ['Match', boost.radiusKm === null ? null : `${boost.radiusKm} km`, boost.matchTags.map((t) => `#${t}`).join(' ') || null];
+  return parts.filter((p): p is string => p !== null).join(' · ');
+}
+
+/** Frase da estimativa, sem nunca sugerir quem são as pessoas. */
+export function reachText(reach: Pick<MatchReach, 'label' | 'partial'>): string {
+  const label = reach.label.charAt(0).toUpperCase() + reach.label.slice(1);
+  return `${label} combinam hoje com este Match${reach.partial ? ' (estimativa: só parte da região foi examinada)' : ''}.`;
+}
+
+/** Distância para a Home: “Pertinho de você” ou “A cerca de 3 km de você”. */
+export function distanceText(km: number): string {
+  return km <= 1 ? 'Pertinho de você' : `A cerca de ${Math.round(km)} km de você`;
+}
+
+/** Arredonda uma coordenada para ~1 km antes de enviar (o servidor também arredonda). */
+export function roundCoordinate(value: number): number {
+  return Math.round(value * 100) / 100;
 }

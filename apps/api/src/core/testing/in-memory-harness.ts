@@ -19,6 +19,7 @@ import {
   InMemoryPasswordResetRepository,
   InMemoryBoostRepository,
   InMemoryDwellRepository,
+  InMemoryRegionRepository,
   InMemoryPendingSignupRepository,
   InMemoryUserRepository,
 } from './in-memory.ts';
@@ -31,6 +32,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let passwordResets = new InMemoryPasswordResetRepository();
   let boosts = new InMemoryBoostRepository();
   let dwell = new InMemoryDwellRepository();
+  let regions = new InMemoryRegionRepository();
   let availability = new InMemoryAvailabilityRepository();
   let flash = new InMemoryFlashRepository();
   let conversations = new InMemoryConversationRepository();
@@ -67,6 +69,9 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
     },
     get dwell() {
       return dwell;
+    },
+    get regions() {
+      return regions;
     },
     get availability() {
       return availability;
@@ -119,6 +124,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
       passwordResets = new InMemoryPasswordResetRepository();
       boosts = new InMemoryBoostRepository();
       dwell = new InMemoryDwellRepository();
+      regions = new InMemoryRegionRepository();
       availability = new InMemoryAvailabilityRepository();
       flash = new InMemoryFlashRepository();
       conversations = new InMemoryConversationRepository();

@@ -26,6 +26,7 @@ import type {
   IdGenerator,
   PasswordResetRepository,
   BoostRepository,
+  RegionRepository,
   DwellRepository,
   PaymentCharge,
   PaymentGateway,
@@ -41,7 +42,7 @@ import type {
   DirectActivityRow,
   DwellRecord,
   EngagementRow, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
-import type { BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
+import type { RegionRecord, BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -556,6 +557,31 @@ export class InMemoryDwellRepository implements DwellRepository {
     this.rows.length = 0;
     this.rows.push(...keep);
     return removed;
+  }
+}
+
+export class InMemoryRegionRepository implements RegionRepository {
+  readonly rows = new Map<string, RegionRecord>();
+
+  async find(userId: string): Promise<RegionRecord | undefined> {
+    const r = this.rows.get(userId);
+    return r ? { ...r } : undefined;
+  }
+
+  async upsert(region: RegionRecord): Promise<void> {
+    this.rows.set(region.userId, { ...region });
+  }
+
+  async delete(userId: string): Promise<boolean> {
+    return this.rows.delete(userId);
+  }
+
+  async listInBox(box: { minLat: number; maxLat: number; minLng: number; maxLng: number }, limit: number): Promise<RegionRecord[]> {
+    return [...this.rows.values()]
+      .filter((r) => r.lat >= box.minLat && r.lat <= box.maxLat && r.lng >= box.minLng && r.lng <= box.maxLng)
+      .sort((a, b) => (a.userId < b.userId ? -1 : 1))
+      .slice(0, limit)
+      .map((r) => ({ ...r }));
   }
 }
 

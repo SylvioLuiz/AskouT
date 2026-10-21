@@ -205,6 +205,7 @@ model User {
   ownedVenues       Venue[]       @relation("VenueOwner")
   venueClaims       VenueClaim[]  @relation("ClaimUser")
   venueFollows      VenueFollow[]
+  region            UserRegion?
   venueRatings      VenueRating[]
   reviewedClaims    VenueClaim[]  @relation("ClaimReviewer")
 }
@@ -1204,6 +1205,12 @@ model Boost {
   paidAt      DateTime?
   startsAt    DateTime?
   endsAt      DateTime?
+  /// 'ALL' (destaque para todos) ou 'MATCH' (só quem mora no raio e tem o gosto validado).
+  audience    String    @default("ALL")
+  /// Só no Match: raio em metros em volta do local.
+  radiusM     Int?
+  /// Só no Match: hashtags do evento que o responsável quer alcançar.
+  matchTags   String[]  @default([])
 
   venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
   owner User  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -1234,4 +1241,17 @@ model ContentDwell {
 
   @@index([userId, createdAt])
   @@index([createdAt])
+}
+
+/// Região aproximada (coordenada arredondada, cerca de 1 km) que a própria pessoa informa para receber o Match.
+/// Dado de localização (LGPD): opcional, a pessoa remove quando quiser e some junto com a conta.
+model UserRegion {
+  userId    String   @id @db.Uuid
+  lat       Float
+  lng       Float
+  updatedAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([lat, lng])
 }

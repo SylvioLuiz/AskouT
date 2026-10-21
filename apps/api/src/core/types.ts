@@ -813,6 +813,12 @@ export type BoostTarget = 'VENUE' | 'EVENT';
 /** Estado guardado. “Ativo”, “agendado” e “encerrado” são deduzidos de `startsAt`/`endsAt` e do relógio. */
 export type BoostStatus = 'PENDING_PAYMENT' | 'PAID' | 'CANCELLED' | 'PAUSED';
 
+/**
+ * Para quem o anúncio aparece. ALL: destaque para todo mundo (Explorar e Home).
+ * MATCH: só para quem mora no raio escolhido E tem o gosto validado por uma das hashtags escolhidas.
+ */
+export type BoostAudience = 'ALL' | 'MATCH';
+
 export interface BoostRecord {
   id: string;
   venueId: string;
@@ -835,6 +841,22 @@ export interface BoostRecord {
   /** Só depois de pago: a janela em que o anúncio aparece. */
   startsAt: Date | null;
   endsAt: Date | null;
+  audience: BoostAudience;
+  /** Só no Match: raio, em metros, em volta do local. */
+  radiusM: number | null;
+  /** Só no Match: hashtags (do evento) que o responsável quer alcançar. */
+  matchTags: string[];
+}
+
+/**
+ * Região aproximada de quem mora na cidade, dada pela própria pessoa para receber o Match.
+ * Coordenada arredondada (cerca de 1 km): nunca a posição exata. Apagar a linha desliga o Match.
+ */
+export interface RegionRecord {
+  userId: string;
+  lat: number;
+  lng: number;
+  updatedAt: Date;
 }
 
 // ---------- Recomendação ----------

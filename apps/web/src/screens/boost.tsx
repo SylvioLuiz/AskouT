@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, EmptyState, ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
-import { BOOST_PHASE_LABEL, boostTitle, boostTotalCents, canCancelBoost, daysLabel, formatBrl, sortBoosts } from '../lib/boost.ts';
+import { BOOST_PHASE_LABEL, boostTitle, boostTotalCents, canCancelBoost, daysLabel, formatBrl, matchLabel, reachText, sortBoosts, toggleTag } from '../lib/boost.ts';
 import { toApiError } from '../lib/errors.ts';
-import type { BoostView } from '../lib/types.ts';
+import type { BoostView, MatchReach } from '../lib/types.ts';
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);
@@ -21,9 +21,33 @@ export function BoostScreen({ venueId }: { venueId: string }) {
 
   const [target, setTarget] = useState<string>('VENUE'); // 'VENUE' ou id do evento
   const [days, setDays] = useState<number>(3);
+  const [audience, setAudience] = useState<'ALL' | 'MATCH'>('ALL');
+  const [radiusKm, setRadiusKm] = useState<number>(5);
+  const [tags, setTags] = useState<string[]>([]);
+  const [reach, setReach] = useState<{ state: 'idle' | 'loading' | 'error' | 'ready'; data?: MatchReach }>({ state: 'idle' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [copied, setCopied] = useState<string | undefined>(undefined);
+
+  const eventTarget = target === 'VENUE' ? undefined : profile.data?.upcomingEvents.find((e) => e.id === target);
+  const matching = audience === 'MATCH' && eventTarget !== undefined;
+
+  // Estimativa de quantas pessoas combinam: só o número, depois de uma pequena pausa para não consultar a cada toque.
+  useEffect(() => {
+    if (!matching || !eventTarget || tags.length === 0) {
+      setReach({ state: 'idle' });
+      return;
+    }
+    let cancelled = false;
+    setReach({ state: 'loading' });
+    const timer = window.setTimeout(() => {
+      api.matchReach(venueId, { eventId: eventTarget.id, radiusKm, tags }).then(
+        (data) => { if (!cancelled) setReach({ state: 'ready', data }); },
+        () => { if (!cancelled) setReach({ state: 'error' }); },
+      );
+    }, 350);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [matching, eventTarget?.id, radiusKm, tags.join(','), venueId]);
 
   if (profile.loading || pricing.loading || boosts.loading) return (<><PageHead title="Impulsionar" back={back} /><Loading /></>);
   if (profile.error || pricing.error || boosts.error || !profile.data || !pricing.data || !boosts.data) {
@@ -52,7 +76,14 @@ export function BoostScreen({ venueId }: { venueId: string }) {
   }
 
   const create = () =>
-    run(() => api.createBoost(venueId, target === 'VENUE' ? { target: 'VENUE', days } : { target: 'EVENT', eventId: target, days }));
+    run(() => api.createBoost(venueId, target === 'VENUE' ? { target: 'VENUE', days } : matching ? { target: 'EVENT', eventId: target, days, audience: 'MATCH', radiusKm, tags } : { target: 'EVENT', eventId: target, days }));
+
+  function pickTarget(id: string): void {
+    setTarget(id);
+    const ev = v.upcomingEvents.find((e) => e.id === id);
+    setTags(ev ? ev.tags.slice(0, price.match.maxTags) : []);
+    if (!ev) setAudience('ALL');
+  }
 
   async function copy(boost: BoostView): Promise<void> {
     const code = boost.payment?.pixCode;
@@ -76,12 +107,12 @@ export function BoostScreen({ venueId }: { venueId: string }) {
         <section className="boost__block" aria-labelledby="boost-what">
           <h2 id="boost-what" className="boost__h">O que impulsionar</h2>
           <div className="boost__choices" role="radiogroup" aria-labelledby="boost-what">
-            <button type="button" role="radio" aria-checked={target === 'VENUE'} className="boost__choice" onClick={() => setTarget('VENUE')}>
+            <button type="button" role="radio" aria-checked={target === 'VENUE'} className="boost__choice" onClick={() => pickTarget('VENUE')}>
               <strong>O rolê (página do local)</strong>
               <span>Mostra o próximo evento do local</span>
             </button>
             {v.upcomingEvents.map((e) => (
-              <button key={e.id} type="button" role="radio" aria-checked={target === e.id} className="boost__choice" onClick={() => setTarget(e.id)}>
+              <button key={e.id} type="button" role="radio" aria-checked={target === e.id} className="boost__choice" onClick={() => pickTarget(e.id)}>
                 <strong>{e.title}</strong>
                 <span>{formatWhen(e.startsAt)}</span>
               </button>
@@ -89,6 +120,56 @@ export function BoostScreen({ venueId }: { venueId: string }) {
           </div>
           {v.upcomingEvents.length === 0 ? <p className="boost__hint">Crie um evento para impulsionar só ele.</p> : null}
         </section>
+
+        {eventTarget ? (
+          <section className="boost__block" aria-labelledby="boost-who">
+            <h2 id="boost-who" className="boost__h">Para quem aparece</h2>
+            <div className="boost__choices" role="radiogroup" aria-labelledby="boost-who">
+              <button type="button" role="radio" aria-checked={audience === 'ALL'} className="boost__choice" onClick={() => setAudience('ALL')}>
+                <strong>Todos</strong>
+                <span>Destaque no Explorar e na Home para qualquer pessoa</span>
+              </button>
+              <button type="button" role="radio" aria-checked={audience === 'MATCH'} className="boost__choice" onClick={() => setAudience('MATCH')}>
+                <strong>Match</strong>
+                <span>Só quem mora perto e curte esse estilo de rolê</span>
+              </button>
+            </div>
+            {audience === 'MATCH' ? (
+              <div className="boost__match">
+                {eventTarget.tags.length === 0 ? (
+                  <Notice tone="info">Este evento não tem hashtags. Edite o evento e adicione, por exemplo, #rock para usar o Match.</Notice>
+                ) : (
+                  <>
+                    <h3 id="boost-radius" className="boost__sub">Raio em volta do local</h3>
+                    <div className="optrow" role="radiogroup" aria-labelledby="boost-radius">
+                      {price.match.radiusKmOptions.map((km) => (
+                        <button key={km} type="button" role="radio" aria-checked={radiusKm === km} aria-pressed={radiusKm === km} className="chip" onClick={() => setRadiusKm(km)}>
+                          {km} km
+                        </button>
+                      ))}
+                    </div>
+                    <h3 id="boost-tags" className="boost__sub">Gostos que você quer alcançar</h3>
+                    <div className="optrow" role="group" aria-labelledby="boost-tags">
+                      {eventTarget.tags.map((t) => (
+                        <button key={t} type="button" aria-pressed={tags.includes(t)} className="chip" onClick={() => setTags((cur) => toggleTag(cur, t, price.match.maxTags))}>
+                          #{t}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="boost__reach" role="status" aria-live="polite">
+                      {tags.length === 0 ? 'Escolha ao menos uma hashtag.' : reach.state === 'loading' ? 'Calculando o alcance…' : reach.state === 'error' ? 'Não foi possível estimar o alcance agora. Você ainda pode comprar.' : reach.state === 'ready' && reach.data ? reachText(reach.data) : ''}
+                    </p>
+                    <details className="boost__rule">
+                      <summary>Como o Match escolhe as pessoas</summary>
+                      <p>Vê o anúncio só quem salvou a própria região e mora até {radiusKm} km do seu local, e tem o gosto confirmado por uma das hashtags escolhidas: nos últimos 60 dias curtiu, comentou, compartilhou ou foi a pelo menos 3 conteúdos com essa hashtag, em pelo menos 2 dias diferentes, e o último foi nos últimos 30 dias.</p>
+                      <p>Você vê apenas um número aproximado. Nunca vê quem são as pessoas, e quem desliga as recomendações personalizadas ou apaga a região deixa de receber.</p>
+                    </details>
+                  </>
+                )}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         <section className="boost__block" aria-labelledby="boost-days">
           <h2 id="boost-days" className="boost__h">Por quantos dias</h2>
@@ -105,7 +186,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
           <span>{formatBrl(price.pricePerDayCents)} por dia × {daysLabel(days)}</span>
           <strong>{formatBrl(total)}</strong>
         </div>
-        <Button full loading={busy} onClick={() => void create()}>Gerar Pix de {formatBrl(total)}</Button>
+        <Button full loading={busy} disabled={matching && (tags.length === 0 || eventTarget?.tags.length === 0)} onClick={() => void create()}>Gerar Pix de {formatBrl(total)}</Button>
         <p className="boost__hint">O anúncio começa assim que o pagamento for confirmado. Depois de pago, não há cancelamento.</p>
 
         <h2 className="boost__h">Seus impulsionamentos</h2>
@@ -118,7 +199,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
                 <span className={`boost__phase boost__phase--${b.phase.toLowerCase()}`}>{BOOST_PHASE_LABEL[b.phase]}</span>
               </div>
               <div className="boost__meta">
-                {daysLabel(b.days)} · {formatBrl(b.amountCents)}
+                {matchLabel(b) ? `${matchLabel(b)} · ` : ''}{daysLabel(b.days)} · {formatBrl(b.amountCents)}
                 {b.endsAt && b.phase === 'ACTIVE' ? ` · até ${formatWhen(b.endsAt)}` : ''}
               </div>
               {b.phase === 'PENDING_PAYMENT' && b.payment ? (

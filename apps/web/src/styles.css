@@ -4476,6 +4476,13 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .boost__pay { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 .boost__code { width: 100%; box-sizing: border-box; padding: 10px; font: 0.8125rem/1.4 ui-monospace, monospace; color: var(--ink); background: var(--surface); border: 1.5px solid var(--control-border); border-radius: 10px; resize: none; }
 .boost__code-label { font-size: 0.875rem; font-weight: 600; }
+.boost__sub { margin: 4px 0 0; font-size: 0.9375rem; font-weight: 600; }
+.boost__match { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: var(--surface); border: 0.5px solid var(--line-strong); }
+.boost__reach { margin: 0; min-height: 1.25em; font-weight: 600; color: var(--ink); }
+.boost__rule { color: var(--muted); font-size: 0.875rem; }
+.boost__rule summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.boost__rule p { margin: 0 0 8px; }
+.foryou__ad { align-self: flex-start; }
 .tag-sponsored { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.6875rem; font-weight: 700; color: var(--ink-2); background: var(--brand-soft); }
 .sponsored-sec { display: flex; flex-direction: column; gap: 8px; }
 

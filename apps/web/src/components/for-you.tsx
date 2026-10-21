@@ -39,6 +39,7 @@ function EventReco({ item }: { item: RecommendationItem }) {
         <span className="foryou__meta">{e.venueName} · {kindLabel(e.kind)}</span>
         <span className="foryou__meta">{when(e.startsAt)}</span>
       </Link>
+      {item.sponsored ? <span className="tag-sponsored foryou__ad">Patrocinado</span> : null}
       <Reasons item={item} />
     </li>
   );

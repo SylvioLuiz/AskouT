@@ -1,6 +1,8 @@
 import { buildEventCards } from './event-card.ts';
 import type { EventCardView } from './event-card.ts';
 import { fold, normalizeTag } from './explore-match.ts';
+import type { MatchPick, MatchService } from './match-service.ts';
+import { MATCH_MAX_PER_VIEW } from './match.ts';
 import type { PostService, PostView } from './post-service.ts';
 import type { CoreDeps } from './ports.ts';
 import type { DirectActivityRow, DwellRecord, EventKind, PostRecord, PublicProfile } from './types.ts';
@@ -154,6 +156,10 @@ export interface RecommendationItem {
   friendsEngaged: number;
   event: EventCardView | null;
   post: PostView | null;
+  /** Anúncio pago (Match). A tela mostra “Patrocinado”. */
+  sponsored: boolean;
+  /** Só no Match: por que combina com a pessoa. Nunca revela dados de outras pessoas. */
+  match: { tag: string; distanceKm: number } | null;
 }
 
 export interface RecommendationsView {
@@ -184,10 +190,12 @@ interface Candidate {
 export class RecommendationService {
   private readonly deps: CoreDeps;
   private readonly postService: PostService;
+  private readonly matchService: MatchService;
 
-  constructor(deps: CoreDeps, postService: PostService) {
+  constructor(deps: CoreDeps, postService: PostService, matchService: MatchService) {
     this.deps = deps;
     this.postService = postService;
+    this.matchService = matchService;
   }
 
   async recommend(viewerId: string, input: { personalize?: unknown; limit?: unknown } = {}): Promise<RecommendationsView> {
@@ -407,7 +415,39 @@ export class RecommendationService {
         const tag = c.features.tags.find((t) => taste.tags.has(t));
         reasons.push(tag ? `Tem a ver com #${tag}` : c.features.venueId && taste.venues.has(c.features.venueId) ? 'De um rolê que você curte' : 'Parecido com o que você curte');
       }
-      items.push({ type: c.type, score: Math.round(score * 100) / 100, reasons, friendsGoing, friendsEngaged: c.engaged.size, event, post });
+      items.push({ type: c.type, score: Math.round(score * 100) / 100, reasons, friendsGoing, friendsEngaged: c.engaged.size, event, post, sponsored: false, match: null });
+    }
+
+    // 6. Anúncios Match (pagos): só para quem tem região salva, mora no raio e tem o gosto validado. Entram em segundo lugar.
+    if (personalize) {
+      const picks: MatchPick[] = [];
+      for (const pick of await this.matchService.forViewer(viewerId, now)) {
+        const id = pick.event.id;
+        if (sharedEvents.has(id) || (impressions.get(id) ?? 0) >= RECO_MAX_IMPRESSIONS || (await eventRoom.isGoing({ source: 'PLACE', id }, viewerId))) continue;
+        picks.push(pick);
+        if (picks.length >= MATCH_MAX_PER_VIEW) break;
+      }
+      const cards = await buildEventCards(this.deps, picks.map((p) => p.event.id));
+      for (const pick of picks) {
+        const event = cards.get(pick.event.id);
+        if (!event) continue;
+        const at = items.findIndex((i) => i.event?.id === pick.event.id);
+        if (at >= 0) items.splice(at, 1);
+        const km = Math.max(1, Math.round(pick.distanceM / 1000));
+        const sponsoredItem: RecommendationItem = {
+          type: 'EVENT',
+          score: 1,
+          reasons: [`Combina com você: #${pick.tag}`, km <= 1 ? 'Pertinho de você' : `A cerca de ${km} km de você`],
+          friendsGoing: [],
+          friendsEngaged: 0,
+          event,
+          post: null,
+          sponsored: true,
+          match: { tag: pick.tag, distanceKm: km },
+        };
+        items.splice(Math.min(1, items.length), 0, sponsoredItem);
+      }
+      if (items.length > limit) items.length = limit;
     }
     return { personalized: personalize, items };
   }

@@ -28,7 +28,7 @@ const pay = (w: Awaited<ReturnType<typeof setup>>['w'], chargeId: string) =>
 
 test('preço e opções vêm da configuração', async () => {
   const { w } = await setup();
-  assert.deepEqual(w.core.boosts.pricing(), { currency: 'BRL', pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS, dayOptions: [1, 3, 7, 14], sandbox: true });
+  assert.deepEqual(w.core.boosts.pricing(), { currency: 'BRL', pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS, dayOptions: [1, 3, 7, 14], match: { radiusKmOptions: [2, 5, 10, 25], maxTags: 5 }, sandbox: true });
 });
 
 test('criar: só o responsável, com duração válida, e cobra dias × valor', async () => {

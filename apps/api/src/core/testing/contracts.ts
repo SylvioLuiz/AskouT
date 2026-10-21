@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { DwellRepository, BoostRepository, EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
+import type { DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -20,6 +20,7 @@ export interface RepoHarness {
   passwordResets: PasswordResetRepository;
   boosts: BoostRepository;
   dwell: DwellRepository;
+  regions: RegionRepository;
   availability: AvailabilityRepository;
   flash: FlashRepository;
   conversations: ConversationRepository;
@@ -471,13 +472,16 @@ export function defineRepositoryContract(
         const v: VenueRecord = { id: randomUUID(), name: 'Bar Boost', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: owner };
         await h.places.createVenue(v);
         const t0 = new Date(Date.UTC(2030, 0, 10, 12));
-        const mk = (n: number, over: Partial<BoostRecord> = {}): BoostRecord => ({ id: randomUUID(), venueId: v.id, ownerId: owner, target: 'VENUE', eventId: null, days: 3, amountCents: 4500, status: 'PENDING_PAYMENT', chargeId: `ch_${n}_${v.id}`, payCode: 'PIX', payUrl: null, createdAt: new Date(t0.getTime() + n), paidAt: null, startsAt: null, endsAt: null, ...over });
+        const mk = (n: number, over: Partial<BoostRecord> = {}): BoostRecord => ({ id: randomUUID(), venueId: v.id, ownerId: owner, target: 'VENUE', eventId: null, days: 3, amountCents: 4500, status: 'PENDING_PAYMENT', chargeId: `ch_${n}_${v.id}`, payCode: 'PIX', payUrl: null, createdAt: new Date(t0.getTime() + n), paidAt: null, startsAt: null, endsAt: null, audience: 'ALL', radiusM: null, matchTags: [], ...over });
         const a = mk(1);
-        const b = mk(2);
+        const b = mk(2, { target: 'EVENT', eventId: randomUUID(), audience: 'MATCH', radiusM: 5000, matchTags: ['rock', 'metal'] });
         await h.boosts.create(a);
         await h.boosts.create(b);
         assert.deepEqual((await h.boosts.listByVenue(v.id)).map((x) => x.id), [b.id, a.id], 'mais novo primeiro');
         assert.equal((await h.boosts.findByChargeId(a.chargeId!))?.id, a.id);
+        const stored = await h.boosts.find(b.id);
+        assert.deepEqual([stored?.audience, stored?.radiusM, stored?.matchTags], ['MATCH', 5000, ['rock', 'metal']], 'guarda o Match');
+        assert.deepEqual([(await h.boosts.find(a.id))?.audience, (await h.boosts.find(a.id))?.radiusM, (await h.boosts.find(a.id))?.matchTags], ['ALL', null, []]);
         assert.equal(await h.boosts.findByChargeId('nao-existe'), undefined);
         assert.deepEqual(await h.boosts.listActive(t0), [], 'sem pagamento não aparece');
         const window = { paidAt: t0, startsAt: t0, endsAt: new Date(t0.getTime() + 3 * 86_400_000) };
@@ -490,6 +494,27 @@ export function defineRepositoryContract(
         assert.equal(await h.boosts.transition(b.id, ['PAID'], 'CANCELLED'), false, 'estado de origem errado não muda');
         assert.equal(await h.boosts.transition(b.id, ['PENDING_PAYMENT'], 'CANCELLED'), true);
         assert.equal(await h.boosts.markPaid(b.id, window), false, 'cancelado não paga');
+      });
+
+      it('região: guarda uma por pessoa, troca, apaga e filtra pela caixa', async () => {
+        const ana = await newUser('regiao_ana');
+        const bia = await newUser('regiao_bia');
+        const t0 = new Date(Date.UTC(2030, 0, 10, 12));
+        assert.equal(await h.regions.find(ana), undefined);
+        await h.regions.upsert({ userId: ana, lat: -23.55, lng: -46.63, updatedAt: t0 });
+        await h.regions.upsert({ userId: bia, lat: -22.9, lng: -43.17, updatedAt: t0 });
+        await h.regions.upsert({ userId: ana, lat: -23.56, lng: -46.64, updatedAt: new Date(t0.getTime() + 1000) });
+        const mine = await h.regions.find(ana);
+        assert.deepEqual([mine?.lat, mine?.lng, mine?.updatedAt.getTime()], [-23.56, -46.64, t0.getTime() + 1000], 'troca em vez de duplicar');
+        const sp = { minLat: -24, maxLat: -23, minLng: -47, maxLng: -46 };
+        assert.deepEqual((await h.regions.listInBox(sp, 10)).map((r) => r.userId), [ana], 'só quem está na caixa');
+        assert.equal((await h.regions.listInBox({ minLat: -90, maxLat: 90, minLng: -180, maxLng: 180 }, 1)).length, 1, 'respeita o limite');
+        assert.equal(await h.regions.delete(ana), true);
+        assert.equal(await h.regions.delete(ana), false);
+        assert.equal(await h.regions.delete('nao-e-uuid'), false);
+        assert.equal(await h.regions.find('nao-e-uuid'), undefined);
+        assert.deepEqual(await h.regions.listInBox(sp, 10), []);
+        assert.ok(await h.regions.find(bia), 'não mexe em outra pessoa');
       });
 
       it('incrementAttempts soma 1, devolve o total e é atômico', async () => {

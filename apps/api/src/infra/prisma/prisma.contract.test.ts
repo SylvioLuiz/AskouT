@@ -3,6 +3,7 @@ import type { RepoHarness } from '../../core/testing/contracts.ts';
 import type { UserStatus } from '../../core/types.ts';
 import {
   PrismaAvailabilityRepository,
+  PrismaRegionRepository,
   PrismaBlockRepository,
   PrismaConversationRepository,
   PrismaMeetupRepository,
@@ -61,6 +62,7 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     pending: new PrismaPendingSignupRepository(prisma),
     passwordResets: new PrismaPasswordResetRepository(prisma),
     dwell: new PrismaDwellRepository(prisma),
+    regions: new PrismaRegionRepository(prisma),
     availability: new PrismaAvailabilityRepository(prisma),
     flash: new PrismaFlashRepository(prisma),
     conversations: new PrismaConversationRepository(prisma),

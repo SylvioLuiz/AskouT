@@ -806,6 +806,8 @@ export interface BoostPricing {
   currency: 'BRL';
   pricePerDayCents: number;
   dayOptions: number[];
+  /** Raios (km) e número máximo de hashtags do Match. */
+  match: { radiusKmOptions: number[]; maxTags: number };
   /** Pagamento de teste: não cobra de verdade. */
   sandbox: boolean;
 }
@@ -820,11 +822,31 @@ export interface BoostView {
   eventTitle: string | null;
   days: number;
   amountCents: number;
+  /** ALL: destaque para todos. MATCH: só para quem mora no raio e tem o gosto validado. */
+  audience: 'ALL' | 'MATCH';
+  radiusKm: number | null;
+  matchTags: string[];
   phase: BoostPhase;
   createdAt: string;
   startsAt: string | null;
   endsAt: string | null;
   payment: { pixCode: string | null; checkoutUrl: string | null } | null;
+}
+
+/** Quantas pessoas combinam hoje com um Match. Só o número, arredondado; nunca quem. */
+export interface MatchReach {
+  low: boolean;
+  people: number | null;
+  label: string;
+  /** Só parte da região foi examinada. */
+  partial: boolean;
+}
+
+/** Região aproximada (~1 km) que a pessoa informou para receber o Match. */
+export interface RegionView {
+  lat: number;
+  lng: number;
+  updatedAt: string;
 }
 
 // ---------- Recomendações ----------
@@ -848,6 +870,9 @@ export interface RecommendationItem {
     sample: boolean;
   } | null;
   post: PostView | null;
+  /** Anúncio pago (Match): mostrar “Patrocinado”. */
+  sponsored: boolean;
+  match: { tag: string; distanceKm: number } | null;
 }
 
 export interface Recommendations {

@@ -93,3 +93,21 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 - **Como ler o painel:** "atividade" = ter tempo medido naquele dia, então quem desligou as recomendações some dos números (subestima o uso). Quem viu o bloco e voltou mais **não prova** que o bloco causou isso (quem usa mais vê mais o bloco). Para provar, esconder o bloco de um grupo sorteado e comparar: ainda não existe. Com menos de 30 dias-pessoa num grupo o painel avisa "poucos dados".
 - **Limites:** os pesos (`RECO_WEIGHTS` e afins) são palpites e precisam de ajuste com uso real; só recomenda eventos do AskouT, não lugares do Google/OSM.
 - Migração `20261120120000_content_dwell` escrita à mão e **nunca rodada em Postgres** (`prisma migrate deploy` + `prisma generate`; depois rodar a suíte de contrato Prisma, que já cobre `ContentDwell` (inclui `clicked` e `listAllSince`), `listEngagement` e `directActivity`).
+
+## Match (impulsionamento por gosto e raio)
+
+O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 5 hashtags do próprio evento (ex.: #rock). O anúncio só aparece, com a etiqueta "Patrocinado" e o motivo ("Combina com você: #rock · a cerca de 3 km"), no bloco "Para você" de quem **tem região salva dentro do raio** e **tem o gosto validado** por uma das hashtags. No máximo 1 anúncio Match por vez, em segundo lugar na lista. Não aparece no destaque geral do Explorar.
+
+**Regra do gosto validado** (`core/match.ts`, constantes no topo, fáceis de ajustar). Olhando só para o que a própria pessoa fez nos últimos 60 dias (curtir, comentar, compartilhar, confirmar presença, ficar mais tempo que a própria média): pelo menos 3 conteúdos diferentes com a hashtag, em pelo menos 2 dias diferentes, peso somado de pelo menos 4 (envelhece: metade a cada 30 dias) e o último gesto nos últimos 30 dias. Só as 5 hashtags mais fortes de cada pessoa valem. O gosto dos amigos não entra. Os números (3, 2, 4, 30 dias, 5) são palpites e precisam ser calibrados com uso real.
+
+**Região do usuário** ("Minha região", em Privacidade): opcional, a pessoa toca em "Usar minha localização atual", o app usa a localização uma vez e o servidor guarda a coordenada arredondada (~1 km). Dá para apagar; some junto com a conta; desligar as recomendações personalizadas também apaga a região. Sem região, a pessoa não entra em nenhum Match.
+
+**Privacidade do alcance:** o dono vê só uma faixa ("menos de 10 pessoas" ou "cerca de N pessoas", arredondado para baixo de 10 em 10), nunca quem. Nada identifica pessoas.
+
+**Antes de ir ao ar:**
+- Rodar a migração `20261125120000_match` (nunca foi executada contra um Postgres; escrita à mão). O repositório Prisma de região e as colunas novas do Boost só foram testados em memória.
+- **Advogado:** localização é dado pessoal. Hoje o consentimento é o ato de tocar em "Usar minha localização atual", com o texto explicando o uso. Confirmar se basta, o texto exato, e o uso para publicidade segmentada (comentar também na política de privacidade e nos termos para donos).
+- **Preço:** o Match custa o mesmo por dia que o destaque comum (`BOOST_DEFAULT_PRICE_PER_DAY_CENTS`). Definir se terá valor próprio.
+- **Limites conhecidos:** a estimativa examina no máximo 1000 pessoas da região por consulta (a tela avisa quando é parcial) e calcula o gosto na hora, o que não escala; com muitos usuários, calcular os gostos em lote (ex.: de madrugada) e guardar. O dono pode variar raio e hashtags para tentar isolar pessoas; a faixa mínima de 10 e o arredondamento reduzem isso, mas vale limitar o número de consultas por dono.
+- Não há ainda relatório para o dono (quantas vezes o anúncio foi exibido e aberto) nem cobrança diferente por resultado. A exibição já é medida como as demais do "Para você" (fonte RECO).
+- O Match só existe no "Para você" da Home; não aparece no Explorar nem fora do app.

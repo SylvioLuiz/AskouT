@@ -21,6 +21,9 @@ function toRecord(row: Boost): BoostRecord {
     paidAt: row.paidAt,
     startsAt: row.startsAt,
     endsAt: row.endsAt,
+    audience: row.audience === 'MATCH' ? 'MATCH' : 'ALL',
+    radiusM: row.radiusM,
+    matchTags: row.matchTags,
   };
 }
 
