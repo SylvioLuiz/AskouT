@@ -64,16 +64,30 @@ async function ensurePostgres() {
   process.exit(1);
 }
 
-function freePort(port) {
-  const pids = spawnSync('lsof', ['-ti', `:${port}`], { encoding: 'utf8' }).stdout.split(/\s+/).filter(Boolean);
-  for (const pid of pids) {
-    try {
-      process.kill(Number(pid), 'SIGTERM');
-      console.log(`[dev] liberei a porta ${port} (processo ${pid})`);
-    } catch {
-      /* já tinha saído */
-    }
+function pidsOn(port) {
+  return spawnSync('lsof', ['-ti', `:${port}`], { encoding: 'utf8' }).stdout.split(/\s+/).filter(Boolean).map(Number);
+}
+
+function signal(pid, sig) {
+  try {
+    process.kill(pid, sig);
+  } catch {
+    /* já tinha saído */
   }
+}
+
+// Libera a porta de qualquer processo que sobrou de antes. Se o dono da porta é filho de um "tsx watch" ou "vite"
+// (de outra janela ainda aberta), encerra o pai também: senão ele sobe o filho de novo e a porta continua ocupada.
+async function freePort(port) {
+  for (const pid of pidsOn(port)) {
+    const ppid = Number(spawnSync('ps', ['-o', 'ppid=', '-p', String(pid)], { encoding: 'utf8' }).stdout.trim());
+    const parent = ppid > 1 ? spawnSync('ps', ['-o', 'command=', '-p', String(ppid)], { encoding: 'utf8' }).stdout : '';
+    if (/tsx|vite/.test(parent)) signal(ppid, 'SIGTERM');
+    signal(pid, 'SIGTERM');
+    console.log(`[dev] liberei a porta ${port} (processo ${pid})`);
+  }
+  for (let i = 0; i < 10 && pidsOn(port).length > 0; i += 1) await sleep(300);
+  for (const pid of pidsOn(port)) signal(pid, 'SIGKILL');
 }
 
 function start(name, cwd, command, args, env, logFile) {
@@ -120,9 +134,9 @@ if (process.argv.includes('--update')) {
   const { ensureSetup } = await import('./ensure-setup.mjs');
   ensureSetup();
 }
-freePort(3000);
-freePort(5173);
-freePort(5174);
+await freePort(3000);
+await freePort(5173);
+await freePort(5174);
 await sleep(500);
 
 console.log(`[dev] API → http://localhost:3000   (log em ${logPath})`);
