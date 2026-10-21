@@ -11,13 +11,18 @@
 // Internet não é necessária: API, banco e app rodam na sua máquina. Só os tiles do mapa vêm da internet.
 import { spawn, spawnSync } from 'node:child_process';
 import { createWriteStream, existsSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const useHttps = process.argv.includes('--https');
 const logPath = process.env.ASKOUT_API_LOG ?? join(homedir(), 'askout-api.log');
+// Endereços do Mac na rede local, para abrir no celular. 172.20.10.x é a rede do "Compartilhamento de Internet" do iPhone:
+// nela o próprio iPhone não consegue abrir o que roda no Mac, então avisamos.
+function lanAddresses() {
+  return Object.values(networkInterfaces()).flat().filter((a) => a && a.family === 'IPv4' && !a.internal).map((a) => a.address);
+}
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function databaseHostPort() {
@@ -142,7 +147,12 @@ await sleep(500);
 console.log(`[dev] API → http://localhost:3000   (log em ${logPath})`);
 children.push(start('api', join(root, 'apps/api'), 'npm', ['run', 'dev'], {}, logPath));
 await sleep(2500);
-console.log(`[dev] Web → ${useHttps ? 'https' : 'http'}://localhost:5173${useHttps ? '   (celular: https://IP-DO-MAC:5173)' : ''}`);
+const ips = lanAddresses();
+console.log(`[dev] Web → ${useHttps ? 'https' : 'http'}://localhost:5173${useHttps ? `   (celular: ${ips.length > 0 ? ips.map((ip) => `https://${ip}:5173`).join(' ou ') : 'https://IP-DO-MAC:5173'})` : ''}`);
+if (useHttps && ips.some((ip) => ip.startsWith('172.20.10.'))) {
+  console.log('[dev] ATENÇÃO: o Mac está na internet do iPhone (Compartilhamento de Internet). Por essa rede o iPhone não abre o AskouT.');
+  console.log('[dev]          Conecte o Mac e o iPhone ao MESMO Wi-Fi (o do roteador) e rode de novo.');
+}
 children.push(start('web', join(root, 'apps/web'), 'npm', ['run', useHttps ? 'dev:https' : 'dev'], {}));
 console.log('[dev] Gestão (só computador) → http://localhost:5174   (criar admin: cd apps/api && npm run admin:promote -- seu@email.com)');
 children.push(start('gestao', join(root, 'apps/admin'), 'npm', ['run', 'dev'], {}));
