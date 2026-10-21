@@ -30,6 +30,16 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 - [ ] Votação de datas, fase 2.
 - [ ] Vídeo nos posts: hoje o vídeo (até 60 MB) fica no próprio Postgres e é servido pela API. Para valer em escala, mover para armazenamento de arquivos (com CDN) e comprimir/gerar versões leves no servidor.
 - [ ] Vídeo nos posts: a duração máxima (3 minutos) é conferida só no app; conferir também no servidor. Testar em iPhone/Android de verdade.
+- [ ] Vídeo nos posts: o servidor entrega o vídeo inteiro do banco a cada pedido de trecho (Range), o que pesa com muita gente. Resolvido junto com a mudança para armazenamento de arquivos (S3/R2 + CDN).
+
+### Compressão de vídeo antes do envio
+Feito: `apps/web/src/lib/video-prepare.ts`. Ao publicar, o app reduz o vídeo (até ~720p, ~3,5 Mbps, MP4/H.264) ANTES de criar o post. Aceita escolher arquivos de até 500 MB quando o aparelho consegue comprimir; o que for enviado continua limitado a 60 MB. Se não der para comprimir, ou o resultado não ficar menor, segue o original. Ordem: plugin nativo → navegador (WebCodecs, biblioteca `mediabunny`, licença MPL-2.0) → original.
+
+- [ ] **Testar em iPhone e Android de verdade** com vídeo grande de câmera (inclusive .mov HEVC do iPhone). No sandbox só foi verificado o caminho VP9/WebM no Chromium; o caminho H.264/MP4 (o usado de fato), a velocidade com aceleração por hardware e a qualidade em filmagem real NÃO foram testados.
+- [ ] Casca Capacitor: implementar `window.AskouTVideo.compress(file, { maxEdge, videoBitsPerSecond, onProgress })` → `Promise<File | undefined>`. A casca grava o arquivo no cache, chama o plugin e lê o resultado de volta. O app já usa isso se existir.
+- [ ] Plugin recomendado: `capacitor-native-video-compressor` (qualidade alta ≈ 720p). Plano B: plugin próprio com AVAssetExportSession (iOS) e Media3 Transformer (Android).
+- [ ] Requisitos Android: `compileSdk` 35+, repositório JitPack, permissões `READ_MEDIA_VIDEO` / `READ_EXTERNAL_STORAGE`, serviço em primeiro plano. iOS: `NSPhotoLibraryUsageDescription` no Info.plist.
+- [ ] Avisar a pessoa para manter a tela aberta durante a otimização (o texto já aparece no app).
 
 ## Stories de evento
 

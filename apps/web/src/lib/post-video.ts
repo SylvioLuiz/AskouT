@@ -3,15 +3,27 @@ import { resizePostPhoto } from './image.ts';
 /** Vídeo no post: até 60 MB e até 3 minutos. */
 export const POST_VIDEO_MAX_BYTES = 60 * 1024 * 1024;
 export const POST_VIDEO_MAX_SECONDS = 180;
+/** Com compressão disponível, dá para escolher um vídeo bem maior que o limite de envio (ex.: 4K do iPhone). */
+export const POST_VIDEO_SOURCE_MAX_BYTES = 500 * 1024 * 1024;
 const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 
-/** Motivo de não aceitar o arquivo como vídeo do post, ou undefined se serve. */
-export function videoProblem(file: { type: string; size: number }): string | undefined {
+/**
+ * Motivo de não aceitar o arquivo como vídeo do post, ou undefined se serve.
+ * Com `canCompress`, o vídeo pode passar de 60 MB (até 500 MB): ele é reduzido antes de enviar.
+ */
+export function videoProblem(file: { type: string; size: number }, options: { canCompress?: boolean } = {}): string | undefined {
   if (!VIDEO_TYPES.includes(file.type.split(';')[0]?.trim().toLowerCase() ?? '')) return 'Use um vídeo MP4, WebM ou MOV.';
   if (file.size === 0) return 'O vídeo está vazio.';
+  if (options.canCompress) {
+    if (file.size > POST_VIDEO_SOURCE_MAX_BYTES) return 'O vídeo passa de 500 MB. Escolha um mais curto.';
+    return undefined;
+  }
   if (file.size > POST_VIDEO_MAX_BYTES) return 'O vídeo passa de 60 MB. Escolha um mais curto.';
   return undefined;
 }
+
+/** Depois de otimizar, ainda não coube no limite de envio. */
+export const VIDEO_STILL_TOO_BIG = 'Não foi possível reduzir o vídeo para menos de 60 MB neste aparelho. Escolha um mais curto.';
 
 /** Motivo de recusar pela duração, ou undefined. Duração desconhecida (infinita) não passa. */
 export function durationProblem(seconds: number): string | undefined {

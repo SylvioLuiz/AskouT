@@ -16,7 +16,8 @@ import { cropPostPhoto, readPostSource, resizePostPhoto } from '../lib/image.ts'
 import type { CropRect } from '../lib/crop.ts';
 import { toggleId } from '../lib/meetup.ts';
 import { addImages, buildPostBody, effectivePlace, eventProblem, videoOf, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
-import { isVideoFile, uploadProgressText, videoPoster, videoProblem } from '../lib/post-video.ts';
+import { isVideoFile, POST_VIDEO_MAX_BYTES, uploadProgressText, videoPoster, videoProblem, VIDEO_STILL_TOO_BIG } from '../lib/post-video.ts';
+import { canCompressVideo, prepareProgressText, prepareVideo } from '../lib/video-prepare.ts';
 import type { DraftImage, LinkedPlace } from '../lib/post-draft.ts';
 import type { EventKind, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
@@ -114,6 +115,7 @@ export function CreatePostScreen() {
   const [tags, setTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [upload, setUpload] = useState<{ sent: number; total: number } | undefined>();
+  const [prep, setPrep] = useState<{ progress: number } | undefined>();
   const [reading, setReading] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const [linking, setLinking] = useState(false);
@@ -153,7 +155,8 @@ export function CreatePostScreen() {
       try {
         if (isVideoFile(file)) {
           if (hasVideo) throw new Error('Só cabe um vídeo por publicação.');
-          const problem = videoProblem(file);
+          // Passou de 60 MB? Só serve se este aparelho conseguir reduzir antes de enviar.
+          const problem = videoProblem(file, { canCompress: file.size > POST_VIDEO_MAX_BYTES ? await canCompressVideo() : false });
           if (problem) throw new Error(problem);
           const { poster } = await videoPoster(file);
           added.push({ key: nextKey(), kind: 'UPLOAD', preview: poster, dataUrl: poster, video: file });
@@ -221,8 +224,18 @@ export function CreatePostScreen() {
       return;
     }
     try {
+      // O vídeo é otimizado ANTES de criar o post: se não der para reduzir, nada fica pela metade no servidor.
+      const draftVideo = videoOf(items);
+      let videoFile: File | undefined;
+      if (draftVideo) {
+        setPrep({ progress: 0 });
+        const prepared = await prepareVideo(draftVideo.file, { onProgress: (progress) => setPrep({ progress }) });
+        setPrep(undefined);
+        if (prepared.file.size > POST_VIDEO_MAX_BYTES) throw new Error(VIDEO_STILL_TOO_BIG);
+        videoFile = prepared.file;
+      }
       const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft, prefill.get('votacao')));
-      const video = videoOf(items);
+      const video = draftVideo && videoFile ? { ...draftVideo, file: videoFile } : undefined;
       if (video) {
         // O vídeo segue logo depois do post, no item da capa. Se falhar, o post não fica pela metade (só com a capa).
         const target = created.images[video.index];
@@ -250,6 +263,7 @@ export function CreatePostScreen() {
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
       setUpload(undefined);
+      setPrep(undefined);
       setBusy(false);
     }
   }
@@ -269,6 +283,13 @@ export function CreatePostScreen() {
           </Button>
         </header>
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+        {busy && prep ? (
+          <div className="uploadbar" role="status" aria-live="polite">
+            <progress className="uploadbar__bar" max={1} value={prep.progress} aria-label="Otimização do vídeo" />
+            <p className="uploadbar__text">{prepareProgressText(prep.progress)}</p>
+            <p className="uploadbar__hint">Estamos reduzindo o vídeo para o envio ser mais rápido. Mantenha esta tela aberta.</p>
+          </div>
+        ) : null}
         {busy && upload ? (
           <div className="uploadbar" role="status" aria-live="polite">
             <progress className="uploadbar__bar" max={upload.total} value={upload.sent} aria-label="Envio do vídeo" />
