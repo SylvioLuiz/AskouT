@@ -55,6 +55,7 @@ import type {
   PostView,
   ExploreParams,
   ExploreResult,
+  ExplorePlace,
   PageRequest,
   Profile,
   ProfilePatch,
@@ -312,6 +313,12 @@ export function createApi(deps: ApiDeps) {
       if (params.hot) query.set('hot', 'true');
       const text = query.toString();
       return request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
+    },
+    /** Locais perto (AskouT + Google/OSM) para os pins do mapa do Explorar. */
+    explorePlaces: (params: { lat: number; lng: number; radiusKm?: number }) => {
+      const query = new URLSearchParams({ lat: String(params.lat), lng: String(params.lng) });
+      if (params.radiusKm !== undefined) query.set('radiusKm', String(params.radiusKm));
+      return request<{ places: ExplorePlace[]; placesAvailable: boolean }>('GET', `/explore/places?${query.toString()}`);
     },
     recommendations: (personalize: boolean) => request<Recommendations>('GET', `/me/recommendations?personalize=${personalize ? 'true' : 'false'}`),
     recordDwell: (items: DwellEntry[]) => request<{ saved: number }>('POST', '/me/dwell', { body: { items } }),

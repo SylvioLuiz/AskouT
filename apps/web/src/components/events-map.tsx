@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import type { Map as GlMap, Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-// Mapa dos eventos que estão acontecendo agora: OpenStreetMap desenhado pelo MapLibre, carregado sob demanda.
+// Mapa do Explorar: locais e eventos acontecendo agora. Mapa-base do OpenStreetMap desenhado pelo MapLibre, carregado sob demanda.
 
 export interface EventPin {
   id: string;
   lat: number;
   lng: number;
-  /** Pins do mesmo tipo de evento compartilham a classe de cor. */
-  kind: string;
+  /** Local (bar, casa…) ou evento acontecendo agora: cada um tem a sua cor. */
+  kind: 'place' | 'event';
+  label: string;
 }
 
 interface Props {
@@ -28,6 +29,9 @@ const STYLE = {
   layers: [{ id: 'osm', type: 'raster' as const, source: 'osm' }],
 };
 
+// Em produção, aponte VITE_MAP_STYLE_URL para um estilo MapLibre (ex.: MapTiler, Stadia, Protomaps). Sem isso usa os blocos públicos do OSM, só para desenvolvimento.
+const STYLE_URL = (import.meta.env.VITE_MAP_STYLE_URL as string | undefined)?.trim() || undefined;
+
 type Lib = typeof import('maplibre-gl');
 
 export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Props) {
@@ -45,7 +49,7 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Pr
       try {
         const lib = await import('maplibre-gl');
         if (cancelled || !box.current) return;
-        const map = new lib.Map({ container: box.current, style: STYLE, center: [-46.6333, -23.5505], zoom: 13, attributionControl: { compact: true } });
+        const map = new lib.Map({ container: box.current, style: STYLE_URL ?? STYLE, center: [-46.6333, -23.5505], zoom: 13, attributionControl: { compact: true } });
         map.addControl(new lib.NavigationControl({ showCompass: false }), 'top-right');
         live.current = { map, lib, markers: new Map(), fitKey: '' };
         setReady(true);
@@ -83,12 +87,14 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Pr
     }
     for (const pin of pins) {
       let marker = state.markers.get(pin.id);
-      if (marker) marker.setLngLat([pin.lng, pin.lat]);
-      else {
+      if (marker) {
+        marker.setLngLat([pin.lng, pin.lat]);
+        marker.getElement().setAttribute('aria-label', pin.label);
+      } else {
         const el = document.createElement('button');
         el.type = 'button';
-        el.className = 'evpin';
-        el.setAttribute('aria-label', 'Ver evento');
+        el.className = `evpin evpin--${pin.kind}`;
+        el.setAttribute('aria-label', pin.label);
         el.dataset['id'] = pin.id;
         el.addEventListener('click', () => selectRef.current(pin.id));
         marker = new lib.Marker({ element: el, anchor: 'bottom' }).setLngLat([pin.lng, pin.lat]).addTo(map);
@@ -104,7 +110,7 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Pr
       else {
         const bounds = new lib.LngLatBounds([first.lng, first.lat], [first.lng, first.lat]);
         for (const p of pins) bounds.extend([p.lng, p.lat]);
-        map.fitBounds(bounds, { padding: { top: 80, bottom: 260, left: 40, right: 40 }, maxZoom: 15, duration: 0 });
+        map.fitBounds(bounds, { padding: { top: 80, bottom: 300, left: 40, right: 40 }, maxZoom: 15, duration: 0 });
       }
     } else if (pins.length === 0 && me && state.fitKey !== 'me') {
       state.fitKey = 'me';
@@ -121,5 +127,5 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Pr
     if (pin) state.map.easeTo({ center: [pin.lng, pin.lat], offset: [0, -90], duration: 350 });
   }, [ready, selectedId, pins]);
 
-  return <div ref={box} className="evmap__canvas" role="region" aria-label="Mapa dos eventos acontecendo agora" />;
+  return <div ref={box} className="evmap__canvas" role="region" aria-label="Mapa com os locais e eventos perto" />;
 }

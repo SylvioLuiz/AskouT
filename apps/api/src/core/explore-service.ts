@@ -19,6 +19,7 @@ export const EXPLORE_HOT_MIN_GOING = 5;
 export const EXPLORE_EXTERNAL_MAX_RADIUS_M = 10_000;
 const EVENT_LIMIT = 40;
 const VENUE_LIMIT = 15;
+const MAP_PLACE_LIMIT = 40;
 const TAG_LIMIT = 10;
 const PEOPLE_LIMIT = 10;
 const DAY_MS = 86_400_000;
@@ -200,7 +201,7 @@ export class ExploreService {
    * A posição vale só para esta consulta; nada é guardado.
    */
   async search(actorId: string, input: ExploreInput): Promise<ExploreView> {
-    const { places, placeSource, clock } = this.deps;
+    const { places, clock } = this.deps;
 
     const rawQ = typeof input.q === 'string' ? input.q.trim() : '';
     // eslint-disable-next-line no-control-regex
@@ -287,6 +288,25 @@ export class ExploreService {
       text.length >= 2 ? this.profiles.search(actorId, text, PEOPLE_LIMIT).catch(() => []) : Promise.resolve([]),
     ]);
 
+    const { placeItems, placesAvailable } = await this.collectPlaces(actorId, venues, {
+      center,
+      radiusM,
+      now,
+      needle: !kind && !freeOnly && text.length >= 2 ? fold(text) : undefined,
+      limit: VENUE_LIMIT,
+    });
+
+    return { ...empty, events: await toItems(found), places: placeItems, people, tags, placesAvailable };
+  }
+
+  /** Locais do AskouT já achados + de fora (Google/OSM) na mesma região, sem repetir, com os impulsionados primeiro. */
+  private async collectPlaces(
+    actorId: string,
+    venues: { venue: VenueRecord; distanceM: number | null }[],
+    opts: { center: { lat: number; lng: number } | undefined; radiusM: number; now: Date; needle?: string | undefined; all?: boolean; limit: number },
+  ): Promise<{ placeItems: ExplorePlaceItem[]; placesAvailable: boolean }> {
+    const { places, placeSource } = this.deps;
+    const { center, radiusM, now, needle } = opts;
     const profiles = await Promise.all(
       venues.map(async ({ venue }) => ({ id: venue.id, followerCount: await places.countVenueFollowers(venue.id), following: await places.isFollowingVenue(actorId, venue.id), rating: await places.venueRating(venue.id, actorId) })),
     );
@@ -316,19 +336,18 @@ export class ExploreService {
     }
 
     let placesAvailable = true;
-    // Lugares de fora (Google/OSM) só quando há posição e nenhum filtro de evento (tipo/grátis) escondendo-os.
-    if (center && !kind && !freeOnly && text.length >= 2) {
-      const ext = await placeSource.nearby(center, Math.min(radiusM, EXPLORE_EXTERNAL_MAX_RADIUS_M), 60);
+    // Lugares de fora (Google/OSM) só quando há posição; na busca por texto, só os que combinam com o texto.
+    if (center && (needle !== undefined || opts.all)) {
+      const ext = await placeSource.nearby(center, Math.min(radiusM, EXPLORE_EXTERNAL_MAX_RADIUS_M), opts.all ? 80 : 60);
       placesAvailable = ext.available;
-      const needle = fold(text);
       const seen = new Set(placeItems.map((p) => fold(p.name)));
       const known = new Set(venues.flatMap(({ venue }) => (venue.externalKey ? [venue.externalKey] : [])));
       const extra = ext.places
-        .filter((p) => fold(p.name).includes(needle))
+        .filter((p) => needle === undefined || fold(p.name).includes(needle))
         .map((p) => ({ p, d: distanceMeters(center, { lat: p.lat, lng: p.lng }) }))
         .sort((a, b) => a.d - b.d);
       for (const { p, d } of extra) {
-        if (placeItems.length >= VENUE_LIMIT) break;
+        if (placeItems.length >= opts.limit) break;
         const name = fold(p.name);
         if (seen.has(name) || known.has(`${p.source.toLowerCase()}:${p.externalId}`)) continue;
         seen.add(name);
@@ -351,8 +370,22 @@ export class ExploreService {
         });
       }
     }
+    return { placeItems, placesAvailable };
+  }
 
-    return { ...empty, events: await toItems(found), places: placeItems, people, tags, placesAvailable };
+  /** Locais perto para o mapa do Explorar: os do AskouT e os de fora, sem filtro de texto. Exige posição. */
+  async mapPlaces(actorId: string, input: ExploreInput): Promise<{ places: ExplorePlaceItem[]; placesAvailable: boolean }> {
+    const lat = parseNumber(input.lat, 'lat');
+    const lng = parseNumber(input.lng, 'lng');
+    if (lat === undefined || lng === undefined) throw validationError('Posição necessária', { lat: 'Envie lat e lng' });
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) throw validationError('Posição inválida', { lat: 'Coordenadas fora do intervalo' });
+    const radiusKm = parseNumber(input.radiusKm, 'radiusKm') ?? EXPLORE_DEFAULT_RADIUS_KM;
+    if (radiusKm < 1 || radiusKm > EXPLORE_MAX_RADIUS_KM) throw validationError('Raio inválido', { radiusKm: `Entre 1 e ${EXPLORE_MAX_RADIUS_KM} km` });
+    const center = { lat, lng };
+    const radiusM = Math.round(radiusKm * 1000);
+    const venues = await this.deps.places.searchVenues('', center, radiusM, MAP_PLACE_LIMIT);
+    const { placeItems, placesAvailable } = await this.collectPlaces(actorId, venues, { center, radiusM, now: this.deps.clock.now(), all: true, limit: MAP_PLACE_LIMIT });
+    return { places: placeItems, placesAvailable };
   }
 
   /** Um evento pelo id. Com posição, inclui a distância (usada só nesta resposta). */

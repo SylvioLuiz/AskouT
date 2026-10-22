@@ -89,6 +89,24 @@ test('lugares externos entram só com posição, sem repetir os do AskouT, e res
   assert.deepEqual(off.places.map((p) => p.source), ['ASKOUT']);
 });
 
+test('mapa: locais perto sem texto, do AskouT e de fora, sem repetir; exige posição', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  await seed(w);
+  w.placeSource.places = [
+    { externalId: 'g1', source: 'GOOGLE', name: 'Bar do Zé', category: 'bar', lat: HERE.lat + 0.005, lng: HERE.lng },
+    { externalId: 'o1', source: 'OSM', name: 'Padaria', category: 'bakery', lat: HERE.lat, lng: HERE.lng },
+  ];
+  const v = await w.core.explore.mapPlaces(ana!, { lat: HERE.lat, lng: HERE.lng });
+  assert.deepEqual(v.places.map((p) => [p.source, p.name]), [['ASKOUT', 'Bar do Zé'], ['OSM', 'Padaria']]);
+  assert.equal(v.placesAvailable, true);
+  w.placeSource.available = false;
+  const off = await w.core.explore.mapPlaces(ana!, { lat: HERE.lat, lng: HERE.lng });
+  assert.equal(off.placesAvailable, false);
+  assert.deepEqual(off.places.map((p) => p.source), ['ASKOUT']);
+  await rejectsWith(w.core.explore.mapPlaces(ana!, {}), 'VALIDATION');
+});
+
 test('entradas inválidas são recusadas', async () => {
   const w = makeWorld();
   const { ana } = await w.signUpMany('ana');
