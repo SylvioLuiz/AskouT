@@ -39,6 +39,7 @@ save(rounded(fit(512), 0.2237), os.path.join(WEB_PUBLIC, 'logo.png'))
 save(fit(180), os.path.join(WEB_PUBLIC, 'apple-touch-icon.png'), rgb=True)
 save(rounded(fit(64), 0.2237), os.path.join(WEB_PUBLIC, 'favicon.png'))
 save(rounded(fit(64), 0.2237), os.path.join(ADMIN_PUBLIC, 'favicon.png'))
+save(rounded(fit(256), 0.2237), os.path.join(ADMIN_PUBLIC, 'logo.png'))
 
 # Android: ícone antigo (quadrado arredondado), redondo e adaptivo (logo a 62% para caber na zona segura).
 for dpi, legacy, adaptive in [('mdpi', 48, 108), ('hdpi', 72, 162), ('xhdpi', 96, 216), ('xxhdpi', 144, 324), ('xxxhdpi', 192, 432)]:

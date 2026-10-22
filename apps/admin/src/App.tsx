@@ -48,6 +48,7 @@ function LoginScreen({ onLogin, expired }: { onLogin: (u: Admin) => void; expire
   return (
     <main className="login">
       <form className="login__card" onSubmit={submit}>
+        <img className="login__logo" src="/logo.png" alt="" width="72" height="72" />
         <h1>AskouT Gestão</h1>
         <p className="muted">Acesso restrito a administradores.</p>
         {expired ? <p className="notice">Sua sessão acabou. Entre de novo.</p> : null}
@@ -124,7 +125,10 @@ function Shell({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
   return (
     <div className="shell">
       <aside className="side">
-        <div className="side__brand">AskouT Gestão</div>
+        <div className="side__brand">
+          <img src="/logo.png" alt="" width="28" height="28" />
+          AskouT Gestão
+        </div>
         <nav aria-label="Seções">
           {ROUTES.map((r) => (
             <a

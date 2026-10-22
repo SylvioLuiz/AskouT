@@ -62,7 +62,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Estrutura */
 .shell { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
 .side { background: var(--side); color: var(--side-ink); padding: 20px 12px; display: flex; flex-direction: column; gap: 8px; position: sticky; top: 0; height: 100vh; }
-.side__brand { font-weight: 700; font-size: 16px; padding: 4px 12px 16px; letter-spacing: -0.01em; }
+.side__brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; padding: 4px 12px 16px; letter-spacing: -0.01em; }
+.side__brand img { border-radius: 22%; }
 .side nav { display: flex; flex-direction: column; gap: 2px; }
 .nav { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-radius: 8px; color: var(--side-ink); text-decoration: none; opacity: 0.8; }
 .nav:hover { background: rgba(255, 255, 255, 0.08); opacity: 1; }
@@ -151,6 +152,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Entrada e aviso de tela pequena */
 .login { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
 .login__card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 32px; width: 380px; }
+.login__logo { display: block; border-radius: 22%; margin-bottom: 16px; }
 .login__card h1 { margin-bottom: 4px; }
 .login__card .btn { margin-top: 8px; }
 .desktop-only { min-height: 100vh; display: grid; place-content: center; text-align: center; padding: 32px; max-width: 520px; margin: 0 auto; gap: 8px; }
