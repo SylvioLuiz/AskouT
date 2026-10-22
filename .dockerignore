@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/dist
+apps/mobile/*
+!apps/mobile/package.json
+apps/web/*
+!apps/web/package.json
+apps/admin/*
+!apps/admin/package.json
+reviews
+*.md
