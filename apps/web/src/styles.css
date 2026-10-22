@@ -22,6 +22,10 @@
   --wait: #8e8e93;
   --shadow-brand: rgb(0 102 204 / 0.35);
   --stripe: #c9cdea;
+  /* Entrada, cadastro e abertura do app: sempre no visual noturno. */
+  --auth-bg: #080620;
+  --auth-field: #121320;
+  --auth-on-brand: #1a0b2e;
 
   --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', 'Segoe UI', system-ui, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', system-ui, sans-serif;
@@ -627,6 +631,35 @@ button {
   text-align: center;
 }
 
+.ringloader {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.ringloader picture,
+.ringloader img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ringloader__center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.ringloader__center .wordmark {
+  min-height: 0;
+  font-size: 1.25rem;
+}
+
+.splash--night {
+  background: var(--auth-bg);
+}
+
 .splash .empty {
   align-items: center;
 }
@@ -1013,9 +1046,6 @@ button {
 
 .auth {
   /* Entrada e cadastro sempre no visual noturno (o tema escuro é forçado pelo AuthLayout). */
-  --auth-bg: #080620;
-  --auth-field: #121320;
-  --auth-on-brand: #1a0b2e;
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;

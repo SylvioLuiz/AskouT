@@ -4,6 +4,7 @@ import { FlashPresenceProvider } from './components/flash-presence.tsx';
 import { AuthProvider, useAuthContext, useUser } from './auth.tsx';
 import { Shell } from './components/Shell.tsx';
 import { Onboarding } from './components/onboarding.tsx';
+import { RingLoader } from './components/ring-loader.tsx';
 import { Button, EmptyState } from './components/ui.tsx';
 import { useTitle } from './hooks.ts';
 import { Link, navigate, resolveRoute, usePathname } from './router.tsx';
@@ -102,9 +103,8 @@ function NotFoundScreen() {
 
 function Splash() {
   return (
-    <div className="splash" role="status">
-      <span className="wordmark wordmark--big">AskouT</span>
-      <span className="visually-hidden">Carregando</span>
+    <div className="splash splash--night">
+      <RingLoader size={176} />
     </div>
   );
 }

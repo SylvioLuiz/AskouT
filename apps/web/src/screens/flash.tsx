@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BoltIcon, CalendarIcon, ChatIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, RefreshIcon, ShieldIcon, UserPlusIcon, UsersIcon, BulbIcon } from '../components/icons.tsx';
 import { Sheet } from '../components/agenda.tsx';
+import { RingLoader } from '../components/ring-loader.tsx';
 import { ChatButton } from '../components/chat-button.tsx';
 import { InviteSheet } from '../components/invite.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
@@ -204,7 +205,7 @@ export function FlashScreen() {
         No mapa
       </h2>
       {!mapFailed && (share.mine || mapOthers.length > 0) ? (
-        <Suspense fallback={<div className="matchmap matchmap--loading" role="status">Carregando o mapa…</div>}>
+        <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label="Carregando o mapa" /></div>}>
           <MatchMap me={share.mine} others={mapOthers} onFail={() => setMapFailed(true)} />
         </Suspense>
       ) : null}
@@ -1029,7 +1030,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
       </section>
 
       {!mapFailed && (them || myPoint) ? (
-        <Suspense fallback={<div className="matchmap matchmap--loading" role="status">Carregando o mapa…</div>}>
+        <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label="Carregando o mapa" /></div>}>
           <MatchMap
             me={myPoint}
             others={
