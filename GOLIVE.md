@@ -32,6 +32,22 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 - [ ] Vídeo nos posts: a duração máxima (3 minutos) é conferida só no app; conferir também no servidor. Testar em iPhone/Android de verdade.
 - [ ] Vídeo nos posts: o servidor entrega o vídeo inteiro do banco a cada pedido de trecho (Range), o que pesa com muita gente. Resolvido junto com a mudança para armazenamento de arquivos (S3/R2 + CDN).
 
+## Aplicativo nativo (casca Capacitor, `apps/mobile`)
+Feito: pacote `apps/mobile` com as pastas `android/` e `ios/` geradas, o app web empacotado em `www/` e as duas pontes nativas (`window.AskouTVideo` com `capacitor-native-video-compressor`, e `window.AskouTStore` com `@capgo/native-purchases`), com testes. Permissões de galeria, câmera, microfone e localização já declaradas; JitPack já no Gradle. NADA disso foi compilado ou aberto num aparelho: o sandbox não tem Android SDK nem Xcode.
+
+Como gerar (no seu Mac, com Android Studio e Xcode instalados):
+1. `cd apps/mobile && VITE_API_URL=https://api.seudominio.com.br npm run sync` (gera `www/` e copia para as duas plataformas).
+2. `npx cap open android` / `npx cap open ios` e rodar num aparelho ou emulador.
+
+- [ ] Confirmar o `appId` (`br.com.askout.app`, em `apps/mobile/capacitor.config.ts`): vale também para a Apple e o Google e NÃO muda depois de publicar.
+- [ ] Na API de produção, incluir `https://localhost,capacitor://localhost` em `CORS_ORIGINS` (o app roda nessas origens). A API precisa estar em https.
+- [ ] Primeira compilação em Android Studio e Xcode (assinatura, versão, ícones e tela de abertura definitivos; hoje são os padrões do Capacitor). Xcode: ativar a capacidade "In-App Purchase".
+- [ ] Testar as pontes em aparelho: compressão (iPhone e Android), compra de teste (sandbox da Apple e testadores do Google Play), e se `fetch` do arquivo comprimido funciona no WebView.
+- [ ] Cadastrar o produto de compra única "impulsionamento por dia" nas duas lojas com o mesmo identificador usado pelo servidor.
+- [ ] Notificações push (lembrete de evento, Flash) e agenda do celular ainda não têm plugin.
+- [ ] A cancelação da otimização de vídeo (sair da tela) ainda não chega ao plugin nativo.
+- [ ] O service worker (`sw.js`) roda também dentro do aplicativo; conferir no aparelho se não atrapalha as atualizações.
+
 ### Compressão de vídeo antes do envio
 Feito: `apps/web/src/lib/video-prepare.ts`. Ao publicar, o app reduz o vídeo (até ~720p, ~3,5 Mbps, MP4/H.264) ANTES de criar o post. Aceita escolher arquivos de até 500 MB quando o aparelho consegue comprimir; o que for enviado continua limitado a 60 MB. Se não der para comprimir, ou o resultado não ficar menor, segue o original. Ordem: plugin nativo → navegador (WebCodecs, biblioteca `mediabunny`, licença MPL-2.0) → original.
 

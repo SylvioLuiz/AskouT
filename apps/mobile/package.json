@@ -1,0 +1,28 @@
+{
+  "name": "@askout/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Casca nativa (Capacitor) do AskouT para iOS e Android. O app em si é o apps/web.",
+  "scripts": {
+    "build:web": "node scripts/build-web.mjs",
+    "sync": "npm run build:web && cap sync",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/ios": "^8.5.0",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
+    "@capgo/native-purchases": "^8.9.6",
+    "capacitor-native-video-compressor": "^1.1.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
+    "typescript": "^5.8.0"
+  },
+  "engines": { "node": ">=22" }
+}

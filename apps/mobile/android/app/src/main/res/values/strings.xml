@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AskouT</string>
+    <string name="title_activity_main">AskouT</string>
+    <string name="package_name">br.com.askout.app</string>
+    <string name="custom_url_scheme">br.com.askout.app</string>
+</resources>
