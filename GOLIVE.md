@@ -4,7 +4,7 @@ Itens que ficaram de fora de propósito até a publicação. Marque com `[x]` qu
 
 ## Entrar com Google e Apple
 O código está pronto e desligado: sem os IDs abaixo, os botões não aparecem. Faltam só as chaves, que dependem do domínio definitivo.
-- [ ] Definir o domínio do site (HTTPS).
+- [ ] Domínio: `askout.com.br`. Em 22/10/2026 ele NÃO respondia no DNS (sem servidores de nome), então ainda não está apontado para lugar nenhum. Plano de endereços: `askout.com.br` (site), `api.askout.com.br` (API), `gestao.askout.com.br` (portal de gestão). Em produção: `PUBLIC_WEB_URL=https://askout.com.br`, `CORS_ORIGINS=https://askout.com.br,https://gestao.askout.com.br,https://localhost,capacitor://localhost`, `VITE_API_URL=https://api.askout.com.br`.
 - [ ] Google: criar o ID de cliente "Aplicativo da Web" no Google Cloud e cadastrar o endereço do site em "Origens JavaScript autorizadas". Pôr em `GOOGLE_CLIENT_ID` (o Google pode ser ativado antes do go live: é grátis).
 - [ ] Apple: assinar a conta de desenvolvedor, criar o "Services ID" e cadastrar o domínio e a URL de retorno. Pôr em `APPLE_CLIENT_ID`. Não funciona em localhost.
 - [ ] Rodar `npx prisma migrate deploy` no servidor e reiniciar a API.
