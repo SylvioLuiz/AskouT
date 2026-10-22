@@ -1012,126 +1012,104 @@ button {
 /* ---------- Entrada e cadastro ---------- */
 
 .auth {
+  /* Entrada e cadastro sempre no visual noturno (o tema escuro é forçado pelo AuthLayout). */
+  --auth-bg: #080620;
+  --auth-field: #121320;
+  --auth-on-brand: #1a0b2e;
+  position: relative;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background: var(--auth-bg);
+  color: var(--ink);
+}
+
+.auth::before,
+.auth::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.auth::before {
+  left: -120px;
+  bottom: -160px;
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, rgb(181 110 252 / 0.55) 0%, rgb(181 110 252 / 0) 68%);
+}
+
+.auth::after {
+  right: -140px;
+  bottom: -80px;
+  width: 380px;
+  height: 380px;
+  background: radial-gradient(circle, rgb(250 114 201 / 0.45) 0%, rgb(250 114 201 / 0) 68%);
 }
 
 .auth__hero {
-  padding: 28px 20px 8px;
-  padding-top: calc(28px + env(safe-area-inset-top));
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 20px;
 }
 
-.auth__logo {
+.auth__scene {
   display: block;
-  width: 120px;
-  height: 120px;
-  border-radius: 22%;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  width: min(100vw, 520px);
+  height: auto;
+  aspect-ratio: 780 / 540;
+  max-height: 300px;
+  object-fit: cover;
+  -webkit-mask-image: radial-gradient(ellipse 56% 54% at 50% 50%, #000 44%, transparent 100%);
+  mask-image: radial-gradient(ellipse 56% 54% at 50% 50%, #000 44%, transparent 100%);
 }
 
 .auth__headline {
-  margin-top: 28px;
-  max-width: 14ch;
+  margin-top: -18px;
+  max-width: 16ch;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: clamp(2.25rem, 9vw, 3.25rem);
-  letter-spacing: -0.035em;
-  line-height: 1.02;
-}
-
-.auth__lead {
-  margin-top: 14px;
-  max-width: 40ch;
-  color: var(--ink-2);
-  font-size: 1.0625rem;
+  font-size: clamp(1.75rem, 7.5vw, 2.25rem);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .auth__panel {
-  padding: 20px 20px 40px;
-  width: 100%;
+  position: relative;
+  z-index: 1;
+  width: calc(100% - 40px);
   max-width: 460px;
+  margin: 24px auto 40px;
+  padding: 18px;
+  border-radius: 24px;
+  background: rgb(27 28 38 / 0.82);
+  border: 1px solid rgb(255 255 255 / 0.1);
 }
 
-/* A faixa da semana: o momento marcante da marca. Barras mais altas = mais gente pode. */
-
-.week {
-  margin: 28px 0 0;
+.auth .field__control {
+  background: var(--auth-field);
+  border-color: rgb(255 255 255 / 0.2);
 }
 
-.week__bars {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-  max-width: 420px;
+.auth .btn--primary {
+  background: var(--brand-grad);
+  color: var(--auth-on-brand);
+  font-weight: 700;
+  box-shadow: 0 10px 28px rgb(250 114 201 / 0.35);
 }
 
-.week__col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-.week__track {
-  display: flex;
-  align-items: flex-end;
-  width: 100%;
-  height: 132px;
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.week__bar {
-  width: 100%;
-  border-radius: 12px;
-  transform-origin: bottom;
-  animation: grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.week__bar--ok { background: var(--ok); }
-.week__bar--warn { background: var(--warn); }
-.week__bar--bad { background: var(--bad); }
-.week__bar--wait {
-  background: repeating-linear-gradient(135deg, var(--wait) 0 6px, var(--stripe) 6px 12px);
-}
-
-.week__day {
-  font-size: 0.8125rem;
-  color: var(--muted);
-}
-
-.week__caption {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-  max-width: 420px;
-}
-
-.week__example {
-  align-self: flex-start;
-  padding: 2px 8px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  font-size: 0.8125rem;
-  color: var(--muted);
-}
-
-.week__legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  font-size: 0.875rem;
-  color: var(--ink-2);
-}
-
-.week__legend li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.auth .btn--primary:hover:not(:disabled) {
+  background: var(--brand-grad);
+  color: var(--auth-on-brand);
+  filter: brightness(1.08);
 }
 
 .dot {
@@ -1145,20 +1123,7 @@ button {
 .dot--bad { background: var(--bad); }
 .dot--wait { background: repeating-linear-gradient(135deg, var(--wait) 0 3px, var(--stripe) 3px 6px); }
 
-@keyframes grow {
-  from {
-    transform: scaleY(0);
-  }
-  to {
-    transform: scaleY(1);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .week__bar {
-    animation: none;
-  }
-
   * {
     transition: none !important;
   }
@@ -1169,7 +1134,7 @@ button {
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 96px;
+    gap: 64px;
     padding: 48px;
   }
 
@@ -1178,16 +1143,20 @@ button {
     flex: 0 1 520px;
   }
 
-  .auth__panel {
-    flex: 0 0 400px;
-    padding: 36px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-panel);
+  .auth__scene {
+    width: 100%;
+    max-height: none;
   }
 
-  .week__track {
-    height: 156px;
+  .auth__headline {
+    font-size: 2.5rem;
+  }
+
+  .auth__panel {
+    flex: 0 0 420px;
+    width: auto;
+    margin: 0;
+    padding: 32px;
   }
 }
 

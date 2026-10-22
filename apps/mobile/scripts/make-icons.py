@@ -34,8 +34,7 @@ def save(img: Image.Image, path: str, rgb: bool = False) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     (img.convert('RGB') if rgb else img).save(path, optimize=True)
 
-# Site: logo da tela de entrada, favicon e ícone de tela inicial.
-save(rounded(fit(512), 0.2237), os.path.join(WEB_PUBLIC, 'logo.png'))
+# Site: favicon e ícone de tela inicial (a tela de entrada usa web/public/auth-hero.jpg, imagem pronta).
 save(fit(180), os.path.join(WEB_PUBLIC, 'apple-touch-icon.png'), rgb=True)
 save(rounded(fit(64), 0.2237), os.path.join(WEB_PUBLIC, 'favicon.png'))
 save(rounded(fit(64), 0.2237), os.path.join(ADMIN_PUBLIC, 'favicon.png'))
