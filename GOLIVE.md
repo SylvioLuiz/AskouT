@@ -41,7 +41,7 @@ Como gerar (no seu Mac, com Android Studio e Xcode instalados):
 
 - [ ] Confirmar o `appId` (`br.com.askout.app`, em `apps/mobile/capacitor.config.ts`): vale também para a Apple e o Google e NÃO muda depois de publicar.
 - [ ] Na API de produção, incluir `https://localhost,capacitor://localhost` em `CORS_ORIGINS` (o app roda nessas origens). A API precisa estar em https.
-- [ ] Primeira compilação em Android Studio e Xcode (assinatura, versão, ícones e tela de abertura definitivos; hoje são os padrões do Capacitor). Xcode: ativar a capacidade "In-App Purchase".
+- [ ] Primeira compilação em Android Studio e Xcode (assinatura e versão; ícones e tela de abertura já vêm do logo, gerados por `apps/mobile/scripts/make-icons.py`, mas ainda não foram vistos num aparelho). Xcode: ativar a capacidade "In-App Purchase".
 - [ ] Testar as pontes em aparelho: compressão (iPhone e Android), compra de teste (sandbox da Apple e testadores do Google Play), e se `fetch` do arquivo comprimido funciona no WebView.
 - [ ] Cadastrar o produto de compra única "impulsionamento por dia" nas duas lojas com o mesmo identificador usado pelo servidor.
 - [ ] Notificações push (lembrete de evento, Flash) e agenda do celular ainda não têm plugin.

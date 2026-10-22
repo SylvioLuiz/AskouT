@@ -52,7 +52,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="auth">
       <section className="auth__hero">
-        <p className="wordmark wordmark--big">AskouT</p>
+        <img className="auth__logo" src="/logo.png" alt="AskouT" width="120" height="120" />
         <h1 className="auth__headline">Menos tempo combinando. Mais tempo juntos.</h1>
         <p className="auth__lead">Veja em que dia você e seus amigos podem sair juntos, sem trocar vinte mensagens para descobrir.</p>
         <WeekStrip />
