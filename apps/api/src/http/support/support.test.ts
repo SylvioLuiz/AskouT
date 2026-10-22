@@ -42,6 +42,18 @@ describe('loadConfig', () => {
     assert.throws(() => loadConfig({ ...good, TOKEN_TTL_SECONDS: '5' }), /TOKEN_TTL_SECONDS/);
   });
 
+  it('Resend: exige chave e remetente, e em produção libera o envio real', () => {
+    const resend = { ...good, EMAIL_TRANSPORT: 'resend', RESEND_API_KEY: 're_abc12345xyz', EMAIL_FROM: 'AskouT <nao-responda@exemplo.com.br>' };
+    const cfg = loadConfig(resend);
+    assert.equal(cfg.emailTransport, 'resend');
+    assert.deepEqual(cfg.resend, { apiKey: 're_abc12345xyz', from: 'AskouT <nao-responda@exemplo.com.br>', replyTo: undefined });
+    assert.equal(loadConfig({ ...resend, EMAIL_FROM: 'nao-responda@exemplo.com.br', EMAIL_REPLY_TO: 'ajuda@exemplo.com.br' }).resend?.replyTo, 'ajuda@exemplo.com.br');
+    assert.equal(loadConfig({ ...resend, NODE_ENV: 'production' }).emailTransport, 'resend');
+    assert.throws(() => loadConfig({ ...resend, RESEND_API_KEY: '' }), /RESEND_API_KEY/);
+    assert.throws(() => loadConfig({ ...resend, EMAIL_FROM: 'sem-arroba' }), /EMAIL_FROM/);
+    assert.throws(() => loadConfig({ ...resend, EMAIL_REPLY_TO: 'x' }), /EMAIL_REPLY_TO/);
+  });
+
   it('chaves VAPID: opcionais, devem vir em par e combinar', () => {
     const keys = generateVapidKeys();
     assert.equal(loadConfig(good).vapid, undefined);

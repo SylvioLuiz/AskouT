@@ -20,7 +20,7 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 - [ ] Mover a escolha de agendas ligadas para a conta, no servidor.
 
 ## Outros itens já combinados
-- [ ] Provedor de e-mail real (hoje o código de cadastro só sai no terminal; produção recusa esse modo).
+- [ ] E-mail real: o envio pelo Resend está escrito e testado com respostas simuladas, mas NUNCA rodou contra a conta real. Falta: criar a conta no Resend, adicionar o domínio e publicar no DNS os registros que ele mostrar (SPF e DKIM; DMARC recomendado), gerar a chave, e na API de produção definir `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY` e `EMAIL_FROM`. Depois, testar cadastro e recuperação de senha com um e-mail seu (e conferir se não cai no spam no Gmail, Outlook e iCloud).
 - [ ] Idade mínima e LGPD (consentimento e política).
 - [ ] Limite de requisições (rate limit) na API.
 - [ ] Capacitor / app nativo (iOS e Android).

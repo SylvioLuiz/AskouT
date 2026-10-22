@@ -7,8 +7,10 @@ export interface AppConfig {
   codeSecret: string;
   tokenTtlSeconds: number;
   corsOrigins: string[];
-  /** Hoje só existe o envio "console" (imprime o código no terminal, só para desenvolvimento). */
-  emailTransport: 'console';
+  /** “console” imprime o código no terminal (só desenvolvimento); “resend” envia e-mail de verdade. */
+  emailTransport: 'console' | 'resend';
+  /** Dados do Resend, só quando `emailTransport` é “resend”. */
+  resend: { apiKey: string; from: string; replyTo: string | undefined } | undefined;
   /** Contato (e-mail ou site) enviado no User-Agent ao consultar o OpenStreetMap. Opcional em desenvolvimento. */
   osmContact: string | undefined;
   /** Chave do Google Places. Sem ela, a fonte Google fica desligada e o app usa só OpenStreetMap. */
@@ -68,11 +70,22 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     problems.push('TOKEN_TTL_SECONDS deve ficar entre 60 e 2592000');
   }
 
-  const emailTransport = env.EMAIL_TRANSPORT ?? 'console';
-  if (emailTransport !== 'console') {
-    problems.push('EMAIL_TRANSPORT: só "console" está implementado (ainda não há provedor real de e-mail)');
+  const emailRaw = env.EMAIL_TRANSPORT ?? 'console';
+  const emailTransport: AppConfig['emailTransport'] = emailRaw === 'resend' ? 'resend' : 'console';
+  let resend: AppConfig['resend'];
+  if (emailRaw === 'resend') {
+    const apiKey = env.RESEND_API_KEY?.trim() ?? '';
+    const from = env.EMAIL_FROM?.trim() ?? '';
+    const replyTo = env.EMAIL_REPLY_TO?.trim() || undefined;
+    const before = problems.length;
+    if (!/^re_[A-Za-z0-9_-]{8,}$/.test(apiKey)) problems.push('RESEND_API_KEY deve ser a chave da API do Resend (re_…)');
+    if (!/^(?:[^<>@\r\n]+<[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+>|[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+)$/.test(from)) problems.push('EMAIL_FROM deve ser um e-mail do seu domínio, como "AskouT <nao-responda@seudominio.com.br>"');
+    if (replyTo !== undefined && !/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(replyTo)) problems.push('EMAIL_REPLY_TO deve ser um e-mail');
+    if (problems.length === before) resend = { apiKey, from, replyTo };
+  } else if (emailRaw !== 'console') {
+    problems.push('EMAIL_TRANSPORT deve ser "console" ou "resend"');
   } else if (nodeEnv === 'production') {
-    problems.push('Em produção o envio "console" é recusado: ele imprime os códigos de cadastro no log. Falta implementar um provedor real de e-mail');
+    problems.push('Em produção o envio "console" é recusado: ele imprime os códigos de cadastro no log. Use EMAIL_TRANSPORT=resend');
   }
 
   const corsOrigins = (env.CORS_ORIGINS ?? '')
@@ -148,5 +161,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport: 'console', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, vapid, paymentProvider, stripe, paymentsEnabled, boostPricePerDayCents, boostStorePricePerDayCents };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport, resend, osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, vapid, paymentProvider, stripe, paymentsEnabled, boostPricePerDayCents, boostStorePricePerDayCents };
 }

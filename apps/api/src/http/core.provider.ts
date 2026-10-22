@@ -34,6 +34,7 @@ import { OverpassPlaceSource } from '../infra/overpass/overpass-place-source.ts'
 import { SandboxPaymentGateway, UnconfiguredPaymentGateway } from '../infra/payments/sandbox-payment-gateway.ts';
 import { StripePaymentGateway } from '../infra/payments/stripe-payment-gateway.ts';
 import { ConsoleEmailSender } from './console-email-sender.ts';
+import { ResendEmailSender } from '../infra/email/resend-email-sender.ts';
 import type { AppConfig } from './support/config.ts';
 import { PhotoSigner } from './support/photo-signing.ts';
 import { CONFIG, CORE, PLACE_PHOTOS, PRISMA } from './tokens.ts';
@@ -88,7 +89,7 @@ export const coreProvider = {
       boostsEnabled: config.paymentsEnabled,
       identities: new PrismaIdentityRepository(prisma),
       verifier: new OidcIdentityVerifier({ googleClientId: config.googleClientId, appleClientId: config.appleClientId }),
-      mailer: new ConsoleEmailSender(),
+      mailer: config.resend ? new ResendEmailSender(config.resend) : new ConsoleEmailSender(),
       codes: new HmacOneTimeCodes({ secret: config.codeSecret }),
       hasher: new ScryptPasswordHasher(),
       tokens: new Hs256TokenService({ secret: config.jwtSecret, ttlSeconds: config.tokenTtlSeconds }),
