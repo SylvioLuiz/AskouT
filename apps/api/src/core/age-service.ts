@@ -13,6 +13,10 @@ export interface AgeStatus {
   declared: boolean;
   /** Tem 18 anos ou mais. Falso também quando ainda não informou. */
   adult: boolean;
+  /** A data informada (só para a própria pessoa), ou null. */
+  birthDate: string | null;
+  /** Não dá para corrigir sozinho: a data diz que é menor de 18 anos (evita trocar a data só para liberar o Flash). */
+  locked: boolean;
 }
 
 /** Idade completa em `now` para uma data AAAA-MM-DD (usa UTC; o dia do aniversário conta). */
@@ -70,8 +74,9 @@ export class AgeService {
   async status(userId: string): Promise<AgeStatus> {
     const user = await this.deps.users.findById(userId);
     if (!user) throw notFound('Conta não encontrada');
-    if (!user.birthDate) return { declared: false, adult: false };
-    return { declared: true, adult: ageOn(user.birthDate, this.deps.clock.now()) >= ADULT_AGE };
+    if (!user.birthDate) return { declared: false, adult: false, birthDate: null, locked: false };
+    const adult = ageOn(user.birthDate, this.deps.clock.now()) >= ADULT_AGE;
+    return { declared: true, adult, birthDate: user.birthDate, locked: !adult };
   }
 
   async declare(userId: string, input: { birthDate?: unknown }): Promise<AgeStatus> {
@@ -81,7 +86,22 @@ export class AgeService {
     if (user.birthDate) throw conflict('A data de nascimento já foi informada e não pode ser trocada');
     const saved = await this.deps.users.setBirthDate(userId, raw);
     if (!saved) throw conflict('A data de nascimento já foi informada e não pode ser trocada');
-    return { declared: true, adult: age >= ADULT_AGE };
+    return { declared: true, adult: age >= ADULT_AGE, birthDate: raw, locked: age < ADULT_AGE };
+  }
+
+  /**
+   * Corrige a data de nascimento (errei ao digitar). Só quem hoje consta como maior de 18 anos pode;
+   * quem consta como menor fala com o suporte, senão bastaria trocar a data para liberar o Flash.
+   */
+  async correct(userId: string, input: { birthDate?: unknown }): Promise<AgeStatus> {
+    const now = this.deps.clock.now();
+    const { birthDate, age } = parseBirthDate(input.birthDate, now);
+    if (age < MIN_ACCOUNT_AGE) throw validationError(`O AskouT é para quem tem ${MIN_ACCOUNT_AGE} anos ou mais`, { birthDate: `O AskouT é para quem tem ${MIN_ACCOUNT_AGE} anos ou mais` });
+    const current = await this.status(userId);
+    if (!current.declared) return this.declare(userId, { birthDate });
+    if (current.locked) throw forbidden('Não dá para trocar a data por aqui. Fale com o suporte.');
+    await this.deps.users.updateBirthDate(userId, birthDate);
+    return { declared: true, adult: age >= ADULT_AGE, birthDate, locked: age < ADULT_AGE };
   }
 
   /** Usado pelo Flash: recusa quem não informou a data ou tem menos de 18 anos. */

@@ -14,6 +14,8 @@ export interface UserRepository {
   findIdsByEmailHashes(hashes: string[]): Promise<string[]>;
   /** Guarda a data de nascimento (AAAA-MM-DD) só se ainda não houver uma. Devolve false se já existia. */
   setBirthDate(userId: string, birthDate: string): Promise<boolean>;
+  /** Troca a data de nascimento (AAAA-MM-DD). */
+  updateBirthDate(userId: string, birthDate: string): Promise<void>;
   /** Troca o hash da senha. */
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
   findProfileById(userId: string): Promise<Profile | undefined>;

@@ -16,11 +16,11 @@ test('Flash: conta antiga, sem data de nascimento, não liga nem vê ninguém', 
   const w = makeWorld();
   const ana = (await w.signUp('ana')).user.id;
   w.users.users.set(ana, { ...w.users.users.get(ana)!, birthDate: null });
-  assert.deepEqual(await w.core.age.status(ana), { declared: false, adult: false });
+  assert.deepEqual(await w.core.age.status(ana), { declared: false, adult: false, birthDate: null, locked: false });
   await rejectsWith(w.core.flash.turnOn(ana, { hours: 1 }), 'FORBIDDEN');
   await rejectsWith(w.core.flash.listAvailable(ana), 'FORBIDDEN');
   // Informa a data uma vez; depois disso é maior de idade e liga.
-  assert.deepEqual(await w.core.age.declare(ana, { birthDate: '1990-05-10' }), { declared: true, adult: true });
+  assert.deepEqual(await w.core.age.declare(ana, { birthDate: '1990-05-10' }), { declared: true, adult: true, birthDate: '1990-05-10', locked: false });
   assert.equal((await w.core.flash.turnOn(ana, { hours: 1 })).active, true);
   await rejectsWith(w.core.age.declare(ana, { birthDate: '1991-05-10' }), 'CONFLICT');
 });
@@ -28,7 +28,7 @@ test('Flash: conta antiga, sem data de nascimento, não liga nem vê ninguém', 
 test('Flash: quem se cadastrou com 17 anos é recusado e a data não muda', async () => {
   const w = makeWorld();
   const ana = (await w.signUp('ana', { minor: true })).user.id;
-  assert.deepEqual(await w.core.age.status(ana), { declared: true, adult: false });
+  assert.deepEqual(await w.core.age.status(ana), { declared: true, adult: false, birthDate: `${w.clock.now().getUTCFullYear() - 17}-01-01`, locked: true });
   await rejectsWith(w.core.flash.turnOn(ana, { hours: 1 }), 'FORBIDDEN');
   await rejectsWith(w.core.age.declare(ana, { birthDate: '1990-01-01' }), 'CONFLICT');
   assert.equal((await w.core.age.status(ana)).adult, false);
@@ -53,4 +53,22 @@ test('Cadastro: exige data válida, 13 anos ou mais e o aceite dos Termos; guard
   assert.equal(user.termsVersion, '2026-10-22');
   assert.ok(user.termsAcceptedAt instanceof Date);
   assert.equal((await w.core.age.status(user.id)).adult, false, '15 anos: tem conta, mas sem Flash');
+});
+
+test('Corrigir a data: adulto pode; quem consta como menor não; nunca abaixo de 13', async () => {
+  const w = makeWorld();
+  const ana = (await w.signUp('ana')).user.id;
+  const y = w.clock.now().getUTCFullYear();
+  assert.equal((await w.core.age.correct(ana, { birthDate: '1985-03-02' })).birthDate, '1985-03-02');
+  assert.equal((await w.users.findById(ana))?.birthDate, '1985-03-02');
+  await rejectsWith(w.core.age.correct(ana, { birthDate: `${y - 10}-01-01` }), 'VALIDATION');
+  await rejectsWith(w.core.age.correct(ana, { birthDate: 'lixo' }), 'VALIDATION');
+  // Menor: bloqueado, não consegue "virar adulto" corrigindo.
+  const bia = (await w.signUp('bia', { minor: true })).user.id;
+  await rejectsWith(w.core.age.correct(bia, { birthDate: '1990-01-01' }), 'FORBIDDEN');
+  assert.equal((await w.core.age.status(bia)).adult, false);
+  // Adulto que corrige para menor perde o Flash e não volta sozinho.
+  const caio = (await w.signUp('caio')).user.id;
+  assert.equal((await w.core.age.correct(caio, { birthDate: `${y - 16}-01-01` })).adult, false);
+  await rejectsWith(w.core.age.correct(caio, { birthDate: '1990-01-01' }), 'FORBIDDEN');
 });

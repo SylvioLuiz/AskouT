@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, HttpCode, Inject, Post, Put } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
@@ -35,7 +35,14 @@ export class AccountController {
     return this.core.age.status(actor.userId);
   }
 
-  /** Informa a data de nascimento (AAAA-MM-DD). Só vale uma vez. */
+  /** Corrige a data de nascimento. Não vale para quem consta como menor de 18 anos. */
+  @Put('me/age')
+  correctAge(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.age.correct(actor.userId, { birthDate: b.birthDate });
+  }
+
+  /** Informa a data de nascimento (AAAA-MM-DD) quando ainda não existe uma. */
   @Post('me/age')
   @HttpCode(200)
   declareAge(@CurrentActor() actor: Actor, @Body() body: unknown) {

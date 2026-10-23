@@ -131,6 +131,11 @@ export class InMemoryUserRepository implements UserRepository {
     return true;
   }
 
+  async updateBirthDate(userId: string, birthDate: string): Promise<void> {
+    const u = this.users.get(userId);
+    if (u) this.users.set(userId, { ...u, birthDate });
+  }
+
   async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
     const u = this.users.get(userId);
     if (u) this.users.set(userId, { ...u, passwordHash });

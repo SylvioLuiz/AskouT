@@ -211,3 +211,9 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 - **Versão dos Termos:** `TERMS_VERSION` em `core/age-service.ts` ('2026-10-22'). Ao mudar o texto legal, mude a versão. Ainda **não há** tela para pedir novo aceite a quem já tem conta (hoje não há contas reais; precisa existir antes de mudar os termos em produção).
 - **Contas criadas antes desta mudança** não têm aceite registrado e não têm data de nascimento (o Flash pede a data na primeira vez).
 - Cadastros pendentes antigos foram apagados pela migração (o código vale poucos minutos; quem estava no meio refaz).
+
+## Corrigir a data de nascimento
+
+- Em **Editar perfil → Data de nascimento** (`PUT /me/age`). Regra: quem hoje consta como **maior de 18 anos** corrige sozinho (mínimo 13). Quem consta como **menor de 18 não corrige por aqui** (botão some e aparece "fale com o suporte"), senão bastaria trocar a data para liberar o Flash. Adulto que troca para uma data de menor perde o Flash e também não volta sozinho.
+- **Falta:** o suporte não tem ferramenta para trocar a data de quem digitou errado e ficou bloqueado. Hoje só dá por SQL; vale um botão no painel admin. O link de suporte depende de `VITE_SUPPORT_EMAIL`.
+- Brecha conhecida: uma pessoa de 13 a 17 anos que mentiu no cadastro e disse ter 18+ continua passando (é autodeclaração).

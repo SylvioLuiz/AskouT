@@ -19,6 +19,7 @@ import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validat
 import { InviteSheet } from '../components/invite.tsx';
 import { supportMailto } from '../lib/help-mailto.ts';
 import { downloadJson } from '../lib/account.ts';
+import { birthDateProblem, MIN_ACCOUNT_AGE, ageOnDate, todayIso } from '../lib/age.ts';
 import { Link } from '../router.tsx';
 
 type Message = { tone: 'ok' | 'error'; text: string } | undefined;
@@ -129,7 +130,70 @@ export function EditProfileScreen() {
           </Button>
         </div>
       </form>
+      <BirthDateSection />
     </>
+  );
+}
+
+/** Corrigir a data de nascimento, caso tenha sido digitada errada no cadastro. */
+function BirthDateSection() {
+  const user = useUser();
+  const age = useAsync(() => api.ageStatus(), []);
+  const [birth, setBirth] = useState('');
+  const [error, setError] = useState<string | undefined>();
+  const [message, setMessage] = useState<Message>();
+  const [saving, setSaving] = useState(false);
+  const status = age.data;
+  useEffect(() => {
+    if (status?.birthDate) setBirth(status.birthDate);
+  }, [status?.birthDate]);
+
+  if (!status) return null;
+  const support = supportMailto(import.meta.env['VITE_SUPPORT_EMAIL'] as string | undefined, user.profile.username);
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    setMessage(undefined);
+    const problem = birthDateProblem(birth, new Date()) ?? (ageOnDate(birth, new Date()) < MIN_ACCOUNT_AGE ? `O AskouT é para quem tem ${MIN_ACCOUNT_AGE} anos ou mais` : undefined);
+    setError(problem);
+    if (problem) return;
+    setSaving(true);
+    try {
+      const next = await api.correctBirthDate(birth);
+      age.setData(next);
+      setMessage({ tone: 'ok', text: next.adult ? 'Data de nascimento atualizada.' : 'Data atualizada. Com ela, o Flash fica indisponível para você.' });
+    } catch (failure) {
+      const e = toApiError(failure);
+      setError(e.fields['birthDate']);
+      if (!e.fields['birthDate']) setMessage({ tone: 'error', text: e.message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="birthedit">
+      <h2 className="birthedit__title">
+        Data de nascimento
+      </h2>
+      <p className="muted">Ela não aparece para ninguém. Serve para liberar o Flash a maiores de 18 anos.</p>
+      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      {status.locked ? (
+        <p className="muted">
+          Pela data cadastrada, você ainda não tem 18 anos, então não dá para trocá-la por aqui. Se foi um erro de digitação,{' '}
+          {support ? <a href={support}>fale com o suporte</a> : 'fale com o suporte'}.
+        </p>
+      ) : (
+        <form className="form form--flat" onSubmit={save} noValidate>
+          <Field label="Data de nascimento" type="date" value={birth} onChange={setBirth} error={error} max={todayIso()} autoComplete="bday" hint={status.declared ? undefined : 'Você ainda não informou. O Flash pede essa data.'} />
+          <div>
+            <Button type="submit" variant="secondary" loading={saving}>
+              Atualizar data
+            </Button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }
 

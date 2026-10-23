@@ -142,6 +142,8 @@ test('data de nascimento no Postgres: grava uma vez só', { skip: url ? false : 
     assert.equal(await users.setBirthDate(id, '1990-05-10'), true);
     assert.equal(await users.setBirthDate(id, '2010-01-01'), false, 'a segunda tentativa não troca');
     assert.equal((await users.findById(id))?.birthDate, '1990-05-10');
+    await users.updateBirthDate(id, '1985-03-02');
+    assert.equal((await users.findById(id))?.birthDate, '1985-03-02');
     assert.equal(await users.setBirthDate('nao-e-uuid', '1990-05-10'), false);
   } finally {
     await prisma.$disconnect();

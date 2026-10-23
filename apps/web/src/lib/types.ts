@@ -83,6 +83,15 @@ export interface PageRequest {
   offset?: number;
 }
 
+/** Situação da data de nascimento da própria pessoa (libera o Flash a maiores de 18 anos). */
+export interface AgeStatus {
+  declared: boolean;
+  adult: boolean;
+  birthDate: string | null;
+  /** Consta como menor de 18 anos: não dá para corrigir por aqui, só pelo suporte. */
+  locked: boolean;
+}
+
 export interface SignupInput {
   email: string;
   username: string;
