@@ -2,6 +2,22 @@
 
 Itens que ficaram de fora de propósito até a publicação. Marque com `[x]` quando concluir.
 
+## ⚠️ Antes de subir nas lojas: LIMPAR TUDO QUE É DE TESTE (pedido do Sylvio, 23/10/2026)
+Quando chegar a hora de publicar nas lojas (Apple e Google), o Claude deve fazer uma limpa em tudo o que foi cadastrado só para teste no app e no banco de produção. Fazer **depois de um backup do banco** (`pg_dump`, ou o backup do Railway) e **mostrando a lista do que vai sair ao Sylvio antes de apagar**. Não apagar a conta de administrador nem os dados reais.
+
+Checklist:
+- [ ] **Pessoas e posts de exemplo `[TESTE]`**: `npm run seed:demo -- --clear` (contas `teste_*`, e-mail `@teste.askout.invalid`). Atenção: o script **recusa rodar com `NODE_ENV=production`**; para limpar o banco de produção, rodar de uma máquina com `DATABASE_URL` de produção e sem `NODE_ENV=production`, conferindo o banco de destino antes (ou apagar pelo painel de gestão).
+- [ ] **Lugares e eventos de exemplo** (selo "Exemplo de teste", `isSample`): `npm run seed:places -- --clear`.
+- [ ] **Contas de teste de pessoas reais** (as do Sylvio e de quem testou, inclusive as criadas pelo `smoke.mjs` e pelos testes no celular): listar no painel de gestão ou no banco, escolher quais ficam (as do Sylvio e do administrador) e apagar o resto pelo fluxo de "apagar conta" (apaga em cascata).
+- [ ] **Conteúdo criado nos testes**: posts, comentários, stories, posts de evento, conversas, grupos, votações de data, encontros, Flash, notificações, denúncias e registros de auditoria de teste. Em geral saem junto com as contas; conferir o que sobra (denúncias e auditoria não somem sozinhas).
+- [ ] **Locais reivindicados de teste** (pedidos de posse de bar) e donos de teste: desfazer; conferir o painel de claims.
+- [ ] **Impulsionamentos de teste**: apagar. Pagamentos desligados até depois do lançamento; se houve compra de teste (sandbox Apple, testadores do Google Play, Stripe em modo teste), não deixar registro misturado com os reais.
+- [ ] **Inscrições de push e dispositivos de teste**: remover as inscrições antigas.
+- [ ] **Usuários de teste do Google** (tela de consentimento) e testadores das lojas: o app já está "Em produção", conferir que não sobrou lista de teste.
+- [ ] **Textos "[TESTE]" ou de rascunho visíveis no app**: procurar no código e no app por "[TESTE]", "Exemplo de teste", "versão preliminar" (`LEGAL_REVIEWED` precisa estar `true` só depois da revisão do advogado) e placeholders "[A revisar]".
+- [ ] **Chaves de teste**: nenhuma chave de teste (Stripe `sk_test`, Resend de teste etc.) nas variáveis de produção.
+- [ ] Depois da limpa: contar usuários, posts e lugares (o painel de gestão mostra os totais) e conferir que o primeiro acesso não cai em tela vazia sem querer (os exemplos `[TESTE]` existem justamente para isso; decidir se algum conteúdo inicial real entra no lugar).
+
 ## Entrar com Google e Apple
 O código está pronto e desligado: sem os IDs abaixo, os botões não aparecem. Faltam só as chaves, que dependem do domínio definitivo.
 - [ ] Domínio: `askout.com.br` (Hostinger; ativo desde 22/10/2026, ainda sem registros). Implantação passo a passo em `deploy/README.md` (Cloudflare + Railway + Resend); Dockerfile da API e rota `/saude` já existem, mas a imagem nunca foi construída nem rodada. Plano de endereços: `askout.com.br` (site), `api.askout.com.br` (API), `gestao.askout.com.br` (portal de gestão). Em produção: `PUBLIC_WEB_URL=https://askout.com.br`, `CORS_ORIGINS=https://askout.com.br,https://gestao.askout.com.br,https://localhost,capacitor://localhost`, `VITE_API_URL=https://api.askout.com.br`.
