@@ -263,3 +263,9 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Sobras do Firebase antigo no DNS (A do domínio principal, TXT `firebase=`, `firebase1/2._domainkey`): limpar quando o site novo for ligado.
 - Resend: conta criada, domínio `askout.com.br` **verificado** e chave de envio já criada e guardada pelo Sylvio (ainda NÃO testada contra a API real). Colar a chave só no Railway (`RESEND_API_KEY`), nunca no chat.
 - Próximos: dados legais, Cloudflare Pages, Railway.
+
+## Dados legais preenchidos (22/10/2026)
+- Controladora: Thunderbolt LTDA, CNPJ 44.953.028/0001-19 (contrato social JUCESP, 2022). Endereço publicado nos textos: Av. Jabaquara, 1909, sala 62, São Paulo/SP (informado pelo Sylvio; **o contrato social ainda mostra outra sede**: atualizar o endereço na Junta/CNPJ para bater com o que está publicado). Encarregado: Sylvio Luiz de Souza (`privacidade@askout.com.br`). Tudo em `COMPANY` em `apps/web/src/lib/legal-text.ts`.
+- Política de reembolso do impulsionamento: **proposta minha**, ainda não confirmada pelo Sylvio nem por advogado (reembolso se não começou a rodar, 7 dias de arrependimento, proporcional se falha nossa).
+- Objeto social não cita publicidade: perguntar ao contador se precisa incluir essa atividade (CNAE) antes de vender impulsionamento.
+- Restam marcados "[A revisar]": regras do ECA Digital, prazo de resposta a denúncias, e a revisão jurídica geral (`LEGAL_REVIEWED` continua falso).

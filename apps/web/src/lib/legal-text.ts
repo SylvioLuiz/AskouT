@@ -20,6 +20,14 @@ export interface LegalDoc {
   blocks: LegalBlock[];
 }
 
+/** Quem opera o AskouT. Dados do contrato social (JUCESP, NIRE 35238445720); o endereço é o informado pelo sócio em 22/10/2026. */
+export const COMPANY = {
+  name: 'Thunderbolt LTDA',
+  cnpj: '44.953.028/0001-19',
+  address: 'Av. Jabaquara, 1909, sala 62, São Paulo/SP',
+  dpo: 'Sylvio Luiz de Souza',
+};
+
 export function privacyEmail(configured: string | undefined): string {
   const v = configured?.trim();
   return v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? v : 'privacidade@askout.com.br';
@@ -34,8 +42,8 @@ export function buildPrivacy(email: string): LegalDoc {
       {
         title: '1. Quem é o responsável',
         text: [
-          'O responsável pelo tratamento (controlador) é a empresa que opera o AskouT. [A preencher antes do lançamento: razão social, CNPJ e endereço.]',
-          `Para qualquer assunto de privacidade, inclusive falar com o encarregado de dados (DPO), escreva para ${email}.`,
+          `O responsável pelo tratamento (controlador) é a ${COMPANY.name}, CNPJ ${COMPANY.cnpj}, com sede na ${COMPANY.address}, empresa que opera o AskouT.`,
+          `Para qualquer assunto de privacidade, inclusive falar com o encarregado de dados (DPO), ${COMPANY.dpo}, escreva para ${email}.`,
         ],
       },
       {
@@ -127,7 +135,7 @@ export function buildPrivacy(email: string): LegalDoc {
 export function buildTerms(email: string): LegalDoc {
   return {
     title: 'Termos de Uso',
-    intro: 'Estes termos valem para quem usa o AskouT. Ao criar uma conta ou entrar, você concorda com eles e com a Política de Privacidade.',
+    intro: `Estes termos valem para quem usa o AskouT, operado pela ${COMPANY.name}, CNPJ ${COMPANY.cnpj}, ${COMPANY.address}. Ao criar uma conta ou entrar, você concorda com eles e com a Política de Privacidade.`,
     blocks: [
       {
         title: '1. O que é o AskouT',
@@ -176,7 +184,7 @@ export function buildTerms(email: string): LegalDoc {
       },
       {
         title: '7. Donos de locais e impulsionamento',
-        text: ['Quem administra um local declara ter autorização para isso. O impulsionamento é um anúncio pago, sempre identificado como "Patrocinado". Preços, forma de cobrança e regras de cancelamento e reembolso são mostrados antes da compra. [A definir e revisar antes do lançamento: política de reembolso.]'],
+        text: ['Quem administra um local declara ter autorização para isso. O impulsionamento é um anúncio pago, sempre identificado como "Patrocinado". Preços, forma de cobrança e regras de cancelamento e reembolso são mostrados antes da compra. Reembolso: se o impulsionamento ainda não começou a ser exibido, você pode cancelar e receber o valor de volta; vale também o prazo de arrependimento de 7 dias do Código de Defesa do Consumidor para compras feitas fora de loja física. Se uma falha nossa impedir a exibição, devolvemos o valor proporcional ao período não entregue. Compras feitas pela Apple ou pelo Google seguem também as regras de reembolso da loja. [A revisar com advogado antes do lançamento.]'],
       },
       {
         title: '8. Suspensão e encerramento',
