@@ -14,6 +14,9 @@ export class ApiError extends Error {
   }
 }
 
+/** Em produção o portal fica em outro endereço que a API (VITE_API_URL); em desenvolvimento usa o proxy `/api`. */
+const API_BASE = ((import.meta.env.VITE_API_URL as string | undefined) ?? '/api').replace(/\/+$/, '');
+
 const TOKEN_KEY = 'askout.admin.token';
 
 /** O token fica só na sessão da aba (some ao fechar) e, se o navegador bloquear, na memória. */
@@ -64,7 +67,7 @@ async function send(method: string, path: string, body?: unknown, auth = true): 
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   let response: Response;
   try {
-    response = await fetch(`/api${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    response = await fetch(`${API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   } catch {
     throw new ApiError(0, 'NETWORK', 'Não foi possível falar com a API. Confira se ela está rodando.');
   }
@@ -137,4 +140,4 @@ export const api = {
 };
 
 /** Endereço público da foto de um post (o id é aleatório, como no app). */
-export const postImageUrl = (imageId: string) => `/api/posts/images/${encodeURIComponent(imageId)}`;
+export const postImageUrl = (imageId: string) => `${API_BASE}/posts/images/${encodeURIComponent(imageId)}`;

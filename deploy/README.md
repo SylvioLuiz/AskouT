@@ -40,7 +40,7 @@ Crie **dois projetos** (Workers & Pages → Create → Pages → Connect to Git 
 |---|---|---|
 | Build command | `npm ci && npm run build -w @askout/web` | `npm ci && npm run build -w @askout/admin` |
 | Build output directory | `apps/web/dist` | `apps/admin/dist` |
-| Variáveis | `VITE_API_URL=https://api.askout.com.br` · `NODE_VERSION=22` | igual |
+| Variáveis | `VITE_API_URL=https://api.askout.com.br` · `NODE_VERSION=22` · `VITE_SUPPORT_EMAIL=suporte@askout.com.br` · `VITE_PRIVACY_EMAIL=privacidade@askout.com.br` · `VITE_MAP_STYLE_URL` (estilo do mapa; ver GOLIVE) | `VITE_API_URL=https://api.askout.com.br` · `NODE_VERSION=22` |
 | Domínio personalizado | `askout.com.br` e `www.askout.com.br` | `gestao.askout.com.br` |
 
 Em cada projeto: **Custom domains → Set up a domain**; como o DNS já está no Cloudflare, o registro é criado sozinho.
