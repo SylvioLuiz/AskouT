@@ -11,6 +11,7 @@ import { Link, navigate, resolveRoute, usePathname } from './router.tsx';
 import type { RouteDef } from './router.tsx';
 import { AgendaScreen } from './screens/agenda.tsx';
 import { LegalScreen } from './screens/legal.tsx';
+import { DeleteAccountScreen } from './screens/delete-account.tsx';
 import { ActivityScreen } from './screens/activity.tsx';
 import { ForgotPasswordScreen, LoginScreen, SignupScreen } from './screens/auth.tsx';
 import { ChatScreen, ConversationsScreen } from './screens/conversations.tsx';
@@ -70,6 +71,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/perfil/editar', render: () => <EditProfileScreen /> },
   { path: '/configuracao', render: () => <SettingsScreen /> },
   { path: '/privacidade', render: () => <PrivacyScreen /> },
+  { path: '/privacidade/apagar-conta', render: () => <DeleteAccountScreen /> },
   { path: '/arquivados', render: () => <ArchivedScreen /> },
   { path: '/interacoes', render: () => <InteractionsScreen /> },
   { path: '/ajuda', render: () => <HelpScreen /> },

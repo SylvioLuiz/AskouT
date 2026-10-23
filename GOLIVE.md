@@ -172,7 +172,26 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 - **Campos a preencher no texto:** razão social, CNPJ e endereço do controlador (política, seção 1); política de reembolso do impulsionamento (termos, seção 6).
 - **E-mail de privacidade:** o texto usa `privacidade@askout.com.br` (ou `VITE_PRIVACY_EMAIL`). Essa caixa ainda **não existe**: criar um encaminhamento no Cloudflare (Email Routing, grátis) para um e-mail seu antes do lançamento.
 - **Lacunas entre o texto e o app (resolver ou ajustar o texto):**
-  - **Não há "apagar minha conta" nem "baixar meus dados" no app.** O texto promete atender por e-mail em até 15 dias, manualmente. Para escalar, criar as duas funções (exclusão em cascata de tudo o que a pessoa criou; exportação em arquivo).
+  - **Apagar conta e baixar dados já existem** (Privacidade → "Seus dados"; ver a seção abaixo). Falta e-mail de confirmação depois de apagar e tela de "conta apagada".
   - **Idade mínima 18:** o texto afirma 18+, mas o cadastro não pergunta idade. Falta a trava (data de nascimento ou declaração) e decidir o que fazer com quem declarar menos.
   - Conferir se mensagens e posts apagados somem de fato do banco (o texto diz "enquanto a conta existir ou até você apagar").
   - Registrar o aceite dos termos (data e versão) por conta, ainda não é gravado.
+
+## Apagar conta e exportar dados (LGPD)
+
+- **Como funciona:** em Privacidade → "Seus dados". **Baixar meus dados** gera um JSON (`GET /me/export`) com conta, perfil, seguidores, bloqueios, agenda, posts, comentários, mensagens que a pessoa enviou, Flash, encontros, locais seguidos, impulsionamentos, avisos e uso para recomendações. Não leva fotos e vídeos (só o registro de que existem) nem o que outras pessoas escreveram. **Apagar minha conta** (`DELETE /me`) pede o @usuário e, em conta com senha, a senha; quem entra com Google/Apple confirma só com o @usuário.
+- **O que a exclusão faz** (`infra/prisma/prisma-account.repository.ts`, uma transação só): apaga perfil, posts, comentários, curtidas, seguidores, bloqueios, agenda, Flash, avisos, região, histórico de uso e pagamentos da pessoa; apaga **todas as mensagens dela**, inclusive em grupos; **cancela e remove encontros que ela organizou**; passa grupos de que é dona para o membro mais antigo (sem outros membros, o grupo some); locais que administrava ficam sem dono; conversa que fica sem ninguém é apagada. A sessão antiga deixa de valer na hora.
+- **Recusas:** conta de administração (precisa ser rebaixada antes) e quem tem impulsionamento pago em andamento.
+- **Testado contra Postgres de verdade** (`prisma-account.test.ts`, conta cheia com as três chaves estrangeiras que travam a exclusão). Como rodar: ver "Testes no Postgres" abaixo.
+- **Decisões que um advogado/contador deve confirmar:**
+  - Os **registros de pagamento (Boost) são apagados junto**. Se a lei fiscal exigir guardar, é preciso anonimizar em vez de apagar.
+  - Apagar as mensagens de um grupo tira contexto dos outros membros. A alternativa seria manter com "conta apagada".
+  - Backups do banco do Railway podem guardar a conta por um tempo; o texto da política não menciona isso.
+- **No app nativo:** o download usa um link `download` do navegador, que o WKWebView do iOS pode ignorar. Testar no aparelho; se falhar, usar o menu de compartilhar nativo.
+- **Falta:** e-mail de confirmação "sua conta foi apagada", e apagar também arquivos de mídia quando saírem do banco para o R2.
+
+## Testes no Postgres
+
+- Os testes dos repositórios Prisma rodam contra um Postgres de teste, só quando `ASKOUT_TEST_DATABASE_URL` aponta para um banco terminado em `_test` (eles apagam tudo). Neste ambiente, subi um Postgres 16 local, apliquei **todas as migrações** (`prisma migrate deploy`, incluindo as escritas à mão) e a suíte de contrato inteira passou (79 de 79).
+- Isso achou um erro de verdade que os testes em memória escondiam: **o índice "uma proposta aberta por votação" nunca tinha sido criado**. Corrigido na migração `20261203120000_date_poll_one_open_proposal` (índice parcial; o Prisma não o enxerga no schema, então um `prisma migrate dev` futuro pode sugerir apagá-lo: não aceitar).
+- Continua **sem teste**: o Dockerfile da API, o Railway, a Stripe, os verificadores da Apple/Google.

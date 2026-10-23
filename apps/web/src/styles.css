@@ -4568,3 +4568,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .legal__switch { margin-top: 32px; }
 .auth__legal { margin: 14px 0 0; text-align: center; font-size: 13px; line-height: 1.45; color: var(--muted); }
 .auth__legal a { color: inherit; text-decoration: underline; }
+
+.setting--stack { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+.btn--danger-text { color: var(--danger); text-align: center; }
+.legal-list { margin: 12px 0; line-height: 1.5; font-size: 15px; }
+.legal-list ul { padding-left: 20px; margin: 8px 0; list-style: disc; }
+.legal-list li { margin: 6px 0; }

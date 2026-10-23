@@ -330,6 +330,10 @@ export function createApi(deps: ApiDeps) {
       request<MatchReach>('GET', `/me/venues/${id(venueId)}/boosts/estimate?eventId=${encodeURIComponent(q.eventId)}&radiusKm=${q.radiusKm}&tags=${q.tags.map(encodeURIComponent).join(',')}`),
     region: () => request<{ region: RegionView | null }>('GET', '/me/region'),
     saveRegion: (lat: number, lng: number) => request<{ region: RegionView }>('PUT', '/me/region', { body: { lat, lng } }),
+    /** Cópia dos meus dados (LGPD). */
+    exportMyData: () => request<{ filename: string; data: Record<string, unknown> }>('GET', '/me/export'),
+    /** Apaga a minha conta de vez. Conta que entra com Google/Apple não manda senha. */
+    deleteMyAccount: (input: { username: string; password?: string }) => request<{ deleted: true }>('DELETE', '/me', { body: input }),
     clearRegion: () => request<{ removed: boolean }>('DELETE', '/me/region'),
     cancelBoost: (boostId: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/cancel`),
     simulateBoostPayment: (boostId: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/simulate-payment`),

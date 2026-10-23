@@ -14,6 +14,7 @@ import { ExploreController } from './controllers/explore.controller.ts';
 import { AdminController } from './controllers/admin.controller.ts';
 import { VenuesController } from './controllers/venues.controller.ts';
 import { RecommendationsController } from './controllers/recommendations.controller.ts';
+import { AccountController } from './controllers/account.controller.ts';
 import { RegionController } from './controllers/region.controller.ts';
 import { BoostsController } from './controllers/boosts.controller.ts';
 import { HealthController } from './controllers/health.controller.ts';
@@ -30,7 +31,7 @@ import { loadConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
 
 @Module({
-  controllers: [AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, FlashController, ConversationsController, PlacesController, ExploreController, VenuesController, BoostsController, HealthController, RecommendationsController, RegionController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AdminController],
+  controllers: [AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, FlashController, ConversationsController, PlacesController, ExploreController, VenuesController, BoostsController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AdminController],
   providers: [
     { provide: CONFIG, useFactory: () => loadConfig(process.env) },
     prismaProvider,

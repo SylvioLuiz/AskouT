@@ -123,7 +123,7 @@ export function Shell({ children }: { children: ReactNode }) {
     to: '/perfil',
     label: 'Perfil',
     icon: <UserIcon />,
-    also: ['/amigos', '/bloqueados', '/configuracao', '/privacidade', '/interacoes', '/arquivados', '/ajuda', '/tema'],
+    also: ['/amigos', '/bloqueados', '/configuracao', '/privacidade', '/privacidade/apagar-conta', '/interacoes', '/arquivados', '/ajuda', '/tema'],
   };
 
   return (

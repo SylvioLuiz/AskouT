@@ -18,6 +18,7 @@ import type { ThemeChoice } from '../lib/theme.ts';
 import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validation.ts';
 import { InviteSheet } from '../components/invite.tsx';
 import { supportMailto } from '../lib/help-mailto.ts';
+import { downloadJson } from '../lib/account.ts';
 import { Link } from '../router.tsx';
 
 type Message = { tone: 'ok' | 'error'; text: string } | undefined;
@@ -217,7 +218,44 @@ export function PrivacyScreen() {
         <Link to="/politica-de-privacidade">Política de Privacidade</Link>
         <Link to="/termos-de-uso">Termos de Uso</Link>
       </nav>
+      <MyDataSection />
     </>
+  );
+}
+
+/** Seus dados: baixar uma cópia ou apagar a conta (LGPD). */
+function MyDataSection() {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Message>();
+
+  async function download() {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      const file = await api.exportMyData();
+      downloadJson(file.filename, file.data);
+      setMessage({ tone: 'ok', text: 'Pronto. O arquivo com os seus dados foi baixado. Ele não inclui fotos e vídeos, só o registro de que existem.' });
+    } catch (failure) {
+      setMessage({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="setting setting--stack">
+      <div>
+        <h3 className="setting__title">Seus dados</h3>
+        <p className="setting__help">Baixe uma cópia do que o AskouT guarda sobre você, ou apague a sua conta.</p>
+      </div>
+      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      <Button variant="secondary" loading={busy} onClick={() => void download()}>
+        Baixar meus dados
+      </Button>
+      <Link className="btn btn--quiet btn--danger-text" to="/privacidade/apagar-conta">
+        Apagar minha conta
+      </Link>
+    </section>
   );
 }
 

@@ -27,6 +27,7 @@ import type {
   PasswordResetRepository,
   BoostRepository,
   RegionRepository,
+  AccountRepository,
   DwellRepository,
   PaymentCharge,
   PaymentGateway,
@@ -1286,6 +1287,57 @@ export class InMemoryVenueClaimRepository implements VenueClaimRepository {
   async findDocument(id: string) {
     const d = this.documents.get(id);
     return d ? { mime: d.mime, data: new Uint8Array(d.data) } : undefined;
+  }
+}
+
+/**
+ * Conta (exportar/apagar) em memória. Só apaga o que os testes conferem: conta, perfil, seguidores, bloqueios e região.
+ * O comportamento completo (cascata em todas as tabelas) é conferido no teste com Postgres de verdade.
+ */
+export class InMemoryAccountRepository implements AccountRepository {
+  readonly deleted: string[] = [];
+  /** Impulsionamentos em andamento por pessoa (o teste define). */
+  readonly activeBoosts = new Map<string, number>();
+  private readonly users: InMemoryUserRepository;
+  private readonly follows: InMemoryFollowRepository;
+  private readonly blocks: InMemoryBlockRepository;
+  private readonly regions: InMemoryRegionRepository;
+  private readonly identities: InMemoryIdentityRepository;
+
+  constructor(users: InMemoryUserRepository, follows: InMemoryFollowRepository, blocks: InMemoryBlockRepository, regions: InMemoryRegionRepository, identities: InMemoryIdentityRepository) {
+    this.users = users;
+    this.follows = follows;
+    this.blocks = blocks;
+    this.regions = regions;
+    this.identities = identities;
+  }
+
+  async exportData(userId: string): Promise<Record<string, unknown>> {
+    const profile = this.users.profiles.get(userId);
+    const user = this.users.users.get(userId);
+    return {
+      account: user ? { id: user.id, email: user.email } : null,
+      profile: profile ? { username: profile.username, displayName: profile.displayName } : null,
+      following: [...this.follows.rows.values()].filter((f) => f.followerId === userId).map((f) => ({ id: f.followeeId, status: f.status })),
+    };
+  }
+
+  async hasExternalIdentity(userId: string): Promise<boolean> {
+    return [...this.identities.rows.values()].includes(userId);
+  }
+
+  async activeBoostCount(userId: string): Promise<number> {
+    return this.activeBoosts.get(userId) ?? 0;
+  }
+
+  async deleteAccount(userId: string): Promise<void> {
+    this.deleted.push(userId);
+    this.users.users.delete(userId);
+    this.users.profiles.delete(userId);
+    for (const [key, f] of this.follows.rows) if (f.followerId === userId || f.followeeId === userId) this.follows.rows.delete(key);
+    for (const key of this.blocks.rows.keys()) if (key.startsWith(`${userId}>`) || key.endsWith(`>${userId}`)) this.blocks.rows.delete(key);
+    this.regions.rows.delete(userId);
+    for (const [key, id] of this.identities.rows) if (id === userId) this.identities.rows.delete(key);
   }
 }
 

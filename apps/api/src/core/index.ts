@@ -20,6 +20,7 @@ import { InterestService } from './interest-service.ts';
 import { MatchService } from './match-service.ts';
 import { PaymentsSwitch } from './payments-switch.ts';
 import { RegionService } from './region-service.ts';
+import { AccountService } from './account-service.ts';
 import { RecommendationService } from './recommendation-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
 import { NotificationService, StoredNotifier } from './notification-service.ts';
@@ -79,6 +80,7 @@ export function createCore(input: CoreInput) {
     dwell: new DwellService(deps),
     recommendations: new RecommendationService(deps, posts, match),
     regions: new RegionService(deps),
+    account: new AccountService(deps),
     notifications: new NotificationService(input),
     /** Espera os pushes em andamento (testes e desligamento). */
     flushNotifications: () => notifier.flush(),

@@ -99,7 +99,7 @@ export function buildPrivacy(email: string): LegalDoc {
         title: '8. Seus direitos',
         text: [
           `Pela LGPD, você pode pedir: confirmação de que tratamos seus dados; acesso; correção; anonimização, bloqueio ou eliminação de dados desnecessários ou tratados fora da lei; portabilidade; informação sobre com quem compartilhamos; eliminação dos dados tratados com consentimento; e revogar o consentimento. Você também pode se opor a um tratamento e pedir revisão de decisões automatizadas.`,
-          `Parte disso você faz sozinho no app: editar o perfil, tornar o perfil privado, bloquear pessoas, desligar as recomendações, apagar a região e o histórico de uso. Para o restante, inclusive para apagar a conta e pedir uma cópia dos seus dados, escreva para ${email}. Respondemos em até 15 dias. Hoje esses pedidos são atendidos manualmente.`,
+          `Parte disso você faz sozinho no app, em Privacidade: editar o perfil, tornar o perfil privado, bloquear pessoas, desligar as recomendações, apagar a região e o histórico de uso, baixar uma cópia dos seus dados e apagar a sua conta. Ao apagar a conta, removemos o seu perfil, posts, comentários, mensagens, agenda e demais dados ligados a ela. Para os outros pedidos, escreva para ${email}. Respondemos em até 15 dias.`,
           'Se achar que seus dados foram tratados de forma incorreta, você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).',
         ],
       },

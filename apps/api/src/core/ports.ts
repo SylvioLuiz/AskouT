@@ -111,6 +111,18 @@ export interface RegionRepository {
   listInBox(box: { minLat: number; maxLat: number; minLng: number; maxLng: number }, limit: number): Promise<RegionRecord[]>;
 }
 
+/** Exportação e exclusão da conta (LGPD). */
+export interface AccountRepository {
+  /** Tudo o que a pessoa forneceu ou gerou, em dados simples (datas em texto ISO), sem arquivos de imagem ou vídeo. */
+  exportData(userId: string): Promise<Record<string, unknown>>;
+  /** A conta entra com Google ou Apple (nesse caso não tem senha própria para confirmar a exclusão). */
+  hasExternalIdentity(userId: string): Promise<boolean>;
+  /** Impulsionamentos pagos ainda em andamento. */
+  activeBoostCount(userId: string, now: Date): Promise<number>;
+  /** Apaga a conta e tudo o que depende dela, de uma vez. */
+  deleteAccount(userId: string): Promise<void>;
+}
+
 export interface BoostRepository {
   create(boost: BoostRecord): Promise<void>;
   find(id: string): Promise<BoostRecord | undefined>;
@@ -686,6 +698,7 @@ export interface CoreDeps {
   boosts: BoostRepository;
   dwell: DwellRepository;
   regions: RegionRepository;
+  account: AccountRepository;
   payments: PaymentGateway;
   settings: AppSettingsRepository;
   /** Conferência das compras dentro do app. Sem ela, só a compra pela web funciona. */
