@@ -23,6 +23,8 @@ export class AuthController {
       username: b.username,
       displayName: b.displayName,
       password: b.password,
+      birthDate: b.birthDate,
+      acceptTerms: b.acceptTerms,
     });
   }
 
@@ -75,7 +77,7 @@ export class AuthController {
   @HttpCode(200)
   social(@Body() body: unknown) {
     const b = asBody(body);
-    return this.core.auth.socialLogin({ provider: b.provider, idToken: b.idToken, username: b.username, displayName: b.displayName });
+    return this.core.auth.socialLogin({ provider: b.provider, idToken: b.idToken, username: b.username, displayName: b.displayName, birthDate: b.birthDate, acceptTerms: b.acceptTerms });
   }
 
   @Get('me')

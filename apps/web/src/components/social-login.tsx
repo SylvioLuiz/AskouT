@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { ConsentFields } from './consent-fields.tsx';
 import { Button, Field, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAuthContext } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
+import { consentProblems } from '../lib/age.ts';
 import { toApiError } from '../lib/errors.ts';
 import { GOOGLE_SCRIPT, appleIdToken, googleApi, loadScript, providerLabel } from '../lib/social-login.ts';
 import type { SocialNeedsProfile, SocialProviderId } from '../lib/types.ts';
@@ -102,6 +104,9 @@ export function SocialLogin() {
 function ChooseUsername({ pending, onBack }: { pending: Pending; onBack: () => void }) {
   const { signIn } = useAuthContext();
   const [username, setUsername] = useState(pending.offer.suggestedUsername);
+  const [birth, setBirth] = useState('');
+  const [accepted, setAccepted] = useState(false);
+  const [consentErrors, setConsentErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
@@ -113,15 +118,20 @@ function ChooseUsername({ pending, onBack }: { pending: Pending; onBack: () => v
       setError(problem);
       return;
     }
+    const consent = consentProblems(birth, accepted, new Date());
+    setConsentErrors(consent);
+    if (Object.keys(consent).length > 0) return;
     setError(undefined);
     setBusy(true);
     try {
-      const result = await api.socialLogin({ provider: pending.provider, idToken: pending.idToken, username: clean, displayName: pending.offer.displayName });
+      const result = await api.socialLogin({ provider: pending.provider, idToken: pending.idToken, username: clean, displayName: pending.offer.displayName, birthDate: birth, acceptTerms: true });
       if ('needsProfile' in result) setError('Não foi possível criar a conta. Tente de novo.');
       else signIn(result);
     } catch (failure) {
       const e = toApiError(failure);
-      setError(e.fields['username'] ?? e.message);
+      const f = e.fields;
+      setError(f['username'] ?? (f['birthDate'] || f['acceptTerms'] ? undefined : e.message));
+      setConsentErrors({ ...(f['birthDate'] ? { birthDate: f['birthDate'] } : {}), ...(f['acceptTerms'] ? { acceptTerms: f['acceptTerms'] } : {}) });
     } finally {
       setBusy(false);
     }
@@ -132,6 +142,7 @@ function ChooseUsername({ pending, onBack }: { pending: Pending; onBack: () => v
       <h3 className="form__title">Quase lá</h3>
       <p className="muted">Escolha seu nome de usuário no AskouT. Sua conta {providerLabel(pending.provider)} entra com ele.</p>
       <Field label="Nome de usuário" value={username} onChange={setUsername} error={error} autoComplete="username" autoFocus />
+      <ConsentFields birth={birth} onBirth={setBirth} accepted={accepted} onAccepted={setAccepted} errors={consentErrors} />
       <Button type="submit" full loading={busy}>
         Criar conta
       </Button>

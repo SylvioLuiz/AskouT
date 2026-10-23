@@ -148,6 +148,9 @@ model User {
   updatedAt    DateTime   @updatedAt
   /// Informada uma vez, para liberar o Flash (18+). Não aparece no perfil público.
   birthDate    DateTime?  @db.Date
+  /// Aceite dos Termos de Uso e da Política de Privacidade no cadastro (e a versão aceita).
+  termsAcceptedAt DateTime?
+  termsVersion    String?
 
   profile  Profile?
   settings UserSettings?
@@ -637,6 +640,8 @@ model PendingSignup {
   username     String
   displayName  String
   passwordHash String
+  birthDate    DateTime @db.Date
+  termsVersion String
   codeHash     String
   expiresAt    DateTime
   attempts     Int      @default(0) // incrementar de forma atômica (attempts: { increment: 1 })

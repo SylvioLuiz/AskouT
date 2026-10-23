@@ -12,6 +12,9 @@ export interface User {
   createdAt: Date;
   /** Data de nascimento (AAAA-MM-DD), informada uma vez para liberar o Flash. Nunca aparece no perfil público. */
   birthDate?: string | null;
+  /** Quando e em qual versão dos Termos a pessoa deu o aceite. */
+  termsAcceptedAt?: Date | null;
+  termsVersion?: string | null;
 }
 
 /** Pedido de nova senha em andamento: um por pessoa. `channel` deixa pronto o envio por celular (SMS) no futuro. */
@@ -63,6 +66,9 @@ export interface PendingSignup {
   username: string;
   displayName: string;
   passwordHash: string;
+  /** Data de nascimento (AAAA-MM-DD) e versão dos Termos aceita, guardadas até o código ser confirmado. */
+  birthDate: string;
+  termsVersion: string;
   codeHash: string;
   expiresAt: Date;
   /** Tentativas erradas de código. */

@@ -34,7 +34,7 @@ test('conta no Postgres: exportar e apagar em cascata', { skip: url ? false : 'd
     await prisma.userRegion.create({ data: { userId: ana, lat: -23.5, lng: -46.6, updatedAt: now } });
     await prisma.availabilitySlot.create({ data: { userId: ana, startsAt: now, endsAt: later, state: 'AVAILABLE' } });
     await prisma.externalIdentity.create({ data: { provider: 'GOOGLE', subject: 'sub-ana', userId: ana } });
-    await prisma.pendingSignup.create({ data: { email: 'ana@teste.com', username: 'ana', displayName: 'Ana', passwordHash: 'x', codeHash: 'x', expiresAt: later, lastSentAt: now } });
+    await prisma.pendingSignup.create({ data: { email: 'ana@teste.com', username: 'ana', displayName: 'Ana', passwordHash: 'x', birthDate: new Date('1990-01-01'), termsVersion: '2026-10-22', codeHash: 'x', expiresAt: later, lastSentAt: now } });
 
     // Grupo da Ana com a Bia (passa para a Bia) e grupo só da Ana (some)
     const g1 = await prisma.group.create({ data: { ownerId: ana, name: 'Rolê', members: { create: [{ userId: ana, role: 'OWNER' }, { userId: bia, role: 'MEMBER' }] } } });

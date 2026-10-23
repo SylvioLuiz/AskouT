@@ -12,32 +12,45 @@ test('ageOn: o aniversário conta no próprio dia', () => {
   assert.equal(ageOn('lixo', now), -1);
 });
 
-test('Flash: sem data de nascimento, não liga nem vê ninguém', async () => {
+test('Flash: conta antiga, sem data de nascimento, não liga nem vê ninguém', async () => {
   const w = makeWorld();
-  const ana = (await w.signUp('ana', { minor: true })).user.id;
+  const ana = (await w.signUp('ana')).user.id;
+  w.users.users.set(ana, { ...w.users.users.get(ana)!, birthDate: null });
   assert.deepEqual(await w.core.age.status(ana), { declared: false, adult: false });
   await rejectsWith(w.core.flash.turnOn(ana, { hours: 1 }), 'FORBIDDEN');
   await rejectsWith(w.core.flash.listAvailable(ana), 'FORBIDDEN');
+  // Informa a data uma vez; depois disso é maior de idade e liga.
+  assert.deepEqual(await w.core.age.declare(ana, { birthDate: '1990-05-10' }), { declared: true, adult: true });
+  assert.equal((await w.core.flash.turnOn(ana, { hours: 1 })).active, true);
+  await rejectsWith(w.core.age.declare(ana, { birthDate: '1991-05-10' }), 'CONFLICT');
 });
 
-test('Flash: menor de 18 anos é recusado e não consegue trocar a data', async () => {
+test('Flash: quem se cadastrou com 17 anos é recusado e a data não muda', async () => {
   const w = makeWorld();
   const ana = (await w.signUp('ana', { minor: true })).user.id;
-  const today = w.clock.now();
-  const seventeen = `${today.getUTCFullYear() - 17}-01-01`;
-  assert.deepEqual(await w.core.age.declare(ana, { birthDate: seventeen }), { declared: true, adult: false });
+  assert.deepEqual(await w.core.age.status(ana), { declared: true, adult: false });
   await rejectsWith(w.core.flash.turnOn(ana, { hours: 1 }), 'FORBIDDEN');
   await rejectsWith(w.core.age.declare(ana, { birthDate: '1990-01-01' }), 'CONFLICT');
   assert.equal((await w.core.age.status(ana)).adult, false);
 });
 
-test('Flash: maior de 18 anos liga normalmente; datas inválidas são recusadas', async () => {
+test('Cadastro: exige data válida, 13 anos ou mais e o aceite dos Termos; guarda os dois', async () => {
   const w = makeWorld();
-  const ana = (await w.signUp('ana', { minor: true })).user.id;
-  for (const bad of [undefined, 123, '', '2000-13-01', '2001-02-30', '1800-01-01', '2999-01-01', '01/01/1990']) {
-    await rejectsWith(w.core.age.declare(ana, { birthDate: bad }), 'VALIDATION');
-  }
-  assert.deepEqual(await w.core.age.declare(ana, { birthDate: '1990-05-10' }), { declared: true, adult: true });
-  const st = await w.core.flash.turnOn(ana, { hours: 1 });
-  assert.equal(st.active, true);
+  const base = { email: 'ana@exemplo.com', username: 'ana', password: 'uma-senha-forte-123' };
+  const y = w.clock.now().getUTCFullYear();
+  await rejectsWith(w.core.auth.startSignup({ ...base, acceptTerms: true }), 'VALIDATION');
+  await rejectsWith(w.core.auth.startSignup({ ...base, birthDate: '1990-01-01' }), 'VALIDATION');
+  await rejectsWith(w.core.auth.startSignup({ ...base, birthDate: '1990-01-01', acceptTerms: 'sim' }), 'VALIDATION');
+  await rejectsWith(w.core.auth.startSignup({ ...base, birthDate: '2001-02-30', acceptTerms: true }), 'VALIDATION');
+  const small = await rejectsWith(w.core.auth.startSignup({ ...base, birthDate: `${y - 12}-01-01`, acceptTerms: true }), 'VALIDATION');
+  assert.ok(small.details && 'birthDate' in small.details);
+  assert.equal(w.mailer.sent.length, 0, 'nada é enviado se o cadastro foi recusado');
+
+  await w.core.auth.startSignup({ ...base, birthDate: `${y - 15}-01-01`, acceptTerms: true });
+  const session = await w.core.auth.confirmSignup({ email: base.email, code: w.mailer.lastCodeFor(base.email) });
+  const user = w.users.users.get(session.user.id)!;
+  assert.equal(user.birthDate, `${y - 15}-01-01`);
+  assert.equal(user.termsVersion, '2026-10-22');
+  assert.ok(user.termsAcceptedAt instanceof Date);
+  assert.equal((await w.core.age.status(user.id)).adult, false, '15 anos: tem conta, mas sem Flash');
 });

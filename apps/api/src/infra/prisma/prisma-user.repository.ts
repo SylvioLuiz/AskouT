@@ -12,6 +12,8 @@ function toUser(row: {
   role: User['role'];
   createdAt: Date;
   birthDate: Date | null;
+  termsAcceptedAt: Date | null;
+  termsVersion: string | null;
 }): User {
   return {
     id: row.id,
@@ -21,6 +23,8 @@ function toUser(row: {
     role: row.role,
     createdAt: row.createdAt,
     birthDate: row.birthDate ? row.birthDate.toISOString().slice(0, 10) : null,
+    termsAcceptedAt: row.termsAcceptedAt,
+    termsVersion: row.termsVersion,
   };
 }
 
@@ -60,6 +64,9 @@ export class PrismaUserRepository implements UserRepository {
           status: user.status,
           role: user.role,
           createdAt: user.createdAt,
+          birthDate: user.birthDate ? new Date(`${user.birthDate}T00:00:00.000Z`) : null,
+          termsAcceptedAt: user.termsAcceptedAt ?? null,
+          termsVersion: user.termsVersion ?? null,
           profile: {
             create: {
               username: profile.username,

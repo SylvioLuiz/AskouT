@@ -2,6 +2,10 @@ import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 
 export const ADULT_AGE = 18;
+/** Idade mínima para ter conta. Decisão jurídica pendente (ver GOLIVE.md): subir para 18 é trocar este número. */
+export const MIN_ACCOUNT_AGE = 13;
+/** Versão dos Termos de Uso e da Política que o cadastro registra. Mude junto com o texto legal. */
+export const TERMS_VERSION = '2026-10-22';
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export interface AgeStatus {
@@ -28,6 +32,30 @@ function isRealDate(s: string): boolean {
   return dt.getUTCFullYear() === Number(m[1]) && dt.getUTCMonth() === Number(m[2]) - 1 && dt.getUTCDate() === Number(m[3]);
 }
 
+/** Confere uma data de nascimento digitada. Devolve a data e a idade, ou lança VALIDATION. */
+export function parseBirthDate(raw: unknown, now: Date): { birthDate: string; age: number } {
+  if (typeof raw !== 'string' || !isRealDate(raw)) throw validationError('Informe uma data de nascimento válida', { birthDate: 'Informe uma data de nascimento válida' });
+  const age = ageOn(raw, now);
+  if (age < 0 || age > 120) throw validationError('Informe uma data de nascimento válida', { birthDate: 'Informe uma data de nascimento válida' });
+  return { birthDate: raw, age };
+}
+
+/** Confere os dados de idade e aceite no cadastro. Lança VALIDATION se faltar o aceite ou a pessoa for pequena demais. */
+export function checkSignupConsent(input: { birthDate: unknown; acceptTerms: unknown }, now: Date): { birthDate: string; termsVersion: string } {
+  const problems: Record<string, string> = {};
+  let birthDate = '';
+  try {
+    const parsed = parseBirthDate(input.birthDate, now);
+    birthDate = parsed.birthDate;
+    if (parsed.age < MIN_ACCOUNT_AGE) problems.birthDate = `O AskouT é para quem tem ${MIN_ACCOUNT_AGE} anos ou mais`;
+  } catch (e) {
+    problems.birthDate = (e as { details?: Record<string, string> }).details?.birthDate ?? 'Informe uma data de nascimento válida';
+  }
+  if (input.acceptTerms !== true) problems.acceptTerms = 'Para criar a conta, aceite os Termos de Uso e a Política de Privacidade';
+  if (Object.keys(problems).length > 0) throw validationError(Object.values(problems)[0] as string, problems);
+  return { birthDate, termsVersion: TERMS_VERSION };
+}
+
 /**
  * Trava de idade do Flash. A data de nascimento é informada uma vez e não muda depois:
  * assim, quem põe uma data de menor de idade não consegue "tentar de novo" com outra.
@@ -47,11 +75,7 @@ export class AgeService {
   }
 
   async declare(userId: string, input: { birthDate?: unknown }): Promise<AgeStatus> {
-    const raw = input.birthDate;
-    const now = this.deps.clock.now();
-    if (typeof raw !== 'string' || !isRealDate(raw)) throw validationError('Informe uma data válida', { birthDate: 'Informe uma data válida' });
-    const age = ageOn(raw, now);
-    if (age < 0 || age > 120) throw validationError('Informe uma data válida', { birthDate: 'Informe uma data válida' });
+    const { birthDate: raw, age } = parseBirthDate(input.birthDate, this.deps.clock.now());
     const user = await this.deps.users.findById(userId);
     if (!user) throw notFound('Conta não encontrada');
     if (user.birthDate) throw conflict('A data de nascimento já foi informada e não pode ser trocada');

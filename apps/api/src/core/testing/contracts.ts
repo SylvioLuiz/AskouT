@@ -381,6 +381,8 @@ export function defineRepositoryContract(
         username: 'ana',
         displayName: 'Ana',
         passwordHash: 'hash-senha',
+        birthDate: '1990-01-01',
+        termsVersion: '2026-10-22',
         codeHash: 'hash-codigo',
         expiresAt: at(600),
         attempts: 0,

@@ -16,7 +16,7 @@ const SEC = 1000;
 
 test('cadastro: envia o código de 6 dígitos para o e-mail normalizado e não cria conta ainda', async () => {
   const w = makeWorld();
-  const started = await w.core.auth.startSignup({
+  const started = await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true,
     email: '  Ana@Exemplo.COM ',
     username: '@Ana.Silva',
     password: PASSWORD,
@@ -36,7 +36,7 @@ test('cadastro: envia o código de 6 dígitos para o e-mail normalizado e não c
 
 test('cadastro: o pendente guarda só hashes, nunca a senha nem o código', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   const code = w.mailer.lastCodeFor('ana@exemplo.com');
   const row = (await w.pending.find('ana@exemplo.com'))!;
 
@@ -52,7 +52,7 @@ test('cadastro: o pendente guarda só hashes, nunca a senha nem o código', asyn
 test('cadastro: reúne todos os campos inválidos em um único erro e não envia e-mail', async () => {
   const w = makeWorld();
   const err = await rejectsWith(
-    w.core.auth.startSignup({ email: 'nao-e-email', username: 'a', password: '123' }),
+    w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'nao-e-email', username: 'a', password: '123' }),
     'VALIDATION',
   );
   assert.deepEqual(Object.keys(err.details ?? {}).sort(), ['email', 'password', 'username']);
@@ -61,9 +61,9 @@ test('cadastro: reúne todos os campos inválidos em um único erro e não envia
 
 test('cadastro: valores que não são texto e username reservado viram erro de validação', async () => {
   const w = makeWorld();
-  await rejectsWith(w.core.auth.startSignup({ email: 123, username: {}, password: null }), 'VALIDATION');
-  await rejectsWith(w.core.auth.startSignup({ email: ['a@b.com'], username: 'ana', password: PASSWORD }), 'VALIDATION');
-  await rejectsWith(w.core.auth.startSignup({ email: 'a@b.com', username: 'admin', password: PASSWORD }), 'VALIDATION');
+  await rejectsWith(w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 123, username: {}, password: null }), 'VALIDATION');
+  await rejectsWith(w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: ['a@b.com'], username: 'ana', password: PASSWORD }), 'VALIDATION');
+  await rejectsWith(w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'a@b.com', username: 'admin', password: PASSWORD }), 'VALIDATION');
   assert.equal(w.mailer.sent.length, 0);
 });
 
@@ -73,13 +73,13 @@ test('cadastro: e-mail ou username já em uso são avisados logo na primeira eta
   const sentBefore = w.mailer.sent.length;
 
   const email = await rejectsWith(
-    w.core.auth.startSignup({ email: 'ANA@exemplo.com', username: 'outra', password: PASSWORD }),
+    w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ANA@exemplo.com', username: 'outra', password: PASSWORD }),
     'CONFLICT',
   );
   assert.ok(email.details?.email);
 
   const username = await rejectsWith(
-    w.core.auth.startSignup({ email: 'outra@exemplo.com', username: '@ANA', password: PASSWORD }),
+    w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'outra@exemplo.com', username: '@ANA', password: PASSWORD }),
     'CONFLICT',
   );
   assert.ok(username.details?.username);
@@ -90,7 +90,7 @@ test('cadastro: e-mail ou username já em uso são avisados logo na primeira eta
 
 test('confirmar: cria a conta com os dados do cadastro, devolve a sessão e limpa o pendente', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true,
     email: 'ana@exemplo.com',
     username: 'ana.silva',
     displayName: ' Ana   Silva ',
@@ -131,7 +131,7 @@ test('confirmar: o e-mail não aparece no perfil público', async () => {
 
 test('confirmar: código errado dá erro e conta a tentativa; o certo ainda vale dentro do limite', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   const right = w.mailer.lastCodeFor('ana@exemplo.com');
   const wrong = right === '000000' ? '000001' : '000000';
 
@@ -145,7 +145,7 @@ test('confirmar: código errado dá erro e conta a tentativa; o certo ainda vale
 
 test('confirmar: atingir o limite de tentativas erradas descarta o cadastro, mesmo para o código certo', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   const right = w.mailer.lastCodeFor('ana@exemplo.com');
   const wrong = right === '000000' ? '000001' : '000000';
 
@@ -160,7 +160,7 @@ test('confirmar: atingir o limite de tentativas erradas descarta o cadastro, mes
 
 test('confirmar: um contador já no limite também bloqueia o código certo', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   const right = w.mailer.lastCodeFor('ana@exemplo.com');
   w.pending.rows.get('ana@exemplo.com')!.attempts = MAX_CODE_ATTEMPTS;
   await rejectsWith(w.core.auth.confirmSignup({ email: 'ana@exemplo.com', code: right }), 'RATE_LIMITED');
@@ -169,7 +169,7 @@ test('confirmar: um contador já no limite também bloqueia o código certo', as
 
 test('confirmar: formato inválido não gasta tentativa', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   for (const bad of ['abc123', '12345', '1234567', '', undefined, 123456, '12 456']) {
     await rejectsWith(w.core.auth.confirmSignup({ email: 'ana@exemplo.com', code: bad }), 'VALIDATION');
   }
@@ -184,13 +184,13 @@ test('confirmar: sem cadastro pendente dá a mesma resposta de código expirado'
 
 test('confirmar: o código vale por 10 minutos, nem um instante a mais', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   const code = w.mailer.lastCodeFor('ana@exemplo.com');
 
   w.clock.tick(CODE_TTL_MINUTES * MIN - SEC);
   await w.core.auth.confirmSignup({ email: 'ana@exemplo.com', code }); // 9min59s: vale
 
-  await w.core.auth.startSignup({ email: 'bia@exemplo.com', username: 'bia', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'bia@exemplo.com', username: 'bia', password: PASSWORD });
   const codeBia = w.mailer.lastCodeFor('bia@exemplo.com');
   w.clock.tick(CODE_TTL_MINUTES * MIN);
   await rejectsWith(w.core.auth.confirmSignup({ email: 'bia@exemplo.com', code: codeBia }), 'VALIDATION');
@@ -199,8 +199,8 @@ test('confirmar: o código vale por 10 minutos, nem um instante a mais', async (
 
 test('confirmar: o código está amarrado ao e-mail (o de outra pessoa não serve)', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
-  await w.core.auth.startSignup({ email: 'bia@exemplo.com', username: 'bia', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'bia@exemplo.com', username: 'bia', password: PASSWORD });
   const codeBia = w.mailer.lastCodeFor('bia@exemplo.com');
   await rejectsWith(w.core.auth.confirmSignup({ email: 'ana@exemplo.com', code: codeBia }), 'VALIDATION');
   assert.equal(await w.users.findByEmail('ana@exemplo.com'), undefined);
@@ -208,7 +208,7 @@ test('confirmar: o código está amarrado ao e-mail (o de outra pessoa não serv
 
 test('confirmar: se tomarem o username no meio do caminho, dá CONFLICT e descarta o pendente', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   const code = w.mailer.lastCodeFor('ana@exemplo.com');
 
   // outra pessoa conclui o cadastro com o mesmo username antes
@@ -222,7 +222,7 @@ test('confirmar: se tomarem o username no meio do caminho, dá CONFLICT e descar
 
 test('confirmar: não dá para confirmar duas vezes (o pendente some)', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   const code = w.mailer.lastCodeFor('ana@exemplo.com');
   await w.core.auth.confirmSignup({ email: 'ana@exemplo.com', code });
   await rejectsWith(w.core.auth.confirmSignup({ email: 'ana@exemplo.com', code }), 'VALIDATION');
@@ -232,11 +232,11 @@ test('confirmar: não dá para confirmar duas vezes (o pendente some)', async ()
 
 test('reenvio: pedir de novo antes de 60 segundos dá RATE_LIMITED com o tempo de espera', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
 
   w.clock.tick(20 * SEC);
   const byStart = await rejectsWith(
-    w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD }),
+    w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD }),
     'RATE_LIMITED',
   );
   assert.equal(byStart.details?.retryAfterSeconds, '40');
@@ -247,7 +247,7 @@ test('reenvio: pedir de novo antes de 60 segundos dá RATE_LIMITED com o tempo d
 
 test('reenvio: depois do intervalo, o novo código vale e o antigo deixa de valer', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   const first = w.mailer.lastCodeFor('ana@exemplo.com');
 
   w.clock.tick(RESEND_COOLDOWN_SECONDS * SEC);
@@ -264,7 +264,7 @@ test('reenvio: depois do intervalo, o novo código vale e o antigo deixa de vale
 
 test('reenvio: zera as tentativas erradas e mantém os dados do cadastro', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', displayName: 'Ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', displayName: 'Ana', password: PASSWORD });
   const before = (await w.pending.find('ana@exemplo.com'))!;
   await rejectsWith(w.core.auth.confirmSignup({ email: 'ana@exemplo.com', code: '000000' }), 'VALIDATION');
 
@@ -282,7 +282,7 @@ test('reenvio: sem cadastro pendente ou depois de expirar dá NOT_FOUND', async 
   await rejectsWith(w.core.auth.resendSignupCode('ninguem@exemplo.com'), 'NOT_FOUND');
   await rejectsWith(w.core.auth.resendSignupCode(undefined), 'NOT_FOUND');
 
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   w.clock.tick(CODE_TTL_MINUTES * MIN);
   await rejectsWith(w.core.auth.resendSignupCode('ana@exemplo.com'), 'NOT_FOUND');
   assert.equal(await w.pending.find('ana@exemplo.com'), undefined);
@@ -290,7 +290,7 @@ test('reenvio: sem cadastro pendente ou depois de expirar dá NOT_FOUND', async 
 
 test('envios: no máximo 5 códigos por janela de cadastro; o limite vale também para começar de novo', async () => {
   const w = makeWorld();
-  const input = { email: 'ana@exemplo.com', username: 'ana', password: PASSWORD };
+  const input = { email: 'ana@exemplo.com', username: 'ana', password: PASSWORD, birthDate: '1990-01-01', acceptTerms: true };
   await w.core.auth.startSignup(input);
   for (let i = 1; i < MAX_CODE_SENDS; i += 1) {
     w.clock.tick((RESEND_COOLDOWN_SECONDS + 1) * SEC);
@@ -306,7 +306,7 @@ test('envios: no máximo 5 códigos por janela de cadastro; o limite vale també
 
 test('envios: depois que a janela expira, dá para recomeçar do zero', async () => {
   const w = makeWorld();
-  const input = { email: 'ana@exemplo.com', username: 'ana', password: PASSWORD };
+  const input = { email: 'ana@exemplo.com', username: 'ana', password: PASSWORD, birthDate: '1990-01-01', acceptTerms: true };
   await w.core.auth.startSignup(input);
   for (let i = 1; i < MAX_CODE_SENDS; i += 1) {
     w.clock.tick((RESEND_COOLDOWN_SECONDS + 1) * SEC);
@@ -319,11 +319,11 @@ test('envios: depois que a janela expira, dá para recomeçar do zero', async ()
 
 test('recomeçar o cadastro depois do intervalo substitui os dados e invalida o código anterior', async () => {
   const w = makeWorld();
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   const first = w.mailer.lastCodeFor('ana@exemplo.com');
 
   w.clock.tick((RESEND_COOLDOWN_SECONDS + 1) * SEC);
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana.nova', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana.nova', password: PASSWORD });
   const second = w.mailer.lastCodeFor('ana@exemplo.com');
 
   await rejectsWith(w.core.auth.confirmSignup({ email: 'ana@exemplo.com', code: first }), 'VALIDATION');
@@ -335,13 +335,13 @@ test('falha no envio do e-mail: o erro chega a quem chamou e o pendente é desca
   const w = makeWorld();
   w.mailer.failNext = true;
   await assert.rejects(
-    w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD }),
+    w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD }),
     /falha simulada/,
   );
   assert.equal(await w.pending.find('ana@exemplo.com'), undefined);
 
   // sem espera: não ficou intervalo preso por um envio que não aconteceu
-  await w.core.auth.startSignup({ email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
+  await w.core.auth.startSignup({ birthDate: "1990-01-01", acceptTerms: true, email: 'ana@exemplo.com', username: 'ana', password: PASSWORD });
   assert.equal(w.mailer.sent.length, 1);
 });
 

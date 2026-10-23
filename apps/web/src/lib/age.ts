@@ -24,3 +24,16 @@ export function birthDateProblem(birth: string, now: Date): string | undefined {
   if (age < 0 || age > 120) return 'Informe uma data válida';
   return undefined;
 }
+
+/** Idade mínima para ter conta (a API confere de novo; este número só avisa mais cedo). */
+export const MIN_ACCOUNT_AGE = 13;
+
+/** Problemas na data de nascimento e no aceite dos Termos, por campo. Vazio = pode enviar. */
+export function consentProblems(birth: string, accepted: boolean, now: Date): Record<string, string> {
+  const out: Record<string, string> = {};
+  const problem = birthDateProblem(birth, now);
+  if (problem) out['birthDate'] = problem;
+  else if (ageOnDate(birth, now) < MIN_ACCOUNT_AGE) out['birthDate'] = `O AskouT é para quem tem ${MIN_ACCOUNT_AGE} anos ou mais`;
+  if (!accepted) out['acceptTerms'] = 'Para criar a conta, aceite os Termos de Uso e a Política de Privacidade';
+  return out;
+}

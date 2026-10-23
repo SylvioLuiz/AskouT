@@ -84,11 +84,10 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   async function signUp(username: string, extra: { displayName?: string; email?: string; minor?: boolean } = {}): Promise<AuthResult> {
     clock.tick(1000);
     const email = (extra.email ?? `${username}@exemplo.com`).toLowerCase();
-    await core.auth.startSignup({ email, username, displayName: extra.displayName ?? username, password: PASSWORD });
-    const result = await core.auth.confirmSignup({ email, code: mailer.lastCodeFor(email) });
-    // Nos testes, todo mundo já é maior de idade; os testes da trava usam makeWorld().users.setBirthDate para mudar.
-    if (!extra.minor) await users.setBirthDate(result.user.id, '1990-01-01');
-    return result;
+    // Nos testes, todo mundo é maior de idade, salvo `minor` (17 anos).
+    const birthDate = extra.minor ? `${clock.now().getUTCFullYear() - 17}-01-01` : '1990-01-01';
+    await core.auth.startSignup({ email, username, displayName: extra.displayName ?? username, password: PASSWORD, birthDate, acceptTerms: true });
+    return core.auth.confirmSignup({ email, code: mailer.lastCodeFor(email) });
   }
 
   /** Cria vários usuários de uma vez e devolve os ids por username. */

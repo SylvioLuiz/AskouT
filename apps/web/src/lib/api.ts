@@ -152,7 +152,7 @@ export function createApi(deps: ApiDeps) {
     login: (identifier: string, password: string) =>
       request<AuthResult>('POST', '/auth/login', { body: { identifier, password }, auth: false }),
     socialProviders: () => request<{ items: SocialProvider[] }>('GET', '/auth/providers', { auth: false }),
-    socialLogin: (input: { provider: SocialProviderId; idToken: string; username?: string; displayName?: string }) =>
+    socialLogin: (input: { provider: SocialProviderId; idToken: string; username?: string; displayName?: string; birthDate?: string; acceptTerms?: boolean }) =>
       request<AuthResult | SocialNeedsProfile>('POST', '/auth/social', { body: input, auth: false }),
     me: () => request<SessionUser>('GET', '/auth/me'),
 

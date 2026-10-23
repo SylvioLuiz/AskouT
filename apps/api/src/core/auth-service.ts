@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { DomainError, conflict, forbidden, notFound, rateLimited, unauthorized, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
+import { checkSignupConsent } from './age-service.ts';
 import type { Actor, ExternalProvider, PendingSignup, Profile, PublicProfile, User, UserRole } from './types.ts';
 import { toPublicProfile } from './types.ts';
 import {
@@ -38,6 +39,10 @@ export interface SignupInput {
   username: unknown;
   displayName?: unknown;
   password: unknown;
+  /** Data de nascimento AAAA-MM-DD. */
+  birthDate?: unknown;
+  /** Tem que ser `true`: aceite dos Termos de Uso e da Política de Privacidade. */
+  acceptTerms?: unknown;
 }
 
 export interface SignupStarted {
@@ -63,6 +68,9 @@ export interface SocialLoginInput {
   /** Só na primeira vez: o nome de usuário escolhido para a conta nova. */
   username?: unknown;
   displayName?: unknown;
+  /** Só na criação da conta: data de nascimento e aceite dos Termos. */
+  birthDate?: unknown;
+  acceptTerms?: unknown;
 }
 
 /** A conta externa é nova: falta a pessoa escolher o nome de usuário. */
@@ -101,6 +109,7 @@ export class AuthService {
     const rawName = asString(input.displayName);
     const displayName = normalizeDisplayName(rawName.length > 0 ? rawName : username);
     const password = asString(input.password);
+    const consent = checkSignupConsent({ birthDate: input.birthDate, acceptTerms: input.acceptTerms }, clock.now());
 
     assertNoProblems({
       email: emailProblem(email),
@@ -127,6 +136,8 @@ export class AuthService {
       username,
       displayName,
       passwordHash: await hasher.hash(password),
+      birthDate: consent.birthDate,
+      termsVersion: consent.termsVersion,
       codeHash: codes.hash(email, code),
       expiresAt: addMs(now, CODE_TTL_MINUTES * 60_000),
       attempts: 0,
@@ -198,6 +209,9 @@ export class AuthService {
       status: 'ACTIVE',
       role: 'USER',
       createdAt: now,
+      birthDate: record.birthDate,
+      termsAcceptedAt: now,
+      termsVersion: record.termsVersion,
     };
     const profile: Profile = {
       userId: user.id,
@@ -265,7 +279,8 @@ export class AuthService {
       throw conflict('Este nome de usuário já está em uso', { username: 'Este nome de usuário já está em uso' });
     }
 
-    const user: User = { id: ids.next(), email, passwordHash: await hasher.hash(randomBytes(32).toString('hex')), status: 'ACTIVE', role: 'USER', createdAt: now };
+    const consent = checkSignupConsent({ birthDate: input.birthDate, acceptTerms: input.acceptTerms }, now);
+    const user: User = { id: ids.next(), email, passwordHash: await hasher.hash(randomBytes(32).toString('hex')), status: 'ACTIVE', role: 'USER', createdAt: now, birthDate: consent.birthDate, termsAcceptedAt: now, termsVersion: consent.termsVersion };
     const profile: Profile = { userId: user.id, username, displayName, bio: null, avatarUrl: null, isPrivate: false };
     await users.create(user, profile);
     await identities.link(provider, claims.subject, user.id, now);

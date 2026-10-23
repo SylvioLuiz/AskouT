@@ -67,7 +67,7 @@ describe('cliente da API', () => {
     assert.equal(call?.headers['Content-Type'], 'application/json');
     assert.deepEqual(JSON.parse(call?.body ?? ''), { identifier: '@ana', password: 'segredo-forte' });
     await t.api.confirmSignup('a@b.co', '123456');
-    await t.api.startSignup({ email: 'a@b.co', username: 'ana', password: 'x' });
+    await t.api.startSignup({ email: 'a@b.co', username: 'ana', password: 'x', birthDate: '1990-01-01', acceptTerms: true });
     await t.api.resendSignupCode('a@b.co');
     assert.ok(t.calls.every((c) => c.headers['Authorization'] === undefined));
   });
@@ -117,7 +117,7 @@ describe('cliente da API', () => {
       status: 400,
       body: { error: { code: 'VALIDATION', message: 'Dados inválidos', details: { username: 'Nome em uso', n: 3 } } },
     });
-    await assert.rejects(t.api.startSignup({ email: 'a', username: 'b', password: 'c' }), (e: unknown) => {
+    await assert.rejects(t.api.startSignup({ email: 'a', username: 'b', password: 'c', birthDate: '1990-01-01', acceptTerms: true }), (e: unknown) => {
       assert.ok(e instanceof ApiError);
       assert.equal(e.code, 'VALIDATION');
       assert.equal(e.status, 400);

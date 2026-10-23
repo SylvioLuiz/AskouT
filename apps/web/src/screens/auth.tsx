@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { AuthLayout } from '../components/AuthLayout.tsx';
+import { ConsentFields } from '../components/consent-fields.tsx';
 import { SocialLogin } from '../components/social-login.tsx';
+import { consentProblems } from '../lib/age.ts';
 import { Button, Field, Notice, PasswordField } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAuthContext } from '../auth.tsx';
@@ -110,6 +112,8 @@ export function SignupScreen() {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
+  const [birth, setBirth] = useState('');
+  const [accepted, setAccepted] = useState(false);
   const [code, setCode] = useState('');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -126,6 +130,7 @@ export function SignupScreen() {
       username: usernameProblem(handle),
       displayName: displayNameProblem(displayName, false),
       password: passwordProblem(password),
+      ...consentProblems(birth, accepted, new Date()),
     });
     setErrors(found);
     setFormError(undefined);
@@ -137,6 +142,8 @@ export function SignupScreen() {
         email: email.trim(),
         username: handle,
         password,
+        birthDate: birth,
+        acceptTerms: true,
         ...(displayName.trim() !== '' ? { displayName: displayName.trim() } : {}),
       });
       setStarted(result);
@@ -236,6 +243,7 @@ export function SignupScreen() {
         <Field label="Nome de usuário" value={username} onChange={(v) => setUsername(v.toLowerCase())} error={errors['username']} hint="Letras minúsculas, números, ponto e sublinhado. Não dá para trocar depois." prefix="@" autoComplete="username" maxLength={31} />
         <Field label="Nome (opcional)" value={displayName} onChange={setDisplayName} error={errors['displayName']} autoComplete="name" maxLength={60} />
         <PasswordField label="Senha" value={password} onChange={setPassword} error={errors['password']} hint="Pelo menos 8 caracteres." autoComplete="new-password" />
+        <ConsentFields birth={birth} onBirth={setBirth} accepted={accepted} onAccepted={setAccepted} errors={errors} />
         <Button type="submit" full loading={busy}>
           Continuar
         </Button>
@@ -244,7 +252,6 @@ export function SignupScreen() {
         </p>
       </form>
       <SocialLogin />
-      <LegalNote />
     </AuthLayout>
   );
 }

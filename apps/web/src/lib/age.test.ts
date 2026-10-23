@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ageOnDate, birthDateProblem, todayIso } from './age.ts';
+import { ageOnDate, birthDateProblem, consentProblems, todayIso } from './age.ts';
 
 const now = new Date(2026, 9, 22, 12);
 
@@ -20,4 +20,12 @@ test('birthDateProblem: vazio, futuro e antigo demais dão erro', () => {
 
 test('todayIso: formata com zeros', () => {
   assert.equal(todayIso(new Date(2026, 0, 5)), '2026-01-05');
+});
+
+test('consentProblems: exige data válida, 13 anos ou mais e o aceite', () => {
+  assert.deepEqual(consentProblems('1990-05-10', true, now), {});
+  assert.ok(consentProblems('', true, now)['birthDate']);
+  assert.ok(consentProblems('2020-01-01', true, now)['birthDate']);
+  assert.ok(consentProblems('1990-05-10', false, now)['acceptTerms']);
+  assert.equal(consentProblems('2013-10-22', true, now)['birthDate'], undefined, '13 anos hoje já vale');
 });

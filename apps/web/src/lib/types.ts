@@ -88,6 +88,8 @@ export interface SignupInput {
   username: string;
   displayName?: string;
   password: string;
+  birthDate: string;
+  acceptTerms: true;
 }
 
 export interface ProfilePatch {

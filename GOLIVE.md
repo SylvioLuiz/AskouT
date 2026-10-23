@@ -201,5 +201,13 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 - **Como funciona:** ao abrir o Flash, a pessoa informa a data de nascimento uma única vez (`POST /me/age`; `GET /me/age` diz se já informou e se é maior de idade). Menor de 18 anos fica bloqueado no Flash e não consegue trocar a data. A API também recusa (403) ligar o Flash, ver disponíveis, convidar e responder convite sem 18+, então burlar a tela não adianta. O resto do app continua liberado.
 - **Limite honesto:** é **autodeclaração**. Quem mente a data passa. Para loja e LGPD isso é o padrão do mercado, mas não é verificação de documento.
 - **Dados:** a data fica no cadastro (`User.birthDate`), não aparece no perfil público, entra na cópia dos dados e some junto com a conta. Está citada na Política de Privacidade (aguarda revisão do advogado). Quem já tem conta precisa informar a data na primeira vez que abrir o Flash.
-- **Não coberto:** o cadastro em si (ainda não pede idade) e o aceite dos termos. Falta decidir se a trava vira exigência já no cadastro.
 - **Lojas:** ver a resposta dada na conversa (classificação etária do app é do app inteiro, não só do Flash). Preencher o questionário de classificação e a declaração de público-alvo na Apple e no Google Play com isso em mente.
+
+## Idade e aceite no cadastro
+
+- **O que existe:** o cadastro (e-mail ou Google/Apple, na hora de criar a conta) pede **data de nascimento** e o **aceite dos Termos e da Política** (caixa obrigatória). A API recusa sem os dois. Ficam em `User.birthDate`, `User.termsAcceptedAt` e `User.termsVersion`, e entram na cópia dos dados. Quem entra com Google/Apple numa conta que já existe não passa por isso de novo.
+- **Idade mínima: 13 anos** (`MIN_ACCOUNT_AGE` em `core/age-service.ts`; o site avisa com o mesmo número em `lib/age.ts`). De 13 a 17 tem conta, sem Flash.
+- **DECISÃO JURÍDICA PENDENTE (importante):** pelo que sei, o ECA Digital (Lei 15.211/2025) trouxe exigências para serviços que menores acessam (verificação de idade, vínculo com responsável em contas de menores de 16, regras para dados de menores). Não confirmei o texto atual. Se o advogado achar pesado, o caminho mais simples é **subir `MIN_ACCOUNT_AGE` para 18** nos dois arquivos (uma linha em cada).
+- **Versão dos Termos:** `TERMS_VERSION` em `core/age-service.ts` ('2026-10-22'). Ao mudar o texto legal, mude a versão. Ainda **não há** tela para pedir novo aceite a quem já tem conta (hoje não há contas reais; precisa existir antes de mudar os termos em produção).
+- **Contas criadas antes desta mudança** não têm aceite registrado e não têm data de nascimento (o Flash pede a data na primeira vez).
+- Cadastros pendentes antigos foram apagados pela migração (o código vale poucos minutos; quem estava no meio refaz).

@@ -62,7 +62,7 @@ export class PrismaAccountRepository implements AccountRepository {
     ]);
     const who = (u: { profile: { username: string; displayName: string } | null }) => (u.profile ? { username: u.profile.username, displayName: u.profile.displayName } : null);
     return {
-      account: user ? { id: user.id, email: user.email, status: user.status, role: user.role, createdAt: iso(user.createdAt), birthDate: user.birthDate ? user.birthDate.toISOString().slice(0, 10) : null } : null,
+      account: user ? { id: user.id, email: user.email, status: user.status, role: user.role, createdAt: iso(user.createdAt), birthDate: user.birthDate ? user.birthDate.toISOString().slice(0, 10) : null, termsAcceptedAt: user.termsAcceptedAt ? iso(user.termsAcceptedAt) : null, termsVersion: user.termsVersion } : null,
       profile: user?.profile ? { username: user.profile.username, displayName: user.profile.displayName, bio: user.profile.bio, isPrivate: user.profile.isPrivate } : null,
       settings: { timeZone: settings?.timeZone ?? null, notifyPrefs: settings?.notifyPrefs ?? null, notifications: notificationSetting ? { muteAll: notificationSetting.muteAll, muteChats: notificationSetting.muteChats, muteEvents: notificationSetting.muteEvents } : null },
       region: region ? { lat: region.lat, lng: region.lng, updatedAt: iso(region.updatedAt) } : null,

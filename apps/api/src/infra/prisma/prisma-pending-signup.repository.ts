@@ -3,12 +3,16 @@ import type { PendingSignupRepository } from '../../core/ports.ts';
 import type { PendingSignup } from '../../core/types.ts';
 import { isRecordNotFound } from './helpers.ts';
 
-function toPending(row: PendingSignup): PendingSignup {
+type PendingRow = Omit<PendingSignup, 'birthDate'> & { birthDate: Date };
+
+function toPending(row: PendingRow): PendingSignup {
   return {
     email: row.email,
     username: row.username,
     displayName: row.displayName,
     passwordHash: row.passwordHash,
+    birthDate: row.birthDate.toISOString().slice(0, 10),
+    termsVersion: row.termsVersion,
     codeHash: row.codeHash,
     expiresAt: row.expiresAt,
     attempts: row.attempts,
@@ -31,7 +35,8 @@ export class PrismaPendingSignupRepository implements PendingSignupRepository {
   }
 
   async save(pending: PendingSignup): Promise<void> {
-    const { email, ...fields } = pending;
+    const { email, birthDate, ...rest } = pending;
+    const fields = { ...rest, birthDate: new Date(`${birthDate}T00:00:00.000Z`) };
     await this.prisma.pendingSignup.upsert({
       where: { email },
       create: { email, ...fields },
