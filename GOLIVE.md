@@ -261,4 +261,5 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Feito pelo Sylvio: domínio `askout.com.br` no Cloudflare (DNS), caixas de e-mail `privacidade@`, `contato@` e `suporte@` no Hostinger (plano gratuito **até 12/03/2027**: renovar ou migrar antes), SPF duplicado do Firebase removido. Teste de recebimento e resposta ok.
 - Valores a usar: `VITE_SUPPORT_EMAIL=suporte@askout.com.br`, `VITE_PRIVACY_EMAIL=privacidade@askout.com.br`, `EMAIL_REPLY_TO=privacidade@askout.com.br`, `OSM_CONTACT=contato@askout.com.br`.
 - Sobras do Firebase antigo no DNS (A do domínio principal, TXT `firebase=`, `firebase1/2._domainkey`): limpar quando o site novo for ligado.
-- Próximos: Resend (conta, domínio, chave), dados legais, Cloudflare Pages, Railway.
+- Resend: conta criada, domínio `askout.com.br` **verificado** e chave de envio já criada e guardada pelo Sylvio (ainda NÃO testada contra a API real). Colar a chave só no Railway (`RESEND_API_KEY`), nunca no chat.
+- Próximos: dados legais, Cloudflare Pages, Railway.
