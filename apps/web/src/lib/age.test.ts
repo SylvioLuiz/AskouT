@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ageOnDate, birthDateProblem, consentProblems, todayIso } from './age.ts';
+import { ageOnDate, birthDateProblem, consentProblems, showFlashCard, todayIso } from './age.ts';
 
 const now = new Date(2026, 9, 22, 12);
 
@@ -20,6 +20,13 @@ test('birthDateProblem: vazio, futuro e antigo demais dão erro', () => {
 
 test('todayIso: formata com zeros', () => {
   assert.equal(todayIso(new Date(2026, 0, 5)), '2026-01-05');
+});
+
+test('showFlashCard: some para menor de 18, aparece para adulto e para quem ainda não informou a data', () => {
+  assert.equal(showFlashCard(undefined), false, 'ainda carregando: não mostra');
+  assert.equal(showFlashCard({ adult: true, locked: false }), true);
+  assert.equal(showFlashCard({ adult: false, locked: false }), true, 'sem data informada: precisa ver para liberar');
+  assert.equal(showFlashCard({ adult: false, locked: true }), false, 'consta como menor de 18');
 });
 
 test('consentProblems: exige data válida, 13 anos ou mais e o aceite', () => {

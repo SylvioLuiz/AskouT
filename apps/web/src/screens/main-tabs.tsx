@@ -8,6 +8,7 @@ import { agendaEvents, nextPlan, planWhenLabel } from '../lib/agenda.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { PullRefresh } from '../components/pull-refresh.tsx';
 import { formatRemaining, minutesLeft } from '../lib/flash.ts';
+import { showFlashCard } from '../lib/age.ts';
 import { PostList } from '../components/post.tsx';
 import { Link } from '../router.tsx';
 import { SuggestedPeople } from '../components/suggested-people.tsx';
@@ -17,6 +18,7 @@ export function HomeScreen() {
   useTitle('Home');
   const user = useUser();
   const flash = useAsync(() => api.flashStatus(), []);
+  const age = useAsync(() => api.ageStatus(), []);
   const flashOn = flash.data?.active === true;
   const followed = useAsync(() => api.followedEvents(), []);
   const followedEvents = followed.data?.events ?? [];
@@ -53,19 +55,21 @@ export function HomeScreen() {
         </Link>
       ) : null}
 
-      <Link to="/flash" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
-        <span className="flashcta__icon">
-          <BoltIcon filled />
-        </span>
-        <span className="flashcta__text">
-          <span className="flashcta__title">{flashOn ? 'Flash ligado' : 'Flash: estou livre agora'}</span>
-          <span className="flashcta__sub">
-            {flashOn && flash.data?.expiresAt
-              ? `Faltam ${formatRemaining(minutesLeft(flash.data.expiresAt, Date.now()))}. Veja quem mais está livre.`
-              : 'Avise seus amigos que dá para sair agora.'}
+      {showFlashCard(age.data) ? (
+        <Link to="/flash" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
+          <span className="flashcta__icon">
+            <BoltIcon filled />
           </span>
-        </span>
-      </Link>
+          <span className="flashcta__text">
+            <span className="flashcta__title">{flashOn ? 'Flash ligado' : 'Flash: estou livre agora'}</span>
+            <span className="flashcta__sub">
+              {flashOn && flash.data?.expiresAt
+                ? `Faltam ${formatRemaining(minutesLeft(flash.data.expiresAt, Date.now()))}. Veja quem mais está livre.`
+                : 'Avise seus amigos que dá para sair agora.'}
+            </span>
+          </span>
+        </Link>
+      ) : null}
 
       {followedEvents.length > 0 ? (
         <section className="section" aria-labelledby="seguindo-titulo">
