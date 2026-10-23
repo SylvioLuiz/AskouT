@@ -3,7 +3,7 @@
 Itens que ficaram de fora de propósito até a publicação. Marque com `[x]` quando concluir.
 
 ## ⚠️ Antes de subir nas lojas: LIMPAR TUDO QUE É DE TESTE (pedido do Sylvio, 23/10/2026)
-Quando chegar a hora de publicar nas lojas (Apple e Google), o Claude deve fazer uma limpa em tudo o que foi cadastrado só para teste no app e no banco de produção. Fazer **depois de um backup do banco** (`pg_dump`, ou o backup do Railway) e **mostrando a lista do que vai sair ao Sylvio antes de apagar**. Não apagar a conta de administrador nem os dados reais.
+Quando chegar a hora de publicar nas lojas (Apple e Google), o Claude deve fazer uma limpa em tudo o que foi cadastrado só para teste no app e no banco de produção. Fazer **depois de um backup do banco** (`pg_dump`, ou o backup do Render/Railway) e **mostrando a lista do que vai sair ao Sylvio antes de apagar**. Não apagar a conta de administrador nem os dados reais.
 
 Checklist:
 - [ ] **Pessoas e posts de exemplo `[TESTE]`**: `npm run seed:demo -- --clear` (contas `teste_*`, e-mail `@teste.askout.invalid`). Atenção: o script **recusa rodar com `NODE_ENV=production`**; para limpar o banco de produção, rodar de uma máquina com `DATABASE_URL` de produção e sem `NODE_ENV=production`, conferindo o banco de destino antes (ou apagar pelo painel de gestão).
@@ -279,7 +279,12 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Sobras do Firebase antigo no DNS (A do domínio principal, TXT `firebase=`, `firebase1/2._domainkey`): limpar quando o site novo for ligado.
 - Resend: conta criada, domínio `askout.com.br` **verificado** e chave de envio já criada e guardada pelo Sylvio (ainda NÃO testada contra a API real). Colar a chave só no Railway (`RESEND_API_KEY`), nunca no chat.
 - Cloudflare Pages (22-23/10/2026): projetos `askout-site` (`askout-site.pages.dev`) e `askout-gestao` (`askout-gestao.pages.dev`) criados e com o primeiro deploy concluído, ligados ao repositório `SylvioLuiz/AskouT` (branch `main`; cada push publica sozinho). Domínios `askout.com.br` e `gestao.askout.com.br` adicionados (status "Initializing" na hora). O A antigo do Firebase (`199.36.158.100`) foi substituído por CNAME. Variáveis: `NODE_VERSION=22`, `VITE_API_URL=https://api.askout.com.br` (+ e-mails de suporte/privacidade no site). Falta `VITE_MAP_STYLE_URL` (mapa) e conferir os domínios como Ativos.
-- Em 23/10/2026: domínios ativos (respondem 200), mapa configurado, Google feito. Próximo: Railway (API).
+- Em 23/10/2026: domínios ativos (respondem 200), mapa configurado, Google feito.
+- **API no Render (23/10/2026):** a Railway estava em incidente de segurança (cadastros pausados), então a API foi publicada no **Render** pelo `render.yaml` (Blueprint `askout`, workspace "My Workspace", região Oregon): serviço `askout-api` (Docker, plano Starter) + banco `askout-db` (Postgres, Basic-256mb). `https://api.askout.com.br/saude` responde `{"ok":true}` com HTTPS; CNAME `api` → `askout-api.onrender.com` no Cloudflare, **só DNS (proxy desligado)**. CORS conferido: aceita `https://askout.com.br`, não aceita origem estranha. O site publicado já aponta para `api.askout.com.br`.
+  - Preenchidas pelo Sylvio direto no Render: `RESEND_API_KEY` e `GOOGLE_PLACES_API_KEY`. **`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` ficaram vazias**: push desligado por enquanto (ativar depois, colando o par direto no Render).
+  - Na primeira partida o deploy falhou (`P1001`: o banco ainda não aceitava conexões quando a migration rodou). Um "Deploy latest commit" manual resolveu. Em novos Blueprints/bancos, esperar o banco ficar disponível antes do primeiro deploy.
+  - Ainda NÃO testado contra a API real: envio de e-mail (Resend), login do Google, busca de bares (Places), cadastro e login pelo site, `make-admin`. Backups do banco do Render (plano Basic): conferir a retenção antes de ter dados reais.
+  - Custo: planos pagos por segundo de uso; conferir o valor mensal em Billing no Render. Se a Railway normalizar, dá para migrar (mesmo Dockerfile; mover o banco e repontar o `api`).
 
 ## Dados legais preenchidos (22/10/2026)
 - Controladora: Thunderbolt LTDA, CNPJ 44.953.028/0001-19 (contrato social JUCESP, 2022). Endereço publicado nos textos: Av. Jabaquara, 1909, sala 62, São Paulo/SP (informado pelo Sylvio; **o contrato social ainda mostra outra sede**: atualizar o endereço na Junta/CNPJ para bater com o que está publicado). Encarregado: Sylvio Luiz de Souza (`privacidade@askout.com.br`). Tudo em `COMPANY` em `apps/web/src/lib/legal-text.ts`.
