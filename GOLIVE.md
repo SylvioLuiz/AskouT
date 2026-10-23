@@ -278,3 +278,9 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - A chave secreta do cliente não é usada pela API (não guardar).
 - Tela de consentimento: Externa, em modo "Teste" → publicar para produção antes do lançamento público (só e-mail/perfil básico, sem verificação pesada). E-mail de suporte atual é pessoal; trocar por suporte@askout.com.br (via grupo) se possível.
 - Login nativo (app Capacitor) exigirá clientes Android/iOS próprios depois.
+
+## Mapa (feito em 2026-10-23)
+- Chave MapTiler "AskouT Web" criada (plano gratuito), restrita às origens askout.com.br, *.askout.com.br e localhost (a chave é de frontend, pública por design; a restrição de origem é a proteção).
+- `VITE_MAP_STYLE_URL` = `https://api.maptiler.com/maps/streets-v2/style.json?key=<chave>` definida no projeto Cloudflare Pages `askout-site`.
+- App nativo (Capacitor): MapTiler não aceitou `capacitor://localhost` como origem; ao fazer o app, testar se o mapa carrega ou criar uma segunda chave sem restrição de origem com restrição de user-agent.
+- Conferir uso no painel do MapTiler (limite do plano gratuito) depois do lançamento.
