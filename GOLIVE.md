@@ -164,3 +164,15 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 - **IP do cliente:** em produção a API confia em 1 proxy (`TRUST_PROXY_HOPS`, padrão 1, certo para o Railway) para ler o IP em `X-Forwarded-For`. Confirmar depois de subir que o IP lido não é o do proxy (se for, todos dividiriam o mesmo limite).
 - **Fora do que já existia:** o núcleo já limitava tentativas de código por pedido, mensagens por minuto e criação de encontros. Não há limite por usuário logado nas demais rotas (só o por IP) nem bloqueio de contas.
 - **Desligar para testes locais:** `RATE_LIMIT=off` (recusado em produção).
+
+## Política de Privacidade e Termos de Uso
+
+- **Onde estão:** `/politica-de-privacidade` e `/termos-de-uso` (públicas, abrem sem login; textos em `apps/web/src/lib/legal-text.ts`). Linkadas no login, no cadastro e em Privacidade. Mostram o aviso "versão preliminar" até `LEGAL_REVIEWED` virar `true`.
+- **É um rascunho escrito por mim a partir do que o app faz, não parecer jurídico.** Advogado precisa revisar tudo antes de abrir ao público, principalmente: base legal das recomendações (hoje ligadas por padrão, texto cita legítimo interesse e consentimento), localização para anúncios por região, transferência internacional, prazos de retenção, foro, texto sobre ingressos e responsabilidade.
+- **Campos a preencher no texto:** razão social, CNPJ e endereço do controlador (política, seção 1); política de reembolso do impulsionamento (termos, seção 6).
+- **E-mail de privacidade:** o texto usa `privacidade@askout.com.br` (ou `VITE_PRIVACY_EMAIL`). Essa caixa ainda **não existe**: criar um encaminhamento no Cloudflare (Email Routing, grátis) para um e-mail seu antes do lançamento.
+- **Lacunas entre o texto e o app (resolver ou ajustar o texto):**
+  - **Não há "apagar minha conta" nem "baixar meus dados" no app.** O texto promete atender por e-mail em até 15 dias, manualmente. Para escalar, criar as duas funções (exclusão em cascata de tudo o que a pessoa criou; exportação em arquivo).
+  - **Idade mínima 18:** o texto afirma 18+, mas o cadastro não pergunta idade. Falta a trava (data de nascimento ou declaração) e decidir o que fazer com quem declarar menos.
+  - Conferir se mensagens e posts apagados somem de fato do banco (o texto diz "enquanto a conta existir ou até você apagar").
+  - Registrar o aceite dos termos (data e versão) por conta, ainda não é gravado.

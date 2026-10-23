@@ -4551,3 +4551,20 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .uploadbar__bar::-moz-progress-bar { background: var(--brand); border-radius: 999px; }
 .uploadbar__text { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .uploadbar__hint { margin: 0; color: var(--muted); font-size: 0.875rem; }
+
+/* Páginas legais (política de privacidade e termos): leitura, fora do Shell. */
+.legal { min-height: 100dvh; background: var(--bg); color: var(--ink); }
+.legal__top { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px; }
+.legal__back { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 22px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.legal__brand { font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+.legal__body { max-width: 720px; margin: 0 auto; padding: 8px 16px 48px; line-height: 1.55; font-size: 16px; }
+.legal__body h1 { margin: 8px 0 4px; font-family: var(--font-display); font-size: 28px; letter-spacing: -0.02em; }
+.legal__meta { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+.legal__draft { margin: 0 0 16px; padding: 10px 14px; border-radius: var(--radius-control); background: var(--brand-soft); color: var(--ink); font-size: 14px; }
+.legal__section h2 { margin: 28px 0 6px; font-size: 18px; }
+.legal__section p, .legal__section ul { margin: 8px 0; }
+.legal__section ul { padding-left: 20px; }
+.legal__section li { margin: 6px 0; }
+.legal__switch { margin-top: 32px; }
+.auth__legal { margin: 14px 0 0; text-align: center; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.auth__legal a { color: inherit; text-decoration: underline; }

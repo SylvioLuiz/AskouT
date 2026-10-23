@@ -214,6 +214,8 @@ export function PrivacyScreen() {
         <Link to="/atividades">Pedidos para seguir</Link>
         <Link to="/bloqueados">Pessoas bloqueadas</Link>
         <Link to={`/u/${encodeURIComponent(user.profile.username)}`}>Ver como os outros veem</Link>
+        <Link to="/politica-de-privacidade">Política de Privacidade</Link>
+        <Link to="/termos-de-uso">Termos de Uso</Link>
       </nav>
     </>
   );

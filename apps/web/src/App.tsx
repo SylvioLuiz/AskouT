@@ -10,6 +10,7 @@ import { useTitle } from './hooks.ts';
 import { Link, navigate, resolveRoute, usePathname } from './router.tsx';
 import type { RouteDef } from './router.tsx';
 import { AgendaScreen } from './screens/agenda.tsx';
+import { LegalScreen } from './screens/legal.tsx';
 import { ActivityScreen } from './screens/activity.tsx';
 import { ForgotPasswordScreen, LoginScreen, SignupScreen } from './screens/auth.tsx';
 import { ChatScreen, ConversationsScreen } from './screens/conversations.tsx';
@@ -30,6 +31,12 @@ import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
 import { ArchivedScreen, CreatePostScreen, PostScreen } from './screens/posts.tsx';
 
 // Telas para quem ainda não entrou.
+/** Páginas legais: abrem com ou sem login, fora do Shell. */
+const LEGAL_ROUTES: RouteDef[] = [
+  { path: '/politica-de-privacidade', render: () => <LegalScreen doc="privacy" /> },
+  { path: '/termos-de-uso', render: () => <LegalScreen doc="terms" /> },
+];
+
 const GUEST_ROUTES: RouteDef[] = [
   { path: '/entrar', render: () => <LoginScreen /> },
   { path: '/cadastro', render: () => <SignupScreen /> },
@@ -114,12 +121,15 @@ function AppRoutes() {
   const pathname = usePathname();
   const guest = resolveRoute(GUEST_ROUTES, pathname);
   const priv = resolveRoute(PRIVATE_ROUTES, pathname);
+  const legal = resolveRoute(LEGAL_ROUTES, pathname);
 
   useEffect(() => {
+    if (legal) return;
     if (state.status === 'user' && guest) navigate('/', { replace: true });
     if (state.status === 'guest' && !guest) navigate('/entrar', { replace: true });
-  }, [state.status, guest, pathname]);
+  }, [state.status, guest, legal, pathname]);
 
+  if (legal) return <>{legal.route.render(legal.params)}</>;
   if (state.status === 'loading') return <Splash />;
 
   if (state.status === 'failed') {

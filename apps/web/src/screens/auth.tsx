@@ -82,7 +82,17 @@ export function LoginScreen() {
         </p>
       </form>
       <SocialLogin />
+      <LegalNote />
     </AuthLayout>
+  );
+}
+
+/** Aviso de aceite com os links dos textos legais. */
+function LegalNote() {
+  return (
+    <p className="auth__legal">
+      Ao continuar, você concorda com os <Link to="/termos-de-uso">Termos de Uso</Link> e com a <Link to="/politica-de-privacidade">Política de Privacidade</Link>.
+    </p>
   );
 }
 
@@ -234,6 +244,7 @@ export function SignupScreen() {
         </p>
       </form>
       <SocialLogin />
+      <LegalNote />
     </AuthLayout>
   );
 }
