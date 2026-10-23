@@ -4,6 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.ts';
 import { AllExceptionsFilter } from './exception.filter.ts';
+import { securityHeaders } from './support/security-headers.ts';
 import type { AppConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
 
@@ -21,6 +22,8 @@ app.useBodyParser('json', { limit: '3mb' });
 app.useBodyParser('raw', { type: ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'], limit: '61mb' });
 // Atrás do proxy da hospedagem, o IP do cliente vem do cabeçalho X-Forwarded-For; sem isso o limite contaria o IP do proxy.
 if (config.trustProxyHops > 0) app.set('trust proxy', config.trustProxyHops);
+app.disable('x-powered-by');
+app.use(securityHeaders({ production: config.nodeEnv === 'production' }));
 app.useGlobalFilters(new AllExceptionsFilter());
 app.enableShutdownHooks();
 if (config.corsOrigins.length > 0) {

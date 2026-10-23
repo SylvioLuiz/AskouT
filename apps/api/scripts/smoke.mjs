@@ -56,11 +56,11 @@ async function codeFor(email) {
   throw new Error(`Código de ${email} não apareceu em ${LOG}`);
 }
 
-async function signUp(label, suffix) {
+async function signUp(label, suffix, birthDate = '1990-01-01') {
   const email = `smoke-${suffix}-${label}@exemplo.com`;
   const username = `smk${suffix}${label}`;
   const started = await call('POST', '/auth/signup', {
-    body: { email, username, displayName: `Smoke ${label}`, password: PASSWORD },
+    body: { email, username, displayName: `Smoke ${label}`, password: PASSWORD, birthDate, acceptTerms: true },
   });
   if (started.status !== 200) throw new Error(`signup ${label}: ${started.status} ${JSON.stringify(started.body)}`);
   const code = await codeFor(email);
@@ -92,7 +92,7 @@ try {
   const badLogin = await call('POST', '/auth/login', { body: { identifier: a.username, password: 'errada-errada' } });
   check('senha errada dá 401 genérico', badLogin.status === 401 && badLogin.body.error.code === 'UNAUTHORIZED', badLogin.body);
   const dup = await call('POST', '/auth/signup', {
-    body: { email: a.email, username: `outro${suffix}`, displayName: 'X', password: PASSWORD },
+    body: { email: a.email, username: `outro${suffix}`, displayName: 'X', password: PASSWORD, birthDate: '1990-01-01', acceptTerms: true },
   });
   check('e-mail já em uso é recusado já no cadastro (409)', dup.status === 409, dup.body);
   const wrongCode = await call('POST', '/auth/signup/confirm', { body: { email: a.email, code: '000000' } });
@@ -159,16 +159,10 @@ try {
   const mine = await call('GET', `/me/availability?from=${encodeURIComponent(day(0, 0))}&to=${encodeURIComponent(day(10, 0))}`, { token: a.token });
   check('listar meus horários', mine.status === 200 && mine.body.length === 1, mine.body);
   const friendRange = `from=${encodeURIComponent(day(0, 0))}&to=${encodeURIComponent(day(10, 0))}`;
-  check('amigo vê a agenda', (await call('GET', `/users/${a.id}/availability?${friendRange}`, { token: b.token })).status === 200);
-  check('quem não é amigo não vê (403)', (await call('GET', `/users/${a.id}/availability?${friendRange}`, { token: c.token })).status === 403);
-  const compat = await call('POST', '/compatibility', { token: a.token, body: { friendIds: [b.id], start: day(3, 23), end: day(4, 1) } });
-  check('compatibilidade sem info do amigo = aguardando', compat.status === 200 && compat.body.level === 'awaiting', compat.body);
+  // A agenda é privada: não existe agenda de amigo nem comparação (decisão de produto).
+  check('agenda de outra pessoa não existe (404)', (await call('GET', `/users/${a.id}/availability?${friendRange}`, { token: b.token })).status === 404);
+  check('comparação de agendas não existe (404)', (await call('POST', '/compatibility', { token: a.token, body: { friendIds: [b.id], start: day(3, 23), end: day(4, 1) } })).status === 404);
   await call('POST', '/me/availability', { token: b.token, body: { start: day(3, 22), end: day(4, 2), state: 'AVAILABLE' } });
-  const compat2 = await call('POST', '/compatibility', { token: a.token, body: { friendIds: [b.id], start: day(3, 23), end: day(4, 1) } });
-  check('os dois livres = verde', compat2.body?.level === 'green', compat2.body);
-  const best = await call('POST', '/compatibility/best-dates', { token: a.token, body: { friendIds: [b.id], fromDate: day(1, 0).slice(0, 10), toDate: day(6, 0).slice(0, 10), durationMinutes: 120, earliestStart: '16:00', latestStart: '23:00', limit: 3 } });
-  check('melhor data devolve candidatos verdes primeiro', best.status === 200 && best.body.items?.[0]?.level === 'green', best.body);
-  check('compatibilidade com quem não é amigo (403)', (await call('POST', '/compatibility', { token: a.token, body: { friendIds: [c.id], start: day(3, 23), end: day(4, 1) } })).status === 403);
   check('remover horário', (await call('DELETE', `/me/availability/${slotA.body.id}`, { token: a.token })).body?.removed === true);
 
   console.log('\nFlash');
@@ -263,7 +257,7 @@ try {
   check('enviar sugestão', sentCard.status === 201 && sentCard.body?.kind === 'SUGGESTION', sentCard.body);
   const webm = `data:audio/webm;codecs=opus;base64,${Buffer.from([0x1a, 0x45, 0xdf, 0xa3, ...new Array(60).fill(5)]).toString('base64')}`;
   const voiceMsg = await call('POST', `/conversations/${convId}/messages`, { token: a.token, body: { audio: webm, audioMs: 3000 } });
-  check('mensagem de voz: envia', voiceMsg.status === 200 && voiceMsg.body?.kind === 'AUDIO' && voiceMsg.body?.audio?.durationMs === 3000, voiceMsg.body);
+  check('mensagem de voz: envia', voiceMsg.status === 201 && voiceMsg.body?.kind === 'AUDIO' && voiceMsg.body?.audio?.durationMs === 3000, voiceMsg.body);
   const voiceGet = await fetch(`${BASE}/conversations/${convId}/messages/${voiceMsg.body?.id}/audio`, { headers: { Authorization: `Bearer ${b.token}` } });
   check('mensagem de voz: o outro amigo baixa o áudio', voiceGet.status === 200 && (voiceGet.headers.get('content-type') ?? '').startsWith('audio/webm'));
   check('mensagem de voz: sem token, 401', (await fetch(`${BASE}/conversations/${convId}/messages/${voiceMsg.body?.id}/audio`)).status === 401);
@@ -324,7 +318,7 @@ try {
   check('post sem fotos: 400', (await call('POST', '/posts', { token: a.token, body: { images: [] } })).status === 400);
   check('foto de lugar com endereço falso: 400', (await call('POST', '/posts', { token: a.token, body: { images: [{ photoPath: '/places/photo?ref=x&exp=1&sig=y' }] } })).status === 400);
   const aPosts = await call('GET', `/profiles/${a.username}/posts`, { token: b.token });
-  check('amigo vê os posts do perfil', aPosts.status === 200 && aPosts.body.total === 1, aPosts.body);
+  check('amigo vê os posts do perfil (o do evento e o das fotos)', aPosts.status === 200 && aPosts.body.total === 2, aPosts.body?.total);
   check('feed traz o post do amigo', (await call('GET', '/posts/feed', { token: b.token })).body?.items?.some((p) => p.id === post.body.id));
   const tagged = await call('POST', '/posts', { token: a.token, body: { images: [tinyJpeg], tagUserIds: [b.id] } });
   check('marcar amigo: fica pendente', tagged.status === 200 && tagged.body.tags?.[0]?.status === 'PENDING', tagged.body);
@@ -433,6 +427,50 @@ try {
   check('bloquear esconde a conversa dos dois', (await call('GET', `/conversations/${convId}/messages`, { token: b.token })).status === 404 && (await call('GET', '/conversations', { token: a.token })).body.items.every((i) => i.id !== convId));
   const unblock = await call('DELETE', `/users/${b.id}/block`, { token: a.token });
   check('desbloquear', unblock.status === 200 && unblock.body.removed === true, unblock.body);
+
+  console.log('\nIdade, Termos e Flash');
+  const yearsAgo = (n) => `${new Date().getUTCFullYear() - n}-01-01`;
+  const noTerms = await call('POST', '/auth/signup', { body: { email: `semaceite-${suffix}@exemplo.com`, username: `sem${suffix}`, password: PASSWORD, birthDate: '1990-01-01' } });
+  check('cadastro sem aceite dos Termos: 400', noTerms.status === 400 && noTerms.body?.error?.details?.acceptTerms, noTerms.body);
+  const tooYoung = await call('POST', '/auth/signup', { body: { email: `crianca-${suffix}@exemplo.com`, username: `cri${suffix}`, password: PASSWORD, birthDate: yearsAgo(10), acceptTerms: true } });
+  check('cadastro com menos de 13 anos: 400', tooYoung.status === 400 && tooYoung.body?.error?.details?.birthDate, tooYoung.body);
+  const adultAge = await call('GET', '/me/age', { token: a.token });
+  check('adulto: /me/age diz maior de idade', adultAge.status === 200 && adultAge.body.adult === true && adultAge.body.locked === false, adultAge.body);
+  await call('DELETE', '/me/flash', { token: a.token });
+  const flashOn = await call('POST', '/me/flash', { token: a.token, body: { hours: 1 } });
+  check('adulto liga o Flash', flashOn.status === 200 && flashOn.body.active === true, flashOn.body);
+  await call('DELETE', '/me/flash', { token: a.token });
+  const d = await signUp('d', suffix, yearsAgo(15));
+  const minorAge = await call('GET', '/me/age', { token: d.token });
+  check('menor de 18: /me/age diz bloqueado', minorAge.body?.adult === false && minorAge.body?.locked === true, minorAge.body);
+  check('menor de 18 não liga o Flash (403)', (await call('POST', '/me/flash', { token: d.token, body: { hours: 1 } })).status === 403);
+  check('menor de 18 não vê quem está no Flash (403)', (await call('GET', '/flash/available', { token: d.token })).status === 403);
+  check('menor de 18 não corrige a data sozinho (403)', (await call('PUT', '/me/age', { token: d.token, body: { birthDate: '1990-01-01' } })).status === 403);
+  const fixed = await call('PUT', '/me/age', { token: a.token, body: { birthDate: '1989-12-31' } });
+  check('adulto corrige a própria data', fixed.status === 200 && fixed.body.birthDate === '1989-12-31', fixed.body);
+
+  console.log('\nSeus dados (LGPD)');
+  const exp = await call('GET', '/me/export', { token: a.token });
+  const expText = JSON.stringify(exp.body);
+  check('exportar dados: 200, com arquivo e conteúdo', exp.status === 200 && /^askout-meus-dados-/.test(exp.body?.filename ?? '') && exp.body?.data?.profile, Object.keys(exp.body ?? {}));
+  check('exportação não leva senha nem token', !/passwordHash|"token"|codeHash/.test(expText) && !expText.includes(PASSWORD));
+  check('exportar dados sem login: 401', (await call('GET', '/me/export')).status === 401);
+  const e = await signUp('e', suffix);
+  check('apagar conta com @usuário errado: 400', (await call('DELETE', '/me', { token: e.token, body: { username: 'outra', password: PASSWORD } })).status === 400);
+  const wrongPass = await call('DELETE', '/me', { token: e.token, body: { username: `@${e.username}`, password: 'errada-errada-1' } });
+  check('apagar conta com senha errada é recusado', wrongPass.status >= 400 && wrongPass.status < 500, wrongPass.status);
+  const del = await call('DELETE', '/me', { token: e.token, body: { username: `@${e.username}`, password: PASSWORD } });
+  check('apagar conta com tudo certo: 200', del.status === 200 && del.body?.deleted === true, del.body);
+  check('sessão antiga deixa de valer (401)', (await call('GET', '/auth/me', { token: e.token })).status === 401);
+  const e2 = await signUp('e', suffix).catch((err) => err);
+  check('o mesmo e-mail e @usuário podem ser usados de novo', !(e2 instanceof Error), e2?.message);
+
+  console.log('\nLimite de requisições');
+  let last;
+  for (let i = 0; i < 12; i += 1) last = await call('POST', '/auth/login', { body: { identifier: d.username, password: 'errada-errada-1' } });
+  check('muitas senhas erradas na mesma conta: 429 com Retry-After', last.status === 429 && Number(last.headers.get('retry-after')) > 0, { status: last.status, retry: last.headers.get('retry-after') });
+  const stillOk = await call('GET', '/auth/me', { token: a.token });
+  check('quem está usando o app normalmente não é afetado', stillOk.status === 200);
 } catch (error) {
   failed += 1;
   console.log(`\nERRO NO TESTE: ${error instanceof Error ? error.message : error}`);
