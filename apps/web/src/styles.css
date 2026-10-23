@@ -769,9 +769,10 @@ button {
 .pagehead__back {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  margin-left: -10px;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin-left: -12px;
   color: var(--ink);
   border-radius: 12px;
 }

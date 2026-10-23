@@ -244,3 +244,8 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Ao mudar `TERMS_VERSION` em `apps/api/src/core/age-service.ts`, quem já tem conta vê uma tela que bloqueia o app até aceitar a versão nova (`GET/POST /me/terms`). Contas antigas, sem registro de aceite, também passam por ela.
 - O bloqueio é só na tela do app; a API não recusa chamadas de quem não aceitou. Decidir com o jurídico se isso basta.
 - Antes de publicar texto novo dos Termos: trocar `TERMS_VERSION` (e revisar `LEGAL_UPDATED` no site).
+
+## Acessibilidade e desempenho (revisão automática, 22/10/2026)
+- Contraste dos textos nos dois temas ≥ 4,8:1 (`--warn` claro tem 3,1:1: só é usado em marcadores e bordas, nunca em texto). Zoom do navegador liberado, `lang="pt-BR"`, foco visível e `prefers-reduced-motion` tratados.
+- Verificado só por script no navegador simulado (nomes de botões e campos, `alt`, tamanho de toque). **Falta** teste com leitor de tela real (VoiceOver/TalkBack) e em aparelho de verdade.
+- Pacote inicial do site: ~202 KB comprimido; mapa (~285 KB) e leitor de PDF carregam só quando usados. Não medimos tempo de carregamento em rede móvel real.
