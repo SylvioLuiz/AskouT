@@ -289,5 +289,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Passos do Dockerfile reproduzidos numa cópia limpa (só arquivos versionados): `npm ci`, `prisma generate`, `migrate deploy` e a API subiu em modo production com `EMAIL_TRANSPORT=resend`; `/saude` respondeu `{"ok":true}` e o CORS respondeu para `https://askout.com.br`. A imagem Docker em si não foi construída (sem daemon).
 - `render.yaml` (plano B) na raiz do repositório.
 
-## Google: verificação de marca
-- Link da política corrigido para `/politica-de-privacidade` (antes apontava para a tela com login). Pedi "Verificar marca" no Google Auth Platform → Branding (leva alguns minutos). Conferir se o status ficou verificado; sem isso a tela de consentimento mostra o nome genérico.
+## Google: verificação de marca (feito em 2026-10-23)
+- Link da política corrigido para `/politica-de-privacidade` (antes apontava para a tela com login).
+- Domínio `askout.com.br` verificado no Google Search Console por registro TXT no Cloudflare (`google-site-verification=...`). **Não apagar esse registro**, senão a verificação da marca cai.
+- Status no Google Auth Platform → Branding: "marca verificada e aparecendo para os usuários". Logotipo NÃO enviado de propósito (enviar logotipo exige verificação completa do app).
