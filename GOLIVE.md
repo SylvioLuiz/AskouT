@@ -5,7 +5,7 @@ Itens que ficaram de fora de propósito até a publicação. Marque com `[x]` qu
 ## Entrar com Google e Apple
 O código está pronto e desligado: sem os IDs abaixo, os botões não aparecem. Faltam só as chaves, que dependem do domínio definitivo.
 - [ ] Domínio: `askout.com.br` (Hostinger; ativo desde 22/10/2026, ainda sem registros). Implantação passo a passo em `deploy/README.md` (Cloudflare + Railway + Resend); Dockerfile da API e rota `/saude` já existem, mas a imagem nunca foi construída nem rodada. Plano de endereços: `askout.com.br` (site), `api.askout.com.br` (API), `gestao.askout.com.br` (portal de gestão). Em produção: `PUBLIC_WEB_URL=https://askout.com.br`, `CORS_ORIGINS=https://askout.com.br,https://gestao.askout.com.br,https://localhost,capacitor://localhost`, `VITE_API_URL=https://api.askout.com.br`.
-- [ ] Google: criar o ID de cliente "Aplicativo da Web" no Google Cloud e cadastrar o endereço do site em "Origens JavaScript autorizadas". Pôr em `GOOGLE_CLIENT_ID` (o Google pode ser ativado antes do go live: é grátis).
+- [x] (feito em 23/10/2026, ver seção "Google Login") Google: criar o ID de cliente "Aplicativo da Web" no Google Cloud e cadastrar o endereço do site em "Origens JavaScript autorizadas". Pôr em `GOOGLE_CLIENT_ID` (o Google pode ser ativado antes do go live: é grátis).
 - [ ] Apple: assinar a conta de desenvolvedor, criar o "Services ID" e cadastrar o domínio e a URL de retorno. Pôr em `APPLE_CLIENT_ID`. Não funciona em localhost.
 - [ ] Rodar `npx prisma migrate deploy` no servidor e reiniciar a API.
 - [ ] Testar uma entrada com cada plataforma: conta nova, conta com o mesmo e-mail já existente e entrada repetida.
@@ -167,7 +167,7 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 
 ## Política de Privacidade e Termos de Uso
 
-- **Onde estão:** `/politica-de-privacidade` e `/termos-de-uso` (públicas, abrem sem login; textos em `apps/web/src/lib/legal-text.ts`). Linkadas no login, no cadastro e em Privacidade. Mostram o aviso "versão preliminar" até `LEGAL_REVIEWED` virar `true`.
+- **Onde estão:** `/politica-de-privacidade` e `/termos-de-uso` (atenção: `/privacidade` é a tela de configurações, exige login; o Google usa `/politica-de-privacidade`) (públicas, abrem sem login; textos em `apps/web/src/lib/legal-text.ts`). Linkadas no login, no cadastro e em Privacidade. Mostram o aviso "versão preliminar" até `LEGAL_REVIEWED` virar `true`.
 - **É um rascunho escrito por mim a partir do que o app faz, não parecer jurídico.** Advogado precisa revisar tudo antes de abrir ao público, principalmente: base legal das recomendações (hoje ligadas por padrão, texto cita legítimo interesse e consentimento), localização para anúncios por região, transferência internacional, prazos de retenção, foro, texto sobre ingressos e responsabilidade.
 - **Campos a preencher no texto:** razão social, CNPJ e endereço do controlador (política, seção 1); política de reembolso do impulsionamento (termos, seção 6).
 - **E-mail de privacidade:** o texto usa `privacidade@askout.com.br` (ou `VITE_PRIVACY_EMAIL`). Essa caixa ainda **não existe**: criar um encaminhamento no Cloudflare (Email Routing, grátis) para um e-mail seu antes do lançamento.
@@ -263,7 +263,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Sobras do Firebase antigo no DNS (A do domínio principal, TXT `firebase=`, `firebase1/2._domainkey`): limpar quando o site novo for ligado.
 - Resend: conta criada, domínio `askout.com.br` **verificado** e chave de envio já criada e guardada pelo Sylvio (ainda NÃO testada contra a API real). Colar a chave só no Railway (`RESEND_API_KEY`), nunca no chat.
 - Cloudflare Pages (22-23/10/2026): projetos `askout-site` (`askout-site.pages.dev`) e `askout-gestao` (`askout-gestao.pages.dev`) criados e com o primeiro deploy concluído, ligados ao repositório `SylvioLuiz/AskouT` (branch `main`; cada push publica sozinho). Domínios `askout.com.br` e `gestao.askout.com.br` adicionados (status "Initializing" na hora). O A antigo do Firebase (`199.36.158.100`) foi substituído por CNAME. Variáveis: `NODE_VERSION=22`, `VITE_API_URL=https://api.askout.com.br` (+ e-mails de suporte/privacidade no site). Falta `VITE_MAP_STYLE_URL` (mapa) e conferir os domínios como Ativos.
-- Próximos: Railway (API), Google (ID de cliente), mapa.
+- Em 23/10/2026: domínios ativos (respondem 200), mapa configurado, Google feito. Próximo: Railway (API).
 
 ## Dados legais preenchidos (22/10/2026)
 - Controladora: Thunderbolt LTDA, CNPJ 44.953.028/0001-19 (contrato social JUCESP, 2022). Endereço publicado nos textos: Av. Jabaquara, 1909, sala 62, São Paulo/SP (informado pelo Sylvio; **o contrato social ainda mostra outra sede**: atualizar o endereço na Junta/CNPJ para bater com o que está publicado). Encarregado: Sylvio Luiz de Souza (`privacidade@askout.com.br`). Tudo em `COMPANY` em `apps/web/src/lib/legal-text.ts`.
@@ -288,3 +288,6 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 ## Verificação do Dockerfile (2026-10-23)
 - Passos do Dockerfile reproduzidos numa cópia limpa (só arquivos versionados): `npm ci`, `prisma generate`, `migrate deploy` e a API subiu em modo production com `EMAIL_TRANSPORT=resend`; `/saude` respondeu `{"ok":true}` e o CORS respondeu para `https://askout.com.br`. A imagem Docker em si não foi construída (sem daemon).
 - `render.yaml` (plano B) na raiz do repositório.
+
+## Google: verificação de marca
+- Link da política corrigido para `/politica-de-privacidade` (antes apontava para a tela com login). Pedi "Verificar marca" no Google Auth Platform → Branding (leva alguns minutos). Conferir se o status ficou verificado; sem isso a tela de consentimento mostra o nome genérico.
