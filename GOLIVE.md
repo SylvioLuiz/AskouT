@@ -276,7 +276,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Origens JS autorizadas: https://askout.com.br e https://www.askout.com.br (sem URIs de redirecionamento: fluxo por ID token).
 - `GOOGLE_CLIENT_ID` (público, não é segredo) = 427546548243-44jukkdjh3sgl1rooj0hbs4oi21ig0a4.apps.googleusercontent.com
 - A chave secreta do cliente não é usada pela API (não guardar).
-- Tela de consentimento: Externa, em modo "Teste" → publicar para produção antes do lançamento público (só e-mail/perfil básico, sem verificação pesada). E-mail de suporte atual é pessoal; trocar por suporte@askout.com.br (via grupo) se possível.
+- Tela de consentimento: Externa, **publicada em produção em 2026-10-23** (escopos básicos, sem logotipo, então sem verificação). Branding com página inicial, /privacidade, /termos-de-uso e domínio askout.com.br. E-mail de suporte exibido ao usuário ainda é pessoal (sylviofox@gmail.com); trocar por suporte@askout.com.br exige um grupo do Google.
 - Login nativo (app Capacitor) exigirá clientes Android/iOS próprios depois.
 
 ## Mapa (feito em 2026-10-23)
