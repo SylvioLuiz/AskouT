@@ -262,7 +262,8 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Valores a usar: `VITE_SUPPORT_EMAIL=suporte@askout.com.br`, `VITE_PRIVACY_EMAIL=privacidade@askout.com.br`, `EMAIL_REPLY_TO=privacidade@askout.com.br`, `OSM_CONTACT=contato@askout.com.br`.
 - Sobras do Firebase antigo no DNS (A do domínio principal, TXT `firebase=`, `firebase1/2._domainkey`): limpar quando o site novo for ligado.
 - Resend: conta criada, domínio `askout.com.br` **verificado** e chave de envio já criada e guardada pelo Sylvio (ainda NÃO testada contra a API real). Colar a chave só no Railway (`RESEND_API_KEY`), nunca no chat.
-- Próximos: dados legais, Cloudflare Pages, Railway.
+- Cloudflare Pages (22-23/10/2026): projetos `askout-site` (`askout-site.pages.dev`) e `askout-gestao` (`askout-gestao.pages.dev`) criados e com o primeiro deploy concluído, ligados ao repositório `SylvioLuiz/AskouT` (branch `main`; cada push publica sozinho). Domínios `askout.com.br` e `gestao.askout.com.br` adicionados (status "Initializing" na hora). O A antigo do Firebase (`199.36.158.100`) foi substituído por CNAME. Variáveis: `NODE_VERSION=22`, `VITE_API_URL=https://api.askout.com.br` (+ e-mails de suporte/privacidade no site). Falta `VITE_MAP_STYLE_URL` (mapa) e conferir os domínios como Ativos.
+- Próximos: Railway (API), Google (ID de cliente), mapa.
 
 ## Dados legais preenchidos (22/10/2026)
 - Controladora: Thunderbolt LTDA, CNPJ 44.953.028/0001-19 (contrato social JUCESP, 2022). Endereço publicado nos textos: Av. Jabaquara, 1909, sala 62, São Paulo/SP (informado pelo Sylvio; **o contrato social ainda mostra outra sede**: atualizar o endereço na Junta/CNPJ para bater com o que está publicado). Encarregado: Sylvio Luiz de Souza (`privacidade@askout.com.br`). Tudo em `COMPANY` em `apps/web/src/lib/legal-text.ts`.
