@@ -270,3 +270,11 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Política de reembolso do impulsionamento: **proposta minha**, ainda não confirmada pelo Sylvio nem por advogado (reembolso se não começou a rodar, 7 dias de arrependimento, proporcional se falha nossa).
 - Objeto social não cita publicidade: perguntar ao contador se precisa incluir essa atividade (CNAE) antes de vender impulsionamento.
 - Restam marcados "[A revisar]": regras do ECA Digital, prazo de resposta a denúncias, e a revisão jurídica geral (`LEGAL_REVIEWED` continua falso).
+
+## Google Login (feito em 2026-10-23)
+- Projeto Google Cloud `askout-512422`, cliente OAuth "AskouT Web" (Aplicativo da Web).
+- Origens JS autorizadas: https://askout.com.br e https://www.askout.com.br (sem URIs de redirecionamento: fluxo por ID token).
+- `GOOGLE_CLIENT_ID` (público, não é segredo) = 427546548243-44jukkdjh3sgl1rooj0hbs4oi21ig0a4.apps.googleusercontent.com
+- A chave secreta do cliente não é usada pela API (não guardar).
+- Tela de consentimento: Externa, em modo "Teste" → publicar para produção antes do lançamento público (só e-mail/perfil básico, sem verificação pesada). E-mail de suporte atual é pessoal; trocar por suporte@askout.com.br (via grupo) se possível.
+- Login nativo (app Capacitor) exigirá clientes Android/iOS próprios depois.
