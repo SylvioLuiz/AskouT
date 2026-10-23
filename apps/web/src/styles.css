@@ -4596,3 +4596,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 /* Denunciar comentário */
 .comment__report { background: none; border: 0; padding: 4px 6px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; text-decoration: underline; min-height: 32px; }
 .comment__report:hover, .comment__report:focus-visible { color: var(--danger); }
+
+.termsgate { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); }
+.termsgate__card { display: flex; flex-direction: column; gap: 14px; max-width: 420px; width: 100%; }
+.termsgate__card h1 { font-size: 1.4rem; margin: 0; }
+.termsgate__card p { margin: 0; color: var(--muted); }
+.termsgate .consent { display: flex; gap: 10px; align-items: flex-start; }

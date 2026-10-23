@@ -178,6 +178,11 @@ export class PrismaUserRepository implements UserRepository {
     await this.prisma.user.updateMany({ where: { id: userId }, data: { birthDate: new Date(`${birthDate}T00:00:00.000Z`) } });
   }
 
+  async acceptTerms(userId: string, version: string, at: Date): Promise<void> {
+    if (!isUuid(userId)) return;
+    await this.prisma.user.updateMany({ where: { id: userId }, data: { termsVersion: version, termsAcceptedAt: at } });
+  }
+
   async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
     if (!isUuid(userId)) return;
     await this.prisma.user.updateMany({ where: { id: userId }, data: { passwordHash } });

@@ -42,6 +42,19 @@ export class AccountController {
     return this.core.age.correct(actor.userId, { birthDate: b.birthDate });
   }
 
+  /** Versão dos Termos que a pessoa aceitou e se é a atual. */
+  @Get('me/terms')
+  termsStatus(@CurrentActor() actor: Actor) {
+    return this.core.age.termsStatus(actor.userId);
+  }
+
+  /** `{version}`: aceita a versão atual dos Termos. */
+  @Post('me/terms')
+  @HttpCode(200)
+  acceptTerms(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.age.acceptTerms(actor.userId, { version: asBody(body).version });
+  }
+
   /** Informa a data de nascimento (AAAA-MM-DD) quando ainda não existe uma. */
   @Post('me/age')
   @HttpCode(200)

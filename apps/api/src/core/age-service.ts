@@ -60,6 +60,14 @@ export function checkSignupConsent(input: { birthDate: unknown; acceptTerms: unk
   return { birthDate, termsVersion: TERMS_VERSION };
 }
 
+export interface TermsStatus {
+  currentVersion: string;
+  acceptedVersion: string | null;
+  acceptedAt: string | null;
+  /** false = a pessoa precisa aceitar a versão atual antes de continuar. */
+  upToDate: boolean;
+}
+
 /**
  * Trava de idade do Flash. A data de nascimento é informada uma vez e não muda depois:
  * assim, quem põe uma data de menor de idade não consegue "tentar de novo" com outra.
@@ -102,6 +110,28 @@ export class AgeService {
     if (current.locked) throw forbidden('Não dá para trocar a data por aqui. Fale com o suporte.');
     await this.deps.users.updateBirthDate(userId, birthDate);
     return { declared: true, adult: age >= ADULT_AGE, birthDate, locked: age < ADULT_AGE };
+  }
+
+  /** Qual versão dos Termos a pessoa aceitou e se é a atual. Contas antigas, sem registro, precisam aceitar. */
+  async termsStatus(userId: string): Promise<TermsStatus> {
+    const user = await this.deps.users.findById(userId);
+    if (!user) throw notFound('Conta não encontrada');
+    const acceptedVersion = user.termsVersion ?? null;
+    return {
+      currentVersion: TERMS_VERSION,
+      acceptedVersion,
+      acceptedAt: acceptedVersion && user.termsAcceptedAt ? new Date(user.termsAcceptedAt).toISOString() : null,
+      upToDate: acceptedVersion === TERMS_VERSION,
+    };
+  }
+
+  /** Aceita os Termos. A versão enviada tem que ser a atual, para ninguém aceitar um texto que não viu. */
+  async acceptTerms(userId: string, input: { version?: unknown }): Promise<TermsStatus> {
+    if (input.version !== TERMS_VERSION) throw validationError('Os Termos mudaram. Abra a versão atual e aceite de novo.', { version: 'Versão dos Termos desatualizada' });
+    const user = await this.deps.users.findById(userId);
+    if (!user) throw notFound('Conta não encontrada');
+    await this.deps.users.acceptTerms(userId, TERMS_VERSION, this.deps.clock.now());
+    return this.termsStatus(userId);
   }
 
   /** Usado pelo Flash: recusa quem não informou a data ou tem menos de 18 anos. */

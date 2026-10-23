@@ -64,6 +64,7 @@ import type {
   SessionUser,
   SignupInput,
   AgeStatus,
+  TermsStatus,
   SignupStarted,
   SocialNeedsProfile,
   SocialProvider,
@@ -340,6 +341,8 @@ export function createApi(deps: ApiDeps) {
     correctBirthDate: (birthDate: string) => request<AgeStatus>('PUT', '/me/age', { body: { birthDate } }),
     /** Informa a data de nascimento (AAAA-MM-DD). Só vale uma vez. */
     declareAge: (birthDate: string) => request<AgeStatus>('POST', '/me/age', { body: { birthDate } }),
+    termsStatus: () => request<TermsStatus>('GET', '/me/terms'),
+    acceptTerms: (version: string) => request<TermsStatus>('POST', '/me/terms', { body: { version } }),
     exportMyData: () => request<{ filename: string; data: Record<string, unknown> }>('GET', '/me/export'),
     /** Apaga a minha conta de vez. Conta que entra com Google/Apple não manda senha. */
     deleteMyAccount: (input: { username: string; password?: string }) => request<{ deleted: true }>('DELETE', '/me', { body: input }),

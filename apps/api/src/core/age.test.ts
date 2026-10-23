@@ -72,3 +72,20 @@ test('Corrigir a data: adulto pode; quem consta como menor não; nunca abaixo de
   assert.equal((await w.core.age.correct(caio, { birthDate: `${y - 16}-01-01` })).adult, false);
   await rejectsWith(w.core.age.correct(caio, { birthDate: '1990-01-01' }), 'FORBIDDEN');
 });
+
+test('Termos: conta sem aceite ou com versão antiga precisa aceitar a atual; versão errada é recusada', async () => {
+  const w = makeWorld();
+  const ana = (await w.signUp('ana')).user.id;
+  const atual = await w.core.age.termsStatus(ana);
+  assert.equal(atual.upToDate, true, 'quem acabou de se cadastrar já aceitou a versão atual');
+  // Conta antiga: sem registro de aceite.
+  w.users.users.set(ana, { ...w.users.users.get(ana)!, termsVersion: null, termsAcceptedAt: null });
+  const antiga = await w.core.age.termsStatus(ana);
+  assert.deepEqual({ ...antiga, currentVersion: undefined }, { currentVersion: undefined, acceptedVersion: null, acceptedAt: null, upToDate: false });
+  await rejectsWith(w.core.age.acceptTerms(ana, { version: '1999-01-01' }), 'VALIDATION');
+  await rejectsWith(w.core.age.acceptTerms(ana, {}), 'VALIDATION');
+  assert.equal((await w.core.age.termsStatus(ana)).upToDate, false);
+  const depois = await w.core.age.acceptTerms(ana, { version: atual.currentVersion });
+  assert.equal(depois.upToDate, true);
+  assert.ok(depois.acceptedAt);
+});

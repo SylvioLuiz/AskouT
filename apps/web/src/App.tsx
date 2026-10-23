@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { FlashPresenceProvider } from './components/flash-presence.tsx';
 import { AuthProvider, useAuthContext, useUser } from './auth.tsx';
 import { Shell } from './components/Shell.tsx';
+import { TermsGate } from './components/terms-gate.tsx';
 import { Onboarding } from './components/onboarding.tsx';
 import { RingLoader } from './components/ring-loader.tsx';
 import { Button, EmptyState } from './components/ui.tsx';
@@ -148,8 +149,10 @@ function AppRoutes() {
   if (guest) return null; // redirecionando para a Home
   return (
     <FlashPresenceProvider>
-      <Shell>{priv ? priv.route.render(priv.params) : <NotFoundScreen />}</Shell>
-      <Onboarding />
+      <TermsGate>
+        <Shell>{priv ? priv.route.render(priv.params) : <NotFoundScreen />}</Shell>
+        <Onboarding />
+      </TermsGate>
     </FlashPresenceProvider>
   );
 }

@@ -239,3 +239,8 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - **Classificação etária:** é do app inteiro. Responda o questionário contando que há encontros presenciais, conteúdo de usuários, locais que servem bebida alcoólica e um recurso 18+ (Flash). Provável: 17+ na Apple. No Google Play, o público-alvo deve excluir crianças; o app tem conta a partir de 13 anos (decisão jurídica pendente, ver "Idade e aceite").
 - **Formulários de privacidade (Apple "Privacy Nutrition Labels" e Google "Segurança dos dados"):** declare e-mail, nome, @usuário, data de nascimento, localização aproximada (Flash e mapa), fotos/vídeos/áudio de conversa e posts, mensagens, identificadores de dispositivo (push), compras. Nenhum dado é vendido; use os textos da Política de Privacidade como base.
 - **Compras:** impulsionamento pago dentro do app nativo precisa usar a compra da loja (Apple/Google); os verificadores de recibo **ainda não estão implementados**.
+
+## Novo aceite dos Termos
+- Ao mudar `TERMS_VERSION` em `apps/api/src/core/age-service.ts`, quem já tem conta vê uma tela que bloqueia o app até aceitar a versão nova (`GET/POST /me/terms`). Contas antigas, sem registro de aceite, também passam por ela.
+- O bloqueio é só na tela do app; a API não recusa chamadas de quem não aceitou. Decidir com o jurídico se isso basta.
+- Antes de publicar texto novo dos Termos: trocar `TERMS_VERSION` (e revisar `LEGAL_UPDATED` no site).

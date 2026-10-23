@@ -18,6 +18,8 @@ export interface UserRepository {
   setBirthDate(userId: string, birthDate: string): Promise<boolean>;
   /** Troca a data de nascimento (AAAA-MM-DD). */
   updateBirthDate(userId: string, birthDate: string): Promise<void>;
+  /** Registra que a pessoa aceitou os Termos nesta versão. */
+  acceptTerms(userId: string, version: string, at: Date): Promise<void>;
   /** Troca o hash da senha. */
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
   findProfileById(userId: string): Promise<Profile | undefined>;

@@ -92,6 +92,14 @@ export interface AgeStatus {
   locked: boolean;
 }
 
+/** Versão dos Termos que a pessoa aceitou. `upToDate: false` pede um novo aceite. */
+export interface TermsStatus {
+  currentVersion: string;
+  acceptedVersion: string | null;
+  acceptedAt: string | null;
+  upToDate: boolean;
+}
+
 export interface SignupInput {
   email: string;
   username: string;
