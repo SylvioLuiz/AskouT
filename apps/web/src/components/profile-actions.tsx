@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Sheet } from './agenda.tsx';
 import { MoreIcon } from './icons.tsx';
-import { ShareLinkSheet } from './post-actions.tsx';
+import { ReasonSheet, ShareLinkSheet } from './post-actions.tsx';
 import { Confirm, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
@@ -9,7 +9,7 @@ import { toApiError } from '../lib/errors.ts';
 import { profileLink, profileShareText } from '../lib/share.ts';
 import type { FlashVisibility, Profile, Relationship } from '../lib/types.ts';
 
-type Step = 'menu' | 'share' | 'remove' | 'block';
+type Step = 'menu' | 'share' | 'remove' | 'block' | 'report';
 
 /** Botão ⋯ do perfil de outra pessoa e a aba com as opções: compartilhar, remover seguidor, Flash e bloquear. */
 export function ProfileActions({ profile, relationship, onChanged }: { profile: Profile; relationship: Relationship; onChanged: (notice: string) => void }) {
@@ -69,6 +69,18 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
     }
   }
 
+  if (step === 'report') {
+    return (
+      <ReasonSheet
+        title={`Denunciar @${profile.username}`}
+        doneText="Obrigado por avisar. A equipe vai analisar o perfil. Se quiser, você também pode bloquear a pessoa."
+        submit={(reason, details) => api.reportProfile(profile.username, reason, details)}
+        onClose={() => setStep('menu')}
+        onDone={onClose}
+      />
+    );
+  }
+
   if (step === 'share') {
     return <ShareLinkSheet url={profileLink(window.location.origin, profile.username)} text={profileShareText(profile.username)} onClose={onClose} />;
   }
@@ -115,6 +127,7 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
           {relationship.followsYou === 'ACCEPTED' && !blocked ? row('Remover seguidor', 'Ela deixa de seguir você. Não avisamos.', () => setStep('remove')) : null}
           {flashOptions && current ? row('Ocultar Flash dela', current.hideTheirs ? 'Ativo: você não vê quando ela liga o Flash.' : 'Você deixa de ver quando ela liga o Flash.', () => void toggle('hideTheirs'), { on: current.hideTheirs, role: 'switch' }) : null}
           {flashOptions && current ? row('Não deixar ela me ver no Flash', current.hideMine ? 'Ativo: ela não vê você disponível.' : 'Ela não vê você disponível, mesmo com o Flash ligado.', () => void toggle('hideMine'), { on: current.hideMine, role: 'switch' }) : null}
+          {!relationship.isSelf ? row('Denunciar perfil', 'Nome, foto ou descrição que não deveriam estar aqui.', () => setStep('report'), { danger: true }) : null}
           {!blocked ? row('Bloquear', 'Ela deixa de ver seu perfil e vocês param de se seguir.', () => setStep('block'), { danger: true }) : null}
         </ul>
       )}

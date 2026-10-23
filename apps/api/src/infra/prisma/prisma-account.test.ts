@@ -31,6 +31,7 @@ test('conta no Postgres: exportar e apagar em cascata', { skip: url ? false : 'd
     // Relações
     await prisma.follow.createMany({ data: [{ followerId: ana, followeeId: bia }, { followerId: bia, followeeId: ana }] });
     await prisma.block.create({ data: { blockerId: ana, blockedId: cris } });
+    await prisma.userReport.createMany({ data: [{ dedupeKey: `${ana}:${bia}:PROFILE:`, kind: 'PROFILE', reporterId: ana, reportedUserId: bia, reason: 'SPAM' }, { dedupeKey: `${bia}:${ana}:PROFILE:`, kind: 'PROFILE', reporterId: bia, reportedUserId: ana, reason: 'SPAM' }, { dedupeKey: `${bia}:${cris}:PROFILE:`, kind: 'PROFILE', reporterId: bia, reportedUserId: cris, reason: 'SPAM' }] });
     await prisma.userRegion.create({ data: { userId: ana, lat: -23.5, lng: -46.6, updatedAt: now } });
     await prisma.availabilitySlot.create({ data: { userId: ana, startsAt: now, endsAt: later, state: 'AVAILABLE' } });
     await prisma.externalIdentity.create({ data: { provider: 'GOOGLE', subject: 'sub-ana', userId: ana } });
@@ -116,6 +117,7 @@ test('conta no Postgres: exportar e apagar em cascata', { skip: url ? false : 'd
     assert.equal(bMsgs.length, 1, 'a mensagem do cartão do encontro some junto com o encontro');
     assert.equal(bMsgs[0]?.replyToId, null);
     assert.equal(await prisma.conversation.count({ where: { id: convSolo.id } }), 0, 'conversa sem ninguém some');
+    assert.equal(await prisma.userReport.count(), 1, 'denúncias feitas por ela ou contra ela somem; as de outras pessoas ficam');
     assert.equal(await prisma.conversation.count({ where: { id: conv.id } }), 1);
 
     // Apagar de novo (ou id inválido) não quebra

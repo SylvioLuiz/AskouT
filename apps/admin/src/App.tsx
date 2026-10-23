@@ -106,7 +106,7 @@ function Shell({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
     let alive = true;
     const load = () =>
       api.stats().then(
-        (s) => alive && setPending({ claims: s.pendingClaims, reports: s.openPostReports + s.openConversationReports + (s.openStoryReports ?? 0) }),
+        (s) => alive && setPending({ claims: s.pendingClaims, reports: s.openPostReports + s.openConversationReports + (s.openStoryReports ?? 0) + (s.openUserReports ?? 0) }),
         () => {},
       );
     void load();

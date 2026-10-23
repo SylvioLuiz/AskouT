@@ -47,7 +47,7 @@ import { distanceMeters } from '../geo.ts';
 import type {
   DirectActivityRow,
   DwellRecord,
-  EngagementRow, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -59,6 +59,13 @@ import { DELETED_BODY } from '../types.ts';
 export class InMemoryUserRepository implements UserRepository {
   readonly users = new Map<string, User>();
   readonly profiles = new Map<string, Profile>();
+  readonly reports = new Map<string, UserReportRecord & { resolvedAt?: Date | null; resolvedBy?: string | null; resolution?: ReportResolution | null; resolutionNote?: string | null }>();
+
+  async addReport(report: UserReportRecord): Promise<void> {
+    const key = `${report.reporterId}:${report.reportedUserId}:${report.kind}:${report.commentId ?? ''}`;
+    const previous = this.reports.get(key);
+    this.reports.set(key, { ...report, id: previous?.id ?? report.id, createdAt: previous?.createdAt ?? report.createdAt });
+  }
 
   async create(user: User, profile: Profile): Promise<void> {
     for (const existing of this.users.values()) {
@@ -1925,6 +1932,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       openPostReports: [...this.posts.reports.values()].filter((r) => !r.resolvedAt).length,
       openConversationReports: [...this.conversations.reports.values()].filter((r) => !r.resolvedAt).length,
       openStoryReports: [...this.eventRoom.storyReports.values()].filter((r) => !r.resolvedAt).length,
+      openUserReports: [...this.users.reports.values()].filter((r) => !r.resolvedAt).length,
     };
   }
 
@@ -2035,6 +2043,38 @@ export class InMemoryAdminRepository implements AdminRepository {
     }
     rows.sort((a, b) => (open ? a.createdAt.getTime() - b.createdAt.getTime() : (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0)) || (a.id < b.id ? -1 : 1));
     return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  async listUserReports(open: boolean, page: Page) {
+    const rows: AdminUserReportRow[] = [];
+    for (const r of this.users.reports.values()) {
+      if (open === (r.resolvedAt !== null && r.resolvedAt !== undefined)) continue;
+      const reported = this.users.users.get(r.reportedUserId);
+      if (!reported) continue;
+      rows.push({
+        id: r.id, kind: r.kind, reason: r.reason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
+        reporter: { id: r.reporterId, username: this.username(r.reporterId) },
+        reported: { id: r.reportedUserId, username: this.username(r.reportedUserId), status: reported.status },
+        resolvedAt: r.resolvedAt ?? null, resolution: r.resolution ?? null, resolutionNote: r.resolutionNote ?? null,
+      });
+    }
+    rows.sort((a, b) => (open ? a.createdAt.getTime() - b.createdAt.getTime() : (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0)) || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  async findUserReport(id: string) {
+    for (const r of this.users.reports.values()) if (r.id === id) return { id: r.id, reportedUserId: r.reportedUserId, resolvedAt: r.resolvedAt ?? null };
+    return undefined;
+  }
+
+  async resolveUserReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date) {
+    for (const [key, r] of this.users.reports) {
+      if (r.id !== id) continue;
+      if (r.resolvedAt) return false;
+      this.users.reports.set(key, { ...r, resolvedAt: at, resolvedBy: adminId, resolution, resolutionNote: note });
+      return true;
+    }
+    return false;
   }
 
   async listStoryReports(open: boolean, page: Page) {

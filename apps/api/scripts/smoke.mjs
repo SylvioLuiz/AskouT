@@ -331,6 +331,9 @@ try {
   const cm = await call('POST', `/posts/${post.body.id}/comments`, { token: b.token, body: { body: 'Bora!' } });
   check('amigo comenta', cm.status === 200 && cm.body?.body === 'Bora!', cm.body);
   check('lista comentários', (await call('GET', `/posts/${post.body.id}/comments`, { token: a.token })).body?.items?.length === 1);
+  check('denunciar o próprio comentário: 403', (await call('POST', `/posts/${post.body.id}/comments/${cm.body.id}/report`, { token: b.token, body: { reason: 'SPAM' } })).status === 403);
+  check('denunciar comentário que não existe: 404', (await call('POST', `/posts/${post.body.id}/comments/nao-existe/report`, { token: a.token, body: { reason: 'SPAM' } })).status === 404);
+  check('denunciar comentário: 200', (await call('POST', `/posts/${post.body.id}/comments/${cm.body.id}/report`, { token: a.token, body: { reason: 'OFFENSIVE', details: 'teste' } })).status === 200);
   check('não-autor não edita: 403', (await call('PATCH', `/posts/${post.body.id}`, { token: b.token, body: { caption: 'x' } })).status === 403);
   check('autor edita legenda', (await call('PATCH', `/posts/${post.body.id}`, { token: a.token, body: { caption: 'Editada' } })).body?.edited === true);
   check('autor arquiva', (await call('POST', `/posts/${post.body.id}/archive`, { token: a.token })).status === 200);
@@ -427,6 +430,14 @@ try {
   check('bloquear esconde a conversa dos dois', (await call('GET', `/conversations/${convId}/messages`, { token: b.token })).status === 404 && (await call('GET', '/conversations', { token: a.token })).body.items.every((i) => i.id !== convId));
   const unblock = await call('DELETE', `/users/${b.id}/block`, { token: a.token });
   check('desbloquear', unblock.status === 200 && unblock.body.removed === true, unblock.body);
+
+  console.log('\nDenúncias de perfil e comentário');
+  check('denunciar perfil sem login: 401', (await call('POST', `/profiles/${a.username}/report`, { body: { reason: 'SPAM' } })).status === 401);
+  check('denunciar o próprio perfil: 403', (await call('POST', `/profiles/${a.username}/report`, { token: a.token, body: { reason: 'SPAM' } })).status === 403);
+  check('denunciar perfil com motivo inválido: 400', (await call('POST', `/profiles/${a.username}/report`, { token: b.token, body: { reason: 'XYZ' } })).status === 400);
+  check('denunciar perfil que não existe: 404', (await call('POST', '/profiles/nao.existe.mesmo/report', { token: b.token, body: { reason: 'SPAM' } })).status === 404);
+  check('denunciar perfil: 200', (await call('POST', `/profiles/${a.username}/report`, { token: b.token, body: { reason: 'OFFENSIVE', details: 'texto de teste' } })).status === 200);
+  check('denunciar o mesmo perfil de novo: 200 (atualiza)', (await call('POST', `/profiles/${a.username}/report`, { token: b.token, body: { reason: 'SPAM' } })).status === 200);
 
   console.log('\nIdade, Termos e Flash');
   const yearsAgo = (n) => `${new Date().getUTCFullYear() - n}-01-01`;

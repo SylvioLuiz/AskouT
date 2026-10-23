@@ -630,6 +630,7 @@ export interface AdminStats {
   approvedClaims: number;
   openPostReports: number;
   openConversationReports: number;
+  openUserReports: number;
   openStoryReports: number;
 }
 
@@ -705,6 +706,34 @@ export interface AdminStoryReportRow {
   resolutionNote: string | null;
 }
 
+/** Denúncia de perfil ou de comentário. */
+export interface UserReportRecord {
+  id: string;
+  kind: 'PROFILE' | 'COMMENT';
+  reporterId: string;
+  reportedUserId: string;
+  commentId: string | null;
+  /** O texto denunciado (nome, descrição ou comentário) como estava no momento da denúncia. */
+  evidence: string;
+  reason: PostReportReason;
+  details: string | null;
+  createdAt: Date;
+}
+
+export interface AdminUserReportRow {
+  id: string;
+  kind: 'PROFILE' | 'COMMENT';
+  reason: PostReportReason;
+  details: string | null;
+  evidence: string;
+  createdAt: Date;
+  reporter: { id: string; username: string };
+  reported: { id: string; username: string; status: UserStatus };
+  resolvedAt: Date | null;
+  resolution: ReportResolution | null;
+  resolutionNote: string | null;
+}
+
 export interface AdminConversationReportRow {
   id: string;
   conversationId: string;
@@ -739,7 +768,7 @@ export interface AuditRecord {
   id: string;
   adminId: string;
   action: AuditAction;
-  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'STORY' | 'STORY_REPORT' | 'SETTING';
+  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'USER_REPORT' | 'STORY' | 'STORY_REPORT' | 'SETTING';
   targetId: string;
   note: string | null;
   createdAt: Date;

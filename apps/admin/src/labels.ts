@@ -53,6 +53,7 @@ export const TARGET_LABEL: Record<string, string> = {
   STORY_REPORT: 'Denúncia de story',
   POST_REPORT: 'Denúncia de post',
   CONVERSATION_REPORT: 'Denúncia de conversa',
+  USER_REPORT: 'Denúncia de perfil ou comentário',
 };
 
 export const EVENT_KIND_LABEL: Record<string, string> = {

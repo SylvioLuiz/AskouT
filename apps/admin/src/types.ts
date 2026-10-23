@@ -35,6 +35,7 @@ export interface Stats {
   approvedClaims: number;
   openPostReports: number;
   openConversationReports: number;
+  openUserReports: number;
   openStoryReports: number;
 }
 
@@ -130,6 +131,21 @@ export interface ConversationReportRow {
   createdAt: string;
   reporter: { id: string; username: string };
   reported: { id: string; username: string; status: UserStatus } | null;
+  resolvedAt: string | null;
+  resolution: Resolution | null;
+  resolutionNote: string | null;
+}
+
+export interface UserReportRow {
+  id: string;
+  kind: 'PROFILE' | 'COMMENT';
+  reason: ReportReason;
+  details: string | null;
+  /** O texto denunciado como estava quando a pessoa denunciou. */
+  evidence: string;
+  createdAt: string;
+  reporter: { id: string; username: string };
+  reported: { id: string; username: string; status: UserStatus };
   resolvedAt: string | null;
   resolution: Resolution | null;
   resolutionNote: string | null;

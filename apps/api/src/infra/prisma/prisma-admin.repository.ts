@@ -2,7 +2,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { isUuid } from './helpers.ts';
 import type { AdminRepository } from '../../core/ports.ts';
 import type {
-  AdminConversationReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
+  AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
   AuditAction, AuditRecord, AuditRow, Page, PostReportReason, ReportResolution, UserStatus,
 } from '../../core/types.ts';
 
@@ -40,7 +40,7 @@ export class PrismaAdminRepository implements AdminRepository {
 
   async stats(): Promise<AdminStats> {
     const p = this.prisma;
-    const [users, suspendedUsers, venues, venuesWithOwner, placeEvents, userEvents, posts, pendingClaims, approvedClaims, openPostReports, openConversationReports, openStoryReports] = await Promise.all([
+    const [users, suspendedUsers, venues, venuesWithOwner, placeEvents, userEvents, posts, pendingClaims, approvedClaims, openPostReports, openConversationReports, openStoryReports, openUserReports] = await Promise.all([
       p.user.count(),
       p.user.count({ where: { status: 'SUSPENDED' } }),
       p.venue.count(),
@@ -53,8 +53,9 @@ export class PrismaAdminRepository implements AdminRepository {
       p.postReport.count({ where: { resolvedAt: null } }),
       p.conversationReport.count({ where: { resolvedAt: null } }),
       p.eventStoryReport.count({ where: { resolvedAt: null } }),
+      p.userReport.count({ where: { resolvedAt: null } }),
     ]);
-    return { users, suspendedUsers, venues, venuesWithOwner, placeEvents, userEvents, posts, pendingClaims, approvedClaims, openPostReports, openConversationReports, openStoryReports };
+    return { users, suspendedUsers, venues, venuesWithOwner, placeEvents, userEvents, posts, pendingClaims, approvedClaims, openPostReports, openConversationReports, openStoryReports, openUserReports };
   }
 
   async searchUsers(text: string, status: UserStatus | undefined, page: Page): Promise<AdminUserRow[]> {
@@ -173,6 +174,37 @@ export class PrismaAdminRepository implements AdminRepository {
       reported: r.reported ? { id: r.reported.id, username: r.reported.profile?.username ?? MISSING, status: r.reported.status } : null,
       resolvedAt: r.resolvedAt, resolution: r.resolution as ReportResolution | null, resolutionNote: r.resolutionNote,
     }));
+  }
+
+  async listUserReports(open: boolean, page: Page): Promise<AdminUserReportRow[]> {
+    const rows = await this.prisma.userReport.findMany({
+      where: { resolvedAt: open ? null : { not: null } },
+      orderBy: open ? [{ createdAt: 'asc' }, { id: 'asc' }] : [{ resolvedAt: 'desc' }, { id: 'asc' }],
+      skip: page.offset, take: page.limit,
+      select: {
+        id: true, kind: true, reason: true, details: true, evidence: true, createdAt: true, resolvedAt: true, resolution: true, resolutionNote: true,
+        reporter: { select: { id: true, profile: { select: { username: true } } } },
+        reported: { select: { id: true, status: true, profile: { select: { username: true } } } },
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id, kind: r.kind === 'COMMENT' ? 'COMMENT' as const : 'PROFILE' as const, reason: r.reason as PostReportReason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
+      reporter: { id: r.reporter.id, username: r.reporter.profile?.username ?? MISSING },
+      reported: { id: r.reported.id, username: r.reported.profile?.username ?? MISSING, status: r.reported.status },
+      resolvedAt: r.resolvedAt, resolution: r.resolution as ReportResolution | null, resolutionNote: r.resolutionNote,
+    }));
+  }
+
+  async findUserReport(id: string) {
+    if (!isUuid(id)) return undefined;
+    const r = await this.prisma.userReport.findUnique({ where: { id }, select: { id: true, reportedUserId: true, resolvedAt: true } });
+    return r ?? undefined;
+  }
+
+  async resolveUserReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean> {
+    if (!isUuid(id)) return false;
+    const r = await this.prisma.userReport.updateMany({ where: { id, resolvedAt: null }, data: { resolvedAt: at, resolvedBy: adminId, resolution, resolutionNote: note } });
+    return r.count > 0;
   }
 
   async listStoryReports(open: boolean, page: Page): Promise<AdminStoryReportRow[]> {

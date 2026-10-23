@@ -6,6 +6,7 @@ import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
 import type { PollRecord, PostCommentRecord, PostPatch, PostReportReason, PostKindFilter, PostImageRecord, PostRecord, PostTagStatus, PostWithImages, PublicProfile } from './types.ts';
 import type { EventKind } from './types.ts';
+import { parseReportInput } from './report-input.ts';
 import { EVENT_KINDS, POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
 export const POST_IMAGES_MAX = 5;
@@ -401,6 +402,17 @@ export class PostService {
     const text = optionalText(details, POST_REPORT_DETAILS_MAX, 'details', 'Detalhes');
     await this.deps.posts.report({ id: this.deps.ids.next(), postId: post.id, reporterId: viewerId, reason: reason as PostReportReason, details: text, createdAt: this.deps.clock.now() });
     await this.deps.posts.hide(post.id, viewerId);
+    return { reported: true };
+  }
+
+  /** Denunciar um comentário de outra pessoa. A equipe recebe o texto como estava. */
+  async reportComment(viewerId: string, postId: unknown, commentId: unknown, reason: unknown, details?: unknown): Promise<{ reported: true }> {
+    const { post } = await this.seeable(viewerId, postId);
+    const comment = typeof commentId === 'string' && commentId.length <= 64 ? await this.deps.posts.findComment(commentId) : undefined;
+    if (!comment || comment.postId !== post.id) throw notFound('Comentário não encontrado');
+    if (comment.authorId === viewerId) throw forbidden('Você não pode denunciar o seu próprio comentário');
+    const input = parseReportInput(reason, details);
+    await this.deps.users.addReport({ id: this.deps.ids.next(), kind: 'COMMENT', reporterId: viewerId, reportedUserId: comment.authorId, commentId: comment.id, evidence: comment.body.slice(0, 600), reason: input.reason, details: input.details, createdAt: this.deps.clock.now() });
     return { reported: true };
   }
 

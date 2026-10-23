@@ -86,7 +86,7 @@ function AgeGate({ declared, onDone }: { declared: boolean; onDone: () => void }
         ) : (
           <>
             <h2 className="agegate__title">Confirme que você tem 18 anos ou mais</h2>
-            <p className="agegate__text">O Flash mostra quem está disponível para sair agora, por isso é só para maiores de idade. Informe sua data de nascimento. Ela não aparece para ninguém e não pode ser trocada depois.</p>
+            <p className="agegate__text">O Flash mostra quem está disponível para sair agora, por isso é só para maiores de idade. Informe sua data de nascimento. Ela não aparece para ninguém. Se errar, você corrige em Editar perfil.</p>
             <form className="form" onSubmit={(e) => void submit(e)} noValidate>
               <Field label="Data de nascimento" type="date" value={birth} onChange={setBirth} error={error} max={todayIso()} autoComplete="bday" />
               <Button type="submit" full loading={busy}>

@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import { REASON_LABEL, RESOLUTION_LABEL, formatDateTime } from '../labels.ts';
-import type { ConversationReportRow, PostReportRow, StoryReportRow } from '../types.ts';
+import type { ConversationReportRow, PostReportRow, StoryReportRow, UserReportRow } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead, Pager, Tabs } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
 import { PostThumb, deletePostAction } from './posts.tsx';
 
-type Kind = 'posts' | 'stories' | 'conversations';
+type Kind = 'posts' | 'stories' | 'conversations' | 'users';
 
 function Outcome({ r }: { r: { resolution: PostReportRow['resolution']; resolutionNote: string | null; resolvedAt: string | null } }) {
   if (!r.resolution) return null;
@@ -181,6 +181,62 @@ function ConversationReportCard({ r, onAction }: { r: ConversationReportRow; onA
   );
 }
 
+function UserReportCard({ r, onAction }: { r: UserReportRow; onAction: (a: ActionSpec) => void }) {
+  const open = r.resolution === null;
+  const target = r.reported;
+  return (
+    <article className="report">
+      <div className="report__main">
+        <div>
+          <Badge tone="info">{r.kind === 'COMMENT' ? 'Comentário' : 'Perfil'}</Badge> <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge>{' '}
+          <span className="muted small">denunciado por @{r.reporter.username} em {formatDateTime(r.createdAt)}</span>
+        </div>
+        <p className="muted small">
+          Pessoa denunciada: <span className="handle">@{target.username}</span> {target.status === 'SUSPENDED' ? <Badge tone="bad">Suspensa</Badge> : null}
+        </p>
+        {r.details ? <p className="pre">“{r.details}”</p> : null}
+        <details open>
+          <summary>{r.kind === 'COMMENT' ? 'Comentário denunciado' : 'Nome e descrição no momento da denúncia'}</summary>
+          <pre className="evidence">{r.evidence || 'Nada anexado.'}</pre>
+        </details>
+        <Outcome r={r} />
+      </div>
+      {open ? (
+        <div className="report__actions">
+          <button type="button" className="btn btn--small" onClick={() => onAction({ title: 'Denúncia sem problema', description: <p>A denúncia sai da fila sem nenhuma providência.</p>, confirmLabel: 'Marcar sem problema', noteLabel: 'Nota', run: (n) => api.resolveUserReport(r.id, 'DISMISSED', n) })}>
+            Sem problema
+          </button>
+          <button type="button" className="btn btn--small" onClick={() => onAction({ title: 'Providência tomada', description: <p>Use quando você já agiu por outro caminho (por exemplo, pediu para a pessoa mudar o texto).</p>, confirmLabel: 'Registrar providência', noteLabel: 'O que foi feito', noteRequired: true, run: (n) => api.resolveUserReport(r.id, 'ACTIONED', n) })}>
+            Providência tomada
+          </button>
+          {target.status !== 'SUSPENDED' ? (
+            <button
+              type="button"
+              className="btn btn--small btn--danger-quiet"
+              onClick={() =>
+                onAction({
+                  title: `Suspender @${target.username}`,
+                  description: <p>A conta perde o acesso agora e esta denúncia é encerrada como “providência tomada”.</p>,
+                  confirmLabel: 'Suspender e encerrar',
+                  danger: true,
+                  noteLabel: 'Motivo',
+                  noteRequired: true,
+                  run: async (n) => {
+                    await api.setUserStatus(target.id, 'SUSPENDED', n);
+                    await api.resolveUserReport(r.id, 'ACTIONED', n);
+                  },
+                })
+              }
+            >
+              Suspender @{target.username}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 export function ReportsPage() {
   const [kind, setKind] = useState<Kind>('posts');
   const [resolved, setResolved] = useState(false);
@@ -189,12 +245,14 @@ export function ReportsPage() {
   const stats = useAsync(() => api.stats(), []);
   const posts = useAsync(() => (kind === 'posts' ? api.postReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
   const stories = useAsync(() => (kind === 'stories' ? api.storyReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
+  const users = useAsync(() => (kind === 'users' ? api.userReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
   const convs = useAsync(() => (kind === 'conversations' ? api.conversationReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
 
   const reload = () => {
     posts.reload();
     stories.reload();
     convs.reload();
+    users.reload();
     stats.reload();
   };
 
@@ -209,6 +267,7 @@ export function ReportsPage() {
             { value: 'posts', label: 'Posts', count: stats.data?.openPostReports },
             { value: 'stories', label: 'Stories', count: stats.data?.openStoryReports },
             { value: 'conversations', label: 'Conversas', count: stats.data?.openConversationReports },
+            { value: 'users', label: 'Perfis e comentários', count: stats.data?.openUserReports },
           ]}
         />
         <Tabs value={resolved ? 'done' : 'open'} onChange={(v) => { setResolved(v === 'done'); setOffset(0); }} options={[{ value: 'open', label: 'Abertas' }, { value: 'done', label: 'Decididas' }]} />
@@ -230,6 +289,17 @@ export function ReportsPage() {
             page ? (
               <>
                 <div className="reports">{page.items.map((r) => <StoryReportCard key={r.id} r={r} onAction={setAction} />)}</div>
+                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+              </>
+            ) : null
+          }
+        </Loadable>
+      ) : kind === 'users' ? (
+        <Loadable state={users} empty={resolved ? 'Nenhuma denúncia decidida ainda.' : 'Nenhuma denúncia aberta. 🎉'} isEmpty={(d) => d === undefined || d.items.length === 0}>
+          {(page) =>
+            page ? (
+              <>
+                <div className="reports">{page.items.map((r) => <UserReportCard key={r.id} r={r} onAction={setAction} />)}</div>
                 <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
               </>
             ) : null

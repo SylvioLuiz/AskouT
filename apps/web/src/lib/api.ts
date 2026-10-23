@@ -234,6 +234,8 @@ export function createApi(deps: ApiDeps) {
     likeComment: (postId: string, commentId: string, liked: boolean) =>
       request<{ liked: boolean; likeCount: number }>(liked ? 'POST' : 'DELETE', `/posts/${id(postId)}/comments/${id(commentId)}/like`),
     deleteComment: (postId: string, commentId: string) => request<{ deleted: true }>('DELETE', `/posts/${id(postId)}/comments/${id(commentId)}`),
+    reportProfile: (username: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/profiles/${id(username)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+    reportComment: (postId: string, commentId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/posts/${id(postId)}/comments/${id(commentId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
     reportPost: (postId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/posts/${id(postId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
     notInterested: (postId: string) => request<{ hidden: true }>('POST', `/posts/${id(postId)}/not-interested`),
     editPost: (postId: string, patch: PostEdit) => request<PostView>('PATCH', `/posts/${id(postId)}`, { body: patch }),

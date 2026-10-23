@@ -154,7 +154,19 @@ export class AdminController {
     return this.core.admin.conversationReports(actor, q);
   }
 
+  @Get('reports/users')
+  userReports(@CurrentActor() actor: Actor, @Query() q: { status?: unknown; limit?: unknown; offset?: unknown }) {
+    return this.core.admin.userReports(actor, q);
+  }
+
   /** `{resolution: 'DISMISSED'|'ACTIONED', note?}` */
+  @Post('reports/users/:id/resolve')
+  @HttpCode(200)
+  resolveUserReport(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.resolveUserReport(actor, id, b.resolution, b.note);
+  }
+
   @Post('reports/posts/:id/resolve')
   @HttpCode(200)
   resolvePost(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {

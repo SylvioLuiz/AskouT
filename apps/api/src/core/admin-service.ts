@@ -6,7 +6,7 @@ import type { AuthResult, AuthService, LoginInput } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
 import type { VenueService } from './venue-service.ts';
 import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
-import type { Actor, AdminConversationReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
+import type { Actor, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
 import { REPORT_RESOLUTIONS } from './types.ts';
 
 export const ADMIN_PAGE_DEFAULT = 25;
@@ -299,6 +299,23 @@ export class AdminService {
     this.assertAdmin(actor);
     const open = query.status !== 'resolved';
     return this.paged(query, (page) => this.deps.admin.listConversationReports(open, page));
+  }
+
+  async userReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminUserReportRow>> {
+    this.assertAdmin(actor);
+    const open = query.status !== 'resolved';
+    return this.paged(query, (page) => this.deps.admin.listUserReports(open, page));
+  }
+
+  async resolveUserReport(actor: Actor, reportId: unknown, resolution: unknown, note: unknown): Promise<{ resolved: true }> {
+    this.assertAdmin(actor);
+    const res = this.parseResolution(resolution);
+    const text = noteText(note, false);
+    const report = typeof reportId === 'string' && reportId.length <= 64 ? await this.deps.admin.findUserReport(reportId) : undefined;
+    if (!report) throw notFound('Denúncia não encontrada');
+    if (!(await this.deps.admin.resolveUserReport(report.id, actor.userId, res, text, this.deps.clock.now()))) throw conflict('Esta denúncia já foi decidida');
+    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'USER_REPORT', report.id, text);
+    return { resolved: true };
   }
 
   /** Encerra uma denúncia de post sem ou com providência. A providência em si (remover o post, suspender a conta) é outra chamada. */

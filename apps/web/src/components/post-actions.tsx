@@ -152,7 +152,7 @@ export function ReasonSheet({ title, doneText, extra, submit, onClose, onDone }:
 
 // ---------- Comentários ----------
 
-function CommentRow({ comment, onDelete, onLike, busy }: { comment: PostComment; onDelete: () => void; onLike: () => void; busy: boolean }) {
+function CommentRow({ comment, onDelete, onLike, onReport, busy }: { comment: PostComment; onDelete: () => void; onLike: () => void; onReport: () => void; busy: boolean }) {
   return (
     <li className="comment">
       {comment.venue ? (
@@ -193,6 +193,11 @@ function CommentRow({ comment, onDelete, onLike, busy }: { comment: PostComment;
         <HeartIcon filled={comment.likedByMe} />
         {comment.likeCount > 0 ? <span>{comment.likeCount}</span> : null}
       </button>
+      {!comment.mine ? (
+        <button type="button" className="comment__report" onClick={onReport} aria-label={`Denunciar comentário de ${comment.venue?.name ?? comment.author.username}`}>
+          Denunciar
+        </button>
+      ) : null}
       {comment.canDelete ? (
         <button type="button" className="comment__del" onClick={onDelete} disabled={busy} aria-label="Apagar comentário">
           <TrashIcon />
@@ -210,6 +215,7 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<string | undefined>();
+  const [reporting, setReporting] = useState<PostComment | undefined>();
   const endRef = useRef<HTMLDivElement>(null);
   const query = mentionQueryAt(text);
   const debouncedQuery = useDebounced(query, 250);
@@ -290,12 +296,21 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
 
   return (
     <Sheet title="Comentários" onClose={onClose}>
+      {reporting ? (
+        <ReasonSheet
+          title="Denunciar comentário"
+          doneText="Obrigado por avisar. A equipe vai analisar o comentário."
+          submit={(reason, details) => api.reportComment(postId, reporting.id, reason, details)}
+          onClose={() => setReporting(undefined)}
+          onDone={() => setReporting(undefined)}
+        />
+      ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
       {!loaded ? <Loading /> : null}
       {loaded && items.length === 0 && !error ? <p className="comments__empty">Ainda não há nenhum comentário.</p> : null}
       <ul className="comments">
         {items.map((c) => (
-          <CommentRow key={c.id} comment={c} busy={deleting === c.id} onDelete={() => void remove(c)} onLike={() => void toggleLike(c)} />
+          <CommentRow key={c.id} comment={c} busy={deleting === c.id} onDelete={() => void remove(c)} onLike={() => void toggleLike(c)} onReport={() => setReporting(c)} />
         ))}
       </ul>
       {hasMore ? (

@@ -1,5 +1,6 @@
 import { decodeImageDataUrl } from './image.ts';
-import { notFound, validationError } from './errors.ts';
+import { forbidden, notFound, validationError } from './errors.ts';
+import { parseReportInput } from './report-input.ts';
 import { evaluateFriendship } from './friendship.ts';
 import type { CoreDeps } from './ports.ts';
 import type { FollowStatus, Profile, PublicProfile } from './types.ts';
@@ -95,6 +96,16 @@ export class ProfileService {
       },
       canViewContent: !blockedByViewer && (!profile.isPrivate || viewerFollows?.status === 'ACCEPTED'),
     };
+  }
+
+  /** Denunciar o perfil de outra pessoa (nome, foto ou descrição). Quem denuncia não vê perfil bloqueado ou suspenso, e a equipe recebe o texto como estava. */
+  async report(viewerId: string, rawUsername: unknown, reason: unknown, details?: unknown): Promise<{ reported: true }> {
+    const view = await this.getByUsername(viewerId, rawUsername);
+    if (view.profile.userId === viewerId) throw forbidden('Você não pode denunciar o seu próprio perfil');
+    const input = parseReportInput(reason, details);
+    const evidence = `${view.profile.displayName} (@${view.profile.username})${view.profile.bio ? ` — ${view.profile.bio}` : ''}`.slice(0, 600);
+    await this.deps.users.addReport({ id: this.deps.ids.next(), kind: 'PROFILE', reporterId: viewerId, reportedUserId: view.profile.userId, commentId: null, evidence, reason: input.reason, details: input.details, createdAt: this.deps.clock.now() });
+    return { reported: true };
   }
 
   async updateOwn(userId: string, patch: ProfilePatch): Promise<Profile> {

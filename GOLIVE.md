@@ -217,3 +217,24 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 - Em **Editar perfil → Data de nascimento** (`PUT /me/age`). Regra: quem hoje consta como **maior de 18 anos** corrige sozinho (mínimo 13). Quem consta como **menor de 18 não corrige por aqui** (botão some e aparece "fale com o suporte"), senão bastaria trocar a data para liberar o Flash. Adulto que troca para uma data de menor perde o Flash e também não volta sozinho.
 - **Suporte:** no painel, em **Pessoas → Corrigir idade** (`PUT /admin/users/:id/birth-date`), a gestão troca a data de quem ficou bloqueado como menor. Motivo obrigatório; a data antiga e a nova ficam na **Auditoria** ("Corrigiu a data de nascimento"). Não vale para contas de admin nem para menos de 13 anos. Confira a pessoa por fora (ex.: documento enviado ao suporte) antes de corrigir. O link "fale com o suporte" no app depende de `VITE_SUPPORT_EMAIL`.
 - Brecha conhecida: uma pessoa de 13 a 17 anos que mentiu no cadastro e disse ter 18+ continua passando (é autodeclaração).
+
+## Lojas (Apple e Google): exigências para apps com conteúdo de usuários
+
+Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o texto atual da Apple (App Review Guidelines 1.2) e do Google Play (política de conteúdo gerado por usuários) na hora de enviar.
+
+**Já atende**
+- **Denunciar pelo app:** post, comentário, story, conversa/grupo e **perfil** (menu do perfil → "Denunciar perfil"; comentário → "Denunciar"). Todas caem em Gestão → Denúncias, com o texto como estava, decisão e nota na auditoria. Suspender a conta é um clique na própria denúncia.
+- **Bloquear** qualquer pessoa, a qualquer momento (perfil e conversa).
+- **Termos com regra de conduta e aceite no cadastro** (seção "O que não é permitido" e "Denúncias, bloqueio e moderação"); versão e data do aceite ficam guardadas.
+- **Apagar a conta dentro do app** (exigência da Apple) e baixar os dados.
+- **Contato publicado:** e-mail de privacidade nos textos legais e suporte na tela Ajuda (precisa de `VITE_SUPPORT_EMAIL` e do e-mail `privacidade@askout.com.br` criados).
+- **Trava de idade** no Flash (ver seção própria) e classificação etária coerente (ver abaixo).
+
+**Lacunas e riscos (decidir antes de enviar)**
+- **Filtro automático de conteúdo ofensivo: não existe.** A Apple cita "um método para filtrar conteúdo impróprio". Hoje só há denúncia + moderação manual. Muitos apps passam assim, mas é o ponto mais provável de questionamento. Opção barata: lista de palavras bloqueadas em @usuário, nome e descrição. Opção mais forte: moderação automática de imagens (serviço pago).
+- **Prazo de resposta às denúncias:** os Termos dizem "meta de até 24 horas" entre colchetes. Alguém precisa olhar o painel todo dia (o painel mostra o total de denúncias abertas no menu). Ajuste o prazo no texto para o que você consegue cumprir.
+- **Denunciar eventos e comentários de donos de local:** eventos criados por donos de local não têm botão de denunciar (só dá para a gestão apagar). Vale incluir se a loja questionar.
+- **Entrar com Apple:** a Apple exige oferecer "Entrar com a Apple" quando há login com Google. Está implementado, mas **nunca foi testado** (precisa de `APPLE_CLIENT_ID` e domínio HTTPS).
+- **Classificação etária:** é do app inteiro. Responda o questionário contando que há encontros presenciais, conteúdo de usuários, locais que servem bebida alcoólica e um recurso 18+ (Flash). Provável: 17+ na Apple. No Google Play, o público-alvo deve excluir crianças; o app tem conta a partir de 13 anos (decisão jurídica pendente, ver "Idade e aceite").
+- **Formulários de privacidade (Apple "Privacy Nutrition Labels" e Google "Segurança dos dados"):** declare e-mail, nome, @usuário, data de nascimento, localização aproximada (Flash e mapa), fotos/vídeos/áudio de conversa e posts, mensagens, identificadores de dispositivo (push), compras. Nenhum dado é vendido; use os textos da Política de Privacidade como base.
+- **Compras:** impulsionamento pago dentro do app nativo precisa usar a compra da loja (Apple/Google); os verificadores de recibo **ainda não estão implementados**.

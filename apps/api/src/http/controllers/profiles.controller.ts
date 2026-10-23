@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, HttpCode, Inject, NotFoundException, Param, Patch, Put, Query, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Inject, NotFoundException, Param, Patch, Post, Put, Query, StreamableFile } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor, Public } from '../decorators.ts';
@@ -43,6 +43,14 @@ export class ProfilesController {
   @Get(':username/events')
   events(@CurrentActor() actor: Actor, @Param('username') username: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
     return this.core.profileEvents.list(actor.userId, username, { limit, offset });
+  }
+
+  /** Denunciar um perfil. `{reason: SPAM|OFFENSIVE|NUDITY|VIOLENCE|FALSE_INFO|OTHER, details?}` */
+  @Post(':username/report')
+  @HttpCode(200)
+  report(@CurrentActor() actor: Actor, @Param('username') username: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.profiles.report(actor.userId, username, b.reason, b.details);
   }
 
   @Get(':username')

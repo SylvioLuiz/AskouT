@@ -4592,3 +4592,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 /* Data de nascimento em Editar perfil */
 .birthedit { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
 .birthedit__title { margin: 0; font-size: 17px; }
+
+/* Denunciar comentário */
+.comment__report { background: none; border: 0; padding: 4px 6px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; text-decoration: underline; min-height: 32px; }
+.comment__report:hover, .comment__report:focus-visible { color: var(--danger); }

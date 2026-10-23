@@ -14,7 +14,7 @@ interface Props {
 export function ConsentFields({ birth, onBirth, accepted, onAccepted, errors }: Props) {
   return (
     <>
-      <Field label="Data de nascimento" type="date" value={birth} onChange={onBirth} error={errors['birthDate']} hint="Não aparece para ninguém. Não dá para trocar depois." max={todayIso()} autoComplete="bday" />
+      <Field label="Data de nascimento" type="date" value={birth} onChange={onBirth} error={errors['birthDate']} hint="Não aparece para ninguém. Você pode corrigir depois em Editar perfil." max={todayIso()} autoComplete="bday" />
       <div className={`consent${errors['acceptTerms'] ? ' consent--error' : ''}`}>
         <label className="consent__row">
           <input type="checkbox" checked={accepted} onChange={(e) => onAccepted(e.target.checked)} aria-invalid={errors['acceptTerms'] ? true : undefined} aria-describedby={errors['acceptTerms'] ? 'consent-msg' : undefined} />

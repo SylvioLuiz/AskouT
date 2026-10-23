@@ -42,7 +42,7 @@ export function buildPrivacy(email: string): LegalDoc {
         title: '2. Quais dados tratamos',
         items: [
           'Conta: e-mail, @usuário, nome, e senha (guardada de forma irreversível, nunca em texto aberto). Se você entrar com Google ou Apple, recebemos a confirmação de identidade deles e o e-mail da conta.',
-          'Data de nascimento: pedida no cadastro, para conferir a idade mínima e liberar o Flash só a maiores de 18 anos. Não aparece para outras pessoas e não pode ser trocada depois. Também guardamos o dia e a versão dos Termos que você aceitou ao criar a conta.',
+          'Data de nascimento: pedida no cadastro, para conferir a idade mínima e liberar o Flash só a maiores de 18 anos. Não aparece para outras pessoas. Você pode corrigi-la em Editar perfil (quem consta como menor de 18 anos fala com o suporte). Também guardamos o dia e a versão dos Termos que você aceitou ao criar a conta.',
           'Perfil e conteúdo: foto de perfil, posts, fotos, vídeos, eventos que você posta, comentários, curtidas e mensagens das conversas e grupos.',
           'Relações: quem você segue, quem segue você, quem você bloqueou e as pessoas que você aprova no perfil privado. Dois perfis que se seguem mutuamente são "amigos" no AskouT.',
           'Agenda e planos: os dias e horários em que você marca que pode sair, os modos "Flash" (disponibilidade temporária), enquetes de data e presença em eventos.',
@@ -110,7 +110,7 @@ export function buildPrivacy(email: string): LegalDoc {
       },
       {
         title: '10. Crianças e adolescentes',
-        text: ['O AskouT é para pessoas com 18 anos ou mais, porque envolve encontros presenciais e locais que servem bebida alcoólica. Não queremos dados de menores. Se soubermos que uma conta é de menor de 18 anos, vamos encerrá-la.'],
+        text: ['O AskouT é para pessoas com 13 anos ou mais. O Flash (aviso de que você está disponível para sair agora) é só para maiores de 18 anos, e quem não tem essa idade não consegue usá-lo. Não queremos dados de menores de 13 anos: se soubermos que uma conta é de alguém abaixo dessa idade, vamos encerrá-la. [A revisar com advogado antes do lançamento: regras do ECA Digital (Lei 15.211/2025) para contas de adolescentes.]'],
       },
       {
         title: '11. Armazenamento no aparelho',
@@ -136,7 +136,7 @@ export function buildTerms(email: string): LegalDoc {
       {
         title: '2. Sua conta',
         items: [
-          'Você precisa ter 18 anos ou mais e informar dados verdadeiros.',
+          'Você precisa ter 13 anos ou mais para ter uma conta, e informar dados verdadeiros, inclusive a data de nascimento. O Flash é só para maiores de 18 anos.',
           'Você é responsável pela sua senha e por tudo o que acontece na sua conta. Avise-nos se achar que alguém a usou.',
           'Cada pessoa pode ter uma conta. Contas falsas, que imitam outras pessoas ou são feitas para enganar, podem ser removidas.',
         ],
@@ -156,9 +156,18 @@ export function buildTerms(email: string): LegalDoc {
           'Tentar burlar a segurança, adivinhar senhas, coletar dados em massa ou usar robôs sem autorização.',
           'Violar a lei ou direitos de terceiros.',
         ],
+        text: ['Conteúdo ofensivo, de ódio, violento ou sexual não é tolerado e será removido; quem insistir terá a conta suspensa.'],
       },
       {
-        title: '5. Locais, eventos e links de terceiros',
+        title: '5. Denúncias, bloqueio e moderação',
+        items: [
+          'Você pode denunciar perfis, posts, comentários, stories e conversas pelo próprio app (menu de opções de cada item) e bloquear qualquer pessoa a qualquer momento.',
+          'A nossa equipe analisa as denúncias, remove o que descumprir estes termos e pode suspender contas. [A revisar antes do lançamento: prazo de resposta. Meta atual: até 24 horas.]',
+          `Para denúncias que não caibam no app ou casos urgentes, escreva para ${email}.`,
+        ],
+      },
+      {
+        title: '6. Locais, eventos e links de terceiros',
         text: [
           'As informações de locais e eventos vêm de donos de locais, de fontes públicas e de outros usuários, e podem estar desatualizadas ou incorretas. Confira horário e endereço antes de sair. Itens marcados como "[TESTE]" são apenas exemplos.',
           'O botão "Comprar ingresso" leva você ao site de venda de terceiros. O AskouT não vende, não cobra e não entrega ingressos, e não responde por esse site ou pela compra.',
@@ -166,19 +175,19 @@ export function buildTerms(email: string): LegalDoc {
         ],
       },
       {
-        title: '6. Donos de locais e impulsionamento',
+        title: '7. Donos de locais e impulsionamento',
         text: ['Quem administra um local declara ter autorização para isso. O impulsionamento é um anúncio pago, sempre identificado como "Patrocinado". Preços, forma de cobrança e regras de cancelamento e reembolso são mostrados antes da compra. [A definir e revisar antes do lançamento: política de reembolso.]'],
       },
       {
-        title: '7. Suspensão e encerramento',
+        title: '8. Suspensão e encerramento',
         text: ['Você pode parar de usar o AskouT quando quiser e pedir a exclusão da conta pelo e-mail de privacidade. Podemos suspender ou encerrar contas que descumpram estes termos, com aviso quando possível.'],
       },
       {
-        title: '8. Responsabilidade',
+        title: '9. Responsabilidade',
         text: ['Oferecemos o AskouT como ele está, e nos esforçamos para mantê-lo no ar e seguro, mas não garantimos que nunca terá falhas. Na medida permitida em lei, não respondemos por encontros entre usuários, por conteúdo de terceiros nem por prejuízos indiretos. Nada aqui limita direitos que a lei garante a você como consumidor.'],
       },
       {
-        title: '9. Mudanças, lei e foro',
+        title: '10. Mudanças, lei e foro',
         text: [
           `Podemos atualizar estes termos e avisaremos no aplicativo quando a mudança for relevante. Última atualização: ${LEGAL_UPDATED}.`,
           'Valem as leis do Brasil. Fica eleito o foro do domicílio do consumidor para resolver conflitos.',

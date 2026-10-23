@@ -228,3 +228,41 @@ test('corrigir data de nascimento: só admin, motivo obrigatório, registra de/p
   const listed = (await w.core.admin.searchUsers(A, { q: 'juca' })).items[0]!;
   assert.equal(listed.birthDate, '2000-01-01');
 });
+
+test('denúncia de perfil e de comentário: vai para a fila da gestão, com o texto da época, e se resolve', async () => {
+  const { w, A, U, ana, bia, caio } = await setup();
+  await w.core.profiles.updateOwn(bia, { bio: 'bio ofensiva' });
+  // Perfil
+  await rejectsWith(w.core.profiles.report(ana, 'bia', 'XYZ'), 'VALIDATION');
+  await rejectsWith(w.core.profiles.report(ana, 'ana', 'OFFENSIVE'), 'FORBIDDEN');
+  await rejectsWith(w.core.profiles.report(ana, 'ninguem', 'OFFENSIVE'), 'NOT_FOUND');
+  await w.core.profiles.report(ana, 'bia', 'OFFENSIVE', '  muito ruim  ');
+  await w.core.profiles.report(ana, 'bia', 'SPAM'); // denunciar de novo atualiza, não duplica
+  await rejectsWith(w.core.profiles.report(ana, 'bia', 'OFFENSIVE', 'x'.repeat(301)), 'VALIDATION');
+  // Comentário
+  const post = await w.core.posts.create(bia, { caption: 'oi', images: [JPEG()] });
+  const c = await w.core.posts.addComment(ana, post.id, 'comentário ruim');
+  await rejectsWith(w.core.posts.reportComment(ana, post.id, c.id, 'OFFENSIVE'), 'FORBIDDEN');
+  await w.core.posts.reportComment(bia, post.id, c.id, 'OFFENSIVE', 'ofensa');
+  await rejectsWith(w.core.posts.reportComment(bia, post.id, 'nao-existe', 'OFFENSIVE'), 'NOT_FOUND');
+
+  await rejectsWith(w.core.admin.userReports(U(caio), {}), 'FORBIDDEN');
+  const open = await w.core.admin.userReports(A, {});
+  assert.equal(open.items.length, 2);
+  const profile = open.items.find((r) => r.kind === 'PROFILE')!;
+  assert.equal(profile.reason, 'SPAM');
+  assert.equal(profile.reported.username, 'bia');
+  assert.ok(profile.evidence.includes('bio ofensiva'));
+  const comment = open.items.find((r) => r.kind === 'COMMENT')!;
+  assert.equal(comment.evidence, 'comentário ruim');
+  assert.equal(comment.reported.username, 'ana');
+  assert.equal((await w.core.admin.stats(A)).openUserReports, 2);
+
+  await rejectsWith(w.core.admin.resolveUserReport(A, profile.id, 'X', null), 'VALIDATION');
+  await w.core.admin.resolveUserReport(A, profile.id, 'ACTIONED', 'Pedi para mudar a bio');
+  await rejectsWith(w.core.admin.resolveUserReport(A, profile.id, 'DISMISSED', null), 'CONFLICT');
+  await rejectsWith(w.core.admin.resolveUserReport(A, 'nao-existe', 'DISMISSED', null), 'NOT_FOUND');
+  assert.equal((await w.core.admin.userReports(A, {})).items.length, 1);
+  assert.equal((await w.core.admin.userReports(A, { status: 'resolved' })).items[0]!.resolution, 'ACTIONED');
+  assert.equal((await w.core.admin.stats(A)).openUserReports, 1);
+});

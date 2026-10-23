@@ -1298,6 +1298,22 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.admin.listConversationReports(true, page), []);
         assert.equal((await h.admin.listConversationReports(false, page))[0]!.resolution, 'DISMISSED');
         assert.equal((await h.admin.stats()).openConversationReports, 0);
+
+        // perfis e comentários
+        const u1 = randomUUID();
+        await h.users.addReport({ id: u1, kind: 'PROFILE', reporterId: bia, reportedUserId: ana, commentId: null, evidence: 'Ana (@ana) — bio', reason: 'OFFENSIVE', details: null, createdAt: at(20) });
+        await h.users.addReport({ id: randomUUID(), kind: 'PROFILE', reporterId: bia, reportedUserId: ana, commentId: null, evidence: 'Ana (@ana) — bio nova', reason: 'SPAM', details: 'de novo', createdAt: at(21) });
+        await h.users.addReport({ id: randomUUID(), kind: 'COMMENT', reporterId: bia, reportedUserId: ana, commentId: 'c-1', evidence: 'texto do comentário', reason: 'OTHER', details: null, createdAt: at(22) });
+        const uopen = await h.admin.listUserReports(true, page);
+        assert.deepEqual(uopen.map((r) => [r.kind, r.reason, r.reporter.username, r.reported.username, r.reported.status]), [['PROFILE', 'SPAM', 'bia', 'ana', 'ACTIVE'], ['COMMENT', 'OTHER', 'bia', 'ana', 'ACTIVE']], 'denunciar o mesmo perfil de novo atualiza, não duplica');
+        assert.equal(uopen[0]!.evidence, 'Ana (@ana) — bio nova');
+        assert.equal((await h.admin.stats()).openUserReports, 2);
+        assert.equal((await h.admin.findUserReport(uopen[0]!.id))?.reportedUserId, ana);
+        assert.equal(await h.admin.findUserReport('nao-e-uuid'), undefined);
+        assert.equal(await h.admin.resolveUserReport(uopen[0]!.id, caio, 'ACTIONED', 'ok', at(30)), true);
+        assert.equal(await h.admin.resolveUserReport(uopen[0]!.id, caio, 'DISMISSED', null, at(31)), false);
+        assert.equal((await h.admin.listUserReports(false, page))[0]!.resolution, 'ACTIONED');
+        assert.equal((await h.admin.stats()).openUserReports, 1);
       });
 
       it('auditoria: guarda quem fez o quê, mais novo primeiro, e pagina', async () => {

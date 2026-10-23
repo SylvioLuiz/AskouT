@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -129,6 +129,8 @@ export const api = {
     return { url: URL.createObjectURL(blob), mime: blob.type };
   },
   resolvePostReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/posts/${encodeURIComponent(id)}/resolve`, { resolution, note }),
+  userReports: (p: { resolved: boolean; offset: number }) => request<Page<UserReportRow>>('GET', `/admin/reports/users${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
+  resolveUserReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/users/${encodeURIComponent(id)}/resolve`, { resolution, note }),
   resolveConversationReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/conversations/${encodeURIComponent(id)}/resolve`, { resolution, note }),
 
   audit: (offset: number) => request<Page<AuditRow>>('GET', `/admin/audit${query({ offset })}`),

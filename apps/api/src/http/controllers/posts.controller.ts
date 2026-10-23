@@ -214,6 +214,14 @@ export class PostsController {
     return this.core.posts.report(actor.userId, id, b.reason, b.details);
   }
 
+  /** Denunciar um comentário. Mesmo corpo da denúncia de post. */
+  @Post('posts/:id/comments/:commentId/report')
+  @HttpCode(200)
+  reportComment(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('commentId') commentId: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.posts.reportComment(actor.userId, id, commentId, b.reason, b.details);
+  }
+
   @Post('posts/:id/not-interested')
   @HttpCode(200)
   notInterested(@CurrentActor() actor: Actor, @Param('id') id: string) {

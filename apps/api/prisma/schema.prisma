@@ -179,6 +179,9 @@ model User {
   organizedMeetings     Meeting[]            @relation("MeetingOrganizer")
   meetingParticipations MeetingParticipant[]
 
+  userReportsMade     UserReport[] @relation("UserReportsMade")
+  userReportsReceived UserReport[] @relation("UserReportsReceived")
+
   ownedGroups  Group[]       @relation("GroupOwner")
   groupMembers GroupMember[]
 
@@ -438,6 +441,31 @@ model ConversationReport {
   reported     User?        @relation("ConversationReported", fields: [reportedUserId], references: [id], onDelete: SetNull)
 
   @@unique([conversationId, reporterId])
+  @@index([createdAt])
+  @@index([resolvedAt])
+}
+
+/// Denúncia de um perfil (nome, foto, descrição) ou de um comentário. `evidence` guarda o texto no momento da denúncia.
+/// `dedupeKey` (denunciante + alvo + tipo + comentário) impede denunciar a mesma coisa duas vezes.
+model UserReport {
+  id             String    @id @default(uuid()) @db.Uuid
+  dedupeKey      String    @unique
+  kind           String // PROFILE | COMMENT
+  reporterId     String    @db.Uuid
+  reportedUserId String    @db.Uuid
+  commentId      String?
+  reason         String
+  details        String?
+  evidence       String    @default("")
+  createdAt      DateTime  @default(now())
+  resolvedAt     DateTime?
+  resolvedBy     String?   @db.Uuid
+  resolution     String?
+  resolutionNote String?
+
+  reporter User @relation("UserReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User @relation("UserReportsReceived", fields: [reportedUserId], references: [id], onDelete: Cascade)
+
   @@index([createdAt])
   @@index([resolvedAt])
 }

@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import { conflict } from '../../core/errors.ts';
 import type { UserRepository } from '../../core/ports.ts';
-import type { Profile, ProfilePhotoRecord, User } from '../../core/types.ts';
+import type { Profile, ProfilePhotoRecord, User, UserReportRecord } from '../../core/types.ts';
 import { isUuid, onlyUuids, uniqueViolationTargets } from './helpers.ts';
 
 function toUser(row: {
@@ -156,6 +156,15 @@ export class PrismaUserRepository implements UserRepository {
     if (!isUuid(userId)) return undefined;
     const row = await this.prisma.profilePhoto.findUnique({ where: { userId } });
     return row ? { mime: row.mime as ProfilePhotoRecord['mime'], data: new Uint8Array(row.data), updatedAt: row.updatedAt } : undefined;
+  }
+
+  async addReport(report: UserReportRecord): Promise<void> {
+    const dedupeKey = `${report.reporterId}:${report.reportedUserId}:${report.kind}:${report.commentId ?? ''}`;
+    await this.prisma.userReport.upsert({
+      where: { dedupeKey },
+      create: { id: report.id, dedupeKey, kind: report.kind, reporterId: report.reporterId, reportedUserId: report.reportedUserId, commentId: report.commentId, reason: report.reason, details: report.details, evidence: report.evidence, createdAt: report.createdAt },
+      update: { reason: report.reason, details: report.details, evidence: report.evidence, resolvedAt: null, resolvedBy: null, resolution: null, resolutionNote: null },
+    });
   }
 
   async setBirthDate(userId: string, birthDate: string): Promise<boolean> {
