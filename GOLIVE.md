@@ -315,3 +315,9 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Grupo: membro sai ("Sair do grupo", já existia); quem criou também pode "Apagar grupo para todos" (`DELETE /conversations/:id/group`): apaga conversa, mensagens e membros; os outros recebem aviso (tipo `GROUP_REMOVED`); encontros já marcados continuam na agenda sem o grupo.
 - Testado: testes automáticos (memória e Postgres real). NÃO testado: as telas num navegador/aparelho nem a rota HTTP nova.
 - Segue sem apagar: notificações (só marcar como lida), mensagens recebidas de outras pessoas (só some para você), data de nascimento (só com a conta).
+
+## Chave do Google Places (criada em 23/10/2026)
+- Projeto `askout-512422`: chave "AskouT API Places (servidor)", restrita só à **Places API (New)** (sem restrição por IP: Railway/Render não têm IP fixo). O valor aparece em Google Cloud → APIs e serviços → Credenciais → "Exibir chave". **Nunca colar no chat nem no GitHub**: colar direto em `GOOGLE_PLACES_API_KEY` no Railway (ou na `.env` local de `apps/api` para teste).
+- Existe também a chave automática "Maps Platform API Key" (22/10), liberada para 32 APIs: excluir ou restringir, porque é permissiva demais e não é usada pelo app.
+- Falta: definir orçamento e alerta de gasto na conta de cobrança do Google Cloud; `GOOGLE_DAILY_LIMIT` na API limita as consultas por dia.
+- A busca real no Google ainda NÃO foi testada (só com respostas simuladas).
