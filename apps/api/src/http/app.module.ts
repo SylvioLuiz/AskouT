@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthGuard } from './auth.guard.ts';
+import { RateLimitGuard } from './rate-limit.guard.ts';
 import { AuthController } from './controllers/auth.controller.ts';
 import { AvailabilityController } from './controllers/availability.controller.ts';
 import { BlocksController } from './controllers/blocks.controller.ts';
@@ -40,6 +41,7 @@ import { CONFIG } from './tokens.ts';
     FlashPurge,
     PollDeadlines,
     EventReminders,
+    { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
 })

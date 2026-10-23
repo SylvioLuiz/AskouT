@@ -19,6 +19,8 @@ const config = app.get<AppConfig>(CONFIG);
 app.useBodyParser('json', { limit: '3mb' });
 // Fotos e vídeos da conversa chegam como arquivo cru (sem base64): até 20 MB, só desses tipos.
 app.useBodyParser('raw', { type: ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'], limit: '61mb' });
+// Atrás do proxy da hospedagem, o IP do cliente vem do cabeçalho X-Forwarded-For; sem isso o limite contaria o IP do proxy.
+if (config.trustProxyHops > 0) app.set('trust proxy', config.trustProxyHops);
 app.useGlobalFilters(new AllExceptionsFilter());
 app.enableShutdownHooks();
 if (config.corsOrigins.length > 0) {

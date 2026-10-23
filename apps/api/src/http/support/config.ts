@@ -7,6 +7,10 @@ export interface AppConfig {
   codeSecret: string;
   tokenTtlSeconds: number;
   corsOrigins: string[];
+  /** Limite de requisições ligado. Só dá para desligar (RATE_LIMIT=off) fora de produção. */
+  rateLimitEnabled: boolean;
+  /** Quantos proxies confiáveis ficam na frente da API (Railway = 1). Define de onde vem o IP do cliente. */
+  trustProxyHops: number;
   /** “console” imprime o código no terminal (só desenvolvimento); “resend” envia e-mail de verdade. */
   emailTransport: 'console' | 'resend';
   /** Dados do Resend, só quando `emailTransport` é “resend”. */
@@ -88,6 +92,10 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     problems.push('Em produção o envio "console" é recusado: ele imprime os códigos de cadastro no log. Use EMAIL_TRANSPORT=resend');
   }
 
+  const rateLimitEnabled = !(env.RATE_LIMIT === 'off' && nodeEnv !== 'production');
+  if (env.RATE_LIMIT === 'off' && nodeEnv === 'production') problems.push('RATE_LIMIT=off não é aceito em produção');
+  const trustProxyHops = env.TRUST_PROXY_HOPS === undefined || env.TRUST_PROXY_HOPS.trim() === '' ? (nodeEnv === 'production' ? 1 : 0) : Number(env.TRUST_PROXY_HOPS);
+  if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 5) problems.push('TRUST_PROXY_HOPS deve ser um inteiro entre 0 e 5');
   const corsOrigins = (env.CORS_ORIGINS ?? '')
     .split(',')
     .map((o) => o.trim())
@@ -161,5 +169,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, emailTransport, resend, osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, vapid, paymentProvider, stripe, paymentsEnabled, boostPricePerDayCents, boostStorePricePerDayCents };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, vapid, paymentProvider, stripe, paymentsEnabled, boostPricePerDayCents, boostStorePricePerDayCents };
 }
