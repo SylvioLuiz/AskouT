@@ -907,6 +907,8 @@ export function defineRepositoryContract(
         const empty = (await h.conversations.listForUser(ana))[0]!;
         assert.equal(empty.lastMessage, null);
         assert.equal(empty.unread, 0);
+        assert.deepEqual(empty.clearedAt, at(5), 'a lista informa quando a pessoa limpou (a conversa 1 a 1 limpa some da lista)');
+        assert.equal((await h.conversations.listForUser(bia))[0]!.clearedAt ?? null, null);
 
         const report = { id: randomUUID(), conversationId: c.id, reporterId: ana, reportedUserId: bia, reason: 'SPAM' as const, details: null, evidence: 'x', createdAt: at(6) };
         await h.conversations.addReport(report);
@@ -1621,6 +1623,22 @@ export function defineRepositoryContract(
         await h.conversations.removeParticipant(g.id, caio);
         assert.deepEqual(await h.conversations.participantIds(g.id), [ana, bia]);
         assert.equal((await h.conversations.listForUser(caio)).length, 0);
+      });
+
+      it('apagar grupo: leva conversa, mensagens e membros; não mexe em conversa 1 a 1', async () => {
+        const { ana, bia, caio } = await setup();
+        const g = await h.conversations.createGroup({ id: randomUUID(), name: 'G', ownerId: ana, now: at(1) });
+        await h.conversations.addParticipant(g.id, bia, at(2));
+        await h.conversations.addMessage({ id: randomUUID(), conversationId: g.id, senderId: bia, kind: 'TEXT', body: 'oi', suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: at(3) });
+        await h.conversations.setCleared(g.id, bia, at(4));
+        const direct = await h.conversations.getOrCreateDirect(ana, caio, randomUUID(), at(0));
+        await h.conversations.deleteGroup(direct.id);
+        assert.ok((await h.conversations.listForUser(ana)).some((x) => x.conversation.id === direct.id), 'a 1 a 1 continua');
+        await h.conversations.deleteGroup(g.id);
+        await h.conversations.deleteGroup(g.id);
+        for (const u of [ana, bia]) assert.equal((await h.conversations.listForUser(u)).some((x) => x.conversation.id === g.id), false);
+        assert.deepEqual(await h.conversations.listMessages(g.id, 10), []);
+        assert.deepEqual((await h.conversations.participantIds(g.id)) ?? [], []);
       });
 
       it('encontro: convidar de novo, mudar título/estado e sair dos encontros do grupo', async () => {

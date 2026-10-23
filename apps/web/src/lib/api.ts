@@ -485,6 +485,7 @@ export function createApi(deps: ApiDeps) {
     reportConversation: (conversationId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/conversations/${id(conversationId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
     shared: (conversationId: string) => request<SharedView>('GET', `/conversations/${id(conversationId)}/shared`),
     group: (conversationId: string) => request<GroupDetails>('GET', `/conversations/${id(conversationId)}/group`),
+    deleteGroup: (conversationId: string) => request<{ deleted: true }>('DELETE', `/conversations/${id(conversationId)}/group`),
     leaveGroup: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/leave`),
     setGroupAdmin: (conversationId: string, userId: string, admin: boolean) =>
       request<{ role: 'ADMIN' | 'MEMBER' }>('PUT', `/conversations/${id(conversationId)}/members/${id(userId)}/admin`, { body: { admin } }),

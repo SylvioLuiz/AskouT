@@ -24,7 +24,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   const polls = useAsync(() => api.conversationPolls(conversationId), [conversationId]);
   const me = useUser();
   const [tab, setTab] = useState<Tab>('people');
-  const [sheet, setSheet] = useState<'edit' | 'leave' | 'add' | { member: string } | { remove: string } | { block: string } | { meetup: MeetupView } | undefined>();
+  const [sheet, setSheet] = useState<'edit' | 'leave' | 'delete' | 'add' | { member: string } | { remove: string } | { block: string } | { meetup: MeetupView } | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
@@ -134,6 +134,11 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
           <button type="button" className="groupleave" onClick={() => { setProblem(undefined); setSheet('leave'); }}>
             Sair do grupo
           </button>
+          {isOwner ? (
+            <button type="button" className="groupleave" onClick={() => { setProblem(undefined); setSheet('delete'); }}>
+              Apagar grupo para todos
+            </button>
+          ) : null}
         </>
       ) : null}
 
@@ -270,6 +275,16 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full variant="danger" loading={busy} onClick={() => void act(() => api.leaveGroup(conversationId), () => navigate('/conversas'))}>
             Sair do grupo
+          </Button>
+        </Sheet>
+      ) : null}
+
+      {sheet === 'delete' ? (
+        <Sheet title="Apagar grupo" onClose={() => setSheet(undefined)}>
+          <p className="muted">O grupo e todas as mensagens dele são apagados para todo mundo, e não dá para desfazer. Os outros participantes recebem um aviso. Os encontros já marcados continuam na agenda de cada um.</p>
+          {problem ? <p className="sugcard__problem">{problem}</p> : null}
+          <Button full variant="danger" loading={busy} onClick={() => void act(() => api.deleteGroup(conversationId), () => navigate('/conversas'))}>
+            Apagar grupo para todos
           </Button>
         </Sheet>
       ) : null}

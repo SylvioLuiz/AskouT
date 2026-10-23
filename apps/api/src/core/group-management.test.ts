@@ -222,3 +222,34 @@ test('adicionar pessoas ao grupo: só dono/administrador, só amigos de quem adi
   await rejectsWith(conv.addMembers(ana, cid, [eva]), 'NOT_FOUND');
   await rejectsWith(conv.addMembers(eva, cid, [dani]), 'NOT_FOUND');
 });
+
+test('apagar grupo: só quem criou apaga, para todos; os outros recebem aviso e o grupo some', async () => {
+  const w = makeWorld();
+  const u = await w.signUpMany('ana', 'bia', 'caio');
+  const ana = u['ana']!;
+  for (const n of ['bia', 'caio']) {
+    await w.core.follows.follow(ana, u[n]!);
+    await w.core.follows.follow(u[n]!, ana);
+  }
+  const { id } = await w.core.conversations.createGroup(ana, { name: 'Turma', memberIds: [u['bia']!, u['caio']!] });
+  await w.core.conversations.send(u['bia']!, id, { body: 'oi' });
+  await rejectsWith(w.core.conversations.deleteGroup(u['bia']!, id), 'FORBIDDEN');
+  assert.ok((await w.core.conversations.list(u['bia']!)).some((c) => c.id === id), 'quem não criou não apaga');
+  assert.deepEqual(await w.core.conversations.deleteGroup(ana, id), { deleted: true });
+  for (const n of ['ana', 'bia', 'caio']) {
+    assert.equal((await w.core.conversations.list(u[n]!)).some((c) => c.id === id), false, n);
+    await rejectsWith(w.core.conversations.messages(u[n]!, id), 'NOT_FOUND');
+  }
+  const notes = await w.core.notifications.list(u['bia']!);
+  assert.ok(notes.items.some((n) => n.type === 'GROUP_REMOVED' && n.body.includes('apagado')));
+  await rejectsWith(w.core.conversations.deleteGroup(ana, id), 'NOT_FOUND');
+});
+
+test('apagar grupo não vale para conversa 1 a 1', async () => {
+  const w = makeWorld();
+  const u = await w.signUpMany('ana', 'bia');
+  await w.core.follows.follow(u['ana']!, u['bia']!);
+  await w.core.follows.follow(u['bia']!, u['ana']!);
+  const direct = await w.core.conversations.open(u['ana']!, u['bia']!);
+  await rejectsWith(w.core.conversations.deleteGroup(u['ana']!, direct.id), 'NOT_FOUND');
+});

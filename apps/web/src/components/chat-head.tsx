@@ -11,7 +11,7 @@ import { toApiError } from '../lib/errors.ts';
 import type { PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 
-type Step = 'menu' | 'clear' | 'block' | 'report' | 'prefs' | 'background';
+type Step = 'menu' | 'clear' | 'remove' | 'block' | 'report' | 'prefs' | 'background';
 
 /** Topo da conversa: voltar, foto e nome (preso ao rolar) e o menu ⋯ no canto oposto. */
 export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared, below, pinned, muted, onPrefsChanged }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode; pinned: boolean; muted: boolean; onPrefsChanged: () => void }) {
@@ -92,6 +92,15 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
           onCancel={() => setStep('menu')}
           onConfirm={() => void run(() => api.clearConversation(conversationId), () => { onClose(); onCleared(); })}
         />
+      ) : step === 'remove' ? (
+        <Confirm
+          danger
+          question="Apagar esta conversa? Ela some da sua lista e as mensagens somem para você; a outra pessoa continua vendo. Se ela escrever de novo, a conversa volta só com as mensagens novas."
+          confirmLabel="Apagar conversa"
+          busy={busy}
+          onCancel={() => setStep('menu')}
+          onConfirm={() => void run(() => api.clearConversation(conversationId), () => navigate('/conversas'))}
+        />
       ) : step === 'block' && other ? (
         <Confirm
           danger
@@ -110,6 +119,7 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
           {row(pinned || muted ? 'Fixar e silenciar (ativo)' : 'Fixar e silenciar', () => setStep('prefs'))}
           {row('Imagem de fundo', () => setStep('background'))}
           {row('Limpar conversa', () => setStep('clear'))}
+          {other ? row('Apagar conversa', () => setStep('remove'), true) : null}
           {other ? row('Bloquear', () => setStep('block'), true) : null}
           {row('Denunciar', () => setStep('report'), true)}
         </ul>

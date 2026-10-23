@@ -134,6 +134,12 @@ export class ConversationsController {
     return this.core.conversations.group(actor.userId, id);
   }
 
+  /** Apaga o grupo para todos (só quem criou). */
+  @Delete(':id/group')
+  deleteGroup(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.conversations.deleteGroup(actor.userId, id);
+  }
+
   /** Sair do grupo. */
   @Post(':id/leave')
   @HttpCode(200)

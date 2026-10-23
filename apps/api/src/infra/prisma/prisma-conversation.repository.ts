@@ -134,6 +134,14 @@ export class PrismaConversationRepository implements ConversationRepository {
     });
   }
 
+  async deleteGroup(conversationId: string): Promise<void> {
+    if (!isUuid(conversationId)) return;
+    const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true, type: true } });
+    if (!conversation?.groupId || conversation.type !== 'GROUP') return;
+    // Apagar o grupo leva junto a conversa, as mensagens e os membros (cascata); os encontros marcados ficam, sem o grupo.
+    await this.prisma.group.delete({ where: { id: conversation.groupId } });
+  }
+
   async adminIds(conversationId: string): Promise<string[]> {
     if (!isUuid(conversationId)) return [];
     const conversation = await this.prisma.conversation.findUnique({ where: { id: conversationId }, select: { groupId: true } });
@@ -203,6 +211,7 @@ export class PrismaConversationRepository implements ConversationRepository {
         unread,
         pinnedAt: p.pinnedAt,
         muted: p.muted,
+        clearedAt: p.clearedAt,
       });
     }
     const stamp = (s: ConversationSummaryRecord) => (s.lastMessage ?? s.conversation).createdAt.getTime();

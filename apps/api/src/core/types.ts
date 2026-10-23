@@ -249,6 +249,8 @@ export interface ConversationSummaryRecord {
   /** Preferências de quem pediu a lista. */
   pinnedAt?: Date | null;
   muted?: boolean;
+  /** Quando quem pediu a lista limpou/apagou a conversa (mensagens até aí não aparecem para ela). */
+  clearedAt?: Date | null;
 }
 
 // ---------- Lugares e eventos ----------

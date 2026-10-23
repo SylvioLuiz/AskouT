@@ -267,6 +267,8 @@ export interface ConversationRepository {
   addParticipant(conversationId: string, userId: string, now: Date): Promise<void>;
   /** Tira a pessoa do grupo (idempotente). Quem entrou primeiro vem primeiro em `participantIds`. */
   removeParticipant(conversationId: string, userId: string): Promise<void>;
+  /** Apaga o grupo para todos: conversa, mensagens, membros e preferências. Só vale para conversas GROUP. */
+  deleteGroup(conversationId: string): Promise<void>;
   /** Quem é administrador (não inclui o dono) no grupo da conversa. */
   adminIds(conversationId: string): Promise<string[]>;
   /** Faz ou desfaz um administrador. Só vale para quem é membro e não é o dono. */

@@ -293,3 +293,9 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Link da política corrigido para `/politica-de-privacidade` (antes apontava para a tela com login).
 - Domínio `askout.com.br` verificado no Google Search Console por registro TXT no Cloudflare (`google-site-verification=...`). **Não apagar esse registro**, senão a verificação da marca cai.
 - Status no Google Auth Platform → Branding: "marca verificada e aparecendo para os usuários". Logotipo NÃO enviado de propósito (enviar logotipo exige verificação completa do app).
+
+## Apagar conversa e grupo (23/10/2026)
+- Conversa 1 a 1: menu da conversa → "Apagar conversa" (só para você): some da lista e das suas mensagens; a outra pessoa continua vendo; se ela escrever de novo, volta só com as mensagens novas. Usa o mesmo `POST /conversations/:id/clear` do "Limpar conversa".
+- Grupo: membro sai ("Sair do grupo", já existia); quem criou também pode "Apagar grupo para todos" (`DELETE /conversations/:id/group`): apaga conversa, mensagens e membros; os outros recebem aviso (tipo `GROUP_REMOVED`); encontros já marcados continuam na agenda sem o grupo.
+- Testado: testes automáticos (memória e Postgres real). NÃO testado: as telas num navegador/aparelho nem a rota HTTP nova.
+- Segue sem apagar: notificações (só marcar como lida), mensagens recebidas de outras pessoas (só some para você), data de nascimento (só com a conta).

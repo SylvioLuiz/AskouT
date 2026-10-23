@@ -370,7 +370,9 @@ export class ConversationService {
     const hidden = new Set(blocked);
     const rows = summaries
       .map((s) => ({ s, otherId: s.conversation.type === 'DIRECT' ? (s.participantIds.find((id) => id !== actorId) ?? null) : null }))
-      .filter(({ s, otherId }) => s.conversation.type === 'GROUP' || (otherId !== null && !hidden.has(otherId)));
+      .filter(({ s, otherId }) => s.conversation.type === 'GROUP' || (otherId !== null && !hidden.has(otherId)))
+      // "Apagar conversa" (1 a 1): some da lista até chegar mensagem nova. As mensagens continuam para a outra pessoa.
+      .filter(({ s }) => !(s.conversation.type === 'DIRECT' && s.clearedAt != null && s.lastMessage === null));
     const profiles = new Map((await users.findProfilesByIds(rows.flatMap((v) => (v.otherId ? [v.otherId] : [])))).map((p) => [p.userId, p] as const));
     const items: ConversationListItem[] = [];
     const pins = new Map<string, number>();
@@ -785,6 +787,20 @@ export class ConversationService {
       if (next) await conversations.updateGroup(conversationId, { ownerId: next });
     }
     return { ok: true };
+  }
+
+  /** Apaga o grupo para todos. Só quem criou. Os outros membros recebem um aviso. */
+  async deleteGroup(actorId: string, conversationId: string): Promise<{ deleted: true }> {
+    const { conversations } = this.deps;
+    const { conversation, memberIds } = await this.groupAccess(actorId, conversationId);
+    if (conversation.ownerId !== actorId) throw forbidden('Só quem criou o grupo pode apagá-lo. Você pode sair do grupo.');
+    const title = conversation.name ?? 'Grupo';
+    await conversations.deleteGroup(conversationId);
+    for (const id of memberIds) {
+      if (id === actorId) continue;
+      await this.deps.notifier.notify({ userId: id, type: 'GROUP_REMOVED', title, body: 'O grupo foi apagado por quem criou', url: '/conversas' });
+    }
+    return { deleted: true };
   }
 
   /** Quem criou o grupo e os administradores removem membros; só o dono remove um administrador. A pessoa fica fora dos encontros do grupo; pode ser convidada de novo. */

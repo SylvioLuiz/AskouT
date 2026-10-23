@@ -292,9 +292,12 @@ test('clear: limpa só para quem pediu; a outra pessoa continua vendo tudo e as 
   assert.equal((await w.core.conversations.messages(bia, id)).messages.length, 2);
   assert.equal((await w.core.conversations.shared(ana, id)).links.length, 0);
   assert.equal((await w.core.conversations.shared(bia, id)).links.length, 1);
-  assert.equal((await w.core.conversations.list(ana))[0]!.lastMessage, null);
+  // "Apagar conversa": a conversa 1 a 1 limpa e sem mensagens novas some da lista de quem apagou, não da outra pessoa.
+  assert.equal((await w.core.conversations.list(ana)).some((c) => c.id === id), false);
+  assert.equal((await w.core.conversations.list(bia)).some((c) => c.id === id), true);
   w.clock.tick(5_000);
   await w.core.conversations.send(bia, id, { body: 'três' });
+  assert.equal((await w.core.conversations.list(ana)).some((c) => c.id === id), true, 'volta quando chega mensagem nova');
   assert.deepEqual((await w.core.conversations.messages(ana, id)).messages.map((m) => m.body), ['três']);
   await rejectsWith(w.core.conversations.clear(caio, id), 'NOT_FOUND');
 });

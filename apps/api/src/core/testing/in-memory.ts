@@ -850,6 +850,17 @@ export class InMemoryConversationRepository implements ConversationRepository {
     this.groupAdmins.get(conversationId)?.delete(userId);
   }
 
+  async deleteGroup(conversationId: string): Promise<void> {
+    const c = this.conversations.get(conversationId);
+    if (!c || c.type !== 'GROUP') return;
+    this.conversations.delete(conversationId);
+    this.participants.delete(conversationId);
+    this.groupAdmins.delete(conversationId);
+    for (let i = this.messages.length - 1; i >= 0; i--) if (this.messages[i]!.conversationId === conversationId) this.messages.splice(i, 1);
+    for (const key of [...this.cleared.keys()]) if (key.startsWith(`${conversationId}|`)) this.cleared.delete(key);
+    for (const key of [...this.prefs.keys()]) if (key.startsWith(`${conversationId}|`)) this.prefs.delete(key);
+  }
+
   async adminIds(conversationId: string): Promise<string[]> {
     return [...(this.groupAdmins.get(conversationId) ?? [])];
   }
@@ -883,7 +894,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
       const lastRead = p.get(userId) ?? null;
       const unread = msgs.filter((m) => m.senderId !== userId && (lastRead === null || m.createdAt > lastRead)).length;
       const pref = this.prefs.get(`${id}|${userId}`);
-      out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [...p.keys()], lastMessage: msgs.at(-1) ?? null, unread, pinnedAt: pref?.pinnedAt ?? null, muted: pref?.muted ?? false });
+      out.push({ conversation: { ...this.conversations.get(id)! }, participantIds: [...p.keys()], lastMessage: msgs.at(-1) ?? null, unread, pinnedAt: pref?.pinnedAt ?? null, muted: pref?.muted ?? false, clearedAt });
     }
     const stamp = (s: ConversationSummaryRecord) => (s.lastMessage ?? s.conversation).createdAt.getTime();
     return out.sort((a, b) => stamp(b) - stamp(a));
