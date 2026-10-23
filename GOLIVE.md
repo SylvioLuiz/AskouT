@@ -188,7 +188,8 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
   - Apagar as mensagens de um grupo tira contexto dos outros membros. A alternativa seria manter com "conta apagada".
   - Backups do banco do Railway podem guardar a conta por um tempo; o texto da política não menciona isso.
 - **No app nativo:** o download usa um link `download` do navegador, que o WKWebView do iOS pode ignorar. Testar no aparelho; se falhar, usar o menu de compartilhar nativo.
-- **Falta:** e-mail de confirmação "sua conta foi apagada", e apagar também arquivos de mídia quando saírem do banco para o R2.
+- E-mail de confirmação "sua conta foi apagada" implementado (melhor esforço; usa `EMAIL_REPLY_TO` como contato). Boas-vindas também vai após o cadastro. Ainda não testado com a conta Resend real.
+- **Falta:** apagar também arquivos de mídia quando saírem do banco para o R2.
 
 ## Testes no Postgres
 

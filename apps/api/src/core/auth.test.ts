@@ -496,3 +496,13 @@ test('repositório: barra e-mail e username duplicados mesmo sem passar pelo ser
     'CONFLICT',
   );
 });
+
+test('boas-vindas: enviadas ao criar a conta; se o envio falhar, o cadastro conclui igual', async () => {
+  const w = makeWorld();
+  await w.signUp('ana');
+  assert.deepEqual(w.mailer.welcomes, [{ to: 'ana@exemplo.com', username: 'ana' }]);
+  w.mailer.failNotices = true;
+  const bia = await w.signUp('bia');
+  assert.ok(bia.token);
+  assert.equal(w.mailer.welcomes.length, 1);
+});

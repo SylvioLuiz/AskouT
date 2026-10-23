@@ -14,6 +14,8 @@ export interface ResendOptions {
   from: string;
   /** Para onde vão as respostas das pessoas (opcional). */
   replyTo?: string;
+  /** Endereço de contato que aparece nos avisos (padrão: o de resposta, se houver). */
+  contactEmail?: string;
   fetch?: MailFetch;
 }
 
@@ -39,6 +41,17 @@ function codeMessage(input: { title: string; intro: string; code: string; expire
   return { subject: `${input.code} é o seu código do AskouT`, text, html };
 }
 
+function noticeMessage(input: { subject: string; title: string; paragraphs: string[]; footer: string }): Message {
+  const text = `${input.title}\n\n${input.paragraphs.join('\n\n')}\n\n${input.footer}\n\nAskouT`;
+  const html = `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:24px;background:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1c1c1e">
+<div style="max-width:420px;margin:0 auto;padding:28px;background:#ffffff;border-radius:16px">
+<p style="margin:0 0 16px;font-size:20px;font-weight:700">${escapeHtml(input.title)}</p>
+${input.paragraphs.map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:1.5">${escapeHtml(p)}</p>`).join('\n')}
+<p style="margin:8px 0 0;font-size:13px;line-height:1.5;color:#5c5c60">${escapeHtml(input.footer)}</p>
+</div></body></html>`;
+  return { subject: input.subject, text, html };
+}
+
 /**
  * Envio real de e-mail pelo Resend (API HTTP, sem biblioteca). Só entram o código e o endereço de quem pediu;
  * nenhum dos dois é registrado no log. Escrito conforme a documentação do Resend, mas ainda NÃO exercitado contra a conta real (ver GOLIVE.md).
@@ -47,12 +60,14 @@ export class ResendEmailSender implements EmailSender {
   private readonly apiKey: string;
   private readonly from: string;
   private readonly replyTo: string | undefined;
+  private readonly contact: string;
   private readonly fetchImpl: MailFetch;
 
   constructor(options: ResendOptions) {
     this.apiKey = options.apiKey;
     this.from = options.from;
     this.replyTo = options.replyTo;
+    this.contact = options.contactEmail ?? options.replyTo ?? 'privacidade@askout.com.br';
     this.fetchImpl = options.fetch ?? ((url, init) => fetch(url, init));
   }
 
@@ -78,6 +93,36 @@ export class ResendEmailSender implements EmailSender {
         code: input.code,
         expiresInMinutes: input.expiresInMinutes,
         footer: 'Se não foi você, ignore este e-mail: sua senha continua a mesma.',
+      }),
+    );
+  }
+
+  sendWelcome(input: { to: string; username: string }): Promise<void> {
+    return this.deliver(
+      input.to,
+      noticeMessage({
+        subject: 'Bem-vindo ao AskouT',
+        title: `Bem-vindo ao AskouT, @${input.username}!`,
+        paragraphs: [
+          'Sua conta está pronta. Siga seus amigos, marque nos dias em que você pode sair e combine encontros de verdade.',
+          'Você controla quem vê o quê em Privacidade, dentro do app, e pode baixar seus dados ou apagar a conta quando quiser.',
+        ],
+        footer: `Se você não criou esta conta, escreva para ${this.contact}.`,
+      }),
+    );
+  }
+
+  sendAccountDeleted(input: { to: string; username: string }): Promise<void> {
+    return this.deliver(
+      input.to,
+      noticeMessage({
+        subject: 'Sua conta do AskouT foi apagada',
+        title: 'Sua conta foi apagada',
+        paragraphs: [
+          `A conta @${input.username} e os dados ligados a ela foram apagados do AskouT, como você pediu. Isso não pode ser desfeito.`,
+          'Você pode criar uma conta nova quando quiser, com este mesmo e-mail.',
+        ],
+        footer: `Se você não pediu isso, escreva agora para ${this.contact}.`,
       }),
     );
   }

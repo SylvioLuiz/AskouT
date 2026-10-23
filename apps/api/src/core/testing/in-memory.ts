@@ -724,7 +724,21 @@ export class FakeStoreVerifier implements StorePurchaseVerifier {
 export class FakeEmailSender implements EmailSender {
   readonly sent: { to: string; code: string; expiresInMinutes: number }[] = [];
   readonly sentReset: { to: string; code: string; expiresInMinutes: number }[] = [];
+  readonly welcomes: { to: string; username: string }[] = [];
+  readonly deletions: { to: string; username: string }[] = [];
   failNext = false;
+  /** Faz as boas-vindas e o aviso de conta apagada falharem (o cadastro e a exclusão têm que seguir mesmo assim). */
+  failNotices = false;
+
+  async sendWelcome(input: { to: string; username: string }): Promise<void> {
+    if (this.failNotices) throw new Error('falha simulada no envio de e-mail');
+    this.welcomes.push({ ...input });
+  }
+
+  async sendAccountDeleted(input: { to: string; username: string }): Promise<void> {
+    if (this.failNotices) throw new Error('falha simulada no envio de e-mail');
+    this.deletions.push({ ...input });
+  }
 
   async sendPasswordResetCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void> {
     if (this.failNext) {

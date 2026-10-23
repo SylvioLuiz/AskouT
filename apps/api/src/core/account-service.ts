@@ -58,6 +58,12 @@ export class AccountService {
     }
 
     await account.deleteAccount(user.id);
+    // Confirmação para a própria pessoa. A conta já foi apagada: se o envio falhar, a exclusão continua valendo.
+    try {
+      await this.deps.mailer.sendAccountDeleted({ to: user.email, username: profile.username });
+    } catch {
+      // melhor esforço
+    }
     return { deleted: true };
   }
 }

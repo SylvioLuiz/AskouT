@@ -61,3 +61,16 @@ describe('conta: exportar e apagar', () => {
     assert.deepEqual(w.account.deleted, []);
   });
 });
+
+describe('e-mail de conta apagada', () => {
+  it('vai para a própria pessoa depois da exclusão, e uma falha de envio não desfaz nada', async () => {
+    const w = makeWorld();
+    const ana = (await w.signUp('ana')).user.id;
+    const bia = (await w.signUp('bia')).user.id;
+    await w.core.account.deleteAccount(ana, { username: 'ana', password: PASSWORD });
+    assert.deepEqual(w.mailer.deletions, [{ to: 'ana@exemplo.com', username: 'ana' }]);
+    w.mailer.failNotices = true;
+    await w.core.account.deleteAccount(bia, { username: 'bia', password: PASSWORD });
+    assert.equal(await w.users.findById(bia), undefined, 'apagou mesmo com o e-mail falhando');
+  });
+});

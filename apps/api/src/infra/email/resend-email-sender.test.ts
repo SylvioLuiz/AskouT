@@ -36,6 +36,29 @@ describe('ResendEmailSender', () => {
     assert.equal(body['reply_to'], 'ajuda@exemplo.com.br');
   });
 
+  it('boas-vindas e conta apagada: textos próprios, com contato para quem não reconhece', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const sender = make(async (_u, init) => {
+      bodies.push(JSON.parse(init.body) as Record<string, unknown>);
+      return { ok: true, status: 200 };
+    }, 'ajuda@exemplo.com.br');
+    await sender.sendWelcome({ to: 'ana@exemplo.com', username: 'ana' });
+    await sender.sendAccountDeleted({ to: 'ana@exemplo.com', username: 'ana' });
+    assert.equal(bodies[0]!['subject'], 'Bem-vindo ao AskouT');
+    assert.match(String(bodies[0]!['text']), /@ana/);
+    assert.match(String(bodies[0]!['text']), /ajuda@exemplo.com.br/);
+    assert.equal(bodies[1]!['subject'], 'Sua conta do AskouT foi apagada');
+    assert.match(String(bodies[1]!['text']), /não pode ser desfeito/);
+    assert.match(String(bodies[1]!['html']), /ajuda@exemplo.com.br/);
+    assert.deepEqual(bodies[1]!['to'], ['ana@exemplo.com']);
+  });
+
+  it('nome com caracteres especiais não quebra o HTML', async () => {
+    let body: Record<string, unknown> = {};
+    await make(async (_u, init) => { body = JSON.parse(init.body) as Record<string, unknown>; return { ok: true, status: 200 }; }).sendWelcome({ to: 'a@b.co', username: '<b>x</b>' });
+    assert.doesNotMatch(String(body['html']), /<b>x<\/b>/);
+  });
+
   it('falha com mensagem clara, sem expor o código nem a chave, quando o provedor recusa ou cai', async () => {
     for (const fetch of [async () => ({ ok: false, status: 422 }), async () => { throw new Error('rede com re_teste'); }] as MailFetch[]) {
       await assert.rejects(make(fetch).sendSignupCode({ to: 'ana@exemplo.com', code: '999999', expiresInMinutes: 10 }), (error: Error) => {

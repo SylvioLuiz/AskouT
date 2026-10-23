@@ -570,6 +570,10 @@ export interface EmailSender {
   sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void>;
   /** Código para criar uma nova senha. */
   sendPasswordResetCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void>;
+  /** Boas-vindas depois que a conta é criada. Quem chama não deixa uma falha aqui derrubar o cadastro. */
+  sendWelcome(input: { to: string; username: string }): Promise<void>;
+  /** Aviso de que a conta foi apagada (confirmação para a própria pessoa; o endereço não é guardado). */
+  sendAccountDeleted(input: { to: string; username: string }): Promise<void>;
 }
 
 export interface OneTimeCodes {

@@ -229,6 +229,7 @@ export class AuthService {
       throw error;
     }
     await pending.delete(email);
+    await this.welcome(user.email, profile.username);
     return this.session(user, profile);
   }
 
@@ -284,7 +285,17 @@ export class AuthService {
     const profile: Profile = { userId: user.id, username, displayName, bio: null, avatarUrl: null, isPrivate: false };
     await users.create(user, profile);
     await identities.link(provider, claims.subject, user.id, now);
+    await this.welcome(user.email, profile.username);
     return this.session(user, profile);
+  }
+
+  /** Boas-vindas por e-mail. Se o envio falhar, a conta já foi criada e o cadastro segue normalmente. */
+  private async welcome(to: string, username: string): Promise<void> {
+    try {
+      await this.deps.mailer.sendWelcome({ to, username });
+    } catch {
+      // melhor esforço: ninguém deve perder o cadastro por causa de um e-mail de cortesia
+    }
   }
 
   private async sessionFor(userId: string): Promise<AuthResult> {
