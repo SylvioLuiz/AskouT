@@ -1,0 +1,52 @@
+# Plano B de hospedagem da API (Render), caso a Railway fique indisponível.
+# Uso: render.com → New → Blueprint → repositório SylvioLuiz/AskouT. Os valores marcados com sync:false são
+# pedidos na tela (cole lá, nunca no chat nem no GitHub). Depois: Settings → Custom Domains → api.askout.com.br.
+services:
+  - type: web
+    name: askout-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    plan: starter
+    region: oregon
+    healthCheckPath: /saude
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: askout-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CODE_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://askout.com.br,https://www.askout.com.br,https://gestao.askout.com.br,https://localhost,capacitor://localhost
+      - key: PUBLIC_WEB_URL
+        value: https://askout.com.br
+      - key: EMAIL_TRANSPORT
+        value: resend
+      - key: EMAIL_FROM
+        value: AskouT <nao-responda@askout.com.br>
+      - key: EMAIL_REPLY_TO
+        value: privacidade@askout.com.br
+      - key: OSM_CONTACT
+        value: contato@askout.com.br
+      - key: GOOGLE_CLIENT_ID
+        value: 427546548243-44jukkdjh3sgl1rooj0hbs4oi21ig0a4.apps.googleusercontent.com
+      - key: RESEND_API_KEY
+        sync: false
+      - key: GOOGLE_PLACES_API_KEY
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        value: mailto:contato@askout.com.br
+databases:
+  - name: askout-db
+    plan: basic-256mb
+    region: oregon
+    databaseName: askout

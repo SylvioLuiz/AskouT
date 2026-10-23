@@ -3,7 +3,7 @@
 Montagem escolhida: **Cloudflare** (DNS + site + portal de gestão, grátis) · **Railway** (API + banco Postgres) · **Resend** (e-mail).
 Endereços: `askout.com.br` (site) · `api.askout.com.br` (API) · `gestao.askout.com.br` (portal de gestão).
 
-> Nada disto foi executado de verdade ainda: o Dockerfile da API e as configurações abaixo foram escritos sem poder construir a imagem nem falar com essas contas. A instalação das dependências foi testada; o resto, não. Se um passo falhar, mande a mensagem de erro.
+> Nada disto foi executado de verdade ainda contra Railway/Render. Os passos do Dockerfile (instalar dependências, `prisma generate`, `migrate deploy` e subir a API) foram reproduzidos à mão, em uma cópia limpa e com um Postgres real, e a API respondeu em `/saude` com a configuração de produção; a imagem Docker em si nunca foi construída. Plano B de hospedagem: `render.yaml` na raiz. Se um passo falhar, mande a mensagem de erro.
 
 ## 1. Cloudflare: DNS (uma vez, ~10 min + espera)
 1. Crie a conta grátis em cloudflare.com → **Add a domain** → `askout.com.br` → plano **Free**.

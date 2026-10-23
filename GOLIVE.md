@@ -284,3 +284,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - `VITE_MAP_STYLE_URL` = `https://api.maptiler.com/maps/streets-v2/style.json?key=<chave>` definida no projeto Cloudflare Pages `askout-site`.
 - App nativo (Capacitor): MapTiler não aceitou `capacitor://localhost` como origem; ao fazer o app, testar se o mapa carrega ou criar uma segunda chave sem restrição de origem com restrição de user-agent.
 - Conferir uso no painel do MapTiler (limite do plano gratuito) depois do lançamento.
+
+## Verificação do Dockerfile (2026-10-23)
+- Passos do Dockerfile reproduzidos numa cópia limpa (só arquivos versionados): `npm ci`, `prisma generate`, `migrate deploy` e a API subiu em modo production com `EMAIL_TRANSPORT=resend`; `/saude` respondeu `{"ok":true}` e o CORS respondeu para `https://askout.com.br`. A imagem Docker em si não foi construída (sem daemon).
+- `render.yaml` (plano B) na raiz do repositório.
