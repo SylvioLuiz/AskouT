@@ -195,3 +195,11 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 - Os testes dos repositórios Prisma rodam contra um Postgres de teste, só quando `ASKOUT_TEST_DATABASE_URL` aponta para um banco terminado em `_test` (eles apagam tudo). Neste ambiente, subi um Postgres 16 local, apliquei **todas as migrações** (`prisma migrate deploy`, incluindo as escritas à mão) e a suíte de contrato inteira passou (79 de 79).
 - Isso achou um erro de verdade que os testes em memória escondiam: **o índice "uma proposta aberta por votação" nunca tinha sido criado**. Corrigido na migração `20261203120000_date_poll_one_open_proposal` (índice parcial; o Prisma não o enxerga no schema, então um `prisma migrate dev` futuro pode sugerir apagá-lo: não aceitar).
 - Continua **sem teste**: o Dockerfile da API, o Railway, a Stripe, os verificadores da Apple/Google.
+
+## Trava de 18 anos no Flash
+
+- **Como funciona:** ao abrir o Flash, a pessoa informa a data de nascimento uma única vez (`POST /me/age`; `GET /me/age` diz se já informou e se é maior de idade). Menor de 18 anos fica bloqueado no Flash e não consegue trocar a data. A API também recusa (403) ligar o Flash, ver disponíveis, convidar e responder convite sem 18+, então burlar a tela não adianta. O resto do app continua liberado.
+- **Limite honesto:** é **autodeclaração**. Quem mente a data passa. Para loja e LGPD isso é o padrão do mercado, mas não é verificação de documento.
+- **Dados:** a data fica no cadastro (`User.birthDate`), não aparece no perfil público, entra na cópia dos dados e some junto com a conta. Está citada na Política de Privacidade (aguarda revisão do advogado). Quem já tem conta precisa informar a data na primeira vez que abrir o Flash.
+- **Não coberto:** o cadastro em si (ainda não pede idade) e o aceite dos termos. Falta decidir se a trava vira exigência já no cadastro.
+- **Lojas:** ver a resposta dada na conversa (classificação etária do app é do app inteiro, não só do Flash). Preencher o questionário de classificação e a declaração de público-alvo na Apple e no Google Play com isso em mente.

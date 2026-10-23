@@ -331,6 +331,10 @@ export function createApi(deps: ApiDeps) {
     region: () => request<{ region: RegionView | null }>('GET', '/me/region'),
     saveRegion: (lat: number, lng: number) => request<{ region: RegionView }>('PUT', '/me/region', { body: { lat, lng } }),
     /** Cópia dos meus dados (LGPD). */
+    /** Se já informei a data de nascimento e se tenho 18 anos ou mais (libera o Flash). */
+    ageStatus: () => request<{ declared: boolean; adult: boolean }>('GET', '/me/age'),
+    /** Informa a data de nascimento (AAAA-MM-DD). Só vale uma vez. */
+    declareAge: (birthDate: string) => request<{ declared: boolean; adult: boolean }>('POST', '/me/age', { body: { birthDate } }),
     exportMyData: () => request<{ filename: string; data: Record<string, unknown> }>('GET', '/me/export'),
     /** Apaga a minha conta de vez. Conta que entra com Google/Apple não manda senha. */
     deleteMyAccount: (input: { username: string; password?: string }) => request<{ deleted: true }>('DELETE', '/me', { body: input }),

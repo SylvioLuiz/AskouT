@@ -10,6 +10,8 @@ export interface User {
   status: UserStatus;
   role: UserRole;
   createdAt: Date;
+  /** Data de nascimento (AAAA-MM-DD), informada uma vez para liberar o Flash. Nunca aparece no perfil público. */
+  birthDate?: string | null;
 }
 
 /** Pedido de nova senha em andamento: um por pessoa. `channel` deixa pronto o envio por celular (SMS) no futuro. */

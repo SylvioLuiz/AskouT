@@ -12,6 +12,8 @@ export interface UserRepository {
   findByEmail(email: string): Promise<User | undefined>;
   /** Contas ativas cujo e-mail (minúsculo, UTF-8) tem esse SHA-256 em hexadecimal. Para achar amigos nos contatos sem receber e-mails em claro. */
   findIdsByEmailHashes(hashes: string[]): Promise<string[]>;
+  /** Guarda a data de nascimento (AAAA-MM-DD) só se ainda não houver uma. Devolve false se já existia. */
+  setBirthDate(userId: string, birthDate: string): Promise<boolean>;
   /** Troca o hash da senha. */
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
   findProfileById(userId: string): Promise<Profile | undefined>;

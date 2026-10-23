@@ -42,6 +42,7 @@ export function buildPrivacy(email: string): LegalDoc {
         title: '2. Quais dados tratamos',
         items: [
           'Conta: e-mail, @usuário, nome, e senha (guardada de forma irreversível, nunca em texto aberto). Se você entrar com Google ou Apple, recebemos a confirmação de identidade deles e o e-mail da conta.',
+          'Data de nascimento: pedida uma única vez, só para liberar o Flash a maiores de 18 anos. Não aparece para outras pessoas e não pode ser trocada depois.',
           'Perfil e conteúdo: foto de perfil, posts, fotos, vídeos, eventos que você posta, comentários, curtidas e mensagens das conversas e grupos.',
           'Relações: quem você segue, quem segue você, quem você bloqueou e as pessoas que você aprova no perfil privado. Dois perfis que se seguem mutuamente são "amigos" no AskouT.',
           'Agenda e planos: os dias e horários em que você marca que pode sair, os modos "Flash" (disponibilidade temporária), enquetes de data e presença em eventos.',

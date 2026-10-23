@@ -146,6 +146,8 @@ model User {
   role         UserRole   @default(USER)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+  /// Informada uma vez, para liberar o Flash (18+). Não aparece no perfil público.
+  birthDate    DateTime?  @db.Date
 
   profile  Profile?
   settings UserSettings?

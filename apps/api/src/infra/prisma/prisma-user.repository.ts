@@ -11,6 +11,7 @@ function toUser(row: {
   status: User['status'];
   role: User['role'];
   createdAt: Date;
+  birthDate: Date | null;
 }): User {
   return {
     id: row.id,
@@ -19,6 +20,7 @@ function toUser(row: {
     status: row.status,
     role: row.role,
     createdAt: row.createdAt,
+    birthDate: row.birthDate ? row.birthDate.toISOString().slice(0, 10) : null,
   };
 }
 
@@ -147,6 +149,12 @@ export class PrismaUserRepository implements UserRepository {
     if (!isUuid(userId)) return undefined;
     const row = await this.prisma.profilePhoto.findUnique({ where: { userId } });
     return row ? { mime: row.mime as ProfilePhotoRecord['mime'], data: new Uint8Array(row.data), updatedAt: row.updatedAt } : undefined;
+  }
+
+  async setBirthDate(userId: string, birthDate: string): Promise<boolean> {
+    if (!isUuid(userId)) return false;
+    const r = await this.prisma.user.updateMany({ where: { id: userId, birthDate: null }, data: { birthDate: new Date(`${birthDate}T00:00:00.000Z`) } });
+    return r.count === 1;
   }
 
   async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {

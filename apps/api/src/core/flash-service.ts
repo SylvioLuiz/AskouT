@@ -1,4 +1,5 @@
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
+import { AgeService } from './age-service.ts';
 import type { CoreDeps } from './ports.ts';
 import type { FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
@@ -114,13 +115,16 @@ function parseCoordinate(value: unknown, field: 'lat' | 'lng', limit: number): n
 
 export class FlashService {
   private readonly deps: CoreDeps;
+  private readonly age: AgeService;
 
   constructor(deps: CoreDeps) {
     this.deps = deps;
+    this.age = new AgeService(deps);
   }
 
   /** Liga o Flash por 1, 2 ou 3 horas. Só um por vez; para mudar a duração é preciso desligar antes. */
   async turnOn(actorId: string, input: { hours?: unknown; minutes?: unknown; note?: unknown }): Promise<FlashStatusView> {
+    await this.age.requireAdult(actorId);
     const { flash, clock, ids } = this.deps;
     const problems: Record<string, string> = {};
     let minutes = 0;
@@ -169,6 +173,7 @@ export class FlashService {
 
   /** Amigos com Flash ligado. Para ver a lista você também precisa estar com o Flash ligado. */
   async listAvailable(actorId: string): Promise<AvailableFriendView[]> {
+    await this.age.requireAdult(actorId);
     const { flash, follows, users, clock } = this.deps;
     const now = clock.now();
     await this.requireActive(actorId, now);
@@ -236,6 +241,7 @@ export class FlashService {
 
   /** Convida um amigo que está com o Flash ligado. O convite vale 15 minutos (ou até um dos Flash acabar). */
   async invite(actorId: string, targetId: string): Promise<InviteView> {
+    await this.age.requireAdult(actorId);
     const { flash, follows, users, clock, ids } = this.deps;
     if (actorId === targetId) throw validationError('Você não pode convidar a si mesmo');
     const now = clock.now();
@@ -269,6 +275,7 @@ export class FlashService {
 
   /** Quem recebeu aceita ou recusa. Ao aceitar, os dois passam a ver a posição um do outro até o encontro acabar. */
   async respond(actorId: string, inviteId: string, action: unknown): Promise<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }> {
+    await this.age.requireAdult(actorId);
     if (action !== 'accept' && action !== 'decline') {
       throw validationError('Ação inválida', { action: 'Use accept ou decline' });
     }

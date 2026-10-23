@@ -126,3 +126,24 @@ test('conta no Postgres: exportar e apagar em cascata', { skip: url ? false : 'd
     await prisma.$disconnect();
   }
 });
+
+test('data de nascimento no Postgres: grava uma vez só', { skip: url ? false : 'defina ASKOUT_TEST_DATABASE_URL' }, async () => {
+  const dbName = new URL(url!).pathname.replace(/^\//, '');
+  assert.ok(dbName.endsWith('_test'), 'só roda em banco _test');
+  const { PrismaClient } = await import('@prisma/client');
+  const { PrismaUserRepository } = await import('./prisma-user.repository.ts');
+  const prisma = new PrismaClient({ datasourceUrl: url! });
+  await prisma.$connect();
+  try {
+    await prisma.$executeRawUnsafe('TRUNCATE TABLE "User", "PendingSignup", "Venue" CASCADE');
+    const users = new PrismaUserRepository(prisma);
+    const id = (await prisma.user.create({ data: { email: 'age@teste.com', passwordHash: 'x', profile: { create: { username: 'age', displayName: 'Age' } } } })).id;
+    assert.equal((await users.findById(id))?.birthDate, null);
+    assert.equal(await users.setBirthDate(id, '1990-05-10'), true);
+    assert.equal(await users.setBirthDate(id, '2010-01-01'), false, 'a segunda tentativa não troca');
+    assert.equal((await users.findById(id))?.birthDate, '1990-05-10');
+    assert.equal(await users.setBirthDate('nao-e-uuid', '1990-05-10'), false);
+  } finally {
+    await prisma.$disconnect();
+  }
+});
