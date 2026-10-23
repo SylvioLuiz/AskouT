@@ -249,3 +249,10 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Contraste dos textos nos dois temas ≥ 4,8:1 (`--warn` claro tem 3,1:1: só é usado em marcadores e bordas, nunca em texto). Zoom do navegador liberado, `lang="pt-BR"`, foco visível e `prefers-reduced-motion` tratados.
 - Verificado só por script no navegador simulado (nomes de botões e campos, `alt`, tamanho de toque). **Falta** teste com leitor de tela real (VoiceOver/TalkBack) e em aparelho de verdade.
 - Pacote inicial do site: ~202 KB comprimido; mapa (~285 KB) e leitor de PDF carregam só quando usados. Não medimos tempo de carregamento em rede móvel real.
+
+## Dados de exemplo "[TESTE]" para o primeiro acesso
+- `npm run seed:demo` (em `apps/api`) cria 4 pessoas `teste_*` com posts; `-- --follow SEU_USUARIO` faz você e elas se seguirem (viram amigos), `-- --clear` apaga tudo. Roda várias vezes sem duplicar.
+- As contas usam e-mail `@teste.askout.invalid` e hash de senha inválido: ninguém consegue entrar nelas. O script **recusa rodar** com `NODE_ENV=production`.
+- Lugares e eventos de exemplo: `npm run seed:places` (já existia).
+- Antes de abrir ao público: rodar `seed:demo -- --clear` e `seed:places -- --clear` em qualquer banco que tenha recebido esses dados.
+- Testado contra Postgres real (criar, repetir, seguir, apagar, recusa em produção). Não visto ainda no app no celular.

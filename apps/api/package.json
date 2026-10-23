@@ -15,6 +15,7 @@
     "start": "node dist/http/main.js",
     "smoke": "node scripts/smoke.mjs",
     "seed:places": "tsx scripts/seed-sample-places.ts",
+    "seed:demo": "tsx scripts/seed-demo-people.ts",
     "admin:promote": "tsx scripts/make-admin.ts"
   },
   "dependencies": {
