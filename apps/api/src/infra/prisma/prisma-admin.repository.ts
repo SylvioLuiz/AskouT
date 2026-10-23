@@ -66,7 +66,7 @@ export class PrismaAdminRepository implements AdminRepository {
     };
     const users = await this.prisma.user.findMany({
       where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: page.offset, take: page.limit,
-      select: { id: true, email: true, status: true, role: true, createdAt: true, profile: { select: { username: true, displayName: true } } },
+      select: { id: true, email: true, status: true, role: true, createdAt: true, birthDate: true, profile: { select: { username: true, displayName: true } } },
     });
     const ids = users.map((u) => u.id);
     const [posts, postReports, convReports] = await Promise.all([
@@ -81,6 +81,7 @@ export class PrismaAdminRepository implements AdminRepository {
     return users.map((u) => ({
       id: u.id, email: u.email, username: u.profile?.username ?? MISSING, displayName: u.profile?.displayName ?? '', status: u.status, role: u.role,
       createdAt: u.createdAt, postsCount: postsBy.get(u.id) ?? 0, reportsCount: reports.get(u.id) ?? 0,
+      birthDate: u.birthDate ? u.birthDate.toISOString().slice(0, 10) : null,
     }));
   }
 

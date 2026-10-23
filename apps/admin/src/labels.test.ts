@@ -20,3 +20,10 @@ test('plural', () => {
   assert.equal(plural(1, 'pedido', 'pedidos'), '1 pedido');
   assert.equal(plural(0, 'pedido', 'pedidos'), '0 pedidos');
 });
+
+test('formatBirthDate: não troca o dia por causa do fuso', async () => {
+  const { formatBirthDate } = await import('./labels.ts');
+  assert.equal(formatBirthDate('1990-01-01'), '01/01/1990');
+  assert.equal(formatBirthDate(null), '—');
+  assert.equal(formatBirthDate('lixo'), '—');
+});

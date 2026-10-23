@@ -60,6 +60,8 @@ export interface UserRow {
   createdAt: string;
   postsCount: number;
   reportsCount: number;
+  /** AAAA-MM-DD, ou null se a pessoa ainda não informou. */
+  birthDate: string | null;
 }
 
 export interface VenueRow {

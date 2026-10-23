@@ -1,3 +1,4 @@
+import { MIN_ACCOUNT_AGE, parseBirthDate } from './age-service.ts';
 import { buildRetentionReport } from './retention.ts';
 import type { RetentionReport } from './retention.ts';
 import { conflict, forbidden, notFound, unauthorized, validationError } from './errors.ts';
@@ -161,6 +162,25 @@ export class AdminService {
     if (!(await this.deps.admin.setUserStatus(target.id, status))) throw notFound('Usuário não encontrado');
     await this.log(actor.userId, status === 'SUSPENDED' ? 'USER_SUSPENDED' : 'USER_REACTIVATED', 'USER', target.id, reason);
     return { id: target.id, status };
+  }
+
+  /**
+   * Corrige a data de nascimento de uma pessoa (erro de digitação que a trava de idade não deixa a própria pessoa consertar).
+   * Motivo obrigatório; a data antiga e a nova ficam na auditoria. Contas de administrador não passam por aqui.
+   */
+  async setUserBirthDate(actor: Actor, userId: unknown, birthDate: unknown, note: unknown): Promise<{ id: string; birthDate: string }> {
+    this.assertAdmin(actor);
+    const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
+    if (!target) throw notFound('Usuário não encontrado');
+    if (target.role === 'ADMIN') throw conflict('Contas de administrador não passam por aqui');
+    const parsed = parseBirthDate(birthDate, this.deps.clock.now());
+    if (parsed.age < MIN_ACCOUNT_AGE) throw validationError(`O AskouT é para quem tem ${MIN_ACCOUNT_AGE} anos ou mais`, { birthDate: `O AskouT é para quem tem ${MIN_ACCOUNT_AGE} anos ou mais` });
+    const reason = noteText(note, true);
+    const before = target.birthDate ?? null;
+    if (before === parsed.birthDate) throw conflict('Essa já é a data cadastrada');
+    await this.deps.users.updateBirthDate(target.id, parsed.birthDate);
+    await this.log(actor.userId, 'USER_BIRTHDATE_CHANGED', 'USER', target.id, `${reason ?? ''} (de ${before ?? 'sem data'} para ${parsed.birthDate})`.slice(0, 400));
+    return { id: target.id, birthDate: parsed.birthDate };
   }
 
   // ---------- Pagamentos (chave geral do impulsionamento) ----------

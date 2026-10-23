@@ -1936,7 +1936,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       if (!p) continue;
       if (status && u.status !== status) continue;
       if (q && !fold(`${u.email} ${p.username} ${p.displayName}`).includes(q)) continue;
-      rows.push({ id: u.id, email: u.email, username: p.username, displayName: p.displayName, status: u.status, role: u.role, createdAt: u.createdAt, postsCount: [...this.posts.posts.values()].filter((x) => x.authorId === u.id).length, reportsCount: this.reportsAgainst(u.id) });
+      rows.push({ id: u.id, email: u.email, username: p.username, displayName: p.displayName, status: u.status, role: u.role, createdAt: u.createdAt, postsCount: [...this.posts.posts.values()].filter((x) => x.authorId === u.id).length, reportsCount: this.reportsAgainst(u.id), birthDate: u.birthDate ?? null });
     }
     rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : 1));
     return rows.slice(page.offset, page.offset + page.limit);

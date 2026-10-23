@@ -117,23 +117,28 @@ export interface ActionSpec {
   danger?: boolean;
   noteLabel?: string;
   noteRequired?: boolean;
-  run: (note: string) => Promise<unknown>;
+  /** Pede também uma data (AAAA-MM-DD), com valor inicial opcional. */
+  dateLabel?: string;
+  dateInitial?: string;
+  run: (note: string, date: string) => Promise<unknown>;
 }
 
 /** Confirma uma ação da gestão, com motivo opcional ou obrigatório. Os motivos ficam na auditoria. */
 export function ActionDialog({ spec, onClose, onDone }: { spec: ActionSpec; onClose: () => void; onDone: () => void }) {
   const [note, setNote] = useState('');
+  const [date, setDate] = useState(spec.dateInitial ?? '');
+  const dateId = useId();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const noteId = useId();
-  const missing = spec.noteRequired === true && note.trim() === '';
+  const missing = (spec.noteRequired === true && note.trim() === '') || (spec.dateLabel !== undefined && date === '');
 
   async function confirm() {
     if (missing || busy) return;
     setBusy(true);
     setError(undefined);
     try {
-      await spec.run(note.trim());
+      await spec.run(note.trim(), date);
       window.dispatchEvent(new Event(CHANGED_EVENT));
       onDone();
       onClose();
@@ -146,6 +151,12 @@ export function ActionDialog({ spec, onClose, onDone }: { spec: ActionSpec; onCl
   return (
     <Modal title={spec.title} onClose={onClose}>
       {spec.description ? <div className="modal__body">{spec.description}</div> : null}
+      {spec.dateLabel ? (
+        <div className="field">
+          <label htmlFor={dateId}>{spec.dateLabel}</label>
+          <input id={dateId} type="date" value={date} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)} autoFocus />
+        </div>
+      ) : null}
       {spec.noteLabel ? (
         <div className="field">
           <label htmlFor={noteId}>

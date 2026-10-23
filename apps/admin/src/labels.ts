@@ -29,6 +29,7 @@ export const RESOLUTION_LABEL: Record<Resolution, string> = {
 export const ACTION_LABEL: Record<string, string> = {
   USER_SUSPENDED: 'Suspendeu a conta',
   USER_REACTIVATED: 'Reativou a conta',
+  USER_BIRTHDATE_CHANGED: 'Corrigiu a data de nascimento',
   CLAIM_APPROVED: 'Aprovou pedido de dono',
   CLAIM_REJECTED: 'Recusou pedido de dono',
   VENUE_OWNER_REMOVED: 'Tirou o responsável do local',
@@ -72,6 +73,12 @@ export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : dateOnly.format(d).replace(/\./g, '');
+}
+
+/** Data de nascimento AAAA-MM-DD como DD/MM/AAAA, sem passar por fuso (new Date mostraria o dia anterior em São Paulo). */
+export function formatBirthDate(iso: string | null | undefined): string {
+  const m = iso ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso) : null;
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '—';
 }
 
 export function plural(n: number, one: string, many: string): string {

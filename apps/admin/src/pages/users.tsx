@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
-import { STATUS_LABEL, formatDate } from '../labels.ts';
+import { STATUS_LABEL, formatBirthDate, formatDate } from '../labels.ts';
 import type { UserRow, UserStatus } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead, Pager, SearchBox } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
@@ -23,6 +23,22 @@ export function UsersPage() {
       noteLabel: 'Motivo',
       noteRequired: true,
       run: (note) => api.setUserStatus(u.id, 'SUSPENDED', note),
+    });
+  }
+  function fixBirth(u: UserRow) {
+    setAction({
+      title: `Corrigir data de nascimento de @${u.username}`,
+      description: (
+        <p>
+          Data hoje: <strong>{u.birthDate ? formatBirthDate(u.birthDate) : 'não informada'}</strong>. Use só para erro de digitação, depois de conferir com a pessoa. Quem passa a ter 18 anos ou mais ganha acesso ao Flash. A data antiga e a nova ficam na auditoria.
+        </p>
+      ),
+      confirmLabel: 'Corrigir data',
+      dateLabel: 'Data de nascimento correta',
+      dateInitial: u.birthDate ?? '',
+      noteLabel: 'Motivo',
+      noteRequired: true,
+      run: (note, date) => api.setUserBirthDate(u.id, date, note),
     });
   }
   function reactivate(u: UserRow) {
@@ -57,6 +73,7 @@ export function UsersPage() {
                   <th>Situação</th>
                   <th className="num">Posts</th>
                   <th className="num">Denúncias</th>
+                  <th>Nascimento</th>
                   <th>Desde</th>
                   <th aria-label="Ações" />
                 </tr>
@@ -74,8 +91,14 @@ export function UsersPage() {
                     </td>
                     <td className="num">{u.postsCount}</td>
                     <td className="num">{u.reportsCount > 0 ? <strong className="alert">{u.reportsCount}</strong> : 0}</td>
+                    <td>{formatBirthDate(u.birthDate)}</td>
                     <td>{formatDate(u.createdAt)}</td>
                     <td className="right">
+                      {u.role === 'ADMIN' ? null : (
+                        <button type="button" className="btn btn--small" onClick={() => fixBirth(u)}>
+                          Corrigir idade
+                        </button>
+                      )}{' '}
                       {u.role === 'ADMIN' ? null : u.status === 'SUSPENDED' ? (
                         <button type="button" className="btn btn--small" onClick={() => reactivate(u)}>
                           Reativar

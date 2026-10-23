@@ -80,6 +80,13 @@ export class AdminController {
     return this.core.admin.setUserStatus(actor, id, b.status, b.note);
   }
 
+  /** `{birthDate: 'AAAA-MM-DD', note}`: corrige a data de nascimento (motivo obrigatório). */
+  @Put('users/:id/birth-date')
+  setBirthDate(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.setUserBirthDate(actor, id, b.birthDate, b.note);
+  }
+
   @Get('venues')
   venues(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; limit?: unknown; offset?: unknown }) {
     return this.core.admin.searchVenues(actor, q);

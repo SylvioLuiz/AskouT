@@ -644,6 +644,8 @@ export interface AdminUserRow {
   postsCount: number;
   /** Denúncias recebidas (em posts da pessoa e em conversas). */
   reportsCount: number;
+  /** Data de nascimento (AAAA-MM-DD) para a gestão conferir idade; null se ainda não informou. */
+  birthDate: string | null;
 }
 
 export interface AdminVenueRow {
@@ -721,6 +723,7 @@ export interface AdminConversationReportRow {
 export type AuditAction =
   | 'USER_SUSPENDED'
   | 'USER_REACTIVATED'
+  | 'USER_BIRTHDATE_CHANGED'
   | 'CLAIM_APPROVED'
   | 'CLAIM_REJECTED'
   | 'VENUE_OWNER_REMOVED'

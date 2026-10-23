@@ -204,3 +204,27 @@ test('denúncias de story: fila da gestão, mídia mesmo vencida, decisão uma v
   const actions = (await w.core.admin.audit(A, {})).items.map((r) => r.action);
   assert.deepEqual(actions, ['STORY_REMOVED', 'REPORT_DISMISSED']);
 });
+
+test('corrigir data de nascimento: só admin, motivo obrigatório, registra de/para e destrava o Flash', async () => {
+  const { w, A, U, adm, caio } = await setup();
+  const minor = (await w.signUp('juca', { minor: true })).user.id;
+  await rejectsWith(w.core.flash.turnOn(minor, { hours: 1 }), 'FORBIDDEN');
+  const before = w.users.users.get(minor)!.birthDate!;
+
+  await rejectsWith(w.core.admin.setUserBirthDate(U(caio), minor, '2000-01-01', 'erro'), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.setUserBirthDate(A, minor, '2000-01-01', ''), 'VALIDATION');
+  await rejectsWith(w.core.admin.setUserBirthDate(A, minor, 'lixo', 'erro'), 'VALIDATION');
+  await rejectsWith(w.core.admin.setUserBirthDate(A, minor, `${w.clock.now().getUTCFullYear() - 8}-01-01`, 'erro'), 'VALIDATION');
+  await rejectsWith(w.core.admin.setUserBirthDate(A, minor, before, 'erro'), 'CONFLICT');
+  await rejectsWith(w.core.admin.setUserBirthDate(A, adm, '2000-01-01', 'erro'), 'CONFLICT');
+  await rejectsWith(w.core.admin.setUserBirthDate(A, '00000000-0000-4000-8000-000000000000', '2000-01-01', 'erro'), 'NOT_FOUND');
+
+  await w.core.admin.setUserBirthDate(A, minor, '2000-01-01', 'Digitou o ano errado; conferido por documento');
+  assert.equal((await w.core.age.status(minor)).adult, true);
+  assert.equal((await w.core.flash.turnOn(minor, { hours: 1 })).active, true);
+  const audit = await w.core.admin.audit(A, {});
+  const row = audit.items.find((r) => r.action === 'USER_BIRTHDATE_CHANGED')!;
+  assert.ok(row.note?.includes(`de ${before} para 2000-01-01`));
+  const listed = (await w.core.admin.searchUsers(A, { q: 'juca' })).items[0]!;
+  assert.equal(listed.birthDate, '2000-01-01');
+});

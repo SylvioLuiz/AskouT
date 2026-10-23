@@ -105,6 +105,7 @@ export const api = {
   reviewClaim: (id: string, decision: 'APPROVED' | 'REJECTED', note: string) => request<unknown>('POST', `/admin/claims/${encodeURIComponent(id)}/review`, { decision, note }),
 
   users: (p: { q: string; status?: UserStatus; offset: number }) => request<Page<UserRow>>('GET', `/admin/users${query({ q: p.q, status: p.status, offset: p.offset })}`),
+  setUserBirthDate: (id: string, birthDate: string, note: string) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/birth-date`, { birthDate, note }),
   setUserStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED', note: string) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/status`, { status, note }),
 
   venues: (p: { q: string; offset: number }) => request<Page<VenueRow>>('GET', `/admin/venues${query(p)}`),
