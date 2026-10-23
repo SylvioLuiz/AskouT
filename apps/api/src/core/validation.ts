@@ -1,3 +1,4 @@
+import { OFFENSIVE_MESSAGE, hasOffensiveText } from './content-filter.ts';
 import { validationError } from './errors.ts';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -68,6 +69,7 @@ export function usernameProblem(username: string): string | undefined {
   if (username.startsWith('.') || username.endsWith('.')) return 'Não pode começar nem terminar com ponto';
   if (username.includes('..')) return 'Não pode ter dois pontos seguidos';
   if (RESERVED_USERNAMES.has(username)) return 'Este nome de usuário não está disponível';
+  if (hasOffensiveText(username, false)) return 'Este nome de usuário não está disponível';
   return undefined;
 }
 
@@ -85,6 +87,7 @@ export function displayNameProblem(name: string): string | undefined {
   if (name.length === 0) return 'Informe um nome';
   if (name.length > DISPLAY_NAME_MAX) return `O nome pode ter no máximo ${DISPLAY_NAME_MAX} caracteres`;
   if (CONTROL_CHARS_RE.test(name)) return 'O nome tem caracteres inválidos';
+  if (hasOffensiveText(name, true)) return OFFENSIVE_MESSAGE;
   return undefined;
 }
 
@@ -105,6 +108,7 @@ export function bioProblem(bio: string | null): string | undefined {
   // quebras de linha são permitidas; demais controles não
   // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f]/.test(bio)) return 'A biografia tem caracteres inválidos';
+  if (hasOffensiveText(bio, true)) return OFFENSIVE_MESSAGE;
   return undefined;
 }
 
