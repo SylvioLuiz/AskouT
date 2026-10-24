@@ -32,9 +32,9 @@ test('preço e opções vêm da configuração', async () => {
     currency: 'BRL',
     enabled: true,
     pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS,
-    packagePricesCents: { '1': 1490, '3': 3490, '7': 6990, '14': 11990 },
+    packagePricesCents: { '1': 1490, '3': 3490, '7': 6990, '14': 12990 },
     dayOptions: [1, 3, 7, 14],
-    store: { available: false, pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS, packagePricesCents: { '1': 1490, '3': 3490, '7': 6990, '14': 11990 }, products: { '1': 'askout.boost.1d', '3': 'askout.boost.3d', '7': 'askout.boost.7d', '14': 'askout.boost.14d' } },
+    store: { available: false, pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS, packagePricesCents: { '1': 1490, '3': 3490, '7': 6990, '14': 12990 }, products: { '1': 'askout.boost.1d', '3': 'askout.boost.3d', '7': 'askout.boost.7d', '14': 'askout.boost.14d' } },
     match: { radiusKmOptions: [2, 5, 10, 25], maxTags: 5 },
     sandbox: true,
   });

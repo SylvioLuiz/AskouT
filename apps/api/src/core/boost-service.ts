@@ -14,7 +14,7 @@ export const BOOST_DEFAULT_PRICE_PER_DAY_CENTS = 1490;
  * Os valores são faixas de preço da Apple/Google no Brasil, para o preço da web e o das lojas serem o mesmo.
  * Se mudar aqui, mude também os produtos askout.boost.* nas lojas.
  */
-export const BOOST_DEFAULT_PACKAGE_PRICES_CENTS: Readonly<Record<number, number>> = { 1: 1490, 3: 3490, 7: 6990, 14: 11990 };
+export const BOOST_DEFAULT_PACKAGE_PRICES_CENTS: Readonly<Record<number, number>> = { 1: 1490, 3: 3490, 7: 6990, 14: 12990 };
 
 const DAY_MS = 86_400_000;
 
