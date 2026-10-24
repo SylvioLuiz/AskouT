@@ -287,6 +287,12 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
   - Ainda NÃO testado contra a API real: envio de e-mail (Resend), login do Google, busca de bares (Places), cadastro e login pelo site, `make-admin`. Backups do banco do Render (plano Basic): conferir a retenção antes de ter dados reais.
   - Custo: planos pagos por segundo de uso; conferir o valor mensal em Billing no Render. Se a Railway normalizar, dá para migrar (mesmo Dockerfile; mover o banco e repontar o `api`).
 
+## Card "Chame a galera" na Home (23/10/2026)
+- Aparece na Home enquanto a pessoa tem **menos de 5 amigos** (amigo = follow mútuo) e abre o convite (WhatsApp / compartilhar / copiar link). Constante: `INVITE_CARD_GOAL` em `apps/web/src/lib/invite.ts`.
+- Hoje o link compartilhado é o do site (`/cadastro?convite=usuario`), que já faz quem entra seguir quem convidou.
+- **Quando o app estiver nas lojas:** definir `VITE_STORE_URL` no Cloudflare Pages (projeto `askout-site`, endereço http(s) da loja) e publicar de novo. O convite passa a compartilhar o link da loja. Atenção: o link da loja **não carrega quem convidou**, então o "seguir automático" deixa de acontecer; para manter, é preciso um link com referência (Android Install Referrer / link dinâmico, ou o código do convidado digitado no cadastro). Decidir antes do lançamento nas lojas.
+- Não foi visto numa tela real (só tipos, testes e build). Conferir no celular, nos temas claro e escuro.
+
 ## Dados legais preenchidos (22/10/2026)
 - Controladora: Thunderbolt LTDA, CNPJ 44.953.028/0001-19 (contrato social JUCESP, 2022). Endereço publicado nos textos: Av. Jabaquara, 1909, sala 62, São Paulo/SP (informado pelo Sylvio; **o contrato social ainda mostra outra sede**: atualizar o endereço na Junta/CNPJ para bater com o que está publicado). Encarregado: Sylvio Luiz de Souza (`privacidade@askout.com.br`). Tudo em `COMPANY` em `apps/web/src/lib/legal-text.ts`.
 - Política de reembolso do impulsionamento: **proposta minha**, ainda não confirmada pelo Sylvio nem por advogado (reembolso se não começou a rodar, 7 dias de arrependimento, proporcional se falha nossa).

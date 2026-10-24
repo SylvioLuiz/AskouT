@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useUser } from '../auth.tsx';
-import { inviteText, inviteUrl, whatsappUrl } from '../lib/invite.ts';
+import { inviteText, shareableInviteUrl, storeLink, whatsappUrl } from '../lib/invite.ts';
 import { Sheet } from './agenda.tsx';
 import { Button, Notice } from './ui.tsx';
 
 /** Convidar quem ainda não está no AskouT: WhatsApp, compartilhar do aparelho ou copiar o link. */
 export function InviteSheet({ onClose }: { onClose: () => void }) {
   const user = useUser();
-  const url = inviteUrl(window.location.origin, user.profile.username);
+  const store = storeLink(import.meta.env.VITE_STORE_URL as string | undefined);
+  const url = shareableInviteUrl(window.location.origin, user.profile.username, store);
   const text = inviteText(user.profile.displayName);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
 
@@ -28,7 +29,11 @@ export function InviteSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <Sheet title="Convidar amigos" onClose={onClose}>
-      <p className="muted">Quem entrar pelo seu link já passa a seguir você. Para virarem amigos, é só você seguir de volta.</p>
+      <p className="muted">
+        {store
+          ? 'Mande o link para a galera baixar o app. Depois, é só se seguirem para virarem amigos.'
+          : 'Quem entrar pelo seu link já passa a seguir você. Para virarem amigos, é só você seguir de volta.'}
+      </p>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       <a className="btn btn--primary btn--full" href={whatsappUrl(text, url)} target="_blank" rel="noopener noreferrer">
         Enviar pelo WhatsApp

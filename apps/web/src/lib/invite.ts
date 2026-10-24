@@ -6,6 +6,31 @@ export function inviteUrl(origin: string, username: string): string {
   return `${origin}/cadastro?convite=${encodeURIComponent(username)}`;
 }
 
+/** Quantos amigos a pessoa precisa ter para o card "Chame a galera" sair da Home. */
+export const INVITE_CARD_GOAL = 5;
+
+/**
+ * O card "Chame a galera" aparece na Home enquanto a pessoa tem menos de 5 amigos.
+ * Enquanto a lista não chegou, não mostra (evita piscar e sumir); se a lista falhar, também não mostra.
+ */
+export function showInviteCard(friendCount: number | undefined): boolean {
+  return friendCount !== undefined && friendCount < INVITE_CARD_GOAL;
+}
+
+/**
+ * Endereço de loja configurado (VITE_STORE_URL), só se for http(s). Vazio enquanto o app não está nas lojas.
+ * Quando existir, é ele que vai no convite, no lugar do link do site.
+ */
+export function storeLink(value: string | undefined): string | undefined {
+  const v = (value ?? '').trim();
+  return /^https?:\/\/[^\s]+$/i.test(v) ? v : undefined;
+}
+
+/** O que o convite compartilha: o link da loja, se houver; senão o link do site que já registra quem convidou. */
+export function shareableInviteUrl(origin: string, username: string, store: string | undefined): string {
+  return store ?? inviteUrl(origin, username);
+}
+
 export function inviteText(displayName: string): string {
   return `${displayName} te chamou para o AskouT, a rede social de rolês. Entra aí:`;
 }

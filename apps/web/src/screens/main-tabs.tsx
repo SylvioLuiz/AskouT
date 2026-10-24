@@ -1,4 +1,6 @@
-import { BoltIcon, CalendarIcon } from '../components/icons.tsx';
+import { BoltIcon, CalendarIcon, UsersIcon } from '../components/icons.tsx';
+import { InviteSheet } from '../components/invite.tsx';
+import { showInviteCard } from '../lib/invite.ts';
 import { EmptyState, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
@@ -19,6 +21,8 @@ export function HomeScreen() {
   const user = useUser();
   const flash = useAsync(() => api.flashStatus(), []);
   const age = useAsync(() => api.ageStatus(), []);
+  const friends = useAsync(() => api.friends(), []);
+  const [inviting, setInviting] = useState(false);
   const flashOn = flash.data?.active === true;
   const followed = useAsync(() => api.followedEvents(), []);
   const followedEvents = followed.data?.events ?? [];
@@ -35,6 +39,7 @@ export function HomeScreen() {
       onRefresh={async () => {
         setFeedKey((k) => k + 1);
         flash.reload();
+        friends.reload();
         followed.reload();
         sponsored.reload();
         meetups.reload();
@@ -54,6 +59,19 @@ export function HomeScreen() {
           </span>
         </Link>
       ) : null}
+
+      {showInviteCard(friends.data?.length) ? (
+        <button type="button" className="invitecta" onClick={() => setInviting(true)}>
+          <span className="invitecta__icon" aria-hidden="true">
+            <UsersIcon />
+          </span>
+          <span className="invitecta__text">
+            <span className="invitecta__title">Chame a galera</span>
+            <span className="invitecta__sub">O AskouT é melhor com os amigos. Compartilhe o link.</span>
+          </span>
+        </button>
+      ) : null}
+      {inviting ? <InviteSheet onClose={() => setInviting(false)} /> : null}
 
       {showFlashCard(age.data) ? (
         <Link to="/flash" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>

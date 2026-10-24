@@ -1,6 +1,28 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { inviteUrl, parseInvite, rememberInvite, takeInvite, whatsappUrl } from './invite.ts';
+import { INVITE_CARD_GOAL, inviteUrl, parseInvite, rememberInvite, shareableInviteUrl, showInviteCard, storeLink, takeInvite, whatsappUrl } from './invite.ts';
+
+describe('card "Chame a galera" na Home', () => {
+  it('aparece com menos de 5 amigos e some a partir do 5º', () => {
+    assert.equal(INVITE_CARD_GOAL, 5);
+    assert.equal(showInviteCard(0), true);
+    assert.equal(showInviteCard(4), true);
+    assert.equal(showInviteCard(5), false);
+    assert.equal(showInviteCard(40), false);
+  });
+  it('não aparece enquanto a lista de amigos não chegou (ou falhou)', () => {
+    assert.equal(showInviteCard(undefined), false);
+  });
+  it('compartilha o link do site enquanto não há loja e o da loja quando houver', () => {
+    assert.equal(storeLink(undefined), undefined);
+    assert.equal(storeLink('   '), undefined);
+    assert.equal(storeLink('javascript:alert(1)'), undefined);
+    assert.equal(storeLink('apps.apple.com/app/x'), undefined, 'sem http(s) não vale');
+    assert.equal(storeLink(' https://apps.apple.com/br/app/askout/id1 '), 'https://apps.apple.com/br/app/askout/id1');
+    assert.equal(shareableInviteUrl('https://askout.com.br', 'ana', undefined), 'https://askout.com.br/cadastro?convite=ana');
+    assert.equal(shareableInviteUrl('https://askout.com.br', 'ana', 'https://loja.example/askout'), 'https://loja.example/askout');
+  });
+});
 
 describe('convite por link', () => {
   it('monta o link e o WhatsApp', () => {
