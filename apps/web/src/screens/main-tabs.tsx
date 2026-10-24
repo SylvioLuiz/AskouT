@@ -20,7 +20,6 @@ export function HomeScreen() {
   useTitle('Home');
   const user = useUser();
   const flash = useAsync(() => api.flashStatus(), []);
-  const age = useAsync(() => api.ageStatus(), []);
   const friends = useAsync(() => api.friends(), []);
   const me = useAsync(() => api.getProfile(user.profile.username), [user.profile.username]);
   const [inviting, setInviting] = useState(false);
@@ -75,7 +74,7 @@ export function HomeScreen() {
       ) : null}
       {inviting ? <InviteSheet onClose={() => setInviting(false)} /> : null}
 
-      {showFlashCard(age.data, me.data?.counts.following) ? (
+      {showFlashCard(me.data?.counts.following) ? (
         <Link to="/flash" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
           <span className="flashcta__icon">
             <BoltIcon filled />

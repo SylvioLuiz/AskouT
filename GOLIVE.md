@@ -219,7 +219,7 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 
 ## Trava de 18 anos no Flash
 
-- **Como funciona:** ao abrir o Flash, a pessoa informa a data de nascimento uma única vez (`POST /me/age`; `GET /me/age` diz se já informou e se é maior de idade). Menor de 18 anos fica bloqueado no Flash e não consegue trocar a data. A API também recusa (403) ligar o Flash, ver disponíveis, convidar e responder convite sem 18+, então burlar a tela não adianta. O resto do app continua liberado.
+- **Como funciona (atualizado em 24/10/2026):** o cadastro só aceita 18 anos ou mais e guarda a data de nascimento (`POST /me/age` e `GET /me/age` ainda existem para contas antigas sem data). **Não há mais trava de idade no Flash**: a regra vale no cadastro. Contas antigas marcadas como menor de 18 anos ficam marcadas e só a gestão corrige a data.
 - **Limite honesto:** é **autodeclaração**. Quem mente a data passa. Para loja e LGPD isso é o padrão do mercado, mas não é verificação de documento.
 - **Dados:** a data fica no cadastro (`User.birthDate`), não aparece no perfil público, entra na cópia dos dados e some junto com a conta. Está citada na Política de Privacidade (aguarda revisão do advogado). Quem já tem conta precisa informar a data na primeira vez que abrir o Flash.
 - **Lojas:** ver a resposta dada na conversa (classificação etária do app é do app inteiro, não só do Flash). Preencher o questionário de classificação e a declaração de público-alvo na Apple e no Google Play com isso em mente.
@@ -227,9 +227,9 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 ## Idade e aceite no cadastro
 
 - **O que existe:** o cadastro (e-mail ou Google/Apple, na hora de criar a conta) pede **data de nascimento** e o **aceite dos Termos e da Política** (caixa obrigatória). A API recusa sem os dois. Ficam em `User.birthDate`, `User.termsAcceptedAt` e `User.termsVersion`, e entram na cópia dos dados. Quem entra com Google/Apple numa conta que já existe não passa por isso de novo.
-- **Idade mínima: 13 anos** (`MIN_ACCOUNT_AGE` em `core/age-service.ts`; o site avisa com o mesmo número em `lib/age.ts`). De 13 a 17 tem conta, sem Flash.
-- **Decisão do Sylvio (23/10/2026):** manter **13+** para ter conta (só o Flash é 18+), mesmo sem revisão jurídica, sabendo do risco abaixo. Riscos apontados: idade só declarada, mensagens entre adultos e adolescentes, recomendações por perfil e Boost, localização. Revisar com o advogado o quanto antes; se ele achar pesado, é só subir `MIN_ACCOUNT_AGE` para 18.
-- **DECISÃO JURÍDICA PENDENTE (importante):** pelo que sei, o ECA Digital (Lei 15.211/2025) trouxe exigências para serviços que menores acessam (verificação de idade, vínculo com responsável em contas de menores de 16, regras para dados de menores). Não confirmei o texto atual. Se o advogado achar pesado, o caminho mais simples é **subir `MIN_ACCOUNT_AGE` para 18** nos dois arquivos (uma linha em cada).
+- **Idade mínima: 18 anos** (`MIN_ACCOUNT_AGE` em `core/age-service.ts` e `lib/age.ts`), decidida em 24/10/2026. Os Termos e a Política já dizem 18+. O cadastro recusa menores. Contas antigas de menores (se existirem) não são apagadas automaticamente: decidir o que fazer com elas antes do lançamento.
+- (Histórico) em 23/10/2026 a decisão era 13+; foi substituída pelo 18+ acima.
+- **Ainda vale rever com advogado (histórico do debate sobre 13+):** pelo que sei, o ECA Digital (Lei 15.211/2025) trouxe exigências para serviços que menores acessam (verificação de idade, vínculo com responsável em contas de menores de 16, regras para dados de menores). Não confirmei o texto atual. Se o advogado achar pesado, o caminho mais simples é **subir `MIN_ACCOUNT_AGE` para 18** nos dois arquivos (uma linha em cada).
 - **Versão dos Termos:** `TERMS_VERSION` em `core/age-service.ts` ('2026-10-22'). Ao mudar o texto legal, mude a versão. Ainda **não há** tela para pedir novo aceite a quem já tem conta (hoje não há contas reais; precisa existir antes de mudar os termos em produção).
 - **Contas criadas antes desta mudança** não têm aceite registrado e não têm data de nascimento (o Flash pede a data na primeira vez).
 - Cadastros pendentes antigos foram apagados pela migração (o código vale poucos minutos; quem estava no meio refaz).
@@ -238,7 +238,7 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 
 - Em **Editar perfil → Data de nascimento** (`PUT /me/age`). Regra: quem hoje consta como **maior de 18 anos** corrige sozinho (mínimo 13). Quem consta como **menor de 18 não corrige por aqui** (botão some e aparece "fale com o suporte"), senão bastaria trocar a data para liberar o Flash. Adulto que troca para uma data de menor perde o Flash e também não volta sozinho.
 - **Suporte:** no painel, em **Pessoas → Corrigir idade** (`PUT /admin/users/:id/birth-date`), a gestão troca a data de quem ficou bloqueado como menor. Motivo obrigatório; a data antiga e a nova ficam na **Auditoria** ("Corrigiu a data de nascimento"). Não vale para contas de admin nem para menos de 13 anos. Confira a pessoa por fora (ex.: documento enviado ao suporte) antes de corrigir. O link "fale com o suporte" no app depende de `VITE_SUPPORT_EMAIL`.
-- Brecha conhecida: uma pessoa de 13 a 17 anos que mentiu no cadastro e disse ter 18+ continua passando (é autodeclaração).
+- Brecha conhecida: a idade é autodeclarada; quem mente a data no cadastro continua passando.
 
 ## Lojas (Apple e Google): exigências para apps com conteúdo de usuários
 
@@ -257,7 +257,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - **Prazo de resposta às denúncias:** os Termos dizem "meta de até 24 horas" entre colchetes. Alguém precisa olhar o painel todo dia (o painel mostra o total de denúncias abertas no menu). Ajuste o prazo no texto para o que você consegue cumprir.
 - **Denunciar eventos e comentários de donos de local:** eventos criados por donos de local não têm botão de denunciar (só dá para a gestão apagar). Vale incluir se a loja questionar.
 - **Entrar com Apple:** a Apple exige oferecer "Entrar com a Apple" quando há login com Google. Está implementado, mas **nunca foi testado** (precisa de `APPLE_CLIENT_ID` e domínio HTTPS).
-- **Decisão (24/10/2026): a Apple fica em 18+** (Brasil: 16). Isso impede menores de 18 de baixar o app no iPhone, mas o cadastro (web/Android) ainda aceita 13+. **Pendente decidir com o advogado:** subir `MIN_ACCOUNT_AGE` para 18 (api `core/age-service.ts`, web `lib/age.ts`, textos legais e testes) para ficar coerente.
+- **Decisão (24/10/2026): a Apple fica em 18+** (Brasil: 16). Isso impede menores de 18 de baixar o app no iPhone. **Feito em 24/10/2026:** `MIN_ACCOUNT_AGE` subiu para 18 (api, web, textos legais e testes), então o cadastro em qualquer canal só aceita 18+.
 - **Classificação etária:** é do app inteiro. Responda o questionário contando que há encontros presenciais, conteúdo de usuários, locais que servem bebida alcoólica e um recurso 18+ (Flash). Provável: 17+ na Apple. No Google Play, o público-alvo deve excluir crianças; o app tem conta a partir de 13 anos (decisão jurídica pendente, ver "Idade e aceite").
 - **Formulários de privacidade (Apple "Privacy Nutrition Labels" e Google "Segurança dos dados"):** declare e-mail, nome, @usuário, data de nascimento, localização aproximada (Flash e mapa), fotos/vídeos/áudio de conversa e posts, mensagens, identificadores de dispositivo (push), compras. Nenhum dado é vendido; use os textos da Política de Privacidade como base.
 - **Compras:** impulsionamento pago dentro do app nativo precisa usar a compra da loja (Apple/Google); os verificadores de recibo **ainda não estão implementados**.

@@ -30,7 +30,7 @@ export function UsersPage() {
       title: `Corrigir data de nascimento de @${u.username}`,
       description: (
         <p>
-          Data hoje: <strong>{u.birthDate ? formatBirthDate(u.birthDate) : 'não informada'}</strong>. Use só para erro de digitação, depois de conferir com a pessoa. Quem passa a ter 18 anos ou mais ganha acesso ao Flash. A data antiga e a nova ficam na auditoria.
+          Data hoje: <strong>{u.birthDate ? formatBirthDate(u.birthDate) : 'não informada'}</strong>. Use só para erro de digitação, depois de conferir com a pessoa. A data precisa indicar 18 anos ou mais. A data antiga e a nova ficam na auditoria.
         </p>
       ),
       confirmLabel: 'Corrigir data',

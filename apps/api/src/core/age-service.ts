@@ -2,8 +2,8 @@ import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 
 export const ADULT_AGE = 18;
-/** Idade mínima para ter conta. Decisão jurídica pendente (ver GOLIVE.md): subir para 18 é trocar este número. */
-export const MIN_ACCOUNT_AGE = 13;
+/** Idade mínima para ter conta: o AskouT é só para maiores de 18 anos (decisão de 24/10/2026, também por causa da classificação 18+ da Apple). */
+export const MIN_ACCOUNT_AGE = 18;
 /** Versão dos Termos de Uso e da Política que o cadastro registra. Mude junto com o texto legal. */
 export const TERMS_VERSION = '2026-10-22';
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -15,7 +15,7 @@ export interface AgeStatus {
   adult: boolean;
   /** A data informada (só para a própria pessoa), ou null. */
   birthDate: string | null;
-  /** Não dá para corrigir sozinho: a data diz que é menor de 18 anos (evita trocar a data só para liberar o Flash). */
+  /** Conta antiga com data de menor de 18 anos (de antes da regra 18+): não dá para corrigir sozinho, só pelo suporte. */
   locked: boolean;
 }
 
@@ -69,8 +69,8 @@ export interface TermsStatus {
 }
 
 /**
- * Trava de idade do Flash. A data de nascimento é informada uma vez e não muda depois:
- * assim, quem põe uma data de menor de idade não consegue "tentar de novo" com outra.
+ * Data de nascimento e idade mínima. O cadastro só aceita 18 anos ou mais. A data é informada uma vez;
+ * corrigir erro de digitação só é permitido a quem já consta como maior de idade.
  */
 export class AgeService {
   private readonly deps: CoreDeps;
@@ -99,7 +99,7 @@ export class AgeService {
 
   /**
    * Corrige a data de nascimento (errei ao digitar). Só quem hoje consta como maior de 18 anos pode;
-   * quem consta como menor fala com o suporte, senão bastaria trocar a data para liberar o Flash.
+   * quem consta como menor (conta antiga) fala com o suporte.
    */
   async correct(userId: string, input: { birthDate?: unknown }): Promise<AgeStatus> {
     const now = this.deps.clock.now();
@@ -132,12 +132,5 @@ export class AgeService {
     if (!user) throw notFound('Conta não encontrada');
     await this.deps.users.acceptTerms(userId, TERMS_VERSION, this.deps.clock.now());
     return this.termsStatus(userId);
-  }
-
-  /** Usado pelo Flash: recusa quem não informou a data ou tem menos de 18 anos. */
-  async requireAdult(userId: string): Promise<void> {
-    const s = await this.status(userId);
-    if (!s.declared) throw forbidden('Informe sua data de nascimento para usar o Flash');
-    if (!s.adult) throw forbidden('O Flash é só para maiores de 18 anos');
   }
 }

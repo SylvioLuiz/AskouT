@@ -161,7 +161,7 @@ function BirthDateSection() {
     try {
       const next = await api.correctBirthDate(birth);
       age.setData(next);
-      setMessage({ tone: 'ok', text: next.adult ? 'Data de nascimento atualizada.' : 'Data atualizada. Com ela, o Flash fica indisponível para você.' });
+      setMessage({ tone: 'ok', text: 'Data de nascimento atualizada.' });
     } catch (failure) {
       const e = toApiError(failure);
       setError(e.fields['birthDate']);
@@ -176,7 +176,7 @@ function BirthDateSection() {
       <h2 className="birthedit__title">
         Data de nascimento
       </h2>
-      <p className="muted">Ela não aparece para ninguém. Serve para liberar o Flash a maiores de 18 anos.</p>
+      <p className="muted">Ela não aparece para ninguém. Serve para confirmar que você tem 18 anos ou mais.</p>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {status.locked ? (
         <p className="muted">
@@ -185,7 +185,7 @@ function BirthDateSection() {
         </p>
       ) : (
         <form className="form form--flat" onSubmit={save} noValidate>
-          <Field label="Data de nascimento" type="date" value={birth} onChange={setBirth} error={error} max={todayIso()} autoComplete="bday" hint={status.declared ? undefined : 'Você ainda não informou. O Flash pede essa data.'} />
+          <Field label="Data de nascimento" type="date" value={birth} onChange={setBirth} error={error} max={todayIso()} autoComplete="bday" hint={status.declared ? undefined : 'Você ainda não informou. Precisamos dela para confirmar que você tem 18 anos ou mais.'} />
           <div>
             <Button type="submit" variant="secondary" loading={saving}>
               Atualizar data

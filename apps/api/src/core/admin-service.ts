@@ -165,7 +165,7 @@ export class AdminService {
   }
 
   /**
-   * Corrige a data de nascimento de uma pessoa (erro de digitação que a trava de idade não deixa a própria pessoa consertar).
+   * Corrige a data de nascimento de uma pessoa (erro de digitação que a pessoa (conta antiga marcada como menor) não pode consertar sozinha).
    * Motivo obrigatório; a data antiga e a nova ficam na auditoria. Contas de administrador não passam por aqui.
    */
   async setUserBirthDate(actor: Actor, userId: unknown, birthDate: unknown, note: unknown): Promise<{ id: string; birthDate: string }> {

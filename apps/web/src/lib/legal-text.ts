@@ -50,7 +50,7 @@ export function buildPrivacy(email: string): LegalDoc {
         title: '2. Quais dados tratamos',
         items: [
           'Conta: e-mail, @usuário, nome, e senha (guardada de forma irreversível, nunca em texto aberto). Se você entrar com Google ou Apple, recebemos a confirmação de identidade deles e o e-mail da conta.',
-          'Data de nascimento: pedida no cadastro, para conferir a idade mínima e liberar o Flash só a maiores de 18 anos. Não aparece para outras pessoas. Você pode corrigi-la em Editar perfil (quem consta como menor de 18 anos fala com o suporte). Também guardamos o dia e a versão dos Termos que você aceitou ao criar a conta.',
+          'Data de nascimento: pedida no cadastro, para conferir a idade mínima (18 anos). Não aparece para outras pessoas. Você pode corrigi-la em Editar perfil (quem consta como menor de 18 anos fala com o suporte). Também guardamos o dia e a versão dos Termos que você aceitou ao criar a conta.',
           'Perfil e conteúdo: foto de perfil, posts, fotos, vídeos, eventos que você posta, comentários, curtidas e mensagens das conversas e grupos.',
           'Relações: quem você segue, quem segue você, quem você bloqueou e as pessoas que você aprova no perfil privado. Dois perfis que se seguem mutuamente são "amigos" no AskouT.',
           'Agenda e planos: os dias e horários em que você marca que pode sair, os modos "Flash" (disponibilidade temporária), enquetes de data e presença em eventos.',
@@ -118,7 +118,7 @@ export function buildPrivacy(email: string): LegalDoc {
       },
       {
         title: '10. Crianças e adolescentes',
-        text: ['O AskouT é para pessoas com 13 anos ou mais. O Flash (aviso de que você está disponível para sair agora) é só para maiores de 18 anos, e quem não tem essa idade não consegue usá-lo. Não queremos dados de menores de 13 anos: se soubermos que uma conta é de alguém abaixo dessa idade, vamos encerrá-la. [A revisar com advogado antes do lançamento: regras do ECA Digital (Lei 15.211/2025) para contas de adolescentes.]'],
+        text: ['O AskouT é só para pessoas com 18 anos ou mais, e o cadastro não aceita quem tem menos que isso. Não queremos dados de menores de 18 anos: se soubermos que uma conta é de alguém abaixo dessa idade, vamos encerrá-la. [A revisar com advogado antes do lançamento: regras do ECA Digital (Lei 15.211/2025).]'],
       },
       {
         title: '11. Armazenamento no aparelho',
@@ -144,7 +144,7 @@ export function buildTerms(email: string): LegalDoc {
       {
         title: '2. Sua conta',
         items: [
-          'Você precisa ter 13 anos ou mais para ter uma conta, e informar dados verdadeiros, inclusive a data de nascimento. O Flash é só para maiores de 18 anos.',
+          'Você precisa ter 18 anos ou mais para ter uma conta, e informar dados verdadeiros, inclusive a data de nascimento.',
           'Você é responsável pela sua senha e por tudo o que acontece na sua conta. Avise-nos se achar que alguém a usou.',
           'Cada pessoa pode ter uma conta. Contas falsas, que imitam outras pessoas ou são feitas para enganar, podem ser removidas.',
         ],

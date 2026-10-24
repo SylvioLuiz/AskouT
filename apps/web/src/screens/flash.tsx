@@ -47,68 +47,10 @@ type Feedback = { tone: 'ok' | 'error'; text: string } | undefined;
 
 // ---------- Trava de idade ----------
 
-function AgeGate({ declared, onDone }: { declared: boolean; onDone: () => void }) {
-  const [birth, setBirth] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    const problem = birthDateProblem(birth, new Date());
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    setError(undefined);
-    setBusy(true);
-    try {
-      await api.declareAge(birth);
-      onDone();
-    } catch (failure) {
-      setError(toApiError(failure).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <>
-      <PageHead title="Flash" />
-      <div className="agegate">
-        <span className="agegate__icon" aria-hidden="true">
-          <BoltIcon />
-        </span>
-        {declared ? (
-          <>
-            <h2 className="agegate__title">O Flash é só para maiores de 18 anos</h2>
-            <p className="agegate__text">Pela data de nascimento que você informou, você ainda não pode usar o Flash. O resto do AskouT continua liberado.</p>
-          </>
-        ) : (
-          <>
-            <h2 className="agegate__title">Confirme que você tem 18 anos ou mais</h2>
-            <p className="agegate__text">O Flash mostra quem está disponível para sair agora, por isso é só para maiores de idade. Informe sua data de nascimento. Ela não aparece para ninguém. Se errar, você corrige em Editar perfil.</p>
-            <form className="form" onSubmit={(e) => void submit(e)} noValidate>
-              <Field label="Data de nascimento" type="date" value={birth} onChange={setBirth} error={error} max={todayIso()} autoComplete="bday" />
-              <Button type="submit" full loading={busy}>
-                Confirmar
-              </Button>
-            </form>
-          </>
-        )}
-      </div>
-    </>
-  );
-}
-
 // ---------- Tela do Flash ----------
 
-/** Flash é só para maiores de 18 anos: antes de tudo, confere a idade (a API confere de novo). */
 export function FlashScreen() {
   useTitle('Flash');
-  const age = useAsync(() => api.ageStatus(), []);
-  if (age.loading && !age.data) return <Loading />;
-  if (age.error && !age.data) return <ErrorState message={age.error.message} onRetry={age.reload} />;
-  if (!age.data?.adult) return <AgeGate declared={age.data?.declared === true} onDone={age.reload} />;
   return <FlashContent />;
 }
 
