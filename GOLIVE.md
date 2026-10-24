@@ -51,6 +51,8 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 ## Aplicativo nativo (casca Capacitor, `apps/mobile`)
 Feito: pacote `apps/mobile` com as pastas `android/` e `ios/` geradas, o app web empacotado em `www/` e as duas pontes nativas (`window.AskouTVideo` com `capacitor-native-video-compressor`, e `window.AskouTStore` com `@capgo/native-purchases`), com testes. Permissões de galeria, câmera, microfone e localização já declaradas; JitPack já no Gradle. NADA disso foi compilado ou aberto num aparelho: o sandbox não tem Android SDK nem Xcode.
 
+**Roteiro completo para iPhone (Xcode, assinatura, TestFlight): `apps/mobile/IOS.md`.**
+
 Como gerar (no seu Mac, com Android Studio e Xcode instalados):
 1. `cd apps/mobile && VITE_API_URL=https://api.seudominio.com.br npm run sync` (gera `www/` e copia para as duas plataformas).
 2. `npx cap open android` / `npx cap open ios` e rodar num aparelho ou emulador.
