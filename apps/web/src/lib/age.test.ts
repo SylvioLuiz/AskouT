@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ageOnDate, birthDateProblem, consentProblems, showFlashCard, todayIso } from './age.ts';
+import { ageOnDate, birthDateProblem, consentProblems, FLASH_CARD_MIN_FOLLOWING, showFlashCard, todayIso } from './age.ts';
 
 const now = new Date(2026, 9, 22, 12);
 
@@ -23,10 +23,21 @@ test('todayIso: formata com zeros', () => {
 });
 
 test('showFlashCard: some para menor de 18, aparece para adulto e para quem ainda não informou a data', () => {
-  assert.equal(showFlashCard(undefined), false, 'ainda carregando: não mostra');
-  assert.equal(showFlashCard({ adult: true, locked: false }), true);
-  assert.equal(showFlashCard({ adult: false, locked: false }), true, 'sem data informada: precisa ver para liberar');
-  assert.equal(showFlashCard({ adult: false, locked: true }), false, 'consta como menor de 18');
+  assert.equal(showFlashCard(undefined, 10), false, 'idade ainda carregando: não mostra');
+  assert.equal(showFlashCard({ adult: true, locked: false }, 10), true);
+  assert.equal(showFlashCard({ adult: false, locked: false }, 10), true, 'sem data informada: precisa ver para liberar');
+  assert.equal(showFlashCard({ adult: false, locked: true }, 10), false, 'consta como menor de 18');
+});
+
+test('showFlashCard: só aparece para quem segue pelo menos 3 pessoas', () => {
+  const adult = { adult: true, locked: false };
+  assert.equal(FLASH_CARD_MIN_FOLLOWING, 3);
+  assert.equal(showFlashCard(adult, 0), false);
+  assert.equal(showFlashCard(adult, 2), false);
+  assert.equal(showFlashCard(adult, 3), true);
+  assert.equal(showFlashCard(adult, 50), true);
+  assert.equal(showFlashCard(adult, undefined), false, 'contagem ainda carregando (ou falhou): não mostra');
+  assert.equal(showFlashCard({ adult: false, locked: true }, 50), false, 'menor de 18 não vê mesmo seguindo muita gente');
 });
 
 test('consentProblems: exige data válida, 13 anos ou mais e o aceite', () => {
