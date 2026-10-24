@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { Button, EmptyState, ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
-import { BOOST_PHASE_LABEL, boostTitle, boostTotalCents, canCancelBoost, daysLabel, formatBrl, matchLabel, reachText, sortBoosts, toggleTag } from '../lib/boost.ts';
+import { BOOST_PHASE_LABEL, boostTitle, canCancelBoost, daysLabel, formatBrl, matchLabel, reachText, sortBoosts, toggleTag } from '../lib/boost.ts';
 import { toApiError } from '../lib/errors.ts';
-import { buyInStore, paymentReturn, pricePerDayCents, purchaseChannel, safePaymentUrl, STORE_LABEL, storeBridge } from '../lib/purchase.ts';
+import { buyInStore, packageSummary, paymentReturn, purchaseChannel, safePaymentUrl, STORE_LABEL, storeBridge } from '../lib/purchase.ts';
 import type { BoostView, MatchReach } from '../lib/types.ts';
 
 function formatWhen(iso: string): string {
@@ -73,7 +73,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
   const items = sortBoosts(boosts.data.items);
   const onStore = channel !== 'WEB';
   const storeName = onStore ? STORE_LABEL[channel] : '';
-  const total = boostTotalCents(pricePerDayCents(price, channel), days);
+  const { total, perDay, discountPct } = packageSummary(price, channel, days);
   // Na loja a compra precisa da casca nativa do aplicativo; sem ela o botão fica desligado e explicado.
   const storeReady = !onStore || (price.store.available && storeBridge() !== undefined);
 
@@ -260,13 +260,14 @@ export function BoostScreen({ venueId }: { venueId: string }) {
             {price.dayOptions.map((d) => (
               <button key={d} type="button" role="radio" aria-checked={days === d} aria-pressed={days === d} className="chip" onClick={() => setDays(d)}>
                 {daysLabel(d)}
+                {packageSummary(price, channel, d).discountPct > 0 ? <small> −{packageSummary(price, channel, d).discountPct}%</small> : null}
               </button>
             ))}
           </div>
         </section>
 
         <div className="boost__total">
-          <span>{formatBrl(pricePerDayCents(price, channel))} por dia × {daysLabel(days)}</span>
+          <span>{formatBrl(perDay)} por dia × {daysLabel(days)}{discountPct > 0 ? ` (${discountPct}% de desconto)` : ''}</span>
           <strong>{formatBrl(total)}</strong>
         </div>
         <Button full loading={busy} disabled={!storeReady || (matching && (tags.length === 0 || eventTarget?.tags.length === 0))} onClick={() => void create()}>{onStore ? `Comprar por ${formatBrl(total)}` : `Pagar ${formatBrl(total)}`}</Button>

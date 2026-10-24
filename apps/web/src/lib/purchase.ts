@@ -46,6 +46,21 @@ export async function buyInStore(productId: string, env?: { AskouTStore?: StoreB
 }
 
 /** Valor por dia neste canal: na loja costuma ser maior por causa da comissão. */
+/** Total do pacote de `days` dias no canal. Sem preço de pacote (resposta antiga), cai em dias × valor por dia. */
+export function packageTotalCents(pricing: Pick<BoostPricing, 'pricePerDayCents' | 'packagePricesCents' | 'store'>, channel: BoostChannel, days: number): number {
+  const table = channel === 'WEB' ? pricing.packagePricesCents : pricing.store.packagePricesCents;
+  return table?.[String(days)] ?? Math.max(0, Math.round(pricePerDayCents(pricing, channel))) * Math.max(0, Math.floor(days));
+}
+
+/** Quanto sai por dia no pacote, e o desconto frente ao pacote de 1 dia (0 quando não há). */
+export function packageSummary(pricing: Pick<BoostPricing, 'pricePerDayCents' | 'packagePricesCents' | 'store'>, channel: BoostChannel, days: number): { total: number; perDay: number; discountPct: number } {
+  const total = packageTotalCents(pricing, channel, days);
+  const perDay = days > 0 ? Math.round(total / days) : 0;
+  const one = packageTotalCents(pricing, channel, 1);
+  const discountPct = one > 0 && days > 1 ? Math.max(0, Math.round((1 - total / (one * days)) * 100)) : 0;
+  return { total, perDay, discountPct };
+}
+
 export function pricePerDayCents(pricing: Pick<BoostPricing, 'pricePerDayCents' | 'store'>, channel: BoostChannel): number {
   return channel === 'WEB' ? pricing.pricePerDayCents : pricing.store.pricePerDayCents;
 }

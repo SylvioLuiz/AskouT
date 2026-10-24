@@ -39,9 +39,9 @@ export interface AppConfig {
    */
   paymentsEnabled: boolean;
   /** Valor do impulsionamento por dia, em centavos de real. */
-  boostPricePerDayCents: number;
+  boostPricePerDayCents?: number;
   /** Valor por dia na compra dentro do app (iOS/Android), em centavos. Padrão: o mesmo da web. */
-  boostStorePricePerDayCents: number;
+  boostStorePricePerDayCents?: number;
 }
 
 const MIN_SECRET = 32;
@@ -152,8 +152,10 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     paymentProvider = 'sandbox';
   }
 
-  const boostPricePerDayCents = Number(env.BOOST_PRICE_PER_DAY_CENTS ?? '1500');
-  if (!Number.isInteger(boostPricePerDayCents) || boostPricePerDayCents < 100 || boostPricePerDayCents > 1_000_000) {
+  // Sem esta variável valem os pacotes com desconto progressivo (ver BOOST_DEFAULT_PACKAGE_PRICES_CENTS).
+  const priceRaw = env.BOOST_PRICE_PER_DAY_CENTS?.trim() ?? '';
+  const boostPricePerDayCents = priceRaw === '' ? undefined : Number(priceRaw);
+  if (boostPricePerDayCents !== undefined && (!Number.isInteger(boostPricePerDayCents) || boostPricePerDayCents < 100 || boostPricePerDayCents > 1_000_000)) {
     problems.push('BOOST_PRICE_PER_DAY_CENTS deve ser um inteiro de 100 a 1000000 (centavos)');
   }
 
@@ -162,8 +164,8 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
   }
 
   const storePriceRaw = env.BOOST_STORE_PRICE_PER_DAY_CENTS?.trim() ?? '';
-  const boostStorePricePerDayCents = storePriceRaw === '' ? boostPricePerDayCents : Number(storePriceRaw);
-  if (!Number.isInteger(boostStorePricePerDayCents) || boostStorePricePerDayCents < 100 || boostStorePricePerDayCents > 1_000_000) {
+  const boostStorePricePerDayCents = storePriceRaw === '' ? undefined : Number(storePriceRaw);
+  if (boostStorePricePerDayCents !== undefined && (!Number.isInteger(boostStorePricePerDayCents) || boostStorePricePerDayCents < 100 || boostStorePricePerDayCents > 1_000_000)) {
     problems.push('BOOST_STORE_PRICE_PER_DAY_CENTS deve ser um inteiro de 100 a 1000000 (centavos)');
   }
 
@@ -171,5 +173,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, paymentProvider, stripe, paymentsEnabled, boostPricePerDayCents, boostStorePricePerDayCents };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
 }

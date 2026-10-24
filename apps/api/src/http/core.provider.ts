@@ -90,8 +90,8 @@ export const coreProvider = {
       regions: new PrismaRegionRepository(prisma),
       account: new PrismaAccountRepository(prisma),
       payments: config.stripe ? new StripePaymentGateway(config.stripe) : config.paymentProvider === 'sandbox' ? new SandboxPaymentGateway() : new UnconfiguredPaymentGateway(),
-      boostPricePerDayCents: config.boostPricePerDayCents,
-      boostStorePricePerDayCents: config.boostStorePricePerDayCents,
+      ...(config.boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents: config.boostPricePerDayCents }),
+      ...(config.boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: config.boostStorePricePerDayCents }),
       boostsEnabled: config.paymentsEnabled,
       // Compra pela App Store só liga com o bundle id do app configurado (APPLE_APP_ID). Google Play ainda não é conferido.
       ...(config.appleAppId ? { storeVerifier: new AppleJwsPurchaseVerifier({ bundleId: config.appleAppId }) } : {}),

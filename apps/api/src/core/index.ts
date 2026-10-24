@@ -150,7 +150,7 @@ export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { EventPageService } from './event-page-service.ts';
 export { EventReminderService } from './event-reminder-service.ts';
 export type { EventPageView, EventPostView, EventCoverView } from './event-page-service.ts';
-export { BoostService, BOOST_DAY_OPTIONS, BOOST_DEFAULT_PRICE_PER_DAY_CENTS, boostPhase, boostProductId } from './boost-service.ts';
+export { BoostService, BOOST_DAY_OPTIONS, BOOST_DEFAULT_PRICE_PER_DAY_CENTS, BOOST_DEFAULT_PACKAGE_PRICES_CENTS, boostPhase, boostProductId } from './boost-service.ts';
 export type { BoostPricing, BoostView, BoostPhase } from './boost-service.ts';
 export { ExploreService, EXPLORE_DEFAULT_RADIUS_KM, EXPLORE_MAX_RADIUS_KM } from './explore-service.ts';
 export type { ExploreEventItem, ExplorePlaceItem, ExploreView } from './explore-service.ts';

@@ -65,7 +65,7 @@ describe('loadConfig', () => {
 
   it('pagamento: teste ligado por padrão fora de produção; produção recusa o teste e exige provedor real', () => {
     assert.equal(loadConfig(good).paymentProvider, 'sandbox');
-    assert.equal(loadConfig(good).boostPricePerDayCents, 1500);
+    assert.equal(loadConfig(good).boostPricePerDayCents, undefined, 'sem a variável valem os pacotes com desconto');
     assert.throws(() => loadConfig({ ...good, PAYMENT_PROVIDER: 'outro' }), /PAYMENT_PROVIDER/);
     assert.throws(() => loadConfig({ ...good, NODE_ENV: 'production', PAYMENT_PROVIDER: 'sandbox' }), /produção/);
     assert.throws(() => loadConfig({ ...good, BOOST_PRICE_PER_DAY_CENTS: '5' }), /BOOST_PRICE_PER_DAY_CENTS/);
@@ -100,8 +100,9 @@ describe('loadConfig', () => {
   });
 
   it('preço na loja: igual ao da web se não for informado', () => {
-    assert.equal(loadConfig(good).boostStorePricePerDayCents, 1500);
-    assert.equal(loadConfig({ ...good, BOOST_PRICE_PER_DAY_CENTS: '2000' }).boostStorePricePerDayCents, 2000);
+    // Sem valor próprio da loja, o serviço usa o mesmo da web (pacotes com desconto, ou dias × valor configurado).
+    assert.equal(loadConfig(good).boostStorePricePerDayCents, undefined);
+    assert.equal(loadConfig({ ...good, BOOST_PRICE_PER_DAY_CENTS: '2000' }).boostStorePricePerDayCents, undefined);
     assert.equal(loadConfig({ ...good, BOOST_STORE_PRICE_PER_DAY_CENTS: '2200' }).boostStorePricePerDayCents, 2200);
     assert.throws(() => loadConfig({ ...good, BOOST_STORE_PRICE_PER_DAY_CENTS: '1' }), /BOOST_STORE_PRICE_PER_DAY_CENTS/);
   });

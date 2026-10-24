@@ -7,8 +7,14 @@ import type { BoostAudience, BoostChannel, BoostRecord, BoostTarget, PlaceEventR
 
 /** Quantos dias o responsável pode comprar de uma vez. */
 export const BOOST_DAY_OPTIONS: readonly number[] = [1, 3, 7, 14];
-/** Valor padrão por dia, em centavos. Ajustável por configuração, sem mexer no código. */
-export const BOOST_DEFAULT_PRICE_PER_DAY_CENTS = 1500;
+/** Valor do pacote de 1 dia, em centavos (referência do “por dia” sem desconto). */
+export const BOOST_DEFAULT_PRICE_PER_DAY_CENTS = 1490;
+/**
+ * Preço de cada pacote, em centavos: desconto progressivo (quanto mais dias, menor o valor por dia).
+ * Os valores são faixas de preço da Apple/Google no Brasil, para o preço da web e o das lojas serem o mesmo.
+ * Se mudar aqui, mude também os produtos askout.boost.* nas lojas.
+ */
+export const BOOST_DEFAULT_PACKAGE_PRICES_CENTS: Readonly<Record<number, number>> = { 1: 1490, 3: 3490, 7: 6990, 14: 11990 };
 
 const DAY_MS = 86_400_000;
 
@@ -24,10 +30,13 @@ export interface BoostPricing {
    * Anúncios já pagos continuam aparecendo até o fim, e pagamentos em andamento ainda são confirmados.
    */
   enabled: boolean;
+  /** Valor do pacote de 1 dia (referência). O total de cada pacote está em `packagePricesCents`. */
   pricePerDayCents: number;
+  /** Total de cada pacote, por dias (chave = número de dias), em centavos. */
+  packagePricesCents: Record<string, number>;
   dayOptions: number[];
   /** Compra dentro do app (iOS/Android): o valor vem da tabela de preços da loja, que costuma ser maior por causa da comissão. */
-  store: { available: boolean; pricePerDayCents: number; products: Record<string, string> };
+  store: { available: boolean; pricePerDayCents: number; packagePricesCents: Record<string, number>; products: Record<string, string> };
   /** Raios (km) e limite de hashtags do Match. */
   match: { radiusKmOptions: number[]; maxTags: number };
   /** Pagamento de teste: não cobra de verdade (a tela mostra “simular pagamento”). */
@@ -74,6 +83,8 @@ export class BoostService {
   private readonly deps: CoreDeps;
   private readonly pricePerDayCents: number;
   private readonly storePricePerDayCents: number;
+  private readonly webPackages: Record<string, number> = {};
+  private readonly storePackages: Record<string, number> = {};
   private readonly paymentsSwitch: PaymentsSwitch;
   private readonly match: MatchService;
 
@@ -81,8 +92,14 @@ export class BoostService {
     this.deps = deps;
     this.match = match;
     this.paymentsSwitch = paymentsSwitch;
+    // Sem valor por dia configurado, valem os pacotes com desconto. Com valor configurado, cobra dias × valor (como antes).
     this.pricePerDayCents = options.pricePerDayCents ?? BOOST_DEFAULT_PRICE_PER_DAY_CENTS;
     this.storePricePerDayCents = options.storePricePerDayCents ?? this.pricePerDayCents;
+    for (const d of BOOST_DAY_OPTIONS) {
+      this.webPackages[String(d)] = options.pricePerDayCents === undefined ? (BOOST_DEFAULT_PACKAGE_PRICES_CENTS[d] ?? d * this.pricePerDayCents) : d * this.pricePerDayCents;
+      this.storePackages[String(d)] =
+        options.storePricePerDayCents !== undefined ? d * this.storePricePerDayCents : options.pricePerDayCents !== undefined ? d * this.pricePerDayCents : this.webPackages[String(d)]!;
+    }
   }
 
   async pricing(): Promise<BoostPricing> {
@@ -92,8 +109,9 @@ export class BoostService {
       currency: 'BRL',
       enabled: await this.paymentsSwitch.isEnabled(),
       pricePerDayCents: this.pricePerDayCents,
+      packagePricesCents: { ...this.webPackages },
       dayOptions: [...BOOST_DAY_OPTIONS],
-      store: { available: this.deps.storeVerifier !== undefined, pricePerDayCents: this.storePricePerDayCents, products },
+      store: { available: this.deps.storeVerifier !== undefined, pricePerDayCents: this.storePricePerDayCents, packagePricesCents: { ...this.storePackages }, products },
       match: { radiusKmOptions: [...MATCH_RADIUS_KM_OPTIONS], maxTags: MATCH_MAX_TAGS },
       sandbox: this.deps.payments.sandbox,
     };
@@ -203,7 +221,7 @@ export class BoostService {
     const open = existing.find((b) => b.target === target && b.eventId === eventId && (b.status === 'PENDING_PAYMENT' || (b.status === 'PAID' && (b.endsAt?.getTime() ?? 0) > now.getTime())));
     if (open) throw conflict(open.status === 'PENDING_PAYMENT' ? 'Já existe um pedido aguardando pagamento para isto' : 'Isto já está impulsionado');
 
-    const amountCents = days * (channel === 'WEB' ? this.pricePerDayCents : this.storePricePerDayCents);
+    const amountCents = (channel === 'WEB' ? this.webPackages : this.storePackages)[String(days)]!;
     const id = this.deps.ids.next();
     // Nas lojas quem cobra é a loja: não existe cobrança no provedor, só o pedido esperando o recibo do app.
     const charge = channel === 'WEB' ? await this.deps.payments.createCharge({ reference: id, amountCents, description, returnPath: `/bares/${encodeURIComponent(venue.id)}/impulsionar` }) : { chargeId: null, pixCode: null, checkoutUrl: null };

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { BOOST_DEFAULT_PRICE_PER_DAY_CENTS } from './boost-service.ts';
+import { BOOST_DEFAULT_PACKAGE_PRICES_CENTS, BOOST_DEFAULT_PRICE_PER_DAY_CENTS } from './boost-service.ts';
 import { FakePaymentGateway, FakeStoreVerifier } from './testing/in-memory.ts';
 import { rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
@@ -32,8 +32,9 @@ test('preço e opções vêm da configuração', async () => {
     currency: 'BRL',
     enabled: true,
     pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS,
+    packagePricesCents: { '1': 1490, '3': 3490, '7': 6990, '14': 11990 },
     dayOptions: [1, 3, 7, 14],
-    store: { available: false, pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS, products: { '1': 'askout.boost.1d', '3': 'askout.boost.3d', '7': 'askout.boost.7d', '14': 'askout.boost.14d' } },
+    store: { available: false, pricePerDayCents: BOOST_DEFAULT_PRICE_PER_DAY_CENTS, packagePricesCents: { '1': 1490, '3': 3490, '7': 6990, '14': 11990 }, products: { '1': 'askout.boost.1d', '3': 'askout.boost.3d', '7': 'askout.boost.7d', '14': 'askout.boost.14d' } },
     match: { radiusKmOptions: [2, 5, 10, 25], maxTags: 5 },
     sandbox: true,
   });
@@ -49,7 +50,8 @@ test('criar: só o responsável, com duração válida, e cobra dias × valor', 
   await rejectsWith(w.core.boosts.create(dono, 'v1', { target: 'OUTRO', days: 3 }), 'VALIDATION');
   assert.equal(w.payments.charges.length, 0, 'pedido inválido não gera cobrança');
   const b = await w.core.boosts.create(dono, 'v1', { target: 'VENUE', days: 3 });
-  assert.equal(b.amountCents, 3 * BOOST_DEFAULT_PRICE_PER_DAY_CENTS);
+  assert.equal(b.amountCents, BOOST_DEFAULT_PACKAGE_PRICES_CENTS[3]);
+  assert.ok(b.amountCents < 3 * BOOST_DEFAULT_PRICE_PER_DAY_CENTS, 'desconto progressivo: 3 dias custa menos que 3 × 1 dia');
   assert.equal(b.phase, 'PENDING_PAYMENT');
   assert.equal(b.payment?.pixCode, 'PIX-ch_1');
   assert.deepEqual([w.payments.charges[0]?.amountCents, w.payments.charges[0]?.reference], [b.amountCents, b.id]);
@@ -289,4 +291,11 @@ test('loja: com a chave geral desligada, quem já pagou na loja ainda consegue c
   await off.boosts.create({ id: a.id, venueId: 'v1', channel: 'APPLE', ownerId: u['dono']!, target: 'VENUE', eventId: null, days: 1, amountCents: 1500, status: 'PENDING_PAYMENT', chargeId: null, payCode: null, payUrl: null, createdAt: off.clock.now(), paidAt: null, startsAt: null, endsAt: null, audience: 'ALL', radiusM: null, matchTags: [] });
   const paid = await off.core.boosts.confirmStorePurchase(u['dono']!, a.id, { receipt: FakeStoreVerifier.receipt('askout.boost.1d', 'T-11') });
   assert.equal(paid.phase, 'ACTIVE');
+});
+
+test('valor por dia configurado vale como antes (dias × valor) e a loja acompanha a web', async () => {
+  const { w } = await setupWith({ pricePerDayCents: 2000 });
+  const p = await w.core.boosts.pricing();
+  assert.deepEqual(p.packagePricesCents, { '1': 2000, '3': 6000, '7': 14000, '14': 28000 });
+  assert.deepEqual(p.store.packagePricesCents, p.packagePricesCents);
 });

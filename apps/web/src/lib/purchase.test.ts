@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buyInStore, paymentReturn, pricePerDayCents, purchaseChannel, safePaymentUrl, StoreUnavailableError } from './purchase.ts';
+import { buyInStore, packageSummary, packageTotalCents, paymentReturn, pricePerDayCents, purchaseChannel, safePaymentUrl, StoreUnavailableError } from './purchase.ts';
 
-const pricing = { pricePerDayCents: 1500, store: { available: true, pricePerDayCents: 2000, products: {} } };
+const pricing = { pricePerDayCents: 1500, packagePricesCents: { '1': 1500, '3': 3500 }, store: { available: true, pricePerDayCents: 2000, packagePricesCents: { '1': 2000, '3': 5000 }, products: {} } };
 
 describe('pagamento do impulsionamento (web)', () => {
   it('no site paga por Pix/cartão; nas lojas, pela compra do aplicativo', () => {
@@ -44,5 +44,18 @@ describe('pagamento do impulsionamento (web)', () => {
     assert.equal(paymentReturn('?pagamento=cancelado'), 'cancelado');
     assert.equal(paymentReturn('?pagamento=outro'), undefined);
     assert.equal(paymentReturn(''), undefined);
+  });
+});
+
+describe('pacotes com desconto', () => {
+  it('usa o preço do pacote por canal e calcula o desconto', () => {
+    assert.equal(packageTotalCents(pricing, 'WEB', 3), 3500);
+    assert.equal(packageTotalCents(pricing, 'APPLE', 3), 5000);
+    assert.deepEqual(packageSummary(pricing, 'WEB', 3), { total: 3500, perDay: 1167, discountPct: 22 });
+    assert.equal(packageSummary(pricing, 'WEB', 1).discountPct, 0);
+  });
+  it('sem tabela de pacotes (resposta antiga) cobra dias × valor por dia', () => {
+    const old = { pricePerDayCents: 1500, store: { available: false, pricePerDayCents: 1500, products: {} } } as unknown as Parameters<typeof packageTotalCents>[0];
+    assert.equal(packageTotalCents(old, 'WEB', 7), 10500);
   });
 });

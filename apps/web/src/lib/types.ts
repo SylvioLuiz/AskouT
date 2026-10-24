@@ -867,9 +867,11 @@ export interface BoostPricing {
   /** Chave geral: com false não se cria pedido novo (a tela mostra “em breve”). */
   enabled: boolean;
   pricePerDayCents: number;
+  /** Total de cada pacote, por dias (chave = dias), em centavos. */
+  packagePricesCents: Record<string, number>;
   dayOptions: number[];
   /** Compra dentro do app (iOS/Android). `products` mapeia dias → produto da loja. */
-  store: { available: boolean; pricePerDayCents: number; products: Record<string, string> };
+  store: { available: boolean; pricePerDayCents: number; packagePricesCents: Record<string, number>; products: Record<string, string> };
   /** Raios (km) e número máximo de hashtags do Match. */
   match: { radiusKmOptions: number[]; maxTags: number };
   /** Pagamento de teste: não cobra de verdade. */
