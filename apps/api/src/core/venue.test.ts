@@ -222,3 +222,12 @@ test('link de ingresso: só https com domínio de verdade, aparece na página do
   assert.equal((await w.core.eventPages.get(bia, created.id, {})).ticketUrl, null);
   assert.equal((await w.core.venues.panel(ana, 'v1')).events.find((e) => e.id === semLink.id)?.ticketUrl, null);
 });
+
+test('quem passa a administrar o local já o segue', async () => {
+  const { w, ana, adm } = await setup();
+  assert.equal(await w.places.isFollowingVenue(ana, 'v1'), false);
+  const claim = await w.core.venues.requestClaim(ana, 'v1', { document: JPEG() });
+  assert.equal(await w.places.isFollowingVenue(ana, 'v1'), false, 'pedido pendente ainda não segue');
+  await w.core.venues.reviewClaim(adm, claim.id, 'APPROVED');
+  assert.equal(await w.places.isFollowingVenue(ana, 'v1'), true);
+});

@@ -359,6 +359,8 @@ export class VenueService {
     if (!(await this.deps.claims.review(claim.id, decision, adminId, note, now))) throw conflict('Este pedido já foi decidido');
     if (decision === 'APPROVED') {
       await this.deps.places.setVenueOwner(venue.id, claim.userId);
+      // Quem passa a administrar o local já o segue: os posts dele entram no feed.
+      await this.deps.places.followVenue(claim.userId, venue.id, now);
       for (const other of await this.deps.claims.listByStatus('PENDING', 200)) {
         if (other.venueId === venue.id) await this.deps.claims.review(other.id, 'REJECTED', adminId, 'Outro pedido foi aprovado para este local', now);
       }
