@@ -55,7 +55,7 @@ Como gerar (no seu Mac, com Android Studio e Xcode instalados):
 1. `cd apps/mobile && VITE_API_URL=https://api.seudominio.com.br npm run sync` (gera `www/` e copia para as duas plataformas).
 2. `npx cap open android` / `npx cap open ios` e rodar num aparelho ou emulador.
 
-- [ ] Confirmar o `appId` (`br.com.askout.app`, em `apps/mobile/capacitor.config.ts`): vale também para a Apple e o Google e NÃO muda depois de publicar.
+- [ ] Confirmar o `appId` (`br.com.askout` (decidido em 24/10/2026), em `apps/mobile/capacitor.config.ts`): vale também para a Apple e o Google e NÃO muda depois de publicar.
 - [ ] Na API de produção, incluir `https://localhost,capacitor://localhost` em `CORS_ORIGINS` (o app roda nessas origens). A API precisa estar em https.
 - [ ] Primeira compilação em Android Studio e Xcode (assinatura e versão; ícones e tela de abertura já vêm do logo, gerados por `apps/mobile/scripts/make-icons.py`, mas ainda não foram vistos num aparelho). Xcode: ativar a capacidade "In-App Purchase".
 - [ ] Testar as pontes em aparelho: compressão (iPhone e Android), compra de teste (sandbox da Apple e testadores do Google Play), e se `fetch` do arquivo comprimido funciona no WebView.

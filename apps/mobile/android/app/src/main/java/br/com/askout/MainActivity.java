@@ -1,4 +1,4 @@
-package br.com.askout.app;
+package br.com.askout;
 
 import com.getcapacitor.BridgeActivity;
 

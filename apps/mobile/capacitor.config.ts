@@ -5,7 +5,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  * ATENÇÃO: o `appId` é definitivo depois de publicar nas lojas. Confirme antes do primeiro envio (ver GOLIVE.md).
  */
 const config: CapacitorConfig = {
-  appId: 'br.com.askout.app',
+  appId: 'br.com.askout',
   appName: 'AskouT',
   webDir: 'www',
   server: {
