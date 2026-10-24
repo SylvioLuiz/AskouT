@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { CHUNK_BYTES, createVideoBridge, qualityFor, type VideoBridgeDeps } from './video-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
+import { createAppleBridge } from './apple-bridge.ts';
 
 function fakeVideoDeps(overrides: Partial<VideoBridgeDeps> = {}) {
   const log: string[] = [];
@@ -104,5 +105,49 @@ describe('ponte da loja', () => {
     let seen: unknown;
     await createStoreBridge({ purchases: { purchaseProduct: async (o) => ((seen = o), { purchaseToken: 't' }) }, platform: () => 'android' }).purchase('askout.boost.day');
     assert.deepEqual(seen, { productIdentifier: 'askout.boost.day', productType: 'inapp', isConsumable: true, quantity: 1 });
+  });
+});
+
+describe('ponte da Apple', () => {
+  it('inicializa uma vez e devolve o token de identidade', async () => {
+    const calls: string[] = [];
+    const bridge = createAppleBridge({
+      login: {
+        async initialize() {
+          calls.push('init');
+        },
+        async login(o) {
+          calls.push(`login:${o.options.scopes.join(',')}`);
+          return { result: { idToken: 'jwt-da-apple' } };
+        },
+      },
+    });
+    assert.equal(await bridge.signIn(), 'jwt-da-apple');
+    assert.equal(await bridge.signIn(), 'jwt-da-apple');
+    assert.deepEqual(calls, ['init', 'login:email,name', 'login:email,name']);
+  });
+
+  it('cancelar não é erro; falha de verdade sobe; sem token devolve undefined', async () => {
+    const mk = (login: () => Promise<{ result: { idToken?: string | null } }>) => createAppleBridge({ login: { initialize: async () => undefined, login } });
+    assert.equal(await mk(async () => { throw new Error('The operation couldn’t be completed. (com.apple.AuthenticationServices.AuthorizationError error 1001.)'); }).signIn(), undefined);
+    await assert.rejects(mk(async () => { throw new Error('Sem rede'); }).signIn(), /Sem rede/);
+    assert.equal(await mk(async () => ({ result: { idToken: null } })).signIn(), undefined);
+  });
+
+  it('se a inicialização falhar, tenta de novo na próxima vez', async () => {
+    let n = 0;
+    const bridge = createAppleBridge({
+      login: {
+        async initialize() {
+          n += 1;
+          if (n === 1) throw new Error('falhou');
+        },
+        async login() {
+          return { result: { idToken: 'ok' } };
+        },
+      },
+    });
+    await assert.rejects(bridge.signIn(), /falhou/);
+    assert.equal(await bridge.signIn(), 'ok');
   });
 });

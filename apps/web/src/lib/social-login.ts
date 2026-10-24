@@ -36,8 +36,20 @@ export function googleApi(): GoogleId | undefined {
   return (window as unknown as { google?: { accounts?: { id?: GoogleId } } }).google?.accounts?.id;
 }
 
-/** Abre a janela da Apple e devolve o token de identidade. Recusar ou fechar a janela devolve undefined. */
+/** Ponte do app para iPhone (`window.AskouTApple`, ver apps/mobile): abre a janela nativa da Apple. */
+export interface NativeAppleBridge {
+  signIn(): Promise<string | undefined>;
+}
+
+export function nativeAppleBridge(host: unknown = globalThis): NativeAppleBridge | undefined {
+  const b = (host as { AskouTApple?: Partial<NativeAppleBridge> } | undefined)?.AskouTApple;
+  return b && typeof b.signIn === 'function' ? (b as NativeAppleBridge) : undefined;
+}
+
+/** Abre a janela da Apple (a nativa dentro do app do iPhone, a do site no navegador) e devolve o token de identidade. Recusar ou fechar a janela devolve undefined. */
 export async function appleIdToken(clientId: string): Promise<string | undefined> {
+  const native = nativeAppleBridge();
+  if (native) return native.signIn();
   await loadScript(APPLE_SCRIPT);
   const apple = (window as unknown as { AppleID?: { auth?: AppleAuth } }).AppleID?.auth;
   if (!apple) throw new Error('Não foi possível carregar o login da Apple.');

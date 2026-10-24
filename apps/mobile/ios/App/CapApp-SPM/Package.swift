@@ -15,6 +15,7 @@ let package = Package(
         .package(name: "CapacitorFilesystem", path: "../../../../../node_modules/@capacitor/filesystem"),
         .package(name: "CapacitorSplashScreen", path: "../../../../../node_modules/@capacitor/splash-screen"),
         .package(name: "CapacitorStatusBar", path: "../../../../../node_modules/@capacitor/status-bar"),
+        .package(name: "CapgoCapacitorSocialLogin", path: "../../../../../node_modules/@capgo/capacitor-social-login"),
         .package(name: "CapgoNativePurchases", path: "../../../../../node_modules/@capgo/native-purchases"),
         .package(name: "CapacitorNativeVideoCompressor", path: "../../../../../node_modules/capacitor-native-video-compressor")
     ],
@@ -27,6 +28,7 @@ let package = Package(
                 .product(name: "CapacitorFilesystem", package: "CapacitorFilesystem"),
                 .product(name: "CapacitorSplashScreen", package: "CapacitorSplashScreen"),
                 .product(name: "CapacitorStatusBar", package: "CapacitorStatusBar"),
+                .product(name: "CapgoCapacitorSocialLogin", package: "CapgoCapacitorSocialLogin"),
                 .product(name: "CapgoNativePurchases", package: "CapgoNativePurchases"),
                 .product(name: "CapacitorNativeVideoCompressor", package: "CapacitorNativeVideoCompressor")
             ]

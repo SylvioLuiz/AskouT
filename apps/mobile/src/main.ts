@@ -4,6 +4,8 @@ import { SplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
 import { NativeVideoCompressor } from 'capacitor-native-video-compressor';
+import { SocialLogin } from '@capgo/capacitor-social-login';
+import { createAppleBridge } from './apple-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createVideoBridge } from './video-bridge.ts';
 
@@ -38,6 +40,10 @@ if (Capacitor.isNativePlatform()) {
     },
     platform: () => Capacitor.getPlatform(),
   });
+  if (Capacitor.getPlatform() === 'ios') {
+    // O botão da Apple da web não abre dentro do app; no iPhone entra a janela nativa.
+    w['AskouTApple'] = createAppleBridge({ login: SocialLogin as never });
+  }
   void StatusBar.setStyle({ style: Style.Default }).catch(() => undefined);
   void SplashScreen.hide().catch(() => undefined);
 }
