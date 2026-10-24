@@ -19,7 +19,7 @@ import type { VenueEvent, VenueProfile } from '../lib/types.ts';
 import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX, VENUE_NAME_MAX, VENUE_POST_CAPTION_MAX, VENUE_POST_PHOTOS_MAX, applyToAll, daysSummary, draftFromProfile, friendsWentLabel, hoursLines, openStatus, profileBody, profileProblem } from '../lib/venue-profile.ts';
 import type { VenueProfileDraft } from '../lib/venue-profile.ts';
 import { Link, navigate } from '../router.tsx';
-import { VenueEventRow, VenueEventSheet } from './venues.tsx';
+import { ClaimSheet, VenueEventRow, VenueEventSheet } from './venues.tsx';
 
 type Tab = 'about' | 'events' | 'regulars' | 'posts';
 
@@ -441,6 +441,8 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const [followBusy, setFollowBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [sharing, setSharing] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [claimSent, setClaimSent] = useState(false);
   const where = useCurrentPosition();
   const [postsKey, setPostsKey] = useState(0);
   const [eventsKey, setEventsKey] = useState(0);
@@ -520,9 +522,14 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
           </div>
         )}
         {problem ? <Notice tone="error">{problem}</Notice> : null}
-        {!v.claimed ? (
+        {claimSent ? <Notice tone="ok">Pedido enviado para {v.name}. Um administrador vai analisar o documento e você recebe um aviso com a resposta.</Notice> : null}
+        {claiming ? <ClaimSheet fixed={{ id: v.id, name: v.name, address: v.address }} onClose={() => setClaiming(false)} onSent={() => { setClaiming(false); setClaimSent(true); }} /> : null}
+        {!v.claimed && !claimSent ? (
           <p className="muted vhead__unclaimed">
-            Esta página ainda não tem responsável. <Link to="/locais">É o dono? Peça para administrar.</Link>
+            Esta página ainda não tem responsável.{' '}
+            <button type="button" className="linkbtn" onClick={() => setClaiming(true)}>
+              É o dono? Peça para administrar.
+            </button>
           </p>
         ) : null}
       </div>

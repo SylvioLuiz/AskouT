@@ -38,11 +38,12 @@ function VenueLine({ venue }: { venue: VenueSummary }) {
 
 // ---------- Reivindicar um local ----------
 
-function ClaimSheet({ onClose, onSent }: { onClose: () => void; onSent: () => void }) {
+/** Com `fixed`, o pedido já é para aquele local (sem busca): usado na própria página do local. */
+export function ClaimSheet({ onClose, onSent, fixed }: { onClose: () => void; onSent: () => void; fixed?: { id: string; name: string; address: string | null } }) {
   const [query, setQuery] = useState('');
   const debounced = useDebounced(query.trim(), 300);
   const found = useAsync(() => (debounced.length >= 2 ? api.claimableVenues(debounced) : Promise.resolve([] as ClaimableVenue[])), [debounced]);
-  const [picked, setPicked] = useState<ClaimableVenue | undefined>();
+  const [picked, setPicked] = useState<{ id: string; name: string; address: string | null } | undefined>(fixed);
   const [file, setFile] = useState<File | undefined>();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -111,9 +112,11 @@ function ClaimSheet({ onClose, onSent }: { onClose: () => void; onSent: () => vo
             <Button full loading={busy} disabled={!file} onClick={send}>
               Enviar pedido
             </Button>
-            <Button variant="quiet" onClick={() => setPicked(undefined)} disabled={busy}>
-              Escolher outro local
-            </Button>
+            {fixed ? null : (
+              <Button variant="quiet" onClick={() => setPicked(undefined)} disabled={busy}>
+                Escolher outro local
+              </Button>
+            )}
           </div>
         </div>
       )}
