@@ -54,3 +54,15 @@ test('sem ID do aplicativo configurado, a plataforma fica desligada; chaves fica
   await only.verify('GOOGLE', token(good));
   assert.equal(fetches.n, 1);
 });
+
+test('Apple: token do app nativo (bundle id) vale só se o bundle id foi configurado', async () => {
+  const apple = { ...good, iss: 'https://appleid.apple.com' };
+  const fetchJson = async () => ({ keys: [jwk] });
+  const comApp = new OidcIdentityVerifier({ appleClientId: 'cli-apple', appleAppId: 'br.com.app', now: () => NOW, fetchJson });
+  assert.equal((await comApp.verify('APPLE', token({ ...apple, aud: 'br.com.app' })))?.subject, '123', 'bundle id configurado');
+  assert.equal((await comApp.verify('APPLE', token({ ...apple, aud: 'cli-apple' })))?.subject, '123', 'Services ID continua valendo');
+  assert.equal(await comApp.verify('APPLE', token({ ...apple, aud: 'outro.app' })), undefined, 'outro app não vale');
+  const semApp = new OidcIdentityVerifier({ appleClientId: 'cli-apple', now: () => NOW, fetchJson });
+  assert.equal(await semApp.verify('APPLE', token({ ...apple, aud: 'br.com.app' })), undefined, 'sem configurar, bundle id não vale');
+  assert.deepEqual(comApp.providers(), [{ provider: 'APPLE', clientId: 'cli-apple' }], 'o site continua recebendo só o Services ID');
+});

@@ -55,7 +55,7 @@ Feito pelo Claude depois que houver um build e capturas de tela:
 O primeiro produto de compra precisa ser enviado junto com a primeira versão do app.
 
 ## Pontos de atenção conhecidos
-- **Login com Apple dentro do app:** o servidor só aceita o código de cliente da web (`br.com.askout.web`). Se o botão "Entrar com a Apple" falhar dentro do app nativo, é isso: falta aceitar o identificador do app (`br.com.askout`) no servidor. Avise o Claude.
-- **Verificação de compra:** o servidor ainda NÃO confere o recibo da App Store. Até isso ser feito, as compras dentro do app não devem ser abertas ao público.
+- **Login com Apple dentro do app:** o servidor agora aceita também o bundle id (`APPLE_APP_ID=br.com.askout`) como público do token. Mas o app ainda NÃO tem o plugin de login nativo da Apple: o botão da web usa uma janela do site e deve falhar dentro do app. Se falhar no teste, avise o Claude (falta um plugin como `@capgo/capacitor-social-login`).
+- **Verificação de compra:** o servidor confere a transação assinada do StoreKit 2 (cadeia de certificados até a raiz da Apple, bundle id, produto e devolução) quando `APPLE_APP_ID` está definido. Nunca foi testada com uma transação real da Apple, só com uma cadeia de teste: faça uma compra Sandbox antes de abrir ao público. O Google Play ainda não é conferido.
 - **Push, agenda do celular e cancelamento de otimização de vídeo** ainda não existem no app nativo (ver GOLIVE.md).
 - Teste de compra: usar uma conta "Sandbox tester" criada em App Store Connect → Users and Access → Sandbox.

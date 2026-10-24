@@ -51,6 +51,8 @@ A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só
 ## Aplicativo nativo (casca Capacitor, `apps/mobile`)
 Feito: pacote `apps/mobile` com as pastas `android/` e `ios/` geradas, o app web empacotado em `www/` e as duas pontes nativas (`window.AskouTVideo` com `capacitor-native-video-compressor`, e `window.AskouTStore` com `@capgo/native-purchases`), com testes. Permissões de galeria, câmera, microfone e localização já declaradas; JitPack já no Gradle. NADA disso foi compilado ou aberto num aparelho: o sandbox não tem Android SDK nem Xcode.
 
+**Feito em 24/10/2026 (testado só com dados de teste): API aceita o bundle id no login Apple e confere a transação StoreKit 2 (`infra/store/apple-purchase-verifier.ts`); ligam com `APPLE_APP_ID=br.com.askout` no Render. Falta: plugin de login Apple nativo no app, conferência do Google Play, e uma compra Sandbox real.
+
 **Roteiro completo para iPhone (Xcode, assinatura, TestFlight): `apps/mobile/IOS.md`.**
 
 Como gerar (no seu Mac, com Android Studio e Xcode instalados):

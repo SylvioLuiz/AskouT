@@ -28,6 +28,8 @@ export interface OidcVerifierOptions {
   googleClientId?: string;
   /** ID de serviço da Apple ("Services ID"). Sem ele, o login Apple fica desligado. */
   appleClientId?: string;
+  /** ID do app nativo na Apple (bundle id, ex.: br.com.askout). O login nativo da Apple assina o token para ele, não para o Services ID. */
+  appleAppId?: string;
   fetchJson?: (url: string) => Promise<unknown>;
   now?: () => Date;
 }
@@ -53,6 +55,7 @@ async function defaultFetchJson(url: string): Promise<unknown> {
  */
 export class OidcIdentityVerifier implements IdentityVerifier {
   private readonly clients: Partial<Record<ExternalProvider, string>>;
+  private readonly extraAudiences: Partial<Record<ExternalProvider, string[]>> = {};
   private readonly fetchJson: (url: string) => Promise<unknown>;
   private readonly now: () => Date;
   private readonly cache = new Map<ExternalProvider, { keys: Jwk[]; at: number }>();
@@ -61,6 +64,7 @@ export class OidcIdentityVerifier implements IdentityVerifier {
     this.clients = {};
     if (options.googleClientId) this.clients.GOOGLE = options.googleClientId;
     if (options.appleClientId) this.clients.APPLE = options.appleClientId;
+    if (options.appleClientId && options.appleAppId && options.appleAppId !== options.appleClientId) this.extraAudiences.APPLE = [options.appleAppId];
     this.fetchJson = options.fetchJson ?? defaultFetchJson;
     this.now = options.now ?? (() => new Date());
   }
@@ -91,7 +95,8 @@ export class OidcIdentityVerifier implements IdentityVerifier {
 
     const spec = SPECS[provider];
     const aud = payload['aud'];
-    const audOk = typeof aud === 'string' ? aud === clientId : Array.isArray(aud) && aud.includes(clientId);
+    const accepted = [clientId, ...(this.extraAudiences[provider] ?? [])];
+    const audOk = typeof aud === 'string' ? accepted.includes(aud) : Array.isArray(aud) && aud.some((a) => typeof a === 'string' && accepted.includes(a));
     const exp = payload['exp'];
     const nowS = this.now().getTime() / 1000;
     if (typeof payload['iss'] !== 'string' || !spec.issuers.includes(payload['iss']) || !audOk) return undefined;

@@ -1,3 +1,4 @@
+import { AppleJwsPurchaseVerifier } from '../infra/store/apple-purchase-verifier.ts';
 import type { PrismaClient } from '@prisma/client';
 import { HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../core/adapters/crypto.ts';
 import { SystemClock, UuidGenerator } from '../core/adapters/system.ts';
@@ -92,8 +93,10 @@ export const coreProvider = {
       boostPricePerDayCents: config.boostPricePerDayCents,
       boostStorePricePerDayCents: config.boostStorePricePerDayCents,
       boostsEnabled: config.paymentsEnabled,
+      // Compra pela App Store só liga com o bundle id do app configurado (APPLE_APP_ID). Google Play ainda não é conferido.
+      ...(config.appleAppId ? { storeVerifier: new AppleJwsPurchaseVerifier({ bundleId: config.appleAppId }) } : {}),
       identities: new PrismaIdentityRepository(prisma),
-      verifier: new OidcIdentityVerifier({ googleClientId: config.googleClientId, appleClientId: config.appleClientId }),
+      verifier: new OidcIdentityVerifier({ googleClientId: config.googleClientId, appleClientId: config.appleClientId, appleAppId: config.appleAppId }),
       mailer: config.resend ? new ResendEmailSender(config.resend) : new ConsoleEmailSender(),
       codes: new HmacOneTimeCodes({ secret: config.codeSecret }),
       hasher: new ScryptPasswordHasher(),
