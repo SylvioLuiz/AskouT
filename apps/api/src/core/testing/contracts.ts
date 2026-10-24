@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { AppSettingsRepository, DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
-import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
+import type { AppSettingsRepository, DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+  CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
+import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -27,6 +28,7 @@ export interface RepoHarness {
   conversations: ConversationRepository;
   places: PlaceRepository;
   claims: VenueClaimRepository;
+  calendars: CalendarRepository;
   admin: AdminRepository;
   meetups: MeetupRepository;
   scheduling: SchedulingRepository;
@@ -1397,6 +1399,84 @@ export function defineRepositoryContract(
         const c2 = claim(ana, 7);
         await h.claims.create(c2, new Uint8Array([1]));
         assert.deepEqual((await h.claims.listByUser(ana)).map((c) => c.id), [c2.id, c1.id], 'mais novo primeiro');
+      });
+    });
+
+    describe('agenda importada do estabelecimento', () => {
+      const draftOf = (venueId: string, occKey: string, startsAtSec: number, extra: Partial<CalendarDraftRecord> = {}): CalendarDraftRecord => ({
+        id: randomUUID(), venueId, occKey, title: `Evento ${occKey}`, description: '', startsAt: at(startsAtSec), endsAt: at(startsAtSec + 3600), kind: 'OTHER', isFree: false, imageUrl: null, tags: [], ticketUrl: null,
+        publishAt: at(startsAtSec - 600), status: 'WAITING', edited: false, notifiedAt: null, publishedEventId: null, createdAt: at(0), updatedAt: at(0), ...extra,
+      });
+
+      it('configuração: salva, troca, lista as atrasadas e apaga junto com os rascunhos que não subiram', async () => {
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: 0, lng: 0, isSample: false };
+        await h.places.createVenue(v);
+        assert.equal(await h.calendars.getConfig(v.id), undefined);
+        const cfg: VenueCalendarRecord = { venueId: v.id, url: 'https://exemplo.com/a.ics', leadDays: 7, enabled: true, lastSyncAt: null, lastError: null, lastFound: 0, createdAt: at(0) };
+        await h.calendars.saveConfig(cfg);
+        assert.deepEqual(await h.calendars.getConfig(v.id), cfg);
+        await h.calendars.saveConfig({ ...cfg, leadDays: 3, lastSyncAt: at(100), lastError: 'falhou', lastFound: 4 });
+        const got = (await h.calendars.getConfig(v.id))!;
+        assert.equal(got.leadDays, 3);
+        assert.equal(got.lastSyncAt?.getTime(), at(100).getTime());
+        assert.equal(got.lastError, 'falhou');
+        assert.equal(got.createdAt.getTime(), at(0).getTime());
+        assert.deepEqual((await h.calendars.listToSync(at(200), 10)).map((c) => c.venueId), [v.id]);
+        assert.deepEqual(await h.calendars.listToSync(at(100), 10), [], 'lida há pouco: não entra');
+        await h.calendars.saveConfig({ ...got, enabled: false });
+        assert.deepEqual(await h.calendars.listToSync(at(200), 10), [], 'desligada não entra');
+        const waiting = draftOf(v.id, 'a', 5000);
+        const published = draftOf(v.id, 'b', 6000, { status: 'PUBLISHED' });
+        await h.calendars.createDraft(waiting);
+        await h.calendars.createDraft(published);
+        await h.calendars.deleteConfig(v.id);
+        assert.equal(await h.calendars.getConfig(v.id), undefined);
+        assert.deepEqual((await h.calendars.listDrafts(v.id)).map((d) => d.occKey), ['b'], 'o que já subiu fica registrado');
+      });
+
+      it('rascunhos: chave única por local, edição, listas por status e travas de mudança', async () => {
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: 0, lng: 0, isSample: false };
+        const w: VenueRecord = { id: randomUUID(), name: 'Outro', address: null, category: null, lat: 0, lng: 0, isSample: false };
+        await h.places.createVenue(v);
+        await h.places.createVenue(w);
+        await h.calendars.saveConfig({ venueId: v.id, url: 'https://exemplo.com/a.ics', leadDays: 7, enabled: true, lastSyncAt: null, lastError: null, lastFound: 0, createdAt: at(0) });
+        const d1 = draftOf(v.id, 'x|1', 5000, { tags: ['samba'], ticketUrl: 'https://t.exemplo/1', kind: 'SHOW', isFree: true, imageUrl: 'https://i.exemplo/1.jpg', description: 'oi' });
+        const d2 = draftOf(v.id, 'x|2', 4000);
+        await h.calendars.createDraft(d1);
+        await h.calendars.createDraft(d2);
+        await assert.rejects(h.calendars.createDraft(draftOf(v.id, 'x|1', 9000)), 'mesma ocorrência no mesmo local');
+        await h.calendars.createDraft(draftOf(w.id, 'x|1', 9000));
+        assert.deepEqual((await h.calendars.findDraft(d1.id))!, d1);
+        assert.deepEqual((await h.calendars.findDraftByKey(v.id, 'x|1'))!, d1);
+        assert.equal(await h.calendars.findDraft('nao-e-uuid'), undefined);
+        assert.equal(await h.calendars.findDraftByKey(v.id, 'nao-existe'), undefined);
+        assert.deepEqual((await h.calendars.listDrafts(v.id)).map((d) => d.occKey), ['x|2', 'x|1'], 'por data do evento');
+        await h.calendars.updateDraft({ ...d1, title: 'Novo', tags: ['a', 'b'], edited: true, updatedAt: at(10) });
+        const upd = (await h.calendars.findDraft(d1.id))!;
+        assert.equal(upd.title, 'Novo');
+        assert.deepEqual(upd.tags, ['a', 'b']);
+        assert.equal(upd.edited, true);
+        // Notificar: só os WAITING dentro do prazo.
+        assert.deepEqual((await h.calendars.listToNotify(at(4000), 10)).map((d) => d.id), [d2.id]);
+        assert.deepEqual((await h.calendars.listToNotify(at(5000), 10)).map((d) => d.id), [d2.id, d1.id], 'mais cedo primeiro');
+        assert.equal(await h.calendars.moveDraft(d2.id, ['WAITING'], 'AWAITING', { notifiedAt: at(20), at: at(20) }), true);
+        assert.equal(await h.calendars.moveDraft(d2.id, ['WAITING'], 'AWAITING', { notifiedAt: at(21), at: at(21) }), false, 'só decide uma vez');
+        assert.equal((await h.calendars.findDraft(d2.id))!.notifiedAt?.getTime(), at(20).getTime());
+        assert.deepEqual((await h.calendars.listToNotify(at(9000), 10)).filter((d) => d.venueId === v.id).map((d) => d.id), [d1.id]);
+        // Publicar: só APPROVED com a data chegada.
+        assert.deepEqual(await h.calendars.listToPublish(at(9000), 10), []);
+        assert.equal(await h.calendars.moveDraft(d2.id, ['AWAITING', 'WAITING'], 'APPROVED', { at: at(30) }), true);
+        assert.deepEqual(await h.calendars.listToPublish(at(3000), 10), [], 'ainda não chegou a data');
+        assert.deepEqual((await h.calendars.listToPublish(at(3400), 10)).map((d) => d.id), [d2.id]);
+        assert.equal(await h.calendars.moveDraft(d2.id, ['APPROVED'], 'PUBLISHED', { at: at(40) }), true);
+        assert.equal(await h.calendars.moveDraft(d2.id, ['APPROVED'], 'PUBLISHED', { at: at(41) }), false, 'não vira dois eventos');
+        await h.calendars.updateDraft({ ...upd, ...(await h.calendars.findDraft(d2.id))!, title: 'tentativa' });
+        assert.notEqual((await h.calendars.findDraft(d2.id))!.title, 'tentativa', 'publicado não é editado');
+        // Vencidos saem da fila; publicados ficam.
+        assert.equal(await h.calendars.expire(at(6000)), 1);
+        assert.equal((await h.calendars.findDraft(d1.id))!.status, 'DISMISSED');
+        assert.equal((await h.calendars.findDraft(d2.id))!.status, 'PUBLISHED');
+        assert.deepEqual((await h.calendars.listDrafts(v.id, ['PUBLISHED'])).map((d) => d.id), [d2.id]);
       });
     });
 

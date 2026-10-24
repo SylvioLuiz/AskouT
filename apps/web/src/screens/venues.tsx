@@ -12,7 +12,7 @@ import { toApiError } from '../lib/errors.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { kindLabel } from '../lib/explore.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
-import type { ClaimableVenue, VenueClaim, VenueEvent, VenueSummary } from '../lib/types.ts';
+import type { ClaimableVenue, VenueClaim, VenueEvent, VenueEventBody, VenueSummary } from '../lib/types.ts';
 import { CLAIM_NOTE_MAX, EMPTY_VENUE_EVENT, VENUE_EVENT_DESCRIPTION_MAX, VENUE_EVENT_TITLE_MAX, claimStateLabel, claimStatusLabel, documentProblem, draftFromEvent, phaseLabel, venueEventBody, venueEventProblem } from '../lib/venue.ts';
 import type { VenueEventDraft } from '../lib/venue.ts';
 import { Link } from '../router.tsx';
@@ -219,14 +219,18 @@ export function VenuesScreen() {
 
 // ---------- Painel de um local ----------
 
-export function VenueEventSheet({ venueId, event, onClose, onSaved }: { venueId: string; event?: VenueEvent; onClose: () => void; onSaved: () => void }) {
-  const [draft, setDraft] = useState<VenueEventDraft>(event ? draftFromEvent(event, isoToLocalInput) : EMPTY_VENUE_EVENT);
+/**
+ * Formulário de evento. Sem `custom`, cria ou edita um evento do local. Com `custom`, serve a outro destino
+ * (por exemplo, o rascunho vindo da agenda): usa os dados iniciais dele e entrega o corpo a `custom.submit`.
+ */
+export function VenueEventSheet({ venueId, event, onClose, onSaved, custom }: { venueId: string; event?: VenueEvent; onClose: () => void; onSaved: () => void; custom?: { heading: string; saveLabel: string; initial: VenueEventDraft; linkOnlyCover?: boolean; submit: (body: VenueEventBody) => Promise<void> } }) {
+  const [draft, setDraft] = useState<VenueEventDraft>(custom ? custom.initial : event ? draftFromEvent(event, isoToLocalInput) : EMPTY_VENUE_EVENT);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | undefined>();
   const set = <K extends keyof VenueEventDraft>(key: K, value: VenueEventDraft[K]) => setDraft((d) => ({ ...d, [key]: value }));
 
   async function save() {
-    const problem = venueEventProblem(draft, new Date(), event !== undefined);
+    const problem = venueEventProblem(draft, new Date(), event !== undefined || custom !== undefined);
     if (problem) {
       setMessage(problem);
       return;
@@ -235,7 +239,8 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved }: { venueId:
     setMessage(undefined);
     try {
       const body = venueEventBody(draft);
-      if (event) await api.updateVenueEvent(venueId, event.id, body);
+      if (custom) await custom.submit(body);
+      else if (event) await api.updateVenueEvent(venueId, event.id, body);
       else await api.createVenueEvent(venueId, body);
       onSaved();
     } catch (failure) {
@@ -245,9 +250,9 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved }: { venueId:
   }
 
   return (
-    <Sheet title={event ? 'Editar evento' : 'Novo evento'} onClose={onClose}>
+    <Sheet title={custom ? custom.heading : event ? 'Editar evento' : 'Novo evento'} onClose={onClose}>
       <div className="claim">
-        <CoverPicker imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
+        <CoverPicker linkOnly={custom?.linkOnlyCover === true} imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
         <Field label="Nome do evento" value={draft.title} onChange={(v) => set('title', v)} maxLength={VENUE_EVENT_TITLE_MAX} />
         <EventKindPicker value={draft.kind} onChange={(k) => set('kind', k)} />
         <EventDates starts={draft.starts} ends={draft.ends} onStarts={(v) => set('starts', v)} onEnds={(v) => set('ends', v)} />
@@ -269,7 +274,7 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved }: { venueId:
         />
         {message ? <Notice tone="error">{message}</Notice> : null}
         <Button full loading={busy} onClick={save}>
-          {event ? 'Salvar' : 'Criar evento'}
+          {custom ? custom.saveLabel : event ? 'Salvar' : 'Criar evento'}
         </Button>
       </div>
     </Sheet>

@@ -5,7 +5,7 @@ import { safeImage } from '../lib/explore.ts';
 import { resizeEventCover, resizeVenueLogo } from '../lib/image.ts';
 
 /** Imagem de capa (evento ou estabelecimento): um quadro que mostra a imagem e, dentro dele, os botões das duas origens (aparelho ou link da web). */
-export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem, a capa usa a foto do rolê.', logo = false }: { imageUrl: string; imageData: string; onChange: (patch: { imageUrl?: string; imageData?: string }) => void; hint?: string; logo?: boolean }) {
+export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem, a capa usa a foto do rolê.', logo = false, linkOnly = false }: { imageUrl: string; imageData: string; onChange: (patch: { imageUrl?: string; imageData?: string }) => void; hint?: string; logo?: boolean; linkOnly?: boolean }) {
   const [linking, setLinking] = useState(false);
   const [link, setLink] = useState('');
   const [error, setError] = useState<string | undefined>();
@@ -59,9 +59,11 @@ export function CoverPicker({ imageUrl, imageData, onChange, hint = 'Sem imagem,
           </div>
         ) : (
           <div className="cover__actions" role="group" aria-label="Origem da imagem">
-            <Button small variant="secondary" loading={reading} onClick={() => fileRef.current?.click()}>
-              Fotos do aparelho
-            </Button>
+            {linkOnly ? null : (
+              <Button small variant="secondary" loading={reading} onClick={() => fileRef.current?.click()}>
+                Fotos do aparelho
+              </Button>
+            )}
             <Button small variant="secondary" onClick={() => { setLinking(true); setError(undefined); }}>
               Link da web
             </Button>

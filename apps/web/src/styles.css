@@ -4654,3 +4654,23 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .termsgate__card h1 { font-size: 1.4rem; margin: 0; }
 .termsgate__card p { margin: 0; color: var(--muted); }
 .termsgate .consent { display: flex; gap: 10px; align-items: flex-start; }
+
+/* Agenda importada do local */
+.calsec { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.calsec__line { margin: 0; overflow-wrap: anywhere; }
+.calsec__hint { margin: 0; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; }
+.calsec__hint--bad { color: var(--danger); }
+.calsec__row { display: flex; flex-wrap: wrap; gap: 8px; }
+.callist { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.calcard { display: flex; flex-direction: column; gap: 10px; background: var(--surface); border-radius: var(--radius-control); overflow: hidden; border: 1px solid transparent; }
+.calcard--ok { border-color: color-mix(in srgb, var(--ink) 18%, transparent); }
+.calcard__img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.calcard__body { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px 0; }
+.calcard__status { margin: 0; color: var(--muted); font-size: 0.8125rem; font-weight: 600; }
+.calcard__title { margin: 0; font-size: 1.125rem; line-height: 1.25; overflow-wrap: anywhere; }
+.calcard__when { margin: 0; color: var(--ink-2); }
+.calcard__meta { margin: 0; color: var(--muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+.calcard__desc { margin: 4px 0 0; color: var(--ink-2); font-size: 0.9375rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; }
+.calcard__goes { margin: 6px 0 0; font-size: 0.9375rem; }
+.calcard__actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 14px; }
+.calcard > .confirm, .calcard > .notice { margin: 0 16px 14px; }

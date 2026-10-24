@@ -165,4 +165,44 @@ export class VenuesController {
   deleteEvent(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('eventId') eventId: string) {
     return this.core.venues.deleteEvent(actor.userId, id, eventId);
   }
+
+  // ---- Agenda importada (iCal / Google Agenda) ----
+
+  @Get('me/venues/:id/calendar')
+  calendar(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.calendarImport.panel(actor.userId, id);
+  }
+
+  @Put('me/venues/:id/calendar')
+  saveCalendar(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.calendarImport.save(actor.userId, id, asBody(body));
+  }
+
+  @Delete('me/venues/:id/calendar')
+  removeCalendar(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.calendarImport.remove(actor.userId, id);
+  }
+
+  @Post('me/venues/:id/calendar/sync')
+  @HttpCode(200)
+  syncCalendar(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.calendarImport.syncNow(actor.userId, id);
+  }
+
+  @Put('me/venues/:id/calendar/drafts/:draftId')
+  editCalendarDraft(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('draftId') draftId: string, @Body() body: unknown) {
+    return this.core.calendarImport.editDraft(actor.userId, id, draftId, asBody(body));
+  }
+
+  @Post('me/venues/:id/calendar/drafts/:draftId/approve')
+  @HttpCode(200)
+  approveCalendarDraft(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('draftId') draftId: string) {
+    return this.core.calendarImport.approve(actor.userId, id, draftId);
+  }
+
+  @Post('me/venues/:id/calendar/drafts/:draftId/dismiss')
+  @HttpCode(200)
+  dismissCalendarDraft(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('draftId') draftId: string) {
+    return this.core.calendarImport.dismiss(actor.userId, id, draftId);
+  }
 }

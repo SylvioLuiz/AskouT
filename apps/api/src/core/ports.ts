@@ -1,4 +1,4 @@
-import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -501,6 +501,39 @@ export interface PlaceRepository {
   venueRating(venueId: string, userId: string): Promise<{ count: number; sum: number; mine: number | null }>;
 }
 
+export interface CalendarRepository {
+  getConfig(venueId: string): Promise<VenueCalendarRecord | undefined>;
+  /** Cria ou troca a configuração do local. */
+  saveConfig(config: VenueCalendarRecord): Promise<void>;
+  /** Apaga a configuração e os rascunhos que ainda não subiram. */
+  deleteConfig(venueId: string): Promise<void>;
+  /** Agendas ligadas que não são lidas desde `before` (ou nunca foram), as mais atrasadas primeiro. */
+  listToSync(before: Date, limit: number): Promise<VenueCalendarRecord[]>;
+  findDraft(id: string): Promise<CalendarDraftRecord | undefined>;
+  findDraftByKey(venueId: string, occKey: string): Promise<CalendarDraftRecord | undefined>;
+  /** Do local, por data do evento. */
+  listDrafts(venueId: string, statuses?: CalendarDraftStatus[]): Promise<CalendarDraftRecord[]>;
+  createDraft(draft: CalendarDraftRecord): Promise<void>;
+  /** Troca os campos de um rascunho que não esteja PUBLISHED. */
+  updateDraft(draft: CalendarDraftRecord): Promise<void>;
+  /** Muda o status só se ainda estiver em um dos `from` (evita decidir duas vezes). */
+  moveDraft(id: string, from: CalendarDraftStatus[], to: CalendarDraftStatus, patch?: { notifiedAt?: Date; publishedEventId?: string; at: Date }): Promise<boolean>;
+  /** WAITING cujo `publishAt` é até `before` (hora de pedir aprovação). */
+  listToNotify(before: Date, limit: number): Promise<CalendarDraftRecord[]>;
+  /** APPROVED cujo `publishAt` já chegou. */
+  listToPublish(now: Date, limit: number): Promise<CalendarDraftRecord[]>;
+  /** Dispensa o que ainda não subiu e já começou. Devolve quantos. */
+  expire(now: Date): Promise<number>;
+}
+
+/** Baixa o texto de uma agenda iCal. Quem implementa recusa endereços internos e respostas grandes. */
+export interface CalendarFetcher {
+  /** Lança `CalendarFetchError` com mensagem pronta para a pessoa. */
+  fetch(url: string): Promise<string>;
+}
+
+export class CalendarFetchError extends Error {}
+
 export interface VenueClaimRepository {
   create(claim: VenueClaimRecord, document: Uint8Array): Promise<void>;
   findById(id: string): Promise<VenueClaimRecord | undefined>;
@@ -708,6 +741,8 @@ export interface CoreDeps {
   eventRoom: EventRoomRepository;
   places: PlaceRepository;
   claims: VenueClaimRepository;
+  calendars: CalendarRepository;
+  calendarFetcher: CalendarFetcher;
   admin: AdminRepository;
   placeSource: PlaceSource;
   pending: PendingSignupRepository;

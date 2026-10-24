@@ -505,6 +505,9 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/impulsionar`)}>
               Impulsionar
             </Button>
+            <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/agenda`)}>
+              Agenda
+            </Button>
           </div>
         ) : (
           <div className="vhead__actions">

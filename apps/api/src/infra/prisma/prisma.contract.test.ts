@@ -17,6 +17,7 @@ import {
   PrismaPushSubscriptionRepository,
   PrismaPlaceRepository,
   PrismaVenueClaimRepository,
+  PrismaCalendarRepository,
   PrismaAdminRepository,
   PrismaFlashRepository,
   PrismaFollowRepository,
@@ -79,6 +80,7 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     pushSubscriptions: new PrismaPushSubscriptionRepository(prisma),
     places: new PrismaPlaceRepository(prisma),
     claims: new PrismaVenueClaimRepository(prisma),
+    calendars: new PrismaCalendarRepository(prisma),
     admin: new PrismaAdminRepository(prisma),
     async setUserStatus(userId: string, status: UserStatus) {
       await prisma.user.update({ where: { id: userId }, data: { status } });

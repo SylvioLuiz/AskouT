@@ -15,6 +15,7 @@ import {
   PrismaPushSubscriptionRepository,
   PrismaPlaceRepository,
   PrismaVenueClaimRepository,
+  PrismaCalendarRepository,
   PrismaAdminRepository,
   PrismaFlashRepository,
   PrismaFollowRepository,
@@ -35,6 +36,7 @@ import { SandboxPaymentGateway, UnconfiguredPaymentGateway } from '../infra/paym
 import { StripePaymentGateway } from '../infra/payments/stripe-payment-gateway.ts';
 import { ConsoleEmailSender } from './console-email-sender.ts';
 import { ResendEmailSender } from '../infra/email/resend-email-sender.ts';
+import { HttpCalendarFetcher } from '../infra/calendar/http-calendar-fetcher.ts';
 import type { AppConfig } from './support/config.ts';
 import { PhotoSigner } from './support/photo-signing.ts';
 import { CONFIG, CORE, PLACE_PHOTOS, PRISMA } from './tokens.ts';
@@ -75,6 +77,8 @@ export const coreProvider = {
       push: config.vapid ? new WebPushSender({ keys: { publicKey: config.vapid.publicKey, privateKey: config.vapid.privateKey }, subject: config.vapid.subject }) : new DisabledPushSender(),
       places: new PrismaPlaceRepository(prisma),
       claims: new PrismaVenueClaimRepository(prisma),
+      calendars: new PrismaCalendarRepository(prisma),
+      calendarFetcher: new HttpCalendarFetcher(),
       admin: new PrismaAdminRepository(prisma),
       placeSource: google ? new FallbackPlaceSource(google, new OverpassPlaceSource({ contact: config.osmContact })) : new OverpassPlaceSource({ contact: config.osmContact }),
       pending: new PrismaPendingSignupRepository(prisma),

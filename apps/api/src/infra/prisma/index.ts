@@ -9,6 +9,7 @@ export { PrismaMeetupRepository } from './prisma-meetup.repository.ts';
 export { PrismaSchedulingRepository } from './prisma-scheduling.repository.ts';
 export { PrismaPlaceRepository } from './prisma-place.repository.ts';
 export { PrismaVenueClaimRepository } from './prisma-venue-claim.repository.ts';
+export { PrismaCalendarRepository } from './prisma-calendar.repository.ts';
 export { PrismaNotificationRepository, PrismaPushSubscriptionRepository } from './prisma-notification.repository.ts';
 export { PrismaProfileEventRepository } from './prisma-profile-event.repository.ts';
 export { PrismaEventRoomRepository } from './prisma-event-room.repository.ts';

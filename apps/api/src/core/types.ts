@@ -386,7 +386,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR';
 
 /** O que a pessoa silenciou no push (o aviso continua no sino). `all` vale para tudo; `chats` e `events` só para o seu grupo de avisos. */
 export interface NotificationMuteSettings {
@@ -947,4 +947,48 @@ export interface DirectActivityRow {
   at: Date;
   /** Foi a própria pessoa quem mandou. */
   mine: boolean;
+}
+
+/** Agenda (iCal / Google Agenda) ligada a um estabelecimento. O endereço é segredo de quem administra: nunca sai inteiro nas respostas. */
+export interface VenueCalendarRecord {
+  venueId: string;
+  url: string;
+  /** Com quantos dias de antecedência o evento sobe (1 a 30). */
+  leadDays: number;
+  enabled: boolean;
+  lastSyncAt: Date | null;
+  /** Mensagem da última tentativa que falhou; null quando a última deu certo. */
+  lastError: string | null;
+  /** Quantos eventos futuros a última leitura encontrou. */
+  lastFound: number;
+  createdAt: Date;
+}
+
+/** WAITING: ainda longe; AWAITING: dono avisado, falta decidir; APPROVED: sobe na data; PUBLISHED: virou evento; DISMISSED: dispensado ou vencido. */
+export type CalendarDraftStatus = 'WAITING' | 'AWAITING' | 'APPROVED' | 'PUBLISHED' | 'DISMISSED';
+
+/** Evento lido da agenda, esperando a aprovação do dono para virar evento do local. */
+export interface CalendarDraftRecord {
+  id: string;
+  venueId: string;
+  /** Identifica a ocorrência na agenda: `uid|início original`. Único por local. */
+  occKey: string;
+  title: string;
+  description: string;
+  startsAt: Date;
+  endsAt: Date;
+  kind: EventKind;
+  isFree: boolean;
+  imageUrl: string | null;
+  tags: string[];
+  ticketUrl: string | null;
+  /** Quando o evento sobe: início menos os dias de antecedência. */
+  publishAt: Date;
+  status: CalendarDraftStatus;
+  /** O dono mexeu: a agenda não sobrescreve mais. */
+  edited: boolean;
+  notifiedAt: Date | null;
+  publishedEventId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }

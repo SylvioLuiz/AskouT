@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { conflict } from '../errors.ts';
+import { CalendarFetchError } from '../ports.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
   PostRepository,
@@ -15,6 +16,8 @@ import type {
   ProfileEventRepository,
   PlaceRepository,
   VenueClaimRepository,
+  CalendarRepository,
+  CalendarFetcher,
   AdminRepository,
   PlaceSource,
   AvailabilityRepository,
@@ -47,7 +50,7 @@ import { distanceMeters } from '../geo.ts';
 import type {
   DirectActivityRow,
   DwellRecord,
-  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -1297,6 +1300,111 @@ export class InMemoryPlaceRepository implements PlaceRepository {
       if (m) out.push(m);
     }
     return out.sort((a, b) => (a.distanceM ?? 0) - (b.distanceM ?? 0) || (a.venue.id < b.venue.id ? -1 : 1)).slice(0, limit);
+  }
+}
+
+export class InMemoryCalendarRepository implements CalendarRepository {
+  readonly configs = new Map<string, VenueCalendarRecord>();
+  readonly drafts = new Map<string, CalendarDraftRecord>();
+
+  async getConfig(venueId: string) {
+    const c = this.configs.get(venueId);
+    return c ? { ...c } : undefined;
+  }
+
+  async saveConfig(config: VenueCalendarRecord): Promise<void> {
+    this.configs.set(config.venueId, { ...config });
+  }
+
+  async deleteConfig(venueId: string): Promise<void> {
+    this.configs.delete(venueId);
+    for (const [id, d] of this.drafts) if (d.venueId === venueId && d.status !== 'PUBLISHED') this.drafts.delete(id);
+  }
+
+  async listToSync(before: Date, limit: number) {
+    return [...this.configs.values()]
+      .filter((c) => c.enabled && (c.lastSyncAt === null || c.lastSyncAt.getTime() < before.getTime()))
+      .sort((a, b) => (a.lastSyncAt?.getTime() ?? 0) - (b.lastSyncAt?.getTime() ?? 0) || (a.venueId < b.venueId ? -1 : 1))
+      .slice(0, limit)
+      .map((c) => ({ ...c }));
+  }
+
+  async findDraft(id: string) {
+    const d = this.drafts.get(id);
+    return d ? { ...d, tags: [...d.tags] } : undefined;
+  }
+
+  async findDraftByKey(venueId: string, occKey: string) {
+    const d = [...this.drafts.values()].find((x) => x.venueId === venueId && x.occKey === occKey);
+    return d ? { ...d, tags: [...d.tags] } : undefined;
+  }
+
+  async listDrafts(venueId: string, statuses?: CalendarDraftStatus[]) {
+    return [...this.drafts.values()]
+      .filter((d) => d.venueId === venueId && (!statuses || statuses.includes(d.status)))
+      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map((d) => ({ ...d, tags: [...d.tags] }));
+  }
+
+  async createDraft(draft: CalendarDraftRecord): Promise<void> {
+    if ([...this.drafts.values()].some((x) => x.venueId === draft.venueId && x.occKey === draft.occKey)) throw new Error('rascunho duplicado');
+    this.drafts.set(draft.id, { ...draft, tags: [...draft.tags] });
+  }
+
+  async updateDraft(draft: CalendarDraftRecord): Promise<void> {
+    const cur = this.drafts.get(draft.id);
+    if (!cur || cur.status === 'PUBLISHED') return;
+    this.drafts.set(draft.id, { ...draft, tags: [...draft.tags] });
+  }
+
+  async moveDraft(id: string, from: CalendarDraftStatus[], to: CalendarDraftStatus, patch?: { notifiedAt?: Date; publishedEventId?: string; at: Date }) {
+    const d = this.drafts.get(id);
+    if (!d || !from.includes(d.status)) return false;
+    this.drafts.set(id, { ...d, status: to, ...(patch?.notifiedAt ? { notifiedAt: patch.notifiedAt } : {}), ...(patch?.publishedEventId ? { publishedEventId: patch.publishedEventId } : {}), ...(patch ? { updatedAt: patch.at } : {}) });
+    return true;
+  }
+
+  async listToNotify(before: Date, limit: number) {
+    return [...this.drafts.values()]
+      .filter((d) => d.status === 'WAITING' && d.publishAt.getTime() <= before.getTime())
+      .sort((a, b) => a.publishAt.getTime() - b.publishAt.getTime() || (a.id < b.id ? -1 : 1))
+      .slice(0, limit)
+      .map((d) => ({ ...d, tags: [...d.tags] }));
+  }
+
+  async listToPublish(now: Date, limit: number) {
+    return [...this.drafts.values()]
+      .filter((d) => d.status === 'APPROVED' && d.publishAt.getTime() <= now.getTime())
+      .sort((a, b) => a.publishAt.getTime() - b.publishAt.getTime() || (a.id < b.id ? -1 : 1))
+      .slice(0, limit)
+      .map((d) => ({ ...d, tags: [...d.tags] }));
+  }
+
+  async expire(now: Date) {
+    let n = 0;
+    for (const [id, d] of this.drafts) {
+      if ((d.status === 'WAITING' || d.status === 'AWAITING' || d.status === 'APPROVED') && d.startsAt.getTime() <= now.getTime()) {
+        this.drafts.set(id, { ...d, status: 'DISMISSED', updatedAt: now });
+        n += 1;
+      }
+    }
+    return n;
+  }
+}
+
+/** Agenda falsa dos testes: devolve o texto de `texts[url]` ou falha com `errors[url]`. */
+export class FakeCalendarFetcher implements CalendarFetcher {
+  readonly texts = new Map<string, string>();
+  readonly errors = new Map<string, string>();
+  readonly calls: string[] = [];
+
+  async fetch(url: string): Promise<string> {
+    this.calls.push(url);
+    const error = this.errors.get(url);
+    if (error !== undefined) throw new CalendarFetchError(error);
+    const text = this.texts.get(url);
+    if (text === undefined) throw new CalendarFetchError('Não foi possível abrir a agenda');
+    return text;
   }
 }
 

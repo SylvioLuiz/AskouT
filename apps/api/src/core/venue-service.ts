@@ -391,6 +391,16 @@ export class VenueService {
     return this.eventView(event);
   }
 
+  /**
+   * Confere os campos de um evento sem criar nada (rascunhos da agenda). Foto enviada do aparelho não vale aqui: só endereço https.
+   * `keepStart` deixa manter um início que já passou do prazo de "no futuro".
+   */
+  checkEventInput(input: VenueEventInput, keepStart?: Date): { title: string; description: string; kind: EventKind; startsAt: Date; endsAt: Date; isFree: boolean; tags: string[]; ticketUrl: string | null; imageUrl: string | null } {
+    const { cover, ...f } = this.parseEvent(input, keepStart);
+    if (cover.mode === 'upload') throw validationError('Evento inválido', { imageUrl: 'Aqui só dá para usar o endereço (https://) de uma imagem' });
+    return { title: f.title, description: f.description ?? '', kind: f.kind, startsAt: f.startsAt, endsAt: f.endsAt, isFree: f.isFree, tags: f.tags, ticketUrl: f.ticketUrl ?? null, imageUrl: cover.mode === 'url' ? cover.url : null };
+  }
+
   async updateEvent(userId: string, venueId: unknown, eventId: unknown, input: VenueEventInput): Promise<VenueEventView> {
     const venue = await this.ownedOrThrow(userId, venueId);
     const current = typeof eventId === 'string' && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;

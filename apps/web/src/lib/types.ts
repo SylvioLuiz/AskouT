@@ -269,7 +269,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR';
 
 export interface NotificationItem {
   id: string;
@@ -744,6 +744,39 @@ export interface VenueEvent {
   ticketUrl?: string | null;
   phase: 'UPCOMING' | 'LIVE' | 'PAST';
   sample: boolean;
+}
+
+/** Agenda (iCal / Google Agenda) ligada ao local. O endereço nunca volta inteiro: só o site. */
+export interface CalendarInfo {
+  host: string;
+  leadDays: number;
+  enabled: boolean;
+  lastSyncAt: string | null;
+  lastError: string | null;
+  lastFound: number;
+}
+
+/** Evento lido da agenda que espera a aprovação do dono. */
+export interface CalendarDraft {
+  id: string;
+  title: string;
+  description: string;
+  kind: EventKind;
+  startsAt: string;
+  endsAt: string;
+  isFree: boolean;
+  imageUrl: string | null;
+  tags: string[];
+  ticketUrl: string | null;
+  /** Quando o evento sobe no AskouT, depois de aprovado. */
+  publishAt: string;
+  status: 'WAITING' | 'AWAITING' | 'APPROVED';
+  edited: boolean;
+}
+
+export interface CalendarPanel {
+  calendar: CalendarInfo | null;
+  drafts: CalendarDraft[];
 }
 
 export interface VenuePanel {

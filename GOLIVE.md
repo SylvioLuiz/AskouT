@@ -333,3 +333,10 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Existe também a chave automática "Maps Platform API Key" (22/10), liberada para 32 APIs: excluir ou restringir, porque é permissiva demais e não é usada pelo app.
 - Falta: definir orçamento e alerta de gasto na conta de cobrança do Google Cloud; `GOOGLE_DAILY_LIMIT` na API limita as consultas por dia.
 - A busca real no Google ainda NÃO foi testada (só com respostas simuladas).
+
+## Agenda importada do local (iCal / Google Agenda)
+
+- Dono do local abre o local → **Agenda**: cola o endereço iCal, escolhe na roleta (1 a 30) quantos dias antes cada evento sobe. Nada sobe sem aprovação: um dia antes da data de subir chega um aviso (tipo `VENUE_CALENDAR`) com a prévia; dá para editar tudo (nome, data, tipo, descrição, hashtags, ingresso, imagem por link https) antes de aprovar.
+- Job `CalendarImportJob` roda a cada 5 min na API (lê agendas a cada 6 h, avisa, publica). A migração `20261205120000_venue_calendar` roda sozinha no deploy do Render.
+- O link da agenda é segredo do dono: fica só no banco e nunca volta inteiro nas respostas (só o site). Leitura com proteção contra endereços internos (só https, IP público, 2 MB, 10 s). Mencionar no texto de privacidade na revisão jurídica.
+- **Não testado com Google Agenda real** (o sandbox não alcança a internet): validar com um calendário de verdade após o deploy. Foto enviada do aparelho não vale para eventos importados (só link https).

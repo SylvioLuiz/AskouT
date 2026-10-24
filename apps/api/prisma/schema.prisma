@@ -713,6 +713,8 @@ model Venue {
   claims VenueClaim[]
   cover  VenueCover?
   logo   VenueLogo?
+  calendar       VenueCalendar?
+  calendarDrafts VenueCalendarDraft[]
   followers VenueFollow[]
   ratings   VenueRating[]
   posts  Post[]
@@ -1302,4 +1304,52 @@ model UserRegion {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([lat, lng])
+}
+
+/// Agenda (iCal / Google Agenda) ligada a um estabelecimento. O endereço é um segredo de quem administra.
+model VenueCalendar {
+  venueId   String    @id @db.Uuid
+  url       String
+  /// Com quantos dias de antecedência o evento sobe (1 a 30).
+  leadDays  Int       @default(7)
+  enabled   Boolean   @default(true)
+  lastSyncAt DateTime?
+  lastError String?
+  lastFound Int       @default(0)
+  createdAt DateTime
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@index([enabled, lastSyncAt])
+}
+
+/// Evento lido da agenda, esperando a aprovação do dono. Só vira PlaceEvent depois de aprovado e na data de subir.
+model VenueCalendarDraft {
+  id               String   @id @db.Uuid
+  venueId          String   @db.Uuid
+  /// `uid|início original`: identifica a ocorrência na agenda.
+  occKey           String
+  title            String
+  description      String   @default("")
+  startsAt         DateTime
+  endsAt           DateTime
+  kind             EventKind @default(OTHER)
+  isFree           Boolean  @default(false)
+  imageUrl         String?
+  tags             String[] @default([])
+  ticketUrl        String?
+  publishAt        DateTime
+  /// WAITING, AWAITING, APPROVED, PUBLISHED ou DISMISSED.
+  status           String
+  edited           Boolean  @default(false)
+  notifiedAt       DateTime?
+  publishedEventId String?
+  createdAt        DateTime
+  updatedAt        DateTime
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, occKey])
+  @@index([status, publishAt])
+  @@index([venueId, startsAt])
 }

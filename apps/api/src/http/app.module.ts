@@ -25,6 +25,7 @@ import { PlacesController } from './controllers/places.controller.ts';
 import { coreProvider, googleProvider, placePhotosProvider } from './core.provider.ts';
 import { FlashPurge } from './flash-purge.ts';
 import { EventReminders } from './event-reminders.ts';
+import { CalendarImportJob } from './calendar-import-job.ts';
 import { PollDeadlines } from './poll-deadlines.ts';
 import { PrismaShutdown, prismaProvider } from './prisma.provider.ts';
 import { loadConfig } from './support/config.ts';
@@ -42,6 +43,7 @@ import { CONFIG } from './tokens.ts';
     FlashPurge,
     PollDeadlines,
     EventReminders,
+    CalendarImportJob,
     { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
   ],
