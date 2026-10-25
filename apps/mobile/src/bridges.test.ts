@@ -3,6 +3,8 @@ import { describe, it } from 'node:test';
 import { CHUNK_BYTES, createVideoBridge, qualityFor, type VideoBridgeDeps } from './video-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createAppleBridge } from './apple-bridge.ts';
+import { createCalendarBridge } from './calendar-bridge.ts';
+import { createPushBridge, type PushPluginLike } from './push-bridge.ts';
 
 function fakeVideoDeps(overrides: Partial<VideoBridgeDeps> = {}) {
   const log: string[] = [];
@@ -149,5 +151,97 @@ describe('ponte da Apple', () => {
     });
     await assert.rejects(bridge.signIn(), /falhou/);
     assert.equal(await bridge.signIn(), 'ok');
+  });
+});
+
+function fakePush(opts: { receive?: string; requested?: string; token?: string; error?: string } = {}) {
+  const listeners = new Map<string, (p: never) => void>();
+  const removed: string[] = [];
+  let requests = 0;
+  const push = {
+    async checkPermissions() {
+      return { receive: opts.receive ?? 'prompt' };
+    },
+    async requestPermissions() {
+      requests++;
+      return { receive: opts.requested ?? 'granted' };
+    },
+    async register() {
+      queueMicrotask(() => {
+        if (opts.error) listeners.get('registrationError')?.({ error: opts.error } as never);
+        else if (opts.token) listeners.get('registration')?.({ value: opts.token } as never);
+      });
+    },
+    async addListener(event: string, cb: (p: never) => void) {
+      listeners.set(event, cb);
+      return { remove: async () => void removed.push(event) };
+    },
+  } as unknown as PushPluginLike;
+  return { push, listeners, removed, requests: () => requests };
+}
+
+describe('ponte de avisos (push)', () => {
+  it('pede permissão, registra e devolve o token do aparelho', async () => {
+    const f = fakePush({ token: 'ab12' });
+    const bridge = createPushBridge({ push: f.push, open: () => undefined });
+    assert.equal(await bridge.permission(), 'prompt');
+    assert.equal(await bridge.register(), 'ab12');
+    assert.equal(f.requests(), 1);
+    assert.deepEqual(f.removed.sort(), ['registration', 'registrationError'], 'solta os ouvintes depois');
+  });
+
+  it('não pede de novo quando já está liberado, e devolve undefined quando a pessoa recusa', async () => {
+    const ok = fakePush({ receive: 'granted', token: 'cd34' });
+    assert.equal(await createPushBridge({ push: ok.push, open: () => undefined }).register(), 'cd34');
+    assert.equal(ok.requests(), 0);
+    const no = fakePush({ requested: 'denied', token: 'x' });
+    assert.equal(await createPushBridge({ push: no.push, open: () => undefined }).register(), undefined);
+    const blocked = fakePush({ receive: 'denied' });
+    const bridge = createPushBridge({ push: blocked.push, open: () => undefined });
+    assert.equal(await bridge.permission(), 'denied');
+    assert.equal(await bridge.register(), undefined);
+    assert.equal(blocked.requests(), 0);
+  });
+
+  it('erro da Apple e falta de resposta viram mensagem clara', async () => {
+    const bad = fakePush({ receive: 'granted', error: 'sem rede' });
+    await assert.rejects(createPushBridge({ push: bad.push, open: () => undefined }).register(), /sem rede/);
+    const silent = fakePush({ receive: 'granted' });
+    await assert.rejects(createPushBridge({ push: silent.push, open: () => undefined, timeoutMs: 20 }).register(), /não respondeu/);
+  });
+
+  it('tocar no aviso abre só caminhos de dentro do app', () => {
+    const f = fakePush();
+    const opened: string[] = [];
+    createPushBridge({ push: f.push, open: (p) => opened.push(p) });
+    const tap = (url: unknown) => (f.listeners.get('pushNotificationActionPerformed') as (a: unknown) => void)({ notification: { data: { url } } });
+    tap('/conversas/1');
+    tap('https://golpe.example');
+    tap('//golpe.example');
+    tap(42);
+    assert.deepEqual(opened, ['/conversas/1']);
+  });
+});
+
+describe('ponte da agenda', () => {
+  const ics = 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n';
+  it('grava o arquivo e abre o menu de compartilhar com o endereço dele', async () => {
+    const calls: string[] = [];
+    const bridge = createCalendarBridge({
+      writeFile: async (o) => (calls.push(`write:${o.path}:${o.data.length}`), { uri: `file:///cache/${o.path}` }),
+      share: async (o) => void calls.push(`share:${o.url}`),
+    });
+    await bridge.addEvent({ filename: 'samba.ics', ics });
+    assert.deepEqual(calls, [`write:samba.ics:${ics.length}`, 'share:file:///cache/samba.ics']);
+  });
+  it('recusa nome ou conteúdo estranho e ignora o cancelamento do menu', async () => {
+    const ok = createCalendarBridge({ writeFile: async () => ({ uri: 'file:///x' }), share: async () => undefined });
+    await assert.rejects(ok.addEvent({ filename: '../x.ics', ics }), /Nome/);
+    await assert.rejects(ok.addEvent({ filename: 'x.txt', ics }), /Nome/);
+    await assert.rejects(ok.addEvent({ filename: 'x.ics', ics: 'qualquer coisa' }), /inválido/);
+    const cancelled = createCalendarBridge({ writeFile: async () => ({ uri: 'file:///x' }), share: async () => Promise.reject(new Error('Share canceled')) });
+    await cancelled.addEvent({ filename: 'x.ics', ics });
+    const broken = createCalendarBridge({ writeFile: async () => ({ uri: 'file:///x' }), share: async () => Promise.reject(new Error('falhou')) });
+    await assert.rejects(broken.addEvent({ filename: 'x.ics', ics }), /falhou/);
   });
 });

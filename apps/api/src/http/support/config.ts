@@ -1,3 +1,4 @@
+import { apnsKeyIsValid } from '../../infra/push/apns-sender.ts';
 import { vapidKeysMatch } from '../../infra/push/web-push-sender.ts';
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
@@ -29,6 +30,8 @@ export interface AppConfig {
   appleAppId: string | undefined;
   /** Chaves VAPID do Web Push. Sem as duas, o aviso fora do app fica desligado (o sino dentro do app continua). */
   vapid: { publicKey: string; privateKey: string; subject: string } | undefined;
+  /** Chave da Apple (APNs) para avisos no app do iPhone. Sem as três variáveis, o push do app fica desligado. */
+  apns: { keyId: string; teamId: string; privateKey: string; bundleId: string; production: boolean } | undefined;
   /** Provedor de pagamento do impulsionamento. “sandbox” é só de teste (não cobra); “stripe” cobra de verdade; sem valor, recusa criar pedidos. */
   paymentProvider: 'sandbox' | 'stripe' | undefined;
   /** Dados da Stripe, só quando `paymentProvider` é “stripe”. */
@@ -120,6 +123,21 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     else vapid = { publicKey: vapidPublic, privateKey: vapidPrivate, subject: vapidSubject };
   }
 
+  const apnsKeyId = env.APNS_KEY_ID?.trim() ?? '';
+  const apnsTeamId = env.APNS_TEAM_ID?.trim() ?? '';
+  const apnsPrivateKey = env.APNS_PRIVATE_KEY?.trim() ?? '';
+  const apnsBundleId = env.APNS_BUNDLE_ID?.trim() || env.APPLE_APP_ID?.trim() || 'br.com.askout';
+  const apnsEnvironment = (env.APNS_ENVIRONMENT?.trim().toLowerCase() || 'production');
+  let apns: AppConfig['apns'];
+  if (apnsKeyId !== '' || apnsTeamId !== '' || apnsPrivateKey !== '') {
+    if (apnsKeyId === '' || apnsTeamId === '' || apnsPrivateKey === '') problems.push('APNS_KEY_ID, APNS_TEAM_ID e APNS_PRIVATE_KEY devem ser definidas juntas');
+    else if (!/^[A-Z0-9]{10}$/.test(apnsKeyId)) problems.push('APNS_KEY_ID deve ter 10 letras/números (mostrado ao criar a chave na Apple)');
+    else if (!/^[A-Z0-9]{10}$/.test(apnsTeamId)) problems.push('APNS_TEAM_ID deve ter 10 letras/números (Team ID da conta Apple)');
+    else if (!apnsKeyIsValid(apnsPrivateKey)) problems.push('APNS_PRIVATE_KEY não é uma chave .p8 válida (cole o conteúdo inteiro do arquivo, com BEGIN/END PRIVATE KEY)');
+    else if (apnsEnvironment !== 'production' && apnsEnvironment !== 'sandbox') problems.push('APNS_ENVIRONMENT deve ser production ou sandbox');
+    else apns = { keyId: apnsKeyId, teamId: apnsTeamId, privateKey: apnsPrivateKey, bundleId: apnsBundleId, production: apnsEnvironment === 'production' };
+  }
+
   const enabledRaw = env.PAYMENTS_ENABLED?.trim().toLowerCase() ?? '';
   let paymentsEnabled = false;
   if (enabledRaw === 'true' || enabledRaw === '1') paymentsEnabled = true;
@@ -173,5 +191,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
 }

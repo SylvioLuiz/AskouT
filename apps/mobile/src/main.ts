@@ -1,11 +1,15 @@
 import { Capacitor } from '@capacitor/core';
-import { Directory, Filesystem } from '@capacitor/filesystem';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
 import { NativeVideoCompressor } from 'capacitor-native-video-compressor';
 import { SocialLogin } from '@capgo/capacitor-social-login';
 import { createAppleBridge } from './apple-bridge.ts';
+import { createCalendarBridge } from './calendar-bridge.ts';
+import { createPushBridge } from './push-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createVideoBridge } from './video-bridge.ts';
 
@@ -40,9 +44,16 @@ if (Capacitor.isNativePlatform()) {
     },
     platform: () => Capacitor.getPlatform(),
   });
+  // "Adicionar à agenda": grava o .ics e abre o menu de compartilhar (iPhone e Android).
+  w['AskouTCalendar'] = createCalendarBridge({
+    writeFile: (o) => Filesystem.writeFile({ path: o.path, data: o.data, directory: Directory.Cache, encoding: Encoding.UTF8 }),
+    share: (o) => Share.share(o),
+  });
   if (Capacitor.getPlatform() === 'ios') {
     // O botão da Apple da web não abre dentro do app; no iPhone entra a janela nativa.
     w['AskouTApple'] = createAppleBridge({ login: SocialLogin as never });
+    // Avisos fora do app: o token vai para o servidor pelo app web; tocar no aviso abre a tela certa.
+    w['AskouTPush'] = createPushBridge({ push: PushNotifications as never, open: (path) => window.location.assign(path) });
   }
   void StatusBar.setStyle({ style: Style.Default }).catch(() => undefined);
   void SplashScreen.hide().catch(() => undefined);

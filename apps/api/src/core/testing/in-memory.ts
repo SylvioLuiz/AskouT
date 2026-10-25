@@ -1627,6 +1627,7 @@ export class InMemoryPushSubscriptionRepository implements PushSubscriptionRepos
 /** Guarda o que seria enviado; `results` permite simular inscrição vencida ou falha. */
 export class FakePushSender implements PushSender {
   publicKey: string | null = 'chave-publica-de-teste';
+  nativeEnabled = false;
   readonly sent: { subscription: PushSubscriptionRecord; message: PushMessage }[] = [];
   results = new Map<string, PushResult>();
 

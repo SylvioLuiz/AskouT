@@ -528,8 +528,8 @@ export function createApi(deps: ApiDeps) {
     notifications: () => request<NotificationList>('GET', '/notifications'),
     unreadNotifications: () => request<{ unread: number; latestUnreadAt: string | null }>('GET', '/notifications/unread'),
     markNotificationsRead: (notificationId?: string) => request<{ unread: number }>('POST', '/notifications/read', { body: notificationId ? { id: notificationId } : {} }),
-    pushKey: () => request<{ publicKey: string | null }>('GET', '/notifications/push-key'),
-    pushSubscribe: (input: { endpoint: string; keys: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
+    pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),
+    pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
     pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),
 
     // Bloqueios

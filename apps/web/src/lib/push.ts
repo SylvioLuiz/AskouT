@@ -95,3 +95,77 @@ export async function disablePush(api: Api): Promise<void> {
   await api.pushUnsubscribe(endpoint);
   await subscription.unsubscribe();
 }
+
+// ——— App no iPhone (ponte `window.AskouTPush`, ver apps/mobile) ———
+
+export interface NativePushBridge {
+  permission(): Promise<'granted' | 'denied' | 'prompt'>;
+  /** Pede permissão se preciso e devolve o token do aparelho; `undefined` se a pessoa recusou. */
+  register(): Promise<string | undefined>;
+}
+
+export function nativePushBridge(host: unknown = typeof window === 'undefined' ? undefined : window): NativePushBridge | undefined {
+  const b = (host as { AskouTPush?: Partial<NativePushBridge> } | undefined)?.AskouTPush;
+  return b && typeof b.permission === 'function' && typeof b.register === 'function' ? (b as NativePushBridge) : undefined;
+}
+
+const NATIVE_TOKEN_KEY = 'askout.push.native-token';
+export const nativeEndpoint = (token: string): string => `apns:${token}`;
+
+function storedNativeToken(): string | null {
+  try {
+    return localStorage.getItem(NATIVE_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeNativeToken(token: string | null): void {
+  try {
+    if (token === null) localStorage.removeItem(NATIVE_TOKEN_KEY);
+    else localStorage.setItem(NATIVE_TOKEN_KEY, token);
+  } catch {
+    /* sem armazenamento: o botão só mostra "ligar" de novo */
+  }
+}
+
+/** Estado do botão no app do iPhone. Função pura. */
+export function nativePushState(input: { serverNative: boolean; permission: 'granted' | 'denied' | 'prompt'; hasToken: boolean }): PushState {
+  if (!input.serverNative) return 'not-configured';
+  if (input.permission === 'denied') return 'denied';
+  return input.permission === 'granted' && input.hasToken ? 'on' : 'off';
+}
+
+export async function readNativeState(bridge: NativePushBridge, serverNative: boolean): Promise<PushState> {
+  let permission: 'granted' | 'denied' | 'prompt' = 'prompt';
+  try {
+    permission = await bridge.permission();
+  } catch {
+    /* trata como "ainda não pediu" */
+  }
+  return nativePushState({ serverNative, permission, hasToken: storedNativeToken() !== null });
+}
+
+export async function enableNativePush(api: Api, bridge: NativePushBridge): Promise<void> {
+  const token = await bridge.register();
+  if (!token) throw new Error('Os avisos não foram liberados. Você pode liberar em Ajustes do iPhone > AskouT > Notificações.');
+  await api.pushSubscribe({ endpoint: nativeEndpoint(token) });
+  storeNativeToken(token);
+}
+
+export async function disableNativePush(api: Api): Promise<void> {
+  const token = storedNativeToken();
+  if (token) await api.pushUnsubscribe(nativeEndpoint(token));
+  storeNativeToken(null);
+}
+
+/** O iPhone pode trocar o token do aparelho; ao abrir, quem já ligou registra de novo em silêncio. */
+export async function refreshNativeToken(api: Api, bridge: NativePushBridge): Promise<void> {
+  const old = storedNativeToken();
+  if (!old || (await bridge.permission()) !== 'granted') return;
+  const token = await bridge.register();
+  if (!token) return;
+  await api.pushSubscribe({ endpoint: nativeEndpoint(token) });
+  if (token !== old) await api.pushUnsubscribe(nativeEndpoint(old)).catch(() => undefined);
+  storeNativeToken(token);
+}

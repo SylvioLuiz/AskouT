@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { generateKeyPairSync } from 'node:crypto';
 import { DomainError, rateLimited, validationError, notFound, conflict, forbidden, unauthorized } from '../../core/errors.ts';
 import { generateVapidKeys } from '../../infra/push/web-push-sender.ts';
 import { loadConfig } from './config.ts';
@@ -61,6 +62,20 @@ describe('loadConfig', () => {
     assert.throws(() => loadConfig({ ...good, VAPID_PUBLIC_KEY: keys.publicKey }), /juntas/);
     assert.throws(() => loadConfig({ ...good, VAPID_PUBLIC_KEY: generateVapidKeys().publicKey, VAPID_PRIVATE_KEY: keys.privateKey }), /não corresponde/);
     assert.throws(() => loadConfig({ ...good, VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: 'ftp://x' }), /VAPID_SUBJECT/);
+  });
+
+  it('chaves APNs (aviso no iPhone): opcionais, em conjunto e com .p8 válida', () => {
+    const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+    const apns = { APNS_KEY_ID: 'ABC123DEFG', APNS_TEAM_ID: '359NDWACC5', APNS_PRIVATE_KEY: pem };
+    assert.equal(loadConfig(good).apns, undefined);
+    assert.deepEqual({ ...loadConfig({ ...good, ...apns }).apns, privateKey: '' }, { keyId: 'ABC123DEFG', teamId: '359NDWACC5', privateKey: '', bundleId: 'br.com.askout', production: true });
+    assert.equal(loadConfig({ ...good, ...apns, APNS_PRIVATE_KEY: pem.trim().replace(/\n/g, '\\n') }).apns?.keyId, 'ABC123DEFG', 'aceita \\n literal numa linha só');
+    assert.equal(loadConfig({ ...good, ...apns, APNS_ENVIRONMENT: 'sandbox' }).apns?.production, false);
+    assert.throws(() => loadConfig({ ...good, APNS_KEY_ID: 'ABC123DEFG' }), /juntas/);
+    assert.throws(() => loadConfig({ ...good, ...apns, APNS_KEY_ID: 'curta' }), /APNS_KEY_ID/);
+    assert.throws(() => loadConfig({ ...good, ...apns, APNS_PRIVATE_KEY: 'lixo' }), /\.p8/);
+    assert.throws(() => loadConfig({ ...good, ...apns, APNS_ENVIRONMENT: 'teste' }), /APNS_ENVIRONMENT/);
   });
 
   it('pagamento: teste ligado por padrão fora de produção; produção recusa o teste e exige provedor real', () => {

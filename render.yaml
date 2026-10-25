@@ -45,6 +45,13 @@ services:
         sync: false
       - key: VAPID_SUBJECT
         value: mailto:contato@askout.com.br
+      # Aviso no app do iPhone (APNs). Colar direto no Render: a chave .p8 é segredo.
+      - key: APNS_KEY_ID
+        sync: false
+      - key: APNS_TEAM_ID
+        value: 359NDWACC5
+      - key: APNS_PRIVATE_KEY
+        sync: false
 databases:
   - name: askout-db
     plan: basic-256mb

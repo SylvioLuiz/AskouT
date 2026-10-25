@@ -28,6 +28,7 @@ import {
   PrismaIdentityRepository,
   PrismaUserRepository,
 } from '../infra/prisma/index.ts';
+import { ApnsSender, CompositePushSender } from '../infra/push/apns-sender.ts';
 import { DisabledPushSender, WebPushSender } from '../infra/push/web-push-sender.ts';
 import { OidcIdentityVerifier } from '../infra/identity/oidc-verifier.ts';
 import { GooglePlaceSource } from '../infra/google/google-place-source.ts';
@@ -75,7 +76,7 @@ export const coreProvider = {
       eventRoom: new PrismaEventRoomRepository(prisma),
       notifications: new PrismaNotificationRepository(prisma),
       pushSubscriptions: new PrismaPushSubscriptionRepository(prisma),
-      push: config.vapid ? new WebPushSender({ keys: { publicKey: config.vapid.publicKey, privateKey: config.vapid.privateKey }, subject: config.vapid.subject }) : new DisabledPushSender(),
+      push: new CompositePushSender(config.vapid ? new WebPushSender({ keys: { publicKey: config.vapid.publicKey, privateKey: config.vapid.privateKey }, subject: config.vapid.subject }) : new DisabledPushSender(), config.apns ? new ApnsSender({ config: config.apns }) : undefined),
       places: new PrismaPlaceRepository(prisma),
       claims: new PrismaVenueClaimRepository(prisma),
       calendars: new PrismaCalendarRepository(prisma),

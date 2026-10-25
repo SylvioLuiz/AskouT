@@ -83,7 +83,40 @@ describe('avisos', () => {
     await w.core.flushNotifications();
     assert.equal((await w.core.notifications.list(bia!)).unread, 1);
     assert.equal(w.push.sent.length, 0);
-    assert.deepEqual(w.core.notifications.pushKey(), { publicKey: null });
+    assert.deepEqual(w.core.notifications.pushKey(), { publicKey: null, native: false });
+  });
+
+  it('aparelho do app (iPhone): inscreve com o token da Apple, só quando o envio nativo está ligado', async () => {
+    const w = makeWorld();
+    const { ana, bia } = await friends(w, 'ana', 'bia');
+    const token = 'ab12'.repeat(16);
+    await assert.rejects(w.core.notifications.subscribe(bia!, { endpoint: `apns:${token}`, keys: undefined }), { code: 'CONFLICT' }, 'sem chave da Apple no servidor');
+    w.push.nativeEnabled = true;
+    assert.deepEqual(w.core.notifications.pushKey(), { publicKey: 'chave-publica-de-teste', native: true });
+    await assert.rejects(w.core.notifications.subscribe(bia!, { endpoint: 'apns:xyz', keys: undefined }), { code: 'VALIDATION' });
+    await assert.rejects(w.core.notifications.subscribe(bia!, { endpoint: `apns:${token}0`.replace(/0$/, 'z'), keys: undefined }), { code: 'VALIDATION' });
+    await w.core.notifications.subscribe(bia!, { endpoint: `apns:${token}`, keys: undefined });
+    assert.deepEqual((await w.pushSubscriptions.listForUser(bia!)).map((s) => s.endpoint), [`apns:${token}`]);
+    const { id } = await w.core.conversations.open(ana!, bia!);
+    await w.core.conversations.send(ana!, id, { body: 'oi' });
+    await w.core.flushNotifications();
+    assert.deepEqual(w.push.sent.map((s) => s.subscription.endpoint), [`apns:${token}`]);
+    await w.core.notifications.unsubscribe(bia!, `apns:${token}`);
+    assert.equal((await w.pushSubscriptions.listForUser(bia!)).length, 0);
+  });
+
+  it('só o envio nativo ligado (sem chave do navegador) ainda manda o push ao app', async () => {
+    const w = makeWorld();
+    w.push.publicKey = null;
+    w.push.nativeEnabled = true;
+    const { ana, bia } = await friends(w, 'ana', 'bia');
+    const token = 'cd34'.repeat(16);
+    await w.core.notifications.subscribe(bia!, { endpoint: `apns:${token}`, keys: undefined });
+    await assert.rejects(w.core.notifications.subscribe(bia!, { endpoint: 'https://push.example/a', keys: { p256dh: 'a', auth: 'b' } }), { code: 'CONFLICT' }, 'o navegador continua precisando da chave VAPID');
+    const { id } = await w.core.conversations.open(ana!, bia!);
+    await w.core.conversations.send(ana!, id, { body: 'oi' });
+    await w.core.flushNotifications();
+    assert.equal(w.push.sent.length, 1);
   });
 
   it('validação da inscrição, limite por pessoa e cancelamento', async () => {

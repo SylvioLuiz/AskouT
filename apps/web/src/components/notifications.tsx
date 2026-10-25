@@ -3,7 +3,7 @@ import { Button, ErrorState, Loading, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
-import { currentSubscription, disablePush, enablePush, pushState, readEnvironment } from '../lib/push.ts';
+import { currentSubscription, disableNativePush, disablePush, enableNativePush, enablePush, nativePushBridge, pushState, readEnvironment, readNativeState, refreshNativeToken } from '../lib/push.ts';
 import type { PushState } from '../lib/push.ts';
 import type { NotificationMute } from '../lib/types.ts';
 
@@ -14,6 +14,8 @@ const COPY: Record<Exclude<PushState, 'off' | 'on'>, string> = {
   denied: 'Você bloqueou os avisos deste site no navegador. Para receber, libere as notificações nas configurações do site e volte aqui.',
 };
 
+const NATIVE_DENIED = 'Os avisos do AskouT estão bloqueados neste iPhone. Para receber, libere em Ajustes > AskouT > Notificações e volte aqui.';
+
 /** Liga ou desliga os avisos fora do app neste aparelho. */
 export function PushCard() {
   const [state, setState] = useState<PushState | undefined>();
@@ -23,10 +25,20 @@ export function PushCard() {
 
   async function refresh() {
     let key: string | null | undefined;
+    let serverNative = false;
     try {
-      key = (await api.pushKey()).publicKey;
+      const res = await api.pushKey();
+      key = res.publicKey;
+      serverNative = res.native === true;
     } catch {
       key = undefined;
+    }
+    const bridge = nativePushBridge();
+    if (bridge) {
+      // No app do iPhone os avisos vão pela Apple; o navegador interno não tem Web Push.
+      if (serverNative) await refreshNativeToken(api, bridge).catch(() => undefined);
+      setState(await readNativeState(bridge, serverNative));
+      return;
     }
     const subscribed = (await currentSubscription()) !== null;
     setPublicKey(key ?? null);
@@ -41,7 +53,11 @@ export function PushCard() {
     setBusy(true);
     setProblem(undefined);
     try {
-      if (turnOn) {
+      const bridge = nativePushBridge();
+      if (bridge) {
+        if (turnOn) await enableNativePush(api, bridge);
+        else await disableNativePush(api);
+      } else if (turnOn) {
         if (!publicKey) throw new Error('Os avisos fora do app não estão ligados neste servidor.');
         await enablePush(api, publicKey);
       } else {
@@ -57,7 +73,7 @@ export function PushCard() {
   }
 
   if (!state) return null;
-  if (state !== 'off' && state !== 'on') return <p className="muted pushcard__hint">{COPY[state]}</p>;
+  if (state !== 'off' && state !== 'on') return <p className="muted pushcard__hint">{state === 'denied' && nativePushBridge() ? NATIVE_DENIED : COPY[state]}</p>;
   return (
     <div className="callout pushcard">
       <p className="callout__text">

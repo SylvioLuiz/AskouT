@@ -6,6 +6,9 @@ export const NOTIFICATIONS_PAGE = 30;
 export const MAX_PUSH_SUBSCRIPTIONS = 10;
 const ENDPOINT_MAX = 1000;
 const KEY_MAX = 200;
+/** Aparelhos do app guardam o token da Apple como `apns:<token em hexadecimal>` no lugar do endereço do navegador. */
+export const NATIVE_ENDPOINT_PREFIX = 'apns:';
+const NATIVE_TOKEN = /^[0-9a-f]{32,200}$/i;
 
 /** A que grupo de silenciar cada tipo de aviso pertence. Os demais (curtidas, seguidores, Flash...) só calam com "todas". */
 export function muteGroup(type: NotificationType): 'chats' | 'events' | null {
@@ -85,7 +88,7 @@ export class StoredNotifier implements Notifier {
 
   private async pushTo(input: { userId: string; title: string; body: string; url: string; type: NotificationType; dedupeKey?: string }): Promise<void> {
     const { pushSubscriptions, push } = this.deps;
-    if (push.publicKey === null) return;
+    if (push.publicKey === null && !push.nativeEnabled) return;
     const subs = await pushSubscriptions.listForUser(input.userId);
     await Promise.all(
       subs.map(async (sub) => {
@@ -147,29 +150,37 @@ export class NotificationService {
     return { unread: await notifications.unreadCount(userId) };
   }
 
-  /** Chave pública para o navegador se inscrever; `null` quando o servidor não tem chaves de push. */
-  pushKey(): { publicKey: string | null } {
-    return { publicKey: this.deps.push.publicKey };
+  /** Chave pública para o navegador se inscrever; `null` quando o servidor não tem chaves de push. `native`: o app do iPhone pode se registrar. */
+  pushKey(): { publicKey: string | null; native: boolean } {
+    return { publicKey: this.deps.push.publicKey, native: this.deps.push.nativeEnabled === true };
   }
 
   async subscribe(userId: string, input: PushSubscribeInput): Promise<{ ok: true }> {
     const { pushSubscriptions, push, clock } = this.deps;
-    if (push.publicKey === null) throw conflict('O aviso fora do app não está configurado neste servidor');
     const endpoint = input.endpoint;
     const keys = typeof input.keys === 'object' && input.keys !== null ? (input.keys as Record<string, unknown>) : {};
-    const { p256dh, auth } = keys;
-    if (typeof endpoint !== 'string' || endpoint.length > ENDPOINT_MAX || !/^https:\/\//.test(endpoint)) {
-      throw validationError('Inscrição inválida', { endpoint: 'Endereço inválido' });
-    }
-    const b64url = /^[A-Za-z0-9_-]+$/;
-    if (typeof p256dh !== 'string' || typeof auth !== 'string' || p256dh.length > KEY_MAX || auth.length > KEY_MAX || !b64url.test(p256dh) || !b64url.test(auth)) {
-      throw validationError('Inscrição inválida', { keys: 'Chaves inválidas' });
+    let { p256dh, auth } = keys;
+    if (typeof endpoint === 'string' && endpoint.startsWith(NATIVE_ENDPOINT_PREFIX)) {
+      // Aparelho do app (iPhone): o "endereço" é `apns:` + token do aparelho, sem chaves de criptografia.
+      if (!push.nativeEnabled) throw conflict('O aviso fora do app não está configurado neste servidor');
+      if (!NATIVE_TOKEN.test(endpoint.slice(NATIVE_ENDPOINT_PREFIX.length))) throw validationError('Inscrição inválida', { endpoint: 'Token do aparelho inválido' });
+      p256dh = 'apns';
+      auth = 'apns';
+    } else {
+      if (push.publicKey === null) throw conflict('O aviso fora do app não está configurado neste servidor');
+      if (typeof endpoint !== 'string' || endpoint.length > ENDPOINT_MAX || !/^https:\/\//.test(endpoint)) {
+        throw validationError('Inscrição inválida', { endpoint: 'Endereço inválido' });
+      }
+      const b64url = /^[A-Za-z0-9_-]+$/;
+      if (typeof p256dh !== 'string' || typeof auth !== 'string' || p256dh.length > KEY_MAX || auth.length > KEY_MAX || !b64url.test(p256dh) || !b64url.test(auth)) {
+        throw validationError('Inscrição inválida', { keys: 'Chaves inválidas' });
+      }
     }
     const existing = await pushSubscriptions.listForUser(userId);
     if (existing.length >= MAX_PUSH_SUBSCRIPTIONS && !existing.some((s) => s.endpoint === endpoint)) {
       throw conflict('Você já tem avisos ligados em muitos aparelhos. Desligue em algum para ligar aqui.');
     }
-    await pushSubscriptions.upsert({ userId, endpoint, p256dh, auth, createdAt: clock.now() });
+    await pushSubscriptions.upsert({ userId, endpoint: endpoint as string, p256dh: p256dh as string, auth: auth as string, createdAt: clock.now() });
     return { ok: true };
   }
 

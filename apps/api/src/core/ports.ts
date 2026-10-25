@@ -682,6 +682,8 @@ export type PushResult = 'SENT' | 'GONE' | 'FAILED';
 export interface PushSender {
   /** Chave pública que o navegador usa para se inscrever; `null` se o envio não está configurado. */
   readonly publicKey: string | null;
+  /** Há envio para os aparelhos do app (iPhone), que não usa a chave pública acima. */
+  readonly nativeEnabled?: boolean;
   send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult>;
 }
 

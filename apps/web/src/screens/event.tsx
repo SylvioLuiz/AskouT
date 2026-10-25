@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { StoryCreateSheet, StoryViewer } from '../components/event-story.tsx';
 import { Sheet } from '../components/agenda.tsx';
-import { ChevronLeftIcon, EventKindIcon, MoreIcon, PlusIcon, ShareIcon, TicketIcon, TrashIcon, XIcon } from '../components/icons.tsx';
+import { CalendarIcon, ChevronLeftIcon, EventKindIcon, MoreIcon, PlusIcon, ShareIcon, TicketIcon, TrashIcon, XIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
@@ -12,11 +12,13 @@ import { useAsync, useTitle } from '../hooks.ts';
 import { startOf } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
 import { mapLink, routeLink } from '../lib/chat.ts';
+import { eventLink } from '../lib/share.ts';
 import { attendeeStrip, eventDateLabel, eventTimeLabel, venueLine, venueMapLink } from '../lib/event-page.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { ticketHost } from '../lib/venue.ts';
 import { toApiError } from '../lib/errors.ts';
+import { addToCalendar } from '../lib/ics.ts';
 import { resizePostPhoto } from '../lib/image.ts';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
 import { timeAgo } from '../lib/format.ts';
@@ -33,6 +35,16 @@ const STRIP_MAX = 7;
 function coverSrc(path: string | null): string | null {
   if (!path) return null;
   return path.startsWith('/') ? api.assetUrl(path) : safeImage(path);
+}
+
+/** Endereço público do site: no app do iPhone a origem é `capacitor://localhost`, que não serve de link. */
+function siteOrigin(): string {
+  return /^https?:$/.test(window.location.protocol) ? window.location.origin : 'https://askout.com.br';
+}
+
+/** Cria o arquivo de agenda do evento e abre na agenda (ou baixa, no navegador). */
+async function addEventToCalendar(page: EventPage): Promise<void> {
+  await addToCalendar({ id: page.id, title: page.title, description: page.description, startsAt: page.startsAt, endsAt: page.endsAt, venue: page.venue.name ? { name: page.venue.name, address: page.venue.address } : null, url: eventLink(siteOrigin(), page.id) });
 }
 
 function goBack() {
@@ -142,6 +154,16 @@ function EventMenuSheet({ page, onChange, onShare, onClose }: { page: EventPage;
       <Button full variant="secondary" onClick={onShare}>
         <ShareIcon /> Compartilhar
       </Button>
+      <Button
+        full
+        variant="secondary"
+        onClick={() => {
+          setMessage(undefined);
+          addEventToCalendar(page).then(onClose, (failure: unknown) => setMessage(failure instanceof Error ? failure.message : 'Não foi possível adicionar à agenda.'));
+        }}
+      >
+        <CalendarIcon /> Adicionar à agenda
+      </Button>
       {page.isOwner && page.postsEnabled ? (
       <>
       <h3 className="radiolist__title">Quem pode postar</h3>
@@ -243,6 +265,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [planning, setPlanning] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [calMessage, setCalMessage] = useState<string | undefined>();
   const [creatingStory, setCreatingStory] = useState(false);
   const [viewing, setViewing] = useState<StoryPos | undefined>();
   const [storyGroups, setStoryGroups] = useState<import('../lib/types.ts').EventStoryGroup[]>([]);
@@ -340,6 +363,19 @@ export function EventScreen({ eventId }: { eventId: string }) {
               {time.sub ? <dd className="evstats__sub">{time.sub}</dd> : null}
             </div>
           </dl>
+          <div className="row-actions evcal">
+            <Button
+              small
+              variant="secondary"
+              onClick={() => {
+                setCalMessage(undefined);
+                addEventToCalendar(e).catch((failure: unknown) => setCalMessage(failure instanceof Error ? failure.message : 'Não foi possível adicionar à agenda.'));
+              }}
+            >
+              <CalendarIcon /> Adicionar à agenda
+            </Button>
+          </div>
+          {calMessage ? <Notice tone="error">{calMessage}</Notice> : null}
 
           <section className="evgoing" aria-label="Quem confirmou">
             {strip.shown.length > 0 || canStory ? (
