@@ -210,7 +210,7 @@ export function ProfileScreen({ username }: { username: string }) {
         <EmptyState title={t('Você bloqueou @{username}', { username: profile.username })}>{t('Desbloqueie para ver o perfil de novo ou seguir.')}</EmptyState>
       ) : !canViewContent ? (
         <EmptyState title={t('Este perfil é privado')}>
-          {relationship.following === 'PENDING' ? t('Seu pedido foi enviado. Você vê o conteúdo quando @') + profile.username + ' aprovar.' : t('Peça para seguir e aguarde a aprovação para ver o conteúdo.')}
+          {relationship.following === 'PENDING' ? t('Seu pedido foi enviado. Você vê o conteúdo quando @{username} aprovar.', { username: profile.username }) : t('Peça para seguir e aguarde a aprovação para ver o conteúdo.')}
         </EmptyState>
       ) : (
         <>

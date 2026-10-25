@@ -21,7 +21,7 @@ import { supportMailto } from '../lib/help-mailto.ts';
 import { downloadJson } from '../lib/account.ts';
 import { birthDateProblem, MIN_ACCOUNT_AGE, ageOnDate, todayIso } from '../lib/age.ts';
 import { Link } from '../router.tsx';
-import { intlLocale, t } from '../lib/i18n/index.ts';
+import { LOCALES, chooseLocale, getLocale, intlLocale, t } from '../lib/i18n/index.ts';
 
 type Message = { tone: 'ok' | 'error'; text: string } | undefined;
 
@@ -562,7 +562,7 @@ export function HelpScreen() {
 }
 
 export function ThemeScreen() {
-  useTitle(t('Tema'));
+  useTitle(t('Tema e idioma'));
   const [choice, setChoice] = useState<ThemeChoice>(() => readTheme(window.localStorage));
   function pick(next: ThemeChoice) {
     setChoice(next);
@@ -571,12 +571,21 @@ export function ThemeScreen() {
   }
   return (
     <>
-      <PageHead title={t('Tema')} back="/perfil" />
+      <PageHead title={t('Tema e idioma')} back="/perfil" />
       <div className="radios" role="radiogroup" aria-label={t('Tema')}>
         {(['system', 'light', 'dark'] as const).map((id) => (
           <label key={id} className="radios__item">
             <input type="radio" name="tema" checked={choice === id} onChange={() => pick(id)} />
             <span>{THEME_LABELS[id]}</span>
+          </label>
+        ))}
+      </div>
+      <h3 className="settings__sub">{t('Idioma')}</h3>
+      <div className="radios" role="radiogroup" aria-label={t('Idioma')}>
+        {LOCALES.map((item) => (
+          <label key={item.code} className="radios__item">
+            <input type="radio" name="idioma" checked={getLocale() === item.code} onChange={() => chooseLocale(item.code)} />
+            <span>{item.label}</span>
           </label>
         ))}
       </div>

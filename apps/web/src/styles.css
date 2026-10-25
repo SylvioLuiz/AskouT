@@ -4669,3 +4669,4 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .calcard__actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 14px; }
 .calcard > .confirm, .calcard > .notice { margin: 0 16px 14px; }
 .evcal { justify-content: center; padding: 10px 16px 0; }
+.settings__sub { margin: 20px 0 8px; font-size: 15px; font-weight: 600; }

@@ -11,7 +11,7 @@ export const PROFILE_MENU: { to: string; label: string }[] = [
   { to: '/arquivados', label: t('Arquivados') },
   { to: '/interacoes', label: t('Suas interações') },
   { to: '/ajuda', label: t('Ajuda') },
-  { to: '/tema', label: t('Tema') },
+  { to: '/tema', label: t('Tema e idioma') },
 ];
 
 /** Painel escuro que abre pela direita com o menu do perfil. */
