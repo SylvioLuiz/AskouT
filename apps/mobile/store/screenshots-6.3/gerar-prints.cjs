@@ -20,10 +20,10 @@ const srv = http.createServer((q,r)=>{ let p=path.join(root, decodeURIComponent(
     return {items:[],nextCursor:null};
   };
   async function shot(name, route, guest, w){ CUR=w||'';
-    const ctx = await b.newContext({ viewport:{width:430,height:932}, deviceScaleFactor:3, isMobile:true, hasTouch:true, locale:'pt-BR' });
-    await ctx.addInitScript((g)=>{ if(!g){ localStorage.setItem('askout.token','demo'); localStorage.setItem('askout.onboarded.u1','1'); } window.Capacitor={getPlatform:()=> 'ios'}; }, guest);
+    const ctx = await b.newContext({ viewport:{width:402,height:874}, deviceScaleFactor:3, isMobile:true, hasTouch:true, locale:'pt-BR' });
+    await ctx.addInitScript((g)=>{ if(!g){ localStorage.setItem('askout.token','demo'); localStorage.setItem('askout.onboarded.u1','1'); } window.Capacitor={getPlatform:()=> 'ios'}; window.AskouTStore={purchase: async()=> 'demo'}; }, guest);
     await ctx.route('**/api/**', r=>{ const u=r.request().url(); if(guest && u.endsWith('/auth/me')) return r.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:{code:'UNAUTHORIZED',message:'x'}})}); r.fulfill({status:200,contentType:'application/json',body:JSON.stringify(mock(u))}); });
-    const page = await ctx.newPage(); await page.goto(`http://localhost:${port}${route}`); await page.waitForTimeout(2500);
+    const page = await ctx.newPage(); await page.goto(`http://localhost:${port}${route}`); await page.waitForTimeout(2500); if(w==='own'){ await page.evaluate(()=>window.scrollTo(0,420)); await page.waitForTimeout(500); }
     await page.screenshot({path: `${out}/${name}.png`}); await ctx.close();
   }
   await shot('s1-entrar','/entrar',true);
