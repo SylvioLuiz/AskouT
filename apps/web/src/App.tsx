@@ -11,7 +11,7 @@ import { useTitle } from './hooks.ts';
 import { Link, navigate, resolveRoute, usePathname } from './router.tsx';
 import type { RouteDef } from './router.tsx';
 import { AgendaScreen } from './screens/agenda.tsx';
-import { LegalScreen } from './screens/legal.tsx';
+import { LegalScreen, SupportScreen } from './screens/legal.tsx';
 import { DeleteAccountScreen } from './screens/delete-account.tsx';
 import { ActivityScreen } from './screens/activity.tsx';
 import { ForgotPasswordScreen, LoginScreen, SignupScreen } from './screens/auth.tsx';
@@ -39,6 +39,7 @@ import { t } from './lib/i18n/index.ts';
 const LEGAL_ROUTES: RouteDef[] = [
   { path: '/politica-de-privacidade', render: () => <LegalScreen doc="privacy" /> },
   { path: '/termos-de-uso', render: () => <LegalScreen doc="terms" /> },
+  { path: '/suporte', render: () => <SupportScreen /> },
 ];
 
 const GUEST_ROUTES: RouteDef[] = [

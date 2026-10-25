@@ -51,3 +51,34 @@ export function LegalScreen({ doc }: { doc: 'privacy' | 'terms' }) {
     </div>
   );
 }
+
+/** Página pública de suporte (URL de suporte da App Store): contato e atalhos para o que mais se pergunta. */
+export function SupportScreen() {
+  const email = (import.meta.env.VITE_SUPPORT_EMAIL as string | undefined) || 'suporte@askout.com.br';
+  useTitle(t('Suporte'));
+  return (
+    <div className="legal">
+      <header className="legal__top">
+        <button type="button" className="legal__back" onClick={goBack} aria-label={t('Voltar')}>
+          <ChevronLeftIcon />
+        </button>
+        <span className="legal__brand">{t('AskouT')}</span>
+      </header>
+      <main className="legal__body">
+        <h1>{t('Suporte')}</h1>
+        <p>{t('Precisa de ajuda com o AskouT? Escreva para a gente e respondemos por e-mail.')}</p>
+        <section className="legal__section">
+          <h2>{t('Fale com o suporte')}</h2>
+          <p><a href={`mailto:${email}`}>{email}</a></p>
+        </section>
+        <section className="legal__section">
+          <h2>{t('Sua conta e seus dados')}</h2>
+          <p>{t('Dentro do app, em Perfil > Privacidade, você baixa seus dados e apaga a conta quando quiser.')}</p>
+        </section>
+        <p className="legal__switch">
+          <Link to="/politica-de-privacidade">{t('Política de Privacidade')}</Link> · <Link to="/termos-de-uso">{t('Termos de Uso')}</Link>
+        </p>
+      </main>
+    </div>
+  );
+}
