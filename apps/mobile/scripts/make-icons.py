@@ -45,7 +45,7 @@ for dpi, legacy, adaptive in [('mdpi', 48, 108), ('hdpi', 72, 162), ('xhdpi', 96
     folder = os.path.join(RES, f'mipmap-{dpi}')
     save(rounded(fit(legacy), 0.2), os.path.join(folder, 'ic_launcher.png'))
     save(rounded(fit(legacy), 0.5), os.path.join(folder, 'ic_launcher_round.png'))
-    save(fit(adaptive, 0.62, background=None), os.path.join(folder, 'ic_launcher_foreground.png'))
+    save(fit(adaptive, 0.68, background=None), os.path.join(folder, 'ic_launcher_foreground.png'))
 with open(os.path.join(RES, 'values', 'ic_launcher_background.xml'), 'w') as f:
     f.write('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#000000</color>\n</resources>\n')
 
