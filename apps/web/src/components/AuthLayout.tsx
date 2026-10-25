@@ -20,7 +20,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="auth">
       <section className="auth__hero">
-        <img className="auth__scene" src="/auth-hero.jpg" alt={t('AskouT')} width="780" height="540" />
+        <img className="auth__logo" src="/auth-logo.png" alt={t('AskouT')} width="360" height="273" />
         <h1 className="auth__headline">{t('Menos tempo combinando. Mais tempo juntos.')}</h1>
       </section>
       <section className="auth__panel">{children}</section>

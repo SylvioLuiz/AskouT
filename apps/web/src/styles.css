@@ -1092,19 +1092,14 @@ button {
   padding: 0 20px;
 }
 
-.auth__scene {
+.auth__logo {
   display: block;
-  width: min(100vw, 520px);
+  width: min(62vw, 260px);
   height: auto;
-  aspect-ratio: 780 / 540;
-  max-height: 300px;
-  object-fit: cover;
-  -webkit-mask-image: radial-gradient(ellipse 56% 54% at 50% 50%, #000 44%, transparent 100%);
-  mask-image: radial-gradient(ellipse 56% 54% at 50% 50%, #000 44%, transparent 100%);
+  margin: 28px auto 20px;
 }
 
 .auth__headline {
-  margin-top: -18px;
   max-width: 26ch;
   text-wrap: balance;
   font-family: var(--font-display);
@@ -1175,9 +1170,9 @@ button {
     flex: 0 1 520px;
   }
 
-  .auth__scene {
-    width: 100%;
-    max-height: none;
+  .auth__logo {
+    width: 320px;
+    margin-top: 0;
   }
 
   .auth__headline {
