@@ -3,7 +3,10 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
 import './styles.css';
 
+import { getLocale } from './lib/i18n/index.ts';
 import { applyTheme, readTheme } from './lib/theme.ts';
+
+document.documentElement.lang = getLocale();
 
 try {
   applyTheme(readTheme(window.localStorage), document.documentElement);

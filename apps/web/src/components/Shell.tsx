@@ -9,6 +9,7 @@ import { hasNewActivity, NOTIFICATIONS_CHANGED_EVENT, readActivitySeen } from '.
 import { Link, navigate, usePathname } from '../router.tsx';
 import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, HomeIcon, PlusBigIcon, SearchIcon, UserIcon } from './icons.tsx';
 import { Avatar } from './ui.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 interface NavItem {
   to: string;
@@ -18,10 +19,10 @@ interface NavItem {
   also?: string[];
 }
 
-const HOME: NavItem = { to: '/', label: 'Home', icon: <HomeIcon /> };
-const EXPLORE: NavItem = { to: '/explorar', label: 'Explorar', icon: <SearchIcon /> };
-const AGENDA: NavItem = { to: '/agenda', label: 'Agenda', icon: <CalendarIcon /> };
-const CHATS: NavItem = { to: '/conversas', label: 'Conversas', icon: <ChatIcon /> };
+const HOME: NavItem = { to: '/', label: t('Home'), icon: <HomeIcon /> };
+const EXPLORE: NavItem = { to: '/explorar', label: t('Explorar'), icon: <SearchIcon /> };
+const AGENDA: NavItem = { to: '/agenda', label: t('Agenda'), icon: <CalendarIcon /> };
+const CHATS: NavItem = { to: '/conversas', label: t('Conversas'), icon: <ChatIcon /> };
 
 function isActive(item: NavItem, pathname: string): boolean {
   if (item.to === '/') return pathname === '/';
@@ -116,12 +117,12 @@ export function Shell({ children }: { children: ReactNode }) {
   const flashOn = flash.data?.active === true;
   const flashInvited = (flashInvites.data?.received.length ?? 0) > 0;
 
-  const flashItem: NavItem = { to: '/flash', label: 'Flash', icon: <BoltIcon filled={flashOn} />, also: ['/flash/encontro'] };
-  const createItem: NavItem = { to: '/criar', label: 'Criar post', icon: <PlusBigIcon /> };
-  const activities: NavItem = { to: '/atividades', label: 'Notificações', icon: <BellIcon /> };
+  const flashItem: NavItem = { to: '/flash', label: t('Flash'), icon: <BoltIcon filled={flashOn} />, also: ['/flash/encontro'] };
+  const createItem: NavItem = { to: '/criar', label: t('Criar post'), icon: <PlusBigIcon /> };
+  const activities: NavItem = { to: '/atividades', label: t('Notificações'), icon: <BellIcon /> };
   const profile: NavItem = {
     to: '/perfil',
-    label: 'Perfil',
+    label: t('Perfil'),
     icon: <UserIcon />,
     also: ['/amigos', '/bloqueados', '/configuracao', '/privacidade', '/privacidade/apagar-conta', '/interacoes', '/arquivados', '/ajuda', '/tema'],
   };
@@ -129,14 +130,14 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className={`shell${inChat ? ' shell--chat' : ''}${inEvent ? ' shell--detail' : ''}`}>
       <a className="skip" href="#conteudo">
-        Ir para o conteúdo
+        {t('Ir para o conteúdo')}
       </a>
 
       <aside className="rail">
-        <Link to="/" className="wordmark" aria-label="AskouT, ir para a Home">
-          AskouT
+        <Link to="/" className="wordmark" aria-label={t('AskouT, ir para a Home')}>
+          {t('AskouT')}
         </Link>
-        <nav className="rail__nav" aria-label="Principal">
+        <nav className="rail__nav" aria-label={t('Principal')}>
           <NavLink item={HOME} pathname={pathname} />
           <NavLink item={EXPLORE} pathname={pathname} />
           <NavLink item={createItem} pathname={pathname} />
@@ -156,10 +157,10 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       <header className="topbar" ref={topbarRef}>
-        <Link to="/" className="wordmark" aria-label="AskouT, ir para a Home">
-          AskouT
+        <Link to="/" className="wordmark" aria-label={t('AskouT, ir para a Home')}>
+          {t('AskouT')}
         </Link>
-        <nav className="topbar__actions" aria-label="Conta">
+        <nav className="topbar__actions" aria-label={t('Conta')}>
           <Link to="/conversas" className="iconbtn iconbtn--chat" aria-label={hasUnread ? `Conversas, ${unreadChats} com mensagem nova` : 'Conversas'} aria-current={pathname.startsWith('/conversas') ? 'page' : undefined}>
             <ChatIcon />
             {hasUnread ? <span className="iconbtn__count" aria-hidden="true">{unreadChats > 9 ? '9+' : unreadChats}</span> : null}
@@ -168,7 +169,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <BellIcon />
             {hasPending ? <span className="navlink__badge" aria-hidden="true" /> : null}
           </Link>
-          <Link to="/perfil" className="iconbtn" aria-label="Perfil" aria-current={pathname === '/perfil' ? 'page' : undefined}>
+          <Link to="/perfil" className="iconbtn" aria-label={t('Perfil')} aria-current={pathname === '/perfil' ? 'page' : undefined}>
             <UserIcon />
           </Link>
         </nav>
@@ -178,10 +179,10 @@ export function Shell({ children }: { children: ReactNode }) {
         {children}
       </main>
 
-      <nav className="tabbar" aria-label="Principal">
+      <nav className="tabbar" aria-label={t('Principal')}>
         <NavLink item={HOME} pathname={pathname} />
         <NavLink item={EXPLORE} pathname={pathname} />
-        <Link to="/criar" className={`tabbar__create${pathname === '/criar' ? ' tabbar__create--active' : ''}`} aria-label="Criar post" aria-current={pathname === '/criar' ? 'page' : undefined}>
+        <Link to="/criar" className={`tabbar__create${pathname === '/criar' ? ' tabbar__create--active' : ''}`} aria-label={t('Criar post')} aria-current={pathname === '/criar' ? 'page' : undefined}>
           <PlusBigIcon />
         </Link>
         <NavLink item={flashItem} pathname={pathname} badge={flashInvited} />

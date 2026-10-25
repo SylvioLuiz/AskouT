@@ -6,10 +6,11 @@ import { useTitle } from '../hooks.ts';
 import { canPickContacts, CONTACTS_MAX, emailsFromVcf, pickContactEmails, sha256Hex } from '../lib/contacts.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { PublicProfile } from '../lib/types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 /** Achar amigos nos contatos. Os e-mails ficam no aparelho: só o código SHA-256 de cada um vai ao servidor, e nada é guardado. */
 export function ContactsScreen() {
-  useTitle('Contatos');
+  useTitle(t('Contatos'));
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error' | 'info'; text: string } | undefined>();
@@ -19,7 +20,7 @@ export function ContactsScreen() {
 
   async function search(emails: string[]) {
     if (emails.length === 0) {
-      setMessage({ tone: 'info', text: 'Não encontrei e-mails nesses contatos.' });
+      setMessage({ tone: 'info', text: t('Não encontrei e-mails nesses contatos.') });
       return;
     }
     const hashes = await Promise.all(emails.slice(0, CONTACTS_MAX).map((e) => sha256Hex(e)));
@@ -28,7 +29,7 @@ export function ContactsScreen() {
     setFollowed({});
     setMessage(
       emails.length > CONTACTS_MAX
-        ? { tone: 'info', text: `Conferi os primeiros ${CONTACTS_MAX} contatos.` }
+        ? { tone: 'info', text: t('Conferi os primeiros {CONTACTS_MAX} contatos.', { CONTACTS_MAX }) }
         : undefined,
     );
   }
@@ -52,7 +53,7 @@ export function ContactsScreen() {
     event.target.value = '';
     if (!file) return;
     if (file.size > 5_000_000) {
-      setMessage({ tone: 'error', text: 'O arquivo é grande demais. Use até 5 MB.' });
+      setMessage({ tone: 'error', text: t('O arquivo é grande demais. Use até 5 MB.') });
       return;
     }
     await run(async () => emailsFromVcf(await file.text()));
@@ -72,14 +73,14 @@ export function ContactsScreen() {
 
   return (
     <>
-      <PageHead title="Achar nos contatos" back="/amigos" subtitle="Veja quais dos seus contatos já estão no AskouT" />
+      <PageHead title={t('Achar nos contatos')} back="/amigos" subtitle={t('Veja quais dos seus contatos já estão no AskouT')} />
       <p className="muted">
-        Os e-mails dos seus contatos não saem do aparelho: só um código irreversível de cada um é enviado para conferir quem tem conta. O AskouT não guarda esses códigos nem sua lista de contatos.
+        {t('Os e-mails dos seus contatos não saem do aparelho: só um código irreversível de cada um é enviado para conferir quem tem conta. O AskouT não guarda esses códigos nem sua lista de contatos.')}
       </p>
       <div className="stack">
         {canPickContacts() ? (
           <Button loading={busy} onClick={() => void run(pickContactEmails)}>
-            Escolher contatos
+            {t('Escolher contatos')}
           </Button>
         ) : null}
         <Button variant={canPickContacts() ? 'secondary' : 'primary'} loading={busy} onClick={() => fileRef.current?.click()}>
@@ -87,9 +88,9 @@ export function ContactsScreen() {
         </Button>
         <input ref={fileRef} type="file" accept=".vcf,text/vcard,text/x-vcard" hidden onChange={(e) => void onFile(e)} />
       </div>
-      {!canPickContacts() ? <p className="muted">No iPhone, abra Contatos, escolha as pessoas, toque em Compartilhar e salve o arquivo .vcf para enviar aqui. O app do celular vai ler os contatos direto, mais para frente.</p> : null}
+      {!canPickContacts() ? <p className="muted">{t('No iPhone, abra Contatos, escolha as pessoas, toque em Compartilhar e salve o arquivo .vcf para enviar aqui. O app do celular vai ler os contatos direto, mais para frente.')}</p> : null}
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      {found && found.length === 0 ? <EmptyState title="Ninguém novo por aqui">Nenhum dos contatos que você enviou está no AskouT ou todos já estão entre quem você segue.</EmptyState> : null}
+      {found && found.length === 0 ? <EmptyState title={t('Ninguém novo por aqui')}>{t('Nenhum dos contatos que você enviou está no AskouT ou todos já estão entre quem você segue.')}</EmptyState> : null}
       {found && found.length > 0 ? (
         <ul className="list">
           {found.map((p) => (
@@ -102,7 +103,7 @@ export function ContactsScreen() {
                   <span className="muted">{followed[p.userId] === 'PENDING' ? 'Pedido enviado' : 'Seguindo'}</span>
                 ) : (
                   <Button small loading={followingBusy === p.userId} onClick={() => void follow(p)}>
-                    Seguir
+                    {t('Seguir')}
                   </Button>
                 )
               }

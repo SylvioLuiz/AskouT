@@ -7,6 +7,7 @@ import type { PublicProfile } from '../lib/types.ts';
 import { BoltIcon, ChevronLeftIcon } from './icons.tsx';
 import { useFlashOn } from './flash-presence.tsx';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 // ---------- Botões ----------
 
@@ -103,7 +104,7 @@ export function PasswordField(props: Omit<FieldProps, 'type' | 'trailing'>) {
       type={visible ? 'text' : 'password'}
       trailing={
         <button type="button" className="field__toggle" onClick={() => setVisible((v) => !v)} aria-pressed={visible}>
-          {visible ? 'Ocultar' : 'Mostrar'}
+          {visible ? t('Ocultar') : t('Mostrar')}
         </button>
       }
     />
@@ -153,11 +154,11 @@ export function Loading({ label = 'Carregando' }: { label?: string }) {
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="empty">
-      <h2 className="empty__title">Não deu certo</h2>
+      <h2 className="empty__title">{t('Não deu certo')}</h2>
       <p className="empty__text">{message}</p>
       {onRetry ? (
         <Button variant="secondary" onClick={onRetry}>
-          Tentar de novo
+          {t('Tentar de novo')}
         </Button>
       ) : null}
     </div>
@@ -184,10 +185,10 @@ export function Avatar({ profile, size = 44 }: { profile: AvatarProfile; size?: 
   return (
     <span className="avatarflash" style={{ width: size, height: size }}>
       {face}
-      <span className="avatarflash__bolt" style={{ width: badge, height: badge }} title="Flash ligado" aria-hidden="true">
+      <span className="avatarflash__bolt" style={{ width: badge, height: badge }} title={t('Flash ligado')} aria-hidden="true">
         <BoltIcon filled />
       </span>
-      <span className="visually-hidden">Flash ligado</span>
+      <span className="visually-hidden">{t('Flash ligado')}</span>
     </span>
   );
 }
@@ -214,7 +215,7 @@ export function PageHead({ title, back, subtitle, titleTo, action }: { title: st
   return (
     <header className="pagehead">
       {back ? (
-        <Link to={back} className="pagehead__back" aria-label="Voltar">
+        <Link to={back} className="pagehead__back" aria-label={t('Voltar')}>
           <ChevronLeftIcon />
         </Link>
       ) : null}
@@ -244,7 +245,7 @@ export function Confirm({ question, confirmLabel, onConfirm, onCancel, busy, dan
           {confirmLabel}
         </Button>
         <Button variant="quiet" small onClick={onCancel} disabled={busy}>
-          Cancelar
+          {t('Cancelar')}
         </Button>
       </div>
     </div>

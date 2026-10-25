@@ -26,6 +26,7 @@ import { toApiError } from '../lib/errors.ts';
 import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
 import type { ChatMessage, ConversationItem } from '../lib/types.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 export const MESSAGE_MAX = 2000;
 
@@ -34,7 +35,7 @@ export const MESSAGE_MAX = 2000;
 const UNDO_MS = 6000;
 
 export function ConversationsScreen() {
-  useTitle('Conversas');
+  useTitle(t('Conversas'));
   const list = useAsync(() => api.conversations(), []);
   usePolling(list.reload, 10_000);
   useEffect(() => {
@@ -54,9 +55,9 @@ export function ConversationsScreen() {
   return (
     <>
       <PageHead
-        title="Conversas"
+        title={t('Conversas')}
         action={
-          <button type="button" className="iconbtn" aria-label="Nova conversa" onClick={() => setCreating(true)}>
+          <button type="button" className="iconbtn" aria-label={t('Nova conversa')} onClick={() => setCreating(true)}>
             <PlusIcon />
           </button>
         }
@@ -64,14 +65,14 @@ export function ConversationsScreen() {
       {creating ? <NewConversationSheet onClose={() => setCreating(false)} /> : null}
       {items.length === 0 ? (
         <EmptyState
-          title="Nenhuma conversa ainda"
+          title={t('Nenhuma conversa ainda')}
           action={
             <Link to="/flash" className="btn btn--primary">
-              Ver quem está no Flash
+              {t('Ver quem está no Flash')}
             </Link>
           }
         >
-          Quando um convite do Flash for aceito, a conversa com a pessoa abre aqui. Você também pode escrever para qualquer amigo pelo perfil dele ou criar um encontro a partir de um evento.
+          {t('Quando um convite do Flash for aceito, a conversa com a pessoa abre aqui. Você também pode escrever para qualquer amigo pelo perfil dele ou criar um encontro a partir de um evento.')}
         </EmptyState>
       ) : (
         <>
@@ -80,18 +81,18 @@ export function ConversationsScreen() {
               <SearchIcon />
             </span>
             <label className="visually-hidden" htmlFor="busca-conversas">
-              Buscar nas conversas
+              {t('Buscar nas conversas')}
             </label>
-            <input id="busca-conversas" className="search__input search__input--icon" type="search" placeholder="Buscar nas conversas" value={query} maxLength={60} autoComplete="off" onChange={(e) => setQuery(e.target.value)} />
+            <input id="busca-conversas" className="search__input search__input--icon" type="search" placeholder={t('Buscar nas conversas')} value={query} maxLength={60} autoComplete="off" onChange={(e) => setQuery(e.target.value)} />
           </div>
           {shown.length === 0 ? (
-            <EmptyState title={searching ? `Nada encontrado para "${query.trim()}"` : 'Nenhuma conversa encontrada'}>
-              Procure pelo nome da pessoa ou do grupo, pelo @usuário ou por um trecho da última mensagem.
+            <EmptyState title={searching ? t('Nada encontrado para "{trim}"', { trim: query.trim() }) : t('Nenhuma conversa encontrada')}>
+              {t('Procure pelo nome da pessoa ou do grupo, pelo @usuário ou por um trecho da última mensagem.')}
               {searching ? (
                 <>
                   {' '}
                   <button type="button" className="linkbtn" onClick={() => setQuery('')}>
-                    Limpar busca
+                    {t('Limpar busca')}
                   </button>
                 </>
               ) : null}
@@ -101,20 +102,20 @@ export function ConversationsScreen() {
               {shown.map((c) => (
                 <li key={c.id} className="convitem">
                   <Link to={`/conversas/${c.id}`} className={`convrow${c.unread > 0 ? ' convrow--unread' : ''}`}>
-                    {c.other ? <Avatar profile={c.other} size={48} /> : <GroupAvatar name={c.name ?? 'Grupo'} size={48} imageUrl={c.imageUrl} />}
+                    {c.other ? <Avatar profile={c.other} size={48} /> : <GroupAvatar name={c.name ?? t('Grupo')} size={48} imageUrl={c.imageUrl} />}
                     <span className="convrow__body">
                       <span className="convrow__top">
                         <span className="convrow__name">{c.other ? c.other.displayName : (c.name ?? 'Grupo')}</span>
                         {c.pinned && !searching ? (
-                          <span className="convrow__flag" title="Fixada no topo">
+                          <span className="convrow__flag" title={t('Fixada no topo')}>
                             <PinIcon />
-                            <span className="visually-hidden">Fixada no topo</span>
+                            <span className="visually-hidden">{t('Fixada no topo')}</span>
                           </span>
                         ) : null}
                         {c.muted ? (
-                          <span className="convrow__flag" title="Avisos silenciados">
+                          <span className="convrow__flag" title={t('Avisos silenciados')}>
                             <BellOffIcon />
-                            <span className="visually-hidden">Avisos silenciados</span>
+                            <span className="visually-hidden">{t('Avisos silenciados')}</span>
                           </span>
                         ) : null}
                         {c.lastMessage ? <span className="convrow__time">{listTimeLabel(c.lastMessage.createdAt, now)}</span> : null}
@@ -139,7 +140,7 @@ export function ConversationsScreen() {
       {prefsFor ? (
         <ChatPrefsSheet
           conversationId={prefsFor.id}
-          title={prefsFor.other ? prefsFor.other.displayName : (prefsFor.name ?? 'Grupo')}
+          title={prefsFor.other ? prefsFor.other.displayName : (prefsFor.name ?? t('Grupo'))}
           pinned={prefsFor.pinned}
           muted={prefsFor.muted}
           onClose={() => setPrefsFor(undefined)}
@@ -184,7 +185,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const stickToEnd = useRef(true);
   const loadedFirst = useRef(false);
 
-  const chatName = view.data ? (view.data.other ? view.data.other.displayName : (view.data.name ?? 'Grupo')) : 'Conversa';
+  const chatName = view.data ? (view.data.other ? view.data.other.displayName : (view.data.name ?? t('Grupo'))) : 'Conversa';
   useTitle(chatName);
 
   useEffect(() => {
@@ -250,16 +251,16 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     if (view.error.code === 'NOT_FOUND') {
       return (
         <>
-          <PageHead title="Conversa" back="/conversas" />
+          <PageHead title={t('Conversa')} back="/conversas" />
           <EmptyState
-            title="Conversa não encontrada"
+            title={t('Conversa não encontrada')}
             action={
               <Link to="/conversas" className="btn btn--primary">
-                Ver conversas
+                {t('Ver conversas')}
               </Link>
             }
           >
-            Ela pode ter sido ocultada por um bloqueio.
+            {t('Ela pode ter sido ocultada por um bloqueio.')}
           </EmptyState>
         </>
       );
@@ -315,7 +316,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       setReplyTo(undefined);
       setMessages((current) => mergeMessages(current, [message]));
     } catch (failure) {
-      setProblem(failure instanceof Error && failure.message === 'grande' ? 'Não consegui reduzir a foto para o tamanho permitido.' : toApiError(failure).message);
+      setProblem(failure instanceof Error && failure.message === 'grande' ? t('Não consegui reduzir a foto para o tamanho permitido.') : toApiError(failure).message);
     } finally {
       setUploading(false);
     }
@@ -378,14 +379,14 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const matchCard = match ? (
     <div className="callout chat__match">
       <p className="callout__text">
-        <strong>Encontro Flash ativo</strong> · acaba em {formatRemaining(minutesLeft(match.expiresAt, serverNow))}
+        <strong>{t('Encontro Flash ativo')}</strong> · acaba em {formatRemaining(minutesLeft(match.expiresAt, serverNow))}
       </p>
       <div className="row-actions">
         <Button small onClick={() => setSuggesting(true)}>
-          Sugerir um rolê
+          {t('Sugerir um rolê')}
         </Button>
         <Link to={`/flash/encontro/${match.id}`} className="btn btn--secondary btn--small">
-          Ver no mapa
+          {t('Ver no mapa')}
         </Link>
       </div>
     </div>
@@ -406,7 +407,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       await navigator.clipboard.writeText(text);
       setSelected(undefined);
     } catch {
-      setProblem('Não consegui copiar. Tente de novo.');
+      setProblem(t('Não consegui copiar. Tente de novo.'));
     }
   }
   /** Apaga de verdade no servidor. Falhando, a mensagem volta para a tela e o aviso explica. */
@@ -442,7 +443,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   }
 
   const moreButton = (m: ChatMessage) => (
-    <button type="button" className="msg__more" aria-label="Opções da mensagem" onClick={() => setActionsFor(m)}>
+    <button type="button" className="msg__more" aria-label={t('Opções da mensagem')} onClick={() => setActionsFor(m)}>
       <MoreIcon />
     </button>
   );
@@ -455,7 +456,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           <p className="selectbar__count" role="status">
             {selected.length === 1 ? '1 selecionada' : `${selected.length} selecionadas`}
           </p>
-          <button type="button" className="iconbtn selectbar__close" aria-label="Cancelar seleção" onClick={() => setSelected(undefined)}>
+          <button type="button" className="iconbtn selectbar__close" aria-label={t('Cancelar seleção')} onClick={() => setSelected(undefined)}>
             <XIcon />
           </button>
         </header>
@@ -482,7 +483,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         {older.hasMore ? (
           <div className="chat__older">
             <Button small variant="quiet" loading={older.loading} onClick={loadOlder}>
-              Ver mensagens anteriores
+              {t('Ver mensagens anteriores')}
             </Button>
           </div>
         ) : null}
@@ -512,8 +513,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                       {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
                       {m.replyTo && !m.deleted ? (
                         <button type="button" className="bubble__quote" aria-label={`Ir para a mensagem respondida de ${m.replyTo.mine ? 'você' : m.replyTo.senderName}`} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
-                          <strong>{m.replyTo.mine ? 'Você' : m.replyTo.senderName}</strong>
-                          <span>{m.replyTo.deleted ? 'Mensagem apagada' : m.replyTo.preview}</span>
+                          <strong>{m.replyTo.mine ? t('Você') : m.replyTo.senderName}</strong>
+                          <span>{m.replyTo.deleted ? t('Mensagem apagada') : m.replyTo.preview}</span>
                         </button>
                       ) : null}
                       {m.deleted ? (
@@ -562,7 +563,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       {problem ? <Notice tone="error">{problem}</Notice> : null}
       {uploading ? (
         <p className="muted chat__sending" role="status">
-          Enviando…
+          {t('Enviando…')}
         </p>
       ) : null}
       {replyTo && data.canSend ? (
@@ -571,25 +572,25 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             <strong>Respondendo a {replyTo.mine ? 'você' : (replyTo.senderName ?? data.other?.displayName ?? 'mensagem')}</strong>
             <span>{replyPreview(replyTo)}</span>
           </div>
-          <button type="button" className="iconbtn" aria-label="Cancelar resposta" onClick={() => setReplyTo(undefined)}>
+          <button type="button" className="iconbtn" aria-label={t('Cancelar resposta')} onClick={() => setReplyTo(undefined)}>
             <XIcon />
           </button>
         </div>
       ) : null}
 
       {selected ? (
-        <div className="selectactions" role="toolbar" aria-label="Ações para as mensagens selecionadas">
+        <div className="selectactions" role="toolbar" aria-label={t('Ações para as mensagens selecionadas')}>
           <button type="button" className="selectactions__btn" disabled={selected.length !== 1 || !data.canSend} onClick={() => { const only = chosen[0]; if (only) { setReplyTo(only); setSelected(undefined); } }}>
             <ReplyIcon />
-            <span>Responder</span>
+            <span>{t('Responder')}</span>
           </button>
           <button type="button" className="selectactions__btn" disabled={copyText(chosen) === ''} onClick={() => void copyChosen()}>
             <CopyIcon />
-            <span>Copiar</span>
+            <span>{t('Copiar')}</span>
           </button>
           <button type="button" className="selectactions__btn selectactions__btn--danger" disabled={!allDeletable(chosen)} onClick={() => setDeleting(true)}>
             <TrashIcon />
-            <span>Apagar</span>
+            <span>{t('Apagar')}</span>
           </button>
         </div>
       ) : data.canSend ? (
@@ -599,8 +600,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           </label>
           {recording ? null : (
             <>
-              <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" aria-label="Escolher foto ou vídeo" tabIndex={-1} onChange={(e) => void pickMedia(e)} />
-              <button type="button" className="iconbtn composer__attach" aria-label="Enviar foto ou vídeo" disabled={uploading} onClick={() => fileRef.current?.click()}>
+              <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" aria-label={t('Escolher foto ou vídeo')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
+              <button type="button" className="iconbtn composer__attach" aria-label={t('Enviar foto ou vídeo')} disabled={uploading} onClick={() => fileRef.current?.click()}>
                 <PhotoIcon />
               </button>
             </>
@@ -615,7 +616,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 rows={1}
                 value={draft}
                 maxLength={MESSAGE_MAX}
-                placeholder="Escreva uma mensagem"
+                placeholder={t('Escreva uma mensagem')}
                 onChange={(e) => {
                   setDraft(e.target.value);
                   noteTyping(e.target.value);
@@ -626,11 +627,11 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 }}
               />
               {draft.trim() !== '' ? (
-                <button type="submit" className="commentbox__send composer__send" disabled={sending} aria-label="Enviar mensagem" aria-busy={sending || undefined}>
+                <button type="submit" className="commentbox__send composer__send" disabled={sending} aria-label={t('Enviar mensagem')} aria-busy={sending || undefined}>
                   <ArrowUpIcon />
                 </button>
               ) : (
-                <button type="button" className="commentbox__send composer__send" aria-label="Gravar áudio" onClick={() => {
+                <button type="button" className="commentbox__send composer__send" aria-label={t('Gravar áudio')} onClick={() => {
                     setProblem(undefined);
                     setRecording(true);
                   }}>
@@ -641,7 +642,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           )}
         </form>
       ) : (
-        <Notice>Vocês não são mais amigos. O histórico continua aqui, mas não dá para enviar novas mensagens.</Notice>
+        <Notice>{t('Vocês não são mais amigos. O histórico continua aqui, mas não dá para enviar novas mensagens.')}</Notice>
       )}
 
       {actionsFor ? (
@@ -659,16 +660,16 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
 
       {pendingDelete ? (
         <div className="undobar" role="status">
-          <span>{pendingDelete.length === 1 ? 'Mensagem apagada' : `${pendingDelete.length} mensagens apagadas`}</span>
+          <span>{pendingDelete.length === 1 ? t('Mensagem apagada') : `${pendingDelete.length} mensagens apagadas`}</span>
           <button type="button" onClick={undoDelete}>
-            Desfazer
+            {t('Desfazer')}
           </button>
         </div>
       ) : null}
 
       {deleting ? (
-        <Sheet title="Apagar mensagens" onClose={() => (bulkBusy ? undefined : setDeleting(false))}>
-          <Confirm danger question={chosen.length === 1 ? 'Apagar esta mensagem para todos? Você terá alguns segundos para desfazer.' : `Apagar ${chosen.length} mensagens para todos? Você terá alguns segundos para desfazer.`} confirmLabel="Apagar para todos" busy={bulkBusy} onCancel={() => setDeleting(false)} onConfirm={deleteChosen} />
+        <Sheet title={t('Apagar mensagens')} onClose={() => (bulkBusy ? undefined : setDeleting(false))}>
+          <Confirm danger question={chosen.length === 1 ? t('Apagar esta mensagem para todos? Você terá alguns segundos para desfazer.') : t('Apagar {length} mensagens para todos? Você terá alguns segundos para desfazer.', { length: chosen.length })} confirmLabel={t('Apagar para todos')} busy={bulkBusy} onCancel={() => setDeleting(false)} onConfirm={deleteChosen} />
         </Sheet>
       ) : null}
 

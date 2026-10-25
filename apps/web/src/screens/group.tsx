@@ -13,6 +13,7 @@ import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { peopleLabel, toggleId } from '../lib/meetup.ts';
 import type { MeetupView } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 type Tab = 'people' | 'events' | 'media' | 'links';
 
@@ -30,15 +31,15 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   const [picked, setPicked] = useState<string[]>([]);
   const [name, setName] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
-  useTitle(group.data?.name ?? 'Grupo');
+  useTitle(group.data?.name ?? t('Grupo'));
 
   if (group.loading && !group.data) return <Loading />;
   if (group.error && !group.data) {
     return (
       <>
-        <PageHead title="Grupo" back={`/conversas/${conversationId}`} />
+        <PageHead title={t('Grupo')} back={`/conversas/${conversationId}`} />
         {group.error.code === 'NOT_FOUND' ? (
-          <EmptyState title="Grupo não encontrado">Só quem está no grupo vê os detalhes. Você entra no grupo ao aceitar o convite do encontro.</EmptyState>
+          <EmptyState title={t('Grupo não encontrado')}>{t('Só quem está no grupo vê os detalhes. Você entra no grupo ao aceitar o convite do encontro.')}</EmptyState>
         ) : (
           <ErrorState message={group.error.message} onRetry={group.reload} />
         )}
@@ -73,10 +74,10 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
     if (fileRef.current) fileRef.current.value = '';
   }
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'people', label: 'Pessoas' },
-    { id: 'events', label: 'Eventos' },
-    { id: 'media', label: 'Mídia' },
-    { id: 'links', label: 'Links' },
+    { id: 'people', label: t('Pessoas') },
+    { id: 'events', label: t('Eventos') },
+    { id: 'media', label: t('Mídia') },
+    { id: 'links', label: t('Links') },
   ];
 
   return (
@@ -87,7 +88,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         subtitle={peopleLabel(data.members.length)}
         action={
           data.canManage ? (
-            <button type="button" className="iconbtn" aria-label="Editar nome e foto do grupo" onClick={() => { setName(data.name); setProblem(undefined); setSheet('edit'); }}>
+            <button type="button" className="iconbtn" aria-label={t('Editar nome e foto do grupo')} onClick={() => { setName(data.name); setProblem(undefined); setSheet('edit'); }}>
               <EditIcon />
             </button>
           ) : undefined
@@ -97,7 +98,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         <GroupAvatar name={data.name} size={96} imageUrl={data.imageUrl} />
       </div>
       {problem && !sheet ? <p className="sugcard__problem" role="alert">{problem}</p> : null}
-      <div className="segtabs segtabs--fill" role="tablist" aria-label="Detalhes do grupo">
+      <div className="segtabs segtabs--fill" role="tablist" aria-label={t('Detalhes do grupo')}>
         {tabs.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className="segtabs__tab" onClick={() => setTab(t.id)}>
             {t.label}
@@ -108,10 +109,10 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
       {tab === 'people' ? (
         <>
           <div className="peoplehead">
-            <h2 className="results__h">Participantes</h2>
+            <h2 className="results__h">{t('Participantes')}</h2>
             {data.canManage ? (
               <button type="button" className="peoplehead__add" onClick={() => { setProblem(undefined); setPicked([]); setSheet('add'); }}>
-                Adicionar
+                {t('Adicionar')}
               </button>
             ) : null}
           </div>
@@ -119,9 +120,9 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
             {data.members.map((m) => (
               <PersonRow key={m.profile.userId} profile={m.profile} realName aside={
                   <>
-                    {m.role === 'OWNER' ? <span className="tag tag--event">Criou o grupo</span> : m.role === 'ADMIN' ? <span className="tag tag--event">Administrador</span> : null}
+                    {m.role === 'OWNER' ? <span className="tag tag--event">{t('Criou o grupo')}</span> : m.role === 'ADMIN' ? <span className="tag tag--event">{t('Administrador')}</span> : null}
                     {m.profile.userId !== me.id ? (
-                      <button type="button" className="iconbtn" aria-label={`Opções de ${m.profile.displayName}`} onClick={() => { setProblem(undefined); setSheet({ member: m.profile.userId }); }}>
+                      <button type="button" className="iconbtn" aria-label={t('Opções de {displayName}', { displayName: m.profile.displayName })} onClick={() => { setProblem(undefined); setSheet({ member: m.profile.userId }); }}>
                         <MoreIcon />
                       </button>
                     ) : null}
@@ -130,13 +131,13 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
               />
             ))}
           </ul>
-          <p className="muted">Entra no grupo quem aceita o convite do encontro ou quem o criador ou um administrador adiciona.</p>
+          <p className="muted">{t('Entra no grupo quem aceita o convite do encontro ou quem o criador ou um administrador adiciona.')}</p>
           <button type="button" className="groupleave" onClick={() => { setProblem(undefined); setSheet('leave'); }}>
-            Sair do grupo
+            {t('Sair do grupo')}
           </button>
           {isOwner ? (
             <button type="button" className="groupleave" onClick={() => { setProblem(undefined); setSheet('delete'); }}>
-              Apagar grupo para todos
+              {t('Apagar grupo para todos')}
             </button>
           ) : null}
         </>
@@ -145,7 +146,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
       {tab === 'events' ? <GroupPolls items={polls.data?.items ?? []} /> : null}
       {tab === 'events' ? (
         visibleMeetups.length === 0 && (polls.data?.items.length ?? 0) === 0 ? (
-          <EmptyState title="Nenhum evento no grupo">Os encontros marcados com este grupo aparecem aqui.</EmptyState>
+          <EmptyState title={t('Nenhum evento no grupo')}>{t('Os encontros marcados com este grupo aparecem aqui.')}</EmptyState>
         ) : (
           <ul className="groupevents">
             {visibleMeetups.map((m) => (
@@ -166,26 +167,26 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
       ) : null}
 
       {sheet === 'edit' ? (
-        <Sheet title="Editar grupo" onClose={() => setSheet(undefined)}>
+        <Sheet title={t('Editar grupo')} onClose={() => setSheet(undefined)}>
           <div className="groupedit">
             <div className="groupedit__photo">
               <GroupAvatar name={data.name} size={96} imageUrl={data.imageUrl} />
               <div className="groupedit__actions">
                 <span className="btn btn--secondary btn--small filebtn">
-                  {data.imageUrl ? 'Trocar foto' : 'Adicionar foto'}
-                  <input ref={fileRef} type="file" accept="image/*" aria-label={data.imageUrl ? 'Trocar foto do grupo' : 'Adicionar foto do grupo'} onChange={(e) => void pickPhoto(e.target.files?.[0])} />
+                  {data.imageUrl ? t('Trocar foto') : t('Adicionar foto')}
+                  <input ref={fileRef} type="file" accept="image/*" aria-label={data.imageUrl ? t('Trocar foto do grupo') : t('Adicionar foto do grupo')} onChange={(e) => void pickPhoto(e.target.files?.[0])} />
                 </span>
                 {data.imageUrl ? (
                   <Button small variant="quiet" onClick={() => void act(() => api.setGroupPhoto(conversationId, null))}>
-                    Remover foto
+                    {t('Remover foto')}
                   </Button>
                 ) : null}
               </div>
             </div>
             <div className="groupedit__form">
-              <Field label="Nome do grupo" value={name} onChange={setName} maxLength={60} />
+              <Field label={t('Nome do grupo')} value={name} onChange={setName} maxLength={60} />
               <Button full loading={busy} disabled={name.trim() === '' || name.trim() === data.name} onClick={() => void act(() => api.renameGroup(conversationId, name.trim()))}>
-                Salvar nome
+                {t('Salvar nome')}
               </Button>
             </div>
           </div>
@@ -208,35 +209,35 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
                 {canPromote ? (
                   <li>
                     <button type="button" className="sharelist__item" disabled={busy} onClick={() => void act(() => api.setGroupAdmin(conversationId, targetId, true))}>
-                      <strong>Tornar administrador</strong>
-                      <span>Pode editar o grupo e remover participantes.</span>
+                      <strong>{t('Tornar administrador')}</strong>
+                      <span>{t('Pode editar o grupo e remover participantes.')}</span>
                     </button>
                   </li>
                 ) : null}
                 {canDemote ? (
                   <li>
                     <button type="button" className="sharelist__item" disabled={busy} onClick={() => void act(() => api.setGroupAdmin(conversationId, targetId, false))}>
-                      <strong>Remover como administrador</strong>
+                      <strong>{t('Remover como administrador')}</strong>
                     </button>
                   </li>
                 ) : null}
                 {target.follow === 'NONE' ? (
                   <li>
                     <button type="button" className="sharelist__item" disabled={busy} onClick={() => void act(() => api.follow(targetId))}>
-                      <strong>Seguir</strong>
+                      <strong>{t('Seguir')}</strong>
                     </button>
                   </li>
                 ) : null}
                 {canRemove ? (
                   <li>
                     <button type="button" className="sharelist__item sharelist__item--danger" onClick={() => { setProblem(undefined); setSheet({ remove: targetId }); }}>
-                      <strong>Remover do grupo</strong>
+                      <strong>{t('Remover do grupo')}</strong>
                     </button>
                   </li>
                 ) : null}
                 <li>
                   <button type="button" className="sharelist__item sharelist__item--danger" onClick={() => { setProblem(undefined); setSheet({ block: targetId }); }}>
-                    <strong>Bloquear</strong>
+                    <strong>{t('Bloquear')}</strong>
                   </button>
                 </li>
               </ul>
@@ -246,55 +247,55 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
       ) : null}
 
       {sheet && typeof sheet === 'object' && 'block' in sheet ? (
-        <Sheet title="Bloquear" onClose={() => setSheet(undefined)}>
+        <Sheet title={t('Bloquear')} onClose={() => setSheet(undefined)}>
           <p className="muted">
-            {memberOf(sheet.block)?.profile.displayName ?? 'Essa pessoa'} deixa de ver você e você deixa de ver essa pessoa, inclusive neste grupo. Vocês deixam de se seguir. Dá para desbloquear depois nas configurações.
+            {memberOf(sheet.block)?.profile.displayName ?? t('Essa pessoa')} deixa de ver você e você deixa de ver essa pessoa, inclusive neste grupo. Vocês deixam de se seguir. Dá para desbloquear depois nas configurações.
           </p>
           {problem ? <p className="sugcard__problem" role="alert">{problem}</p> : null}
           <Button full variant="danger" loading={busy} onClick={() => void act(() => api.block(sheet.block))}>
-            Bloquear
+            {t('Bloquear')}
           </Button>
         </Sheet>
       ) : null}
 
       {sheet === 'add' ? (
-        <Sheet title="Adicionar ao grupo" onClose={() => setSheet(undefined)}>
+        <Sheet title={t('Adicionar ao grupo')} onClose={() => setSheet(undefined)}>
           <FriendPicker picked={picked} onToggle={(userId) => setPicked((cur) => toggleId(cur, userId))} exclude={data.members.map((m) => m.profile.userId)} />
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full loading={busy} disabled={picked.length === 0} onClick={() => void act(() => api.addGroupMembers(conversationId, picked))}>
-            {picked.length > 1 ? `Adicionar ${picked.length} pessoas` : 'Adicionar'}
+            {picked.length > 1 ? t('Adicionar {length} pessoas', { length: picked.length }) : t('Adicionar')}
           </Button>
         </Sheet>
       ) : null}
 
       {sheet === 'leave' ? (
-        <Sheet title="Sair do grupo" onClose={() => setSheet(undefined)}>
+        <Sheet title={t('Sair do grupo')} onClose={() => setSheet(undefined)}>
           <p className="muted">
             Você deixa de ver as mensagens do grupo e sai dos encontros dele.{isOwner && data.members.length > 1 ? ' Outra pessoa passa a administrar o grupo.' : ''} Para voltar, só com um novo convite.
           </p>
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full variant="danger" loading={busy} onClick={() => void act(() => api.leaveGroup(conversationId), () => navigate('/conversas'))}>
-            Sair do grupo
+            {t('Sair do grupo')}
           </Button>
         </Sheet>
       ) : null}
 
       {sheet === 'delete' ? (
-        <Sheet title="Apagar grupo" onClose={() => setSheet(undefined)}>
-          <p className="muted">O grupo e todas as mensagens dele são apagados para todo mundo, e não dá para desfazer. Os outros participantes recebem um aviso. Os encontros já marcados continuam na agenda de cada um.</p>
+        <Sheet title={t('Apagar grupo')} onClose={() => setSheet(undefined)}>
+          <p className="muted">{t('O grupo e todas as mensagens dele são apagados para todo mundo, e não dá para desfazer. Os outros participantes recebem um aviso. Os encontros já marcados continuam na agenda de cada um.')}</p>
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full variant="danger" loading={busy} onClick={() => void act(() => api.deleteGroup(conversationId), () => navigate('/conversas'))}>
-            Apagar grupo para todos
+            {t('Apagar grupo para todos')}
           </Button>
         </Sheet>
       ) : null}
 
       {sheet && typeof sheet === 'object' && 'remove' in sheet ? (
-        <Sheet title="Remover do grupo" onClose={() => setSheet(undefined)}>
+        <Sheet title={t('Remover do grupo')} onClose={() => setSheet(undefined)}>
           <p className="muted">{data.members.find((m) => m.profile.userId === sheet.remove)?.profile.displayName ?? 'Essa pessoa'} sai do grupo e dos encontros dele.</p>
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full variant="danger" loading={busy} onClick={() => void act(() => api.removeMember(conversationId, sheet.remove))}>
-            Remover
+            {t('Remover')}
           </Button>
         </Sheet>
       ) : null}

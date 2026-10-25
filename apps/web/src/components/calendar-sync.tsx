@@ -3,6 +3,7 @@ import { Button } from './ui.tsx';
 import { Sheet } from './agenda.tsx';
 import { CALENDAR_PROVIDERS, addSynced, parseSynced, removeSynced } from '../lib/calendar-sync.ts';
 import type { CalendarProvider } from '../lib/calendar-sync.ts';
+import { t } from '../lib/i18n/index.ts';
 
 const KEY = 'askout.calendarSync';
 
@@ -43,8 +44,8 @@ export function CalendarSyncSheet({ onClose, onChange }: { onClose: () => void; 
   }
 
   return (
-    <Sheet title="Sincronizar agendas" onClose={onClose}>
-      <p className="muted">Escolha de onde trazer seus compromissos para a agenda do AskouT.</p>
+    <Sheet title={t('Sincronizar agendas')} onClose={onClose}>
+      <p className="muted">{t('Escolha de onde trazer seus compromissos para a agenda do AskouT.')}</p>
       <ul className="calsync">
         {CALENDAR_PROVIDERS.map((p) => {
           const on = synced.includes(p.id);
@@ -60,22 +61,22 @@ export function CalendarSyncSheet({ onClose, onChange }: { onClose: () => void; 
                   <span className="calsync__badge">
                     <span aria-hidden="true">✓</span> Sincronizado
                   </span>
-                  <Button variant="quiet" small onClick={() => update(removeSynced(synced, p.id))} aria-label={`Dessincronizar ${p.name}`}>
-                    Dessincronizar
+                  <Button variant="quiet" small onClick={() => update(removeSynced(synced, p.id))} aria-label={t('Dessincronizar {name}', { name: p.name })}>
+                    {t('Dessincronizar')}
                   </Button>
                 </>
               ) : (
-                <button type="button" className="calsync__pick" aria-pressed={chosen} aria-label={`Selecionar ${p.name}`} onClick={() => toggle(p.id)}>
-                  {chosen ? 'Selecionado' : 'Selecionar'}
+                <button type="button" className="calsync__pick" aria-pressed={chosen} aria-label={t('Selecionar {name}', { name: p.name })} onClick={() => toggle(p.id)}>
+                  {chosen ? t('Selecionado') : t('Selecionar')}
                 </button>
               )}
             </li>
           );
         })}
       </ul>
-      <p className="muted calsync__note">A importação dos compromissos ainda está sendo preparada. Sua escolha fica salva neste aparelho e passa a valer quando a ligação for liberada.</p>
+      <p className="muted calsync__note">{t('A importação dos compromissos ainda está sendo preparada. Sua escolha fica salva neste aparelho e passa a valer quando a ligação for liberada.')}</p>
       <Button full disabled={picked.length === 0} onClick={sync}>
-        {picked.length > 0 ? `Sincronizar (${picked.length})` : 'Sincronizar'}
+        {picked.length > 0 ? t('Sincronizar ({length})', { length: picked.length }) : t('Sincronizar')}
       </Button>
     </Sheet>
   );

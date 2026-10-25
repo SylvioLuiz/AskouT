@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 import { POST_VIDEO_MAX_BYTES } from './post-video.ts';
 
 /**
@@ -173,10 +174,10 @@ async function compressOnWeb(
     return useful(out) ? done(out) : original('not-smaller');
   } catch (failure) {
     if (options.signal?.aborted || (failure instanceof Error && failure.name === 'ConversionCanceledError')) {
-      throw new DOMException('Otimização cancelada', 'AbortError');
+      throw new DOMException(t('Otimização cancelada'), 'AbortError');
     }
     // Fica no console para quem for investigar; a pessoa só segue com o arquivo original.
-    console.warn('Otimização do vídeo não funcionou; enviando o original.', failure);
+    console.warn(t('Otimização do vídeo não funcionou; enviando o original.'), failure);
     return original('failed');
   } finally {
     options.signal?.removeEventListener('abort', onAbort);
@@ -187,5 +188,5 @@ async function compressOnWeb(
 /** “Otimizando o vídeo… 42%”. */
 export function prepareProgressText(fraction: number): string {
   const pct = Math.min(100, Math.max(0, Math.floor((Number.isFinite(fraction) ? fraction : 0) * 100)));
-  return `Otimizando o vídeo… ${pct}%`;
+  return t('Otimizando o vídeo… {pct}%', { pct });
 }

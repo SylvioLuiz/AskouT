@@ -6,6 +6,7 @@ import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { Link } from '../router.tsx';
 import { Button, Notice } from './ui.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 /**
  * Quando os Termos mudam, quem já tem conta precisa aceitar a versão nova antes de continuar.
@@ -27,7 +28,7 @@ function TermsNotice({ version, first, onAccepted }: { version: string; first: b
   async function accept(event: React.FormEvent) {
     event.preventDefault();
     if (!checked) {
-      setError('Marque a caixa para continuar');
+      setError(t('Marque a caixa para continuar'));
       return;
     }
     setBusy(true);
@@ -45,25 +46,25 @@ function TermsNotice({ version, first, onAccepted }: { version: string; first: b
   return (
     <main className="termsgate" aria-labelledby="termsgate-title">
       <form className="termsgate__card" onSubmit={(event) => void accept(event)} noValidate>
-        <h1 id="termsgate-title">{first ? 'Aceite os Termos para continuar' : 'Os Termos de Uso mudaram'}</h1>
+        <h1 id="termsgate-title">{first ? t('Aceite os Termos para continuar') : t('Os Termos de Uso mudaram')}</h1>
         <p>
           {first
-            ? 'Sua conta é anterior ao registro do aceite. Leia os Termos e a Política de Privacidade e confirme para seguir usando o AskouT.'
-            : 'Atualizamos os Termos de Uso e a Política de Privacidade. Leia e confirme para seguir usando o AskouT.'}
+            ? t('Sua conta é anterior ao registro do aceite. Leia os Termos e a Política de Privacidade e confirme para seguir usando o AskouT.')
+            : t('Atualizamos os Termos de Uso e a Política de Privacidade. Leia e confirme para seguir usando o AskouT.')}
         </p>
         <p>
-          <Link to="/termos-de-uso">Termos de Uso</Link> · <Link to="/politica-de-privacidade">Política de Privacidade</Link>
+          <Link to="/termos-de-uso">{t('Termos de Uso')}</Link> · <Link to="/politica-de-privacidade">{t('Política de Privacidade')}</Link>
         </p>
         {error ? <Notice tone="error">{error}</Notice> : null}
         <label className="consent">
           <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} />
-          <span>Li e aceito os Termos de Uso e a Política de Privacidade.</span>
+          <span>{t('Li e aceito os Termos de Uso e a Política de Privacidade.')}</span>
         </label>
         <Button type="submit" full loading={busy}>
-          Aceitar e continuar
+          {t('Aceitar e continuar')}
         </Button>
         <button type="button" className="linkbtn" onClick={signOut}>
-          Sair
+          {t('Sair')}
         </button>
       </form>
     </main>

@@ -3,6 +3,7 @@ import { Sheet } from './agenda.tsx';
 import { Button, GroupAvatar, Notice } from './ui.tsx';
 import { resizeChatBackground, setChatBackground, useChatBackground } from '../lib/chat-bg.ts';
 import { toApiError } from '../lib/errors.ts';
+import { t } from '../lib/i18n/index.ts';
 
 /** Escolher ou tirar a imagem de fundo da conversa. Vale só para você, neste aparelho. */
 export function ChatBackgroundSheet({ conversationId, onClose }: { conversationId: string; onClose: () => void }) {
@@ -26,18 +27,18 @@ export function ChatBackgroundSheet({ conversationId, onClose }: { conversationI
   }
 
   return (
-    <Sheet title="Imagem de fundo" onClose={onClose}>
+    <Sheet title={t('Imagem de fundo')} onClose={onClose}>
       {problem ? <Notice tone="error">{problem}</Notice> : null}
       <div className="groupedit__photo">
-        {current ? <img className="chatbgprev" src={current} alt="Fundo atual da conversa" /> : <GroupAvatar name="Fundo" size={96} imageUrl={null} />}
+        {current ? <img className="chatbgprev" src={current} alt={t('Fundo atual da conversa')} /> : <GroupAvatar name={t('Fundo')} size={96} imageUrl={null} />}
         <div className="groupedit__actions">
           <span className="btn btn--secondary btn--small filebtn">
-            {current ? 'Trocar imagem' : 'Escolher imagem'}
-            <input ref={fileRef} type="file" accept="image/*" aria-label="Escolher imagem de fundo" disabled={busy} onChange={(e) => void pick(e.target.files?.[0])} />
+            {current ? t('Trocar imagem') : t('Escolher imagem')}
+            <input ref={fileRef} type="file" accept="image/*" aria-label={t('Escolher imagem de fundo')} disabled={busy} onChange={(e) => void pick(e.target.files?.[0])} />
           </span>
           {current ? (
             <Button small variant="quiet" onClick={() => { setChatBackground(conversationId, null); onClose(); }}>
-              Remover imagem
+              {t('Remover imagem')}
             </Button>
           ) : null}
         </div>

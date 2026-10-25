@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 /** Recorte em frações da imagem (0 a 1): canto de cima à esquerda e tamanho. */
 export interface CropRect {
   x: number;
@@ -14,7 +15,7 @@ export const CROP_MODES: readonly { id: CropMode; label: string; ratio: number |
   { id: 'square', label: '1:1', ratio: 1 },
   { id: 'portrait', label: '4:5', ratio: 4 / 5 },
   { id: 'landscape', label: '1,91:1', ratio: 1.91 },
-  { id: 'free', label: 'Livre', ratio: null },
+  { id: 'free', label: t('Livre'), ratio: null },
 ];
 
 /** Menor lado do recorte, como fração do lado menor da imagem. */

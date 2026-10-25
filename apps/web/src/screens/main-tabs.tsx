@@ -15,9 +15,10 @@ import { PostList } from '../components/post.tsx';
 import { Link } from '../router.tsx';
 import { SuggestedPeople } from '../components/suggested-people.tsx';
 import { EventCard } from './explore.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 export function HomeScreen() {
-  useTitle('Home');
+  useTitle(t('Home'));
   const user = useUser();
   const flash = useAsync(() => api.flashStatus(), []);
   const friends = useAsync(() => api.friends(), []);
@@ -51,7 +52,7 @@ export function HomeScreen() {
       <PageHead title={`Olá, ${user.profile.displayName}`} />
 
       {plan ? (
-        <Link to="/agenda" className="nextplan" aria-label={`Seu próximo plano: ${planWhenLabel(plan, now)}, ${plan.title}. Abrir a agenda`}>
+        <Link to="/agenda" className="nextplan" aria-label={t('Seu próximo plano: {now}, {title}. Abrir a agenda', { now: planWhenLabel(plan, now), title: plan.title })}>
           <span className="nextplan__icon" aria-hidden="true">
             <CalendarIcon />
           </span>
@@ -67,8 +68,8 @@ export function HomeScreen() {
             <UsersIcon />
           </span>
           <span className="invitecta__text">
-            <span className="invitecta__title">Chame a galera</span>
-            <span className="invitecta__sub">O AskouT é melhor com os amigos. Compartilhe o link.</span>
+            <span className="invitecta__title">{t('Chame a galera')}</span>
+            <span className="invitecta__sub">{t('O AskouT é melhor com os amigos. Compartilhe o link.')}</span>
           </span>
         </button>
       ) : null}
@@ -83,8 +84,8 @@ export function HomeScreen() {
             <span className="flashcta__title">{flashOn ? 'Flash ligado' : 'Flash: estou livre agora'}</span>
             <span className="flashcta__sub">
               {flashOn && flash.data?.expiresAt
-                ? `Faltam ${formatRemaining(minutesLeft(flash.data.expiresAt, Date.now()))}. Veja quem mais está livre.`
-                : 'Avise seus amigos que dá para sair agora.'}
+                ? t('Faltam {now}. Veja quem mais está livre.', { now: formatRemaining(minutesLeft(flash.data.expiresAt, Date.now())) })
+                : t('Avise seus amigos que dá para sair agora.')}
             </span>
           </span>
         </Link>
@@ -94,7 +95,7 @@ export function HomeScreen() {
         <section className="section" aria-labelledby="seguindo-titulo">
           <div className="section__head">
             <h2 id="seguindo-titulo" className="section__title">
-              Eventos dos rolês que você segue
+              {t('Eventos dos rolês que você segue')}
             </h2>
           </div>
           <ul className="evposters">
@@ -109,9 +110,9 @@ export function HomeScreen() {
         <section className="section" aria-labelledby="patrocinado-titulo">
           <div className="section__head">
             <h2 id="patrocinado-titulo" className="section__title">
-              Rolês em destaque
+              {t('Rolês em destaque')}
             </h2>
-            <span className="tag-sponsored">Patrocinado</span>
+            <span className="tag-sponsored">{t('Patrocinado')}</span>
           </div>
           <ul className="evposters">
             {sponsoredEvents.map((event) => (
@@ -124,11 +125,11 @@ export function HomeScreen() {
       <section className="section" aria-labelledby="posts-titulo">
         <div className="section__head">
           <h2 id="posts-titulo" className="section__title">
-            Posts dos amigos
+            {t('Posts dos amigos')}
           </h2>
-          <Link to="/criar">Criar post</Link>
+          <Link to="/criar">{t('Criar post')}</Link>
         </div>
-        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint="Seus posts e os dos seus amigos aparecem aqui." inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
+        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os dos seus amigos aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
       </section>
     </PullRefresh>
   );
@@ -139,7 +140,7 @@ export function SoonScreen({ title, text }: { title: string; text: string }) {
   return (
     <>
       <PageHead title={title} />
-      <EmptyState title="Ainda não está disponível">{text}</EmptyState>
+      <EmptyState title={t('Ainda não está disponível')}>{text}</EmptyState>
     </>
   );
 }

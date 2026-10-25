@@ -72,6 +72,7 @@ import type {
   SocialProvider,
   SocialProviderId,
 } from './types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 /** O mínimo de `fetch` que o cliente usa (facilita testar sem navegador). */
 export type FetchLike = (
@@ -114,7 +115,7 @@ export function createApi(deps: ApiDeps) {
     const token = useAuth ? deps.getToken() : undefined;
 
     const headers: Record<string, string> = { Accept: 'application/json' };
-    if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+    if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
     let body: string | undefined;
     if (options.body !== undefined) {
       headers['Content-Type'] = 'application/json';
@@ -178,7 +179,7 @@ export function createApi(deps: ApiDeps) {
     attachPostVideo: async (postId: string, imageId: string, file: Blob, onProgress?: (sent: number, total: number) => void): Promise<PostView> => {
       const token = deps.getToken();
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
-      if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+      if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
       const url = `${deps.baseUrl}/posts/${id(postId)}/images/${id(imageId)}/video`;
       let status: number;
       let payload: unknown;
@@ -360,7 +361,7 @@ export function createApi(deps: ApiDeps) {
     createEventStory: async (eventId: string, file: Blob): Promise<EventStoryGroup> => {
       const token = deps.getToken();
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
-      if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+      if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
       let response;
       try {
         response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/stories`, { method: 'POST', headers, body: file });
@@ -432,7 +433,7 @@ export function createApi(deps: ApiDeps) {
     sendMedia: async (conversationId: string, file: Blob, replyToId?: string): Promise<ChatMessage> => {
       const token = deps.getToken();
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
-      if (token !== undefined) headers['Authorization'] = `Bearer ${token}`;
+      if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
       let response;
       try {
         response = await deps.fetch(`${deps.baseUrl}/conversations/${id(conversationId)}/media${replyToId ? `?replyTo=${id(replyToId)}` : ''}`, { method: 'POST', headers, body: file });
@@ -455,7 +456,7 @@ export function createApi(deps: ApiDeps) {
       const token = deps.getToken();
       let response;
       try {
-        response = await deps.fetch(`${deps.baseUrl}/conversations/${id(conversationId)}/messages/${id(messageId)}/media`, { method: 'GET', headers: token !== undefined ? { Authorization: `Bearer ${token}` } : {} });
+        response = await deps.fetch(`${deps.baseUrl}/conversations/${id(conversationId)}/messages/${id(messageId)}/media`, { method: 'GET', headers: token !== undefined ? { Authorization: t('Bearer {token}', { token }) } : {} });
       } catch {
         throw networkError();
       }
@@ -477,7 +478,7 @@ export function createApi(deps: ApiDeps) {
       const token = deps.getToken();
       let response;
       try {
-        response = await deps.fetch(`${deps.baseUrl}/conversations/${id(conversationId)}/messages/${id(messageId)}/audio`, { method: 'GET', headers: token !== undefined ? { Authorization: `Bearer ${token}` } : {} });
+        response = await deps.fetch(`${deps.baseUrl}/conversations/${id(conversationId)}/messages/${id(messageId)}/audio`, { method: 'GET', headers: token !== undefined ? { Authorization: t('Bearer {token}', { token }) } : {} });
       } catch {
         throw networkError();
       }

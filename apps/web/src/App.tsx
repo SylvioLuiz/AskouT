@@ -32,6 +32,7 @@ import { ContactsScreen } from './screens/contacts.tsx';
 import { BlockedScreen, EditProfileScreen, FriendsScreen, HelpScreen, InteractionsScreen, PrivacyScreen, SettingsScreen, ThemeScreen } from './screens/me.tsx';
 import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
 import { ArchivedScreen, CreatePostScreen, PostScreen } from './screens/posts.tsx';
+import { t } from './lib/i18n/index.ts';
 
 // Telas para quem ainda não entrou.
 /** Páginas legais: abrem com ou sem login, fora do Shell. */
@@ -99,17 +100,17 @@ function Redirect({ to }: { to: string }) {
 }
 
 function NotFoundScreen() {
-  useTitle('Página não encontrada');
+  useTitle(t('Página não encontrada'));
   return (
     <EmptyState
-      title="Página não encontrada"
+      title={t('Página não encontrada')}
       action={
         <Link to="/" className="btn btn--primary">
-          Ir para a Home
+          {t('Ir para a Home')}
         </Link>
       }
     >
-      O endereço não existe ou mudou de lugar.
+      {t('O endereço não existe ou mudou de lugar.')}
     </EmptyState>
   );
 }
@@ -141,8 +142,8 @@ function AppRoutes() {
   if (state.status === 'failed') {
     return (
       <div className="splash">
-        <EmptyState title="Não foi possível abrir o AskouT">{state.message}</EmptyState>
-        <Button onClick={retry}>Tentar de novo</Button>
+        <EmptyState title={t('Não foi possível abrir o AskouT')}>{state.message}</EmptyState>
+        <Button onClick={retry}>{t('Tentar de novo')}</Button>
       </div>
     );
   }

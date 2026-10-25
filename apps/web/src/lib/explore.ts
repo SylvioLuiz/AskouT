@@ -1,28 +1,29 @@
+import { t } from '../lib/i18n/index.ts';
 import type { EventKind, ExplorePlace } from './types.ts';
 
 export type RangeId = 'today' | 'tomorrow' | 'week' | 'weekend' | 'nextweek' | 'month' | 'any';
 
 export const RANGES: readonly { id: RangeId; label: string }[] = [
-  { id: 'today', label: 'Hoje' },
-  { id: 'tomorrow', label: 'Amanhã' },
-  { id: 'week', label: 'Esta semana' },
-  { id: 'weekend', label: 'Fim de semana' },
-  { id: 'nextweek', label: 'Próxima semana' },
-  { id: 'month', label: 'Este mês' },
-  { id: 'any', label: 'Próximos 30 dias' },
+  { id: 'today', label: t('Hoje') },
+  { id: 'tomorrow', label: t('Amanhã') },
+  { id: 'week', label: t('Esta semana') },
+  { id: 'weekend', label: t('Fim de semana') },
+  { id: 'nextweek', label: t('Próxima semana') },
+  { id: 'month', label: t('Este mês') },
+  { id: 'any', label: t('Próximos 30 dias') },
 ];
 
 export const KINDS: readonly { id: EventKind; label: string }[] = [
-  { id: 'DIGITAL', label: 'Digital' },
-  { id: 'SHOW', label: 'Show' },
-  { id: 'CINEMA', label: 'Cinema' },
-  { id: 'THEATER', label: 'Espetáculos' },
-  { id: 'EXHIBITION', label: 'Exposição' },
-  { id: 'GASTRONOMY', label: 'Gastronomia' },
-  { id: 'NIGHT', label: 'Noite' },
-  { id: 'OUTDOOR', label: 'Ar livre' },
-  { id: 'SPORT', label: 'Esporte' },
-  { id: 'OTHER', label: 'Outros' },
+  { id: 'DIGITAL', label: t('Digital') },
+  { id: 'SHOW', label: t('Show') },
+  { id: 'CINEMA', label: t('Cinema') },
+  { id: 'THEATER', label: t('Espetáculos') },
+  { id: 'EXHIBITION', label: t('Exposição') },
+  { id: 'GASTRONOMY', label: t('Gastronomia') },
+  { id: 'NIGHT', label: t('Noite') },
+  { id: 'OUTDOOR', label: t('Ar livre') },
+  { id: 'SPORT', label: t('Esporte') },
+  { id: 'OTHER', label: t('Outros') },
 ];
 
 /** Igual ao da API: quantas pessoas confirmadas para um evento de agora ser "Bombando". */
@@ -76,7 +77,7 @@ export function effectiveQuery(raw: string): string {
 }
 
 export function sourceName(source: ExplorePlace['source']): string {
-  return source === 'ASKOUT' ? 'Local no AskouT' : source === 'GOOGLE' ? 'Rolê do Google' : 'Rolê do OpenStreetMap';
+  return source === 'ASKOUT' ? t('Local no AskouT') : source === 'GOOGLE' ? t('Rolê do Google') : t('Rolê do OpenStreetMap');
 }
 
 /** Variação de altura da capa na grade (mosaico), estável por evento. */

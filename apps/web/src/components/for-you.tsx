@@ -9,6 +9,7 @@ import { readPersonalize } from '../lib/dwell.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import type { RecommendationItem, RecommendationSource } from '../lib/types.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 const when = (iso: string) => new Date(iso).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
@@ -55,11 +56,11 @@ function FollowSource({ source }: { source: RecommendationSource | null }) {
       {state === 'PENDING' ? (
         <span className="foryou__followed">Pedido enviado para {label}</span>
       ) : (
-        <Button small variant="secondary" loading={busy} onClick={() => void follow()} aria-label={`Seguir ${label}`}>
+        <Button small variant="secondary" loading={busy} onClick={() => void follow()} aria-label={t('Seguir {label}', { label })}>
           Seguir {label}
         </Button>
       )}
-      {failed ? <span className="foryou__followerr" role="alert">Não deu para seguir agora.</span> : null}
+      {failed ? <span className="foryou__followerr" role="alert">{t('Não deu para seguir agora.')}</span> : null}
     </div>
   );
 }
@@ -78,7 +79,7 @@ function EventReco({ item }: { item: RecommendationItem }) {
         <span className="foryou__meta">{e.venueName} · {kindLabel(e.kind)}</span>
         <span className="foryou__meta">{when(e.startsAt)}</span>
       </Link>
-      {item.sponsored ? <span className="tag-sponsored foryou__ad">Patrocinado</span> : null}
+      {item.sponsored ? <span className="tag-sponsored foryou__ad">{t('Patrocinado')}</span> : null}
       <Reasons item={item} />
       <FollowSource source={item.source} />
     </li>
@@ -111,7 +112,7 @@ export function ForYou({ reloadKey }: { reloadKey?: string }) {
   if (items.length === 0) return null;
   return (
     <section className="foryou" aria-labelledby="foryou-titulo">
-      <h2 id="foryou-titulo" className="section__title">Para você</h2>
+      <h2 id="foryou-titulo" className="section__title">{t('Para você')}</h2>
       <ul className="foryou__list">
         {items.map((item) => (item.type === 'EVENT' && item.event ? <EventReco key={`e${item.event.id}`} item={item} /> : item.post ? <PostReco key={`p${item.post.id}`} item={item} /> : null))}
       </ul>

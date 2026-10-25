@@ -1,5 +1,6 @@
 import { useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
+import { t } from '../lib/i18n/index.ts';
 
 /** Entrada e cadastro ficam sempre no visual noturno; ao sair da tela, volta o tema que a pessoa escolheu. */
 function useNightTheme(): void {
@@ -19,8 +20,8 @@ export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="auth">
       <section className="auth__hero">
-        <img className="auth__scene" src="/auth-hero.jpg" alt="AskouT" width="780" height="540" />
-        <h1 className="auth__headline">Menos tempo combinando. Mais tempo juntos.</h1>
+        <img className="auth__scene" src="/auth-hero.jpg" alt={t('AskouT')} width="780" height="540" />
+        <h1 className="auth__headline">{t('Menos tempo combinando. Mais tempo juntos.')}</h1>
       </section>
       <section className="auth__panel">{children}</section>
     </div>

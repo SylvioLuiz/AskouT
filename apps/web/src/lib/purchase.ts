@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 import type { BoostChannel, BoostPricing } from './types.ts';
 
 /**
@@ -14,7 +15,7 @@ export function purchaseChannel(env: { Capacitor?: { getPlatform?: () => string 
   return platform === 'ios' ? 'APPLE' : platform === 'android' ? 'GOOGLE' : 'WEB';
 }
 
-export const STORE_LABEL: Record<Exclude<BoostChannel, 'WEB'>, string> = { APPLE: 'App Store', GOOGLE: 'Google Play' };
+export const STORE_LABEL: Record<Exclude<BoostChannel, 'WEB'>, string> = { APPLE: t('App Store'), GOOGLE: t('Google Play') };
 
 /**
  * Contrato com a casca nativa: `window.AskouTStore.purchase(produto)` abre a compra da loja e devolve o recibo
@@ -31,7 +32,7 @@ export function storeBridge(env: { AskouTStore?: StoreBridge } = globalThis as n
 
 export class StoreUnavailableError extends Error {
   constructor() {
-    super('A compra pelo aplicativo ainda não está disponível nesta versão.');
+    super(t('A compra pelo aplicativo ainda não está disponível nesta versão.'));
     this.name = 'StoreUnavailableError';
   }
 }
@@ -41,7 +42,7 @@ export async function buyInStore(productId: string, env?: { AskouTStore?: StoreB
   const bridge = storeBridge(env);
   if (!bridge) throw new StoreUnavailableError();
   const receipt = await bridge.purchase(productId);
-  if (typeof receipt !== 'string' || receipt === '') throw new Error('A loja não devolveu o recibo da compra. Se o valor foi cobrado, toque em “Concluir compra”.');
+  if (typeof receipt !== 'string' || receipt === '') throw new Error(t('A loja não devolveu o recibo da compra. Se o valor foi cobrado, toque em “Concluir compra”.'));
   return receipt;
 }
 

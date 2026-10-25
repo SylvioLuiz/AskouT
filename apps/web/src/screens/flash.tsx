@@ -30,14 +30,15 @@ import { FLASH_PRIVACY_POINTS, flashNoticeSeen, markFlashNoticeSeen, safeStorage
 import type { OtherPin } from '../components/match-map.tsx';
 import type { AvailableFriend, FlashInvite, FlashMatch, PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 const POLL_MS = 10_000;
 /** Durações oferecidas ao ligar o Flash (a API aceita de 5 min a 3 h). */
 const DURATIONS: readonly { minutes: number; value: string; unit: string; label: string }[] = [
-  { minutes: 30, value: '30', unit: 'min', label: '30 minutos' },
-  { minutes: 60, value: '1', unit: 'hora', label: '1 hora' },
-  { minutes: 120, value: '2', unit: 'horas', label: '2 horas' },
-  { minutes: 180, value: '3', unit: 'horas', label: '3 horas' },
+  { minutes: 30, value: '30', unit: 'min', label: t('30 minutos') },
+  { minutes: 60, value: '1', unit: 'hora', label: t('1 hora') },
+  { minutes: 120, value: '2', unit: 'horas', label: t('2 horas') },
+  { minutes: 180, value: '3', unit: 'horas', label: t('3 horas') },
 ];
 
 // O mapa (MapLibre) é pesado: só é baixado quando alguém abre um encontro.
@@ -50,7 +51,7 @@ type Feedback = { tone: 'ok' | 'error'; text: string } | undefined;
 // ---------- Tela do Flash ----------
 
 export function FlashScreen() {
-  useTitle('Flash');
+  useTitle(t('Flash'));
   return <FlashContent />;
 }
 
@@ -156,7 +157,7 @@ function FlashContent() {
       setNote('');
       reloadAll();
       announceFlashChange();
-      setFeedback({ tone: 'ok', text: 'Flash desligado. Seus convites foram cancelados.' });
+      setFeedback({ tone: 'ok', text: t('Flash desligado. Seus convites foram cancelados.') });
     } catch (failure) {
       setFeedback({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -200,8 +201,8 @@ function FlashContent() {
     setCallAllOpen(false);
     setFeedback(
       failed === 0
-        ? { tone: 'ok', text: sent === 1 ? 'Convite enviado. Vale por 15 minutos.' : `${sent} convites enviados. Valem por 15 minutos.` }
-        : { tone: 'error', text: `${sent} de ${results.length} convites enviados. Os outros não puderam ser enviados agora.` },
+        ? { tone: 'ok', text: sent === 1 ? t('Convite enviado. Vale por 15 minutos.') : `${sent} convites enviados. Valem por 15 minutos.` }
+        : { tone: 'error', text: t('{sent} de {length} convites enviados. Os outros não puderam ser enviados agora.', { sent, length: results.length }) },
     );
     reloadAll();
   }
@@ -209,34 +210,34 @@ function FlashContent() {
   const mapSection = (
     <section className="section" aria-labelledby="mapa-titulo">
       <h2 id="mapa-titulo" className="section__title">
-        No mapa
+        {t('No mapa')}
       </h2>
       {!mapFailed && (share.mine || mapOthers.length > 0) ? (
-        <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label="Carregando o mapa" /></div>}>
+        <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label={t('Carregando o mapa')} /></div>}>
           <MatchMap me={share.mine} others={mapOthers} onFail={() => setMapFailed(true)} />
         </Suspense>
       ) : null}
       <p className="muted">
         {matches.length === 0
-          ? 'Só aparecem aqui você e os amigos que aceitaram sair com você. Convide alguém da lista abaixo.'
+          ? t('Só aparecem aqui você e os amigos que aceitaram sair com você. Convide alguém da lista abaixo.')
           : mapOthers.length === 0
-            ? 'Seus amigos aparecem no mapa quando compartilharem a localização.'
-            : 'Amigos que aceitaram sair com você, atualizados a cada poucos segundos.'}
+            ? t('Seus amigos aparecem no mapa quando compartilharem a localização.')
+            : t('Amigos que aceitaram sair com você, atualizados a cada poucos segundos.')}
       </p>
       {share.state.phase === 'sharing' ? (
         <Button variant="secondary" full onClick={share.stop}>
-          Parar de compartilhar
+          {t('Parar de compartilhar')}
         </Button>
       ) : (
         <>
           {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
           <Button full loading={share.state.phase === 'asking'} onClick={share.start}>
-            Compartilhar minha localização
+            {t('Compartilhar minha localização')}
           </Button>
-          <p className="muted">Sua localização só vai para quem aceitou sair com você, enquanto este Flash estiver ligado.</p>
+          <p className="muted">{t('Sua localização só vai para quem aceitou sair com você, enquanto este Flash estiver ligado.')}</p>
         </>
       )}
-      <p className="muted">Quando alguém aceita um convite, vocês dois passam a compartilhar a localização automaticamente. Dá para parar quando quiser.</p>
+      <p className="muted">{t('Quando alguém aceita um convite, vocês dois passam a compartilhar a localização automaticamente. Dá para parar quando quiser.')}</p>
     </section>
   );
 
@@ -244,7 +245,7 @@ function FlashContent() {
     received.length > 0 ? (
       <section className="section" aria-labelledby="recebidos-titulo">
         <h2 id="recebidos-titulo" className="section__title">
-          Convites para você
+          {t('Convites para você')}
         </h2>
         <ul className="list">
           {received.map((invite) => (
@@ -258,7 +259,7 @@ function FlashContent() {
     matches.length > 0 ? (
       <section className="section" aria-labelledby="encontros-titulo">
         <h2 id="encontros-titulo" className="section__title">
-          Encontros em andamento
+          {t('Encontros em andamento')}
         </h2>
         <ul className="list">
           {matches.map((invite) => (
@@ -267,13 +268,13 @@ function FlashContent() {
                 <Avatar profile={invite.other} />
                 <span className="person__body">
                   <span className="person__name">{invite.other.username}</span>
-                  <span className="person__handle">Aceitou sair com você</span>
+                  <span className="person__handle">{t('Aceitou sair com você')}</span>
                 </span>
               </Link>
               <div className="person__aside row-actions">
                 <ChatButton userId={invite.other.userId} variant="primary" small />
                 <Link to={`/flash/encontro/${invite.id}`} className="btn btn--secondary btn--small">
-                  Mapa
+                  {t('Mapa')}
                 </Link>
               </div>
             </li>
@@ -291,7 +292,7 @@ function FlashContent() {
             <span className="flashtoast__bolt">
               <BoltIcon filled />
             </span>
-            <strong>Flash ativado</strong>
+            <strong>{t('Flash ativado')}</strong>
             <span>{started}</span>
           </div>
         ) : null}
@@ -299,16 +300,16 @@ function FlashContent() {
           <h1 className="flashlive__title">
             Flash <BoltIcon filled />
           </h1>
-          <p className="flashlive__sub">Você está disponível agora.</p>
+          <p className="flashlive__sub">{t('Você está disponível agora.')}</p>
         </header>
 
-        <section className="flashcard" aria-label="Seu Flash">
+        <section className="flashcard" aria-label={t('Seu Flash')}>
           <div className="flashcard__top">
             <span className="flashcard__icon">
               <BoltIcon filled />
             </span>
             <div className="flashcard__text">
-              <p className="flashcard__title">Flash ativo</p>
+              <p className="flashcard__title">{t('Flash ativo')}</p>
               <p className="flashcard__status">
                 {status.data?.expiresAt ? (
                   <>
@@ -321,16 +322,16 @@ function FlashContent() {
           {status.data?.expiresAt ? <FlashBar startsAt={status.data.startsAt} expiresAt={status.data.expiresAt} /> : null}
           {status.data?.note ? <p className="flashcard__note">“{status.data.note}”</p> : null}
           {confirmOff ? (
-            <Confirm question="Desligar o Flash? Convites abertos e encontros em andamento serão encerrados." confirmLabel="Desligar" onConfirm={turnOff} onCancel={() => setConfirmOff(false)} busy={busy} danger />
+            <Confirm question={t('Desligar o Flash? Convites abertos e encontros em andamento serão encerrados.')} confirmLabel={t('Desligar')} onConfirm={turnOff} onCancel={() => setConfirmOff(false)} busy={busy} danger />
           ) : (
             <div className="flashcard__foot">
               <span className="flashcard__visible">
                 <UsersIcon />
-                Visível para seus amigos
+                {t('Visível para seus amigos')}
               </span>
               <button type="button" className="flashcard__off" onClick={() => setConfirmOff(true)}>
                 <span className="flashcard__stop" aria-hidden="true" />
-                Desligar
+                {t('Desligar')}
               </button>
             </div>
           )}
@@ -339,11 +340,11 @@ function FlashContent() {
         <section className="flashlive__section" aria-labelledby="livres-titulo">
           <div className="flashlive__row">
             <h2 id="livres-titulo" className="flashlive__h2">
-              {empty ? 'Amigos livres agora' : `Amigos livres agora (${friends.length})`}
+              {empty ? t('Amigos livres agora') : t('Amigos livres agora ({length})', { length: friends.length })}
             </h2>
             <button type="button" className="flashlive__refresh" onClick={reloadAll}>
               <RefreshIcon />
-              Atualizar
+              {t('Atualizar')}
             </button>
           </div>
           {empty ? (
@@ -351,11 +352,11 @@ function FlashContent() {
               <span className="flashempty__icon" aria-hidden="true">
                 <UsersIcon />
               </span>
-              <h3 className="flashempty__title">Ninguém disponível por enquanto</h3>
-              <p className="flashempty__text">Que tal chamar seus amigos para ligar o Flash também?</p>
+              <h3 className="flashempty__title">{t('Ninguém disponível por enquanto')}</h3>
+              <p className="flashempty__text">{t('Que tal chamar seus amigos para ligar o Flash também?')}</p>
               <button type="button" className="flashempty__cta" onClick={() => setInviting(true)}>
                 <UserPlusIcon />
-                Convidar amigos
+                {t('Convidar amigos')}
               </button>
           </div>
           ) : (
@@ -363,7 +364,7 @@ function FlashContent() {
               <ul className="flashfriends">
                 {friends.map((f) => {
                   const dir = f.invite?.direction;
-                  const detail = distanceById.get(f.profile.userId) ?? (dir === 'MATCHED' ? 'Encontro' : dir === 'SENT' ? 'Convidado' : dir === 'RECEIVED' ? 'Convidou você' : '');
+                  const detail = distanceById.get(f.profile.userId) ?? (dir === 'MATCHED' ? 'Encontro' : dir === 'SENT' ? 'Convidado' : dir === 'RECEIVED' ? t('Convidou você') : '');
                   return (
                     <li key={f.profile.userId}>
                       <button type="button" className="flashfriend" onClick={() => setFriendOpen(f.profile.userId)}>
@@ -379,7 +380,7 @@ function FlashContent() {
                         </span>
                         <span className="flashfriend__name">{f.profile.username}</span>
                         <span className="flashfriend__detail">{detail || ' '}</span>
-                        <span className="visually-hidden">Livre agora. Abrir opções.</span>
+                        <span className="visually-hidden">{t('Livre agora. Abrir opções.')}</span>
                       </button>
                     </li>
                   );
@@ -387,7 +388,7 @@ function FlashContent() {
               </ul>
               <button type="button" className="flashlive__map" onClick={() => setMapOpen(true)}>
                 <LocationIcon />
-                Ver no mapa
+                {t('Ver no mapa')}
               </button>
             </>
           )}
@@ -397,27 +398,27 @@ function FlashContent() {
           <>
             <section className="flashlive__section" aria-labelledby="acoes-titulo">
               <h2 id="acoes-titulo" className="flashlive__h2">
-                Ações rápidas
+                {t('Ações rápidas')}
               </h2>
               <div className="flashquick">
                 <button type="button" className="flashquick__item" disabled={eligible.length === 0} onClick={() => setCallAllOpen(true)}>
                   <UsersIcon />
-                  Chamar todos
+                  {t('Chamar todos')}
                 </button>
                 <Link to="/criar" className="flashquick__item">
                   <CalendarIcon />
-                  Criar evento agora
+                  {t('Criar evento agora')}
                 </Link>
                 <Link to="/conversas" className="flashquick__item">
                   <ChatIcon />
-                  Ver conversas
+                  {t('Ver conversas')}
                 </Link>
               </div>
             </section>
 
             <button type="button" className="flashprivacy" onClick={() => setInfoOpen(true)}>
               <ShieldIcon />
-              <span>Sua localização é compartilhada apenas com amigos que você autorizar.</span>
+              <span>{t('Sua localização é compartilhada apenas com amigos que você autorizar.')}</span>
               <ChevronRightIcon />
             </button>
           </>
@@ -427,7 +428,7 @@ function FlashContent() {
               <BulbIcon />
             </span>
             <div>
-              <p className="flashtip__title">Dica</p>
+              <p className="flashtip__title">{t('Dica')}</p>
               <p className="flashtip__text">Quanto mais amigos usarem o Flash, maiores as <strong>chances</strong> de encontrar alguém para sair.</p>
             </div>
           </div>
@@ -438,13 +439,13 @@ function FlashContent() {
 
         {inviting ? <InviteSheet onClose={() => setInviting(false)} /> : null}
         {infoOpen ? (
-          <Sheet title="Como o Flash funciona" onClose={() => setInfoOpen(false)}>
-            <p>Seus amigos que também estiverem com Flash ligado veem seu nome e sua foto.</p>
-            <p>Sua localização só é compartilhada com quem aceitar sair com você.</p>
+          <Sheet title={t('Como o Flash funciona')} onClose={() => setInfoOpen(false)}>
+            <p>{t('Seus amigos que também estiverem com Flash ligado veem seu nome e sua foto.')}</p>
+            <p>{t('Sua localização só é compartilhada com quem aceitar sair com você.')}</p>
           </Sheet>
         ) : null}
         {mapOpen ? (
-          <Sheet title="Ver no mapa" onClose={() => setMapOpen(false)}>
+          <Sheet title={t('Ver no mapa')} onClose={() => setMapOpen(false)}>
             {mapSection}
           </Sheet>
         ) : null}
@@ -456,7 +457,7 @@ function FlashContent() {
           </Sheet>
         ) : null}
         {callAllOpen ? (
-          <Sheet title="Chamar todos" onClose={() => (callingAll ? undefined : setCallAllOpen(false))}>
+          <Sheet title={t('Chamar todos')} onClose={() => (callingAll ? undefined : setCallAllOpen(false))}>
             <p>
               Enviar convite para {eligible.length === 1 ? '1 amigo que está livre' : `${eligible.length} amigos que estão livres`} agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.
             </p>
@@ -466,10 +467,10 @@ function FlashContent() {
               ))}
             </ul>
             <Button full loading={callingAll} onClick={() => void callAll()}>
-              Enviar convites
+              {t('Enviar convites')}
             </Button>
             <Button full variant="quiet" disabled={callingAll} onClick={() => setCallAllOpen(false)}>
-              Cancelar
+              {t('Cancelar')}
             </Button>
           </Sheet>
         ) : null}
@@ -479,35 +480,35 @@ function FlashContent() {
 
   return (
     <>
-      {active ? <PageHead title="Flash" subtitle="Estou livre agora. Para o futuro, use a Agenda." /> : null}
+      {active ? <PageHead title={t('Flash')} subtitle={t('Estou livre agora. Para o futuro, use a Agenda.')} /> : null}
       {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
       {started ? (
         <div className="flashtoast" role="status">
           <span className="flashtoast__bolt">
             <BoltIcon filled />
           </span>
-          <strong>Flash ativado</strong>
+          <strong>{t('Flash ativado')}</strong>
           <span>{started}</span>
         </div>
       ) : null}
 
       {active ? (
-        <section className="flashpanel flashpanel--on" aria-label="Seu Flash">
+        <section className="flashpanel flashpanel--on" aria-label={t('Seu Flash')}>
           <div className="flashpanel__head">
             <span className="flashpanel__bolt">
               <BoltIcon filled />
             </span>
             <div>
-              <p className="flashpanel__title">Flash ligado</p>
+              <p className="flashpanel__title">{t('Flash ligado')}</p>
               <p className="flashpanel__sub">Faltam {formatRemaining(left)}</p>
             </div>
           </div>
           {status.data?.note ? <p className="flashpanel__note">“{status.data.note}”</p> : null}
-          <p className="muted">Seus amigos com Flash ligado veem seu nome e sua foto. Ninguém vê onde você está até aceitar sair com você.</p>
+          <p className="muted">{t('Seus amigos com Flash ligado veem seu nome e sua foto. Ninguém vê onde você está até aceitar sair com você.')}</p>
           {confirmOff ? (
             <Confirm
-              question="Desligar o Flash? Convites abertos e encontros em andamento serão encerrados."
-              confirmLabel="Desligar"
+              question={t('Desligar o Flash? Convites abertos e encontros em andamento serão encerrados.')}
+              confirmLabel={t('Desligar')}
               onConfirm={turnOff}
               onCancel={() => setConfirmOff(false)}
               busy={busy}
@@ -515,22 +516,22 @@ function FlashContent() {
             />
           ) : (
             <Button variant="secondary" full onClick={() => setConfirmOff(true)}>
-              Desligar Flash
+              {t('Desligar Flash')}
             </Button>
           )}
         </section>
       ) : (
-        <section className="flashoff" aria-label="Ligar o Flash">
+        <section className="flashoff" aria-label={t('Ligar o Flash')}>
           <header className="flashoff__head">
             <h1 className="flashoff__title">
               Flash <BoltIcon filled />
             </h1>
             <button type="button" className="flashoff__how" onClick={() => setInfoOpen(true)}>
               <HelpIcon />
-              Como funciona?
+              {t('Como funciona?')}
             </button>
           </header>
-          <p className="flashoff__sub">Livre agora? Encontre alguém para sair.</p>
+          <p className="flashoff__sub">{t('Livre agora? Encontre alguém para sair.')}</p>
 
           {/* Ilustração decorativa: os perfis são silhuetas e não indicam amigos disponíveis. */}
           <div className="flashhero" aria-hidden="true">
@@ -552,7 +553,7 @@ function FlashContent() {
           </div>
 
           <h2 className="flashoff__lead">
-            Encontre amigos
+            {t('Encontre amigos')}
             <br />
             que também estão <em>livres agora.</em>
           </h2>
@@ -562,23 +563,23 @@ function FlashContent() {
               <span className="flashperks__icon">
                 <UsersIcon />
               </span>
-              Apenas seus amigos
+              {t('Apenas seus amigos')}
             </li>
             <li>
               <span className="flashperks__icon">
                 <ClockIcon />
               </span>
-              Tempo limitado
+              {t('Tempo limitado')}
             </li>
             <li>
               <span className="flashperks__icon">
                 <LockIcon />
               </span>
-              Você controla a sua localização
+              {t('Você controla a sua localização')}
             </li>
           </ul>
 
-          <div className="flashdur" role="radiogroup" aria-label="Duração do Flash">
+          <div className="flashdur" role="radiogroup" aria-label={t('Duração do Flash')}>
             {DURATIONS.map((d) => (
               <button key={d.minutes} type="button" role="radio" aria-checked={minutes === d.minutes} aria-label={d.label} className="flashdur__opt" onClick={() => setMinutes(d.minutes)}>
                 <span className="flashdur__value">{d.value}</span>
@@ -587,9 +588,9 @@ function FlashContent() {
             ))}
           </div>
           <Field
-            label="Recado (opcional)"
+            label={t('Recado (opcional)')}
             hideLabel
-            placeholder="Adicionar recado"
+            placeholder={t('Adicionar recado')}
             value={note}
             onChange={setNote}
             error={noteError}
@@ -599,10 +600,10 @@ function FlashContent() {
           />
           <Button full loading={busy} onClick={turnOn}>
             <BoltIcon filled />
-            Ativar Flash
+            {t('Ativar Flash')}
           </Button>
           {explaining ? (
-            <Sheet title="Antes de ligar o Flash" onClose={() => setExplaining(false)}>
+            <Sheet title={t('Antes de ligar o Flash')} onClose={() => setExplaining(false)}>
               <ul className="flashnotice">
                 {FLASH_PRIVACY_POINTS.map((point) => (
                   <li key={point}>{point}</li>
@@ -616,13 +617,13 @@ function FlashContent() {
                   void doTurnOn();
                 }}
               >
-                Entendi, ligar o Flash
+                {t('Entendi, ligar o Flash')}
               </Button>
             </Sheet>
           ) : null}
           <p className="flashoff__privacy">
             <LockIcon />
-            <span>Sua localização só será compartilhada com amigos que você autorizar, enquanto o Flash estiver ativo.</span>
+            <span>{t('Sua localização só será compartilhada com amigos que você autorizar, enquanto o Flash estiver ativo.')}</span>
           </p>
 
           <Link to="/amigos/contatos" className="flashinvite">
@@ -632,16 +633,16 @@ function FlashContent() {
               <span className="flashinvite__plus">+</span>
             </span>
             <span className="flashinvite__body">
-              <strong>Chame seus amigos para ativar o Flash também!</strong>
-              <span>Quanto mais amigos ativos, maiores as chances de encontrar alguém para sair.</span>
+              <strong>{t('Chame seus amigos para ativar o Flash também!')}</strong>
+              <span>{t('Quanto mais amigos ativos, maiores as chances de encontrar alguém para sair.')}</span>
             </span>
             <ChevronRightIcon />
           </Link>
 
           {infoOpen ? (
-            <Sheet title="Como o Flash funciona" onClose={() => setInfoOpen(false)}>
-              <p>Seus amigos que também estiverem com Flash ligado veem seu nome e sua foto.</p>
-              <p>Sua localização só é compartilhada com quem aceitar sair com você.</p>
+            <Sheet title={t('Como o Flash funciona')} onClose={() => setInfoOpen(false)}>
+              <p>{t('Seus amigos que também estiverem com Flash ligado veem seu nome e sua foto.')}</p>
+              <p>{t('Sua localização só é compartilhada com quem aceitar sair com você.')}</p>
             </Sheet>
           ) : null}
         </section>
@@ -655,17 +656,17 @@ function FlashContent() {
 
       <section className="section" aria-labelledby="livres-titulo">
         <h2 id="livres-titulo" className="section__title">
-          Livres agora
+          {t('Livres agora')}
         </h2>
         {!active ? (
           <p className="muted">
-            Ligue seu Flash para ver quais amigos estão livres agora. Para outro dia, use a <Link to="/agenda">Agenda</Link>.
+            Ligue seu Flash para ver quais amigos estão livres agora. Para outro dia, use a <Link to="/agenda">{t('Agenda')}</Link>.
           </p>
         ) : null}
         {active && available.loading && !available.data ? <Loading /> : null}
         {active && available.error && !available.data ? <ErrorState message={available.error.message} onRetry={available.reload} /> : null}
         {active && available.data && available.data.length === 0 ? (
-          <EmptyState title="Nenhum amigo com Flash ligado agora">Quando alguém ligar o Flash, aparece aqui. Você também pode combinar um dia pela Agenda.</EmptyState>
+          <EmptyState title={t('Nenhum amigo com Flash ligado agora')}>{t('Quando alguém ligar o Flash, aparece aqui. Você também pode combinar um dia pela Agenda.')}</EmptyState>
         ) : null}
         {active && available.data && available.data.length > 0 ? (
           <ul className="list">
@@ -700,7 +701,7 @@ function FlashBar({ startsAt, expiresAt }: { startsAt: string | null; expiresAt:
   const now = useNow(1000);
   const share = flashRemainingShare(startsAt, expiresAt, now);
   return (
-    <div className="flashbar" role="progressbar" aria-label="Tempo restante do Flash" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}>
+    <div className="flashbar" role="progressbar" aria-label={t('Tempo restante do Flash')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}>
       <span className="flashbar__fill" style={{ width: `${Math.round(share * 100)}%` }} />
     </div>
   );
@@ -716,7 +717,7 @@ function BlockAction({ profile, onDone, onFeedback }: { profile: PublicProfile; 
     setBusy(true);
     try {
       await api.block(profile.userId);
-      onFeedback({ tone: 'ok', text: `Você bloqueou ${profile.username}. Ele não vê mais você e vocês deixam de ser amigos.` });
+      onFeedback({ tone: 'ok', text: t('Você bloqueou {username}. Ele não vê mais você e vocês deixam de ser amigos.', { username: profile.username }) });
       onDone();
     } catch (failure) {
       onFeedback({ tone: 'error', text: toApiError(failure).message });
@@ -728,14 +729,14 @@ function BlockAction({ profile, onDone, onFeedback }: { profile: PublicProfile; 
   if (!asking) {
     return (
       <Button small variant="quiet" onClick={() => setAsking(true)}>
-        Bloquear
+        {t('Bloquear')}
       </Button>
     );
   }
   return (
     <Confirm
-      question={`Bloquear ${profile.username}? Vocês deixam de ser amigos e nenhum dos dois vê o outro.`}
-      confirmLabel="Bloquear"
+      question={t('Bloquear {username}? Vocês deixam de ser amigos e nenhum dos dois vê o outro.', { username: profile.username })}
+      confirmLabel={t('Bloquear')}
       onConfirm={block}
       onCancel={() => setAsking(false)}
       busy={busy}
@@ -753,7 +754,7 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
     setBusy(true);
     try {
       await api.flashInvite(profile.userId);
-      onFeedback({ tone: 'ok', text: `Convite enviado para ${profile.username}. Vale por 15 minutos.` });
+      onFeedback({ tone: 'ok', text: t('Convite enviado para {username}. Vale por 15 minutos.', { username: profile.username }) });
       onChanged();
     } catch (failure) {
       onFeedback({ tone: 'error', text: toApiError(failure).message });
@@ -780,21 +781,21 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
   if (invite?.direction === 'MATCHED') {
     action = (
       <Link to={`/flash/encontro/${invite.id}`} className="btn btn--primary btn--small">
-        Ver encontro
+        {t('Ver encontro')}
       </Link>
     );
   } else if (invite?.direction === 'SENT') {
     action = (
       <Button small variant="secondary" loading={busy} onClick={cancel}>
-        Cancelar convite
+        {t('Cancelar convite')}
       </Button>
     );
   } else if (invite?.direction === 'RECEIVED') {
-    action = <span className="muted">Convidou você</span>;
+    action = <span className="muted">{t('Convidou você')}</span>;
   } else {
     action = (
       <Button small loading={busy} onClick={send}>
-        Convidar
+        {t('Convidar')}
       </Button>
     );
   }
@@ -851,13 +852,13 @@ function InviteRow({ invite, canAccept, onChanged, onFeedback }: { invite: Flash
           </span>
         </div>
       </div>
-      {canAccept ? null : <p className="muted">Ligue seu Flash para aceitar.</p>}
+      {canAccept ? null : <p className="muted">{t('Ligue seu Flash para aceitar.')}</p>}
       <div className="row-actions">
         <Button small loading={busy === 'accept'} disabled={!canAccept || busy === 'decline'} onClick={() => answer('accept')}>
-          Aceitar
+          {t('Aceitar')}
         </Button>
         <Button small variant="secondary" loading={busy === 'decline'} disabled={busy === 'accept'} onClick={() => answer('decline')}>
-          Recusar
+          {t('Recusar')}
         </Button>
         <BlockAction profile={invite.other} onDone={onChanged} onFeedback={onFeedback} />
       </div>
@@ -954,7 +955,7 @@ function osmLink(lat: number, lng: number): string {
 }
 
 export function MatchScreen({ inviteId }: { inviteId: string }) {
-  useTitle('Encontro');
+  useTitle(t('Encontro'));
   const match = useAsync(() => api.flashMatch(inviteId), [inviteId]);
   usePolling(match.reload, 8_000);
 
@@ -969,16 +970,16 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
     if (match.error.code === 'NOT_FOUND') {
       return (
         <>
-          <PageHead title="Encontro" back="/flash" />
+          <PageHead title={t('Encontro')} back="/flash" />
           <EmptyState
-            title="Este encontro acabou"
+            title={t('Este encontro acabou')}
             action={
               <Link to="/flash" className="btn btn--primary">
-                Voltar ao Flash
+                {t('Voltar ao Flash')}
               </Link>
             }
           >
-            O convite venceu, alguém encerrou ou o Flash foi desligado. A localização compartilhada já foi apagada.
+            {t('O convite venceu, alguém encerrou ou o Flash foi desligado. A localização compartilhada já foi apagada.')}
           </EmptyState>
         </>
       );
@@ -1006,19 +1007,19 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
 
   return (
     <>
-      <PageHead title={data.other.username} back="/flash" subtitle={`Encontro Flash · acaba em ${formatRemaining(left)}`} />
+      <PageHead title={data.other.username} back="/flash" subtitle={t('Encontro Flash · acaba em {left}', { left: formatRemaining(left) })} />
       {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
 
-      <section className="whereis" aria-label={`Onde ${data.other.username} está`}>
+      <section className="whereis" aria-label={t('Onde {username} está', { username: data.other.username })}>
         <Avatar profile={data.other} size={56} />
         {!them ? (
           <>
-            <p className="whereis__main">Ainda sem localização</p>
+            <p className="whereis__main">{t('Ainda sem localização')}</p>
             <p className="muted">{data.other.username} ainda não compartilhou. Assim que compartilhar, a distância aparece aqui.</p>
           </>
         ) : them.stale ? (
           <>
-            <p className="whereis__main">Sem sinal</p>
+            <p className="whereis__main">{t('Sem sinal')}</p>
             <p className="muted">
               A última localização de {data.other.username} foi {formatAge(them.updatedAt, data.now)}. Ela volta quando o sinal voltar.
             </p>
@@ -1031,13 +1032,13 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         )}
         {them ? (
           <a className="whereis__link" href={osmLink(them.lat, them.lng)} target="_blank" rel="noopener noreferrer">
-            Abrir no mapa
+            {t('Abrir no mapa')}
           </a>
         ) : null}
       </section>
 
       {!mapFailed && (them || myPoint) ? (
-        <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label="Carregando o mapa" /></div>}>
+        <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label={t('Carregando o mapa')} /></div>}>
           <MatchMap
             me={myPoint}
             others={
@@ -1048,24 +1049,24 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         </Suspense>
       ) : null}
 
-      <section className="sharebox" aria-label="Sua localização">
+      <section className="sharebox" aria-label={t('Sua localização')}>
         {share.state.phase === 'sharing' ? (
           <>
-            <p className="sharebox__title">Compartilhando sua localização</p>
+            <p className="sharebox__title">{t('Compartilhando sua localização')}</p>
             <p className="muted">
-              {share.state.accuracyM !== undefined ? `Precisão de cerca de ${share.state.accuracyM} m. ` : ''}Mantenha esta tela aberta; ao sair, o envio para.
+              {share.state.accuracyM !== undefined ? t('Precisão de cerca de {accuracyM} m. ', { accuracyM: share.state.accuracyM }) : ''}Mantenha esta tela aberta; ao sair, o envio para.
             </p>
             <Button variant="secondary" full onClick={share.stop}>
-              Parar de compartilhar
+              {t('Parar de compartilhar')}
             </Button>
           </>
         ) : (
           <>
-            <p className="sharebox__title">Mostrar onde estou</p>
+            <p className="sharebox__title">{t('Mostrar onde estou')}</p>
             <p className="muted">Só {data.other.username} vê sua localização, só durante este encontro, e ela some quando ele acabar. Ao aceitar o convite, o envio começa sozinho.</p>
             {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
             <Button full loading={share.state.phase === 'asking'} onClick={share.start}>
-              Compartilhar minha localização
+              {t('Compartilhar minha localização')}
             </Button>
           </>
         )}
@@ -1073,13 +1074,13 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
 
       <div className="stack">
         <Link to={`/conversas/${data.conversationId}`} className="btn btn--primary btn--full">
-          Conversar e sugerir um rolê
+          {t('Conversar e sugerir um rolê')}
         </Link>
         {confirmEnd ? (
-          <Confirm question="Encerrar o encontro? A localização dos dois deixa de ser compartilhada." confirmLabel="Encerrar" onConfirm={endMatch} onCancel={() => setConfirmEnd(false)} busy={busy} danger />
+          <Confirm question={t('Encerrar o encontro? A localização dos dois deixa de ser compartilhada.')} confirmLabel={t('Encerrar')} onConfirm={endMatch} onCancel={() => setConfirmEnd(false)} busy={busy} danger />
         ) : (
           <Button variant="secondary" full onClick={() => setConfirmEnd(true)}>
-            Encerrar encontro
+            {t('Encerrar encontro')}
           </Button>
         )}
         <BlockAction profile={data.other} onDone={() => navigate('/flash')} onFeedback={setFeedback} />

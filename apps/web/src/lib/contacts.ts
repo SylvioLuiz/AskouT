@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 const EMAIL = /^[^\s@,;<>"]+@[^\s@,;<>"]+\.[^\s@,;<>"]+$/;
 
 export const CONTACTS_MAX = 500;
@@ -25,7 +26,7 @@ export function emailsFromVcf(text: string): string[] {
 
 export async function sha256Hex(text: string): Promise<string> {
   const subtle = globalThis.crypto?.subtle;
-  if (!subtle) throw new Error('Este navegador não consegue proteger os contatos. Abra o AskouT por https.');
+  if (!subtle) throw new Error(t('Este navegador não consegue proteger os contatos. Abra o AskouT por https.'));
   const bytes = new TextEncoder().encode(text);
   const digest = await subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');

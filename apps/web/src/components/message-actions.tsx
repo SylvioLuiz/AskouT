@@ -6,6 +6,7 @@ import { allDeletable, selectable } from '../lib/chat.ts';
 import { REACTIONS } from '../lib/chat-media.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ChatMessage, ChatReaction } from '../lib/types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 export { selectable as hasActions };
 
@@ -98,19 +99,19 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
       setCopied(true);
       window.setTimeout(onClose, 500);
     } catch {
-      setProblem('Não consegui copiar. Selecione o texto na mensagem.');
+      setProblem(t('Não consegui copiar. Selecione o texto na mensagem.'));
     }
   }
 
   const side = message.mine ? 'msgpop--mine' : 'msgpop--theirs';
   const style = (top: number | undefined) => (top === undefined ? { visibility: 'hidden' as const } : { top });
   return (
-    <div className={`msgpop ${side}`} role="dialog" aria-modal="true" aria-label="Opções da mensagem">
+    <div className={`msgpop ${side}`} role="dialog" aria-modal="true" aria-label={t('Opções da mensagem')}>
       <div className="msgpop__scrim" onClick={onClose} />
       {canSend && step === 'menu' ? (
-        <div className="msgpop__bar" style={style(pos?.barTop)} role="group" aria-label="Reagir">
+        <div className="msgpop__bar" style={style(pos?.barTop)} role="group" aria-label={t('Reagir')}>
           {REACTIONS.map((emoji) => (
-            <button key={emoji} type="button" className={`msgpop__emoji${mine === emoji ? ' is-on' : ''}`} aria-pressed={mine === emoji} aria-label={`Reagir com ${emoji}`} disabled={busy} onClick={() => void react(emoji)}>
+            <button key={emoji} type="button" className={`msgpop__emoji${mine === emoji ? ' is-on' : ''}`} aria-pressed={mine === emoji} aria-label={t('Reagir com {emoji}', { emoji })} disabled={busy} onClick={() => void react(emoji)}>
               {emoji}
             </button>
           ))}
@@ -119,13 +120,13 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
       <div ref={menuRef} className="msgpop__menu" style={style(pos?.menuTop)}>
         {problem ? <Notice tone="error">{problem}</Notice> : null}
         {step === 'delete' ? (
-          <Confirm danger question="Apagar esta mensagem para todos? Ela some da conversa de todo mundo e não dá para desfazer." confirmLabel="Apagar para todos" busy={busy} onCancel={() => setStep('menu')} onConfirm={() => void remove()} />
+          <Confirm danger question={t('Apagar esta mensagem para todos? Ela some da conversa de todo mundo e não dá para desfazer.')} confirmLabel={t('Apagar para todos')} busy={busy} onCancel={() => setStep('menu')} onConfirm={() => void remove()} />
         ) : (
           <ul>
             {canSend ? (
               <li>
                 <button type="button" className="msgpop__item" onClick={() => { onReply(); onClose(); }}>
-                  <span>Responder</span>
+                  <span>{t('Responder')}</span>
                   <ReplyIcon />
                 </button>
               </li>
@@ -133,21 +134,21 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
             {message.kind === 'TEXT' ? (
               <li>
                 <button type="button" className="msgpop__item" onClick={() => void copy()}>
-                  <span>{copied ? 'Copiado' : 'Copiar texto'}</span>
+                  <span>{copied ? t('Copiado') : t('Copiar texto')}</span>
                   <CopyIcon />
                 </button>
               </li>
             ) : null}
             <li>
               <button type="button" className="msgpop__item" onClick={() => { onSelect(); onClose(); }}>
-                <span>Selecionar</span>
+                <span>{t('Selecionar')}</span>
                 <CheckCircleIcon />
               </button>
             </li>
             {canDelete ? (
               <li>
                 <button type="button" className="msgpop__item msgpop__item--danger" onClick={() => setStep('delete')}>
-                  <span>Apagar para todos</span>
+                  <span>{t('Apagar para todos')}</span>
                   <TrashIcon />
                 </button>
               </li>

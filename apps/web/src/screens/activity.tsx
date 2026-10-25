@@ -10,9 +10,10 @@ import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { pluralize } from '../lib/format.ts';
 import type { PublicProfile } from '../lib/types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 export function ActivityScreen() {
-  useTitle('Notificações');
+  useTitle(t('Notificações'));
   const requests = useAsync(() => api.followRequests({ limit: 50 }), []);
   const news = useAsync(() => api.notifications(), []);
   const tagReqs = useAsync(() => api.pendingTags({ limit: 20 }), []);
@@ -23,7 +24,7 @@ export function ActivityScreen() {
     try {
       await api.respondTag(postId, action);
       if (tagReqs.data) tagReqs.setData({ ...tagReqs.data, items: tagReqs.data.items.filter((p) => p.id !== postId) });
-      setMessage({ tone: 'ok', text: action === 'accept' ? 'Marcação aceita. O post aparece no seu perfil e no seu feed.' : 'Marcação recusada.' });
+      setMessage({ tone: 'ok', text: action === 'accept' ? t('Marcação aceita. O post aparece no seu perfil e no seu feed.') : t('Marcação recusada.') });
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
       tagReqs.reload();
@@ -65,11 +66,11 @@ export function ActivityScreen() {
       if (decision === 'approve') {
         const result = await api.approveRequest(profile.userId);
         text = result.isFriend
-          ? `Você aprovou ${profile.username}. Agora vocês são amigos.`
-          : `Você aprovou ${profile.username}. Siga de volta para virarem amigos.`;
+          ? t('Você aprovou {username}. Agora vocês são amigos.', { username: profile.username })
+          : t('Você aprovou {username}. Siga de volta para virarem amigos.', { username: profile.username });
       } else {
         await api.rejectRequest(profile.userId);
-        text = `Você recusou o pedido de ${profile.username}.`;
+        text = t('Você recusou o pedido de {username}.', { username: profile.username });
       }
       if (requests.data) {
         requests.setData({
@@ -112,15 +113,15 @@ export function ActivityScreen() {
   const now = new Date();
   return (
     <>
-      <PageHead title="Notificações" subtitle="Novidades e pedidos para seguir você" />
+      <PageHead title={t('Notificações')} subtitle={t('Novidades e pedidos para seguir você')} />
       <PushCard />
       {news.data && news.data.items.length > 0 ? (
         <>
           <div className="newshead">
-            <h2 className="results__h">Novidades</h2>
+            <h2 className="results__h">{t('Novidades')}</h2>
             {news.data.unread > 0 ? (
               <Button small variant="quiet" onClick={() => void readAll()}>
-                Marcar tudo como lido
+                {t('Marcar tudo como lido')}
               </Button>
             ) : null}
           </div>
@@ -141,11 +142,11 @@ export function ActivityScreen() {
           </ul>
         </>
       ) : null}
-      {news.data && news.data.items.length === 0 ? <p className="muted">Nenhuma novidade ainda. Mensagens, convites e encontros aparecem aqui.</p> : null}
+      {news.data && news.data.items.length === 0 ? <p className="muted">{t('Nenhuma novidade ainda. Mensagens, convites e encontros aparecem aqui.')}</p> : null}
       {news.error && !news.data ? <ErrorState message={news.error.message} onRetry={news.reload} /> : null}
       {tagReqs.data && tagReqs.data.items.length > 0 ? (
         <>
-          <h2 className="results__h">Marcações</h2>
+          <h2 className="results__h">{t('Marcações')}</h2>
           <ul className="list">
             {tagReqs.data.items.map((post) => (
               <li key={post.id} className="tagreq">
@@ -158,10 +159,10 @@ export function ActivityScreen() {
                 </Link>
                 <div className="row-actions">
                   <Button small onClick={() => void answerTag(post.id, 'accept')} loading={tagBusy === post.id}>
-                    Aceitar
+                    {t('Aceitar')}
                   </Button>
                   <Button small variant="secondary" onClick={() => void answerTag(post.id, 'decline')} disabled={tagBusy === post.id}>
-                    Recusar
+                    {t('Recusar')}
                   </Button>
                 </div>
               </li>
@@ -169,12 +170,12 @@ export function ActivityScreen() {
           </ul>
         </>
       ) : null}
-      <h2 className="results__h">Pedidos para seguir</h2>
+      <h2 className="results__h">{t('Pedidos para seguir')}</h2>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {requests.loading && !requests.data ? <Loading /> : null}
       {requests.error ? <ErrorState message={requests.error.message} onRetry={requests.reload} /> : null}
       {requests.data && requests.data.items.length === 0 ? (
-        <EmptyState title="Nenhum pedido no momento">Quando alguém pedir para seguir seu perfil privado, o pedido aparece aqui.</EmptyState>
+        <EmptyState title={t('Nenhum pedido no momento')}>{t('Quando alguém pedir para seguir seu perfil privado, o pedido aparece aqui.')}</EmptyState>
       ) : null}
       {requests.data && requests.data.items.length > 0 ? (
         <>
@@ -187,10 +188,10 @@ export function ActivityScreen() {
                 aside={
                   <div className="row-actions">
                     <Button small onClick={() => answer(profile, 'approve')} loading={busyId === profile.userId}>
-                      Aprovar
+                      {t('Aprovar')}
                     </Button>
                     <Button small variant="secondary" onClick={() => answer(profile, 'reject')} disabled={busyId === profile.userId}>
-                      Recusar
+                      {t('Recusar')}
                     </Button>
                   </div>
                 }

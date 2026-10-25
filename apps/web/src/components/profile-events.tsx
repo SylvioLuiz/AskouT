@@ -7,6 +7,7 @@ import type { ApiError } from '../lib/errors.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import type { PostedEvent, PostedEventsPage, PostView } from '../lib/types.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 const PAGE = 12;
 
@@ -20,12 +21,12 @@ function Tile({ event, mine, onRemove, busy }: { event: PostedEvent; mine: boole
         <span className="ptile__info">
           <span className="ptile__title">{event.title}</span>
           <span className="ptile__when">{formatWhen(event.startsAt, event.endsAt, new Date())}</span>
-          {event.sample ? <span className="tag tag--sample">Exemplo de teste</span> : null}
+          {event.sample ? <span className="tag tag--sample">{t('Exemplo de teste')}</span> : null}
         </span>
       </Link>
       {mine ? (
-        <button type="button" className="ptile__remove" onClick={onRemove} disabled={busy} aria-label={`Tirar ${event.title} do perfil`}>
-          Tirar do perfil
+        <button type="button" className="ptile__remove" onClick={onRemove} disabled={busy} aria-label={t('Tirar {title} do perfil', { title: event.title })}>
+          {t('Tirar do perfil')}
         </button>
       ) : null}
     </li>
@@ -42,15 +43,15 @@ function PostTile({ post, mine, onRemove, busy }: { post: PostView; mine: boolea
   return (
     <li className="ptile">
       <Link to={`/eventos/${encodeURIComponent(post.id)}`} className={`ptile__link evcover--other${image ? '' : ' ptile__link--plain'}`}>
-        {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="ptile__kind" aria-hidden="true">Evento</span>}
+        {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="ptile__kind" aria-hidden="true">{t('Evento')}</span>}
         <span className="ptile__info">
           <span className="ptile__title">{event.title}</span>
           <span className="ptile__when">{formatWhen(event.startsAt, event.endsAt, new Date())}</span>
         </span>
       </Link>
       {mine ? (
-        <button type="button" className="ptile__remove" onClick={onRemove} disabled={busy} aria-label={`Apagar o evento ${event.title}`}>
-          Apagar evento
+        <button type="button" className="ptile__remove" onClick={onRemove} disabled={busy} aria-label={t('Apagar o evento {title}', { title: event.title })}>
+          {t('Apagar evento')}
         </button>
       ) : null}
     </li>
@@ -123,17 +124,17 @@ export function PostedEvents({ username, mine, onCount, quietEmpty }: { username
     if (quietEmpty) return null;
     return mine ? (
       <EmptyState
-        title="Você ainda não postou eventos"
+        title={t('Você ainda não postou eventos')}
         action={
           <Link to="/explorar" className="btn btn--primary">
-            Explorar eventos
+            {t('Explorar eventos')}
           </Link>
         }
       >
-        Abra um evento e use Compartilhar para postar no seu perfil.
+        {t('Abra um evento e use Compartilhar para postar no seu perfil.')}
       </EmptyState>
     ) : (
-      <EmptyState title="Nenhum evento postado">Quando essa pessoa postar um evento, ele aparece aqui.</EmptyState>
+      <EmptyState title={t('Nenhum evento postado')}>{t('Quando essa pessoa postar um evento, ele aparece aqui.')}</EmptyState>
     );
   }
 
@@ -147,7 +148,7 @@ export function PostedEvents({ username, mine, onCount, quietEmpty }: { username
   return (
     <>
       {error ? <ErrorState message={error.message} onRetry={() => void load(page.items.length)} /> : null}
-      <div className="pgrid" aria-label="Eventos">
+      <div className="pgrid" aria-label={t('Eventos')}>
         {[left, right].map((column, index) => (
           <ul className="pgrid__col" key={index}>
             {column}
@@ -157,7 +158,7 @@ export function PostedEvents({ username, mine, onCount, quietEmpty }: { username
       {page.items.length < page.total ? (
         <div className="more">
           <Button variant="secondary" loading={loading} onClick={() => void load(page.items.length)}>
-            Carregar mais
+            {t('Carregar mais')}
           </Button>
         </div>
       ) : null}

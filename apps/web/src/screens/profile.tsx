@@ -15,6 +15,7 @@ import { hasIncomingRequest, profileAction, relationNote } from '../lib/relation
 import type { ConnectionsPage } from '../lib/types.ts';
 import { FOLLOW_HINT, safeStorage, takeFirstFollowHint } from '../lib/hints.ts';
 import { Link, useSearch } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 type Pending = 'unfollow' | undefined;
 
@@ -22,14 +23,14 @@ function NotFoundProfile({ error, onRetry }: { error: ApiError; onRetry: () => v
   if (error.code === 'NOT_FOUND') {
     return (
       <EmptyState
-        title="Perfil não encontrado"
+        title={t('Perfil não encontrado')}
         action={
           <Link to="/explorar" className="btn btn--secondary">
-            Buscar pessoas
+            {t('Buscar pessoas')}
           </Link>
         }
       >
-        Esse @usuário não existe ou não está disponível para você.
+        {t('Esse @usuário não existe ou não está disponível para você.')}
       </EmptyState>
     );
   }
@@ -87,7 +88,7 @@ export function ProfileScreen({ username }: { username: string }) {
       {relationship.isSelf ? (
         <div className="profile__bar">
           <span className="profile__barname">@{profile.username}</span>
-          <button type="button" className="iconbtn" onClick={() => setMenuOpen(true)} aria-label="Abrir menu" aria-haspopup="dialog">
+          <button type="button" className="iconbtn" onClick={() => setMenuOpen(true)} aria-label={t('Abrir menu')} aria-haspopup="dialog">
             <MenuIcon />
           </button>
         </div>
@@ -99,9 +100,9 @@ export function ProfileScreen({ username }: { username: string }) {
           <h1 className="profile__name">
             {profile.displayName}
             {profile.isPrivate ? (
-              <span className="profile__lock" title="Perfil privado">
+              <span className="profile__lock" title={t('Perfil privado')}>
                 <LockIcon />
-                <span className="visually-hidden">Perfil privado</span>
+                <span className="visually-hidden">{t('Perfil privado')}</span>
               </span>
             ) : null}
           </h1>
@@ -109,7 +110,7 @@ export function ProfileScreen({ username }: { username: string }) {
           {note ? <p className="profile__note">{note}</p> : null}
         </div>
         {relationship.isSelf ? (
-          <Link to="/perfil/editar" className="iconbtn profile__edit" aria-label="Editar perfil">
+          <Link to="/perfil/editar" className="iconbtn profile__edit" aria-label={t('Editar perfil')}>
             <EditIcon />
           </Link>
         ) : !relationship.isSelf ? (
@@ -161,11 +162,11 @@ export function ProfileScreen({ username }: { username: string }) {
             <strong>@{profile.username}</strong> pediu para seguir você.
           </p>
           <div className="row-actions">
-            <Button small loading={busy} onClick={() => run(() => api.approveRequest(profile.userId), 'Pedido aprovado.')}>
-              Aprovar
+            <Button small loading={busy} onClick={() => run(() => api.approveRequest(profile.userId), t('Pedido aprovado.'))}>
+              {t('Aprovar')}
             </Button>
-            <Button small variant="secondary" disabled={busy} onClick={() => run(() => api.rejectRequest(profile.userId), 'Pedido recusado.')}>
-              Recusar
+            <Button small variant="secondary" disabled={busy} onClick={() => run(() => api.rejectRequest(profile.userId), t('Pedido recusado.'))}>
+              {t('Recusar')}
             </Button>
           </div>
         </div>
@@ -178,7 +179,7 @@ export function ProfileScreen({ username }: { username: string }) {
           </Button>
         ) : null}
         {action.kind === 'requested' ? (
-          <Button variant="secondary" loading={busy} onClick={() => run(() => api.unfollow(profile.userId), 'Pedido cancelado.')}>
+          <Button variant="secondary" loading={busy} onClick={() => run(() => api.unfollow(profile.userId), t('Pedido cancelado.'))}>
             {action.label}
           </Button>
         ) : null}
@@ -189,36 +190,36 @@ export function ProfileScreen({ username }: { username: string }) {
         ) : null}
         {relationship.isFriend && !relationship.isSelf && action.kind !== 'blocked' ? <ChatButton userId={profile.userId} variant="primary" /> : null}
         {action.kind === 'blocked' ? (
-          <Button variant="secondary" loading={busy} onClick={() => run(() => api.unblock(profile.userId), `Você desbloqueou @${profile.username}.`)}>
-            Desbloquear
+          <Button variant="secondary" loading={busy} onClick={() => run(() => api.unblock(profile.userId), t('Você desbloqueou @{username}.', { username: profile.username }))}>
+            {t('Desbloquear')}
           </Button>
         ) : null}
       </div>
 
       {pending === 'unfollow' ? (
         <Confirm
-          question={relationship.isFriend ? `Deixar de seguir @${profile.username}? Vocês deixam de ser amigos.` : `Deixar de seguir @${profile.username}?`}
-          confirmLabel="Deixar de seguir"
+          question={relationship.isFriend ? t('Deixar de seguir @{username}? Vocês deixam de ser amigos.', { username: profile.username }) : t('Deixar de seguir @{username}?', { username: profile.username })}
+          confirmLabel={t('Deixar de seguir')}
           busy={busy}
           onCancel={() => setPending(undefined)}
-          onConfirm={() => run(() => api.unfollow(profile.userId), `Você deixou de seguir @${profile.username}.`)}
+          onConfirm={() => run(() => api.unfollow(profile.userId), t('Você deixou de seguir @{username}.', { username: profile.username }))}
         />
       ) : null}
 
       {relationship.blockedByViewer ? (
-        <EmptyState title={`Você bloqueou @${profile.username}`}>Desbloqueie para ver o perfil de novo ou seguir.</EmptyState>
+        <EmptyState title={t('Você bloqueou @{username}', { username: profile.username })}>{t('Desbloqueie para ver o perfil de novo ou seguir.')}</EmptyState>
       ) : !canViewContent ? (
-        <EmptyState title="Este perfil é privado">
-          {relationship.following === 'PENDING' ? 'Seu pedido foi enviado. Você vê o conteúdo quando @' + profile.username + ' aprovar.' : 'Peça para seguir e aguarde a aprovação para ver o conteúdo.'}
+        <EmptyState title={t('Este perfil é privado')}>
+          {relationship.following === 'PENDING' ? t('Seu pedido foi enviado. Você vê o conteúdo quando @') + profile.username + ' aprovar.' : t('Peça para seguir e aguarde a aprovação para ver o conteúdo.')}
         </EmptyState>
       ) : (
         <>
-          <div className="tabs" role="tablist" aria-label="Conteúdo do perfil">
+          <div className="tabs" role="tablist" aria-label={t('Conteúdo do perfil')}>
             <button type="button" role="tab" id="aba-eventos" aria-selected={tab === 'events'} aria-controls="painel-perfil" className={`tabs__tab${tab === 'events' ? ' tabs__tab--on' : ''}`} onClick={() => setTab('events')}>
-              Eventos
+              {t('Eventos')}
             </button>
             <button type="button" role="tab" id="aba-posts" aria-selected={tab === 'posts'} aria-controls="painel-perfil" className={`tabs__tab${tab === 'posts' ? ' tabs__tab--on' : ''}`} onClick={() => setTab('posts')}>
-              Posts
+              {t('Posts')}
             </button>
           </div>
           <div id="painel-perfil" role="tabpanel" aria-labelledby={tab === 'events' ? 'aba-eventos' : 'aba-posts'}>
@@ -244,7 +245,7 @@ export function ConnectionsScreen({ username, direction }: { username: string; d
 
   const userId = view.data?.profile.userId;
   const title = direction === 'followers' ? 'Seguidores' : 'Seguindo';
-  useTitle(`${title} de @${username}`);
+  useTitle(t('{title} de @{username}', { title, username }));
 
   async function load(offset: number) {
     if (!userId) return;
@@ -278,13 +279,13 @@ export function ConnectionsScreen({ username, direction }: { username: string; d
       <PageHead title={title} back={back} subtitle={`@${username}`} />
       {error ? (
         error.code === 'FORBIDDEN' || error.code === 'NOT_FOUND' ? (
-          <EmptyState title="Você não pode ver esta lista">Só quem segue este perfil privado, com aprovação, vê as conexões.</EmptyState>
+          <EmptyState title={t('Você não pode ver esta lista')}>{t('Só quem segue este perfil privado, com aprovação, vê as conexões.')}</EmptyState>
         ) : (
           <ErrorState message={error.message} onRetry={() => void load(page?.items.length ?? 0)} />
         )
       ) : null}
       {!page && loading ? <Loading /> : null}
-      {page && page.items.length === 0 ? <EmptyState title={direction === 'followers' ? 'Ninguém segue este perfil ainda' : 'Não segue ninguém ainda'} /> : null}
+      {page && page.items.length === 0 ? <EmptyState title={direction === 'followers' ? t('Ninguém segue este perfil ainda') : t('Não segue ninguém ainda')} /> : null}
       {page && page.items.length > 0 ? (
         <>
           <p className="muted">{pluralize(page.total, direction === 'followers' ? 'seguidor' : 'pessoa', direction === 'followers' ? 'seguidores' : 'pessoas')}</p>
@@ -296,7 +297,7 @@ export function ConnectionsScreen({ username, direction }: { username: string; d
           {hasMore ? (
             <div className="more">
               <Button variant="secondary" loading={loading} onClick={() => void load(page.items.length)}>
-                Carregar mais
+                {t('Carregar mais')}
               </Button>
             </div>
           ) : null}

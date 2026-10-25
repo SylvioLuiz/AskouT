@@ -8,6 +8,7 @@ import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { profileLink, profileShareText } from '../lib/share.ts';
 import type { FlashVisibility, Profile, Relationship } from '../lib/types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 type Step = 'menu' | 'share' | 'remove' | 'block' | 'report';
 
@@ -16,7 +17,7 @@ export function ProfileActions({ profile, relationship, onChanged }: { profile: 
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="iconbtn profile__more" onClick={() => setOpen(true)} aria-label="Mais opções" aria-haspopup="dialog">
+      <button type="button" className="iconbtn profile__more" onClick={() => setOpen(true)} aria-label={t('Mais opções')} aria-haspopup="dialog">
         <MoreIcon />
       </button>
       {open ? (
@@ -72,8 +73,8 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
   if (step === 'report') {
     return (
       <ReasonSheet
-        title={`Denunciar @${profile.username}`}
-        doneText="Obrigado por avisar. A equipe vai analisar o perfil. Se quiser, você também pode bloquear a pessoa."
+        title={t('Denunciar @{username}', { username: profile.username })}
+        doneText={t('Obrigado por avisar. A equipe vai analisar o perfil. Se quiser, você também pode bloquear a pessoa.')}
         submit={(reason, details) => api.reportProfile(profile.username, reason, details)}
         onClose={() => setStep('menu')}
         onDone={onClose}
@@ -107,7 +108,7 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
       {step === 'remove' ? (
         <Confirm
           question={`Remover @${profile.username} dos seus seguidores? ${relationship.isFriend ? 'Vocês deixam de ser amigos. ' : ''}A pessoa não é avisada.`}
-          confirmLabel="Remover seguidor"
+          confirmLabel={t('Remover seguidor')}
           busy={busy}
           onCancel={() => setStep('menu')}
           onConfirm={() => void confirm(() => api.removeFollower(profile.userId), `@${profile.username} não segue mais você.`)}
@@ -115,20 +116,20 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
       ) : step === 'block' ? (
         <Confirm
           danger
-          question={`Bloquear @${profile.username}? Essa pessoa deixa de ver seu perfil e vocês param de se seguir.`}
-          confirmLabel="Bloquear"
+          question={t('Bloquear @{username}? Essa pessoa deixa de ver seu perfil e vocês param de se seguir.', { username: profile.username })}
+          confirmLabel={t('Bloquear')}
           busy={busy}
           onCancel={() => setStep('menu')}
-          onConfirm={() => void confirm(() => api.block(profile.userId), `Você bloqueou @${profile.username}.`)}
+          onConfirm={() => void confirm(() => api.block(profile.userId), t('Você bloqueou @{username}.', { username: profile.username }))}
         />
       ) : (
         <ul className="sharelist">
-          {row('Compartilhar perfil', 'Mande em uma conversa ou para fora do app.', () => setStep('share'))}
-          {relationship.followsYou === 'ACCEPTED' && !blocked ? row('Remover seguidor', 'Ela deixa de seguir você. Não avisamos.', () => setStep('remove')) : null}
-          {flashOptions && current ? row('Ocultar Flash dela', current.hideTheirs ? 'Ativo: você não vê quando ela liga o Flash.' : 'Você deixa de ver quando ela liga o Flash.', () => void toggle('hideTheirs'), { on: current.hideTheirs, role: 'switch' }) : null}
-          {flashOptions && current ? row('Não deixar ela me ver no Flash', current.hideMine ? 'Ativo: ela não vê você disponível.' : 'Ela não vê você disponível, mesmo com o Flash ligado.', () => void toggle('hideMine'), { on: current.hideMine, role: 'switch' }) : null}
-          {!relationship.isSelf ? row('Denunciar perfil', 'Nome, foto ou descrição que não deveriam estar aqui.', () => setStep('report'), { danger: true }) : null}
-          {!blocked ? row('Bloquear', 'Ela deixa de ver seu perfil e vocês param de se seguir.', () => setStep('block'), { danger: true }) : null}
+          {row(t('Compartilhar perfil'), t('Mande em uma conversa ou para fora do app.'), () => setStep('share'))}
+          {relationship.followsYou === 'ACCEPTED' && !blocked ? row(t('Remover seguidor'), t('Ela deixa de seguir você. Não avisamos.'), () => setStep('remove')) : null}
+          {flashOptions && current ? row(t('Ocultar Flash dela'), current.hideTheirs ? t('Ativo: você não vê quando ela liga o Flash.') : t('Você deixa de ver quando ela liga o Flash.'), () => void toggle('hideTheirs'), { on: current.hideTheirs, role: 'switch' }) : null}
+          {flashOptions && current ? row(t('Não deixar ela me ver no Flash'), current.hideMine ? t('Ativo: ela não vê você disponível.') : t('Ela não vê você disponível, mesmo com o Flash ligado.'), () => void toggle('hideMine'), { on: current.hideMine, role: 'switch' }) : null}
+          {!relationship.isSelf ? row(t('Denunciar perfil'), t('Nome, foto ou descrição que não deveriam estar aqui.'), () => setStep('report'), { danger: true }) : null}
+          {!blocked ? row('Bloquear', t('Ela deixa de ver seu perfil e vocês param de se seguir.'), () => setStep('block'), { danger: true }) : null}
         </ul>
       )}
     </Sheet>

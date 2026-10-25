@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 /** Mensagem de voz: os limites são os mesmos da API (1 a 90 s, até 600 KB). */
 export const VOICE_MAX_MS = 90_000;
 export const VOICE_MIN_MS = 1_000;
@@ -23,13 +24,13 @@ export type VoiceProblem = 'unsupported' | 'denied' | 'no-device' | 'failed';
 export function voiceProblemMessage(problem: VoiceProblem): string {
   switch (problem) {
     case 'unsupported':
-      return 'Este navegador não consegue gravar áudio. Abra o AskouT em https no Chrome, Safari ou Firefox atualizados.';
+      return t('Este navegador não consegue gravar áudio. Abra o AskouT em https no Chrome, Safari ou Firefox atualizados.');
     case 'denied':
-      return 'O microfone está bloqueado. Libere nas configurações do navegador ou do celular para gravar.';
+      return t('O microfone está bloqueado. Libere nas configurações do navegador ou do celular para gravar.');
     case 'no-device':
-      return 'Não encontramos um microfone neste aparelho.';
+      return t('Não encontramos um microfone neste aparelho.');
     default:
-      return 'Não foi possível gravar o áudio. Tente de novo.';
+      return t('Não foi possível gravar o áudio. Tente de novo.');
   }
 }
 

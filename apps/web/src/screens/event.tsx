@@ -25,6 +25,7 @@ import { timeAgo } from '../lib/format.ts';
 import type { EventPage, EventPost } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 /** O mesmo texto máximo que a API aceita num post de evento. */
 const EVENT_POST_CAPTION_MAX = 500;
@@ -69,7 +70,7 @@ function EventPostSheet({ eventId, onClose, onCreated }: { eventId: string; onCl
     try {
       setImage(await resizePostPhoto(file));
     } catch (failure) {
-      setMessage(failure instanceof Error ? failure.message : 'Não foi possível usar essa foto.');
+      setMessage(failure instanceof Error ? failure.message : t('Não foi possível usar essa foto.'));
     }
   }
 
@@ -85,24 +86,24 @@ function EventPostSheet({ eventId, onClose, onCreated }: { eventId: string; onCl
   }
 
   return (
-    <Sheet title="Postar no evento" onClose={onClose}>
+    <Sheet title={t('Postar no evento')} onClose={onClose}>
       {message ? <Notice tone="error">{message}</Notice> : null}
-      <Field label="Texto" value={caption} onChange={setCaption} multiline maxLength={EVENT_POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${EVENT_POST_CAPTION_MAX}`} autoFocus />
+      <Field label={t('Texto')} value={caption} onChange={setCaption} multiline maxLength={EVENT_POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${EVENT_POST_CAPTION_MAX}`} autoFocus />
       {image ? (
         <div className="evpost__preview">
-          <img src={image} alt="Foto do post" />
-          <button type="button" className="iconbtn evpost__remove" onClick={() => setImage(undefined)} aria-label="Tirar a foto">
+          <img src={image} alt={t('Foto do post')} />
+          <button type="button" className="iconbtn evpost__remove" onClick={() => setImage(undefined)} aria-label={t('Tirar a foto')}>
             <XIcon />
           </button>
         </div>
       ) : (
         <Button variant="secondary" full onClick={() => input.current?.click()}>
-          Adicionar foto
+          {t('Adicionar foto')}
         </Button>
       )}
       <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => void pick(e)} />
       <Button full loading={busy} disabled={caption.trim() === '' || Array.from(caption).length > EVENT_POST_CAPTION_MAX} onClick={() => void send()}>
-        Postar
+        {t('Postar')}
       </Button>
     </Sheet>
   );
@@ -119,7 +120,7 @@ function EventPostCard({ post, onDelete, busy }: { post: EventPost; onDelete: ()
         </Link>
         <span className="muted evpost__when">{timeAgo(post.createdAt, new Date())}</span>
         {post.canDelete ? (
-          <button type="button" className="iconbtn evpost__del" onClick={onDelete} disabled={busy} aria-label="Apagar este post do evento">
+          <button type="button" className="iconbtn evpost__del" onClick={onDelete} disabled={busy} aria-label={t('Apagar este post do evento')}>
             <TrashIcon />
           </button>
         ) : null}
@@ -149,7 +150,7 @@ function EventMenuSheet({ page, onChange, onShare, onClose }: { page: EventPage;
   }
 
   return (
-    <Sheet title="Opções do evento" onClose={onClose}>
+    <Sheet title={t('Opções do evento')} onClose={onClose}>
       {message ? <Notice tone="error">{message}</Notice> : null}
       <Button full variant="secondary" onClick={onShare}>
         <ShareIcon /> Compartilhar
@@ -159,27 +160,27 @@ function EventMenuSheet({ page, onChange, onShare, onClose }: { page: EventPage;
         variant="secondary"
         onClick={() => {
           setMessage(undefined);
-          addEventToCalendar(page).then(onClose, (failure: unknown) => setMessage(failure instanceof Error ? failure.message : 'Não foi possível adicionar à agenda.'));
+          addEventToCalendar(page).then(onClose, (failure: unknown) => setMessage(failure instanceof Error ? failure.message : t('Não foi possível adicionar à agenda.')));
         }}
       >
         <CalendarIcon /> Adicionar à agenda
       </Button>
       {page.isOwner && page.postsEnabled ? (
       <>
-      <h3 className="radiolist__title">Quem pode postar</h3>
-      <div className="radiolist" role="radiogroup" aria-label="Quem pode postar neste evento">
+      <h3 className="radiolist__title">{t('Quem pode postar')}</h3>
+      <div className="radiolist" role="radiogroup" aria-label={t('Quem pode postar neste evento')}>
         <label className="radiolist__item">
           <input type="radio" name="quem-posta" checked={!page.postsPublic} disabled={busy} onChange={() => void choose(false)} />
           <span>
-            <strong>Só eu</strong>
-            <span className="muted radiolist__desc">Todos veem, mas só você publica.</span>
+            <strong>{t('Só eu')}</strong>
+            <span className="muted radiolist__desc">{t('Todos veem, mas só você publica.')}</span>
           </span>
         </label>
         <label className="radiolist__item">
           <input type="radio" name="quem-posta" checked={page.postsPublic} disabled={busy} onChange={() => void choose(true)} />
           <span>
-            <strong>Eu e quem vai</strong>
-            <span className="muted radiolist__desc">Quem confirmou presença também publica.</span>
+            <strong>{t('Eu e quem vai')}</strong>
+            <span className="muted radiolist__desc">{t('Quem confirmou presença também publica.')}</span>
           </span>
         </label>
       </div>
@@ -211,11 +212,11 @@ function EventPosts({ page, onChange }: { page: EventPage; onChange: (page: Even
     <section className="evposts" aria-labelledby="evposts-title">
       <div className="evposts__head">
         <h2 id="evposts-title" className="evposts__title">
-          Posts do evento
+          {t('Posts do evento')}
         </h2>
         {page.canPost ? (
           <Button small onClick={() => setComposing(true)}>
-            Postar
+            {t('Postar')}
           </Button>
         ) : null}
       </div>
@@ -224,7 +225,7 @@ function EventPosts({ page, onChange }: { page: EventPage; onChange: (page: Even
       ) : page.postsPublic ? (
         <p className="muted">{page.going ? 'Você confirmou presença: pode postar aqui.' : 'Confirme presença para postar neste evento.'}</p>
       ) : (
-        <p className="muted">Neste evento só quem organiza posta.</p>
+        <p className="muted">{t('Neste evento só quem organiza posta.')}</p>
       )}
       {message ? <Notice tone="error">{message}</Notice> : null}
       {page.posts.length === 0 ? (
@@ -259,7 +260,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [fresh, setFresh] = useState<EventPage | undefined>();
   useEffect(() => setFresh(undefined), [loaded.data]);
   const e = fresh ?? loaded.data ?? undefined;
-  useTitle(e?.title ?? 'Evento');
+  useTitle(e?.title ?? t('Evento'));
 
   const [coverFailed, setCoverFailed] = useState(false);
   const [planning, setPlanning] = useState(false);
@@ -317,13 +318,13 @@ export function EventScreen({ eventId }: { eventId: string }) {
       ) : null}
       {e && date && time && strip ? (
         <article className="evpage">
-          <section className={`evhero evhero--${e.kind.toLowerCase()}`} aria-label="Capa do evento">
+          <section className={`evhero evhero--${e.kind.toLowerCase()}`} aria-label={t('Capa do evento')}>
             {cover ? <img className="evhero__img" src={cover} alt="" referrerPolicy="no-referrer" onError={() => setCoverFailed(true)} /> : null}
             <div className="evhero__shade" aria-hidden="true" />
-            <button type="button" className="evhero__btn evhero__btn--back" onClick={goBack} aria-label="Voltar">
+            <button type="button" className="evhero__btn evhero__btn--back" onClick={goBack} aria-label={t('Voltar')}>
               <ChevronLeftIcon />
             </button>
-            <button type="button" className="evhero__btn evhero__btn--share" onClick={() => setMenu(true)} aria-label="Mais opções do evento" aria-haspopup="dialog">
+            <button type="button" className="evhero__btn evhero__btn--share" onClick={() => setMenu(true)} aria-label={t('Mais opções do evento')} aria-haspopup="dialog">
               <MoreIcon />
             </button>
             <div className="evhero__body">
@@ -348,17 +349,17 @@ export function EventScreen({ eventId }: { eventId: string }) {
 
           <dl className="evstats">
             <div className="evstats__cell">
-              <dt>Confirmados</dt>
+              <dt>{t('Confirmados')}</dt>
               <dd className="evstats__main">{e.confirmedCount}</dd>
               <dd className="evstats__sub">{e.confirmedCount === 1 ? 'pessoa' : 'pessoas'}</dd>
             </div>
             <div className="evstats__cell">
-              <dt>Data</dt>
+              <dt>{t('Data')}</dt>
               <dd className="evstats__main">{date.main}</dd>
               {date.sub ? <dd className="evstats__sub">{date.sub}</dd> : null}
             </div>
             <div className="evstats__cell">
-              <dt>Hora</dt>
+              <dt>{t('Hora')}</dt>
               <dd className="evstats__main">{time.main}</dd>
               {time.sub ? <dd className="evstats__sub">{time.sub}</dd> : null}
             </div>
@@ -369,7 +370,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
               variant="secondary"
               onClick={() => {
                 setCalMessage(undefined);
-                addEventToCalendar(e).catch((failure: unknown) => setCalMessage(failure instanceof Error ? failure.message : 'Não foi possível adicionar à agenda.'));
+                addEventToCalendar(e).catch((failure: unknown) => setCalMessage(failure instanceof Error ? failure.message : t('Não foi possível adicionar à agenda.')));
               }}
             >
               <CalendarIcon /> Adicionar à agenda
@@ -377,27 +378,27 @@ export function EventScreen({ eventId }: { eventId: string }) {
           </div>
           {calMessage ? <Notice tone="error">{calMessage}</Notice> : null}
 
-          <section className="evgoing" aria-label="Quem confirmou">
+          <section className="evgoing" aria-label={t('Quem confirmou')}>
             {strip.shown.length > 0 || canStory ? (
               <ul className="evgoing__faces">
                 {canStory ? (
                   <li>
-                    <button type="button" className="evgoing__story" onClick={() => setCreatingStory(true)} aria-label="Criar story neste evento">
+                    <button type="button" className="evgoing__story" onClick={() => setCreatingStory(true)} aria-label={t('Criar story neste evento')}>
                       <span className="evgoing__storyring">
                         <PlusIcon />
                       </span>
-                      <span className="evgoing__storylabel">Seu story</span>
+                      <span className="evgoing__storylabel">{t('Seu story')}</span>
                     </button>
                   </li>
                 ) : null}
                 {strip.shown.map((p) => (
                   <li key={p.userId}>
                     {e.storyUserIds.includes(p.userId) && startOf(storyGroups, p.userId) ? (
-                      <button type="button" className="evgoing__face evgoing__face--story" onClick={() => setViewing(startOf(storyGroups, p.userId) ?? undefined)} aria-label={`Ver o story de ${p.username}`}>
+                      <button type="button" className="evgoing__face evgoing__face--story" onClick={() => setViewing(startOf(storyGroups, p.userId) ?? undefined)} aria-label={t('Ver o story de {username}', { username: p.username })}>
                         <Avatar profile={p} size={40} />
                       </button>
                     ) : (
-                      <Link to={`/u/${encodeURIComponent(p.username)}`} aria-label={`Perfil de ${p.username}`}>
+                      <Link to={`/u/${encodeURIComponent(p.username)}`} aria-label={t('Perfil de {username}', { username: p.username })}>
                         <Avatar profile={p} size={44} />
                       </Link>
                     )}
@@ -405,29 +406,29 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 ))}
                 {strip.more > 0 ? (
                   <li>
-                    <span className="evgoing__more" aria-label={`mais ${strip.more} pessoas`}>
+                    <span className="evgoing__more" aria-label={t('mais {more} pessoas', { more: strip.more })}>
                       +{strip.more}
                     </span>
                   </li>
                 ) : null}
               </ul>
             ) : (
-              <p className="muted">Ninguém confirmou ainda. Seja o primeiro.</p>
+              <p className="muted">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
             )}
             {e.ticketUrl && !ended ? (
               <div className="evticket">
                 <a className="btn btn--secondary btn--full evticket__link" href={e.ticketUrl} target="_blank" rel="noopener noreferrer nofollow sponsored">
                   <TicketIcon />
-                  Comprar ingresso
+                  {t('Comprar ingresso')}
                 </a>
                 <p className="evticket__note">Abre {ticketHost(e.ticketUrl) || 'o site de venda'}. A venda é feita lá: o AskouT não cobra nem entrega o ingresso.</p>
               </div>
             ) : null}
             {e.isOwner ? null : ended ? (
-              <p className="muted">Esse evento já terminou.</p>
+              <p className="muted">{t('Esse evento já terminou.')}</p>
             ) : (
               <Button full variant={e.going ? 'secondary' : 'primary'} loading={goBusy} onClick={() => void toggleGoing()} aria-pressed={e.going}>
-                {e.going ? 'Eu vou ✓ (toque para cancelar)' : 'Eu vou'}
+                {e.going ? t('Eu vou ✓ (toque para cancelar)') : t('Eu vou')}
               </Button>
             )}
             {problem ? <Notice tone="error">{problem}</Notice> : null}
@@ -435,7 +436,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
 
           <div className="sugcard__tags">
             <span className="tag tag--event">{kindLabel(e.kind)}</span>
-            {e.isFree ? <span className="tag tag--free">Grátis</span> : null}
+            {e.isFree ? <span className="tag tag--free">{t('Grátis')}</span> : null}
             {e.sample ? <SampleBadge /> : null}
             {e.distanceM !== null ? <span className="muted">a {formatDistance(e.distanceM)} de você</span> : null}
           </div>
@@ -471,12 +472,12 @@ export function EventScreen({ eventId }: { eventId: string }) {
             <div className="sugcard__actions">
               {e.venue.lat !== null && e.venue.lng !== null ? (
                 <a className="btn btn--quiet btn--small" href={routeLink(e.venue.lat, e.venue.lng)} target="_blank" rel="noopener noreferrer">
-                  Rota até lá
+                  {t('Rota até lá')}
                 </a>
               ) : null}
               {e.venue.name || e.venue.address || e.venue.lat !== null ? (
                 <a className="btn btn--quiet btn--small" href={e.venue.lat !== null && e.venue.lng !== null ? mapLink(e.venue.lat, e.venue.lng) : venueMapLink(e.venue)} target="_blank" rel="noopener noreferrer">
-                  Mapa
+                  {t('Mapa')}
                 </a>
               ) : null}
             </div>

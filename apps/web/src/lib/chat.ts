@@ -2,6 +2,7 @@
 import { formatDistance } from './flash.ts';
 import { formatVoiceTime } from './voice.ts';
 import type { ChatMessage, ConversationItem, SuggestionCard, SuggestionItem } from './types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 const clock = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
 const dayMonth = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
@@ -37,9 +38,9 @@ export function listTimeLabel(iso: string, now: Date): string {
 
 /** Quando o evento acontece, em palavras, sem fingir horário que não existe. */
 export function formatWhen(startsAt: string | null, endsAt: string | null, now: Date): string {
-  if (startsAt === null) return 'Horário não informado';
+  if (startsAt === null) return t('Horário não informado');
   const start = new Date(startsAt);
-  if (Number.isNaN(start.getTime())) return 'Horário não informado';
+  if (Number.isNaN(start.getTime())) return t('Horário não informado');
   const end = endsAt === null ? undefined : new Date(endsAt);
   const hasEnd = end !== undefined && !Number.isNaN(end.getTime());
   // O fim só leva a data quando cai em outro dia que o início (ou, em andamento, que hoje): eventos podem passar de 24 h.
@@ -50,7 +51,7 @@ export function formatWhen(startsAt: string | null, endsAt: string | null, now: 
   };
   const reference = start.getTime() <= now.getTime() ? now : start;
   const until = hasEnd ? (sameDay(end, reference) ? ` até ${clock.format(end)}` : ` até ${endDay(end)} às ${clock.format(end)}`) : '';
-  if (start.getTime() <= now.getTime()) return `Acontecendo agora${until}`;
+  if (start.getTime() <= now.getTime()) return t('Acontecendo agora{until}', { until });
   const diff = -dayDiff(start, now);
   const day = diff === 0 ? 'Hoje' : diff === 1 ? 'Amanhã' : dayLabel(startsAt, now);
   return `${day} às ${clock.format(start)}${until}`;
@@ -62,7 +63,7 @@ export function formatDistances(item: Pick<SuggestionItem, 'distanceFromMeM' | '
 }
 
 export function sourceLabel(source: SuggestionCard['source']): string {
-  return source === 'EVENT' ? 'Evento no AskouT' : source === 'GOOGLE' ? 'Rolê do Google' : 'Rolê do OpenStreetMap';
+  return source === 'EVENT' ? t('Evento no AskouT') : source === 'GOOGLE' ? t('Rolê do Google') : t('Rolê do OpenStreetMap');
 }
 
 /** 4.62 -> "4,6" */
@@ -72,7 +73,7 @@ export function formatRating(rating: number): string {
 
 /** "Nota 4,6 de 5, 321 avaliações no Google" */
 export function ratingLabel(rating: number, count: number | null): string {
-  const base = `Nota ${formatRating(rating)} de 5`;
+  const base = t('Nota {rating} de 5', { rating: formatRating(rating) });
   return count === null ? `${base} no Google` : `${base}, ${count} ${count === 1 ? 'avaliação' : 'avaliações'} no Google`;
 }
 
@@ -115,7 +116,7 @@ export function mapLink(lat: number, lng: number): string {
 
 /** Resumo para a lista de conversas. */
 export function previewOf(m: ChatMessage | null): string {
-  if (!m) return 'Nenhuma mensagem ainda';
+  if (!m) return t('Nenhuma mensagem ainda');
   const prefix = m.mine ? 'Você: ' : '';
   const who = m.senderName && !m.mine ? `${m.senderName}: ` : prefix;
   if (m.deleted) return `${who}Mensagem apagada`;
@@ -131,12 +132,12 @@ export function previewOf(m: ChatMessage | null): string {
 
 /** Trecho da mensagem para a barra "Respondendo a…". */
 export function replyPreview(m: ChatMessage): string {
-  if (m.deleted) return 'Mensagem apagada';
-  if (m.kind === 'AUDIO') return 'Mensagem de voz';
+  if (m.deleted) return t('Mensagem apagada');
+  if (m.kind === 'AUDIO') return t('Mensagem de voz');
   if (m.kind === 'IMAGE') return 'Foto';
   if (m.kind === 'VIDEO') return 'Vídeo';
   if (m.kind === 'EVENT') return `Evento: ${m.event?.title ?? 'compartilhado'}`;
-  if (m.kind === 'SUGGESTION' && m.suggestion) return `Sugestão: ${m.suggestion.venueName}`;
+  if (m.kind === 'SUGGESTION' && m.suggestion) return t('Sugestão: {venueName}', { venueName: m.suggestion.venueName });
   return Array.from(m.body.replace(/\s+/g, ' ')).slice(0, 100).join('');
 }
 

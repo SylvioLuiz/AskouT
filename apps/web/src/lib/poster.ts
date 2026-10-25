@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 const weekdayFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });
 const monthFmt = new Intl.DateTimeFormat('pt-BR', { month: 'short' });
 
@@ -19,6 +20,6 @@ export function dateTile(iso: string): DateTile | null {
 /** "12 confirmados" / "1 confirmado" / "" quando ainda não se sabe. */
 export function confirmedLabel(count: number | undefined): string {
   if (count === undefined) return '';
-  if (count <= 0) return 'Seja o primeiro a confirmar';
+  if (count <= 0) return t('Seja o primeiro a confirmar');
   return count === 1 ? '1 confirmado' : `${count} confirmados`;
 }

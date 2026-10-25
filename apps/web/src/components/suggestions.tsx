@@ -8,10 +8,11 @@ import { toApiError } from '../lib/errors.ts';
 import type { ChatMessage, SuggestionCard, SuggestionItem } from '../lib/types.ts';
 import { Sheet } from './agenda.tsx';
 import { Button, Loading, Notice } from './ui.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 /** Selo de dado de exemplo: o app nunca apresenta como real o que foi criado para teste. */
 export function SampleBadge() {
-  return <span className="tag tag--sample">Exemplo de teste</span>;
+  return <span className="tag tag--sample">{t('Exemplo de teste')}</span>;
 }
 
 function SourceTag({ source }: { source: SuggestionCard['source'] }) {
@@ -47,9 +48,9 @@ export function PlacePhoto({ path, author }: { path: string; author: string | nu
 
 function Distances({ distances, otherName }: { distances: { meM: number; themM: number }; otherName: string }) {
   return (
-    <ul className="sugcard__routes" aria-label="Distância até o rolê, em linha reta">
+    <ul className="sugcard__routes" aria-label={t('Distância até o rolê, em linha reta')}>
       <li>
-        <strong>Você</strong> a {formatDistance(distances.meM)}
+        <strong>{t('Você')}</strong> a {formatDistance(distances.meM)}
       </li>
       <li>
         <strong>{otherName}</strong> a {formatDistance(distances.themM)}
@@ -88,15 +89,15 @@ export function SuggestionBubble({ message, otherName, nowIso, conversationId, o
       {message.distances ? <Distances distances={message.distances} otherName={otherName} /> : null}
       <div className="sugcard__links">
         <a href={routeLink(card.lat, card.lng)} target="_blank" rel="noopener noreferrer">
-          Rota até lá
+          {t('Rota até lá')}
         </a>
         <a href={mapLink(card.lat, card.lng)} target="_blank" rel="noopener noreferrer">
-          Ver no mapa
+          {t('Ver no mapa')}
         </a>
       </div>
       {message.response ? (
         <p className={`sugcard__answer sugcard__answer--${message.response === 'ACCEPTED' ? 'yes' : 'no'}`} role="status">
-          {message.response === 'ACCEPTED' ? (message.mine ? `${otherName} aceitou` : 'Você aceitou') : message.mine ? `${otherName} recusou` : 'Você recusou'}
+          {message.response === 'ACCEPTED' ? (message.mine ? `${otherName} aceitou` : t('Você aceitou')) : message.mine ? `${otherName} recusou` : t('Você recusou')}
         </p>
       ) : message.mine ? (
         <p className="sugcard__answer" role="status">
@@ -105,10 +106,10 @@ export function SuggestionBubble({ message, otherName, nowIso, conversationId, o
       ) : (
         <div className="sugcard__actions">
           <Button small loading={busy === 'accept'} disabled={busy === 'decline'} onClick={() => answer('accept')}>
-            Aceitar
+            {t('Aceitar')}
           </Button>
           <Button small variant="secondary" loading={busy === 'decline'} disabled={busy === 'accept'} onClick={() => answer('decline')}>
-            Recusar
+            {t('Recusar')}
           </Button>
         </div>
       )}
@@ -152,23 +153,23 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
   const hasGoogle = data?.items.some((i) => i.source === 'GOOGLE') ?? false;
 
   return (
-    <Sheet title="Sugerir um rolê" onClose={onClose}>
+    <Sheet title={t('Sugerir um rolê')} onClose={onClose}>
       <p className="muted sheet__lead">Perto do ponto médio entre você e {otherName}, até {data ? Math.round(data.radiusM / 1000) : 3} km.</p>
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {result.loading && !data ? <Loading label="Buscando rolês" /> : null}
+      {result.loading && !data ? <Loading label={t('Buscando rolês')} /> : null}
       {result.error && !data ? (
         result.error.code === 'CONFLICT' ? (
-          <Notice>Os dois precisam compartilhar a localização no encontro para ver sugestões perto de vocês.</Notice>
+          <Notice>{t('Os dois precisam compartilhar a localização no encontro para ver sugestões perto de vocês.')}</Notice>
         ) : (
           <Notice tone="error">{result.error.message}</Notice>
         )
       ) : null}
-      {data?.reason === 'TOO_FAR' ? <Notice>Vocês estão longe demais um do outro para achar algo no meio do caminho.</Notice> : null}
+      {data?.reason === 'TOO_FAR' ? <Notice>{t('Vocês estão longe demais um do outro para achar algo no meio do caminho.')}</Notice> : null}
       {data && data.reason === null && data.items.length === 0 ? (
-        <Notice>Nenhum evento ou rolê encontrado por perto agora.</Notice>
+        <Notice>{t('Nenhum evento ou rolê encontrado por perto agora.')}</Notice>
       ) : null}
       {data && data.items.length > 0 ? (
-        <ul className="carousel" aria-label="Sugestões">
+        <ul className="carousel" aria-label={t('Sugestões')}>
           {data.items.map((item) => (
             <li key={item.key} className="carousel__slide">
               <article className="sugcard">
@@ -188,13 +189,13 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
                 <p className="sugcard__dist">{formatDistances(item, otherName)}</p>
                 <div className="sugcard__actions">
                   <Button small loading={sending === item.key} disabled={sent.has(item.key) || sending !== undefined} onClick={() => send(item)}>
-                    {sent.has(item.key) ? 'Enviado' : 'Sugerir'}
+                    {sent.has(item.key) ? t('Enviado') : t('Sugerir')}
                   </Button>
                   <a className="btn btn--quiet btn--small" href={routeLink(item.lat, item.lng)} target="_blank" rel="noopener noreferrer">
-                    Rota
+                    {t('Rota')}
                   </a>
                   <a className="btn btn--quiet btn--small" href={item.mapsUri ?? mapLink(item.lat, item.lng)} target="_blank" rel="noopener noreferrer">
-                    Mapa
+                    {t('Mapa')}
                   </a>
                 </div>
               </article>
@@ -202,9 +203,9 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
           ))}
         </ul>
       ) : null}
-      {data && !data.placesAvailable ? <p className="muted sheet__foot">Não foi possível buscar rolês agora. Mostrando só eventos do AskouT.</p> : null}
-      {hasGoogle ? <p className="muted sheet__foot">Notas, fotos e lugares: Google.</p> : null}
-      {hasOsm ? <p className="muted sheet__foot">Lugares: © colaboradores do OpenStreetMap.</p> : null}
+      {data && !data.placesAvailable ? <p className="muted sheet__foot">{t('Não foi possível buscar rolês agora. Mostrando só eventos do AskouT.')}</p> : null}
+      {hasGoogle ? <p className="muted sheet__foot">{t('Notas, fotos e lugares: Google.')}</p> : null}
+      {hasOsm ? <p className="muted sheet__foot">{t('Lugares: © colaboradores do OpenStreetMap.')}</p> : null}
     </Sheet>
   );
 }

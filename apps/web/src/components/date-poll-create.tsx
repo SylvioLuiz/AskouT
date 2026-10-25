@@ -12,22 +12,23 @@ import type { DaySlot, Policy } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
 import { navigate } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 const WEEK_HEAD = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const SLOTS: readonly { id: DaySlot; label: string; icon: ReactNode; tone: string }[] = [
-  { id: 'MORNING', label: 'Manhã', icon: <SunriseIcon />, tone: 'sunrise' },
-  { id: 'AFTERNOON', label: 'Tarde', icon: <SunIcon />, tone: 'sun' },
-  { id: 'NIGHT', label: 'Noite', icon: <MoonIcon />, tone: 'moon' },
+  { id: 'MORNING', label: t('Manhã'), icon: <SunriseIcon />, tone: 'sunrise' },
+  { id: 'AFTERNOON', label: t('Tarde'), icon: <SunIcon />, tone: 'sun' },
+  { id: 'NIGHT', label: t('Noite'), icon: <MoonIcon />, tone: 'moon' },
 ];
 const POLICY_TEXT: Record<Policy, string> = {
-  MAJORITY: 'A data será aprovada quando mais da metade confirmar.',
-  MANUAL: 'Você escolhe a data entre as mais votadas.',
-  UNANIMITY: 'A data só fecha quando todos confirmam.',
+  MAJORITY: t('A data será aprovada quando mais da metade confirmar.'),
+  MANUAL: t('Você escolhe a data entre as mais votadas.'),
+  UNANIMITY: t('A data só fecha quando todos confirmam.'),
 };
 
 /** "Combinar uma data": nome, período e pronto. O resto é opcional. */
 export function DatePollCreateScreen({ conversationId }: { conversationId: string }) {
-  useTitle('Combinar uma data');
+  useTitle(t('Combinar uma data'));
   const [title, setTitle] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -50,8 +51,8 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
     setProblem(undefined);
     if (title.trim() === '') return setProblem('Dê um nome ao encontro.');
     if (start === '' || end === '') return setProblem('Escolha o período de datas.');
-    if (eventRange && (start !== eventRange.start || end !== eventRange.end)) return setProblem('Com um evento, só dá para votar nos dias dele.');
-    if (deadlineMax && deadline > deadlineMax) return setProblem('O prazo para votar não pode ser depois do início do evento.');
+    if (eventRange && (start !== eventRange.start || end !== eventRange.end)) return setProblem(t('Com um evento, só dá para votar nos dias dele.'));
+    if (deadlineMax && deadline > deadlineMax) return setProblem(t('O prazo para votar não pode ser depois do início do evento.'));
     setBusy(true);
     try {
       const poll = await api.createPoll({
@@ -72,21 +73,21 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
 
   return (
     <div className="pollform">
-      <PageHead title="Combinar uma data" back={`/conversas/${conversationId}`} subtitle="Crie uma votação e encontre o melhor dia para reunir a galera." />
+      <PageHead title={t('Combinar uma data')} back={`/conversas/${conversationId}`} subtitle={t('Crie uma votação e encontre o melhor dia para reunir a galera.')} />
       <form className="pollform__form" onSubmit={(e) => void submit(e)} noValidate>
         {problem ? <Notice tone="error">{problem}</Notice> : null}
 
         <section className="pollcard">
           <div className="pollcard__body">
             <Field
-              label="Nome do encontro"
+              label={t('Nome do encontro')}
               value={title}
               onChange={setTitle}
               maxLength={120}
-              placeholder="Ex.: Churrasco de aniversário"
+              placeholder={t('Ex.: Churrasco de aniversário')}
               autoComplete="off"
               trailing={
-                <button type="button" className="iconbtn" aria-label="Usar um evento que já existe" onClick={() => setPicking(true)}>
+                <button type="button" className="iconbtn" aria-label={t('Usar um evento que já existe')} onClick={() => setPicking(true)}>
                   <PlusIcon />
                 </button>
               }
@@ -96,7 +97,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
 
         <section className="pollcard">
           <div className="pollcard__body">
-            <p className="pollcard__label">Período de datas</p>
+            <p className="pollcard__label">{t('Período de datas')}</p>
             <button type="button" className="pollrange" disabled={eventRange !== undefined} onClick={() => setCalendar(true)} aria-label={eventRange ? `Período do evento: ${longDay(start)}${end !== start ? ` a ${longDay(end)}` : ''}` : start && end ? `Período: ${longDay(start)} a ${longDay(end)}. Alterar` : 'Escolher o período de datas'}>
               {start && end ? (
                 <span className="pollrange__value">
@@ -111,14 +112,14 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
                   ) : null}
                 </span>
               ) : (
-                <span className="pollrange__empty">Escolha as datas</span>
+                <span className="pollrange__empty">{t('Escolha as datas')}</span>
               )}
             </button>
             {event && eventRange ? (
               <p className="pollcard__hint">
-                {eventRange.start === eventRange.end ? `Só no dia do evento “${event.title}”.` : `Só nos dias do evento “${event.title}”.`}{' '}
+                {eventRange.start === eventRange.end ? t('Só no dia do evento “{title}”.', { title: event.title }) : t('Só nos dias do evento “{title}”.', { title: event.title })}{' '}
                 <button type="button" className="pollcard__unlink" onClick={() => setEvent(undefined)}>
-                  Não usar este evento
+                  {t('Não usar este evento')}
                 </button>
               </p>
             ) : null}
@@ -131,7 +132,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
               Melhor horário <span className="pollcard__opt">(opcional)</span>
             </p>
           </div>
-          <div className="pollslots" role="group" aria-label="Melhor horário">
+          <div className="pollslots" role="group" aria-label={t('Melhor horário')}>
             {SLOTS.map((o) => (
               <button key={o.id} type="button" className={`pollslot pollslot--${o.tone}`} aria-pressed={slot === o.id} onClick={() => setSlot(slot === o.id ? undefined : o.id)}>
                 {o.icon}
@@ -143,37 +144,37 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
 
         <section className="pollcard">
           <div className="pollcard__body">
-            <p className="pollcard__label">Como escolher a data?</p>
+            <p className="pollcard__label">{t('Como escolher a data?')}</p>
           </div>
-          <div className="pollpolicy" role="group" aria-label="Como escolher a data">
+          <div className="pollpolicy" role="group" aria-label={t('Como escolher a data')}>
             <button type="button" className="pollpolicy__opt" aria-pressed={policy !== 'MANUAL'} onClick={() => setPolicy('MAJORITY')}>
-              Maioria
+              {t('Maioria')}
             </button>
             <button type="button" className="pollpolicy__opt" aria-pressed={policy === 'MANUAL'} onClick={() => setPolicy('MANUAL')}>
-              Eu decido
+              {t('Eu decido')}
             </button>
           </div>
           <p className="pollcard__hint pollcard__hint--wide">{POLICY_TEXT[policy]}</p>
         </section>
 
         <details className="pollmore">
-          <summary>Mais opções</summary>
+          <summary>{t('Mais opções')}</summary>
           <div className="pollmore__body">
-            <Field label="Prazo para votar" type="datetime-local" value={deadline} max={deadlineMax} onChange={setDeadline} hint={deadlineMax ? 'Não pode passar do início do evento.' : 'Sem prazo, a votação fica aberta até alguém encerrar.'} />
+            <Field label={t('Prazo para votar')} type="datetime-local" value={deadline} max={deadlineMax} onChange={setDeadline} hint={deadlineMax ? t('Não pode passar do início do evento.') : t('Sem prazo, a votação fica aberta até alguém encerrar.')} />
             <button type="button" className="chip pollmore__chip" aria-pressed={policy === 'UNANIMITY'} onClick={() => setPolicy(policy === 'UNANIMITY' ? 'MAJORITY' : 'UNANIMITY')}>
-              Exigir que todos confirmem
+              {t('Exigir que todos confirmem')}
             </button>
           </div>
         </details>
 
         <Button type="submit" full loading={busy}>
-          Criar votação
+          {t('Criar votação')}
         </Button>
-        <p className="pollform__note">Quem está na conversa vota. A melhor data é só uma sugestão: ela vale depois que as pessoas confirmam.</p>
+        <p className="pollform__note">{t('Quem está na conversa vota. A melhor data é só uma sugestão: ela vale depois que as pessoas confirmam.')}</p>
       </form>
 
       {calendar ? (
-        <Sheet title="Período de datas" onClose={() => setCalendar(false)}>
+        <Sheet title={t('Período de datas')} onClose={() => setCalendar(false)}>
           <RangeCalendar
             start={start}
             end={end}
@@ -187,7 +188,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
         </Sheet>
       ) : null}
       {picking ? (
-        <Sheet title="Escolher um evento" onClose={() => setPicking(false)}>
+        <Sheet title={t('Escolher um evento')} onClose={() => setPicking(false)}>
           <EventPick
             onPick={(picked) => {
               setTitle(picked.title.slice(0, 120));
@@ -231,11 +232,11 @@ function RangeCalendar({ start, end, min, max, onPick }: { start: string; end: s
   return (
     <div className="pollcal">
       <div className="pollcal__nav">
-        <button type="button" className="pollcal__arrow" aria-label="Mês anterior" disabled={!canBack} onClick={() => setView(shiftMonth(view.year, view.month, -1))}>
+        <button type="button" className="pollcal__arrow" aria-label={t('Mês anterior')} disabled={!canBack} onClick={() => setView(shiftMonth(view.year, view.month, -1))}>
           <ChevronLeftIcon />
         </button>
         <strong aria-live="polite">{monthTitle(first)}</strong>
-        <button type="button" className="pollcal__arrow" aria-label="Próximo mês" disabled={!canNext} onClick={() => setView(shiftMonth(view.year, view.month, 1))}>
+        <button type="button" className="pollcal__arrow" aria-label={t('Próximo mês')} disabled={!canNext} onClick={() => setView(shiftMonth(view.year, view.month, 1))}>
           <ChevronRightIcon />
         </button>
       </div>
@@ -258,7 +259,7 @@ function RangeCalendar({ start, end, min, max, onPick }: { start: string; end: s
         })}
       </div>
       <p className="pollcal__hint" role="status">
-        {anchor ? 'Agora toque no último dia.' : 'Toque no primeiro e no último dia.'}
+        {anchor ? t('Agora toque no último dia.') : t('Toque no primeiro e no último dia.')}
       </p>
     </div>
   );
@@ -272,9 +273,9 @@ function EventPick({ onPick, onBack }: { onPick: (event: ExploreEvent) => void; 
   const events = list.data ?? [];
   return (
     <>
-      <Field label="Buscar evento" value={query} onChange={setQuery} placeholder="Nome do evento" autoFocus />
+      <Field label={t('Buscar evento')} value={query} onChange={setQuery} placeholder={t('Nome do evento')} autoFocus />
       {list.error ? <Notice tone="error">{list.error.message}</Notice> : null}
-      {list.data && events.length === 0 ? <EmptyState title="Nenhum evento">{q.length >= 2 ? 'Tente outro nome.' : 'Digite o nome de um evento para buscar.'}</EmptyState> : null}
+      {list.data && events.length === 0 ? <EmptyState title={t('Nenhum evento')}>{q.length >= 2 ? t('Tente outro nome.') : t('Digite o nome de um evento para buscar.')}</EmptyState> : null}
       <ul className="sharelist">
         {events.slice(0, 20).map((e) => (
           <li key={e.id}>
@@ -288,7 +289,7 @@ function EventPick({ onPick, onBack }: { onPick: (event: ExploreEvent) => void; 
         ))}
       </ul>
       <Button variant="quiet" small onClick={onBack}>
-        Voltar
+        {t('Voltar')}
       </Button>
     </>
   );

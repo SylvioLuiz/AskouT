@@ -22,6 +22,7 @@ import type { DraftImage, LinkedPlace } from '../lib/post-draft.ts';
 import type { EventKind, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 let counter = 0;
 const nextKey = () => `i${(counter += 1)}`;
@@ -40,7 +41,7 @@ function usePlaceSearch(q: string, withPhoto: boolean) {
 }
 
 function LocationNotice({ status }: { status: string }) {
-  return status === 'denied' || status === 'unavailable' ? <Notice tone="error">Para achar rolês perto de você, permita a localização no navegador.</Notice> : null;
+  return status === 'denied' || status === 'unavailable' ? <Notice tone="error">{t('Para achar rolês perto de você, permita a localização no navegador.')}</Notice> : null;
 }
 
 /** Escolher o lugar a vincular ao post (qualquer lugar, com ou sem foto). */
@@ -48,14 +49,14 @@ function LinkPlaceSheet({ onPick, onClose }: { onPick: (place: LinkedPlace) => v
   const [q, setQ] = useState('');
   const { term, where, result, places } = usePlaceSearch(q, false);
   return (
-    <Sheet title="Vincular um rolê" onClose={onClose}>
-      <Field label="Buscar rolê" type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint="Ex.: bar, balada, show" />
+    <Sheet title={t('Vincular um rolê')} onClose={onClose}>
+      <Field label={t('Buscar rolê')} type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint={t('Ex.: bar, balada, show')} />
       <LocationNotice status={where.status} />
-      {term.length < 2 ? <p className="muted">Digite o nome ou o tipo do rolê.</p> : null}
+      {term.length < 2 ? <p className="muted">{t('Digite o nome ou o tipo do rolê.')}</p> : null}
       {result.loading && !result.data ? <Loading /> : null}
       {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
-      {result.data && !result.data.placesAvailable ? <Notice>A busca de rolês ainda não está ligada neste ambiente.</Notice> : null}
-      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">Nenhum rolê encontrado.</p> : null}
+      {result.data && !result.data.placesAvailable ? <Notice>{t('A busca de rolês ainda não está ligada neste ambiente.')}</Notice> : null}
+      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">{t('Nenhum rolê encontrado.')}</p> : null}
       <ul className="placepick">
         {places.map((p) => (
           <li key={p.key}>
@@ -78,14 +79,14 @@ function PlacePhotoGrid({ picked, onPick }: { picked: string | undefined; onPick
   const { term, where, result, places } = usePlaceSearch(q, true);
   return (
     <>
-      <Field label="Buscar rolê" type="search" value={q} onChange={setQ} autoComplete="off" hint="Ex.: bar, balada, show" />
+      <Field label={t('Buscar rolê')} type="search" value={q} onChange={setQ} autoComplete="off" hint={t('Ex.: bar, balada, show')} />
       <LocationNotice status={where.status} />
-      {term.length < 2 ? <p className="muted">Digite o nome ou o tipo do rolê para ver as fotos.</p> : null}
+      {term.length < 2 ? <p className="muted">{t('Digite o nome ou o tipo do rolê para ver as fotos.')}</p> : null}
       {result.loading && !result.data ? <Loading /> : null}
       {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
-      {result.data && !result.data.placesAvailable ? <Notice>A busca de rolês com foto ainda não está ligada neste ambiente.</Notice> : null}
-      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">Nenhum rolê com foto para essa busca.</p> : null}
-      <ul className="placegrid" aria-label="Fotos de rolês">
+      {result.data && !result.data.placesAvailable ? <Notice>{t('A busca de rolês com foto ainda não está ligada neste ambiente.')}</Notice> : null}
+      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">{t('Nenhum rolê com foto para essa busca.')}</p> : null}
+      <ul className="placegrid" aria-label={t('Fotos de rolês')}>
         {places.map((p) => (
           <li key={p.key}>
             <button type="button" className="placegrid__item" aria-pressed={picked === p.name} onClick={() => onPick(p)}>
@@ -95,7 +96,7 @@ function PlacePhotoGrid({ picked, onPick }: { picked: string | undefined; onPick
           </li>
         ))}
       </ul>
-      <p className="muted">Fotos de rolês são do Google, com o crédito de quem tirou.</p>
+      <p className="muted">{t('Fotos de rolês são do Google, com o crédito de quem tirou.')}</p>
     </>
   );
 }
@@ -104,7 +105,7 @@ type Step = 'photos' | 'details';
 type Source = 'photos' | 'place';
 
 export function CreatePostScreen() {
-  useTitle('Nova publicação');
+  useTitle(t('Nova publicação'));
   const fileRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<Step>('photos');
   const [source, setSource] = useState<Source>('photos');
@@ -154,7 +155,7 @@ export function CreatePostScreen() {
     for (const file of files.slice(0, Math.max(room, 0))) {
       try {
         if (isVideoFile(file)) {
-          if (hasVideo) throw new Error('Só cabe um vídeo por publicação.');
+          if (hasVideo) throw new Error(t('Só cabe um vídeo por publicação.'));
           // Passou de 60 MB? Só serve se este aparelho conseguir reduzir antes de enviar.
           const problem = videoProblem(file, { canCompress: file.size > POST_VIDEO_MAX_BYTES ? await canCompressVideo() : false });
           if (problem) throw new Error(problem);
@@ -173,7 +174,7 @@ export function CreatePostScreen() {
     setItems((current) => addImages(current, added));
     if (added[0]) setFocusKey(added[0].key);
     const extra = files.length - Math.max(room, 0);
-    if (extra > 0) skipped.push(`Só cabem ${POST_IMAGES_MAX} itens: ${extra} ficou de fora.`);
+    if (extra > 0) skipped.push(t('Só cabem {POST_IMAGES_MAX} itens: {extra} ficou de fora.', { POST_IMAGES_MAX, extra }));
     if (skipped.length > 0) setMessage({ tone: 'error', text: skipped.join(' ') });
     setReading(false);
   }
@@ -183,7 +184,7 @@ export function CreatePostScreen() {
     const image: DraftImage = { key: nextKey(), kind: 'PLACE', preview: api.assetUrl(p.photoPath), photoPath: p.photoPath, author: p.photoAuthor, placeName: p.name, placeAddress: p.address };
     const next = addImages(items, [image]);
     if (!next.includes(image)) {
-      setMessage({ tone: 'error', text: `Já são ${POST_IMAGES_MAX} fotos. Remova uma para usar a foto do rolê.` });
+      setMessage({ tone: 'error', text: t('Já são {POST_IMAGES_MAX} fotos. Remova uma para usar a foto do rolê.', { POST_IMAGES_MAX }) });
       return;
     }
     setItems(next);
@@ -201,7 +202,7 @@ export function CreatePostScreen() {
       setCropKey(undefined);
       setMessage(undefined);
     } catch (failure) {
-      setMessage({ tone: 'error', text: failure instanceof Error ? failure.message : 'Não foi possível recortar a foto.' });
+      setMessage({ tone: 'error', text: failure instanceof Error ? failure.message : t('Não foi possível recortar a foto.') });
     } finally {
       setCropBusy(false);
     }
@@ -240,7 +241,7 @@ export function CreatePostScreen() {
         // O vídeo segue logo depois do post, no item da capa. Se falhar, o post não fica pela metade (só com a capa).
         const target = created.images[video.index];
         try {
-          if (!target) throw new Error('Não foi possível anexar o vídeo.');
+          if (!target) throw new Error(t('Não foi possível anexar o vídeo.'));
           setUpload({ sent: 0, total: video.file.size });
           await api.attachPostVideo(created.id, target.id, video.file, (sent, total) => setUpload({ sent, total }));
         } catch (failure) {
@@ -268,78 +269,78 @@ export function CreatePostScreen() {
     }
   }
 
-  const fileInput = <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="visually-hidden" aria-label="Escolher fotos ou vídeo" id="fotos-post" onChange={addFiles} />;
+  const fileInput = <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="visually-hidden" aria-label={t('Escolher fotos ou vídeo')} id="fotos-post" onChange={addFiles} />;
 
   if (step === 'details') {
     return (
       <div className="compose">
         <header className="compose__bar">
-          <button type="button" className="iconbtn" onClick={() => setStep('photos')} aria-label="Voltar para as fotos">
+          <button type="button" className="iconbtn" onClick={() => setStep('photos')} aria-label={t('Voltar para as fotos')}>
             <span aria-hidden="true">‹</span>
           </button>
-          <h1 className="compose__title">Detalhes</h1>
+          <h1 className="compose__title">{t('Detalhes')}</h1>
           <Button small loading={busy} disabled={Array.from(caption).length > POST_CAPTION_MAX} onClick={publish}>
-            Compartilhar
+            {t('Compartilhar')}
           </Button>
         </header>
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
         {busy && prep ? (
           <div className="uploadbar" role="status" aria-live="polite">
-            <progress className="uploadbar__bar" max={1} value={prep.progress} aria-label="Otimização do vídeo" />
+            <progress className="uploadbar__bar" max={1} value={prep.progress} aria-label={t('Otimização do vídeo')} />
             <p className="uploadbar__text">{prepareProgressText(prep.progress)}</p>
-            <p className="uploadbar__hint">Estamos reduzindo o vídeo para o envio ser mais rápido. Mantenha esta tela aberta.</p>
+            <p className="uploadbar__hint">{t('Estamos reduzindo o vídeo para o envio ser mais rápido. Mantenha esta tela aberta.')}</p>
           </div>
         ) : null}
         {busy && upload ? (
           <div className="uploadbar" role="status" aria-live="polite">
-            <progress className="uploadbar__bar" max={upload.total} value={upload.sent} aria-label="Envio do vídeo" />
+            <progress className="uploadbar__bar" max={upload.total} value={upload.sent} aria-label={t('Envio do vídeo')} />
             <p className="uploadbar__text">{uploadProgressText(upload.sent, upload.total)}</p>
-            <p className="uploadbar__hint">Mantenha esta tela aberta até terminar.</p>
+            <p className="uploadbar__hint">{t('Mantenha esta tela aberta até terminar.')}</p>
           </div>
         ) : null}
         {createdId ? (
           <Link to={`/eventos/${encodeURIComponent(createdId)}`} className="btn btn--secondary">
-            Abrir o evento criado
+            {t('Abrir o evento criado')}
           </Link>
         ) : null}
-        <ul className="composestrip" aria-label="Fotos do post">
+        <ul className="composestrip" aria-label={t('Fotos do post')}>
           {items.map((item, i) => (
             <li key={item.key}>
-              <img src={item.preview} alt={`Foto ${i + 1}`} referrerPolicy="no-referrer" />
+              <img src={item.preview} alt={t('Foto {i}', { i: i + 1 })} referrerPolicy="no-referrer" />
             </li>
           ))}
         </ul>
-        <div className="segmented" role="group" aria-label="Tipo de publicação">
+        <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
           <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
-            Post
+            {t('Post')}
           </button>
           <button type="button" className={`segmented__tab${kind === 'EVENT' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'EVENT'} onClick={() => setKind('EVENT')}>
-            Evento
+            {t('Evento')}
           </button>
         </div>
         {kind === 'EVENT' ? (
-          <section className="compose__row" aria-label="Dados do evento">
-            <Field label="Nome do evento" value={eventTitle} onChange={setEventTitle} maxLength={120} />
+          <section className="compose__row" aria-label={t('Dados do evento')}>
+            <Field label={t('Nome do evento')} value={eventTitle} onChange={setEventTitle} maxLength={120} />
             <EventKindPicker value={eventKind} onChange={setEventKind} />
             <EventDates starts={eventStart} ends={eventEnd} onStarts={setEventStart} onEnds={setEventEnd} />
-            <p className="muted">O rolê é opcional: escolha abaixo se quiser.</p>
+            <p className="muted">{t('O rolê é opcional: escolha abaixo se quiser.')}</p>
             <label className="check">
               <input type="checkbox" checked={eventPrivate} onChange={(e) => setEventPrivate(e.target.checked)} />
               <span>
-                <strong>Evento privado</strong>
-                <span className="muted"> Não aparece no seu perfil nem no feed, e ninguém o posta no próprio perfil. Só chega a quem receber nas conversas.</span>
+                <strong>{t('Evento privado')}</strong>
+                <span className="muted">{t('Não aparece no seu perfil nem no feed, e ninguém o posta no próprio perfil. Só chega a quem receber nas conversas.')}</span>
               </span>
             </label>
-            <h3 className="compose__h">Enviar para conversas e grupos</h3>
-            <ConversationPick selected={shareTo} onChange={setShareTo} label="Conversas que vão receber o evento" />
+            <h3 className="compose__h">{t('Enviar para conversas e grupos')}</h3>
+            <ConversationPick selected={shareTo} onChange={setShareTo} label={t('Conversas que vão receber o evento')} />
             <p className="muted">{eventPrivate ? 'Escolha com quem compartilhar.' : 'Opcional. Quem estiver no grupo poderá postar o evento no próprio perfil.'}</p>
           </section>
         ) : null}
-        <Field label="Descrição (opcional)" value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />
+        <Field label={t('Descrição (opcional)')} value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />
 
         <section className="compose__row" aria-labelledby="lugar-titulo">
           <h2 id="lugar-titulo" className="compose__h">
-            Rolê
+            {t('Rolê')}
           </h2>
           {place ? (
             <p className="compose__value">
@@ -347,18 +348,18 @@ export function CreatePostScreen() {
               {place.address ? <span className="muted"> {place.address}</span> : null}
             </p>
           ) : (
-            <p className="muted">Nenhum rolê vinculado.</p>
+            <p className="muted">{t('Nenhum rolê vinculado.')}</p>
           )}
           {placeFromPhoto ? (
-            <p className="muted">O rolê vem da foto do rolê que você escolheu.</p>
+            <p className="muted">{t('O rolê vem da foto do rolê que você escolheu.')}</p>
           ) : (
             <div className="row-actions">
               <Button variant="secondary" small onClick={() => setLinking(true)}>
-                {linked ? 'Trocar rolê' : 'Vincular um rolê'}
+                {linked ? t('Trocar rolê') : t('Vincular um rolê')}
               </Button>
               {linked ? (
                 <Button variant="quiet" small onClick={() => setLinked(null)}>
-                  Remover
+                  {t('Remover')}
                 </Button>
               ) : null}
             </div>
@@ -367,15 +368,15 @@ export function CreatePostScreen() {
 
         <section className="compose__row" aria-labelledby="pessoas-titulo">
           <h2 id="pessoas-titulo" className="compose__h">
-            Marcar pessoas
+            {t('Marcar pessoas')}
           </h2>
           {tagged.length > 0 ? (
-            <ul className="chips" aria-label="Pessoas marcadas">
+            <ul className="chips" aria-label={t('Pessoas marcadas')}>
               {tagged.map((f) => (
                 <li key={f.userId} className="tagchip">
                   <Avatar profile={f} size={24} />
                   <span>{f.username}</span>
-                  <button type="button" onClick={() => setTags((c) => c.filter((id) => id !== f.userId))} aria-label={`Tirar a marcação de ${f.username}`}>
+                  <button type="button" onClick={() => setTags((c) => c.filter((id) => id !== f.userId))} aria-label={t('Tirar a marcação de {username}', { username: f.username })}>
                     ×
                   </button>
                 </li>
@@ -384,10 +385,10 @@ export function CreatePostScreen() {
           ) : null}
           <div className="row-actions">
             <Button variant="secondary" small onClick={() => setTagging(true)}>
-              {tags.length > 0 ? 'Mudar marcações' : 'Marcar amigos'}
+              {tags.length > 0 ? t('Mudar marcações') : t('Marcar amigos')}
             </Button>
           </div>
-          <p className="muted">Só amigos. Cada pessoa precisa aceitar a marcação para o post aparecer no perfil e no feed dela.</p>
+          <p className="muted">{t('Só amigos. Cada pessoa precisa aceitar a marcação para o post aparecer no perfil e no feed dela.')}</p>
         </section>
 
         {linking ? (
@@ -400,10 +401,10 @@ export function CreatePostScreen() {
           />
         ) : null}
         {tagging ? (
-          <Sheet title="Marcar pessoas" onClose={() => setTagging(false)}>
+          <Sheet title={t('Marcar pessoas')} onClose={() => setTagging(false)}>
             <FriendPicker picked={tags} onToggle={(id) => setTags((c) => toggleId(c, id))} />
             <Button full onClick={() => setTagging(false)}>
-              Concluir
+              {t('Concluir')}
             </Button>
           </Sheet>
         ) : null}
@@ -414,22 +415,22 @@ export function CreatePostScreen() {
   return (
     <div className="compose">
       <header className="compose__bar">
-        <Link to="/" className="iconbtn" aria-label="Cancelar">
+        <Link to="/" className="iconbtn" aria-label={t('Cancelar')}>
           <XIcon />
         </Link>
-        <h1 className="compose__title">Nova publicação</h1>
+        <h1 className="compose__title">{t('Nova publicação')}</h1>
         <Button small disabled={items.length === 0 || reading || cropKey !== undefined} onClick={() => setStep('details')}>
-          Avançar
+          {t('Avançar')}
         </Button>
       </header>
       {fileInput}
 
-      <div className="segmented" role="tablist" aria-label="De onde vem a foto">
+      <div className="segmented" role="tablist" aria-label={t('De onde vem a foto')}>
         <button type="button" role="tab" aria-selected={source === 'photos'} className={`segmented__tab${source === 'photos' ? ' segmented__tab--on' : ''}`} onClick={() => setSource('photos')}>
-          Escolher fotos
+          {t('Escolher fotos')}
         </button>
         <button type="button" role="tab" aria-selected={source === 'place'} className={`segmented__tab${source === 'place' ? ' segmented__tab--on' : ''}`} onClick={() => setSource('place')}>
-          Foto de um rolê
+          {t('Foto de um rolê')}
         </button>
       </div>
 
@@ -441,18 +442,18 @@ export function CreatePostScreen() {
       <div className="compose__stage">
         {focused ? (
           <>
-            <img src={focused.preview} alt={focused.kind === 'UPLOAD' && focused.video ? 'Capa do vídeo' : 'Foto em destaque'} referrerPolicy="no-referrer" />
-            {focused.kind === 'UPLOAD' && focused.video ? <span className="stage__video" aria-label="Vídeo">▶ Vídeo</span> : null}
+            <img src={focused.preview} alt={focused.kind === 'UPLOAD' && focused.video ? t('Capa do vídeo') : t('Foto em destaque')} referrerPolicy="no-referrer" />
+            {focused.kind === 'UPLOAD' && focused.video ? <span className="stage__video" aria-label={t('Vídeo')}>▶ Vídeo</span> : null}
           </>
         ) : source === 'photos' ? (
           <button type="button" className="compose__empty" onClick={() => fileRef.current?.click()} disabled={reading}>
-            {reading ? 'Preparando as fotos…' : 'Toque para abrir a galeria'}
+            {reading ? t('Preparando as fotos…') : t('Toque para abrir a galeria')}
           </button>
         ) : (
-          <p className="compose__empty">Busque um rolê abaixo para usar a foto dele.</p>
+          <p className="compose__empty">{t('Busque um rolê abaixo para usar a foto dele.')}</p>
         )}
         {focused && focused.kind === 'UPLOAD' && focused.source ? (
-          <button type="button" className="stage__crop" onClick={() => setCropKey(focused.key)} aria-label="Recortar foto" title="Recortar">
+          <button type="button" className="stage__crop" onClick={() => setCropKey(focused.key)} aria-label={t('Recortar foto')} title={t('Recortar')}>
             <CropIcon />
           </button>
         ) : null}
@@ -460,22 +461,22 @@ export function CreatePostScreen() {
       )}
 
       {items.length > 0 ? (
-        <ul className="composegrid" aria-label="Fotos escolhidas">
+        <ul className="composegrid" aria-label={t('Fotos escolhidas')}>
           {items.map((item, i) => (
             <li key={item.key} className={`composegrid__item${item.key === focused?.key ? ' composegrid__item--on' : ''}`}>
-              <button type="button" className="composegrid__pick" onClick={() => { if (cropKey === undefined) setFocusKey(item.key); }} disabled={cropKey !== undefined && item.key !== cropKey} aria-label={`Ver item ${i + 1}`} aria-pressed={item.key === focused?.key}>
+              <button type="button" className="composegrid__pick" onClick={() => { if (cropKey === undefined) setFocusKey(item.key); }} disabled={cropKey !== undefined && item.key !== cropKey} aria-label={t('Ver item {i}', { i: i + 1 })} aria-pressed={item.key === focused?.key}>
                 <img src={item.preview} alt="" referrerPolicy="no-referrer" />
                 {item.kind === 'UPLOAD' && item.video ? <span className="composegrid__video" aria-hidden="true">▶</span> : null}
                 <span className="composegrid__n">{i + 1}</span>
               </button>
-              <button type="button" className="composegrid__remove" onClick={() => remove(item.key)} aria-label={`Remover foto ${i + 1}`}>
+              <button type="button" className="composegrid__remove" onClick={() => remove(item.key)} aria-label={t('Remover foto {i}', { i: i + 1 })}>
                 ×
               </button>
             </li>
           ))}
           {source === 'photos' && room > 0 ? (
             <li className="composegrid__item">
-              <button type="button" className="composegrid__add" onClick={() => fileRef.current?.click()} disabled={reading} aria-label="Adicionar fotos">
+              <button type="button" className="composegrid__add" onClick={() => fileRef.current?.click()} disabled={reading} aria-label={t('Adicionar fotos')}>
                 +
               </button>
             </li>
@@ -491,31 +492,31 @@ export function CreatePostScreen() {
 
 /** Posts que você arquivou: só você vê. Pelo menu ⋯ do post dá para desarquivar. */
 export function ArchivedScreen() {
-  useTitle('Arquivados');
+  useTitle(t('Arquivados'));
   return (
     <>
-      <PageHead title="Arquivados" back="/perfil" />
-      <p className="muted">Posts que você arquivou ficam fora do feed e do seu perfil. Só você vê.</p>
-      <PostList load={(offset) => api.archivedPosts({ limit: 12, offset })} emptyTitle="Nada arquivado" emptyHint="Use o menu ⋯ de um post seu e escolha Arquivar." />
+      <PageHead title={t('Arquivados')} back="/perfil" />
+      <p className="muted">{t('Posts que você arquivou ficam fora do feed e do seu perfil. Só você vê.')}</p>
+      <PostList load={(offset) => api.archivedPosts({ limit: 12, offset })} emptyTitle={t('Nada arquivado')} emptyHint={t('Use o menu ⋯ de um post seu e escolha Arquivar.')} />
     </>
   );
 }
 
 export function PostScreen({ postId }: { postId: string }) {
-  useTitle('Post');
+  useTitle(t('Post'));
   const post = useAsync(() => api.post(postId), [postId]);
   if (post.loading && !post.data) return <Loading />;
   if (post.error) {
     return post.error.code === 'NOT_FOUND' ? (
       <EmptyState
-        title="Post não encontrado"
+        title={t('Post não encontrado')}
         action={
           <Link to="/" className="btn btn--secondary">
-            Ir para a Home
+            {t('Ir para a Home')}
           </Link>
         }
       >
-        Ele foi apagado ou você não pode vê-lo.
+        {t('Ele foi apagado ou você não pode vê-lo.')}
       </EmptyState>
     ) : (
       <ErrorState message={post.error.message} onRetry={post.reload} />
@@ -524,7 +525,7 @@ export function PostScreen({ postId }: { postId: string }) {
   if (!post.data) return null;
   return (
     <>
-      <PageHead title="Post" back={`/u/${encodeURIComponent(post.data.author.username)}`} />
+      <PageHead title={t('Post')} back={`/u/${encodeURIComponent(post.data.author.username)}`} />
       <PostCard poster post={post.data} onGone={(_id, why) => navigate(why === 'hidden' ? '/' : '/perfil')} />
     </>
   );

@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 import type { SocialProviderId } from './types.ts';
 
 /** Carrega o script da plataforma uma única vez. */
@@ -12,7 +13,7 @@ export function loadScript(src: string): Promise<void> {
     el.onload = () => resolve();
     el.onerror = () => {
       loading.delete(src);
-      reject(new Error('Não foi possível carregar o login da plataforma. Verifique sua conexão.'));
+      reject(new Error(t('Não foi possível carregar o login da plataforma. Verifique sua conexão.')));
     };
     document.head.appendChild(el);
   });
@@ -52,7 +53,7 @@ export async function appleIdToken(clientId: string): Promise<string | undefined
   if (native) return native.signIn();
   await loadScript(APPLE_SCRIPT);
   const apple = (window as unknown as { AppleID?: { auth?: AppleAuth } }).AppleID?.auth;
-  if (!apple) throw new Error('Não foi possível carregar o login da Apple.');
+  if (!apple) throw new Error(t('Não foi possível carregar o login da Apple.'));
   apple.init({ clientId, scope: 'name email', redirectURI: window.location.origin, usePopup: true });
   try {
     const result = await apple.signIn();

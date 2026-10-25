@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 import type { PublicProfile } from './types.ts';
 
 export type VoteStatus = 'YES' | 'MAYBE' | 'NO';
@@ -99,15 +100,15 @@ export interface PollInput {
   confirmationPolicy: Policy;
 }
 
-export const VOTE_LABEL: Record<VoteStatus, string> = { YES: 'Posso', MAYBE: 'Talvez', NO: 'Não posso' };
+export const VOTE_LABEL: Record<VoteStatus, string> = { YES: 'Posso', MAYBE: 'Talvez', NO: t('Não posso') };
 /** Sinal além da cor, para quem não distingue cores. */
 export const VOTE_MARK: Record<VoteStatus, string> = { YES: '✓', MAYBE: '?', NO: '✕' };
-export const LEVEL_LABEL: Record<Level, string> = { GREEN: 'Alta', ORANGE: 'Média', RED: 'Baixa', GRAY: 'Poucos votos' };
-export const POLICY_LABEL: Record<Policy, string> = { UNANIMITY: 'Unanimidade', MAJORITY: 'Maioria', MANUAL: 'Decisão do organizador' };
+export const LEVEL_LABEL: Record<Level, string> = { GREEN: 'Alta', ORANGE: 'Média', RED: 'Baixa', GRAY: t('Poucos votos') };
+export const POLICY_LABEL: Record<Policy, string> = { UNANIMITY: 'Unanimidade', MAJORITY: 'Maioria', MANUAL: t('Decisão do organizador') };
 export const POLICY_HINT: Record<Policy, string> = {
-  UNANIMITY: 'Fecha quando todos confirmam; uma recusa derruba a data.',
-  MAJORITY: 'Fecha quando mais da metade confirma.',
-  MANUAL: 'Você fecha a data quando quiser.',
+  UNANIMITY: t('Fecha quando todos confirmam; uma recusa derruba a data.'),
+  MAJORITY: t('Fecha quando mais da metade confirma.'),
+  MANUAL: t('Você fecha a data quando quiser.'),
 };
 
 const WEEKDAYS = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];

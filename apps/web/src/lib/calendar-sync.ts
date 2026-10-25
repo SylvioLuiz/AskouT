@@ -1,10 +1,11 @@
+import { t } from '../lib/i18n/index.ts';
 /** Agendas externas que a pessoa pode ligar à agenda do AskouT. */
 export type CalendarProvider = 'PHONE' | 'GOOGLE' | 'OUTLOOK';
 
 export const CALENDAR_PROVIDERS: readonly { id: CalendarProvider; name: string; hint: string }[] = [
-  { id: 'PHONE', name: 'Agenda do celular', hint: 'Compromissos do calendário do aparelho' },
-  { id: 'GOOGLE', name: 'Google Agenda', hint: 'Compromissos da sua conta Google' },
-  { id: 'OUTLOOK', name: 'Outlook', hint: 'Compromissos da sua conta Microsoft' },
+  { id: 'PHONE', name: t('Agenda do celular'), hint: t('Compromissos do calendário do aparelho') },
+  { id: 'GOOGLE', name: t('Google Agenda'), hint: t('Compromissos da sua conta Google') },
+  { id: 'OUTLOOK', name: t('Outlook'), hint: t('Compromissos da sua conta Microsoft') },
 ];
 
 const IDS: readonly string[] = CALENDAR_PROVIDERS.map((p) => p.id);

@@ -1,7 +1,8 @@
+import { t } from '../lib/i18n/index.ts';
 import type { MeetupView } from './types.ts';
 
 /** Nome do botão que cria o encontro. Ainda não é definitivo: mude só aqui. */
-export const MEETUP_ACTION_LABEL = 'Criar encontro';
+export const MEETUP_ACTION_LABEL = t('Criar encontro');
 export const MEETUP_NAME_MAX = 60;
 
 /** Quem conta como "vai": organizador e confirmados. */
@@ -13,11 +14,11 @@ export function goingLabel(m: Pick<MeetupView, 'confirmedCount' | 'invitedCount'
 export function statusLabel(status: MeetupView['myStatus']): string | null {
   switch (status) {
     case 'ORGANIZER':
-      return 'Você criou este encontro';
+      return t('Você criou este encontro');
     case 'CONFIRMED':
-      return 'Você vai';
+      return t('Você vai');
     case 'DECLINED':
-      return 'Você recusou';
+      return t('Você recusou');
     default:
       return null;
   }

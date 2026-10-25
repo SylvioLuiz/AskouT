@@ -6,12 +6,13 @@ import { toApiError } from '../lib/errors.ts';
 import { currentSubscription, disableNativePush, disablePush, enableNativePush, enablePush, nativePushBridge, pushState, readEnvironment, readNativeState, refreshNativeToken } from '../lib/push.ts';
 import type { PushState } from '../lib/push.ts';
 import type { NotificationMute } from '../lib/types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 const COPY: Record<Exclude<PushState, 'off' | 'on'>, string> = {
-  unsupported: 'Este navegador não permite avisos fora do app. Os avisos continuam aparecendo aqui dentro.',
-  'needs-install': 'No iPhone e no iPad, os avisos só funcionam com o AskouT na Tela de Início: toque em Compartilhar e em "Adicionar à Tela de Início", depois abra por lá.',
-  'not-configured': 'Os avisos fora do app ainda não estão ligados neste servidor. Os avisos continuam aparecendo aqui dentro.',
-  denied: 'Você bloqueou os avisos deste site no navegador. Para receber, libere as notificações nas configurações do site e volte aqui.',
+  unsupported: t('Este navegador não permite avisos fora do app. Os avisos continuam aparecendo aqui dentro.'),
+  'needs-install': t('No iPhone e no iPad, os avisos só funcionam com o AskouT na Tela de Início: toque em Compartilhar e em "Adicionar à Tela de Início", depois abra por lá.'),
+  'not-configured': t('Os avisos fora do app ainda não estão ligados neste servidor. Os avisos continuam aparecendo aqui dentro.'),
+  denied: t('Você bloqueou os avisos deste site no navegador. Para receber, libere as notificações nas configurações do site e volte aqui.'),
 };
 
 const NATIVE_DENIED = 'Os avisos do AskouT estão bloqueados neste iPhone. Para receber, libere em Ajustes > AskouT > Notificações e volte aqui.';
@@ -58,7 +59,7 @@ export function PushCard() {
         if (turnOn) await enableNativePush(api, bridge);
         else await disableNativePush(api);
       } else if (turnOn) {
-        if (!publicKey) throw new Error('Os avisos fora do app não estão ligados neste servidor.');
+        if (!publicKey) throw new Error(t('Os avisos fora do app não estão ligados neste servidor.'));
         await enablePush(api, publicKey);
       } else {
         await disablePush(api);
@@ -77,18 +78,18 @@ export function PushCard() {
   return (
     <div className="callout pushcard">
       <p className="callout__text">
-        <strong>{state === 'on' ? 'Avisos ligados neste aparelho' : 'Receba avisos fora do app'}</strong>
+        <strong>{state === 'on' ? t('Avisos ligados neste aparelho') : t('Receba avisos fora do app')}</strong>
         <br />
-        {state === 'on' ? 'Você é avisado de mensagens, convites e encontros mesmo com o AskouT fechado. O texto das mensagens não aparece no aviso.' : 'Mensagens, convites e encontros chegam como notificação, mesmo com o AskouT fechado.'}
+        {state === 'on' ? t('Você é avisado de mensagens, convites e encontros mesmo com o AskouT fechado. O texto das mensagens não aparece no aviso.') : t('Mensagens, convites e encontros chegam como notificação, mesmo com o AskouT fechado.')}
       </p>
       <div className="row-actions">
         {state === 'on' ? (
           <Button small variant="secondary" loading={busy} onClick={() => void toggle(false)}>
-            Desligar neste aparelho
+            {t('Desligar neste aparelho')}
           </Button>
         ) : (
           <Button small loading={busy} onClick={() => void toggle(true)}>
-            Ativar avisos
+            {t('Ativar avisos')}
           </Button>
         )}
       </div>
@@ -98,9 +99,9 @@ export function PushCard() {
 }
 
 const MUTE_ROWS: { key: 'all' | 'chats' | 'events'; title: string; help: string }[] = [
-  { key: 'all', title: 'Todas', help: 'Nenhum aviso toca no aparelho. Eles continuam aparecendo no sino.' },
-  { key: 'chats', title: 'Conversas', help: 'Sem push de mensagens e avisos de grupos. Continuam no sino.' },
-  { key: 'events', title: 'Eventos', help: 'Sem push de convites, mudanças e do lembrete de 30 min antes do evento. Continuam no sino.' },
+  { key: 'all', title: t('Todas'), help: t('Nenhum aviso toca no aparelho. Eles continuam aparecendo no sino.') },
+  { key: 'chats', title: t('Conversas'), help: t('Sem push de mensagens e avisos de grupos. Continuam no sino.') },
+  { key: 'events', title: t('Eventos'), help: t('Sem push de convites, mudanças e do lembrete de 30 min antes do evento. Continuam no sino.') },
 ];
 
 /** Chaves para silenciar avisos: tudo, só conversas ou só eventos. */

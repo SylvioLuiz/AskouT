@@ -2,6 +2,7 @@ import { ChevronLeftIcon } from '../components/icons.tsx';
 import { useTitle } from '../hooks.ts';
 import { buildPrivacy, buildTerms, LEGAL_REVIEWED, LEGAL_UPDATED, privacyEmail } from '../lib/legal-text.ts';
 import { Link, navigate } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 function goBack() {
   if (window.history.length > 1) window.history.back();
@@ -16,17 +17,17 @@ export function LegalScreen({ doc }: { doc: 'privacy' | 'terms' }) {
   return (
     <div className="legal">
       <header className="legal__top">
-        <button type="button" className="legal__back" onClick={goBack} aria-label="Voltar">
+        <button type="button" className="legal__back" onClick={goBack} aria-label={t('Voltar')}>
           <ChevronLeftIcon />
         </button>
-        <span className="legal__brand">AskouT</span>
+        <span className="legal__brand">{t('AskouT')}</span>
       </header>
       <main className="legal__body">
         <h1>{content.title}</h1>
         <p className="legal__meta">Atualizada em {LEGAL_UPDATED}</p>
         {LEGAL_REVIEWED ? null : (
           <p className="legal__draft" role="note">
-            Versão preliminar, ainda em revisão jurídica. Pode mudar antes do lançamento.
+            {t('Versão preliminar, ainda em revisão jurídica. Pode mudar antes do lançamento.')}
           </p>
         )}
         <p>{content.intro}</p>
@@ -44,7 +45,7 @@ export function LegalScreen({ doc }: { doc: 'privacy' | 'terms' }) {
           </section>
         ))}
         <p className="legal__switch">
-          {doc === 'privacy' ? <Link to="/termos-de-uso">Ler os Termos de Uso</Link> : <Link to="/politica-de-privacidade">Ler a Política de Privacidade</Link>}
+          {doc === 'privacy' ? <Link to="/termos-de-uso">{t('Ler os Termos de Uso')}</Link> : <Link to="/politica-de-privacidade">{t('Ler a Política de Privacidade')}</Link>}
         </p>
       </main>
     </div>

@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 import type { BoostPhase, BoostView, MatchReach } from './types.ts';
 
 /** Valor em reais, no formato brasileiro (R$ 15,00). */
@@ -15,9 +16,9 @@ export function daysLabel(days: number): string {
 }
 
 export const BOOST_PHASE_LABEL: Record<BoostPhase, string> = {
-  PENDING_PAYMENT: 'Aguardando pagamento',
+  PENDING_PAYMENT: t('Aguardando pagamento'),
   SCHEDULED: 'Agendado',
-  ACTIVE: 'No ar',
+  ACTIVE: t('No ar'),
   ENDED: 'Encerrado',
   CANCELLED: 'Cancelado',
   PAUSED: 'Pausado',
@@ -35,7 +36,7 @@ export function sortBoosts(items: BoostView[]): BoostView[] {
 }
 
 export function boostTitle(boost: Pick<BoostView, 'target' | 'eventTitle'>): string {
-  return boost.target === 'EVENT' ? (boost.eventTitle ?? 'Evento') : 'O rolê (página do local)';
+  return boost.target === 'EVENT' ? (boost.eventTitle ?? 'Evento') : t('O rolê (página do local)');
 }
 
 /** Marca ou desmarca uma hashtag, sem passar do máximo. */
@@ -59,7 +60,7 @@ export function reachText(reach: Pick<MatchReach, 'label' | 'partial'>): string 
 
 /** Distância para a Home: “Pertinho de você” ou “A cerca de 3 km de você”. */
 export function distanceText(km: number): string {
-  return km <= 1 ? 'Pertinho de você' : `A cerca de ${Math.round(km)} km de você`;
+  return km <= 1 ? t('Pertinho de você') : t('A cerca de {km} km de você', { km: Math.round(km) });
 }
 
 /** Arredonda uma coordenada para ~1 km antes de enviar (o servidor também arredonda). */

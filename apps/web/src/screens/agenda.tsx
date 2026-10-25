@@ -26,6 +26,7 @@ import {
 import { toApiError } from '../lib/errors.ts';
 import type { Slot, SlotState } from '../lib/types.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 /** Quantos dias a faixa mostra a partir de hoje. */
 const WINDOW_DAYS = 28;
@@ -42,7 +43,7 @@ function useDayWindow() {
 function EventList({ events }: { events: AgendaEvent[] }) {
   return (
     <div className="agevents">
-      <h3 className="agevents__title">Eventos que você vai</h3>
+      <h3 className="agevents__title">{t('Eventos que você vai')}</h3>
       <ul className="agevents__list">
         {events.map((e) => (
           <li key={e.key}>
@@ -70,8 +71,8 @@ function SlotList({ slots, day, onRemove }: { slots: Slot[]; day: string; onRemo
             <StateMark state={slot.state} />
           </div>
           {onRemove ? (
-            <Button variant="quiet" small onClick={() => onRemove(slot)} aria-label={`Remover horário ${timeRangeLabel(slot, day)}`}>
-              Remover
+            <Button variant="quiet" small onClick={() => onRemove(slot)} aria-label={t('Remover horário {day}', { day: timeRangeLabel(slot, day) })}>
+              {t('Remover')}
             </Button>
           ) : null}
         </li>
@@ -113,12 +114,12 @@ function AddSlotSheet({ day, onClose, onSaved }: { day: string; onClose: () => v
   }
 
   return (
-    <Sheet title="Marcar horário" onClose={onClose}>
+    <Sheet title={t('Marcar horário')} onClose={onClose}>
       <form className="form form--flat" onSubmit={submit} noValidate>
         <p className="muted">{dayLongLabel(day)}</p>
 
         <fieldset className="choice">
-          <legend className="choice__legend">Como você está nesse período?</legend>
+          <legend className="choice__legend">{t('Como você está nesse período?')}</legend>
           {STATES.map((option) => (
             <label key={option} className={`choice__opt${state === option ? ' choice__opt--on' : ''}`}>
               <input type="radio" name="estado" value={option} checked={state === option} onChange={() => setState(option)} />
@@ -131,7 +132,7 @@ function AddSlotSheet({ day, onClose, onSaved }: { day: string; onClose: () => v
           {errors['state'] ? <p className="field__error" role="alert">{errors['state']}</p> : null}
         </fieldset>
 
-        <div className="chips" role="group" aria-label="Atalhos de horário">
+        <div className="chips" role="group" aria-label={t('Atalhos de horário')}>
           {PRESETS.map((preset) => (
             <button
               key={preset.label}
@@ -150,13 +151,13 @@ function AddSlotSheet({ day, onClose, onSaved }: { day: string; onClose: () => v
         </div>
 
         <div className="form__pair">
-          <Field label="Início" type="time" value={start} onChange={setStart} error={errors['start']} />
-          <Field label="Fim" type="time" value={end} onChange={setEnd} error={errors['end']} hint="00:00 é meia-noite" />
+          <Field label={t('Início')} type="time" value={start} onChange={setStart} error={errors['start']} />
+          <Field label={t('Fim')} type="time" value={end} onChange={setEnd} error={errors['end']} hint={t('00:00 é meia-noite')} />
         </div>
 
         {formError ? <Notice tone="error">{formError}</Notice> : null}
         <Button type="submit" full loading={saving}>
-          Salvar horário
+          {t('Salvar horário')}
         </Button>
       </form>
     </Sheet>
@@ -164,7 +165,7 @@ function AddSlotSheet({ day, onClose, onSaved }: { day: string; onClose: () => v
 }
 
 export function AgendaScreen() {
-  useTitle('Agenda');
+  useTitle(t('Agenda'));
   const { today, days, range } = useDayWindow();
   const [selected, setSelected] = useState(today);
   const [adding, setAdding] = useState(false);
@@ -187,7 +188,7 @@ export function AgendaScreen() {
     try {
       await api.removeSlot(slot.id);
       setRemoving(undefined);
-      setMessage({ tone: 'ok', text: 'Horário removido.' });
+      setMessage({ tone: 'ok', text: t('Horário removido.') });
       slots.reload();
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
@@ -198,11 +199,11 @@ export function AgendaScreen() {
 
   return (
     <>
-      <PageHead title="Agenda" subtitle="Só você vê esta agenda. Marque quando topa sair." />
+      <PageHead title={t('Agenda')} subtitle={t('Só você vê esta agenda. Marque quando topa sair.')} />
 
       <div className="agsync">
         <Button variant="quiet" small onClick={() => setSyncing(true)}>
-          {syncedN > 0 ? `Sincronizar · ${syncedN} ${syncedN === 1 ? 'ligada' : 'ligadas'}` : 'Sincronizar'}
+          {syncedN > 0 ? `Sincronizar · ${syncedN} ${syncedN === 1 ? 'ligada' : 'ligadas'}` : t('Sincronizar')}
         </Button>
       </div>
 
@@ -219,14 +220,14 @@ export function AgendaScreen() {
         {slots.error ? <ErrorState message={slots.error.message} onRetry={slots.reload} /> : null}
 
         {slots.data && ofDay.length === 0 ? (
-          <p className="muted">Nenhum horário marcado neste dia.</p>
+          <p className="muted">{t('Nenhum horário marcado neste dia.')}</p>
         ) : null}
         {ofDay.length > 0 ? <SlotList slots={ofDay} day={selected} onRemove={(slot) => setRemoving(slot)} /> : null}
         {eventsToday.length > 0 ? <EventList events={eventsToday} /> : null}
         {removing ? (
           <Confirm
-            question={`Remover o horário ${timeRangeLabel(removing, selected)}?`}
-            confirmLabel="Remover"
+            question={t('Remover o horário {selected}?', { selected: timeRangeLabel(removing, selected) })}
+            confirmLabel={t('Remover')}
             danger
             busy={busy}
             onCancel={() => setRemoving(undefined)}
@@ -237,7 +238,7 @@ export function AgendaScreen() {
 
       <button type="button" className="fab" onClick={() => setAdding(true)}>
         <PlusIcon />
-        Marcar horário
+        {t('Marcar horário')}
       </button>
 
       {syncing ? <CalendarSyncSheet onClose={() => setSyncing(false)} onChange={(list) => setSyncedN(list.length)} /> : null}
@@ -248,7 +249,7 @@ export function AgendaScreen() {
           onClose={() => setAdding(false)}
           onSaved={() => {
             setAdding(false);
-            setMessage({ tone: 'ok', text: 'Horário salvo.' });
+            setMessage({ tone: 'ok', text: t('Horário salvo.') });
             slots.reload();
           }}
         />

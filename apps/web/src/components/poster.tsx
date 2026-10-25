@@ -4,6 +4,7 @@ import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
 import { confirmedLabel, dateTile } from '../lib/poster.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 /** Selo com o dia do evento ("SÁB 25 OUT"), em vidro sobre a foto. */
 export function DateBadge({ startsAt, mini = false }: { startsAt: string; mini?: boolean }) {
@@ -89,7 +90,7 @@ export function PosterEvent({
         <div className="poster__row">
           {label ? <span className="poster__glass">{label}</span> : <span />}
           <button type="button" className="poster__cta" onClick={() => void toggle()} aria-pressed={going} disabled={busy}>
-            {going ? 'Confirmado' : 'Eu vou'}
+            {going ? t('Confirmado') : t('Eu vou')}
           </button>
         </div>
       </div>

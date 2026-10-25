@@ -10,6 +10,7 @@ import { toApiError } from '../lib/errors.ts';
 import { MEETUP_ACTION_LABEL, MEETUP_NAME_MAX, goingLabel, statusLabel, toggleId } from '../lib/meetup.ts';
 import type { MeetupView } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 /** Capa do evento do encontro: imagem https ou degradê pelo tipo. */
 export function MeetupCover({ meetup }: { meetup: MeetupView }) {
   const [failed, setFailed] = useState(false);
@@ -20,7 +21,7 @@ export function MeetupCover({ meetup }: { meetup: MeetupView }) {
       {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="evcover__kind" aria-hidden="true">{kindLabel(kind)}</span>}
       {meetup.event?.sample ? (
         <span className="evcover__tags">
-          <span className="tag tag--sample">Exemplo de teste</span>
+          <span className="tag tag--sample">{t('Exemplo de teste')}</span>
         </span>
       ) : null}
     </div>
@@ -67,21 +68,21 @@ export function MeetupBubble({ meetup, nowIso, onUpdated }: { meetup: MeetupView
       <MeetupFacts meetup={meetup} now={now} />
       {meetup.isGroup && meetup.groupName ? <p className="meetcard__line">Grupo: {meetup.groupName}</p> : null}
       {cancelled ? (
-        <p className="sugcard__answer sugcard__answer--no" role="status">Encontro cancelado</p>
+        <p className="sugcard__answer sugcard__answer--no" role="status">{t('Encontro cancelado')}</p>
       ) : meetup.myStatus === 'INVITED' ? (
         ended ? (
-          <p className="sugcard__answer" role="status">Esse encontro já aconteceu</p>
+          <p className="sugcard__answer" role="status">{t('Esse encontro já aconteceu')}</p>
         ) : (
           <>
             <div className="sugcard__actions">
               <Button small loading={busy === 'accept'} disabled={busy === 'decline'} onClick={() => answer('accept')}>
-                Aceitar
+                {t('Aceitar')}
               </Button>
               <Button small variant="secondary" loading={busy === 'decline'} disabled={busy === 'accept'} onClick={() => answer('decline')}>
-                Recusar
+                {t('Recusar')}
               </Button>
             </div>
-            {meetup.isGroup ? <p className="meetcard__hint">Ao aceitar, você entra no grupo.</p> : null}
+            {meetup.isGroup ? <p className="meetcard__hint">{t('Ao aceitar, você entra no grupo.')}</p> : null}
           </>
         )
       ) : status ? (
@@ -90,8 +91,8 @@ export function MeetupBubble({ meetup, nowIso, onUpdated }: { meetup: MeetupView
         </p>
       ) : null}
       <div className="sugcard__links">
-        {meetup.event ? <Link to={`/eventos/${encodeURIComponent(meetup.event.id)}`}>Ver evento</Link> : null}
-        {meetup.isGroup && (meetup.myStatus === 'CONFIRMED' || meetup.myStatus === 'ORGANIZER') ? <Link to={`/conversas/${meetup.conversationId}`}>Abrir o grupo</Link> : null}
+        {meetup.event ? <Link to={`/eventos/${encodeURIComponent(meetup.event.id)}`}>{t('Ver evento')}</Link> : null}
+        {meetup.isGroup && (meetup.myStatus === 'CONFIRMED' || meetup.myStatus === 'ORGANIZER') ? <Link to={`/conversas/${meetup.conversationId}`}>{t('Abrir o grupo')}</Link> : null}
       </div>
       {problem ? <p className="sugcard__problem">{problem}</p> : null}
     </div>
@@ -112,15 +113,15 @@ export function FriendPicker({ picked, onToggle, exclude = [] }: { picked: strin
   if (friends.error) return <ErrorState message={friends.error.message} onRetry={friends.reload} />;
   if (available.length === 0) {
     return (
-      <EmptyState title={exclude.length > 0 ? 'Nenhum amigo para convidar' : 'Você ainda não tem amigos no AskouT'}>
-        {exclude.length > 0 ? 'Todos os seus amigos já estão aqui.' : 'Amigos são quem você segue e que segue você de volta. Encontre pessoas no Explorar.'}
+      <EmptyState title={exclude.length > 0 ? t('Nenhum amigo para convidar') : t('Você ainda não tem amigos no AskouT')}>
+        {exclude.length > 0 ? t('Todos os seus amigos já estão aqui.') : t('Amigos são quem você segue e que segue você de volta. Encontre pessoas no Explorar.')}
       </EmptyState>
     );
   }
   return (
     <>
-      {available.length > 6 ? <Field label="Buscar amigo" value={filter} onChange={setFilter} /> : null}
-      <ul className="friendpick" aria-label="Amigos">
+      {available.length > 6 ? <Field label={t('Buscar amigo')} value={filter} onChange={setFilter} /> : null}
+      <ul className="friendpick" aria-label={t('Amigos')}>
         {visible.map((f) => {
           const on = picked.includes(f.userId);
           return (
@@ -171,7 +172,7 @@ export function CreateMeetupSheet({ event, onClose }: { event: { id: string; tit
       <FriendPicker picked={picked} onToggle={(userId) => setPicked((cur) => toggleId(cur, userId))} />
       {friends.data && friends.data.length > 0 ? (
         <>
-          {picked.length > 1 ? <Field label="Nome do grupo (opcional)" value={name} onChange={setName} maxLength={MEETUP_NAME_MAX} hint={`Se ficar vazio, usa "${event.title}".`} /> : null}
+          {picked.length > 1 ? <Field label={t('Nome do grupo (opcional)')} value={name} onChange={setName} maxLength={MEETUP_NAME_MAX} hint={t('Se ficar vazio, usa "{title}".', { title: event.title })} /> : null}
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full loading={busy} disabled={picked.length === 0} onClick={create}>
             {picked.length > 1 ? `${MEETUP_ACTION_LABEL} com ${picked.length} pessoas` : MEETUP_ACTION_LABEL}
@@ -203,31 +204,31 @@ export function ManageMeetupSheet({ meetup, excludeIds, onClose, onChanged }: { 
   }
 
   return (
-    <Sheet title="Editar encontro" onClose={onClose}>
-      <Field label="Nome do encontro" value={title} onChange={setTitle} maxLength={120} />
+    <Sheet title={t('Editar encontro')} onClose={onClose}>
+      <Field label={t('Nome do encontro')} value={title} onChange={setTitle} maxLength={120} />
       <Button full loading={busy === 'rename'} disabled={title.trim() === '' || title.trim() === meetup.title} onClick={() => run('rename', () => api.renameMeetup(meetup.id, title.trim()))}>
-        Salvar nome
+        {t('Salvar nome')}
       </Button>
       {meetup.isGroup ? (
         <>
-          <h3 className="results__h">Convidar mais gente</h3>
+          <h3 className="results__h">{t('Convidar mais gente')}</h3>
           <FriendPicker picked={picked} onToggle={(userId) => setPicked((cur) => toggleId(cur, userId))} exclude={excludeIds} />
           <Button full variant="secondary" loading={busy === 'invite'} disabled={picked.length === 0} onClick={() => run('invite', () => api.inviteMeetup(meetup.id, picked))}>
-            {picked.length > 1 ? `Convidar ${picked.length} pessoas` : 'Convidar'}
+            {picked.length > 1 ? t('Convidar {length} pessoas', { length: picked.length }) : t('Convidar')}
           </Button>
         </>
       ) : null}
-      <h3 className="results__h">Cancelar</h3>
+      <h3 className="results__h">{t('Cancelar')}</h3>
       {confirmCancel ? (
         <>
-          <p className="muted">Todos os convidados são avisados de que o encontro foi cancelado.</p>
+          <p className="muted">{t('Todos os convidados são avisados de que o encontro foi cancelado.')}</p>
           <Button full variant="danger" loading={busy === 'cancel'} onClick={() => run('cancel', () => api.cancelMeetup(meetup.id))}>
-            Sim, cancelar o encontro
+            {t('Sim, cancelar o encontro')}
           </Button>
         </>
       ) : (
         <Button full variant="secondary" onClick={() => setConfirmCancel(true)}>
-          Cancelar encontro
+          {t('Cancelar encontro')}
         </Button>
       )}
       {problem ? <p className="sugcard__problem">{problem}</p> : null}

@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 /** Idade completa em `now` para uma data AAAA-MM-DD; -1 se a data não existir. */
 export function ageOnDate(birth: string, now: Date): number {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birth);
@@ -21,7 +22,7 @@ export function todayIso(now: Date = new Date()): string {
 export function birthDateProblem(birth: string, now: Date): string | undefined {
   if (birth === '') return 'Informe a sua data de nascimento';
   const age = ageOnDate(birth, now);
-  if (age < 0 || age > 120) return 'Informe uma data válida';
+  if (age < 0 || age > 120) return t('Informe uma data válida');
   return undefined;
 }
 
@@ -45,7 +46,7 @@ export function consentProblems(birth: string, accepted: boolean, now: Date): Re
   const out: Record<string, string> = {};
   const problem = birthDateProblem(birth, now);
   if (problem) out['birthDate'] = problem;
-  else if (ageOnDate(birth, now) < MIN_ACCOUNT_AGE) out['birthDate'] = `O AskouT é para quem tem ${MIN_ACCOUNT_AGE} anos ou mais`;
-  if (!accepted) out['acceptTerms'] = 'Para criar a conta, aceite os Termos de Uso e a Política de Privacidade';
+  else if (ageOnDate(birth, now) < MIN_ACCOUNT_AGE) out['birthDate'] = t('O AskouT é para quem tem {MIN_ACCOUNT_AGE} anos ou mais', { MIN_ACCOUNT_AGE });
+  if (!accepted) out['acceptTerms'] = t('Para criar a conta, aceite os Termos de Uso e a Política de Privacidade');
   return out;
 }

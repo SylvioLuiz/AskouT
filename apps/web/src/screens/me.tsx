@@ -21,11 +21,12 @@ import { supportMailto } from '../lib/help-mailto.ts';
 import { downloadJson } from '../lib/account.ts';
 import { birthDateProblem, MIN_ACCOUNT_AGE, ageOnDate, todayIso } from '../lib/age.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 type Message = { tone: 'ok' | 'error'; text: string } | undefined;
 
 export function EditProfileScreen() {
-  useTitle('Editar perfil');
+  useTitle(t('Editar perfil'));
   const user = useUser();
   const { setOwnProfile } = useAuthContext();
   const view = useAsync(() => api.getProfile(user.profile.username), [user.profile.username]);
@@ -60,7 +61,7 @@ export function EditProfileScreen() {
     try {
       const image = await resizeProfilePhoto(file);
       remember(await api.setProfilePhoto(image));
-      setMessage({ tone: 'ok', text: 'Foto atualizada.' });
+      setMessage({ tone: 'ok', text: t('Foto atualizada.') });
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -73,7 +74,7 @@ export function EditProfileScreen() {
     setMessage(undefined);
     try {
       remember(await api.setProfilePhoto(null));
-      setMessage({ tone: 'ok', text: 'Foto removida.' });
+      setMessage({ tone: 'ok', text: t('Foto removida.') });
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -90,7 +91,7 @@ export function EditProfileScreen() {
     setSaving(true);
     try {
       remember(await api.updateProfile({ displayName: displayName.trim(), bio: bio.trim() }));
-      setMessage({ tone: 'ok', text: 'Perfil atualizado.' });
+      setMessage({ tone: 'ok', text: t('Perfil atualizado.') });
     } catch (failure) {
       const error = toApiError(failure);
       setErrors(error.fields);
@@ -105,28 +106,28 @@ export function EditProfileScreen() {
 
   return (
     <>
-      <PageHead title="Editar perfil" back="/perfil" />
+      <PageHead title={t('Editar perfil')} back="/perfil" />
       <div className="photoedit">
         <Avatar profile={{ userId: user.profile.userId, username: user.profile.username, displayName: displayName || user.profile.displayName, avatarUrl }} size={96} />
         <div className="photoedit__actions">
-          <input ref={fileRef} type="file" accept="image/*" className="visually-hidden" aria-label="Escolher foto de perfil" id="foto" onChange={pickPhoto} />
+          <input ref={fileRef} type="file" accept="image/*" className="visually-hidden" aria-label={t('Escolher foto de perfil')} id="foto" onChange={pickPhoto} />
           <Button variant="secondary" small loading={photoBusy} onClick={() => fileRef.current?.click()}>
-            {avatarUrl ? 'Trocar foto' : 'Subir foto'}
+            {avatarUrl ? t('Trocar foto') : t('Subir foto')}
           </Button>
           {avatarUrl ? (
             <Button variant="quiet" small disabled={photoBusy} onClick={removePhoto}>
-              Remover foto
+              {t('Remover foto')}
             </Button>
           ) : null}
         </div>
       </div>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       <form className="form form--flat" onSubmit={save} noValidate>
-        <Field label="Nome" value={displayName} onChange={setDisplayName} error={errors['displayName']} maxLength={60} autoComplete="name" />
-        <Field label="Descrição" value={bio} onChange={setBio} error={errors['bio']} hint={`${Array.from(bio).length}/${BIO_MAX}`} multiline maxLength={BIO_MAX + 20} />
+        <Field label={t('Nome')} value={displayName} onChange={setDisplayName} error={errors['displayName']} maxLength={60} autoComplete="name" />
+        <Field label={t('Descrição')} value={bio} onChange={setBio} error={errors['bio']} hint={`${Array.from(bio).length}/${BIO_MAX}`} multiline maxLength={BIO_MAX + 20} />
         <div>
           <Button type="submit" loading={saving}>
-            Salvar alterações
+            {t('Salvar alterações')}
           </Button>
         </div>
       </form>
@@ -154,14 +155,14 @@ function BirthDateSection() {
   async function save(event: FormEvent) {
     event.preventDefault();
     setMessage(undefined);
-    const problem = birthDateProblem(birth, new Date()) ?? (ageOnDate(birth, new Date()) < MIN_ACCOUNT_AGE ? `O AskouT é para quem tem ${MIN_ACCOUNT_AGE} anos ou mais` : undefined);
+    const problem = birthDateProblem(birth, new Date()) ?? (ageOnDate(birth, new Date()) < MIN_ACCOUNT_AGE ? t('O AskouT é para quem tem {MIN_ACCOUNT_AGE} anos ou mais', { MIN_ACCOUNT_AGE }) : undefined);
     setError(problem);
     if (problem) return;
     setSaving(true);
     try {
       const next = await api.correctBirthDate(birth);
       age.setData(next);
-      setMessage({ tone: 'ok', text: 'Data de nascimento atualizada.' });
+      setMessage({ tone: 'ok', text: t('Data de nascimento atualizada.') });
     } catch (failure) {
       const e = toApiError(failure);
       setError(e.fields['birthDate']);
@@ -174,9 +175,9 @@ function BirthDateSection() {
   return (
     <section className="birthedit">
       <h2 className="birthedit__title">
-        Data de nascimento
+        {t('Data de nascimento')}
       </h2>
-      <p className="muted">Ela não aparece para ninguém. Serve para confirmar que você tem 18 anos ou mais.</p>
+      <p className="muted">{t('Ela não aparece para ninguém. Serve para confirmar que você tem 18 anos ou mais.')}</p>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {status.locked ? (
         <p className="muted">
@@ -185,10 +186,10 @@ function BirthDateSection() {
         </p>
       ) : (
         <form className="form form--flat" onSubmit={save} noValidate>
-          <Field label="Data de nascimento" type="date" value={birth} onChange={setBirth} error={error} max={todayIso()} autoComplete="bday" hint={status.declared ? undefined : 'Você ainda não informou. Precisamos dela para confirmar que você tem 18 anos ou mais.'} />
+          <Field label={t('Data de nascimento')} type="date" value={birth} onChange={setBirth} error={error} max={todayIso()} autoComplete="bday" hint={status.declared ? undefined : t('Você ainda não informou. Precisamos dela para confirmar que você tem 18 anos ou mais.')} />
           <div>
             <Button type="submit" variant="secondary" loading={saving}>
-              Atualizar data
+              {t('Atualizar data')}
             </Button>
           </div>
         </form>
@@ -198,36 +199,36 @@ function BirthDateSection() {
 }
 
 export function SettingsScreen() {
-  useTitle('Configuração');
+  useTitle(t('Configuração'));
   const user = useUser();
   return (
     <>
-      <PageHead title="Configuração" back="/perfil" />
+      <PageHead title={t('Configuração')} back="/perfil" />
       <dl className="eventpage__facts">
         <div>
-          <dt>Usuário</dt>
+          <dt>{t('Usuário')}</dt>
           <dd>@{user.profile.username}</dd>
         </div>
         <div>
-          <dt>E-mail</dt>
+          <dt>{t('E-mail')}</dt>
           <dd>{user.email}</dd>
         </div>
       </dl>
-      <p className="muted">Ainda não dá para trocar o e-mail ou a senha por aqui. Isso entra numa próxima etapa.</p>
-      <h2 className="profile__section">Avisos no aparelho</h2>
+      <p className="muted">{t('Ainda não dá para trocar o e-mail ou a senha por aqui. Isso entra numa próxima etapa.')}</p>
+      <h2 className="profile__section">{t('Avisos no aparelho')}</h2>
       <PushCard />
-      <h2 className="profile__section">Silenciar push</h2>
+      <h2 className="profile__section">{t('Silenciar push')}</h2>
       <MuteCard />
-      <nav className="linklist" aria-label="Sua conta">
-        <Link to="/amigos">Amigos</Link>
-        <Link to="/bloqueados">Pessoas bloqueadas</Link>
+      <nav className="linklist" aria-label={t('Sua conta')}>
+        <Link to="/amigos">{t('Amigos')}</Link>
+        <Link to="/bloqueados">{t('Pessoas bloqueadas')}</Link>
       </nav>
     </>
   );
 }
 
 export function PrivacyScreen() {
-  useTitle('Privacidade');
+  useTitle(t('Privacidade'));
   const user = useUser();
   const { setOwnProfile } = useAuthContext();
   const [isPrivate, setIsPrivate] = useState(user.profile.isPrivate);
@@ -246,10 +247,10 @@ export function PrivacyScreen() {
       setMessage({
         tone: 'ok',
         text: result.isPrivate
-          ? 'Seu perfil agora é privado. Quem já segue continua seguindo; novos seguidores precisam da sua aprovação.'
+          ? t('Seu perfil agora é privado. Quem já segue continua seguindo; novos seguidores precisam da sua aprovação.')
           : result.acceptedPending > 0
             ? `Seu perfil agora é público. ${pluralize(result.acceptedPending, 'pedido pendente foi aceito', 'pedidos pendentes foram aceitos')}.`
-            : 'Seu perfil agora é público.',
+            : t('Seu perfil agora é público.'),
       });
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
@@ -260,14 +261,14 @@ export function PrivacyScreen() {
 
   return (
     <>
-      <PageHead title="Privacidade" back="/perfil" />
+      <PageHead title={t('Privacidade')} back="/perfil" />
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       <section className="setting">
         <div className="setting__text">
           <h2 className="setting__title" id="privado-titulo">
-            Perfil privado
+            {t('Perfil privado')}
           </h2>
-          <p className="setting__help">Com o perfil privado, só quem você aprova vê seus eventos postados, sua agenda e suas conexões.</p>
+          <p className="setting__help">{t('Com o perfil privado, só quem você aprova vê seus eventos postados, sua agenda e suas conexões.')}</p>
         </div>
         <button type="button" role="switch" aria-checked={isPrivate} aria-labelledby="privado-titulo" className="switch" onClick={toggle} disabled={busy}>
           <span className="switch__thumb" />
@@ -275,12 +276,12 @@ export function PrivacyScreen() {
       </section>
       <PersonalizeSetting userId={user.profile.userId} onChange={() => setPersonalizeRev((n) => n + 1)} />
       <RegionSetting key={personalizeRev} userId={user.profile.userId} />
-      <nav className="linklist" aria-label="Privacidade">
-        <Link to="/atividades">Pedidos para seguir</Link>
-        <Link to="/bloqueados">Pessoas bloqueadas</Link>
-        <Link to={`/u/${encodeURIComponent(user.profile.username)}`}>Ver como os outros veem</Link>
-        <Link to="/politica-de-privacidade">Política de Privacidade</Link>
-        <Link to="/termos-de-uso">Termos de Uso</Link>
+      <nav className="linklist" aria-label={t('Privacidade')}>
+        <Link to="/atividades">{t('Pedidos para seguir')}</Link>
+        <Link to="/bloqueados">{t('Pessoas bloqueadas')}</Link>
+        <Link to={`/u/${encodeURIComponent(user.profile.username)}`}>{t('Ver como os outros veem')}</Link>
+        <Link to="/politica-de-privacidade">{t('Política de Privacidade')}</Link>
+        <Link to="/termos-de-uso">{t('Termos de Uso')}</Link>
       </nav>
       <MyDataSection />
     </>
@@ -298,7 +299,7 @@ function MyDataSection() {
     try {
       const file = await api.exportMyData();
       downloadJson(file.filename, file.data);
-      setMessage({ tone: 'ok', text: 'Pronto. O arquivo com os seus dados foi baixado. Ele não inclui fotos e vídeos, só o registro de que existem.' });
+      setMessage({ tone: 'ok', text: t('Pronto. O arquivo com os seus dados foi baixado. Ele não inclui fotos e vídeos, só o registro de que existem.') });
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -309,15 +310,15 @@ function MyDataSection() {
   return (
     <section className="setting setting--stack">
       <div>
-        <h3 className="setting__title">Seus dados</h3>
-        <p className="setting__help">Baixe uma cópia do que o AskouT guarda sobre você, ou apague a sua conta.</p>
+        <h3 className="setting__title">{t('Seus dados')}</h3>
+        <p className="setting__help">{t('Baixe uma cópia do que o AskouT guarda sobre você, ou apague a sua conta.')}</p>
       </div>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       <Button variant="secondary" loading={busy} onClick={() => void download()}>
-        Baixar meus dados
+        {t('Baixar meus dados')}
       </Button>
       <Link className="btn btn--quiet btn--danger-text" to="/privacidade/apagar-conta">
-        Apagar minha conta
+        {t('Apagar minha conta')}
       </Link>
     </section>
   );
@@ -334,7 +335,7 @@ function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: ()
     setOn(next);
     savePersonalize(userId, next);
     if (next) {
-      setMessage({ tone: 'ok', text: 'Recomendações personalizadas ligadas.' });
+      setMessage({ tone: 'ok', text: t('Recomendações personalizadas ligadas.') });
       onChange();
       return;
     }
@@ -342,9 +343,9 @@ function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: ()
     setBusy(true);
     try {
       await Promise.all([api.eraseDwell(), api.clearRegion()]);
-      setMessage({ tone: 'ok', text: 'Desligado. Apagamos o seu histórico de tempo na tela e a sua região. Você ainda vê o que os amigos fizeram, mas sem usar o seu comportamento.' });
+      setMessage({ tone: 'ok', text: t('Desligado. Apagamos o seu histórico de tempo na tela e a sua região. Você ainda vê o que os amigos fizeram, mas sem usar o seu comportamento.') });
     } catch (failure) {
-      setMessage({ tone: 'error', text: `Desligamos, mas não deu para apagar o histórico agora: ${toApiError(failure).message}` });
+      setMessage({ tone: 'error', text: t('Desligamos, mas não deu para apagar o histórico agora: {message}', { message: toApiError(failure).message }) });
     } finally {
       setBusy(false);
       onChange();
@@ -355,7 +356,7 @@ function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: ()
     setBusy(true);
     try {
       const r = await api.eraseDwell();
-      setMessage({ tone: 'ok', text: r.removed > 0 ? 'Histórico apagado.' : 'Não havia nada para apagar.' });
+      setMessage({ tone: 'ok', text: r.removed > 0 ? t('Histórico apagado.') : t('Não havia nada para apagar.') });
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -369,9 +370,9 @@ function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: ()
       <section className="setting">
         <div className="setting__text">
           <h2 className="setting__title" id="personalizar-titulo">
-            Recomendações personalizadas
+            {t('Recomendações personalizadas')}
           </h2>
-          <p className="setting__help">O app mede quanto tempo você fica em cada post ou evento, o que você curte, comenta, compartilha e confirma presença, e com quem você mais conversa (só quando e com quem, nunca o texto). Usa isso, junto com o que seus amigos mais próximos foram ou curtiram (com peso menor que o seu), para montar o bloco “Para você”. As medições ficam 60 dias e ninguém vê. A equipe vê apenas totais, nunca o seu histórico.</p>
+          <p className="setting__help">{t('O app mede quanto tempo você fica em cada post ou evento, o que você curte, comenta, compartilha e confirma presença, e com quem você mais conversa (só quando e com quem, nunca o texto). Usa isso, junto com o que seus amigos mais próximos foram ou curtiram (com peso menor que o seu), para montar o bloco “Para você”. As medições ficam 60 dias e ninguém vê. A equipe vê apenas totais, nunca o seu histórico.')}</p>
         </div>
         <button type="button" role="switch" aria-checked={on} aria-labelledby="personalizar-titulo" className="switch" onClick={() => void change()} disabled={busy}>
           <span className="switch__thumb" />
@@ -379,7 +380,7 @@ function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: ()
       </section>
       <div className="setting__actions">
         <Button variant="quiet" small loading={busy} onClick={() => void erase()}>
-          Apagar meu histórico de tempo na tela
+          {t('Apagar meu histórico de tempo na tela')}
         </Button>
       </div>
     </>
@@ -400,7 +401,7 @@ function RegionSetting({ userId }: { userId: string }) {
 
   function useHere() {
     if (!('geolocation' in navigator)) {
-      setMessage({ tone: 'error', text: 'Este aparelho não informa a localização.' });
+      setMessage({ tone: 'error', text: t('Este aparelho não informa a localização.') });
       return;
     }
     setBusy(true);
@@ -408,13 +409,13 @@ function RegionSetting({ userId }: { userId: string }) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         api.saveRegion(roundCoordinate(pos.coords.latitude), roundCoordinate(pos.coords.longitude)).then(
-          (r) => { setRegion(r.region); setMessage({ tone: 'ok', text: 'Região salva. Guardamos só uma posição aproximada, de cerca de 1 km.' }); },
+          (r) => { setRegion(r.region); setMessage({ tone: 'ok', text: t('Região salva. Guardamos só uma posição aproximada, de cerca de 1 km.') }); },
           (failure) => setMessage({ tone: 'error', text: toApiError(failure).message }),
         ).finally(() => setBusy(false));
       },
       () => {
         setBusy(false);
-        setMessage({ tone: 'error', text: 'Não consegui pegar a sua localização. Permita o acesso no navegador e tente de novo.' });
+        setMessage({ tone: 'error', text: t('Não consegui pegar a sua localização. Permita o acesso no navegador e tente de novo.') });
       },
       { enableHighAccuracy: false, maximumAge: 0, timeout: 15000 },
     );
@@ -426,7 +427,7 @@ function RegionSetting({ userId }: { userId: string }) {
     try {
       await api.clearRegion();
       setRegion(null);
-      setMessage({ tone: 'ok', text: 'Região apagada. Você deixa de receber anúncios Match.' });
+      setMessage({ tone: 'ok', text: t('Região apagada. Você deixa de receber anúncios Match.') });
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -439,26 +440,26 @@ function RegionSetting({ userId }: { userId: string }) {
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       <section className="setting">
         <div className="setting__text">
-          <h2 className="setting__title">Minha região</h2>
+          <h2 className="setting__title">{t('Minha região')}</h2>
           <p className="setting__help">
-            Opcional. Se você informar mais ou menos onde mora, bares e casas de show perto de você podem mostrar, no “Para você”, rolês com a etiqueta “Patrocinado” que combinam com o que você curte (por exemplo, rock). Usamos a localização uma vez e guardamos só uma posição aproximada, de cerca de 1 km. Quem anuncia vê apenas um número aproximado de pessoas, nunca quem você é. Funciona só com as recomendações personalizadas ligadas.
+            {t('Opcional. Se você informar mais ou menos onde mora, bares e casas de show perto de você podem mostrar, no “Para você”, rolês com a etiqueta “Patrocinado” que combinam com o que você curte (por exemplo, rock). Usamos a localização uma vez e guardamos só uma posição aproximada, de cerca de 1 km. Quem anuncia vê apenas um número aproximado de pessoas, nunca quem você é. Funciona só com as recomendações personalizadas ligadas.')}
           </p>
-          {current ? <p className="setting__help"><strong>Região salva.</strong> Atualizada em {new Date(current.updatedAt).toLocaleDateString('pt-BR')}.</p> : null}
-          {!personalizing ? <p className="setting__help">Ligue as recomendações personalizadas para poder informar a região.</p> : null}
+          {current ? <p className="setting__help"><strong>{t('Região salva.')}</strong> Atualizada em {new Date(current.updatedAt).toLocaleDateString('pt-BR')}.</p> : null}
+          {!personalizing ? <p className="setting__help">{t('Ligue as recomendações personalizadas para poder informar a região.')}</p> : null}
         </div>
       </section>
       <div className="setting__actions">
         <Button variant="secondary" small loading={busy} disabled={!personalizing} onClick={useHere}>
-          {current ? 'Atualizar com minha localização atual' : 'Usar minha localização atual'}
+          {current ? t('Atualizar com minha localização atual') : t('Usar minha localização atual')}
         </Button>
-        {current ? <Button variant="quiet" small disabled={busy} onClick={() => void remove()}>Apagar minha região</Button> : null}
+        {current ? <Button variant="quiet" small disabled={busy} onClick={() => void remove()}>{t('Apagar minha região')}</Button> : null}
       </div>
     </>
   );
 }
 
 export function InteractionsScreen() {
-  useTitle('Suas interações');
+  useTitle(t('Suas interações'));
   const meetups = useAsync(() => api.myMeetups(), []);
   const requests = useAsync(() => api.followRequests({ limit: 1 }), []);
   const items = meetups.data?.items ?? [];
@@ -478,44 +479,44 @@ export function InteractionsScreen() {
 
   return (
     <>
-      <PageHead title="Suas interações" back="/perfil" />
+      <PageHead title={t('Suas interações')} back="/perfil" />
       {(requests.data?.total ?? 0) > 0 ? (
         <Link to="/atividades" className="callout callout--link">
           <span className="callout__text">
             <strong>{pluralize(requests.data?.total ?? 0, 'pedido para seguir', 'pedidos para seguir')}</strong>
             <br />
-            Aprove ou recuse em Notificações.
+            {t('Aprove ou recuse em Notificações.')}
           </span>
         </Link>
       ) : null}
-      <h2 className="profile__section">Seus encontros</h2>
+      <h2 className="profile__section">{t('Seus encontros')}</h2>
       {meetups.loading && !meetups.data ? <Loading /> : null}
       {meetups.error ? <ErrorState message={meetups.error.message} onRetry={meetups.reload} /> : null}
       {meetups.data && items.length === 0 ? (
         <EmptyState
-          title="Nenhum encontro ainda"
+          title={t('Nenhum encontro ainda')}
           action={
             <Link to="/explorar" className="btn btn--primary">
-              Explorar eventos
+              {t('Explorar eventos')}
             </Link>
           }
         >
-          Os encontros que você criar ou for convidado aparecem aqui.
+          {t('Os encontros que você criar ou for convidado aparecem aqui.')}
         </EmptyState>
       ) : null}
       {upcoming.length > 0 ? <ul className="inter">{upcoming.map(row)}</ul> : null}
       {past.length > 0 ? (
         <>
-          <h2 className="profile__section">Anteriores</h2>
+          <h2 className="profile__section">{t('Anteriores')}</h2>
           <ul className="inter">{past.map(row)}</ul>
         </>
       ) : null}
-      <h2 className="profile__section">Seus eventos</h2>
+      <h2 className="profile__section">{t('Seus eventos')}</h2>
       <Link to="/perfil" className="callout callout--link">
         <span className="callout__text">
-          <strong>Eventos postados no perfil</strong>
+          <strong>{t('Eventos postados no perfil')}</strong>
           <br />
-          Veja e tire eventos do seu perfil. Para postar, abra um evento e use Compartilhar.
+          {t('Veja e tire eventos do seu perfil. Para postar, abra um evento e use Compartilhar.')}
         </span>
       </Link>
     </>
@@ -523,24 +524,24 @@ export function InteractionsScreen() {
 }
 
 const FAQ: { q: string; a: string }[] = [
-  { q: 'Como viro amigo de alguém?', a: 'Vocês viram amigos quando se seguem. Se o perfil for privado, a pessoa precisa aprovar seu pedido.' },
-  { q: 'Como posto um evento no meu perfil?', a: 'Abra o evento em Explorar, toque em Compartilhar e escolha Postar no meu perfil. Para tirar, use o mesmo botão ou Tirar do perfil na grade.' },
-  { q: 'Como compartilho um evento?', a: 'No evento, toque em Compartilhar: poste no perfil, envie numa conversa ou copie o link para mandar fora do app, por exemplo no WhatsApp.' },
-  { q: 'Como marco um encontro?', a: 'No evento, toque em Criar encontro e escolha quem convidar. Quem aceitar vê o encontro na Agenda.' },
-  { q: 'O que é o Flash?', a: 'É o botão para avisar seus amigos que você está livre agora. Quem também estiver livre pode te chamar, e a conversa abre na hora. Ele fica na barra de baixo.' },
-  { q: 'Onde ficam minhas conversas?', a: 'No ícone de balão, no topo da tela. Um número mostra quantas conversas têm mensagem nova.' },
-  { q: 'Para que serve a Agenda?', a: 'Ela mostra os eventos em que você confirmou presença e os encontros marcados. Você também pode marcar quando está livre. Só você vê.' },
-  { q: 'Os eventos de exemplo são reais?', a: 'Não. Eventos marcados como Exemplo de teste existem só para testar o app.' },
-  { q: 'Como troco foto, nome ou descrição?', a: 'No seu perfil, toque no lápis.' },
+  { q: t('Como viro amigo de alguém?'), a: t('Vocês viram amigos quando se seguem. Se o perfil for privado, a pessoa precisa aprovar seu pedido.') },
+  { q: t('Como posto um evento no meu perfil?'), a: t('Abra o evento em Explorar, toque em Compartilhar e escolha Postar no meu perfil. Para tirar, use o mesmo botão ou Tirar do perfil na grade.') },
+  { q: t('Como compartilho um evento?'), a: t('No evento, toque em Compartilhar: poste no perfil, envie numa conversa ou copie o link para mandar fora do app, por exemplo no WhatsApp.') },
+  { q: t('Como marco um encontro?'), a: t('No evento, toque em Criar encontro e escolha quem convidar. Quem aceitar vê o encontro na Agenda.') },
+  { q: t('O que é o Flash?'), a: t('É o botão para avisar seus amigos que você está livre agora. Quem também estiver livre pode te chamar, e a conversa abre na hora. Ele fica na barra de baixo.') },
+  { q: t('Onde ficam minhas conversas?'), a: t('No ícone de balão, no topo da tela. Um número mostra quantas conversas têm mensagem nova.') },
+  { q: t('Para que serve a Agenda?'), a: t('Ela mostra os eventos em que você confirmou presença e os encontros marcados. Você também pode marcar quando está livre. Só você vê.') },
+  { q: t('Os eventos de exemplo são reais?'), a: t('Não. Eventos marcados como Exemplo de teste existem só para testar o app.') },
+  { q: t('Como troco foto, nome ou descrição?'), a: t('No seu perfil, toque no lápis.') },
 ];
 
 export function HelpScreen() {
-  useTitle('Ajuda');
+  useTitle(t('Ajuda'));
   const user = useUser();
   const mailto = supportMailto(import.meta.env.VITE_SUPPORT_EMAIL as string | undefined, user.profile.username);
   return (
     <>
-      <PageHead title="Ajuda" back="/perfil" />
+      <PageHead title={t('Ajuda')} back="/perfil" />
       <div className="faq">
         {FAQ.map((item) => (
           <details key={item.q} className="faq__item">
@@ -551,17 +552,17 @@ export function HelpScreen() {
       </div>
       {mailto ? (
         <a className="btn btn--secondary btn--full" href={mailto}>
-          Falar com o suporte
+          {t('Falar com o suporte')}
         </a>
       ) : (
-        <p className="muted">O canal de suporte por e-mail ainda não foi ativado.</p>
+        <p className="muted">{t('O canal de suporte por e-mail ainda não foi ativado.')}</p>
       )}
     </>
   );
 }
 
 export function ThemeScreen() {
-  useTitle('Tema');
+  useTitle(t('Tema'));
   const [choice, setChoice] = useState<ThemeChoice>(() => readTheme(window.localStorage));
   function pick(next: ThemeChoice) {
     setChoice(next);
@@ -570,8 +571,8 @@ export function ThemeScreen() {
   }
   return (
     <>
-      <PageHead title="Tema" back="/perfil" />
-      <div className="radios" role="radiogroup" aria-label="Tema">
+      <PageHead title={t('Tema')} back="/perfil" />
+      <div className="radios" role="radiogroup" aria-label={t('Tema')}>
         {(['system', 'light', 'dark'] as const).map((id) => (
           <label key={id} className="radios__item">
             <input type="radio" name="tema" checked={choice === id} onChange={() => pick(id)} />
@@ -584,28 +585,28 @@ export function ThemeScreen() {
 }
 
 export function FriendsScreen() {
-  useTitle('Amigos');
+  useTitle(t('Amigos'));
   const friends = useAsync(() => api.friends(), []);
   const [inviting, setInviting] = useState(false);
   return (
     <>
-      <PageHead title="Amigos" back="/perfil" subtitle="Pessoas que seguem você e que você segue" action={<Link to="/amigos/contatos">Achar nos contatos</Link>} />
+      <PageHead title={t('Amigos')} back="/perfil" subtitle={t('Pessoas que seguem você e que você segue')} action={<Link to="/amigos/contatos">{t('Achar nos contatos')}</Link>} />
       <Button full variant="secondary" onClick={() => setInviting(true)}>
-        Convidar amigos para o AskouT
+        {t('Convidar amigos para o AskouT')}
       </Button>
       {inviting ? <InviteSheet onClose={() => setInviting(false)} /> : null}
       {friends.loading && !friends.data ? <Loading /> : null}
       {friends.error ? <ErrorState message={friends.error.message} onRetry={friends.reload} /> : null}
       {friends.data && friends.data.length === 0 ? (
         <EmptyState
-          title="Nenhum amigo ainda"
+          title={t('Nenhum amigo ainda')}
           action={
             <Link to="/explorar" className="btn btn--primary">
-              Encontrar pessoas
+              {t('Encontrar pessoas')}
             </Link>
           }
         >
-          Você e outra pessoa viram amigos quando se seguem.
+          {t('Você e outra pessoa viram amigos quando se seguem.')}
         </EmptyState>
       ) : null}
       {friends.data && friends.data.length > 0 ? (
@@ -623,7 +624,7 @@ export function FriendsScreen() {
 }
 
 export function BlockedScreen() {
-  useTitle('Pessoas bloqueadas');
+  useTitle(t('Pessoas bloqueadas'));
   const blocked = useAsync(() => api.blocks(), []);
   const [busyId, setBusyId] = useState<string | undefined>();
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
@@ -634,7 +635,7 @@ export function BlockedScreen() {
     try {
       await api.unblock(userId);
       if (blocked.data) blocked.setData(blocked.data.filter((p) => p.userId !== userId));
-      setMessage({ tone: 'ok', text: `Você desbloqueou @${username}.` });
+      setMessage({ tone: 'ok', text: t('Você desbloqueou @{username}.', { username }) });
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -644,11 +645,11 @@ export function BlockedScreen() {
 
   return (
     <>
-      <PageHead title="Pessoas bloqueadas" back="/perfil" />
+      <PageHead title={t('Pessoas bloqueadas')} back="/perfil" />
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {blocked.loading && !blocked.data ? <Loading /> : null}
       {blocked.error ? <ErrorState message={blocked.error.message} onRetry={blocked.reload} /> : null}
-      {blocked.data && blocked.data.length === 0 ? <EmptyState title="Você não bloqueou ninguém">Quem você bloquear aparece aqui, e dá para desbloquear quando quiser.</EmptyState> : null}
+      {blocked.data && blocked.data.length === 0 ? <EmptyState title={t('Você não bloqueou ninguém')}>{t('Quem você bloquear aparece aqui, e dá para desbloquear quando quiser.')}</EmptyState> : null}
       {blocked.data && blocked.data.length > 0 ? (
         <ul className="list">
           {blocked.data.map((profile) => (
@@ -657,7 +658,7 @@ export function BlockedScreen() {
               profile={profile}
               aside={
                 <Button small variant="secondary" loading={busyId === profile.userId} onClick={() => unblock(profile.userId, profile.username)}>
-                  Desbloquear
+                  {t('Desbloquear')}
                 </Button>
               }
             />

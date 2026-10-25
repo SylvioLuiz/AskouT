@@ -20,6 +20,7 @@ import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX,
 import type { VenueProfileDraft } from '../lib/venue-profile.ts';
 import { Link, navigate } from '../router.tsx';
 import { ClaimSheet, VenueEventRow, VenueEventSheet } from './venues.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 type Tab = 'about' | 'events' | 'regulars' | 'posts';
 
@@ -115,7 +116,7 @@ function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
   const today = lines.find((l) => l.today);
   return (
     <>
-      <InfoRow icon={<ClockIcon />} open={open} onToggle={() => setOpen((o) => !o)} label={open ? 'Esconder os horários da semana' : 'Ver os horários da semana'}>
+      <InfoRow icon={<ClockIcon />} open={open} onToggle={() => setOpen((o) => !o)} label={open ? t('Esconder os horários da semana') : t('Ver os horários da semana')}>
         <span className={`vinfo__status${status ? (status.closingSoon ? ' vinfo__status--soon' : status.open ? ' vinfo__status--open' : ' vinfo__status--closed') : ''}`}>{status?.label ?? 'Horário de funcionamento'}</span>
         {today && !open ? <span className="vinfo__sub">Hoje: {today.text}</span> : null}
       </InfoRow>
@@ -150,7 +151,7 @@ function RatingInfo({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
             </span>
           </>
         ) : (
-          <span className="vinfo__sub vinfo__sub--inline">Ainda sem avaliações</span>
+          <span className="vinfo__sub vinfo__sub--inline">{t('Ainda sem avaliações')}</span>
         )}
       </span>
       {!venue.isOwner ? <StarPicker venue={venue} onChanged={onChanged} /> : null}
@@ -172,15 +173,15 @@ function VenueHero({ venue, now, onShare }: { venue: VenueProfile; now: Date; on
     <header className="vhero">
       {bg ? <img className="vhero__bg" src={bg} alt="" referrerPolicy="no-referrer" onError={() => setCoverFailed(true)} /> : null}
       <div className="vhero__shade" />
-      <button type="button" className="vhero__back" onClick={goBack} aria-label="Voltar">
+      <button type="button" className="vhero__back" onClick={goBack} aria-label={t('Voltar')}>
         <ChevronLeftIcon />
       </button>
-      <button type="button" className="vhero__share" onClick={onShare} aria-label="Compartilhar página do rolê">
+      <button type="button" className="vhero__share" onClick={onShare} aria-label={t('Compartilhar página do rolê')}>
         <ShareIcon />
       </button>
       <div className="vhero__body">
         {logo ? (
-          <img className="vhero__logo" src={logo} alt={`Logo de ${venue.name}`} onError={() => setLogoFailed(true)} />
+          <img className="vhero__logo" src={logo} alt={t('Logo de {name}', { name: venue.name })} onError={() => setLogoFailed(true)} />
         ) : (
           <span className="vhero__logo vhero__logo--initials" aria-hidden="true">
             {initialsOf(venue.name)}
@@ -200,7 +201,7 @@ function VenueHero({ venue, now, onShare }: { venue: VenueProfile; now: Date; on
               <span aria-hidden="true"> · {venue.rating.count} {venue.rating.count === 1 ? 'avaliação' : 'avaliações'}</span>
             </>
           ) : (
-            <span aria-hidden="true">Ainda sem avaliações</span>
+            <span aria-hidden="true">{t('Ainda sem avaliações')}</span>
           )}
         </p>
         {venue.friendsWent.count > 0 ? (
@@ -222,11 +223,11 @@ function VenueHero({ venue, now, onShare }: { venue: VenueProfile; now: Date; on
         </div>
         <div className="vstat vstat--days">
           <dd className="vstat__value">{days ?? '—'}</dd>
-          <dt className="vstat__label">Funcionamento</dt>
+          <dt className="vstat__label">{t('Funcionamento')}</dt>
         </div>
         <div className={`vstat vstat--hours${status ? (status.closingSoon ? ' vstat--soon' : status.open ? ' vstat--open' : '') : ''}`}>
           <dd className="vstat__value">{status ? status.short : '—'}</dd>
-          <dt className="vstat__label">Horário</dt>
+          <dt className="vstat__label">{t('Horário')}</dt>
         </div>
       </dl>
       {google && !coverFailed ? <p className="vhero__credit">Foto: {venue.photoAuthor ? `${venue.photoAuthor} · ` : ''}Google</p> : null}
@@ -255,7 +256,7 @@ function HoursEditor({ draft, onChange }: { draft: VenueProfileDraft; onChange: 
   const set = (i: number, patch: Partial<VenueProfileDraft['days'][number]>) => onChange(draft.days.map((d, k) => (k === i ? { ...d, ...patch } : d)));
   return (
     <fieldset className="hours">
-      <legend className="field__label">Horário de funcionamento</legend>
+      <legend className="field__label">{t('Horário de funcionamento')}</legend>
       {[1, 2, 3, 4, 5, 6, 0].map((i) => {
         const d = draft.days[i]!;
         return (
@@ -266,22 +267,22 @@ function HoursEditor({ draft, onChange }: { draft: VenueProfileDraft; onChange: 
             </label>
             {d.open ? (
               <span className="hours__times">
-                <input type="time" aria-label={`Abre ${DAY_LONG[i]}`} value={d.from} onChange={(e) => set(i, { from: e.target.value })} />
-                <span aria-hidden="true">às</span>
-                <input type="time" aria-label={`Fecha ${DAY_LONG[i]}`} value={d.to} onChange={(e) => set(i, { to: e.target.value })} />
+                <input type="time" aria-label={t('Abre {i}', { i: DAY_LONG[i] ?? '' })} value={d.from} onChange={(e) => set(i, { from: e.target.value })} />
+                <span aria-hidden="true">{t('às')}</span>
+                <input type="time" aria-label={t('Fecha {i}', { i: DAY_LONG[i] ?? '' })} value={d.to} onChange={(e) => set(i, { to: e.target.value })} />
                 {i === firstOpen ? (
                   <button type="button" className="linkbtn" onClick={() => onChange(applyToAll(draft.days, i))}>
-                    Copiar para todos
+                    {t('Copiar para todos')}
                   </button>
                 ) : null}
               </span>
             ) : (
-              <span className="hours__closed">Fechado</span>
+              <span className="hours__closed">{t('Fechado')}</span>
             )}
           </div>
         );
       })}
-      <p className="field__hint">Se fechar de madrugada, é só colocar a hora do dia seguinte (ex.: abre 18:00, fecha 02:00).</p>
+      <p className="field__hint">{t('Se fechar de madrugada, é só colocar a hora do dia seguinte (ex.: abre 18:00, fecha 02:00).')}</p>
     </fieldset>
   );
 }
@@ -310,18 +311,18 @@ function ProfileEditSheet({ venue, onClose, onSaved }: { venue: VenueProfile; on
   }
 
   return (
-    <Sheet title="Editar perfil do rolê" onClose={onClose}>
+    <Sheet title={t('Editar perfil do rolê')} onClose={onClose}>
       <div className="claim">
-        <CoverPicker imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} hint="Foto de fundo da página, de preferência a fachada do rolê." />
-        <CoverPicker logo imageUrl={draft.logoUrl} imageData={draft.logoData} onChange={(patch) => setDraft((d) => ({ ...d, ...(patch.imageUrl !== undefined ? { logoUrl: patch.imageUrl } : {}), ...(patch.imageData !== undefined ? { logoData: patch.imageData } : {}) }))} hint="Aparece em círculo sobre a capa." />
-        <Field label="Nome do rolê" value={draft.name} onChange={(v) => set('name', v)} maxLength={VENUE_NAME_MAX} />
-        <Field label="Tipo de rolê (opcional)" value={draft.category} onChange={(v) => set('category', v)} maxLength={VENUE_CATEGORY_MAX} placeholder="Bar, balada, casa de shows…" />
-        <Field label="Endereço (opcional)" value={draft.address} onChange={(v) => set('address', v)} maxLength={VENUE_ADDRESS_MAX} />
-        <Field label="Sobre o rolê (opcional)" value={draft.description} onChange={(v) => set('description', v)} multiline maxLength={VENUE_DESCRIPTION_MAX} hint="O que as pessoas encontram aí: música, comida, ambiente." />
+        <CoverPicker imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} hint={t('Foto de fundo da página, de preferência a fachada do rolê.')} />
+        <CoverPicker logo imageUrl={draft.logoUrl} imageData={draft.logoData} onChange={(patch) => setDraft((d) => ({ ...d, ...(patch.imageUrl !== undefined ? { logoUrl: patch.imageUrl } : {}), ...(patch.imageData !== undefined ? { logoData: patch.imageData } : {}) }))} hint={t('Aparece em círculo sobre a capa.')} />
+        <Field label={t('Nome do rolê')} value={draft.name} onChange={(v) => set('name', v)} maxLength={VENUE_NAME_MAX} />
+        <Field label={t('Tipo de rolê (opcional)')} value={draft.category} onChange={(v) => set('category', v)} maxLength={VENUE_CATEGORY_MAX} placeholder={t('Bar, balada, casa de shows…')} />
+        <Field label={t('Endereço (opcional)')} value={draft.address} onChange={(v) => set('address', v)} maxLength={VENUE_ADDRESS_MAX} />
+        <Field label={t('Sobre o rolê (opcional)')} value={draft.description} onChange={(v) => set('description', v)} multiline maxLength={VENUE_DESCRIPTION_MAX} hint={t('O que as pessoas encontram aí: música, comida, ambiente.')} />
         <HoursEditor draft={draft} onChange={(days) => set('days', days)} />
         {message ? <Notice tone="error">{message}</Notice> : null}
         <Button full loading={busy} onClick={save}>
-          Salvar
+          {t('Salvar')}
         </Button>
       </div>
     </Sheet>
@@ -347,7 +348,7 @@ function VenuePostSheet({ venueId, onClose, onSaved }: { venueId: string; onClos
       for (const f of files) done.push(await resizePostPhoto(f));
       setPhotos((cur) => [...cur, ...done].slice(0, VENUE_POST_PHOTOS_MAX));
     } catch (failure) {
-      setMessage(failure instanceof Error ? failure.message : 'Não foi possível usar essa foto.');
+      setMessage(failure instanceof Error ? failure.message : t('Não foi possível usar essa foto.'));
     } finally {
       setReading(false);
     }
@@ -355,7 +356,7 @@ function VenuePostSheet({ venueId, onClose, onSaved }: { venueId: string; onClos
 
   async function publish() {
     if (photos.length === 0) {
-      setMessage('Escolha pelo menos uma foto.');
+      setMessage(t('Escolha pelo menos uma foto.'));
       return;
     }
     setBusy(true);
@@ -370,14 +371,14 @@ function VenuePostSheet({ venueId, onClose, onSaved }: { venueId: string; onClos
   }
 
   return (
-    <Sheet title="Novo post do rolê" onClose={onClose}>
+    <Sheet title={t('Novo post do rolê')} onClose={onClose}>
       <div className="claim">
         {photos.length > 0 ? (
-          <ul className="vpost__thumbs" aria-label="Fotos do post">
+          <ul className="vpost__thumbs" aria-label={t('Fotos do post')}>
             {photos.map((src, i) => (
               <li key={i}>
-                <img src={src} alt={`Foto ${i + 1}`} />
-                <button type="button" className="vpost__remove" aria-label={`Tirar foto ${i + 1}`} onClick={() => setPhotos((cur) => cur.filter((_, k) => k !== i))}>
+                <img src={src} alt={t('Foto {i}', { i: i + 1 })} />
+                <button type="button" className="vpost__remove" aria-label={t('Tirar foto {i}', { i: i + 1 })} onClick={() => setPhotos((cur) => cur.filter((_, k) => k !== i))}>
                   ×
                 </button>
               </li>
@@ -386,14 +387,14 @@ function VenuePostSheet({ venueId, onClose, onSaved }: { venueId: string; onClos
         ) : null}
         {photos.length < VENUE_POST_PHOTOS_MAX ? (
           <Button variant="secondary" full loading={reading} onClick={() => fileRef.current?.click()}>
-            {photos.length === 0 ? 'Escolher fotos do aparelho' : 'Adicionar mais fotos'}
+            {photos.length === 0 ? t('Escolher fotos do aparelho') : t('Adicionar mais fotos')}
           </Button>
         ) : null}
-        <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={pick} aria-label="Escolher fotos do aparelho" />
-        <Field label="Legenda (opcional)" value={caption} onChange={setCaption} multiline maxLength={VENUE_POST_CAPTION_MAX} />
+        <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={pick} aria-label={t('Escolher fotos do aparelho')} />
+        <Field label={t('Legenda (opcional)')} value={caption} onChange={setCaption} multiline maxLength={VENUE_POST_CAPTION_MAX} />
         {message ? <Notice tone="error">{message}</Notice> : null}
         <Button full loading={busy} onClick={publish}>
-          Publicar
+          {t('Publicar')}
         </Button>
       </div>
     </Sheet>
@@ -406,13 +407,13 @@ function OwnerEvents({ venueId, now, reloadKey, onNew, onEdit, onChanged }: { ve
   return (
     <section className="vowner">
       <Button full onClick={onNew}>
-        Novo evento
+        {t('Novo evento')}
       </Button>
       {panel.loading && !panel.data ? <Loading /> : null}
       {panel.error && !panel.data ? <ErrorState message={panel.error.message} onRetry={panel.reload} /> : null}
-      {panel.data && panel.data.events.length === 0 ? <EmptyState title="Nenhum evento ainda">Os eventos que você criar aparecem aqui e no Explorar para quem está perto.</EmptyState> : null}
+      {panel.data && panel.data.events.length === 0 ? <EmptyState title={t('Nenhum evento ainda')}>{t('Os eventos que você criar aparecem aqui e no Explorar para quem está perto.')}</EmptyState> : null}
       {panel.data && panel.data.events.length > 0 ? (
-        <ul className="velist" aria-label="Eventos do rolê">
+        <ul className="velist" aria-label={t('Eventos do rolê')}>
           {panel.data.events.map((e) => (
             <VenueEventRow
               key={e.id}
@@ -435,7 +436,7 @@ function OwnerEvents({ venueId, now, reloadKey, onNew, onEdit, onChanged }: { ve
 export function VenuePageScreen({ venueId }: { venueId: string }) {
   const page = useAsync(() => api.venueProfile(venueId), [venueId]);
   const v = page.data;
-  useTitle(v?.name ?? 'Rolê');
+  useTitle(v?.name ?? t('Rolê'));
   const [tab, setTab] = useState<Tab>('about');
   const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | undefined>();
   const [followBusy, setFollowBusy] = useState(false);
@@ -467,7 +468,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   if (page.loading && !v) {
     return (
       <>
-        <PageHead title="Rolê" back="/explorar" />
+        <PageHead title={t('Rolê')} back="/explorar" />
         <Loading />
       </>
     );
@@ -475,18 +476,18 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   if (!v) {
     return (
       <>
-        <PageHead title="Rolê" back="/explorar" />
-        <ErrorState message={page.error?.message ?? 'Não foi possível abrir esta página.'} onRetry={page.reload} />
+        <PageHead title={t('Rolê')} back="/explorar" />
+        <ErrorState message={page.error?.message ?? t('Não foi possível abrir esta página.')} onRetry={page.reload} />
       </>
     );
   }
 
   const lines = hoursLines(v.hours, now);
   const tabs: { id: Tab; label: string; n?: number }[] = [
-    { id: 'about', label: 'Sobre' },
-    { id: 'events', label: 'Eventos', n: v.upcomingEvents.length },
-    { id: 'regulars', label: 'Ranking' },
-    { id: 'posts', label: 'Posts' },
+    { id: 'about', label: t('Sobre') },
+    { id: 'events', label: t('Eventos'), n: v.upcomingEvents.length },
+    { id: 'regulars', label: t('Ranking') },
+    { id: 'posts', label: t('Posts') },
   ];
 
   return (
@@ -496,25 +497,25 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         {v.isOwner ? (
           <div className="vhead__actions">
             <Button small onClick={() => setSheet('edit')}>
-              Editar perfil
+              {t('Editar perfil')}
             </Button>
             <Button small variant="secondary" onClick={() => setSheet('event')}>
-              Novo evento
+              {t('Novo evento')}
             </Button>
             <Button small variant="secondary" onClick={() => setSheet('post')}>
-              Novo post
+              {t('Novo post')}
             </Button>
             <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/impulsionar`)}>
-              Impulsionar
+              {t('Impulsionar')}
             </Button>
             <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/agenda`)}>
-              Agenda
+              {t('Agenda')}
             </Button>
           </div>
         ) : (
           <div className="vhead__actions">
             <Button variant={v.following ? 'secondary' : 'primary'} loading={followBusy} aria-pressed={v.following} onClick={() => void toggleFollow()}>
-              {v.following ? 'Seguindo' : 'Seguir'}
+              {v.following ? t('Seguindo') : t('Seguir')}
             </Button>
             <a className="btn btn--quiet" href={routeLink(v.lat, v.lng)} target="_blank" rel="noopener noreferrer">
               Rota{where.status === 'ok' ? ` · a ${formatDistance(distanceMeters(where.position, { lat: v.lat, lng: v.lng }))}` : ''}
@@ -528,13 +529,13 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
           <p className="muted vhead__unclaimed">
             Esta página ainda não tem responsável.{' '}
             <button type="button" className="linkbtn" onClick={() => setClaiming(true)}>
-              É o dono? Peça para administrar.
+              {t('É o dono? Peça para administrar.')}
             </button>
           </p>
         ) : null}
       </div>
 
-      <div className="segtabs segtabs--fill" role="tablist" aria-label="Seções da página">
+      <div className="segtabs segtabs--fill" role="tablist" aria-label={t('Seções da página')}>
         {tabs.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className="segtabs__tab" onClick={() => setTab(t.id)}>
             {t.label}
@@ -545,19 +546,19 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
 
       {tab === 'about' ? (
         <section className="vabout">
-          {v.description ? <p className="vabout__text">{v.description}</p> : v.isOwner ? <p className="muted">Conte o que as pessoas encontram aí. Toque em Editar perfil.</p> : null}
+          {v.description ? <p className="vabout__text">{v.description}</p> : v.isOwner ? <p className="muted">{t('Conte o que as pessoas encontram aí. Toque em Editar perfil.')}</p> : null}
           <div className="vinfolist">
             <HoursInfo venue={v} now={now} />
             {v.address ? (
               <InfoRow icon={<LocationIcon />}>
                 <span className="vinfo__addr">{v.address}</span>
                 <a className="vinfo__sub vinfo__link" href={routeLink(v.lat, v.lng)} target="_blank" rel="noopener noreferrer">
-                  Como chegar
+                  {t('Como chegar')}
                 </a>
               </InfoRow>
             ) : v.isOwner ? (
               <InfoRow icon={<LocationIcon />}>
-                <span className="muted">Informe o endereço em Editar perfil.</span>
+                <span className="muted">{t('Informe o endereço em Editar perfil.')}</span>
               </InfoRow>
             ) : null}
             <RatingInfo venue={v} onChanged={page.reload} />
@@ -569,9 +570,9 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         v.isOwner ? (
           <OwnerEvents venueId={v.id} now={now} reloadKey={eventsKey} onNew={() => setSheet('event')} onEdit={(e) => setEditing(e)} onChanged={page.reload} />
         ) : v.upcomingEvents.length === 0 ? (
-          <EmptyState title="Nenhum evento marcado">Quando o rolê divulgar eventos, eles aparecem aqui.</EmptyState>
+          <EmptyState title={t('Nenhum evento marcado')}>{t('Quando o rolê divulgar eventos, eles aparecem aqui.')}</EmptyState>
         ) : (
-          <ul className="vagenda" aria-label="Próximos eventos">
+          <ul className="vagenda" aria-label={t('Próximos eventos')}>
             {v.upcomingEvents.map((e) => (
               <AgendaRow key={e.id} event={e} now={now} />
             ))}
@@ -581,10 +582,10 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
 
       {tab === 'regulars' ? (
         v.regulars.length === 0 ? (
-          <EmptyState title="O ranking ainda está vazio">Quem confirmar presença nos eventos de {v.name} e for aparece aqui.</EmptyState>
+          <EmptyState title={t('O ranking ainda está vazio')}>Quem confirmar presença nos eventos de {v.name} e for aparece aqui.</EmptyState>
         ) : (
           <>
-            <ol className="vrank" aria-label="Quem mais frequenta">
+            <ol className="vrank" aria-label={t('Quem mais frequenta')}>
               {v.regulars.map((r) => (
                 <li key={r.user.userId} className={`vrank__row${r.rank <= 3 ? ' vrank__row--top' : ''}`}>
                   <span className="vrank__pos" aria-label={`${r.rank}º lugar`}>
@@ -603,12 +604,12 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
                 </li>
               ))}
             </ol>
-            <p className="muted vrank__note">Conta as presenças confirmadas em eventos do local que já aconteceram. Perfis privados só aparecem para quem os segue.</p>
+            <p className="muted vrank__note">{t('Conta as presenças confirmadas em eventos do local que já aconteceram. Perfis privados só aparecem para quem os segue.')}</p>
           </>
         )
       ) : null}
 
-      {tab === 'posts' ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle="Ainda não há posts" emptyHint={v.isOwner ? 'Toque em Novo post para publicar fotos do rolê.' : 'Os posts do rolê aparecem aqui e no seu feed se você seguir.'} reloadKey={String(postsKey)} /> : null}
+      {tab === 'posts' ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={v.isOwner ? t('Toque em Novo post para publicar fotos do rolê.') : t('Os posts do rolê aparecem aqui e no seu feed se você seguir.')} reloadKey={String(postsKey)} /> : null}
 
       {sheet === 'edit' ? (
         <ProfileEditSheet
@@ -648,7 +649,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
           }}
         />
       ) : null}
-      {sharing ? <ShareLinkSheet url={`${window.location.origin}/bares/${encodeURIComponent(v.id)}`} text={`${v.name} no AskouT`} onClose={() => setSharing(false)} /> : null}
+      {sharing ? <ShareLinkSheet url={`${window.location.origin}/bares/${encodeURIComponent(v.id)}`} text={t('{name} no AskouT', { name: v.name })} onClose={() => setSharing(false)} /> : null}
     </>
   );
 }

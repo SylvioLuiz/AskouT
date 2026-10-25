@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 import type { CompatibilityLevel, GoingEvent, MeetupView, ParticipantStatus, Slot, SlotState } from './types.ts';
 
 // Tudo aqui trabalha no fuso do aparelho: a pessoa marca "20h" e é isso que ela espera ver.
@@ -48,14 +49,14 @@ export type BuiltSlot = { ok: true; start: string; end: string } | { ok: false; 
 export function buildSlot(dayKey: string, startHm: string, endHm: string, now: Date): BuiltSlot {
   const s = HM.exec(startHm);
   const e = HM.exec(endHm);
-  if (!s) return { ok: false, field: 'start', message: 'Informe a hora de início' };
-  if (!e) return { ok: false, field: 'end', message: 'Informe a hora de fim' };
+  if (!s) return { ok: false, field: 'start', message: t('Informe a hora de início') };
+  if (!e) return { ok: false, field: 'end', message: t('Informe a hora de fim') };
   const { y, m, d } = parts(dayKey);
   const start = new Date(y, m - 1, d, Number(s[1]), Number(s[2]), 0, 0);
   const endMinutes = Number(e[1]) * 60 + Number(e[2]);
   const end = endMinutes === 0 ? new Date(y, m - 1, d + 1, 0, 0, 0, 0) : new Date(y, m - 1, d, Number(e[1]), Number(e[2]), 0, 0);
-  if (end.getTime() <= start.getTime()) return { ok: false, field: 'end', message: 'O fim precisa ser depois do início' };
-  if (end.getTime() <= now.getTime()) return { ok: false, field: 'start', message: 'Esse horário já passou' };
+  if (end.getTime() <= start.getTime()) return { ok: false, field: 'end', message: t('O fim precisa ser depois do início') };
+  if (end.getTime() <= now.getTime()) return { ok: false, field: 'start', message: t('Esse horário já passou') };
   return { ok: true, start: start.toISOString(), end: end.toISOString() };
 }
 
@@ -127,23 +128,23 @@ export const STATE_LABEL: Record<SlotState, string> = {
 };
 
 export const STATE_HELP: Record<SlotState, string> = {
-  AVAILABLE: 'Posso aceitar convites neste período',
-  PARTIAL: 'Talvez, só parte do período ou com algum aviso',
-  UNAVAILABLE: 'Não posso, mesmo que alguém convide',
+  AVAILABLE: t('Posso aceitar convites neste período'),
+  PARTIAL: t('Talvez, só parte do período ou com algum aviso'),
+  UNAVAILABLE: t('Não posso, mesmo que alguém convide'),
 };
 
 export const LEVEL_LABEL: Record<CompatibilityLevel, string> = {
-  green: 'Alta compatibilidade',
-  orange: 'Compatibilidade parcial',
-  red: 'Baixa compatibilidade',
-  awaiting: 'Aguardando informações',
+  green: t('Alta compatibilidade'),
+  orange: t('Compatibilidade parcial'),
+  red: t('Baixa compatibilidade'),
+  awaiting: t('Aguardando informações'),
 };
 
 export const PARTICIPANT_LABEL: Record<ParticipantStatus, string> = {
   available: 'Disponível',
   partial: 'Parcial',
   unavailable: 'Indisponível',
-  unknown: 'Sem informação',
+  unknown: t('Sem informação'),
 };
 
 export interface Preset {
@@ -153,9 +154,9 @@ export interface Preset {
 }
 
 export const PRESETS: readonly Preset[] = [
-  { label: 'Manhã', start: '08:00', end: '12:00' },
-  { label: 'Tarde', start: '12:00', end: '18:00' },
-  { label: 'Noite', start: '18:00', end: '00:00' },
+  { label: t('Manhã'), start: '08:00', end: '12:00' },
+  { label: t('Tarde'), start: '12:00', end: '18:00' },
+  { label: t('Noite'), start: '18:00', end: '00:00' },
 ];
 
 /** Fuso do aparelho, para pedir à API os horários candidatos no relógio da pessoa. */
@@ -220,8 +221,8 @@ export function planWhenLabel(event: Pick<AgendaEvent, 'startsAt'>, now: Date): 
   if (start.getTime() <= now.getTime()) return 'Agora';
   const today = localDateKey(now);
   const key = localDateKey(start);
-  if (key === today) return `Hoje ${hm}`;
-  if (key === addDays(today, 1)) return `Amanhã ${hm}`;
+  if (key === today) return t('Hoje {hm}', { hm });
+  if (key === addDays(today, 1)) return t('Amanhã {hm}', { hm });
   if (key < addDays(today, 7)) return `${start.toLocaleDateString('pt-BR', { weekday: 'short' })} ${hm}`;
   return `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')} ${hm}`;
 }

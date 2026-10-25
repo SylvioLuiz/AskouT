@@ -4,6 +4,7 @@ import { useAsync } from '../hooks.ts';
 import { markShown, readLastShown, shouldShowSuggestions } from '../lib/suggested-people.ts';
 import { Link } from '../router.tsx';
 import { Avatar } from './ui.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 /** "Pessoas que você talvez conheça": amigos de amigos, em carrossel. Aparece de 3 em 3 dias (sempre, se você segue menos de 5 pessoas). */
 export function SuggestedPeople() {
@@ -22,9 +23,9 @@ export function SuggestedPeople() {
     <section className="section suggest" aria-labelledby="talvez-titulo">
       <div className="section__head">
         <h2 id="talvez-titulo" className="section__title">
-          Pessoas que você talvez conheça
+          {t('Pessoas que você talvez conheça')}
         </h2>
-        <Link to="/amigos/contatos" className="suggest__contacts">Achar nos contatos</Link>
+        <Link to="/amigos/contatos" className="suggest__contacts">{t('Achar nos contatos')}</Link>
       </div>
       <ul className="suggest__track">
         {items.map((p) => (

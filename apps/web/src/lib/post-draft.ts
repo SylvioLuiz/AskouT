@@ -1,5 +1,6 @@
 import type { CropRect } from './crop.ts';
 import type { EventKind } from './types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 export const POST_IMAGES_MAX = 5;
 export const POST_CAPTION_MAX = 500;
@@ -89,14 +90,14 @@ export const POST_EVENT_MAX_DAYS = 30;
 
 /** O que falta para publicar como evento (null = tudo certo). */
 export function eventProblem(event: EventDraft, _place: LinkedPlace | null, now: Date): string | null {
-  if (!event.title.trim()) return 'Dê um nome ao evento.';
+  if (!event.title.trim()) return t('Dê um nome ao evento.');
   const start = localToIso(event.startsAt);
-  if (!start) return 'Escolha o dia e a hora de início.';
-  if (new Date(start).getTime() < now.getTime() - 5 * 60_000) return 'O início precisa ser no futuro.';
+  if (!start) return t('Escolha o dia e a hora de início.');
+  if (new Date(start).getTime() < now.getTime() - 5 * 60_000) return t('O início precisa ser no futuro.');
   if (event.endsAt) {
     const end = localToIso(event.endsAt);
-    if (!end || new Date(end).getTime() <= new Date(start).getTime()) return 'O fim precisa ser depois do início.';
-    if (new Date(end).getTime() - new Date(start).getTime() > POST_EVENT_MAX_DAYS * 24 * 3_600_000) return `O evento pode durar até ${POST_EVENT_MAX_DAYS} dias.`;
+    if (!end || new Date(end).getTime() <= new Date(start).getTime()) return t('O fim precisa ser depois do início.');
+    if (new Date(end).getTime() - new Date(start).getTime() > POST_EVENT_MAX_DAYS * 24 * 3_600_000) return t('O evento pode durar até {POST_EVENT_MAX_DAYS} dias.', { POST_EVENT_MAX_DAYS });
   }
   return null;
 }

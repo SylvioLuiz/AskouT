@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 import type { EventKind } from './types.ts';
 
 /** Os temas de rolê do lançamento. Para abrir outro (cinema, parques…), basta incluir aqui. */
@@ -12,8 +13,8 @@ export interface Theme {
 }
 
 export const THEMES: readonly Theme[] = [
-  { id: 'BAR', label: 'Bares', hint: 'Boteco, pub, música ao vivo, happy hour', category: /\b(bar|pub|boteco|botequim|choperia|cervejaria|biergarten|casa de shows?|samba)\b|bar_|_bar/i },
-  { id: 'NIGHT', label: 'Baladas', hint: 'Balada, festa, pista, noite', category: /night|balada|boate|danceteria|\bclub\b|club\b|festa|casa noturna/i },
+  { id: 'BAR', label: t('Bares'), hint: t('Boteco, pub, música ao vivo, happy hour'), category: /\b(bar|pub|boteco|botequim|choperia|cervejaria|biergarten|casa de shows?|samba)\b|bar_|_bar/i },
+  { id: 'NIGHT', label: t('Baladas'), hint: t('Balada, festa, pista, noite'), category: /night|balada|boate|danceteria|\bclub\b|club\b|festa|casa noturna/i },
 ];
 
 const NIGHT_KINDS: readonly EventKind[] = ['NIGHT'];

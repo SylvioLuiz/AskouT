@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 import type { Relationship } from './types.ts';
 
 export type ProfileAction =
@@ -11,16 +12,16 @@ export type ProfileAction =
 export function profileAction(relationship: Relationship): ProfileAction {
   if (relationship.isSelf) return { kind: 'self' };
   if (relationship.blockedByViewer) return { kind: 'blocked' };
-  if (relationship.following === 'ACCEPTED') return { kind: 'following', label: 'Seguindo' };
-  if (relationship.following === 'PENDING') return { kind: 'requested', label: 'Solicitado' };
-  return { kind: 'follow', label: relationship.followsYou === 'ACCEPTED' ? 'Seguir de volta' : 'Seguir' };
+  if (relationship.following === 'ACCEPTED') return { kind: 'following', label: t('Seguindo') };
+  if (relationship.following === 'PENDING') return { kind: 'requested', label: t('Solicitado') };
+  return { kind: 'follow', label: relationship.followsYou === 'ACCEPTED' ? t('Seguir de volta') : 'Seguir' };
 }
 
 /** Frase curta sobre a relação, quando há algo a dizer. */
 export function relationNote(relationship: Relationship): string | undefined {
   if (relationship.isSelf || relationship.blockedByViewer) return undefined;
-  if (relationship.isFriend) return 'Vocês são amigos';
-  if (relationship.followsYou === 'ACCEPTED') return 'Segue você';
+  if (relationship.isFriend) return t('Vocês são amigos');
+  if (relationship.followsYou === 'ACCEPTED') return t('Segue você');
   return undefined;
 }
 

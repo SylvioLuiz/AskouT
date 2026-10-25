@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../client.ts';
 import { PlayIcon, XIcon } from './icons.tsx';
 import type { ChatMessage } from '../lib/types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 // Cache de fotos/vídeos já baixados (o token vai no cabeçalho, então não dá para usar <img src> direto).
 const cache = new Map<string, string>();
@@ -57,7 +58,7 @@ export function MediaViewer({ kind, url, label, onClose }: { kind: 'IMAGE' | 'VI
   }, [onClose]);
   return (
     <div className="mediaviewer" role="dialog" aria-modal="true" aria-label={label} onClick={onClose}>
-      <button type="button" className="mediaviewer__close iconbtn" aria-label="Fechar" onClick={onClose}>
+      <button type="button" className="mediaviewer__close iconbtn" aria-label={t('Fechar')} onClick={onClose}>
         <XIcon />
       </button>
       {kind === 'IMAGE' ? (
@@ -76,7 +77,7 @@ export function MediaBubble({ message, conversationId }: { message: Pick<ChatMes
   const [wanted, setWanted] = useState(false);
   const [open, setOpen] = useState(false);
   const media = useMessageMedia(conversationId, message.id, !isVideo || wanted);
-  const label = `${isVideo ? 'Vídeo enviado' : 'Foto enviada'} por ${message.mine ? 'você' : (message.senderName ?? 'alguém')}`;
+  const label = `${isVideo ? t('Vídeo enviado') : t('Foto enviada')} por ${message.mine ? 'você' : (message.senderName ?? 'alguém')}`;
 
   useEffect(() => {
     if (isVideo && wanted && media.url) setOpen(true);
@@ -88,7 +89,7 @@ export function MediaBubble({ message, conversationId }: { message: Pick<ChatMes
       <button
         type="button"
         className={`mediabubble${isVideo ? ' mediabubble--video' : ''}`}
-        aria-label={isVideo ? `Assistir vídeo. ${label}` : `Abrir foto. ${label}`}
+        aria-label={isVideo ? t('Assistir vídeo. {label}', { label }) : t('Abrir foto. {label}', { label })}
         aria-busy={(!media.url && (!isVideo || wanted)) || undefined}
         onClick={() => {
           if (isVideo) {
@@ -103,10 +104,10 @@ export function MediaBubble({ message, conversationId }: { message: Pick<ChatMes
         {isVideo ? (
           <span className="mediabubble__play">
             <PlayIcon />
-            <span>{wanted && !media.url ? 'Carregando…' : 'Vídeo'}</span>
+            <span>{wanted && !media.url ? 'Carregando…' : t('Vídeo')}</span>
           </span>
         ) : null}
-        {!isVideo && !media.url ? <span className="mediabubble__wait">Carregando…</span> : null}
+        {!isVideo && !media.url ? <span className="mediabubble__wait">{t('Carregando…')}</span> : null}
       </button>
       {open && media.url ? (
         <MediaViewer
@@ -137,7 +138,7 @@ export function MediaThumb({ conversationId, messageId, kind, label }: { convers
       <button
         type="button"
         className="mediathumb"
-        aria-label={`${isVideo ? 'Assistir vídeo' : 'Abrir foto'}. ${label}`}
+        aria-label={`${isVideo ? t('Assistir vídeo') : 'Abrir foto'}. ${label}`}
         onClick={() => {
           setWanted(true);
           if (media.url) setOpen(true);

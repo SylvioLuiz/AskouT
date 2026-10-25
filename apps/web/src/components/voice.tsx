@@ -13,6 +13,7 @@ import {
   voiceProblemFrom,
   voiceProblemMessage,
 } from '../lib/voice.ts';
+import { t } from '../lib/i18n/index.ts';
 
 export function voiceSupported(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined';
@@ -99,12 +100,12 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
       if (discard.current) return;
       const blob = new Blob(chunks.current, { type: mime });
       if (durationMs < VOICE_MIN_MS) {
-        callbacks.current.onProblem('Gravação curta demais. Segure por pelo menos 1 segundo.');
+        callbacks.current.onProblem(t('Gravação curta demais. Segure por pelo menos 1 segundo.'));
         callbacks.current.onCancel();
         return;
       }
       if (blob.size > VOICE_MAX_BYTES) {
-        callbacks.current.onProblem('O áudio ficou grande demais. Grave um pouco menos.');
+        callbacks.current.onProblem(t('O áudio ficou grande demais. Grave um pouco menos.'));
         callbacks.current.onCancel();
         return;
       }
@@ -144,16 +145,16 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
   }
 
   return (
-    <div className="recbar" role="group" aria-label="Gravando áudio">
-      <button type="button" className="recbar__cancel" onClick={() => finish(false)} aria-label="Cancelar gravação" disabled={busy && !discard.current}>
+    <div className="recbar" role="group" aria-label={t('Gravando áudio')}>
+      <button type="button" className="recbar__cancel" onClick={() => finish(false)} aria-label={t('Cancelar gravação')} disabled={busy && !discard.current}>
         <XIcon />
       </button>
       <span className="recbar__dot" aria-hidden="true" />
       <span className="recbar__time" role="timer" aria-live="off">
         {formatVoiceTime(elapsed)}
       </span>
-      <span className="recbar__label">Gravando</span>
-      <button type="button" className="commentbox__send recbar__send" onClick={() => finish(true)} disabled={busy || elapsed < 300} aria-label="Enviar áudio" aria-busy={busy || undefined}>
+      <span className="recbar__label">{t('Gravando')}</span>
+      <button type="button" className="commentbox__send recbar__send" onClick={() => finish(true)} disabled={busy || elapsed < 300} aria-label={t('Enviar áudio')} aria-busy={busy || undefined}>
         <ArrowUpIcon />
       </button>
     </div>

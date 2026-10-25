@@ -14,6 +14,7 @@ import { routeLink } from '../lib/chat.ts';
 import type { ExploreEvent, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 const EventsMap = lazy(() => import('../components/events-map.tsx'));
 
@@ -33,7 +34,7 @@ function MapCard({ event, selected }: { event: ExploreEvent; selected: boolean }
   return (
     <li className={`evmap__slide${selected ? ' evmap__slide--on' : ''}`} data-id={`e:${event.id}`}>
       <article className="evmapcard">
-        <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evmapcard__link" aria-label={`Abrir evento ${event.title}`}>
+        <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evmapcard__link" aria-label={t('Abrir evento {title}', { title: event.title })}>
           <span className={`evmapcard__cover evcover--${event.kind.toLowerCase()}`}>
             {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : null}
             <span className="evmapcard__shade" />
@@ -96,14 +97,14 @@ function PlaceCard({ place, selected }: { place: ExplorePlace; selected: boolean
             {place.rating !== null ? <Rating rating={place.rating} count={place.ratingCount} /> : null}
           </span>
         </div>
-        {place.sponsored ? <span className="tag-sponsored">Patrocinado</span> : null}
+        {place.sponsored ? <span className="tag-sponsored">{t('Patrocinado')}</span> : null}
         {problem ? <p className="field__error">{problem}</p> : null}
         <div className="evmapplace__actions">
           <Button small loading={opening} onClick={() => void openPage()}>
-            Ver página
+            {t('Ver página')}
           </Button>
           <a className="btn btn--quiet btn--small" href={routeLink(place.lat, place.lng)} target="_blank" rel="noopener noreferrer">
-            Rota
+            {t('Rota')}
           </a>
         </div>
       </article>
@@ -113,7 +114,7 @@ function PlaceCard({ place, selected }: { place: ExplorePlace; selected: boolean
 
 /** Mapa em tela cheia com os locais perto e os eventos acontecendo agora; embaixo, o carrossel do que estiver escolhido. */
 export function EventsMapScreen() {
-  useTitle('Mapa do Explorar');
+  useTitle(t('Mapa do Explorar'));
   const where = useCurrentPosition();
   const waiting = where.status === 'asking';
   const position = where.position;
@@ -146,8 +147,8 @@ export function EventsMapScreen() {
 
   const pins = useMemo(
     () => [
-      ...places.map((p) => ({ id: `p:${p.key}`, lat: p.lat, lng: p.lng, kind: 'place' as const, label: `Ver ${p.name}` })),
-      ...events.map((e) => ({ id: `e:${e.id}`, lat: e.venue.lat, lng: e.venue.lng, kind: 'event' as const, label: `Ver evento ${e.title}` })),
+      ...places.map((p) => ({ id: `p:${p.key}`, lat: p.lat, lng: p.lng, kind: 'place' as const, label: t('Ver {name}', { name: p.name }) })),
+      ...events.map((e) => ({ id: `e:${e.id}`, lat: e.venue.lat, lng: e.venue.lng, kind: 'event' as const, label: t('Ver evento {title}', { title: e.title }) })),
     ],
     [places, events],
   );
@@ -207,7 +208,7 @@ export function EventsMapScreen() {
     <div className="evmap">
       {mapFailed ? (
         <div className="evmap__canvas evmap__canvas--off">
-          <EmptyState title="Não foi possível carregar o mapa">Confira a conexão e tente de novo. Os locais e eventos continuam na lista do Explorar.</EmptyState>
+          <EmptyState title={t('Não foi possível carregar o mapa')}>{t('Confira a conexão e tente de novo. Os locais e eventos continuam na lista do Explorar.')}</EmptyState>
         </div>
       ) : (
         <Suspense fallback={<div className="evmap__canvas" />}>
@@ -215,10 +216,10 @@ export function EventsMapScreen() {
         </Suspense>
       )}
       <header className="evmap__top">
-        <button type="button" className="evmap__back" onClick={goBack} aria-label="Voltar para o Explorar">
+        <button type="button" className="evmap__back" onClick={goBack} aria-label={t('Voltar para o Explorar')}>
           <ChevronLeftIcon />
         </button>
-        <div className="evmap__seg" role="group" aria-label="O que mostrar no carrossel">
+        <div className="evmap__seg" role="group" aria-label={t('O que mostrar no carrossel')}>
           <button type="button" aria-pressed={mode === 'places'} className={mode === 'places' ? 'is-on' : ''} onClick={() => setMode('places')}>
             Locais{placesResult.data ? ` ${places.length}` : ''}
           </button>
@@ -230,9 +231,9 @@ export function EventsMapScreen() {
       <section className="evmap__bottom" aria-label={mode === 'places' ? 'Locais mais próximos' : 'Eventos mais próximos'}>
         {noLocation ? (
           <div className="evmap__status">
-            <p>Ative a localização para ver os locais perto de você.</p>
+            <p>{t('Ative a localização para ver os locais perto de você.')}</p>
             <Button small variant="secondary" onClick={() => setMode('events')}>
-              Ver eventos de agora
+              {t('Ver eventos de agora')}
             </Button>
           </div>
         ) : loading ? (
@@ -243,19 +244,19 @@ export function EventsMapScreen() {
           <div className="evmap__status">
             <p>{active.error.message}</p>
             <Button small onClick={active.reload}>
-              Tentar de novo
+              {t('Tentar de novo')}
             </Button>
           </div>
         ) : ids.length === 0 ? (
           <div className="evmap__status">
             {mode === 'places' ? (
-              <p>{placesResult.data?.placesAvailable === false ? 'A busca de locais de fora está indisponível agora.' : 'Nenhum local encontrado por perto.'}</p>
+              <p>{placesResult.data?.placesAvailable === false ? t('A busca de locais de fora está indisponível agora.') : t('Nenhum local encontrado por perto.')}</p>
             ) : (
               <p>Nenhum evento acontecendo agora{position ? ' por perto' : ''}.</p>
             )}
             {mode === 'events' ? (
               <Button small variant="secondary" onClick={() => navigate('/explorar')}>
-                Ver eventos de hoje
+                {t('Ver eventos de hoje')}
               </Button>
             ) : null}
           </div>
@@ -266,7 +267,7 @@ export function EventsMapScreen() {
               : events.map((e) => <MapCard key={e.id} event={e} selected={`e:${e.id}` === current} />)}
           </ul>
         )}
-        {where.status === 'denied' || where.status === 'unavailable' ? <p className="evmap__note">Sem a sua localização, os eventos não estão ordenados por distância.</p> : null}
+        {where.status === 'denied' || where.status === 'unavailable' ? <p className="evmap__note">{t('Sem a sua localização, os eventos não estão ordenados por distância.')}</p> : null}
       </section>
     </div>
   );

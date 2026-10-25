@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 // Arquivo de agenda (.ics, RFC 5545) de um evento, para "Adicionar à agenda".
 export interface IcsEvent {
   id: string;
@@ -62,7 +63,7 @@ export function buildEventIcs(event: IcsEvent, now: Date = new Date()): string |
     ...(event.url ? [`URL:${event.url}`] : []),
     'BEGIN:VALARM',
     'ACTION:DISPLAY',
-    'DESCRIPTION:Lembrete do evento',
+    t('DESCRIPTION:Lembrete do evento'),
     'TRIGGER:-PT1H',
     'END:VALARM',
     'END:VEVENT',
@@ -94,7 +95,7 @@ export function nativeCalendarBridge(host: unknown = typeof window === 'undefine
 /** No app, abre pelo iPhone; no navegador, baixa o arquivo (o celular/computador oferece abrir na agenda). */
 export async function addToCalendar(event: IcsEvent): Promise<void> {
   const ics = buildEventIcs(event);
-  if (ics === null) throw new Error('Este evento não tem data válida para a agenda.');
+  if (ics === null) throw new Error(t('Este evento não tem data válida para a agenda.'));
   const filename = icsFilename(event.title);
   const bridge = nativeCalendarBridge();
   if (bridge) {

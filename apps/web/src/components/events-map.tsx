@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Map as GlMap, Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { t } from '../lib/i18n/index.ts';
 
 // Mapa do Explorar: locais e eventos acontecendo agora. Mapa-base do OpenStreetMap desenhado pelo MapLibre, carregado sob demanda.
 
@@ -127,5 +128,5 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Pr
     if (pin) state.map.easeTo({ center: [pin.lng, pin.lat], offset: [0, -90], duration: 350 });
   }, [ready, selectedId, pins]);
 
-  return <div ref={box} className="evmap__canvas" role="region" aria-label="Mapa com os locais e eventos perto" />;
+  return <div ref={box} className="evmap__canvas" role="region" aria-label={t('Mapa com os locais e eventos perto')} />;
 }

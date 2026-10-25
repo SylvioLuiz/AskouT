@@ -11,6 +11,7 @@ import type { ConversationItem, EventCard } from '../lib/types.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 type Step = 'menu' | 'chat';
 
@@ -32,7 +33,7 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
       else await api.postEvent(eventId);
       onPostedChange(!posted);
       if (!posted) shared();
-      setMessage({ tone: 'ok', text: posted ? 'Evento tirado do seu perfil.' : 'Evento postado no seu perfil.' });
+      setMessage({ tone: 'ok', text: posted ? t('Evento tirado do seu perfil.') : t('Evento postado no seu perfil.') });
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -67,25 +68,25 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
       }
       await navigator.clipboard.writeText(url);
       shared();
-      setMessage({ tone: 'ok', text: 'Link copiado. Cole onde quiser, por exemplo no WhatsApp.' });
+      setMessage({ tone: 'ok', text: t('Link copiado. Cole onde quiser, por exemplo no WhatsApp.') });
     } catch (failure) {
       if (failure instanceof DOMException && failure.name === 'AbortError') return;
-      setMessage({ tone: 'error', text: `Não foi possível copiar. O link é ${url}` });
+      setMessage({ tone: 'error', text: t('Não foi possível copiar. O link é {url}', { url }) });
     }
   }
 
   const sendable = (chats.data?.items ?? []).filter((c) => c.canSend);
 
   return (
-    <Sheet title="Compartilhar" onClose={onClose}>
+    <Sheet title={t('Compartilhar')} onClose={onClose}>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {step === 'menu' ? (
         <ul className="sharelist">
           {profile === 'toggle' ? (
             <li>
               <button type="button" className="sharelist__item" onClick={togglePost} disabled={busy}>
-                <strong>{posted ? 'Tirar do meu perfil' : 'Postar no meu perfil'}</strong>
-                <span>{posted ? 'O evento deixa de aparecer na sua grade.' : 'Aparece na grade do seu perfil para quem pode ver.'}</span>
+                <strong>{posted ? t('Tirar do meu perfil') : t('Postar no meu perfil')}</strong>
+                <span>{posted ? t('O evento deixa de aparecer na sua grade.') : t('Aparece na grade do seu perfil para quem pode ver.')}</span>
               </button>
             </li>
           ) : (
@@ -95,15 +96,15 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
           )}
           <li>
             <button type="button" className="sharelist__item" onClick={() => setStep('chat')} disabled={busy}>
-              <strong>Enviar em uma conversa</strong>
-              <span>Mande para um amigo ou um grupo.</span>
+              <strong>{t('Enviar em uma conversa')}</strong>
+              <span>{t('Mande para um amigo ou um grupo.')}</span>
             </button>
           </li>
           {allowOutside ? (
             <li>
               <button type="button" className="sharelist__item" onClick={outside} disabled={busy}>
-                <strong>Fora do app</strong>
-                <span>WhatsApp, redes sociais ou copiar o link.</span>
+                <strong>{t('Fora do app')}</strong>
+                <span>{t('WhatsApp, redes sociais ou copiar o link.')}</span>
               </button>
             </li>
           ) : null}
@@ -112,7 +113,7 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
         <>
           {chats.loading && !chats.data ? <Loading /> : null}
           {chats.error ? <ErrorState message={chats.error.message} onRetry={chats.reload} /> : null}
-          {chats.data && sendable.length === 0 ? <p className="muted">Você ainda não tem conversas. Siga alguém que também te segue para conversar.</p> : null}
+          {chats.data && sendable.length === 0 ? <p className="muted">{t('Você ainda não tem conversas. Siga alguém que também te segue para conversar.')}</p> : null}
           <ul className="sharelist">
             {sendable.map((c) => (
               <li key={c.id}>
@@ -124,7 +125,7 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
             ))}
           </ul>
           <Button variant="quiet" small onClick={() => setStep('menu')}>
-            Voltar
+            {t('Voltar')}
           </Button>
         </>
       )}
@@ -148,8 +149,8 @@ export function EventBubble({ event }: { event: EventCard }) {
           <VenueLink venueId={event.venueId} name={event.venueName} nested />
         </span>
       ) : null}
-      {event.going ? <span className="evbubble__going">Você vai</span> : null}
-      {event.sample ? <span className="tag tag--sample">Exemplo de teste</span> : null}
+      {event.going ? <span className="evbubble__going">{t('Você vai')}</span> : null}
+      {event.sample ? <span className="tag tag--sample">{t('Exemplo de teste')}</span> : null}
     </Link>
   );
 }

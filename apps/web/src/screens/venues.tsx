@@ -16,12 +16,13 @@ import type { ClaimableVenue, VenueClaim, VenueEvent, VenueEventBody, VenueSumma
 import { CLAIM_NOTE_MAX, EMPTY_VENUE_EVENT, VENUE_EVENT_DESCRIPTION_MAX, VENUE_EVENT_TITLE_MAX, claimStateLabel, claimStatusLabel, documentProblem, draftFromEvent, phaseLabel, venueEventBody, venueEventProblem } from '../lib/venue.ts';
 import type { VenueEventDraft } from '../lib/venue.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+    reader.onerror = () => reject(new Error(t('Não foi possível ler o arquivo.')));
     reader.readAsDataURL(file);
   });
 }
@@ -73,14 +74,14 @@ export function ClaimSheet({ onClose, onSent, fixed }: { onClose: () => void; on
   }
 
   return (
-    <Sheet title="Reivindicar um local" onClose={onClose}>
+    <Sheet title={t('Reivindicar um local')} onClose={onClose}>
       {!picked ? (
         <div className="claim">
-          <Field label="Nome do local" value={query} onChange={setQuery} placeholder="Ex.: Bar do Zé ou Balada Nova" autoFocus />
-          {debounced.length < 2 ? <p className="muted">Digite pelo menos 2 letras. Só aparecem locais já cadastrados no AskouT.</p> : null}
+          <Field label={t('Nome do local')} value={query} onChange={setQuery} placeholder={t('Ex.: Bar do Zé ou Balada Nova')} autoFocus />
+          {debounced.length < 2 ? <p className="muted">{t('Digite pelo menos 2 letras. Só aparecem locais já cadastrados no AskouT.')}</p> : null}
           {found.loading ? <Loading /> : null}
           {found.error ? <ErrorState message={found.error.message} onRetry={found.reload} /> : null}
-          {found.data && debounced.length >= 2 && found.data.length === 0 ? <p className="muted">Nenhum local com esse nome.</p> : null}
+          {found.data && debounced.length >= 2 && found.data.length === 0 ? <p className="muted">{t('Nenhum local com esse nome.')}</p> : null}
           {found.data && found.data.length > 0 ? (
             <ul className="venuelist">
               {found.data.map((v) => (
@@ -100,21 +101,21 @@ export function ClaimSheet({ onClose, onSent, fixed }: { onClose: () => void; on
             <strong>{picked.name}</strong>
             {picked.address ? <span className="muted"> · {picked.address}</span> : null}
           </p>
-          <p className="muted">Para confirmar que o local é seu, envie um documento (CNPJ, alvará ou comprovante). Só um administrador do AskouT vê o arquivo.</p>
-          <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="visually-hidden" aria-label="Escolher documento" onChange={choose} />
+          <p className="muted">{t('Para confirmar que o local é seu, envie um documento (CNPJ, alvará ou comprovante). Só um administrador do AskouT vê o arquivo.')}</p>
+          <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="visually-hidden" aria-label={t('Escolher documento')} onChange={choose} />
           <Button variant="secondary" onClick={() => input.current?.click()}>
-            {file ? 'Trocar documento' : 'Escolher documento'}
+            {file ? t('Trocar documento') : t('Escolher documento')}
           </Button>
           {file ? <p className="claim__file">{file.name}</p> : null}
-          <Field label="Mensagem (opcional)" value={note} onChange={setNote} multiline maxLength={CLAIM_NOTE_MAX} hint={`Até ${CLAIM_NOTE_MAX} caracteres`} />
+          <Field label={t('Mensagem (opcional)')} value={note} onChange={setNote} multiline maxLength={CLAIM_NOTE_MAX} hint={t('Até {CLAIM_NOTE_MAX} caracteres', { CLAIM_NOTE_MAX })} />
           {message ? <Notice tone="error">{message}</Notice> : null}
           <div className="claim__actions">
             <Button full loading={busy} disabled={!file} onClick={send}>
-              Enviar pedido
+              {t('Enviar pedido')}
             </Button>
             {fixed ? null : (
               <Button variant="quiet" onClick={() => setPicked(undefined)} disabled={busy}>
-                Escolher outro local
+                {t('Escolher outro local')}
               </Button>
             )}
           </div>
@@ -150,10 +151,10 @@ function ClaimRow({ claim, onChanged }: { claim: VenueClaim; onChanged: () => vo
       {claim.status === 'REJECTED' && claim.reviewNote ? <p className="muted">Motivo: {claim.reviewNote}</p> : null}
       {claim.status === 'PENDING' ? (
         asking ? (
-          <Confirm question="Desistir deste pedido?" confirmLabel="Desistir" danger busy={busy} onConfirm={cancel} onCancel={() => setAsking(false)} />
+          <Confirm question={t('Desistir deste pedido?')} confirmLabel={t('Desistir')} danger busy={busy} onConfirm={cancel} onCancel={() => setAsking(false)} />
         ) : (
           <Button small variant="quiet" onClick={() => setAsking(true)}>
-            Desistir do pedido
+            {t('Desistir do pedido')}
           </Button>
         )
       ) : null}
@@ -163,15 +164,15 @@ function ClaimRow({ claim, onChanged }: { claim: VenueClaim; onChanged: () => vo
 }
 
 export function VenuesScreen() {
-  useTitle('Meus locais');
+  useTitle(t('Meus locais'));
   const mine = useAsync(() => api.myVenues(), []);
   const [claiming, setClaiming] = useState(false);
   const [sent, setSent] = useState(false);
 
   return (
     <>
-      <PageHead title="Meus locais" back="/perfil" subtitle="Rolês que você administra no AskouT." />
-      {sent ? <Notice tone="ok">Pedido enviado. Um administrador vai analisar o documento e você recebe um aviso com a resposta.</Notice> : null}
+      <PageHead title={t('Meus locais')} back="/perfil" subtitle={t('Rolês que você administra no AskouT.')} />
+      {sent ? <Notice tone="ok">{t('Pedido enviado. Um administrador vai analisar o documento e você recebe um aviso com a resposta.')}</Notice> : null}
       {mine.loading && !mine.data ? <Loading /> : null}
       {mine.error && !mine.data ? <ErrorState message={mine.error.message} onRetry={mine.reload} /> : null}
       {mine.data ? (
@@ -179,7 +180,7 @@ export function VenuesScreen() {
           {mine.data.claims.length > 0 ? (
             <section aria-labelledby="pedidos-titulo">
               <h2 id="pedidos-titulo" className="section__title">
-                Seus pedidos
+                {t('Seus pedidos')}
               </h2>
               <ul className="claimlist">
                 {mine.data.claims.map((c) => (
@@ -189,9 +190,9 @@ export function VenuesScreen() {
             </section>
           ) : null}
           {mine.data.venues.length === 0 && mine.data.claims.length === 0 ? (
-            <EmptyState title="Você ainda não administra nenhum local">Reivindique o seu rolê (bar, balada ou casa) para criar os eventos dele. O pedido é analisado por um administrador.</EmptyState>
+            <EmptyState title={t('Você ainda não administra nenhum local')}>{t('Reivindique o seu rolê (bar, balada ou casa) para criar os eventos dele. O pedido é analisado por um administrador.')}</EmptyState>
           ) : mine.data.venues.length === 0 ? null : (
-            <ul className="venuelist" aria-label="Locais que você administra">
+            <ul className="venuelist" aria-label={t('Locais que você administra')}>
               {mine.data.venues.map((v) => (
                 <li key={v.id}>
                   <Link to={`/bares/${encodeURIComponent(v.id)}`} className="venuerow">
@@ -202,7 +203,7 @@ export function VenuesScreen() {
             </ul>
           )}
           <Button full onClick={() => setClaiming(true)}>
-            Reivindicar um local
+            {t('Reivindicar um local')}
           </Button>
         </>
       ) : null}
@@ -253,31 +254,31 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved, custom }: { 
   }
 
   return (
-    <Sheet title={custom ? custom.heading : event ? 'Editar evento' : 'Novo evento'} onClose={onClose}>
+    <Sheet title={custom ? custom.heading : event ? t('Editar evento') : t('Novo evento')} onClose={onClose}>
       <div className="claim">
         <CoverPicker linkOnly={custom?.linkOnlyCover === true} imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
-        <Field label="Nome do evento" value={draft.title} onChange={(v) => set('title', v)} maxLength={VENUE_EVENT_TITLE_MAX} />
+        <Field label={t('Nome do evento')} value={draft.title} onChange={(v) => set('title', v)} maxLength={VENUE_EVENT_TITLE_MAX} />
         <EventKindPicker value={draft.kind} onChange={(k) => set('kind', k)} />
         <EventDates starts={draft.starts} ends={draft.ends} onStarts={(v) => set('starts', v)} onEnds={(v) => set('ends', v)} />
         <label className="check">
           <input type="checkbox" checked={draft.isFree} onChange={(e) => set('isFree', e.target.checked)} />
-          <span>Entrada grátis</span>
+          <span>{t('Entrada grátis')}</span>
         </label>
-        <Field label="Descrição (opcional)" value={draft.description} onChange={(v) => set('description', v)} multiline maxLength={VENUE_EVENT_DESCRIPTION_MAX} />
-        <Field label="Hashtags (opcional)" value={draft.tags} onChange={(v) => set('tags', v)} placeholder="#samba #happyhour" hint="Até 5, separadas por espaço" />
+        <Field label={t('Descrição (opcional)')} value={draft.description} onChange={(v) => set('description', v)} multiline maxLength={VENUE_EVENT_DESCRIPTION_MAX} />
+        <Field label={t('Hashtags (opcional)')} value={draft.tags} onChange={(v) => set('tags', v)} placeholder="#samba #happyhour" hint={t('Até 5, separadas por espaço')} />
         <Field
-          label="Link para comprar ingresso (opcional)"
+          label={t('Link para comprar ingresso (opcional)')}
           type="url"
           inputMode="url"
           autoComplete="off"
           value={draft.ticketUrl}
           onChange={(v) => set('ticketUrl', v)}
           placeholder="https://"
-          hint="Site do local ou de uma bilheteria. O AskouT só leva a pessoa até lá: não vende nem cobra o ingresso."
+          hint={t('Site do local ou de uma bilheteria. O AskouT só leva a pessoa até lá: não vende nem cobra o ingresso.')}
         />
         {message ? <Notice tone="error">{message}</Notice> : null}
         <Button full loading={busy} onClick={save}>
-          {custom ? custom.saveLabel : event ? 'Salvar' : 'Criar evento'}
+          {custom ? custom.saveLabel : event ? t('Salvar') : t('Criar evento')}
         </Button>
       </div>
     </Sheet>
@@ -308,19 +309,19 @@ export function VenueEventRow({ venueId, event, now, onEdit, onChanged }: { venu
         </Link>
         <span className="vevent__when">{formatWhen(event.startsAt, event.endsAt, now)}</span>
         <span className="vevent__meta">
-          {kindLabel(event.kind)} · {event.isFree ? 'Grátis' : 'Pago'} · {phaseLabel(event.phase)}
+          {kindLabel(event.kind)} · {event.isFree ? t('Grátis') : t('Pago')} · {phaseLabel(event.phase)}
         </span>
         {event.sample ? <SampleBadge /> : null}
       </div>
       {asking ? (
-        <Confirm question="Apagar este evento? Quem confirmou presença deixa de vê-lo." confirmLabel="Apagar" danger busy={busy} onConfirm={remove} onCancel={() => setAsking(false)} />
+        <Confirm question={t('Apagar este evento? Quem confirmou presença deixa de vê-lo.')} confirmLabel={t('Apagar')} danger busy={busy} onConfirm={remove} onCancel={() => setAsking(false)} />
       ) : (
         <div className="vevent__actions">
           <Button small variant="secondary" onClick={onEdit}>
-            Editar
+            {t('Editar')}
           </Button>
           <Button small variant="quiet" onClick={() => setAsking(true)}>
-            Apagar
+            {t('Apagar')}
           </Button>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 // Contas do Flash que não dependem de tela: distância, tempo restante e rótulos.
 
 const EARTH_RADIUS_M = 6_371_000;
@@ -62,7 +63,7 @@ export function formatAge(updatedAtIso: string, serverNowIso: string): string {
 
 /** Avisa o resto do app (o raio do topo, por exemplo) que o Flash ligou, desligou ou mudou de estado. */
 /** Mensagem de sistema que a API posta ao casar um Flash (mesmo texto de `FLASH_MATCH_MESSAGE` na API). */
-export const FLASH_MATCH_MESSAGE = 'Flash combinado! Vocês dois estão disponíveis agora.';
+export const FLASH_MATCH_MESSAGE = t('Flash combinado! Vocês dois estão disponíveis agora.');
 export const FLASH_CHANGED_EVENT = 'askout:flash-changed';
 export function announceFlashChange(): void {
   window.dispatchEvent(new Event(FLASH_CHANGED_EVENT));
@@ -89,16 +90,16 @@ export function formatFlashDuration(minutes: number): string {
 export const FLASH_NOTE_MAX = 60;
 
 export function flashNoteProblem(note: string): string | undefined {
-  return Array.from(note.trim()).length > FLASH_NOTE_MAX ? `Use no máximo ${FLASH_NOTE_MAX} caracteres` : undefined;
+  return Array.from(note.trim()).length > FLASH_NOTE_MAX ? t('Use no máximo {FLASH_NOTE_MAX} caracteres', { FLASH_NOTE_MAX }) : undefined;
 }
 
 /** Mensagem para cada motivo de falha do navegador ao pegar a localização (códigos de GeolocationPositionError). */
 export function geolocationMessage(code: number | undefined, secure: boolean): string {
-  if (!secure) return 'O navegador só libera a localização em conexão segura (https).';
-  if (code === 1) return 'A localização está bloqueada. Libere nas configurações do navegador ou do celular para compartilhar.';
-  if (code === 2) return 'Não foi possível descobrir onde você está agora. Vá para um lugar com melhor sinal.';
-  if (code === 3) return 'A localização demorou demais. Toque em compartilhar para tentar de novo.';
-  return 'Este aparelho não consegue informar a localização.';
+  if (!secure) return t('O navegador só libera a localização em conexão segura (https).');
+  if (code === 1) return t('A localização está bloqueada. Libere nas configurações do navegador ou do celular para compartilhar.');
+  if (code === 2) return t('Não foi possível descobrir onde você está agora. Vá para um lugar com melhor sinal.');
+  if (code === 3) return t('A localização demorou demais. Toque em compartilhar para tentar de novo.');
+  return t('Este aparelho não consegue informar a localização.');
 }
 
 /** Contagem regressiva: "1h 58min" (de uma hora para cima) ou "42min 07s". */

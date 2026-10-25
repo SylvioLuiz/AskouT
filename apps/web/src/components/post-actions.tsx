@@ -18,6 +18,7 @@ import { eventProblem, isoToLocalInput, localToIso, POST_CAPTION_MAX } from '../
 import { postLink, postShareText } from '../lib/share.ts';
 import type { ConversationItem, EventKind, PostComment, PostView, PublicProfile, ReportReason } from '../lib/types.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 export type PostGone = 'deleted' | 'hidden' | 'archived';
 
@@ -55,20 +56,20 @@ export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArc
     </li>
   );
   return (
-    <Sheet title="Opções do post" onClose={onClose}>
+    <Sheet title={t('Opções do post')} onClose={onClose}>
       {confirming ? (
-        <Confirm danger question="Excluir este post? As fotos, curtidas e comentários são removidos." confirmLabel="Excluir" busy={busy} onCancel={() => setConfirming(false)} onConfirm={onDelete} />
+        <Confirm danger question={t('Excluir este post? As fotos, curtidas e comentários são removidos.')} confirmLabel={t('Excluir')} busy={busy} onCancel={() => setConfirming(false)} onConfirm={onDelete} />
       ) : post.mine ? (
         <ul className="sharelist">
-          {item('Editar', 'Legenda, rolê e dados do evento.', onEdit)}
-          {item('Ajustar', 'Recortar as fotos que você enviou.', onAdjust, { icon: true })}
-          {item(post.archived ? 'Desarquivar' : 'Arquivar', post.archived ? 'O post volta para o seu perfil e o feed.' : 'Só você vê. Sai do feed e do seu perfil.', onArchiveToggle)}
-          {item('Excluir', 'Apaga o post para sempre.', () => setConfirming(true), { danger: true })}
+          {item('Editar', t('Legenda, rolê e dados do evento.'), onEdit)}
+          {item('Ajustar', t('Recortar as fotos que você enviou.'), onAdjust, { icon: true })}
+          {item(post.archived ? t('Desarquivar') : 'Arquivar', post.archived ? t('O post volta para o seu perfil e o feed.') : t('Só você vê. Sai do feed e do seu perfil.'), onArchiveToggle)}
+          {item('Excluir', t('Apaga o post para sempre.'), () => setConfirming(true), { danger: true })}
         </ul>
       ) : (
         <ul className="sharelist">
-          {item('Denunciar', 'Conteúdo que não deveria estar aqui.', onReport, { danger: true })}
-          {item('Não tenho interesse', 'Deixa de mostrar este post no seu feed.', onNotInterested)}
+          {item('Denunciar', t('Conteúdo que não deveria estar aqui.'), onReport, { danger: true })}
+          {item(t('Não tenho interesse'), t('Deixa de mostrar este post no seu feed.'), onNotInterested)}
         </ul>
       )}
     </Sheet>
@@ -78,19 +79,19 @@ export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArc
 // ---------- Denunciar ----------
 
 const REASONS: { id: ReportReason; label: string }[] = [
-  { id: 'SPAM', label: 'Spam ou propaganda' },
-  { id: 'OFFENSIVE', label: 'Ofensivo ou discurso de ódio' },
-  { id: 'NUDITY', label: 'Nudez ou conteúdo sexual' },
-  { id: 'VIOLENCE', label: 'Violência' },
-  { id: 'FALSE_INFO', label: 'Informação falsa' },
-  { id: 'OTHER', label: 'Outro motivo' },
+  { id: 'SPAM', label: t('Spam ou propaganda') },
+  { id: 'OFFENSIVE', label: t('Ofensivo ou discurso de ódio') },
+  { id: 'NUDITY', label: t('Nudez ou conteúdo sexual') },
+  { id: 'VIOLENCE', label: t('Violência') },
+  { id: 'FALSE_INFO', label: t('Informação falsa') },
+  { id: 'OTHER', label: t('Outro motivo') },
 ];
 
 export function ReportSheet({ postId, onClose, onDone }: { postId: string; onClose: () => void; onDone: () => void }) {
   return (
     <ReasonSheet
-      title="Denunciar post"
-      doneText="Obrigado por avisar. A equipe vai analisar, e você não verá mais este post."
+      title={t('Denunciar post')}
+      doneText={t('Obrigado por avisar. A equipe vai analisar, e você não verá mais este post.')}
       submit={(reason, details) => api.reportPost(postId, reason, details)}
       onClose={onClose}
       onDone={onDone}
@@ -122,10 +123,10 @@ export function ReasonSheet({ title, doneText, extra, submit, onClose, onDone }:
 
   if (sent) {
     return (
-      <Sheet title="Denúncia enviada" onClose={onDone}>
+      <Sheet title={t('Denúncia enviada')} onClose={onDone}>
         <p>{doneText}</p>
         <Button full onClick={onDone}>
-          Fechar
+          {t('Fechar')}
         </Button>
       </Sheet>
     );
@@ -134,7 +135,7 @@ export function ReasonSheet({ title, doneText, extra, submit, onClose, onDone }:
     <Sheet title={title} onClose={onClose}>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {extra ? <p className="muted">{extra}</p> : null}
-      <div className="reasons" role="radiogroup" aria-label="Motivo da denúncia">
+      <div className="reasons" role="radiogroup" aria-label={t('Motivo da denúncia')}>
         {REASONS.map((r) => (
           <label key={r.id} className={`reasons__item${reason === r.id ? ' reasons__item--on' : ''}`}>
             <input type="radio" name="motivo" checked={reason === r.id} onChange={() => setReason(r.id)} />
@@ -142,9 +143,9 @@ export function ReasonSheet({ title, doneText, extra, submit, onClose, onDone }:
           </label>
         ))}
       </div>
-      <Field label="Detalhes (opcional)" value={details} onChange={setDetails} multiline maxLength={300} />
+      <Field label={t('Detalhes (opcional)')} value={details} onChange={setDetails} multiline maxLength={300} />
       <Button full disabled={!reason} loading={busy} onClick={() => void send()}>
-        Enviar denúncia
+        {t('Enviar denúncia')}
       </Button>
     </Sheet>
   );
@@ -156,11 +157,11 @@ function CommentRow({ comment, onDelete, onLike, onReport, busy }: { comment: Po
   return (
     <li className="comment">
       {comment.venue ? (
-        <Link to={`/bares/${encodeURIComponent(comment.venue.id)}`} aria-label={`Página de ${comment.venue.name}`}>
+        <Link to={`/bares/${encodeURIComponent(comment.venue.id)}`} aria-label={t('Página de {name}', { name: comment.venue.name })}>
           <VenueLogo name={comment.venue.name} logoUrl={comment.venue.logoUrl} size={32} />
         </Link>
       ) : (
-        <Link to={`/u/${encodeURIComponent(comment.author.username)}`} aria-label={`Perfil de ${comment.author.username}`}>
+        <Link to={`/u/${encodeURIComponent(comment.author.username)}`} aria-label={t('Perfil de {username}', { username: comment.author.username })}>
           <Avatar profile={comment.author} size={32} />
         </Link>
       )}
@@ -168,7 +169,7 @@ function CommentRow({ comment, onDelete, onLike, onReport, busy }: { comment: Po
         <p>
           {comment.venue ? (
             <Link to={`/bares/${encodeURIComponent(comment.venue.id)}`} className="comment__name">
-              {comment.venue.name} <span className="tag tag--event">Rolê</span>
+              {comment.venue.name} <span className="tag tag--event">{t('Rolê')}</span>
             </Link>
           ) : (
             <Link to={`/u/${encodeURIComponent(comment.author.username)}`} className="comment__name">
@@ -195,11 +196,11 @@ function CommentRow({ comment, onDelete, onLike, onReport, busy }: { comment: Po
       </button>
       {!comment.mine ? (
         <button type="button" className="comment__report" onClick={onReport} aria-label={`Denunciar comentário de ${comment.venue?.name ?? comment.author.username}`}>
-          Denunciar
+          {t('Denunciar')}
         </button>
       ) : null}
       {comment.canDelete ? (
-        <button type="button" className="comment__del" onClick={onDelete} disabled={busy} aria-label="Apagar comentário">
+        <button type="button" className="comment__del" onClick={onDelete} disabled={busy} aria-label={t('Apagar comentário')}>
           <TrashIcon />
         </button>
       ) : null}
@@ -295,11 +296,11 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
   }
 
   return (
-    <Sheet title="Comentários" onClose={onClose}>
+    <Sheet title={t('Comentários')} onClose={onClose}>
       {reporting ? (
         <ReasonSheet
-          title="Denunciar comentário"
-          doneText="Obrigado por avisar. A equipe vai analisar o comentário."
+          title={t('Denunciar comentário')}
+          doneText={t('Obrigado por avisar. A equipe vai analisar o comentário.')}
           submit={(reason, details) => api.reportComment(postId, reporting.id, reason, details)}
           onClose={() => setReporting(undefined)}
           onDone={() => setReporting(undefined)}
@@ -307,7 +308,7 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
       ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
       {!loaded ? <Loading /> : null}
-      {loaded && items.length === 0 && !error ? <p className="comments__empty">Ainda não há nenhum comentário.</p> : null}
+      {loaded && items.length === 0 && !error ? <p className="comments__empty">{t('Ainda não há nenhum comentário.')}</p> : null}
       <ul className="comments">
         {items.map((c) => (
           <CommentRow key={c.id} comment={c} busy={deleting === c.id} onDelete={() => void remove(c)} onLike={() => void toggleLike(c)} onReport={() => setReporting(c)} />
@@ -315,7 +316,7 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
       </ul>
       {hasMore ? (
         <Button variant="quiet" small onClick={() => void load(items.length)}>
-          Ver mais comentários
+          {t('Ver mais comentários')}
         </Button>
       ) : null}
       <div ref={endRef} />
@@ -327,10 +328,10 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
         }}
       >
         <label className="visually-hidden" htmlFor="comment-input">
-          Escreva um comentário
+          {t('Escreva um comentário')}
         </label>
         {query !== undefined && query.length > 0 && people.length > 0 ? (
-          <ul className="mentionlist" aria-label="Pessoas para marcar">
+          <ul className="mentionlist" aria-label={t('Pessoas para marcar')}>
             {people.map((person) => (
               <li key={person.userId}>
                 <button type="button" className="mentionlist__item" onClick={() => setText((current) => applyMention(current, person.username))}>
@@ -345,9 +346,9 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
           </ul>
         ) : null}
         <div className="commentbox">
-          <input id="comment-input" className="commentbox__input" value={text} onChange={(event) => setText(event.target.value)} maxLength={520} placeholder="Escreva um comentário" autoComplete="off" enterKeyHint="send" />
+          <input id="comment-input" className="commentbox__input" value={text} onChange={(event) => setText(event.target.value)} maxLength={520} placeholder={t('Escreva um comentário')} autoComplete="off" enterKeyHint="send" />
           {text.trim() !== '' ? (
-            <button type="submit" className="commentbox__send" disabled={busy} aria-label="Publicar comentário" aria-busy={busy || undefined}>
+            <button type="submit" className="commentbox__send" disabled={busy} aria-label={t('Publicar comentário')} aria-busy={busy || undefined}>
               <ArrowUpIcon />
             </button>
           ) : null}
@@ -399,28 +400,28 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
   }
 
   return (
-    <Sheet title="Editar post" onClose={onClose}>
+    <Sheet title={t('Editar post')} onClose={onClose}>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      <div className="segmented" role="group" aria-label="Tipo de publicação">
+      <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
         <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
-          Post
+          {t('Post')}
         </button>
         <button type="button" className={`segmented__tab${kind === 'EVENT' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'EVENT'} onClick={() => setKind('EVENT')}>
-          Evento
+          {t('Evento')}
         </button>
       </div>
       {kind === 'EVENT' ? (
         <>
-          <Field label="Nome do evento" value={title} onChange={setTitle} maxLength={120} />
+          <Field label={t('Nome do evento')} value={title} onChange={setTitle} maxLength={120} />
           <EventKindPicker value={eventKind} onChange={setEventKind} />
           <EventDates starts={starts} ends={ends} onStarts={setStarts} onEnds={setEnds} />
         </>
       ) : null}
-      <Field label="Descrição" value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />
-      <Field label={kind === 'EVENT' ? 'Rolê (obrigatório no evento)' : 'Rolê (opcional)'} value={placeName} onChange={setPlaceName} maxLength={120} />
-      {placeName.trim() ? <Field label="Endereço (opcional)" value={placeAddress} onChange={setPlaceAddress} maxLength={200} /> : null}
+      <Field label={t('Descrição')} value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />
+      <Field label={kind === 'EVENT' ? t('Rolê (obrigatório no evento)') : t('Rolê (opcional)')} value={placeName} onChange={setPlaceName} maxLength={120} />
+      {placeName.trim() ? <Field label={t('Endereço (opcional)')} value={placeAddress} onChange={setPlaceAddress} maxLength={200} /> : null}
       <Button full loading={busy} disabled={Array.from(caption).length > POST_CAPTION_MAX} onClick={() => void save()}>
-        Salvar
+        {t('Salvar')}
       </Button>
     </Sheet>
   );
@@ -430,12 +431,12 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
 
 async function toDataUrl(url: string): Promise<string> {
   const response = await fetch(url);
-  if (!response.ok) throw new Error('Não foi possível abrir a foto.');
+  if (!response.ok) throw new Error(t('Não foi possível abrir a foto.'));
   const blob = await response.blob();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Não foi possível abrir a foto.'));
+    reader.onerror = () => reject(new Error(t('Não foi possível abrir a foto.')));
     reader.readAsDataURL(blob);
   });
 }
@@ -457,7 +458,7 @@ export function AdjustSheet({ post, onClose, onSaved }: { post: PostView; onClos
         if (!cancelled) setSource(url);
       })
       .catch((failure: unknown) => {
-        if (!cancelled) setMessage({ tone: 'error', text: failure instanceof Error ? failure.message : 'Não foi possível abrir a foto.' });
+        if (!cancelled) setMessage({ tone: 'error', text: failure instanceof Error ? failure.message : t('Não foi possível abrir a foto.') });
       });
     return () => {
       cancelled = true;
@@ -479,16 +480,16 @@ export function AdjustSheet({ post, onClose, onSaved }: { post: PostView; onClos
   }
 
   return (
-    <Sheet title="Ajustar foto" onClose={onClose}>
+    <Sheet title={t('Ajustar foto')} onClose={onClose}>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      {uploads.length === 0 ? <p className="muted">Só fotos que você enviou podem ser ajustadas. A foto de um rolê não pode ser recortada.</p> : null}
+      {uploads.length === 0 ? <p className="muted">{t('Só fotos que você enviou podem ser ajustadas. A foto de um rolê não pode ser recortada.')}</p> : null}
       {uploads.length > 1 ? (
         <>
-          <p className="muted">Escolha a foto para recortar.</p>
-          <ul className="composegrid" aria-label="Fotos do post">
+          <p className="muted">{t('Escolha a foto para recortar.')}</p>
+          <ul className="composegrid" aria-label={t('Fotos do post')}>
             {uploads.map((image, i) => (
               <li key={image.id} className={`composegrid__item${image.id === chosen ? ' composegrid__item--on' : ''}`}>
-                <button type="button" className="composegrid__pick" onClick={() => setChosen(image.id)} aria-label={`Ajustar foto ${i + 1}`} aria-pressed={image.id === chosen}>
+                <button type="button" className="composegrid__pick" onClick={() => setChosen(image.id)} aria-label={t('Ajustar foto {i}', { i: i + 1 })} aria-pressed={image.id === chosen}>
                   {image.path ? <img src={api.assetUrl(image.path)} alt="" /> : null}
                   <span className="composegrid__n">{i + 1}</span>
                 </button>
@@ -499,7 +500,7 @@ export function AdjustSheet({ post, onClose, onSaved }: { post: PostView; onClos
       ) : null}
       {chosen && !source && !message ? <Loading /> : null}
       {chosen && source ? <CropEditor key={chosen} source={source} busy={busy} onApply={(rect) => void apply(rect)} onCancel={onClose} /> : null}
-      {chosen ? <p className="muted">O recorte parte da foto já publicada (até 720 px).</p> : null}
+      {chosen ? <p className="muted">{t('O recorte parte da foto já publicada (até 720 px).')}</p> : null}
     </Sheet>
   );
 }
@@ -521,16 +522,16 @@ export function ShareLinkSheet({ url, text, onShared, onClose }: { url: string; 
     setMessage(undefined);
     try {
       if (typeof navigator.share === 'function') {
-        await navigator.share({ title: 'AskouT', text, url });
+        await navigator.share({ title: t('AskouT'), text, url });
         onShared?.();
         return;
       }
       await navigator.clipboard.writeText(url);
       onShared?.();
-      setMessage({ tone: 'ok', text: 'Link copiado. Cole onde quiser, por exemplo no WhatsApp.' });
+      setMessage({ tone: 'ok', text: t('Link copiado. Cole onde quiser, por exemplo no WhatsApp.') });
     } catch (failure) {
       if (failure instanceof DOMException && failure.name === 'AbortError') return;
-      setMessage({ tone: 'error', text: `Não foi possível copiar. O link é ${url}` });
+      setMessage({ tone: 'error', text: t('Não foi possível copiar. O link é {url}', { url }) });
     }
   }
 
@@ -551,20 +552,20 @@ export function ShareLinkSheet({ url, text, onShared, onClose }: { url: string; 
 
   const sendable = (chats.data?.items ?? []).filter((c) => c.canSend);
   return (
-    <Sheet title="Compartilhar" onClose={onClose}>
+    <Sheet title={t('Compartilhar')} onClose={onClose}>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {step === 'menu' ? (
         <ul className="sharelist">
           <li>
             <button type="button" className="sharelist__item" onClick={() => setStep('chat')}>
-              <strong>Enviar em uma conversa</strong>
-              <span>Mande o link para um amigo ou um grupo.</span>
+              <strong>{t('Enviar em uma conversa')}</strong>
+              <span>{t('Mande o link para um amigo ou um grupo.')}</span>
             </button>
           </li>
           <li>
             <button type="button" className="sharelist__item" onClick={() => void outside()}>
-              <strong>Fora do app</strong>
-              <span>WhatsApp, redes sociais ou copiar o link.</span>
+              <strong>{t('Fora do app')}</strong>
+              <span>{t('WhatsApp, redes sociais ou copiar o link.')}</span>
             </button>
           </li>
         </ul>
@@ -572,7 +573,7 @@ export function ShareLinkSheet({ url, text, onShared, onClose }: { url: string; 
         <>
           {chats.loading && !chats.data ? <Loading /> : null}
           {chats.error ? <ErrorState message={chats.error.message} onRetry={chats.reload} /> : null}
-          {chats.data && sendable.length === 0 ? <p className="muted">Você ainda não tem conversas. Siga alguém que também te segue para conversar.</p> : null}
+          {chats.data && sendable.length === 0 ? <p className="muted">{t('Você ainda não tem conversas. Siga alguém que também te segue para conversar.')}</p> : null}
           <ul className="sharelist">
             {sendable.map((c) => (
               <li key={c.id}>
@@ -584,7 +585,7 @@ export function ShareLinkSheet({ url, text, onShared, onClose }: { url: string; 
             ))}
           </ul>
           <Button variant="quiet" small onClick={() => setStep('menu')}>
-            Voltar
+            {t('Voltar')}
           </Button>
         </>
       )}

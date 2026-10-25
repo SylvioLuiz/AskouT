@@ -4,6 +4,7 @@ import { Avatar, EmptyState, ErrorState, Loading, PageHead } from '../components
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { Link, navigate } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 type Tab = 'events' | 'media' | 'links';
 
@@ -12,7 +13,7 @@ export function ChatInfoScreen({ conversationId }: { conversationId: string }) {
   const shared = useAsync(() => api.shared(conversationId), [conversationId]);
   const [tab, setTab] = useState<Tab>('events');
   const data = shared.data;
-  useTitle(data?.other ? data.other.displayName : 'Informações da conversa');
+  useTitle(data?.other ? data.other.displayName : t('Informações da conversa'));
 
   useEffect(() => {
     if (data?.type === 'GROUP') navigate(`/conversas/${conversationId}/grupo`, { replace: true });
@@ -23,30 +24,30 @@ export function ChatInfoScreen({ conversationId }: { conversationId: string }) {
   if (shared.error && !data) {
     return (
       <>
-        <PageHead title="Informações" back={back} />
-        {shared.error.code === 'NOT_FOUND' ? <EmptyState title="Conversa não encontrada">Só quem participa vê as informações da conversa.</EmptyState> : <ErrorState message={shared.error.message} onRetry={shared.reload} />}
+        <PageHead title={t('Informações')} back={back} />
+        {shared.error.code === 'NOT_FOUND' ? <EmptyState title={t('Conversa não encontrada')}>{t('Só quem participa vê as informações da conversa.')}</EmptyState> : <ErrorState message={shared.error.message} onRetry={shared.reload} />}
       </>
     );
   }
   if (!data || !data.other) return null;
   const other = data.other;
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'events', label: 'Eventos' },
-    { id: 'media', label: 'Mídia' },
-    { id: 'links', label: 'Links' },
+    { id: 'events', label: t('Eventos') },
+    { id: 'media', label: t('Mídia') },
+    { id: 'links', label: t('Links') },
   ];
 
   return (
     <>
-      <PageHead title="Informações" back={back} />
+      <PageHead title={t('Informações')} back={back} />
       <div className="chatinfo">
-        <Link to={`/u/${encodeURIComponent(other.username)}`} className="chatinfo__who" aria-label={`Ver perfil de ${other.displayName}`}>
+        <Link to={`/u/${encodeURIComponent(other.username)}`} className="chatinfo__who" aria-label={t('Ver perfil de {displayName}', { displayName: other.displayName })}>
           <Avatar profile={other} size={96} />
           <span className="chatinfo__name">{other.displayName}</span>
           <span className="chatinfo__handle">@{other.username}</span>
         </Link>
       </div>
-      <div className="segtabs segtabs--fill" role="tablist" aria-label="Informações da conversa">
+      <div className="segtabs segtabs--fill" role="tablist" aria-label={t('Informações da conversa')}>
         {tabs.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className="segtabs__tab" onClick={() => setTab(t.id)}>
             {t.label}

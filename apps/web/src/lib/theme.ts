@@ -1,8 +1,9 @@
+import { t } from '../lib/i18n/index.ts';
 export type ThemeChoice = 'system' | 'light' | 'dark';
 
 export const THEME_KEY = 'askout:theme';
 export const THEME_LABELS: Record<ThemeChoice, string> = {
-  system: 'Automático (igual ao aparelho)',
+  system: t('Automático (igual ao aparelho)'),
   light: 'Claro',
   dark: 'Escuro',
 };

@@ -18,6 +18,7 @@ import type { DwellSource } from '../lib/dwell.ts';
 import { timeAgo } from '../lib/format.ts';
 import type { PostImage, PostView, PostsPage } from '../lib/types.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: number; total: number; onFirstLoad?: (w: number, h: number) => void }) {
   const [failed, setFailed] = useState(false);
@@ -57,7 +58,7 @@ function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: 
           loop
           playsInline
           preload="auto"
-          aria-label={`Vídeo ${index + 1} de ${total}`}
+          aria-label={t('Vídeo {index} de {total}', { index: index + 1, total })}
           onLoadedMetadata={(event) => {
             if (index === 0) onFirstLoad?.(event.currentTarget.videoWidth, event.currentTarget.videoHeight);
           }}
@@ -74,7 +75,7 @@ function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: 
           }}
         />
       ) : (
-        <span className="pcarousel__missing">Foto indisponível</span>
+        <span className="pcarousel__missing">{t('Foto indisponível')}</span>
       )}
       {hasSound(image) ? <SoundToggle muted={muted} onToggle={toggleSound} shifted={total > 1} /> : null}
       {image.kind === 'PLACE' ? <figcaption>Foto: {image.photoAuthor ? `${image.photoAuthor} · ` : ''}Google</figcaption> : null}
@@ -98,7 +99,7 @@ export function Carousel({ images }: { images: PostImage[] }) {
   }
   return (
     <div className="pcarousel" style={{ '--carousel-ratio': String(ratio) } as CSSProperties}>
-      <div className="pcarousel__track" ref={ref} onScroll={onScroll} role="group" aria-label="Fotos e vídeo do post" tabIndex={images.length > 1 ? 0 : undefined}>
+      <div className="pcarousel__track" ref={ref} onScroll={onScroll} role="group" aria-label={t('Fotos e vídeo do post')} tabIndex={images.length > 1 ? 0 : undefined}>
         {images.map((image, i) => (
           <Slide key={image.id} image={image} index={i} total={images.length} onFirstLoad={(w, h) => setRatio(feedRatio(w, h))} />
         ))}
@@ -110,7 +111,7 @@ export function Carousel({ images }: { images: PostImage[] }) {
           </span>
           <div className="pcarousel__dots">
             {images.map((image, i) => (
-              <button key={image.id} type="button" className={`pcarousel__dot${i === index ? ' pcarousel__dot--on' : ''}`} onClick={() => go(i)} aria-label={`Ir para a foto ${i + 1}`} aria-current={i === index ? 'true' : undefined} />
+              <button key={image.id} type="button" className={`pcarousel__dot${i === index ? ' pcarousel__dot--on' : ''}`} onClick={() => go(i)} aria-label={t('Ir para a foto {i}', { i: i + 1 })} aria-current={i === index ? 'true' : undefined} />
             ))}
           </div>
         </>
@@ -128,9 +129,9 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
       title={event.title}
       startsAt={event.startsAt}
       whenText={formatWhen(event.startsAt, event.endsAt, new Date())}
-      venue={post.placeName ?? 'Evento'}
+      venue={post.placeName ?? t('Evento')}
       image={first?.path ? api.assetUrl(first.path) : null}
-      fallback={<span className="poster__kind" aria-hidden="true">Evento</span>}
+      fallback={<span className="poster__kind" aria-hidden="true">{t('Evento')}</span>}
     />
   );
 }
@@ -228,12 +229,12 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           {timeAgo(post.createdAt, new Date())}
           {post.edited ? ' · editado' : ''}
         </Link>
-        <button type="button" className="iconbtn post__more" onClick={() => setSheet('menu')} aria-label="Mais opções do post" aria-haspopup="dialog">
+        <button type="button" className="iconbtn post__more" onClick={() => setSheet('menu')} aria-label={t('Mais opções do post')} aria-haspopup="dialog">
           <MoreIcon />
         </button>
       </header>
       )}
-      {post.archived ? <p className="muted">Arquivado: só você vê este post.</p> : null}
+      {post.archived ? <p className="muted">{t('Arquivado: só você vê este post.')}</p> : null}
       {problem ? <p className="field__error">{problem}</p> : null}
       {myTag === 'PENDING' ? (
         <div className="callout">
@@ -242,10 +243,10 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           </p>
           <div className="row-actions">
             <Button small loading={tagBusy} onClick={() => void answerTag('accept')}>
-              Aceitar
+              {t('Aceitar')}
             </Button>
             <Button small variant="secondary" disabled={tagBusy} onClick={() => void answerTag('decline')}>
-              Recusar
+              {t('Recusar')}
             </Button>
           </div>
         </div>
@@ -254,14 +255,14 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
         <p className="muted">
           Você está marcado neste post.{' '}
           <button type="button" className="linkbtn" onClick={() => void answerTag('decline')} disabled={tagBusy}>
-            Tirar minha marcação
+            {t('Tirar minha marcação')}
           </button>
         </p>
       ) : null}
       {post.event && eventCard ? <EventPostCard post={post} event={post.event} /> : null}
       {post.event && !eventCard ? (
         <p className="post__event">
-          <span className="post__eventbadge">Evento</span> <strong>{post.event.title}</strong>
+          <span className="post__eventbadge">{t('Evento')}</span> <strong>{post.event.title}</strong>
           <span className="muted"> · {eventWhen(post.event.startsAt)}</span>
         </p>
       ) : null}
@@ -275,11 +276,11 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           <div className="poster__top">
             <div className="poster__who">
               {post.venue ? (
-                <Link to={`/bares/${encodeURIComponent(post.venue.id)}`} aria-label={`Página de ${post.venue.name}`} className="poster__avatar">
+                <Link to={`/bares/${encodeURIComponent(post.venue.id)}`} aria-label={t('Página de {name}', { name: post.venue.name })} className="poster__avatar">
                   <VenueLogo name={post.venue.name} logoUrl={post.venue.logoUrl} size={32} />
                 </Link>
               ) : (
-                <Link to={`/u/${encodeURIComponent(post.author.username)}`} aria-label={`Perfil de ${post.author.username}`} className="poster__avatar">
+                <Link to={`/u/${encodeURIComponent(post.author.username)}`} aria-label={t('Perfil de {username}', { username: post.author.username })} className="poster__avatar">
                   <Avatar profile={post.author} size={32} />
                 </Link>
               )}
@@ -296,7 +297,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
                 </Link>
               </span>
             </div>
-            <button type="button" className="poster__round" onClick={() => setSheet('menu')} aria-label="Mais opções do post" aria-haspopup="dialog">
+            <button type="button" className="poster__round" onClick={() => setSheet('menu')} aria-label={t('Mais opções do post')} aria-haspopup="dialog">
               <MoreIcon />
             </button>
           </div>
@@ -325,7 +326,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           </div>
           </div>
           <div className="poster__foot">
-            <div className="poster__row" role="group" aria-label="Ações do post">
+            <div className="poster__row" role="group" aria-label={t('Ações do post')}>
       <div className="poster__glass poster__glass--actions">
           <button type="button" className={`poster__act${post.likedByMe ? ' poster__act--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
             <HeartIcon filled={post.likedByMe} />
@@ -336,7 +337,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
             <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
           </button>
         </div>
-        <button type="button" className="poster__act poster__share" onClick={() => setSheet('share')} aria-label="Compartilhar">
+        <button type="button" className="poster__act poster__share" onClick={() => setSheet('share')} aria-label={t('Compartilhar')}>
           <SendIcon />
         </button>
       </div>
@@ -345,7 +346,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
       ) : null}
       {eventCard || cartaz ? null : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} />}
       {cartaz ? null : (
-      <div className="post__actions" role="group" aria-label="Ações do post">
+      <div className="post__actions" role="group" aria-label={t('Ações do post')}>
         <button type="button" className={`post__action${post.likedByMe ? ' post__action--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
           <HeartIcon filled={post.likedByMe} />
           <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
@@ -354,7 +355,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           <CommentIcon />
           <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
         </button>
-        <button type="button" className="post__action" onClick={() => setSheet('share')} aria-label="Compartilhar">
+        <button type="button" className="post__action" onClick={() => setSheet('share')} aria-label={t('Compartilhar')}>
           <SendIcon />
         </button>
       </div>
@@ -483,7 +484,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
       {error ? <ErrorState message={error.message} onRetry={() => void more(items.length)} /> : null}
       {page.hasMore ? (
         <div className="more" ref={sentinel}>
-          {loading ? <Loading /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => void more(items.length)}>Carregar mais</Button> : null}
+          {loading ? <Loading /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => void more(items.length)}>{t('Carregar mais')}</Button> : null}
         </div>
       ) : null}
     </div>
@@ -524,17 +525,17 @@ export function PostGrid({ username, kind, quiet, onCount }: { username: string;
   }, [username, kind]);
   if (error && items.length === 0) return <ErrorState message={error.message} onRetry={() => void more(0)} />;
   if (!page) return <Loading />;
-  if (items.length === 0) return quiet ? null : <EmptyState title="Nenhum post ainda">Posts com fotos aparecem aqui.</EmptyState>;
+  if (items.length === 0) return quiet ? null : <EmptyState title={t('Nenhum post ainda')}>{t('Posts com fotos aparecem aqui.')}</EmptyState>;
   return (
     <>
-      <ul className="postgrid" aria-label="Posts">
+      <ul className="postgrid" aria-label={t('Posts')}>
         {items.map((post) => {
           const first = post.images[0];
           return (
             <li key={post.id}>
               <Link to={`/posts/${encodeURIComponent(post.id)}`} className="postgrid__item" aria-label={post.caption ? `Post: ${post.caption}` : 'Abrir post'}>
                 {first?.path ? <img src={api.assetUrl(first.path)} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span className="postgrid__none" />}
-                {post.event ? <span className="postgrid__event">Evento</span> : null}
+                {post.event ? <span className="postgrid__event">{t('Evento')}</span> : null}
                 {post.images.length > 1 ? (
                   <span className="postgrid__multi" aria-label={`${post.images.length} fotos`}>
                     <CarouselIcon />
@@ -548,7 +549,7 @@ export function PostGrid({ username, kind, quiet, onCount }: { username: string;
       {page.hasMore ? (
         <div className="more">
           <Button variant="secondary" loading={loading} onClick={() => void more(items.length)}>
-            Carregar mais
+            {t('Carregar mais')}
           </Button>
         </div>
       ) : null}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { resizePhoto, safeGroupImage } from './image.ts';
+import { t } from '../lib/i18n/index.ts';
 
 const EVENT = 'askout:chatbg';
 const key = (conversationId: string) => `askout:chatbg:${conversationId}`;
@@ -18,7 +19,7 @@ export function setChatBackground(conversationId: string, value: string | null):
     if (value) localStorage.setItem(key(conversationId), value);
     else localStorage.removeItem(key(conversationId));
   } catch {
-    throw new Error('O navegador não deixou guardar a imagem de fundo');
+    throw new Error(t('O navegador não deixou guardar a imagem de fundo'));
   }
   window.dispatchEvent(new Event(EVENT));
 }

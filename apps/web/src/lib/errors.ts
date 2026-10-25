@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 export type ApiErrorCode =
   | 'VALIDATION'
   | 'UNAUTHORIZED'
@@ -55,8 +56,8 @@ export function fieldsFrom(details: unknown): Record<string, string> {
   return result;
 }
 
-const GENERIC = 'Algo deu errado. Tente de novo.';
-const SERVER_DOWN = 'O AskouT está com problemas agora. Tente de novo em instantes.';
+const GENERIC = t('Algo deu errado. Tente de novo.');
+const SERVER_DOWN = t('O AskouT está com problemas agora. Tente de novo em instantes.');
 
 function codeForStatus(status: number): ApiErrorCode {
   if (status === 400) return 'VALIDATION';
@@ -87,7 +88,7 @@ export function errorFromResponse(status: number, payload: unknown, retryAfterHe
 }
 
 export function networkError(): ApiError {
-  return new ApiError('NETWORK', 'Não foi possível conectar ao AskouT. Verifique sua internet e tente de novo.');
+  return new ApiError('NETWORK', t('Não foi possível conectar ao AskouT. Verifique sua internet e tente de novo.'));
 }
 
 /** Garante um ApiError para mostrar na tela, seja qual for o erro capturado. */

@@ -4,6 +4,7 @@ import { api, session, setUnauthorizedHandler } from './client.ts';
 import { toApiError } from './lib/errors.ts';
 import type { AuthResult, PublicProfile, SessionUser } from './lib/types.ts';
 import { navigate } from './router.tsx';
+import { t } from './lib/i18n/index.ts';
 
 type AuthState =
   | { status: 'loading' }
@@ -88,13 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuthContext(): AuthContextValue {
   const value = useContext(AuthContext);
-  if (!value) throw new Error('useAuthContext fora do AuthProvider');
+  if (!value) throw new Error(t('useAuthContext fora do AuthProvider'));
   return value;
 }
 
 /** Usuário logado; só use dentro de telas privadas (o roteador garante que existe). */
 export function useUser(): SessionUser {
   const { state } = useAuthContext();
-  if (state.status !== 'user') throw new Error('useUser fora de uma tela privada');
+  if (state.status !== 'user') throw new Error(t('useUser fora de uma tela privada'));
   return state.user;
 }

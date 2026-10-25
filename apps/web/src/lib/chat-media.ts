@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 // Foto e vídeo na conversa: limites, redução da foto antes de enviar e textos do "digitando…".
 
 export const CHAT_IMAGE_SIDE = 1600;
@@ -20,13 +21,13 @@ export function fitWithin(width: number, height: number, max: number): { width: 
 /** Texto de erro se o arquivo não serve (tipo ou tamanho); `null` se pode seguir. Foto grande é reduzida, então só o vídeo tem teto aqui. */
 export function mediaProblem(file: { type: string; size: number }): string | null {
   const type = file.type.split(';')[0]?.trim().toLowerCase() ?? '';
-  if (file.size <= 0) return 'O arquivo está vazio.';
-  if (type.startsWith('image/')) return IMAGE_TYPES.includes(type) || type === 'image/heic' || type === 'image/heif' ? null : 'Use uma foto JPEG, PNG ou WebP.';
+  if (file.size <= 0) return t('O arquivo está vazio.');
+  if (type.startsWith('image/')) return IMAGE_TYPES.includes(type) || type === 'image/heic' || type === 'image/heif' ? null : t('Use uma foto JPEG, PNG ou WebP.');
   if (type.startsWith('video/')) {
-    if (!VIDEO_TYPES.includes(type)) return 'Use um vídeo MP4, WebM ou MOV.';
-    return file.size > CHAT_VIDEO_MAX_BYTES ? 'O vídeo passa de 20 MB. Escolha um mais curto.' : null;
+    if (!VIDEO_TYPES.includes(type)) return t('Use um vídeo MP4, WebM ou MOV.');
+    return file.size > CHAT_VIDEO_MAX_BYTES ? t('O vídeo passa de 20 MB. Escolha um mais curto.') : null;
   }
-  return 'Escolha uma foto ou um vídeo.';
+  return t('Escolha uma foto ou um vídeo.');
 }
 
 export function mediaKind(file: { type: string }): 'IMAGE' | 'VIDEO' | null {

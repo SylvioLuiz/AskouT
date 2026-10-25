@@ -6,6 +6,7 @@ import { BOOST_PHASE_LABEL, boostTitle, canCancelBoost, daysLabel, formatBrl, ma
 import { toApiError } from '../lib/errors.ts';
 import { buyInStore, packageSummary, paymentReturn, purchaseChannel, safePaymentUrl, STORE_LABEL, storeBridge } from '../lib/purchase.ts';
 import type { BoostView, MatchReach } from '../lib/types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);
@@ -14,7 +15,7 @@ function formatWhen(iso: string): string {
 
 /** Tela do responsável pelo local: escolhe o que impulsionar, por quantos dias, e paga (Pix/cartão no site, compra da loja no aplicativo). */
 export function BoostScreen({ venueId }: { venueId: string }) {
-  useTitle('Impulsionar');
+  useTitle(t('Impulsionar'));
   const back = `/bares/${encodeURIComponent(venueId)}`;
   const profile = useAsync(() => api.venueProfile(venueId), [venueId]);
   const pricing = useAsync(() => api.boostPricing(), []);
@@ -60,14 +61,14 @@ export function BoostScreen({ venueId }: { venueId: string }) {
     return () => window.clearInterval(timer);
   }, [waiting]);
 
-  if (profile.loading || pricing.loading || boosts.loading) return (<><PageHead title="Impulsionar" back={back} /><Loading /></>);
+  if (profile.loading || pricing.loading || boosts.loading) return (<><PageHead title={t('Impulsionar')} back={back} /><Loading /></>);
   if (profile.error || pricing.error || boosts.error || !profile.data || !pricing.data || !boosts.data) {
     const e = profile.error ?? pricing.error ?? boosts.error;
-    return (<><PageHead title="Impulsionar" back={back} /><ErrorState message={e?.message ?? 'Não foi possível carregar.'} onRetry={() => { profile.reload(); pricing.reload(); boosts.reload(); }} /></>);
+    return (<><PageHead title={t('Impulsionar')} back={back} /><ErrorState message={e?.message ?? t('Não foi possível carregar.')} onRetry={() => { profile.reload(); pricing.reload(); boosts.reload(); }} /></>);
   }
   const v = profile.data;
   if (!v.isOwner) {
-    return (<><PageHead title="Impulsionar" back={back} /><EmptyState title="Só quem cuida do local pode impulsionar" /></>);
+    return (<><PageHead title={t('Impulsionar')} back={back} /><EmptyState title={t('Só quem cuida do local pode impulsionar')} /></>);
   }
   const price = pricing.data;
   const items = sortBoosts(boosts.data.items);
@@ -124,14 +125,14 @@ export function BoostScreen({ venueId }: { venueId: string }) {
       await navigator.clipboard.writeText(code);
       setCopied(boost.id);
     } catch {
-      setError('Não consegui copiar. Selecione o código e copie manualmente.');
+      setError(t('Não consegui copiar. Selecione o código e copie manualmente.'));
     }
   }
 
   const listBlock = (
     <>
-    <h2 className="boost__h">Seus impulsionamentos</h2>
-    {items.length === 0 ? <p className="boost__hint">Nada por aqui ainda.</p> : null}
+    <h2 className="boost__h">{t('Seus impulsionamentos')}</h2>
+    {items.length === 0 ? <p className="boost__hint">{t('Nada por aqui ainda.')}</p> : null}
     <ul className="boost__list">
       {items.map((b) => (
         <li key={b.id} className="boost__item">
@@ -147,17 +148,17 @@ export function BoostScreen({ venueId }: { venueId: string }) {
             <div className="boost__pay">
               {b.payment.pixCode ? (
                 <>
-                  <label className="boost__code-label" htmlFor={`pix-${b.id}`}>Pix copia e cola</label>
+                  <label className="boost__code-label" htmlFor={`pix-${b.id}`}>{t('Pix copia e cola')}</label>
                   <textarea id={`pix-${b.id}`} className="boost__code" readOnly rows={3} value={b.payment.pixCode} onFocus={(e) => e.currentTarget.select()} />
-                  <Button small variant="secondary" onClick={() => void copy(b)}>{copied === b.id ? 'Copiado' : 'Copiar código'}</Button>
+                  <Button small variant="secondary" onClick={() => void copy(b)}>{copied === b.id ? 'Copiado' : t('Copiar código')}</Button>
                 </>
               ) : null}
-              {safePaymentUrl(b.payment.checkoutUrl) ? <a className="btn btn--secondary btn--small" href={safePaymentUrl(b.payment.checkoutUrl)} target="_blank" rel="noopener noreferrer">Abrir pagamento</a> : null}
-              {price.sandbox && b.channel === 'WEB' ? <Button small loading={busy} onClick={() => void run(() => api.simulateBoostPayment(b.id))}>Simular pagamento</Button> : null}
+              {safePaymentUrl(b.payment.checkoutUrl) ? <a className="btn btn--secondary btn--small" href={safePaymentUrl(b.payment.checkoutUrl)} target="_blank" rel="noopener noreferrer">{t('Abrir pagamento')}</a> : null}
+              {price.sandbox && b.channel === 'WEB' ? <Button small loading={busy} onClick={() => void run(() => api.simulateBoostPayment(b.id))}>{t('Simular pagamento')}</Button> : null}
             </div>
           ) : null}
-          {b.phase === 'PENDING_PAYMENT' && b.storeProductId && storeReady ? <Button small loading={busy} onClick={() => void run(() => finishStorePurchase(b))}>Concluir compra</Button> : null}
-          {canCancelBoost(b) ? <Button small variant="quiet" disabled={busy} onClick={() => void run(() => api.cancelBoost(b.id))}>Cancelar pedido</Button> : null}
+          {b.phase === 'PENDING_PAYMENT' && b.storeProductId && storeReady ? <Button small loading={busy} onClick={() => void run(() => finishStorePurchase(b))}>{t('Concluir compra')}</Button> : null}
+          {canCancelBoost(b) ? <Button small variant="quiet" disabled={busy} onClick={() => void run(() => api.cancelBoost(b.id))}>{t('Cancelar pedido')}</Button> : null}
         </li>
       ))}
     </ul>
@@ -167,9 +168,9 @@ export function BoostScreen({ venueId }: { venueId: string }) {
   if (!price.enabled) {
     return (
       <>
-        <PageHead title="Impulsionar" back={back} subtitle={v.name} />
+        <PageHead title={t('Impulsionar')} back={back} subtitle={v.name} />
         <div className="boost">
-          <EmptyState title="Impulsionar chega em breve">Em breve você poderá destacar seu rolê e seus eventos aqui. Avisaremos quando abrir.</EmptyState>
+          <EmptyState title={t('Impulsionar chega em breve')}>{t('Em breve você poderá destacar seu rolê e seus eventos aqui. Avisaremos quando abrir.')}</EmptyState>
           {items.length > 0 ? listBlock : null}
         </div>
       </>
@@ -178,21 +179,21 @@ export function BoostScreen({ venueId }: { venueId: string }) {
 
   return (
     <>
-      <PageHead title="Impulsionar" back={back} subtitle={v.name} />
+      <PageHead title={t('Impulsionar')} back={back} subtitle={v.name} />
       <div className="boost">
-        <p className="boost__lead">Seu rolê aparece primeiro na busca e na Home de quem segue bares como o seu, sempre com a etiqueta “Patrocinado”.</p>
-        {returned === 'ok' ? <Notice tone="ok">Pagamento enviado. Assim que for confirmado, seu impulsionamento começa. O Pix pode levar alguns minutos.</Notice> : null}
-        {returned === 'cancelado' ? <Notice tone="info">O pagamento foi cancelado e nada foi cobrado. Você pode tentar de novo quando quiser.</Notice> : null}
-        {price.sandbox && !onStore ? <Notice tone="info">Modo de teste: nenhum valor é cobrado de verdade. Depois de criar o pedido, use “Simular pagamento”.</Notice> : null}
-        {onStore && !storeReady ? <Notice tone="info">A compra pelo aplicativo ainda não está disponível nesta versão.</Notice> : null}
+        <p className="boost__lead">{t('Seu rolê aparece primeiro na busca e na Home de quem segue bares como o seu, sempre com a etiqueta “Patrocinado”.')}</p>
+        {returned === 'ok' ? <Notice tone="ok">{t('Pagamento enviado. Assim que for confirmado, seu impulsionamento começa. O Pix pode levar alguns minutos.')}</Notice> : null}
+        {returned === 'cancelado' ? <Notice tone="info">{t('O pagamento foi cancelado e nada foi cobrado. Você pode tentar de novo quando quiser.')}</Notice> : null}
+        {price.sandbox && !onStore ? <Notice tone="info">{t('Modo de teste: nenhum valor é cobrado de verdade. Depois de criar o pedido, use “Simular pagamento”.')}</Notice> : null}
+        {onStore && !storeReady ? <Notice tone="info">{t('A compra pelo aplicativo ainda não está disponível nesta versão.')}</Notice> : null}
         {error ? <Notice tone="error">{error}</Notice> : null}
 
         <section className="boost__block" aria-labelledby="boost-what">
-          <h2 id="boost-what" className="boost__h">O que impulsionar</h2>
+          <h2 id="boost-what" className="boost__h">{t('O que impulsionar')}</h2>
           <div className="boost__choices" role="radiogroup" aria-labelledby="boost-what">
             <button type="button" role="radio" aria-checked={target === 'VENUE'} className="boost__choice" onClick={() => pickTarget('VENUE')}>
-              <strong>O rolê (página do local)</strong>
-              <span>Mostra o próximo evento do local</span>
+              <strong>{t('O rolê (página do local)')}</strong>
+              <span>{t('Mostra o próximo evento do local')}</span>
             </button>
             {v.upcomingEvents.map((e) => (
               <button key={e.id} type="button" role="radio" aria-checked={target === e.id} className="boost__choice" onClick={() => pickTarget(e.id)}>
@@ -201,29 +202,29 @@ export function BoostScreen({ venueId }: { venueId: string }) {
               </button>
             ))}
           </div>
-          {v.upcomingEvents.length === 0 ? <p className="boost__hint">Crie um evento para impulsionar só ele.</p> : null}
+          {v.upcomingEvents.length === 0 ? <p className="boost__hint">{t('Crie um evento para impulsionar só ele.')}</p> : null}
         </section>
 
         {eventTarget ? (
           <section className="boost__block" aria-labelledby="boost-who">
-            <h2 id="boost-who" className="boost__h">Para quem aparece</h2>
+            <h2 id="boost-who" className="boost__h">{t('Para quem aparece')}</h2>
             <div className="boost__choices" role="radiogroup" aria-labelledby="boost-who">
               <button type="button" role="radio" aria-checked={audience === 'ALL'} className="boost__choice" onClick={() => setAudience('ALL')}>
-                <strong>Todos</strong>
-                <span>Destaque no Explorar e na Home para qualquer pessoa</span>
+                <strong>{t('Todos')}</strong>
+                <span>{t('Destaque no Explorar e na Home para qualquer pessoa')}</span>
               </button>
               <button type="button" role="radio" aria-checked={audience === 'MATCH'} className="boost__choice" onClick={() => setAudience('MATCH')}>
-                <strong>Match</strong>
-                <span>Só quem mora perto e curte esse estilo de rolê</span>
+                <strong>{t('Match')}</strong>
+                <span>{t('Só quem mora perto e curte esse estilo de rolê')}</span>
               </button>
             </div>
             {audience === 'MATCH' ? (
               <div className="boost__match">
                 {eventTarget.tags.length === 0 ? (
-                  <Notice tone="info">Este evento não tem hashtags. Edite o evento e adicione, por exemplo, #rock para usar o Match.</Notice>
+                  <Notice tone="info">{t('Este evento não tem hashtags. Edite o evento e adicione, por exemplo, #rock para usar o Match.')}</Notice>
                 ) : (
                   <>
-                    <h3 id="boost-radius" className="boost__sub">Raio em volta do local</h3>
+                    <h3 id="boost-radius" className="boost__sub">{t('Raio em volta do local')}</h3>
                     <div className="optrow" role="radiogroup" aria-labelledby="boost-radius">
                       {price.match.radiusKmOptions.map((km) => (
                         <button key={km} type="button" role="radio" aria-checked={radiusKm === km} aria-pressed={radiusKm === km} className="chip" onClick={() => setRadiusKm(km)}>
@@ -231,7 +232,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
                         </button>
                       ))}
                     </div>
-                    <h3 id="boost-tags" className="boost__sub">Gostos que você quer alcançar</h3>
+                    <h3 id="boost-tags" className="boost__sub">{t('Gostos que você quer alcançar')}</h3>
                     <div className="optrow" role="group" aria-labelledby="boost-tags">
                       {eventTarget.tags.map((t) => (
                         <button key={t} type="button" aria-pressed={tags.includes(t)} className="chip" onClick={() => setTags((cur) => toggleTag(cur, t, price.match.maxTags))}>
@@ -240,12 +241,12 @@ export function BoostScreen({ venueId }: { venueId: string }) {
                       ))}
                     </div>
                     <p className="boost__reach" role="status" aria-live="polite">
-                      {tags.length === 0 ? 'Escolha ao menos uma hashtag.' : reach.state === 'loading' ? 'Calculando o alcance…' : reach.state === 'error' ? 'Não foi possível estimar o alcance agora. Você ainda pode comprar.' : reach.state === 'ready' && reach.data ? reachText(reach.data) : ''}
+                      {tags.length === 0 ? t('Escolha ao menos uma hashtag.') : reach.state === 'loading' ? t('Calculando o alcance…') : reach.state === 'error' ? t('Não foi possível estimar o alcance agora. Você ainda pode comprar.') : reach.state === 'ready' && reach.data ? reachText(reach.data) : ''}
                     </p>
                     <details className="boost__rule">
-                      <summary>Como o Match escolhe as pessoas</summary>
+                      <summary>{t('Como o Match escolhe as pessoas')}</summary>
                       <p>Vê o anúncio só quem salvou a própria região e mora até {radiusKm} km do seu local, e tem o gosto confirmado por uma das hashtags escolhidas: nos últimos 60 dias curtiu, comentou, compartilhou ou foi a pelo menos 3 conteúdos com essa hashtag, em pelo menos 2 dias diferentes, e o último foi nos últimos 30 dias.</p>
-                      <p>Você vê apenas um número aproximado. Nunca vê quem são as pessoas, e quem desliga as recomendações personalizadas ou apaga a região deixa de receber.</p>
+                      <p>{t('Você vê apenas um número aproximado. Nunca vê quem são as pessoas, e quem desliga as recomendações personalizadas ou apaga a região deixa de receber.')}</p>
                     </details>
                   </>
                 )}
@@ -255,7 +256,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
         ) : null}
 
         <section className="boost__block" aria-labelledby="boost-days">
-          <h2 id="boost-days" className="boost__h">Por quantos dias</h2>
+          <h2 id="boost-days" className="boost__h">{t('Por quantos dias')}</h2>
           <div className="optrow" role="radiogroup" aria-labelledby="boost-days">
             {price.dayOptions.map((d) => (
               <button key={d} type="button" role="radio" aria-checked={days === d} aria-pressed={days === d} className="chip" onClick={() => setDays(d)}>
@@ -270,9 +271,9 @@ export function BoostScreen({ venueId }: { venueId: string }) {
           <span>{formatBrl(perDay)} por dia × {daysLabel(days)}{discountPct > 0 ? ` (${discountPct}% de desconto)` : ''}</span>
           <strong>{formatBrl(total)}</strong>
         </div>
-        <Button full loading={busy} disabled={!storeReady || (matching && (tags.length === 0 || eventTarget?.tags.length === 0))} onClick={() => void create()}>{onStore ? `Comprar por ${formatBrl(total)}` : `Pagar ${formatBrl(total)}`}</Button>
+        <Button full loading={busy} disabled={!storeReady || (matching && (tags.length === 0 || eventTarget?.tags.length === 0))} onClick={() => void create()}>{onStore ? t('Comprar por {total}', { total: formatBrl(total) }) : t('Pagar {total}', { total: formatBrl(total) })}</Button>
         <p className="boost__hint">
-          {onStore ? `A compra é cobrada pela ${storeName}. ` : 'Pague com Pix ou cartão. '}O anúncio começa assim que o pagamento for confirmado. Depois de pago, não há cancelamento.
+          {onStore ? t('A compra é cobrada pela {storeName}. ', { storeName }) : t('Pague com Pix ou cartão. ')}O anúncio começa assim que o pagamento for confirmado. Depois de pago, não há cancelamento.
         </p>
 
         {listBlock}

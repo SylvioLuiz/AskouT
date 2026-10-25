@@ -3,6 +3,7 @@ import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
 import { navigate } from '../router.tsx';
 import { Button } from './ui.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 /** Abre (ou cria) a conversa com um amigo e vai para ela. */
 export function ChatButton({ userId, variant = 'secondary', small = false, onError }: { userId: string; variant?: 'primary' | 'secondary' | 'quiet'; small?: boolean; onError?: (message: string) => void }) {
@@ -19,7 +20,7 @@ export function ChatButton({ userId, variant = 'secondary', small = false, onErr
   }
   return (
     <Button variant={variant} small={small} loading={busy} onClick={open}>
-      Conversar
+      {t('Conversar')}
     </Button>
   );
 }

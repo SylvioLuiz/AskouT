@@ -10,6 +10,7 @@ import type { ConfirmationAnswer, DateStats, PollView, VoteStatus } from '../lib
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
 import { Link, navigate } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 const WEEK_HEAD = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const BRUSHES: VoteStatus[] = ['YES', 'MAYBE', 'NO'];
@@ -23,7 +24,7 @@ export function DatePollScreen({ pollId }: { pollId: string }) {
     if (load.data) setPoll(load.data);
   }, [load.data]);
   usePolling(load.reload, 15_000);
-  useTitle(poll?.title ?? 'Encontrar a melhor data');
+  useTitle(poll?.title ?? t('Encontrar a melhor data'));
 
   if (!poll) {
     if (load.error) return <ErrorState message={load.error.message} onRetry={load.reload} />;
@@ -94,7 +95,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
       {problem ? <Notice tone="error">{problem}</Notice> : null}
 
       {poll.status === 'FINALIZED' && poll.final ? (
-        <section className="callout dpoll__final" aria-label="Data definida">
+        <section className="callout dpoll__final" aria-label={t('Data definida')}>
           <p className="callout__text">
             <strong>Data definida: {longDay(poll.final.date)}</strong>
             <br />
@@ -103,32 +104,32 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           <div className="row-actions">
             {poll.final.meetupId ? (
               <Link to="/agenda" className="btn btn--secondary btn--small">
-                Ver na agenda
+                {t('Ver na agenda')}
               </Link>
             ) : null}
             <Link to={`/conversas/${poll.conversationId}`} className="btn btn--secondary btn--small">
-              Voltar à conversa
+              {t('Voltar à conversa')}
             </Link>
             {poll.isOrganizer ? (
               <Link to={`/criar?${new URLSearchParams({ votacao: poll.id, titulo: poll.title, inicio: isoToLocalInput(poll.final.startsAt), fim: isoToLocalInput(poll.final.endsAt), conversa: poll.conversationId }).toString()}`} className="btn btn--primary btn--small">
-                Transformar em evento
+                {t('Transformar em evento')}
               </Link>
             ) : null}
           </div>
         </section>
       ) : null}
-      {poll.status === 'VOTING' && poll.votingClosed ? <Notice>Os votos foram encerrados. {poll.isOrganizer ? 'Escolha a data entre as melhores abaixo.' : 'Aguarde quem organiza escolher a data.'}</Notice> : null}
+      {poll.status === 'VOTING' && poll.votingClosed ? <Notice>Os votos foram encerrados. {poll.isOrganizer ? t('Escolha a data entre as melhores abaixo.') : t('Aguarde quem organiza escolher a data.')}</Notice> : null}
       {poll.canClose ? (
         <div className="callout">
           <p className="callout__text">
-            <strong>Todos já votaram.</strong> Você pode encerrar a votação agora e escolher a data.
+            <strong>{t('Todos já votaram.')}</strong> Você pode encerrar a votação agora e escolher a data.
           </p>
           <Button small loading={busy} onClick={() => void act(() => api.closePoll(poll.id))}>
-            Encerrar votação
+            {t('Encerrar votação')}
           </Button>
         </div>
       ) : null}
-      {poll.status === 'CANCELLED' ? <Notice>Esta votação foi cancelada.</Notice> : null}
+      {poll.status === 'CANCELLED' ? <Notice>{t('Esta votação foi cancelada.')}</Notice> : null}
 
       {poll.proposal && poll.status === 'CONFIRMING' ? <ProposalCard poll={poll} busy={busy} act={act} /> : null}
 
@@ -139,37 +140,37 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
         {finished} de {poll.participants.length} concluíram
       </p>
 
-      <div className="segtabs" role="tablist" aria-label="Visão do calendário">
+      <div className="segtabs" role="tablist" aria-label={t('Visão do calendário')}>
         <button type="button" role="tab" aria-selected={tab === 'mine'} className="segtabs__tab" onClick={() => setTab('mine')}>
-          Meu voto
+          {t('Meu voto')}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'group'} className="segtabs__tab" onClick={() => setTab('group')}>
-          Mapa do grupo
+          {t('Mapa do grupo')}
         </button>
       </div>
 
       {tab === 'mine' && canVote ? (
-        <div className="dpoll__brushes" role="group" aria-label="Escolha uma resposta e toque nos dias">
+        <div className="dpoll__brushes" role="group" aria-label={t('Escolha uma resposta e toque nos dias')}>
           {BRUSHES.map((b) => (
             <button key={b} type="button" className={`dpoll__brush dpoll__brush--${b}`} aria-pressed={brush === b} onClick={() => setBrush(b)}>
               <span aria-hidden="true">{VOTE_MARK[b]}</span> {VOTE_LABEL[b]}
             </button>
           ))}
           <button type="button" className="dpoll__brush dpoll__brush--CLEAR" aria-pressed={brush === 'CLEAR'} onClick={() => setBrush('CLEAR')}>
-            Limpar
+            {t('Limpar')}
           </button>
         </div>
       ) : null}
       {tab === 'mine' && canVote ? (
         <div className="row-actions">
           <Button small variant="quiet" onClick={() => askOrPaint(allDays)}>
-            Aplicar a todos os dias
+            {t('Aplicar a todos os dias')}
           </Button>
         </div>
       ) : null}
-      {tab === 'mine' && !canVote && poll.status === 'VOTING' ? <Notice>O prazo da votação acabou.</Notice> : null}
+      {tab === 'mine' && !canVote && poll.status === 'VOTING' ? <Notice>{t('O prazo da votação acabou.')}</Notice> : null}
 
-      <div className="dpcal" role="grid" aria-label={`Calendário de ${monthTitle(poll.rangeStart)}`}>
+      <div className="dpcal" role="grid" aria-label={t('Calendário de {rangeStart}', { rangeStart: monthTitle(poll.rangeStart) })}>
         <div className="dpcal__head" role="row">
           {WEEK_HEAD.map((w, i) => (
             <span key={i} role="columnheader">
@@ -213,7 +214,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           Verde {poll.thresholds.green}% ou mais · laranja {poll.thresholds.orange}% a {poll.thresholds.green - 1}% · vermelho abaixo · cinza: poucos votos. * = menos de {poll.thresholds.minCoverage}% responderam.
         </p>
       ) : (
-        <p className="dpoll__legend muted">Dia sem marca fica “sem resposta” e não conta como “não posso”.</p>
+        <p className="dpoll__legend muted">{t('Dia sem marca fica “sem resposta” e não conta como “não posso”.')}</p>
       )}
 
       {allDays.some((d) => eventsOn(d).length > 0) ? (
@@ -230,12 +231,12 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
             <>
               <p className="dpoll__done">✓ Você concluiu sua votação. Pode mudar os votos até o encerramento.</p>
               <Button small variant="secondary" loading={busy} onClick={() => void act(() => api.finishPoll(poll.id, false))}>
-                Reabrir minha votação
+                {t('Reabrir minha votação')}
               </Button>
             </>
           ) : (
             <Button full loading={busy} onClick={() => void act(() => api.finishPoll(poll.id, true))}>
-              Concluí minha votação
+              {t('Concluí minha votação')}
             </Button>
           )}
         </div>
@@ -243,19 +244,19 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
       <section aria-labelledby="dpoll-rank">
         <h2 id="dpoll-rank" className="dpoll__h">
-          Melhores datas
+          {t('Melhores datas')}
         </h2>
         {!poll.enoughData ? (
-          <p className="muted">Ainda faltam respostas para sugerir uma data. Peça para o pessoal votar.</p>
+          <p className="muted">{t('Ainda faltam respostas para sugerir uma data. Peça para o pessoal votar.')}</p>
         ) : (
           <>
-            <ol className="dpoll__podium" aria-label="Três melhores datas">
+            <ol className="dpoll__podium" aria-label={t('Três melhores datas')}>
               {[1, 0, 2].map((i) => {
                 const d = poll.ranking[i];
                 if (!d) return <li key={i} className="dpoll__pcol dpoll__pcol--empty" aria-hidden="true" />;
                 return (
                   <li key={d.date} className={`dpoll__pcol dpoll__pcol--${i + 1}`}>
-                    <button type="button" className="dpoll__pbtn" onClick={() => { setSelected(d.date); setTab('group'); }} aria-label={`${i + 1}º lugar: ${longDay(d.date)}, ${percent(d.compatibility)} de compatibilidade`}>
+                    <button type="button" className="dpoll__pbtn" onClick={() => { setSelected(d.date); setTab('group'); }} aria-label={t('{i}º lugar: {date}, {compatibility} de compatibilidade', { i: i + 1, date: longDay(d.date), compatibility: percent(d.compatibility) })}>
                       {i === 0 ? <span className="dpoll__crown" aria-hidden="true">👑</span> : <span className="dpoll__ppos" aria-hidden="true">{i + 1}º</span>}
                       <span className="dpoll__pday">{podiumDay(d.date)}</span>
                       <span className="dpoll__ppct">{percent(d.compatibility)}{i === 0 ? ' compatível' : ''}</span>
@@ -293,7 +294,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
             ) : null}
             {poll.ranking.length > 3 ? (
               <Button small variant="quiet" onClick={() => setShowAll((v) => !v)}>
-                {showAll ? 'Ver só as 3 melhores' : 'Ver todas as datas'}
+                {showAll ? t('Ver só as 3 melhores') : t('Ver todas as datas')}
               </Button>
             ) : null}
           </>
@@ -302,7 +303,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
       <section aria-labelledby="dpoll-people">
         <h2 id="dpoll-people" className="dpoll__h">
-          Quem vota
+          {t('Quem vota')}
         </h2>
         <ul className="dpoll__people">
           {poll.participants.map((p) => (
@@ -318,7 +319,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
       {poll.history.length > 0 ? (
         <section aria-labelledby="dpoll-hist">
           <h2 id="dpoll-hist" className="dpoll__h">
-            Histórico
+            {t('Histórico')}
           </h2>
           <ul className="dpoll__hist">
             {poll.history.map((h) => (
@@ -332,19 +333,19 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
       {poll.isOrganizer && (poll.status === 'VOTING' || poll.status === 'CONFIRMING') ? (
         confirming === 'cancel' ? (
-          <Confirm danger question="Cancelar esta votação? Os votos ficam guardados, mas ninguém mais pode votar." confirmLabel="Cancelar votação" busy={busy} onCancel={() => setConfirming(undefined)} onConfirm={() => void act(async () => {
+          <Confirm danger question={t('Cancelar esta votação? Os votos ficam guardados, mas ninguém mais pode votar.')} confirmLabel={t('Cancelar votação')} busy={busy} onCancel={() => setConfirming(undefined)} onConfirm={() => void act(async () => {
             const next = await api.cancelPoll(poll.id);
             navigate(`/conversas/${poll.conversationId}`);
             return next;
           }).then(() => setConfirming(undefined))} />
         ) : (
           <Button variant="quiet" onClick={() => setConfirming('cancel')}>
-            Cancelar votação
+            {t('Cancelar votação')}
           </Button>
         )
       ) : null}
       {conflict ? (
-        <Sheet title={conflict.busyDays.length === 1 ? 'Você já tem um evento nesse dia' : 'Você já tem eventos nesses dias'} onClose={() => setConflict(undefined)}>
+        <Sheet title={conflict.busyDays.length === 1 ? t('Você já tem um evento nesse dia') : t('Você já tem eventos nesses dias')} onClose={() => setConflict(undefined)}>
           <div className="dpconflict">
             <ul className="dpconflict__list">
               {conflict.busyDays.map(({ date, events }) => (
@@ -354,7 +355,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
                 </li>
               ))}
             </ul>
-            <p className="muted">Quer dizer que pode mesmo assim?</p>
+            <p className="muted">{t('Quer dizer que pode mesmo assim?')}</p>
             <Button
               full
               onClick={() => {
@@ -363,7 +364,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
                 paint(dates);
               }}
             >
-              Confirmar presença mesmo assim
+              {t('Confirmar presença mesmo assim')}
             </Button>
             {conflict.dates.length > conflict.busyDays.length ? (
               <Button
@@ -376,11 +377,11 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
                   paint(free);
                 }}
               >
-                Só nos dias livres
+                {t('Só nos dias livres')}
               </Button>
             ) : null}
             <Button full variant="quiet" onClick={() => setConflict(undefined)}>
-              Cancelar
+              {t('Cancelar')}
             </Button>
           </div>
         </Sheet>
@@ -391,14 +392,14 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
 function DayDetail({ stats, poll, busy, onPropose }: { stats: DateStats; poll: PollView; busy: boolean; onPropose: () => void }) {
   return (
-    <section className="dpoll__detail" aria-label={`Detalhes de ${longDay(stats.date)}`}>
+    <section className="dpoll__detail" aria-label={t('Detalhes de {date}', { date: longDay(stats.date) })}>
       <h2 className="dpoll__h">{longDay(stats.date)}</h2>
       <div className="dpoll__top">
         <div className="dpoll__ring" style={{ '--v': Math.max(0, Math.min(100, stats.compatibility ?? 0)) } as CSSProperties} role="img" aria-label={stats.compatibility === null ? 'Compatibilidade: sem votos' : `Compatibilidade: ${percent(stats.compatibility)}`}>
           <span>{percent(stats.compatibility)}</span>
         </div>
         <div className="dpoll__topinfo">
-          <strong>{stats.level === 'GRAY' ? LEVEL_LABEL.GRAY : `Compatibilidade ${LEVEL_LABEL[stats.level].toLowerCase()}`}</strong>
+          <strong>{stats.level === 'GRAY' ? LEVEL_LABEL.GRAY : t('Compatibilidade {toLowerCase}', { toLowerCase: LEVEL_LABEL[stats.level].toLowerCase() })}</strong>
           <p className="muted">
             {percent(stats.coverage)} votaram
             <br />
@@ -408,22 +409,22 @@ function DayDetail({ stats, poll, busy, onPropose }: { stats: DateStats; poll: P
       </div>
       <dl className="dpoll__counts">
         <div className="dpoll__count dpoll__count--YES">
-          <dt>Posso</dt>
+          <dt>{t('Posso')}</dt>
           <dd>{stats.yes}</dd>
         </div>
         <div className="dpoll__count dpoll__count--MAYBE">
-          <dt>Talvez</dt>
+          <dt>{t('Talvez')}</dt>
           <dd>{stats.maybe}</dd>
         </div>
         <div className="dpoll__count dpoll__count--NO">
-          <dt>Não posso</dt>
+          <dt>{t('Não posso')}</dt>
           <dd>{stats.no}</dd>
         </div>
       </dl>
-      {stats.lowCoverage ? <p className="muted dpoll__note">Poucas pessoas responderam esta data. Ainda não dá para tratar como consenso.</p> : null}
+      {stats.lowCoverage ? <p className="muted dpoll__note">{t('Poucas pessoas responderam esta data. Ainda não dá para tratar como consenso.')}</p> : null}
       {poll.isOrganizer && poll.status === 'VOTING' ? (
         <Button full loading={busy} onClick={onPropose}>
-          Propor esta data
+          {t('Propor esta data')}
         </Button>
       ) : null}
     </section>
@@ -435,7 +436,7 @@ function ProposalCard({ poll, busy, act }: { poll: PollView; busy: boolean; act:
   const mine = p.myConfirmation;
   const answer = (status: ConfirmationAnswer) => void act(() => api.respondPoll(poll.id, status));
   return (
-    <section className="callout dpoll__proposal" aria-label="Data em confirmação">
+    <section className="callout dpoll__proposal" aria-label={t('Data em confirmação')}>
       <p className="callout__text">
         <strong>Data proposta: {longDay(p.date)}</strong>
         <br />
@@ -446,24 +447,24 @@ function ProposalCard({ poll, busy, act }: { poll: PollView; busy: boolean; act:
       </p>
       <div className="row-actions">
         <Button small variant={mine === 'CONFIRMED' ? 'primary' : 'secondary'} disabled={busy} onClick={() => answer('CONFIRMED')}>
-          {mine === 'CONFIRMED' ? '✓ Confirmado' : 'Confirmar presença'}
+          {mine === 'CONFIRMED' ? '✓ Confirmado' : t('Confirmar presença')}
         </Button>
         <Button small variant={mine === 'ADJUST' ? 'primary' : 'secondary'} disabled={busy} onClick={() => answer('ADJUST')}>
-          Preciso ajustar
+          {t('Preciso ajustar')}
         </Button>
         <Button small variant={mine === 'DECLINED' ? 'danger' : 'secondary'} disabled={busy} onClick={() => answer('DECLINED')}>
-          Recusar
+          {t('Recusar')}
         </Button>
       </div>
       {poll.isOrganizer ? (
         <div className="row-actions">
           {poll.confirmationPolicy === 'MANUAL' ? (
             <Button small disabled={busy} onClick={() => void act(() => api.finalizePoll(poll.id))}>
-              Fechar a data
+              {t('Fechar a data')}
             </Button>
           ) : null}
           <Button small variant="quiet" disabled={busy} onClick={() => void act(() => api.withdrawPoll(poll.id))}>
-            Escolher outra data
+            {t('Escolher outra data')}
           </Button>
         </div>
       ) : null}

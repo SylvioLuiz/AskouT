@@ -2,15 +2,16 @@ import { useEffect, useRef } from 'react';
 import { XIcon } from './icons.tsx';
 import { useAuthContext } from '../auth.tsx';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 export const PROFILE_MENU: { to: string; label: string }[] = [
-  { to: '/configuracao', label: 'Configuração' },
-  { to: '/privacidade', label: 'Privacidade' },
-  { to: '/locais', label: 'Meus locais' },
-  { to: '/arquivados', label: 'Arquivados' },
-  { to: '/interacoes', label: 'Suas interações' },
-  { to: '/ajuda', label: 'Ajuda' },
-  { to: '/tema', label: 'Tema' },
+  { to: '/configuracao', label: t('Configuração') },
+  { to: '/privacidade', label: t('Privacidade') },
+  { to: '/locais', label: t('Meus locais') },
+  { to: '/arquivados', label: t('Arquivados') },
+  { to: '/interacoes', label: t('Suas interações') },
+  { to: '/ajuda', label: t('Ajuda') },
+  { to: '/tema', label: t('Tema') },
 ];
 
 /** Painel escuro que abre pela direita com o menu do perfil. */
@@ -50,8 +51,8 @@ export function ProfileMenu({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="drawer" onMouseDown={(event) => event.target === event.currentTarget && closeRef.current()}>
-      <nav className="drawer__panel" role="dialog" aria-modal="true" aria-label="Menu do perfil" ref={panelRef}>
-        <button type="button" className="drawer__close" onClick={() => closeRef.current()} aria-label="Fechar menu">
+      <nav className="drawer__panel" role="dialog" aria-modal="true" aria-label={t('Menu do perfil')} ref={panelRef}>
+        <button type="button" className="drawer__close" onClick={() => closeRef.current()} aria-label={t('Fechar menu')}>
           <XIcon />
         </button>
         <ul className="drawer__list">
@@ -64,7 +65,7 @@ export function ProfileMenu({ onClose }: { onClose: () => void }) {
           ))}
           <li>
             <button type="button" className="drawer__item drawer__item--out" onClick={signOut}>
-              Sair
+              {t('Sair')}
             </button>
           </li>
         </ul>

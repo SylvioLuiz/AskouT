@@ -14,6 +14,7 @@ import { STORY_PHOTO_MS, nextStory, prevStory } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
 import type { EventStoryGroup } from '../lib/types.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 // ---------- Publicar ----------
 
@@ -42,10 +43,10 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
         const blob = await prepareImage(picked);
         setFile({ blob, kind: 'IMAGE', url: URL.createObjectURL(blob) });
       } else {
-        throw new Error('Escolha uma foto ou um vídeo.');
+        throw new Error(t('Escolha uma foto ou um vídeo.'));
       }
     } catch (failure) {
-      setProblem(failure instanceof Error && failure.message !== 'grande' && failure.message !== 'canvas' ? failure.message : 'Não foi possível usar este arquivo. Tente outro.');
+      setProblem(failure instanceof Error && failure.message !== 'grande' && failure.message !== 'canvas' ? failure.message : t('Não foi possível usar este arquivo. Tente outro.'));
     } finally {
       setBusy(false);
     }
@@ -65,20 +66,20 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
   }
 
   return (
-    <Sheet title="Seu story" onClose={onClose}>
-      <p className="muted">Foto ou vídeo. Qualquer pessoa vê, fica no ar por 24 h e some quando o evento acabar.</p>
-      <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" onChange={(event) => void pick(event)} aria-label="Escolher foto ou vídeo" />
+    <Sheet title={t('Seu story')} onClose={onClose}>
+      <p className="muted">{t('Foto ou vídeo. Qualquer pessoa vê, fica no ar por 24 h e some quando o evento acabar.')}</p>
+      <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" onChange={(event) => void pick(event)} aria-label={t('Escolher foto ou vídeo')} />
       {file ? (
-        <div className="storysheet__preview">{file.kind === 'VIDEO' ? <video src={file.url} controls playsInline muted /> : <img src={file.url} alt="Prévia do story" />}</div>
+        <div className="storysheet__preview">{file.kind === 'VIDEO' ? <video src={file.url} controls playsInline muted /> : <img src={file.url} alt={t('Prévia do story')} />}</div>
       ) : null}
       {problem ? <Notice tone="error">{problem}</Notice> : null}
       <div className="storysheet__actions">
         <Button variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
-          {file ? 'Trocar' : 'Escolher foto ou vídeo'}
+          {file ? t('Trocar') : t('Escolher foto ou vídeo')}
         </Button>
         {file ? (
           <Button loading={busy} onClick={() => void publish()}>
-            Publicar story
+            {t('Publicar story')}
           </Button>
         ) : null}
       </div>
@@ -153,7 +154,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
 
   const src = api.storyMediaUrl(item.id);
   return (
-    <div className="storyview" role="dialog" aria-modal="true" aria-label={`Story de ${group.author.username}`}>
+    <div className="storyview" role="dialog" aria-modal="true" aria-label={t('Story de {username}', { username: group.author.username })}>
       <div className="storyview__bars" aria-hidden="true">
         {group.items.map((it, index) => (
           <span key={it.id} className="storyview__bar">
@@ -168,16 +169,16 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
           <span>{timeAgo(item.createdAt, new Date())}</span>
         </Link>
         {!group.mine ? (
-          <button type="button" className="storyview__btn storyview__btn--quiet" onClick={() => setReporting(true)} aria-label="Mais opções do story" aria-haspopup="dialog">
+          <button type="button" className="storyview__btn storyview__btn--quiet" onClick={() => setReporting(true)} aria-label={t('Mais opções do story')} aria-haspopup="dialog">
             <MoreIcon />
           </button>
         ) : null}
         {item.canDelete ? (
-          <button type="button" className="storyview__btn" onClick={() => void remove()} disabled={busy} aria-label="Apagar este story">
+          <button type="button" className="storyview__btn" onClick={() => void remove()} disabled={busy} aria-label={t('Apagar este story')}>
             <TrashIcon />
           </button>
         ) : null}
-        <button type="button" className="storyview__btn" onClick={onClose} aria-label="Fechar">
+        <button type="button" className="storyview__btn" onClick={onClose} aria-label={t('Fechar')}>
           <XIcon />
         </button>
       </header>
@@ -193,20 +194,20 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
             muted={muted}
             onTimeUpdate={(event) => setProgress(event.currentTarget.duration > 0 ? event.currentTarget.currentTime / event.currentTarget.duration : 0)}
             onEnded={advance}
-            onError={() => setError('Não foi possível abrir este vídeo.')}
+            onError={() => setError(t('Não foi possível abrir este vídeo.'))}
           />
         ) : (
-          <img key={item.id} className="storyview__media" src={src} alt="" onError={() => setError('Não foi possível abrir esta foto.')} />
+          <img key={item.id} className="storyview__media" src={src} alt="" onError={() => setError(t('Não foi possível abrir esta foto.'))} />
         )}
-        <button type="button" className="storyview__tap storyview__tap--prev" onClick={() => setPos(prevStory(groups, pos))} aria-label="Story anterior" />
-        <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label="Próximo story" />
+        <button type="button" className="storyview__tap storyview__tap--prev" onClick={() => setPos(prevStory(groups, pos))} aria-label={t('Story anterior')} />
+        <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo story')} />
         {item.kind === 'VIDEO' ? <SoundToggle muted={muted} onToggle={() => setMuted((m) => !m)} /> : null}
       </div>
       {error ? <p className="storyview__error">{error}</p> : null}
       {reporting ? (
         <ReasonSheet
-          title="Denunciar story"
-          doneText="Denúncia enviada. Você não verá mais este story."
+          title={t('Denunciar story')}
+          doneText={t('Denúncia enviada. Você não verá mais este story.')}
           submit={(reason, details) => api.reportEventStory(eventId, item.id, reason, details)}
           onClose={() => setReporting(false)}
           onDone={() => {

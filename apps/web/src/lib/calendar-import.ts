@@ -2,6 +2,7 @@ import { timeAgo } from './format.ts';
 import type { VenueEventDraft } from './venue.ts';
 import { draftFromEvent } from './venue.ts';
 import type { CalendarDraft, CalendarInfo } from './types.ts';
+import { t } from '../lib/i18n/index.ts';
 
 /** Iguais aos limites da API. */
 export const CALENDAR_LEAD_MIN = 1;
@@ -17,8 +18,8 @@ export function leadLabel(days: number): string {
 export function calendarUrlProblem(raw: string): string | null {
   const v = raw.trim();
   if (v === '') return 'Cole o endereço da agenda.';
-  if (v.length > 500) return 'O endereço é grande demais.';
-  if (!/^(https|webcal):\/\/\S+$/i.test(v)) return 'Use o endereço completo, começando com https:// ou webcal://';
+  if (v.length > 500) return t('O endereço é grande demais.');
+  if (!/^(https|webcal):\/\/\S+$/i.test(v)) return t('Use o endereço completo, começando com https:// ou webcal://');
   return null;
 }
 
@@ -41,18 +42,18 @@ export function draftStatusLabel(status: CalendarDraft['status']): string {
     case 'APPROVED':
       return 'Aprovado';
     case 'AWAITING':
-      return 'Esperando sua aprovação';
+      return t('Esperando sua aprovação');
     default:
-      return 'Ainda não chegou a hora de aprovar';
+      return t('Ainda não chegou a hora de aprovar');
   }
 }
 
 /** Frase sobre a última leitura da agenda. */
 export function syncLabel(c: CalendarInfo, now: Date): string {
   if (c.lastError) return c.lastError;
-  if (!c.lastSyncAt) return 'Ainda não foi lida.';
+  if (!c.lastSyncAt) return t('Ainda não foi lida.');
   const found = c.lastFound === 0 ? 'nenhum evento novo à vista' : c.lastFound === 1 ? '1 evento à vista' : `${c.lastFound} eventos à vista`;
-  return `Lida ${timeAgo(c.lastSyncAt, now)} · ${found}`;
+  return t('Lida {now} · {found}', { now: timeAgo(c.lastSyncAt, now), found });
 }
 
 /** Os dados do rascunho no formato do formulário de evento. */

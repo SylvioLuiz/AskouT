@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { KINDS } from '../lib/explore.ts';
 import type { EventKind } from '../lib/types.ts';
 import { ChevronDownIcon, EventKindIcon } from './icons.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 /** Escolha do tipo do evento (lista suspensa): decide o ícone no círculo da capa. */
 export function EventKindPicker({ value, onChange }: { value: EventKind; onChange: (kind: EventKind) => void }) {
@@ -9,7 +10,7 @@ export function EventKindPicker({ value, onChange }: { value: EventKind; onChang
   return (
     <div className="field kindpick">
       <label className="field__label" htmlFor={id}>
-        Tipo do evento
+        {t('Tipo do evento')}
       </label>
       <div className="field__control kindpick__control">
         <span className="kindpick__icon" aria-hidden="true">

@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 /** Link público do evento, para mandar fora do app. */
 export function eventLink(origin: string, eventId: string): string {
   return `${origin}/eventos/${encodeURIComponent(eventId)}`;
@@ -9,11 +10,11 @@ export function postLink(origin: string, postId: string): string {
 }
 
 export function postShareText(authorName: string): string {
-  return `Olha esse post de ${authorName} no AskouT`;
+  return t('Olha esse post de {authorName} no AskouT', { authorName });
 }
 
 export function eventShareText(title: string): string {
-  return `Olha esse evento no AskouT: ${title}`;
+  return t('Olha esse evento no AskouT: {title}', { title });
 }
 
 /** Link do perfil, para mandar fora do app ou numa conversa. */
@@ -22,5 +23,5 @@ export function profileLink(origin: string, username: string): string {
 }
 
 export function profileShareText(username: string): string {
-  return `Olha o perfil de @${username} no AskouT`;
+  return t('Olha o perfil de @{username} no AskouT', { username });
 }

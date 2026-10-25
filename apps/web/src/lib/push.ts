@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 import type { Api } from './api.ts';
 
 export type PushState =
@@ -41,7 +42,7 @@ export function urlBase64ToBytes(value: string): Uint8Array<ArrayBuffer> {
 /** Formato que a API espera, a partir do JSON da inscrição do navegador. */
 export function subscriptionBody(json: { endpoint?: string; keys?: Record<string, string> }): { endpoint: string; keys: { p256dh: string; auth: string } } {
   const { endpoint, keys } = json;
-  if (!endpoint || !keys?.['p256dh'] || !keys['auth']) throw new Error('O navegador devolveu uma inscrição incompleta');
+  if (!endpoint || !keys?.['p256dh'] || !keys['auth']) throw new Error(t('O navegador devolveu uma inscrição incompleta'));
   return { endpoint, keys: { p256dh: keys['p256dh'], auth: keys['auth'] } };
 }
 
@@ -81,7 +82,7 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
 /** Pede permissão, inscreve o navegador e registra na API. Lança Error com texto claro. */
 export async function enablePush(api: Api, publicKey: string): Promise<void> {
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted') throw new Error('Os avisos não foram liberados no navegador.');
+  if (permission !== 'granted') throw new Error(t('Os avisos não foram liberados no navegador.'));
   const reg = await registration();
   const existing = await reg.pushManager.getSubscription();
   const subscription = existing ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToBytes(publicKey) }));
@@ -148,7 +149,7 @@ export async function readNativeState(bridge: NativePushBridge, serverNative: bo
 
 export async function enableNativePush(api: Api, bridge: NativePushBridge): Promise<void> {
   const token = await bridge.register();
-  if (!token) throw new Error('Os avisos não foram liberados. Você pode liberar em Ajustes do iPhone > AskouT > Notificações.');
+  if (!token) throw new Error(t('Os avisos não foram liberados. Você pode liberar em Ajustes do iPhone > AskouT > Notificações.'));
   await api.pushSubscribe({ endpoint: nativeEndpoint(token) });
   storeNativeToken(token);
 }

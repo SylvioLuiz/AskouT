@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { dayChip, dayLongLabel, LEVEL_LABEL, PARTICIPANT_LABEL, STATE_LABEL } from '../lib/agenda.ts';
 import type { CompatibilityLevel, ParticipantStatus, SlotState } from '../lib/types.ts';
 import { AlertIcon, CheckIcon, ClockIcon, HalfIcon, XIcon } from './icons.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 // Cor nunca sozinha: todo estado de agenda vem com ícone e texto (acessibilidade e daltonismo).
 
@@ -79,7 +80,7 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf }
   }, [selected]);
 
   return (
-    <div className="daystrip" role="group" aria-label="Escolha o dia">
+    <div className="daystrip" role="group" aria-label={t('Escolha o dia')}>
       {days.map((key) => {
         const chip = dayChip(key);
         const states = statesOf(key);
@@ -198,7 +199,7 @@ export function Sheet({ title, onClose, children }: SheetProps) {
           <div className="sheet__head">
             <h2 className="sheet__title">{title}</h2>
             {/* No celular fecha-se puxando a aba para baixo; o botão só aparece em tela grande (e para leitor de tela). */}
-            <button type="button" className="sheet__close" onClick={() => closeRef.current()} onPointerDown={(event) => event.stopPropagation()} aria-label="Fechar">
+            <button type="button" className="sheet__close" onClick={() => closeRef.current()} onPointerDown={(event) => event.stopPropagation()} aria-label={t('Fechar')}>
               <XIcon />
             </button>
           </div>

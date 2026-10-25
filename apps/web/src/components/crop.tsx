@@ -3,6 +3,7 @@ import type { PointerEvent } from 'react';
 import { Button } from './ui.tsx';
 import { changeMode, CROP_MODES, initialCrop, moveCrop, ratioOf, resizeCrop } from '../lib/crop.ts';
 import type { Corner, CropMode, CropRect } from '../lib/crop.ts';
+import { t } from '../lib/i18n/index.ts';
 
 type Drag = { kind: 'move' | Corner; startX: number; startY: number; rect: CropRect };
 
@@ -29,7 +30,7 @@ export function CropEditor({ source, initial, busy, onApply, onCancel }: { sourc
     img.src = source;
   }, [source]);
 
-  if (!size || !rect) return <p className="muted">Abrindo a foto…</p>;
+  if (!size || !rect) return <p className="muted">{t('Abrindo a foto…')}</p>;
   const { w: imgW, h: imgH } = size;
   const ratio = imgW / imgH;
 
@@ -68,7 +69,7 @@ export function CropEditor({ source, initial, busy, onApply, onCancel }: { sourc
 
   return (
     <div className="cropper">
-      <div className="cropper__modes" role="group" aria-label="Formato do recorte">
+      <div className="cropper__modes" role="group" aria-label={t('Formato do recorte')}>
         {CROP_MODES.map((m) => (
           <button key={m.id} type="button" className={`cropper__mode${mode === m.id ? ' cropper__mode--on' : ''}`} aria-pressed={mode === m.id} onClick={() => pick(m.id)}>
             {m.label}
@@ -76,11 +77,11 @@ export function CropEditor({ source, initial, busy, onApply, onCancel }: { sourc
         ))}
       </div>
       <div className="cropper__frame" ref={box} style={{ aspectRatio: String(ratio), width: `min(100%, ${(60 * ratio).toFixed(2)}vh)` }}>
-        <img src={source} alt="Foto para recortar" draggable={false} />
+        <img src={source} alt={t('Foto para recortar')} draggable={false} />
         <div
           className="cropper__box"
           role="group"
-          aria-label="Área do recorte"
+          aria-label={t('Área do recorte')}
           style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%` }}
           onPointerDown={start('move')}
           onPointerMove={onMove}
@@ -92,13 +93,13 @@ export function CropEditor({ source, initial, busy, onApply, onCancel }: { sourc
           ))}
         </div>
       </div>
-      <p className="muted cropper__hint">Arraste a moldura e puxe os cantos para ajustar.</p>
+      <p className="muted cropper__hint">{t('Arraste a moldura e puxe os cantos para ajustar.')}</p>
       <div className="row-actions">
         <Button variant="secondary" small onClick={onCancel} disabled={busy}>
-          Cancelar
+          {t('Cancelar')}
         </Button>
         <Button small loading={busy} onClick={() => onApply(rect)}>
-          Aplicar recorte
+          {t('Aplicar recorte')}
         </Button>
       </div>
     </div>

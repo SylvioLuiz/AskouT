@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Map as GlMap, Marker } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { t } from '../lib/i18n/index.ts';
 
 // Mapa do encontro: OpenStreetMap (tiles raster) desenhado pelo MapLibre. Carregado sob demanda, só na tela
 // do encontro, porque a biblioteca é grande. Os pins só existem aqui, depois do aceite do convite.
@@ -127,5 +128,5 @@ export default function MatchMap({ me, others, onFail }: Props) {
     }
   }, [ready, me, others]);
 
-  return <div ref={box} className="matchmap" role="region" aria-label="Mapa com a posição de vocês dois" />;
+  return <div ref={box} className="matchmap" role="region" aria-label={t('Mapa com a posição de vocês dois')} />;
 }

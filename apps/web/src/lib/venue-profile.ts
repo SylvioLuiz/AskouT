@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 import type { VenueDayHours, VenueHours, VenueProfile, VenueProfileBody } from './types.ts';
 
 /** Iguais aos limites da API. */
@@ -57,15 +58,15 @@ export function openStatus(hours: VenueHours | null, now: Date): OpenStatus | nu
       if (nowMin >= base + shift && nowMin < base + shift + length) {
         const left = base + shift + length - nowMin;
         const soon = left <= CLOSING_SOON_MIN;
-        return { open: true, label: `Aberto agora · fecha às ${day.close}`, short: soon ? `Fecha em ${left} min` : `Aberto até ${shortHour(day.close)}`, closingSoon: soon };
+        return { open: true, label: t('Aberto agora · fecha às {close}', { close: day.close }), short: soon ? t('Fecha em {left} min', { left }) : t('Aberto até {close}', { close: shortHour(day.close) }), closingSoon: soon };
       }
     }
     for (const start of [base, base + WEEK]) if (start > nowMin && (!next || start < next.start)) next = { start, day: d, time: day.open };
   }
-  if (!next) return { open: false, label: 'Fechado', short: 'Fechado', closingSoon: false };
+  if (!next) return { open: false, label: t('Fechado'), short: 'Fechado', closingSoon: false };
   const diffDays = Math.floor(next.start / 1440) - now.getDay();
   const when = diffDays === 0 ? 'hoje' : diffDays === 1 ? 'amanhã' : DAY_LONG[next.day]!;
-  return { open: false, label: `Fechado · abre ${when} às ${next.time}`, short: diffDays === 0 || diffDays === 1 ? `Abre às ${shortHour(next.time)}` : `Abre ${when} às ${shortHour(next.time)}`, closingSoon: false };
+  return { open: false, label: t('Fechado · abre {when} às {time}', { when, time: next.time }), short: diffDays === 0 || diffDays === 1 ? t('Abre às {time}', { time: shortHour(next.time) }) : t('Abre {when} às {time}', { when, time: shortHour(next.time) }), closingSoon: false };
 }
 
 /** Dias em que abre, em poucas palavras: "Seg a Sáb", "Sex e Sáb", "Todos os dias". `null` se não há horários. */
@@ -73,7 +74,7 @@ export function daysSummary(hours: VenueHours | null): string | null {
   if (!hours || hours.length !== 7) return null;
   const open = DISPLAY_ORDER.filter((d) => hours[d]);
   if (open.length === 0) return null;
-  if (open.length === 7) return 'Todos os dias';
+  if (open.length === 7) return t('Todos os dias');
   const runs: number[][] = [];
   for (const d of open) {
     const last = runs[runs.length - 1];
@@ -143,16 +144,16 @@ const HOUR_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export function profileProblem(d: VenueProfileDraft): string | null {
   const name = d.name.trim();
-  if (Array.from(name).length < VENUE_NAME_MIN) return `O nome precisa de pelo menos ${VENUE_NAME_MIN} caracteres.`;
-  if (Array.from(name).length > VENUE_NAME_MAX) return `O nome pode ter até ${VENUE_NAME_MAX} caracteres.`;
-  if (Array.from(d.address.trim()).length > VENUE_ADDRESS_MAX) return `O endereço pode ter até ${VENUE_ADDRESS_MAX} caracteres.`;
-  if (Array.from(d.category.trim()).length > VENUE_CATEGORY_MAX) return `A categoria pode ter até ${VENUE_CATEGORY_MAX} caracteres.`;
-  if (Array.from(d.description.trim()).length > VENUE_DESCRIPTION_MAX) return `A descrição pode ter até ${VENUE_DESCRIPTION_MAX} caracteres.`;
+  if (Array.from(name).length < VENUE_NAME_MIN) return t('O nome precisa de pelo menos {VENUE_NAME_MIN} caracteres.', { VENUE_NAME_MIN });
+  if (Array.from(name).length > VENUE_NAME_MAX) return t('O nome pode ter até {VENUE_NAME_MAX} caracteres.', { VENUE_NAME_MAX });
+  if (Array.from(d.address.trim()).length > VENUE_ADDRESS_MAX) return t('O endereço pode ter até {VENUE_ADDRESS_MAX} caracteres.', { VENUE_ADDRESS_MAX });
+  if (Array.from(d.category.trim()).length > VENUE_CATEGORY_MAX) return t('A categoria pode ter até {VENUE_CATEGORY_MAX} caracteres.', { VENUE_CATEGORY_MAX });
+  if (Array.from(d.description.trim()).length > VENUE_DESCRIPTION_MAX) return t('A descrição pode ter até {VENUE_DESCRIPTION_MAX} caracteres.', { VENUE_DESCRIPTION_MAX });
   for (let i = 0; i < 7; i += 1) {
     const day = d.days[i]!;
     if (!day.open) continue;
-    if (!HOUR_RE.test(day.from) || !HOUR_RE.test(day.to)) return `Informe a hora de abrir e fechar de ${DAY_LONG[i]}.`;
-    if (day.from === day.to) return `Em ${DAY_LONG[i]}, abrir e fechar não podem ser na mesma hora.`;
+    if (!HOUR_RE.test(day.from) || !HOUR_RE.test(day.to)) return t('Informe a hora de abrir e fechar de {i}.', { i: DAY_LONG[i] ?? '' });
+    if (day.from === day.to) return t('Em {i}, abrir e fechar não podem ser na mesma hora.', { i: DAY_LONG[i] ?? '' });
   }
   return null;
 }
