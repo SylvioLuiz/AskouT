@@ -1107,9 +1107,9 @@ button {
   margin-top: -18px;
   max-width: 16ch;
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 500;
   font-size: clamp(1.75rem, 7.5vw, 2.25rem);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.025em;
   line-height: 1.1;
 }
 
