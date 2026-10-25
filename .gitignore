@@ -4,3 +4,9 @@ dist
 .DS_Store
 .askout-update.log
 .askout-setup-stamp
+
+# Segredos do Android (nunca versionar)
+*.jks
+*.keystore
+keystore.properties
+local.properties
