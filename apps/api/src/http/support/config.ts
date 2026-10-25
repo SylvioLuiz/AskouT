@@ -1,4 +1,6 @@
 import { apnsKeyIsValid } from '../../infra/push/apns-sender.ts';
+import { parseServiceAccount } from '../../infra/google/service-account.ts';
+import type { ServiceAccountCredentials } from '../../infra/google/service-account.ts';
 import { vapidKeysMatch } from '../../infra/push/web-push-sender.ts';
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
@@ -32,6 +34,10 @@ export interface AppConfig {
   vapid: { publicKey: string; privateKey: string; subject: string } | undefined;
   /** Chave da Apple (APNs) para avisos no app do iPhone. Sem as três variáveis, o push do app fica desligado. */
   apns: { keyId: string; teamId: string; privateKey: string; bundleId: string; production: boolean } | undefined;
+  /** Conta de serviço do Google (aviso no Android pelo FCM e conferência de compra no Google Play). */
+  googleServiceAccount: ServiceAccountCredentials | undefined;
+  /** Nome do pacote do app no Google Play. */
+  googlePlayPackage: string;
   /** Provedor de pagamento do impulsionamento. “sandbox” é só de teste (não cobra); “stripe” cobra de verdade; sem valor, recusa criar pedidos. */
   paymentProvider: 'sandbox' | 'stripe' | undefined;
   /** Dados da Stripe, só quando `paymentProvider` é “stripe”. */
@@ -138,6 +144,14 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     else apns = { keyId: apnsKeyId, teamId: apnsTeamId, privateKey: apnsPrivateKey, bundleId: apnsBundleId, production: apnsEnvironment === 'production' };
   }
 
+  const googleSaRaw = env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim() ?? '';
+  let googleServiceAccount: ServiceAccountCredentials | undefined;
+  if (googleSaRaw !== '') {
+    googleServiceAccount = parseServiceAccount(googleSaRaw);
+    if (!googleServiceAccount) problems.push('GOOGLE_SERVICE_ACCOUNT_JSON não é o arquivo JSON de uma conta de serviço do Google (cole o conteúdo inteiro do arquivo baixado)');
+  }
+  const googlePlayPackage = env.GOOGLE_PLAY_PACKAGE_NAME?.trim() || 'br.com.askout';
+
   const enabledRaw = env.PAYMENTS_ENABLED?.trim().toLowerCase() ?? '';
   let paymentsEnabled = false;
   if (enabledRaw === 'true' || enabledRaw === '1') paymentsEnabled = true;
@@ -191,5 +205,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
 }

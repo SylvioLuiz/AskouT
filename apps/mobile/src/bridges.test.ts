@@ -98,7 +98,7 @@ describe('ponte da loja', () => {
     assert.equal(await createStoreBridge({ purchases: purchases({ receipt: 'old' }), platform: () => 'ios' }).purchase('p'), 'old');
   });
   it('Android devolve o token de compra', async () => {
-    assert.equal(await createStoreBridge({ purchases: purchases({ purchaseToken: 'tok' }), platform: () => 'android' }).purchase('p'), 'tok');
+    assert.equal(await createStoreBridge({ purchases: purchases({ purchaseToken: 'tok' }), platform: () => 'android' }).purchase('p'), '{"productId":"p","purchaseToken":"tok"}');
   });
   it('sem recibo é erro', async () => {
     await assert.rejects(createStoreBridge({ purchases: purchases({}), platform: () => 'android' }).purchase('p'), /recibo/);

@@ -64,6 +64,15 @@ describe('loadConfig', () => {
     assert.throws(() => loadConfig({ ...good, VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: 'ftp://x' }), /VAPID_SUBJECT/);
   });
 
+  it('conta de serviço do Google (FCM e Google Play): opcional e precisa ser o JSON certo', () => {
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const sa = JSON.stringify({ client_email: 'askout@askout-1.iam.gserviceaccount.com', private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(), project_id: 'askout-1' });
+    assert.equal(loadConfig(good).googleServiceAccount, undefined);
+    assert.equal(loadConfig(good).googlePlayPackage, 'br.com.askout');
+    assert.equal(loadConfig({ ...good, GOOGLE_SERVICE_ACCOUNT_JSON: sa }).googleServiceAccount?.project_id, 'askout-1');
+    assert.throws(() => loadConfig({ ...good, GOOGLE_SERVICE_ACCOUNT_JSON: 'lixo' }), /GOOGLE_SERVICE_ACCOUNT_JSON/);
+  });
+
   it('chaves APNs (aviso no iPhone): opcionais, em conjunto e com .p8 válida', () => {
     const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
     const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();

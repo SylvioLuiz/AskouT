@@ -187,7 +187,7 @@ export class CompositePushSender implements PushSender {
   }
 
   send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
-    if (subscription.endpoint.startsWith(NATIVE_PREFIX)) return this.native ? this.native.send(subscription, message) : Promise.resolve('FAILED');
+    if (subscription.endpoint.startsWith(NATIVE_PREFIX) || subscription.endpoint.startsWith('fcm:')) return this.native ? this.native.send(subscription, message) : Promise.resolve('FAILED');
     return this.web.send(subscription, message);
   }
 }

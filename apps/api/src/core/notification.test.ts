@@ -105,6 +105,19 @@ describe('avisos', () => {
     assert.equal((await w.pushSubscriptions.listForUser(bia!)).length, 0);
   });
 
+  it('aparelho Android: inscreve com o token do FCM (`fcm:`) e recusa token com formato errado', async () => {
+    const w = makeWorld();
+    const { bia } = await friends(w, 'ana', 'bia');
+    w.push.nativeEnabled = true;
+    const token = `${'f'.repeat(22)}:APA91b${'x'.repeat(80)}`;
+    await assert.rejects(w.core.notifications.subscribe(bia!, { endpoint: 'fcm:curto', keys: undefined }), { code: 'VALIDATION' });
+    await assert.rejects(w.core.notifications.subscribe(bia!, { endpoint: `fcm:${token}/../x`, keys: undefined }), { code: 'VALIDATION' });
+    await w.core.notifications.subscribe(bia!, { endpoint: `fcm:${token}`, keys: undefined });
+    const [saved] = await w.pushSubscriptions.listForUser(bia!);
+    assert.equal(saved?.endpoint, `fcm:${token}`);
+    assert.equal(saved?.p256dh, 'fcm');
+  });
+
   it('só o envio nativo ligado (sem chave do navegador) ainda manda o push ao app', async () => {
     const w = makeWorld();
     w.push.publicKey = null;

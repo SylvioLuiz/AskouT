@@ -193,7 +193,7 @@ export class BoostService {
       throw validationError('Forma de pagamento inválida', { channel: 'Use WEB, APPLE ou GOOGLE' });
     }
     const channel: BoostChannel = input.channel === 'APPLE' || input.channel === 'GOOGLE' ? input.channel : 'WEB';
-    if (channel !== 'WEB' && !this.deps.storeVerifier) throw conflict('A compra pelo app ainda não está disponível.');
+    if (channel !== 'WEB' && (!this.deps.storeVerifier || this.deps.storeVerifier.supports?.(channel) === false)) throw conflict('A compra pelo app ainda não está disponível.');
 
     const days = input.days;
     if (typeof days !== 'number' || !BOOST_DAY_OPTIONS.includes(days)) throw validationError('Duração inválida', { days: `Escolha ${BOOST_DAY_OPTIONS.join(', ')} dias` });

@@ -52,6 +52,9 @@ services:
         value: 359NDWACC5
       - key: APNS_PRIVATE_KEY
         sync: false
+      # Android: aviso (FCM) e conferência de compra do Google Play. Colar o JSON da conta de serviço direto no Render (é segredo).
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
 databases:
   - name: askout-db
     plan: basic-256mb

@@ -8,7 +8,10 @@ const ENDPOINT_MAX = 1000;
 const KEY_MAX = 200;
 /** Aparelhos do app guardam o token da Apple como `apns:<token em hexadecimal>` no lugar do endereço do navegador. */
 export const NATIVE_ENDPOINT_PREFIX = 'apns:';
+/** Aparelhos Android guardam o token do FCM como `fcm:<token>`. */
+export const FCM_ENDPOINT_PREFIX = 'fcm:';
 const NATIVE_TOKEN = /^[0-9a-f]{32,200}$/i;
+const FCM_TOKEN = /^[A-Za-z0-9:_-]{50,400}$/;
 
 /** A que grupo de silenciar cada tipo de aviso pertence. Os demais (curtidas, seguidores, Flash...) só calam com "todas". */
 export function muteGroup(type: NotificationType): 'chats' | 'events' | null {
@@ -160,12 +163,14 @@ export class NotificationService {
     const endpoint = input.endpoint;
     const keys = typeof input.keys === 'object' && input.keys !== null ? (input.keys as Record<string, unknown>) : {};
     let { p256dh, auth } = keys;
-    if (typeof endpoint === 'string' && endpoint.startsWith(NATIVE_ENDPOINT_PREFIX)) {
-      // Aparelho do app (iPhone): o "endereço" é `apns:` + token do aparelho, sem chaves de criptografia.
+    if (typeof endpoint === 'string' && (endpoint.startsWith(NATIVE_ENDPOINT_PREFIX) || endpoint.startsWith(FCM_ENDPOINT_PREFIX))) {
+      // Aparelho do app: o "endereço" é `apns:` (iPhone) ou `fcm:` (Android) + token do aparelho, sem chaves de criptografia.
       if (!push.nativeEnabled) throw conflict('O aviso fora do app não está configurado neste servidor');
-      if (!NATIVE_TOKEN.test(endpoint.slice(NATIVE_ENDPOINT_PREFIX.length))) throw validationError('Inscrição inválida', { endpoint: 'Token do aparelho inválido' });
-      p256dh = 'apns';
-      auth = 'apns';
+      const isFcm = endpoint.startsWith(FCM_ENDPOINT_PREFIX);
+      const token = endpoint.slice(isFcm ? FCM_ENDPOINT_PREFIX.length : NATIVE_ENDPOINT_PREFIX.length);
+      if (!(isFcm ? FCM_TOKEN : NATIVE_TOKEN).test(token)) throw validationError('Inscrição inválida', { endpoint: 'Token do aparelho inválido' });
+      p256dh = isFcm ? 'fcm' : 'apns';
+      auth = isFcm ? 'fcm' : 'apns';
     } else {
       if (push.publicKey === null) throw conflict('O aviso fora do app não está configurado neste servidor');
       if (typeof endpoint !== 'string' || endpoint.length > ENDPOINT_MAX || !/^https:\/\//.test(endpoint)) {

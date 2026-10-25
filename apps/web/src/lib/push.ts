@@ -111,7 +111,8 @@ export function nativePushBridge(host: unknown = typeof window === 'undefined' ?
 }
 
 const NATIVE_TOKEN_KEY = 'askout.push.native-token';
-export const nativeEndpoint = (token: string): string => `apns:${token}`;
+/** O token da Apple é só hexadecimal (`apns:`); o do Android (FCM) tem `:` e outros caracteres (`fcm:`). */
+export const nativeEndpoint = (token: string): string => (/^[0-9a-f]+$/i.test(token) ? `apns:${token}` : `fcm:${token}`);
 
 function storedNativeToken(): string | null {
   try {

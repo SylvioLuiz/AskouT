@@ -43,5 +43,6 @@ describe('push no app do iPhone', () => {
     const bridge = { permission: async () => 'granted' as const, register: async () => 'ab12' };
     assert.equal(nativePushBridge({ AskouTPush: bridge }), bridge);
     assert.equal(nativeEndpoint('ab12'), 'apns:ab12');
+    assert.equal(nativeEndpoint('cAb:APA91b-x_y'), 'fcm:cAb:APA91b-x_y');
   });
 });

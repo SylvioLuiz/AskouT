@@ -207,6 +207,8 @@ export interface VerifiedStorePurchase {
 export interface StorePurchaseVerifier {
   /** `undefined` se o recibo for falso, de outro app ou ilegível. */
   verify(input: { store: StoreName; receipt: string }): Promise<VerifiedStorePurchase | undefined>;
+  /** Se existir e devolver false, a loja não tem conferente configurado e o pedido nem é criado. */
+  supports?(store: StoreName): boolean;
 }
 
 export interface AvailabilityRepository {
