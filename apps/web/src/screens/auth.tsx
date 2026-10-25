@@ -210,7 +210,7 @@ export function SignupScreen() {
         <form className="form" onSubmit={submitCode} noValidate>
           <h2 className="form__title">{t('Confirme seu e-mail')}</h2>
           <p className="form__text">
-            Enviamos um código de 6 números para <strong>{started.email}</strong>. Ele vale por 10 minutos.
+            {t('Enviamos um código de 6 números para')} <strong>{started.email}</strong>. {t('Ele vale por 10 minutos.')}
           </p>
           {import.meta.env.DEV ? (
             <Notice tone="info">{t('Ambiente de desenvolvimento: o código não chega por e-mail, aparece no log da API.')}</Notice>
@@ -238,7 +238,7 @@ export function SignupScreen() {
     <AuthLayout>
       <form className="form" onSubmit={submitDetails} noValidate>
         <h2 className="form__title">{t('Criar conta')}</h2>
-        {invitedBy ? <Notice>Você foi convidado por @{invitedBy}. Ao entrar, você já passa a seguir essa pessoa.</Notice> : null}
+        {invitedBy ? <Notice>{t('Você foi convidado por @{invitedBy}. Ao entrar, você já passa a seguir essa pessoa.', { invitedBy })}</Notice> : null}
         {formError ? <Notice tone="error">{formError}</Notice> : null}
         <Field label={t('E-mail')} type="email" value={email} onChange={setEmail} error={errors['email']} autoComplete="email" inputMode="email" autoFocus />
         <Field label={t('Nome de usuário')} value={username} onChange={(v) => setUsername(v.toLowerCase())} error={errors['username']} hint={t('Letras minúsculas, números, ponto e sublinhado. Não dá para trocar depois.')} prefix="@" autoComplete="username" maxLength={31} />
@@ -317,7 +317,7 @@ export function ForgotPasswordScreen() {
         <form className="form" onSubmit={confirm} noValidate>
           <h2 className="form__title">{t('Criar nova senha')}</h2>
           <p className="form__text">
-            Se existir uma conta com esse dado, enviamos um código de 6 números para o e-mail dela. Ele vale por {started.expiresInMinutes} minutos.
+            {t('Se existir uma conta com esse dado, enviamos um código de 6 números para o e-mail dela. Ele vale por {minutes} minutos.', { minutes: started.expiresInMinutes })}
           </p>
           {import.meta.env.DEV ? <Notice tone="info">{t('Ambiente de desenvolvimento: o código não chega por e-mail, aparece no log da API.')}</Notice> : null}
           {info ? <Notice tone="ok">{info}</Notice> : null}

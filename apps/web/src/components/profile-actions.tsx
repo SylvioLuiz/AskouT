@@ -107,11 +107,11 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
       {problem ? <Notice tone="error">{problem}</Notice> : null}
       {step === 'remove' ? (
         <Confirm
-          question={`Remover @${profile.username} dos seus seguidores? ${relationship.isFriend ? 'Vocês deixam de ser amigos. ' : ''}A pessoa não é avisada.`}
+          question={t('Remover @{username} dos seus seguidores? {friends}A pessoa não é avisada.', { username: profile.username, friends: relationship.isFriend ? t('Vocês deixam de ser amigos. ') : '' })}
           confirmLabel={t('Remover seguidor')}
           busy={busy}
           onCancel={() => setStep('menu')}
-          onConfirm={() => void confirm(() => api.removeFollower(profile.userId), `@${profile.username} não segue mais você.`)}
+          onConfirm={() => void confirm(() => api.removeFollower(profile.userId), t('@{username} não segue mais você.', { username: profile.username }))}
         />
       ) : step === 'block' ? (
         <Confirm

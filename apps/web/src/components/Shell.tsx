@@ -161,11 +161,11 @@ export function Shell({ children }: { children: ReactNode }) {
           {t('AskouT')}
         </Link>
         <nav className="topbar__actions" aria-label={t('Conta')}>
-          <Link to="/conversas" className="iconbtn iconbtn--chat" aria-label={hasUnread ? `Conversas, ${unreadChats} com mensagem nova` : 'Conversas'} aria-current={pathname.startsWith('/conversas') ? 'page' : undefined}>
+          <Link to="/conversas" className="iconbtn iconbtn--chat" aria-label={hasUnread ? t('Conversas, {unreadChats} com mensagem nova', { unreadChats }) : 'Conversas'} aria-current={pathname.startsWith('/conversas') ? 'page' : undefined}>
             <ChatIcon />
             {hasUnread ? <span className="iconbtn__count" aria-hidden="true">{unreadChats > 9 ? '9+' : unreadChats}</span> : null}
           </Link>
-          <Link to="/atividades" className="iconbtn" aria-label={hasPending ? 'Notificações, há novidades' : 'Notificações'} aria-current={pathname === '/atividades' ? 'page' : undefined}>
+          <Link to="/atividades" className="iconbtn" aria-label={hasPending ? t('Notificações, há novidades') : t('Notificações')} aria-current={pathname === '/atividades' ? 'page' : undefined}>
             <BellIcon />
             {hasPending ? <span className="navlink__badge" aria-hidden="true" /> : null}
           </Link>

@@ -1,4 +1,4 @@
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 import type { CompatibilityLevel, GoingEvent, MeetupView, ParticipantStatus, Slot, SlotState } from './types.ts';
 
 // Tudo aqui trabalha no fuso do aparelho: a pessoa marca "20h" e é isso que ela espera ver.
@@ -75,7 +75,7 @@ export function statesOnDay(slots: readonly Slot[], key: string): SlotState[] {
   return (['AVAILABLE', 'PARTIAL', 'UNAVAILABLE'] as const).filter((s) => present.has(s));
 }
 
-const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+const timeFmt = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
 
 function hm(date: Date): string {
   return timeFmt.format(date).replace(/^24:/, '00:');
@@ -91,13 +91,13 @@ export function timeRangeLabel(slot: Pick<Slot, 'start' | 'end'>, dayKey: string
   const endsAfter = end.getTime() > dayEnd;
   const from = startsBefore ? '00:00' : hm(start);
   const to = endsAfter ? '24:00' : end.getTime() === dayEnd ? '24:00' : hm(end);
-  const note = startsBefore ? ' (começou ontem)' : endsAfter ? ' (continua amanhã)' : '';
+  const note = startsBefore ? t(' (começou ontem)') : endsAfter ? t(' (continua amanhã)') : '';
   return `${from} – ${to}${note}`;
 }
 
-const weekdayShort = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', timeZone: 'UTC' });
-const dayLong = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
-const instantDay = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'short' });
+const weekdayShort = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short', timeZone: 'UTC' });
+const dayLong = new Intl.DateTimeFormat(intlLocale(), { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+const instantDay = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short' });
 
 function noon(key: string): Date {
   const { y, m, d } = parts(key);
@@ -122,9 +122,9 @@ export function instantRangeLabel(startIso: string, endIso: string): string {
 }
 
 export const STATE_LABEL: Record<SlotState, string> = {
-  AVAILABLE: 'Disponível',
-  PARTIAL: 'Parcial',
-  UNAVAILABLE: 'Indisponível',
+  AVAILABLE: t('Disponível'),
+  PARTIAL: t('Parcial'),
+  UNAVAILABLE: t('Indisponível'),
 };
 
 export const STATE_HELP: Record<SlotState, string> = {
@@ -141,9 +141,9 @@ export const LEVEL_LABEL: Record<CompatibilityLevel, string> = {
 };
 
 export const PARTICIPANT_LABEL: Record<ParticipantStatus, string> = {
-  available: 'Disponível',
-  partial: 'Parcial',
-  unavailable: 'Indisponível',
+  available: t('Disponível'),
+  partial: t('Parcial'),
+  unavailable: t('Indisponível'),
   unknown: t('Sem informação'),
 };
 
@@ -223,6 +223,6 @@ export function planWhenLabel(event: Pick<AgendaEvent, 'startsAt'>, now: Date): 
   const key = localDateKey(start);
   if (key === today) return t('Hoje {hm}', { hm });
   if (key === addDays(today, 1)) return t('Amanhã {hm}', { hm });
-  if (key < addDays(today, 7)) return `${start.toLocaleDateString('pt-BR', { weekday: 'short' })} ${hm}`;
+  if (key < addDays(today, 7)) return `${start.toLocaleDateString(intlLocale(), { weekday: 'short' })} ${hm}`;
   return `${String(start.getDate()).padStart(2, '0')}/${String(start.getMonth() + 1).padStart(2, '0')} ${hm}`;
 }

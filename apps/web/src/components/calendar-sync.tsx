@@ -59,7 +59,7 @@ export function CalendarSyncSheet({ onClose, onChange }: { onClose: () => void; 
               {on ? (
                 <>
                   <span className="calsync__badge">
-                    <span aria-hidden="true">✓</span> Sincronizado
+                    <span aria-hidden="true">✓</span> {t('Sincronizado')}
                   </span>
                   <Button variant="quiet" small onClick={() => update(removeSynced(synced, p.id))} aria-label={t('Dessincronizar {name}', { name: p.name })}>
                     {t('Dessincronizar')}

@@ -271,7 +271,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
       {sheet === 'leave' ? (
         <Sheet title={t('Sair do grupo')} onClose={() => setSheet(undefined)}>
           <p className="muted">
-            Você deixa de ver as mensagens do grupo e sai dos encontros dele.{isOwner && data.members.length > 1 ? ' Outra pessoa passa a administrar o grupo.' : ''} Para voltar, só com um novo convite.
+            {t('Você deixa de ver as mensagens do grupo e sai dos encontros dele.')}{isOwner && data.members.length > 1 ? t(' Outra pessoa passa a administrar o grupo.') : ''} {t('Para voltar, só com um novo convite.')}
           </p>
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full variant="danger" loading={busy} onClick={() => void act(() => api.leaveGroup(conversationId), () => navigate('/conversas'))}>
@@ -292,7 +292,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
 
       {sheet && typeof sheet === 'object' && 'remove' in sheet ? (
         <Sheet title={t('Remover do grupo')} onClose={() => setSheet(undefined)}>
-          <p className="muted">{data.members.find((m) => m.profile.userId === sheet.remove)?.profile.displayName ?? 'Essa pessoa'} sai do grupo e dos encontros dele.</p>
+          <p className="muted">{data.members.find((m) => m.profile.userId === sheet.remove)?.profile.displayName ?? t('Essa pessoa')} sai do grupo e dos encontros dele.</p>
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full variant="danger" loading={busy} onClick={() => void act(() => api.removeMember(conversationId, sheet.remove))}>
             {t('Remover')}

@@ -190,12 +190,12 @@ function CommentRow({ comment, onDelete, onLike, onReport, busy }: { comment: Po
           )}
         </p>
       </div>
-      <button type="button" className={`comment__like${comment.likedByMe ? ' comment__like--on' : ''}`} onClick={onLike} aria-pressed={comment.likedByMe} aria-label={comment.likedByMe ? 'Descurtir comentário' : 'Curtir comentário'}>
+      <button type="button" className={`comment__like${comment.likedByMe ? ' comment__like--on' : ''}`} onClick={onLike} aria-pressed={comment.likedByMe} aria-label={comment.likedByMe ? t('Descurtir comentário') : t('Curtir comentário')}>
         <HeartIcon filled={comment.likedByMe} />
         {comment.likeCount > 0 ? <span>{comment.likeCount}</span> : null}
       </button>
       {!comment.mine ? (
-        <button type="button" className="comment__report" onClick={onReport} aria-label={`Denunciar comentário de ${comment.venue?.name ?? comment.author.username}`}>
+        <button type="button" className="comment__report" onClick={onReport} aria-label={t('Denunciar comentário de {name}', { name: comment.venue?.name ?? comment.author.username })}>
           {t('Denunciar')}
         </button>
       ) : null}

@@ -91,7 +91,7 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
             </li>
           ) : (
             <li>
-              <p className="muted sharelist__note">{profile === 'private' ? 'Evento privado: só vai para as conversas que você escolher, e ninguém posta no perfil.' : 'Seu evento já aparece na aba Eventos do seu perfil.'}</p>
+              <p className="muted sharelist__note">{profile === 'private' ? t('Evento privado: só vai para as conversas que você escolher, e ninguém posta no perfil.') : t('Seu evento já aparece na aba Eventos do seu perfil.')}</p>
             </li>
           )}
           <li>

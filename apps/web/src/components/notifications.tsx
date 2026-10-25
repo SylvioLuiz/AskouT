@@ -15,7 +15,7 @@ const COPY: Record<Exclude<PushState, 'off' | 'on'>, string> = {
   denied: t('Você bloqueou os avisos deste site no navegador. Para receber, libere as notificações nas configurações do site e volte aqui.'),
 };
 
-const NATIVE_DENIED = 'Os avisos do AskouT estão bloqueados neste iPhone. Para receber, libere em Ajustes > AskouT > Notificações e volte aqui.';
+const NATIVE_DENIED = t('Os avisos do AskouT estão bloqueados neste iPhone. Para receber, libere em Ajustes > AskouT > Notificações e volte aqui.');
 
 /** Liga ou desliga os avisos fora do app neste aparelho. */
 export function PushCard() {

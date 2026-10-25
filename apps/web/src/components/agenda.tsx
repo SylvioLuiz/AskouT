@@ -86,7 +86,7 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf }
         const states = statesOf(key);
         const isSelected = key === selected;
         const events = eventsOf?.(key) ?? 0;
-        const slotSummary = states.length === 0 ? 'sem horários' : states.map((s) => STATE_LABEL[s].toLowerCase()).join(', ');
+        const slotSummary = states.length === 0 ? t('sem horários') : states.map((s) => STATE_LABEL[s].toLowerCase()).join(', ');
         const summary = events > 0 ? `${slotSummary}, ${events === 1 ? '1 evento' : `${events} eventos`} confirmado${events === 1 ? '' : 's'}` : slotSummary;
         return (
           <button

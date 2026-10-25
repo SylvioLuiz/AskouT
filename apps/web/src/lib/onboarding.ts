@@ -30,5 +30,5 @@ export function markOnboardingDone(storage: Pick<Storage, 'setItem'> | undefined
 export function followProgressLabel(count: number): string {
   if (count >= ONBOARDING_FOLLOW_GOAL) return t('Pronto! Sua Home já terá eventos.');
   const missing = ONBOARDING_FOLLOW_GOAL - count;
-  return `Siga mais ${missing} ${missing === 1 ? 'rolê' : 'rolês'} (${count} de ${ONBOARDING_FOLLOW_GOAL})`;
+  return missing === 1 ? t('Siga mais 1 rolê ({count} de {goal})', { count, goal: ONBOARDING_FOLLOW_GOAL }) : t('Siga mais {missing} rolês ({count} de {goal})', { missing, count, goal: ONBOARDING_FOLLOW_GOAL });
 }

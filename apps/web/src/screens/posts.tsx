@@ -168,7 +168,7 @@ export function CreatePostScreen() {
         const source = await readPostSource(file).catch(() => undefined);
         added.push({ key: nextKey(), kind: 'UPLOAD', preview: dataUrl, dataUrl, ...(source ? { source } : {}) });
       } catch (failure) {
-        skipped.push(`${file.name}: ${failure instanceof Error ? failure.message : 'não foi possível usar'}`);
+        skipped.push(`${file.name}: ${failure instanceof Error ? failure.message : t('não foi possível usar')}`);
       }
     }
     setItems((current) => addImages(current, added));
@@ -254,7 +254,7 @@ export function CreatePostScreen() {
         const failed = results.filter((r) => r.status === 'rejected').length;
         if (failed > 0) {
           setCreatedId(created.id);
-          setMessage({ tone: 'error', text: `O evento foi criado, mas não consegui enviar para ${failed === 1 ? '1 conversa' : `${failed} conversas`}. Abra o evento e use Compartilhar.` });
+          setMessage({ tone: 'error', text: failed === 1 ? t('O evento foi criado, mas não consegui enviar para 1 conversa. Abra o evento e use Compartilhar.') : t('O evento foi criado, mas não consegui enviar para {count} conversas. Abra o evento e use Compartilhar.', { count: failed }) });
           setBusy(false);
           return;
         }
@@ -333,7 +333,7 @@ export function CreatePostScreen() {
             </label>
             <h3 className="compose__h">{t('Enviar para conversas e grupos')}</h3>
             <ConversationPick selected={shareTo} onChange={setShareTo} label={t('Conversas que vão receber o evento')} />
-            <p className="muted">{eventPrivate ? 'Escolha com quem compartilhar.' : 'Opcional. Quem estiver no grupo poderá postar o evento no próprio perfil.'}</p>
+            <p className="muted">{eventPrivate ? t('Escolha com quem compartilhar.') : t('Opcional. Quem estiver no grupo poderá postar o evento no próprio perfil.')}</p>
           </section>
         ) : null}
         <Field label={t('Descrição (opcional)')} value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />
@@ -483,7 +483,7 @@ export function CreatePostScreen() {
           ) : null}
         </ul>
       ) : null}
-      <p className="muted">{items.length}/{POST_IMAGES_MAX} fotos. As fotos são reduzidas antes de enviar.</p>
+      <p className="muted">{t('{count}/{max} fotos. As fotos são reduzidas antes de enviar.', { count: items.length, max: POST_IMAGES_MAX })}</p>
 
       {source === 'place' ? <PlacePhotoGrid picked={placePhoto?.placeName} onPick={pickPlacePhoto} /> : null}
     </div>

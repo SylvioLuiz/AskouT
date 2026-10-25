@@ -83,7 +83,7 @@ export function MediaBubble({ message, conversationId }: { message: Pick<ChatMes
     if (isVideo && wanted && media.url) setOpen(true);
   }, [isVideo, wanted, media.url]);
 
-  if (media.failed) return <p className="bubble__text muted">Não consegui carregar {isVideo ? 'o vídeo' : 'a foto'}.</p>;
+  if (media.failed) return <p className="bubble__text muted">{isVideo ? t('Não consegui carregar o vídeo.') : t('Não consegui carregar a foto.')}</p>;
   return (
     <>
       <button

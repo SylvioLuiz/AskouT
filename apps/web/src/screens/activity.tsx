@@ -135,7 +135,7 @@ export function ActivityScreen() {
                     <span className="newsrow__text">{n.body}</span>
                   </span>
                   <span className="newsrow__time">{listTimeLabel(n.createdAt, now)}</span>
-                  {n.read ? null : <span className="visually-hidden">não lido</span>}
+                  {n.read ? null : <span className="visually-hidden">{t('não lido')}</span>}
                 </button>
               </li>
             ))}
@@ -153,7 +153,7 @@ export function ActivityScreen() {
                 <Link to={`/posts/${encodeURIComponent(post.id)}`} className="tagreq__link">
                   {post.images[0]?.path ? <img src={api.assetUrl(post.images[0].path)} alt="" referrerPolicy="no-referrer" /> : <span className="tagreq__none" />}
                   <span>
-                    <strong>{post.author.username}</strong> marcou você num post
+                    <strong>{post.author.username}</strong> {t('marcou você num post')}
                     {post.caption ? <span className="muted"> {post.caption.slice(0, 60)}</span> : null}
                   </span>
                 </Link>

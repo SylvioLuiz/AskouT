@@ -228,7 +228,7 @@ export function EventsMapScreen() {
           </button>
         </div>
       </header>
-      <section className="evmap__bottom" aria-label={mode === 'places' ? 'Locais mais próximos' : 'Eventos mais próximos'}>
+      <section className="evmap__bottom" aria-label={mode === 'places' ? t('Locais mais próximos') : t('Eventos mais próximos')}>
         {noLocation ? (
           <div className="evmap__status">
             <p>{t('Ative a localização para ver os locais perto de você.')}</p>

@@ -2,11 +2,11 @@
 import { formatDistance } from './flash.ts';
 import { formatVoiceTime } from './voice.ts';
 import type { ChatMessage, ConversationItem, SuggestionCard, SuggestionItem } from './types.ts';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
-const clock = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
-const dayMonth = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
-const weekday = new Intl.DateTimeFormat('pt-BR', { weekday: 'long' });
+const clock = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
+const dayMonth = new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'short' });
+const weekday = new Intl.DateTimeFormat(intlLocale(), { weekday: 'long' });
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 const DAY = 86_400_000;
@@ -47,19 +47,19 @@ export function formatWhen(startsAt: string | null, endsAt: string | null, now: 
   const sameDay = (a: Date, b: Date) => dayDiff(a, b) === 0;
   const endDay = (e: Date) => {
     const d = -dayDiff(e, now);
-    return d === 0 ? 'hoje' : d === 1 ? 'amanhã' : dayMonth.format(e);
+    return d === 0 ? t('hoje') : d === 1 ? t('amanhã') : dayMonth.format(e);
   };
   const reference = start.getTime() <= now.getTime() ? now : start;
-  const until = hasEnd ? (sameDay(end, reference) ? ` até ${clock.format(end)}` : ` até ${endDay(end)} às ${clock.format(end)}`) : '';
+  const until = hasEnd ? (sameDay(end, reference) ? t(' até {time}', { time: clock.format(end) }) : t(' até {day} às {time}', { day: endDay(end), time: clock.format(end) })) : '';
   if (start.getTime() <= now.getTime()) return t('Acontecendo agora{until}', { until });
   const diff = -dayDiff(start, now);
-  const day = diff === 0 ? 'Hoje' : diff === 1 ? 'Amanhã' : dayLabel(startsAt, now);
-  return `${day} às ${clock.format(start)}${until}`;
+  const day = diff === 0 ? t('Hoje') : diff === 1 ? t('Amanhã') : dayLabel(startsAt, now);
+  return t('{day} às {time}{until}', { day, time: clock.format(start), until });
 }
 
 /** "a 1,2 km de você · 800 m de Bia" */
 export function formatDistances(item: Pick<SuggestionItem, 'distanceFromMeM' | 'distanceFromThemM'>, otherName: string): string {
-  return `a ${formatDistance(item.distanceFromMeM)} de você · ${formatDistance(item.distanceFromThemM)} de ${otherName}`;
+  return t('a {me} de você · {them} de {otherName}', { me: formatDistance(item.distanceFromMeM), them: formatDistance(item.distanceFromThemM), otherName });
 }
 
 export function sourceLabel(source: SuggestionCard['source']): string {
@@ -74,7 +74,7 @@ export function formatRating(rating: number): string {
 /** "Nota 4,6 de 5, 321 avaliações no Google" */
 export function ratingLabel(rating: number, count: number | null): string {
   const base = t('Nota {rating} de 5', { rating: formatRating(rating) });
-  return count === null ? `${base} no Google` : `${base}, ${count} ${count === 1 ? 'avaliação' : 'avaliações'} no Google`;
+  return count === null ? t('{base} no Google', { base }) : count === 1 ? t('{base}, 1 avaliação no Google', { base }) : t('{base}, {count} avaliações no Google', { base, count });
 }
 
 /** Percentual de estrelas cheias (0–100), arredondado para meia estrela. */
@@ -117,15 +117,15 @@ export function mapLink(lat: number, lng: number): string {
 /** Resumo para a lista de conversas. */
 export function previewOf(m: ChatMessage | null): string {
   if (!m) return t('Nenhuma mensagem ainda');
-  const prefix = m.mine ? 'Você: ' : '';
+  const prefix = m.mine ? t('Você: ') : '';
   const who = m.senderName && !m.mine ? `${m.senderName}: ` : prefix;
-  if (m.deleted) return `${who}Mensagem apagada`;
-  if (m.kind === 'IMAGE') return `${who}Foto`;
-  if (m.kind === 'VIDEO') return `${who}Vídeo`;
-  if (m.kind === 'SUGGESTION' && m.suggestion) return `${prefix}Sugeriu ${m.suggestion.venueName}`;
-  if (m.kind === 'AUDIO') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}Mensagem de voz${m.audio ? ` (${formatVoiceTime(m.audio.durationMs)})` : ''}`;
+  if (m.deleted) return `${who}${t('Mensagem apagada')}`;
+  if (m.kind === 'IMAGE') return `${who}${t('Foto')}`;
+  if (m.kind === 'VIDEO') return `${who}${t('Vídeo')}`;
+  if (m.kind === 'SUGGESTION' && m.suggestion) return `${prefix}${t('Sugeriu {venueName}', { venueName: m.suggestion.venueName })}`;
+  if (m.kind === 'AUDIO') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}${t('Mensagem de voz')}${m.audio ? ` (${formatVoiceTime(m.audio.durationMs)})` : ''}`;
   if (m.kind === 'MEETUP') return `${prefix}${m.body}`;
-  if (m.kind === 'EVENT') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}Compartilhou ${m.event?.title ?? 'um evento'}`;
+  if (m.kind === 'EVENT') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}${t('Compartilhou {title}', { title: m.event?.title ?? t('um evento') })}`;
   if (m.senderName && !m.mine) return `${m.senderName}: ${m.body.replace(/\s+/g, ' ')}`;
   return `${prefix}${m.body.replace(/\s+/g, ' ')}`;
 }
@@ -134,9 +134,9 @@ export function previewOf(m: ChatMessage | null): string {
 export function replyPreview(m: ChatMessage): string {
   if (m.deleted) return t('Mensagem apagada');
   if (m.kind === 'AUDIO') return t('Mensagem de voz');
-  if (m.kind === 'IMAGE') return 'Foto';
-  if (m.kind === 'VIDEO') return 'Vídeo';
-  if (m.kind === 'EVENT') return `Evento: ${m.event?.title ?? 'compartilhado'}`;
+  if (m.kind === 'IMAGE') return t('Foto');
+  if (m.kind === 'VIDEO') return t('Vídeo');
+  if (m.kind === 'EVENT') return t('Evento: {title}', { title: m.event?.title ?? t('compartilhado') });
   if (m.kind === 'SUGGESTION' && m.suggestion) return t('Sugestão: {venueName}', { venueName: m.suggestion.venueName });
   return Array.from(m.body.replace(/\s+/g, ' ')).slice(0, 100).join('');
 }
@@ -186,5 +186,5 @@ export function copyText(messages: readonly ChatMessage[]): string {
   if (texts.length === 0) return '';
   const first = texts[0];
   if (messages.length === 1 && first) return first.body;
-  return texts.map((m) => `[${formatClock(m.createdAt)}] ${m.mine ? 'Você' : (m.senderName ?? 'Contato')}: ${m.body}`).join('\n');
+  return texts.map((m) => `[${formatClock(m.createdAt)}] ${m.mine ? t('Você') : (m.senderName ?? t('Contato'))}: ${m.body}`).join('\n');
 }

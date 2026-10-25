@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n/index.ts';
 const USERNAME = /^[a-z0-9._]{3,30}$/;
 const KEY = 'askout.invite';
 
@@ -32,7 +33,7 @@ export function shareableInviteUrl(origin: string, username: string, store: stri
 }
 
 export function inviteText(displayName: string): string {
-  return `${displayName} te chamou para o AskouT, a rede social de rolês. Entra aí:`;
+  return t('{displayName} te chamou para o AskouT, a rede social de rolês. Entra aí:', { displayName });
 }
 
 /** Abre o WhatsApp com a mensagem pronta (o app ou o WhatsApp Web, conforme o aparelho). */

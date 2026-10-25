@@ -1,7 +1,7 @@
 import { Link } from '../router.tsx';
 import { longDay, percent, shortDay } from '../lib/date-poll.ts';
 import type { PollSummary } from '../lib/date-poll.ts';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
 function line(p: PollSummary): string {
   if (p.status === 'FINALIZED') return p.finalDate ? t('Data definida: {finalDate}', { finalDate: longDay(p.finalDate) }) : t('Data definida');
@@ -32,7 +32,7 @@ export function GroupPolls({ items }: { items: PollSummary[] }) {
               <li key={p.id}>
                 <Link to={`/eventos/${encodeURIComponent(p.event.id)}`} className="dpsum__item">
                   <strong>{p.event.title}</strong>
-                  <span>{starts.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  <span>{starts.toLocaleString(intlLocale(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                   <span className="muted">{t('Evento marcado pela votação')}</span>
                 </Link>
               </li>
@@ -45,10 +45,10 @@ export function GroupPolls({ items }: { items: PollSummary[] }) {
                 <strong>{p.title}</strong>
                 <span className="muted">
                   {shortDay(p.rangeStart)} a {shortDay(p.rangeEnd)}
-                  {p.status === 'VOTING' ? ` · ${p.finishedCount} de ${p.participantCount} concluíram` : ''}
+                  {p.status === 'VOTING' ? t(' · {done} de {total} concluíram', { done: p.finishedCount, total: p.participantCount }) : ''}
                 </span>
                 <span>{line(p)}</span>
-                {p.status === 'VOTING' && p.votingDeadline ? <span className="muted">Votação até {new Date(p.votingDeadline).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span> : null}
+                {p.status === 'VOTING' && p.votingDeadline ? <span className="muted">{t('Votação até {when}', { when: new Date(p.votingDeadline).toLocaleString(intlLocale(), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) })}</span> : null}
                 {action ? <span className="dpsum__todo">{action}</span> : null}
               </Link>
             </li>

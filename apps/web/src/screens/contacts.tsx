@@ -100,7 +100,7 @@ export function ContactsScreen() {
               realName
               aside={
                 followed[p.userId] ? (
-                  <span className="muted">{followed[p.userId] === 'PENDING' ? 'Pedido enviado' : 'Seguindo'}</span>
+                  <span className="muted">{followed[p.userId] === 'PENDING' ? t('Pedido enviado') : 'Seguindo'}</span>
                 ) : (
                   <Button small loading={followingBusy === p.userId} onClick={() => void follow(p)}>
                     {t('Seguir')}

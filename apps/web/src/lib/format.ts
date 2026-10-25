@@ -1,4 +1,5 @@
-const compact = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
+import { intlLocale, t } from '../lib/i18n/index.ts';
+const compact = new Intl.NumberFormat(intlLocale(), { notation: 'compact', maximumFractionDigits: 1 });
 
 /** 950 -> "950"; 1200 -> "1,2 mil". */
 export function formatCount(value: number): string {
@@ -28,11 +29,11 @@ export function pluralize(count: number, singular: string, plural: string): stri
 export function timeAgo(iso: string, now: Date): string {
   const diff = Math.max(0, now.getTime() - Date.parse(iso));
   const min = Math.floor(diff / 60_000);
-  if (min < 1) return 'agora';
-  if (min < 60) return `há ${min} min`;
+  if (min < 1) return t('agora');
+  if (min < 60) return t('há {min} min', { min });
   const h = Math.floor(min / 60);
-  if (h < 24) return `há ${h} h`;
+  if (h < 24) return t('há {h} h', { h });
   const d = Math.floor(h / 24);
-  if (d < 7) return `há ${d} ${d === 1 ? 'dia' : 'dias'}`;
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  if (d < 7) return d === 1 ? t('há 1 dia') : t('há {d} dias', { d });
+  return new Date(iso).toLocaleDateString(intlLocale(), { day: '2-digit', month: 'short' });
 }

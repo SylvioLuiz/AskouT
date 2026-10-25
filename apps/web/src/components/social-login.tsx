@@ -141,7 +141,7 @@ function ChooseUsername({ pending, onBack }: { pending: Pending; onBack: () => v
   return (
     <form className="form form--flat social__choose" onSubmit={submit} noValidate>
       <h3 className="form__title">{t('Quase lá')}</h3>
-      <p className="muted">Escolha seu nome de usuário no AskouT. Sua conta {providerLabel(pending.provider)} entra com ele.</p>
+      <p className="muted">{t('Escolha seu nome de usuário no AskouT. Sua conta {provider} entra com ele.', { provider: providerLabel(pending.provider) })}</p>
       <Field label={t('Nome de usuário')} value={username} onChange={setUsername} error={error} autoComplete="username" autoFocus />
       <ConsentFields birth={birth} onBirth={setBirth} accepted={accepted} onAccepted={setAccepted} errors={consentErrors} />
       <Button type="submit" full loading={busy}>

@@ -30,7 +30,7 @@ import { FLASH_PRIVACY_POINTS, flashNoticeSeen, markFlashNoticeSeen, safeStorage
 import type { OtherPin } from '../components/match-map.tsx';
 import type { AvailableFriend, FlashInvite, FlashMatch, PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
 const POLL_MS = 10_000;
 /** Durações oferecidas ao ligar o Flash (a API aceita de 5 min a 3 h). */
@@ -136,7 +136,7 @@ function FlashContent() {
       const next = await api.flashOn(minutes, note.trim());
       status.setData(next);
       const until = next.expiresAt ? new Date(next.expiresAt) : new Date(Date.now() + minutes * 60_000);
-      setStarted(`${formatFlashDuration(minutes)}, até ${until.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
+      setStarted(t('{duration}, até {time}', { duration: formatFlashDuration(minutes), time: until.toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit' }) }));
       available.reload();
       announceFlashChange();
     } catch (failure) {
@@ -429,7 +429,7 @@ function FlashContent() {
             </span>
             <div>
               <p className="flashtip__title">{t('Dica')}</p>
-              <p className="flashtip__text">Quanto mais amigos usarem o Flash, maiores as <strong>chances</strong> de encontrar alguém para sair.</p>
+              <p className="flashtip__text">{t('Quanto mais amigos usarem o Flash, maiores as')} <strong>{t('chances')}</strong> {t('de encontrar alguém para sair.')}</p>
             </div>
           </div>
         )}
@@ -459,7 +459,7 @@ function FlashContent() {
         {callAllOpen ? (
           <Sheet title={t('Chamar todos')} onClose={() => (callingAll ? undefined : setCallAllOpen(false))}>
             <p>
-              Enviar convite para {eligible.length === 1 ? '1 amigo que está livre' : `${eligible.length} amigos que estão livres`} agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.
+              {eligible.length === 1 ? t('Enviar convite para 1 amigo que está livre agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.') : t('Enviar convite para {count} amigos que estão livres agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.', { count: eligible.length })}
             </p>
             <ul className="flashcall">
               {eligible.map((f) => (
@@ -555,7 +555,7 @@ function FlashContent() {
           <h2 className="flashoff__lead">
             {t('Encontre amigos')}
             <br />
-            que também estão <em>livres agora.</em>
+            {t('que também estão')} <em>{t('livres agora.')}</em>
           </h2>
 
           <ul className="flashperks">
@@ -807,7 +807,7 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
           <Avatar profile={profile} />
           <span className="person__body">
             <span className="person__name">{profile.username}</span>
-            <span className="person__handle">{friend.note ? `“${friend.note}”` : `Livre por mais ${formatRemaining(left)}`}</span>
+            <span className="person__handle">{friend.note ? `“${friend.note}”` : t('Livre por mais {left}', { left: formatRemaining(left) })}</span>
           </span>
         </div>
         <div className="person__aside">{action}</div>
@@ -1015,19 +1015,19 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         {!them ? (
           <>
             <p className="whereis__main">{t('Ainda sem localização')}</p>
-            <p className="muted">{data.other.username} ainda não compartilhou. Assim que compartilhar, a distância aparece aqui.</p>
+            <p className="muted">{t('{name} ainda não compartilhou. Assim que compartilhar, a distância aparece aqui.', { name: data.other.username })}</p>
           </>
         ) : them.stale ? (
           <>
             <p className="whereis__main">{t('Sem sinal')}</p>
             <p className="muted">
-              A última localização de {data.other.username} foi {formatAge(them.updatedAt, data.now)}. Ela volta quando o sinal voltar.
+              {t('A última localização de {name} foi {when}. Ela volta quando o sinal voltar.', { name: data.other.username, when: formatAge(them.updatedAt, data.now) })}
             </p>
           </>
         ) : (
           <>
-            <p className="whereis__main">{distance !== undefined ? `a ${formatDistance(distance)} de você` : 'Localização recebida'}</p>
-            <p className="muted">Atualizado {formatAge(them.updatedAt, data.now)}.{distance === undefined ? ' Compartilhe a sua para ver a distância.' : ''}</p>
+            <p className="whereis__main">{distance !== undefined ? t('a {distance} de você', { distance: formatDistance(distance) }) : t('Localização recebida')}</p>
+            <p className="muted">{t('Atualizado {when}.', { when: formatAge(them.updatedAt, data.now) })}{distance === undefined ? t(' Compartilhe a sua para ver a distância.') : ''}</p>
           </>
         )}
         {them ? (
@@ -1063,7 +1063,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         ) : (
           <>
             <p className="sharebox__title">{t('Mostrar onde estou')}</p>
-            <p className="muted">Só {data.other.username} vê sua localização, só durante este encontro, e ela some quando ele acabar. Ao aceitar o convite, o envio começa sozinho.</p>
+            <p className="muted">{t('Só {name} vê sua localização, só durante este encontro, e ela some quando ele acabar. Ao aceitar o convite, o envio começa sozinho.', { name: data.other.username })}</p>
             {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
             <Button full loading={share.state.phase === 'asking'} onClick={share.start}>
               {t('Compartilhar minha localização')}

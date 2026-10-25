@@ -216,13 +216,13 @@ export function VoiceBubble({ message, conversationId }: { message: ChatMessage;
   const progress = total > 0 ? Math.min(100, (position / total) * 100) : 0;
   return (
     <div className="voice">
-      <button type="button" className="voice__btn" onClick={() => void toggle()} aria-label={state === 'playing' ? 'Pausar áudio' : 'Ouvir áudio'} aria-busy={state === 'loading' || undefined}>
+      <button type="button" className="voice__btn" onClick={() => void toggle()} aria-label={state === 'playing' ? t('Pausar áudio') : t('Ouvir áudio')} aria-busy={state === 'loading' || undefined}>
         {state === 'playing' ? <PauseIcon /> : <PlayIcon />}
       </button>
       <div className="voice__track" aria-hidden="true">
         <div className="voice__bar" style={{ width: `${progress}%` }} />
       </div>
-      <span className="voice__time">{state === 'error' ? 'Erro ao tocar' : formatVoiceTime(shown)}</span>
+      <span className="voice__time">{state === 'error' ? t('Erro ao tocar') : formatVoiceTime(shown)}</span>
     </div>
   );
 }

@@ -1,11 +1,13 @@
 // Contas da página do evento que não dependem de tela.
 import type { EventPage } from './types.ts';
+import { intlLocale } from '../lib/i18n/index.ts';
+import { t } from '../lib/i18n/index.ts';
 
-const dayMonthParts = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short' });
+const dayMonthParts = new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'short' });
 /** "17 out" (curto, para caber nas colunas). */
 const dayMonth = { format: (d: Date) => dayMonthParts.formatToParts(d).filter((p) => p.type === 'day' || p.type === 'month').map((p) => p.value.replace('.', '')).join(' ') };
-const weekday = { format: (d: Date) => new Intl.DateTimeFormat('pt-BR', { weekday: 'short' }).format(d).replace('.', '') };
-const clock = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+const weekday = { format: (d: Date) => new Intl.DateTimeFormat(intlLocale(), { weekday: 'short' }).format(d).replace('.', '') };
+const clock = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
 
 const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
@@ -15,7 +17,7 @@ export function eventDateLabel(startsAt: string, endsAt: string): { main: string
   if (Number.isNaN(start.getTime())) return { main: '—', sub: null };
   const end = new Date(endsAt);
   const multi = !Number.isNaN(end.getTime()) && !sameDay(start, end);
-  return { main: dayMonth.format(start), sub: multi ? `até ${dayMonth.format(end)}` : weekday.format(start) };
+  return { main: dayMonth.format(start), sub: multi ? t('até {day}', { day: dayMonth.format(end) }) : weekday.format(start) };
 }
 
 /** "20:00" e, quando termina no mesmo dia, "até 23:00". */
@@ -24,7 +26,7 @@ export function eventTimeLabel(startsAt: string, endsAt: string): { main: string
   if (Number.isNaN(start.getTime())) return { main: '—', sub: null };
   const end = new Date(endsAt);
   const sameDayEnd = !Number.isNaN(end.getTime()) && sameDay(start, end);
-  return { main: clock.format(start), sub: sameDayEnd ? `até ${clock.format(end)}` : null };
+  return { main: clock.format(start), sub: sameDayEnd ? t('até {time}', { time: clock.format(end) }) : null };
 }
 
 /** Texto do endereço do evento: lugar e, se houver, o endereço. */

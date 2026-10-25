@@ -49,7 +49,7 @@ export function HomeScreen() {
         await new Promise((resolve) => setTimeout(resolve, 700));
       }}
     >
-      <PageHead title={`Olá, ${user.profile.displayName}`} />
+      <PageHead title={t('Olá, {name}', { name: user.profile.displayName })} />
 
       {plan ? (
         <Link to="/agenda" className="nextplan" aria-label={t('Seu próximo plano: {now}, {title}. Abrir a agenda', { now: planWhenLabel(plan, now), title: plan.title })}>
@@ -81,7 +81,7 @@ export function HomeScreen() {
             <BoltIcon filled />
           </span>
           <span className="flashcta__text">
-            <span className="flashcta__title">{flashOn ? 'Flash ligado' : 'Flash: estou livre agora'}</span>
+            <span className="flashcta__title">{flashOn ? t('Flash ligado') : t('Flash: estou livre agora')}</span>
             <span className="flashcta__sub">
               {flashOn && flash.data?.expiresAt
                 ? t('Faltam {now}. Veja quem mais está livre.', { now: formatRemaining(minutesLeft(flash.data.expiresAt, Date.now())) })

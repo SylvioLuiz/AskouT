@@ -145,7 +145,7 @@ export function Onboarding() {
             <div className="onb__art" aria-hidden="true">{SLIDE_ICONS[step]}</div>
             <h2 id="onb-titulo" className="onb__title">{slide.title}</h2>
             <p className="onb__text">{slide.text}</p>
-            {invited && step === 0 ? <p className="onb__invited" role="status">Você entrou pelo convite de @{invited} e já segue essa pessoa.</p> : null}
+            {invited && step === 0 ? <p className="onb__invited" role="status">{t('Você entrou pelo convite de @{invited} e já segue essa pessoa.', { invited })}</p> : null}
             <div className="onb__dots" aria-hidden="true">
               {ONBOARDING_SLIDES.map((s, i) => (
                 <span key={s.title} className={`onb__dot${i === step ? ' onb__dot--on' : ''}`} />

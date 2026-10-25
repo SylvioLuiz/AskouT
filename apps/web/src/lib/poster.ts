@@ -1,6 +1,6 @@
-import { t } from '../lib/i18n/index.ts';
-const weekdayFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short' });
-const monthFmt = new Intl.DateTimeFormat('pt-BR', { month: 'short' });
+import { intlLocale, t } from '../lib/i18n/index.ts';
+const weekdayFmt = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short' });
+const monthFmt = new Intl.DateTimeFormat(intlLocale(), { month: 'short' });
 
 export interface DateTile {
   weekday: string;

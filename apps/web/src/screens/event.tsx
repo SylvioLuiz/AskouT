@@ -163,7 +163,7 @@ function EventMenuSheet({ page, onChange, onShare, onClose }: { page: EventPage;
           addEventToCalendar(page).then(onClose, (failure: unknown) => setMessage(failure instanceof Error ? failure.message : t('Não foi possível adicionar à agenda.')));
         }}
       >
-        <CalendarIcon /> Adicionar à agenda
+        <CalendarIcon /> {t('Adicionar à agenda')}
       </Button>
       {page.isOwner && page.postsEnabled ? (
       <>
@@ -221,15 +221,15 @@ function EventPosts({ page, onChange }: { page: EventPage; onChange: (page: Even
         ) : null}
       </div>
       {page.isOwner ? (
-        <p className="muted">{page.postsPublic ? 'Você e quem confirmou presença podem postar.' : 'Só você posta neste evento.'} Mude no menu ⋯ do topo.</p>
+        <p className="muted">{page.postsPublic ? t('Você e quem confirmou presença podem postar.') : t('Só você posta neste evento.')} {t('Mude no menu ⋯ do topo.')}</p>
       ) : page.postsPublic ? (
-        <p className="muted">{page.going ? 'Você confirmou presença: pode postar aqui.' : 'Confirme presença para postar neste evento.'}</p>
+        <p className="muted">{page.going ? t('Você confirmou presença: pode postar aqui.') : t('Confirme presença para postar neste evento.')}</p>
       ) : (
         <p className="muted">{t('Neste evento só quem organiza posta.')}</p>
       )}
       {message ? <Notice tone="error">{message}</Notice> : null}
       {page.posts.length === 0 ? (
-        <p className="muted">{page.canPost ? 'Nenhum post ainda. Que tal abrir o assunto?' : 'Nenhum post ainda.'}</p>
+        <p className="muted">{page.canPost ? t('Nenhum post ainda. Que tal abrir o assunto?') : t('Nenhum post ainda.')}</p>
       ) : (
         <ul className="evposts__list">
           {page.posts.map((post) => (
@@ -373,7 +373,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 addEventToCalendar(e).catch((failure: unknown) => setCalMessage(failure instanceof Error ? failure.message : t('Não foi possível adicionar à agenda.')));
               }}
             >
-              <CalendarIcon /> Adicionar à agenda
+              <CalendarIcon /> {t('Adicionar à agenda')}
             </Button>
           </div>
           {calMessage ? <Notice tone="error">{calMessage}</Notice> : null}
@@ -421,7 +421,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   <TicketIcon />
                   {t('Comprar ingresso')}
                 </a>
-                <p className="evticket__note">Abre {ticketHost(e.ticketUrl) || 'o site de venda'}. A venda é feita lá: o AskouT não cobra nem entrega o ingresso.</p>
+                <p className="evticket__note">{t('Abre {host}. A venda é feita lá: o AskouT não cobra nem entrega o ingresso.', { host: ticketHost(e.ticketUrl) || t('o site de venda') })}</p>
               </div>
             ) : null}
             {e.isOwner ? null : ended ? (
@@ -438,7 +438,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
             <span className="tag tag--event">{kindLabel(e.kind)}</span>
             {e.isFree ? <span className="tag tag--free">{t('Grátis')}</span> : null}
             {e.sample ? <SampleBadge /> : null}
-            {e.distanceM !== null ? <span className="muted">a {formatDistance(e.distanceM)} de você</span> : null}
+            {e.distanceM !== null ? <span className="muted">{t('a {distance} de você', { distance: formatDistance(e.distanceM) })}</span> : null}
           </div>
           {e.owner ? (
             <p className="muted">

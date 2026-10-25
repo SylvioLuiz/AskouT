@@ -1,10 +1,10 @@
-import { t } from '../lib/i18n/index.ts';
+import { decimal, t } from '../lib/i18n/index.ts';
 import type { BoostPhase, BoostView, MatchReach } from './types.ts';
 
 /** Valor em reais, no formato brasileiro (R$ 15,00). */
 export function formatBrl(cents: number): string {
   const value = Math.max(0, Math.round(cents)) / 100;
-  return `R$ ${value.toFixed(2).replace('.', ',')}`;
+  return t('R$ {toFixed}', { toFixed: decimal(value.toFixed(2)) });
 }
 
 export function boostTotalCents(pricePerDayCents: number, days: number): number {
@@ -12,7 +12,7 @@ export function boostTotalCents(pricePerDayCents: number, days: number): number 
 }
 
 export function daysLabel(days: number): string {
-  return days === 1 ? '1 dia' : `${days} dias`;
+  return days === 1 ? t('1 dia') : t('{days} dias', { days });
 }
 
 export const BOOST_PHASE_LABEL: Record<BoostPhase, string> = {
@@ -55,7 +55,7 @@ export function matchLabel(boost: Pick<BoostView, 'audience' | 'radiusKm' | 'mat
 /** Frase da estimativa, sem nunca sugerir quem são as pessoas. */
 export function reachText(reach: Pick<MatchReach, 'label' | 'partial'>): string {
   const label = reach.label.charAt(0).toUpperCase() + reach.label.slice(1);
-  return `${label} combinam hoje com este Match${reach.partial ? ' (estimativa: só parte da região foi examinada)' : ''}.`;
+  return t('{label} combinam hoje com este Match{estimate}.', { label, estimate: reach.partial ? t(' (estimativa: só parte da região foi examinada)') : '' });
 }
 
 /** Distância para a Home: “Pertinho de você” ou “A cerca de 3 km de você”. */

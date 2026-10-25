@@ -68,13 +68,13 @@ function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
   }
   return (
     <div className="vrate">
-      <div key={cheer} className={`vrate__stars${cheer > 0 && mine === 5 ? ' vrate__stars--five' : ''}`} role="group" aria-label={mine ? `Sua nota: ${mine} de 5` : 'Toque para dar a sua nota de 1 a 5'}>
+      <div key={cheer} className={`vrate__stars${cheer > 0 && mine === 5 ? ' vrate__stars--five' : ''}`} role="group" aria-label={mine ? `Sua nota: ${mine} de 5` : t('Toque para dar a sua nota de 1 a 5')}>
         {[1, 2, 3, 4, 5].map((n) => (
           <button key={n} type="button" className={`vrate__star${mine !== null && n <= mine ? ' vrate__star--on' : ''}`} aria-pressed={mine === n} aria-label={`${n} ${n === 1 ? 'estrela' : 'estrelas'}`} disabled={busy} onClick={() => void pick(n)}>
             ★
           </button>
         ))}
-        <span className="vrate__label">{mine ? 'Sua nota' : 'Avaliar'}</span>
+        <span className="vrate__label">{mine ? t('Sua nota') : 'Avaliar'}</span>
       </div>
       {problem ? <p className="field__error">{problem}</p> : null}
     </div>
@@ -111,13 +111,13 @@ function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
   const lines = hoursLines(venue.hours, now);
   const status = openStatus(venue.hours, now);
   if (lines.length === 0) {
-    return <InfoRow icon={<ClockIcon />}><span className="muted">{venue.isOwner ? 'Informe os horários em Editar perfil.' : 'O rolê ainda não informou os horários.'}</span></InfoRow>;
+    return <InfoRow icon={<ClockIcon />}><span className="muted">{venue.isOwner ? t('Informe os horários em Editar perfil.') : t('O rolê ainda não informou os horários.')}</span></InfoRow>;
   }
   const today = lines.find((l) => l.today);
   return (
     <>
       <InfoRow icon={<ClockIcon />} open={open} onToggle={() => setOpen((o) => !o)} label={open ? t('Esconder os horários da semana') : t('Ver os horários da semana')}>
-        <span className={`vinfo__status${status ? (status.closingSoon ? ' vinfo__status--soon' : status.open ? ' vinfo__status--open' : ' vinfo__status--closed') : ''}`}>{status?.label ?? 'Horário de funcionamento'}</span>
+        <span className={`vinfo__status${status ? (status.closingSoon ? ' vinfo__status--soon' : status.open ? ' vinfo__status--open' : ' vinfo__status--closed') : ''}`}>{status?.label ?? t('Horário de funcionamento')}</span>
         {today && !open ? <span className="vinfo__sub">Hoje: {today.text}</span> : null}
       </InfoRow>
       {open ? (
@@ -147,7 +147,7 @@ function RatingInfo({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
               ★★★★★
             </span>
             <span className="vinfo__sub vinfo__sub--inline">
-              {r.count} {r.count === 1 ? 'avaliação' : 'avaliações'}
+              {r.count === 1 ? t('1 avaliação') : t('{count} avaliações', { count: r.count })}
             </span>
           </>
         ) : (
@@ -194,11 +194,11 @@ function VenueHero({ venue, now, onShare }: { venue: VenueProfile; now: Date; on
             <span>{place}</span>
           </p>
         ) : null}
-        <p className="vhero__rating" aria-label={venue.rating.count > 0 ? `Nota ${formatRating(venue.rating.average ?? 0)} de 5, ${venue.rating.count} ${venue.rating.count === 1 ? 'avaliação' : 'avaliações'}` : 'Ainda sem avaliações'}>
+        <p className="vhero__rating" aria-label={venue.rating.count > 0 ? (venue.rating.count === 1 ? t('Nota {rating} de 5, 1 avaliação', { rating: formatRating(venue.rating.average ?? 0) }) : t('Nota {rating} de 5, {count} avaliações', { rating: formatRating(venue.rating.average ?? 0), count: venue.rating.count })) : t('Ainda sem avaliações')}>
           {venue.rating.count > 0 ? (
             <>
               <span aria-hidden="true">★ {formatRating(venue.rating.average ?? 0)}</span>
-              <span aria-hidden="true"> · {venue.rating.count} {venue.rating.count === 1 ? 'avaliação' : 'avaliações'}</span>
+              <span aria-hidden="true"> · {venue.rating.count === 1 ? t('1 avaliação') : t('{count} avaliações', { count: venue.rating.count })}</span>
             </>
           ) : (
             <span aria-hidden="true">{t('Ainda sem avaliações')}</span>
@@ -243,7 +243,7 @@ function AgendaRow({ event, now }: { event: VenueEvent; now: Date }) {
         <span className="vagenda__when">{formatWhen(event.startsAt, event.endsAt, now)}</span>
         <span className="vagenda__meta">
           {kindLabel(event.kind)}
-          {event.isFree ? ' · Grátis' : ''}
+          {event.isFree ? t(' · Grátis') : ''}
           {event.phase === 'LIVE' ? ' · Acontecendo agora' : ''}
         </span>
       </Link>
@@ -523,11 +523,11 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
           </div>
         )}
         {problem ? <Notice tone="error">{problem}</Notice> : null}
-        {claimSent ? <Notice tone="ok">Pedido enviado para {v.name}. Um administrador vai analisar o documento e você recebe um aviso com a resposta.</Notice> : null}
+        {claimSent ? <Notice tone="ok">{t('Pedido enviado para {name}. Um administrador vai analisar o documento e você recebe um aviso com a resposta.', { name: v.name })}</Notice> : null}
         {claiming ? <ClaimSheet fixed={{ id: v.id, name: v.name, address: v.address }} onClose={() => setClaiming(false)} onSent={() => { setClaiming(false); setClaimSent(true); }} /> : null}
         {!v.claimed && !claimSent ? (
           <p className="muted vhead__unclaimed">
-            Esta página ainda não tem responsável.{' '}
+            {t('Esta página ainda não tem responsável.')}{' '}
             <button type="button" className="linkbtn" onClick={() => setClaiming(true)}>
               {t('É o dono? Peça para administrar.')}
             </button>
@@ -588,7 +588,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             <ol className="vrank" aria-label={t('Quem mais frequenta')}>
               {v.regulars.map((r) => (
                 <li key={r.user.userId} className={`vrank__row${r.rank <= 3 ? ' vrank__row--top' : ''}`}>
-                  <span className="vrank__pos" aria-label={`${r.rank}º lugar`}>
+                  <span className="vrank__pos" aria-label={t('{rank}º lugar', { rank: r.rank })}>
                     {r.rank}
                   </span>
                   <Link to={`/u/${encodeURIComponent(r.user.username)}`} className="vrank__who">
@@ -599,7 +599,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
                     </span>
                   </Link>
                   <span className="vrank__n">
-                    {r.visits} {r.visits === 1 ? 'presença' : 'presenças'}
+                    {r.visits === 1 ? t('1 presença') : t('{count} presenças', { count: r.visits })}
                   </span>
                 </li>
               ))}

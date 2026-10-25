@@ -5,10 +5,10 @@ import { VoiceBubble } from './voice.tsx';
 import { Button, EmptyState } from './ui.tsx';
 import type { ChatMessage, MeetupView, SharedLink, SharedMedia as SharedMediaItem, SharedVoice } from '../lib/types.ts';
 import { Link } from '../router.tsx';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
-const dateFmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-const timeFmt = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const dateFmt = new Intl.DateTimeFormat(intlLocale(), { day: '2-digit', month: '2-digit', year: 'numeric' });
+const timeFmt = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit' });
 
 export function GroupEvent({ meetup, onManage }: { meetup: MeetupView; onManage?: () => void }) {
   const start = new Date(meetup.startsAt);
@@ -18,7 +18,7 @@ export function GroupEvent({ meetup, onManage }: { meetup: MeetupView; onManage?
       <div className="groupevent__body">
         <h3 className="groupevent__title">{meetup.title}</h3>
         {meetup.status === 'CANCELLED' ? <p className="groupevent__venue">{t('Cancelado')}</p> : null}
-        <p className="groupevent__venue">{meetup.event ? <VenueLink venueId={meetup.event.venueId} name={meetup.event.venueName} nested /> : 'Local do evento'}</p>
+        <p className="groupevent__venue">{meetup.event ? <VenueLink venueId={meetup.event.venueId} name={meetup.event.venueName} nested /> : t('Local do evento')}</p>
         <dl className="groupevent__facts">
           <div>
             <dt>{t('Confirmados')}</dt>

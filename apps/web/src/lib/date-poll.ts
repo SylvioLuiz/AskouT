@@ -111,8 +111,8 @@ export const POLICY_HINT: Record<Policy, string> = {
   MANUAL: t('Você fecha a data quando quiser.'),
 };
 
-const WEEKDAYS = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
-const MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const WEEKDAYS = [t('domingo'), t('segunda-feira'), t('terça-feira'), t('quarta-feira'), t('quinta-feira'), t('sexta-feira'), t('sábado')];
+const MONTHS = [t('janeiro'), t('fevereiro'), t('março'), t('abril'), t('maio'), t('junho'), t('julho'), t('agosto'), t('setembro'), t('outubro'), t('novembro'), t('dezembro')];
 
 /** Dia da semana (0 = domingo) de um AAAA-MM-DD, sem depender do fuso do aparelho. */
 export function weekdayOf(day: string): number {
@@ -178,9 +178,9 @@ export function pollLine(p: PollSummary, now: Date): { name: string; status: str
     if (!p.finalDate || (p.finalEndsAt && new Date(p.finalEndsAt).getTime() < now.getTime())) return null;
     return { name: p.title, status: `marcado para ${weekdayName(p.finalDate)}, ${shortDay(p.finalDate)}` };
   }
-  if (p.status === 'CONFIRMING') return { name: p.title, status: `confirmando ${p.proposedDate ? shortDay(p.proposedDate) : 'a data'}` };
+  if (p.status === 'CONFIRMING') return { name: p.title, status: p.proposedDate ? t('confirmando {day}', { day: shortDay(p.proposedDate) }) : t('confirmando a data') };
   const share = p.participantCount > 0 ? Math.round((p.votedCount / p.participantCount) * 100) : 0;
-  return { name: p.title, status: `em votação: ${share}% dos votos` };
+  return { name: p.title, status: t('em votação: {share}% dos votos', { share }) };
 }
 
 /** Dia (AAAA-MM-DD) de um instante no fuso da votação. */
@@ -236,7 +236,7 @@ export function shiftMonth(year: number, month: number, delta: number): { year: 
 export type DaySlot = 'MORNING' | 'AFTERNOON' | 'NIGHT';
 export const SLOT_TIME: Record<DaySlot, string> = { MORNING: '09:00', AFTERNOON: '14:00', NIGHT: '19:00' };
 
-const WEEKDAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const WEEKDAYS_SHORT = [t('Dom'), t('Seg'), t('Ter'), t('Qua'), t('Qui'), t('Sex'), t('Sáb')];
 
 /** "2026-10-24" -> "Sáb, 24 out" (rótulo curto do pódio). */
 export function podiumDay(day: string): string {

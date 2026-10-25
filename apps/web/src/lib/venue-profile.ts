@@ -10,8 +10,8 @@ export const VENUE_DESCRIPTION_MAX = 600;
 export const VENUE_POST_CAPTION_MAX = 500;
 export const VENUE_POST_PHOTOS_MAX = 5;
 
-export const DAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'] as const;
-export const DAY_LONG = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'] as const;
+export const DAY_SHORT = [t('Dom'), t('Seg'), t('Ter'), t('Qua'), t('Qui'), t('Sex'), t('Sáb')] as const;
+export const DAY_LONG = [t('domingo'), t('segunda'), t('terça'), t('quarta'), t('quinta'), t('sexta'), t('sábado')] as const;
 /** Ordem de exibição: a semana começa na segunda. */
 export const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
@@ -63,9 +63,9 @@ export function openStatus(hours: VenueHours | null, now: Date): OpenStatus | nu
     }
     for (const start of [base, base + WEEK]) if (start > nowMin && (!next || start < next.start)) next = { start, day: d, time: day.open };
   }
-  if (!next) return { open: false, label: t('Fechado'), short: 'Fechado', closingSoon: false };
+  if (!next) return { open: false, label: t('Fechado'), short: t('Fechado'), closingSoon: false };
   const diffDays = Math.floor(next.start / 1440) - now.getDay();
-  const when = diffDays === 0 ? 'hoje' : diffDays === 1 ? 'amanhã' : DAY_LONG[next.day]!;
+  const when = diffDays === 0 ? t('hoje') : diffDays === 1 ? t('amanhã') : DAY_LONG[next.day]!;
   return { open: false, label: t('Fechado · abre {when} às {time}', { when, time: next.time }), short: diffDays === 0 || diffDays === 1 ? t('Abre às {time}', { time: shortHour(next.time) }) : t('Abre {when} às {time}', { when, time: shortHour(next.time) }), closingSoon: false };
 }
 
@@ -97,7 +97,7 @@ export function hoursLines(hours: VenueHours | null, now: Date): HoursLine[] {
   if (!hours) return [];
   return DISPLAY_ORDER.map((d) => {
     const h = hours[d];
-    return { day: d, label: DAY_SHORT[d]!, text: h ? `${h.open} às ${h.close}` : 'Fechado', today: d === now.getDay() };
+    return { day: d, label: DAY_SHORT[d]!, text: h ? t('{open} às {close}', { open: h.open, close: h.close }) : t('Fechado'), today: d === now.getDay() };
   });
 }
 
@@ -182,7 +182,7 @@ export function applyToAll(days: DayDraft[], from: number): DayDraft[] {
 export function friendsWentLabel(friends: { count: number; sample: readonly { username: string }[] }): string {
   if (friends.count <= 0) return '';
   const first = friends.sample[0]?.username;
-  if (friends.count === 1) return first ? `@${first} já foi aqui` : '1 amigo já foi aqui';
+  if (friends.count === 1) return first ? t('@{first} já foi aqui', { first }) : t('1 amigo já foi aqui');
   const others = friends.count - 1;
-  return first ? `@${first} e mais ${others} ${others === 1 ? 'amigo' : 'amigos'} já foram aqui` : `${friends.count} amigos já foram aqui`;
+  return first ? (others === 1 ? t('@{first} e mais 1 amigo já foram aqui', { first }) : t('@{first} e mais {others} amigos já foram aqui', { first, others })) : t('{count} amigos já foram aqui', { count: friends.count });
 }

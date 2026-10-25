@@ -123,12 +123,12 @@ export function ConversationsScreen() {
                       <span className="convrow__preview">{previewOf(c.lastMessage)}</span>
                     </span>
                     {c.unread > 0 ? (
-                      <span className={`convrow__count${c.muted ? ' convrow__count--muted' : ''}`} aria-label={`${c.unread} não lida${c.unread === 1 ? '' : 's'}`}>
+                      <span className={`convrow__count${c.muted ? ' convrow__count--muted' : ''}`} aria-label={c.unread === 1 ? t('1 não lida') : t('{count} não lidas', { count: c.unread })}>
                         {c.unread > 9 ? '9+' : c.unread}
                       </span>
                     ) : null}
                   </Link>
-                  <button type="button" className="iconbtn convitem__more" aria-label={`Opções de ${c.other ? c.other.displayName : (c.name ?? 'Grupo')}`} onClick={() => setPrefsFor(c)}>
+                  <button type="button" className="iconbtn convitem__more" aria-label={t('Opções de {name}', { name: c.other ? c.other.displayName : (c.name ?? t('Grupo')) })} onClick={() => setPrefsFor(c)}>
                     <MoreIcon />
                   </button>
                 </li>
@@ -504,7 +504,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 <>
                   <SwipeRow className={`msg${m.mine ? ' msg--mine' : ''}${selected ? ' msg--selecting' : ''}${selected?.includes(m.id) ? ' msg--selected' : ''}`} id={`msg-${m.id}`} enabled={data.canSend && hasActions(m) && !selected} onReply={() => setReplyTo(m)}>
                     {selected && hasActions(m) ? (
-                      <button type="button" className="msg__pick" role="checkbox" aria-checked={selected.includes(m.id)} aria-label={`Selecionar mensagem de ${m.mine ? 'você' : (m.senderName ?? 'contato')}, ${formatClock(m.createdAt)}`} onClick={() => toggleChosen(m.id)}>
+                      <button type="button" className="msg__pick" role="checkbox" aria-checked={selected.includes(m.id)} aria-label={t('Selecionar mensagem de {name}, {time}', { name: m.mine ? t('você') : (m.senderName ?? t('contato')), time: formatClock(m.createdAt) })} onClick={() => toggleChosen(m.id)}>
                         <span className={`msg__check${selected.includes(m.id) ? ' is-on' : ''}`} aria-hidden="true">{selected.includes(m.id) ? <CheckIcon /> : null}</span>
                       </button>
                     ) : null}
@@ -512,13 +512,13 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.reactions.length > 0 ? ' bubble--reacted' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} {...pressHandlers(m)}>
                       {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
                       {m.replyTo && !m.deleted ? (
-                        <button type="button" className="bubble__quote" aria-label={`Ir para a mensagem respondida de ${m.replyTo.mine ? 'você' : m.replyTo.senderName}`} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+                        <button type="button" className="bubble__quote" aria-label={t('Ir para a mensagem respondida de {name}', { name: m.replyTo.mine ? t('você') : (m.replyTo.senderName ?? '') })} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
                           <strong>{m.replyTo.mine ? t('Você') : m.replyTo.senderName}</strong>
                           <span>{m.replyTo.deleted ? t('Mensagem apagada') : m.replyTo.preview}</span>
                         </button>
                       ) : null}
                       {m.deleted ? (
-                        <p className="bubble__text bubble__text--deleted">{m.mine ? 'Você apagou esta mensagem' : 'Mensagem apagada'}</p>
+                        <p className="bubble__text bubble__text--deleted">{m.mine ? t('Você apagou esta mensagem') : t('Mensagem apagada')}</p>
                       ) : m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
                         <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} />
                       ) : m.kind === 'MEETUP' && m.meetup ? (
@@ -536,7 +536,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                       {m.reactions.length > 0 ? (
                         <div className="reactions">
                           {m.reactions.map((r) => (
-                            <button key={r.emoji} type="button" className={`reactions__chip${r.mine ? ' is-mine' : ''}`} aria-pressed={r.mine} aria-label={`${r.emoji} ${r.count} ${r.count === 1 ? 'reação' : 'reações'}${r.mine ? ', sua. Toque para tirar' : ''}`} disabled={!data.canSend} onClick={() => void toggleReaction(m, r.emoji)}>
+                            <button key={r.emoji} type="button" className={`reactions__chip${r.mine ? ' is-mine' : ''}`} aria-pressed={r.mine} aria-label={`${r.emoji} ${r.count === 1 ? t('1 reação') : t('{count} reações', { count: r.count })}${r.mine ? t(', sua. Toque para tirar') : ''}`} disabled={!data.canSend} onClick={() => void toggleReaction(m, r.emoji)}>
                               <span aria-hidden="true">{r.emoji}</span>
                               {r.count > 1 ? <span className="reactions__n">{r.count}</span> : null}
                             </button>
@@ -569,7 +569,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       {replyTo && data.canSend ? (
         <div className="replybar">
           <div className="replybar__text">
-            <strong>Respondendo a {replyTo.mine ? 'você' : (replyTo.senderName ?? data.other?.displayName ?? 'mensagem')}</strong>
+            <strong>{t('Respondendo a {name}', { name: replyTo.mine ? t('você') : (replyTo.senderName ?? data.other?.displayName ?? t('mensagem')) })}</strong>
             <span>{replyPreview(replyTo)}</span>
           </div>
           <button type="button" className="iconbtn" aria-label={t('Cancelar resposta')} onClick={() => setReplyTo(undefined)}>

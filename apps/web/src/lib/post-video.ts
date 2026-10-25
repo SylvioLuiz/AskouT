@@ -13,7 +13,7 @@ const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
  * Com `canCompress`, o vídeo pode passar de 60 MB (até 500 MB): ele é reduzido antes de enviar.
  */
 export function videoProblem(file: { type: string; size: number }, options: { canCompress?: boolean } = {}): string | undefined {
-  if (!VIDEO_TYPES.includes(file.type.split(';')[0]?.trim().toLowerCase() ?? '')) return 'Use um vídeo MP4, WebM ou MOV.';
+  if (!VIDEO_TYPES.includes(file.type.split(';')[0]?.trim().toLowerCase() ?? '')) return t('Use um vídeo MP4, WebM ou MOV.');
   if (file.size === 0) return t('O vídeo está vazio.');
   if (options.canCompress) {
     if (file.size > POST_VIDEO_SOURCE_MAX_BYTES) return t('O vídeo passa de 500 MB. Escolha um mais curto.');

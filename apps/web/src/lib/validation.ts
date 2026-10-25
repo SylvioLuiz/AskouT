@@ -8,7 +8,7 @@ export function normalizeUsername(raw: string): string {
 
 export function emailProblem(email: string): string | undefined {
   const value = email.trim();
-  if (value === '') return 'Informe seu e-mail';
+  if (value === '') return t('Informe seu e-mail');
   if (value.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return t('Esse e-mail não parece válido');
   return undefined;
 }
@@ -34,7 +34,7 @@ export const BIO_MAX = 150;
 
 export function displayNameProblem(name: string, required: boolean): string | undefined {
   const value = name.trim();
-  if (value === '') return required ? 'Informe seu nome' : undefined;
+  if (value === '') return required ? t('Informe seu nome') : undefined;
   if (Array.from(value).length > DISPLAY_NAME_MAX) return t('Use no máximo {DISPLAY_NAME_MAX} caracteres', { DISPLAY_NAME_MAX });
   return undefined;
 }

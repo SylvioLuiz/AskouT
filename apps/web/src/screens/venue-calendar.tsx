@@ -59,13 +59,13 @@ function DraftCard({ venueId, draft, now, onChanged, setNotice }: { venueId: str
         <p className="calcard__when">{formatWhen(draft.startsAt, draft.endsAt, now)}</p>
         <p className="calcard__meta">
           {kindLabel(draft.kind)} · {draft.isFree ? t('Grátis') : t('Pago')}
-          {draft.edited ? ' · Editado por você' : ''}
+          {draft.edited ? t(' · Editado por você') : ''}
         </p>
         {draft.description ? <p className="calcard__desc">{draft.description}</p> : null}
         {draft.tags.length > 0 ? <p className="calcard__meta">{draft.tags.map((t) => `#${t}`).join(' ')}</p> : null}
         <p className="calcard__goes">
           <strong>{approved && new Date(draft.publishAt).getTime() <= now.getTime() ? t('Sobe em instantes') : t('Sobe {now}', { now: publishLabel(draft.publishAt, now) })}</strong>
-          {approved ? '' : ' se você aprovar'}
+          {approved ? '' : t(' se você aprovar')}
         </p>
       </div>
       {asking ? (
@@ -253,7 +253,7 @@ export function VenueCalendarScreen({ venueId }: { venueId: string }) {
                 {t('Para aprovar')}
               </h2>
               {panel.data.drafts.length === 0 ? (
-                <p className="calsec__hint">{calendar.enabled ? 'Nenhum evento à vista. Quando a agenda tiver eventos nos próximos dias, eles aparecem aqui.' : 'A agenda está pausada.'}</p>
+                <p className="calsec__hint">{calendar.enabled ? t('Nenhum evento à vista. Quando a agenda tiver eventos nos próximos dias, eles aparecem aqui.') : t('A agenda está pausada.')}</p>
               ) : (
                 <ul className="callist" aria-label={t('Eventos esperando aprovação')}>
                   {panel.data.drafts.map((d) => (

@@ -10,7 +10,7 @@ import type { ConfirmationAnswer, DateStats, PollView, VoteStatus } from '../lib
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
 import { Link, navigate } from '../router.tsx';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
 const WEEK_HEAD = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const BRUSHES: VoteStatus[] = ['YES', 'MAYBE', 'NO'];
@@ -99,7 +99,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           <p className="callout__text">
             <strong>Data definida: {longDay(poll.final.date)}</strong>
             <br />
-            {new Date(poll.final.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })} às {new Date(poll.final.endsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })}
+            {new Date(poll.final.startsAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })} {t('às')} {new Date(poll.final.endsAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })}
           </p>
           <div className="row-actions">
             {poll.final.meetupId ? (
@@ -135,9 +135,9 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
       <p className="dpoll__meta muted">
         {POLICY_LABEL[poll.confirmationPolicy]}
-        {poll.votingClosed ? ' · votos encerrados' : poll.votingDeadline ? ` · votação até ${new Date(poll.votingDeadline).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}
+        {poll.votingClosed ? t(' · votos encerrados') : poll.votingDeadline ? t(' · votação até {when}', { when: new Date(poll.votingDeadline).toLocaleString(intlLocale(), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) }) : ''}
         {' · '}
-        {finished} de {poll.participants.length} concluíram
+        {t('{done} de {total} concluíram', { done: finished, total: poll.participants.length })}
       </p>
 
       <div className="segtabs" role="tablist" aria-label={t('Visão do calendário')}>
@@ -190,7 +190,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
                   ? `dpcal__cell dpcal__cell--${mine ?? 'NONE'}`
                   : `dpcal__cell dpcal__cell--L${stats.level}`;
               return (
-                <button key={di} type="button" role="gridcell" className={`${cls}${selected === date ? ' is-selected' : ''}`} aria-label={`${cellLabel(stats, mine)}${busyEvents.length > 0 ? `, você já tem compromisso: ${busyEvents.map((e) => e.title).join(', ')}` : ''}`} aria-selected={selected === date} onClick={() => tapDay(date)}>
+                <button key={di} type="button" role="gridcell" className={`${cls}${selected === date ? ' is-selected' : ''}`} aria-label={`${cellLabel(stats, mine)}${busyEvents.length > 0 ? t(', você já tem compromisso: {titles}', { titles: busyEvents.map((e) => e.title).join(', ') }) : ''}`} aria-selected={selected === date} onClick={() => tapDay(date)}>
                   {busyEvents.length > 0 ? <span className="dpcal__busy" aria-hidden="true" /> : null}
                   <span className="dpcal__day">{Number(date.slice(8, 10))}</span>
                   {tab === 'mine' ? (
@@ -219,7 +219,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
       {allDays.some((d) => eventsOn(d).length > 0) ? (
         <p className="dpoll__legend muted">
-          <span className="dpoll__busyicon" aria-hidden="true" /> Você já tem evento ou compromisso neste dia.
+          <span className="dpoll__busyicon" aria-hidden="true" /> {t('Você já tem evento ou compromisso neste dia.')}
         </p>
       ) : null}
 
@@ -229,7 +229,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
         <div className="dpoll__finish">
           {poll.iFinished ? (
             <>
-              <p className="dpoll__done">✓ Você concluiu sua votação. Pode mudar os votos até o encerramento.</p>
+              <p className="dpoll__done">✓ {t('Você concluiu sua votação. Pode mudar os votos até o encerramento.')}</p>
               <Button small variant="secondary" loading={busy} onClick={() => void act(() => api.finishPoll(poll.id, false))}>
                 {t('Reabrir minha votação')}
               </Button>
@@ -259,7 +259,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
                     <button type="button" className="dpoll__pbtn" onClick={() => { setSelected(d.date); setTab('group'); }} aria-label={t('{i}º lugar: {date}, {compatibility} de compatibilidade', { i: i + 1, date: longDay(d.date), compatibility: percent(d.compatibility) })}>
                       {i === 0 ? <span className="dpoll__crown" aria-hidden="true">👑</span> : <span className="dpoll__ppos" aria-hidden="true">{i + 1}º</span>}
                       <span className="dpoll__pday">{podiumDay(d.date)}</span>
-                      <span className="dpoll__ppct">{percent(d.compatibility)}{i === 0 ? ' compatível' : ''}</span>
+                      <span className="dpoll__ppct">{percent(d.compatibility)}{i === 0 ? t(' compatível') : ''}</span>
                       <span className="dpoll__pblock" aria-hidden="true">{i + 1}</span>
                     </button>
                   </li>
@@ -270,7 +270,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
               <p className="dpoll__psum">
                 <span className={`dpoll__badge dpoll__badge--${poll.ranking[0].level}`}>{LEVEL_LABEL[poll.ranking[0].level]}</span>
                 <span>
-                  {poll.ranking[0].yes} posso, {poll.ranking[0].maybe} talvez, {poll.ranking[0].no} não posso. Toque em uma data para ver quem pode.
+                  {t('{yes} posso, {maybe} talvez, {no} não posso. Toque em uma data para ver quem pode.', { yes: poll.ranking[0].yes, maybe: poll.ranking[0].maybe, no: poll.ranking[0].no })}
                 </span>
               </p>
             ) : null}
@@ -283,7 +283,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
                       <span className="dpoll__rankmain">
                         <strong>{longDay(d.date)}</strong>
                         <span className="muted">
-                          {percent(d.compatibility)} de compatibilidade · {percent(d.coverage)} votaram · {d.yes} posso, {d.maybe} talvez, {d.no} não posso
+                          {t('{compat} de compatibilidade · {coverage} votaram · {yes} posso, {maybe} talvez, {no} não posso', { compat: percent(d.compatibility), coverage: percent(d.coverage), yes: d.yes, maybe: d.maybe, no: d.no })}
                         </span>
                       </span>
                       <span className={`dpoll__badge dpoll__badge--${d.level}`}>{LEVEL_LABEL[d.level]}</span>
@@ -324,7 +324,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           <ul className="dpoll__hist">
             {poll.history.map((h) => (
               <li key={h.id}>
-                {longDay(h.date)} — {h.status === 'CONFIRMED' ? 'confirmada' : h.status === 'REJECTED' ? 'não passou' : 'retirada'}
+                {longDay(h.date)} — {h.status === 'CONFIRMED' ? t('confirmada') : h.status === 'REJECTED' ? t('não passou') : t('retirada')}
               </li>
             ))}
           </ul>
@@ -395,7 +395,7 @@ function DayDetail({ stats, poll, busy, onPropose }: { stats: DateStats; poll: P
     <section className="dpoll__detail" aria-label={t('Detalhes de {date}', { date: longDay(stats.date) })}>
       <h2 className="dpoll__h">{longDay(stats.date)}</h2>
       <div className="dpoll__top">
-        <div className="dpoll__ring" style={{ '--v': Math.max(0, Math.min(100, stats.compatibility ?? 0)) } as CSSProperties} role="img" aria-label={stats.compatibility === null ? 'Compatibilidade: sem votos' : `Compatibilidade: ${percent(stats.compatibility)}`}>
+        <div className="dpoll__ring" style={{ '--v': Math.max(0, Math.min(100, stats.compatibility ?? 0)) } as CSSProperties} role="img" aria-label={stats.compatibility === null ? t('Compatibilidade: sem votos') : t('Compatibilidade: {compatibility}', { compatibility: percent(stats.compatibility) })}>
           <span>{percent(stats.compatibility)}</span>
         </div>
         <div className="dpoll__topinfo">
@@ -440,7 +440,7 @@ function ProposalCard({ poll, busy, act }: { poll: PollView; busy: boolean; act:
       <p className="callout__text">
         <strong>Data proposta: {longDay(p.date)}</strong>
         <br />
-        {new Date(p.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })} · {percent(p.compatibility)} de compatibilidade
+        {new Date(p.startsAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })} · {percent(p.compatibility)} de compatibilidade
       </p>
       <p className="muted">
         {p.tally.confirmed} confirmaram · {p.tally.adjust} precisam ajustar · {p.tally.declined} recusaram · {p.tally.pending} sem resposta

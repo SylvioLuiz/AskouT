@@ -18,7 +18,7 @@ import type { DwellSource } from '../lib/dwell.ts';
 import { timeAgo } from '../lib/format.ts';
 import type { PostImage, PostView, PostsPage } from '../lib/types.ts';
 import { Link } from '../router.tsx';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
 function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: number; total: number; onFirstLoad?: (w: number, h: number) => void }) {
   const [failed, setFailed] = useState(false);
@@ -47,7 +47,7 @@ function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: 
     return () => observer.disconnect();
   }, [image.videoPath]);
   return (
-    <figure className="pcarousel__slide" aria-label={`${image.videoPath ? 'Vídeo' : 'Foto'} ${index + 1} de ${total}`}>
+    <figure className="pcarousel__slide" aria-label={t('{kind} {index} de {total}', { kind: image.videoPath ? t('Vídeo') : t('Foto'), index: index + 1, total })}>
       {image.videoPath ? (
         <video
           ref={videoRef}
@@ -239,7 +239,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
       {myTag === 'PENDING' ? (
         <div className="callout">
           <p className="callout__text">
-            <strong>{post.author.username}</strong> marcou você neste post. Se aceitar, ele aparece no seu perfil e no seu feed.
+            <strong>{post.author.username}</strong> {t('marcou você neste post. Se aceitar, ele aparece no seu perfil e no seu feed.')}
           </p>
           <div className="row-actions">
             <Button small loading={tagBusy} onClick={() => void answerTag('accept')}>
@@ -253,7 +253,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
       ) : null}
       {myTag === 'ACCEPTED' && !post.mine ? (
         <p className="muted">
-          Você está marcado neste post.{' '}
+          {t('Você está marcado neste post.')}{' '}
           <button type="button" className="linkbtn" onClick={() => void answerTag('decline')} disabled={tagBusy}>
             {t('Tirar minha marcação')}
           </button>
@@ -332,7 +332,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
             <HeartIcon filled={post.likedByMe} />
             <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
           </button>
-          <button type="button" className="poster__act" onClick={() => setSheet('comments')} aria-label={post.commentCount > 0 ? `Comentários (${post.commentCount})` : 'Comentar'}>
+          <button type="button" className="poster__act" onClick={() => setSheet('comments')} aria-label={post.commentCount > 0 ? t('Comentários ({count})', { count: post.commentCount }) : t('Comentar')}>
             <CommentIcon />
             <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
           </button>
@@ -351,7 +351,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           <HeartIcon filled={post.likedByMe} />
           <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
         </button>
-        <button type="button" className="post__action" onClick={() => setSheet('comments')} aria-label={post.commentCount > 0 ? `Comentários (${post.commentCount})` : 'Comentar'}>
+        <button type="button" className="post__action" onClick={() => setSheet('comments')} aria-label={post.commentCount > 0 ? t('Comentários ({count})', { count: post.commentCount }) : t('Comentar')}>
           <CommentIcon />
           <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
         </button>
@@ -492,7 +492,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
 }
 
 /** Grade de quadrados do perfil: toque abre o post. */
-const eventFmt = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+const eventFmt = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
 function eventWhen(iso: string): string {
   return eventFmt.format(new Date(iso));
 }
@@ -533,7 +533,7 @@ export function PostGrid({ username, kind, quiet, onCount }: { username: string;
           const first = post.images[0];
           return (
             <li key={post.id}>
-              <Link to={`/posts/${encodeURIComponent(post.id)}`} className="postgrid__item" aria-label={post.caption ? `Post: ${post.caption}` : 'Abrir post'}>
+              <Link to={`/posts/${encodeURIComponent(post.id)}`} className="postgrid__item" aria-label={post.caption ? t('Post: {caption}', { caption: post.caption }) : t('Abrir post')}>
                 {first?.path ? <img src={api.assetUrl(first.path)} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span className="postgrid__none" />}
                 {post.event ? <span className="postgrid__event">{t('Evento')}</span> : null}
                 {post.images.length > 1 ? (

@@ -397,7 +397,7 @@ export function ExploreScreen() {
           <SearchIcon />
         </span>
         <label className="visually-hidden" htmlFor="busca">
-          Buscar eventos, rolês, pessoas ou #
+          {t('Buscar eventos, rolês, pessoas ou #')}
         </label>
         <input
           id="busca"
@@ -527,13 +527,13 @@ export function ExploreScreen() {
                 }
               >
                 {hot
-                  ? `Nenhum evento acontecendo agora tem ${HOT_MIN_GOING} ou mais pessoas confirmadas${data.located ? ` a até ${data.radiusKm} km` : ''}.`
-                  : `Ainda não há eventos cadastrados ${data.located ? `a até ${data.radiusKm} km ` : ''}neste período. Busque por um rolê, uma pessoa ou uma #.`}
+                  ? (data.located ? t('Nenhum evento acontecendo agora tem {n} ou mais pessoas confirmadas a até {km} km.', { n: HOT_MIN_GOING, km: data.radiusKm }) : t('Nenhum evento acontecendo agora tem {n} ou mais pessoas confirmadas.', { n: HOT_MIN_GOING }))
+                  : (data.located ? t('Ainda não há eventos cadastrados a até {km} km neste período. Busque por um rolê, uma pessoa ou uma #.', { km: data.radiusKm }) : t('Ainda não há eventos cadastrados neste período. Busque por um rolê, uma pessoa ou uma #.'))}
               </EmptyState>
             ) : (
               <>
                 <p className="muted" aria-live="polite">
-                  {pluralize(data.events.length, 'evento', 'eventos')} {hot ? 'bombando agora' : data.located ? `a até ${data.radiusKm} km` : 'no período'}
+                  {pluralize(data.events.length, t('evento'), t('eventos'))} {hot ? t('bombando agora') : data.located ? t('a até {km} km', { km: data.radiusKm }) : t('no período')}
                 </p>
                 <ul className="evgrid">
                   {data.events.map((e) => (

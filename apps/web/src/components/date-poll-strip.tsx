@@ -2,6 +2,7 @@ import { api } from '../client.ts';
 import { useAsync, usePolling } from '../hooks.ts';
 import { pollLine } from '../lib/date-poll.ts';
 import { Link } from '../router.tsx';
+import { t } from '../lib/i18n/index.ts';
 
 const MAX_LINES = 2;
 
@@ -24,7 +25,7 @@ export function PollLine({ conversationId }: { conversationId: string }) {
           <span className="pollline__status">{l.status}</span>
         </Link>
       ))}
-      {lines.length > MAX_LINES ? <span className="pollline__more">+{lines.length - MAX_LINES} votações</span> : null}
+      {lines.length > MAX_LINES ? <span className="pollline__more">{t('+{count} votações', { count: lines.length - MAX_LINES })}</span> : null}
     </div>
   );
 }

@@ -49,8 +49,8 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
   async function submit(form: FormEvent) {
     form.preventDefault();
     setProblem(undefined);
-    if (title.trim() === '') return setProblem('Dê um nome ao encontro.');
-    if (start === '' || end === '') return setProblem('Escolha o período de datas.');
+    if (title.trim() === '') return setProblem(t('Dê um nome ao encontro.'));
+    if (start === '' || end === '') return setProblem(t('Escolha o período de datas.'));
     if (eventRange && (start !== eventRange.start || end !== eventRange.end)) return setProblem(t('Com um evento, só dá para votar nos dias dele.'));
     if (deadlineMax && deadline > deadlineMax) return setProblem(t('O prazo para votar não pode ser depois do início do evento.'));
     setBusy(true);
@@ -98,7 +98,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
         <section className="pollcard">
           <div className="pollcard__body">
             <p className="pollcard__label">{t('Período de datas')}</p>
-            <button type="button" className="pollrange" disabled={eventRange !== undefined} onClick={() => setCalendar(true)} aria-label={eventRange ? `Período do evento: ${longDay(start)}${end !== start ? ` a ${longDay(end)}` : ''}` : start && end ? `Período: ${longDay(start)} a ${longDay(end)}. Alterar` : 'Escolher o período de datas'}>
+            <button type="button" className="pollrange" disabled={eventRange !== undefined} onClick={() => setCalendar(true)} aria-label={eventRange ? (end !== start ? t('Período do evento: {from} a {to}', { from: longDay(start), to: longDay(end) }) : t('Período do evento: {from}', { from: longDay(start) })) : start && end ? t('Período: {from} a {to}. Alterar', { from: longDay(start), to: longDay(end) }) : t('Escolher o período de datas')}>
               {start && end ? (
                 <span className="pollrange__value">
                   {chipDay(start)}
@@ -129,7 +129,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
         <section className="pollcard">
           <div className="pollcard__body">
             <p className="pollcard__label">
-              Melhor horário <span className="pollcard__opt">(opcional)</span>
+              {t('Melhor horário')} <span className="pollcard__opt">{t('(opcional)')}</span>
             </p>
           </div>
           <div className="pollslots" role="group" aria-label={t('Melhor horário')}>

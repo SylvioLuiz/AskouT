@@ -159,7 +159,7 @@ export function ProfileScreen({ username }: { username: string }) {
       {hasIncomingRequest(relationship) ? (
         <div className="callout">
           <p className="callout__text">
-            <strong>@{profile.username}</strong> pediu para seguir você.
+            <strong>@{profile.username}</strong> {t('pediu para seguir você.')}
           </p>
           <div className="row-actions">
             <Button small loading={busy} onClick={() => run(() => api.approveRequest(profile.userId), t('Pedido aprovado.'))}>

@@ -8,7 +8,7 @@ import { t } from '../lib/i18n/index.ts';
 type Drag = { kind: 'move' | Corner; startX: number; startY: number; rect: CropRect };
 
 const CORNERS: Corner[] = ['nw', 'ne', 'sw', 'se'];
-const CORNER_LABEL: Record<Corner, string> = { nw: 'canto de cima à esquerda', ne: 'canto de cima à direita', sw: 'canto de baixo à esquerda', se: 'canto de baixo à direita' };
+const CORNER_LABEL: Record<Corner, string> = { nw: t('canto de cima à esquerda'), ne: t('canto de cima à direita'), sw: t('canto de baixo à esquerda'), se: t('canto de baixo à direita') };
 
 /**
  * Recorte da foto: escolha um formato do Instagram (1:1, 4:5, 1,91:1) ou Livre,

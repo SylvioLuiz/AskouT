@@ -6,11 +6,11 @@ import { BOOST_PHASE_LABEL, boostTitle, canCancelBoost, daysLabel, formatBrl, ma
 import { toApiError } from '../lib/errors.ts';
 import { buyInStore, packageSummary, paymentReturn, purchaseChannel, safePaymentUrl, STORE_LABEL, storeBridge } from '../lib/purchase.ts';
 import type { BoostView, MatchReach } from '../lib/types.ts';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
 function formatWhen(iso: string): string {
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(intlLocale(), { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
 /** Tela do responsável pelo local: escolhe o que impulsionar, por quantos dias, e paga (Pix/cartão no site, compra da loja no aplicativo). */
@@ -142,7 +142,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
           </div>
           <div className="boost__meta">
             {matchLabel(b) ? `${matchLabel(b)} · ` : ''}{daysLabel(b.days)} · {formatBrl(b.amountCents)}
-            {b.endsAt && b.phase === 'ACTIVE' ? ` · até ${formatWhen(b.endsAt)}` : ''}
+            {b.endsAt && b.phase === 'ACTIVE' ? t(' · até {when}', { when: formatWhen(b.endsAt) }) : ''}
           </div>
           {b.phase === 'PENDING_PAYMENT' && b.payment ? (
             <div className="boost__pay">
@@ -245,7 +245,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
                     </p>
                     <details className="boost__rule">
                       <summary>{t('Como o Match escolhe as pessoas')}</summary>
-                      <p>Vê o anúncio só quem salvou a própria região e mora até {radiusKm} km do seu local, e tem o gosto confirmado por uma das hashtags escolhidas: nos últimos 60 dias curtiu, comentou, compartilhou ou foi a pelo menos 3 conteúdos com essa hashtag, em pelo menos 2 dias diferentes, e o último foi nos últimos 30 dias.</p>
+                      <p>{t('Vê o anúncio só quem salvou a própria região e mora até {radiusKm} km do seu local, e tem o gosto confirmado por uma das hashtags escolhidas: nos últimos 60 dias curtiu, comentou, compartilhou ou foi a pelo menos 3 conteúdos com essa hashtag, em pelo menos 2 dias diferentes, e o último foi nos últimos 30 dias.', { radiusKm })}</p>
                       <p>{t('Você vê apenas um número aproximado. Nunca vê quem são as pessoas, e quem desliga as recomendações personalizadas ou apaga a região deixa de receber.')}</p>
                     </details>
                   </>
@@ -268,7 +268,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
         </section>
 
         <div className="boost__total">
-          <span>{formatBrl(perDay)} por dia × {daysLabel(days)}{discountPct > 0 ? ` (${discountPct}% de desconto)` : ''}</span>
+          <span>{t('{price} por dia × {days}', { price: formatBrl(perDay), days: daysLabel(days) })}{discountPct > 0 ? t(' ({pct}% de desconto)', { pct: discountPct }) : ''}</span>
           <strong>{formatBrl(total)}</strong>
         </div>
         <Button full loading={busy} disabled={!storeReady || (matching && (tags.length === 0 || eventTarget?.tags.length === 0))} onClick={() => void create()}>{onStore ? t('Comprar por {total}', { total: formatBrl(total) }) : t('Pagar {total}', { total: formatBrl(total) })}</Button>

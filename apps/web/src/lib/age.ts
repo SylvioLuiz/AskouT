@@ -20,7 +20,7 @@ export function todayIso(now: Date = new Date()): string {
 
 /** Mensagem de erro para a data digitada, ou undefined se estiver ok. Não decide se é maior de idade: quem decide é a API. */
 export function birthDateProblem(birth: string, now: Date): string | undefined {
-  if (birth === '') return 'Informe a sua data de nascimento';
+  if (birth === '') return t('Informe a sua data de nascimento');
   const age = ageOnDate(birth, now);
   if (age < 0 || age > 120) return t('Informe uma data válida');
   return undefined;

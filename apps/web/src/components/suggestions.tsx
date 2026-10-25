@@ -154,7 +154,7 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
 
   return (
     <Sheet title={t('Sugerir um rolê')} onClose={onClose}>
-      <p className="muted sheet__lead">Perto do ponto médio entre você e {otherName}, até {data ? Math.round(data.radiusM / 1000) : 3} km.</p>
+      <p className="muted sheet__lead">{t('Perto do ponto médio entre você e {otherName}, até {km} km.', { otherName, km: data ? Math.round(data.radiusM / 1000) : 3 })}</p>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {result.loading && !data ? <Loading label={t('Buscando rolês')} /> : null}
       {result.error && !data ? (

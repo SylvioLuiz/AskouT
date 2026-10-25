@@ -1,4 +1,4 @@
-import { t } from '../lib/i18n/index.ts';
+import { decimal, t } from '../lib/i18n/index.ts';
 // Contas do Flash que não dependem de tela: distância, tempo restante e rótulos.
 
 const EARTH_RADIUS_M = 6_371_000;
@@ -24,7 +24,7 @@ export function formatDistance(meters: number): string {
   if (meters < 100) return `${Math.max(10, Math.round(meters / 10) * 10)} m`;
   if (meters < 1000) return `${Math.round(meters / 50) * 50} m`;
   const km = meters / 1000;
-  return `${km < 10 ? km.toFixed(1).replace('.', ',') : Math.round(km)} km`;
+  return `${km < 10 ? decimal(km.toFixed(1)) : Math.round(km)} km`;
 }
 
 /** Sempre em km, como na lista de amigos livres: 800 -> "0,8 km"; 2000 -> "2 km"; 2600 -> "2,6 km"; 15000 -> "15 km". */
@@ -32,8 +32,8 @@ export function formatKm(meters: number): string {
   if (!Number.isFinite(meters) || meters < 0) return '—';
   const km = meters / 1000;
   if (km >= 10) return `${Math.round(km)} km`;
-  const text = (Math.max(0.1, Math.round(km * 10) / 10)).toFixed(1).replace('.', ',');
-  return `${text.endsWith(',0') ? text.slice(0, -2) : text} km`;
+  const text = (Math.max(0.1, Math.round(km * 10) / 10)).toFixed(1);
+  return `${decimal(text.endsWith('.0') ? text.slice(0, -2) : text)} km`;
 }
 
 /** Minutos restantes até `iso`: 0 quando já passou, arredondando para cima. */
@@ -45,7 +45,7 @@ export function minutesLeft(iso: string, nowMs: number): number {
 
 /** 5 -> "5 min"; 90 -> "1 h 30 min"; 120 -> "2 h". */
 export function formatRemaining(minutes: number): string {
-  if (minutes <= 0) return 'acabou';
+  if (minutes <= 0) return t('acabou');
   if (minutes < 60) return `${minutes} min`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -56,9 +56,9 @@ export function formatRemaining(minutes: number): string {
 export function formatAge(updatedAtIso: string, serverNowIso: string): string {
   const seconds = Math.max(0, Math.round((Date.parse(serverNowIso) - Date.parse(updatedAtIso)) / 1000));
   if (Number.isNaN(seconds)) return '';
-  if (seconds < 10) return 'agora';
-  if (seconds < 60) return `há ${seconds} s`;
-  return `há ${Math.floor(seconds / 60)} min`;
+  if (seconds < 10) return t('agora');
+  if (seconds < 60) return t('há {seconds} s', { seconds });
+  return t('há {min} min', { min: Math.floor(seconds / 60) });
 }
 
 /** Avisa o resto do app (o raio do topo, por exemplo) que o Flash ligou, desligou ou mudou de estado. */
@@ -104,7 +104,7 @@ export function geolocationMessage(code: number | undefined, secure: boolean): s
 
 /** Contagem regressiva: "1h 58min" (de uma hora para cima) ou "42min 07s". */
 export function formatCountdown(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return 'acabou';
+  if (!Number.isFinite(ms) || ms <= 0) return t('acabou');
   const total = Math.ceil(ms / 1000);
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);

@@ -26,7 +26,7 @@ import {
 import { toApiError } from '../lib/errors.ts';
 import type { Slot, SlotState } from '../lib/types.ts';
 import { Link } from '../router.tsx';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
 /** Quantos dias a faixa mostra a partir de hoje. */
 const WINDOW_DAYS = 28;
@@ -48,7 +48,7 @@ function EventList({ events }: { events: AgendaEvent[] }) {
         {events.map((e) => (
           <li key={e.key}>
             <Link to={e.to} className="agevent">
-              <span className="agevent__time">{new Date(e.startsAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="agevent__time">{new Date(e.startsAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit' })}</span>
               <span className="agevent__main">
                 <strong>{e.title}</strong>
                 {e.venueName ? <span className="muted">{e.venueName}</span> : null}

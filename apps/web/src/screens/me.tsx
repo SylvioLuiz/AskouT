@@ -21,7 +21,7 @@ import { supportMailto } from '../lib/help-mailto.ts';
 import { downloadJson } from '../lib/account.ts';
 import { birthDateProblem, MIN_ACCOUNT_AGE, ageOnDate, todayIso } from '../lib/age.ts';
 import { Link } from '../router.tsx';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
 type Message = { tone: 'ok' | 'error'; text: string } | undefined;
 
@@ -181,7 +181,7 @@ function BirthDateSection() {
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {status.locked ? (
         <p className="muted">
-          Pela data cadastrada, você ainda não tem 18 anos, então não dá para trocá-la por aqui. Se foi um erro de digitação,{' '}
+          {t('Pela data cadastrada, você ainda não tem 18 anos, então não dá para trocá-la por aqui. Se foi um erro de digitação,')}{' '}
           {support ? <a href={support}>fale com o suporte</a> : 'fale com o suporte'}.
         </p>
       ) : (
@@ -249,7 +249,7 @@ export function PrivacyScreen() {
         text: result.isPrivate
           ? t('Seu perfil agora é privado. Quem já segue continua seguindo; novos seguidores precisam da sua aprovação.')
           : result.acceptedPending > 0
-            ? `Seu perfil agora é público. ${pluralize(result.acceptedPending, 'pedido pendente foi aceito', 'pedidos pendentes foram aceitos')}.`
+            ? t('Seu perfil agora é público. {accepted}.', { accepted: pluralize(result.acceptedPending, t('pedido pendente foi aceito'), t('pedidos pendentes foram aceitos')) })
             : t('Seu perfil agora é público.'),
       });
     } catch (failure) {
@@ -444,7 +444,7 @@ function RegionSetting({ userId }: { userId: string }) {
           <p className="setting__help">
             {t('Opcional. Se você informar mais ou menos onde mora, bares e casas de show perto de você podem mostrar, no “Para você”, rolês com a etiqueta “Patrocinado” que combinam com o que você curte (por exemplo, rock). Usamos a localização uma vez e guardamos só uma posição aproximada, de cerca de 1 km. Quem anuncia vê apenas um número aproximado de pessoas, nunca quem você é. Funciona só com as recomendações personalizadas ligadas.')}
           </p>
-          {current ? <p className="setting__help"><strong>{t('Região salva.')}</strong> Atualizada em {new Date(current.updatedAt).toLocaleDateString('pt-BR')}.</p> : null}
+          {current ? <p className="setting__help"><strong>{t('Região salva.')}</strong> Atualizada em {new Date(current.updatedAt).toLocaleDateString(intlLocale())}.</p> : null}
           {!personalizing ? <p className="setting__help">{t('Ligue as recomendações personalizadas para poder informar a região.')}</p> : null}
         </div>
       </section>

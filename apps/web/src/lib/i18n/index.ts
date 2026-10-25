@@ -72,3 +72,8 @@ export function t(text: string, vars?: Readonly<Record<string, string | number>>
   if (!vars) return translated;
   return translated.replace(/\{(\w+)\}/g, (whole, key: string) => (key in vars ? String(vars[key]) : whole));
 }
+
+/** Troca o ponto decimal de um número já formatado com ponto ("1.2") pela convenção do idioma ("1,2" em pt/es). */
+export function decimal(text: string): string {
+  return current === 'en' ? text : text.replace('.', ',');
+}

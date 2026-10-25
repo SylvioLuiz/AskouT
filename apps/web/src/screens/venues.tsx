@@ -16,7 +16,7 @@ import type { ClaimableVenue, VenueClaim, VenueEvent, VenueEventBody, VenueSumma
 import { CLAIM_NOTE_MAX, EMPTY_VENUE_EVENT, VENUE_EVENT_DESCRIPTION_MAX, VENUE_EVENT_TITLE_MAX, claimStateLabel, claimStatusLabel, documentProblem, draftFromEvent, phaseLabel, venueEventBody, venueEventProblem } from '../lib/venue.ts';
 import type { VenueEventDraft } from '../lib/venue.ts';
 import { Link } from '../router.tsx';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -147,7 +147,7 @@ function ClaimRow({ claim, onChanged }: { claim: VenueClaim; onChanged: () => vo
         <span className="venuerow__name">{claim.venue.name}</span>
         <span className={`tag claimrow__status claimrow__status--${claim.status.toLowerCase()}`}>{claimStatusLabel(claim.status)}</span>
       </div>
-      {claim.status === 'PENDING' ? <p className="claimrow__help">Um administrador está avaliando o documento enviado em {new Date(claim.createdAt).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}. Você recebe um aviso quando houver resposta.</p> : null}
+      {claim.status === 'PENDING' ? <p className="claimrow__help">{t('Um administrador está avaliando o documento enviado em {date}. Você recebe um aviso quando houver resposta.', { date: new Date(claim.createdAt).toLocaleDateString(intlLocale(), { day: 'numeric', month: 'long' }) })}</p> : null}
       {claim.status === 'REJECTED' && claim.reviewNote ? <p className="muted">Motivo: {claim.reviewNote}</p> : null}
       {claim.status === 'PENDING' ? (
         asking ? (

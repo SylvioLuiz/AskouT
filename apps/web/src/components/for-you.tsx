@@ -9,9 +9,9 @@ import { readPersonalize } from '../lib/dwell.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import type { RecommendationItem, RecommendationSource } from '../lib/types.ts';
 import { Link } from '../router.tsx';
-import { t } from '../lib/i18n/index.ts';
+import { intlLocale, t } from '../lib/i18n/index.ts';
 
-const when = (iso: string) => new Date(iso).toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const when = (iso: string) => new Date(iso).toLocaleString(intlLocale(), { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 function Reasons({ item }: { item: RecommendationItem }) {
   return (

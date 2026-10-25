@@ -104,7 +104,7 @@ export function ticketHost(url: string): string {
 
 /** Texto do primeiro problema do rascunho, ou null. `editing`: o início de um evento já existente pode estar no passado. */
 export function venueEventProblem(d: VenueEventDraft, now: Date, editing: boolean): string | null {
-  if (d.title.trim() === '') return 'Dê um nome ao evento.';
+  if (d.title.trim() === '') return t('Dê um nome ao evento.');
   if (Array.from(d.title.trim()).length > VENUE_EVENT_TITLE_MAX) return t('O nome pode ter até {VENUE_EVENT_TITLE_MAX} caracteres.', { VENUE_EVENT_TITLE_MAX });
   if (Array.from(d.description).length > VENUE_EVENT_DESCRIPTION_MAX) return t('A descrição pode ter até {VENUE_EVENT_DESCRIPTION_} caracteres.', { VENUE_EVENT_DESCRIPTION_: VENUE_EVENT_DESCRIPTION_MAX });
   const start = localToIso(d.starts);
@@ -116,7 +116,7 @@ export function venueEventProblem(d: VenueEventDraft, now: Date, editing: boolea
     if (new Date(end).getTime() <= new Date(start).getTime()) return t('O fim precisa ser depois do início.');
     if (new Date(end).getTime() - new Date(start).getTime() > VENUE_EVENT_MAX_DAYS * 24 * 3_600_000) return t('O evento pode durar até {VENUE_EVENT_MAX_DAYS} dias.', { VENUE_EVENT_MAX_DAYS });
   }
-  if (d.imageData === '' && d.imageUrl.trim() !== '' && !isOwnCoverPath(d.imageUrl.trim()) && !/^https:\/\/\S+$/.test(d.imageUrl.trim())) return 'O endereço da imagem precisa começar com https://';
+  if (d.imageData === '' && d.imageUrl.trim() !== '' && !isOwnCoverPath(d.imageUrl.trim()) && !/^https:\/\/\S+$/.test(d.imageUrl.trim())) return t('O endereço da imagem precisa começar com https://');
   if (parseTags(d.tags).length > VENUE_EVENT_TAGS_MAX) return t('Use até {VENUE_EVENT_TAGS_MAX} hashtags.', { VENUE_EVENT_TAGS_MAX });
   return ticketUrlProblem(d.ticketUrl);
 }

@@ -32,7 +32,7 @@ export function MeetupCover({ meetup }: { meetup: MeetupView }) {
 export function MeetupFacts({ meetup, now }: { meetup: MeetupView; now: Date }) {
   return (
     <>
-      <p className="meetcard__venue">{meetup.event ? <VenueLink venueId={meetup.event.venueId} name={meetup.event.venueName} nested /> : 'Local do evento'}</p>
+      <p className="meetcard__venue">{meetup.event ? <VenueLink venueId={meetup.event.venueId} name={meetup.event.venueName} nested /> : t('Local do evento')}</p>
       <p className="meetcard__line">{formatWhen(meetup.startsAt, meetup.endsAt, now)}</p>
       <p className="meetcard__line">{goingLabel(meetup)}</p>
     </>
@@ -63,7 +63,7 @@ export function MeetupBubble({ meetup, nowIso, onUpdated }: { meetup: MeetupView
   return (
     <div className="meetcard">
       <MeetupCover meetup={meetup} />
-      <p className="meetcard__who">{meetup.myStatus === 'ORGANIZER' ? 'Você criou um encontro' : `${meetup.organizer.displayName} convidou você`}</p>
+      <p className="meetcard__who">{meetup.myStatus === 'ORGANIZER' ? t('Você criou um encontro') : t('{name} convidou você', { name: meetup.organizer.displayName })}</p>
       <h3 className="meetcard__title">{meetup.title}</h3>
       <MeetupFacts meetup={meetup} now={now} />
       {meetup.isGroup && meetup.groupName ? <p className="meetcard__line">Grupo: {meetup.groupName}</p> : null}
@@ -167,7 +167,7 @@ export function CreateMeetupSheet({ event, onClose }: { event: { id: string; tit
   return (
     <Sheet title={MEETUP_ACTION_LABEL} onClose={onClose}>
       <p className="muted meetsheet__intro">
-        {event.title} · escolha quem convidar. Com uma pessoa, o convite vai para a conversa de vocês; com várias, cria um grupo e cada um entra ao aceitar.
+        {event.title} · {t('escolha quem convidar. Com uma pessoa, o convite vai para a conversa de vocês; com várias, cria um grupo e cada um entra ao aceitar.')}
       </p>
       <FriendPicker picked={picked} onToggle={(userId) => setPicked((cur) => toggleId(cur, userId))} />
       {friends.data && friends.data.length > 0 ? (
