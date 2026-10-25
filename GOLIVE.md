@@ -357,3 +357,8 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - **App ID `br.com.askout`:** Sign in with Apple, Push Notifications e In-App Purchase ativados (conferido).
 - **Compras `askout.boost.{1,3,7,14}d`:** print de revisão (1290×2796, dados [TESTE]) anexado às 4 (arquivos em `apps/mobile/store/iap-review/`, gerados por `gerar-prints.cjs`). Continuam "Preparar para envio": a primeira compra consumível só vai junto com uma nova versão do app. Preço em BRL não conferido pelo painel.
 - Ainda sem teste em iPhone de verdade: push, calendário, login Apple, compra Sandbox (precisa de testador Sandbox criado pelo usuário).
+
+## App Store: envio para revisão (25/10/2026)
+- Versão 1.0 (build 3) enviada à Apple em 25/10/2026 00:10 (status "Waiting for Review"; prazo de até 48 h, resposta por e-mail). Preço grátis (base Brasil), disponível só no Brasil; página do app (textos, prints iPhone/iPad, App Privacy) preenchida; conta de demonstração `apple-review@askout.com.br` com a senha digitada pelo Sylvio.
+- **As 4 compras (impulsionamento) NÃO foram anexadas à submissão**: a seção "In-App Purchases" não apareceu na página da versão e o rascunho de submissão só tinha o item da versão. Elas seguem "Prepare for Submission". Enviar junto com a próxima versão (1.0.1) ou assim que o painel permitir. Preços em reais ainda não conferidos.
+- Ajustes visuais feitos depois do build 3 (título da tela de login mais fino e em 2 linhas, logo da capa maior) só entram no app num próximo build; no site já estão no ar.
