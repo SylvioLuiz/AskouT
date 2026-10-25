@@ -51,7 +51,7 @@ export function fieldsFrom(details: unknown): Record<string, string> {
   const result: Record<string, string> = {};
   if (typeof details !== 'object' || details === null || Array.isArray(details)) return result;
   for (const [key, value] of Object.entries(details)) {
-    if (typeof value === 'string') result[key] = value;
+    if (typeof value === 'string') result[key] = t(value);
   }
   return result;
 }
@@ -78,7 +78,7 @@ export function errorFromResponse(status: number, payload: unknown, retryAfterHe
   const code: ApiErrorCode =
     typeof body.code === 'string' && KNOWN_CODES.has(body.code) ? (body.code as ApiErrorCode) : codeForStatus(status);
 
-  let message = typeof body.message === 'string' && body.message.trim() !== '' ? body.message : GENERIC;
+  let message = typeof body.message === 'string' && body.message.trim() !== '' ? t(body.message) : GENERIC;
   if (status >= 500) message = SERVER_DOWN;
 
   const parsedRetry = retryAfterHeader === null ? NaN : Number(retryAfterHeader);
