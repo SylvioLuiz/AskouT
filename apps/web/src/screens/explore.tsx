@@ -28,6 +28,7 @@ import {
   kindLabel,
   rangeFor,
   rangeLabel,
+  widenSteps,
   safeImage,
   sourceName,
 } from '../lib/explore.ts';
@@ -354,6 +355,52 @@ export function ExploreScreen() {
     inputRef.current?.focus();
   }
 
+  // Abriu sem nada para hoje: procura sozinho o primeiro filtro mais amplo que tenha evento e já deixa selecionado (uma vez só, e só se a pessoa ainda não mexeu em nada).
+  const autoTried = useRef(false);
+  const alive = useRef(true);
+  const [autoRange, setAutoRange] = useState<RangeId | null>(null);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (autoTried.current || waiting || result.loading || !raw) return;
+    autoTried.current = true;
+    const untouched = q === '' && range === 'today' && kind === null && !free && !hot && radiusKm === RADIUS_DEFAULT_KM;
+    if (!untouched || filterByThemes(raw.events, themes, themeOfEvent).length > 0) return;
+    void (async () => {
+      for (const step of widenSteps({ hasThemes: themes.size > 0, located: position !== undefined })) {
+        const { from, to } = rangeFor(step.range, new Date());
+        try {
+          const r = await api.explore({
+            lat: position?.lat,
+            lng: position?.lng,
+            radiusKm: position ? step.radiusKm : undefined,
+            from: from.toISOString(),
+            to: to.toISOString(),
+            free: false,
+            hot: false,
+          });
+          if (!alive.current) return;
+          const events = step.clearThemes ? r.events : filterByThemes(r.events, themes, themeOfEvent);
+          if (events.length > 0) {
+            if (step.clearThemes) setThemes(new Set());
+            if (step.radiusKm !== RADIUS_DEFAULT_KM) setRadiusKm(step.radiusKm);
+            setRange(step.range);
+            setAutoRange(step.range);
+            return;
+          }
+        } catch {
+          return;
+        }
+      }
+    })();
+    // Roda uma vez, quando o primeiro resultado chega.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [raw, waiting, result.loading]);
+
   const hasResults = data !== undefined && data !== null && data.events.length + data.places.length + data.people.length > 0;
   // Buscou, achou e ficou na tela: entra nas recentes (sem salvar cada letra digitada).
   useEffect(() => {
@@ -532,6 +579,7 @@ export function ExploreScreen() {
               </EmptyState>
             ) : (
               <>
+                {autoRange !== null && range === autoRange ? <p className="muted" role="status">{t('Nada para hoje. Mostrando: {periodo}.', { periodo: rangeLabel(autoRange) })}</p> : null}
                 <p className="muted" aria-live="polite">
                   {pluralize(data.events.length, t('evento'), t('eventos'))} {hot ? t('bombando agora') : data.located ? t('a até {km} km', { km: data.radiusKm }) : t('no período')}
                 </p>

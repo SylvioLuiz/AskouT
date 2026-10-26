@@ -68,3 +68,16 @@ test('safeImage aceita capas servidas pela API com o endereço base', async () =
   assert.equal(safeImage('https://x.com/a.jpg'), 'https://x.com/a.jpg');
   setAssetBase('');
 });
+
+test('widenSteps: do menos para o mais amplo, só com passos que mudam algo', async () => {
+  const { widenSteps, RADIUS_DEFAULT_KM, RADIUS_MAX_KM } = await import('./explore.ts');
+  assert.deepEqual(widenSteps({ hasThemes: false, located: false }).map((s) => s.range), ['week', 'any']);
+  const all = widenSteps({ hasThemes: true, located: true });
+  assert.deepEqual(all.map((s) => [s.range, s.clearThemes, s.radiusKm]), [
+    ['week', false, RADIUS_DEFAULT_KM],
+    ['any', false, RADIUS_DEFAULT_KM],
+    ['any', true, RADIUS_DEFAULT_KM],
+    ['any', true, RADIUS_MAX_KM],
+  ]);
+  assert.equal(widenSteps({ hasThemes: false, located: true }).at(-1)!.clearThemes, false);
+});

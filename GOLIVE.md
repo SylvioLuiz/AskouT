@@ -375,3 +375,6 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 ## Feed: quem você segue (26/10/2026)
 - Decisão do Sylvio: o Início passa a mostrar os posts de **quem você segue**, mesmo sem seguir de volta (antes só amigos = seguimento mútuo). Continua valendo: perfil privado só aparece para quem foi aceito, bloqueio esconde nos dois sentidos, evento privado não entra. Amizade (mútuo) segue valendo para Flash, chat, marcações etc.
 - Textos: "Posts de quem você segue". Testes do servidor e do web passam; o teste de contrato do Prisma (`listFollowingIds`) não rodou contra banco real. **Mencionar na Política de Privacidade (revisão do advogado).**
+
+## Explorar: amplia a busca sozinho (26/10/2026)
+- Ao abrir o Explorar e não haver evento para hoje, a tela testa, na ordem, esta semana, próximos 30 dias, sem o filtro de tema (escolha inicial) e raio máximo, e já deixa selecionado o primeiro filtro que tem evento, com o aviso "Nada para hoje. Mostrando: …". Roda uma vez, só se a pessoa ainda não mexeu em nenhum filtro. Testado: a lista de passos (unidade). **Não testado no aparelho** com dados reais.

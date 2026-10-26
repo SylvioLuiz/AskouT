@@ -1351,6 +1351,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Ver o story de {username}": "View {username}'s story",
   "Ver os horários da semana": "View the week's hours",
   "Ver os próximos 30 dias": "View the next 30 days",
+  "Nada para hoje. Mostrando: {periodo}.": "Nothing for today. Showing: {periodo}.",
   "Ver perfil de {displayName}": "View {displayName}'s profile",
   "Ver página": "View page",
   "Ver quem está no Flash": "See who's on Flash",

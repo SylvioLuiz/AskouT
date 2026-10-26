@@ -101,6 +101,27 @@ export function safeImage(url: string | null): string | null {
   return null;
 }
 
+/** Um passo da busca automática quando a tela abre vazia: período maior, sem tema e/ou raio máximo. */
+export interface WidenStep {
+  range: RangeId;
+  clearThemes: boolean;
+  radiusKm: number;
+}
+
+/**
+ * Do menos para o mais amplo: primeiro mais dias, depois sem o filtro de tema (vindo da escolha inicial) e por fim o raio máximo.
+ * Só entra passo que muda alguma coisa: sem tema não há passo "sem tema"; sem localização não há passo de raio.
+ */
+export function widenSteps(opts: { hasThemes: boolean; located: boolean }): WidenStep[] {
+  const steps: WidenStep[] = [
+    { range: 'week', clearThemes: false, radiusKm: RADIUS_DEFAULT_KM },
+    { range: 'any', clearThemes: false, radiusKm: RADIUS_DEFAULT_KM },
+  ];
+  if (opts.hasThemes) steps.push({ range: 'any', clearThemes: true, radiusKm: RADIUS_DEFAULT_KM });
+  if (opts.located) steps.push({ range: 'any', clearThemes: opts.hasThemes, radiusKm: RADIUS_MAX_KM });
+  return steps;
+}
+
 export function activeFilterCount(f: { range: RangeId; kind: EventKind | null; free: boolean; radiusKm: number; hot?: boolean }): number {
   // Com "Bombando" ligado o período não vale, então não conta como filtro.
   return (f.hot ? 1 : f.range !== 'today' ? 1 : 0) + (f.kind ? 1 : 0) + (f.free ? 1 : 0) + (f.radiusKm !== RADIUS_DEFAULT_KM ? 1 : 0);
