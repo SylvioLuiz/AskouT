@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "507806258991",
+    "project_id": "askout-2cdcd",
+    "storage_bucket": "askout-2cdcd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:507806258991:android:31e2a67d5e11e2ec2af3da",
+        "android_client_info": {
+          "package_name": "br.com.askout"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbJCIWpy1uyuR0DymfyC21cPYgWPn-uco"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

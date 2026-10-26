@@ -382,3 +382,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 ## iOS build 1.0 (6) (26/10/2026)
 - Enviado ao App Store Connect em 26/10/2026 13:44 (arquivado no Xcode do MacBook). Inclui: ícone com fundo preto, Início com posts de quem se segue, Explorar que amplia a busca sozinho. O 1.0 (3) continua sendo o enviado à revisão da Apple (rejeitado por "Information Needed", Guideline 2.1: falta responder com vídeo e notas); trocar pelo build 6 na página da versão antes de reenviar.
 - **iOS build 1.0 (7) enviado em 26/10/2026 14:20** (substitui o 6): agora sim com o **ícone de fundo preto** (o build 6 saiu com o ícone antigo: eu havia copiado só o site, sem a pasta de ícones), o link do bar nos posts de evento e o post do estabelecimento na Home do dono. O build a anexar na versão 1.0 é o 7.
+
+## Android: google-services.json (26/10)
+- `apps/mobile/android/app/google-services.json` (projeto Firebase askout-2cdcd, pacote br.com.askout) adicionado; o plugin google-services passa a ser aplicado no build. É config de cliente, não segredo.
+- Falta: conta de serviço FCM (`GOOGLE_SERVICE_ACCOUNT_JSON` no Render), reconstruir o AAB e testar push em aparelho real (não testado).
