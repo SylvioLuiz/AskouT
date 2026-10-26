@@ -7,6 +7,7 @@ import { AdjustSheet, CommentsSheet, EditPostSheet, PostMenuSheet, ReportSheet, 
 import type { PostGone } from './post-actions.tsx';
 import { VenueLogo } from './venue-logo.tsx';
 import { PosterEvent } from './poster.tsx';
+import { VenueLink } from './venue-link.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Loading } from './ui.tsx';
 import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -129,7 +130,7 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
       title={event.title}
       startsAt={event.startsAt}
       whenText={formatWhen(event.startsAt, event.endsAt, new Date())}
-      venue={post.placeName ?? t('Evento')}
+      venue={<VenueLink venueId={post.placeVenueId} name={post.placeName ?? t('Evento')} />}
       image={first?.path ? api.assetUrl(first.path) : null}
       fallback={<span className="poster__kind" aria-hidden="true">{t('Evento')}</span>}
     />
@@ -290,11 +291,18 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
                 ) : (
                   <Link to={`/u/${encodeURIComponent(post.author.username)}`} className="poster__name">{post.author.username}</Link>
                 )}
+                {post.placeName && !post.venue ? (
+                  <span className="poster__sub">
+                    <VenueLink venueId={post.placeVenueId} name={post.placeName} />
+                    {' · '}
+                    <Link to={`/posts/${encodeURIComponent(post.id)}`}>{timeAgo(post.createdAt, new Date())}{post.edited ? ' · editado' : ''}</Link>
+                  </span>
+                ) : (
                 <Link to={`/posts/${encodeURIComponent(post.id)}`} className="poster__sub">
-                  {post.placeName && !post.venue ? `${post.placeName} · ` : ''}
                   {timeAgo(post.createdAt, new Date())}
                   {post.edited ? ' · editado' : ''}
                 </Link>
+                )}
               </span>
             </div>
             <button type="button" className="poster__round" onClick={() => setSheet('menu')} aria-label={t('Mais opções do post')} aria-haspopup="dialog">
@@ -362,7 +370,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
       )}
       {post.placeName && !eventCard && !cartaz ? (
         <p className="post__place">
-          <strong>{post.placeName}</strong>
+          <strong><VenueLink venueId={post.placeVenueId} name={post.placeName} /></strong>
           {post.placeAddress ? <span> · {post.placeAddress}</span> : null}
         </p>
       ) : null}

@@ -642,6 +642,8 @@ export interface PostView {
   venue?: { id: string; name: string; logoUrl: string | null } | null;
   caption: string | null;
   placeName: string | null;
+  /** Página do local, quando o nome do rolê é de um local do AskouT. */
+  placeVenueId?: string | null;
   placeAddress: string | null;
   /** Preenchido quando o post é um evento criado pela pessoa. */
   event: { title: string; kind: EventKind; startsAt: string; endsAt: string } | null;

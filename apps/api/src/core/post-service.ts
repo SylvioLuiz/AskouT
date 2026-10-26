@@ -76,6 +76,8 @@ export interface PostView {
   venue: PostVenueView | null;
   caption: string | null;
   placeName: string | null;
+  /** Página do local quando o nome digitado bate, sem diferença de maiúscula, com um único local do AskouT; senão null. */
+  placeVenueId: string | null;
   placeAddress: string | null;
   /** Preenchido quando o post é um evento. */
   event: PostEventView | null;
@@ -674,6 +676,14 @@ export class PostService {
     const byId = new Map(authors.map((a) => [a.userId, toPublicProfile(a)]));
     const venueIds = [...new Set(rows.flatMap((r) => (r.post.venueId ? [r.post.venueId] : [])))];
     const venues = new Map((await Promise.all(venueIds.map((id) => this.deps.places.findVenue(id)))).flatMap((v) => (v ? [[v.id, { id: v.id, name: v.name, logoUrl: v.logoUrl ?? null }] as const] : [])));
+    // Post de pessoa com "rolê" digitado: se o nome é de um único local do AskouT, o nome leva à página dele.
+    const typedNames = [...new Set(rows.flatMap((r) => (!r.post.venueId && r.post.placeName ? [r.post.placeName.trim().toLowerCase()] : [])))];
+    const placeVenues = new Map<string, string>();
+    for (const name of typedNames) {
+      if (name === '') continue;
+      const found = (await this.deps.places.searchVenues(name, undefined, 0, 10)).filter((m) => m.venue.name.trim().toLowerCase() === name);
+      if (found.length === 1) placeVenues.set(name, found[0]!.venue.id);
+    }
     const ids = rows.map((r) => r.post.id);
     const likes = new Map((await this.deps.posts.likeStats(ids, viewerId)).map((l) => [l.postId, l]));
     const comments = new Map((await this.deps.posts.commentCounts(ids)).map((c) => [c.postId, c.count]));
@@ -687,6 +697,7 @@ export class PostService {
           venue: (post.venueId ? venues.get(post.venueId) : undefined) ?? null,
           caption: post.caption,
           placeName: post.placeName,
+          placeVenueId: post.venueId ? post.venueId : post.placeName ? (placeVenues.get(post.placeName.trim().toLowerCase()) ?? null) : null,
           placeAddress: post.placeAddress,
           event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString(), private: post.eventPrivate === true } : null,
           createdAt: post.createdAt.toISOString(),

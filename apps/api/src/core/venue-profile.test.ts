@@ -327,3 +327,16 @@ test('amigos que já foram: só quem se segue de volta, sem o próprio visitante
   assert.deepEqual([alone.count, alone.sample.length], [0, 0], 'sem amigos: zero');
   assert.deepEqual((await w.core.venues.profile(ana, 'v2')).friendsWent, { count: 0, sample: [] });
 });
+
+test('post de pessoa: o nome do rolê leva à página do local quando bate com um só local', async () => {
+  const { w, ana, bia } = await setup();
+  await w.core.follows.follow(ana, bia);
+  await w.core.follows.follow(bia, ana);
+  const igual = await w.core.posts.create(ana, { images: [JPEG()], placeName: '  bar do zé ' });
+  const outro = await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Lugar que não existe' });
+  assert.equal((await w.core.posts.get(bia, igual.id)).placeVenueId, 'v1');
+  assert.equal((await w.core.posts.get(bia, outro.id)).placeVenueId, null);
+  // duas casas com o mesmo nome: ambíguo, sem link
+  await w.places.createVenue({ id: 'v3', name: 'Bar do Zé', address: null, category: 'bar', lat: -23.6, lng: -46.7, isSample: false });
+  assert.equal((await w.core.posts.get(bia, igual.id)).placeVenueId, null);
+});
