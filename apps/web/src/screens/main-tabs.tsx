@@ -125,11 +125,11 @@ export function HomeScreen() {
       <section className="section" aria-labelledby="posts-titulo">
         <div className="section__head">
           <h2 id="posts-titulo" className="section__title">
-            {t('Posts dos amigos')}
+            {t('Posts de quem você segue')}
           </h2>
           <Link to="/criar">{t('Criar post')}</Link>
         </div>
-        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os dos seus amigos aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
+        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os de quem você segue aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
       </section>
     </PullRefresh>
   );

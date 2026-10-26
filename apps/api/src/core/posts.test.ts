@@ -95,17 +95,17 @@ test('bloqueio esconde os posts nos dois sentidos', async () => {
   assert.equal((await w.core.posts.feed(bia)).items.length, 0);
 });
 
-test('feed: seus posts e os dos amigos, não os de quem só você segue', async () => {
+test('feed: seus posts e os de quem você segue, amigo ou não', async () => {
   const { w, ana, bia, caio } = await setup();
-  await w.core.follows.follow(ana, caio); // só segue: não é amigo
+  await w.core.follows.follow(ana, caio); // só segue: não é amigo, mas o post aparece
   await w.core.posts.create(bia, { caption: 'da Bia', images: [JPEG()] });
   w.clock.tick(1000);
   await w.core.posts.create(caio, { caption: 'do Caio', images: [JPEG()] });
   w.clock.tick(1000);
   await w.core.posts.create(ana, { caption: 'da Ana', images: [JPEG()] });
   const feed = await w.core.posts.feed(ana);
-  assert.deepEqual(feed.items.map((p) => p.caption), ['da Ana', 'da Bia']);
-  assert.equal(feed.items[1]!.author.username, 'bia');
+  assert.deepEqual(feed.items.map((p) => p.caption), ['da Ana', 'do Caio', 'da Bia']);
+  assert.equal(feed.items[2]!.author.username, 'bia');
   assert.equal(feed.hasMore, false);
   assert.equal(feed.total, null);
 });

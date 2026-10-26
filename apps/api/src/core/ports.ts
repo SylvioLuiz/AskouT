@@ -48,6 +48,8 @@ export interface FollowRepository {
   acceptAllPending(followeeId: string): Promise<number>;
   /** Seguimento mútuo aceito, sem bloqueio em nenhum sentido (mesma regra da view `friendships`). */
   listFriendIds(userId: string): Promise<string[]>;
+  /** Quem `userId` segue (seguimento aceito), sem bloqueio em nenhum sentido. Inclui os amigos. */
+  listFollowingIds(userId: string): Promise<string[]>;
 }
 
 export interface BlockRepository {

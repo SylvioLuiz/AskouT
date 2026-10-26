@@ -104,4 +104,18 @@ export class PrismaFollowRepository implements FollowRepository {
       .map((f) => f.followeeId)
       .filter((id) => followedBy.has(id) && !blocked.has(id));
   }
+  /** Quem `userId` segue (aceito), sem bloqueio em nenhum sentido. Inclui os amigos. */
+  async listFollowingIds(userId: string): Promise<string[]> {
+    if (!isUuid(userId)) return [];
+    const [following, blocks] = await Promise.all([
+      this.prisma.follow.findMany({ where: { followerId: userId, status: 'ACCEPTED' }, select: { followeeId: true } }),
+      this.prisma.block.findMany({
+        where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
+        select: { blockerId: true, blockedId: true },
+      }),
+    ]);
+    const blocked = new Set<string>();
+    for (const b of blocks as { blockerId: string; blockedId: string }[]) blocked.add(b.blockerId === userId ? b.blockedId : b.blockerId);
+    return (following as { followeeId: string }[]).map((f) => f.followeeId).filter((id) => !blocked.has(id));
+  }
 }

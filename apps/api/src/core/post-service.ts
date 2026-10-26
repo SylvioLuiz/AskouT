@@ -495,12 +495,12 @@ export class PostService {
     return { items: await this.views(viewerId, visible), total, ...page, hasMore };
   }
 
-  /** Posts seus e dos seus amigos (quem segue você e que você segue), do mais recente ao mais antigo. */
+  /** Posts seus e de quem você segue (amigos ou não; perfil privado só aparece para quem já foi aceito), do mais recente ao mais antigo. */
   async feed(viewerId: string, query: { limit?: unknown; offset?: unknown } = {}): Promise<PostsPage> {
     const page = parsePage(query);
-    const friends = await this.deps.follows.listFriendIds(viewerId);
+    const following = await this.deps.follows.listFollowingIds(viewerId);
     const venueIds = await this.deps.places.listFollowedVenueIds(viewerId);
-    const rows = await this.deps.posts.listFor([viewerId, ...friends], [viewerId], { limit: page.limit + 1, offset: page.offset }, undefined, { hideFor: viewerId, venueIds });
+    const rows = await this.deps.posts.listFor([viewerId, ...following], [viewerId], { limit: page.limit + 1, offset: page.offset }, undefined, { hideFor: viewerId, venueIds });
     const hasMore = rows.length > page.limit;
     const visible = await this.onlySeeable(viewerId, rows.slice(0, page.limit));
     return { items: await this.views(viewerId, visible), total: null, ...page, hasMore };

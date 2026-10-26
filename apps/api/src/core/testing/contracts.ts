@@ -336,6 +336,22 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.follows.listFriendIds(sentido), []);
         assert.deepEqual(await h.follows.listFriendIds(bloqueado), []);
       });
+
+      it('listFollowingIds: quem eu sigo (aceito), inclusive sem seguir de volta, menos bloqueados', async () => {
+        const eu = await newUser('eumesmo');
+        const amigo = await newUser('amigo');
+        const sentido = await newUser('sentido'); // só eu sigo
+        const pendente = await newUser('pendente'); // pedido ainda pendente
+        const bloqueado = await newUser('bloqueado');
+        await h.follows.save({ followerId: eu, followeeId: amigo, status: 'ACCEPTED', createdAt: at(1) });
+        await h.follows.save({ followerId: amigo, followeeId: eu, status: 'ACCEPTED', createdAt: at(1) });
+        await h.follows.save({ followerId: eu, followeeId: sentido, status: 'ACCEPTED', createdAt: at(2) });
+        await h.follows.save({ followerId: eu, followeeId: pendente, status: 'PENDING', createdAt: at(3) });
+        await h.follows.save({ followerId: eu, followeeId: bloqueado, status: 'ACCEPTED', createdAt: at(4) });
+        await h.blocks.add(eu, bloqueado, at(5));
+        assert.deepEqual((await h.follows.listFollowingIds(eu)).sort(), [amigo, sentido].sort());
+        assert.deepEqual(await h.follows.listFollowingIds(sentido), []);
+      });
     });
 
     // ---------- Bloqueios ----------

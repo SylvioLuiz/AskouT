@@ -469,6 +469,16 @@ export class InMemoryFollowRepository implements FollowRepository {
     return out;
   }
 
+  async listFollowingIds(userId: string): Promise<string[]> {
+    const out: string[] = [];
+    for (const f of this.rows.values()) {
+      if (f.followerId !== userId || f.status !== 'ACCEPTED') continue;
+      if (await this.blocks.existsEitherWay(userId, f.followeeId)) continue;
+      out.push(f.followeeId);
+    }
+    return out;
+  }
+
   private matching(userId: string, direction: Direction, status: FollowStatus): Follow[] {
     return [...this.rows.values()].filter(
       (f) => f.status === status && (direction === 'followers' ? f.followeeId === userId : f.followerId === userId),
