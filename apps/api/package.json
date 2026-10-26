@@ -16,6 +16,7 @@
     "smoke": "node scripts/smoke.mjs",
     "seed:places": "tsx scripts/seed-sample-places.ts",
     "seed:demo": "tsx scripts/seed-demo-people.ts",
+    "seed:review-venue": "tsx scripts/seed-review-venue.ts",
     "admin:promote": "tsx scripts/make-admin.ts"
   },
   "dependencies": {
