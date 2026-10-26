@@ -128,6 +128,7 @@ test('posts do bar: só o dono publica, aparecem na página e no feed de quem se
   assert.equal(feed.items.length, 1);
   assert.equal(feed.items[0]!.venue?.name, 'Bar do Zé');
   assert.equal((await w.core.posts.feed(bia)).items.length, 0);
+  assert.equal((await w.core.posts.feed(dono)).items.length, 1, 'quem administra o local vê os posts dele no próprio Início');
   // não aparece no perfil pessoal do dono
   const donoProfile = await w.core.posts.listByUsername(ana, 'dono');
   assert.equal(donoProfile.items.length, 0);

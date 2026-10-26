@@ -499,7 +499,9 @@ export class PostService {
   async feed(viewerId: string, query: { limit?: unknown; offset?: unknown } = {}): Promise<PostsPage> {
     const page = parsePage(query);
     const following = await this.deps.follows.listFollowingIds(viewerId);
-    const venueIds = await this.deps.places.listFollowedVenueIds(viewerId);
+    // Quem administra um local vê os posts dele no próprio Início, mesmo sem segui-lo.
+    const owned = (await this.deps.places.listVenuesByOwner(viewerId)).map((v) => v.id);
+    const venueIds = [...new Set([...(await this.deps.places.listFollowedVenueIds(viewerId)), ...owned])];
     const rows = await this.deps.posts.listFor([viewerId, ...following], [viewerId], { limit: page.limit + 1, offset: page.offset }, undefined, { hideFor: viewerId, venueIds });
     const hasMore = rows.length > page.limit;
     const visible = await this.onlySeeable(viewerId, rows.slice(0, page.limit));
