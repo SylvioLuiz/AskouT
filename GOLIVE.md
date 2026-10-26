@@ -378,3 +378,6 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 
 ## Explorar: amplia a busca sozinho (26/10/2026)
 - Ao abrir o Explorar e não haver evento para hoje, a tela testa, na ordem, esta semana, próximos 30 dias, sem o filtro de tema (escolha inicial) e raio máximo, e já deixa selecionado o primeiro filtro que tem evento, com o aviso "Nada para hoje. Mostrando: …". Roda uma vez, só se a pessoa ainda não mexeu em nenhum filtro. Testado: a lista de passos (unidade). **Não testado no aparelho** com dados reais.
+
+## iOS build 1.0 (6) (26/10/2026)
+- Enviado ao App Store Connect em 26/10/2026 13:44 (arquivado no Xcode do MacBook). Inclui: ícone com fundo preto, Início com posts de quem se segue, Explorar que amplia a busca sozinho. O 1.0 (3) continua sendo o enviado à revisão da Apple (rejeitado por "Information Needed", Guideline 2.1: falta responder com vídeo e notas); trocar pelo build 6 na página da versão antes de reenviar.
