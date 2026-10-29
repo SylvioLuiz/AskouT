@@ -25,11 +25,10 @@ test('esqueci a senha: código por e-mail (ou @usuário), nova senha, entra na c
   await rejectsWith(w.core.auth.confirmPasswordReset({ identifier: email, code, password: 'Outra-senha-123' }), 'VALIDATION');
 });
 
-test('a resposta é igual para conta que não existe: nada é enviado e nada vaza', async () => {
+test('conta que não existe: avisa na hora, nada é enviado', async () => {
   const { w, email } = await setup();
-  const known = await w.core.auth.requestPasswordReset(email);
-  const unknown = await w.core.auth.requestPasswordReset('ninguem@exemplo.com');
-  assert.deepEqual(Object.keys(unknown), Object.keys(known));
+  await w.core.auth.requestPasswordReset(email);
+  await rejectsWith(w.core.auth.requestPasswordReset('ninguem@exemplo.com'), 'VALIDATION');
   assert.equal(w.mailer.sentReset.length, 1, 'só a conta real recebeu e-mail');
   await rejectsWith(w.core.auth.confirmPasswordReset({ identifier: 'ninguem@exemplo.com', code: '123456', password: 'Nova-senha-123' }), 'VALIDATION');
 });

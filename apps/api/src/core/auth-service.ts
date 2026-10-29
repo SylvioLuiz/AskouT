@@ -329,7 +329,9 @@ export class AuthService {
     const started: PasswordResetStarted = { expiresInMinutes: CODE_TTL_MINUTES, resendAvailableAt: addMs(now, RESEND_COOLDOWN_SECONDS * 1000) };
 
     const user = await this.findByIdentifier(identifier);
-    if (!user || user.status === 'SUSPENDED') return started;
+    // O cadastro já avisa "e-mail já em uso", então esconder aqui não protege nada e deixa quem errou o endereço sem saber o que houve.
+    if (!user) throw validationError('Não encontramos uma conta com esse e-mail ou @usuário', { identifier: 'Não encontramos uma conta com esse e-mail ou @usuário' });
+    if (user.status === 'SUSPENDED') return started;
     const existing = await passwordResets.find(user.id);
     const active = existing && existing.expiresAt.getTime() > now.getTime() ? existing : undefined;
     if (active) {
