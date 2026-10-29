@@ -65,7 +65,7 @@ export class InMemoryUserRepository implements UserRepository {
   readonly reports = new Map<string, UserReportRecord & { resolvedAt?: Date | null; resolvedBy?: string | null; resolution?: ReportResolution | null; resolutionNote?: string | null }>();
 
   async addReport(report: UserReportRecord): Promise<void> {
-    const key = `${report.reporterId}:${report.reportedUserId}:${report.kind}:${report.commentId ?? ''}`;
+    const key = `${report.reporterId}:${report.reportedUserId}:${report.kind}:${report.commentId ?? ''}${report.variant ? `:${report.variant}` : ''}`;
     const previous = this.reports.get(key);
     this.reports.set(key, { ...report, id: previous?.id ?? report.id, createdAt: previous?.createdAt ?? report.createdAt });
   }

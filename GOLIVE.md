@@ -386,3 +386,9 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 ## Android: google-services.json (26/10)
 - `apps/mobile/android/app/google-services.json` (projeto Firebase askout-2cdcd, pacote br.com.askout) adicionado; o plugin google-services passa a ser aplicado no build. É config de cliente, não segredo.
 - Falta: conta de serviço FCM (`GOOGLE_SERVICE_ACCOUNT_JSON` no Render), reconstruir o AAB e testar push em aparelho real (não testado).
+
+## Rejeição da Apple 1.2 / 2.3.6 (29/10)
+- 2.3.6: questionário de classificação etária → "Age Assurance" = Não (o app não tem controle parental nem verificação de idade além da data de nascimento). Resultado segue 18+ (Brasil 16).
+- 1.2: Termos agora dizem "Tolerância zero", análise de denúncias em até 24 horas e exclusão de quem publicar conteúdo ofensivo (sem colchetes pendentes). **Cumprir esse prazo é compromisso operacional:** olhar o painel de denúncias todo dia.
+- Bloquear alguém agora também cria um registro na fila de denúncias do painel (`variant: 'BLOCK'`, motivo "Outro", texto "Aviso automático…"), sem apagar uma denúncia anterior. Exige deploy da API; o texto novo dos Termos no app exige novo build iOS (8).
+- Pendente: vídeo em aparelho físico (termos no cadastro, denúncia, bloqueio) para responder à Apple e colocar nas Notes.

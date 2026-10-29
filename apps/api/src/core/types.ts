@@ -715,6 +715,8 @@ export interface UserReportRecord {
   reporterId: string;
   reportedUserId: string;
   commentId: string | null;
+  /** Separa registros do mesmo par (ex.: o aviso automático de bloqueio não sobrescreve uma denúncia feita antes). */
+  variant?: string;
   /** O texto denunciado (nome, descrição ou comentário) como estava no momento da denúncia. */
   evidence: string;
   reason: PostReportReason;

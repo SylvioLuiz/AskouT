@@ -159,7 +159,7 @@ export class PrismaUserRepository implements UserRepository {
   }
 
   async addReport(report: UserReportRecord): Promise<void> {
-    const dedupeKey = `${report.reporterId}:${report.reportedUserId}:${report.kind}:${report.commentId ?? ''}`;
+    const dedupeKey = `${report.reporterId}:${report.reportedUserId}:${report.kind}:${report.commentId ?? ''}${report.variant ? `:${report.variant}` : ''}`;
     await this.prisma.userReport.upsert({
       where: { dedupeKey },
       create: { id: report.id, dedupeKey, kind: report.kind, reporterId: report.reporterId, reportedUserId: report.reportedUserId, commentId: report.commentId, reason: report.reason, details: report.details, evidence: report.evidence, createdAt: report.createdAt },

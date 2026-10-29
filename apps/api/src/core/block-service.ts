@@ -24,6 +24,15 @@ export class BlockService {
     if (!target) throw notFound('Usuário não encontrado');
 
     await blocks.add(actorId, targetId, clock.now());
+    // Exigência da App Store (1.2): bloquear também avisa a equipe. Entra na fila de moderação como um registro à parte,
+    // sem apagar uma denúncia que a mesma pessoa já tenha feito. Falha aqui não pode impedir o bloqueio.
+    try {
+      const profile = (await users.findProfilesByIds([targetId]))[0];
+      const evidence = profile ? `${profile.displayName} (@${profile.username})` : targetId;
+      await users.addReport({ id: this.deps.ids.next(), kind: 'PROFILE', variant: 'BLOCK', reporterId: actorId, reportedUserId: targetId, commentId: null, evidence: evidence.slice(0, 600), reason: 'OTHER', details: 'Aviso automático: esta pessoa foi bloqueada por outro usuário.', createdAt: clock.now() });
+    } catch {
+      // melhor esforço
+    }
     await follows.deleteBetween(actorId, targetId);
     // Convites e encontros do Flash entre os dois terminam e a posição some.
     await flash.closeOpenInvitesBetween(actorId, targetId, clock.now());

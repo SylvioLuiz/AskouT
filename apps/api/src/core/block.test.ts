@@ -97,3 +97,15 @@ test('lista de bloqueados é só de quem bloqueou', async () => {
   assert.deepEqual((await w.core.blocks.list(ana!)).map((p) => p.username), ['bia']);
   assert.deepEqual((await w.core.blocks.list(bia!)).map((p) => p.username), []);
 });
+
+test('bloquear: avisa a equipe (fila de moderação) sem apagar uma denúncia anterior', async () => {
+  const w = makeWorld();
+  const { ana, bia } = await w.signUpMany('ana', 'bia');
+  await w.core.profiles.report(ana!, 'bia', 'OFFENSIVE', 'xingou');
+  await w.core.blocks.block(ana!, bia!);
+  await w.core.blocks.block(ana!, bia!);
+  const rows = [...w.users.reports.values()].filter((r) => r.reporterId === ana! && r.reportedUserId === bia!);
+  assert.equal(rows.length, 2, 'a denúncia e o aviso de bloqueio são registros separados, sem duplicar');
+  assert.ok(rows.some((r) => r.reason === 'OFFENSIVE' && r.details === 'xingou'));
+  assert.ok(rows.some((r) => r.variant === 'BLOCK'));
+});

@@ -164,13 +164,13 @@ export function buildTerms(email: string): LegalDoc {
           'Tentar burlar a segurança, adivinhar senhas, coletar dados em massa ou usar robôs sem autorização.',
           'Violar a lei ou direitos de terceiros.',
         ],
-        text: ['Conteúdo ofensivo, de ódio, violento ou sexual não é tolerado e será removido; quem insistir terá a conta suspensa.'],
+        text: ['Tolerância zero: conteúdo ofensivo, de ódio, violento ou sexual e usuários abusivos não são tolerados. O conteúdo será removido e quem o publicou poderá ter a conta suspensa ou excluída.'],
       },
       {
         title: '5. Denúncias, bloqueio e moderação',
         items: [
           'Você pode denunciar perfis, posts, comentários, stories e conversas pelo próprio app (menu de opções de cada item) e bloquear qualquer pessoa a qualquer momento.',
-          'A nossa equipe analisa as denúncias, remove o que descumprir estes termos e pode suspender contas. [A revisar antes do lançamento: prazo de resposta. Meta atual: até 24 horas.]',
+          'A nossa equipe analisa as denúncias em até 24 horas, remove o conteúdo que descumprir estes termos e exclui da plataforma quem o publicou. Bloquear alguém também avisa a nossa equipe e faz o conteúdo dessa pessoa sumir do seu feed na hora.',
           `Para denúncias que não caibam no app ou casos urgentes, escreva para ${email}.`,
         ],
       },
