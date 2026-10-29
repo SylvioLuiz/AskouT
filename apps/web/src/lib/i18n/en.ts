@@ -1416,6 +1416,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Vocês viram amigos quando se seguem. Se o perfil for privado, a pessoa precisa aprovar seu pedido.": "You become friends when you follow each other. If the profile is private, the person has to approve your request.",
   "Enviamos um código de 6 números para o e-mail da conta. Ele vale por {minutes} minutos.": "We sent a 6-digit code to the account's email. It's valid for {minutes} minutes.",
   "Não encontramos uma conta com esse e-mail ou @usuário": "We couldn't find an account with that email or @username",
+  "Atualizada em {data}": "Updated on {data}",
   "Voltar": "Back",
   "Voltar ao Flash": "Back to Flash",
   "Voltar para as fotos": "Back to photos",

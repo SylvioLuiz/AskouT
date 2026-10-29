@@ -3,30 +3,12 @@
 
 /** Enquanto for falso, as páginas mostram o aviso de versão preliminar. Só vire para verdadeiro depois da revisão jurídica. */
 export const LEGAL_REVIEWED = false;
-/** Data da versão do texto (mudar a cada alteração). */
-export const LEGAL_UPDATED = '22 de outubro de 2026';
-
-export interface LegalBlock {
-  title: string;
-  /** Parágrafos. */
-  text?: string[];
-  /** Lista de itens. */
-  items?: string[];
-}
-
-export interface LegalDoc {
-  title: string;
-  intro: string;
-  blocks: LegalBlock[];
-}
-
-/** Quem opera o AskouT. Dados do contrato social (JUCESP, NIRE 35238445720); o endereço é o informado pelo sócio em 22/10/2026. */
-export const COMPANY = {
-  name: 'Thunderbolt LTDA',
-  cnpj: '44.953.028/0001-19',
-  address: 'Av. Jabaquara, 1909, sala 62, São Paulo/SP',
-  dpo: 'Sylvio Luiz de Souza',
-};
+import { COMPANY, LEGAL_UPDATED } from './legal-text-shared.ts';
+import type { LegalDoc } from './legal-text-shared.ts';
+export { COMPANY, LEGAL_UPDATED } from './legal-text-shared.ts';
+export type { LegalBlock, LegalDoc } from './legal-text-shared.ts';
+import { buildPrivacyEn, buildTermsEn } from './legal-text-en.ts';
+import { buildPrivacyEs, buildTermsEs } from './legal-text-es.ts';
 
 export function privacyEmail(configured: string | undefined): string {
   const v = configured?.trim();
@@ -204,4 +186,11 @@ export function buildTerms(email: string): LegalDoc {
       },
     ],
   };
+}
+
+/** Texto no idioma escolhido. O português é o texto de referência; en e es são traduções de cortesia. */
+export function buildLegal(doc: 'privacy' | 'terms', email: string, locale: 'pt-BR' | 'en' | 'es'): LegalDoc {
+  if (locale === 'en') return doc === 'privacy' ? buildPrivacyEn(email) : buildTermsEn(email);
+  if (locale === 'es') return doc === 'privacy' ? buildPrivacyEs(email) : buildTermsEs(email);
+  return doc === 'privacy' ? buildPrivacy(email) : buildTerms(email);
 }

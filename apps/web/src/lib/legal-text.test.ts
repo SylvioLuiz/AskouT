@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buildPrivacy, buildTerms, LEGAL_REVIEWED, privacyEmail } from './legal-text.ts';
+import { buildLegal, buildPrivacy, buildTerms, LEGAL_REVIEWED, privacyEmail } from './legal-text.ts';
 
 describe('textos legais', () => {
   it('e-mail de contato: usa o configurado se for válido, senão o padrão', () => {
@@ -34,5 +34,25 @@ describe('textos legais', () => {
   it('enquanto houver campo a preencher, o texto não pode se declarar revisado', () => {
     const text = JSON.stringify([buildPrivacy('a@b.co'), buildTerms('a@b.co')]);
     if (text.includes('[A preencher') || text.includes('[A definir')) assert.equal(LEGAL_REVIEWED, false);
+  });
+
+  it('en e es: mesmos blocos do português, aviso de cortesia e as cláusulas que a App Store exige', () => {
+    for (const doc of ['privacy', 'terms'] as const) {
+      const pt = buildLegal(doc, 'a@b.co', 'pt-BR');
+      for (const locale of ['en', 'es'] as const) {
+        const tr = buildLegal(doc, 'a@b.co', locale);
+        assert.equal(tr.blocks.length, pt.blocks.length, `${doc} ${locale}: blocos`);
+        pt.blocks.forEach((b, i) => {
+          assert.equal(tr.blocks[i]!.items?.length, b.items?.length, `${doc} ${locale} bloco ${i + 1}: itens`);
+          assert.equal(tr.blocks[i]!.text?.length, b.text?.length, `${doc} ${locale} bloco ${i + 1}: parágrafos`);
+        });
+        assert.ok(tr.notice && tr.updated, `${doc} ${locale}: aviso e data`);
+        assert.ok(JSON.stringify(tr).includes('a@b.co'));
+      }
+    }
+    const en = JSON.stringify(buildLegal('terms', 'a@b.co', 'en'));
+    for (const term of ['Zero tolerance', '24 hours', 'block', 'report']) assert.ok(en.includes(term), `en: falta ${term}`);
+    const es = JSON.stringify(buildLegal('terms', 'a@b.co', 'es'));
+    for (const term of ['Tolerancia cero', '24 horas', 'bloquear', 'denunciar']) assert.ok(es.includes(term), `es: falta ${term}`);
   });
 });

@@ -406,3 +406,8 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 
 ## Build 9 (29/10)
 - Corrige as bolinhas do carrossel: a regra de área de toque (44 px) esticava a bolinha visível; agora 4 px (5 px a ativa), com área de toque de 16x28 px. Medido em Chromium; falta ver no iPhone.
+
+## Termos e Política em inglês e espanhol (29/10, build 10)
+- `legal-text-en.ts` e `legal-text-es.ts`: traduções de cortesia dos Termos de Uso e da Política de Privacidade, mostradas conforme o idioma do app, com aviso "se houver diferença, vale o português". Mesma estrutura de blocos (testada).
+- Pendente: o advogado revisar as traduções junto com o texto em português. Os trechos "[A revisar com advogado…]" (privacidade 10 e termos 7) aparecem nos três idiomas e devem sair só depois dessa revisão.
+- Construído como build 10 (inclui o build 9).
