@@ -400,3 +400,6 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 ## Recuperar senha / telas de código (29/10)
 - Site: botão "<" (voltar) no topo esquerdo das telas de código (cadastro e recuperar senha); se não existe conta com o e-mail/@usuário, mostra o aviso e depois de 3 s vai para o login. O servidor já avisa (publicado no Render).
 - O app iOS (build 7) só tem isso quando sair um build novo; só o aviso do servidor já vale nele. Não foi visto em tela real (só tipos e testes).
+
+## Build 8 (29/10)
+- Inclui: botão "<" nas telas de código, redirecionar ao login sem conta (3 s), bolinhas do carrossel menores (4 px), recuperar senha avisa quando não há conta. Versão do projeto = 8. Envio ao TestFlight: ver abaixo se concluído.
