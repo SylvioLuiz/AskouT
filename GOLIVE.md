@@ -403,3 +403,6 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 
 ## Build 8 (29/10)
 - Inclui: botão "<" nas telas de código, redirecionar ao login sem conta (3 s), bolinhas do carrossel menores (4 px), recuperar senha avisa quando não há conta. Versão do projeto = 8. Enviado ao App Store Connect em 29/10 (1.0 build 8); processamento no TestFlight pela Apple.
+
+## Build 9 (29/10)
+- Corrige as bolinhas do carrossel: a regra de área de toque (44 px) esticava a bolinha visível; agora 4 px (5 px a ativa), com área de toque de 16x28 px. Medido em Chromium; falta ver no iPhone.

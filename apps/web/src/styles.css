@@ -3193,7 +3193,7 @@ button {
 .pcarousel__missing { display: grid; place-items: center; color: var(--muted); font-size: 0.875rem; }
 .pcarousel__count { position: absolute; top: 10px; right: 10px; padding: 2px 9px; border-radius: 999px; background: rgb(0 0 0 / 0.55); color: #fff; font-size: 0.75rem; font-weight: 700; }
 .pcarousel__dots { position: absolute; left: 0; right: 0; bottom: 28px; display: flex; justify-content: center; gap: 0; }
-.pcarousel__dot { width: 12px; height: 22px; min-width: 0; min-height: 0; padding: 0; border: 0; -webkit-appearance: none; appearance: none; background: transparent; position: relative; cursor: pointer; }
+.pcarousel__dot { width: 16px; height: 28px; min-width: 0; min-height: 0; padding: 0; border: 0; -webkit-appearance: none; appearance: none; background: transparent; position: relative; cursor: pointer; }
 .pcarousel__dot::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; background: rgb(255 255 255 / 0.55); box-shadow: 0 0 2px rgb(0 0 0 / 0.5); }
 .pcarousel__dot--on::after { background: #fff; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; }
 
@@ -4031,7 +4031,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .recbar__cancel,
 .voice__btn,
 .evpost__del { position: relative; }
-.pcarousel__dot::after,
 .composepics__remove::after,
 .composegrid__remove::after,
 .comment__del::after,
