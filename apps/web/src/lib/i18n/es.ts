@@ -1310,6 +1310,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Vocês não são mais amigos. O histórico continua aqui, mas não dá para enviar novas mensagens.": "Ya no son amigos. El historial sigue aquí, pero no se pueden enviar mensajes nuevos.",
   "Vocês são amigos": "Son amigos",
   "Vocês viram amigos quando se seguem. Se o perfil for privado, a pessoa precisa aprovar seu pedido.": "Son amigos cuando se siguen. Si el perfil es privado, la persona debe aprobar tu solicitud.",
+  "Enviamos um código de 6 números para o e-mail da conta. Ele vale por {minutes} minutos.": "Enviamos un código de 6 dígitos al correo de la cuenta. Vale por {minutes} minutos.",
+  "Não encontramos uma conta com esse e-mail ou @usuário": "No encontramos una cuenta con ese correo o @usuario",
   "Voltar": "Volver",
   "Voltar ao Flash": "Volver a Flash",
   "Voltar para as fotos": "Volver a las fotos",

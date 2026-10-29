@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { AuthLayout } from '../components/AuthLayout.tsx';
 import { ConsentFields } from '../components/consent-fields.tsx';
@@ -23,7 +23,8 @@ import {
 } from '../lib/validation.ts';
 import { parseInvite, rememberInvite } from '../lib/invite.ts';
 import { safeStorage } from '../lib/hints.ts';
-import { Link, useSearch } from '../router.tsx';
+import { ChevronLeftIcon } from '../components/icons.tsx';
+import { Link, navigate, useSearch } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 function useNow(intervalMs = 1000): number {
@@ -33,6 +34,15 @@ function useNow(intervalMs = 1000): number {
     return () => window.clearInterval(handle);
   }, [intervalMs]);
   return now;
+}
+
+/** "<" no canto de cima à esquerda das telas de código. */
+function BackButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button type="button" className="pagehead__back form__back" aria-label={t('Voltar')} onClick={onClick} disabled={disabled}>
+      <ChevronLeftIcon />
+    </button>
+  );
 }
 
 export function LoginScreen() {
@@ -208,6 +218,7 @@ export function SignupScreen() {
     return (
       <AuthLayout>
         <form className="form" onSubmit={submitCode} noValidate>
+          <BackButton onClick={backToDetails} disabled={busy} />
           <h2 className="form__title">{t('Confirme seu e-mail')}</h2>
           <p className="form__text">
             {t('Enviamos um código de 6 números para')} <strong>{started.email}</strong>. {t('Ele vale por 10 minutos.')}
@@ -270,6 +281,8 @@ export function ForgotPasswordScreen() {
   const [info, setInfo] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const now = useNow();
+  const redirect = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(redirect.current), []);
 
   async function request(event?: FormEvent) {
     event?.preventDefault();
@@ -277,6 +290,7 @@ export function ForgotPasswordScreen() {
     setErrors(found);
     setFormError(undefined);
     setInfo(undefined);
+    window.clearTimeout(redirect.current);
     if (Object.keys(found).length > 0) return;
     setBusy(true);
     try {
@@ -287,6 +301,11 @@ export function ForgotPasswordScreen() {
       const error = toApiError(failure);
       setErrors(error.fields);
       setFormError(Object.keys(error.fields).length === 0 ? error.message : undefined);
+      // Sem conta com esse dado: mostra o aviso e, depois de 3 s, leva para o login.
+      if (error.fields['identifier'] !== undefined && error.code === 'VALIDATION') {
+        setFormError(error.message);
+        redirect.current = window.setTimeout(() => navigate('/entrar'), 3000);
+      }
     } finally {
       setBusy(false);
     }
@@ -315,9 +334,10 @@ export function ForgotPasswordScreen() {
     return (
       <AuthLayout>
         <form className="form" onSubmit={confirm} noValidate>
+          <BackButton onClick={() => setStarted(undefined)} disabled={busy} />
           <h2 className="form__title">{t('Criar nova senha')}</h2>
           <p className="form__text">
-            {t('Se existir uma conta com esse dado, enviamos um código de 6 números para o e-mail dela. Ele vale por {minutes} minutos.', { minutes: started.expiresInMinutes })}
+            {t('Enviamos um código de 6 números para o e-mail da conta. Ele vale por {minutes} minutos.', { minutes: started.expiresInMinutes })}
           </p>
           {import.meta.env.DEV ? <Notice tone="info">{t('Ambiente de desenvolvimento: o código não chega por e-mail, aparece no log da API.')}</Notice> : null}
           {info ? <Notice tone="ok">{info}</Notice> : null}
@@ -333,7 +353,7 @@ export function ForgotPasswordScreen() {
               small
               onClick={async () => {
                 await request();
-                setInfo(t('Se a conta existir, enviamos um novo código. O anterior deixou de valer.'));
+                setInfo(t('Enviamos um novo código. O anterior deixou de valer.'));
               }}
               disabled={busy || wait > 0}
             >

@@ -469,6 +469,15 @@ button {
   justify-content: space-between;
 }
 
+.form__back {
+  align-self: flex-start;
+  margin: -8px 0 -4px -12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
 .form__switch {
   color: var(--ink-2);
   text-align: center;

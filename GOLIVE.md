@@ -396,3 +396,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 ## Apple 1.0 (7): segunda rejeição (29/10)
 - 2.3.6: "Age Assurance" do questionário de classificação passou para No (resultado igual: 18+, Brasil 16). Feito no App Store Connect.
 - 1.2: o app já tem Termos no cadastro (checkbox), denunciar e bloquear. Falta o vídeo em aparelho físico mostrando: Termos antes do cadastro, denúncia e bloqueio. Depois: anexar na resposta à Apple e no campo Notes, e reenviar o build 7 (sem build novo).
+
+## Recuperar senha / telas de código (29/10)
+- Site: botão "<" (voltar) no topo esquerdo das telas de código (cadastro e recuperar senha); se não existe conta com o e-mail/@usuário, mostra o aviso e depois de 3 s vai para o login. O servidor já avisa (publicado no Render).
+- O app iOS (build 7) só tem isso quando sair um build novo; só o aviso do servidor já vale nele. Não foi visto em tela real (só tipos e testes).
