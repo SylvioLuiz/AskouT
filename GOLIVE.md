@@ -256,7 +256,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 
 **Lacunas e riscos (decidir antes de enviar)**
 - **Filtro automático de conteúdo ofensivo: só o mínimo (23/10/2026).** Há uma lista curta de termos inequívocos barrados em @usuário, nome e biografia (`apps/api/src/core/content-filter.ts`, com testes). NÃO filtra posts, comentários nem mensagens. Antes dizia: A Apple cita "um método para filtrar conteúdo impróprio". Hoje só há denúncia + moderação manual. Muitos apps passam assim, mas é o ponto mais provável de questionamento. Opção barata: lista de palavras bloqueadas em @usuário, nome e descrição. Opção mais forte: moderação automática de imagens (serviço pago).
-- **Prazo de resposta às denúncias:** os Termos dizem "meta de até 24 horas" entre colchetes. Alguém precisa olhar o painel todo dia (o painel mostra o total de denúncias abertas no menu). Ajuste o prazo no texto para o que você consegue cumprir.
+- **Prazo de resposta às denúncias:** os Termos (seção 5) já dizem "em até 24 horas", e a Apple (1.2) exige que isso seja cumprido: alguém precisa olhar o painel admin todo dia, remover o conteúdo e excluir quem o publicou. Bloquear alguém também cria um aviso na fila de moderação (variante BLOCK). Só mude o prazo no texto se não conseguir cumprir.
 - **Denunciar eventos e comentários de donos de local:** eventos criados por donos de local não têm botão de denunciar (só dá para a gestão apagar). Vale incluir se a loja questionar.
 - **Entrar com Apple:** a Apple exige oferecer "Entrar com a Apple" quando há login com Google. Está implementado, mas **nunca foi testado** (precisa de `APPLE_CLIENT_ID` e domínio HTTPS).
 - **Decisão (24/10/2026): a Apple fica em 18+** (Brasil: 16). Isso impede menores de 18 de baixar o app no iPhone. **Feito em 24/10/2026:** `MIN_ACCOUNT_AGE` subiu para 18 (api, web, textos legais e testes), então o cadastro em qualquer canal só aceita 18+.
@@ -392,3 +392,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - 1.2: Termos agora dizem "Tolerância zero", análise de denúncias em até 24 horas e exclusão de quem publicar conteúdo ofensivo (sem colchetes pendentes). **Cumprir esse prazo é compromisso operacional:** olhar o painel de denúncias todo dia.
 - Bloquear alguém agora também cria um registro na fila de denúncias do painel (`variant: 'BLOCK'`, motivo "Outro", texto "Aviso automático…"), sem apagar uma denúncia anterior. Exige deploy da API; o texto novo dos Termos no app exige novo build iOS (8).
 - Pendente: vídeo em aparelho físico (termos no cadastro, denúncia, bloqueio) para responder à Apple e colocar nas Notes.
+
+## Apple 1.0 (7): segunda rejeição (29/10)
+- 2.3.6: "Age Assurance" do questionário de classificação passou para No (resultado igual: 18+, Brasil 16). Feito no App Store Connect.
+- 1.2: o app já tem Termos no cadastro (checkbox), denunciar e bloquear. Falta o vídeo em aparelho físico mostrando: Termos antes do cadastro, denúncia e bloqueio. Depois: anexar na resposta à Apple e no campo Notes, e reenviar o build 7 (sem build novo).
