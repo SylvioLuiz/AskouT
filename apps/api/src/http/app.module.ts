@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ResendEmailSender } from '../infra/email/resend-email-sender.ts';
+import { MODERATION_ALERT, ReportAlertInterceptor } from './report-alert.interceptor.ts';
+import type { AppConfig } from './support/config.ts';
 import { AuthGuard } from './auth.guard.ts';
 import { RateLimitGuard } from './rate-limit.guard.ts';
 import { AuthController } from './controllers/auth.controller.ts';
@@ -44,6 +47,12 @@ import { CONFIG } from './tokens.ts';
     PollDeadlines,
     EventReminders,
     CalendarImportJob,
+    {
+      provide: MODERATION_ALERT,
+      inject: [CONFIG],
+      useFactory: (config: AppConfig) => ({ alerter: config.resend ? new ResendEmailSender(config.resend) : undefined, to: config.moderationEmail }),
+    },
+    { provide: APP_INTERCEPTOR, useClass: ReportAlertInterceptor },
     { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
   ],

@@ -127,6 +127,22 @@ export class ResendEmailSender implements EmailSender {
     );
   }
 
+  /** Aviso interno para a equipe quando alguém denuncia algo (sem dados de quem denunciou). */
+  sendModerationAlert(input: { to: string; what: string; reason: string | undefined }): Promise<void> {
+    return this.deliver(
+      input.to,
+      noticeMessage({
+        subject: `Nova denúncia no AskouT: ${input.what}`,
+        title: 'Nova denúncia para revisar',
+        paragraphs: [
+          `Chegou uma denúncia de ${input.what}${input.reason ? ` (motivo: ${input.reason})` : ''}.`,
+          'Abra o painel admin, julgue o conteúdo, remova o que for ofensivo, retire o usuário se necessário e feche a denúncia. O prazo é de 24 horas.',
+        ],
+        footer: 'Aviso automático do AskouT.',
+      }),
+    );
+  }
+
   private async deliver(to: string, message: Message): Promise<void> {
     let res;
     try {

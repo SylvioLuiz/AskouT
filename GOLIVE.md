@@ -411,3 +411,8 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - `legal-text-en.ts` e `legal-text-es.ts`: traduções de cortesia dos Termos de Uso e da Política de Privacidade, mostradas conforme o idioma do app, com aviso "se houver diferença, vale o português". Mesma estrutura de blocos (testada).
 - Pendente: o advogado revisar as traduções junto com o texto em português. Os trechos "[A revisar com advogado…]" (privacidade 10 e termos 7) aparecem nos três idiomas e devem sair só depois dessa revisão.
 - Build 10 enviada ao App Store Connect em 29/10 (inclui o build 9); aguardando processar no TestFlight.
+
+## Aviso de denúncia por e-mail (30/10)
+- Cada denúncia nova (post, comentário, perfil, conversa, story) manda um e-mail para `MODERATION_EMAIL` (padrão `suporte@askout.com.br`) pelo Resend, para cumprir as 24 h da Apple. O e-mail não traz dados de quem denunciou; diz o tipo e o motivo.
+- Só funciona com `EMAIL_TRANSPORT=resend`. Precisa que `suporte@askout.com.br` receba e-mail (caixa ou encaminhamento): conferir.
+- Falha no envio é silenciosa e nunca atrapalha quem denunciou.
