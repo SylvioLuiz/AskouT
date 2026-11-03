@@ -421,3 +421,4 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Moderação (1.2) e Age Assurance (2.3.6) foram aceitos. Apontou: 4.0 (botão "Sign in with Apple" com arte que não era da Apple e que não parecia botão) e 2.3.3 (screenshots de iPhone 6.3" e iPad não mostram o app em uso).
 - Build 11: botão oficial "Continuar com a Apple" (imagem do serviço da Apple, no idioma do app; reserva em texto se a imagem falhar) e app só para iPhone (`TARGETED_DEVICE_FAMILY = 1`).
 - Falta: screenshots reais do iPhone (5, sem tela de login), apagar as de iPad, trocar para a build 11 e reenviar.
+- Build 12 (03/11): tela de entrada cabe na tela do celular sem rolagem (verificado em 390x844 e 375x667 no Chromium), card menor, e o botão do Google no mesmo padrão do da Apple (retangular, mesma largura e altura). Só a entrada: cadastro e recuperar senha continuam rolando. Não testado em iPhone real.
