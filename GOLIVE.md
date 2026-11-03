@@ -414,7 +414,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 
 ## Aviso de denúncia por e-mail (30/10)
 - Cada denúncia nova (post, comentário, perfil, conversa, story) manda um e-mail para `MODERATION_EMAIL` (padrão `suporte@askout.com.br`) pelo Resend, para cumprir as 24 h da Apple. O e-mail não traz dados de quem denunciou; diz o tipo e o motivo.
-- Só funciona com `EMAIL_TRANSPORT=resend`. Precisa que `suporte@askout.com.br` receba e-mail (caixa ou encaminhamento): conferir.
+- Só funciona com `EMAIL_TRANSPORT=resend`. Precisa que `suporte@askout.com.br` receba e-mail (caixa ou encaminhamento): confirmado pelo dono em 2026-11-03 (recebe). Falta só um teste real de denúncia para ver o alerta chegar.
 - Falha no envio é silenciosa e nunca atrapalha quem denunciou.
 
 ## 3ª reprovação da Apple (03/11, build 10) e build 11
