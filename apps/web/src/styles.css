@@ -4360,9 +4360,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .social { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-top: 16px; }
 .social__or { display: flex; align-items: center; gap: 12px; margin: 0; color: var(--muted, inherit); font-size: 0.8125rem; text-align: center; }
 .social__or::before, .social__or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
-.social__google { display: flex; justify-content: center; min-height: 44px; }
-.social__apple { display: block; width: 100%; max-width: 360px; height: 44px; margin: 0 auto; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
-.social__apple img { display: block; width: 100%; height: 100%; object-fit: fill; border-radius: 8px; }
+.social__google { display: flex; justify-content: center; min-height: 40px; }
+.social__apple { display: block; height: 40px; margin: 0 auto; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.social__apple img { display: block; height: 40px; border-radius: 4px; }
 .social__apple:disabled { opacity: 0.6; cursor: default; }
 .social__apple:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
 .social__choose { margin-top: 16px; }
@@ -4684,3 +4684,26 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .calcard > .confirm, .calcard > .notice { margin: 0 16px 14px; }
 .evcal { justify-content: center; padding: 10px 16px 0; }
 .settings__sub { margin: 20px 0 8px; font-size: 15px; font-weight: 600; }
+
+/* ---------- Entrada: cabe inteira na tela do celular, sem rolagem ---------- */
+.form__switch--row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.9375rem; }
+@media (max-width: 899px) {
+  .auth--fit::before, .auth--fit::after { position: fixed; }
+  .auth--fit .auth__hero { flex: 1 1 auto; min-height: 0; justify-content: center; }
+  .auth--fit { height: 100vh; height: 100dvh; min-height: 0; overflow-x: hidden; overflow-y: auto; justify-content: space-between; }
+  .auth--fit .auth__scene { width: min(100vw, 420px); max-height: clamp(90px, 30dvh, 260px); }
+  .auth--fit .auth__headline { margin-top: -10px; font-size: clamp(1.05rem, 5.2vw, 1.5rem); }
+  .auth--fit .auth__panel { width: calc(100% - 64px); max-width: 340px; margin: 8px auto 14px; padding: 14px; border-radius: 20px; }
+  .auth--fit .form { gap: 10px; }
+  .auth--fit .form__title { font-size: 1.375rem; }
+  .auth--fit .field { gap: 4px; }
+  .auth--fit .field__label { font-size: 0.8125rem; }
+  .auth--fit .field__input { min-height: 40px; padding-top: 0; padding-bottom: 0; }
+  .auth--fit .social { margin-top: 10px; gap: 8px; }
+  .auth--fit .auth__legal { margin: 8px 0 0; font-size: 11.5px; line-height: 1.35; }
+  .auth--fit .auth__hero { overflow: hidden; }
+}
+@media (max-width: 899px) and (max-height: 720px) {
+  .auth--fit .auth__headline { display: none; }
+  .auth--fit .auth__scene { max-height: 190px; }
+}

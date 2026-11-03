@@ -77,7 +77,7 @@ export function LoginScreen() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout fit>
       <form className="form" onSubmit={submit} noValidate>
         <h2 className="form__title">{t('Entrar')}</h2>
         {expired ? <Notice tone="info">{t('Sua sessão expirou. Entre de novo para continuar.')}</Notice> : null}
@@ -87,11 +87,9 @@ export function LoginScreen() {
         <Button type="submit" full loading={busy}>
           {t('Entrar')}
         </Button>
-        <p className="form__switch">
+        <p className="form__switch form__switch--row">
           <Link to="/esqueci-senha">{t('Esqueci minha senha')}</Link>
-        </p>
-        <p className="form__switch">
-          Ainda não tem conta? <Link to="/cadastro">{t('Criar conta')}</Link>
+          <Link to="/cadastro">{t('Criar conta')}</Link>
         </p>
       </form>
       <SocialLogin />

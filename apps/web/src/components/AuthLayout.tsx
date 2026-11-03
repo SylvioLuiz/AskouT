@@ -15,10 +15,11 @@ function useNightTheme(): void {
   }, []);
 }
 
-export function AuthLayout({ children }: { children: ReactNode }) {
+/** `fit`: no celular a tela cabe inteira, sem rolagem (usado na entrada). */
+export function AuthLayout({ children, fit = false }: { children: ReactNode; fit?: boolean }) {
   useNightTheme();
   return (
-    <div className="auth">
+    <div className={fit ? 'auth auth--fit' : 'auth'}>
       <section className="auth__hero">
         <img className="auth__scene" src="/auth-hero.jpg" alt={t('AskouT')} width="780" height="540" />
         <h1 className="auth__headline">{t('Menos tempo combinando. Mais tempo juntos.')}</h1>

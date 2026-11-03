@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ConsentFields } from './consent-fields.tsx';
 import { Button, Field, Notice } from './ui.tsx';
@@ -32,6 +32,15 @@ export function SocialLogin() {
   const apple = providers.data?.items.find((p) => p.provider === 'APPLE');
   const googleBox = useRef<HTMLDivElement>(null);
   const [appleImageFailed, setAppleImageFailed] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  /** Largura dos dois botões (Google e Apple), iguais e medidas na tela. */
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const measure = () => setWidth(Math.max(200, Math.min(360, Math.floor(box.current?.clientWidth ?? 0))));
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [google !== undefined || apple !== undefined]);
 
   async function finish(provider: SocialProviderId, idToken: string) {
     setError(undefined);
@@ -51,7 +60,7 @@ export function SocialLogin() {
   finishRef.current = finish;
 
   useEffect(() => {
-    if (!google || !googleBox.current) return;
+    if (!google || !googleBox.current || width === 0) return;
     let cancelled = false;
     loadScript(GOOGLE_SCRIPT)
       .then(() => {
@@ -64,13 +73,13 @@ export function SocialLogin() {
             if (r.credential) void finishRef.current('GOOGLE', r.credential);
           },
         });
-        api2.renderButton(googleBox.current, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', locale: 'pt-BR', width: Math.min(360, googleBox.current.clientWidth || 320) });
+        api2.renderButton(googleBox.current, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'rectangular', logo_alignment: 'left', locale: getLocale(), width });
       })
       .catch((failure: unknown) => setError(failure instanceof Error ? failure.message : t('Falha ao carregar o login do Google.')));
     return () => {
       cancelled = true;
     };
-  }, [google?.clientId]);
+  }, [google?.clientId, width]);
 
   async function withApple() {
     if (!apple) return;
@@ -90,13 +99,13 @@ export function SocialLogin() {
   }
 
   return (
-    <div className="social">
+    <div className="social" ref={box}>
       <p className="social__or">ou</p>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {google ? <div ref={googleBox} className="social__google" aria-busy={busy || undefined} /> : null}
-      {apple && !appleImageFailed ? (
+      {apple && !appleImageFailed && width > 0 ? (
         <button type="button" className="social__apple" aria-label={t('Continuar com a Apple')} aria-busy={busy || undefined} disabled={busy} onClick={() => void withApple()}>
-          <img src={appleButtonUrl(getLocale())} alt="" width="375" height="46" onError={() => setAppleImageFailed(true)} />
+          <img src={appleButtonUrl(getLocale(), width, 40)} alt="" width={width} height="40" onError={() => setAppleImageFailed(true)} />
         </button>
       ) : null}
       {apple && appleImageFailed ? (
