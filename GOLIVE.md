@@ -416,3 +416,8 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Cada denúncia nova (post, comentário, perfil, conversa, story) manda um e-mail para `MODERATION_EMAIL` (padrão `suporte@askout.com.br`) pelo Resend, para cumprir as 24 h da Apple. O e-mail não traz dados de quem denunciou; diz o tipo e o motivo.
 - Só funciona com `EMAIL_TRANSPORT=resend`. Precisa que `suporte@askout.com.br` receba e-mail (caixa ou encaminhamento): conferir.
 - Falha no envio é silenciosa e nunca atrapalha quem denunciou.
+
+## 3ª reprovação da Apple (03/11, build 10) e build 11
+- Moderação (1.2) e Age Assurance (2.3.6) foram aceitos. Apontou: 4.0 (botão "Sign in with Apple" com arte que não era da Apple e que não parecia botão) e 2.3.3 (screenshots de iPhone 6.3" e iPad não mostram o app em uso).
+- Build 11: botão oficial "Continuar com a Apple" (imagem do serviço da Apple, no idioma do app; reserva em texto se a imagem falhar) e app só para iPhone (`TARGETED_DEVICE_FAMILY = 1`).
+- Falta: screenshots reais do iPhone (5, sem tela de login), apagar as de iPad, trocar para a build 11 e reenviar.
