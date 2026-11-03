@@ -7,10 +7,10 @@ import { useAuthContext } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { consentProblems } from '../lib/age.ts';
 import { toApiError } from '../lib/errors.ts';
-import { GOOGLE_SCRIPT, appleIdToken, googleApi, loadScript, providerLabel } from '../lib/social-login.ts';
+import { GOOGLE_SCRIPT, appleButtonUrl, appleIdToken, googleApi, loadScript, providerLabel } from '../lib/social-login.ts';
 import type { SocialNeedsProfile, SocialProviderId } from '../lib/types.ts';
 import { usernameProblem, normalizeUsername } from '../lib/validation.ts';
-import { t } from '../lib/i18n/index.ts';
+import { getLocale, t } from '../lib/i18n/index.ts';
 
 interface Pending {
   provider: SocialProviderId;
@@ -31,6 +31,7 @@ export function SocialLogin() {
   const google = providers.data?.items.find((p) => p.provider === 'GOOGLE');
   const apple = providers.data?.items.find((p) => p.provider === 'APPLE');
   const googleBox = useRef<HTMLDivElement>(null);
+  const [appleImageFailed, setAppleImageFailed] = useState(false);
 
   async function finish(provider: SocialProviderId, idToken: string) {
     setError(undefined);
@@ -93,7 +94,12 @@ export function SocialLogin() {
       <p className="social__or">ou</p>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {google ? <div ref={googleBox} className="social__google" aria-busy={busy || undefined} /> : null}
-      {apple ? (
+      {apple && !appleImageFailed ? (
+        <button type="button" className="social__apple" aria-label={t('Continuar com a Apple')} aria-busy={busy || undefined} disabled={busy} onClick={() => void withApple()}>
+          <img src={appleButtonUrl(getLocale())} alt="" width="375" height="46" onError={() => setAppleImageFailed(true)} />
+        </button>
+      ) : null}
+      {apple && appleImageFailed ? (
         <Button variant="secondary" full loading={busy} onClick={() => void withApple()}>
           {t('Continuar com a Apple')}
         </Button>

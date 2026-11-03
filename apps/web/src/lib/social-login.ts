@@ -63,6 +63,12 @@ export async function appleIdToken(clientId: string): Promise<string | undefined
   }
 }
 
+/** Botão oficial "Continuar com a Apple": a imagem vem do serviço da própria Apple (Sign in with Apple), no idioma do app. */
+export function appleButtonUrl(locale: string, width = 375, height = 46): string {
+  const lang = locale === 'en' ? 'en_US' : locale === 'es' ? 'es_ES' : 'pt_BR';
+  return `https://appleid.cdn-apple.com/appleid/button?type=continue&color=white&border=false&width=${width}&height=${height}&locale=${lang}`;
+}
+
 export function providerLabel(provider: SocialProviderId): string {
   return provider === 'GOOGLE' ? 'Google' : 'Apple';
 }
