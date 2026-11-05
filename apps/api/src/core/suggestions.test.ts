@@ -148,3 +148,19 @@ test('encontro encerrado ou bloqueio: sugestões somem', async () => {
   await w.core.blocks.block(bia, ana);
   await rejectsWith(w.core.suggestions.forMatch(ana, inviteId), 'NOT_FOUND');
 });
+
+test('raio escolhido na Configuração: amplia ou reduz a busca; valor fora das opções vale o automático', async () => {
+  const { w, ana, inviteId } = await matched();
+  await share(w, ana, inviteId, ANA);
+  await share(w, (await w.core.flash.getMatch(ana, inviteId)).other.userId, inviteId, BIA);
+  const mid = { lat: (ANA.lat + BIA.lat) / 2, lng: (ANA.lng + BIA.lng) / 2 };
+  await venueWithEvent(w, 'Perto', mid.lat + 0.001, mid.lng, 1);
+  await venueWithEvent(w, 'Longe', mid.lat + 0.05, mid.lng, 1); // ~5,5 km
+  const wide = await w.core.suggestions.forMatch(ana, inviteId, { radiusKm: '10' });
+  assert.equal(wide.radiusM, 10_000);
+  assert.ok(wide.items.some((i) => i.venueName === 'Longe'));
+  const auto = await w.core.suggestions.forMatch(ana, inviteId, { radiusKm: '7' });
+  assert.ok(!auto.items.some((i) => i.venueName === 'Longe'), 'fora das opções: automático');
+  const narrow = await w.core.suggestions.forMatch(ana, inviteId, { radiusKm: 2 });
+  assert.equal(narrow.radiusM, 2000);
+});

@@ -4259,6 +4259,16 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .flashbar { height: 11px; overflow: hidden; border-radius: 999px; background: var(--line-strong); }
 .flashbar__fill { display: block; height: 100%; border-radius: 999px; background: var(--brand-grad, var(--brand)); transition: width 1s linear; }
 .flashcard__note { margin: 0; color: var(--ink-2); font-size: 0.9375rem; }
+/* Encontro do NOW: raio da busca e "Sugerir outro lugar". */
+.matchradius { margin: -4px 0 12px; font-size: 0.8125rem; }
+.placesearch { display: grid; gap: 10px; margin-bottom: 16px; }
+.placesearch__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.placesearch__head .matchplaces__h { margin: 0; }
+.placesearch__list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.placesearch__item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 14px; }
+.placesearch__text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.placesearch__text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.placesearch__text .muted { font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* NOW: escolher localização exata ou aproximada ao convidar, aceitar ou durante o encontro. */
 .flashchoice-wrap { display: grid; gap: 10px; margin-top: 10px; }
 .flashchoice { display: grid; gap: 10px; }

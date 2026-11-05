@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { NOW_RADIUS_CHOICES_KM, nowRadiusKm, setNowRadiusKm } from '../lib/now-radius.ts';
 import type { FormEvent } from 'react';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { MuteCard, PushCard } from '../components/notifications.tsx';
@@ -222,6 +223,7 @@ export function SettingsScreen() {
         </div>
       </dl>
       <p className="muted">{t('Ainda não dá para trocar o e-mail ou a senha por aqui. Isso entra numa próxima etapa.')}</p>
+      <NowRadiusSetting />
       <h2 className="profile__section">{t('Avisos no aparelho')}</h2>
       <PushCard />
       <h2 className="profile__section">{t('Silenciar push')}</h2>
@@ -231,6 +233,35 @@ export function SettingsScreen() {
         <Link to="/bloqueados">{t('Pessoas bloqueadas')}</Link>
       </nav>
     </>
+  );
+}
+
+/** Até onde buscar rolês entre você e o amigo num encontro do NOW. Fica salvo neste aparelho. */
+function NowRadiusSetting() {
+  const [km, setKm] = useState<number | null>(() => nowRadiusKm());
+  function choose(next: number | null) {
+    setKm(next);
+    setNowRadiusKm(next);
+  }
+  return (
+    <section className="setting setting--stack">
+      <div>
+        <h2 className="setting__title" id="now-raio-titulo">
+          {t('Distância dos rolês no NOW')}
+        </h2>
+        <p className="setting__help">{t('Até quantos km do meio do caminho entre você e o amigo buscar bares e eventos. No automático, a busca cresce quanto mais longe vocês estão.')}</p>
+      </div>
+      <div className="nowsort" role="radiogroup" aria-labelledby="now-raio-titulo">
+        <button type="button" role="radio" aria-checked={km === null} aria-pressed={km === null} className="chip" onClick={() => choose(null)}>
+          {t('Automático')}
+        </button>
+        {NOW_RADIUS_CHOICES_KM.map((option) => (
+          <button key={option} type="button" role="radio" aria-checked={km === option} aria-pressed={km === option} className="chip" onClick={() => choose(option)}>
+            {option} km
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 

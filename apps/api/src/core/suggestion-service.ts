@@ -12,6 +12,14 @@ export const SUGGESTION_MAX_RADIUS_M = 25_000;
 export function suggestionRadiusM(apartM: number): number {
   return Math.round(Math.min(SUGGESTION_MAX_RADIUS_M, Math.max(SUGGESTION_RADIUS_M, apartM * 0.25)));
 }
+/** Raio escolhido pela pessoa na Configuração (km). Fora disso, vale o automático. */
+export const SUGGESTION_RADIUS_CHOICES_KM: readonly number[] = [2, 5, 10, 25];
+
+/** Raio escolhido pela pessoa, se for uma das opções; senão `undefined` (automático). */
+export function chosenRadiusM(radiusKm: unknown): number | undefined {
+  const km = typeof radiusKm === 'string' && radiusKm.trim() !== '' ? Number(radiusKm) : radiusKm;
+  return typeof km === 'number' && SUGGESTION_RADIUS_CHOICES_KM.includes(km) ? km * 1000 : undefined;
+}
 /** Eventos em andamento ou que começam nas próximas horas. */
 export const SUGGESTION_WINDOW_HOURS = 12;
 export const SUGGESTION_MAX_ITEMS = 10;
@@ -68,7 +76,7 @@ export class SuggestionService {
   }
 
   /** Lugares e eventos perto do ponto médio entre você e a pessoa do encontro. */
-  async forMatch(actorId: string, inviteId: string): Promise<SuggestionsView> {
+  async forMatch(actorId: string, inviteId: string, options: { radiusKm?: unknown } = {}): Promise<SuggestionsView> {
     const { places, placeSource, clock } = this.deps;
     const { me, them } = await this.flash.positionsForMatch(actorId, inviteId);
     if (!me || !them) throw conflict('Os dois precisam compartilhar a localização para ver sugestões');
@@ -76,7 +84,7 @@ export class SuggestionService {
     const mine = { lat: me.lat, lng: me.lng };
     const theirs = { lat: them.lat, lng: them.lng };
     const mid = midpoint(mine, theirs);
-    const radiusM = suggestionRadiusM(distanceMeters(mine, theirs));
+    const radiusM = chosenRadiusM(options.radiusKm) ?? suggestionRadiusM(distanceMeters(mine, theirs));
 
     const now = clock.now();
     const to = new Date(now.getTime() + SUGGESTION_WINDOW_HOURS * 3_600_000);

@@ -3,6 +3,8 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BoltIcon, CalendarIcon, ChatIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, RefreshIcon, ShieldIcon, UserPlusIcon, UsersIcon, BulbIcon } from '../components/icons.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { RingLoader } from '../components/ring-loader.tsx';
+import { MatchPlaceSearch } from '../components/match-place-search.tsx';
+import { nowRadiusKm } from '../lib/now-radius.ts';
 import { ChatButton } from '../components/chat-button.tsx';
 import { InviteSheet } from '../components/invite.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
@@ -1165,7 +1167,8 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
 
   // Bares e eventos entre os dois: só quando os dois já compartilharam a localização.
   const bothShared = Boolean(match.data?.me && match.data?.them);
-  const suggestions = useAsync(() => (bothShared ? api.flashSuggestions(inviteId) : Promise.resolve(undefined)), [inviteId, bothShared]);
+  const radiusKm = nowRadiusKm();
+  const suggestions = useAsync(() => (bothShared ? api.flashSuggestions(inviteId, radiusKm) : Promise.resolve(undefined)), [inviteId, bothShared, radiusKm]);
   usePolling(suggestions.reload, 60_000, bothShared);
   // Rota de cada um até o lugar escolhido; some se ninguém escolheu.
   const dest = match.data?.destination ?? null;
@@ -1214,6 +1217,21 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
       await api.flashChooseDestination(inviteId, { name: placeName(item), lat: item.lat, lng: item.lng });
       setPickedKey(undefined);
       match.reload();
+    } catch (failure) {
+      setFeedback({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setDestBusy(false);
+    }
+  }
+
+  async function suggestPlace(place: { name: string; lat: number; lng: number }) {
+    setDestBusy(true);
+    setFeedback(undefined);
+    try {
+      await api.flashChooseDestination(inviteId, place);
+      setPickedKey(undefined);
+      match.reload();
+      setFeedback({ tone: 'ok', text: t('{place} sugerido para {name}.', { place: place.name, name: data.other.username }) });
     } catch (failure) {
       setFeedback({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -1311,6 +1329,15 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         onSelect={setPickedKey}
         onChoose={(item) => void chooseDestination(item)}
       />
+      {suggestions.data ? (
+        <p className="muted matchradius">
+          {radiusKm === null
+            ? t('Buscando até {km} km do meio do caminho (automático).', { km: Math.round(suggestions.data.radiusM / 100) / 10 })
+            : t('Buscando até {km} km do meio do caminho.', { km: radiusKm })}{' '}
+          <Link to="/configuracao">{t('Mudar')}</Link>
+        </p>
+      ) : null}
+      <MatchPlaceSearch center={myPoint ?? (them ? { lat: them.lat, lng: them.lng } : undefined)} otherName={data.other.username} busy={destBusy} onSuggest={(place) => void suggestPlace(place)} />
 
       <section className="sharebox" aria-label={t('Sua localização')}>
         <PrecisionPicker approx={data.meApprox === true} disabled={precisionBusy} onChange={(approx) => void changePrecision(approx)} text={t('{name} vê sua localização {how}.', { name: data.other.username, how: data.meApprox ? t('aproximada') : t('exata') })} />
