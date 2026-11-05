@@ -67,4 +67,4 @@ Configuração (uma vez):
 1. App Store Connect → Users and Access → Integrations → App Store Connect API → **Generate API Key** com acesso **Admin** (precisa ser Admin para o Xcode criar o certificado de distribuição sozinho). Baixar o `.p8` (só baixa uma vez) e anotar o **Key ID** e o **Issuer ID**.
 2. GitHub → repositório → Settings → Secrets and variables → Actions → New repository secret: `ASC_KEY_ID`, `ASC_ISSUER_ID` e `ASC_KEY_P8` (abrir o `.p8` num editor de texto e colar o conteúdo inteiro, com as linhas BEGIN/END).
 
-Para enviar: pôr a versão desejada na branch `testflight` (`git push origin homolog-ari:testflight --force`) ou, com o arquivo na main, Actions → "iOS → TestFlight" → Run workflow. O número do build é 13 + o número da execução.
+Envio: automático a cada push na main (manda o que estiver na main). Também dá para rodar à mão em Actions → "iOS → TestFlight" → Run workflow. O número do build é 13 + o número da execução.
