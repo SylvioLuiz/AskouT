@@ -1,0 +1,94 @@
+# Gera o app do iPhone num Mac do GitHub e envia ao TestFlight.
+# Uso: enviar a versão desejada para a branch `testflight` (ex.: git push origin homolog-ari:testflight --force)
+# ou, depois que este arquivo estiver na main, GitHub → Actions → "iOS → TestFlight" → Run workflow.
+# Precisa dos segredos (Settings → Secrets and variables → Actions):
+#   ASC_KEY_ID, ASC_ISSUER_ID e ASC_KEY_P8 (conteúdo do arquivo .p8 da chave de API do App Store Connect, acesso Admin).
+# Não envia para revisão da loja: o build só aparece no TestFlight.
+name: iOS → TestFlight
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [testflight]
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      VITE_API_URL: https://api.askout.com.br
+      TEAM_ID: 359NDWACC5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Escolher o Xcode mais novo
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar o site e copiar para o iOS
+        working-directory: apps/mobile
+        run: npm run build:web && npx cap sync ios
+
+      - name: Chave da API da Apple
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/asc"
+          printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/asc/AuthKey.p8" >> "$GITHUB_ENV"
+
+      - name: Número do build
+        # Sempre maior que o último enviado à mão (13) e que os envios anteriores deste fluxo.
+        run: echo "BUILD_NUMBER=$((13 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
+      - name: Arquivar (Archive)
+        working-directory: apps/mobile/ios/App
+        run: |
+          xcodebuild archive \
+            -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+
+      - name: Enviar ao App Store Connect
+        run: |
+          cat > "$RUNNER_TEMP/export.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/export.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+          echo "Build $BUILD_NUMBER enviado. Aparece no TestFlight em 10 a 30 minutos." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apagar a chave
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/asc"
