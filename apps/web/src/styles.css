@@ -4904,7 +4904,8 @@ button.reactlist__row { cursor: pointer; }
 .composer__tool { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; }
 .composer__tool svg { width: 24px; height: 24px; }
 .composer__tool:hover, .composer__tool:focus-visible { background: var(--bg); }
-.composer__sendtext { flex: none; height: 40px; padding: 0 14px; border: 0; border-radius: 20px; background: transparent; color: var(--brand-text, var(--brand)); font: inherit; font-weight: 700; cursor: pointer; }
+.composer__sendtext { flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: var(--brand); color: var(--brand-ink); cursor: pointer; }
+.composer__sendtext svg { width: 22px; height: 22px; }
 .composer__sendtext:disabled { opacity: 0.5; }
 .composer button:disabled { cursor: default; }
 
