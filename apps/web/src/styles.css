@@ -1713,7 +1713,7 @@ button {
   background: var(--brand-hover);
 }
 
-/* "Chame a galera": convite na Home enquanto a pessoa tem poucos amigos. Mais discreto que o Flash, para os dois não brigarem. */
+/* "Chame a galera": convite para compartilhar o link, no topo do menu do perfil. */
 .invitecta {
   display: flex;
   align-items: center;

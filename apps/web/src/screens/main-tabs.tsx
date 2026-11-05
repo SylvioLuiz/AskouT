@@ -1,6 +1,4 @@
-import { BoltIcon, CalendarIcon, UsersIcon } from '../components/icons.tsx';
-import { InviteSheet } from '../components/invite.tsx';
-import { showInviteCard } from '../lib/invite.ts';
+import { BoltIcon, CalendarIcon } from '../components/icons.tsx';
 import { EmptyState, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
@@ -21,9 +19,7 @@ export function HomeScreen() {
   useTitle(t('Home'));
   const user = useUser();
   const flash = useAsync(() => api.flashStatus(), []);
-  const friends = useAsync(() => api.friends(), []);
   const me = useAsync(() => api.getProfile(user.profile.username), [user.profile.username]);
-  const [inviting, setInviting] = useState(false);
   const flashOn = flash.data?.active === true;
   const followed = useAsync(() => api.followedEvents(), []);
   const followedEvents = followed.data?.events ?? [];
@@ -40,7 +36,6 @@ export function HomeScreen() {
       onRefresh={async () => {
         setFeedKey((k) => k + 1);
         flash.reload();
-        friends.reload();
         me.reload();
         followed.reload();
         sponsored.reload();
@@ -49,8 +44,6 @@ export function HomeScreen() {
         await new Promise((resolve) => setTimeout(resolve, 700));
       }}
     >
-      <PageHead title={t('Olá, {name}', { name: user.profile.displayName })} />
-
       {plan ? (
         <Link to="/agenda" className="nextplan" aria-label={t('Seu próximo plano: {now}, {title}. Abrir a agenda', { now: planWhenLabel(plan, now), title: plan.title })}>
           <span className="nextplan__icon" aria-hidden="true">
@@ -61,19 +54,6 @@ export function HomeScreen() {
           </span>
         </Link>
       ) : null}
-
-      {showInviteCard(friends.data?.length) ? (
-        <button type="button" className="invitecta" onClick={() => setInviting(true)}>
-          <span className="invitecta__icon" aria-hidden="true">
-            <UsersIcon />
-          </span>
-          <span className="invitecta__text">
-            <span className="invitecta__title">{t('Chame a galera')}</span>
-            <span className="invitecta__sub">{t('O AskouT é melhor com os amigos. Compartilhe o link.')}</span>
-          </span>
-        </button>
-      ) : null}
-      {inviting ? <InviteSheet onClose={() => setInviting(false)} /> : null}
 
       {showFlashCard(me.data?.counts.following) ? (
         <Link to="/flash" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
