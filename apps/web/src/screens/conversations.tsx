@@ -808,8 +808,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                   }}
                 />
                 {draft.trim() !== '' || staged.length > 0 ? (
-                  <button type="submit" className="composer__sendtext" disabled={sending} aria-busy={sending || undefined}>
-                    {t('Enviar')}
+                  <button type="submit" className="composer__sendtext" disabled={sending} aria-busy={sending || undefined} aria-label={t('Enviar')}>
+                    <ArrowUpIcon />
                   </button>
                 ) : (
                   <span className="composer__tools">

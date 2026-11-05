@@ -145,7 +145,7 @@ export type { ConversationListItem, ConversationView, GroupDetails, MessageView 
 export { RecommendationService } from './recommendation-service.ts';
 export type { RecommendationItem, RecommendationsView } from './recommendation-service.ts';
 export { DwellService } from './dwell-service.ts';
-export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_APART_M } from './suggestion-service.ts';
+export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_RADIUS_M, suggestionRadiusM } from './suggestion-service.ts';
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { EventPageService } from './event-page-service.ts';
 export { EventReminderService } from './event-reminder-service.ts';

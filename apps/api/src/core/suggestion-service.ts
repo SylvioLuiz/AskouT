@@ -3,10 +3,15 @@ import type { FlashService } from './flash-service.ts';
 import { conflict } from './errors.ts';
 import { distanceMeters, midpoint } from './geo.ts';
 
-/** Raio em volta do ponto médio entre as duas pessoas. */
+/** Raio mínimo em volta do ponto médio entre as duas pessoas. */
 export const SUGGESTION_RADIUS_M = 3000;
-/** Se estiverem mais longe que isto, "perto dos dois" deixa de fazer sentido. */
-export const SUGGESTION_MAX_APART_M = 20_000;
+/** Não há limite de distância entre as pessoas: quanto mais longe, maior o raio, até este teto. */
+export const SUGGESTION_MAX_RADIUS_M = 25_000;
+
+/** Raio de busca no meio do caminho: 3 km para quem está perto e cresce com a distância entre os dois. */
+export function suggestionRadiusM(apartM: number): number {
+  return Math.round(Math.min(SUGGESTION_MAX_RADIUS_M, Math.max(SUGGESTION_RADIUS_M, apartM * 0.25)));
+}
 /** Eventos em andamento ou que começam nas próximas horas. */
 export const SUGGESTION_WINDOW_HOURS = 12;
 export const SUGGESTION_MAX_ITEMS = 10;
@@ -43,7 +48,7 @@ export interface SuggestionItem {
 }
 
 export interface SuggestionsView {
-  /** TOO_FAR: estão distantes demais. NO_LOCATION não existe aqui: falta de posição vira erro 409. */
+  /** Sempre null hoje (não há mais limite de distância); o campo fica para não quebrar apps já instalados. */
   reason: 'TOO_FAR' | null;
   radiusM: number;
   /** false quando a fonte externa de lugares (Google ou OpenStreetMap) não respondeu (a lista pode ter só eventos do AskouT). */
@@ -71,13 +76,11 @@ export class SuggestionService {
     const mine = { lat: me.lat, lng: me.lng };
     const theirs = { lat: them.lat, lng: them.lng };
     const mid = midpoint(mine, theirs);
-    if (distanceMeters(mine, theirs) > SUGGESTION_MAX_APART_M) {
-      return { reason: 'TOO_FAR', radiusM: SUGGESTION_RADIUS_M, placesAvailable: true, items: [] };
-    }
+    const radiusM = suggestionRadiusM(distanceMeters(mine, theirs));
 
     const now = clock.now();
     const to = new Date(now.getTime() + SUGGESTION_WINDOW_HOURS * 3_600_000);
-    const found = await places.findEventsNear(mid, SUGGESTION_RADIUS_M, now, to, SUGGESTION_MAX_ITEMS);
+    const found = await places.findEventsNear(mid, radiusM, now, to, SUGGESTION_MAX_ITEMS);
 
     const toItem = (item: Omit<SuggestionItem, 'distanceFromMeM' | 'distanceFromThemM' | 'distanceFromMidM' | 'rating' | 'ratingCount' | 'photoRef' | 'photoAuthor' | 'mapsUri'> & Partial<Pick<SuggestionItem, 'rating' | 'ratingCount' | 'photoRef' | 'photoAuthor' | 'mapsUri'>>): SuggestionItem => {
       const at = { lat: item.lat, lng: item.lng };
@@ -102,13 +105,13 @@ export class SuggestionService {
 
     let placesAvailable = true;
     if (items.length < SUGGESTION_MIN_EVENTS) {
-      const osm = await placeSource.nearby(mid, SUGGESTION_RADIUS_M, SUGGESTION_MAX_ITEMS * 2);
+      const osm = await placeSource.nearby(mid, radiusM, SUGGESTION_MAX_ITEMS * 2);
       placesAvailable = osm.available;
       const seen = new Set(items.map((i) => i.venueName.trim().toLowerCase()));
       const extra = osm.places
         .filter((p) => !seen.has(p.name.trim().toLowerCase()))
         .map((p) => ({ p, d: distanceMeters({ lat: p.lat, lng: p.lng }, mid) }))
-        .filter(({ d }) => d <= SUGGESTION_RADIUS_M)
+        .filter(({ d }) => d <= radiusM)
         .sort((a, b) => a.d - b.d);
       for (const { p } of extra) {
         if (items.length >= SUGGESTION_MAX_ITEMS) break;
@@ -136,6 +139,6 @@ export class SuggestionService {
         );
       }
     }
-    return { reason: null, radiusM: SUGGESTION_RADIUS_M, placesAvailable, items };
+    return { reason: null, radiusM, placesAvailable, items };
   }
 }

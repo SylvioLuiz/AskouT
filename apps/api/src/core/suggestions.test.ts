@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { distanceMeters } from './geo.ts';
-import { SUGGESTION_MAX_ITEMS } from './suggestion-service.ts';
+import { SUGGESTION_MAX_ITEMS, SUGGESTION_MAX_RADIUS_M, suggestionRadiusM } from './suggestion-service.ts';
 import { rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
 
@@ -113,14 +113,23 @@ test('não chama o OpenStreetMap quando já há eventos suficientes e respeita o
   assert.equal(w.placeSource.calls, 0);
 });
 
-test('longe demais um do outro: sem sugestões e sem consultar fontes', async () => {
+test('mesmo muito longe um do outro, mostra opções no meio do caminho com raio maior', async () => {
   const { w, ana, bia, inviteId } = await matched();
+  const RIO = { lat: -22.9, lng: -43.2 };
   await share(w, ana, inviteId, ANA);
-  await share(w, bia, inviteId, { lat: -22.9, lng: -43.2 }); // Rio
+  await share(w, bia, inviteId, RIO);
+  const mid = { lat: (ANA.lat + RIO.lat) / 2, lng: (ANA.lng + RIO.lng) / 2 };
+  await venueWithEvent(w, 'Bar do meio', mid.lat, mid.lng, 1);
   const view = await w.core.suggestions.forMatch(ana, inviteId);
-  assert.equal(view.reason, 'TOO_FAR');
-  assert.deepEqual(view.items, []);
-  assert.equal(w.placeSource.calls, 0);
+  assert.equal(view.reason, null);
+  assert.equal(view.radiusM, SUGGESTION_MAX_RADIUS_M);
+  assert.equal(view.items[0]?.venueName, 'Bar do meio');
+});
+
+test('o raio cresce com a distância entre os dois, de 3 km até o teto', () => {
+  assert.equal(suggestionRadiusM(1_000), 3000);
+  assert.equal(suggestionRadiusM(40_000), 10_000);
+  assert.equal(suggestionRadiusM(400_000), SUGGESTION_MAX_RADIUS_M);
 });
 
 test('a resposta nunca traz a posição das pessoas, só dos lugares e distâncias', async () => {

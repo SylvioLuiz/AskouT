@@ -33,7 +33,6 @@ export function MatchPlaces({ bothShared, loading, error, suggestions, places, o
       <h2 className="matchplaces__h">{t('Lugares entre vocês')}</h2>
       {loading && !suggestions ? <Loading label={t('Buscando rolês')} /> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {suggestions?.reason === 'TOO_FAR' ? <Notice>{t('Vocês estão longe demais um do outro para achar algo no meio do caminho.')}</Notice> : null}
       {suggestions && suggestions.reason === null && places.length === 0 ? <p className="muted">{t('Nenhum evento ou rolê encontrado por perto agora.')}</p> : null}
       {places.length > 0 ? (
         <>

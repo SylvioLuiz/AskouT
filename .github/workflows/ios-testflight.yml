@@ -21,6 +21,8 @@ jobs:
     timeout-minutes: 60
     env:
       VITE_API_URL: https://api.askout.com.br
+      # Chave do Google Maps (de navegador, restrita por site no Google Cloud). Cadastrar em GitHub → Settings → Secrets and variables → Actions → Variables.
+      VITE_GOOGLE_MAPS_API_KEY: ${{ vars.VITE_GOOGLE_MAPS_API_KEY }}
       TEAM_ID: 359NDWACC5
     steps:
       - uses: actions/checkout@v4
