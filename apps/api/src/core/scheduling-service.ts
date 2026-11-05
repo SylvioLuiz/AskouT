@@ -366,6 +366,74 @@ export class SchedulingService {
     return done;
   }
 
+  /**
+   * Atalho de quem organiza, quando todos já votaram (ou os votos foram encerrados): confirma a melhor data de uma vez.
+   * Cria o encontro já com quem votou "posso" e "talvez" naquele dia, todos confirmados (mais quem organiza), sem etapa de confirmação.
+   * Quem votou "não posso" ou não respondeu fica de fora. Sem `date`, usa a primeira do ranking.
+   */
+  async confirmBest(actorId: string, pollId: unknown, date?: unknown): Promise<PollView> {
+    const { scheduling, meetups, conversations, blocks, clock, ids } = this.deps;
+    const poll = await this.accessible(actorId, pollId);
+    if (poll.organizerId !== actorId) throw forbidden('Só quem criou a votação confirma a data');
+    if (poll.status !== 'VOTING') throw conflict(poll.status === 'CONFIRMING' ? 'Já existe uma data em confirmação' : 'Esta votação já terminou');
+    const participants = await scheduling.listParticipants(poll.id);
+    if (!this.isClosed(poll) && !participants.every((p) => p.finishedAt !== null)) throw conflict('Ainda faltam pessoas concluírem a votação');
+
+    const votes = await scheduling.listVotes(poll.id);
+    const days = computeDateStats(dateRange(poll.rangeStart, poll.rangeEnd), votes, participants.map((p) => p.userId), this.thresholds(poll));
+    const ranking = rankDates(days);
+    const chosen = date === undefined || date === null ? ranking[0]?.date : date;
+    if (!isDay(chosen) || chosen < poll.rangeStart || chosen > poll.rangeEnd) throw validationError('Dia fora do período', { date: `Só de ${dayFmt(poll.rangeStart)} a ${dayFmt(poll.rangeEnd)}` });
+    const stats = days.find((d) => d.date === chosen)!;
+
+    const now = clock.now();
+    const startsAt = zonedTimeToUtc(chosen, poll.preferredTimeStart ?? POLL_DEFAULT_START, poll.timezone);
+    if (startsAt <= now) throw validationError('Esse dia já passou', { date: 'Escolha uma data futura' });
+    const endsAt = new Date(startsAt.getTime() + poll.durationMinutes * 60_000);
+
+    const hidden = new Set(await blocks.listRelatedIds(actorId));
+    const can = new Set(votes.filter((v) => v.date === chosen && (v.status === 'YES' || v.status === 'MAYBE')).map((v) => v.userId));
+    const going = participants.map((p) => p.userId).filter((userId) => userId === actorId || (can.has(userId) && !hidden.has(userId)));
+
+    const proposal: PollProposalRecord = {
+      id: ids.next(),
+      pollId: poll.id,
+      candidateDate: chosen,
+      candidateStartAt: startsAt,
+      candidateEndAt: endsAt,
+      compatibilityScore: stats.compatibility,
+      coverageScore: stats.coverage,
+      availableCount: stats.yes,
+      maybeCount: stats.maybe,
+      unavailableCount: stats.no,
+      unansweredCount: stats.unanswered,
+      status: 'CONFIRMED',
+      createdAt: now,
+    };
+    const meetup: MeetupRecord = {
+      id: ids.next(),
+      organizerId: poll.organizerId,
+      conversationId: poll.conversationId,
+      eventId: null,
+      eventPostId: poll.eventPostId ?? null,
+      title: poll.title,
+      startsAt,
+      endsAt,
+      status: 'ACTIVE',
+      createdAt: now,
+      participants: going.map((userId) => ({ userId, status: 'CONFIRMED' as const, respondedAt: now })),
+    };
+    await scheduling.createProposal(proposal);
+    for (const userId of going) await scheduling.setConfirmation(proposal.id, poll.id, userId, 'CONFIRMED', now);
+    await meetups.create(meetup);
+    await scheduling.updatePoll(poll.id, { status: 'FINALIZED', finalProposalId: proposal.id, meetupId: meetup.id, ...(poll.votingClosedAt ? {} : { votingClosedAt: now }) });
+    const card: MessageRecord = { id: ids.next(), conversationId: poll.conversationId, senderId: poll.organizerId, kind: 'MEETUP', body: `Encontro: ${poll.title}`, suggestion: null, response: null, respondedAt: null, meetupId: meetup.id, createdAt: now };
+    await conversations.addMessage(card);
+    await this.postSystem(poll.conversationId, poll.organizerId, `Data definida: ${dayFmt(chosen)} para "${poll.title}". ${going.length} ${going.length === 1 ? 'pessoa confirmada' : 'pessoas confirmadas'}.`, now);
+    await this.notifyAll(poll.organizerId, going.filter((id) => id !== poll.organizerId), poll, `Data definida: ${dayFmt(chosen)}`, `Você está confirmado em "${poll.title}". Veja na sua agenda.`);
+    return this.view(actorId, { ...poll, status: 'FINALIZED', finalProposalId: proposal.id, meetupId: meetup.id });
+  }
+
   /** Quem organiza desiste da data proposta e a votação volta a ficar aberta. */
   async withdraw(actorId: string, pollId: unknown): Promise<PollView> {
     const { scheduling } = this.deps;

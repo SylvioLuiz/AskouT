@@ -1881,4 +1881,11 @@ export const ES: Readonly<Record<string, string>> = {
   "Votação não encontrada": "Votación no encontrada",
   "Áudio inválido": "Audio no válido",
   "Áudio não encontrado": "Audio no encontrado",
+  "Melhor data: {date}": "Mejor fecha: {date}",
+  "Confirmar melhor data": "Confirmar la mejor fecha",
+  "Todos votaram: melhor data": "Todos votaron: mejor fecha",
+  "de compatibilidade": "de compatibilidad",
+  "Ao confirmar, o evento é criado com {n} pessoas já confirmadas: quem votou “posso” ou “talvez” nesta data. Quem não pode fica de fora.": "Al confirmar, el evento se crea con {n} personas ya confirmadas: quienes votaron “puedo” o “quizás” en esta fecha. Quienes no pueden quedan fuera.",
+  "Confirmar esta data e criar o evento": "Confirmar esta fecha y crear el evento",
+  "Ver outras datas": "Ver otras fechas",
 };

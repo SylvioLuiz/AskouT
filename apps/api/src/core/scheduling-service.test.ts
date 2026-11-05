@@ -260,3 +260,46 @@ test('prazo: votação já encerrada à mão, proposta ou cancelada não avisa',
   w.clock.tick(2 * 3_600_000);
   assert.equal(await w.core.scheduling.notifyDeadlines(), 0);
 });
+
+test('confirmar a melhor data: só quando todos concluíram; cria o encontro com quem pode e quem talvez, todos confirmados', async () => {
+  const { w, ana, bia, caio, dani, poll, group } = await setup('MAJORITY');
+  await rejectsWith(w.core.scheduling.confirmBest(ana, poll.id), 'CONFLICT');
+  await w.core.scheduling.vote(ana, poll.id, { status: 'YES', dates: ['2026-10-24'] });
+  await w.core.scheduling.vote(bia, poll.id, { status: 'YES', dates: ['2026-10-24'] });
+  await w.core.scheduling.vote(caio, poll.id, { status: 'MAYBE', dates: ['2026-10-24'] });
+  await w.core.scheduling.vote(dani, poll.id, { status: 'NO', dates: ['2026-10-24'] });
+  for (const id of [ana, bia, caio]) await w.core.scheduling.finish(id, poll.id, true);
+  // ainda falta a Dani concluir
+  await rejectsWith(w.core.scheduling.confirmBest(ana, poll.id), 'CONFLICT');
+  await w.core.scheduling.finish(dani, poll.id, true);
+  await rejectsWith(w.core.scheduling.confirmBest(bia, poll.id), 'FORBIDDEN');
+  await rejectsWith(w.core.scheduling.confirmBest(ana, poll.id, '2026-11-24'), 'VALIDATION');
+  const v = await w.core.scheduling.confirmBest(ana, poll.id, '2026-10-24');
+  assert.equal(v.status, 'FINALIZED');
+  assert.equal(v.final?.date, '2026-10-24');
+  assert.ok(v.final?.meetupId);
+  const mine = await w.core.meetups.listMine(ana);
+  const meetup = mine.find((m) => m.id === v.final!.meetupId)!;
+  // Ana (organiza), Bia (posso) e Caio (talvez) confirmados; Dani (não posso) fica de fora.
+  assert.equal(meetup.confirmedCount, 3);
+  assert.equal(meetup.invitedCount, 0);
+  assert.equal(meetup.declinedCount, 0);
+  assert.equal(meetup.myStatus, 'ORGANIZER');
+  const daniView = await w.core.meetups.listMine(dani);
+  assert.equal(daniView.some((m) => m.id === meetup.id), false);
+  const caioView = (await w.core.meetups.listMine(caio)).find((m) => m.id === meetup.id)!;
+  assert.equal(caioView.myStatus, 'CONFIRMED');
+  const chat = await w.core.conversations.messages(dani, group.id);
+  assert.ok(chat.messages.some((m) => m.kind === 'MEETUP'));
+  await rejectsWith(w.core.scheduling.confirmBest(ana, poll.id), 'CONFLICT');
+});
+
+test('confirmar a melhor data: sem informar o dia, usa o 1º do ranking; vale depois de encerrar os votos', async () => {
+  const { w, ana, bia, caio, dani, poll } = await setup('MAJORITY');
+  for (const id of [ana, bia, caio]) await w.core.scheduling.vote(id, poll.id, { status: 'YES', dates: ['2026-10-25'] });
+  for (const id of [ana, bia, caio, dani]) await w.core.scheduling.finish(id, poll.id, true);
+  const before = await w.core.scheduling.get(ana, poll.id);
+  assert.equal(before.ranking[0]!.date, '2026-10-25');
+  const v = await w.core.scheduling.confirmBest(ana, poll.id);
+  assert.equal(v.final?.date, '2026-10-25');
+});

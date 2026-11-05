@@ -68,6 +68,13 @@ export class DatePollsController {
     return this.core.scheduling.propose(actor.userId, id, asBody(body).date);
   }
 
+  /** Quem organiza confirma a melhor data de uma vez, com quem pode e quem talvez: `{date?}` (sem data, vale a 1ª do ranking). */
+  @Post(':id/confirm-best')
+  @HttpCode(200)
+  confirmBest(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
+    return this.core.scheduling.confirmBest(actor.userId, id, asBody(body).date);
+  }
+
   @Post(':id/withdraw')
   @HttpCode(200)
   withdraw(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {

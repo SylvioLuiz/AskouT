@@ -41,6 +41,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<'cancel' | undefined>();
   const [showAll, setShowAll] = useState(false);
+  const [bestDismissed, setBestDismissed] = useState(false);
   // Dias em que você já tem compromisso (encontros e eventos confirmados ou criados por você).
   const myMeetups = useAsync(() => api.myMeetups(), []);
   const myGoing = useAsync(() => api.myGoingEvents(), []);
@@ -52,6 +53,8 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
   const queue = useRef<Promise<unknown>>(Promise.resolve());
 
   const canVote = poll.votingOpen;
+  // Todos já votaram (ou os votos acabaram): quem organiza vê a melhor data e confirma o evento de uma vez.
+  const best = poll.isOrganizer && poll.status === 'VOTING' && (poll.votingClosed || poll.canClose) && poll.enoughData ? poll.ranking[0] : undefined;
   const byDate = new Map(poll.days.map((d) => [d.date, d] as const));
 
   function run(work: () => Promise<PollView>) {
@@ -119,6 +122,16 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
         </section>
       ) : null}
       {poll.status === 'VOTING' && poll.votingClosed ? <Notice>Os votos foram encerrados. {poll.isOrganizer ? t('Escolha a data entre as melhores abaixo.') : t('Aguarde quem organiza escolher a data.')}</Notice> : null}
+      {best && bestDismissed ? (
+        <div className="callout">
+          <p className="callout__text">
+            <strong>{t('Melhor data: {date}', { date: longDay(best.date) })}</strong>
+          </p>
+          <Button small onClick={() => setBestDismissed(false)}>
+            {t('Confirmar melhor data')}
+          </Button>
+        </div>
+      ) : null}
       {poll.canClose ? (
         <div className="callout">
           <p className="callout__text">
@@ -344,6 +357,11 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           </Button>
         )
       ) : null}
+      {best && !bestDismissed ? (
+        <Sheet title={t('Todos votaram: melhor data')} onClose={() => setBestDismissed(true)}>
+          <BestDate poll={poll} best={best} busy={busy} onConfirm={() => void act(() => api.confirmBestPoll(poll.id, best.date))} onLater={() => setBestDismissed(true)} />
+        </Sheet>
+      ) : null}
       {conflict ? (
         <Sheet title={conflict.busyDays.length === 1 ? t('Você já tem um evento nesse dia') : t('Você já tem eventos nesses dias')} onClose={() => setConflict(undefined)}>
           <div className="dpconflict">
@@ -386,6 +404,39 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           </div>
         </Sheet>
       ) : null}
+    </div>
+  );
+}
+
+/** Popup de quem organiza: a data campeã do ranking e o botão que cria o evento já com quem pode e quem talvez, confirmados. */
+function BestDate({ poll, best, busy, onConfirm, onLater }: { poll: PollView; best: DateStats; busy: boolean; onConfirm: () => void; onLater: () => void }) {
+  const mine = poll.myVotes[best.date];
+  const going = best.yes + best.maybe + (mine === 'YES' || mine === 'MAYBE' ? 0 : 1);
+  const others = poll.ranking.slice(1, 3);
+  return (
+    <div className="dpbest">
+      <p className="dpbest__date">
+        <span aria-hidden="true">👑</span> <strong>{longDay(best.date)}</strong>
+      </p>
+      <p className="muted">
+        {percent(best.compatibility)} {t('de compatibilidade')} · {t('{yes} posso, {maybe} talvez, {no} não posso', { yes: best.yes, maybe: best.maybe, no: best.no })}
+      </p>
+      <p>{t('Ao confirmar, o evento é criado com {n} pessoas já confirmadas: quem votou “posso” ou “talvez” nesta data. Quem não pode fica de fora.', { n: going })}</p>
+      {others.length > 0 ? (
+        <ol className="dpbest__others" start={2}>
+          {others.map((d, i) => (
+            <li key={d.date}>
+              <span className="muted">{i + 2}º</span> {longDay(d.date)} <span className="muted">{percent(d.compatibility)}</span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      <Button full loading={busy} onClick={onConfirm}>
+        {t('Confirmar esta data e criar o evento')}
+      </Button>
+      <Button full variant="quiet" disabled={busy} onClick={onLater}>
+        {t('Ver outras datas')}
+      </Button>
     </div>
   );
 }

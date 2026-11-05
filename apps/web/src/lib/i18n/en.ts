@@ -1997,4 +1997,11 @@ export const EN: Readonly<Record<string, string>> = {
   "Votação não encontrada": "Poll not found",
   "Áudio inválido": "Invalid audio",
   "Áudio não encontrado": "Audio not found",
+  "Melhor data: {date}": "Best date: {date}",
+  "Confirmar melhor data": "Confirm best date",
+  "Todos votaram: melhor data": "Everyone voted: best date",
+  "de compatibilidade": "compatibility",
+  "Ao confirmar, o evento é criado com {n} pessoas já confirmadas: quem votou “posso” ou “talvez” nesta data. Quem não pode fica de fora.": "When you confirm, the event is created with {n} people already confirmed: those who voted “can” or “maybe” for this date. Those who can't are left out.",
+  "Confirmar esta data e criar o evento": "Confirm this date and create the event",
+  "Ver outras datas": "See other dates",
 };

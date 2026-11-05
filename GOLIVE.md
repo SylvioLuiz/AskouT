@@ -427,3 +427,9 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - No app do iPhone, o pedido de permissão do iOS aparece **uma vez**, ~2,5 s depois de a pessoa entrar (`PushAutoAsk`, `autoAskNativePush` em `apps/web/src/lib/push.ts`). Quem recusar não é incomodada de novo; o botão "Ativar avisos" e Ajustes > AskouT > Notificações continuam valendo. Não há tela explicativa antes (só o pedido do iOS).
 - **Só entra na loja com a 1.0.1** (nova build + revisão). O Sylvio pediu para **não submeter ainda**: há outras mudanças antes. Testes e typecheck do web passam; **não testado em aparelho**.
 - Antes de lançar: testar a entrega real do push (botão atual) e conferir que o token é salvo.
+
+## Votação de datas: confirmar a melhor data de uma vez (05/11/2026)
+- Quando todos concluíram a votação (ou os votos foram encerrados), quem organiza vê um popup com a melhor data do ranking (+ 2º e 3º lugares) e o botão **"Confirmar esta data e criar o evento"** (`POST /date-polls/:id/confirm-best`, `SchedulingService.confirmBest`).
+- Cria o encontro na agenda já com **quem votou "posso" e "talvez" naquele dia, todos confirmados** (mais quem organiza). "Não posso", sem resposta e pessoas bloqueadas ficam de fora. Pula a etapa de confirmação; o card do encontro vai para a conversa e os confirmados recebem aviso.
+- O fluxo antigo (propor data → confirmar) continua para quem quiser escolher outra data. Depois de definida, "Transformar em evento" (evento público) segue disponível.
+- Testes do serviço passam; **não testado no celular nem com a API real**.
