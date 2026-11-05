@@ -988,6 +988,8 @@ model EventStory {
   postId       String?  @db.Uuid
   mime         String
   isVideo      Boolean  @default(false)
+  /// A pessoa escolheu publicar também no perfil: aparece na página inicial dos amigos (além do evento).
+  onProfile    Boolean  @default(false)
   data         Bytes
   createdAt    DateTime @default(now())
   expiresAt    DateTime
@@ -1001,6 +1003,7 @@ model EventStory {
   @@index([placeEventId, expiresAt])
   @@index([postId, expiresAt])
   @@index([userId])
+  @@index([userId, onProfile, expiresAt])
 }
 
 /// Denúncia de story: uma por pessoa. Fica guardada para a gestão; quem denunciou deixa de ver aquele story.

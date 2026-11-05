@@ -553,6 +553,8 @@ export interface EventStoryRecord {
   userId: string;
   mime: string;
   video: boolean;
+  /** Também no perfil: os amigos veem na página inicial. Sem o campo, fica só no evento. */
+  onProfile?: boolean;
   data: Uint8Array;
   createdAt: Date;
   expiresAt: Date;

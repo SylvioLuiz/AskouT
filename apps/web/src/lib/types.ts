@@ -560,6 +560,8 @@ export interface EventStoryItem {
   createdAt: string;
   expiresAt: string;
   canDelete: boolean;
+  /** Só nos stories da página inicial: de qual evento veio (null se você não tem acesso a ele). */
+  event?: { id: string; title: string; place: string | null } | null;
 }
 
 export interface EventStoryGroup {

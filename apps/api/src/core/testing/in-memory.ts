@@ -1977,6 +1977,14 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
       .map(({ data: _data, ...meta }) => ({ ...meta, ref: { ...meta.ref } }));
   }
 
+  async listProfileStories(userIds: string[], now: Date): Promise<EventStoryMeta[]> {
+    const ids = new Set(userIds);
+    return [...this.stories.values()]
+      .filter((s) => ids.has(s.userId) && s.onProfile === true && this.alive(s.ref) && s.expiresAt.getTime() > now.getTime())
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map(({ data: _data, ...meta }) => ({ ...meta, ref: { ...meta.ref } }));
+  }
+
   async findStory(id: string): Promise<EventStoryMeta | undefined> {
     const s = this.stories.get(id);
     if (!s || !this.alive(s.ref)) return undefined;

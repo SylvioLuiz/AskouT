@@ -77,12 +77,33 @@ export class ExploreController {
     return this.core.eventPages.stories(actor.userId, id).then((groups) => ({ groups }));
   }
 
-  /** Publica um story: o corpo é o arquivo cru (`Content-Type: image/jpeg`, `video/mp4`...). */
+  /**
+   * Publica um story: o corpo é o arquivo cru (`Content-Type: image/jpeg`, `video/mp4`...).
+   * `?profile=1` publica também no perfil, para os amigos verem na página inicial.
+   */
   @Post('events/:id/stories')
   @HttpCode(200)
-  async createStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Headers('content-type') contentType: string | undefined, @Body() body: unknown) {
+  async createStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Headers('content-type') contentType: string | undefined, @Body() body: unknown, @Query('profile') profile: string | undefined) {
     const data = Buffer.isBuffer(body) ? new Uint8Array(body.buffer, body.byteOffset, body.byteLength) : undefined;
-    return this.core.eventPages.createStory(actor.userId, id, contentType, data);
+    return this.core.eventPages.createStory(actor.userId, id, contentType, data, profile === '1' || profile === 'true');
+  }
+
+  /** Página inicial: os stories que você e seus amigos publicaram também no perfil. */
+  @Get('stories/friends')
+  profileStories(@CurrentActor() actor: Actor) {
+    return this.core.eventPages.profileStories(actor.userId).then((groups) => ({ groups }));
+  }
+
+  @Delete('stories/:storyId')
+  deleteProfileStory(@CurrentActor() actor: Actor, @Param('storyId') storyId: string) {
+    return this.core.eventPages.deleteProfileStory(actor.userId, storyId);
+  }
+
+  @Post('stories/:storyId/report')
+  @HttpCode(200)
+  reportProfileStory(@CurrentActor() actor: Actor, @Param('storyId') storyId: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.eventPages.reportProfileStory(actor.userId, storyId, b.reason, b.details);
   }
 
   @Delete('events/:id/stories/:storyId')

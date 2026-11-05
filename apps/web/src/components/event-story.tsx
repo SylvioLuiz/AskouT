@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from './agenda.tsx';
 import { SoundToggle } from './sound-toggle.tsx';
-import { MoreIcon, TrashIcon, XIcon } from './icons.tsx';
+import { LocationIcon, MoreIcon, TrashIcon, XIcon } from './icons.tsx';
 import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Button, Notice } from './ui.tsx';
 import { api } from '../client.ts';
@@ -52,12 +52,12 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
     }
   }
 
-  async function publish() {
+  async function publish(onProfile: boolean) {
     if (!file) return;
     setBusy(true);
     setProblem(undefined);
     try {
-      await api.createEventStory(eventId, file.blob);
+      await api.createEventStory(eventId, file.blob, onProfile);
       onCreated();
     } catch (failure) {
       setProblem(toApiError(failure).message);
@@ -73,15 +73,28 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
         <div className="storysheet__preview">{file.kind === 'VIDEO' ? <video src={file.url} controls playsInline muted /> : <img src={file.url} alt={t('Prévia do story')} />}</div>
       ) : null}
       {problem ? <Notice tone="error">{problem}</Notice> : null}
+      {file ? (
+        <div className="storysheet__ask" role="group" aria-labelledby="storysheet-ask">
+          <p id="storysheet-ask" className="storysheet__question">
+            <strong>{t('Publicar também no seu perfil?')}</strong>
+            <span className="muted">{t('Seus amigos veem na página inicial, junto com o evento onde você está. Se não, ele fica só neste evento.')}</span>
+          </p>
+        </div>
+      ) : null}
       <div className="storysheet__actions">
-        <Button variant="secondary" disabled={busy} onClick={() => fileRef.current?.click()}>
-          {file ? t('Trocar') : t('Escolher foto ou vídeo')}
-        </Button>
         {file ? (
-          <Button loading={busy} onClick={() => void publish()}>
-            {t('Publicar story')}
-          </Button>
+          <>
+            <Button loading={busy} onClick={() => void publish(true)}>
+              {t('Sim, no evento e no perfil')}
+            </Button>
+            <Button variant="secondary" disabled={busy} onClick={() => void publish(false)}>
+              {t('Não, só no evento')}
+            </Button>
+          </>
         ) : null}
+        <Button variant={file ? 'quiet' : 'secondary'} disabled={busy} onClick={() => fileRef.current?.click()}>
+          {file ? t('Trocar foto ou vídeo') : t('Escolher foto ou vídeo')}
+        </Button>
       </div>
     </Sheet>
   );
@@ -89,7 +102,8 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
 
 // ---------- Assistir ----------
 
-export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { eventId: string; groups: EventStoryGroup[]; start: StoryPos; onClose: () => void; onChanged: () => void }) {
+/** Sem `eventId`, são os stories da página inicial: cada um mostra de qual evento veio. */
+export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { eventId?: string; groups: EventStoryGroup[]; start: StoryPos; onClose: () => void; onChanged: () => void }) {
   const [pos, setPos] = useState<StoryPos>(start);
   const [muted, setMuted] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -144,7 +158,8 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
     setBusy(true);
     setError(undefined);
     try {
-      await api.deleteEventStory(eventId, item.id);
+      if (eventId) await api.deleteEventStory(eventId, item.id);
+      else await api.deleteProfileStory(item.id);
       onChanged();
     } catch (failure) {
       setError(toApiError(failure).message);
@@ -203,12 +218,24 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
         <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo story')} />
         {item.kind === 'VIDEO' ? <SoundToggle muted={muted} onToggle={() => setMuted((m) => !m)} /> : null}
       </div>
+      {!eventId && item.event ? (
+        <Link to={`/eventos/${encodeURIComponent(item.event.id)}`} className="storyview__event" aria-label={t('{username} está em {title}. Abrir o evento', { username: group.author.username, title: item.event.title })}>
+          <span className="storyview__eventicon" aria-hidden="true">
+            <LocationIcon />
+          </span>
+          <span className="storyview__eventtext">
+            <span className="storyview__eventkicker">{t('Está em')}</span>
+            <strong>{item.event.title}</strong>
+            {item.event.place ? <span>{item.event.place}</span> : null}
+          </span>
+        </Link>
+      ) : null}
       {error ? <p className="storyview__error">{error}</p> : null}
       {reporting ? (
         <ReasonSheet
           title={t('Denunciar story')}
           doneText={t('Denúncia enviada. Você não verá mais este story.')}
-          submit={(reason, details) => api.reportEventStory(eventId, item.id, reason, details)}
+          submit={(reason, details) => (eventId ? api.reportEventStory(eventId, item.id, reason, details) : api.reportProfileStory(item.id, reason, details))}
           onClose={() => setReporting(false)}
           onDone={() => {
             setReporting(false);

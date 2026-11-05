@@ -34,6 +34,26 @@ export interface EventStoryGroupView {
   items: EventStoryItemView[];
 }
 
+/** Onde a pessoa está: o evento do story e o local dele. */
+export interface ProfileStoryEventView {
+  id: string;
+  title: string;
+  /** Nome do local (do evento do local ou o lugar informado no evento criado por uma pessoa). */
+  place: string | null;
+}
+
+/** Story na página inicial: vem de um evento; `event` é null quando quem vê não tem acesso a ele. */
+export interface ProfileStoryItemView extends EventStoryItemView {
+  event: ProfileStoryEventView | null;
+}
+
+/** Os stories que uma pessoa publicou também no perfil (os seus e os dos amigos). */
+export interface ProfileStoryGroupView {
+  author: PublicProfile;
+  mine: boolean;
+  items: ProfileStoryItemView[];
+}
+
 /** A capa: o que o dono enviou, a foto que o Google deu para o lugar ou a imagem do evento do local. */
 export type EventCoverView =
   | { kind: 'URL'; url: string }
@@ -401,8 +421,83 @@ export class EventPageService {
     return [...groups.values()].sort((a, b) => Number(b.mine) - Number(a.mine) || (last(a) < last(b) ? 1 : last(a) > last(b) ? -1 : 0));
   }
 
+  /**
+   * Página inicial: os stories que você e seus amigos (seguimento mútuo) escolheram publicar também no perfil.
+   * Os seus primeiro; depois quem publicou por último. Sem bloqueados e sem os que você denunciou.
+   */
+  async profileStories(viewerId: string): Promise<ProfileStoryGroupView[]> {
+    const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
+    const friends = (await this.deps.follows.listFriendIds(viewerId)).filter((id) => !hidden.has(id));
+    const all = await this.deps.eventRoom.listProfileStories([viewerId, ...friends], this.deps.clock.now());
+    const reported = await this.deps.eventRoom.reportedStoryIds(viewerId, all.map((r) => r.id));
+    const rows = all.filter((r) => !reported.has(r.id));
+    const profiles = await this.deps.users.findProfilesByIds([...new Set(rows.map((r) => r.userId))]);
+    const byId = new Map(profiles.map((p) => [p.userId, toPublicProfile(p)]));
+    const events = new Map<string, ProfileStoryEventView | null>();
+    for (const r of rows) {
+      if (events.has(r.ref.id)) continue;
+      events.set(r.ref.id, await this.eventLabel(viewerId, r.ref));
+    }
+    const groups = new Map<string, ProfileStoryGroupView>();
+    for (const r of rows) {
+      const author = byId.get(r.userId);
+      if (!author) continue;
+      const mine = r.userId === viewerId;
+      const group = groups.get(r.userId) ?? { author, mine, items: [] };
+      group.items.push({ id: r.id, kind: r.video ? 'VIDEO' : 'IMAGE', createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), canDelete: mine, event: events.get(r.ref.id) ?? null });
+      groups.set(r.userId, group);
+    }
+    const last = (g: ProfileStoryGroupView) => g.items[g.items.length - 1]!.createdAt;
+    return [...groups.values()].sort((a, b) => Number(b.mine) - Number(a.mine) || (last(a) < last(b) ? 1 : last(a) > last(b) ? -1 : 0));
+  }
+
+  /** Nome do evento para o story na página inicial, se quem vê consegue abrir o evento. */
+  private async eventLabel(viewerId: string, ref: EventRef): Promise<ProfileStoryEventView | null> {
+    try {
+      await this.resolve(viewerId, ref.id);
+    } catch {
+      return null;
+    }
+    if (ref.source === 'PLACE') {
+      const found = await this.deps.places.findEvent(ref.id);
+      return found ? { id: ref.id, title: found.event.title, place: found.venue.name } : null;
+    }
+    const post = (await this.deps.posts.findById(ref.id))?.post;
+    return post?.eventTitle ? { id: ref.id, title: post.eventTitle, place: post.placeName ?? null } : null;
+  }
+
+  /** O story aparece para `viewerId` na página inicial: está no perfil, no ar, e é dele ou de um amigo sem bloqueio. */
+  private async profileStoryFor(viewerId: string, storyId: unknown): Promise<EventStoryMeta> {
+    const story = typeof storyId === 'string' && storyId.length <= 64 ? await this.deps.eventRoom.findStory(storyId) : undefined;
+    const visible =
+      story !== undefined &&
+      story.onProfile === true &&
+      story.expiresAt.getTime() > this.deps.clock.now().getTime() &&
+      (story.userId === viewerId || ((await this.deps.follows.listFriendIds(viewerId)).includes(story.userId) && !(await this.deps.blocks.existsEitherWay(viewerId, story.userId))));
+    if (!visible) throw notFound('Story não encontrado');
+    return story;
+  }
+
+  /** Apaga, pela página inicial, um story seu (some do evento também). */
+  async deleteProfileStory(viewerId: string, storyId: unknown): Promise<{ deleted: true }> {
+    const story = await this.profileStoryFor(viewerId, storyId);
+    if (story.userId !== viewerId) throw forbidden('Só quem publicou apaga o story por aqui');
+    await this.deps.eventRoom.deleteStory(story.id);
+    return { deleted: true };
+  }
+
+  /** Denuncia, pela página inicial, o story de um amigo. */
+  async reportProfileStory(viewerId: string, storyId: unknown, reason: unknown, details?: unknown): Promise<{ reported: true }> {
+    const story = await this.profileStoryFor(viewerId, storyId);
+    if (story.userId === viewerId) throw forbidden('Este story é seu: apague-o se não quiser mais');
+    if (typeof reason !== 'string' || !(POST_REPORT_REASONS as readonly string[]).includes(reason)) throw validationError('Motivo inválido', { reason: 'Escolha um motivo da lista' });
+    const text = optionalText(details, EVENT_STORY_REPORT_DETAILS_MAX, 'details', 'Detalhes');
+    await this.deps.eventRoom.reportStory({ id: this.deps.ids.next(), storyId: story.id, reporterId: viewerId, reason: reason as PostReportReason, details: text, createdAt: this.deps.clock.now() });
+    return { reported: true };
+  }
+
   /** Publica um story. Só quem confirmou presença (ou o dono), enquanto o evento não acabou. Foto até 2 MB ou vídeo até 60 MB. */
-  async createStory(viewerId: string, rawId: unknown, contentType: unknown, bytes: unknown): Promise<EventStoryGroupView> {
+  async createStory(viewerId: string, rawId: unknown, contentType: unknown, bytes: unknown, onProfile?: unknown): Promise<EventStoryGroupView> {
     const { ref, owner } = await this.resolve(viewerId, rawId);
     const isOwner = owner?.userId === viewerId;
     if (!isOwner && !(await this.deps.eventRoom.isGoing(ref, viewerId))) throw forbidden('Confirme presença para publicar um story neste evento');
@@ -414,7 +509,7 @@ export class EventPageService {
     if (mine.length >= EVENT_STORY_MAX_PER_USER) throw validationError('Muitos stories', { media: `Você já tem ${EVENT_STORY_MAX_PER_USER} stories no ar neste evento` });
     const media = parseChatMedia(contentType, bytes, POST_VIDEO_MAX_BYTES);
     const expiresAt = new Date(Math.min(now.getTime() + EVENT_STORY_HOURS * 3_600_000, endsAt));
-    const record = { id: this.deps.ids.next(), ref, userId: viewerId, mime: media.mime, video: media.kind === 'VIDEO', data: media.data, createdAt: now, expiresAt };
+    const record = { id: this.deps.ids.next(), ref, userId: viewerId, mime: media.mime, video: media.kind === 'VIDEO', onProfile: onProfile === true, data: media.data, createdAt: now, expiresAt };
     await this.deps.eventRoom.addStory(record);
     const me = await this.deps.users.findProfileById(viewerId);
     return { author: toPublicProfile(me!), mine: true, items: [{ id: record.id, kind: media.kind, createdAt: now.toISOString(), expiresAt: expiresAt.toISOString(), canDelete: true }] };

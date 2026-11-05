@@ -234,3 +234,35 @@ test('denunciar story: uma vez por pessoa, não o próprio, e quem denunciou dei
   await w.core.eventPages.deleteStory(bia, 'e1', id);
   assert.equal(w.eventRoom.storyReports.size, 0, 'apagou o story, a denúncia some junto (como o cascade do banco)');
 });
+
+test('story também no perfil: aparece na página inicial dos amigos; sem a opção, fica só no evento', async () => {
+  const { w, ana, bia, caio, duda } = await setup();
+  for (const who of [ana, bia, caio, duda]) await w.core.eventPages.go(who, 'e1');
+  const shared = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), true);
+  w.clock.tick(1000);
+  await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES());
+  w.clock.tick(1000);
+  await w.core.eventPages.createStory(duda, 'e1', 'image/jpeg', JPG_BYTES(), true);
+  assert.equal((await w.core.eventPages.stories(caio, 'e1')).flatMap((g) => g.items).length, 3, 'no evento, todos aparecem como antes');
+
+  const forAna = await w.core.eventPages.profileStories(ana);
+  assert.deepEqual(forAna.map((g) => [g.author.username, g.mine, g.items.map((i) => i.id)]), [['bia', false, [shared.items[0]!.id]]], 'amiga: só o story publicado no perfil; duda não é amiga');
+  assert.deepEqual(forAna[0]!.items[0]!.event, { id: 'e1', title: 'Piquenique', place: 'Parque Ibirapuera' }, 'mostra onde a pessoa está');
+  assert.equal(forAna[0]!.items[0]!.canDelete, false);
+  assert.deepEqual(await w.core.eventPages.profileStories(caio), [], 'caio e bia não são amigos');
+  const own = await w.core.eventPages.profileStories(bia);
+  assert.deepEqual(own.map((g) => [g.author.username, g.mine, g.items[0]!.canDelete]), [['bia', true, true]], 'a própria pessoa vê o seu');
+
+  await rejectsWith(w.core.eventPages.reportProfileStory(caio, shared.items[0]!.id, 'SPAM'), 'NOT_FOUND');
+  await rejectsWith(w.core.eventPages.deleteProfileStory(ana, shared.items[0]!.id), 'FORBIDDEN');
+  assert.deepEqual(await w.core.eventPages.reportProfileStory(ana, shared.items[0]!.id, 'SPAM'), { reported: true });
+  assert.deepEqual(await w.core.eventPages.profileStories(ana), [], 'quem denunciou não vê mais');
+
+  await w.core.blocks.block(bia, ana);
+  assert.deepEqual(await w.core.eventPages.profileStories(ana), []);
+  await w.core.eventPages.deleteProfileStory(bia, shared.items[0]!.id);
+  assert.deepEqual(await w.core.eventPages.profileStories(bia), [], 'apagado some da página inicial');
+  assert.equal((await w.core.eventPages.stories(bia, 'e1')).find((g) => g.mine)?.items.length, 1, 'e do evento também');
+  w.clock.tick(25 * H);
+  assert.deepEqual(await w.core.eventPages.profileStories(duda), [], 'depois de 24 h some');
+});

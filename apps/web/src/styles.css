@@ -4462,6 +4462,26 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .storyview__error { position: absolute; left: 16px; right: 16px; bottom: 80px; z-index: 4; margin: 0; padding: 10px 14px; border-radius: 12px; background: rgb(0 0 0 / 0.7); text-align: center; }
 .storyview__btn--quiet { background: transparent; color: rgb(255 255 255 / 0.8); }
 
+/* Stories dos amigos na página inicial: quem publicou também no perfil, com o evento onde está */
+.homestories { margin: 0 -16px 12px; }
+.homestories__list { display: flex; gap: 14px; margin: 0; padding: 4px 16px 6px; list-style: none; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.homestories__list::-webkit-scrollbar { display: none; }
+.homestories__item { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 76px; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.homestories__ring { padding: 3px; border-radius: 50%; background: var(--brand); }
+.homestories__ring > * { box-shadow: 0 0 0 2px var(--bg, #fff); border-radius: 50%; }
+.homestories__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; font-weight: 600; }
+.homestories__where { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.6875rem; color: var(--brand-text); }
+.homestories__item:focus-visible .homestories__ring { outline: 2px solid var(--brand-text); outline-offset: 2px; }
+.storyview__event { position: absolute; top: calc(max(8px, env(safe-area-inset-top)) + 62px); left: 12px; right: 12px; z-index: 3; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; background: rgb(0 0 0 / 0.55); color: #fff; text-decoration: none; backdrop-filter: blur(6px); }
+.storyview__eventicon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: #fff; }
+.storyview__eventicon svg { width: 18px; height: 18px; }
+.storyview__eventtext { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.storyview__eventtext strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
+.storyview__eventtext span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: rgb(255 255 255 / 0.8); }
+.storyview__eventtext .storyview__eventkicker { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; color: rgb(255 255 255 / 0.7); }
+.storysheet__ask { margin-top: 12px; padding: 12px 14px; border-radius: var(--radius-panel); background: var(--brand-soft); }
+.storysheet__question { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+
 /* Puxar para atualizar */
 :root:has(.ptr), :root:has(.ptr) body { overscroll-behavior-y: contain; }
 .ptr { position: relative; }
