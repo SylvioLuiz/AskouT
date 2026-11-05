@@ -561,7 +561,23 @@ export interface EventStoryItem {
   expiresAt: string;
   canDelete: boolean;
   /** Só nos stories da página inicial: de qual evento veio (null se você não tem acesso a ele). */
-  event?: { id: string; title: string; place: string | null } | null;
+  event?: StoryEvent | null;
+}
+
+/** Onde a pessoa do story está: o evento e o local, para mostrar num relance. */
+export interface StoryEvent {
+  id: string;
+  title: string;
+  kind: EventKind;
+  startsAt: string;
+  endsAt: string;
+  place: string | null;
+  address: string | null;
+  coverPath: string | null;
+  confirmedCount: number;
+  going: boolean;
+  isFree: boolean;
+  sample: boolean;
 }
 
 export interface EventStoryGroup {
