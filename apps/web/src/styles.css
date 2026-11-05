@@ -3700,20 +3700,20 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmap__status { margin: 0 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; border-radius: 18px; background: rgba(20,20,22,.92); color: #fff; text-align: center; }
 .evmap__status p { margin: 0; }
 .evmap__note { margin: 8px 16px 0; font-size: 12px; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.8); text-align: center; }
-.evmap__strip { display: flex; gap: 12px; margin: 0; padding: 4px 16px; list-style: none; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.evmap__strip { display: flex; align-items: stretch; gap: 12px; margin: 0; padding: 4px 16px; list-style: none; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
 .evmap__strip::-webkit-scrollbar { display: none; }
-.evmap__slide { flex: 0 0 82%; max-width: 340px; scroll-snap-align: center; }
-.evmapcard { overflow: hidden; border-radius: 22px; background: #121214; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.4); outline: 2px solid transparent; }
+.evmap__slide { display: flex; flex: 0 0 82%; max-width: 340px; scroll-snap-align: center; }
+.evmapcard { display: flex; flex-direction: column; flex: 1; min-width: 0; overflow: hidden; border-radius: 22px; background: #121214; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.4); outline: 2px solid transparent; }
 .evmap__slide--on .evmapcard { outline-color: var(--brand-text); }
 .evmapcard__link { display: block; color: inherit; text-decoration: none; }
 .evmapcard__cover { position: relative; display: block; height: 140px; background: #2b2b30; }
 .evmapcard__cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .evmapcard__shade { position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.72)); }
-.evmapcard__title { position: absolute; left: 14px; right: 14px; bottom: 10px; font-size: 18px; line-height: 1.2; text-shadow: 0 1px 6px rgba(0,0,0,.6); overflow-wrap: anywhere; }
-.evmapcard__bar { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 12px; }
+.evmapcard__title { position: absolute; left: 14px; right: 14px; bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 18px; line-height: 1.2; text-shadow: 0 1px 6px rgba(0,0,0,.6); overflow-wrap: anywhere; }
+.evmapcard__bar { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 12px; }
 .evmapcard__venue { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
 .evmapcard__venue .venuelink { text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.evmapcard__facts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; opacity: .9; }
+.evmapcard__facts { display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; gap: 4px 12px; font-size: 13px; opacity: .9; }
 .evpin { width: 30px; height: 38px; padding: 0; border: 0; background: none; cursor: pointer; }
 .evpin::before { content: ''; display: block; width: 30px; height: 30px; box-sizing: border-box; border: 3px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #1aa7a7; box-shadow: 0 2px 6px rgba(0,0,0,.45); transition: transform .15s, background .15s; }
 .evpin--on::before { background: var(--brand, #3a36f5); transform: rotate(-45deg) scale(1.3); }
@@ -3726,9 +3726,10 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmapplace__head { display: flex; gap: 12px; align-items: center; }
 .evmapplace__logo { width: 48px; height: 48px; border-radius: 12px; object-fit: cover; }
 .evmapplace__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.evmapplace__name { font-size: 17px; overflow-wrap: anywhere; }
-.evmapplace__line { font-size: 13px; opacity: .85; }
-.evmapplace__actions { display: flex; gap: 8px; }
+.evmapplace__name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 17px; line-height: 1.25; overflow-wrap: anywhere; }
+.evmapplace__line { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; opacity: .85; }
+.evmapplace__actions { display: flex; gap: 8px; margin-top: auto; }
+.evmapcard--place .tag-sponsored { align-self: flex-start; }
 .evpin--me { width: 18px; height: 18px; border: 3px solid #fff; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 6px var(--shadow-brand); cursor: default; }
 .evpin--me::before { content: none; }
 
