@@ -19,7 +19,12 @@ export const PAGE_MAX = 100;
 export const GROUP_NAME_MAX = 60;
 export const GROUP_IMAGE_MAX_BYTES = 40 * 1024;
 /** Reações disponíveis. Uma por pessoa e mensagem; tocar na mesma tira. */
-export const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const;
+export const REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍'] as const;
+/** Um emoji só (com modificadores de tom, bandeiras e combinações com ZWJ). */
+const EMOJI_RE = /^(?:\p{RI}\p{RI}|[#*0-9]\uFE0F?\u20E3|\p{Extended_Pictographic}(?:\uFE0F|\p{EMod})?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\p{EMod})?)*)$/u;
+export function isEmoji(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 32 && EMOJI_RE.test(value);
+}
 /** Conversas fixadas por pessoa. */
 export const PINNED_MAX = 5;
 /** "Digitando…" some sozinho depois disso sem novo sinal. */
@@ -76,6 +81,14 @@ export interface ReactionView {
   emoji: string;
   count: number;
   mine: boolean;
+  /** Quem reagiu com este emoji (você primeiro, se reagiu). */
+  people: { userId: string; name: string }[];
+}
+
+/** Outra pessoa da conversa e até quando ela leu (para o "Visto" e as fotos ao lado dos balões). */
+export interface MemberReadView {
+  profile: PublicProfile;
+  readAt: string | null;
 }
 
 export interface ConversationListItem {
@@ -112,6 +125,8 @@ export interface ConversationView {
   muted: boolean;
   /** Nomes de quem está digitando agora. */
   typing: string[];
+  /** As outras pessoas da conversa (sem você e sem quem tem bloqueio com você), com até quando leram. */
+  members: MemberReadView[];
   /** Relógio do servidor. */
   now: string;
   /** Em ordem cronológica. */
@@ -236,17 +251,24 @@ function previewOf(m: MessageRecord): string {
   return PREVIEW_BY_KIND[m.kind] ?? Array.from(m.body.replace(/\s+/g, ' ')).slice(0, REPLY_PREVIEW_MAX).join('');
 }
 
-function groupReactions(rows: MessageReactionRecord[], actorId: string): Map<string, ReactionView[]> {
+function groupReactions(rows: MessageReactionRecord[], actorId: string, names: ReadonlyMap<string, string> = new Map()): Map<string, ReactionView[]> {
   const by = new Map<string, Map<string, ReactionView>>();
   for (const r of rows) {
     const perMessage = by.get(r.messageId) ?? new Map<string, ReactionView>();
-    const cur = perMessage.get(r.emoji) ?? { emoji: r.emoji, count: 0, mine: false };
+    const cur = perMessage.get(r.emoji) ?? { emoji: r.emoji, count: 0, mine: false, people: [] };
     cur.count += 1;
-    if (r.userId === actorId) cur.mine = true;
+    const person = { userId: r.userId, name: names.get(r.userId) ?? 'Alguém' };
+    if (r.userId === actorId) {
+      cur.mine = true;
+      cur.people.unshift(person);
+    } else cur.people.push(person);
     perMessage.set(r.emoji, cur);
     by.set(r.messageId, perMessage);
   }
-  const order = (e: string) => REACTIONS.indexOf(e as (typeof REACTIONS)[number]);
+  const order = (e: string) => {
+    const i = REACTIONS.indexOf(e as (typeof REACTIONS)[number]);
+    return i === -1 ? REACTIONS.length : i;
+  };
   return new Map([...by].map(([id, m]) => [id, [...m.values()].sort((a, b) => b.count - a.count || order(a.emoji) - order(b.emoji))] as const));
 }
 
@@ -435,6 +457,12 @@ export class ConversationService {
     const names = isGroup ? new Map((await this.deps.users.findProfilesByIds([...new Set(items.map((m) => m.senderId))])).map((p) => [p.userId, p.displayName] as const)) : null;
     const decor = await this.decorate(actorId, items);
     const prefs = await conversations.getPrefs(conversationId, actorId);
+    const reads = (await conversations.listReads(conversationId)).filter((r) => r.userId !== actorId && memberIds.includes(r.userId) && !hiddenIds.includes(r.userId));
+    const readProfiles = new Map((other ? [other] : await this.deps.users.findProfilesByIds(reads.map((r) => r.userId))).map((p) => [p.userId, p] as const));
+    const members: MemberReadView[] = reads.flatMap((r) => {
+      const profile = readProfiles.get(r.userId);
+      return profile ? [{ profile: toPublicProfile(profile), readAt: r.lastReadAt ? r.lastReadAt.toISOString() : null }] : [];
+    });
 
     return {
       id: conversationId,
@@ -447,6 +475,7 @@ export class ConversationService {
       pinned: prefs.pinnedAt !== null,
       muted: prefs.muted,
       typing: await this.typingNames(actorId, conversationId, memberIds, hiddenIds, now),
+      members,
       canSend: isGroup ? true : otherId !== null && friends.includes(otherId),
       now: now.toISOString(),
       messages: items.map((m) =>
@@ -552,18 +581,18 @@ export class ConversationService {
     return found;
   }
 
-  /** Reage com um emoji da lista; mandar o mesmo de novo (ou `null`) tira a reação. */
+  /** Reage com qualquer emoji (um por pessoa); mandar o mesmo de novo (ou `null`) tira a reação. */
   async react(actorId: string, conversationId: string, messageId: string, emoji: unknown): Promise<{ reactions: ReactionView[] }> {
     const { conversations, follows, clock } = this.deps;
     const { otherId } = await this.access(actorId, conversationId);
-    if (emoji !== null && (typeof emoji !== 'string' || !(REACTIONS as readonly string[]).includes(emoji))) throw validationError('Reação inválida', { emoji: `Use uma destas: ${REACTIONS.join(' ')}` });
+    if (emoji !== null && !isEmoji(emoji)) throw validationError('Reação inválida', { emoji: 'Use um emoji' });
     const message = await this.visibleMessage(actorId, conversationId, messageId);
     if (message.deletedAt || message.kind === 'SYSTEM') throw notFound('Mensagem não encontrada');
     if (otherId && !(await follows.listFriendIds(actorId)).includes(otherId)) throw forbidden('Vocês não são mais amigos.');
     const current = (await conversations.listReactions([messageId])).find((r) => r.userId === actorId)?.emoji ?? null;
     await conversations.setReaction(messageId, actorId, emoji === current ? null : (emoji as string | null), clock.now());
     const rows = await conversations.listReactions([messageId]);
-    return { reactions: groupReactions(rows, actorId).get(messageId) ?? [] };
+    return { reactions: groupReactions(rows, actorId, await this.namesOf(rows.map((r) => r.userId))).get(messageId) ?? [] };
   }
 
   /** Apaga a própria mensagem para todos (vira "Mensagem apagada"). Cartões do sistema, encontros e sugestões não se apagam. */
@@ -627,10 +656,18 @@ export class ConversationService {
     return target.id;
   }
 
+  /** Nome de exibição de cada pessoa. */
+  private async namesOf(userIds: readonly string[]): Promise<Map<string, string>> {
+    const unique = [...new Set(userIds)];
+    if (unique.length === 0) return new Map();
+    return new Map((await this.deps.users.findProfilesByIds(unique)).map((p) => [p.userId, p.displayName] as const));
+  }
+
   /** Respostas (trecho da original) e reações de um grupo de mensagens. */
   private async decorate(actorId: string, items: MessageRecord[]): Promise<{ replies: Map<string, ReplyView>; reactions: Map<string, ReactionView[]> }> {
     const { conversations, users } = this.deps;
-    const reactions = groupReactions(await conversations.listReactions(items.map((m) => m.id)), actorId);
+    const reactionRows = await conversations.listReactions(items.map((m) => m.id));
+    const reactions = groupReactions(reactionRows, actorId, await this.namesOf(reactionRows.map((r) => r.userId)));
     const replies = new Map<string, ReplyView>();
     const withReply = items.filter((m) => m.replyToId);
     if (withReply.length > 0) {

@@ -1018,6 +1018,10 @@ export class InMemoryConversationRepository implements ConversationRepository {
       .map((m) => ({ ...m }));
   }
 
+  async listReads(conversationId: string): Promise<{ userId: string; lastReadAt: Date | null }[]> {
+    return [...(this.participants.get(conversationId) ?? new Map<string, Date | null>())].map(([userId, lastReadAt]) => ({ userId, lastReadAt }));
+  }
+
   async markRead(conversationId: string, userId: string, now: Date): Promise<void> {
     const p = this.participants.get(conversationId);
     if (p?.has(userId)) p.set(userId, now);

@@ -1,7 +1,7 @@
 // Contas das conversas que não dependem de tela: horários, rótulos e junção de mensagens.
 import { formatDistance } from './flash.ts';
 import { formatVoiceTime } from './voice.ts';
-import type { ChatMessage, ConversationItem, SuggestionCard, SuggestionItem } from './types.ts';
+import type { ChatMemberRead, ChatMessage, ConversationItem, SuggestionCard, SuggestionItem } from './types.ts';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
 const clock = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -178,4 +178,87 @@ export function copyText(messages: readonly ChatMessage[]): string {
   const first = texts[0];
   if (messages.length === 1 && first) return first.body;
   return texts.map((m) => `[${formatClock(m.createdAt)}] ${m.mine ? t('Você') : (m.senderName ?? t('Contato'))}: ${m.body}`).join('\n');
+}
+
+// ---------- Layout no estilo das DMs ----------
+
+/** Mensagens da mesma pessoa com até este intervalo ficam no mesmo bloco de balões. */
+export const RUN_GAP_MS = 5 * 60_000;
+/** Passado esse tempo sem mensagens, a hora volta a aparecer no meio da conversa. */
+export const TIME_BREAK_MS = 60 * 60_000;
+/** Fotos seguidas da mesma pessoa com até este intervalo viram uma grade. */
+export const ALBUM_GAP_MS = 2 * 60_000;
+
+const ms = (iso: string) => new Date(iso).getTime();
+
+/** As duas mensagens ficam no mesmo bloco: mesma pessoa, perto no tempo e no mesmo dia. */
+function sameRun(a: ChatMessage, b: ChatMessage): boolean {
+  return a.kind !== 'SYSTEM' && b.kind !== 'SYSTEM' && a.senderId === b.senderId && ms(b.createdAt) - ms(a.createdAt) <= RUN_GAP_MS && dayDiff(new Date(a.createdAt), new Date(b.createdAt)) === 0;
+}
+
+export type RunPosition = 'single' | 'first' | 'middle' | 'last';
+
+/** Onde cada mensagem cai no seu bloco: os cantos dos balões e a foto da pessoa dependem disso. */
+export function runPositions(messages: readonly ChatMessage[]): RunPosition[] {
+  return messages.map((m, i) => {
+    const prev = messages[i - 1];
+    const next = messages[i + 1];
+    const joinsPrev = prev !== undefined && sameRun(prev, m) && !timeBreak(prev, m);
+    const joinsNext = next !== undefined && sameRun(m, next) && !timeBreak(m, next);
+    return joinsPrev ? (joinsNext ? 'middle' : 'last') : joinsNext ? 'first' : 'single';
+  });
+}
+
+/** A hora aparece no meio da conversa quando muda o dia ou passa mais de uma hora sem mensagens. */
+export function timeBreak(prev: ChatMessage | undefined, m: ChatMessage): boolean {
+  if (!prev) return true;
+  return dayDiff(new Date(prev.createdAt), new Date(m.createdAt)) !== 0 || ms(m.createdAt) - ms(prev.createdAt) > TIME_BREAK_MS;
+}
+
+/** "Hoje 14:32", "Ontem 09:10", "segunda-feira 20:00", "13 de out. 10:00". */
+export function breakLabel(iso: string, now: Date): string {
+  const day = dayLabel(iso, now);
+  const time = formatClock(iso);
+  return day && time ? `${day} ${time}` : day;
+}
+
+/** Foto que pode entrar numa grade com as vizinhas: sem resposta, sem reação e não apagada. */
+function albumable(m: ChatMessage): boolean {
+  return m.kind === 'IMAGE' && !m.deleted && !m.replyTo && m.reactions.length === 0;
+}
+
+/** Junta fotos seguidas da mesma pessoa (enviadas juntas) em grupos; o resto fica sozinho, na mesma ordem. */
+export function groupAlbums(messages: readonly ChatMessage[]): ChatMessage[][] {
+  const out: ChatMessage[][] = [];
+  for (const m of messages) {
+    const last = out[out.length - 1];
+    const tail = last?.[last.length - 1];
+    if (last && tail && albumable(tail) && albumable(m) && tail.senderId === m.senderId && ms(m.createdAt) - ms(tail.createdAt) <= ALBUM_GAP_MS && !timeBreak(tail, m)) last.push(m);
+    else out.push([m]);
+  }
+  return out;
+}
+
+/**
+ * "Visto" embaixo da sua última mensagem, se ela for a última da conversa e alguém já leu.
+ * Na 1 a 1 é só "Visto"; no grupo, "Visto por Bia e Caio" ou "Visto por todos".
+ */
+export function seenLabel(messages: readonly ChatMessage[], members: readonly ChatMemberRead[], isGroup: boolean): string | null {
+  const last = [...messages].reverse().find((m) => m.kind !== 'SYSTEM');
+  if (!last || !last.mine || last.deleted) return null;
+  const at = ms(last.createdAt);
+  const readers = members.filter((r) => r.readAt !== null && ms(r.readAt) >= at);
+  if (readers.length === 0) return null;
+  if (!isGroup) return t('Visto');
+  if (readers.length === members.length && members.length > 1) return t('Visto por todos');
+  const names = readers.map((r) => r.profile.displayName.split(' ')[0] ?? r.profile.displayName);
+  if (names.length === 1) return t('Visto por {name}', { name: names[0] ?? '' });
+  if (names.length <= 3) return t('Visto por {names} e {last}', { names: names.slice(0, -1).join(', '), last: names[names.length - 1] ?? '' });
+  return t('Visto por {names} e mais {count}', { names: names.slice(0, 2).join(', '), count: names.length - 2 });
+}
+
+/** Toque duplo: dois toques no mesmo lugar em até 300 ms. */
+export const DOUBLE_TAP_MS = 300;
+export function isDoubleTap(previous: { at: number; x: number; y: number } | undefined, current: { at: number; x: number; y: number }): boolean {
+  return previous !== undefined && current.at - previous.at <= DOUBLE_TAP_MS && Math.hypot(current.x - previous.x, current.y - previous.y) <= 24;
 }

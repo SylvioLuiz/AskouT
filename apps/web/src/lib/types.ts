@@ -393,6 +393,14 @@ export interface ChatReaction {
   emoji: string;
   count: number;
   mine: boolean;
+  /** Quem reagiu com este emoji (você primeiro, se reagiu). */
+  people: { userId: string; name: string }[];
+}
+
+/** Outra pessoa da conversa e até quando ela leu. */
+export interface ChatMemberRead {
+  profile: PublicProfile;
+  readAt: string | null;
 }
 
 export interface ChatMessage {
@@ -451,6 +459,8 @@ export interface ChatView {
   muted: boolean;
   /** Nomes de quem está digitando agora. */
   typing: string[];
+  /** As outras pessoas da conversa, com até quando leram (para o "Visto" e as fotos ao lado dos balões). */
+  members: ChatMemberRead[];
   /** Relógio do servidor. */
   now: string;
   messages: ChatMessage[];

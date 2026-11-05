@@ -4,7 +4,27 @@ import { t } from '../lib/i18n/index.ts';
 export const CHAT_IMAGE_SIDE = 1600;
 export const CHAT_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 export const CHAT_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
-export const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'] as const;
+export const REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍'] as const;
+
+/** Emojis do "+" das reações (qualquer outro dá para digitar no campo do teclado). */
+export const MORE_EMOJIS: readonly string[] = [
+  '😀', '😃', '😄', '😁', '😆', '🥹', '😅', '🤣', '🥲', '☺️', '😊', '😇', '🙂', '😉', '😌', '😍',
+  '🥰', '😘', '😋', '😛', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥸', '🤩', '🥳', '😏', '😒', '😞',
+  '😔', '😟', '😕', '🙁', '😣', '😖', '😫', '😩', '🥺', '😭', '😤', '🤯', '😳', '🥵', '🥶', '😱',
+  '😨', '😰', '🤗', '🤔', '🫣', '🤭', '🫢', '🤫', '🫠', '😶', '😐', '🙄', '😬', '😴', '🤤', '🤢',
+  '🤮', '🤧', '😷', '🤒', '🤠', '😈', '💀', '👻', '👽', '🤖', '💩', '🙈', '🙉', '🙊', '🔥', '✨',
+  '💯', '💥', '💫', '🎉', '🎊', '🥂', '🍻', '🍕', '☕', '🍿', '⚽', '🎶', '📍', '⭐', '🌈', '☀️',
+  '👏', '🙌', '👐', '🤝', '🙏', '👊', '✊', '🤞', '✌️', '🤟', '🤘', '👌', '🤌', '👈', '👉', '👀',
+  '💪', '🫶', '💘', '💖', '💕', '💔', '❤️‍🔥', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '✅', '❌',
+];
+
+/** O primeiro emoji do texto digitado (o campo do "+" aceita o teclado de emojis do celular). */
+export function firstEmoji(text: string): string | undefined {
+  const Segmenter = (Intl as unknown as { Segmenter?: new (l?: string, o?: { granularity: 'grapheme' }) => { segment: (s: string) => Iterable<{ segment: string }> } }).Segmenter;
+  const parts = Segmenter ? Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(text.trim()), (p) => p.segment) : Array.from(text.trim());
+  const first = parts[0];
+  return first !== undefined && /\p{Extended_Pictographic}|\p{RI}/u.test(first) ? first : undefined;
+}
 
 const VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];

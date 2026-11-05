@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { CheckCircleIcon, CopyIcon, ReplyIcon, TrashIcon } from './icons.tsx';
+import { CheckCircleIcon, CopyIcon, PlusIcon, ReplyIcon, TrashIcon } from './icons.tsx';
+import { Sheet } from './agenda.tsx';
 import { Confirm, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { allDeletable, selectable } from '../lib/chat.ts';
-import { REACTIONS } from '../lib/chat-media.ts';
+import { MORE_EMOJIS, REACTIONS, firstEmoji } from '../lib/chat-media.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ChatMessage, ChatReaction } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
@@ -19,7 +20,8 @@ const EDGE = 12;
  * e as opções logo abaixo (reagir, responder, copiar, selecionar, apagar).
  */
 export function MessagePopup({ message, conversationId, canSend, onClose, onReply, onSelect, onReacted, onDeleted }: { message: ChatMessage; conversationId: string; canSend: boolean; onClose: () => void; onReply: () => void; onSelect: () => void; onReacted: (reactions: ChatReaction[]) => void; onDeleted: (message: ChatMessage) => void }) {
-  const [step, setStep] = useState<'menu' | 'delete'>('menu');
+  const [step, setStep] = useState<'menu' | 'delete' | 'emoji'>('menu');
+  const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [copied, setCopied] = useState(false);
@@ -115,11 +117,56 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
               {emoji}
             </button>
           ))}
+          {mine && !(REACTIONS as readonly string[]).includes(mine) ? (
+            <button type="button" className="msgpop__emoji is-on" aria-pressed="true" aria-label={t('Tirar reação {emoji}', { emoji: mine })} disabled={busy} onClick={() => void react(mine)}>
+              {mine}
+            </button>
+          ) : (
+            <button type="button" className="msgpop__emoji msgpop__emoji--more" aria-label={t('Mais emojis')} disabled={busy} onClick={() => setStep('emoji')}>
+              <PlusIcon />
+            </button>
+          )}
         </div>
       ) : null}
       <div ref={menuRef} className="msgpop__menu" style={style(pos?.menuTop)}>
         {problem ? <Notice tone="error">{problem}</Notice> : null}
-        {step === 'delete' ? (
+        {step === 'emoji' ? (
+          <div className="emojipick">
+            <form
+              className="emojipick__type"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const emoji = firstEmoji(typed);
+                if (emoji) void react(emoji);
+                else setProblem(t('Digite um emoji.'));
+              }}
+            >
+              <label className="visually-hidden" htmlFor="emoji-typed">
+                {t('Digite qualquer emoji')}
+              </label>
+              <input
+                id="emoji-typed"
+                className="emojipick__input"
+                value={typed}
+                placeholder={t('Ou digite qualquer emoji')}
+                autoComplete="off"
+                enterKeyHint="send"
+                onChange={(e) => {
+                  setTyped(e.target.value);
+                  const emoji = firstEmoji(e.target.value);
+                  if (emoji) void react(emoji);
+                }}
+              />
+            </form>
+            <div className="emojipick__grid" role="group" aria-label={t('Escolha um emoji')}>
+              {MORE_EMOJIS.map((emoji) => (
+                <button key={emoji} type="button" className={`emojipick__btn${mine === emoji ? ' is-on' : ''}`} aria-label={t('Reagir com {emoji}', { emoji })} disabled={busy} onClick={() => void react(emoji)}>
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : step === 'delete' ? (
           <Confirm danger question={t('Apagar esta mensagem para todos? Ela some da conversa de todo mundo e não dá para desfazer.')} confirmLabel={t('Apagar para todos')} busy={busy} onCancel={() => setStep('menu')} onConfirm={() => void remove()} />
         ) : (
           <ul>
@@ -157,5 +204,70 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
         )}
       </div>
     </div>
+  );
+}
+
+/** Juntas num chip só, como nas DMs: até três emojis e o total. */
+export function ReactionSummary({ reactions, onOpen }: { reactions: ChatReaction[]; onOpen: () => void }) {
+  if (reactions.length === 0) return null;
+  const total = reactions.reduce((sum, r) => sum + r.count, 0);
+  const mineToo = reactions.some((r) => r.mine);
+  return (
+    <div className="reactions">
+      <button type="button" className={`reactions__chip${mineToo ? ' is-mine' : ''}`} aria-label={total === 1 ? t('1 reação: {emojis}. Ver quem reagiu', { emojis: reactions.map((r) => r.emoji).join(' ') }) : t('{count} reações: {emojis}. Ver quem reagiu', { count: total, emojis: reactions.map((r) => r.emoji).join(' ') })} onClick={onOpen}>
+        <span aria-hidden="true">{reactions.slice(0, 3).map((r) => r.emoji).join('')}</span>
+        {total > 1 ? <span className="reactions__n">{total}</span> : null}
+      </button>
+    </div>
+  );
+}
+
+/** Quem reagiu à mensagem. Tocar na sua reação tira. */
+export function ReactionsSheet({ message, conversationId, canSend, onClose, onReacted }: { message: ChatMessage; conversationId: string; canSend: boolean; onClose: () => void; onReacted: (reactions: ChatReaction[]) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+  const rows = message.reactions.flatMap((r) => r.people.map((p) => ({ ...p, emoji: r.emoji, mine: r.mine && p === r.people[0] })));
+  rows.sort((a, b) => Number(b.mine) - Number(a.mine));
+  const total = rows.length;
+
+  async function removeMine(emoji: string) {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      const result = await api.reactMessage(conversationId, message.id, emoji);
+      onReacted(result.reactions);
+      onClose();
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet title={total === 1 ? t('1 reação') : t('{count} reações', { count: total })} onClose={onClose}>
+      {problem ? <Notice tone="error">{problem}</Notice> : null}
+      <ul className="reactlist">
+        {rows.map((r) => (
+          <li key={`${r.userId}-${r.emoji}`}>
+            {r.mine && canSend ? (
+              <button type="button" className="reactlist__row reactlist__row--mine" disabled={busy} onClick={() => void removeMine(r.emoji)}>
+                <span className="reactlist__who">
+                  <strong>{t('Você')}</strong>
+                  <span>{t('Toque para remover')}</span>
+                </span>
+                <span className="reactlist__emoji" aria-hidden="true">{r.emoji}</span>
+              </button>
+            ) : (
+              <div className="reactlist__row">
+                <span className="reactlist__who">
+                  <strong>{r.mine ? t('Você') : r.name}</strong>
+                </span>
+                <span className="reactlist__emoji" aria-label={t('reagiu com {emoji}', { emoji: r.emoji })}>{r.emoji}</span>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Sheet>
   );
 }

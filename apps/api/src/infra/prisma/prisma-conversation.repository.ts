@@ -361,6 +361,11 @@ export class PrismaConversationRepository implements ConversationRepository {
     return (rows as MessageRow[]).map(toMessage);
   }
 
+  async listReads(conversationId: string): Promise<{ userId: string; lastReadAt: Date | null }[]> {
+    if (!isUuid(conversationId)) return [];
+    return this.prisma.conversationParticipant.findMany({ where: { conversationId }, select: { userId: true, lastReadAt: true } });
+  }
+
   async markRead(conversationId: string, userId: string, now: Date): Promise<void> {
     if (!isUuid(conversationId) || !isUuid(userId)) return;
     await this.prisma.conversationParticipant.updateMany({ where: { conversationId, userId }, data: { lastReadAt: now } });

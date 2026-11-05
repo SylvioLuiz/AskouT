@@ -57,25 +57,43 @@ test('responder: apagar a original mostra "apagada" no trecho', async () => {
 
 // ---------- Reações ----------
 
-test('reagir: uma por pessoa, trocar, tirar, agrupar e só emojis da lista', async () => {
+test('reagir: uma por pessoa, trocar, tirar, agrupar, qualquer emoji e quem reagiu', async () => {
   const { w, ana, bia, caio, id } = await setup();
   const m = await w.core.conversations.send(ana, id, { body: 'oi' });
+  const bare = (list: { emoji: string; count: number; mine: boolean }[]) => list.map(({ emoji, count, mine }) => ({ emoji, count, mine }));
   let r = await w.core.conversations.react(bia, id, m.id, '❤️');
-  assert.deepEqual(r.reactions, [{ emoji: '❤️', count: 1, mine: true }]);
+  assert.deepEqual(bare(r.reactions), [{ emoji: '❤️', count: 1, mine: true }]);
   r = await w.core.conversations.react(bia, id, m.id, '😂');
-  assert.deepEqual(r.reactions, [{ emoji: '😂', count: 1, mine: true }]);
+  assert.deepEqual(bare(r.reactions), [{ emoji: '😂', count: 1, mine: true }]);
   r = await w.core.conversations.react(ana, id, m.id, '😂');
-  assert.deepEqual(r.reactions, [{ emoji: '😂', count: 2, mine: true }]);
+  assert.deepEqual(bare(r.reactions), [{ emoji: '😂', count: 2, mine: true }]);
+  assert.deepEqual(r.reactions[0]?.people.map((p) => p.userId), [ana, bia]);
   const view = (await w.core.conversations.messages(bia, id)).messages.find((x) => x.id === m.id)!;
-  assert.deepEqual(view.reactions, [{ emoji: '😂', count: 2, mine: true }]);
+  assert.deepEqual(bare(view.reactions), [{ emoji: '😂', count: 2, mine: true }]);
+  assert.equal(view.reactions[0]?.people[0]?.userId, bia);
   r = await w.core.conversations.react(bia, id, m.id, '😂');
-  assert.deepEqual(r.reactions, [{ emoji: '😂', count: 1, mine: false }]);
+  assert.deepEqual(bare(r.reactions), [{ emoji: '😂', count: 1, mine: false }]);
   r = await w.core.conversations.react(ana, id, m.id, null);
   assert.deepEqual(r.reactions, []);
-  await rejectsWith(w.core.conversations.react(bia, id, m.id, '💩'), 'VALIDATION');
-  await rejectsWith(w.core.conversations.react(bia, id, m.id, undefined), 'VALIDATION');
+  for (const emoji of ['💩', '🔥', '👍🏽', '🇧🇷', '👩‍❤️‍👨', '❤️‍🔥']) {
+    r = await w.core.conversations.react(bia, id, m.id, emoji);
+    assert.equal(r.reactions[0]?.emoji, emoji);
+  }
+  for (const bad of ['a', 'oi', '😂😂', '', ' 😂', undefined, 3]) await rejectsWith(w.core.conversations.react(bia, id, m.id, bad), 'VALIDATION');
   await rejectsWith(w.core.conversations.react(caio, id, m.id, '👍'), 'NOT_FOUND');
   assert.ok(REACTIONS.length >= 6);
+});
+
+test('visto: a conversa diz até quando cada outra pessoa leu', async () => {
+  const { w, ana, bia, id } = await setup();
+  const before = await w.core.conversations.messages(ana, id);
+  assert.deepEqual(before.members.map((x) => [x.profile.userId, x.readAt]), [[bia, null]]);
+  await w.core.conversations.send(ana, id, { body: 'oi' });
+  await w.core.conversations.messages(bia, id);
+  const after = await w.core.conversations.messages(ana, id);
+  assert.equal(after.members.length, 1);
+  assert.ok(after.members[0]?.readAt !== null);
+  assert.ok(Date.parse(after.members[0]!.readAt!) >= Date.parse(after.messages.at(-1)!.createdAt));
 });
 
 test('reagir: sem reação em mensagem de sistema, apagada ou de quem deixou de ser amigo', async () => {

@@ -34,7 +34,10 @@ describe('contraste dos tokens', () => {
       assert.ok(ratio(t['muted']!, t['surface']!) >= 4.5);
     });
     it(`${name}: cor da marca como texto passa de 4,5:1`, () => {
-      assert.ok(ratio(t['brand']!, t['bg']!) >= 4.5, `${t['brand']} sobre ${t['bg']}`);
+      // --brand é o preenchimento (botões, selos); texto e ícones rosa usam --brand-text.
+      for (const bg of ['bg', 'surface', 'brand-soft']) {
+        assert.ok(ratio(t['brand-text']!, t[bg]!) >= 4.5, `${t['brand-text']} sobre ${bg} ${t[bg]}`);
+      }
     });
     it(`${name}: texto sobre o botão de marca passa de 4,5:1`, () => {
       assert.ok(ratio(t['brand-ink']!, t['brand']!) >= 4.5, `${t['brand-ink']} sobre ${t['brand']}`);

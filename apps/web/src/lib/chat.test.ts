@@ -155,3 +155,64 @@ test('selecionar várias: copiar e apagar', () => {
   assert.equal(selectable(msg('5', 'x', { kind: 'SYSTEM' })), false);
   assert.equal(selectable(a), true);
 });
+
+import { breakLabel, groupAlbums, isDoubleTap, runPositions, seenLabel, timeBreak } from './chat.ts';
+import type { ChatMemberRead } from './types.ts';
+
+test('blocos de balões: mesma pessoa e perto no tempo ficam juntos', () => {
+  const list = [
+    msg('a', iso(at(13, 10, 0)), { senderId: 'x' }),
+    msg('b', iso(at(13, 10, 1)), { senderId: 'x' }),
+    msg('c', iso(at(13, 10, 2)), { senderId: 'x' }),
+    msg('d', iso(at(13, 10, 3)), { senderId: 'y' }),
+    msg('e', iso(at(13, 10, 20)), { senderId: 'y' }),
+    msg('f', iso(at(13, 12, 0)), { senderId: 'y' }),
+    msg('g', iso(at(13, 12, 1)), { senderId: 'y', kind: 'SYSTEM' }),
+  ];
+  assert.deepEqual(runPositions(list), ['first', 'middle', 'last', 'single', 'single', 'single', 'single']);
+});
+
+test('hora no meio da conversa: começo, dia novo ou mais de 1 h', () => {
+  assert.equal(timeBreak(undefined, msg('a', iso(at(13, 10)))), true);
+  assert.equal(timeBreak(msg('a', iso(at(13, 10))), msg('b', iso(at(13, 10, 59)))), false);
+  assert.equal(timeBreak(msg('a', iso(at(13, 10))), msg('b', iso(at(13, 11, 1)))), true);
+  assert.equal(timeBreak(msg('a', iso(at(12, 23, 50))), msg('b', iso(at(13, 0, 5)))), true);
+  assert.equal(breakLabel(iso(at(13, 9, 5)), NOW), 'Hoje 09:05');
+});
+
+test('fotos seguidas da mesma pessoa viram grade', () => {
+  const img = (id: string, min: number, extra: Partial<ChatMessage> = {}) => msg(id, iso(at(13, 10, min)), { kind: 'IMAGE', senderId: 'x', ...extra });
+  const groups = groupAlbums([img('a', 0), img('b', 0), img('c', 1), msg('t', iso(at(13, 10, 1)), { senderId: 'x' }), img('d', 2), img('e', 2, { senderId: 'y' }), img('f', 9, { senderId: 'y' })]);
+  assert.deepEqual(groups.map((g) => g.map((m) => m.id)), [['a', 'b', 'c'], ['t'], ['d'], ['e'], ['f']]);
+  const reacted = groupAlbums([img('a', 0), img('b', 0, { reactions: [{ emoji: '❤️', count: 1, mine: true, people: [] }] })]);
+  assert.equal(reacted.length, 2);
+});
+
+test('visto: só na sua última mensagem e depois que leram', () => {
+  const member = (name: string, readAt: Date | null): ChatMemberRead => ({ profile: { userId: name, username: name, displayName: `${name} Silva`, avatarUrl: null, isPrivate: false }, readAt: readAt ? iso(readAt) : null });
+  const mine = [msg('a', iso(at(13, 10)), { senderId: 'x' }), msg('b', iso(at(13, 11)), { mine: true, senderId: 'me' })];
+  assert.equal(seenLabel(mine, [member('Bia', null)], false), null);
+  assert.equal(seenLabel(mine, [member('Bia', at(13, 10, 30))], false), null);
+  assert.equal(seenLabel(mine, [member('Bia', at(13, 11, 5))], false), 'Visto');
+  assert.equal(seenLabel([...mine, msg('c', iso(at(13, 12)), { senderId: 'x' })], [member('Bia', at(13, 12))], false), null);
+  const late = at(13, 12);
+  assert.equal(seenLabel(mine, [member('Bia', late), member('Caio', null)], true), 'Visto por Bia');
+  assert.equal(seenLabel(mine, [member('Bia', late), member('Caio', late), member('Dani', null)], true), 'Visto por Bia e Caio');
+  assert.equal(seenLabel(mine, [member('Bia', late), member('Caio', late)], true), 'Visto por todos');
+});
+
+test('toque duplo: rápido e no mesmo lugar', () => {
+  assert.equal(isDoubleTap(undefined, { at: 0, x: 0, y: 0 }), false);
+  assert.equal(isDoubleTap({ at: 0, x: 10, y: 10 }, { at: 250, x: 14, y: 12 }), true);
+  assert.equal(isDoubleTap({ at: 0, x: 10, y: 10 }, { at: 400, x: 10, y: 10 }), false);
+  assert.equal(isDoubleTap({ at: 0, x: 10, y: 10 }, { at: 100, x: 80, y: 10 }), false);
+});
+
+import { firstEmoji } from './chat-media.ts';
+test('primeiro emoji digitado no "+"', () => {
+  assert.equal(firstEmoji('🔥 legal'), '🔥');
+  assert.equal(firstEmoji('👍🏽'), '👍🏽');
+  assert.equal(firstEmoji('❤️‍🔥'), '❤️‍🔥');
+  assert.equal(firstEmoji('oi'), undefined);
+  assert.equal(firstEmoji(''), undefined);
+});
