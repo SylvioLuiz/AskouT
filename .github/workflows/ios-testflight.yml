@@ -1,6 +1,6 @@
 # Gera o app do iPhone num Mac do GitHub e envia ao TestFlight.
-# Uso: enviar a versão desejada para a branch `testflight` (ex.: git push origin homolog-ari:testflight --force)
-# ou, depois que este arquivo estiver na main, GitHub → Actions → "iOS → TestFlight" → Run workflow.
+# Roda sozinho a cada push na main (o mesmo push que publica o site) e envia o que estiver na main.
+# Também dá para rodar à mão: GitHub → Actions → "iOS → TestFlight" → Run workflow.
 # Precisa dos segredos (Settings → Secrets and variables → Actions):
 #   ASC_KEY_ID, ASC_ISSUER_ID e ASC_KEY_P8 (conteúdo do arquivo .p8 da chave de API do App Store Connect, acesso Admin).
 # Não envia para revisão da loja: o build só aparece no TestFlight.
@@ -9,7 +9,7 @@ name: iOS → TestFlight
 on:
   workflow_dispatch:
   push:
-    branches: [testflight]
+    branches: [main]
 
 concurrency:
   group: ios-testflight
