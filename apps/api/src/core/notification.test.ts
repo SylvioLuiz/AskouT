@@ -58,6 +58,17 @@ describe('avisos', () => {
     assert.equal((await w.core.notifications.list(bia!)).unread, 1, 'depois de lido, volta a avisar');
   });
 
+  it('push de mensagem: cada mensagem nova chega no celular, mesmo com o aviso da conversa ainda não lido no sino', async () => {
+    const w = makeWorld();
+    const { ana, bia } = await friends(w, 'ana', 'bia');
+    await w.core.notifications.subscribe(bia!, { endpoint: 'https://push.example/bia', keys: { p256dh: 'abc', auth: 'def' } });
+    const { id } = await w.core.conversations.open(ana!, bia!);
+    for (const body of ['oi', 'tá aí?', 'bora?']) await w.core.conversations.send(ana!, id, { body });
+    await w.core.flushNotifications();
+    assert.equal(w.push.sent.filter((s) => s.message.url === `/conversas/${id}`).length, 3, 'um push por mensagem');
+    assert.equal((await w.core.notifications.list(bia!)).unread, 1, 'o sino continua com um aviso só por conversa');
+  });
+
   it('push: envia para os aparelhos inscritos e apaga inscrição vencida', async () => {
     const w = makeWorld();
     const { ana, bia } = await friends(w, 'ana', 'bia');
