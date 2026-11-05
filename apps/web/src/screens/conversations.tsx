@@ -35,8 +35,13 @@ export const MESSAGE_MAX = 2000;
 
 const UNDO_MS = 6000;
 
+/** Quando a última conversa foi fechada: a lista entra "voltando" (da esquerda) se acabou de sair de um chat. */
+let chatLeftAt = 0;
+const BACK_WINDOW_MS = 1500;
+
 export function ConversationsScreen() {
   useTitle(t('Conversas'));
+  const [cameBack] = useState(() => Date.now() - chatLeftAt < BACK_WINDOW_MS);
   const list = useAsync(() => api.conversations(), []);
   usePolling(list.reload, 10_000);
   useEffect(() => {
@@ -54,7 +59,7 @@ export function ConversationsScreen() {
   const searching = query.trim() !== '';
 
   return (
-    <>
+    <div className={`convscreen${cameBack ? ' convscreen--back' : ''}`}>
       <PageHead
         title={t('Conversas')}
         action={
@@ -148,7 +153,7 @@ export function ConversationsScreen() {
           onChanged={() => list.reload()}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -166,6 +171,7 @@ interface StagedMedia {
 }
 
 export function ChatScreen({ conversationId }: { conversationId: string }) {
+  useEffect(() => () => void (chatLeftAt = Date.now()), []);
   const view = useAsync(() => api.messages(conversationId), [conversationId]);
   usePolling(view.reload, POLL_MS);
   const flash = useAsync(() => api.flashInvites(), [conversationId]);
@@ -608,7 +614,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   );
 
   return (
-    <div className={`chat${background ? ' chat--bg' : ''}`} style={background ? ({ '--chat-bg': `url(${background})` } as CSSProperties) : undefined}>
+    <div className={`chat chat--enter${background ? ' chat--bg' : ''}`} style={background ? ({ '--chat-bg': `url(${background})` } as CSSProperties) : undefined}>
       {selected ? (
         <header className="selectbar">
           <p className="selectbar__count" role="status">

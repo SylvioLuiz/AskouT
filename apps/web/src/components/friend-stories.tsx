@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { StoryViewer } from './event-story.tsx';
 import { Avatar } from './ui.tsx';
+import { LocationIcon } from './icons.tsx';
 import type { StoryPos } from '../lib/stories.ts';
 import type { EventStoryGroup } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
-/** Onde a pessoa está agora: o evento do story mais recente dela. */
+/** Onde a pessoa está agora: o local (ou o evento) do story mais recente dela. */
 function where(group: EventStoryGroup): string | undefined {
   const last = group.items[group.items.length - 1];
-  return last?.event ? last.event.title : undefined;
+  return last?.event ? (last.event.place ?? last.event.title) : undefined;
 }
 
 /**
@@ -39,7 +40,12 @@ export function FriendStories({ groups, onChanged }: { groups: EventStoryGroup[]
                 <Avatar profile={group.author} size={60} />
               </span>
               <span className="homestories__name">{group.mine ? t('Seu story') : group.author.username}</span>
-              {where(group) ? <span className="homestories__where">{where(group)}</span> : null}
+              {where(group) ? (
+                <span className="homestories__where">
+                  <LocationIcon />
+                  <span>{where(group)}</span>
+                </span>
+              ) : null}
             </button>
           </li>
         ))}

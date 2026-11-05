@@ -34,12 +34,22 @@ export interface EventStoryGroupView {
   items: EventStoryItemView[];
 }
 
-/** Onde a pessoa está: o evento do story e o local dele. */
+/** Onde a pessoa está: o evento do story, o local e o que dá para saber dele num relance. */
 export interface ProfileStoryEventView {
   id: string;
   title: string;
+  kind: EventKind;
+  startsAt: string;
+  endsAt: string;
   /** Nome do local (do evento do local ou o lugar informado no evento criado por uma pessoa). */
   place: string | null;
+  address: string | null;
+  cover: EventCoverView | null;
+  confirmedCount: number;
+  /** Quem vê também confirmou presença. */
+  going: boolean;
+  isFree: boolean;
+  sample: boolean;
 }
 
 /** Story na página inicial: vem de um evento; `event` é null quando quem vê não tem acesso a ele. */
@@ -451,19 +461,28 @@ export class EventPageService {
     return [...groups.values()].sort((a, b) => Number(b.mine) - Number(a.mine) || (last(a) < last(b) ? 1 : last(a) > last(b) ? -1 : 0));
   }
 
-  /** Nome do evento para o story na página inicial, se quem vê consegue abrir o evento. */
+  /** O evento do story na página inicial, se quem vê consegue abrir o evento. */
   private async eventLabel(viewerId: string, ref: EventRef): Promise<ProfileStoryEventView | null> {
+    let page: EventPageView;
     try {
-      await this.resolve(viewerId, ref.id);
+      page = await this.get(viewerId, ref.id);
     } catch {
       return null;
     }
-    if (ref.source === 'PLACE') {
-      const found = await this.deps.places.findEvent(ref.id);
-      return found ? { id: ref.id, title: found.event.title, place: found.venue.name } : null;
-    }
-    const post = (await this.deps.posts.findById(ref.id))?.post;
-    return post?.eventTitle ? { id: ref.id, title: post.eventTitle, place: post.placeName ?? null } : null;
+    return {
+      id: page.id,
+      title: page.title,
+      kind: page.kind,
+      startsAt: page.startsAt,
+      endsAt: page.endsAt,
+      place: page.venue.name || null,
+      address: page.venue.address,
+      cover: page.cover,
+      confirmedCount: page.confirmedCount,
+      going: page.going,
+      isFree: page.isFree,
+      sample: page.sample,
+    };
   }
 
   /** O story aparece para `viewerId` na página inicial: está no perfil, no ar, e é dele ou de um amigo sem bloqueio. */

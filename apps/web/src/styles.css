@@ -4470,15 +4470,40 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .homestories__ring { padding: 3px; border-radius: 50%; background: var(--brand); }
 .homestories__ring > * { box-shadow: 0 0 0 2px var(--bg, #fff); border-radius: 50%; }
 .homestories__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; font-weight: 600; }
-.homestories__where { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.6875rem; color: var(--brand-text); }
+.homestories__where { display: flex; align-items: center; justify-content: center; gap: 2px; max-width: 100%; font-size: 0.6875rem; color: var(--muted); }
+.homestories__where svg { flex: none; width: 10px; height: 10px; }
+.homestories__where span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .homestories__item:focus-visible .homestories__ring { outline: 2px solid var(--brand-text); outline-offset: 2px; }
-.storyview__event { position: absolute; top: calc(max(8px, env(safe-area-inset-top)) + 62px); left: 12px; right: 12px; z-index: 3; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; background: rgb(0 0 0 / 0.55); color: #fff; text-decoration: none; backdrop-filter: blur(6px); }
-.storyview__eventicon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: #fff; }
-.storyview__eventicon svg { width: 18px; height: 18px; }
-.storyview__eventtext { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
-.storyview__eventtext strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
-.storyview__eventtext span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: rgb(255 255 255 / 0.8); }
-.storyview__eventtext .storyview__eventkicker { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; color: rgb(255 255 255 / 0.7); }
+/* Onde a pessoa está: linha discreta no topo e cartão de vidro no pé do story */
+.storyview__whotext { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.storyview__whoname { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.storyview__whoname strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.storyview__whoplace { display: flex; align-items: center; gap: 3px; min-width: 0; font-size: 0.75rem; color: rgb(255 255 255 / 0.85); }
+.storyview__whoplace svg { flex: none; width: 12px; height: 12px; }
+.storyview__whoplace span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.storyview--placed::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 220px; z-index: 2; background: linear-gradient(to top, rgb(0 0 0 / 0.55), transparent); pointer-events: none; }
+.storyview--placed .storyview__tap { bottom: 132px; }
+.storyview--placed .soundtoggle { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 112px); }
+.storyview--placed .storyview__error { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 120px); }
+.storyplace { position: absolute; left: 12px; right: 12px; bottom: max(14px, env(safe-area-inset-bottom)); z-index: 3; display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 10px 10px 10px 10px; border: 1px solid rgb(255 255 255 / 0.14); border-radius: 20px; background: rgb(18 18 22 / 0.5); color: #fff; text-decoration: none; -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); box-shadow: 0 8px 28px rgb(0 0 0 / 0.28); transition: transform 160ms ease, background-color 160ms ease; -webkit-tap-highlight-color: transparent; }
+.storyplace:active { transform: scale(0.985); background: rgb(18 18 22 / 0.62); }
+.storyplace:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.storyplace__thumb { position: relative; flex: none; display: grid; place-items: center; width: 64px; height: 64px; overflow: hidden; border-radius: 14px; background-color: rgb(255 255 255 / 0.12); color: #fff; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); }
+.storyplace__thumb img { width: 100%; height: 100%; object-fit: cover; }
+.storyplace__thumb svg { width: 26px; height: 26px; opacity: 0.95; }
+.storyplace__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; line-height: 1.25; }
+.storyplace__when { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 0.75rem; font-weight: 600; color: rgb(255 255 255 / 0.72); }
+.storyplace__when span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.storyplace__when--live { color: #fff; }
+.storyplace__live { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 rgb(36 138 61 / 0.6); animation: storyplace-pulse 1.8s ease-out infinite; }
+@keyframes storyplace-pulse { 0% { box-shadow: 0 0 0 0 rgb(36 138 61 / 0.7); } 70%, 100% { box-shadow: 0 0 0 7px rgb(36 138 61 / 0); } }
+@media (prefers-reduced-motion: reduce) { .storyplace__live { animation: none; } .storyplace { transition: none; } }
+.storyplace__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9375rem; font-weight: 700; }
+.storyplace__where { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8125rem; color: rgb(255 255 255 / 0.82); }
+.storyplace__meta { display: flex; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 0.75rem; color: rgb(255 255 255 / 0.62); }
+.storyplace__meta span + span::before { content: "·"; margin: 0 6px; }
+.storyplace__go { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgb(255 255 255 / 0.12); }
+.storyplace__go svg { width: 16px; height: 16px; }
 .storysheet__ask { margin-top: 12px; padding: 12px 14px; border-radius: var(--radius-panel); background: var(--brand-soft); }
 .storysheet__question { display: flex; flex-direction: column; gap: 4px; margin: 0; }
 
@@ -4950,3 +4975,16 @@ button.reactlist__row { cursor: pointer; }
 /* Dentro da conversa, só o topo do chat (sem a barra do app), como nas DMs. */
 .shell--chat .topbar { display: none; }
 .shell--chat .chathead { top: 0; padding-top: calc(8px + env(safe-area-inset-top)); }
+/* Sem a barra do app, a conversa ocupa a tela toda: o campo de mensagem fica colado no rodapé. */
+.shell--chat .chat { min-height: 100dvh; }
+@media (min-width: 900px) { .shell--chat .chat { min-height: calc(100dvh - 16px); } }
+
+/* Transição entre a lista de conversas e o chat: o chat entra da direita; ao voltar, a lista entra da esquerda. */
+.chat--enter { animation: chat-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.convscreen--back { animation: convscreen-back 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes chat-enter { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes convscreen-back { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .chat--enter, .convscreen--back { animation-name: fade-in-only; animation-duration: 160ms; }
+  @keyframes fade-in-only { from { opacity: 0; } to { opacity: 1; } }
+}

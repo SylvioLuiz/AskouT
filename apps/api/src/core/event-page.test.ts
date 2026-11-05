@@ -247,7 +247,8 @@ test('story também no perfil: aparece na página inicial dos amigos; sem a opç
 
   const forAna = await w.core.eventPages.profileStories(ana);
   assert.deepEqual(forAna.map((g) => [g.author.username, g.mine, g.items.map((i) => i.id)]), [['bia', false, [shared.items[0]!.id]]], 'amiga: só o story publicado no perfil; duda não é amiga');
-  assert.deepEqual(forAna[0]!.items[0]!.event, { id: 'e1', title: 'Piquenique', place: 'Parque Ibirapuera' }, 'mostra onde a pessoa está');
+  const where = forAna[0]!.items[0]!.event!;
+  assert.deepEqual([where.id, where.title, where.place, where.kind, where.confirmedCount, where.going, where.cover], ['e1', 'Piquenique', 'Parque Ibirapuera', 'OUTDOOR', 4, true, { kind: 'URL', url: 'https://img.exemplo/capa.jpg' }], 'mostra onde a pessoa está');
   assert.equal(forAna[0]!.items[0]!.canDelete, false);
   assert.deepEqual(await w.core.eventPages.profileStories(caio), [], 'caio e bia não são amigos');
   const own = await w.core.eventPages.profileStories(bia);

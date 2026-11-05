@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from './agenda.tsx';
 import { SoundToggle } from './sound-toggle.tsx';
-import { LocationIcon, MoreIcon, TrashIcon, XIcon } from './icons.tsx';
+import { ChevronRightIcon, EventKindIcon, LocationIcon, MoreIcon, TrashIcon, XIcon } from './icons.tsx';
 import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Button, Notice } from './ui.tsx';
 import { api } from '../client.ts';
@@ -12,7 +12,9 @@ import { mediaKind, prepareImage } from '../lib/chat-media.ts';
 import { isVideoFile, videoPoster, videoProblem } from '../lib/post-video.ts';
 import { STORY_PHOTO_MS, nextStory, prevStory } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
-import type { EventStoryGroup } from '../lib/types.ts';
+import type { EventStoryGroup, StoryEvent } from '../lib/types.ts';
+import { formatWhen } from '../lib/chat.ts';
+import { kindLabel, safeImage } from '../lib/explore.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -169,7 +171,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
 
   const src = api.storyMediaUrl(item.id);
   return (
-    <div className="storyview" role="dialog" aria-modal="true" aria-label={t('Story de {username}', { username: group.author.username })}>
+    <div className={`storyview${!eventId && item.event ? ' storyview--placed' : ''}`} role="dialog" aria-modal="true" aria-label={t('Story de {username}', { username: group.author.username })}>
       <div className="storyview__bars" aria-hidden="true">
         {group.items.map((it, index) => (
           <span key={it.id} className="storyview__bar">
@@ -180,8 +182,18 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
       <header className="storyview__head">
         <Link to={`/u/${encodeURIComponent(group.author.username)}`} className="storyview__who">
           <Avatar profile={group.author} size={36} />
-          <strong>{group.author.username}</strong>
-          <span>{timeAgo(item.createdAt, new Date())}</span>
+          <span className="storyview__whotext">
+            <span className="storyview__whoname">
+              <strong>{group.author.username}</strong>
+              <span>{timeAgo(item.createdAt, new Date())}</span>
+            </span>
+            {!eventId && item.event?.place ? (
+              <span className="storyview__whoplace">
+                <LocationIcon />
+                <span>{item.event.place}</span>
+              </span>
+            ) : null}
+          </span>
         </Link>
         {!group.mine ? (
           <button type="button" className="storyview__btn storyview__btn--quiet" onClick={() => setReporting(true)} aria-label={t('Mais opções do story')} aria-haspopup="dialog">
@@ -218,18 +230,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
         <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo story')} />
         {item.kind === 'VIDEO' ? <SoundToggle muted={muted} onToggle={() => setMuted((m) => !m)} /> : null}
       </div>
-      {!eventId && item.event ? (
-        <Link to={`/eventos/${encodeURIComponent(item.event.id)}`} className="storyview__event" aria-label={t('{username} está em {title}. Abrir o evento', { username: group.author.username, title: item.event.title })}>
-          <span className="storyview__eventicon" aria-hidden="true">
-            <LocationIcon />
-          </span>
-          <span className="storyview__eventtext">
-            <span className="storyview__eventkicker">{t('Está em')}</span>
-            <strong>{item.event.title}</strong>
-            {item.event.place ? <span>{item.event.place}</span> : null}
-          </span>
-        </Link>
-      ) : null}
+      {!eventId && item.event ? <StoryPlace event={item.event} username={group.author.username} /> : null}
       {error ? <p className="storyview__error">{error}</p> : null}
       {reporting ? (
         <ReasonSheet
@@ -244,5 +245,61 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
         />
       ) : null}
     </div>
+  );
+}
+
+// ---------- Onde a pessoa está ----------
+
+/** Situação do evento agora: acontecendo, ainda vai começar ou já acabou. */
+function eventPhase(event: Pick<StoryEvent, 'startsAt' | 'endsAt'>, now: Date): 'LIVE' | 'SOON' | 'ENDED' {
+  const start = Date.parse(event.startsAt);
+  const end = Date.parse(event.endsAt);
+  if (end <= now.getTime()) return 'ENDED';
+  return start <= now.getTime() ? 'LIVE' : 'SOON';
+}
+
+/** Quem confirmou, contando você quando você também vai. */
+function goingText(event: Pick<StoryEvent, 'confirmedCount' | 'going'>): string {
+  const n = event.confirmedCount;
+  if (event.going) return n <= 1 ? t('Você vai') : n === 2 ? t('Você e mais 1 pessoa vão') : t('Você e mais {n} pessoas vão', { n: n - 1 });
+  return n === 1 ? t('1 pessoa vai') : t('{n} pessoas vão', { n });
+}
+
+/**
+ * Cartão discreto no pé do story: o evento e o local onde a pessoa está, com capa, horário e quem vai.
+ * Tocar abre o evento.
+ */
+export function StoryPlace({ event, username }: { event: StoryEvent; username: string }) {
+  const [coverFailed, setCoverFailed] = useState(false);
+  const now = new Date();
+  const phase = eventPhase(event, now);
+  const cover = coverFailed ? null : safeImage(event.coverPath);
+  const where = [event.place, event.address].filter((part): part is string => !!part && part.trim() !== '');
+  return (
+    <Link
+      to={`/eventos/${encodeURIComponent(event.id)}`}
+      className="storyplace"
+      aria-label={t('{username} está em {title}. Abrir o evento', { username, title: event.title })}
+    >
+      <span className={`storyplace__thumb${cover ? '' : ` evcover--${event.kind.toLowerCase()}`}`} aria-hidden="true">
+        {cover ? <img src={cover} alt="" referrerPolicy="no-referrer" onError={() => setCoverFailed(true)} /> : <EventKindIcon kind={event.kind} />}
+      </span>
+      <span className="storyplace__body">
+        <span className={`storyplace__when storyplace__when--${phase.toLowerCase()}`}>
+          {phase === 'LIVE' ? <span className="storyplace__live" aria-hidden="true" /> : null}
+          <span>{phase === 'ENDED' ? t('Já terminou') : formatWhen(event.startsAt, event.endsAt, now)}</span>
+        </span>
+        <strong className="storyplace__title">{event.title}</strong>
+        {where.length > 0 ? <span className="storyplace__where">{where.join(' · ')}</span> : null}
+        <span className="storyplace__meta">
+          <span>{kindLabel(event.kind)}</span>
+          {event.isFree ? <span>{t('Grátis')}</span> : null}
+          {event.confirmedCount > 0 ? <span>{goingText(event)}</span> : null}
+        </span>
+      </span>
+      <span className="storyplace__go" aria-hidden="true">
+        <ChevronRightIcon />
+      </span>
+    </Link>
   );
 }

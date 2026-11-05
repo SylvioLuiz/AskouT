@@ -2060,8 +2060,12 @@ export const EN: Readonly<Record<string, string>> = {
   "Não, só no evento": "No, only in the event",
   "Trocar foto ou vídeo": "Change photo or video",
   "{username} está em {title}. Abrir o evento": "{username} is at {title}. Open the event",
-  "Está em": "Is at",
   "Stories dos amigos": "Friends' stories",
   "Ver o seu story": "View your story",
   "Ver o story de {username}, que está em {title}": "View {username}'s story, at {title}",
+  "Já terminou": "Already over",
+  "Você e mais 1 pessoa vão": "You and 1 other are going",
+  "Você e mais {n} pessoas vão": "You and {n} others are going",
+  "1 pessoa vai": "1 person is going",
+  "{n} pessoas vão": "{n} people are going",
 };

@@ -91,7 +91,16 @@ export class ExploreController {
   /** Página inicial: os stories que você e seus amigos publicaram também no perfil. */
   @Get('stories/friends')
   profileStories(@CurrentActor() actor: Actor) {
-    return this.core.eventPages.profileStories(actor.userId).then((groups) => ({ groups }));
+    return this.core.eventPages.profileStories(actor.userId).then((groups) => ({
+      groups: groups.map((g) => ({
+        ...g,
+        items: g.items.map((item) => {
+          if (!item.event) return { ...item, event: null };
+          const { cover, ...event } = item.event;
+          return { ...item, event: { ...event, coverPath: this.coverPath(cover) } };
+        }),
+      })),
+    }));
   }
 
   @Delete('stories/:storyId')
