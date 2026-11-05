@@ -146,6 +146,7 @@ function FlashContent() {
   const [friendOpen, setFriendOpen] = useState<string | undefined>();
   const [callAllOpen, setCallAllOpen] = useState(false);
   const [callingAll, setCallingAll] = useState(false);
+  const [approxAll, setApproxAll] = useState(false);
   const [inviting, setInviting] = useState(false);
 
   // O aviso de "Flash ativado" some sozinho depois de 3 segundos.
@@ -264,7 +265,6 @@ function FlashContent() {
   }
   const friendInSheet = friends.find((f) => f.profile.userId === friendOpen);
 
-  const [approxAll, setApproxAll] = useState(false);
   async function callAll() {
     setCallingAll(true);
     setFeedback(undefined);
