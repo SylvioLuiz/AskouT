@@ -4988,3 +4988,29 @@ button.reactlist__row { cursor: pointer; }
   .chat--enter, .convscreen--back { animation-name: fade-in-only; animation-duration: 160ms; }
   @keyframes fade-in-only { from { opacity: 0; } to { opacity: 1; } }
 }
+
+/* Toque nos posts da página inicial: a foto abre em tela cheia; o cartaz do evento inteiro abre o evento */
+.pcarousel__open { cursor: zoom-in; }
+.poster__hit { position: absolute; inset: 0; z-index: 1; -webkit-tap-highlight-color: transparent; }
+.poster--event .poster__info { z-index: 2; pointer-events: none; }
+.poster--event .poster__info a, .poster--event .poster__info button { pointer-events: auto; }
+.photoview { position: fixed; inset: 0; z-index: 1000; background: #000; color: #fff; animation: photoview-in 180ms ease-out; }
+@keyframes photoview-in { from { opacity: 0; } to { opacity: 1; } }
+.photoview__track { display: flex; width: 100%; height: 100%; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior: contain; touch-action: pan-x pinch-zoom; }
+.photoview__track::-webkit-scrollbar { display: none; }
+.photoview__slide { position: relative; flex: 0 0 100%; height: 100%; margin: 0; display: grid; place-items: center; scroll-snap-align: center; scroll-snap-stop: always; }
+.photoview__slide img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-select: none; }
+.photoview__slide figcaption { position: absolute; left: 12px; bottom: max(12px, env(safe-area-inset-bottom)); font-size: 0.75rem; color: rgb(255 255 255 / 0.7); }
+.photoview__head { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: max(10px, env(safe-area-inset-top)) 10px 10px 16px; background: linear-gradient(to bottom, rgb(0 0 0 / 0.5), transparent); pointer-events: none; }
+.photoview__head > * { pointer-events: auto; }
+.photoview__count { font-size: 0.875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.photoview__btn { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: rgb(255 255 255 / 0.14); color: #fff; cursor: pointer; }
+.photoview__nav { position: absolute; top: 50%; z-index: 2; display: none; place-items: center; width: 44px; height: 44px; margin-top: -22px; padding: 0; border: 0; border-radius: 50%; background: rgb(255 255 255 / 0.14); color: #fff; cursor: pointer; }
+.photoview__nav:disabled { opacity: 0.3; cursor: default; }
+.photoview__nav--prev { left: 12px; }
+.photoview__nav--next { right: 12px; }
+@media (hover: hover) { .photoview__nav { display: grid; } }
+.photoview__dots { position: absolute; left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 2; display: flex; justify-content: center; gap: 6px; pointer-events: none; }
+.photoview__dot { width: 6px; height: 6px; border-radius: 50%; background: rgb(255 255 255 / 0.4); transition: background-color 160ms ease; }
+.photoview__dot--on { background: #fff; }
+@media (prefers-reduced-motion: reduce) { .photoview { animation: none; } }

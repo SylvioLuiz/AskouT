@@ -18,10 +18,11 @@ import { trackClick, useDwell } from './dwell.tsx';
 import type { DwellSource } from '../lib/dwell.ts';
 import { timeAgo } from '../lib/format.ts';
 import type { PostImage, PostView, PostsPage } from '../lib/types.ts';
-import { Link } from '../router.tsx';
+import { Link, navigate } from '../router.tsx';
+import { PhotoViewer } from './photo-viewer.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
-function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: number; total: number; onFirstLoad?: (w: number, h: number) => void }) {
+function Slide({ image, index, total, onFirstLoad, onOpen }: { image: PostImage; index: number; total: number; onFirstLoad?: (w: number, h: number) => void; onOpen?: (index: number) => void }) {
   const [failed, setFailed] = useState(false);
   // O navegador só deixa o vídeo começar sozinho sem som; quem quiser o som toca no botão.
   const [muted, setMuted] = useState(true);
@@ -70,6 +71,8 @@ function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: 
           alt=""
           loading={index === 0 ? 'lazy' : 'eager'}
           referrerPolicy="no-referrer"
+          className={onOpen ? 'pcarousel__open' : undefined}
+          onClick={onOpen ? () => onOpen(index) : undefined}
           onError={() => setFailed(true)}
           onLoad={(event) => {
             if (index === 0) onFirstLoad?.(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
@@ -85,7 +88,8 @@ function Slide({ image, index, total, onFirstLoad }: { image: PostImage; index: 
 }
 
 /** Fotos lado a lado, que se arrastam com o dedo; mostra "2/5" quando há mais de uma. */
-export function Carousel({ images }: { images: PostImage[] }) {
+/** `onOpen`: tocar numa foto abre o destino do post (a foto em tela cheia, o evento ou o local). */
+export function Carousel({ images, onOpen }: { images: PostImage[]; onOpen?: (index: number) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const [ratio, setRatio] = useState(4 / 5);
@@ -102,7 +106,7 @@ export function Carousel({ images }: { images: PostImage[] }) {
     <div className="pcarousel" style={{ '--carousel-ratio': String(ratio) } as CSSProperties}>
       <div className="pcarousel__track" ref={ref} onScroll={onScroll} role="group" aria-label={t('Fotos e vídeo do post')} tabIndex={images.length > 1 ? 0 : undefined}>
         {images.map((image, i) => (
-          <Slide key={image.id} image={image} index={i} total={images.length} onFirstLoad={(w, h) => setRatio(feedRatio(w, h))} />
+          <Slide key={image.id} image={image} index={i} total={images.length} onFirstLoad={(w, h) => setRatio(feedRatio(w, h))} onOpen={onOpen} />
         ))}
       </div>
       {images.length > 1 ? (
@@ -210,6 +214,13 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
 
   const eventCard = post.event && asEvent;
   const cartaz = poster === true && !eventCard;
+  const [viewing, setViewing] = useState<number | undefined>();
+  // Tocar na foto: post de evento abre o evento; post de um local abre a página do local; os outros abrem a foto em tela cheia.
+  function openMedia(index: number) {
+    if (post.event) navigate(`/eventos/${encodeURIComponent(post.id)}`);
+    else if (post.venue) navigate(`/bares/${encodeURIComponent(post.venue.id)}`);
+    else setViewing(index);
+  }
   const hasVideo = post.images.some((i) => i.videoPath);
   return (
     <article className="post" ref={dwellRef} onClickCapture={track ? (ev) => { if ((ev.target as Element).closest('a')) trackClick('POST', initial.id, track); } : undefined}>
@@ -271,7 +282,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
         <div className={`poster poster--post${hasVideo ? ' poster--video' : ''}${post.images.length > 1 ? ' poster--multi' : ''}`}>
           <div className="poster__stage">
           <div className="poster__media">
-            <Carousel key={post.images.map((i) => i.id).join()} images={post.images} />
+            <Carousel key={post.images.map((i) => i.id).join()} images={post.images} onOpen={openMedia} />
           </div>
           <div className="poster__scrim poster__scrim--post" aria-hidden="true" />
           <div className="poster__top">
@@ -352,7 +363,8 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           </div>
         </div>
       ) : null}
-      {eventCard || cartaz ? null : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} />}
+      {eventCard || cartaz ? null : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} onOpen={openMedia} />}
+      {viewing !== undefined ? <PhotoViewer images={post.images} start={viewing} onClose={() => setViewing(undefined)} /> : null}
       {cartaz ? null : (
       <div className="post__actions" role="group" aria-label={t('Ações do post')}>
         <button type="button" className={`post__action${post.likedByMe ? ' post__action--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
