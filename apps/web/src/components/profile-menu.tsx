@@ -1,4 +1,6 @@
-import { ChevronRightIcon } from './icons.tsx';
+import { useState } from 'react';
+import { ChevronRightIcon, UsersIcon } from './icons.tsx';
+import { InviteSheet } from './invite.tsx';
 import { Sheet } from './agenda.tsx';
 import { useAuthContext } from '../auth.tsx';
 import { Link } from '../router.tsx';
@@ -17,8 +19,20 @@ export const PROFILE_MENU: { to: string; label: string }[] = [
 /** Menu do perfil numa folha que sobe da base da tela, como nos apps nativos. Fecha puxando para baixo, com Esc ou tocando fora. */
 export function ProfileMenu({ onClose }: { onClose: () => void }) {
   const { signOut } = useAuthContext();
+  const [inviting, setInviting] = useState(false);
+  // O convite troca a folha do menu pela do convite (uma folha por vez); fechar o convite fecha tudo.
+  if (inviting) return <InviteSheet onClose={onClose} />;
   return (
-    <Sheet title={t('Menu do perfil')} onClose={onClose}>
+    <Sheet title={t('Menu do perfil')} hideTitle onClose={onClose}>
+      <button type="button" className="invitecta" onClick={() => setInviting(true)}>
+        <span className="invitecta__icon" aria-hidden="true">
+          <UsersIcon />
+        </span>
+        <span className="invitecta__text">
+          <span className="invitecta__title">{t('Chame a galera')}</span>
+          <span className="invitecta__sub">{t('O AskouT é melhor com os amigos. Compartilhe o link.')}</span>
+        </span>
+      </button>
       <ul className="menulist">
         {PROFILE_MENU.map((item) => (
           <li key={item.to}>

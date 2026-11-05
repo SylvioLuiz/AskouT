@@ -1317,6 +1317,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Voltar ao Flash": "Volver a Flash",
   "Voltar para as fotos": "Volver a las fotos",
   "Voltar para o Explorar": "Volver a Explorar",
+  "Visualização do Explorar": "Vista de Explorar",
   "Voltar à conversa": "Volver a la conversación",
   "Votação até {when}": "Votación hasta {when}",
   "Votações e eventos marcados": "Votaciones y eventos programados",

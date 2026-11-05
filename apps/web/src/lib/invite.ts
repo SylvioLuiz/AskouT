@@ -7,17 +7,6 @@ export function inviteUrl(origin: string, username: string): string {
   return `${origin}/cadastro?convite=${encodeURIComponent(username)}`;
 }
 
-/** Quantos amigos a pessoa precisa ter para o card "Chame a galera" sair da Home. */
-export const INVITE_CARD_GOAL = 5;
-
-/**
- * O card "Chame a galera" aparece na Home enquanto a pessoa tem menos de 5 amigos.
- * Enquanto a lista não chegou, não mostra (evita piscar e sumir); se a lista falhar, também não mostra.
- */
-export function showInviteCard(friendCount: number | undefined): boolean {
-  return friendCount !== undefined && friendCount < INVITE_CARD_GOAL;
-}
-
 /**
  * Endereço de loja configurado (VITE_STORE_URL), só se for http(s). Vazio enquanto o app não está nas lojas.
  * Quando existir, é ele que vai no convite, no lugar do link do site.

@@ -1,10 +1,11 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
+import { ExploreViews } from '../components/explore-views.tsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
-import { ClockIcon, EventKindIcon, MapIcon, SearchIcon } from '../components/icons.tsx';
+import { ClockIcon, EventKindIcon, SearchIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
 import { Button, EmptyState, ErrorState, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -431,14 +432,8 @@ export function ExploreScreen() {
 
   return (
     <>
-      <PageHead
-        title={t('Explorar')}
-        action={
-          <Link to="/explorar/mapa" className="btn btn--secondary btn--small">
-            <MapIcon /> Ver no mapa
-          </Link>
-        }
-      />
+      <PageHead title={t('Explorar')} />
+      <ExploreViews current="list" />
 
       <div className="search search--explore" role="search">
         <span className="search__icon" aria-hidden="true">
