@@ -221,6 +221,22 @@ export interface FlashMatch {
   them: FlashPosition | null;
   /** Conversa 1:1 dos dois, criada ao aceitar. */
   conversationId: string;
+  /** Lugar que um dos dois escolheu no mapa; nulo enquanto ninguém escolheu. */
+  destination: { name: string; lat: number; lng: number; chosenByMe: boolean; chosenAt: string } | null;
+}
+
+/** Rota de cada um até o lugar escolhido. `line` nulo: sem trajeto, o mapa desenha uma linha reta. */
+export interface FlashLeg {
+  distanceM: number;
+  durationS: number;
+  /** Pontos do trajeto como [lng, lat]. */
+  line: [number, number][] | null;
+}
+
+export interface FlashRoutes {
+  mode: 'foot' | 'driving';
+  me: FlashLeg | null;
+  them: FlashLeg | null;
 }
 
 // ---------- Conversas e sugestões ----------

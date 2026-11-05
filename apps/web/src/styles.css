@@ -4714,3 +4714,23 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .dpbest { display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; }
 .dpbest__date { font-size: 1.25rem; margin: 0; }
 .dpbest__others { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+
+/* Lugares entre os dois e lugar escolhido (encontro Flash) */
+.pin--place { display: grid; place-items: center; width: 28px; height: 28px; color: var(--brand-ink); background: var(--brand); font-size: 0.8125rem; font-weight: 700; cursor: pointer; }
+.pin--place.pin--selected { width: 36px; height: 36px; background: var(--danger); box-shadow: 0 0 0 4px var(--danger-soft), 0 2px 6px rgb(27 31 74 / 0.4); z-index: 2; }
+.pin--dest { display: grid; place-items: center; width: 40px; height: 40px; color: var(--surface); background: var(--ink); font-size: 1.25rem; z-index: 3; }
+.matchplaces, .matchdest { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+.matchplaces__h { font-size: 1.0625rem; margin: 0; }
+.matchplaces__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.mplace { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1.5px solid var(--control-border); border-radius: var(--radius-panel); }
+.mplace.is-selected { border-color: var(--brand); background: var(--brand-soft); }
+.mplace__main { display: flex; align-items: flex-start; gap: 12px; padding: 0; text-align: left; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+.mplace__num { flex: none; display: grid; place-items: center; width: 28px; height: 28px; color: var(--brand-ink); background: var(--brand); border-radius: 50%; font-size: 0.8125rem; font-weight: 700; }
+.mplace__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.matchdest__title { margin: 0; font-size: 1.125rem; }
+.matchdest__legs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.matchdest__leg { display: flex; align-items: center; gap: 10px; }
+.matchdest__leg > span:last-child { display: flex; flex-direction: column; }
+.matchdest__dot { flex: none; width: 14px; height: 14px; border-radius: 50%; }
+.matchdest__leg--me .matchdest__dot { background: var(--brand); }
+.matchdest__leg--them .matchdest__dot { background: var(--warn); }

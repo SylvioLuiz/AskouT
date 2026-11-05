@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, Put, Query } from '@nestjs/common';
 import type { PlacePhotos } from './places.controller.ts';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
@@ -89,6 +89,24 @@ export class FlashController {
       ...view,
       items: view.items.map(({ photoRef, ...item }) => ({ ...item, photoPath: photoRef && this.photos.google ? this.photos.signer.path(photoRef) : null })),
     };
+  }
+
+  /** Um dos dois escolhe o lugar do encontro: `{name, lat, lng}`. */
+  @Put('flash/matches/:inviteId/destination')
+  chooseDestination(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.flash.chooseDestination(actor.userId, inviteId, { name: b.name, lat: b.lat, lng: b.lng });
+  }
+
+  @Delete('flash/matches/:inviteId/destination')
+  clearDestination(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string) {
+    return this.core.flash.clearDestination(actor.userId, inviteId);
+  }
+
+  /** Rota de cada um até o lugar escolhido. `?modo=carro` para de carro; o padrão é a pé. */
+  @Get('flash/matches/:inviteId/routes')
+  routes(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string, @Query('modo') modo?: string) {
+    return this.core.flash.routes(actor.userId, inviteId, modo === 'carro' ? 'driving' : 'foot');
   }
 
   @Put('flash/matches/:inviteId/location')

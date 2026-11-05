@@ -538,6 +538,12 @@ model FlashInvite {
   expiresAt   DateTime
   respondedAt DateTime?
   endedAt     DateTime?
+  // Lugar escolhido por um dos dois no mapa do encontro (sem chave estrangeira: some com o encontro).
+  destinationName     String?
+  destinationLat      Float?
+  destinationLng      Float?
+  destinationChosenBy String?   @db.Uuid
+  destinationChosenAt DateTime?
 
   from      User            @relation("FlashInviteFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
   to        User            @relation("FlashInviteTo", fields: [toUserId], references: [id], onDelete: Cascade)

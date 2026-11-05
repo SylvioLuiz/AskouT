@@ -27,8 +27,10 @@ import { birthDateProblem, todayIso } from '../lib/age.ts';
 import { initials, tintIndex } from '../lib/avatar.ts';
 import { toApiError } from '../lib/errors.ts';
 import { FLASH_PRIVACY_POINTS, flashNoticeSeen, markFlashNoticeSeen, safeStorage } from '../lib/hints.ts';
-import type { OtherPin } from '../components/match-map.tsx';
-import type { AvailableFriend, FlashInvite, FlashMatch, PublicProfile } from '../lib/types.ts';
+import type { OtherPin, PlacePin, RouteLine } from '../components/match-map.tsx';
+import { MatchDestination, MatchPlaces } from '../components/match-destination.tsx';
+import { MAX_PLACES_ON_MAP, placeName, sortByFairness } from '../lib/flash.ts';
+import type { AvailableFriend, FlashInvite, FlashMatch, PublicProfile, SuggestionItem } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
@@ -964,6 +966,18 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const [feedback, setFeedback] = useState<Feedback>();
   const share = useShareLocation([inviteId], match.reload, match.data !== undefined);
   const [mapFailed, setMapFailed] = useState(false);
+  const [pickedKey, setPickedKey] = useState<string | undefined>();
+  const [mode, setMode] = useState<'foot' | 'driving'>('foot');
+  const [destBusy, setDestBusy] = useState(false);
+
+  // Bares e eventos entre os dois: só quando os dois já compartilharam a localização.
+  const bothShared = Boolean(match.data?.me && match.data?.them);
+  const suggestions = useAsync(() => (bothShared ? api.flashSuggestions(inviteId) : Promise.resolve(undefined)), [inviteId, bothShared]);
+  usePolling(suggestions.reload, 60_000, bothShared);
+  // Rota de cada um até o lugar escolhido; some se ninguém escolheu.
+  const dest = match.data?.destination ?? null;
+  const routes = useAsync(() => (dest ? api.flashRoutes(inviteId, mode) : Promise.resolve(undefined)), [inviteId, mode, dest?.lat, dest?.lng]);
+  usePolling(routes.reload, 20_000, dest !== null);
 
   if (match.loading && !match.data && !match.error) return <Loading />;
   if (match.error && !match.data) {
@@ -1000,10 +1014,45 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
     }
   }
 
+  async function chooseDestination(item: SuggestionItem) {
+    setDestBusy(true);
+    setFeedback(undefined);
+    try {
+      await api.flashChooseDestination(inviteId, { name: placeName(item), lat: item.lat, lng: item.lng });
+      setPickedKey(undefined);
+      match.reload();
+    } catch (failure) {
+      setFeedback({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setDestBusy(false);
+    }
+  }
+
+  async function clearDestination() {
+    setDestBusy(true);
+    try {
+      await api.flashClearDestination(inviteId);
+      match.reload();
+    } catch (failure) {
+      setFeedback({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setDestBusy(false);
+    }
+  }
+
+  const places = sortByFairness(suggestions.data?.items ?? []).slice(0, MAX_PLACES_ON_MAP);
+  const placePins: PlacePin[] = places.map((p) => ({ key: p.key, name: placeName(p), lat: p.lat, lng: p.lng }));
   const left = minutesLeft(data.expiresAt, Date.parse(data.now));
   const them = data.them;
   const myPoint = share.mine ?? (data.me ? { lat: data.me.lat, lng: data.me.lng } : undefined);
   const distance = them && myPoint ? distanceMeters(myPoint, them) : undefined;
+  const routeLines: { me?: RouteLine | undefined; them?: RouteLine | undefined } | undefined =
+    dest && routes.data
+      ? {
+          ...(myPoint && routes.data.me ? { me: { from: myPoint, line: routes.data.me.line } } : {}),
+          ...(them && routes.data.them ? { them: { from: { lat: them.lat, lng: them.lng }, line: routes.data.them.line } } : {}),
+        }
+      : undefined;
 
   return (
     <>
@@ -1044,10 +1093,31 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
             others={
               them ? [{ id: inviteId, lat: them.lat, lng: them.lng, stale: them.stale, initials: initials(data.other.username) }] : []
             }
+            places={dest ? [] : placePins}
+            selectedKey={pickedKey}
+            onPick={setPickedKey}
+            destination={dest ? { lat: dest.lat, lng: dest.lng, name: dest.name } : undefined}
+            routes={routeLines}
             onFail={() => setMapFailed(true)}
           />
         </Suspense>
       ) : null}
+
+      {dest ? (
+        <MatchDestination match={data} mode={mode} onMode={setMode} me={routes.data?.me} them={routes.data?.them} routesLoading={routes.loading} busy={destBusy} onClear={() => void clearDestination()} />
+      ) : null}
+      <MatchPlaces
+        bothShared={bothShared}
+        loading={suggestions.loading}
+        error={suggestions.error && suggestions.error.code !== 'CONFLICT' ? suggestions.error.message : undefined}
+        suggestions={suggestions.data}
+        places={dest ? places.filter((p) => placeName(p) !== dest.name) : places}
+        otherName={data.other.username}
+        selectedKey={pickedKey}
+        busy={destBusy}
+        onSelect={setPickedKey}
+        onChoose={(item) => void chooseDestination(item)}
+      />
 
       <section className="sharebox" aria-label={t('Sua localização')}>
         {share.state.phase === 'sharing' ? (

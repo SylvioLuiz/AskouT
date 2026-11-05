@@ -433,3 +433,9 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Cria o encontro na agenda já com **quem votou "posso" e "talvez" naquele dia, todos confirmados** (mais quem organiza). "Não posso", sem resposta e pessoas bloqueadas ficam de fora. Pula a etapa de confirmação; o card do encontro vai para a conversa e os confirmados recebem aviso.
 - O fluxo antigo (propor data → confirmar) continua para quem quiser escolher outra data. Depois de definida, "Transformar em evento" (evento público) segue disponível.
 - Testes do serviço passam; **não testado no celular nem com a API real**.
+
+## Flash: destino e rotas
+- Na tela do match, as duas pessoas veem os lugares entre elas, escolhem um e cada uma recebe a rota até ele.
+- Migração `20261206120000_flash_destination` (roda sozinha no deploy da API).
+- Rotas via OSRM (servidor público de demonstração, uso leve). Para produção em escala, apontar `OSRM_URL` para um servidor próprio. Sem resposta do OSRM, o app mostra linha reta e tempo estimado.
+- Ainda não testado em aparelho real nem no mapa nativo.

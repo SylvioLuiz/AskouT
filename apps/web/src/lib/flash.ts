@@ -1,3 +1,4 @@
+import type { SuggestionItem } from './types.ts';
 import { decimal, t } from '../lib/i18n/index.ts';
 // Contas do Flash que não dependem de tela: distância, tempo restante e rótulos.
 
@@ -50,6 +51,11 @@ export function formatRemaining(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+/** Tempo de deslocamento: 40 s -> "1 min"; 700 s -> "12 min"; 4000 s -> "1 h 7 min". */
+export function formatTravel(seconds: number): string {
+  return formatRemaining(Math.max(1, Math.round(seconds / 60)));
 }
 
 /** "há 30 s", "há 3 min". Usa o relógio do servidor para não depender da hora do aparelho. */
@@ -120,3 +126,16 @@ export function flashRemainingShare(startsAt: string | null, expiresAt: string, 
   if (Number.isNaN(end) || Number.isNaN(start) || end <= start) return 0;
   return Math.min(1, Math.max(0, (end - nowMs) / (end - start)));
 }
+
+/** Mais perto dos dois primeiro: quem fica mais longe de cada um perde posição. */
+export function sortByFairness(items: readonly SuggestionItem[]): SuggestionItem[] {
+  return [...items].sort((a, b) => Math.max(a.distanceFromMeM, a.distanceFromThemM) - Math.max(b.distanceFromMeM, b.distanceFromThemM));
+}
+
+/** Nome que vai para o lugar escolhido: o do local (bar), não o título do evento. */
+export function placeName(item: Pick<SuggestionItem, 'venueName' | 'title'>): string {
+  return item.venueName.trim() !== '' ? item.venueName : item.title;
+}
+
+/** Quantos lugares aparecem de uma vez no mapa. */
+export const MAX_PLACES_ON_MAP = 8;

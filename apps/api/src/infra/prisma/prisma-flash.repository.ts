@@ -17,6 +17,11 @@ type InviteRow = {
   expiresAt: Date;
   respondedAt: Date | null;
   endedAt: Date | null;
+  destinationName: string | null;
+  destinationLat: number | null;
+  destinationLng: number | null;
+  destinationChosenBy: string | null;
+  destinationChosenAt: Date | null;
 };
 type PositionRow = { inviteId: string; userId: string; lat: number; lng: number; accuracyM: number | null; updatedAt: Date };
 
@@ -37,6 +42,10 @@ const toInvite = (r: InviteRow): FlashInviteRecord => ({
   expiresAt: r.expiresAt,
   respondedAt: r.respondedAt,
   endedAt: r.endedAt,
+  destination:
+    r.destinationName !== null && r.destinationLat !== null && r.destinationLng !== null && r.destinationChosenBy !== null && r.destinationChosenAt !== null
+      ? { name: r.destinationName, lat: r.destinationLat, lng: r.destinationLng, chosenById: r.destinationChosenBy, chosenAt: r.destinationChosenAt }
+      : null,
 });
 const toPosition = (r: PositionRow): FlashPositionRecord => ({
   inviteId: r.inviteId,
@@ -167,7 +176,17 @@ export class PrismaFlashRepository implements FlashRepository {
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.flashInvite.update({
         where: { id: invite.id },
-        data: { status: invite.status, expiresAt: invite.expiresAt, respondedAt: invite.respondedAt, endedAt: invite.endedAt },
+        data: {
+          status: invite.status,
+          expiresAt: invite.expiresAt,
+          respondedAt: invite.respondedAt,
+          endedAt: invite.endedAt,
+          destinationName: invite.destination?.name ?? null,
+          destinationLat: invite.destination?.lat ?? null,
+          destinationLng: invite.destination?.lng ?? null,
+          destinationChosenBy: invite.destination?.chosenById ?? null,
+          destinationChosenAt: invite.destination?.chosenAt ?? null,
+        },
       });
       // Só encontro aceito compartilha posição: em qualquer outro estado ela é apagada.
       if (invite.status !== 'ACCEPTED') await tx.flashPosition.deleteMany({ where: { inviteId: invite.id } });

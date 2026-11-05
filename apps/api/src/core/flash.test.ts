@@ -345,3 +345,66 @@ test('activeIds: eu e amigos com Flash ligado, sem ocultos e sem depender do meu
   w.clock.tick(2 * 60 * 60 * 1000);
   assert.deepEqual(await w.core.flash.activeIds(ana), [], 'expirou');
 });
+
+test('lugar do encontro: um escolhe, o outro vê e é avisado; qualquer um troca ou tira; longe demais é recusado', async () => {
+  const { w, ana, bia, caio, inviteId } = await matched();
+  await w.core.flash.shareLocation(ana, inviteId, { lat: -23.55, lng: -46.63 });
+  await w.core.flash.shareLocation(bia, inviteId, { lat: -23.56, lng: -46.64 });
+  assert.equal((await w.core.flash.getMatch(ana, inviteId)).destination, null);
+  await rejectsWith(w.core.flash.chooseDestination(caio, inviteId, { name: 'Bar', lat: -23.555, lng: -46.635 }), 'NOT_FOUND');
+  await rejectsWith(w.core.flash.chooseDestination(ana, inviteId, { name: '', lat: -23.555, lng: -46.635 }), 'VALIDATION');
+  await rejectsWith(w.core.flash.chooseDestination(ana, inviteId, { name: 'x'.repeat(121), lat: -23.555, lng: -46.635 }), 'VALIDATION');
+  await rejectsWith(w.core.flash.chooseDestination(ana, inviteId, { name: 'Bar', lat: 95, lng: -46.635 }), 'VALIDATION');
+  await rejectsWith(w.core.flash.chooseDestination(ana, inviteId, { name: 'Bar no Rio', lat: -22.9, lng: -43.2 }), 'VALIDATION');
+
+  await w.core.flash.chooseDestination(ana, inviteId, { name: ' Bar do Zé ', lat: -23.555, lng: -46.635 });
+  const mine = (await w.core.flash.getMatch(ana, inviteId)).destination!;
+  const theirs = (await w.core.flash.getMatch(bia, inviteId)).destination!;
+  assert.equal(mine.name, 'Bar do Zé');
+  assert.equal(mine.chosenByMe, true);
+  assert.equal(theirs.chosenByMe, false);
+  assert.ok((await w.core.notifications.list(bia)).items.some((n) => n.title.includes('escolheu um lugar')));
+
+  await w.core.flash.chooseDestination(bia, inviteId, { name: 'Outro Bar', lat: -23.556, lng: -46.636 });
+  assert.equal((await w.core.flash.getMatch(ana, inviteId)).destination!.name, 'Outro Bar');
+  assert.equal((await w.core.flash.getMatch(ana, inviteId)).destination!.chosenByMe, false);
+
+  await w.core.flash.clearDestination(ana, inviteId);
+  assert.equal((await w.core.flash.getMatch(bia, inviteId)).destination, null);
+});
+
+test('rotas do encontro: precisa de lugar escolhido; usa o serviço de rotas e cai na linha reta se ele falhar', async () => {
+  const line: [number, number][] = [[-46.63, -23.55], [-46.635, -23.555]];
+  const calls: string[] = [];
+  const w = makeWorld({
+    routes: {
+      async route(from, _to, mode) {
+        calls.push(mode);
+        return from.lat === -23.55 ? { distanceM: 900, durationS: 700, line } : undefined;
+      },
+    },
+  });
+  const { ana, bia } = await w.signUpMany('ana', 'bia');
+  await w.core.follows.follow(ana!, bia!);
+  await w.core.follows.follow(bia!, ana!);
+  await w.core.flash.turnOn(ana!, { hours: 2 });
+  await w.core.flash.turnOn(bia!, { hours: 2 });
+  const invite = await w.core.flash.invite(ana!, bia!);
+  await w.core.flash.respond(bia!, invite.id, 'accept');
+  await w.core.flash.shareLocation(ana!, invite.id, { lat: -23.55, lng: -46.63 });
+  await w.core.flash.shareLocation(bia!, invite.id, { lat: -23.56, lng: -46.64 });
+  await rejectsWith(w.core.flash.routes(ana!, invite.id, 'foot'), 'CONFLICT');
+  await w.core.flash.chooseDestination(ana!, invite.id, { name: 'Bar', lat: -23.555, lng: -46.635 });
+
+  const r = await w.core.flash.routes(ana!, invite.id, 'foot');
+  assert.equal(r.mode, 'foot');
+  assert.deepEqual(r.me, { distanceM: 900, durationS: 700, line });
+  // Bia: o serviço falhou, então vem a distância em linha reta e tempo estimado, sem trajeto.
+  assert.equal(r.them!.line, null);
+  assert.ok(r.them!.distanceM > 500 && r.them!.durationS > 0);
+  assert.equal((await w.core.flash.routes(ana!, invite.id, 'driving')).mode, 'driving');
+  assert.ok(calls.includes('driving'));
+  // Os dois veem a mesma coisa, cada um do seu ponto de vista.
+  const fromBia = await w.core.flash.routes(bia!, invite.id, 'foot');
+  assert.equal(fromBia.them!.distanceM, 900);
+});

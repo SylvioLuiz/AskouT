@@ -1,5 +1,6 @@
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
-import type { CoreDeps } from './ports.ts';
+import type { CoreDeps, RouteResult } from './ports.ts';
+import { distanceMeters, midpoint } from './geo.ts';
 import type { FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
 
@@ -85,7 +86,20 @@ export interface MatchView {
   them: PositionView | null;
   /** Conversa 1:1 dos dois (criada ao aceitar). Continua existindo depois que o Flash acaba. */
   conversationId: string;
+  /** Lugar que um dos dois escolheu no mapa; nulo enquanto ninguém escolheu. */
+  destination: { name: string; lat: number; lng: number; chosenByMe: boolean; chosenAt: string } | null;
 }
+
+/** Rota de cada um até o lugar escolhido. `line` nulo: sem trajeto (o app desenha uma linha reta). */
+export interface RoutesView {
+  mode: 'foot' | 'driving';
+  me: { distanceM: number; durationS: number; line: [number, number][] | null } | null;
+  them: { distanceM: number; durationS: number; line: [number, number][] | null } | null;
+}
+
+/** O lugar escolhido precisa ficar perto dos dois: no máximo isto do ponto médio. */
+export const DESTINATION_MAX_FROM_MID_M = 25_000;
+export const DESTINATION_NAME_MAX = 120;
 
 function sessionView(s: FlashSessionRecord | undefined): FlashStatusView {
   return s
@@ -383,7 +397,64 @@ export class FlashService {
       me: view(positions.find((p) => p.userId === actorId)),
       them: view(positions.find((p) => p.userId === otherId)),
       conversationId: (await this.deps.conversations.getOrCreateDirect(actorId, otherId, this.deps.ids.next(), now)).id,
+      destination: invite.destination
+        ? { name: invite.destination.name, lat: invite.destination.lat, lng: invite.destination.lng, chosenByMe: invite.destination.chosenById === actorId, chosenAt: invite.destination.chosenAt.toISOString() }
+        : null,
     };
+  }
+
+  /** Um dos dois escolhe (ou troca) o lugar do encontro. O outro é avisado e pode escolher outro. */
+  async chooseDestination(actorId: string, inviteId: string, input: { name?: unknown; lat?: unknown; lng?: unknown }): Promise<{ ok: true }> {
+    const { flash, notifier, users, clock } = this.deps;
+    const now = clock.now();
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
+    const name = typeof input.name === 'string' ? input.name.trim() : '';
+    if (name === '' || name.length > DESTINATION_NAME_MAX || CONTROL_CHARS_RE.test(name)) throw validationError('Nome do lugar inválido', { name: `Informe o nome do lugar (até ${DESTINATION_NAME_MAX} letras)` });
+    const lat = parseCoordinate(input.lat, 'lat', 90);
+    const lng = parseCoordinate(input.lng, 'lng', 180);
+    // Só lugares perto dos dois: impede mandar a outra pessoa para qualquer ponto do mapa.
+    const positions = await flash.listPositions(inviteId);
+    const known = positions.map((p) => ({ lat: p.lat, lng: p.lng }));
+    if (known.length === 2) {
+      const mid = midpoint(known[0]!, known[1]!);
+      if (distanceMeters(mid, { lat, lng }) > DESTINATION_MAX_FROM_MID_M) throw validationError('Lugar longe demais', { lat: 'Escolha um lugar perto dos dois' });
+    } else if (known.length === 1 && distanceMeters(known[0]!, { lat, lng }) > DESTINATION_MAX_FROM_MID_M) {
+      throw validationError('Lugar longe demais', { lat: 'Escolha um lugar perto dos dois' });
+    }
+    await flash.saveInvite({ ...invite, destination: { name, lat, lng, chosenById: actorId, chosenAt: now } });
+    const otherId = invite.fromUserId === actorId ? invite.toUserId : invite.fromUserId;
+    const who = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
+    await notifier.notify({ userId: otherId, type: 'FLASH_INVITE', title: `${who} escolheu um lugar`, body: name, url: `/flash/encontro/${inviteId}`, dedupeKey: `flash-destination:${inviteId}:${name}` });
+    return { ok: true };
+  }
+
+  /** Tira o lugar escolhido (qualquer um dos dois). */
+  async clearDestination(actorId: string, inviteId: string): Promise<{ ok: true }> {
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, this.deps.clock.now());
+    await this.deps.flash.saveInvite({ ...invite, destination: null });
+    return { ok: true };
+  }
+
+  /** Rota de cada um (da última posição dele) até o lugar escolhido. Sem lugar escolhido, não há rota. */
+  async routes(actorId: string, inviteId: string, mode: unknown): Promise<RoutesView> {
+    const m: 'foot' | 'driving' = mode === 'driving' ? 'driving' : 'foot';
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, this.deps.clock.now());
+    const dest = invite.destination;
+    if (!dest) throw conflict('Escolham um lugar primeiro');
+    const otherId = invite.fromUserId === actorId ? invite.toUserId : invite.fromUserId;
+    const positions = await this.deps.flash.listPositions(inviteId);
+    const one = async (userId: string): Promise<RoutesView['me']> => {
+      const p = positions.find((x) => x.userId === userId);
+      if (!p) return null;
+      const from = { lat: p.lat, lng: p.lng };
+      const to = { lat: dest.lat, lng: dest.lng };
+      const found: RouteResult | undefined = await this.deps.routes?.route(from, to, m).catch(() => undefined);
+      if (found) return { distanceM: Math.round(found.distanceM), durationS: Math.round(found.durationS), line: found.line };
+      // Sem serviço de rotas: distância em linha reta e tempo estimado (4,8 km/h a pé; 30 km/h de carro).
+      const straight = distanceMeters(from, to);
+      return { distanceM: Math.round(straight), durationS: Math.round(straight / (m === 'foot' ? 1.33 : 8.33)), line: null };
+    };
+    return { mode: m, me: await one(actorId), them: await one(otherId) };
   }
 
   /** Para as sugestões: as duas últimas posições do encontro (uso interno do núcleo, nunca vai para a API). */
