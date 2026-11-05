@@ -37,14 +37,11 @@ export function formatKm(meters: number): string {
   return `${decimal(text.endsWith('.0') ? text.slice(0, -2) : text)} km`;
 }
 
-/** Sempre deixa claro que é aproximado: "aprox. 12 km · 35 min de carro", "menos de 1 km · aprox. 5 min a pé".
- *  Curto (`short`) para caber embaixo da foto: "~12 km · ~35 min". */
+/** Só a distância, sempre deixando claro que é aproximada: "aprox. 12 km", "menos de 1 km".
+ *  Curto (`short`) para caber embaixo da foto: "~12 km", "<1 km". */
 export function formatApprox(a: ApproxTrip, short = false): string {
-  const time = formatRemaining(a.minutes);
-  if (short) return `${a.km < 1 ? '<1 km' : `~${a.km} km`} · ~${time}`;
-  const km = a.km < 1 ? t('menos de 1 km') : t('aprox. {km} km', { km: a.km });
-  const timeText = a.km < 1 ? t('aprox. {time}', { time }) : time;
-  return a.mode === 'walk' ? t('{km} · {time} a pé', { km, time: timeText }) : t('{km} · {time} de carro', { km, time: timeText });
+  if (short) return a.km < 1 ? '<1 km' : `~${a.km} km`;
+  return a.km < 1 ? t('menos de 1 km') : t('aprox. {km} km', { km: a.km });
 }
 
 /** Minutos restantes até `iso`: 0 quando já passou, arredondando para cima. */

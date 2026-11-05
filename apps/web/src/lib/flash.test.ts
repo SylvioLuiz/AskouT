@@ -117,12 +117,12 @@ describe('lugares entre os dois', () => {
 });
 
 describe('formatApprox', () => {
-  it('a pé e de carro, com "menos de 1 km" quando é muito perto', () => {
-    assert.equal(formatApprox({ km: 0, minutes: 5, mode: 'walk' }), 'menos de 1 km · aprox. 5 min a pé');
-    assert.equal(formatApprox({ km: 12, minutes: 35, mode: 'car' }), 'aprox. 12 km · 35 min de carro');
+  it('só a distância, deixando claro que é aproximada', () => {
+    assert.equal(formatApprox({ km: 0, minutes: 5, mode: 'walk' }), 'menos de 1 km');
+    assert.equal(formatApprox({ km: 12, minutes: 35, mode: 'car' }), 'aprox. 12 km');
   });
   it('versão curta para caber embaixo da foto', () => {
-    assert.equal(formatApprox({ km: 0, minutes: 5, mode: 'walk' }, true), '<1 km · ~5 min');
-    assert.equal(formatApprox({ km: 3, minutes: 10, mode: 'car' }, true), '~3 km · ~10 min');
+    assert.equal(formatApprox({ km: 0, minutes: 5, mode: 'walk' }, true), '<1 km');
+    assert.equal(formatApprox({ km: 3, minutes: 10, mode: 'car' }, true), '~3 km');
   });
 });
