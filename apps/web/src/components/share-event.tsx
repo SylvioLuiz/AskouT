@@ -1,4 +1,5 @@
 import { VenueLink } from './venue-link.tsx';
+import { shareOrigin } from '../lib/public-origin.ts';
 import { trackShare } from './dwell.tsx';
 import { useState } from 'react';
 import { Sheet } from './agenda.tsx';
@@ -58,7 +59,7 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
 
   async function outside() {
     setMessage(undefined);
-    const url = eventLink(window.location.origin, eventId);
+    const url = eventLink(shareOrigin(), eventId);
     const text = eventShareText(title);
     try {
       if (typeof navigator.share === 'function') {

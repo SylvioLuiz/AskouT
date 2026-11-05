@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { shareOrigin } from '../lib/public-origin.ts';
 import { useUser } from '../auth.tsx';
 import { inviteText, shareableInviteUrl, storeLink, whatsappUrl } from '../lib/invite.ts';
 import { Sheet } from './agenda.tsx';
@@ -9,7 +10,7 @@ import { t } from '../lib/i18n/index.ts';
 export function InviteSheet({ onClose }: { onClose: () => void }) {
   const user = useUser();
   const store = storeLink(import.meta.env.VITE_STORE_URL as string | undefined);
-  const url = shareableInviteUrl(window.location.origin, user.profile.username, store);
+  const url = shareableInviteUrl(shareOrigin(), user.profile.username, store);
   const text = inviteText(user.profile.displayName);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
 

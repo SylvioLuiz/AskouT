@@ -514,7 +514,7 @@ test('localização aproximada: quem escolhe "aproximada" ao aceitar só mostra 
   const fromAna = await w.core.flash.getMatch(ana!, invite.id);
   assert.equal(fromAna.themApprox, true);
   assert.equal(fromAna.meApprox, false);
-  assert.deepEqual([fromAna.them?.lat, fromAna.them?.lng, fromAna.them?.accuracyM], [-23.52, -46.19, 1000]);
+  assert.deepEqual([fromAna.them?.lat, fromAna.them?.lng, fromAna.them?.accuracyM], [-23.525, -46.2, 3000]);
   assert.deepEqual([fromAna.me?.lat, fromAna.me?.lng], [-23.551234, -46.633321], 'quem escolheu exata continua exata');
   const fromBia = await w.core.flash.getMatch(bia!, invite.id);
   assert.equal(fromBia.meApprox, true);
@@ -536,6 +536,6 @@ test('localização aproximada: dá para escolher ao convidar e trocar durante o
   await w.core.flash.shareLocation(ana!, invite.id, { lat: -23.551234, lng: -46.633321 });
   assert.equal((await w.core.flash.getMatch(bia!, invite.id)).them?.lat, -23.551234);
   await w.core.flash.setPrecision(bia!, invite.id, true);
-  assert.equal((await w.core.flash.getMatch(ana!, invite.id)).them?.lat, -23.52);
+  assert.equal((await w.core.flash.getMatch(ana!, invite.id)).them?.lat, -23.525);
   await rejectsWith(w.core.flash.setPrecision(bia!, invite.id, 'sim'), 'VALIDATION');
 });

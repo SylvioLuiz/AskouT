@@ -1,4 +1,5 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
+import { shareOrigin } from '../lib/public-origin.ts';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
@@ -38,14 +39,9 @@ function coverSrc(path: string | null): string | null {
   return path.startsWith('/') ? api.assetUrl(path) : safeImage(path);
 }
 
-/** Endereço público do site: no app do iPhone a origem é `capacitor://localhost`, que não serve de link. */
-function siteOrigin(): string {
-  return /^https?:$/.test(window.location.protocol) ? window.location.origin : 'https://askout.com.br';
-}
-
 /** Cria o arquivo de agenda do evento e abre na agenda (ou baixa, no navegador). */
 async function addEventToCalendar(page: EventPage): Promise<void> {
-  await addToCalendar({ id: page.id, title: page.title, description: page.description, startsAt: page.startsAt, endsAt: page.endsAt, venue: page.venue.name ? { name: page.venue.name, address: page.venue.address } : null, url: eventLink(siteOrigin(), page.id) });
+  await addToCalendar({ id: page.id, title: page.title, description: page.description, startsAt: page.startsAt, endsAt: page.endsAt, venue: page.venue.name ? { name: page.venue.name, address: page.venue.address } : null, url: eventLink(shareOrigin(), page.id) });
 }
 
 function goBack() {

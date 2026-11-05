@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { shareOrigin } from '../lib/public-origin.ts';
 import { CameraIcon, ChevronDownIcon, EditIcon, LockIcon, MoreIcon, ShareIcon } from '../components/icons.tsx';
 import { StoryViewer } from '../components/event-story.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
@@ -121,7 +122,7 @@ export function ProfileScreen({ username }: { username: string }) {
   return (
     <>
       {menuOpen ? <ProfileMenu onClose={() => setMenuOpen(false)} /> : null}
-      {shareOpen ? <ShareLinkSheet url={profileLink(window.location.origin, profile.username)} text={profileShareText(profile.username)} onClose={() => setShareOpen(false)} /> : null}
+      {shareOpen ? <ShareLinkSheet url={profileLink(shareOrigin(), profile.username)} text={profileShareText(profile.username)} onClose={() => setShareOpen(false)} /> : null}
       {storyOpen && storyGroup ? (
         <StoryViewer
           groups={[storyGroup]}

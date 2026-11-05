@@ -1,4 +1,5 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
+import { shareOrigin } from '../lib/public-origin.ts';
 import { useRef, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { Sheet } from '../components/agenda.tsx';
@@ -682,7 +683,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
           }}
         />
       ) : null}
-      {sharing ? <ShareLinkSheet url={`${window.location.origin}/bares/${encodeURIComponent(v.id)}`} text={t('{name} no AskouT', { name: v.name })} onClose={() => setSharing(false)} /> : null}
+      {sharing ? <ShareLinkSheet url={`${shareOrigin()}/bares/${encodeURIComponent(v.id)}`} text={t('{name} no AskouT', { name: v.name })} onClose={() => setSharing(false)} /> : null}
     </>
   );
 }
