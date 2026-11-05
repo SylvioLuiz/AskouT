@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type { EventRoomRepository } from '../../core/ports.ts';
-import type { EventAttendanceRecord, EventPostRecord, EventRef, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, Page } from '../../core/types.ts';
+import type { EventAttendanceRecord, EventPostRecord, EventRef, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, Page, StoryHiddenRecord } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 type PostMeta = Omit<EventPostRecord, 'data'> & { hasImage: boolean };
@@ -150,6 +150,29 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
     if (!isUuid(userId) || ids.length === 0) return new Set();
     const rows = await this.prisma.eventStoryReport.findMany({ where: { reporterId: userId, storyId: { in: ids } }, select: { storyId: true } });
     return new Set(rows.map((r) => r.storyId));
+  }
+
+  async setStoryHidden(record: StoryHiddenRecord): Promise<void> {
+    const { ownerId, otherId, hideTheirs, hideMine } = record;
+    if (!isUuid(ownerId) || !isUuid(otherId)) return;
+    if (hideTheirs || hideMine) {
+      await this.prisma.storyHidden.upsert({
+        where: { ownerId_otherId: { ownerId, otherId } },
+        create: { ownerId, otherId, hideTheirs, hideMine },
+        update: { hideTheirs, hideMine },
+      });
+    } else {
+      await this.prisma.storyHidden.deleteMany({ where: { ownerId, otherId } });
+    }
+  }
+
+  async listStoryHidden(userId: string): Promise<StoryHiddenRecord[]> {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.storyHidden.findMany({
+      where: { OR: [{ ownerId: userId }, { otherId: userId }] },
+      select: { ownerId: true, otherId: true, hideTheirs: true, hideMine: true },
+    });
+    return rows.map((r) => ({ ownerId: r.ownerId, otherId: r.otherId, hideTheirs: r.hideTheirs, hideMine: r.hideMine }));
   }
 
   async addPost(post: EventPostRecord): Promise<void> {

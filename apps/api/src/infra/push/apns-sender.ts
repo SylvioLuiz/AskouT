@@ -106,6 +106,32 @@ export interface ApnsSenderOptions {
   config: ApnsConfig;
   transport?: ApnsTransport;
   nowMs?: () => number;
+  /** Onde registrar os envios recusados pela Apple (padrão: console.warn, que vai para o log do servidor). */
+  log?: (line: string) => void;
+}
+
+/** O que costuma resolver cada recusa da Apple, para quem lê o log do servidor. */
+const REASON_HINTS: Readonly<Record<string, string>> = {
+  BadDeviceToken: 'token de outro ambiente: app instalado pelo Xcode usa APNS_ENVIRONMENT=sandbox; TestFlight e loja usam production',
+  Unregistered: 'o app foi desinstalado ou os avisos foram desligados no iPhone',
+  DeviceTokenNotForTopic: 'o token é de outro app: confira APNS_BUNDLE_ID (bundle id do app)',
+  TopicDisallowed: 'a chave não pode enviar para este app: confira APNS_BUNDLE_ID e a chave na conta da Apple',
+  BadTopic: 'APNS_BUNDLE_ID inválido',
+  InvalidProviderToken: 'APNS_KEY_ID, APNS_TEAM_ID e o conteúdo da .p8 não combinam (ou a chave foi revogada)',
+  ExpiredProviderToken: 'o relógio do servidor está errado ou o token passou de 1 hora',
+  MissingProviderToken: 'o pedido saiu sem a chave: confira APNS_KEY_ID e APNS_PRIVATE_KEY',
+  TooManyProviderTokenUpdates: 'a chave está sendo renovada rápido demais (vários servidores com a mesma chave?)',
+  TooManyRequests: 'muitos avisos seguidos para o mesmo aparelho',
+  InternalServerError: 'problema do lado da Apple; tenta de novo no próximo aviso',
+  ServiceUnavailable: 'a Apple está fora do ar no momento',
+};
+
+/** Linha de log de um envio recusado. Só mostra o fim do token do aparelho. */
+export function apnsFailureLine(input: { status: number | null; reason: string; production: boolean; bundleId: string; deviceToken: string; error?: string }): string {
+  const where = `${input.production ? 'production' : 'sandbox'}, app ${input.bundleId}, aparelho …${input.deviceToken.slice(-6)}`;
+  if (input.status === null) return `[push iPhone] falha de conexão com a Apple (${where}): ${input.error ?? 'erro desconhecido'}`;
+  const hint = REASON_HINTS[input.reason];
+  return `[push iPhone] Apple recusou (${where}): HTTP ${input.status}${input.reason ? ` ${input.reason}` : ''}${hint ? ` — ${hint}` : ''}`;
 }
 
 const TOKEN_LIFETIME_SECONDS = 50 * 60;
@@ -119,12 +145,14 @@ export class ApnsSender implements PushSender {
   private readonly config: ApnsConfig;
   private readonly transport: ApnsTransport;
   private readonly nowMs: () => number;
+  private readonly log: (line: string) => void;
   private cached: { token: string; issuedAt: number } | undefined;
 
   constructor(options: ApnsSenderOptions) {
     this.config = options.config;
     this.transport = options.transport ?? http2Transport();
     this.nowMs = options.nowMs ?? Date.now;
+    this.log = options.log ?? ((line) => console.warn(line));
   }
 
   private token(forceNew = false): string {
@@ -164,9 +192,11 @@ export class ApnsSender implements PushSender {
       } catch {
         reason = '';
       }
+      this.log(apnsFailureLine({ status: response.status, reason, production: this.config.production, bundleId: this.config.bundleId, deviceToken }));
       if (response.status === 410 || GONE_REASONS.has(reason)) return 'GONE';
       return 'FAILED';
-    } catch {
+    } catch (failure) {
+      this.log(apnsFailureLine({ status: null, reason: '', production: this.config.production, bundleId: this.config.bundleId, deviceToken, error: failure instanceof Error ? failure.message : String(failure) }));
       return 'FAILED';
     }
   }

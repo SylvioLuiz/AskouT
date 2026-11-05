@@ -70,11 +70,11 @@ export class FollowsController {
     return { ok: true };
   }
 
-  /** `{hashes: string[]}`: SHA-256 (hex) dos e-mails dos contatos, só do aparelho. */
+  /** `{hashes, phoneHashes}`: SHA-256 (hex) dos e-mails (minúsculos) e dos celulares (E.164) dos contatos, só do aparelho. */
   @Post('me/contact-matches')
   @HttpCode(200)
-  contactMatches(@CurrentActor() actor: Actor, @Body() body: { hashes?: unknown }) {
-    return this.core.follows.contactMatches(actor.userId, body?.hashes);
+  contactMatches(@CurrentActor() actor: Actor, @Body() body: { hashes?: unknown; phoneHashes?: unknown }) {
+    return this.core.follows.contactMatches(actor.userId, body?.hashes ?? [], body?.phoneHashes ?? []);
   }
 
   @Get('me/suggested-people')

@@ -66,7 +66,7 @@ export function HomeScreen() {
             <BoltIcon filled />
           </span>
           <span className="flashcta__text">
-            <span className="flashcta__title">{flashOn ? t('Flash ligado') : t('Flash: estou livre agora')}</span>
+            <span className="flashcta__title">{flashOn ? t('NOW ligado') : t('NOW: estou livre agora')}</span>
             <span className="flashcta__sub">
               {flashOn && flash.data?.expiresAt
                 ? t('Faltam {now}. Veja quem mais está livre.', { now: formatRemaining(minutesLeft(flash.data.expiresAt, Date.now())) })

@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
-import { EditIcon, LockIcon, MoreIcon } from '../components/icons.tsx';
+import { CameraIcon, ChevronDownIcon, EditIcon, LockIcon, MoreIcon, ShareIcon } from '../components/icons.tsx';
+import { StoryViewer } from '../components/event-story.tsx';
+import { ShareLinkSheet } from '../components/post-actions.tsx';
+import { profileLink, profileShareText } from '../lib/share.ts';
 import { ProfileActions } from '../components/profile-actions.tsx';
 import { ProfileMenu } from '../components/profile-menu.tsx';
 import { PostedEvents } from '../components/profile-events.tsx';
 import { PostGrid } from '../components/post.tsx';
 import { ChatButton } from '../components/chat-button.tsx';
+import { PhotoPickerSheet } from '../components/photo-picker.tsx';
+import { useAuthContext } from '../auth.tsx';
+import { resizeProfilePhoto } from '../lib/image.ts';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -46,16 +52,26 @@ export function ProfileScreen({ username }: { username: string }) {
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const [pending, setPending] = useState<Pending>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const { setOwnProfile } = useAuthContext();
   const search = useSearch();
   const [tab, setTab] = useState<'events' | 'posts'>(search.get('aba') === 'posts' ? 'posts' : 'events');
   const [eventTotal, setEventTotal] = useState<number | undefined>();
+  const [storyOpen, setStoryOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  // Stories que a pessoa publicou no perfil para os amigos (os mesmos da faixa da página inicial).
+  const stories = useAsync(() => api.profileStories(), [username]);
 
   useEffect(() => {
     setMessage(undefined);
     setPending(undefined);
     setMenuOpen(false);
+    setPhotoOpen(false);
     setTab('events');
     setEventTotal(undefined);
+    setStoryOpen(false);
+    setShareOpen(false);
   }, [username]);
 
   async function run<R>(action: () => Promise<R>, success?: string | ((result: R) => string | undefined)) {
@@ -74,6 +90,22 @@ export function ProfileScreen({ username }: { username: string }) {
     }
   }
 
+  async function changePhoto(file: File | null) {
+    setPhotoBusy(true);
+    setMessage(undefined);
+    try {
+      const image = file ? await resizeProfilePhoto(file) : null;
+      const updated = await api.setProfilePhoto(image);
+      setOwnProfile({ userId: updated.userId, username: updated.username, displayName: updated.displayName, avatarUrl: updated.avatarUrl, isPrivate: updated.isPrivate });
+      setMessage({ tone: 'ok', text: file ? t('Foto atualizada.') : t('Foto removida.') });
+      view.reload();
+    } catch (failure) {
+      setMessage({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
   if (view.loading && !data) return <Loading />;
   if (view.error && !data) return <NotFoundProfile error={view.error} onRetry={view.reload} />;
   if (!data) return null;
@@ -82,12 +114,53 @@ export function ProfileScreen({ username }: { username: string }) {
   const action = profileAction(relationship);
   const note = relationNote(relationship);
   const base = `/u/${encodeURIComponent(profile.username)}`;
+  const storyGroup = stories.data?.groups.find((g) => g.author.userId === profile.userId);
+  const hasStory = Boolean(storyGroup && storyGroup.items.length > 0 && !relationship.blockedByViewer);
+  const storyLabel = relationship.isSelf ? t('Ver o seu story') : t('Ver o story de {username}', { username: profile.username });
 
   return (
     <>
       {menuOpen ? <ProfileMenu onClose={() => setMenuOpen(false)} /> : null}
+      {shareOpen ? <ShareLinkSheet url={profileLink(window.location.origin, profile.username)} text={profileShareText(profile.username)} onClose={() => setShareOpen(false)} /> : null}
+      {storyOpen && storyGroup ? (
+        <StoryViewer
+          groups={[storyGroup]}
+          start={{ group: 0, item: 0 }}
+          onClose={() => setStoryOpen(false)}
+          onChanged={() => {
+            setStoryOpen(false);
+            stories.reload();
+          }}
+        />
+      ) : null}
+      {photoOpen ? <PhotoPickerSheet hasPhoto={profile.avatarUrl !== null} onPick={(file) => void changePhoto(file)} onRemove={() => void changePhoto(null)} onClose={() => setPhotoOpen(false)} /> : null}
       <header className="profile">
-        <Avatar profile={profile} size={88} />
+        {relationship.isSelf ? (
+          <div className="avatarbtn__wrap">
+            {hasStory ? (
+              <button type="button" className="avatarbtn avatarbtn--story" onClick={() => setStoryOpen(true)} aria-label={storyLabel} aria-haspopup="dialog">
+                <span className="storyring">
+                  <Avatar profile={profile} size={88} />
+                </span>
+              </button>
+            ) : (
+              <button type="button" className="avatarbtn" onClick={() => setPhotoOpen(true)} disabled={photoBusy} aria-label={profile.avatarUrl ? t('Trocar foto') : t('Subir foto')} aria-haspopup="dialog" aria-busy={photoBusy}>
+                <Avatar profile={profile} size={88} />
+              </button>
+            )}
+            <button type="button" className="avatarbtn__badge" onClick={() => setPhotoOpen(true)} disabled={photoBusy} aria-label={profile.avatarUrl ? t('Trocar foto') : t('Subir foto')} aria-haspopup="dialog">
+              <CameraIcon />
+            </button>
+          </div>
+        ) : hasStory ? (
+          <button type="button" className="avatarbtn avatarbtn--story" onClick={() => setStoryOpen(true)} aria-label={storyLabel} aria-haspopup="dialog">
+            <span className="storyring">
+              <Avatar profile={profile} size={88} />
+            </span>
+          </button>
+        ) : (
+          <Avatar profile={profile} size={88} />
+        )}
         <div className="profile__id">
           <h1 className="profile__name">
             {profile.displayName}
@@ -169,29 +242,36 @@ export function ProfileScreen({ username }: { username: string }) {
         </div>
       ) : null}
 
-      <div className="profile__actions">
-        {action.kind === 'follow' ? (
-          <Button loading={busy} onClick={() => run(() => api.follow(profile.userId), (r) => (!r.isFriend && takeFirstFollowHint(safeStorage()) ? FOLLOW_HINT : undefined))}>
-            {action.label}
-          </Button>
-        ) : null}
-        {action.kind === 'requested' ? (
-          <Button variant="secondary" loading={busy} onClick={() => run(() => api.unfollow(profile.userId), t('Pedido cancelado.'))}>
-            {action.label}
-          </Button>
-        ) : null}
-        {action.kind === 'following' ? (
-          <Button variant="secondary" disabled={busy} onClick={() => setPending(pending === 'unfollow' ? undefined : 'unfollow')} aria-expanded={pending === 'unfollow'}>
-            {action.label}
-          </Button>
-        ) : null}
-        {relationship.isFriend && !relationship.isSelf && action.kind !== 'blocked' ? <ChatButton userId={profile.userId} variant="primary" /> : null}
-        {action.kind === 'blocked' ? (
-          <Button variant="secondary" loading={busy} onClick={() => run(() => api.unblock(profile.userId), t('Você desbloqueou @{username}.', { username: profile.username }))}>
-            {t('Desbloquear')}
-          </Button>
-        ) : null}
-      </div>
+      {!relationship.isSelf ? (
+        <div className="profile__actions">
+          {action.kind === 'follow' ? (
+            <Button small loading={busy} onClick={() => run(() => api.follow(profile.userId), (r) => (!r.isFriend && takeFirstFollowHint(safeStorage()) ? FOLLOW_HINT : undefined))}>
+              {action.label}
+            </Button>
+          ) : null}
+          {action.kind === 'requested' ? (
+            <Button small variant="secondary" loading={busy} onClick={() => run(() => api.unfollow(profile.userId), t('Pedido cancelado.'))}>
+              {action.label}
+            </Button>
+          ) : null}
+          {action.kind === 'following' ? (
+            <Button small variant="secondary" disabled={busy} onClick={() => setPending(pending === 'unfollow' ? undefined : 'unfollow')} aria-expanded={pending === 'unfollow'}>
+              {action.label}
+              <ChevronDownIcon />
+            </Button>
+          ) : null}
+          {relationship.isFriend && action.kind !== 'blocked' ? <ChatButton userId={profile.userId} variant="secondary" small label={t('Mensagem')} onError={(text) => setMessage({ tone: 'error', text })} /> : null}
+          {action.kind === 'blocked' ? (
+            <Button small variant="secondary" loading={busy} onClick={() => run(() => api.unblock(profile.userId), t('Você desbloqueou @{username}.', { username: profile.username }))}>
+              {t('Desbloquear')}
+            </Button>
+          ) : (
+            <button type="button" className="btn btn--secondary btn--small profile__square" onClick={() => setShareOpen(true)} aria-label={t('Compartilhar perfil')} aria-haspopup="dialog">
+              <ShareIcon />
+            </button>
+          )}
+        </div>
+      ) : null}
 
       {pending === 'unfollow' ? (
         <Confirm

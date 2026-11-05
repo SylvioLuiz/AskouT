@@ -267,3 +267,41 @@ test('story também no perfil: aparece na página inicial dos amigos; sem a opç
   w.clock.tick(25 * H);
   assert.deepEqual(await w.core.eventPages.profileStories(duda), [], 'depois de 24 h some');
 });
+
+test('ocultar stories entre amigos: não ver os dela e não deixar ela ver os meus, na página inicial e no evento', async () => {
+  const { w, ana, bia, caio } = await setup();
+  for (const who of [ana, bia, caio]) await w.core.eventPages.go(who, 'e1');
+  const fromBia = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), true);
+  w.clock.tick(1000);
+  await w.core.eventPages.createStory(ana, 'e1', 'image/jpeg', JPG_BYTES(), true);
+  const storiesOf = async (viewer: string) => (await w.core.eventPages.profileStories(viewer)).map((g) => g.author.username);
+  const inEvent = async (viewer: string) => (await w.core.eventPages.stories(viewer, 'e1')).map((g) => g.author.username).sort();
+  assert.deepEqual(await storiesOf(ana), ['ana', 'bia']);
+  assert.deepEqual(await w.core.eventPages.storyVisibility(ana, bia), { hideTheirs: false, hideMine: false });
+
+  // ana deixa de ver os stories da bia; a bia continua vendo os da ana
+  assert.deepEqual(await w.core.eventPages.setStoryVisibility(ana, bia, { hideTheirs: true }), { hideTheirs: true, hideMine: false });
+  assert.deepEqual(await storiesOf(ana), ['ana']);
+  assert.deepEqual(await inEvent(ana), ['ana'],'no evento também some');
+  assert.deepEqual(await storiesOf(bia), ['bia', 'ana']);
+  assert.ok(!(await w.core.eventPages.get(ana, 'e1')).storyUserIds.includes(bia), 'sem o círculo no avatar');
+  await rejectsWith(w.core.eventPages.reportProfileStory(ana, fromBia.items[0]!.id, 'SPAM'), 'NOT_FOUND');
+
+  // ana esconde os dela da caio; a bia não é afetada
+  await w.core.eventPages.setStoryVisibility(ana, caio, { hideMine: true });
+  assert.deepEqual(await storiesOf(caio), []);
+  assert.deepEqual(await inEvent(caio), ['bia'], 'no evento, só a ana some para a caio');
+  assert.deepEqual(await w.core.eventPages.storyVisibility(caio, ana), { hideTheirs: false, hideMine: false }, 'quem foi ocultado não vê a escolha');
+  assert.deepEqual(await w.core.eventPages.storyVisibility(ana, caio), { hideTheirs: false, hideMine: true });
+
+  // só o que vem no pedido muda; desligar tudo volta ao normal
+  assert.deepEqual(await w.core.eventPages.setStoryVisibility(ana, bia, { hideMine: true }), { hideTheirs: true, hideMine: true });
+  assert.deepEqual(await storiesOf(bia), ['bia']);
+  await w.core.eventPages.setStoryVisibility(ana, bia, { hideTheirs: false, hideMine: false });
+  assert.deepEqual(await storiesOf(ana), ['ana', 'bia']);
+  assert.deepEqual(await storiesOf(bia), ['bia', 'ana']);
+
+  await rejectsWith(w.core.eventPages.setStoryVisibility(ana, ana, { hideMine: true }), 'VALIDATION');
+  await rejectsWith(w.core.eventPages.setStoryVisibility(ana, bia, { hideMine: 'sim' }), 'VALIDATION');
+  await rejectsWith(w.core.eventPages.setStoryVisibility(ana, '00000000-0000-4000-8000-000000000000', { hideMine: true }), 'NOT_FOUND');
+});

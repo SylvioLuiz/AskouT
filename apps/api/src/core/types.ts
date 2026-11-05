@@ -17,6 +17,8 @@ export interface User {
   termsVersion?: string | null;
   /** Quando a pessoa terminou (ou pulou) o tutorial inicial. Vazio = ainda não viu. */
   onboardedAt?: Date | null;
+  /** Celular (E.164). Privado: nunca vai para o perfil público. */
+  phone?: string | null;
 }
 
 /** Pedido de nova senha em andamento: um por pessoa. `channel` deixa pronto o envio por celular (SMS) no futuro. */
@@ -144,6 +146,8 @@ export interface FlashSessionRecord {
   /** Preenchido quando a pessoa desliga antes do fim. */
   endedAt: Date | null;
   note: string | null;
+  /** Região aproximada (~1 km) de quando ligou, só para ordenar por distância. Nunca vai para outra pessoa. */
+  area?: { lat: number; lng: number } | null;
 }
 
 export type FlashInviteStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELED' | 'EXPIRED' | 'ENDED';
@@ -291,6 +295,8 @@ export interface VenueRecord {
   /** Foto do Google (referência opaca) e o crédito de quem tirou. Só para locais externos. */
   photoRef?: string | null;
   photoAuthor?: string | null;
+  /** Organização (bateria, atlética...) em vez de estabelecimento. Sem dono, fica fora das buscas. */
+  isOrganization?: boolean;
 }
 
 /** Abre e fecha em "HH:MM"; `close` menor ou igual a `open` significa que passa da meia-noite. */
@@ -399,7 +405,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT';
 
 /** O que a pessoa silenciou no push (o aviso continua no sino). `all` vale para tudo; `chats` e `events` só para o seu grupo de avisos. */
 export interface NotificationMuteSettings {
@@ -613,6 +619,16 @@ export interface FlashHiddenRecord {
   /** `ownerId` não vê o Flash de `otherId`. */
   hideTheirs: boolean;
   /** `otherId` não vê o Flash de `ownerId`. */
+  hideMine: boolean;
+}
+
+/** Ocultação de stories entre duas pessoas, do ponto de vista de `ownerId` (mesma ideia do Flash). */
+export interface StoryHiddenRecord {
+  ownerId: string;
+  otherId: string;
+  /** `ownerId` não vê os stories de `otherId`. */
+  hideTheirs: boolean;
+  /** `otherId` não vê os stories de `ownerId`. */
   hideMine: boolean;
 }
 

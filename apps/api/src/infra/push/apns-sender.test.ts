@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, verify } from 'node:crypto';
 import { describe, it } from 'node:test';
-import { ApnsSender, apnsKeyIsValid, apnsProviderToken, CompositePushSender } from './apns-sender.ts';
+import { ApnsSender, apnsFailureLine, apnsKeyIsValid, apnsProviderToken, CompositePushSender } from './apns-sender.ts';
 import type { ApnsRequest, ApnsResponse } from './apns-sender.ts';
 import type { PushSender } from '../../core/ports.ts';
 import type { PushSubscriptionRecord } from '../../core/types.ts';
@@ -97,5 +97,37 @@ describe('APNs (aviso no iPhone)', () => {
     const onlyWeb = new CompositePushSender(fake('web', null), undefined);
     assert.equal(onlyWeb.nativeEnabled, false);
     assert.equal(await onlyWeb.send(sub(`apns:${TOKEN}`), msg), 'FAILED');
+  });
+});
+
+describe('APNs: log das recusas da Apple', () => {
+  it('registra o motivo, o ambiente e uma dica, sem mostrar o token inteiro', async () => {
+    const lines: string[] = [];
+    const sender = new ApnsSender({ config, log: (l) => lines.push(l), transport: async () => ({ status: 400, body: JSON.stringify({ reason: 'BadDeviceToken' }) }) });
+    assert.equal(await sender.send(sub(`apns:${'b'.repeat(58)}c0ffee`), msg), 'GONE');
+    assert.equal(lines.length, 1);
+    assert.match(lines[0] ?? '', /HTTP 400 BadDeviceToken/);
+    assert.match(lines[0] ?? '', /production/);
+    assert.match(lines[0] ?? '', /…c0ffee/);
+    assert.match(lines[0] ?? '', /sandbox/, 'dica sobre o ambiente');
+    assert.doesNotMatch(lines[0] ?? '', /b{20}/, 'não mostra o token inteiro');
+  });
+
+  it('registra chave errada e falha de conexão; envio certo não registra nada', async () => {
+    const lines: string[] = [];
+    const bad = new ApnsSender({ config, log: (l) => lines.push(l), transport: async () => ({ status: 403, body: JSON.stringify({ reason: 'InvalidProviderToken' }) }) });
+    assert.equal(await bad.send(sub(`apns:${TOKEN}`), msg), 'FAILED');
+    assert.match(lines.at(-1) ?? '', /InvalidProviderToken — APNS_KEY_ID/);
+    const down = new ApnsSender({ config, log: (l) => lines.push(l), transport: async () => { throw new Error('ECONNRESET'); } });
+    assert.equal(await down.send(sub(`apns:${TOKEN}`), msg), 'FAILED');
+    assert.match(lines.at(-1) ?? '', /falha de conexão com a Apple.*ECONNRESET/);
+    const count = lines.length;
+    const ok = new ApnsSender({ config, log: (l) => lines.push(l), transport: async () => ({ status: 200, body: '' }) });
+    assert.equal(await ok.send(sub(`apns:${TOKEN}`), msg), 'SENT');
+    assert.equal(lines.length, count);
+  });
+
+  it('motivo desconhecido aparece sem dica', () => {
+    assert.equal(apnsFailureLine({ status: 400, reason: 'Novo', production: false, bundleId: 'br.com.askout', deviceToken: 'abcdef123456' }), '[push iPhone] Apple recusou (sandbox, app br.com.askout, aparelho …123456): HTTP 400 Novo');
   });
 });

@@ -17,6 +17,21 @@ export const VENUE_EVENT_MAX_DAYS = 30;
 export const VENUE_EVENTS_LIMIT = 100;
 /** Capa enviada do aparelho (a tela reduz a foto antes de enviar). */
 export const EVENT_COVER_MAX_BYTES = 256 * 1024;
+export const ORGANIZATION_NAME_MAX = 80;
+export const ORGANIZATION_TYPE_MAX = 40;
+export const ORGANIZATION_CAMPUS_MAX = 120;
+export const ORGANIZATION_DESCRIPTION_MAX = 500;
+/** Categoria quando quem pede não diz o tipo (bateria, atlética...). */
+export const ORGANIZATION_DEFAULT_TYPE = 'Organização universitária';
+/** Quantos avisos de evento novo saem ao mesmo tempo (o resto espera a vez). */
+const ANNOUNCE_BATCH = 25;
+
+const ANNOUNCE_WHEN = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+
+function clipTitle(value: string, max: number): string {
+  const chars = Array.from(value.trim());
+  return chars.length <= max ? chars.join('') : `${chars.slice(0, max - 1).join('').trimEnd()}…`;
+}
 
 /** Endereço da capa enviada; `v` muda a cada troca para o navegador não mostrar a antiga. */
 export function eventCoverPath(eventId: string, version: number): string {
@@ -44,6 +59,31 @@ export interface VenueSummaryView {
   address: string | null;
   category: string | null;
   sample: boolean;
+  /** Organização (bateria, atlética...) em vez de estabelecimento. */
+  organization: boolean;
+}
+
+/** Pedido para criar a página de uma organização da faculdade. */
+export interface OrganizationRequestInput {
+  name?: unknown;
+  /** Tipo: bateria, atlética, centro acadêmico... (vira a categoria). */
+  type?: unknown;
+  /** Faculdade e campus (vira o endereço da página). */
+  campus?: unknown;
+  description?: unknown;
+  /** Onde fica a sede (normalmente o campus), para a página ter lugar no mapa. */
+  lat?: unknown;
+  lng?: unknown;
+  /** Data URL de um comprovante de que a pessoa representa a organização (PDF ou imagem até 2 MB). */
+  document?: unknown;
+  note?: unknown;
+}
+
+export interface VenueBellView {
+  following: boolean;
+  /** Sininho: aviso de cada evento novo. */
+  notify: boolean;
+  followerCount: number;
 }
 
 export interface ClaimView {
@@ -132,6 +172,10 @@ export interface VenueProfileView {
   claimed: boolean;
   isOwner: boolean;
   following: boolean;
+  /** Sininho ligado: quem consulta recebe aviso de cada evento novo. */
+  notify: boolean;
+  /** Organização (bateria, atlética...) em vez de estabelecimento. */
+  organization: boolean;
   followerCount: number;
   rating: VenueRatingView;
   /** Eventos que ainda vão acontecer ou estão acontecendo, do mais cedo ao mais tarde. */
@@ -248,7 +292,7 @@ export interface ClaimInput {
 }
 
 function summary(v: VenueRecord): VenueSummaryView {
-  return { id: v.id, name: v.name, address: v.address, category: v.category, sample: v.isSample };
+  return { id: v.id, name: v.name, address: v.address, category: v.category, sample: v.isSample, organization: v.isOrganization === true };
 }
 
 function text(value: unknown, max: number, field: string, label: string, required = false): string | null {
@@ -369,7 +413,7 @@ export class VenueService {
       userId: claim.userId,
       type: 'VENUE_CLAIM',
       title: decision === 'APPROVED' ? `Você agora administra ${venue.name}` : `Pedido para ${venue.name} recusado`,
-      body: decision === 'APPROVED' ? 'Crie os eventos do local no seu perfil' : (note as string),
+      body: decision === 'APPROVED' ? (venue.isOrganization ? 'Crie os eventos da organização: quem ligar o sininho recebe o aviso' : 'Crie os eventos do local no seu perfil') : (note as string),
       url: '/locais',
       dedupeKey: `venue-claim:${claim.id}`,
     });
@@ -390,7 +434,22 @@ export class VenueService {
     if (cover.mode === 'upload') event.imageUrl = eventCoverPath(id, this.deps.clock.now().getTime());
     await this.deps.places.createEvent(event);
     if (cover.mode === 'upload') await this.deps.places.setEventCover(id, cover.mime, cover.bytes);
+    await this.announceEvent(venue, event);
     return this.eventView(event);
+  }
+
+  /** Avisa quem segue o local com o sininho ligado (menos quem administra). Falha de um aviso não atrapalha os outros. */
+  private async announceEvent(venue: VenueRecord, event: PlaceEventRecord): Promise<void> {
+    const followers = (await this.deps.places.listVenueNotifyFollowers(venue.id)).filter((id) => id !== venue.ownerId);
+    const title = `${clipTitle(venue.name, 40)} tem evento novo`;
+    const body = `${clipTitle(event.title, 60)} · ${ANNOUNCE_WHEN.format(event.startsAt).replace(',', '')}`;
+    for (let i = 0; i < followers.length; i += ANNOUNCE_BATCH) {
+      await Promise.all(
+        followers.slice(i, i + ANNOUNCE_BATCH).map((userId) =>
+          this.deps.notifier.notify({ userId, type: 'VENUE_EVENT', title, body, url: `/eventos/${event.id}`, dedupeKey: `venue-event:${event.id}` }).catch(() => undefined),
+        ),
+      );
+    }
   }
 
   /**
@@ -434,7 +493,7 @@ export class VenueService {
   async profile(viewerId: string, venueId: unknown): Promise<VenueProfileView> {
     const venue = await this.venueOrThrow(venueId);
     const now = this.deps.clock.now().getTime();
-    const [following, followerCount, events, rating] = await Promise.all([this.deps.places.isFollowingVenue(viewerId, venue.id), this.deps.places.countVenueFollowers(venue.id), this.deps.places.listVenueEvents(venue.id), this.deps.places.venueRating(venue.id, viewerId)]);
+    const [following, notify, followerCount, events, rating] = await Promise.all([this.deps.places.isFollowingVenue(viewerId, venue.id), this.deps.places.isVenueNotifyOn(viewerId, venue.id), this.deps.places.countVenueFollowers(venue.id), this.deps.places.listVenueEvents(venue.id), this.deps.places.venueRating(venue.id, viewerId)]);
     const upcoming = events
       .filter((e) => e.endsAt.getTime() > now)
       .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || (a.id < b.id ? -1 : 1))
@@ -457,6 +516,8 @@ export class VenueService {
       claimed: (venue.ownerId ?? null) !== null,
       isOwner: venue.ownerId === viewerId,
       following,
+      notify: following && notify,
+      organization: venue.isOrganization === true,
       followerCount,
       rating: ratingView(rating),
       upcomingEvents: upcoming,
@@ -533,10 +594,50 @@ export class VenueService {
     return this.deps.places.findVenueCover(venueId);
   }
 
-  async follow(userId: string, venueId: unknown): Promise<{ following: true; followerCount: number }> {
+  async follow(userId: string, venueId: unknown): Promise<{ following: true; notify: boolean; followerCount: number }> {
     const venue = await this.venueOrThrow(venueId);
     await this.deps.places.followVenue(userId, venue.id, this.deps.clock.now());
-    return { following: true, followerCount: await this.deps.places.countVenueFollowers(venue.id) };
+    const [notify, followerCount] = await Promise.all([this.deps.places.isVenueNotifyOn(userId, venue.id), this.deps.places.countVenueFollowers(venue.id)]);
+    return { following: true, notify, followerCount };
+  }
+
+  /**
+   * Sininho: liga ou desliga o aviso de cada evento novo do local. Ligar sem seguir já segue (o sininho fica ao lado
+   * do botão Seguir); desligar mantém a pessoa seguindo.
+   */
+  async setNotify(userId: string, venueId: unknown, on: unknown): Promise<VenueBellView> {
+    if (typeof on !== 'boolean') throw validationError('Dados inválidos', { notify: 'Use true ou false' });
+    const venue = await this.venueOrThrow(venueId);
+    if (on) await this.deps.places.followVenue(userId, venue.id, this.deps.clock.now());
+    await this.deps.places.setVenueNotify(userId, venue.id, on);
+    const [following, notify, followerCount] = await Promise.all([this.deps.places.isFollowingVenue(userId, venue.id), this.deps.places.isVenueNotifyOn(userId, venue.id), this.deps.places.countVenueFollowers(venue.id)]);
+    return { following, notify: following && notify, followerCount };
+  }
+
+  /**
+   * Pede a página de uma organização da faculdade (bateria, atlética, centro acadêmico...). A página nasce sem dono e
+   * fora das buscas; um admin confere o comprovante no painel de pedidos e, ao aprovar, a pessoa passa a administrá-la.
+   */
+  async requestOrganization(userId: string, input: OrganizationRequestInput): Promise<ClaimView> {
+    if (typeof input !== 'object' || input === null) throw validationError('Dados inválidos', { name: 'Preencha os dados da organização' });
+    const name = text(input.name, ORGANIZATION_NAME_MAX, 'name', 'Nome da organização', true) as string;
+    const type = text(input.type, ORGANIZATION_TYPE_MAX, 'type', 'Tipo') ?? ORGANIZATION_DEFAULT_TYPE;
+    const campus = text(input.campus, ORGANIZATION_CAMPUS_MAX, 'campus', 'Faculdade', true) as string;
+    const description = text(input.description, ORGANIZATION_DESCRIPTION_MAX, 'description', 'Descrição');
+    const note = text(input.note, CLAIM_NOTE_MAX, 'note', 'Mensagem');
+    const { lat, lng } = input;
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      throw validationError('Dados inválidos', { location: 'Informe onde fica a organização (use a localização do aparelho no campus)' });
+    }
+    const pending = (await this.deps.claims.listByUser(userId)).filter((c) => c.status === 'PENDING').length;
+    if (pending >= CLAIMS_PENDING_MAX) throw conflict(`Você já tem ${CLAIMS_PENDING_MAX} pedidos em análise. Espere a resposta antes de pedir outro`);
+    const doc = decodeClaimDocument(input.document);
+    const now = this.deps.clock.now();
+    const venue: VenueRecord = { id: this.deps.ids.next(), name, address: campus, category: type, lat, lng, isSample: false, ownerId: null, description, isOrganization: true };
+    await this.deps.places.createVenue(venue);
+    const claim: VenueClaimRecord = { id: this.deps.ids.next(), venueId: venue.id, userId, status: 'PENDING', note, documentMime: doc.mime, reviewNote: null, reviewedBy: null, reviewedAt: null, createdAt: now };
+    await this.deps.claims.create(claim, doc.bytes);
+    return { id: claim.id, venue: summary(venue), status: 'PENDING', reviewNote: null, createdAt: now.toISOString() };
   }
 
   /** Avalia o local de 1 a 5 estrelas (de novo = troca a nota). Quem administra o local não avalia o próprio. */
@@ -554,10 +655,10 @@ export class VenueService {
     return ratingView(await this.deps.places.venueRating(venue.id, userId));
   }
 
-  async unfollow(userId: string, venueId: unknown): Promise<{ following: false; followerCount: number }> {
+  async unfollow(userId: string, venueId: unknown): Promise<{ following: false; notify: false; followerCount: number }> {
     const venue = await this.venueOrThrow(venueId);
     await this.deps.places.unfollowVenue(userId, venue.id);
-    return { following: false, followerCount: await this.deps.places.countVenueFollowers(venue.id) };
+    return { following: false, notify: false, followerCount: await this.deps.places.countVenueFollowers(venue.id) };
   }
 
   /**

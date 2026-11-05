@@ -16,6 +16,7 @@ import type { ClaimableVenue, VenueClaim, VenueEvent, VenueEventBody, VenueSumma
 import { CLAIM_NOTE_MAX, EMPTY_VENUE_EVENT, VENUE_EVENT_DESCRIPTION_MAX, VENUE_EVENT_TITLE_MAX, claimStateLabel, claimStatusLabel, documentProblem, draftFromEvent, phaseLabel, venueEventBody, venueEventProblem } from '../lib/venue.ts';
 import type { VenueEventDraft } from '../lib/venue.ts';
 import { Link } from '../router.tsx';
+import { useCurrentPosition } from './explore.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
 function readAsDataUrl(file: File): Promise<string> {
@@ -31,6 +32,7 @@ function VenueLine({ venue }: { venue: VenueSummary }) {
   return (
     <>
       <span className="venuerow__name">{venue.name}</span>
+      {venue.organization ? <span className="venuerow__sub">{venue.category ?? t('Organização')}</span> : null}
       {venue.address ? <span className="venuerow__sub">{venue.address}</span> : null}
       {venue.sample ? <SampleBadge /> : null}
     </>
@@ -125,6 +127,104 @@ export function ClaimSheet({ onClose, onSent, fixed }: { onClose: () => void; on
   );
 }
 
+// ---------- Criar uma organização da faculdade ----------
+
+const ORG_TYPES = ['Bateria', 'Atlética', 'Centro acadêmico', 'Empresa júnior', 'Coletivo', 'Outro'] as const;
+export const ORGANIZATION_NAME_MAX = 80;
+export const ORGANIZATION_CAMPUS_MAX = 120;
+export const ORGANIZATION_DESCRIPTION_MAX = 500;
+
+/**
+ * Pede a página de uma organização (bateria, atlética, centro acadêmico...). Quem segue a página e toca no sininho
+ * recebe aviso de cada evento novo. Um administrador confere o comprovante antes de a página aparecer.
+ */
+export function OrganizationSheet({ onClose, onSent }: { onClose: () => void; onSent: () => void }) {
+  const where = useCurrentPosition();
+  const [name, setName] = useState('');
+  const [type, setType] = useState<string>(ORG_TYPES[0]);
+  const [campus, setCampus] = useState('');
+  const [description, setDescription] = useState('');
+  const [file, setFile] = useState<File | undefined>();
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | undefined>();
+  const input = useRef<HTMLInputElement>(null);
+
+  function choose(event: ChangeEvent<HTMLInputElement>) {
+    const chosen = event.target.files?.[0];
+    event.target.value = '';
+    if (!chosen) return;
+    const problem = documentProblem(chosen);
+    setMessage(problem ?? undefined);
+    setFile(problem ? undefined : chosen);
+  }
+
+  const ready = name.trim() !== '' && campus.trim() !== '' && file !== undefined && where.status === 'ok';
+
+  async function send() {
+    if (!file || where.status !== 'ok') return;
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await api.requestOrganization({
+        name: name.trim(),
+        type: type === 'Outro' ? undefined : type,
+        campus: campus.trim(),
+        ...(description.trim() ? { description: description.trim() } : {}),
+        lat: where.position.lat,
+        lng: where.position.lng,
+        document: await readAsDataUrl(file),
+        ...(note.trim() ? { note: note.trim() } : {}),
+      });
+      onSent();
+    } catch (failure) {
+      setMessage(toApiError(failure).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet title={t('Criar página de organização')} onClose={onClose}>
+      <div className="claim">
+        <p className="muted">{t('Para bateria, atlética, centro acadêmico e outras organizações da faculdade. Quem seguir a página e tocar no sininho recebe um aviso a cada evento novo.')}</p>
+        <Field label={t('Nome da organização')} value={name} onChange={setName} placeholder={t('Ex.: Bateria Furiosa')} maxLength={ORGANIZATION_NAME_MAX} autoFocus />
+        <div className="field">
+          <span className="field__label">{t('Tipo')}</span>
+          <div className="chips" role="group" aria-label={t('Tipo')}>
+            {ORG_TYPES.map((option) => (
+              <button key={option} type="button" aria-pressed={type === option} className="chip" onClick={() => setType(option)}>
+                {t(option)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field label={t('Faculdade e campus')} value={campus} onChange={setCampus} placeholder={t('Ex.: UFMG, Campus Pampulha')} maxLength={ORGANIZATION_CAMPUS_MAX} />
+        <Field label={t('Descrição (opcional)')} value={description} onChange={setDescription} multiline maxLength={ORGANIZATION_DESCRIPTION_MAX} />
+        {where.status === 'ok' ? (
+          <p className="muted">{t('A página fica no mapa onde você está agora. Faça o pedido de dentro do campus.')}</p>
+        ) : where.status === 'asking' ? (
+          <p className="muted">{t('Pegando a sua localização...')}</p>
+        ) : (
+          <Notice tone="error">{t('Precisamos da sua localização para colocar a organização no mapa. Libere a localização do aparelho e abra de novo.')}</Notice>
+        )}
+        <p className="muted">{t('Envie um comprovante de que você representa a organização (ata, carteirinha, declaração da faculdade ou print do perfil oficial). Só um administrador do AskouT vê o arquivo.')}</p>
+        <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="visually-hidden" aria-label={t('Escolher comprovante')} onChange={choose} />
+        <Button variant="secondary" onClick={() => input.current?.click()}>
+          {file ? t('Trocar comprovante') : t('Escolher comprovante')}
+        </Button>
+        {file ? <p className="claim__file">{file.name}</p> : null}
+        <Field label={t('Mensagem (opcional)')} value={note} onChange={setNote} multiline maxLength={CLAIM_NOTE_MAX} hint={t('Até {CLAIM_NOTE_MAX} caracteres', { CLAIM_NOTE_MAX })} />
+        {message ? <Notice tone="error">{message}</Notice> : null}
+        <div className="claim__actions">
+          <Button full loading={busy} disabled={!ready} onClick={send}>
+            {t('Enviar pedido')}
+          </Button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
 function ClaimRow({ claim, onChanged }: { claim: VenueClaim; onChanged: () => void }) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -167,6 +267,7 @@ export function VenuesScreen() {
   useTitle(t('Meus locais'));
   const mine = useAsync(() => api.myVenues(), []);
   const [claiming, setClaiming] = useState(false);
+  const [creatingOrg, setCreatingOrg] = useState(false);
   const [sent, setSent] = useState(false);
 
   return (
@@ -205,7 +306,20 @@ export function VenuesScreen() {
           <Button full onClick={() => setClaiming(true)}>
             {t('Reivindicar um local')}
           </Button>
+          <Button full variant="secondary" onClick={() => setCreatingOrg(true)}>
+            {t('Criar página de organização (bateria, atlética...)')}
+          </Button>
         </>
+      ) : null}
+      {creatingOrg ? (
+        <OrganizationSheet
+          onClose={() => setCreatingOrg(false)}
+          onSent={() => {
+            setCreatingOrg(false);
+            setSent(true);
+            mine.reload();
+          }}
+        />
       ) : null}
       {claiming ? (
         <ClaimSheet

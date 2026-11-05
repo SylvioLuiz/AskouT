@@ -38,7 +38,7 @@ test('aceitar o convite cria a conversa dos dois e o encontro aponta para ela', 
   assert.equal(m.conversationId, mb.conversationId);
   assert.equal((await w.core.conversations.open(ana, bia)).id, m.conversationId);
   await w.core.flash.end(ana, inviteId);
-  assert.equal((await w.core.conversations.list(ana))[0]!.id, m.conversationId, 'a conversa continua depois do Flash');
+  assert.equal((await w.core.conversations.list(ana))[0]!.id, m.conversationId, 'a conversa continua depois do NOW');
 });
 
 test('sem os dois compartilhando localização: 409; quem não participa: 404', async () => {

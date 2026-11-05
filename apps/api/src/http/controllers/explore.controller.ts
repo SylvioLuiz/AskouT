@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, Headers, HttpCode, Inject, NotFoundException, Param, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Headers, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
 import type { PlacePhotos } from './places.controller.ts';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
@@ -101,6 +101,18 @@ export class ExploreController {
         }),
       })),
     }));
+  }
+
+  /** Ocultação de stories com uma pessoa (como no Flash): não ver os dela e/ou não deixar ela ver os meus. */
+  @Get('stories/visibility/:userId')
+  storyVisibility(@CurrentActor() actor: Actor, @Param('userId', new ParseUUIDPipe()) userId: string) {
+    return this.core.eventPages.storyVisibility(actor.userId, userId);
+  }
+
+  @Put('stories/visibility/:userId')
+  setStoryVisibility(@CurrentActor() actor: Actor, @Param('userId', new ParseUUIDPipe()) userId: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.eventPages.setStoryVisibility(actor.userId, userId, { hideTheirs: b.hideTheirs, hideMine: b.hideMine });
   }
 
   @Delete('stories/:storyId')

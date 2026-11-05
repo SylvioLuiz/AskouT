@@ -1565,6 +1565,39 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.places.listFollowedVenueIds('nao-e-uuid'), []);
       });
 
+      it('sininho do local: só liga para quem segue, lista quem ligou e some ao deixar de seguir', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bateria', address: 'Campus', category: 'Bateria', lat: -19.8, lng: -43.9, isSample: false, isOrganization: true };
+        await h.places.createVenue(v);
+        assert.equal((await h.places.findVenue(v.id))?.isOrganization, true);
+        assert.equal(await h.places.setVenueNotify(ana, v.id, true), false, 'sem seguir, não liga');
+        await h.places.followVenue(ana, v.id, at(1));
+        await h.places.followVenue(bia, v.id, at(2));
+        assert.equal(await h.places.isVenueNotifyOn(ana, v.id), false, 'seguir começa desligado');
+        assert.equal(await h.places.setVenueNotify(ana, v.id, true), true);
+        assert.equal(await h.places.isVenueNotifyOn(ana, v.id), true);
+        assert.deepEqual(await h.places.listVenueNotifyFollowers(v.id), [ana]);
+        await h.places.followVenue(ana, v.id, at(3));
+        assert.equal(await h.places.isVenueNotifyOn(ana, v.id), true, 'seguir de novo não desliga');
+        await h.places.unfollowVenue(ana, v.id);
+        await h.places.followVenue(ana, v.id, at(4));
+        assert.equal(await h.places.isVenueNotifyOn(ana, v.id), false, 'deixar de seguir apaga o sininho');
+        assert.deepEqual(await h.places.listVenueNotifyFollowers(v.id), []);
+        assert.deepEqual(await h.places.listVenueNotifyFollowers('nao-e-uuid'), []);
+        assert.equal(await h.places.setVenueNotify('nao-e-uuid', v.id, true), false);
+      });
+
+      it('organização sem dono fica fora da busca de locais', async () => {
+        const owner = await newUser('dono');
+        const tag = randomUUID().slice(0, 8);
+        const pending: VenueRecord = { id: randomUUID(), name: `Atletica ${tag}`, address: null, category: null, lat: 0, lng: 0, isSample: false, isOrganization: true };
+        const owned: VenueRecord = { ...pending, id: randomUUID(), name: `Atletica ${tag} Dois`, ownerId: owner };
+        await h.places.createVenue(pending);
+        await h.places.createVenue(owned);
+        assert.deepEqual((await h.places.searchVenues(`atletica ${tag}`, undefined, 0, 10)).map((r) => r.venue.id), [owned.id]);
+      });
+
       it('avaliação do local: uma nota por pessoa, soma, troca e remove', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');
@@ -2044,6 +2077,16 @@ export function defineRepositoryContract(
         assert.equal(await h.eventRoom.reportStory({ ...rep, id: randomUUID() }), false, 'uma denúncia por pessoa');
         assert.deepEqual([...(await h.eventRoom.reportedStoryIds(ana, [storyA.id, storyP.id]))], [storyA.id]);
         assert.deepEqual([...(await h.eventRoom.reportedStoryIds(bia, [storyA.id]))], []);
+        // ocultação de stories: uma linha por dono; tudo desligado apaga
+        assert.deepEqual(await h.eventRoom.listStoryHidden(ana), []);
+        await h.eventRoom.setStoryHidden({ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: false });
+        await h.eventRoom.setStoryHidden({ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: false });
+        assert.deepEqual(await h.eventRoom.listStoryHidden(bia), [{ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: false }]);
+        await h.eventRoom.setStoryHidden({ ownerId: bia, otherId: ana, hideTheirs: false, hideMine: true });
+        assert.equal((await h.eventRoom.listStoryHidden(ana)).length, 2);
+        await h.eventRoom.setStoryHidden({ ownerId: ana, otherId: bia, hideTheirs: false, hideMine: false });
+        assert.deepEqual(await h.eventRoom.listStoryHidden(ana), [{ ownerId: bia, otherId: ana, hideTheirs: false, hideMine: true }]);
+        await h.eventRoom.setStoryHidden({ ownerId: bia, otherId: ana, hideTheirs: false, hideMine: false });
         await h.eventRoom.deleteStory(storyP.id);
         assert.equal(await h.eventRoom.findStory(storyP.id), undefined);
         const mine = await h.eventRoom.listGoingByUser(bia, 10);

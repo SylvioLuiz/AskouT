@@ -25,7 +25,14 @@ export class FlashController {
   @HttpCode(200)
   turnOn(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.flash.turnOn(actor.userId, { hours: b.hours, minutes: b.minutes, note: b.note });
+    return this.core.flash.turnOn(actor.userId, { hours: b.hours, minutes: b.minutes, note: b.note, lat: b.lat, lng: b.lng });
+  }
+
+  /** Estende o NOW ligado: `{minutes: 30 | 60}`. */
+  @Post('me/flash/extend')
+  @HttpCode(200)
+  extend(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.flash.extend(actor.userId, { minutes: asBody(body).minutes });
   }
 
   @Delete('me/flash')
@@ -34,8 +41,9 @@ export class FlashController {
   }
 
   @Get('flash/available')
-  async available(@CurrentActor() actor: Actor) {
-    return { items: await this.core.flash.listAvailable(actor.userId) };
+  /** `?ordem=perto` (padrão quando ligou com localização) ou `?ordem=interacao`. */
+  async available(@CurrentActor() actor: Actor, @Query('ordem') ordem?: string) {
+    return this.core.flash.listAvailableRanked(actor.userId, ordem === 'perto' ? 'near' : ordem === 'interacao' ? 'interaction' : undefined);
   }
 
   @Get('flash/active')

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent, FormEvent } from 'react';
+import { useEffect, useState } from 'react';
+import type { FormEvent } from 'react';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { MuteCard, PushCard } from '../components/notifications.tsx';
 import { api } from '../client.ts';
@@ -17,6 +17,10 @@ import { applyTheme, readTheme, saveTheme, THEME_LABELS } from '../lib/theme.ts'
 import type { ThemeChoice } from '../lib/theme.ts';
 import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validation.ts';
 import { InviteSheet } from '../components/invite.tsx';
+import { ConnectContactsCard } from '../components/connect-contacts.tsx';
+import { PhotoPickerSheet } from '../components/photo-picker.tsx';
+import { CameraIcon } from '../components/icons.tsx';
+import { formatPhone, normalizePhone } from '../lib/phone.ts';
 import { supportMailto } from '../lib/help-mailto.ts';
 import { downloadJson } from '../lib/account.ts';
 import { birthDateProblem, MIN_ACCOUNT_AGE, ageOnDate, todayIso } from '../lib/age.ts';
@@ -25,74 +29,106 @@ import { LOCALES, chooseLocale, getLocale, intlLocale, t } from '../lib/i18n/ind
 
 type Message = { tone: 'ok' | 'error'; text: string } | undefined;
 
+/** Foto escolhida que ainda não foi salva: o arquivo e a prévia, ou o pedido de remover. */
+type PendingPhoto = { file: File; preview: string } | 'remove' | undefined;
+
+/**
+ * Editar perfil: foto, nome, descrição, celular e data de nascimento num formulário só.
+ * Nada é gravado até tocar em "Salvar alterações"; aí vai tudo o que mudou de uma vez.
+ */
 export function EditProfileScreen() {
   useTitle(t('Editar perfil'));
   const user = useUser();
   const { setOwnProfile } = useAuthContext();
-  const view = useAsync(() => api.getProfile(user.profile.username), [user.profile.username]);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const view = useAsync(() => Promise.all([api.getProfile(user.profile.username), api.getPhone(), api.ageStatus()]), [user.profile.username]);
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
+  const [phone, setPhone] = useState('');
+  const [birth, setBirth] = useState('');
+  const [photo, setPhoto] = useState<PendingPhoto>();
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<Message>();
   const [saving, setSaving] = useState(false);
-  const [photoBusy, setPhotoBusy] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(user.profile.avatarUrl);
+  // O que está salvo no servidor, para mandar só o que mudou.
+  const [saved, setSaved] = useState<{ displayName: string; bio: string; phone: string; birth: string; avatarUrl: string | null } | undefined>();
 
   const loaded = view.data;
   useEffect(() => {
     if (!loaded) return;
-    setDisplayName(loaded.profile.displayName);
-    setBio(loaded.profile.bio ?? '');
-    setAvatarUrl(loaded.profile.avatarUrl);
+    const [profileView, phoneView, age] = loaded;
+    const now = { displayName: profileView.profile.displayName, bio: profileView.profile.bio ?? '', phone: phoneView.phone ? formatPhone(phoneView.phone) : '', birth: age.birthDate ?? '', avatarUrl: profileView.profile.avatarUrl };
+    setSaved(now);
+    setDisplayName(now.displayName);
+    setBio(now.bio);
+    setPhone(now.phone);
+    setBirth(now.birth);
+    setPhoto(undefined);
   }, [loaded]);
 
-  function remember(updated: { userId: string; username: string; displayName: string; avatarUrl: string | null; isPrivate: boolean }) {
-    setOwnProfile({ userId: updated.userId, username: updated.username, displayName: updated.displayName, avatarUrl: updated.avatarUrl, isPrivate: updated.isPrivate });
-    setAvatarUrl(updated.avatarUrl);
-  }
+  // Libera a prévia da foto escolhida quando ela é trocada ou a tela fecha.
+  useEffect(() => {
+    if (!photo || photo === 'remove') return;
+    return () => URL.revokeObjectURL(photo.preview);
+  }, [photo]);
 
-  async function pickPhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    setPhotoBusy(true);
-    setMessage(undefined);
-    try {
-      const image = await resizeProfilePhoto(file);
-      remember(await api.setProfilePhoto(image));
-      setMessage({ tone: 'ok', text: t('Foto atualizada.') });
-    } catch (failure) {
-      setMessage({ tone: 'error', text: toApiError(failure).message });
-    } finally {
-      setPhotoBusy(false);
-    }
-  }
+  if (view.loading && !loaded) return <Loading />;
+  if (view.error && !loaded) return <ErrorState message={view.error.message} onRetry={view.reload} />;
+  if (!loaded || !saved) return null;
+  const age = loaded[2];
+  const support = supportMailto(import.meta.env['VITE_SUPPORT_EMAIL'] as string | undefined, user.profile.username);
 
-  async function removePhoto() {
-    setPhotoBusy(true);
-    setMessage(undefined);
-    try {
-      remember(await api.setProfilePhoto(null));
-      setMessage({ tone: 'ok', text: t('Foto removida.') });
-    } catch (failure) {
-      setMessage({ tone: 'error', text: toApiError(failure).message });
-    } finally {
-      setPhotoBusy(false);
-    }
+  const shownAvatar = photo === 'remove' ? null : photo ? photo.preview : saved.avatarUrl;
+  const changed = photo !== undefined || displayName !== saved.displayName || bio !== saved.bio || phone !== saved.phone || (!age.locked && birth !== saved.birth);
+
+  function problems(): Record<string, string> {
+    const birthProblem =
+      age.locked || birth === saved!.birth
+        ? undefined
+        : (birthDateProblem(birth, new Date()) ?? (ageOnDate(birth, new Date()) < MIN_ACCOUNT_AGE ? t('O AskouT é para quem tem {MIN_ACCOUNT_AGE} anos ou mais', { MIN_ACCOUNT_AGE }) : undefined));
+    const phoneProblem = phone.trim() !== '' && phone !== saved!.phone && !normalizePhone(phone) ? t('Informe o celular com DDD, ex.: (11) 98765-4321') : undefined;
+    return compact({ displayName: displayNameProblem(displayName, true), bio: bioProblem(bio), phone: phoneProblem, birthDate: birthProblem });
   }
 
   async function save(event: FormEvent) {
     event.preventDefault();
-    const found = compact({ displayName: displayNameProblem(displayName, true), bio: bioProblem(bio) });
+    const found = problems();
     setErrors(found);
     setMessage(undefined);
     if (Object.keys(found).length > 0) return;
     setSaving(true);
+    const next = { ...saved! };
     try {
-      remember(await api.updateProfile({ displayName: displayName.trim(), bio: bio.trim() }));
+      if (photo !== undefined) {
+        const image = photo === 'remove' ? null : await resizeProfilePhoto(photo.file);
+        const updated = await api.setProfilePhoto(image);
+        next.avatarUrl = updated.avatarUrl;
+        setPhoto(undefined);
+      }
+      if (displayName !== saved!.displayName || bio !== saved!.bio || photo !== undefined) {
+        const updated = await api.updateProfile({ displayName: displayName.trim(), bio: bio.trim() });
+        setOwnProfile({ userId: updated.userId, username: updated.username, displayName: updated.displayName, avatarUrl: updated.avatarUrl, isPrivate: updated.isPrivate });
+        next.displayName = updated.displayName;
+        next.bio = updated.bio ?? '';
+        next.avatarUrl = updated.avatarUrl;
+      }
+      if (phone !== saved!.phone) {
+        const result = await api.setPhone(phone.trim() === '' ? null : phone);
+        next.phone = result.phone ? formatPhone(result.phone) : '';
+      }
+      if (!age.locked && birth !== saved!.birth) {
+        const result = await api.correctBirthDate(birth);
+        next.birth = result.birthDate ?? '';
+      }
+      setSaved(next);
+      setDisplayName(next.displayName);
+      setBio(next.bio);
+      setPhone(next.phone);
+      setBirth(next.birth);
       setMessage({ tone: 'ok', text: t('Perfil atualizado.') });
     } catch (failure) {
+      // O que já foi gravado antes do erro continua salvo.
+      setSaved(next);
       const error = toApiError(failure);
       setErrors(error.fields);
       setMessage(Object.keys(error.fields).length === 0 ? { tone: 'error', text: error.message } : undefined);
@@ -101,100 +137,71 @@ export function EditProfileScreen() {
     }
   }
 
-  if (view.loading && !loaded) return <Loading />;
-  if (view.error && !loaded) return <ErrorState message={view.error.message} onRetry={view.reload} />;
-
   return (
     <>
       <PageHead title={t('Editar perfil')} back="/perfil" />
-      <div className="photoedit">
-        <Avatar profile={{ userId: user.profile.userId, username: user.profile.username, displayName: displayName || user.profile.displayName, avatarUrl }} size={96} />
-        <div className="photoedit__actions">
-          <input ref={fileRef} type="file" accept="image/*" className="visually-hidden" aria-label={t('Escolher foto de perfil')} id="foto" onChange={pickPhoto} />
-          <Button variant="secondary" small loading={photoBusy} onClick={() => fileRef.current?.click()}>
-            {avatarUrl ? t('Trocar foto') : t('Subir foto')}
-          </Button>
-          {avatarUrl ? (
-            <Button variant="quiet" small disabled={photoBusy} onClick={removePhoto}>
-              {t('Remover foto')}
-            </Button>
-          ) : null}
-        </div>
-      </div>
-      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      {photoOpen ? (
+        <PhotoPickerSheet
+          hasPhoto={shownAvatar !== null}
+          onPick={(file) => setPhoto({ file, preview: URL.createObjectURL(file) })}
+          onRemove={() => setPhoto(saved.avatarUrl ? 'remove' : undefined)}
+          onClose={() => setPhotoOpen(false)}
+        />
+      ) : null}
       <form className="form form--flat" onSubmit={save} noValidate>
+        <div className="photoedit">
+          <button type="button" className="avatarbtn" onClick={() => setPhotoOpen(true)} aria-label={shownAvatar ? t('Trocar foto') : t('Subir foto')} aria-haspopup="dialog">
+            <Avatar profile={{ userId: user.profile.userId, username: user.profile.username, displayName: displayName || user.profile.displayName, avatarUrl: shownAvatar }} size={96} />
+            <span className="avatarbtn__badge" aria-hidden="true">
+              <CameraIcon />
+            </span>
+          </button>
+          <div className="photoedit__actions">
+            <Button variant="secondary" small onClick={() => setPhotoOpen(true)}>
+              {shownAvatar ? t('Trocar foto') : t('Subir foto')}
+            </Button>
+            {photo !== undefined ? <span className="muted">{t('A foto muda quando você salvar.')}</span> : null}
+          </div>
+        </div>
         <Field label={t('Nome')} value={displayName} onChange={setDisplayName} error={errors['displayName']} maxLength={60} autoComplete="name" />
         <Field label={t('Descrição')} value={bio} onChange={setBio} error={errors['bio']} hint={`${Array.from(bio).length}/${BIO_MAX}`} multiline maxLength={BIO_MAX + 20} />
+        <Field
+          label={t('Celular')}
+          type="tel"
+          inputMode="tel"
+          value={phone}
+          onChange={setPhone}
+          error={errors['phone']}
+          autoComplete="tel"
+          maxLength={25}
+          placeholder="(11) 98765-4321"
+          hint={t('Não aparece para ninguém. Serve para seus amigos acharem você pela agenda do celular.')}
+        />
+        {age.locked ? (
+          <p className="muted">
+            {t('Pela data cadastrada, você ainda não tem 18 anos, então não dá para trocá-la por aqui. Se foi um erro de digitação,')}{' '}
+            {support ? <a href={support}>fale com o suporte</a> : 'fale com o suporte'}.
+          </p>
+        ) : (
+          <Field
+            label={t('Data de nascimento')}
+            type="date"
+            value={birth}
+            onChange={setBirth}
+            error={errors['birthDate']}
+            max={todayIso()}
+            autoComplete="bday"
+            hint={age.declared ? t('Ela não aparece para ninguém. Serve para confirmar que você tem 18 anos ou mais.') : t('Você ainda não informou. Precisamos dela para confirmar que você tem 18 anos ou mais.')}
+          />
+        )}
+        {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
         <div>
-          <Button type="submit" loading={saving}>
+          <Button type="submit" loading={saving} disabled={!changed && !saving}>
             {t('Salvar alterações')}
           </Button>
         </div>
       </form>
-      <BirthDateSection />
     </>
-  );
-}
-
-/** Corrigir a data de nascimento, caso tenha sido digitada errada no cadastro. */
-function BirthDateSection() {
-  const user = useUser();
-  const age = useAsync(() => api.ageStatus(), []);
-  const [birth, setBirth] = useState('');
-  const [error, setError] = useState<string | undefined>();
-  const [message, setMessage] = useState<Message>();
-  const [saving, setSaving] = useState(false);
-  const status = age.data;
-  useEffect(() => {
-    if (status?.birthDate) setBirth(status.birthDate);
-  }, [status?.birthDate]);
-
-  if (!status) return null;
-  const support = supportMailto(import.meta.env['VITE_SUPPORT_EMAIL'] as string | undefined, user.profile.username);
-
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    setMessage(undefined);
-    const problem = birthDateProblem(birth, new Date()) ?? (ageOnDate(birth, new Date()) < MIN_ACCOUNT_AGE ? t('O AskouT é para quem tem {MIN_ACCOUNT_AGE} anos ou mais', { MIN_ACCOUNT_AGE }) : undefined);
-    setError(problem);
-    if (problem) return;
-    setSaving(true);
-    try {
-      const next = await api.correctBirthDate(birth);
-      age.setData(next);
-      setMessage({ tone: 'ok', text: t('Data de nascimento atualizada.') });
-    } catch (failure) {
-      const e = toApiError(failure);
-      setError(e.fields['birthDate']);
-      if (!e.fields['birthDate']) setMessage({ tone: 'error', text: e.message });
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <section className="birthedit">
-      <h2 className="birthedit__title">
-        {t('Data de nascimento')}
-      </h2>
-      <p className="muted">{t('Ela não aparece para ninguém. Serve para confirmar que você tem 18 anos ou mais.')}</p>
-      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      {status.locked ? (
-        <p className="muted">
-          {t('Pela data cadastrada, você ainda não tem 18 anos, então não dá para trocá-la por aqui. Se foi um erro de digitação,')}{' '}
-          {support ? <a href={support}>fale com o suporte</a> : 'fale com o suporte'}.
-        </p>
-      ) : (
-        <form className="form form--flat" onSubmit={save} noValidate>
-          <Field label={t('Data de nascimento')} type="date" value={birth} onChange={setBirth} error={error} max={todayIso()} autoComplete="bday" hint={status.declared ? undefined : t('Você ainda não informou. Precisamos dela para confirmar que você tem 18 anos ou mais.')} />
-          <div>
-            <Button type="submit" variant="secondary" loading={saving}>
-              {t('Atualizar data')}
-            </Button>
-          </div>
-        </form>
-      )}
-    </section>
   );
 }
 
@@ -528,7 +535,7 @@ const FAQ: { q: string; a: string }[] = [
   { q: t('Como posto um evento no meu perfil?'), a: t('Abra o evento em Explorar, toque em Compartilhar e escolha Postar no meu perfil. Para tirar, use o mesmo botão ou Tirar do perfil na grade.') },
   { q: t('Como compartilho um evento?'), a: t('No evento, toque em Compartilhar: poste no perfil, envie numa conversa ou copie o link para mandar fora do app, por exemplo no WhatsApp.') },
   { q: t('Como marco um encontro?'), a: t('No evento, toque em Criar encontro e escolha quem convidar. Quem aceitar vê o encontro na Agenda.') },
-  { q: t('O que é o Flash?'), a: t('É o botão para avisar seus amigos que você está livre agora. Quem também estiver livre pode te chamar, e a conversa abre na hora. Ele fica na barra de baixo.') },
+  { q: t('O que é o NOW?'), a: t('É o botão para avisar seus amigos que você está livre agora. Quem também estiver livre pode te chamar, e a conversa abre na hora. Ele fica na barra de baixo.') },
   { q: t('Onde ficam minhas conversas?'), a: t('No ícone de balão, no topo da tela. Um número mostra quantas conversas têm mensagem nova.') },
   { q: t('Para que serve a Agenda?'), a: t('Ela mostra os eventos em que você confirmou presença e os encontros marcados. Você também pode marcar quando está livre. Só você vê.') },
   { q: t('Os eventos de exemplo são reais?'), a: t('Não. Eventos marcados como Exemplo de teste existem só para testar o app.') },
@@ -600,6 +607,7 @@ export function FriendsScreen() {
   return (
     <>
       <PageHead title={t('Amigos')} back="/perfil" subtitle={t('Pessoas que seguem você e que você segue')} action={<Link to="/amigos/contatos">{t('Achar nos contatos')}</Link>} />
+      <ConnectContactsCard />
       <Button full variant="secondary" onClick={() => setInviting(true)}>
         {t('Convidar amigos para o AskouT')}
       </Button>

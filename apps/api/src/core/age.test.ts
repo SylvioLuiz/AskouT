@@ -12,12 +12,12 @@ test('ageOn: o aniversário conta no próprio dia', () => {
   assert.equal(ageOn('lixo', now), -1);
 });
 
-test('Conta antiga, sem data de nascimento: Flash funciona (a idade mínima vale no cadastro) e a data ainda pode ser informada uma vez', async () => {
+test('Conta antiga, sem data de nascimento: NOW funciona (a idade mínima vale no cadastro) e a data ainda pode ser informada uma vez', async () => {
   const w = makeWorld();
   const ana = (await w.signUp('ana')).user.id;
   w.users.users.set(ana, { ...w.users.users.get(ana)!, birthDate: null });
   assert.deepEqual(await w.core.age.status(ana), { declared: false, adult: false, birthDate: null, locked: false });
-  assert.equal((await w.core.flash.turnOn(ana, { hours: 1 })).active, true, 'sem trava de idade no Flash');
+  assert.equal((await w.core.flash.turnOn(ana, { hours: 1 })).active, true, 'sem trava de idade no NOW');
   // Informa a data uma vez.
   assert.deepEqual(await w.core.age.declare(ana, { birthDate: '1990-05-10' }), { declared: true, adult: true, birthDate: '1990-05-10', locked: false });
   await rejectsWith(w.core.age.declare(ana, { birthDate: '1991-05-10' }), 'CONFLICT');

@@ -110,9 +110,10 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
   const [muted, setMuted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
-  const [progress, setProgress] = useState(0);
   const [reporting, setReporting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fillRef = useRef<HTMLSpanElement>(null);
+  const spentRef = useRef(0);
   const group = groups[pos.group];
   const item = group?.items[pos.item];
 
@@ -124,18 +125,40 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
 
-  // Foto: passa sozinha; o relógio recomeça a cada story.
+  // O relógio recomeça a cada story.
   useEffect(() => {
-    setProgress(0);
+    spentRef.current = 0;
     setError(undefined);
-    if (!item || item.kind !== 'IMAGE' || reporting) return;
-    const startedAt = Date.now();
-    const timer = window.setInterval(() => {
-      const spent = Date.now() - startedAt;
-      setProgress(Math.min(1, spent / STORY_PHOTO_MS));
-      if (spent >= STORY_PHOTO_MS) advanceRef.current();
-    }, 100);
-    return () => window.clearInterval(timer);
+  }, [item?.id]);
+
+  // Barra de progresso a cada quadro, direto no elemento (sem re-render): anda lisa, sem pulos.
+  // Foto passa sozinha e pausa enquanto a denúncia está aberta; vídeo segue o tempo do próprio vídeo.
+  useEffect(() => {
+    if (!item || reporting) return;
+    let frame = 0;
+    let last = performance.now();
+    const paint = (ratio: number) => {
+      if (fillRef.current) fillRef.current.style.transform = `scaleX(${ratio})`;
+    };
+    const tick = (now: number) => {
+      if (item.kind === 'IMAGE') {
+        // Limita o salto para a aba escondida não pular o story inteiro ao voltar.
+        spentRef.current += Math.min(now - last, 100);
+        last = now;
+        const ratio = Math.min(1, spentRef.current / STORY_PHOTO_MS);
+        paint(ratio);
+        if (ratio >= 1) {
+          advanceRef.current();
+          return;
+        }
+      } else {
+        const video = videoRef.current;
+        paint(video && video.duration > 0 ? Math.min(1, video.currentTime / video.duration) : 0);
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
   }, [item?.id, reporting]);
 
   useEffect(() => {
@@ -175,7 +198,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
       <div className="storyview__bars" aria-hidden="true">
         {group.items.map((it, index) => (
           <span key={it.id} className="storyview__bar">
-            <span className="storyview__fill" style={{ width: index < pos.item ? '100%' : index === pos.item ? `${Math.round((item.kind === 'IMAGE' ? progress : 0) * 100)}%` : '0%' }} />
+            <span ref={index === pos.item ? fillRef : undefined} className="storyview__fill" style={{ transform: index < pos.item ? 'scaleX(1)' : 'scaleX(0)' }} />
           </span>
         ))}
       </div>
@@ -219,7 +242,6 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
             autoPlay
             playsInline
             muted={muted}
-            onTimeUpdate={(event) => setProgress(event.currentTarget.duration > 0 ? event.currentTarget.currentTime / event.currentTarget.duration : 0)}
             onEnded={advance}
             onError={() => setError(t('Não foi possível abrir este vídeo.'))}
           />

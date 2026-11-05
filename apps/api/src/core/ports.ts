@@ -1,4 +1,4 @@
-import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -12,6 +12,10 @@ export interface UserRepository {
   findByEmail(email: string): Promise<User | undefined>;
   /** Contas ativas cujo e-mail (minúsculo, UTF-8) tem esse SHA-256 em hexadecimal. Para achar amigos nos contatos sem receber e-mails em claro. */
   findIdsByEmailHashes(hashes: string[]): Promise<string[]>;
+  /** Contas ativas cujo celular (E.164) tem esse SHA-256 em hexadecimal. */
+  findIdsByPhoneHashes(hashes: string[]): Promise<string[]>;
+  /** Guarda (ou, com `null`, apaga) o celular. Lança DomainError CONFLICT se outra conta já usa o número. */
+  setPhone(userId: string, phone: string | null): Promise<void>;
   /** Registra a denúncia de um perfil ou comentário. Denunciar a mesma coisa de novo atualiza a denúncia anterior. */
   addReport(report: UserReportRecord): Promise<void>;
   /** Guarda a data de nascimento (AAAA-MM-DD) só se ainda não houver uma. Devolve false se já existia. */
@@ -234,6 +238,8 @@ export interface FlashRepository {
   createSession(session: FlashSessionRecord, now: Date): Promise<void>;
   /** Encerra a sessão ativa da pessoa. Retorna se havia uma. */
   endSession(userId: string, now: Date): Promise<boolean>;
+  /** Troca o fim da sessão ativa da pessoa. Retorna se havia uma. */
+  extendSession(userId: string, now: Date, expiresAt: Date): Promise<boolean>;
 
   /** Insere o convite. CONFLICT se já há um aberto (pendente ou aceito, não expirado) entre os dois, em qualquer sentido. */
   createInvite(invite: FlashInviteRecord, now: Date): Promise<void>;
@@ -503,6 +509,11 @@ export interface PlaceRepository {
   isFollowingVenue(userId: string, venueId: string): Promise<boolean>;
   countVenueFollowers(venueId: string): Promise<number>;
   listFollowedVenueIds(userId: string): Promise<string[]>;
+  /** Liga ou desliga o sininho de quem já segue. false se a pessoa não segue o local. */
+  setVenueNotify(userId: string, venueId: string, notify: boolean): Promise<boolean>;
+  isVenueNotifyOn(userId: string, venueId: string): Promise<boolean>;
+  /** Quem segue com o sininho ligado (recebe aviso de cada evento novo). */
+  listVenueNotifyFollowers(venueId: string): Promise<string[]>;
   /** Nota de 1 a 5 do local: uma por pessoa; avaliar de novo troca a nota. */
   rateVenue(userId: string, venueId: string, stars: number, at: Date): Promise<void>;
   clearVenueRating(userId: string, venueId: string): Promise<void>;
@@ -746,6 +757,10 @@ export interface EventRoomRepository {
   reportStory(report: EventStoryReportRecord): Promise<boolean>;
   /** Destes stories, quais `userId` já denunciou (ele não os vê mais). */
   reportedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>>;
+  /** Grava a ocultação de stories de `ownerId` em relação a `otherId`; tudo desligado apaga a linha. */
+  setStoryHidden(record: StoryHiddenRecord): Promise<void>;
+  /** As ocultações de stories em que `userId` aparece (as que ele escolheu e as que escolheram sobre ele). */
+  listStoryHidden(userId: string): Promise<StoryHiddenRecord[]>;
   /** Liga/desliga a publicação aberta. Só o dono. Devolve false se o evento não existe ou é de outra pessoa. */
   setPostsPublic(postId: string, ownerId: string, value: boolean): Promise<boolean>;
 }

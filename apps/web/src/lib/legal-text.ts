@@ -35,7 +35,7 @@ export function buildPrivacy(email: string): LegalDoc {
           'Data de nascimento: pedida no cadastro, para conferir a idade mínima (18 anos). Não aparece para outras pessoas. Você pode corrigi-la em Editar perfil (quem consta como menor de 18 anos fala com o suporte). Também guardamos o dia e a versão dos Termos que você aceitou ao criar a conta.',
           'Perfil e conteúdo: foto de perfil, posts, fotos, vídeos, eventos que você posta, comentários, curtidas e mensagens das conversas e grupos.',
           'Relações: quem você segue, quem segue você, quem você bloqueou e as pessoas que você aprova no perfil privado. Dois perfis que se seguem mutuamente são "amigos" no AskouT.',
-          'Agenda e planos: os dias e horários em que você marca que pode sair, os modos "Flash" (disponibilidade temporária), enquetes de data e presença em eventos.',
+          'Agenda e planos: os dias e horários em que você marca que pode sair, os modos "NOW" (disponibilidade temporária), enquetes de data e presença em eventos.',
           'Localização: só quando você permite. No Explorar e no mapa, usamos a posição do aparelho para achar locais e eventos perto e não guardamos essa posição. Em "Minha região" (opcional), guardamos uma coordenada arredondada (cerca de 1 km) para anúncios por região. Você pode apagá-la a qualquer momento.',
           'Uso para recomendações: quanto tempo você fica em cada conteúdo e se abriu links, para montar o bloco "Para você". Isso pode ser desligado, e ao desligar apagamos o histórico medido.',
           'Avisos: se você ativar notificações, guardamos o endereço técnico de envio do seu navegador ou aparelho.',
@@ -81,7 +81,7 @@ export function buildPrivacy(email: string): LegalDoc {
         title: '7. Por quanto tempo guardamos',
         items: [
           'Os dados da conta e do conteúdo ficam enquanto a conta existir, ou até você apagar o conteúdo.',
-          'Códigos de confirmação expiram em poucos minutos. Disponibilidade "Flash" some sozinha ao expirar.',
+          'Códigos de confirmação expiram em poucos minutos. Disponibilidade "NOW" some sozinha ao expirar.',
           'O histórico de tempo por conteúdo e a região podem ser apagados por você a qualquer momento em Privacidade.',
           'Podemos manter o mínimo necessário por mais tempo quando a lei exigir (por exemplo, registros fiscais de pagamentos) ou para defesa em processos.',
         ],

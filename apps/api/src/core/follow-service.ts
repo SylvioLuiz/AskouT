@@ -5,6 +5,16 @@ import type { Direction, FollowStatus, Page, Profile, PublicProfile } from './ty
 import { MAX_PAGE_LIMIT, normalizePage, toPublicProfile } from './types.ts';
 
 const CONTACT_HASHES_MAX = 500;
+/** Celulares da agenda: o app do celular lê a agenda inteira, então cabe mais. */
+const CONTACT_PHONE_HASHES_MAX = 3000;
+
+/** Códigos SHA-256 (hex), em minúsculas e sem repetir. */
+function cleanHashes(value: unknown, field: string, max: number): string[] {
+  if (!Array.isArray(value) || value.length > max) throw validationError('Contatos inválidos', { [field]: `Envie até ${max} contatos` });
+  const clean = [...new Set(value.map((h) => (typeof h === 'string' ? h.toLowerCase() : '')))];
+  if (clean.some((h) => !/^[0-9a-f]{64}$/.test(h))) throw validationError('Contatos inválidos', { [field]: 'Formato inválido' });
+  return clean;
+}
 
 export interface FollowResult {
   status: FollowStatus;
@@ -135,12 +145,12 @@ export class FollowService {
    * Amigos nos contatos: o app manda só o SHA-256 (hex) do e-mail em minúsculas de cada contato; o servidor não recebe nem guarda e-mails em claro.
    * Devolve quem tem conta, menos você, quem você já segue e quem tem bloqueio com você.
    */
-  async contactMatches(actorId: string, hashes: unknown): Promise<{ items: PublicProfile[] }> {
-    if (!Array.isArray(hashes) || hashes.length > CONTACT_HASHES_MAX) throw validationError('Contatos inválidos', { hashes: `Envie até ${CONTACT_HASHES_MAX} contatos` });
-    const clean = [...new Set(hashes.map((h) => (typeof h === 'string' ? h.toLowerCase() : '')))];
-    if (clean.some((h) => !/^[0-9a-f]{64}$/.test(h))) throw validationError('Contatos inválidos', { hashes: 'Formato inválido' });
+  async contactMatches(actorId: string, hashes: unknown, phoneHashes: unknown = []): Promise<{ items: PublicProfile[] }> {
+    const clean = cleanHashes(hashes, 'hashes', CONTACT_HASHES_MAX);
+    const phones = cleanHashes(phoneHashes ?? [], 'phoneHashes', CONTACT_PHONE_HASHES_MAX);
     const { users, blocks } = this.deps;
-    const [ids, related, followed] = await Promise.all([users.findIdsByEmailHashes(clean), blocks.listRelatedIds(actorId), this.followedIds(actorId)]);
+    const [byEmail, byPhone, related, followed] = await Promise.all([users.findIdsByEmailHashes(clean), users.findIdsByPhoneHashes(phones), blocks.listRelatedIds(actorId), this.followedIds(actorId)]);
+    const ids = [...new Set([...byEmail, ...byPhone])];
     const hidden = new Set([actorId, ...related, ...followed]);
     const profiles = await users.findProfilesByIds(ids.filter((id) => !hidden.has(id)));
     return { items: profiles.map(toPublicProfile).sort((a, b) => a.username.localeCompare(b.username, 'pt-BR') || a.userId.localeCompare(b.userId)) };

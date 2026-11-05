@@ -165,6 +165,14 @@ export interface BestDatesInput {
 // ---------- Flash ----------
 
 /** Escolhas minhas sobre o Flash entre mim e uma pessoa. */
+/** Ocultação de stories com uma pessoa (mesma ideia do Flash). */
+export interface StoryVisibility {
+  /** Eu não vejo os stories dela. */
+  hideTheirs: boolean;
+  /** Ela não vê os meus stories. */
+  hideMine: boolean;
+}
+
 export interface FlashVisibility {
   /** Eu não vejo o Flash dela. */
   hideTheirs: boolean;
@@ -187,6 +195,16 @@ export interface FlashInvite {
   other: PublicProfile;
   createdAt: string;
   expiresAt: string;
+}
+
+/** Ordem de "Livres agora": quem está mais perto ou com quem você mais interage. */
+export type AvailableOrder = 'near' | 'interaction';
+
+export interface AvailableList {
+  items: AvailableFriend[];
+  order: AvailableOrder;
+  /** Você ligou o NOW com localização (dá para ordenar por distância). */
+  nearAvailable: boolean;
 }
 
 export interface AvailableFriend {
@@ -287,7 +305,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT';
 
 export interface NotificationItem {
   id: string;
@@ -759,6 +777,27 @@ export interface VenueSummary {
   address: string | null;
   category: string | null;
   sample: boolean;
+  /** Organização da faculdade (bateria, atlética...) em vez de estabelecimento. */
+  organization?: boolean;
+}
+
+/** Pedido para criar a página de uma organização da faculdade. */
+export interface OrganizationRequestBody {
+  name: string;
+  type?: string;
+  campus: string;
+  description?: string;
+  lat: number;
+  lng: number;
+  document: string;
+  note?: string;
+}
+
+/** Seguir + sininho (aviso de cada evento novo). */
+export interface VenueBell {
+  following: boolean;
+  notify: boolean;
+  followerCount: number;
 }
 
 export interface ClaimableVenue extends VenueSummary {
@@ -865,6 +904,10 @@ export interface VenueProfile {
   claimed: boolean;
   isOwner: boolean;
   following: boolean;
+  /** Sininho ligado: recebe aviso de cada evento novo. */
+  notify?: boolean;
+  /** Organização da faculdade (bateria, atlética...). */
+  organization?: boolean;
   followerCount: number;
   rating: VenueRating;
   upcomingEvents: VenueEvent[];

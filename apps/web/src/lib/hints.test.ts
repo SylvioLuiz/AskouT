@@ -16,7 +16,7 @@ describe('dica do primeiro Seguir', () => {
 
 import { FLASH_PRIVACY_POINTS, flashNoticeSeen, markFlashNoticeSeen } from './hints.ts';
 
-describe('aviso de privacidade do Flash', () => {
+describe('aviso de privacidade do NOW', () => {
   it('lembra depois de visto', () => {
     const data = new Map<string, string>();
     const s = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) };

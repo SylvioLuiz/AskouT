@@ -137,7 +137,7 @@ export class AdminService {
       if (!venue || !profile) continue;
       out.push({
         id: c.id, status: c.status, note: c.note, documentMime: c.documentMime, reviewNote: c.reviewNote, createdAt: c.createdAt, reviewedAt: c.reviewedAt,
-        venue: { id: venue.id, name: venue.name, address: venue.address, isSample: venue.isSample, ownerId: venue.ownerId ?? null },
+        venue: { id: venue.id, name: venue.name, address: venue.address, isSample: venue.isSample, ownerId: venue.ownerId ?? null, isOrganization: venue.isOrganization === true, category: venue.category, description: venue.description ?? null },
         user: { id: c.userId, username: profile.username, displayName: profile.displayName, email: user?.email ?? '' },
       });
     }

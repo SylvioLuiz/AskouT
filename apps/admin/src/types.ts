@@ -47,7 +47,7 @@ export interface Claim {
   reviewNote: string | null;
   createdAt: string;
   reviewedAt: string | null;
-  venue: { id: string; name: string; address: string | null; isSample: boolean; ownerId: string | null };
+  venue: { id: string; name: string; address: string | null; isSample: boolean; ownerId: string | null; isOrganization?: boolean; category?: string | null; description?: string | null };
   user: { id: string; username: string; displayName: string; email: string };
 }
 

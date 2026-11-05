@@ -4,7 +4,7 @@ import { distanceMeters } from './geo.ts';
 import { DomainError, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
-import type { EventKind, EventRef, EventStoryMeta, PostReportReason, PublicProfile } from './types.ts';
+import type { EventKind, EventRef, EventStoryMeta, PostReportReason, PublicProfile, StoryHiddenRecord } from './types.ts';
 import { POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
 export const EVENT_POST_CAPTION_MAX = 500;
@@ -13,6 +13,24 @@ export const EVENT_POST_IMAGE_MAX_BYTES = 100 * 1024;
 /** Quantos posts e quantos avatares a página traz de uma vez. */
 export const EVENT_POSTS_LIMIT = 30;
 export const EVENT_ATTENDEES_LIMIT = 60;
+/** Como os stories estão ocultos entre mim e uma pessoa (só o que eu mesmo escolhi). */
+export interface StoryVisibilityView {
+  /** Eu não vejo os stories dela. */
+  hideTheirs: boolean;
+  /** Ela não vê os meus stories. */
+  hideMine: boolean;
+}
+
+/** Quem `userId` não enxerga nos stories: quem ele ocultou e quem escondeu os stories dele. */
+function storiesUnseenBy(userId: string, rows: StoryHiddenRecord[]): Set<string> {
+  const out = new Set<string>();
+  for (const r of rows) {
+    if (r.ownerId === userId && r.hideTheirs) out.add(r.otherId);
+    if (r.otherId === userId && r.hideMine) out.add(r.ownerId);
+  }
+  return out;
+}
+
 /** Quanto tempo um story fica no ar (ou até o fim do evento, o que vier primeiro). */
 export const EVENT_STORY_HOURS = 24;
 /** Quantos stories no ar uma pessoa pode ter no mesmo evento. */
@@ -393,9 +411,13 @@ export class EventPageService {
     return { deleted: true };
   }
 
-  /** Os stories no ar que `viewerId` pode ver: sem quem tem bloqueio com ele e sem os que ele denunciou. */
+  /**
+   * Os stories no ar que `viewerId` pode ver: sem quem tem bloqueio com ele, sem os que ele denunciou
+   * e sem os de quem ele ocultou (ou que esconderam os stories dele).
+   */
   private async visibleStories(viewerId: string, ref: EventRef, hidden: Set<string>): Promise<EventStoryMeta[]> {
-    const rows = (await this.deps.eventRoom.listStories(ref, this.deps.clock.now())).filter((s) => s.userId === viewerId || !hidden.has(s.userId));
+    const unseen = storiesUnseenBy(viewerId, await this.deps.eventRoom.listStoryHidden(viewerId));
+    const rows = (await this.deps.eventRoom.listStories(ref, this.deps.clock.now())).filter((s) => s.userId === viewerId || (!hidden.has(s.userId) && !unseen.has(s.userId)));
     const reported = await this.deps.eventRoom.reportedStoryIds(viewerId, rows.map((r) => r.id));
     return rows.filter((r) => !reported.has(r.id));
   }
@@ -433,10 +455,12 @@ export class EventPageService {
 
   /**
    * Página inicial: os stories que você e seus amigos (seguimento mútuo) escolheram publicar também no perfil.
-   * Os seus primeiro; depois quem publicou por último. Sem bloqueados e sem os que você denunciou.
+   * Os seus primeiro; depois quem publicou por último. Sem bloqueados, sem os que você denunciou
+   * e sem quem você ocultou (ou que escondeu os stories de você).
    */
   async profileStories(viewerId: string): Promise<ProfileStoryGroupView[]> {
     const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
+    for (const id of storiesUnseenBy(viewerId, await this.deps.eventRoom.listStoryHidden(viewerId))) hidden.add(id);
     const friends = (await this.deps.follows.listFriendIds(viewerId)).filter((id) => !hidden.has(id));
     const all = await this.deps.eventRoom.listProfileStories([viewerId, ...friends], this.deps.clock.now());
     const reported = await this.deps.eventRoom.reportedStoryIds(viewerId, all.map((r) => r.id));
@@ -492,9 +516,38 @@ export class EventPageService {
       story !== undefined &&
       story.onProfile === true &&
       story.expiresAt.getTime() > this.deps.clock.now().getTime() &&
-      (story.userId === viewerId || ((await this.deps.follows.listFriendIds(viewerId)).includes(story.userId) && !(await this.deps.blocks.existsEitherWay(viewerId, story.userId))));
+      (story.userId === viewerId ||
+        ((await this.deps.follows.listFriendIds(viewerId)).includes(story.userId) &&
+          !(await this.deps.blocks.existsEitherWay(viewerId, story.userId)) &&
+          !storiesUnseenBy(viewerId, await this.deps.eventRoom.listStoryHidden(viewerId)).has(story.userId)));
     if (!visible) throw notFound('Story não encontrado');
     return story;
+  }
+
+  /** Como os stories estão ocultos entre mim e essa pessoa (só o que eu mesmo escolhi). */
+  async storyVisibility(actorId: string, otherId: string): Promise<StoryVisibilityView> {
+    const row = (await this.deps.eventRoom.listStoryHidden(actorId)).find((r) => r.ownerId === actorId && r.otherId === otherId);
+    return { hideTheirs: row?.hideTheirs ?? false, hideMine: row?.hideMine ?? false };
+  }
+
+  /**
+   * `hideTheirs`: eu deixo de ver os stories dela. `hideMine`: ela deixa de ver os meus.
+   * Vale na página inicial e nos stories dos eventos. Só o que vier no pedido muda.
+   */
+  async setStoryVisibility(actorId: string, otherId: string, input: { hideTheirs?: unknown; hideMine?: unknown }): Promise<StoryVisibilityView> {
+    if (actorId === otherId) throw validationError('Você não pode ocultar seus stories de si mesmo');
+    for (const key of ['hideTheirs', 'hideMine'] as const) {
+      if (input[key] !== undefined && typeof input[key] !== 'boolean') throw validationError('Confira os dados', { [key]: 'Use verdadeiro ou falso' });
+    }
+    const [other] = await this.deps.users.findProfilesByIds([otherId]);
+    if (!other) throw notFound('Pessoa não encontrada');
+    const current = await this.storyVisibility(actorId, otherId);
+    const next: StoryVisibilityView = {
+      hideTheirs: typeof input.hideTheirs === 'boolean' ? input.hideTheirs : current.hideTheirs,
+      hideMine: typeof input.hideMine === 'boolean' ? input.hideMine : current.hideMine,
+    };
+    await this.deps.eventRoom.setStoryHidden({ ownerId: actorId, otherId, ...next });
+    return next;
   }
 
   /** Apaga, pela página inicial, um story seu (some do evento também). */

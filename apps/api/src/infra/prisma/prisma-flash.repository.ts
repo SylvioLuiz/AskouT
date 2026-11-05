@@ -7,7 +7,7 @@ import { isUuid, onlyUuids } from './helpers.ts';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const OPEN: FlashInviteRecord['status'][] = ['PENDING', 'ACCEPTED'];
 
-type SessionRow = { id: string; userId: string; startsAt: Date; expiresAt: Date; endedAt: Date | null; note: string | null };
+type SessionRow = { id: string; userId: string; startsAt: Date; expiresAt: Date; endedAt: Date | null; note: string | null; areaLat?: number | null; areaLng?: number | null };
 type InviteRow = {
   id: string;
   fromUserId: string;
@@ -32,6 +32,7 @@ const toSession = (r: SessionRow): FlashSessionRecord => ({
   expiresAt: r.expiresAt,
   endedAt: r.endedAt,
   note: r.note,
+  area: r.areaLat != null && r.areaLng != null ? { lat: r.areaLat, lng: r.areaLng } : null,
 });
 const toInvite = (r: InviteRow): FlashInviteRecord => ({
   id: r.id,
@@ -87,7 +88,7 @@ export class PrismaFlashRepository implements FlashRepository {
   }
 
   async createSession(session: FlashSessionRecord, now: Date): Promise<void> {
-    const message = 'Seu Flash já está ligado. Desligue para recomeçar.';
+    const message = 'Seu NOW já está ligado. Desligue para recomeçar.';
     try {
       await this.prisma.$transaction(
         async (tx: Prisma.TransactionClient) => {
@@ -103,6 +104,8 @@ export class PrismaFlashRepository implements FlashRepository {
               expiresAt: session.expiresAt,
               endedAt: null,
               note: session.note,
+              areaLat: session.area?.lat ?? null,
+              areaLng: session.area?.lng ?? null,
             },
           });
         },
@@ -114,11 +117,17 @@ export class PrismaFlashRepository implements FlashRepository {
     }
   }
 
+  async extendSession(userId: string, now: Date, expiresAt: Date): Promise<boolean> {
+    if (!isUuid(userId)) return false;
+    const result = await this.prisma.flashSession.updateMany({ where: { userId, endedAt: null, expiresAt: { gt: now } }, data: { expiresAt } });
+    return result.count > 0;
+  }
+
   async endSession(userId: string, now: Date): Promise<boolean> {
     if (!isUuid(userId)) return false;
     const result = await this.prisma.flashSession.updateMany({
       where: { userId, endedAt: null, expiresAt: { gt: now } },
-      data: { endedAt: now },
+      data: { endedAt: now, areaLat: null, areaLng: null },
     });
     return result.count > 0;
   }
@@ -293,6 +302,8 @@ export class PrismaFlashRepository implements FlashRepository {
 
       const positions = await tx.flashPosition.deleteMany({ where: { invite: { status: { not: 'ACCEPTED' } } } });
 
+      // A região aproximada só vale enquanto o NOW está ligado.
+      await tx.flashSession.updateMany({ where: { areaLat: { not: null }, OR: [{ endedAt: { not: null } }, { expiresAt: { lte: now } }] }, data: { areaLat: null, areaLng: null } });
       const oldSessions = await tx.flashSession.deleteMany({
         where: { OR: [{ endedAt: { lt: cutoff } }, { endedAt: null, expiresAt: { lt: cutoff } }] },
       });

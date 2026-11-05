@@ -39,7 +39,7 @@ interface FieldProps {
   error?: string | undefined;
   hint?: string;
   autoComplete?: string;
-  inputMode?: 'text' | 'numeric' | 'email' | 'url';
+  inputMode?: 'text' | 'numeric' | 'email' | 'url' | 'tel';
   prefix?: string;
   maxLength?: number;
   autoFocus?: boolean;
@@ -185,10 +185,10 @@ export function Avatar({ profile, size = 44 }: { profile: AvatarProfile; size?: 
   return (
     <span className="avatarflash" style={{ width: size, height: size }}>
       {face}
-      <span className="avatarflash__bolt" style={{ width: badge, height: badge }} title={t('Flash ligado')} aria-hidden="true">
+      <span className="avatarflash__bolt" style={{ width: badge, height: badge }} title={t('NOW ligado')} aria-hidden="true">
         <BoltIcon filled />
       </span>
-      <span className="visually-hidden">{t('Flash ligado')}</span>
+      <span className="visually-hidden">{t('NOW ligado')}</span>
     </span>
   );
 }

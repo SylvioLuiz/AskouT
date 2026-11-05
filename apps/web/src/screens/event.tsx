@@ -427,9 +427,17 @@ export function EventScreen({ eventId }: { eventId: string }) {
             {e.isOwner ? null : ended ? (
               <p className="muted">{t('Esse evento já terminou.')}</p>
             ) : (
-              <Button full variant={e.going ? 'secondary' : 'primary'} loading={goBusy} onClick={() => void toggleGoing()} aria-pressed={e.going}>
-                {e.going ? t('Eu vou ✓ (toque para cancelar)') : t('Eu vou')}
-              </Button>
+              // "Eu vou" e "Criar encontro" lado a lado quando os dois existem.
+              <div className="evgo">
+                <Button full variant={e.going ? 'secondary' : 'primary'} loading={goBusy} onClick={() => void toggleGoing()} aria-pressed={e.going}>
+                  {e.going ? t('Eu vou ✓ (toque para cancelar)') : t('Eu vou')}
+                </Button>
+                {e.source === 'PLACE' ? (
+                  <Button full variant="secondary" onClick={() => setPlanning(true)}>
+                    {MEETUP_ACTION_LABEL}
+                  </Button>
+                ) : null}
+              </div>
             )}
             {problem ? <Notice tone="error">{problem}</Notice> : null}
           </section>
@@ -464,7 +472,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
           {e.postsEnabled ? <EventPosts page={e} onChange={setFresh} /> : null}
 
           <div className="evactions">
-            {e.source === 'PLACE' && !ended ? (
+            {e.source === 'PLACE' && !ended && e.isOwner ? (
               <Button full variant="secondary" onClick={() => setPlanning(true)}>
                 {MEETUP_ACTION_LABEL}
               </Button>
