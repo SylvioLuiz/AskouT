@@ -315,6 +315,25 @@ function FlashContent() {
     </section>
   );
 
+  // Mostra no cartão do NOW se a localização está ligada (ela liga sozinha com o NOW).
+  const locationLine = (
+    <div className={`flashloc flashloc--${share.state.phase}`} role="status">
+      <LocationIcon />
+      {share.state.phase === 'sharing' ? (
+        <span>{t('Localização ligada. Só vê quem você aprovar.')}</span>
+      ) : share.state.phase === 'asking' ? (
+        <span>{t('Ligando sua localização…')}</span>
+      ) : (
+        <>
+          <span>{share.state.phase === 'error' ? share.state.message : t('Localização desligada.')}</span>
+          <button type="button" className="flashloc__btn" onClick={share.start}>
+            {share.state.phase === 'error' ? t('Tentar de novo') : t('Ligar')}
+          </button>
+        </>
+      )}
+    </div>
+  );
+
   const receivedBlock =
     received.length > 0 ? (
       <section className="section" aria-labelledby="recebidos-titulo">
@@ -399,6 +418,7 @@ function FlashContent() {
           </div>
           {status.data?.expiresAt ? <FlashBar startsAt={status.data.startsAt} expiresAt={status.data.expiresAt} /> : null}
           {status.data?.note ? <p className="flashcard__note">“{status.data.note}”</p> : null}
+          {locationLine}
           {confirmOff ? (
             <Confirm question={t('Desligar o NOW? Convites abertos e encontros em andamento serão encerrados.')} confirmLabel={t('Desligar')} onConfirm={turnOff} onCancel={() => setConfirmOff(false)} busy={busy} danger />
           ) : (
@@ -998,7 +1018,7 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void, aut
     setState({ phase: 'idle' });
   }
 
-  function start() {
+  function start(highAccuracy = true) {
     stoppedByUser.current = false;
     if (!('geolocation' in navigator)) {
       setState({ phase: 'error', message: geolocationMessage(undefined, window.isSecureContext) });
@@ -1029,9 +1049,14 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void, aut
       (failure) => {
         if (watchId.current !== undefined) navigator.geolocation.clearWatch(watchId.current);
         watchId.current = undefined;
+        // Computador sem GPS costuma estourar o tempo no modo preciso: tenta de novo no modo comum (Wi-Fi/rede).
+        if (highAccuracy && failure.code !== 1) {
+          start(false);
+          return;
+        }
         setState({ phase: 'error', message: geolocationMessage(failure.code, true) });
       },
-      { enableHighAccuracy: true, maximumAge: 5_000, timeout: 20_000 },
+      { enableHighAccuracy: highAccuracy, maximumAge: highAccuracy ? 5_000 : 60_000, timeout: 20_000 },
     );
   }
 
@@ -1058,7 +1083,7 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void, aut
     [],
   );
 
-  return { state, mine, start, stop };
+  return { state, mine, start: () => start(), stop };
 }
 
 export function MatchScreen({ inviteId }: { inviteId: string }) {

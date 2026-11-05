@@ -4277,6 +4277,13 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .flashbar { height: 11px; overflow: hidden; border-radius: 999px; background: var(--line-strong); }
 .flashbar__fill { display: block; height: 100%; border-radius: 999px; background: var(--brand-grad, var(--brand)); transition: width 1s linear; }
 .flashcard__note { margin: 0; color: var(--ink-2); font-size: 0.9375rem; }
+/* Localização do NOW no cartão: liga sozinha; mostra se está ligada ou por que não. */
+.flashloc { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--ink-2); font-size: 0.875rem; line-height: 1.3; }
+.flashloc svg { flex: none; width: 18px; height: 18px; color: var(--muted); }
+.flashloc--sharing svg { color: var(--ok); }
+.flashloc--error { color: var(--danger); }
+.flashloc > span { flex: 1; min-width: 0; }
+.flashloc__btn { flex: none; min-height: 32px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
 .flashcard__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .flashcard__visible { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 0.875rem; line-height: 1.2; }
 .flashcard__visible svg { flex: none; width: 24px; height: 24px; color: var(--brand-text); }
