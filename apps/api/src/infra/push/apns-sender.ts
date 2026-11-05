@@ -164,9 +164,12 @@ export class ApnsSender implements PushSender {
       } catch {
         reason = '';
       }
+      // Sem isto a falha some: o motivo que a Apple devolve é o que diz por que o aviso não chegou (nunca registramos o token inteiro).
+      console.warn(`[apns] aviso recusado: status ${response.status}, motivo ${reason || 'desconhecido'}, aparelho …${deviceToken.slice(-6)}, ${this.config.production ? 'produção' : 'sandbox'}`);
       if (response.status === 410 || GONE_REASONS.has(reason)) return 'GONE';
       return 'FAILED';
-    } catch {
+    } catch (e) {
+      console.warn(`[apns] falha ao falar com a Apple: ${e instanceof Error ? e.message : String(e)}`);
       return 'FAILED';
     }
   }
