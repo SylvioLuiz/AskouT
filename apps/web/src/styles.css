@@ -4073,24 +4073,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .chat--bg::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(color-mix(in srgb, var(--bg) 35%, transparent), color-mix(in srgb, var(--bg) 35%, transparent)), var(--chat-bg) center / cover no-repeat; }
 .chatbgprev { width: 120px; height: 160px; object-fit: cover; border-radius: 16px; border: 1px solid var(--line); }
 
-/* Dentro da conversa o tema escuro mantém o azul (o degradê roxo-rosa fica para o resto do app). */
-:root[data-theme='dark'] .chat {
-  --brand: #4da3ff;
-  --brand-hover: #7ab8ff;
-  --brand-ink: #000000;
-  --brand-soft: #14304f;
-  --brand-grad: linear-gradient(90deg, #4da3ff, #4da3ff);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .chat {
-    --brand: #4da3ff;
-    --brand-hover: #7ab8ff;
-    --brand-ink: #000000;
-    --brand-soft: #14304f;
-    --brand-grad: linear-gradient(90deg, #4da3ff, #4da3ff);
-  }
-}
-
 /* Conversa: o topo do grupo/pessoa encosta no cabeçalho do app, sem faixa entre os dois (nem ao puxar a tela para baixo). */
 .chat { margin-top: -20px; }
 .chathead, .selectbar { top: calc(var(--topbar-h, 0px) - 1px); }
