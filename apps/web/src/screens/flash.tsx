@@ -1,3 +1,4 @@
+import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BoltIcon, CalendarIcon, ChatIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, RefreshIcon, ShieldIcon, UserPlusIcon, UsersIcon, BulbIcon } from '../components/icons.tsx';
 import { Sheet } from '../components/agenda.tsx';
@@ -952,10 +953,6 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void, aut
   return { state, mine, start, stop };
 }
 
-function osmLink(lat: number, lng: number): string {
-  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
-}
-
 export function MatchScreen({ inviteId }: { inviteId: string }) {
   useTitle(t('Encontro'));
   const match = useAsync(() => api.flashMatch(inviteId), [inviteId]);
@@ -1080,9 +1077,9 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
           </>
         )}
         {them ? (
-          <a className="whereis__link" href={osmLink(them.lat, them.lng)} target="_blank" rel="noopener noreferrer">
+          <OpenInMaps className="whereis__link" lat={them.lat} lng={them.lng}>
             {t('Abrir no mapa')}
-          </a>
+          </OpenInMaps>
         ) : null}
       </section>
 

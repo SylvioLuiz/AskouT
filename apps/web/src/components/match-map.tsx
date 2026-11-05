@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Map as GlMap, Marker } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { createMapEngine, type EngineMarker, type MapEngine, type MapLine } from './map-engine.ts';
 import { t } from '../lib/i18n/index.ts';
 
-// Mapa do encontro: OpenStreetMap (tiles raster) desenhado pelo MapLibre. Carregado sob demanda, só na tela
+// Mapa do encontro: Google Maps (ou MapLibre sem a chave, ver map-engine.ts). Carregado sob demanda, só na tela
 // do encontro, porque a biblioteca é grande. Os pins só existem aqui, depois do aceite do convite.
 
 export interface MapPin {
@@ -43,22 +42,6 @@ interface Props {
   onFail: () => void;
 }
 
-const STYLE = {
-  version: 8 as const,
-  sources: {
-    osm: {
-      type: 'raster' as const,
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [{ id: 'osm', type: 'raster' as const, source: 'osm' }],
-};
-
-type Lib = typeof import('maplibre-gl');
-
 function pinElement(className: string, text: string): HTMLDivElement {
   const el = document.createElement('div');
   el.className = className;
@@ -68,39 +51,24 @@ function pinElement(className: string, text: string): HTMLDivElement {
 
 export default function MatchMap({ me, others, places = [], selectedKey, onPick, destination, routes, onFail }: Props) {
   const box = useRef<HTMLDivElement>(null);
-  const live = useRef<{ map: GlMap; lib: Lib; me?: Marker; others: Map<string, Marker>; places: Map<string, Marker>; dest?: Marker; fitKey: string } | undefined>(undefined);
+  const live = useRef<{ map: MapEngine; me?: EngineMarker; others: Map<string, EngineMarker>; places: Map<string, EngineMarker>; dest?: EngineMarker; fitKey: string } | undefined>(undefined);
   const pickRef = useRef(onPick);
   pickRef.current = onPick;
   const failRef = useRef(onFail);
   failRef.current = onFail;
   const [ready, setReady] = useState(false);
-  const [styleReady, setStyleReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const lib = await import('maplibre-gl');
-        if (cancelled || !box.current) return;
-        const map = new lib.Map({
-          container: box.current,
-          style: STYLE,
-          center: [-46.6333, -23.5505],
-          zoom: 14,
-          attributionControl: { compact: true },
-        });
-        map.addControl(new lib.NavigationControl({ showCompass: false }), 'top-right');
-        live.current = { map, lib, others: new Map(), places: new Map(), fitKey: '' };
-        map.on('load', () => {
-          if (cancelled) return;
-          map.addSource('routes', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-          // As cores das rotas vêm dos mesmos tokens da legenda (você = marca, a outra pessoa = aviso).
-          const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-          const color = ['match', ['get', 'who'], 'me', css('--brand', 'blue'), css('--warn', 'orange')] as never;
-          map.addLayer({ id: 'routes-solid', type: 'line', source: 'routes', filter: ['!=', ['get', 'dashed'], true], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': color, 'line-width': 5, 'line-opacity': 0.85 } });
-          map.addLayer({ id: 'routes-dashed', type: 'line', source: 'routes', filter: ['==', ['get', 'dashed'], true], paint: { 'line-color': color, 'line-width': 4, 'line-dasharray': [2, 2], 'line-opacity': 0.85 } });
-          setStyleReady(true);
-        });
+        if (!box.current) return;
+        const map = await createMapEngine(box.current, { center: { lat: -23.5505, lng: -46.6333 }, zoom: 14, onFail: () => failRef.current() });
+        if (cancelled) {
+          map.destroy();
+          return;
+        }
+        live.current = { map, others: new Map(), places: new Map(), fitKey: '' };
         setReady(true);
       } catch {
         if (!cancelled) failRef.current();
@@ -108,7 +76,7 @@ export default function MatchMap({ me, others, places = [], selectedKey, onPick,
     })();
     return () => {
       cancelled = true;
-      live.current?.map.remove();
+      live.current?.map.destroy();
       live.current = undefined;
     };
   }, []);
@@ -116,14 +84,14 @@ export default function MatchMap({ me, others, places = [], selectedKey, onPick,
   useEffect(() => {
     const state = live.current;
     if (!ready || !state) return;
-    const { map, lib } = state;
+    const { map } = state;
 
     // Seu pin.
     if (!me) {
       state.me?.remove();
       state.me = undefined;
-    } else if (state.me) state.me.setLngLat([me.lng, me.lat]);
-    else state.me = new lib.Marker({ element: pinElement('pin pin--me', '') }).setLngLat([me.lng, me.lat]).addTo(map);
+    } else if (state.me) state.me.setPosition(me);
+    else state.me = map.addMarker(pinElement('pin pin--me', ''), me, 'center');
 
     // Um pin por pessoa que aceitou sair com você; some quando o encontro acaba.
     const wanted = new Set(others.map((o) => o.id));
@@ -135,12 +103,12 @@ export default function MatchMap({ me, others, places = [], selectedKey, onPick,
     }
     for (const other of others) {
       let marker = state.others.get(other.id);
-      if (marker) marker.setLngLat([other.lng, other.lat]);
+      if (marker) marker.setPosition(other);
       else {
-        marker = new lib.Marker({ element: pinElement('pin pin--them', other.initials) }).setLngLat([other.lng, other.lat]).addTo(map);
+        marker = map.addMarker(pinElement('pin pin--them', other.initials), other, 'center');
         state.others.set(other.id, marker);
       }
-      marker.getElement().classList.toggle('pin--stale', other.stale);
+      marker.element.classList.toggle('pin--stale', other.stale);
     }
 
     // Reenquadra só quando aparece ou some um pin, para não tirar o mapa do lugar enquanto a pessoa o move.
@@ -149,13 +117,8 @@ export default function MatchMap({ me, others, places = [], selectedKey, onPick,
       state.fitKey = fitKey;
       const points: MapPin[] = [...(me ? [me] : []), ...others];
       const first = points[0] as MapPin;
-      if (points.length === 1) {
-        map.easeTo({ center: [first.lng, first.lat], zoom: 16, duration: 0 });
-      } else {
-        const bounds = new lib.LngLatBounds([first.lng, first.lat], [first.lng, first.lat]);
-        for (const point of points) bounds.extend([point.lng, point.lat]);
-        map.fitBounds(bounds, { padding: 64, maxZoom: 17, duration: 0 });
-      }
+      if (points.length === 1) map.moveTo(first, { zoom: 16 });
+      else map.fit(points, 64, 17);
     }
   }, [ready, me, others]);
 
@@ -163,7 +126,7 @@ export default function MatchMap({ me, others, places = [], selectedKey, onPick,
   useEffect(() => {
     const state = live.current;
     if (!ready || !state) return;
-    const { map, lib } = state;
+    const { map } = state;
     const wanted = new Set(places.map((p) => p.key));
     for (const [key, marker] of state.places) {
       if (!wanted.has(key)) {
@@ -182,10 +145,10 @@ export default function MatchMap({ me, others, places = [], selectedKey, onPick,
           event.stopPropagation();
           pickRef.current?.(place.key);
         });
-        marker = new lib.Marker({ element: el }).setLngLat([place.lng, place.lat]).addTo(map);
+        marker = map.addMarker(el, place, 'center');
         state.places.set(place.key, marker);
       }
-      marker.getElement().classList.toggle('pin--selected', place.key === selectedKey);
+      marker.element.classList.toggle('pin--selected', place.key === selectedKey);
     });
   }, [ready, places, selectedKey]);
 
@@ -193,36 +156,36 @@ export default function MatchMap({ me, others, places = [], selectedKey, onPick,
   useEffect(() => {
     const state = live.current;
     if (!ready || !state) return;
-    const { map, lib } = state;
+    const { map } = state;
     if (!destination) {
       state.dest?.remove();
       state.dest = undefined;
       return;
     }
-    if (state.dest) state.dest.setLngLat([destination.lng, destination.lat]);
+    if (state.dest) state.dest.setPosition(destination);
     else {
       const el = pinElement('pin pin--dest', '★');
       el.setAttribute('aria-label', destination.name);
-      state.dest = new lib.Marker({ element: el }).setLngLat([destination.lng, destination.lat]).addTo(map);
+      state.dest = map.addMarker(el, destination, 'center');
     }
   }, [ready, destination]);
 
   // Rota de cada um até o lugar: trajeto de verdade, ou linha reta tracejada se não houver.
   useEffect(() => {
     const state = live.current;
-    if (!ready || !styleReady || !state) return;
-    const source = state.map.getSource('routes') as { setData(data: unknown): void } | undefined;
-    if (!source) return;
-    const features: unknown[] = [];
+    if (!ready || !state) return;
+    // As cores das rotas vêm dos mesmos tokens da legenda (você = marca, a outra pessoa = aviso).
+    const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+    const lines: MapLine[] = [];
     if (destination) {
       for (const [who, route] of [['me', routes?.me], ['them', routes?.them]] as const) {
         if (!route) continue;
-        const coordinates = route.line ?? [[route.from.lng, route.from.lat], [destination.lng, destination.lat]];
-        features.push({ type: 'Feature', properties: { who, dashed: route.line === null }, geometry: { type: 'LineString', coordinates } });
+        const points = route.line ? route.line.map(([lng, lat]) => ({ lat, lng })) : [route.from, destination];
+        lines.push({ points, color: who === 'me' ? css('--brand', 'blue') : css('--warn', 'orange'), dashed: route.line === null });
       }
     }
-    source.setData({ type: 'FeatureCollection', features });
-  }, [ready, styleReady, destination, routes]);
+    state.map.setLines(lines);
+  }, [ready, destination, routes]);
 
   // Ao escolher o lugar, enquadra os dois e o destino.
   useEffect(() => {
@@ -232,9 +195,7 @@ export default function MatchMap({ me, others, places = [], selectedKey, onPick,
     if (state.fitKey.endsWith(`>${key}`)) return;
     state.fitKey = `${state.fitKey.split('>')[0] ?? ''}>${key}`;
     const points: MapPin[] = [destination, ...(me ? [me] : []), ...others];
-    const bounds = new state.lib.LngLatBounds([destination.lng, destination.lat], [destination.lng, destination.lat]);
-    for (const point of points) bounds.extend([point.lng, point.lat]);
-    state.map.fitBounds(bounds, { padding: 64, maxZoom: 17, duration: 400 });
+    state.map.fit(points, 64, 17, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, destination]);
 

@@ -59,3 +59,12 @@ O primeiro produto de compra precisa ser enviado junto com a primeira versão do
 - **Verificação de compra:** o servidor confere a transação assinada do StoreKit 2 (cadeia de certificados até a raiz da Apple, bundle id, produto e devolução) quando `APPLE_APP_ID` está definido. Nunca foi testada com uma transação real da Apple, só com uma cadeia de teste: faça uma compra Sandbox antes de abrir ao público. O Google Play ainda não é conferido.
 - **Push, agenda do celular e cancelamento de otimização de vídeo** ainda não existem no app nativo (ver GOLIVE.md).
 - Teste de compra: usar uma conta "Sandbox tester" criada em App Store Connect → Users and Access → Sandbox.
+
+## 7. Enviar ao TestFlight sem Mac (GitHub Actions)
+O fluxo `.github/workflows/ios-testflight.yml` gera e envia o build num Mac do GitHub. Nunca envia para revisão da loja.
+
+Configuração (uma vez):
+1. App Store Connect → Users and Access → Integrations → App Store Connect API → **Generate API Key** com acesso **Admin** (precisa ser Admin para o Xcode criar o certificado de distribuição sozinho). Baixar o `.p8` (só baixa uma vez) e anotar o **Key ID** e o **Issuer ID**.
+2. GitHub → repositório → Settings → Secrets and variables → Actions → New repository secret: `ASC_KEY_ID`, `ASC_ISSUER_ID` e `ASC_KEY_P8` (abrir o `.p8` num editor de texto e colar o conteúdo inteiro, com as linhas BEGIN/END).
+
+Envio: automático a cada push na main (manda o que estiver na main). Também dá para rodar à mão em Actions → "iOS → TestFlight" → Run workflow. O número do build é 13 + o número da execução.

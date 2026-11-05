@@ -1,3 +1,4 @@
+import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
@@ -13,7 +14,7 @@ import { addRecent, buildSuggestions, readRecent, removeRecent, saveRecent } fro
 import { filterByThemes, readThemes, THEMES, themeOfCategory, themeOfEvent } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
-import { formatRating, formatWhen, mapLink, routeLink } from '../lib/chat.ts';
+import { formatRating, formatWhen, } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
 import {
   KINDS,
@@ -212,12 +213,12 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
           {following ? t('Seguindo') : t('Seguir')}
         </Button>
         <div className="placerow__actions">
-          <a className="btn btn--quiet btn--small" href={routeLink(place.lat, place.lng)} target="_blank" rel="noopener noreferrer">
+          <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={place.lat} lng={place.lng} label={place.name}>
             {t('Rota')}
-          </a>
-          <a className="btn btn--quiet btn--small" href={place.mapsUri ?? mapLink(place.lat, place.lng)} target="_blank" rel="noopener noreferrer">
+          </OpenInMaps>
+          <OpenInMaps className="btn btn--quiet btn--small" lat={place.lat} lng={place.lng} label={place.name} googleUrl={place.mapsUri}>
             {t('Mapa')}
-          </a>
+          </OpenInMaps>
         </div>
         {problem ? <p className="field__error">{problem}</p> : null}
       </li>
@@ -243,12 +244,12 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
         <Button small loading={opening} onClick={() => void openPage()}>
           {t('Ver página')}
         </Button>
-        <a className="btn btn--quiet btn--small" href={routeLink(place.lat, place.lng)} target="_blank" rel="noopener noreferrer">
+        <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={place.lat} lng={place.lng} label={place.name}>
           {t('Rota')}
-        </a>
-        <a className="btn btn--quiet btn--small" href={place.mapsUri ?? mapLink(place.lat, place.lng)} target="_blank" rel="noopener noreferrer">
+        </OpenInMaps>
+        <OpenInMaps className="btn btn--quiet btn--small" lat={place.lat} lng={place.lng} label={place.name} googleUrl={place.mapsUri}>
           {t('Mapa')}
-        </a>
+        </OpenInMaps>
       </div>
     </li>
   );

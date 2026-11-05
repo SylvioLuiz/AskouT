@@ -1,3 +1,4 @@
+import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeftIcon } from '../components/icons.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
@@ -10,7 +11,6 @@ import { formatDistance } from '../lib/flash.ts';
 import { liveEvents, timeRange } from '../lib/live-events.ts';
 import { Rating } from '../components/suggestions.tsx';
 import { toApiError } from '../lib/errors.ts';
-import { routeLink } from '../lib/chat.ts';
 import type { ExploreEvent, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
@@ -103,9 +103,9 @@ function PlaceCard({ place, selected }: { place: ExplorePlace; selected: boolean
           <Button small loading={opening} onClick={() => void openPage()}>
             {t('Ver página')}
           </Button>
-          <a className="btn btn--quiet btn--small" href={routeLink(place.lat, place.lng)} target="_blank" rel="noopener noreferrer">
+          <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={place.lat} lng={place.lng} label={place.name}>
             {t('Rota')}
-          </a>
+          </OpenInMaps>
         </div>
       </article>
     </li>

@@ -34,13 +34,6 @@ export function venueLine(venue: EventPage['venue']): string {
   return venue.address ? `${venue.name} · ${venue.address}` : venue.name;
 }
 
-/** Link para abrir o lugar no mapa: com coordenadas, pelo ponto; sem elas (evento de pessoa), pela busca do nome. */
-export function venueMapLink(venue: EventPage['venue']): string {
-  if (venue.lat !== null && venue.lng !== null) return `https://www.google.com/maps/search/?api=1&query=${venue.lat},${venue.lng}`;
-  const query = venue.address ? `${venue.name}, ${venue.address}` : venue.name;
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-}
-
 /** Quem aparece na fileira de avatares e quantos ficam de fora ("+3"). */
 export function attendeeStrip<T>(attendees: readonly T[], total: number, max: number): { shown: T[]; more: number } {
   const shown = attendees.slice(0, max);

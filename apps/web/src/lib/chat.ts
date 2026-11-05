@@ -83,11 +83,6 @@ export function starPercent(rating: number): number {
   return (Math.round(clamped * 2) / 10) * 100;
 }
 
-/** Rota a pé até o lugar, aberta no app de mapas a partir de onde a pessoa estiver. */
-export function routeLink(lat: number, lng: number): string {
-  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
-}
-
 /** O cartão que vai na mensagem: só os campos que o servidor aceita. */
 export function toCard(item: SuggestionItem): SuggestionCard {
   return {
@@ -108,10 +103,6 @@ export function mergeMessages(...lists: readonly (readonly ChatMessage[])[]): Ch
   const byId = new Map<string, ChatMessage>();
   for (const list of lists) for (const m of list) byId.set(m.id, m);
   return [...byId.values()].sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.id < b.id ? -1 : 1));
-}
-
-export function mapLink(lat: number, lng: number): string {
-  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
 }
 
 /** Resumo para a lista de conversas. */

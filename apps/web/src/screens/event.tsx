@@ -1,3 +1,4 @@
+import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
@@ -11,9 +12,8 @@ import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { startOf } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
-import { mapLink, routeLink } from '../lib/chat.ts';
 import { eventLink } from '../lib/share.ts';
-import { attendeeStrip, eventDateLabel, eventTimeLabel, venueLine, venueMapLink } from '../lib/event-page.ts';
+import { attendeeStrip, eventDateLabel, eventTimeLabel, venueLine } from '../lib/event-page.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { ticketHost } from '../lib/venue.ts';
@@ -471,14 +471,14 @@ export function EventScreen({ eventId }: { eventId: string }) {
             ) : null}
             <div className="sugcard__actions">
               {e.venue.lat !== null && e.venue.lng !== null ? (
-                <a className="btn btn--quiet btn--small" href={routeLink(e.venue.lat, e.venue.lng)} target="_blank" rel="noopener noreferrer">
+                <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={e.venue.lat} lng={e.venue.lng} label={e.venue.name}>
                   {t('Rota até lá')}
-                </a>
+                </OpenInMaps>
               ) : null}
               {e.venue.name || e.venue.address || e.venue.lat !== null ? (
-                <a className="btn btn--quiet btn--small" href={e.venue.lat !== null && e.venue.lng !== null ? mapLink(e.venue.lat, e.venue.lng) : venueMapLink(e.venue)} target="_blank" rel="noopener noreferrer">
+                <OpenInMaps className="btn btn--quiet btn--small" lat={e.venue.lat} lng={e.venue.lng} label={e.venue.name} address={e.venue.address}>
                   {t('Mapa')}
-                </a>
+                </OpenInMaps>
               ) : null}
             </div>
           </div>

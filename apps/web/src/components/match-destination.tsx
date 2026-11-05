@@ -1,6 +1,6 @@
 import { Button, Loading, Notice } from './ui.tsx';
 import { formatDistance, formatTravel, placeName } from '../lib/flash.ts';
-import { routeLink } from '../lib/chat.ts';
+import { OpenInMaps } from './open-in-maps.tsx';
 import type { FlashLeg, FlashMatch, SuggestionItem, Suggestions } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
@@ -118,9 +118,9 @@ export function MatchDestination({ match, mode, onMode, me, them, routesLoading,
         </li>
       </ul>
       <div className="row-actions">
-        <a className="btn btn--primary btn--small" href={mode === 'driving' ? routeLink(dest.lat, dest.lng).replace('walking', 'driving') : routeLink(dest.lat, dest.lng)} target="_blank" rel="noopener noreferrer">
+        <OpenInMaps className="btn btn--primary btn--small" mode="route" lat={dest.lat} lng={dest.lng} label={dest.name} travel={mode === 'driving' ? 'driving' : 'walking'}>
           {t('Abrir minha rota no mapa')}
-        </a>
+        </OpenInMaps>
         <Button small variant="quiet" loading={busy} onClick={onClear}>
           {t('Tirar lugar')}
         </Button>

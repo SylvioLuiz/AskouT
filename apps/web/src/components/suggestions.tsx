@@ -1,8 +1,9 @@
+import { OpenInMaps } from './open-in-maps.tsx';
 import { VenueLink } from './venue-link.tsx';
 import { useState } from 'react';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
-import { formatDistances, formatRating, formatWhen, mapLink, ratingLabel, routeLink, sourceLabel, starPercent, toCard } from '../lib/chat.ts';
+import { formatDistances, formatRating, formatWhen, ratingLabel, sourceLabel, starPercent, toCard } from '../lib/chat.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ChatMessage, SuggestionCard, SuggestionItem } from '../lib/types.ts';
@@ -88,12 +89,12 @@ export function SuggestionBubble({ message, otherName, nowIso, conversationId, o
       <p className="sugcard__when">{formatWhen(card.startsAt, card.endsAt, new Date(nowIso))}</p>
       {message.distances ? <Distances distances={message.distances} otherName={otherName} /> : null}
       <div className="sugcard__links">
-        <a href={routeLink(card.lat, card.lng)} target="_blank" rel="noopener noreferrer">
+        <OpenInMaps mode="route" lat={card.lat} lng={card.lng} label={card.venueName}>
           {t('Rota até lá')}
-        </a>
-        <a href={mapLink(card.lat, card.lng)} target="_blank" rel="noopener noreferrer">
+        </OpenInMaps>
+        <OpenInMaps lat={card.lat} lng={card.lng} label={card.venueName}>
           {t('Ver no mapa')}
-        </a>
+        </OpenInMaps>
       </div>
       {message.response ? (
         <p className={`sugcard__answer sugcard__answer--${message.response === 'ACCEPTED' ? 'yes' : 'no'}`} role="status">
@@ -191,12 +192,12 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
                   <Button small loading={sending === item.key} disabled={sent.has(item.key) || sending !== undefined} onClick={() => send(item)}>
                     {sent.has(item.key) ? t('Enviado') : t('Sugerir')}
                   </Button>
-                  <a className="btn btn--quiet btn--small" href={routeLink(item.lat, item.lng)} target="_blank" rel="noopener noreferrer">
+                  <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={item.lat} lng={item.lng} label={item.venueName}>
                     {t('Rota')}
-                  </a>
-                  <a className="btn btn--quiet btn--small" href={item.mapsUri ?? mapLink(item.lat, item.lng)} target="_blank" rel="noopener noreferrer">
+                  </OpenInMaps>
+                  <OpenInMaps className="btn btn--quiet btn--small" lat={item.lat} lng={item.lng} label={item.venueName} googleUrl={item.mapsUri}>
                     {t('Mapa')}
-                  </a>
+                  </OpenInMaps>
                 </div>
               </article>
             </li>
