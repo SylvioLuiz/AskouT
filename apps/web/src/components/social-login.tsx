@@ -7,7 +7,7 @@ import { useAuthContext } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { consentProblems } from '../lib/age.ts';
 import { toApiError } from '../lib/errors.ts';
-import { GOOGLE_SCRIPT, appleButtonUrl, appleIdToken, googleApi, loadScript, providerLabel } from '../lib/social-login.ts';
+import { GOOGLE_SCRIPT, appleIdToken, appleLogoUrl, googleApi, loadScript, providerLabel } from '../lib/social-login.ts';
 import type { SocialNeedsProfile, SocialProviderId } from '../lib/types.ts';
 import { usernameProblem, normalizeUsername } from '../lib/validation.ts';
 import { getLocale, t } from '../lib/i18n/index.ts';
@@ -31,7 +31,7 @@ export function SocialLogin() {
   const google = providers.data?.items.find((p) => p.provider === 'GOOGLE');
   const apple = providers.data?.items.find((p) => p.provider === 'APPLE');
   const googleBox = useRef<HTMLDivElement>(null);
-  const [appleImageFailed, setAppleImageFailed] = useState(false);
+  const [appleLogoFailed, setAppleLogoFailed] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   /** Largura dos dois botões (Google e Apple), iguais e medidas na tela. */
   const [width, setWidth] = useState(0);
@@ -103,15 +103,11 @@ export function SocialLogin() {
       <p className="social__or">ou</p>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {google ? <div ref={googleBox} className="social__google" aria-busy={busy || undefined} /> : null}
-      {apple && !appleImageFailed && width > 0 ? (
-        <button type="button" className="social__apple" aria-label={t('Continuar com a Apple')} aria-busy={busy || undefined} disabled={busy} onClick={() => void withApple()}>
-          <img src={appleButtonUrl(getLocale(), width, 40)} alt="" width={width} height="40" onError={() => setAppleImageFailed(true)} />
+      {apple && width > 0 ? (
+        <button type="button" className="social__apple" style={{ width }} aria-busy={busy || undefined} disabled={busy} onClick={() => void withApple()}>
+          {appleLogoFailed ? null : <img className="social__apple-logo" src={appleLogoUrl(40)} alt="" width="38" height="38" onError={() => setAppleLogoFailed(true)} />}
+          <span>{t('Continuar com a Apple')}</span>
         </button>
-      ) : null}
-      {apple && appleImageFailed ? (
-        <Button variant="secondary" full loading={busy} onClick={() => void withApple()}>
-          {t('Continuar com a Apple')}
-        </Button>
       ) : null}
     </div>
   );
