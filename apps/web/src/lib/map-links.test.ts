@@ -51,3 +51,11 @@ describe('apps de mapa por aparelho', () => {
     assert.deepEqual(mapAppsFor(IPAD_AS_MAC, 'MacIntel'), ['google', 'apple', 'waze']);
   });
 });
+
+it('rota com ponto de partida: Google e Apple já abrem com a rota calculada; Waze usa a posição do aparelho', () => {
+  const target = { lat: -23.5, lng: -46.6, label: 'Bar', from: { lat: -23.55, lng: -46.63 } };
+  assert.equal(mapAppLink('google', target, 'route'), 'https://www.google.com/maps/dir/?api=1&origin=-23.55%2C-46.63&destination=-23.5%2C-46.6');
+  assert.equal(mapAppLink('apple', target, 'route'), 'https://maps.apple.com/?saddr=-23.55,-46.63&daddr=-23.5%2C-46.6');
+  assert.equal(mapAppLink('waze', target, 'route'), 'https://waze.com/ul?ll=-23.5,-46.6&navigate=yes');
+  assert.equal(mapAppLink('waze', { ...target, desktop: true }, 'route'), 'https://www.waze.com/live-map/directions?to=ll.-23.5%2C-46.6&from=ll.-23.55%2C-46.63');
+});
