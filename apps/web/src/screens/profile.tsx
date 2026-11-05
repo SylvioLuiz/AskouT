@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { EditIcon, LockIcon, MenuIcon } from '../components/icons.tsx';
+import { EditIcon, LockIcon, MoreIcon } from '../components/icons.tsx';
 import { ProfileActions } from '../components/profile-actions.tsx';
 import { ProfileMenu } from '../components/profile-menu.tsx';
 import { PostedEvents } from '../components/profile-events.tsx';
@@ -85,14 +85,6 @@ export function ProfileScreen({ username }: { username: string }) {
 
   return (
     <>
-      {relationship.isSelf ? (
-        <div className="profile__bar">
-          <span className="profile__barname">@{profile.username}</span>
-          <button type="button" className="iconbtn" onClick={() => setMenuOpen(true)} aria-label={t('Abrir menu')} aria-haspopup="dialog">
-            <MenuIcon />
-          </button>
-        </div>
-      ) : null}
       {menuOpen ? <ProfileMenu onClose={() => setMenuOpen(false)} /> : null}
       <header className="profile">
         <Avatar profile={profile} size={88} />
@@ -110,9 +102,14 @@ export function ProfileScreen({ username }: { username: string }) {
           {note ? <p className="profile__note">{note}</p> : null}
         </div>
         {relationship.isSelf ? (
-          <Link to="/perfil/editar" className="iconbtn profile__edit" aria-label={t('Editar perfil')}>
-            <EditIcon />
-          </Link>
+          <div className="profile__tools">
+            <button type="button" className="iconbtn" onClick={() => setMenuOpen(true)} aria-label={t('Abrir menu')} aria-haspopup="dialog">
+              <MoreIcon />
+            </button>
+            <Link to="/perfil/editar" className="iconbtn" aria-label={t('Editar perfil')}>
+              <EditIcon />
+            </Link>
+          </div>
         ) : !relationship.isSelf ? (
           <ProfileActions
             profile={profile}
