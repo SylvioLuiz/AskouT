@@ -117,12 +117,14 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf }
 
 interface SheetProps {
   title: string;
+  /** Esconde o título na tela; ele continua sendo o nome da folha para leitor de tela. */
+  hideTitle?: boolean;
   onClose: () => void;
   children: ReactNode;
 }
 
 /** No celular sobe da base da tela; em telas grandes vira uma janela no centro. Fecha com Esc ou toque fora. */
-export function Sheet({ title, onClose, children }: SheetProps) {
+export function Sheet({ title, hideTitle, onClose, children }: SheetProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -197,7 +199,7 @@ export function Sheet({ title, onClose, children }: SheetProps) {
         <div className="sheet__drag" onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}>
           <div className="sheet__grab" aria-hidden="true" />
           <div className="sheet__head">
-            <h2 className="sheet__title">{title}</h2>
+            <h2 className={hideTitle ? 'visually-hidden' : 'sheet__title'}>{title}</h2>
             {/* No celular fecha-se puxando a aba para baixo; o botão só aparece em tela grande (e para leitor de tela). */}
             <button type="button" className="sheet__close" onClick={() => closeRef.current()} onPointerDown={(event) => event.stopPropagation()} aria-label={t('Fechar')}>
               <XIcon />
