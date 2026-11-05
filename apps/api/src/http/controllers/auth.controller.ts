@@ -84,4 +84,11 @@ export class AuthController {
   me(@CurrentActor() actor: Actor) {
     return this.core.auth.me(actor);
   }
+
+  /** Marca o tutorial inicial como visto (concluído ou pulado), para não aparecer de novo. */
+  @Post('me/onboarding')
+  @HttpCode(200)
+  completeOnboarding(@CurrentActor() actor: Actor) {
+    return this.core.auth.completeOnboarding(actor);
+  }
 }

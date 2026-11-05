@@ -38,6 +38,8 @@ export interface SessionUser {
   email: string;
   role: Role;
   profile: PublicProfile;
+  /** Já passou pelo tutorial inicial (guardado na conta). Ausente em versões antigas da API. */
+  onboarded?: boolean;
 }
 
 export interface AuthResult {

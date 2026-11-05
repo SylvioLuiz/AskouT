@@ -20,6 +20,8 @@ export interface UserRepository {
   updateBirthDate(userId: string, birthDate: string): Promise<void>;
   /** Registra que a pessoa aceitou os Termos nesta versão. */
   acceptTerms(userId: string, version: string, at: Date): Promise<void>;
+  /** Registra que a pessoa já passou pelo tutorial inicial. Não sobrescreve a data se já houver uma. */
+  markOnboarded(userId: string, at: Date): Promise<void>;
   /** Troca o hash da senha. */
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
   findProfileById(userId: string): Promise<Profile | undefined>;

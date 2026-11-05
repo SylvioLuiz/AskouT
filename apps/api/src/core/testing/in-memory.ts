@@ -151,6 +151,11 @@ export class InMemoryUserRepository implements UserRepository {
     if (u) this.users.set(userId, { ...u, termsVersion: version, termsAcceptedAt: at });
   }
 
+  async markOnboarded(userId: string, at: Date): Promise<void> {
+    const u = this.users.get(userId);
+    if (u && !u.onboardedAt) this.users.set(userId, { ...u, onboardedAt: at });
+  }
+
   async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
     const u = this.users.get(userId);
     if (u) this.users.set(userId, { ...u, passwordHash });

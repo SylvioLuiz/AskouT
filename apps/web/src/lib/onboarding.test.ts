@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { followProgressLabel, markOnboardingDone, onboardingDone, ONBOARDING_SLIDES } from './onboarding.ts';
+import { followProgressLabel, markOnboardingDone, onboardingDone, ONBOARDING_SLIDES, shouldShowOnboarding } from './onboarding.ts';
 
 function memory() {
   const data = new Map<string, string>();
@@ -22,6 +22,14 @@ describe('onboarding', () => {
     assert.equal(onboardingDone(undefined, 'a'), false);
     markOnboardingDone(undefined, 'a');
     assert.equal(onboardingDone({ getItem: () => { throw new Error('x'); } }, 'a'), false);
+  });
+  it('só aparece no primeiro login: a conta manda, o navegador ajuda', () => {
+    const s = memory();
+    assert.equal(shouldShowOnboarding(s, { id: 'a', onboarded: false }), true);
+    assert.equal(shouldShowOnboarding(s, { id: 'a', onboarded: true }), false, 'já visto em outro aparelho');
+    assert.equal(shouldShowOnboarding(s, { id: 'a' }), true, 'API antiga sem o campo');
+    markOnboardingDone(s, 'a');
+    assert.equal(shouldShowOnboarding(s, { id: 'a', onboarded: false }), false, 'já visto neste navegador');
   });
   it('progresso do follow', () => {
     assert.equal(followProgressLabel(0), 'Siga mais 3 rolês (0 de 3)');

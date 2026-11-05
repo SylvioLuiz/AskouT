@@ -151,6 +151,8 @@ model User {
   /// Aceite dos Termos de Uso e da Política de Privacidade no cadastro (e a versão aceita).
   termsAcceptedAt DateTime?
   termsVersion    String?
+  /// Quando a pessoa terminou (ou pulou) o tutorial inicial; o app só o mostra enquanto estiver vazio.
+  onboardedAt     DateTime?
 
   profile  Profile?
   settings UserSettings?
