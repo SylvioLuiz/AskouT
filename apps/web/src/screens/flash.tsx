@@ -18,6 +18,7 @@ import {
   flashRemainingShare,
   formatAge,
   formatCountdown,
+  formatApprox,
   formatDistance,
   formatKm,
   formatRemaining,
@@ -460,7 +461,7 @@ function FlashContent() {
               <ul className="flashfriends">
                 {friends.map((f) => {
                   const dir = f.invite?.direction;
-                  const detail = distanceById.get(f.profile.userId) ?? (dir === 'MATCHED' ? 'Encontro' : dir === 'SENT' ? 'Convidado' : dir === 'RECEIVED' ? t('Convidou você') : '');
+                  const detail = distanceById.get(f.profile.userId) ?? (f.approx ? formatApprox(f.approx, true) : undefined) ?? (dir === 'MATCHED' ? 'Encontro' : dir === 'SENT' ? 'Convidado' : dir === 'RECEIVED' ? t('Convidou você') : '');
                   return (
                     <li key={f.profile.userId}>
                       <button type="button" className="flashfriend" onClick={() => setFriendOpen(f.profile.userId)}>
@@ -901,7 +902,8 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
           <Avatar profile={profile} />
           <span className="person__body">
             <span className="person__name">{profile.username}</span>
-            <span className="person__handle">{friend.note ? `“${friend.note}”` : t('Livre por mais {left}', { left: formatRemaining(left) })}</span>
+            <span className="person__handle">{friend.note ? `“${friend.note}”` : friend.approx ? t('{distance} · livre por mais {left}', { distance: formatApprox(friend.approx), left: formatRemaining(left) }) : t('Livre por mais {left}', { left: formatRemaining(left) })}</span>
+            {friend.note && friend.approx ? <span className="person__handle">{formatApprox(friend.approx)}</span> : null}
           </span>
         </div>
         <div className="person__aside">{action}</div>

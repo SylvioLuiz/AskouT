@@ -662,6 +662,7 @@ export function defineRepositoryContract(
         expiresAt: at(endS),
         endedAt: null,
         note: extra.note ?? null,
+        area: null,
       });
       const invite = (from: string, to: string, extra: Partial<{ status: 'PENDING' | 'ACCEPTED'; expiresS: number }> = {}) => ({
         id: randomUUID(),

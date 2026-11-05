@@ -427,7 +427,7 @@ async function crowd() {
   return { w, ana: ana!, perto: perto!, longe: longe!, papo: papo! };
 }
 
-test('livres agora: mais perto primeiro quando ligou com localização, sem revelar a distância', async () => {
+test('livres agora: mais perto primeiro quando ligou com localização, sem revelar a posição', async () => {
   const { w, ana, perto, longe, papo } = await crowd();
   const r = await w.core.flash.listAvailableRanked(ana);
   assert.equal(r.order, 'near');
@@ -435,9 +435,9 @@ test('livres agora: mais perto primeiro quando ligou com localização, sem reve
   assert.deepEqual(r.items.map((i) => i.profile.userId), [perto, papo, longe]);
   const json = JSON.stringify(r);
   assert.doesNotMatch(json, /-19\.|-43\.|area|lat|lng/i, 'a posição nunca sai na resposta');
-  // Só a distância e o tempo aproximados.
+  // Só a distância e o tempo aproximados (das regiões arredondadas: "perto" dá ~1,5 km).
   assert.deepEqual(r.items.map((i) => i.approx), [
-    { km: 0, minutes: 10, mode: 'walk' },
+    { km: 2, minutes: 20, mode: 'walk' },
     { km: 5, minutes: 15, mode: 'car' },
     { km: 15, minutes: 40, mode: 'car' },
   ]);

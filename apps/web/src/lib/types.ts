@@ -213,6 +213,17 @@ export interface AvailableFriend {
   expiresAt: string;
   /** Convite aberto com essa pessoa. A lista nunca traz localização. */
   invite: { id: string; direction: InviteDirection } | null;
+  /** Distância e tempo aproximados (regiões de ~1 km). Nulo se algum dos dois ligou o NOW sem localização. */
+  approx?: ApproxTrip | null;
+}
+
+/** "~3 km · 15 min de carro": arredondado de propósito pelo servidor. */
+export interface ApproxTrip {
+  /** Quilômetros inteiros; 0 quer dizer "menos de 1 km". */
+  km: number;
+  /** Minutos, de 5 em 5. */
+  minutes: number;
+  mode: 'walk' | 'car';
 }
 
 export interface FlashInvites {

@@ -1,4 +1,4 @@
-import type { SuggestionItem } from './types.ts';
+import type { ApproxTrip, SuggestionItem } from './types.ts';
 import { decimal, t } from '../lib/i18n/index.ts';
 // Contas do Flash que não dependem de tela: distância, tempo restante e rótulos.
 
@@ -35,6 +35,14 @@ export function formatKm(meters: number): string {
   if (km >= 10) return `${Math.round(km)} km`;
   const text = (Math.max(0.1, Math.round(km * 10) / 10)).toFixed(1);
   return `${decimal(text.endsWith('.0') ? text.slice(0, -2) : text)} km`;
+}
+
+/** "menos de 1 km · 5 min a pé", "12 km · 35 min de carro". Curto (`short`) para caber embaixo da foto: "12 km · 35 min". */
+export function formatApprox(a: ApproxTrip, short = false): string {
+  const km = a.km < 1 ? t('menos de 1 km') : `${a.km} km`;
+  const time = formatRemaining(a.minutes);
+  if (short) return `${a.km < 1 ? '<1 km' : km} · ${time}`;
+  return a.mode === 'walk' ? t('{km} · {time} a pé', { km, time }) : t('{km} · {time} de carro', { km, time });
 }
 
 /** Minutos restantes até `iso`: 0 quando já passou, arredondando para cima. */
