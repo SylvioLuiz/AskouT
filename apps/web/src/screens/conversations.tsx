@@ -6,7 +6,7 @@ import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, 
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
 import { ArrowUpIcon, BellOffIcon, CheckIcon, CopyIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
-import { MediaBubble } from '../components/chat-media.tsx';
+import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
 import { MessagePopup, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { SwipeRow } from '../components/swipe-reply.tsx';
@@ -513,8 +513,11 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                       {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
                       {m.replyTo && !m.deleted ? (
                         <button type="button" className="bubble__quote" aria-label={t('Ir para a mensagem respondida de {name}', { name: m.replyTo.mine ? t('você') : (m.replyTo.senderName ?? '') })} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
-                          <strong>{m.replyTo.mine ? t('Você') : m.replyTo.senderName}</strong>
-                          <span>{m.replyTo.deleted ? t('Mensagem apagada') : m.replyTo.preview}</span>
+                          <span className="bubble__quotetext">
+                            <strong>{m.replyTo.mine ? t('Você') : m.replyTo.senderName}</strong>
+                            <span>{m.replyTo.deleted ? t('Mensagem apagada') : m.replyTo.preview}</span>
+                          </span>
+                          {!m.replyTo.deleted && (m.replyTo.kind === 'IMAGE' || m.replyTo.kind === 'VIDEO') ? <ReplyThumb conversationId={conversationId} messageId={m.replyTo.id} kind={m.replyTo.kind} /> : null}
                         </button>
                       ) : null}
                       {m.deleted ? (
@@ -572,6 +575,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             <strong>{t('Respondendo a {name}', { name: replyTo.mine ? t('você') : (replyTo.senderName ?? data.other?.displayName ?? t('mensagem')) })}</strong>
             <span>{replyPreview(replyTo)}</span>
           </div>
+          {!replyTo.deleted && (replyTo.kind === 'IMAGE' || replyTo.kind === 'VIDEO') ? <ReplyThumb conversationId={conversationId} messageId={replyTo.id} kind={replyTo.kind} /> : null}
           <button type="button" className="iconbtn" aria-label={t('Cancelar resposta')} onClick={() => setReplyTo(undefined)}>
             <XIcon />
           </button>
