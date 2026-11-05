@@ -36,12 +36,14 @@ export function InviteSheet({ onClose }: { onClose: () => void }) {
           : t('Quem entrar pelo seu link já passa a seguir você. Para virarem amigos, é só você seguir de volta.')}
       </p>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      <a className="btn btn--primary btn--full" href={whatsappUrl(text, url)} target="_blank" rel="noopener noreferrer">
-        {t('Enviar pelo WhatsApp')}
-      </a>
-      <Button full variant="secondary" onClick={() => void shareOrCopy()}>
-        {typeof navigator.share === 'function' ? t('Compartilhar link') : t('Copiar link')}
-      </Button>
+      <div className="stack">
+        <a className="btn btn--primary btn--full" href={whatsappUrl(text, url)} target="_blank" rel="noopener noreferrer">
+          {t('Enviar pelo WhatsApp')}
+        </a>
+        <Button full variant="secondary" onClick={() => void shareOrCopy()}>
+          {typeof navigator.share === 'function' ? t('Compartilhar link') : t('Copiar link')}
+        </Button>
+      </div>
     </Sheet>
   );
 }
