@@ -23,7 +23,7 @@ export function ProfileMenu({ onClose }: { onClose: () => void }) {
   // O convite troca a folha do menu pela do convite (uma folha por vez); fechar o convite fecha tudo.
   if (inviting) return <InviteSheet onClose={onClose} />;
   return (
-    <Sheet title={t('Menu do perfil')} onClose={onClose}>
+    <Sheet title={t('Menu do perfil')} hideTitle onClose={onClose}>
       <button type="button" className="invitecta" onClick={() => setInviting(true)}>
         <span className="invitecta__icon" aria-hidden="true">
           <UsersIcon />
