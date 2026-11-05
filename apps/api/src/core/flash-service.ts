@@ -78,17 +78,19 @@ export interface ApproxTrip {
 }
 
 /** Precisão que quem escolheu "aproximada" mostra no encontro. */
-export const APPROX_ACCURACY_M = 1000;
+export const APPROX_ACCURACY_M = 3000;
+/** Grade da posição aproximada: 1/40 de grau, uns 2,8 km. */
+const APPROX_GRID = 40;
 
 /** Essa pessoa escolheu mostrar só a posição aproximada neste encontro? */
 function approxFor(invite: FlashInviteRecord, userId: string): boolean {
   return invite.fromUserId === userId ? invite.fromApprox === true : invite.toApprox === true;
 }
 
-/** Arredonda para ~1 km (2 casas decimais) quando a pessoa escolheu "aproximada". A posição exata nem chega a ser guardada. */
+/** Encaixa numa grade de ~3 km quando a pessoa escolheu "aproximada". A posição exata nem chega a ser guardada. */
 function fuzzIfApprox(position: FlashPositionRecord, approx: boolean): FlashPositionRecord {
   if (!approx) return position;
-  return { ...position, lat: Math.round(position.lat * 100) / 100, lng: Math.round(position.lng * 100) / 100, accuracyM: Math.max(position.accuracyM ?? 0, APPROX_ACCURACY_M) };
+  return { ...position, lat: Math.round(position.lat * APPROX_GRID) / APPROX_GRID, lng: Math.round(position.lng * APPROX_GRID) / APPROX_GRID, accuracyM: Math.max(position.accuracyM ?? 0, APPROX_ACCURACY_M) };
 }
 
 /** Até 2 km a pé (5 km/h); acima, de carro na cidade (~25 km/h mais 5 min para sair e estacionar). */

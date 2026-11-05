@@ -996,7 +996,7 @@ function InviteRow({ invite, canAccept, onChanged, onFeedback }: { invite: Flash
   );
 }
 
-/** Escolha entre mostrar a localização exata ou só a aproximada (~1 km). */
+/** Escolha entre mostrar a localização exata ou só a aproximada (~3 km). */
 function PrecisionPicker({ approx, onChange, text, disabled }: { approx: boolean; onChange: (approx: boolean) => void; text: string; disabled?: boolean }) {
   return (
     <div className="flashchoice">
@@ -1011,7 +1011,7 @@ function PrecisionPicker({ approx, onChange, text, disabled }: { approx: boolean
         </button>
         <button type="button" role="radio" aria-checked={approx} className="flashchoice__opt" disabled={disabled} onClick={() => onChange(true)}>
           <strong>{t('Aproximada')}</strong>
-          <span>{t('Só a região, uns 1 km')}</span>
+          <span>{t('Só a região, uns 3 km')}</span>
         </button>
       </div>
     </div>
@@ -1114,6 +1114,32 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void, aut
     if (auto && !stoppedByUser.current && state.phase === 'idle') start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto, state.phase]);
+
+  // Bloqueada no navegador: nenhum site consegue perguntar de novo. Quando a pessoa libera nas configurações, liga sozinho.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  useEffect(() => {
+    const perms = typeof navigator !== 'undefined' ? navigator.permissions : undefined;
+    if (!perms?.query) return undefined;
+    let status: PermissionStatus | undefined;
+    let cancelled = false;
+    const onChange = () => {
+      if (status?.state === 'granted' && stateRef.current.phase === 'error' && !stoppedByUser.current) start();
+    };
+    perms
+      .query({ name: 'geolocation' as PermissionName })
+      .then((s) => {
+        if (cancelled) return;
+        status = s;
+        s.addEventListener('change', onChange);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      status?.removeEventListener('change', onChange);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Desligou (ex.: o NOW acabou): para de ler a posição e volta a ligar sozinho da próxima vez.
   useEffect(() => {
@@ -1286,8 +1312,14 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
           </>
         ) : (
           <>
-            <p className="whereis__main">{distance !== undefined ? t('a {distance} de você', { distance: formatDistance(distance) }) : t('Localização recebida')}</p>
-            <p className="muted">{t('Atualizado {when}.', { when: formatAge(them.updatedAt, data.now) })}{data.themApprox ? t(' Localização aproximada (uns 1 km).') : ''}{distance === undefined ? t(' Compartilhe a sua para ver a distância.') : ''}</p>
+            <p className="whereis__main">
+              {distance === undefined
+                ? t('Localização recebida')
+                : data.themApprox
+                  ? t('a uns {km} km de você', { km: Math.max(3, Math.round(distance / 1000)) })
+                  : t('a {distance} de você', { distance: formatDistance(distance) })}
+            </p>
+            <p className="muted">{t('Atualizado {when}.', { when: formatAge(them.updatedAt, data.now) })}{data.themApprox ? t(' Localização aproximada (uns 3 km).') : ''}{distance === undefined ? t(' Compartilhe a sua para ver a distância.') : ''}</p>
           </>
         )}
         {them ? (
@@ -1345,7 +1377,12 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
           <>
             <p className="sharebox__title">{t('Compartilhando sua localização')}</p>
             <p className="muted">
-              {share.state.accuracyM !== undefined ? t('Precisão de cerca de {accuracyM} m. ', { accuracyM: share.state.accuracyM }) : ''}Mantenha esta tela aberta; ao sair, o envio para.
+              {data.meApprox
+                ? t('{name} vê só a região onde você está, uns 3 km. ', { name: data.other.username })
+                : share.state.accuracyM !== undefined
+                  ? t('Precisão de cerca de {accuracyM} m. ', { accuracyM: share.state.accuracyM })
+                  : ''}
+              Mantenha esta tela aberta; ao sair, o envio para.
             </p>
             <Button variant="secondary" full onClick={share.stop}>
               {t('Parar de compartilhar')}
