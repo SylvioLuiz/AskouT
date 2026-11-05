@@ -82,10 +82,17 @@ function LoginScreen({ onLogin, expired }: { onLogin: (u: Admin) => void; expire
 
   return (
     <main className="login">
+      <section className="login__hero">
+        <img className="login__scene" src="/auth-hero.jpg" alt="AskouT" width="780" height="540" />
+        <p className="login__headline">Menos tempo combinando. Mais tempo juntos.</p>
+      </section>
       <form className="login__card" onSubmit={submit}>
-        <img className="login__logo" src="/logo.png" alt="" width="72" height="72" />
-        <h1>AskouT Gestão</h1>
-        <p className="muted">Acesso restrito a administradores.</p>
+        <div className="login__brand">
+          <img className="login__logo" src="/logo.png" alt="" width="40" height="40" />
+          <span>AskouT Gestão</span>
+        </div>
+        <h1>Entrar</h1>
+        <p className="login__sub">Acesso restrito a administradores.</p>
         {expired ? <p className="notice">Sua sessão acabou. Entre de novo.</p> : null}
         <div className="field">
           <label htmlFor={idId}>E-mail ou @usuário</label>
@@ -100,7 +107,7 @@ function LoginScreen({ onLogin, expired }: { onLogin: (u: Admin) => void; expire
             {error}
           </p>
         ) : null}
-        <button type="submit" className="btn btn--primary btn--block" disabled={busy || identifier.trim() === '' || password === ''}>
+        <button type="submit" className="btn btn--primary btn--block login__submit" disabled={busy || identifier.trim() === '' || password === ''}>
           {busy ? 'Entrando…' : 'Entrar'}
         </button>
         {appleClientId ? (
