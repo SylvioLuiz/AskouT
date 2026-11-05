@@ -3,6 +3,8 @@
 # Também dá para rodar à mão: GitHub → Actions → "iOS → TestFlight" → Run workflow.
 # Precisa dos segredos (Settings → Secrets and variables → Actions):
 #   ASC_KEY_ID, ASC_ISSUER_ID e ASC_KEY_P8 (conteúdo do arquivo .p8 da chave de API do App Store Connect, acesso Admin).
+# Opcional, evita o erro "máximo de certificados": IOS_DEV_CERT_P12_BASE64 (o .p12 do certificado "Apple Development" exportado do Mac, em base64) e IOS_DEV_CERT_PASSWORD (a senha do .p12).
+#   Com eles, todo build reaproveita o mesmo certificado em vez de pedir um novo à Apple. Sem eles, o fluxo funciona como antes.
 # Não envia para revisão da loja: o build só aparece no TestFlight.
 name: iOS → TestFlight
 
@@ -50,6 +52,24 @@ jobs:
           printf '%s' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc/AuthKey.p8"
           echo "ASC_KEY_PATH=$RUNNER_TEMP/asc/AuthKey.p8" >> "$GITHUB_ENV"
 
+      - name: Certificado de desenvolvimento fixo (opcional)
+        env:
+          P12_BASE64: ${{ secrets.IOS_DEV_CERT_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_DEV_CERT_PASSWORD }}
+        run: |
+          if [ -z "$P12_BASE64" ]; then echo "Sem certificado fixo: o Xcode cria um (pode bater no limite da Apple)."; exit 0; fi
+          KC="$RUNNER_TEMP/build.keychain-db"
+          KC_PASS="$(uuidgen)"
+          echo "$P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dev.p12"
+          security create-keychain -p "$KC_PASS" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KC_PASS" "$KC"
+          security import "$RUNNER_TEMP/dev.p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KC_PASS" "$KC" > /dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/dev.p12"
+          security find-identity -v -p codesigning "$KC" | sed 's/[0-9A-F]\{40\}/<hash>/'
+
       - name: Número do build
         # Sempre maior que o último enviado à mão (13) e que os envios anteriores deste fluxo.
         run: echo "BUILD_NUMBER=$((13 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
@@ -91,6 +111,18 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
           echo "Build $BUILD_NUMBER enviado. Aparece no TestFlight em 10 a 30 minutos." >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Limpar builds antigas do TestFlight (a cada 10 builds)
+        # Quando o número da build é múltiplo de 10, expira todas menos as 10 mais novas.
+        if: success()
+        continue-on-error: true
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          if [ $((BUILD_NUMBER % 10)) -eq 0 ]; then node .github/scripts/expire-testflight-builds.mjs; else echo "Build $BUILD_NUMBER: sem limpeza (só nos múltiplos de 10)."; fi
+
       - name: Apagar a chave
         if: always()
-        run: rm -rf "$RUNNER_TEMP/asc"
+        run: |
+          rm -rf "$RUNNER_TEMP/asc"
+          security delete-keychain "$RUNNER_TEMP/build.keychain-db" 2>/dev/null || true
