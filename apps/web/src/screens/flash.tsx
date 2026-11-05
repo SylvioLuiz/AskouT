@@ -444,6 +444,7 @@ function FlashContent() {
             </div>
           )}
           {!empty && listMeta && !listMeta.nearAvailable ? <p className="muted nowsort__hint">{t('Para ver quem está mais perto, libere a localização e ligue o NOW de novo.')}</p> : null}
+          {!empty && friends.some((f) => f.approx) ? <p className="muted nowsort__hint">{t('Distância e tempo aproximados, para não revelar onde cada um está.')}</p> : null}
           {empty ? (
           <div className="flashempty">
               <span className="flashempty__icon" aria-hidden="true">
