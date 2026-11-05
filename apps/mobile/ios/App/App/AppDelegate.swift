@@ -1,5 +1,14 @@
 import UIKit
 import Capacitor
+import ObjectiveC
+
+/// Tira a barra extra do teclado do iPhone (setas para cima/baixo e "OK") que o WebView mostra sobre o teclado.
+/// Faz o campo de texto do WebView não oferecer `inputAccessoryView`. Só afeta o app, não o teclado em si.
+private func hideKeyboardAccessoryBar() {
+    guard let contentView = NSClassFromString("WKContentView") else { return }
+    let block: @convention(block) (AnyObject) -> AnyObject? = { _ in nil }
+    class_replaceMethod(contentView, #selector(getter: UIResponder.inputAccessoryView), imp_implementationWithBlock(block), "@@:")
+}
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,7 +16,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        hideKeyboardAccessoryBar()
         return true
     }
 
