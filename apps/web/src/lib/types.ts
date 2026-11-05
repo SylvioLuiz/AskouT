@@ -252,6 +252,10 @@ export interface FlashMatch {
   conversationId: string;
   /** Lugar que um dos dois escolheu no mapa; nulo enquanto ninguém escolheu. */
   destination: { name: string; lat: number; lng: number; chosenByMe: boolean; chosenAt: string } | null;
+  /** Você escolheu mostrar só a sua posição aproximada (~1 km). */
+  meApprox?: boolean;
+  /** A outra pessoa só mostra a posição aproximada (~1 km). */
+  themApprox?: boolean;
 }
 
 /** Rota de cada um até o lugar escolhido. `line` nulo: sem trajeto, o mapa desenha uma linha reta. */

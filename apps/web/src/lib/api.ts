@@ -304,9 +304,10 @@ export function createApi(deps: ApiDeps) {
     setStoryVisibility: (userId: string, body: Partial<StoryVisibility>) => request<StoryVisibility>('PUT', `/stories/visibility/${id(userId)}`, { body }),
     flashAvailable: (order?: AvailableOrder) => request<AvailableList>('GET', `/flash/available${order ? `?ordem=${order === 'near' ? 'perto' : 'interacao'}` : ''}`),
     flashInvites: () => request<FlashInvites>('GET', '/flash/invites'),
-    flashInvite: (userId: string) => request<FlashInvite>('POST', '/flash/invites', { body: { userId } }),
-    flashRespond: (inviteId: string, action: 'accept' | 'decline') =>
-      request<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: { action } }),
+    flashInvite: (userId: string, approx = false) => request<FlashInvite>('POST', '/flash/invites', { body: { userId, approx } }),
+    flashRespond: (inviteId: string, action: 'accept' | 'decline', approx = false) =>
+      request<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: action === 'accept' ? { action, approx } : { action } }),
+    flashSetPrecision: (inviteId: string, approx: boolean) => request<{ approx: boolean }>('PUT', `/flash/matches/${id(inviteId)}/precision`, { body: { approx } }),
     flashEnd: (inviteId: string) => request<{ ended: boolean }>('DELETE', `/flash/invites/${id(inviteId)}`),
     flashMatch: (inviteId: string) => request<FlashMatch>('GET', `/flash/matches/${id(inviteId)}`),
     flashShareLocation: (inviteId: string, position: { lat: number; lng: number; accuracyM?: number }) =>

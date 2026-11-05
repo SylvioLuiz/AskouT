@@ -500,3 +500,42 @@ test('estender o NOW: +30 min ou +1 h, no máximo 3 horas a partir de agora', as
   await rejectsWith(w.core.flash.extend(ana!, { minutes: 30 }), 'CONFLICT');
   assert.equal((await w.core.flash.status(ana!)).expiresAt, capped.expiresAt);
 });
+
+test('localização aproximada: quem escolhe "aproximada" ao aceitar só mostra a posição arredondada', async () => {
+  const w = makeWorld();
+  const { ana, bia } = await w.signUpMany('ana', 'bia');
+  await befriend(w, ana!, bia!);
+  await w.core.flash.turnOn(ana!, { hours: 1 });
+  await w.core.flash.turnOn(bia!, { hours: 1 });
+  const invite = await w.core.flash.invite(ana!, bia!);
+  await w.core.flash.respond(bia!, invite.id, 'accept', { approx: true });
+  await w.core.flash.shareLocation(bia!, invite.id, { lat: -23.523456, lng: -46.187654, accuracyM: 12 });
+  await w.core.flash.shareLocation(ana!, invite.id, { lat: -23.551234, lng: -46.633321, accuracyM: 8 });
+  const fromAna = await w.core.flash.getMatch(ana!, invite.id);
+  assert.equal(fromAna.themApprox, true);
+  assert.equal(fromAna.meApprox, false);
+  assert.deepEqual([fromAna.them?.lat, fromAna.them?.lng, fromAna.them?.accuracyM], [-23.52, -46.19, 1000]);
+  assert.deepEqual([fromAna.me?.lat, fromAna.me?.lng], [-23.551234, -46.633321], 'quem escolheu exata continua exata');
+  const fromBia = await w.core.flash.getMatch(bia!, invite.id);
+  assert.equal(fromBia.meApprox, true);
+});
+
+test('localização aproximada: dá para escolher ao convidar e trocar durante o encontro', async () => {
+  const w = makeWorld();
+  const { ana, bia } = await w.signUpMany('ana', 'bia');
+  await befriend(w, ana!, bia!);
+  await w.core.flash.turnOn(ana!, { hours: 1 });
+  await w.core.flash.turnOn(bia!, { hours: 1 });
+  const invite = await w.core.flash.invite(ana!, bia!, { approx: true });
+  await w.core.flash.respond(bia!, invite.id, 'accept');
+  await w.core.flash.shareLocation(ana!, invite.id, { lat: -23.551234, lng: -46.633321, accuracyM: 8 });
+  assert.equal((await w.core.flash.getMatch(bia!, invite.id)).them?.lat, -23.55);
+  // Ana passa a mostrar a exata; Bia passa a mostrar a aproximada e a posição já guardada é arredondada.
+  await w.core.flash.shareLocation(bia!, invite.id, { lat: -23.523456, lng: -46.187654 });
+  assert.deepEqual(await w.core.flash.setPrecision(ana!, invite.id, false), { approx: false });
+  await w.core.flash.shareLocation(ana!, invite.id, { lat: -23.551234, lng: -46.633321 });
+  assert.equal((await w.core.flash.getMatch(bia!, invite.id)).them?.lat, -23.551234);
+  await w.core.flash.setPrecision(bia!, invite.id, true);
+  assert.equal((await w.core.flash.getMatch(ana!, invite.id)).them?.lat, -23.52);
+  await rejectsWith(w.core.flash.setPrecision(bia!, invite.id, 'sim'), 'VALIDATION');
+});

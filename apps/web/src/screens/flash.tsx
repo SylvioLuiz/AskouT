@@ -262,10 +262,11 @@ function FlashContent() {
   }
   const friendInSheet = friends.find((f) => f.profile.userId === friendOpen);
 
+  const [approxAll, setApproxAll] = useState(false);
   async function callAll() {
     setCallingAll(true);
     setFeedback(undefined);
-    const results = await Promise.allSettled(eligible.map((f) => api.flashInvite(f.profile.userId)));
+    const results = await Promise.allSettled(eligible.map((f) => api.flashInvite(f.profile.userId, approxAll)));
     const sent = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.length - sent;
     setCallingAll(false);
@@ -585,6 +586,7 @@ function FlashContent() {
                 <li key={f.profile.userId}>{f.profile.username}</li>
               ))}
             </ul>
+            <PrecisionPicker approx={approxAll} onChange={setApproxAll} text={t('Quem aceitar vai ver sua localização enquanto o encontro durar.')} />
             <Button full loading={callingAll} onClick={() => void callAll()}>
               {t('Enviar convites')}
             </Button>
@@ -870,10 +872,12 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
   const { profile, invite } = friend;
   const left = minutesLeft(friend.expiresAt, Date.now());
 
-  async function send() {
+  const [choosing, setChoosing] = useState(false);
+  async function send(approx: boolean) {
     setBusy(true);
     try {
-      await api.flashInvite(profile.userId);
+      await api.flashInvite(profile.userId, approx);
+      setChoosing(false);
       onFeedback({ tone: 'ok', text: t('Convite enviado para {username}. Vale por 15 minutos.', { username: profile.username }) });
       onChanged();
     } catch (failure) {
@@ -914,7 +918,7 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
     action = <span className="muted">{t('Convidou você')}</span>;
   } else {
     action = (
-      <Button small loading={busy} onClick={send}>
+      <Button small loading={busy && !choosing} disabled={choosing} onClick={() => setChoosing(true)}>
         {t('Convidar')}
       </Button>
     );
@@ -933,6 +937,7 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
         </div>
         <div className="person__aside">{action}</div>
       </div>
+      {choosing ? <LocationChoice name={profile.username} busy={busy} confirmLabel={t('Convidar')} onChoose={(approx) => void send(approx)} onCancel={() => setChoosing(false)} /> : null}
       <div className="flashrow__more">
         <BlockAction profile={profile} onDone={onChanged} onFeedback={onFeedback} />
       </div>
@@ -943,10 +948,11 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
 function InviteRow({ invite, canAccept, onChanged, onFeedback }: { invite: FlashInvite; canAccept: boolean; onChanged: () => void; onFeedback: (f: Feedback) => void }) {
   const [busy, setBusy] = useState<'accept' | 'decline' | undefined>();
 
-  async function answer(action: 'accept' | 'decline') {
+  const [choosing, setChoosing] = useState(false);
+  async function answer(action: 'accept' | 'decline', approx = false) {
     setBusy(action);
     try {
-      const result = await api.flashRespond(invite.id, action);
+      const result = await api.flashRespond(invite.id, action, approx);
       if (action === 'accept') {
         announceFlashChange();
         // Aceitou: abre o encontro, onde o envio da localização começa sozinho. A conversa fica a um toque dali.
@@ -974,8 +980,9 @@ function InviteRow({ invite, canAccept, onChanged, onFeedback }: { invite: Flash
         </div>
       </div>
       {canAccept ? null : <p className="muted">{t('Ligue seu NOW para aceitar.')}</p>}
+      {choosing ? <LocationChoice name={invite.other.username} busy={busy === 'accept'} confirmLabel={t('Aceitar')} onChoose={(approx) => void answer('accept', approx)} onCancel={() => setChoosing(false)} /> : null}
       <div className="row-actions">
-        <Button small loading={busy === 'accept'} disabled={!canAccept || busy === 'decline'} onClick={() => answer('accept')}>
+        <Button small loading={busy === 'accept' && !choosing} disabled={!canAccept || busy === 'decline' || choosing} onClick={() => setChoosing(true)}>
           {t('Aceitar')}
         </Button>
         <Button small variant="secondary" loading={busy === 'decline'} disabled={busy === 'accept'} onClick={() => answer('decline')}>
@@ -984,6 +991,46 @@ function InviteRow({ invite, canAccept, onChanged, onFeedback }: { invite: Flash
         <BlockAction profile={invite.other} onDone={onChanged} onFeedback={onFeedback} />
       </div>
     </li>
+  );
+}
+
+/** Escolha entre mostrar a localização exata ou só a aproximada (~1 km). */
+function PrecisionPicker({ approx, onChange, text, disabled }: { approx: boolean; onChange: (approx: boolean) => void; text: string; disabled?: boolean }) {
+  return (
+    <div className="flashchoice">
+      <p className="flashchoice__text">
+        <LocationIcon />
+        <span>{text}</span>
+      </p>
+      <div className="flashchoice__opts" role="radiogroup" aria-label={t('Como mostrar sua localização')}>
+        <button type="button" role="radio" aria-checked={!approx} className="flashchoice__opt" disabled={disabled} onClick={() => onChange(false)}>
+          <strong>{t('Exata')}</strong>
+          <span>{t('Vê onde você está')}</span>
+        </button>
+        <button type="button" role="radio" aria-checked={approx} className="flashchoice__opt" disabled={disabled} onClick={() => onChange(true)}>
+          <strong>{t('Aproximada')}</strong>
+          <span>{t('Só a região, uns 1 km')}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Antes de convidar ou aceitar: deixa claro que o amigo vai ver a localização e deixa escolher a aproximada. */
+function LocationChoice({ name, busy, confirmLabel, onChoose, onCancel }: { name: string; busy: boolean; confirmLabel: string; onChoose: (approx: boolean) => void; onCancel: () => void }) {
+  const [approx, setApprox] = useState(false);
+  return (
+    <div className="flashchoice-wrap">
+      <PrecisionPicker approx={approx} onChange={setApprox} disabled={busy} text={t('{name} vai ver sua localização enquanto o encontro durar. Dá para mudar depois.', { name })} />
+      <div className="row-actions">
+        <Button small loading={busy} onClick={() => onChoose(approx)}>
+          {confirmLabel}
+        </Button>
+        <Button small variant="quiet" disabled={busy} onClick={onCancel}>
+          {t('Cancelar')}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -1099,6 +1146,22 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const [pickedKey, setPickedKey] = useState<string | undefined>();
   const [mode, setMode] = useState<'foot' | 'driving'>('foot');
   const [destBusy, setDestBusy] = useState(false);
+  const [precisionBusy, setPrecisionBusy] = useState(false);
+
+  async function changePrecision(approx: boolean) {
+    if (approx === (match.data?.meApprox === true)) return;
+    setPrecisionBusy(true);
+    setFeedback(undefined);
+    try {
+      await api.flashSetPrecision(inviteId, approx);
+      match.reload();
+      setFeedback({ tone: 'ok', text: approx ? t('Agora só a sua localização aproximada é mostrada.') : t('Agora sua localização exata é mostrada.') });
+    } catch (failure) {
+      setFeedback({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setPrecisionBusy(false);
+    }
+  }
 
   // Bares e eventos entre os dois: só quando os dois já compartilharam a localização.
   const bothShared = Boolean(match.data?.me && match.data?.them);
@@ -1206,7 +1269,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         ) : (
           <>
             <p className="whereis__main">{distance !== undefined ? t('a {distance} de você', { distance: formatDistance(distance) }) : t('Localização recebida')}</p>
-            <p className="muted">{t('Atualizado {when}.', { when: formatAge(them.updatedAt, data.now) })}{distance === undefined ? t(' Compartilhe a sua para ver a distância.') : ''}</p>
+            <p className="muted">{t('Atualizado {when}.', { when: formatAge(them.updatedAt, data.now) })}{data.themApprox ? t(' Localização aproximada (uns 1 km).') : ''}{distance === undefined ? t(' Compartilhe a sua para ver a distância.') : ''}</p>
           </>
         )}
         {them ? (
@@ -1250,6 +1313,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
       />
 
       <section className="sharebox" aria-label={t('Sua localização')}>
+        <PrecisionPicker approx={data.meApprox === true} disabled={precisionBusy} onChange={(approx) => void changePrecision(approx)} text={t('{name} vê sua localização {how}.', { name: data.other.username, how: data.meApprox ? t('aproximada') : t('exata') })} />
         {share.state.phase === 'sharing' ? (
           <>
             <p className="sharebox__title">{t('Compartilhando sua localização')}</p>

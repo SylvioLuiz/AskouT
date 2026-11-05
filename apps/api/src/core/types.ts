@@ -164,6 +164,10 @@ export interface FlashInviteRecord {
   endedAt: Date | null;
   /** Lugar que um dos dois escolheu para se encontrarem. Some junto com o encontro. */
   destination?: FlashDestination | null;
+  /** Quem convidou escolheu mostrar só a posição aproximada (~1 km). */
+  fromApprox?: boolean;
+  /** Quem foi convidado escolheu mostrar só a posição aproximada (~1 km). */
+  toApprox?: boolean;
 }
 
 /** Lugar escolhido no mapa do encontro Flash. */

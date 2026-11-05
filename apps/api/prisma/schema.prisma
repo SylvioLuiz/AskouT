@@ -554,6 +554,9 @@ model FlashInvite {
   destinationLng      Float?
   destinationChosenBy String?   @db.Uuid
   destinationChosenAt DateTime?
+  // Cada um escolhe ao convidar/aceitar: true = o outro só vê a posição arredondada (~1 km).
+  fromApprox Boolean @default(false)
+  toApprox   Boolean @default(false)
 
   from      User            @relation("FlashInviteFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
   to        User            @relation("FlashInviteTo", fields: [toUserId], references: [id], onDelete: Cascade)

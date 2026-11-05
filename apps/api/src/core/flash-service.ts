@@ -77,6 +77,20 @@ export interface ApproxTrip {
   mode: 'walk' | 'car';
 }
 
+/** Precisão que quem escolheu "aproximada" mostra no encontro. */
+export const APPROX_ACCURACY_M = 1000;
+
+/** Essa pessoa escolheu mostrar só a posição aproximada neste encontro? */
+function approxFor(invite: FlashInviteRecord, userId: string): boolean {
+  return invite.fromUserId === userId ? invite.fromApprox === true : invite.toApprox === true;
+}
+
+/** Arredonda para ~1 km (2 casas decimais) quando a pessoa escolheu "aproximada". A posição exata nem chega a ser guardada. */
+function fuzzIfApprox(position: FlashPositionRecord, approx: boolean): FlashPositionRecord {
+  if (!approx) return position;
+  return { ...position, lat: Math.round(position.lat * 100) / 100, lng: Math.round(position.lng * 100) / 100, accuracyM: Math.max(position.accuracyM ?? 0, APPROX_ACCURACY_M) };
+}
+
 /** Até 2 km a pé (5 km/h); acima, de carro na cidade (~25 km/h mais 5 min para sair e estacionar). */
 export function approxTrip(meters: number): ApproxTrip {
   const km = meters / 1000;
@@ -119,6 +133,10 @@ export interface MatchView {
   conversationId: string;
   /** Lugar que um dos dois escolheu no mapa; nulo enquanto ninguém escolheu. */
   destination: { name: string; lat: number; lng: number; chosenByMe: boolean; chosenAt: string } | null;
+  /** Você escolheu mostrar só a sua posição aproximada. */
+  meApprox: boolean;
+  /** A outra pessoa só mostra a posição aproximada (~1 km). */
+  themApprox: boolean;
 }
 
 /** Rota de cada um até o lugar escolhido. `line` nulo: sem trajeto (o app desenha uma linha reta). */
@@ -357,7 +375,7 @@ export class FlashService {
   }
 
   /** Convida um amigo que está com o Flash ligado. O convite vale 15 minutos (ou até um dos Flash acabar). */
-  async invite(actorId: string, targetId: string): Promise<InviteView> {
+  async invite(actorId: string, targetId: string, options: { approx?: unknown } = {}): Promise<InviteView> {
     const { flash, follows, users, clock, ids } = this.deps;
     if (actorId === targetId) throw validationError('Você não pode convidar a si mesmo');
     const now = clock.now();
@@ -382,6 +400,8 @@ export class FlashService {
       expiresAt,
       respondedAt: null,
       endedAt: null,
+      fromApprox: options.approx === true,
+      toApprox: false,
     };
     await flash.createInvite(invite, now);
     const inviter = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
@@ -390,7 +410,7 @@ export class FlashService {
   }
 
   /** Quem recebeu aceita ou recusa. Ao aceitar, os dois passam a ver a posição um do outro até o encontro acabar. */
-  async respond(actorId: string, inviteId: string, action: unknown): Promise<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }> {
+  async respond(actorId: string, inviteId: string, action: unknown, options: { approx?: unknown } = {}): Promise<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }> {
     if (action !== 'accept' && action !== 'decline') {
       throw validationError('Ação inválida', { action: 'Use accept ou decline' });
     }
@@ -420,6 +440,7 @@ export class FlashService {
       ...invite,
       status: 'ACCEPTED',
       respondedAt: now,
+      toApprox: options.approx === true,
       expiresAt: new Date(Math.min(mine.expiresAt.getTime(), theirs.expiresAt.getTime())),
     });
     const conversation = await this.deps.conversations.getOrCreateDirect(invite.fromUserId, invite.toUserId, this.deps.ids.next(), now);
@@ -472,9 +493,23 @@ export class FlashService {
       accuracyM = input.accuracyM;
     }
     const now = this.deps.clock.now();
-    await this.requireAcceptedMatch(actorId, inviteId, now);
-    await this.deps.flash.upsertPosition({ inviteId, userId: actorId, lat, lng, accuracyM, updatedAt: now });
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
+    await this.deps.flash.upsertPosition(fuzzIfApprox({ inviteId, userId: actorId, lat, lng, accuracyM, updatedAt: now }, approxFor(invite, actorId)));
     return { ok: true };
+  }
+
+  /** Troca, durante o encontro, entre mostrar a posição exata ou só a aproximada. A já guardada é ajustada na hora. */
+  async setPrecision(actorId: string, inviteId: string, approx: unknown): Promise<{ approx: boolean }> {
+    if (typeof approx !== 'boolean') throw validationError('Escolha inválida', { approx: 'Use true ou false' });
+    const { flash, clock } = this.deps;
+    const now = clock.now();
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
+    await flash.saveInvite(invite.fromUserId === actorId ? { ...invite, fromApprox: approx } : { ...invite, toApprox: approx });
+    if (approx) {
+      const mine = (await flash.listPositions(inviteId)).find((p) => p.userId === actorId);
+      if (mine) await flash.upsertPosition(fuzzIfApprox(mine, true));
+    }
+    return { approx };
   }
 
   /** O encontro: quem é a outra pessoa e a última posição de cada um (a dela só aparece porque ela aceitou). */
@@ -508,6 +543,8 @@ export class FlashService {
       destination: invite.destination
         ? { name: invite.destination.name, lat: invite.destination.lat, lng: invite.destination.lng, chosenByMe: invite.destination.chosenById === actorId, chosenAt: invite.destination.chosenAt.toISOString() }
         : null,
+      meApprox: approxFor(invite, actorId),
+      themApprox: approxFor(invite, otherId),
     };
   }
 
