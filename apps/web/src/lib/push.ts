@@ -171,3 +171,46 @@ export async function refreshNativeToken(api: Api, bridge: NativePushBridge): Pr
   if (token !== old) await api.pushUnsubscribe(nativeEndpoint(old)).catch(() => undefined);
   storeNativeToken(token);
 }
+
+const ASKED_KEY = 'askout.push.asked';
+
+/** Só pede sozinho uma vez por aparelho, e só se o iPhone ainda não decidiu. Função pura. */
+export function shouldAutoAskPush(input: { serverNative: boolean; permission: 'granted' | 'denied' | 'prompt'; alreadyAsked: boolean }): boolean {
+  return input.serverNative && input.permission === 'prompt' && !input.alreadyAsked;
+}
+
+function wasAsked(): boolean {
+  try {
+    return localStorage.getItem(ASKED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markAsked(): void {
+  try {
+    localStorage.setItem(ASKED_KEY, '1');
+  } catch {
+    /* sem armazenamento: no pior caso pergunta de novo na próxima abertura */
+  }
+}
+
+/**
+ * No app do iPhone, mostra o pedido de permissão do iOS uma única vez, logo depois de a pessoa entrar.
+ * Quem recusar não é incomodada de novo: o botão "Ativar avisos" e os Ajustes do iPhone continuam valendo.
+ */
+export async function autoAskNativePush(api: Api, bridge: NativePushBridge, serverNative: boolean): Promise<void> {
+  let permission: 'granted' | 'denied' | 'prompt' = 'granted';
+  try {
+    permission = await bridge.permission();
+  } catch {
+    return;
+  }
+  if (!shouldAutoAskPush({ serverNative, permission, alreadyAsked: wasAsked() })) return;
+  markAsked();
+  try {
+    await enableNativePush(api, bridge);
+  } catch {
+    /* recusou ou falhou: sem insistir */
+  }
+}

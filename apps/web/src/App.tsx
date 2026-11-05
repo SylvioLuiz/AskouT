@@ -5,6 +5,7 @@ import { AuthProvider, useAuthContext, useUser } from './auth.tsx';
 import { Shell } from './components/Shell.tsx';
 import { TermsGate } from './components/terms-gate.tsx';
 import { Onboarding } from './components/onboarding.tsx';
+import { PushAutoAsk } from './components/push-auto-ask.tsx';
 import { RingLoader } from './components/ring-loader.tsx';
 import { Button, EmptyState } from './components/ui.tsx';
 import { useTitle } from './hooks.ts';
@@ -157,6 +158,7 @@ function AppRoutes() {
       <TermsGate>
         <Shell>{priv ? priv.route.render(priv.params) : <NotFoundScreen />}</Shell>
         <Onboarding />
+        <PushAutoAsk />
       </TermsGate>
     </FlashPresenceProvider>
   );

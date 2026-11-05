@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { nativeEndpoint, nativePushBridge, nativePushState, pushState, subscriptionBody, urlBase64ToBytes } from './push.ts';
+import { nativeEndpoint, nativePushBridge, nativePushState, pushState, shouldAutoAskPush, subscriptionBody, urlBase64ToBytes } from './push.ts';
 import type { PushEnvironment } from './push.ts';
 
 const base: PushEnvironment = { hasServiceWorker: true, hasPushManager: true, hasNotification: true, secureContext: true, permission: 'default', isApple: false, standalone: false, serverKey: 'k', subscribed: false };
@@ -44,5 +44,13 @@ describe('push no app do iPhone', () => {
     assert.equal(nativePushBridge({ AskouTPush: bridge }), bridge);
     assert.equal(nativeEndpoint('ab12'), 'apns:ab12');
     assert.equal(nativeEndpoint('cAb:APA91b-x_y'), 'fcm:cAb:APA91b-x_y');
+  });
+  it('pede permissão sozinho só uma vez e só se o iPhone ainda não decidiu', () => {
+    const ok = { serverNative: true, permission: 'prompt' as const, alreadyAsked: false };
+    assert.equal(shouldAutoAskPush(ok), true);
+    assert.equal(shouldAutoAskPush({ ...ok, alreadyAsked: true }), false);
+    assert.equal(shouldAutoAskPush({ ...ok, permission: 'denied' }), false);
+    assert.equal(shouldAutoAskPush({ ...ok, permission: 'granted' }), false);
+    assert.equal(shouldAutoAskPush({ ...ok, serverNative: false }), false);
   });
 });

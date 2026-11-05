@@ -422,3 +422,8 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Build 11: botão oficial "Continuar com a Apple" (imagem do serviço da Apple, no idioma do app; reserva em texto se a imagem falhar) e app só para iPhone (`TARGETED_DEVICE_FAMILY = 1`).
 - Falta: screenshots reais do iPhone (5, sem tela de login), apagar as de iPad, trocar para a build 11 e reenviar.
 - Build 12 (03/11): tela de entrada cabe na tela do celular sem rolagem (verificado em 390x844 e 375x667 no Chromium), card menor, e o botão do Google no mesmo padrão do da Apple (retangular, mesma largura e altura). Só a entrada: cadastro e recuperar senha continuam rolando. Não testado em iPhone real.
+
+## Pedido automático de avisos no iPhone (05/11/2026) — para a 1.0.1
+- No app do iPhone, o pedido de permissão do iOS aparece **uma vez**, ~2,5 s depois de a pessoa entrar (`PushAutoAsk`, `autoAskNativePush` em `apps/web/src/lib/push.ts`). Quem recusar não é incomodada de novo; o botão "Ativar avisos" e Ajustes > AskouT > Notificações continuam valendo. Não há tela explicativa antes (só o pedido do iOS).
+- **Só entra na loja com a 1.0.1** (nova build + revisão). O Sylvio pediu para **não submeter ainda**: há outras mudanças antes. Testes e typecheck do web passam; **não testado em aparelho**.
+- Antes de lançar: testar a entrega real do push (botão atual) e conferir que o token é salvo.
