@@ -111,6 +111,16 @@ jobs:
             -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
           echo "Build $BUILD_NUMBER enviado. Aparece no TestFlight em 10 a 30 minutos." >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Limpar builds antigas do TestFlight (a cada 10 builds)
+        # Quando o número da build é múltiplo de 10, expira todas menos as 10 mais novas.
+        if: success()
+        continue-on-error: true
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          if [ $((BUILD_NUMBER % 10)) -eq 0 ]; then node .github/scripts/expire-testflight-builds.mjs; else echo "Build $BUILD_NUMBER: sem limpeza (só nos múltiplos de 10)."; fi
+
       - name: Apagar a chave
         if: always()
         run: |
