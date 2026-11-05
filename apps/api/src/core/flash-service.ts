@@ -385,7 +385,7 @@ export class FlashService {
     };
     await flash.createInvite(invite, now);
     const inviter = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
-    await this.deps.notifier.notify({ userId: targetId, type: 'FLASH_INVITE', title: `${inviter} convidou você para o NOW`, body: 'Vale por poucos minutos', url: '/flash', dedupeKey: `flash-invite:${actorId}` });
+    await this.deps.notifier.notify({ userId: targetId, type: 'FLASH_INVITE', title: `${inviter} convidou você para o NOW`, body: 'Vale por poucos minutos', url: '/now', dedupeKey: `flash-invite:${actorId}` });
     return this.inviteView(invite, actorId, profile);
   }
 
@@ -532,7 +532,7 @@ export class FlashService {
     await flash.saveInvite({ ...invite, destination: { name, lat, lng, chosenById: actorId, chosenAt: now } });
     const otherId = invite.fromUserId === actorId ? invite.toUserId : invite.fromUserId;
     const who = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
-    await notifier.notify({ userId: otherId, type: 'FLASH_INVITE', title: `${who} escolheu um lugar`, body: name, url: `/flash/encontro/${inviteId}`, dedupeKey: `flash-destination:${inviteId}:${name}` });
+    await notifier.notify({ userId: otherId, type: 'FLASH_INVITE', title: `${who} escolheu um lugar`, body: name, url: `/now/encontro/${inviteId}`, dedupeKey: `flash-destination:${inviteId}:${name}` });
     return { ok: true };
   }
 

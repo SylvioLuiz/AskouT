@@ -357,7 +357,7 @@ function FlashContent() {
         <ul className="list">
           {matches.map((invite) => (
             <li key={invite.id} className="person">
-              <Link to={`/flash/encontro/${invite.id}`} className="person__link">
+              <Link to={`/now/encontro/${invite.id}`} className="person__link">
                 <Avatar profile={invite.other} />
                 <span className="person__body">
                   <span className="person__name">{invite.other.username}</span>
@@ -366,7 +366,7 @@ function FlashContent() {
               </Link>
               <div className="person__aside row-actions">
                 <ChatButton userId={invite.other.userId} variant="primary" small />
-                <Link to={`/flash/encontro/${invite.id}`} className="btn btn--secondary btn--small">
+                <Link to={`/now/encontro/${invite.id}`} className="btn btn--secondary btn--small">
                   {t('Mapa')}
                 </Link>
               </div>
@@ -900,7 +900,7 @@ function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFrie
   let action;
   if (invite?.direction === 'MATCHED') {
     action = (
-      <Link to={`/flash/encontro/${invite.id}`} className="btn btn--primary btn--small">
+      <Link to={`/now/encontro/${invite.id}`} className="btn btn--primary btn--small">
         {t('Ver encontro')}
       </Link>
     );
@@ -950,7 +950,7 @@ function InviteRow({ invite, canAccept, onChanged, onFeedback }: { invite: Flash
       if (action === 'accept') {
         announceFlashChange();
         // Aceitou: abre o encontro, onde o envio da localização começa sozinho. A conversa fica a um toque dali.
-        navigate(`/flash/encontro/${invite.id}`);
+        navigate(`/now/encontro/${invite.id}`);
         return;
       }
       onChanged();
@@ -1114,11 +1114,11 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
     if (match.error.code === 'NOT_FOUND') {
       return (
         <>
-          <PageHead title={t('Encontro')} back="/flash" />
+          <PageHead title={t('Encontro')} back="/now" />
           <EmptyState
             title={t('Este encontro acabou')}
             action={
-              <Link to="/flash" className="btn btn--primary">
+              <Link to="/now" className="btn btn--primary">
                 {t('Voltar ao NOW')}
               </Link>
             }
@@ -1137,7 +1137,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
     try {
       share.stop();
       await api.flashEnd(inviteId);
-      navigate('/flash');
+      navigate('/now');
     } catch (failure) {
       setFeedback({ tone: 'error', text: toApiError(failure).message });
       setBusy(false);
@@ -1186,7 +1186,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
 
   return (
     <>
-      <PageHead title={data.other.username} back="/flash" subtitle={t('Encontro NOW · acaba em {left}', { left: formatRemaining(left) })} />
+      <PageHead title={data.other.username} back="/now" subtitle={t('Encontro NOW · acaba em {left}', { left: formatRemaining(left) })} />
       {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
 
       <section className="whereis" aria-label={t('Onde {username} está', { username: data.other.username })}>
@@ -1283,7 +1283,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
             {t('Encerrar encontro')}
           </Button>
         )}
-        <BlockAction profile={data.other} onDone={() => navigate('/flash')} onFeedback={setFeedback} />
+        <BlockAction profile={data.other} onDone={() => navigate('/now')} onFeedback={setFeedback} />
       </div>
     </>
   );

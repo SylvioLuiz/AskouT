@@ -73,7 +73,7 @@ export function ConversationsScreen() {
         <EmptyState
           title={t('Nenhuma conversa ainda')}
           action={
-            <Link to="/flash" className="btn btn--primary">
+            <Link to="/now" className="btn btn--primary">
               {t('Ver quem está no NOW')}
             </Link>
           }
@@ -470,7 +470,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         <Button small onClick={() => setSuggesting(true)}>
           {t('Sugerir um rolê')}
         </Button>
-        <Link to={`/flash/encontro/${match.id}`} className="btn btn--secondary btn--small">
+        <Link to={`/now/encontro/${match.id}`} className="btn btn--secondary btn--small">
           {t('Ver no mapa')}
         </Link>
       </div>

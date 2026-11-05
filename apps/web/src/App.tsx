@@ -67,8 +67,11 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/planejar/nova/:id', render: (p) => <DatePollCreateScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/planejar/:id', render: (p) => <DatePollScreen key={p['id']} pollId={p['id'] ?? ''} /> },
   { path: '/agenda', render: () => <AgendaScreen /> },
-  { path: '/flash', render: () => <FlashScreen /> },
-  { path: '/flash/encontro/:id', render: (p) => <MatchScreen inviteId={p['id'] ?? ''} /> },
+  { path: '/now', render: () => <FlashScreen /> },
+  { path: '/now/encontro/:id', render: (p) => <MatchScreen inviteId={p['id'] ?? ''} /> },
+  // Endereços antigos (o NOW se chamava Flash): avisos já enviados e links salvos continuam funcionando.
+  { path: '/flash', render: () => <Redirect to="/now" /> },
+  { path: '/flash/encontro/:id', render: (p) => <Redirect to={`/now/encontro/${encodeURIComponent(p['id'] ?? '')}`} /> },
   { path: '/atividades', render: () => <ActivityScreen /> },
   { path: '/criar', render: () => <CreatePostScreen /> },
   { path: '/posts/:id', render: (p) => <PostScreen key={p['id']} postId={p['id'] ?? ''} /> },

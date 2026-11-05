@@ -61,7 +61,7 @@ export function HomeScreen() {
       ) : null}
 
       {showFlashCard(me.data?.counts.following) ? (
-        <Link to="/flash" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
+        <Link to="/now" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
           <span className="flashcta__icon">
             <BoltIcon filled />
           </span>
