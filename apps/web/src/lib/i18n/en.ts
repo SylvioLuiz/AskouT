@@ -723,6 +723,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Manhã": "Morning",
   "Mantenha esta tela aberta até terminar.": "Keep this screen open until it finishes.",
   "Mapa": "Map",
+  "Lista": "List",
+  "Visualização do Explorar": "Explore view",
   "Mapa com a posição de vocês dois": "Map with both of your positions",
   "Mapa com os locais e eventos perto": "Map with nearby places and events",
   "Mapa do Explorar": "Explore map",
