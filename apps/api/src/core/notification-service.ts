@@ -62,8 +62,11 @@ export class StoredNotifier implements Notifier {
     let muted = false;
     try {
       muted = isMuted(await notifications.getMuteSettings(input.userId), input.type);
-      if (input.dedupeKey && (await notifications.hasUnread(input.userId, input.dedupeKey))) return;
-      await notifications.create({
+      const repeated = input.dedupeKey !== undefined && (await notifications.hasUnread(input.userId, input.dedupeKey));
+      // O sino guarda um aviso por chave. Mensagem é a exceção do celular: cada mensagem nova chega como push,
+      // mesmo com o aviso anterior da conversa ainda não lido (o sino não repete).
+      if (repeated && input.type !== 'MESSAGE') return;
+      if (!repeated) await notifications.create({
         id: ids.next(),
         userId: input.userId,
         type: input.type,
