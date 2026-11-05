@@ -64,7 +64,7 @@ test('previewOf', () => {
   assert.equal(previewOf(msg('2', 'x', { kind: 'SUGGESTION', suggestion: toCard(item) })), 'Sugeriu Bar');
 });
 
-import { formatRating, ratingLabel, routeLink, sourceLabel, starPercent } from './chat.ts';
+import { formatRating, ratingLabel, sourceLabel, starPercent } from './chat.ts';
 
 test('nota do Google: texto, rótulo acessível e estrelas em meias unidades', () => {
   assert.equal(formatRating(4.62), '4,6');
@@ -78,8 +78,7 @@ test('nota do Google: texto, rótulo acessível e estrelas em meias unidades', (
   assert.equal(starPercent(-1), 0);
 });
 
-test('rota e fonte', () => {
-  assert.equal(routeLink(-23.5, -46.6), 'https://www.google.com/maps/dir/?api=1&destination=-23.5,-46.6&travelmode=walking');
+test('fonte', () => {
   assert.equal(sourceLabel('GOOGLE'), 'Rolê do Google');
 });
 

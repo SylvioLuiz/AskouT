@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Map as GlMap, Marker } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { createMapEngine, type EngineMarker, type MapEngine } from './map-engine.ts';
 import { t } from '../lib/i18n/index.ts';
 
-// Mapa do encontro: OpenStreetMap (tiles raster) desenhado pelo MapLibre. Carregado sob demanda, só na tela
+// Mapa do encontro: Google Maps (ou MapLibre sem a chave, ver map-engine.ts). Carregado sob demanda, só na tela
 // do encontro, porque a biblioteca é grande. Os pins só existem aqui, depois do aceite do convite.
 
 export interface MapPin {
@@ -25,22 +24,6 @@ interface Props {
   onFail: () => void;
 }
 
-const STYLE = {
-  version: 8 as const,
-  sources: {
-    osm: {
-      type: 'raster' as const,
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: '© OpenStreetMap contributors',
-    },
-  },
-  layers: [{ id: 'osm', type: 'raster' as const, source: 'osm' }],
-};
-
-type Lib = typeof import('maplibre-gl');
-
 function pinElement(className: string, text: string): HTMLDivElement {
   const el = document.createElement('div');
   el.className = className;
@@ -50,7 +33,7 @@ function pinElement(className: string, text: string): HTMLDivElement {
 
 export default function MatchMap({ me, others, onFail }: Props) {
   const box = useRef<HTMLDivElement>(null);
-  const live = useRef<{ map: GlMap; lib: Lib; me?: Marker; others: Map<string, Marker>; fitKey: string } | undefined>(undefined);
+  const live = useRef<{ map: MapEngine; me?: EngineMarker; others: Map<string, EngineMarker>; fitKey: string } | undefined>(undefined);
   const failRef = useRef(onFail);
   failRef.current = onFail;
   const [ready, setReady] = useState(false);
@@ -59,17 +42,13 @@ export default function MatchMap({ me, others, onFail }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const lib = await import('maplibre-gl');
-        if (cancelled || !box.current) return;
-        const map = new lib.Map({
-          container: box.current,
-          style: STYLE,
-          center: [-46.6333, -23.5505],
-          zoom: 14,
-          attributionControl: { compact: true },
-        });
-        map.addControl(new lib.NavigationControl({ showCompass: false }), 'top-right');
-        live.current = { map, lib, others: new Map(), fitKey: '' };
+        if (!box.current) return;
+        const map = await createMapEngine(box.current, { center: { lat: -23.5505, lng: -46.6333 }, zoom: 14, onFail: () => failRef.current() });
+        if (cancelled) {
+          map.destroy();
+          return;
+        }
+        live.current = { map, others: new Map(), fitKey: '' };
         setReady(true);
       } catch {
         if (!cancelled) failRef.current();
@@ -77,7 +56,7 @@ export default function MatchMap({ me, others, onFail }: Props) {
     })();
     return () => {
       cancelled = true;
-      live.current?.map.remove();
+      live.current?.map.destroy();
       live.current = undefined;
     };
   }, []);
@@ -85,14 +64,14 @@ export default function MatchMap({ me, others, onFail }: Props) {
   useEffect(() => {
     const state = live.current;
     if (!ready || !state) return;
-    const { map, lib } = state;
+    const { map } = state;
 
     // Seu pin.
     if (!me) {
       state.me?.remove();
       state.me = undefined;
-    } else if (state.me) state.me.setLngLat([me.lng, me.lat]);
-    else state.me = new lib.Marker({ element: pinElement('pin pin--me', '') }).setLngLat([me.lng, me.lat]).addTo(map);
+    } else if (state.me) state.me.setPosition(me);
+    else state.me = map.addMarker(pinElement('pin pin--me', ''), me, 'center');
 
     // Um pin por pessoa que aceitou sair com você; some quando o encontro acaba.
     const wanted = new Set(others.map((o) => o.id));
@@ -104,12 +83,12 @@ export default function MatchMap({ me, others, onFail }: Props) {
     }
     for (const other of others) {
       let marker = state.others.get(other.id);
-      if (marker) marker.setLngLat([other.lng, other.lat]);
+      if (marker) marker.setPosition(other);
       else {
-        marker = new lib.Marker({ element: pinElement('pin pin--them', other.initials) }).setLngLat([other.lng, other.lat]).addTo(map);
+        marker = map.addMarker(pinElement('pin pin--them', other.initials), other, 'center');
         state.others.set(other.id, marker);
       }
-      marker.getElement().classList.toggle('pin--stale', other.stale);
+      marker.element.classList.toggle('pin--stale', other.stale);
     }
 
     // Reenquadra só quando aparece ou some um pin, para não tirar o mapa do lugar enquanto a pessoa o move.
@@ -118,13 +97,8 @@ export default function MatchMap({ me, others, onFail }: Props) {
       state.fitKey = fitKey;
       const points: MapPin[] = [...(me ? [me] : []), ...others];
       const first = points[0] as MapPin;
-      if (points.length === 1) {
-        map.easeTo({ center: [first.lng, first.lat], zoom: 16, duration: 0 });
-      } else {
-        const bounds = new lib.LngLatBounds([first.lng, first.lat], [first.lng, first.lat]);
-        for (const point of points) bounds.extend([point.lng, point.lat]);
-        map.fitBounds(bounds, { padding: 64, maxZoom: 17, duration: 0 });
-      }
+      if (points.length === 1) map.moveTo(first, { zoom: 16 });
+      else map.fit(points, 64, 17);
     }
   }, [ready, me, others]);
 

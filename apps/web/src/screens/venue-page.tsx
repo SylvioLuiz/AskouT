@@ -1,3 +1,4 @@
+import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { useRef, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { Sheet } from '../components/agenda.tsx';
@@ -9,7 +10,7 @@ import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
-import { formatRating, formatWhen, routeLink, starPercent } from '../lib/chat.ts';
+import { formatRating, formatWhen, starPercent } from '../lib/chat.ts';
 import { distanceMeters, formatDistance } from '../lib/flash.ts';
 import { useCurrentPosition } from './explore.tsx';
 import { toApiError } from '../lib/errors.ts';
@@ -517,9 +518,9 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             <Button variant={v.following ? 'secondary' : 'primary'} loading={followBusy} aria-pressed={v.following} onClick={() => void toggleFollow()}>
               {v.following ? t('Seguindo') : t('Seguir')}
             </Button>
-            <a className="btn btn--quiet" href={routeLink(v.lat, v.lng)} target="_blank" rel="noopener noreferrer">
+            <OpenInMaps className="btn btn--quiet" mode="route" lat={v.lat} lng={v.lng} label={v.name}>
               Rota{where.status === 'ok' ? ` · a ${formatDistance(distanceMeters(where.position, { lat: v.lat, lng: v.lng }))}` : ''}
-            </a>
+            </OpenInMaps>
           </div>
         )}
         {problem ? <Notice tone="error">{problem}</Notice> : null}
@@ -552,9 +553,9 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             {v.address ? (
               <InfoRow icon={<LocationIcon />}>
                 <span className="vinfo__addr">{v.address}</span>
-                <a className="vinfo__sub vinfo__link" href={routeLink(v.lat, v.lng)} target="_blank" rel="noopener noreferrer">
+                <OpenInMaps className="vinfo__sub vinfo__link" mode="route" lat={v.lat} lng={v.lng} label={v.name}>
                   {t('Como chegar')}
-                </a>
+                </OpenInMaps>
               </InfoRow>
             ) : v.isOwner ? (
               <InfoRow icon={<LocationIcon />}>
