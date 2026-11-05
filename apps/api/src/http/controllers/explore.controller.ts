@@ -40,12 +40,6 @@ export class ExploreController {
     };
   }
 
-  /** Rota de você até um lugar: `?deLat&deLng&paraLat&paraLng&modo=pe|carro`. */
-  @Get('explore/route')
-  route(@Query() query: Record<string, unknown>) {
-    return this.core.explore.route(query);
-  }
-
   /** Locais perto (AskouT + Google/OSM) para os pins do mapa do Explorar. A posição só vale para esta consulta. */
   @Get('explore/places')
   async mapPlaces(@CurrentActor() actor: Actor, @Query() query: Record<string, unknown>) {

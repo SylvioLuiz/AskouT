@@ -7,11 +7,11 @@ import { Button, EmptyState, Loading } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
-import { formatDistance, formatTravel } from '../lib/flash.ts';
+import { formatDistance } from '../lib/flash.ts';
 import { liveEvents, timeRange } from '../lib/live-events.ts';
 import { Rating } from '../components/suggestions.tsx';
 import { toApiError } from '../lib/errors.ts';
-import type { ExploreEvent, ExplorePlace, ExploreRoute } from '../lib/types.ts';
+import type { ExploreEvent, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
 import { t } from '../lib/i18n/index.ts';
@@ -52,9 +52,7 @@ function MapCard({ event, selected }: { event: ExploreEvent; selected: boolean }
   );
 }
 
-type RouteState = { key: string; mode: 'foot' | 'driving'; loading: boolean; data?: ExploreRoute; error?: string };
-
-function PlaceCard({ place, selected, canRoute, route, onRoute, onClearRoute }: { place: ExplorePlace; selected: boolean; canRoute: boolean; route: RouteState | undefined; onRoute: (mode: 'foot' | 'driving') => void; onClearRoute: () => void }) {
+function PlaceCard({ place, selected }: { place: ExplorePlace; selected: boolean }) {
   const [opening, setOpening] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [failed, setFailed] = useState(false);
@@ -100,46 +98,10 @@ function PlaceCard({ place, selected, canRoute, route, onRoute, onClearRoute }: 
           <Button small loading={opening} onClick={() => void openPage()}>
             {t('Ver página')}
           </Button>
-          {canRoute ? (
-            route ? (
-              <Button small variant="quiet" onClick={onClearRoute}>
-                {t('Tirar rota')}
-              </Button>
-            ) : (
-              <Button small variant="secondary" onClick={() => onRoute('foot')}>
-                {t('Rota')}
-              </Button>
-            )
-          ) : (
-            <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={place.lat} lng={place.lng} label={place.name}>
-              {t('Rota')}
-            </OpenInMaps>
-          )}
+          <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={place.lat} lng={place.lng} label={place.name}>
+            {t('Rota')}
+          </OpenInMaps>
         </div>
-        {route ? (
-          <div className="evmaproute">
-            <div className="evmaproute__modes" role="radiogroup" aria-label={t('Como ir')}>
-              <button type="button" role="radio" aria-checked={route.mode === 'foot'} aria-pressed={route.mode === 'foot'} className="chip" onClick={() => onRoute('foot')}>
-                {t('A pé')}
-              </button>
-              <button type="button" role="radio" aria-checked={route.mode === 'driving'} aria-pressed={route.mode === 'driving'} className="chip" onClick={() => onRoute('driving')}>
-                {t('De carro')}
-              </button>
-            </div>
-            <p className="evmaproute__sum" role="status">
-              {route.loading
-                ? t('Traçando a rota…')
-                : route.error
-                  ? route.error
-                  : route.data
-                    ? `${formatDistance(route.data.distanceM)} · ${formatTravel(route.data.durationS)}${route.data.line === null ? ` ${t('(estimativa em linha reta)')}` : ''}`
-                    : null}
-            </p>
-            <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={place.lat} lng={place.lng} label={place.name} travel={route.mode === 'driving' ? 'driving' : 'walking'}>
-              {t('Abrir no app de mapas')}
-            </OpenInMaps>
-          </div>
-        ) : null}
       </article>
     </li>
   );
@@ -233,27 +195,6 @@ export function EventsMapScreen() {
     };
   }, [ids.length, mode]);
 
-  // Rota dentro do mapa, da sua posição até o local escolhido.
-  const [route, setRoute] = useState<RouteState | undefined>();
-  const routeSeq = useRef(0);
-  async function showRoute(place: ExplorePlace, travel: 'foot' | 'driving') {
-    if (!position) return;
-    const seq = ++routeSeq.current;
-    setRoute((cur) => ({ key: place.key, mode: travel, loading: true, ...(cur?.key === place.key && cur.data ? { data: cur.data } : {}) }));
-    try {
-      const data = await api.exploreRoute(position, { lat: place.lat, lng: place.lng }, travel);
-      if (seq === routeSeq.current) setRoute({ key: place.key, mode: travel, loading: false, data });
-    } catch (failure) {
-      if (seq === routeSeq.current) setRoute({ key: place.key, mode: travel, loading: false, error: toApiError(failure).message });
-    }
-  }
-  const routePlace = route ? places.find((p) => p.key === route.key) : undefined;
-  const routeLine = useMemo(() => {
-    if (!route?.data || !routePlace || !position) return undefined;
-    const points = route.data.line ? route.data.line.map(([lng, lat]) => ({ lat, lng })) : [position, { lat: routePlace.lat, lng: routePlace.lng }];
-    return { points, dashed: route.data.line === null };
-  }, [route?.data, routePlace, position?.lat, position?.lng]);
-
   const active = mode === 'places' ? placesResult : eventsResult;
   const loading = waiting || (active.loading && !active.data);
   const noLocation = mode === 'places' && !position && !waiting;
@@ -266,7 +207,7 @@ export function EventsMapScreen() {
         </div>
       ) : (
         <Suspense fallback={<div className="evmap__canvas" />}>
-          <EventsMap pins={pins} me={position} selectedId={current} onSelect={pick} onFail={() => setMapFailed(true)} route={routeLine} />
+          <EventsMap pins={pins} me={position} selectedId={current} onSelect={pick} onFail={() => setMapFailed(true)} />
         </Suspense>
       )}
       <header className="evmap__top">
@@ -315,20 +256,7 @@ export function EventsMapScreen() {
         ) : (
           <ul ref={strip} key={mode} className="evmap__strip">
             {mode === 'places'
-              ? places.map((p) => (
-                  <PlaceCard
-                    key={p.key}
-                    place={p}
-                    selected={`p:${p.key}` === current}
-                    canRoute={position !== undefined}
-                    route={route?.key === p.key ? route : undefined}
-                    onRoute={(travel) => void showRoute(p, travel)}
-                    onClearRoute={() => {
-                      routeSeq.current += 1;
-                      setRoute(undefined);
-                    }}
-                  />
-                ))
+              ? places.map((p) => <PlaceCard key={p.key} place={p} selected={`p:${p.key}` === current} />)
               : events.map((e) => <MapCard key={e.id} event={e} selected={`e:${e.id}` === current} />)}
           </ul>
         )}

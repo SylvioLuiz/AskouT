@@ -158,25 +158,3 @@ test('bombando: só eventos acontecendo agora com muita gente confirmada, do mai
   const plain = await w.core.explore.search(ana, {});
   assert.equal(plain.events.some((e) => e.goingCount !== undefined), false, 'sem o filtro, não mostra contagem');
 });
-
-test('rota no mapa do Explorar: usa o serviço de rotas e, sem ele, linha reta', async () => {
-  const calls: string[] = [];
-  const w = makeWorld({
-    routes: {
-      route: async (_from, _to, mode) => {
-        calls.push(mode);
-        return { distanceM: 1234.4, durationS: 900.6, line: [[-46.63, -23.55], [-46.62, -23.54]] };
-      },
-    },
-  });
-  const r = await w.core.explore.route({ deLat: '-23.55', deLng: '-46.63', paraLat: '-23.54', paraLng: '-46.62', modo: 'carro' });
-  assert.deepEqual(r, { mode: 'driving', distanceM: 1234, durationS: 901, line: [[-46.63, -23.55], [-46.62, -23.54]] });
-  assert.deepEqual(calls, ['driving']);
-  const plain = makeWorld();
-  const s = await plain.core.explore.route({ deLat: -23.55, deLng: -46.63, paraLat: -23.54, paraLng: -46.62 });
-  assert.equal(s.mode, 'foot');
-  assert.equal(s.line, null);
-  assert.ok(s.distanceM > 1000 && s.durationS > 0);
-  await rejectsWith(plain.core.explore.route({ deLat: 'x', deLng: -46.63, paraLat: -23.54, paraLng: -46.62 }), 'VALIDATION');
-  await rejectsWith(plain.core.explore.route({ deLat: -23.55, deLng: -46.63, paraLat: -22.9, paraLng: -40 }), 'VALIDATION');
-});
