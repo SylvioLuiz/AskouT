@@ -74,6 +74,8 @@ export function PosterEvent({
         {image && !failed ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : fallback}
       </div>
       <div className="poster__scrim" aria-hidden="true" />
+      {/* O cartaz inteiro abre o evento; o título continua sendo o link para teclado e leitor de tela. */}
+      <Link to={`/eventos/${encodeURIComponent(eventId)}`} className="poster__hit" tabIndex={-1} aria-hidden="true">{null}</Link>
       <DateBadge startsAt={startsAt} />
       {tags ? <div className="poster__tags">{tags}</div> : null}
       <div className="poster__info">

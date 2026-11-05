@@ -2068,4 +2068,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Você e mais {n} pessoas vão": "You and {n} others are going",
   "1 pessoa vai": "1 person is going",
   "{n} pessoas vão": "{n} people are going",
+  "Foto em tela cheia": "Full-screen photo",
+  "Foto {index} de {total}": "Photo {index} of {total}",
+  "Foto anterior": "Previous photo",
+  "Próxima foto": "Next photo",
 };

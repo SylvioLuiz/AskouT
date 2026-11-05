@@ -1951,4 +1951,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Você e mais {n} pessoas vão": "Tú y {n} personas más van",
   "1 pessoa vai": "Va 1 persona",
   "{n} pessoas vão": "Van {n} personas",
+  "Foto em tela cheia": "Foto a pantalla completa",
+  "Foto {index} de {total}": "Foto {index} de {total}",
+  "Foto anterior": "Foto anterior",
+  "Próxima foto": "Foto siguiente",
 };

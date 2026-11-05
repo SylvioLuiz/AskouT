@@ -47,6 +47,11 @@ window.addEventListener('popstate', () => {
   focusContent();
 });
 
+/** Guarda a rolagem atual desta tela, para o "voltar" de uma camada por cima (ex.: foto em tela cheia) não pular para outra posição. */
+export function rememberScroll(): void {
+  scrolls.set(here(), window.scrollY);
+}
+
 export function navigate(to: string, options: { replace?: boolean } = {}): void {
   scrolls.set(here(), window.scrollY);
   if (options.replace) window.history.replaceState(null, '', to);
