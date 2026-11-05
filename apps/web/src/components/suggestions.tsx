@@ -165,7 +165,6 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
           <Notice tone="error">{result.error.message}</Notice>
         )
       ) : null}
-      {data?.reason === 'TOO_FAR' ? <Notice>{t('Vocês estão longe demais um do outro para achar algo no meio do caminho.')}</Notice> : null}
       {data && data.reason === null && data.items.length === 0 ? (
         <Notice>{t('Nenhum evento ou rolê encontrado por perto agora.')}</Notice>
       ) : null}

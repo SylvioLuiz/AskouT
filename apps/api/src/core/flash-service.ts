@@ -417,7 +417,7 @@ export class FlashService {
     const known = positions.map((p) => ({ lat: p.lat, lng: p.lng }));
     if (known.length === 2) {
       const mid = midpoint(known[0]!, known[1]!);
-      if (distanceMeters(mid, { lat, lng }) > DESTINATION_MAX_FROM_MID_M) throw validationError('Lugar longe demais', { lat: 'Escolha um lugar perto dos dois' });
+      if (distanceMeters(mid, { lat, lng }) > DESTINATION_MAX_FROM_MID_M + distanceMeters(known[0]!, known[1]!) / 2) throw validationError('Lugar longe demais', { lat: 'Escolha um lugar perto dos dois' });
     } else if (known.length === 1 && distanceMeters(known[0]!, { lat, lng }) > DESTINATION_MAX_FROM_MID_M) {
       throw validationError('Lugar longe demais', { lat: 'Escolha um lugar perto dos dois' });
     }
