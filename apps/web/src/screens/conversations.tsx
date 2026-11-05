@@ -5,7 +5,7 @@ import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { BellOffIcon, CameraIcon, CheckIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { BellOffIcon, CameraIcon, CheckIcon, ChevronDownIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
 import { MessagePopup, ReactionSummary, ReactionsSheet, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';
@@ -202,6 +202,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const typingSentAt = useRef(0);
   const pressTimer = useRef<number | undefined>(undefined);
   const endRef = useRef<HTMLDivElement>(null);
+  const lastSeenId = useRef<string | undefined>(undefined);
+  const [unseen, setUnseen] = useState(0);
   /** A página inteira rola: vai até o fim do documento, para a última mensagem ficar acima da barra de envio (que é fixa no rodapé). */
   const scrollToEnd = () => window.scrollTo({ top: document.documentElement.scrollHeight });
   const stickToEnd = useRef(true);
@@ -217,6 +219,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     setActionsFor(undefined);
     setSelected(undefined);
     setDeleting(false);
+    setUnseen(0);
+    lastSeenId.current = undefined;
     setDraft(readDraft(conversationId));
     setStaged((current) => {
       current.forEach((x) => URL.revokeObjectURL(x.url));
@@ -263,6 +267,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     const onScroll = () => {
       const doc = document.documentElement;
       stickToEnd.current = doc.scrollHeight - window.scrollY - window.innerHeight < 120;
+      if (stickToEnd.current) setUnseen(0);
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -271,6 +276,18 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   useLayoutEffect(() => {
     if (stickToEnd.current) scrollToEnd();
   }, [messages.length, view.data?.typing.length, staged.length, replyTo]);
+
+  // Chegou mensagem de outra pessoa enquanto você lia lá em cima: conta para o botão "Novas mensagens".
+  useEffect(() => {
+    const previous = lastSeenId.current;
+    const last = messages[messages.length - 1];
+    lastSeenId.current = last?.id;
+    if (!previous || !last || last.id === previous || stickToEnd.current) return;
+    const from = messages.findIndex((m) => m.id === previous);
+    if (from === -1) return;
+    const fresh = messages.slice(from + 1).filter((m) => !m.mine && m.kind !== 'SYSTEM').length;
+    if (fresh > 0) setUnseen((n) => n + fresh);
+  }, [messages]);
 
   // Fotos e áudios que terminam de carregar depois aumentam a conversa: continua no fim se a pessoa estava lá.
   const hasThread = view.data !== undefined;
@@ -683,6 +700,20 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         <div ref={endRef} />
       </div>
 
+      {unseen > 0 ? (
+        <button
+          type="button"
+          className="chat__newbtn"
+          onClick={() => {
+            stickToEnd.current = true;
+            setUnseen(0);
+            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+          }}
+        >
+          {unseen === 1 ? t('1 mensagem nova') : t('{count} mensagens novas', { count: unseen })}
+          <ChevronDownIcon />
+        </button>
+      ) : null}
       {problem ? <Notice tone="error">{problem}</Notice> : null}
       {uploading ? (
         <p className="muted chat__sending" role="status">
