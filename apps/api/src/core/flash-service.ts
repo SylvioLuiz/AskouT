@@ -146,8 +146,8 @@ export interface RoutesView {
   them: { distanceM: number; durationS: number; line: [number, number][] | null } | null;
 }
 
-/** O lugar escolhido precisa ficar perto dos dois: no máximo isto do ponto médio. */
-export const DESTINATION_MAX_FROM_MID_M = 25_000;
+/** O lugar escolhido (ou sugerido pela busca) precisa ficar a no máximo isto do ponto médio (mais metade da distância entre os dois). */
+export const DESTINATION_MAX_FROM_MID_M = 100_000;
 export const DESTINATION_NAME_MAX = 120;
 
 function sessionView(s: FlashSessionRecord | undefined): FlashStatusView {
