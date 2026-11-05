@@ -2052,4 +2052,6 @@ export const EN: Readonly<Record<string, string>> = {
   "Mensagem…": "Message…",
   "Enviar": "Send",
   "Enviar fotos ou vídeos da galeria": "Send photos or videos from your library",
+  "1 mensagem nova": "1 new message",
+  "{count} mensagens novas": "{count} new messages",
 };

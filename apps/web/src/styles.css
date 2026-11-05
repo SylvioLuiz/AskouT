@@ -4922,3 +4922,11 @@ button.reactlist__row { cursor: pointer; }
 @media (hover: hover) { .msg .msg__more { opacity: 0; } .msg:hover .msg__more, .msg .msg__more:focus-visible { opacity: 1; } }
 /* No toque fica fora da vista, mas o leitor de tela continua achando o botão. */
 @media (hover: none) { .msg .msg__more { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }
+
+/* Mensagens novas enquanto você lia lá em cima */
+.chat__newbtn { position: sticky; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 5; align-self: center; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin: 0 0 8px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font: inherit; font-size: 0.875rem; font-weight: 600; box-shadow: 0 4px 14px rgb(0 0 0 / 0.2); cursor: pointer; animation: msgpop-in 160ms ease-out; }
+.chat__newbtn svg { width: 18px; height: 18px; }
+
+/* Dentro da conversa, só o topo do chat (sem a barra do app), como nas DMs. */
+.shell--chat .topbar { display: none; }
+.shell--chat .chathead { top: 0; padding-top: calc(8px + env(safe-area-inset-top)); }
