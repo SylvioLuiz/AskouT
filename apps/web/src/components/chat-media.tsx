@@ -100,7 +100,7 @@ export function MediaBubble({ message, conversationId }: { message: Pick<ChatMes
           }
         }}
       >
-        {!isVideo && media.url ? <img src={media.url} alt="" className="mediabubble__img" /> : null}
+        {!isVideo && media.url ? <img src={media.url} alt="" className="mediabubble__img" draggable={false} /> : null}
         {isVideo ? (
           <span className="mediabubble__play">
             <PlayIcon />
@@ -121,6 +121,17 @@ export function MediaBubble({ message, conversationId }: { message: Pick<ChatMes
         />
       ) : null}
     </>
+  );
+}
+
+/** Miniatura pequena da foto ou vídeo respondido (na barra "Respondendo a…" e na citação dentro do balão). */
+export function ReplyThumb({ conversationId, messageId, kind }: { conversationId: string; messageId: string; kind: 'IMAGE' | 'VIDEO' }) {
+  const media = useMessageMedia(conversationId, messageId, kind === 'IMAGE');
+  return (
+    <span className={`replythumb${kind === 'VIDEO' ? ' replythumb--video' : ''}`} aria-hidden="true">
+      {kind === 'IMAGE' && media.url ? <img src={media.url} alt="" draggable={false} /> : null}
+      {kind === 'VIDEO' ? <PlayIcon /> : null}
+    </span>
   );
 }
 

@@ -3838,7 +3838,14 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 }
 .bubble--deleted { background: transparent; border: 1px dashed var(--line-strong); }
 .bubble__text--deleted { color: var(--muted); font-style: italic; }
-.bubble__quote { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; margin: 0 0 6px; padding: 4px 8px; border: 0; border-left: 3px solid var(--brand); border-radius: 6px; background: rgba(0, 0, 0, 0.05); color: inherit; font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; }
+.bubble__quote { display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 100%; margin: 0 0 6px; padding: 4px 8px; border: 0; border-left: 3px solid var(--brand); border-radius: 6px; background: rgba(0, 0, 0, 0.05); color: inherit; font: inherit; font-size: 0.8125rem; text-align: left; cursor: pointer; }
+.bubble__quotetext { display: flex; flex: 1; min-width: 0; flex-direction: column; align-items: flex-start; gap: 1px; }
+.bubble--media .bubble__quote { margin: 0 0 4px; }
+.replythumb { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 6px; overflow: hidden; background: var(--line); color: var(--muted); }
+.replythumb img { display: block; width: 100%; height: 100%; object-fit: cover; -webkit-user-drag: none; }
+.replythumb--video { background: rgba(0, 0, 0, 0.55); color: #fff; }
+.replythumb svg { width: 18px; height: 18px; }
+.mediabubble__img { -webkit-user-drag: none; }
 .bubble__quote strong { font-size: 0.75rem; color: var(--brand-hover); }
 .bubble__quote span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .reactions { position: absolute; left: 10px; bottom: -14px; display: flex; flex-wrap: nowrap; gap: 4px; z-index: 1; }
