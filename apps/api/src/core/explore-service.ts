@@ -9,7 +9,7 @@ import type { EventKind, PlaceEventRecord, VenueHours, VenueRecord } from './typ
 import { EVENT_KINDS } from './types.ts';
 
 export const EXPLORE_DEFAULT_RADIUS_KM = 10;
-export const EXPLORE_MAX_RADIUS_KM = 50;
+export const EXPLORE_MAX_RADIUS_KM = 100;
 export const EXPLORE_MAX_SPAN_DAYS = 62;
 export const EXPLORE_DEFAULT_SPAN_DAYS = 30;
 export const EXPLORE_QUERY_MAX = 80;

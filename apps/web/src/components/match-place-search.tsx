@@ -6,8 +6,8 @@ import { t } from '../lib/i18n/index.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ExplorePlace } from '../lib/types.ts';
 
-/** Busca até 50 km em volta de quem pesquisa: dá para sugerir um rolê fora do meio do caminho. */
-const SEARCH_RADIUS_KM = 50;
+/** Busca até 100 km em volta de quem pesquisa: dá para sugerir um rolê fora do meio do caminho. */
+const SEARCH_RADIUS_KM = 100;
 const MIN_CHARS = 2;
 
 interface Props {
