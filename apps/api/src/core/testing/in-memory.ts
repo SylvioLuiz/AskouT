@@ -50,7 +50,7 @@ import { distanceMeters } from '../geo.ts';
 import type {
   DirectActivityRow,
   DwellRecord,
-  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -113,6 +113,26 @@ export class InMemoryUserRepository implements UserRepository {
       if (wanted.has(createHash('sha256').update(u.email.toLowerCase(), 'utf8').digest('hex'))) out.push(u.id);
     }
     return out;
+  }
+
+  async findIdsByPhoneHashes(hashes: string[]): Promise<string[]> {
+    const wanted = new Set(hashes);
+    const out: string[] = [];
+    for (const u of this.users.values()) {
+      if (u.status === 'SUSPENDED' || !u.phone) continue;
+      if (wanted.has(createHash('sha256').update(u.phone, 'utf8').digest('hex'))) out.push(u.id);
+    }
+    return out;
+  }
+
+  async setPhone(userId: string, phone: string | null): Promise<void> {
+    if (phone) {
+      for (const other of this.users.values()) {
+        if (other.id !== userId && other.phone === phone) throw conflict('Este celular já está em outra conta', { phone: 'Este celular já está em outra conta' });
+      }
+    }
+    const u = this.users.get(userId);
+    if (u) this.users.set(userId, { ...u, phone });
   }
 
   async findProfileById(userId: string): Promise<Profile | undefined> {
@@ -271,15 +291,26 @@ export class InMemoryFlashRepository implements FlashRepository {
     for (const s of this.sessions.values()) {
       if (s.userId !== session.userId || s.endedAt !== null) continue;
       if (s.expiresAt <= now) s.endedAt = s.expiresAt;
-      else throw conflict('Seu Flash já está ligado. Desligue para recomeçar.');
+      else throw conflict('Seu NOW já está ligado. Desligue para recomeçar.');
     }
-    this.sessions.set(session.id, { ...session });
+    this.sessions.set(session.id, { ...session, area: session.area ? { ...session.area } : null });
+  }
+
+  async extendSession(userId: string, now: Date, expiresAt: Date): Promise<boolean> {
+    for (const s of this.sessions.values()) {
+      if (s.userId === userId && this.active(s, now)) {
+        s.expiresAt = expiresAt;
+        return true;
+      }
+    }
+    return false;
   }
 
   async endSession(userId: string, now: Date): Promise<boolean> {
     for (const s of this.sessions.values()) {
       if (s.userId === userId && this.active(s, now)) {
         s.endedAt = now;
+        s.area = null;
         return true;
       }
     }
@@ -1141,6 +1172,8 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   readonly venueCovers = new Map<string, { mime: string; data: Uint8Array }>();
   readonly venueLogos = new Map<string, { mime: string; data: Uint8Array }>();
   readonly venueFollows = new Map<string, Date>();
+  /** Sininho ligado (`userId|venueId`). Só vale enquanto a pessoa segue. */
+  readonly venueNotify = new Set<string>();
   readonly venueRatings = new Map<string, number>();
 
   async updateVenueProfile(venueId: string, patch: VenueProfilePatch) {
@@ -1187,6 +1220,23 @@ export class InMemoryPlaceRepository implements PlaceRepository {
 
   async unfollowVenue(userId: string, venueId: string) {
     this.venueFollows.delete(`${userId}|${venueId}`);
+    this.venueNotify.delete(`${userId}|${venueId}`);
+  }
+
+  async setVenueNotify(userId: string, venueId: string, notify: boolean) {
+    const key = `${userId}|${venueId}`;
+    if (!this.venueFollows.has(key)) return false;
+    if (notify) this.venueNotify.add(key);
+    else this.venueNotify.delete(key);
+    return true;
+  }
+
+  async isVenueNotifyOn(userId: string, venueId: string) {
+    return this.venueNotify.has(`${userId}|${venueId}`);
+  }
+
+  async listVenueNotifyFollowers(venueId: string) {
+    return [...this.venueNotify].filter((k) => k.endsWith(`|${venueId}`) && this.venueFollows.has(k)).map((k) => k.slice(0, k.length - venueId.length - 1));
   }
 
   async isFollowingVenue(userId: string, venueId: string) {
@@ -1315,6 +1365,7 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   async searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number) {
     const out: { venue: VenueRecord; distanceM: number | null }[] = [];
     for (const venue of this.venues.values()) {
+      if (venue.isOrganization && !venue.ownerId) continue; // organização ainda sem dono (pedido em análise ou recusado)
       const m = matchVenue(venue, text, center, radiusM);
       if (m) out.push(m);
     }
@@ -2013,6 +2064,18 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
 
   async reportedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>> {
     return new Set(storyIds.filter((id) => this.storyReports.has(`${id}|${userId}`)));
+  }
+
+  readonly storyHidden = new Map<string, StoryHiddenRecord>();
+
+  async setStoryHidden(record: StoryHiddenRecord): Promise<void> {
+    const key = `${record.ownerId}|${record.otherId}`;
+    if (record.hideTheirs || record.hideMine) this.storyHidden.set(key, { ...record });
+    else this.storyHidden.delete(key);
+  }
+
+  async listStoryHidden(userId: string): Promise<StoryHiddenRecord[]> {
+    return [...this.storyHidden.values()].filter((r) => r.ownerId === userId || r.otherId === userId).map((r) => ({ ...r }));
   }
 
   async addPost(post: EventPostRecord): Promise<void> {

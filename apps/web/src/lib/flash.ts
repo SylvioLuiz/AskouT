@@ -1,4 +1,4 @@
-import type { SuggestionItem } from './types.ts';
+import type { ApproxTrip, SuggestionItem } from './types.ts';
 import { decimal, t } from '../lib/i18n/index.ts';
 // Contas do Flash que não dependem de tela: distância, tempo restante e rótulos.
 
@@ -37,6 +37,13 @@ export function formatKm(meters: number): string {
   return `${decimal(text.endsWith('.0') ? text.slice(0, -2) : text)} km`;
 }
 
+/** Só a distância, sempre deixando claro que é aproximada: "aprox. 12 km", "menos de 1 km".
+ *  Curto (`short`) para caber embaixo da foto: "~12 km", "<1 km". */
+export function formatApprox(a: ApproxTrip, short = false): string {
+  if (short) return a.km < 1 ? '<1 km' : `~${a.km} km`;
+  return a.km < 1 ? t('menos de 1 km') : t('aprox. {km} km', { km: a.km });
+}
+
 /** Minutos restantes até `iso`: 0 quando já passou, arredondando para cima. */
 export function minutesLeft(iso: string, nowMs: number): number {
   const target = Date.parse(iso);
@@ -69,7 +76,7 @@ export function formatAge(updatedAtIso: string, serverNowIso: string): string {
 
 /** Avisa o resto do app (o raio do topo, por exemplo) que o Flash ligou, desligou ou mudou de estado. */
 /** Mensagem de sistema que a API posta ao casar um Flash (mesmo texto de `FLASH_MATCH_MESSAGE` na API). */
-export const FLASH_MATCH_MESSAGE = t('Flash combinado! Vocês dois estão disponíveis agora.');
+export const FLASH_MATCH_MESSAGE = t('NOW combinado! Vocês dois estão disponíveis agora.');
 export const FLASH_CHANGED_EVENT = 'askout:flash-changed';
 export function announceFlashChange(): void {
   window.dispatchEvent(new Event(FLASH_CHANGED_EVENT));

@@ -3,6 +3,16 @@ import type { CoreDeps, RouteResult } from './ports.ts';
 import { distanceMeters, midpoint } from './geo.ts';
 import type { FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
+import { decay, directCloseness } from './recommendation-service.ts';
+
+/** Ordem da lista "Livres agora": quem está mais perto ou com quem você mais interage. */
+export type AvailableOrder = 'near' | 'interaction';
+/** Quanto tempo de conversas, curtidas e comentários conta para "mais interação". */
+export const NOW_INTERACTION_DAYS = 90;
+/** Arredonda a posição para ~1 km: o bastante para ordenar, sem guardar onde a pessoa está. */
+export function roundArea(value: number): number {
+  return Math.round(value * 100) / 100;
+}
 
 export const FLASH_HOURS: readonly number[] = [1, 2, 3];
 /** Duração livre em minutos (de 5 em 5), de 5 min até 3 h. */
@@ -10,8 +20,10 @@ export const FLASH_MIN_MINUTES = 5;
 export const FLASH_MAX_MINUTES = 180;
 export const FLASH_NOTE_MAX = 60;
 /** Mensagem de sistema que abre o encontro Flash na conversa; o app mostra nela o botão de sugerir lugar. */
-export const FLASH_MATCH_MESSAGE = 'Flash combinado! Vocês dois estão disponíveis agora.';
+export const FLASH_MATCH_MESSAGE = 'NOW combinado! Vocês dois estão disponíveis agora.';
 export const INVITE_TTL_MINUTES = 15;
+/** Quanto dá para estender o NOW de uma vez. O total que falta nunca passa de FLASH_MAX_MINUTES. */
+export const FLASH_EXTEND_MINUTES: readonly number[] = [30, 60];
 /** Depois disso a última posição conhecida é tratada como "sem sinal". */
 export const POSITION_STALE_SECONDS = 120;
 
@@ -52,6 +64,39 @@ export interface AvailableFriendView {
   expiresAt: string;
   /** Convite aberto entre você e essa pessoa, se houver. Nunca traz localização. */
   invite: { id: string; direction: InviteDirection } | null;
+  /** Distância e tempo aproximados até a pessoa (das regiões de ~1 km de cada um). Nulo se algum dos dois ligou sem localização. */
+  approx: ApproxTrip | null;
+}
+
+/** "~3 km · 15 min de carro": arredondado de propósito; nunca dá para achar a pessoa com isso. */
+export interface ApproxTrip {
+  /** Quilômetros inteiros; 0 quer dizer "menos de 1 km". */
+  km: number;
+  /** Minutos, de 5 em 5 (mínimo 5). */
+  minutes: number;
+  mode: 'walk' | 'car';
+}
+
+/** Precisão que quem escolheu "aproximada" mostra no encontro. */
+export const APPROX_ACCURACY_M = 1000;
+
+/** Essa pessoa escolheu mostrar só a posição aproximada neste encontro? */
+function approxFor(invite: FlashInviteRecord, userId: string): boolean {
+  return invite.fromUserId === userId ? invite.fromApprox === true : invite.toApprox === true;
+}
+
+/** Arredonda para ~1 km (2 casas decimais) quando a pessoa escolheu "aproximada". A posição exata nem chega a ser guardada. */
+function fuzzIfApprox(position: FlashPositionRecord, approx: boolean): FlashPositionRecord {
+  if (!approx) return position;
+  return { ...position, lat: Math.round(position.lat * 100) / 100, lng: Math.round(position.lng * 100) / 100, accuracyM: Math.max(position.accuracyM ?? 0, APPROX_ACCURACY_M) };
+}
+
+/** Até 2 km a pé (5 km/h); acima, de carro na cidade (~25 km/h mais 5 min para sair e estacionar). */
+export function approxTrip(meters: number): ApproxTrip {
+  const km = meters / 1000;
+  const walk = km <= 2;
+  const raw = walk ? (km / 5) * 60 : (km / 25) * 60 + 5;
+  return { km: km < 1 ? 0 : Math.round(km), minutes: Math.max(5, Math.round(raw / 5) * 5), mode: walk ? 'walk' : 'car' };
 }
 
 export interface InviteView {
@@ -88,6 +133,10 @@ export interface MatchView {
   conversationId: string;
   /** Lugar que um dos dois escolheu no mapa; nulo enquanto ninguém escolheu. */
   destination: { name: string; lat: number; lng: number; chosenByMe: boolean; chosenAt: string } | null;
+  /** Você escolheu mostrar só a sua posição aproximada. */
+  meApprox: boolean;
+  /** A outra pessoa só mostra a posição aproximada (~1 km). */
+  themApprox: boolean;
 }
 
 /** Rota de cada um até o lugar escolhido. `line` nulo: sem trajeto (o app desenha uma linha reta). */
@@ -97,8 +146,8 @@ export interface RoutesView {
   them: { distanceM: number; durationS: number; line: [number, number][] | null } | null;
 }
 
-/** O lugar escolhido precisa ficar perto dos dois: no máximo isto do ponto médio. */
-export const DESTINATION_MAX_FROM_MID_M = 25_000;
+/** O lugar escolhido (ou sugerido pela busca) precisa ficar a no máximo isto do ponto médio (mais metade da distância entre os dois). */
+export const DESTINATION_MAX_FROM_MID_M = 100_000;
 export const DESTINATION_NAME_MAX = 120;
 
 function sessionView(s: FlashSessionRecord | undefined): FlashStatusView {
@@ -134,7 +183,7 @@ export class FlashService {
   }
 
   /** Liga o Flash por 1, 2 ou 3 horas. Só um por vez; para mudar a duração é preciso desligar antes. */
-  async turnOn(actorId: string, input: { hours?: unknown; minutes?: unknown; note?: unknown }): Promise<FlashStatusView> {
+  async turnOn(actorId: string, input: { hours?: unknown; minutes?: unknown; note?: unknown; lat?: unknown; lng?: unknown }): Promise<FlashStatusView> {
     const { flash, clock, ids } = this.deps;
     const problems: Record<string, string> = {};
     let minutes = 0;
@@ -153,7 +202,14 @@ export class FlashService {
     } catch {
       problems.note = `Use no máximo ${FLASH_NOTE_MAX} caracteres, sem caracteres especiais`;
     }
-    if (Object.keys(problems).length > 0) throw validationError('Confira os dados do Flash', problems);
+    // Localização opcional: sem ela, a lista fica na ordem de interação.
+    let area: { lat: number; lng: number } | null = null;
+    if (input.lat !== undefined || input.lng !== undefined) {
+      const { lat, lng } = input;
+      if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) problems.location = 'Localização inválida';
+      else area = { lat: roundArea(lat), lng: roundArea(lng) };
+    }
+    if (Object.keys(problems).length > 0) throw validationError('Confira os dados do NOW', problems);
 
     const now = clock.now();
     const session: FlashSessionRecord = {
@@ -163,9 +219,27 @@ export class FlashService {
       expiresAt: new Date(now.getTime() + minutes * 60_000),
       endedAt: null,
       note,
+      area,
     };
     await flash.createSession(session, now);
     return sessionView(session);
+  }
+
+  /**
+   * Estende o NOW ligado em 30 minutos ou 1 hora, sem desligar nem perder convites. O tempo que falta fica limitado a
+   * 3 horas a partir de agora.
+   */
+  async extend(actorId: string, input: { minutes?: unknown }): Promise<FlashStatusView> {
+    const { flash, clock } = this.deps;
+    const now = clock.now();
+    const minutes = input.minutes;
+    if (typeof minutes !== 'number' || !FLASH_EXTEND_MINUTES.includes(minutes)) throw validationError('Confira os dados do NOW', { minutes: 'Escolha 30 minutos ou 1 hora' });
+    const session = await this.requireActive(actorId, now);
+    const cap = now.getTime() + FLASH_MAX_MINUTES * 60_000;
+    if (session.expiresAt.getTime() >= cap) throw conflict('Seu NOW já está no máximo de 3 horas');
+    const expiresAt = new Date(Math.min(cap, session.expiresAt.getTime() + minutes * 60_000));
+    if (!(await flash.extendSession(actorId, now, expiresAt))) throw forbidden('Ligue seu NOW primeiro');
+    return sessionView({ ...session, expiresAt });
   }
 
   /** Desliga o Flash: cancela convites e encerra encontros, e a posição some. Idempotente. */
@@ -182,10 +256,22 @@ export class FlashService {
   }
 
   /** Amigos com Flash ligado. Para ver a lista você também precisa estar com o Flash ligado. */
-  async listAvailable(actorId: string): Promise<AvailableFriendView[]> {
+  async listAvailable(actorId: string, order?: unknown): Promise<AvailableFriendView[]> {
+    return (await this.listAvailableRanked(actorId, order)).items;
+  }
+
+  /**
+   * "Livres agora" em ordem: `near` (padrão quando você ligou com localização) põe primeiro quem está mais perto;
+   * `interaction` põe primeiro com quem você mais conversa, curte e comenta. A distância nunca sai na resposta:
+   * só a ordem. Quem não informou a localização vai para o fim da ordem por distância.
+   */
+  async listAvailableRanked(actorId: string, order?: unknown): Promise<{ items: AvailableFriendView[]; order: AvailableOrder; nearAvailable: boolean }> {
     const { flash, follows, users, clock } = this.deps;
     const now = clock.now();
-    await this.requireActive(actorId, now);
+    const mine = await this.requireActive(actorId, now);
+    const myArea = mine.area ?? null;
+    const chosen: AvailableOrder = order === 'interaction' || order === 'near' ? order : myArea ? 'near' : 'interaction';
+    const effective: AvailableOrder = chosen === 'near' && !myArea ? 'interaction' : chosen;
 
     const skip = new Set(unseenBy(actorId, await flash.listHidden(actorId)));
     const friendIds = (await follows.listFriendIds(actorId)).filter((id) => !skip.has(id));
@@ -202,9 +288,49 @@ export class FlashService {
         note: s.note,
         expiresAt: s.expiresAt.toISOString(),
         invite: invite ? { id: invite.id, direction: this.directionOf(invite, actorId) } : null,
+        approx: myArea && s.area ? approxTrip(distanceMeters(myArea, s.area)) : null,
       });
     }
-    return items.sort((a, b) => a.profile.username.localeCompare(b.profile.username, 'pt-BR'));
+    const areas = new Map(sessions.map((s) => [s.userId, s.area ?? null] as const));
+    const interaction = await this.interactionScores(actorId, items.map((i) => i.profile.userId), now);
+    const distance = (id: string): number => {
+      const a = areas.get(id);
+      return myArea && a ? distanceMeters(myArea, a) : Number.POSITIVE_INFINITY;
+    };
+    const score = (id: string) => interaction.get(id) ?? 0;
+    const byName = (a: AvailableFriendView, b: AvailableFriendView) => a.profile.username.localeCompare(b.profile.username, 'pt-BR');
+    items.sort((a, b) =>
+      effective === 'near'
+        ? distance(a.profile.userId) - distance(b.profile.userId) || score(b.profile.userId) - score(a.profile.userId) || byName(a, b)
+        : score(b.profile.userId) - score(a.profile.userId) || distance(a.profile.userId) - distance(b.profile.userId) || byName(a, b),
+    );
+    // Infinity - Infinity dá NaN: quem está sem localização dos dois lados empata e cai no critério seguinte.
+    return { items, order: effective, nearAvailable: myArea !== null };
+  }
+
+  /** Quanto você interage com cada pessoa: conversas 1 a 1 e curtidas/comentários nos posts um do outro, valendo mais o recente. */
+  private async interactionScores(actorId: string, friendIds: string[], now: Date): Promise<Map<string, number>> {
+    const { conversations, posts } = this.deps;
+    const out = new Map<string, number>();
+    if (friendIds.length === 0) return out;
+    const wanted = new Set(friendIds);
+    const add = (id: string | undefined, w: number) => {
+      if (id && wanted.has(id)) out.set(id, (out.get(id) ?? 0) + w);
+    };
+    const since = new Date(now.getTime() - NOW_INTERACTION_DAYS * 86_400_000);
+    for (const [id, w] of directCloseness(await conversations.directActivity(actorId, since, 2000), now)) add(id, w);
+    const authorOf = new Map<string, string | undefined>();
+    const author = async (postId: string) => {
+      if (!authorOf.has(postId)) authorOf.set(postId, (await posts.findById(postId))?.post.authorId);
+      return authorOf.get(postId);
+    };
+    for (const row of await posts.listEngagement(actorId, since, 500)) add(await author(row.postId), (row.kind === 'COMMENT' ? 2 : 1) * decay(row.at, now));
+    for (const friendId of friendIds) {
+      for (const row of await posts.listEngagement(friendId, since, 200)) {
+        if ((await author(row.postId)) === actorId) add(friendId, (row.kind === 'COMMENT' ? 2 : 1) * decay(row.at, now));
+      }
+    }
+    return out;
   }
 
   /**
@@ -232,7 +358,7 @@ export class FlashService {
    */
   async setVisibility(actorId: string, otherId: string, input: { hideTheirs?: unknown; hideMine?: unknown }): Promise<FlashVisibilityView> {
     const { flash, users, clock } = this.deps;
-    if (actorId === otherId) throw validationError('Você não pode ocultar o Flash de si mesmo');
+    if (actorId === otherId) throw validationError('Você não pode ocultar o NOW de si mesmo');
     for (const key of ['hideTheirs', 'hideMine'] as const) {
       if (input[key] !== undefined && typeof input[key] !== 'boolean') throw validationError('Confira os dados', { [key]: 'Use verdadeiro ou falso' });
     }
@@ -249,7 +375,7 @@ export class FlashService {
   }
 
   /** Convida um amigo que está com o Flash ligado. O convite vale 15 minutos (ou até um dos Flash acabar). */
-  async invite(actorId: string, targetId: string): Promise<InviteView> {
+  async invite(actorId: string, targetId: string, options: { approx?: unknown } = {}): Promise<InviteView> {
     const { flash, follows, users, clock, ids } = this.deps;
     if (actorId === targetId) throw validationError('Você não pode convidar a si mesmo');
     const now = clock.now();
@@ -258,9 +384,9 @@ export class FlashService {
     const friends = await follows.listFriendIds(actorId);
     if (!friends.includes(targetId)) throw forbidden('Só amigos podem ser convidados');
     const rows = await flash.listHidden(actorId);
-    if (unseenBy(actorId, rows).includes(targetId) || rows.some((r) => r.ownerId === actorId && r.otherId === targetId && r.hideMine) || rows.some((r) => r.ownerId === targetId && r.otherId === actorId && r.hideTheirs)) throw conflict('Essa pessoa não está mais com o Flash ligado');
+    if (unseenBy(actorId, rows).includes(targetId) || rows.some((r) => r.ownerId === actorId && r.otherId === targetId && r.hideMine) || rows.some((r) => r.ownerId === targetId && r.otherId === actorId && r.hideTheirs)) throw conflict('Essa pessoa não está mais com o NOW ligado');
     const theirs = await flash.findActiveSession(targetId, now);
-    if (!theirs) throw conflict('Essa pessoa não está mais com o Flash ligado');
+    if (!theirs) throw conflict('Essa pessoa não está mais com o NOW ligado');
     const [profile] = await users.findProfilesByIds([targetId]);
     if (!profile) throw forbidden('Só amigos podem ser convidados');
 
@@ -274,15 +400,17 @@ export class FlashService {
       expiresAt,
       respondedAt: null,
       endedAt: null,
+      fromApprox: options.approx === true,
+      toApprox: false,
     };
     await flash.createInvite(invite, now);
     const inviter = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
-    await this.deps.notifier.notify({ userId: targetId, type: 'FLASH_INVITE', title: `${inviter} convidou você para o Flash`, body: 'Vale por poucos minutos', url: '/flash', dedupeKey: `flash-invite:${actorId}` });
+    await this.deps.notifier.notify({ userId: targetId, type: 'FLASH_INVITE', title: `${inviter} convidou você para o NOW`, body: 'Vale por poucos minutos', url: '/now', dedupeKey: `flash-invite:${actorId}` });
     return this.inviteView(invite, actorId, profile);
   }
 
   /** Quem recebeu aceita ou recusa. Ao aceitar, os dois passam a ver a posição um do outro até o encontro acabar. */
-  async respond(actorId: string, inviteId: string, action: unknown): Promise<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }> {
+  async respond(actorId: string, inviteId: string, action: unknown, options: { approx?: unknown } = {}): Promise<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }> {
     if (action !== 'accept' && action !== 'decline') {
       throw validationError('Ação inválida', { action: 'Use accept ou decline' });
     }
@@ -303,21 +431,22 @@ export class FlashService {
     }
 
     const [mine, theirs] = await Promise.all([flash.findActiveSession(actorId, now), flash.findActiveSession(invite.fromUserId, now)]);
-    if (!mine) throw forbidden('Ligue seu Flash para aceitar');
+    if (!mine) throw forbidden('Ligue seu NOW para aceitar');
     if (!theirs) {
       await flash.saveInvite({ ...invite, status: 'CANCELED', endedAt: now });
-      throw conflict('Essa pessoa não está mais com o Flash ligado');
+      throw conflict('Essa pessoa não está mais com o NOW ligado');
     }
     await flash.saveInvite({
       ...invite,
       status: 'ACCEPTED',
       respondedAt: now,
+      toApprox: options.approx === true,
       expiresAt: new Date(Math.min(mine.expiresAt.getTime(), theirs.expiresAt.getTime())),
     });
     const conversation = await this.deps.conversations.getOrCreateDirect(invite.fromUserId, invite.toUserId, this.deps.ids.next(), now);
     await this.deps.conversations.addMessage({ id: this.deps.ids.next(), conversationId: conversation.id, senderId: actorId, kind: 'SYSTEM', body: FLASH_MATCH_MESSAGE, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: now });
     const accepter = (await this.deps.users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
-    await this.deps.notifier.notify({ userId: invite.fromUserId, type: 'FLASH_INVITE', title: `${accepter} aceitou seu convite do Flash`, body: 'Vocês podem se encontrar agora', url: `/conversas/${conversation.id}`, dedupeKey: `flash-accepted:${actorId}` });
+    await this.deps.notifier.notify({ userId: invite.fromUserId, type: 'FLASH_INVITE', title: `${accepter} aceitou seu convite do NOW`, body: 'Vocês podem se encontrar agora', url: `/conversas/${conversation.id}`, dedupeKey: `flash-accepted:${actorId}` });
     return { status: 'ACCEPTED', conversationId: conversation.id };
   }
 
@@ -364,9 +493,23 @@ export class FlashService {
       accuracyM = input.accuracyM;
     }
     const now = this.deps.clock.now();
-    await this.requireAcceptedMatch(actorId, inviteId, now);
-    await this.deps.flash.upsertPosition({ inviteId, userId: actorId, lat, lng, accuracyM, updatedAt: now });
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
+    await this.deps.flash.upsertPosition(fuzzIfApprox({ inviteId, userId: actorId, lat, lng, accuracyM, updatedAt: now }, approxFor(invite, actorId)));
     return { ok: true };
+  }
+
+  /** Troca, durante o encontro, entre mostrar a posição exata ou só a aproximada. A já guardada é ajustada na hora. */
+  async setPrecision(actorId: string, inviteId: string, approx: unknown): Promise<{ approx: boolean }> {
+    if (typeof approx !== 'boolean') throw validationError('Escolha inválida', { approx: 'Use true ou false' });
+    const { flash, clock } = this.deps;
+    const now = clock.now();
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
+    await flash.saveInvite(invite.fromUserId === actorId ? { ...invite, fromApprox: approx } : { ...invite, toApprox: approx });
+    if (approx) {
+      const mine = (await flash.listPositions(inviteId)).find((p) => p.userId === actorId);
+      if (mine) await flash.upsertPosition(fuzzIfApprox(mine, true));
+    }
+    return { approx };
   }
 
   /** O encontro: quem é a outra pessoa e a última posição de cada um (a dela só aparece porque ela aceitou). */
@@ -400,6 +543,8 @@ export class FlashService {
       destination: invite.destination
         ? { name: invite.destination.name, lat: invite.destination.lat, lng: invite.destination.lng, chosenByMe: invite.destination.chosenById === actorId, chosenAt: invite.destination.chosenAt.toISOString() }
         : null,
+      meApprox: approxFor(invite, actorId),
+      themApprox: approxFor(invite, otherId),
     };
   }
 
@@ -424,7 +569,7 @@ export class FlashService {
     await flash.saveInvite({ ...invite, destination: { name, lat, lng, chosenById: actorId, chosenAt: now } });
     const otherId = invite.fromUserId === actorId ? invite.toUserId : invite.fromUserId;
     const who = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
-    await notifier.notify({ userId: otherId, type: 'FLASH_INVITE', title: `${who} escolheu um lugar`, body: name, url: `/flash/encontro/${inviteId}`, dedupeKey: `flash-destination:${inviteId}:${name}` });
+    await notifier.notify({ userId: otherId, type: 'FLASH_INVITE', title: `${who} escolheu um lugar`, body: name, url: `/now/encontro/${inviteId}`, dedupeKey: `flash-destination:${inviteId}:${name}` });
     return { ok: true };
   }
 
@@ -472,7 +617,7 @@ export class FlashService {
 
   private async requireActive(userId: string, now: Date): Promise<FlashSessionRecord> {
     const session = await this.deps.flash.findActiveSession(userId, now);
-    if (!session) throw forbidden('Ligue seu Flash primeiro');
+    if (!session) throw forbidden('Ligue seu NOW primeiro');
     return session;
   }
 

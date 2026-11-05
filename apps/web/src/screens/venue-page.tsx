@@ -5,7 +5,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { CoverPicker } from '../components/cover-picker.tsx';
 import { PostList } from '../components/post.tsx';
 import { PlacePhoto, SampleBadge } from '../components/suggestions.tsx';
-import { ChevronDownIcon, ChevronLeftIcon, ClockIcon, LocationIcon, ShareIcon, StarIcon } from '../components/icons.tsx';
+import { BellIcon, BellOffIcon, ChevronDownIcon, ChevronLeftIcon, ClockIcon, LocationIcon, ShareIcon, StarIcon } from '../components/icons.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -441,6 +441,8 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const [tab, setTab] = useState<Tab>('about');
   const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | undefined>();
   const [followBusy, setFollowBusy] = useState(false);
+  const [bellBusy, setBellBusy] = useState(false);
+  const [bellNote, setBellNote] = useState<string | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const [sharing, setSharing] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -451,10 +453,27 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const [editing, setEditing] = useState<VenueEvent | undefined>();
   const now = new Date();
 
+  /** Sininho: ligar já segue e avisa de cada evento novo; desligar só para os avisos. */
+  async function toggleBell() {
+    if (!v || bellBusy) return;
+    setBellBusy(true);
+    setProblem(undefined);
+    try {
+      const r = await api.setVenueNotify(v.id, !v.notify);
+      setBellNote(r.notify ? t('Pronto! Você recebe um aviso a cada evento novo de {name}.', { name: v.name }) : t('Avisos de eventos novos desligados.'));
+      page.reload();
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setBellBusy(false);
+    }
+  }
+
   async function toggleFollow() {
     if (!v || followBusy) return;
     setFollowBusy(true);
     setProblem(undefined);
+    setBellNote(undefined);
     try {
       if (v.following) await api.unfollowVenue(v.id);
       else await api.followVenue(v.id);
@@ -518,12 +537,25 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             <Button variant={v.following ? 'secondary' : 'primary'} loading={followBusy} aria-pressed={v.following} onClick={() => void toggleFollow()}>
               {v.following ? t('Seguindo') : t('Seguir')}
             </Button>
+            <button
+              type="button"
+              className={`btn ${v.notify ? 'btn--primary' : 'btn--secondary'} vhead__bell`}
+              aria-pressed={v.notify === true}
+              aria-label={v.notify ? t('Desligar avisos de eventos novos') : t('Avisar de eventos novos')}
+              title={v.notify ? t('Desligar avisos de eventos novos') : t('Avisar de eventos novos')}
+              disabled={bellBusy}
+              aria-busy={bellBusy || undefined}
+              onClick={() => void toggleBell()}
+            >
+              {v.notify ? <BellIcon /> : <BellOffIcon />}
+            </button>
             <OpenInMaps className="btn btn--quiet" mode="route" lat={v.lat} lng={v.lng} label={v.name}>
               Rota{where.status === 'ok' ? ` · a ${formatDistance(distanceMeters(where.position, { lat: v.lat, lng: v.lng }))}` : ''}
             </OpenInMaps>
           </div>
         )}
         {problem ? <Notice tone="error">{problem}</Notice> : null}
+        {bellNote ? <Notice tone="ok">{bellNote}</Notice> : null}
         {claimSent ? <Notice tone="ok">{t('Pedido enviado para {name}. Um administrador vai analisar o documento e você recebe um aviso com a resposta.', { name: v.name })}</Notice> : null}
         {claiming ? <ClaimSheet fixed={{ id: v.id, name: v.name, address: v.address }} onClose={() => setClaiming(false)} onSent={() => { setClaiming(false); setClaimSent(true); }} /> : null}
         {!v.claimed && !claimSent ? (

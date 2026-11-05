@@ -17,12 +17,16 @@ import type {
   VenueEvent,
   VenueEventBody,
   VenueProfile,
+  VenueBell,
+  OrganizationRequestBody,
   VenueRating,
   VenueProfileBody,
   VenuePanel,
   AuthResult,
   PasswordResetStarted,
   AvailableFriend,
+  AvailableList,
+  AvailableOrder,
   ChatMessage,
   ChatReaction,
   ChatView,
@@ -35,6 +39,7 @@ import type {
   FlashRoutes,
   FlashStatus,
   FlashVisibility,
+  StoryVisibility,
   SharedView,
   Slot,
   SlotInput,
@@ -171,6 +176,8 @@ export function createApi(deps: ApiDeps) {
       ),
     getProfile: (username: string) => request<ProfileView>('GET', `/profiles/${id(username)}`),
     setProfilePhoto: (image: string | null) => request<Profile>('PUT', '/profiles/me/photo', { body: { image } }),
+    getPhone: () => request<{ phone: string | null }>('GET', '/profiles/me/phone'),
+    setPhone: (phone: string | null) => request<{ phone: string | null }>('PUT', '/profiles/me/phone', { body: { phone } }),
     profileEvents: (username: string, page?: PageRequest) => request<PostedEventsPage>('GET', `/profiles/${id(username)}/events${pageQuery(page)}`),
     postEvent: (eventId: string) => request<{ posted: true }>('POST', `/events/${id(eventId)}/post`),
     unpostEvent: (eventId: string) => request<{ posted: false }>('DELETE', `/events/${id(eventId)}/post`),
@@ -273,7 +280,7 @@ export function createApi(deps: ApiDeps) {
       request<{ isFriend: boolean }>('POST', `/me/follow-requests/${id(userId)}/approve`),
     rejectRequest: (userId: string) => request<{ ok: true }>('POST', `/me/follow-requests/${id(userId)}/reject`),
     removeFollower: (userId: string) => request<{ ok: true }>('DELETE', `/me/followers/${id(userId)}`),
-    contactMatches: (hashes: string[]) => request<{ items: PublicProfile[] }>('POST', '/me/contact-matches', { body: { hashes } }),
+    contactMatches: (hashes: string[], phoneHashes: string[] = []) => request<{ items: PublicProfile[] }>('POST', '/me/contact-matches', { body: { hashes, phoneHashes } }),
     suggestedPeople: () => request<{ items: SuggestedPerson[]; followingCount: number }>('GET', '/me/suggested-people'),
     friends: () => request<PublicProfile[]>('GET', '/me/friends'),
 
@@ -285,17 +292,22 @@ export function createApi(deps: ApiDeps) {
 
     // Flash
     flashStatus: () => request<FlashStatus>('GET', '/me/flash'),
-    flashOn: (minutes: number, note: string) =>
-      request<FlashStatus>('POST', '/me/flash', { body: note === '' ? { minutes } : { minutes, note } }),
+    /** `area`: posição do aparelho (o servidor arredonda para ~1 km e só usa para ordenar "mais perto"). */
+    flashOn: (minutes: number, note: string, area?: { lat: number; lng: number }) =>
+      request<FlashStatus>('POST', '/me/flash', { body: { minutes, ...(note === '' ? {} : { note }), ...(area ?? {}) } }),
+    flashExtend: (minutes: 30 | 60) => request<FlashStatus>('POST', '/me/flash/extend', { body: { minutes } }),
     flashOff: () => request<{ ended: boolean }>('DELETE', '/me/flash'),
     flashActive: () => request<{ userIds: string[] }>('GET', '/flash/active'),
     flashVisibility: (userId: string) => request<FlashVisibility>('GET', `/flash/visibility/${id(userId)}`),
     setFlashVisibility: (userId: string, body: Partial<FlashVisibility>) => request<FlashVisibility>('PUT', `/flash/visibility/${id(userId)}`, { body }),
-    flashAvailable: () => request<{ items: AvailableFriend[] }>('GET', '/flash/available'),
+    storyVisibility: (userId: string) => request<StoryVisibility>('GET', `/stories/visibility/${id(userId)}`),
+    setStoryVisibility: (userId: string, body: Partial<StoryVisibility>) => request<StoryVisibility>('PUT', `/stories/visibility/${id(userId)}`, { body }),
+    flashAvailable: (order?: AvailableOrder) => request<AvailableList>('GET', `/flash/available${order ? `?ordem=${order === 'near' ? 'perto' : 'interacao'}` : ''}`),
     flashInvites: () => request<FlashInvites>('GET', '/flash/invites'),
-    flashInvite: (userId: string) => request<FlashInvite>('POST', '/flash/invites', { body: { userId } }),
-    flashRespond: (inviteId: string, action: 'accept' | 'decline') =>
-      request<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: { action } }),
+    flashInvite: (userId: string, approx = false) => request<FlashInvite>('POST', '/flash/invites', { body: { userId, approx } }),
+    flashRespond: (inviteId: string, action: 'accept' | 'decline', approx = false) =>
+      request<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: action === 'accept' ? { action, approx } : { action } }),
+    flashSetPrecision: (inviteId: string, approx: boolean) => request<{ approx: boolean }>('PUT', `/flash/matches/${id(inviteId)}/precision`, { body: { approx } }),
     flashEnd: (inviteId: string) => request<{ ended: boolean }>('DELETE', `/flash/invites/${id(inviteId)}`),
     flashMatch: (inviteId: string) => request<FlashMatch>('GET', `/flash/matches/${id(inviteId)}`),
     flashShareLocation: (inviteId: string, position: { lat: number; lng: number; accuracyM?: number }) =>
@@ -304,7 +316,7 @@ export function createApi(deps: ApiDeps) {
     flashChooseDestination: (inviteId: string, place: { name: string; lat: number; lng: number }) => request<{ ok: true }>('PUT', `/flash/matches/${id(inviteId)}/destination`, { body: place }),
     flashClearDestination: (inviteId: string) => request<{ ok: true }>('DELETE', `/flash/matches/${id(inviteId)}/destination`),
     flashRoutes: (inviteId: string, mode: 'foot' | 'driving') => request<FlashRoutes>('GET', `/flash/matches/${id(inviteId)}/routes?modo=${mode === 'driving' ? 'carro' : 'a-pe'}`),
-    flashSuggestions: (inviteId: string) => request<Suggestions>('GET', `/flash/matches/${id(inviteId)}/suggestions`),
+    flashSuggestions: (inviteId: string, radiusKm?: number | null) => request<Suggestions>('GET', `/flash/matches/${id(inviteId)}/suggestions${radiusKm ? `?raioKm=${radiusKm}` : ''}`),
 
     notificationMute: () => request<NotificationMute>('GET', '/notifications/settings'),
     setNotificationMute: (patch: Partial<NotificationMute>) => request<NotificationMute>('PUT', '/notifications/settings', { body: patch }),
@@ -421,6 +433,9 @@ export function createApi(deps: ApiDeps) {
     rateVenue: (venueId: string, stars: number) => request<VenueRating>('PUT', `/venues/${id(venueId)}/rating`, { body: { stars } }),
     clearVenueRating: (venueId: string) => request<VenueRating>('DELETE', `/venues/${id(venueId)}/rating`),
     unfollowVenue: (venueId: string) => request<{ following: false; followerCount: number }>('DELETE', `/venues/${id(venueId)}/follow`),
+    /** Sininho: liga (e já segue) ou desliga o aviso de cada evento novo. */
+    setVenueNotify: (venueId: string, notify: boolean) => request<VenueBell>('PUT', `/venues/${id(venueId)}/notify`, { body: { notify } }),
+    requestOrganization: (body: OrganizationRequestBody) => request<VenueClaim>('POST', '/organizations/requests', { body }),
     venuePosts: (venueId: string, page?: PageRequest) => request<PostsPage>('GET', `/venues/${id(venueId)}/posts${pageQuery(page)}`),
     createVenuePost: (venueId: string, input: { images: string[]; caption?: string }) => request<PostView>('POST', `/me/venues/${id(venueId)}/posts`, { body: input }),
     openExternalVenue: (input: { key: string; lat: number; lng: number }) => request<{ venueId: string }>('POST', '/venues/external', { body: input }),

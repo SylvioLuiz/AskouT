@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { Contacts } from '@capacitor-community/contacts';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -9,6 +10,7 @@ import { NativeVideoCompressor } from 'capacitor-native-video-compressor';
 import { SocialLogin } from '@capgo/capacitor-social-login';
 import { createAppleBridge } from './apple-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
+import { createContactsBridge } from './contacts-bridge.ts';
 import { createPushBridge } from './push-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createVideoBridge } from './video-bridge.ts';
@@ -49,6 +51,8 @@ if (Capacitor.isNativePlatform()) {
     writeFile: (o) => Filesystem.writeFile({ path: o.path, data: o.data, directory: Directory.Cache, encoding: Encoding.UTF8 }),
     share: (o) => Share.share(o),
   });
+  // "Achar nos contatos": lê celulares e e-mails da agenda (iPhone e Android), com a permissão do aparelho.
+  w['AskouTContacts'] = createContactsBridge({ contacts: Contacts as never });
   if (Capacitor.getPlatform() === 'ios') {
     // O botão da Apple da web não abre dentro do app; no iPhone entra a janela nativa.
     w['AskouTApple'] = createAppleBridge({ login: SocialLogin as never });

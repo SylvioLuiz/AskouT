@@ -175,7 +175,7 @@ test('respond: mensagem de texto não é sugestão, estranhos não respondem, ex
   await rejectsWith(w.core.conversations.respond(bia, id, card2.id, 'accept'), 'FORBIDDEN');
 });
 
-test('distâncias do cartão: só com encontro Flash ativo e os dois compartilhando; somem quando acaba', async () => {
+test('distâncias do cartão: só com encontro NOW ativo e os dois compartilhando; somem quando acaba', async () => {
   const w = makeWorld();
   const { ana, bia } = await w.signUpMany('ana', 'bia');
   await befriend(w, ana!, bia!);

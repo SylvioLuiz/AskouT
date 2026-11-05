@@ -5,7 +5,7 @@ export const ONBOARDING_FOLLOW_GOAL = 3;
 export const ONBOARDING_SLIDES: readonly { title: string; text: string }[] = [
   { title: t('Siga bares e baladas, veja eventos'), text: t('Os eventos dos rolês que você segue aparecem na sua Home. Toque em “Eu vou” para confirmar presença e receber um lembrete antes de começar.') },
   { title: t('Amigo é quem se segue'), text: t('Quando você segue alguém e essa pessoa segue você de volta, vocês viram amigos. Só amigos veem seus planos e conversam direto com você.') },
-  { title: t('Flash: encontre quem quer sair agora'), text: t('Ligue o Flash para avisar os amigos que você está livre. Quem também estiver livre pode te chamar, e a conversa abre na hora.') },
+  { title: t('NOW: encontre quem quer sair agora'), text: t('Ligue o NOW para avisar os amigos que você está livre. Quem também estiver livre pode te chamar, e a conversa abre na hora.') },
 ];
 
 const key = (userId: string) => `askout.onboarded.${userId}`;

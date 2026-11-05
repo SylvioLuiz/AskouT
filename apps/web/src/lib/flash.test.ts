@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { distanceMeters, flashNoteProblem, flashRemainingShare, formatCountdown, formatAge, formatDistance, formatKm, formatRemaining, formatTravel, placeName, sortByFairness, geolocationMessage, minutesLeft } from './flash.ts';
+import { distanceMeters, flashNoteProblem, flashRemainingShare, formatCountdown, formatAge, formatApprox, formatDistance, formatKm, formatRemaining, formatTravel, placeName, sortByFairness, geolocationMessage, minutesLeft } from './flash.ts';
 
 describe('distanceMeters', () => {
   it('é zero para o mesmo ponto', () => {
@@ -113,5 +113,16 @@ describe('lugares entre os dois', () => {
   it('usa o nome do local, não o título do evento; sem local, o título', () => {
     assert.equal(placeName({ venueName: 'Bar do Zé', title: 'Samba' }), 'Bar do Zé');
     assert.equal(placeName({ venueName: '  ', title: 'Praça' }), 'Praça');
+  });
+});
+
+describe('formatApprox', () => {
+  it('só a distância, deixando claro que é aproximada', () => {
+    assert.equal(formatApprox({ km: 0, minutes: 5, mode: 'walk' }), 'menos de 1 km');
+    assert.equal(formatApprox({ km: 12, minutes: 35, mode: 'car' }), 'aprox. 12 km');
+  });
+  it('versão curta para caber embaixo da foto', () => {
+    assert.equal(formatApprox({ km: 0, minutes: 5, mode: 'walk' }, true), '<1 km');
+    assert.equal(formatApprox({ km: 3, minutes: 10, mode: 'car' }, true), '~3 km');
   });
 });

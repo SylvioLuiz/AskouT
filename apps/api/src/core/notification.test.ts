@@ -159,7 +159,7 @@ describe('avisos', () => {
     assert.equal((await w.pushSubscriptions.listForUser(bia!)).length, 9);
   });
 
-  it('encontro, grupo, seguir privado e Flash geram avisos', async () => {
+  it('encontro, grupo, seguir privado e NOW geram avisos', async () => {
     const w = makeWorld();
     const { ana, bia, caio } = await friends(w, 'ana', 'bia', 'caio');
     const types = async (id: string) => (await w.core.notifications.list(id)).items.map((n) => n.type);

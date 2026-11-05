@@ -25,11 +25,18 @@ export function PhotoViewer({ images, start, onClose }: { images: PostImage[]; s
   }, [first]);
 
   // O "voltar" do aparelho fecha a foto em vez de sair da página.
+  // O React (StrictMode, em desenvolvimento) monta, desmonta e monta de novo na hora: por isso o "voltar" da saída
+  // espera um instante e só acontece se a foto não reabriu, e a reabertura reaproveita a entrada do histórico.
+  const mounts = useRef(0);
   useEffect(() => {
+    mounts.current += 1;
+    const mount = mounts.current;
+    const onViewerEntry = () => (window.history.state as { photoViewer?: boolean } | null)?.photoViewer === true;
     rememberScroll();
-    window.history.pushState({ photoViewer: true }, '');
+    if (!onViewerEntry()) window.history.pushState({ photoViewer: true }, '');
     let closedByBack = false;
     const onPop = () => {
+      if (onViewerEntry()) return;
       closedByBack = true;
       closeRef.current();
     };
@@ -39,7 +46,10 @@ export function PhotoViewer({ images, start, onClose }: { images: PostImage[]; s
     return () => {
       window.removeEventListener('popstate', onPop);
       document.body.style.overflow = overflow;
-      if (!closedByBack && (window.history.state as { photoViewer?: boolean } | null)?.photoViewer) window.history.back();
+      if (closedByBack) return;
+      window.setTimeout(() => {
+        if (mounts.current === mount && onViewerEntry()) window.history.back();
+      }, 0);
     };
   }, []);
 

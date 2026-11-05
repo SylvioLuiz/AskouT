@@ -85,6 +85,20 @@ export class VenuesController {
     return this.core.venues.unfollow(actor.userId, id);
   }
 
+  /** Sininho: `{notify: true}` avisa de cada evento novo (e já segue); `{notify: false}` só desliga o aviso. */
+  @Put('venues/:id/notify')
+  setNotify(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: { notify?: unknown }) {
+    return this.core.venues.setNotify(actor.userId, id, body?.notify);
+  }
+
+  /** Pede a página de uma organização da faculdade (bateria, atlética...). Um admin aprova no painel de pedidos. */
+  @Post('organizations/requests')
+  @HttpCode(200)
+  requestOrganization(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.venues.requestOrganization(actor.userId, { name: b.name, type: b.type, campus: b.campus, description: b.description, lat: b.lat, lng: b.lng, document: b.document, note: b.note });
+  }
+
   @Put('venues/:id/rating')
   rate(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: { stars?: unknown }) {
     return this.core.venues.rate(actor.userId, id, body?.stars);

@@ -73,12 +73,12 @@ export function ConversationsScreen() {
         <EmptyState
           title={t('Nenhuma conversa ainda')}
           action={
-            <Link to="/flash" className="btn btn--primary">
-              {t('Ver quem está no Flash')}
+            <Link to="/now" className="btn btn--primary">
+              {t('Ver quem está no NOW')}
             </Link>
           }
         >
-          {t('Quando um convite do Flash for aceito, a conversa com a pessoa abre aqui. Você também pode escrever para qualquer amigo pelo perfil dele ou criar um encontro a partir de um evento.')}
+          {t('Quando um convite do NOW for aceito, a conversa com a pessoa abre aqui. Você também pode escrever para qualquer amigo pelo perfil dele ou criar um encontro a partir de um evento.')}
         </EmptyState>
       ) : (
         <>
@@ -464,13 +464,13 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const matchCard = match ? (
     <div className="callout chat__match">
       <p className="callout__text">
-        <strong>{t('Encontro Flash ativo')}</strong> · acaba em {formatRemaining(minutesLeft(match.expiresAt, serverNow))}
+        <strong>{t('Encontro NOW ativo')}</strong> · acaba em {formatRemaining(minutesLeft(match.expiresAt, serverNow))}
       </p>
       <div className="row-actions">
         <Button small onClick={() => setSuggesting(true)}>
           {t('Sugerir um rolê')}
         </Button>
-        <Link to={`/flash/encontro/${match.id}`} className="btn btn--secondary btn--small">
+        <Link to={`/now/encontro/${match.id}`} className="btn btn--secondary btn--small">
           {t('Ver no mapa')}
         </Link>
       </div>

@@ -7,12 +7,12 @@ import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { profileLink, profileShareText } from '../lib/share.ts';
-import type { FlashVisibility, Profile, Relationship } from '../lib/types.ts';
+import type { FlashVisibility, Profile, Relationship, StoryVisibility } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
 type Step = 'menu' | 'share' | 'remove' | 'block' | 'report';
 
-/** Botão ⋯ do perfil de outra pessoa e a aba com as opções: compartilhar, remover seguidor, Flash e bloquear. */
+/** Botão ⋯ do perfil de outra pessoa e a aba com as opções: compartilhar, remover seguidor, Flash, stories e bloquear. */
 export function ProfileActions({ profile, relationship, onChanged }: { profile: Profile; relationship: Relationship; onChanged: (notice: string) => void }) {
   const [open, setOpen] = useState(false);
   return (
@@ -44,6 +44,9 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
   const visibility = useAsync(() => (flashOptions ? api.flashVisibility(profile.userId) : Promise.resolve(null)), [profile.userId, flashOptions]);
   const [override, setOverride] = useState<FlashVisibility | undefined>();
   const current = override ?? visibility.data ?? undefined;
+  const storyVisibility = useAsync(() => (flashOptions ? api.storyVisibility(profile.userId) : Promise.resolve(null)), [profile.userId, flashOptions]);
+  const [storyOverride, setStoryOverride] = useState<StoryVisibility | undefined>();
+  const stories = storyOverride ?? storyVisibility.data ?? undefined;
 
   async function toggle(key: keyof FlashVisibility) {
     if (!current) return;
@@ -51,6 +54,19 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
     setProblem(undefined);
     try {
       setOverride(await api.setFlashVisibility(profile.userId, { [key]: !current[key] }));
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleStories(key: keyof StoryVisibility) {
+    if (!stories) return;
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      setStoryOverride(await api.setStoryVisibility(profile.userId, { [key]: !stories[key] }));
     } catch (failure) {
       setProblem(toApiError(failure).message);
     } finally {
@@ -126,8 +142,10 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
         <ul className="sharelist">
           {row(t('Compartilhar perfil'), t('Mande em uma conversa ou para fora do app.'), () => setStep('share'))}
           {relationship.followsYou === 'ACCEPTED' && !blocked ? row(t('Remover seguidor'), t('Ela deixa de seguir você. Não avisamos.'), () => setStep('remove')) : null}
-          {flashOptions && current ? row(t('Ocultar Flash dela'), current.hideTheirs ? t('Ativo: você não vê quando ela liga o Flash.') : t('Você deixa de ver quando ela liga o Flash.'), () => void toggle('hideTheirs'), { on: current.hideTheirs, role: 'switch' }) : null}
-          {flashOptions && current ? row(t('Não deixar ela me ver no Flash'), current.hideMine ? t('Ativo: ela não vê você disponível.') : t('Ela não vê você disponível, mesmo com o Flash ligado.'), () => void toggle('hideMine'), { on: current.hideMine, role: 'switch' }) : null}
+          {flashOptions && current ? row(t('Ocultar NOW dela'), current.hideTheirs ? t('Ativo: você não vê quando ela liga o NOW.') : t('Você deixa de ver quando ela liga o NOW.'), () => void toggle('hideTheirs'), { on: current.hideTheirs, role: 'switch' }) : null}
+          {flashOptions && current ? row(t('Não deixar ela me ver no NOW'), current.hideMine ? t('Ativo: ela não vê você disponível.') : t('Ela não vê você disponível, mesmo com o NOW ligado.'), () => void toggle('hideMine'), { on: current.hideMine, role: 'switch' }) : null}
+          {flashOptions && stories ? row(t('Ocultar stories dela'), stories.hideTheirs ? t('Ativo: você não vê os stories dela.') : t('Os stories dela somem da sua página inicial e dos eventos.'), () => void toggleStories('hideTheirs'), { on: stories.hideTheirs, role: 'switch' }) : null}
+          {flashOptions && stories ? row(t('Não deixar ela ver meus stories'), stories.hideMine ? t('Ativo: ela não vê os seus stories.') : t('Ela deixa de ver seus stories, no perfil e nos eventos.'), () => void toggleStories('hideMine'), { on: stories.hideMine, role: 'switch' }) : null}
           {!relationship.isSelf ? row(t('Denunciar perfil'), t('Nome, foto ou descrição que não deveriam estar aqui.'), () => setStep('report'), { danger: true }) : null}
           {!blocked ? row('Bloquear', t('Ela deixa de ver seu perfil e vocês param de se seguir.'), () => setStep('block'), { danger: true }) : null}
         </ul>

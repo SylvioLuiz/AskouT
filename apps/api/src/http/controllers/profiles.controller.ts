@@ -39,6 +39,19 @@ export class ProfilesController {
     return this.core.profiles.setPhoto(actor.userId, b.image === undefined ? 'ausente' : b.image);
   }
 
+  /** O próprio celular (privado). */
+  @Get('me/phone')
+  getPhone(@CurrentActor() actor: Actor) {
+    return this.core.profiles.getPhone(actor.userId);
+  }
+
+  /** `{phone: "(11) 98765-4321"}` guarda (normalizado para +55...); `{phone: null}` apaga. */
+  @Put('me/phone')
+  setPhone(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.profiles.setPhone(actor.userId, b.phone === undefined ? 0 : b.phone);
+  }
+
   /** Eventos que a pessoa postou no perfil (perfil privado só para quem segue). */
   @Get(':username/events')
   events(@CurrentActor() actor: Actor, @Param('username') username: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {

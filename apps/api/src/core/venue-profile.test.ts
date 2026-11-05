@@ -81,13 +81,13 @@ test('capa do estabelecimento: aparelho, link, manter e remover', async () => {
 
 test('seguir o bar: contagem, idempotência e desfazer', async () => {
   const { w, ana, bia } = await setup();
-  assert.deepEqual(await w.core.venues.follow(ana, 'v1'), { following: true, followerCount: 1 });
-  assert.deepEqual(await w.core.venues.follow(ana, 'v1'), { following: true, followerCount: 1 });
+  assert.deepEqual(await w.core.venues.follow(ana, 'v1'), { following: true, notify: false, followerCount: 1 });
+  assert.deepEqual(await w.core.venues.follow(ana, 'v1'), { following: true, notify: false, followerCount: 1 });
   await w.core.venues.follow(bia, 'v1');
   const p = await w.core.venues.profile(ana, 'v1');
   assert.equal(p.following, true);
   assert.equal(p.followerCount, 2);
-  assert.deepEqual(await w.core.venues.unfollow(ana, 'v1'), { following: false, followerCount: 1 });
+  assert.deepEqual(await w.core.venues.unfollow(ana, 'v1'), { following: false, notify: false, followerCount: 1 });
   assert.equal((await w.core.venues.profile(ana, 'v1')).following, false);
   await rejectsWith(w.core.venues.follow(ana, 'nao-existe'), 'NOT_FOUND');
   // locais sem dono também podem ser seguidos

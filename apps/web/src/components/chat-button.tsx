@@ -6,7 +6,7 @@ import { Button } from './ui.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 /** Abre (ou cria) a conversa com um amigo e vai para ela. */
-export function ChatButton({ userId, variant = 'secondary', small = false, onError }: { userId: string; variant?: 'primary' | 'secondary' | 'quiet'; small?: boolean; onError?: (message: string) => void }) {
+export function ChatButton({ userId, variant = 'secondary', small = false, label, onError }: { userId: string; variant?: 'primary' | 'secondary' | 'quiet'; small?: boolean; label?: string; onError?: (message: string) => void }) {
   const [busy, setBusy] = useState(false);
   async function open() {
     setBusy(true);
@@ -20,7 +20,7 @@ export function ChatButton({ userId, variant = 'secondary', small = false, onErr
   }
   return (
     <Button variant={variant} small={small} loading={busy} onClick={open}>
-      {t('Conversar')}
+      {label ?? t('Conversar')}
     </Button>
   );
 }

@@ -153,6 +153,10 @@ model User {
   termsVersion    String?
   /// Quando a pessoa terminou (ou pulou) o tutorial inicial; o app só o mostra enquanto estiver vazio.
   onboardedAt     DateTime?
+  /// Celular (E.164, ex.: +5511987654321). Privado: nunca aparece no perfil, só serve para amigos acharem a pessoa na agenda.
+  phone           String?   @unique
+  /// SHA-256 (hex) do celular, comparado com os códigos que o app manda da agenda de quem procura amigos.
+  phoneHash       String?   @unique
 
   profile  Profile?
   settings UserSettings?
@@ -197,6 +201,8 @@ model User {
   flashPositions      FlashPosition[]
   flashHides          FlashHidden[]   @relation("FlashHiddenOwner")
   flashHiddenFrom     FlashHidden[]   @relation("FlashHiddenOther")
+  storyHides          StoryHidden[]   @relation("StoryHiddenOwner")
+  storyHiddenFrom     StoryHidden[]   @relation("StoryHiddenOther")
   notifications Notification[]
   pushSubscriptions PushSubscription[]
   postedEvents      PostedEvent[]
@@ -521,6 +527,10 @@ model FlashSession {
   expiresAt DateTime // obrigatório: todo Flash expira
   endedAt   DateTime? // preenchido quando a pessoa desliga antes do fim
   note      String? // recado curto opcional
+  /// Região aproximada (arredondada para ~1 km) de quando ligou: só para ordenar "mais perto". Nunca sai na resposta
+  /// e é apagada quando o NOW termina.
+  areaLat   Float?
+  areaLng   Float?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -544,6 +554,9 @@ model FlashInvite {
   destinationLng      Float?
   destinationChosenBy String?   @db.Uuid
   destinationChosenAt DateTime?
+  // Cada um escolhe ao convidar/aceitar: true = o outro só vê a posição arredondada (~1 km).
+  fromApprox Boolean @default(false)
+  toApprox   Boolean @default(false)
 
   from      User            @relation("FlashInviteFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
   to        User            @relation("FlashInviteTo", fields: [toUserId], references: [id], onDelete: Cascade)
@@ -578,6 +591,21 @@ model FlashHidden {
 
   owner User @relation("FlashHiddenOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   other User @relation("FlashHiddenOther", fields: [otherId], references: [id], onDelete: Cascade)
+
+  @@id([ownerId, otherId])
+  @@index([otherId])
+}
+
+// Ocultação de stories entre duas pessoas, do ponto de vista de `ownerId`: não ver os stories dela e/ou não deixar ela ver os meus.
+model StoryHidden {
+  ownerId    String   @db.Uuid
+  otherId    String   @db.Uuid
+  hideTheirs Boolean  @default(false)
+  hideMine   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  owner User @relation("StoryHiddenOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  other User @relation("StoryHiddenOther", fields: [otherId], references: [id], onDelete: Cascade)
 
   @@id([ownerId, otherId])
   @@index([otherId])
@@ -713,6 +741,9 @@ model Venue {
   externalKey String?  @unique
   photoRef    String?
   photoAuthor String?
+  /// Organização (bateria, atlética, centro acadêmico...) em vez de estabelecimento. Pedida por quem a representa e
+  /// aprovada por um admin; enquanto não tem dono, fica fora das buscas.
+  isOrganization Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1070,10 +1101,11 @@ model VenueCover {
   venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
 }
 
-/// Quem segue um estabelecimento: os posts dele entram no feed.
+/// Quem segue um estabelecimento: os posts dele entram no feed. `notify` é o sininho: avisa de cada evento novo.
 model VenueFollow {
   userId    String   @db.Uuid
   venueId   String   @db.Uuid
+  notify    Boolean  @default(false)
   createdAt DateTime @default(now())
 
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1081,6 +1113,7 @@ model VenueFollow {
 
   @@id([userId, venueId])
   @@index([venueId])
+  @@index([venueId, notify])
 }
 
 /// Nota de 1 a 5 estrelas que uma pessoa dá a um estabelecimento (uma por pessoa).

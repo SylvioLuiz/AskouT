@@ -48,7 +48,7 @@ test('turnOn: só 1, 2 ou 3 horas; recado opcional com limite', async () => {
   assert.equal(Date.parse(on.expiresAt!) - w.clock.now().getTime(), 3 * 3_600_000);
 });
 
-test('turnOn: só um Flash por vez; depois de desligar ou expirar liga de novo', async () => {
+test('turnOn: só um NOW por vez; depois de desligar ou expirar liga de novo', async () => {
   const w = makeWorld();
   const { ana } = await w.signUpMany('ana');
   await w.core.flash.turnOn(ana!, { hours: 1 });
@@ -63,7 +63,7 @@ test('turnOn: só um Flash por vez; depois de desligar ou expirar liga de novo',
   assert.equal((await w.core.flash.status(ana!)).active, true);
 });
 
-test('listAvailable: exige Flash ligado e só mostra amigos com Flash ligado', async () => {
+test('listAvailable: exige NOW ligado e só mostra amigos com NOW ligado', async () => {
   const { w, ana, bia, caio } = await pair();
   await w.core.flash.turnOn(caio, { hours: 1 }); // caio liga, mas não é amigo de ana
   const list = await w.core.flash.listAvailable(ana);
@@ -84,7 +84,7 @@ test('listAvailable: amigo que expirou ou bloqueou some da lista', async () => {
   assert.equal((await w.core.flash.listAvailable(ana)).length, 0);
 });
 
-test('invite: só amigo com Flash ligado; sem Flash próprio não convida; sem duplicar', async () => {
+test('invite: só amigo com NOW ligado; sem NOW próprio não convida; sem duplicar', async () => {
   const { w, ana, bia, caio } = await pair();
   await rejectsWith(w.core.flash.invite(ana, ana), 'VALIDATION');
   await w.core.flash.turnOn(caio, { hours: 1 });
@@ -104,7 +104,7 @@ test('invite: só amigo com Flash ligado; sem Flash próprio não convida; sem d
   await rejectsWith(w.core.flash.invite(bia, ana), 'CONFLICT', ); // já há convite no outro sentido
 });
 
-test('invite: vale 15 minutos e nunca passa do fim de um dos Flash', async () => {
+test('invite: vale 15 minutos e nunca passa do fim de um dos NOW', async () => {
   const { w, ana, bia } = await pair();
   const invite = await w.core.flash.invite(ana, bia);
   assert.equal(Date.parse(invite.expiresAt) - w.clock.now().getTime(), 15 * 60_000);
@@ -124,7 +124,7 @@ test('invite: vale 15 minutos e nunca passa do fim de um dos Flash', async () =>
   assert.equal(Date.parse(i2.expiresAt) - short.clock.now().getTime(), 10 * 60_000);
 });
 
-test('respond: só quem recebeu responde; aceitar exige os dois Flash ligados', async () => {
+test('respond: só quem recebeu responde; aceitar exige os dois NOW ligados', async () => {
   const { w, ana, bia, caio } = await pair();
   const invite = await w.core.flash.invite(ana, bia);
   await rejectsWith(w.core.flash.respond(ana, invite.id, 'accept'), 'NOT_FOUND'); // quem enviou não aceita
@@ -207,7 +207,7 @@ test('localização: posição antiga vira "sem sinal" (stale)', async () => {
   assert.equal((await w.core.flash.getMatch(bia, inviteId)).them!.stale, true);
 });
 
-test('desligar o Flash encerra o encontro e apaga as posições dos dois', async () => {
+test('desligar o NOW encerra o encontro e apaga as posições dos dois', async () => {
   const { w, ana, bia, inviteId } = await matched();
   await w.core.flash.shareLocation(ana, inviteId, GPS);
   await w.core.flash.shareLocation(bia, inviteId, GPS);
@@ -218,7 +218,7 @@ test('desligar o Flash encerra o encontro e apaga as posições dos dois', async
   await rejectsWith(w.core.flash.shareLocation(bia, inviteId, GPS), 'NOT_FOUND');
 });
 
-test('o encontro acaba quando o Flash de um dos dois expira', async () => {
+test('o encontro acaba quando o NOW de um dos dois expira', async () => {
   const { w, ana, bia, inviteId } = await matched();
   await w.core.flash.shareLocation(ana, inviteId, GPS);
   w.clock.tick(2 * 3_600_000 + 1000);
@@ -279,7 +279,7 @@ test('flash: duração livre em minutos (5 a 180, de 5 em 5)', async () => {
   assert.equal(span, 45 * 60_000);
 });
 
-test('visibilidade: ocultar o Flash dela e não deixar ela me ver, cada um no seu sentido', async () => {
+test('visibilidade: ocultar o NOW dela e não deixar ela me ver, cada um no seu sentido', async () => {
   const { w, ana, bia } = await pair();
   assert.deepEqual(await w.core.flash.visibility(ana, bia), { hideTheirs: false, hideMine: false });
   assert.equal((await w.core.flash.listAvailable(ana)).length, 1);
@@ -330,7 +330,7 @@ test('aceitar o convite deixa uma mensagem de sistema na conversa, para o botão
   assert.equal(last.body, FLASH_MATCH_MESSAGE);
 });
 
-test('activeIds: eu e amigos com Flash ligado, sem ocultos e sem depender do meu Flash', async () => {
+test('activeIds: eu e amigos com NOW ligado, sem ocultos e sem depender do meu NOW', async () => {
   const { w, ana, bia, caio } = await pair();
   await w.core.flash.turnOn(caio, { hours: 1 });
   assert.deepEqual((await w.core.flash.activeIds(ana)).sort(), [ana, bia].sort(), 'Caio não é amigo, não aparece');
@@ -407,4 +407,135 @@ test('rotas do encontro: precisa de lugar escolhido; usa o serviço de rotas e c
   // Os dois veem a mesma coisa, cada um do seu ponto de vista.
   const fromBia = await w.core.flash.routes(bia!, invite.id, 'foot');
   assert.equal(fromBia.them!.distanceM, 900);
+});
+
+// ---------- Ordem de "Livres agora" e estender ----------
+
+async function crowd() {
+  const w = makeWorld();
+  const { ana, perto, longe, papo } = await w.signUpMany('ana', 'perto', 'longe', 'papo');
+  for (const f of [perto!, longe!, papo!]) await befriend(w, ana!, f);
+  // Praça da Liberdade (BH); "perto" a ~1 km, "papo" a ~5 km, "longe" a ~15 km.
+  await w.core.flash.turnOn(ana!, { hours: 2, lat: -19.9320, lng: -43.9380 });
+  await w.core.flash.turnOn(perto!, { hours: 2, lat: -19.9400, lng: -43.9350 });
+  await w.core.flash.turnOn(papo!, { hours: 2, lat: -19.8900, lng: -43.9500 });
+  await w.core.flash.turnOn(longe!, { hours: 2, lat: -19.8000, lng: -43.9600 });
+  // Ana conversa bastante com "papo".
+  const chat = await w.core.conversations.open(ana!, papo!);
+  for (let i = 0; i < 5; i += 1) await w.core.conversations.send(ana!, chat.id, { body: `oi ${i}` });
+  await w.core.conversations.send(papo!, chat.id, { body: 'bora!' });
+  return { w, ana: ana!, perto: perto!, longe: longe!, papo: papo! };
+}
+
+test('livres agora: mais perto primeiro quando ligou com localização, sem revelar a posição', async () => {
+  const { w, ana, perto, longe, papo } = await crowd();
+  const r = await w.core.flash.listAvailableRanked(ana);
+  assert.equal(r.order, 'near');
+  assert.equal(r.nearAvailable, true);
+  assert.deepEqual(r.items.map((i) => i.profile.userId), [perto, papo, longe]);
+  const json = JSON.stringify(r);
+  assert.doesNotMatch(json, /-19\.|-43\.|area|lat|lng/i, 'a posição nunca sai na resposta');
+  // Só a distância e o tempo aproximados (das regiões arredondadas: "perto" dá ~1,5 km).
+  assert.deepEqual(r.items.map((i) => i.approx), [
+    { km: 2, minutes: 20, mode: 'walk' },
+    { km: 5, minutes: 15, mode: 'car' },
+    { km: 15, minutes: 40, mode: 'car' },
+  ]);
+});
+
+test('distância aproximada: a pé até 2 km, de carro acima; minutos de 5 em 5', async () => {
+  const { approxTrip } = await import('./flash-service.ts');
+  assert.deepEqual(approxTrip(400), { km: 0, minutes: 5, mode: 'walk' });
+  assert.deepEqual(approxTrip(1800), { km: 2, minutes: 20, mode: 'walk' });
+  assert.deepEqual(approxTrip(3000), { km: 3, minutes: 10, mode: 'car' });
+  assert.deepEqual(approxTrip(12_400), { km: 12, minutes: 35, mode: 'car' });
+});
+
+test('livres agora: ordem de interação põe primeiro com quem você mais fala', async () => {
+  const { w, ana, papo } = await crowd();
+  const r = await w.core.flash.listAvailableRanked(ana, 'interaction');
+  assert.equal(r.order, 'interaction');
+  assert.equal(r.items[0]?.profile.userId, papo);
+});
+
+test('livres agora: sem localização, a ordem é por interação e quem não informou vai para o fim do "perto"', async () => {
+  const w = makeWorld();
+  const { ana, bia, caio } = await w.signUpMany('ana', 'bia', 'caio');
+  await befriend(w, ana!, bia!);
+  await befriend(w, ana!, caio!);
+  await w.core.flash.turnOn(ana!, { hours: 1 });
+  await w.core.flash.turnOn(bia!, { hours: 1, lat: -23.5, lng: -46.6 });
+  await w.core.flash.turnOn(caio!, { hours: 1 });
+  const r = await w.core.flash.listAvailableRanked(ana!, 'near');
+  assert.equal(r.order, 'interaction', 'sem a minha localização não dá para ordenar por distância');
+  assert.equal(r.nearAvailable, false);
+  assert.equal(r.items.length, 2);
+  assert.ok(r.items.every((i) => i.approx === null), 'sem a minha localização, sem distância');
+  await rejectsWith(w.core.flash.turnOn(caio!, { hours: 1, lat: 200, lng: 0 }), 'VALIDATION');
+});
+
+test('localização do NOW: arredondada para ~1 km e apagada ao desligar', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  await w.core.flash.turnOn(ana!, { hours: 1, lat: -19.932178, lng: -43.938011 });
+  const session = [...w.flash.sessions.values()].find((s) => s.userId === ana);
+  assert.deepEqual(session?.area, { lat: -19.93, lng: -43.94 });
+  await w.core.flash.turnOff(ana!);
+  assert.equal([...w.flash.sessions.values()].find((s) => s.userId === ana)?.area, null);
+});
+
+test('estender o NOW: +30 min ou +1 h, no máximo 3 horas a partir de agora', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  await rejectsWith(w.core.flash.extend(ana!, { minutes: 30 }), 'FORBIDDEN');
+  const on = await w.core.flash.turnOn(ana!, { hours: 1 });
+  const start = new Date(on.expiresAt!).getTime();
+  await rejectsWith(w.core.flash.extend(ana!, { minutes: 45 }), 'VALIDATION');
+  const plus30 = await w.core.flash.extend(ana!, { minutes: 30 });
+  assert.equal(new Date(plus30.expiresAt!).getTime() - start, 30 * 60_000);
+  const plus60 = await w.core.flash.extend(ana!, { minutes: 60 });
+  assert.equal(new Date(plus60.expiresAt!).getTime() - start, 90 * 60_000);
+  const capped = await w.core.flash.extend(ana!, { minutes: 60 });
+  assert.equal(new Date(capped.expiresAt!).getTime(), w.clock.now().getTime() + 180 * 60_000, 'para nas 3 horas');
+  await rejectsWith(w.core.flash.extend(ana!, { minutes: 30 }), 'CONFLICT');
+  assert.equal((await w.core.flash.status(ana!)).expiresAt, capped.expiresAt);
+});
+
+test('localização aproximada: quem escolhe "aproximada" ao aceitar só mostra a posição arredondada', async () => {
+  const w = makeWorld();
+  const { ana, bia } = await w.signUpMany('ana', 'bia');
+  await befriend(w, ana!, bia!);
+  await w.core.flash.turnOn(ana!, { hours: 1 });
+  await w.core.flash.turnOn(bia!, { hours: 1 });
+  const invite = await w.core.flash.invite(ana!, bia!);
+  await w.core.flash.respond(bia!, invite.id, 'accept', { approx: true });
+  await w.core.flash.shareLocation(bia!, invite.id, { lat: -23.523456, lng: -46.187654, accuracyM: 12 });
+  await w.core.flash.shareLocation(ana!, invite.id, { lat: -23.551234, lng: -46.633321, accuracyM: 8 });
+  const fromAna = await w.core.flash.getMatch(ana!, invite.id);
+  assert.equal(fromAna.themApprox, true);
+  assert.equal(fromAna.meApprox, false);
+  assert.deepEqual([fromAna.them?.lat, fromAna.them?.lng, fromAna.them?.accuracyM], [-23.52, -46.19, 1000]);
+  assert.deepEqual([fromAna.me?.lat, fromAna.me?.lng], [-23.551234, -46.633321], 'quem escolheu exata continua exata');
+  const fromBia = await w.core.flash.getMatch(bia!, invite.id);
+  assert.equal(fromBia.meApprox, true);
+});
+
+test('localização aproximada: dá para escolher ao convidar e trocar durante o encontro', async () => {
+  const w = makeWorld();
+  const { ana, bia } = await w.signUpMany('ana', 'bia');
+  await befriend(w, ana!, bia!);
+  await w.core.flash.turnOn(ana!, { hours: 1 });
+  await w.core.flash.turnOn(bia!, { hours: 1 });
+  const invite = await w.core.flash.invite(ana!, bia!, { approx: true });
+  await w.core.flash.respond(bia!, invite.id, 'accept');
+  await w.core.flash.shareLocation(ana!, invite.id, { lat: -23.551234, lng: -46.633321, accuracyM: 8 });
+  assert.equal((await w.core.flash.getMatch(bia!, invite.id)).them?.lat, -23.55);
+  // Ana passa a mostrar a exata; Bia passa a mostrar a aproximada e a posição já guardada é arredondada.
+  await w.core.flash.shareLocation(bia!, invite.id, { lat: -23.523456, lng: -46.187654 });
+  assert.deepEqual(await w.core.flash.setPrecision(ana!, invite.id, false), { approx: false });
+  await w.core.flash.shareLocation(ana!, invite.id, { lat: -23.551234, lng: -46.633321 });
+  assert.equal((await w.core.flash.getMatch(bia!, invite.id)).them?.lat, -23.551234);
+  await w.core.flash.setPrecision(bia!, invite.id, true);
+  assert.equal((await w.core.flash.getMatch(ana!, invite.id)).them?.lat, -23.52);
+  await rejectsWith(w.core.flash.setPrecision(bia!, invite.id, 'sim'), 'VALIDATION');
 });

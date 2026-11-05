@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import { conflict } from '../../core/errors.ts';
 import type { UserRepository } from '../../core/ports.ts';
@@ -15,6 +16,7 @@ function toUser(row: {
   termsAcceptedAt: Date | null;
   termsVersion: string | null;
   onboardedAt: Date | null;
+  phone?: string | null;
 }): User {
   return {
     id: row.id,
@@ -27,6 +29,7 @@ function toUser(row: {
     termsAcceptedAt: row.termsAcceptedAt,
     termsVersion: row.termsVersion,
     onboardedAt: row.onboardedAt,
+    phone: row.phone ?? null,
   };
 }
 
@@ -113,6 +116,24 @@ export class PrismaUserRepository implements UserRepository {
       SELECT id::text AS id FROM "User"
       WHERE status <> 'SUSPENDED' AND encode(sha256(convert_to(lower(email), 'UTF8')), 'hex') = ANY(${hashes}::text[])`;
     return rows.map((r) => r.id);
+  }
+
+  async findIdsByPhoneHashes(hashes: string[]): Promise<string[]> {
+    if (hashes.length === 0) return [];
+    const rows = await this.prisma.user.findMany({ where: { phoneHash: { in: hashes }, status: { not: 'SUSPENDED' } }, select: { id: true } });
+    return rows.map((r) => r.id);
+  }
+
+  async setPhone(userId: string, phone: string | null): Promise<void> {
+    if (!isUuid(userId)) return;
+    const phoneHash = phone ? createHash('sha256').update(phone, 'utf8').digest('hex') : null;
+    try {
+      await this.prisma.user.updateMany({ where: { id: userId }, data: { phone, phoneHash } });
+    } catch (error) {
+      const targets = uniqueViolationTargets(error);
+      if (targets && targets.some((t) => t.includes('phone'))) throw conflict('Este celular já está em outra conta', { phone: 'Este celular já está em outra conta' });
+      throw error;
+    }
   }
 
   async findProfileById(userId: string): Promise<Profile | undefined> {

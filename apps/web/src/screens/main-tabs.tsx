@@ -61,12 +61,12 @@ export function HomeScreen() {
       ) : null}
 
       {showFlashCard(me.data?.counts.following) ? (
-        <Link to="/flash" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
+        <Link to="/now" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
           <span className="flashcta__icon">
             <BoltIcon filled />
           </span>
           <span className="flashcta__text">
-            <span className="flashcta__title">{flashOn ? t('Flash ligado') : t('Flash: estou livre agora')}</span>
+            <span className="flashcta__title">{flashOn ? t('NOW ligado') : t('NOW: estou livre agora')}</span>
             <span className="flashcta__sub">
               {flashOn && flash.data?.expiresAt
                 ? t('Faltam {now}. Veja quem mais está livre.', { now: formatRemaining(minutesLeft(flash.data.expiresAt, Date.now())) })

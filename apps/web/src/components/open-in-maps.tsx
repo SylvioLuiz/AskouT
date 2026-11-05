@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Sheet } from './agenda.tsx';
-import { MAP_APP_NAMES, MAP_APPS, mapAppLink, type MapMode, type MapTarget } from '../lib/map-links.ts';
+import { MAP_APP_NAMES, mapAppLink, mapAppsFor, type MapMode, type MapTarget } from '../lib/map-links.ts';
 import { t } from '../lib/i18n/index.ts';
 
-/** Botão "ver no mapa" / "rota": pergunta em qual app abrir (Google Maps, Apple Mapas, Waze). */
+/** Botão "ver no mapa" / "rota": pergunta em qual app abrir (Google Maps, Waze e, só em aparelho da Apple, Apple Mapas). */
 export function OpenInMaps({ className, mode = 'view', children, ...target }: MapTarget & { className?: string; mode?: MapMode; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
@@ -16,7 +16,7 @@ export function OpenInMaps({ className, mode = 'view', children, ...target }: Ma
         ? createPortal(
             <Sheet title={mode === 'route' ? t('Como chegar') : t('Abrir no mapa')} onClose={() => setOpen(false)}>
               <ul className="sharelist">
-                {MAP_APPS.map((app) => (
+                {mapAppsFor(navigator.userAgent, navigator.platform).map((app) => (
                   <li key={app}>
                     <a className="sharelist__item" href={mapAppLink(app, target, mode)} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}>
                       <strong>{MAP_APP_NAMES[app]}</strong>

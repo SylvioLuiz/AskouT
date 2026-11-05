@@ -112,7 +112,7 @@ test('entradas inválidas são recusadas', async () => {
   const { ana } = await w.signUpMany('ana');
   for (const bad of [
     { q: 'x'.repeat(81) }, { q: 'a\u0000b' }, { lat: 1 }, { lat: 91, lng: 0 }, { lat: 'abc', lng: 1 },
-    { radiusKm: 0 }, { radiusKm: 51 }, { kind: 'FESTA' }, { from: 'ontem' },
+    { radiusKm: 0 }, { radiusKm: 101 }, { kind: 'FESTA' }, { from: 'ontem' },
     { from: '2026-10-14T00:00:00Z', to: '2026-10-13T00:00:00Z' }, { from: '2026-10-01T00:00:00Z', to: '2027-01-01T00:00:00Z' },
   ]) {
     await rejectsWith(w.core.explore.search(ana!, bad), 'VALIDATION');

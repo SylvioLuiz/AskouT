@@ -4,6 +4,7 @@ import { CHUNK_BYTES, createVideoBridge, qualityFor, type VideoBridgeDeps } from
 import { createStoreBridge } from './store-bridge.ts';
 import { createAppleBridge } from './apple-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
+import { createContactsBridge } from './contacts-bridge.ts';
 import { createPushBridge, type PushPluginLike } from './push-bridge.ts';
 
 function fakeVideoDeps(overrides: Partial<VideoBridgeDeps> = {}) {
@@ -243,5 +244,33 @@ describe('ponte da agenda', () => {
     await cancelled.addEvent({ filename: 'x.ics', ics });
     const broken = createCalendarBridge({ writeFile: async () => ({ uri: 'file:///x' }), share: async () => Promise.reject(new Error('falhou')) });
     await assert.rejects(broken.addEvent({ filename: 'x.ics', ics }), /falhou/);
+  });
+});
+
+describe('ponte dos contatos', () => {
+  const agenda = { contacts: [{ phones: [{ number: '(11) 98765-4321' }, { number: null }], emails: [{ address: 'ana@x.com' }] }, {}] };
+  it('pede permissão quando falta e devolve só celulares e e-mails', async () => {
+    const calls: string[] = [];
+    const bridge = createContactsBridge({
+      contacts: {
+        checkPermissions: async () => (calls.push('check'), { contacts: 'prompt' }),
+        requestPermissions: async () => (calls.push('request'), { contacts: 'granted' }),
+        getContacts: async () => (calls.push('read'), agenda),
+      },
+    });
+    assert.deepEqual(await bridge.readAll(), { phones: ['(11) 98765-4321'], emails: ['ana@x.com'] });
+    assert.deepEqual(calls, ['check', 'request', 'read']);
+  });
+  it('sem permissão, avisa e não lê a agenda', async () => {
+    let read = false;
+    const bridge = createContactsBridge({
+      contacts: {
+        checkPermissions: async () => ({ contacts: 'denied' }),
+        requestPermissions: async () => ({ contacts: 'denied' }),
+        getContacts: async () => ((read = true), agenda),
+      },
+    });
+    await assert.rejects(bridge.readAll(), /permissão/);
+    assert.equal(read, false);
   });
 });

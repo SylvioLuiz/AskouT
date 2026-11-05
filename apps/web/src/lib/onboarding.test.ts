@@ -9,7 +9,7 @@ function memory() {
 
 describe('onboarding', () => {
   it('tem as 3 telas combinadas', () => {
-    assert.deepEqual(ONBOARDING_SLIDES.map((s) => s.title), ['Siga bares e baladas, veja eventos', 'Amigo é quem se segue', 'Flash: encontre quem quer sair agora']);
+    assert.deepEqual(ONBOARDING_SLIDES.map((s) => s.title), ['Siga bares e baladas, veja eventos', 'Amigo é quem se segue', 'NOW: encontre quem quer sair agora']);
   });
   it('lembra por usuário', () => {
     const s = memory();

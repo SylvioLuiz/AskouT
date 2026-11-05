@@ -18,6 +18,16 @@ export interface MapTarget {
 
 export const MAP_APPS: readonly MapApp[] = ['google', 'apple', 'waze'];
 
+/** Aparelho da Apple (iPhone, iPad, iPod ou Mac), o único onde o Apple Mapas abre. O iPad novo se apresenta como Mac. */
+export function isAppleDevice(userAgent: string, platform = ''): boolean {
+  return /iPhone|iPad|iPod|Macintosh|Mac OS X/.test(userAgent) || /^(Mac|iPhone|iPad|iPod)/.test(platform);
+}
+
+/** Apps de mapa que fazem sentido neste aparelho: fora da Apple não oferece o Apple Mapas. */
+export function mapAppsFor(userAgent: string, platform = ''): readonly MapApp[] {
+  return isAppleDevice(userAgent, platform) ? MAP_APPS : MAP_APPS.filter((app) => app !== 'apple');
+}
+
 export const MAP_APP_NAMES: Readonly<Record<MapApp, string>> = { google: 'Google Maps', apple: 'Apple Mapas', waze: 'Waze' };
 
 function hasPoint(target: MapTarget): target is MapTarget & { lat: number; lng: number } {

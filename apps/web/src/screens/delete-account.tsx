@@ -48,7 +48,7 @@ export function DeleteAccountScreen() {
       <div className="legal-list">
         <p>{t('O que acontece quando você apaga:')}</p>
         <ul>
-          <li>{t('Seu perfil, posts, comentários, curtidas, agenda, Flash, avisos e histórico de uso são apagados.')}</li>
+          <li>{t('Seu perfil, posts, comentários, curtidas, agenda, NOW, avisos e histórico de uso são apagados.')}</li>
           <li>{t('Você deixa de seguir e de ser seguido por todo mundo.')}</li>
           <li>{t('Suas mensagens são apagadas das conversas, inclusive dos grupos.')}</li>
           <li>{t('Encontros que você organizou são cancelados e removidos. Grupos de que você é dono passam para o membro mais antigo; se não houver outros, o grupo some.')}</li>

@@ -117,7 +117,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const flashOn = flash.data?.active === true;
   const flashInvited = (flashInvites.data?.received.length ?? 0) > 0;
 
-  const flashItem: NavItem = { to: '/flash', label: t('Flash'), icon: <BoltIcon filled={flashOn} />, also: ['/flash/encontro'] };
+  const flashItem: NavItem = { to: '/now', label: t('NOW'), icon: <BoltIcon filled={flashOn} />, also: ['/now/encontro'] };
   const createItem: NavItem = { to: '/criar', label: t('Criar post'), icon: <PlusBigIcon /> };
   const activities: NavItem = { to: '/atividades', label: t('Notificações'), icon: <BellIcon /> };
   const profile: NavItem = {

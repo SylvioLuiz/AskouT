@@ -4,6 +4,7 @@ import { useAsync } from '../hooks.ts';
 import { markShown, readLastShown, shouldShowSuggestions } from '../lib/suggested-people.ts';
 import { Link } from '../router.tsx';
 import { Avatar } from './ui.tsx';
+import { ConnectContactsCard, useContactsConnected } from './connect-contacts.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 /** "Pessoas que você talvez conheça": amigos de amigos, em carrossel. Aparece de 3 em 3 dias (sempre, se você segue menos de 5 pessoas). */
@@ -12,6 +13,7 @@ export function SuggestedPeople() {
   // A decisão vale para a visita inteira: o carimbo é gravado uma vez e o bloco não some no meio da leitura.
   const [decision] = useState(() => ({ lastShownAt: readLastShown(), now: Date.now() }));
   const [stamped, setStamped] = useState(false);
+  const connected = useContactsConnected();
   const items = data.data?.items ?? [];
   const show = data.data !== undefined && items.length > 0 && shouldShowSuggestions(data.data.followingCount, decision.lastShownAt, decision.now);
   if (show && !stamped) {
@@ -25,8 +27,9 @@ export function SuggestedPeople() {
         <h2 id="talvez-titulo" className="section__title">
           {t('Pessoas que você talvez conheça')}
         </h2>
-        <Link to="/amigos/contatos" className="suggest__contacts">{t('Achar nos contatos')}</Link>
+        {connected ? <Link to="/amigos/contatos" className="suggest__contacts">{t('Achar nos contatos')}</Link> : null}
       </div>
+      <ConnectContactsCard />
       <ul className="suggest__track">
         {items.map((p) => (
           <li key={p.userId} className="suggest__card">

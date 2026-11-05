@@ -1,4 +1,5 @@
 import { decodeImageDataUrl } from './image.ts';
+import { normalizePhone } from './phone.ts';
 import { forbidden, notFound, validationError } from './errors.ts';
 import { parseReportInput } from './report-input.ts';
 import { evaluateFriendship } from './friendship.ts';
@@ -163,6 +164,28 @@ export class ProfileService {
     const next = { ...current, avatarUrl: `/users/${userId}/avatar?v=${updatedAt.getTime()}` };
     await users.updateProfile(next);
     return next;
+  }
+
+  /** O próprio celular (privado: só a dona da conta vê). */
+  async getPhone(userId: string): Promise<{ phone: string | null }> {
+    const user = await this.deps.users.findById(userId);
+    if (!user) throw notFound('Perfil não encontrado');
+    return { phone: user.phone ?? null };
+  }
+
+  /** Guarda o celular (qualquer formato; sem código do país, entende Brasil) ou, com `null` ou vazio, apaga. */
+  async setPhone(userId: string, raw: unknown): Promise<{ phone: string | null }> {
+    if (raw !== null && typeof raw !== 'string') throw validationError('Celular inválido', { phone: 'Informe o celular com DDD' });
+    const user = await this.deps.users.findById(userId);
+    if (!user) throw notFound('Perfil não encontrado');
+    if (raw === null || raw.trim() === '') {
+      await this.deps.users.setPhone(userId, null);
+      return { phone: null };
+    }
+    const phone = normalizePhone(raw);
+    if (!phone) throw validationError('Celular inválido', { phone: 'Informe o celular com DDD, ex.: (11) 98765-4321' });
+    if (phone !== user.phone) await this.deps.users.setPhone(userId, phone);
+    return { phone };
   }
 
   /** Bytes da foto de perfil (rota pública, usada em <img>). */

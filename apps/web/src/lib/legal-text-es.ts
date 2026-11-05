@@ -27,7 +27,7 @@ export function buildPrivacyEs(email: string): LegalDoc {
           'Fecha de nacimiento: se pide al registrarte para comprobar la edad mínima (18 años). No se muestra a otras personas. Puedes corregirla en Editar perfil (quien figure como menor de 18 años debe hablar con soporte). También guardamos el día y la versión de los Términos que aceptaste al crear la cuenta.',
           'Perfil y contenido: foto de perfil, publicaciones, fotos, videos, eventos que publicas, comentarios, me gusta y mensajes de chats y grupos.',
           'Relaciones: a quién sigues, quién te sigue, a quién bloqueaste y las personas que apruebas en el perfil privado. Dos perfiles que se siguen mutuamente son "amigos" en AskouT.',
-          'Agenda y planes: los días y horarios en que marcas que puedes salir, los modos "Flash" (disponibilidad temporal), encuestas de fecha y asistencia a eventos.',
+          'Agenda y planes: los días y horarios en que marcas que puedes salir, los modos "NOW" (disponibilidad temporal), encuestas de fecha y asistencia a eventos.',
           'Ubicación: solo cuando lo permites. En Explorar y en el mapa usamos la posición del dispositivo para encontrar lugares y eventos cercanos y no guardamos esa posición. En "Mi región" (opcional) guardamos una coordenada redondeada (cerca de 1 km) para anuncios por región. Puedes borrarla en cualquier momento.',
           'Uso para recomendaciones: cuánto tiempo pasas en cada contenido y si abriste enlaces, para armar el bloque "Para ti". Se puede desactivar y, al hacerlo, borramos el historial medido.',
           'Avisos: si activas las notificaciones, guardamos la dirección técnica de envío de tu navegador o dispositivo.',
@@ -73,7 +73,7 @@ export function buildPrivacyEs(email: string): LegalDoc {
         title: '7. Por cuánto tiempo los guardamos',
         items: [
           'Los datos de la cuenta y del contenido permanecen mientras la cuenta exista, o hasta que borres el contenido.',
-          'Los códigos de confirmación vencen en pocos minutos. La disponibilidad "Flash" desaparece sola al vencer.',
+          'Los códigos de confirmación vencen en pocos minutos. La disponibilidad "NOW" desaparece sola al vencer.',
           'El historial de tiempo por contenido y la región pueden ser borrados por ti en cualquier momento en Privacidad.',
           'Podemos mantener lo mínimo necesario por más tiempo cuando la ley lo exija (por ejemplo, registros fiscales de pagos) o para defensa en procesos.',
         ],

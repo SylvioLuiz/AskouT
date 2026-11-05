@@ -27,7 +27,7 @@ export function buildPrivacyEn(email: string): LegalDoc {
           'Date of birth: requested at sign-up to check the minimum age (18). It is not shown to other people. You can correct it in Edit profile (anyone recorded as under 18 should contact support). We also store the day and version of the Terms you accepted when creating the account.',
           'Profile and content: profile photo, posts, photos, videos, events you post, comments, likes, and messages in chats and groups.',
           'Relationships: who you follow, who follows you, who you blocked and the people you approve on a private profile. Two profiles that follow each other are "friends" on AskouT.',
-          'Calendar and plans: the days and times you mark as available, the "Flash" modes (temporary availability), date polls and attendance at events.',
+          'Calendar and plans: the days and times you mark as available, the "NOW" modes (temporary availability), date polls and attendance at events.',
           'Location: only when you allow it. In Explore and on the map, we use the device position to find places and events nearby and we do not store that position. In "My area" (optional), we store a rounded coordinate (about 1 km) for regional ads. You can delete it at any time.',
           'Use for recommendations: how long you spend on each piece of content and whether you opened links, to build the "For you" block. This can be turned off, and when you turn it off we delete the measured history.',
           'Notifications: if you enable notifications, we store the technical delivery address of your browser or device.',
@@ -73,7 +73,7 @@ export function buildPrivacyEn(email: string): LegalDoc {
         title: '7. How long we keep it',
         items: [
           'Account and content data stay while the account exists, or until you delete the content.',
-          'Confirmation codes expire in a few minutes. "Flash" availability disappears on its own when it expires.',
+          'Confirmation codes expire in a few minutes. "NOW" availability disappears on its own when it expires.',
           'The time-per-content history and the area can be deleted by you at any time in Privacy.',
           'We may keep the minimum necessary for longer when the law requires it (for example, tax records of payments) or for defense in proceedings.',
         ],

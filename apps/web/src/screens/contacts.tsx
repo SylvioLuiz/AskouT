@@ -3,12 +3,19 @@ import type { ChangeEvent } from 'react';
 import { api } from '../client.ts';
 import { Button, EmptyState, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { useTitle } from '../hooks.ts';
-import { canPickContacts, CONTACTS_MAX, emailsFromVcf, pickContactEmails, sha256Hex } from '../lib/contacts.ts';
+import { canPickContacts, canSyncDeviceContacts, hashContactKeys, keysFromVcf, pickContacts, readDeviceContacts } from '../lib/contacts.ts';
+import type { ContactKeys } from '../lib/contacts.ts';
 import { toApiError } from '../lib/errors.ts';
+import { markContactsConnected } from '../lib/contacts-prompt.ts';
+import { safeStorage } from '../lib/hints.ts';
 import type { PublicProfile } from '../lib/types.ts';
+import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
-/** Achar amigos nos contatos. Os e-mails ficam no aparelho: só o código SHA-256 de cada um vai ao servidor, e nada é guardado. */
+/**
+ * Achar amigos nos contatos, por celular e por e-mail. Os dados ficam no aparelho: só o código SHA-256 de cada um vai ao servidor, e nada é guardado.
+ * No app do celular sincroniza a agenda inteira; no navegador, pelo seletor de contatos (Chrome no Android) ou por arquivo .vcf.
+ */
 export function ContactsScreen() {
   useTitle(t('Contatos'));
   const fileRef = useRef<HTMLInputElement>(null);
@@ -17,24 +24,24 @@ export function ContactsScreen() {
   const [found, setFound] = useState<PublicProfile[] | undefined>();
   const [followed, setFollowed] = useState<Record<string, 'ACCEPTED' | 'PENDING'>>({});
   const [followingBusy, setFollowingBusy] = useState<string | undefined>();
+  const [followingAll, setFollowingAll] = useState(false);
+  const native = canSyncDeviceContacts();
+  const picker = canPickContacts();
 
-  async function search(emails: string[]) {
-    if (emails.length === 0) {
-      setMessage({ tone: 'info', text: t('Não encontrei e-mails nesses contatos.') });
+  async function search(keys: ContactKeys) {
+    if (keys.emails.length === 0 && keys.phones.length === 0) {
+      setMessage({ tone: 'info', text: t('Não encontrei celulares nem e-mails nesses contatos.') });
       return;
     }
-    const hashes = await Promise.all(emails.slice(0, CONTACTS_MAX).map((e) => sha256Hex(e)));
-    const result = await api.contactMatches(hashes);
+    const { hashes, phoneHashes, truncated } = await hashContactKeys(keys);
+    const result = await api.contactMatches(hashes, phoneHashes);
+    markContactsConnected(safeStorage());
     setFound(result.items);
     setFollowed({});
-    setMessage(
-      emails.length > CONTACTS_MAX
-        ? { tone: 'info', text: t('Conferi os primeiros {CONTACTS_MAX} contatos.', { CONTACTS_MAX }) }
-        : undefined,
-    );
+    setMessage(truncated ? { tone: 'info', text: t('A agenda é grande: conferi só uma parte dos contatos.') } : undefined);
   }
 
-  async function run(job: () => Promise<string[]>) {
+  async function run(job: () => Promise<ContactKeys>) {
     setBusy(true);
     setMessage(undefined);
     try {
@@ -56,7 +63,7 @@ export function ContactsScreen() {
       setMessage({ tone: 'error', text: t('O arquivo é grande demais. Use até 5 MB.') });
       return;
     }
-    await run(async () => emailsFromVcf(await file.text()));
+    await run(async () => keysFromVcf(await file.text()));
   }
 
   async function follow(profile: PublicProfile) {
@@ -71,45 +78,81 @@ export function ContactsScreen() {
     }
   }
 
+  async function followAll(people: PublicProfile[]) {
+    setFollowingAll(true);
+    setMessage(undefined);
+    try {
+      for (const p of people) {
+        const result = await api.follow(p.userId);
+        setFollowed((current) => ({ ...current, [p.userId]: result.status }));
+      }
+    } catch (failure) {
+      setMessage({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setFollowingAll(false);
+    }
+  }
+
+  const notFollowed = (found ?? []).filter((p) => !followed[p.userId]);
+
   return (
     <>
       <PageHead title={t('Achar nos contatos')} back="/amigos" subtitle={t('Veja quais dos seus contatos já estão no AskouT')} />
       <p className="muted">
-        {t('Os e-mails dos seus contatos não saem do aparelho: só um código irreversível de cada um é enviado para conferir quem tem conta. O AskouT não guarda esses códigos nem sua lista de contatos.')}
+        {t('Os celulares e e-mails dos seus contatos não saem do aparelho: só um código irreversível de cada um é enviado para conferir quem tem conta. O AskouT não guarda esses códigos nem sua agenda.')}
       </p>
       <div className="stack">
-        {canPickContacts() ? (
-          <Button loading={busy} onClick={() => void run(pickContactEmails)}>
+        {native ? (
+          <Button loading={busy} onClick={() => void run(readDeviceContacts)}>
+            {t('Sincronizar agenda do celular')}
+          </Button>
+        ) : null}
+        {!native && picker ? (
+          <Button loading={busy} onClick={() => void run(pickContacts)}>
             {t('Escolher contatos')}
           </Button>
         ) : null}
-        <Button variant={canPickContacts() ? 'secondary' : 'primary'} loading={busy} onClick={() => fileRef.current?.click()}>
-          Enviar arquivo de contatos (.vcf)
-        </Button>
+        {!native ? (
+          <Button variant={picker ? 'secondary' : 'primary'} loading={busy} onClick={() => fileRef.current?.click()}>
+            {t('Enviar arquivo de contatos (.vcf)')}
+          </Button>
+        ) : null}
         <input ref={fileRef} type="file" accept=".vcf,text/vcard,text/x-vcard" hidden onChange={(e) => void onFile(e)} />
       </div>
-      {!canPickContacts() ? <p className="muted">{t('No iPhone, abra Contatos, escolha as pessoas, toque em Compartilhar e salve o arquivo .vcf para enviar aqui. O app do celular vai ler os contatos direto, mais para frente.')}</p> : null}
+      {!native && !picker ? <p className="muted">{t('No iPhone, abra Contatos, escolha as pessoas, toque em Compartilhar e salve o arquivo .vcf para enviar aqui. No app do AskouT dá para sincronizar a agenda direto.')}</p> : null}
+      <p className="muted">
+        {t('Para seus amigos acharem você pela agenda deles,')} <Link to="/perfil/editar">{t('coloque seu celular no perfil')}</Link>.
+      </p>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      {found && found.length === 0 ? <EmptyState title={t('Ninguém novo por aqui')}>{t('Nenhum dos contatos que você enviou está no AskouT ou todos já estão entre quem você segue.')}</EmptyState> : null}
+      {found && found.length === 0 ? <EmptyState title={t('Ninguém novo por aqui')}>{t('Nenhum dos seus contatos está no AskouT ou todos já estão entre quem você segue.')}</EmptyState> : null}
       {found && found.length > 0 ? (
-        <ul className="list">
-          {found.map((p) => (
-            <PersonRow
-              key={p.userId}
-              profile={p}
-              realName
-              aside={
-                followed[p.userId] ? (
-                  <span className="muted">{followed[p.userId] === 'PENDING' ? t('Pedido enviado') : 'Seguindo'}</span>
-                ) : (
-                  <Button small loading={followingBusy === p.userId} onClick={() => void follow(p)}>
-                    {t('Seguir')}
-                  </Button>
-                )
-              }
-            />
-          ))}
-        </ul>
+        <>
+          {notFollowed.length > 1 ? (
+            <div>
+              <Button variant="secondary" small loading={followingAll} onClick={() => void followAll(notFollowed)}>
+                {t('Seguir todos ({n})', { n: notFollowed.length })}
+              </Button>
+            </div>
+          ) : null}
+          <ul className="list">
+            {found.map((p) => (
+              <PersonRow
+                key={p.userId}
+                profile={p}
+                realName
+                aside={
+                  followed[p.userId] ? (
+                    <span className="muted">{followed[p.userId] === 'PENDING' ? t('Pedido enviado') : t('Seguindo')}</span>
+                  ) : (
+                    <Button small loading={followingBusy === p.userId} disabled={followingAll} onClick={() => void follow(p)}>
+                      {t('Seguir')}
+                    </Button>
+                  )
+                }
+              />
+            ))}
+          </ul>
+        </>
       ) : null}
     </>
   );

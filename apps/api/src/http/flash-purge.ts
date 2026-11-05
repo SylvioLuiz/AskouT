@@ -33,7 +33,7 @@ export class FlashPurge implements OnApplicationBootstrap, OnApplicationShutdown
       const result = await this.core.flash.purgeExpired();
       if (result.invites + result.positions + result.removed > 0) this.log.log(`Limpeza: ${JSON.stringify(result)}`);
     } catch (error) {
-      this.log.error(`Falha na limpeza do Flash: ${error instanceof Error ? error.message : String(error)}`);
+      this.log.error(`Falha na limpeza do NOW: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
