@@ -14,6 +14,10 @@ export interface MapTarget {
   googleUrl?: string | null;
   /** Meio de transporte da rota (Google Maps e Apple Mapas). Sem ele, o app escolhe. */
   travel?: 'walking' | 'driving';
+  /** Ponto de partida da rota (sua posição, quando o app já tem). Sem ele, o app de mapa usa a localização do aparelho. */
+  from?: { lat: number; lng: number } | undefined;
+  /** No computador o Waze abre o site, que só traça a rota com o ponto de partida no endereço. */
+  desktop?: boolean;
 }
 
 export const MAP_APPS: readonly MapApp[] = ['google', 'apple', 'waze'];
@@ -47,15 +51,18 @@ export function mapAppLink(app: MapApp, target: MapTarget, mode: MapMode): strin
   const point = hasPoint(target) ? `${target.lat},${target.lng}` : undefined;
   const query = encodeURIComponent(point ?? searchText(target));
   if (app === 'google') {
-    if (mode === 'route') return `https://www.google.com/maps/dir/?api=1&destination=${query}${target.travel ? `&travelmode=${target.travel}` : ''}`;
+    if (mode === 'route') return `https://www.google.com/maps/dir/?api=1${target.from ? `&origin=${encodeURIComponent(`${target.from.lat},${target.from.lng}`)}` : ''}&destination=${query}${target.travel ? `&travelmode=${target.travel}` : ''}`;
     if (target.googleUrl?.startsWith('https://')) return target.googleUrl;
     return `https://www.google.com/maps/search/?api=1&query=${query}`;
   }
   if (app === 'apple') {
-    if (mode === 'route') return `https://maps.apple.com/?daddr=${query}${target.travel ? `&dirflg=${target.travel === 'walking' ? 'w' : 'd'}` : ''}`;
+    if (mode === 'route') return `https://maps.apple.com/?${target.from ? `saddr=${target.from.lat},${target.from.lng}&` : ''}daddr=${query}${target.travel ? `&dirflg=${target.travel === 'walking' ? 'w' : 'd'}` : ''}`;
     if (!point) return `https://maps.apple.com/?q=${query}`;
     const label = target.label?.trim();
     return `https://maps.apple.com/?ll=${point}&q=${label ? encodeURIComponent(label) : point}`;
+  }
+  if (mode === 'route' && target.desktop && point && target.from) {
+    return `https://www.waze.com/live-map/directions?to=ll.${encodeURIComponent(point)}&from=ll.${encodeURIComponent(`${target.from.lat},${target.from.lng}`)}`;
   }
   const where = point ? `ll=${point}` : `q=${query}`;
   return `https://waze.com/ul?${where}${mode === 'route' ? '&navigate=yes' : ''}`;
