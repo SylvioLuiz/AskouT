@@ -1,6 +1,6 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeftIcon } from '../components/icons.tsx';
+import { ExploreViews } from '../components/explore-views.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
 import { VenueLogo } from '../components/venue-logo.tsx';
 import { Button, EmptyState, Loading } from '../components/ui.tsx';
@@ -22,11 +22,6 @@ const RADIUS_KM = 30;
 const PLACES_RADIUS_KM = 10;
 
 type Mode = 'places' | 'events';
-
-function goBack() {
-  if (window.history.length > 1) window.history.back();
-  else navigate('/explorar');
-}
 
 function MapCard({ event, selected }: { event: ExploreEvent; selected: boolean }) {
   const [failed, setFailed] = useState(false);
@@ -216,9 +211,7 @@ export function EventsMapScreen() {
         </Suspense>
       )}
       <header className="evmap__top">
-        <button type="button" className="evmap__back" onClick={goBack} aria-label={t('Voltar para o Explorar')}>
-          <ChevronLeftIcon />
-        </button>
+        <ExploreViews current="map" floating />
         <div className="evmap__seg" role="group" aria-label={t('O que mostrar no carrossel')}>
           <button type="button" aria-pressed={mode === 'places'} className={mode === 'places' ? 'is-on' : ''} onClick={() => setMode('places')}>
             Locais{placesResult.data ? ` ${places.length}` : ''}
