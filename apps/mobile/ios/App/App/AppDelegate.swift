@@ -60,3 +60,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return config
     }
 }
+
+
+/// Tela principal: reforça a retirada da barra do teclado (setas e OK) direto no WebView que está na tela.
+class MainViewController: CAPBridgeViewController {
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        hideAccessory()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        hideAccessory()
+    }
+
+    private func hideAccessory() {
+        guard let web = self.webView else { return }
+        web.inputAssistantItem.leadingBarButtonGroups = []
+        web.inputAssistantItem.trailingBarButtonGroups = []
+        let block: @convention(block) (AnyObject) -> AnyObject? = { _ in nil }
+        let imp = imp_implementationWithBlock(block)
+        for view in web.scrollView.subviews where String(describing: type(of: view)).hasPrefix("WKContent") {
+            class_replaceMethod(type(of: view), #selector(getter: UIResponder.inputAccessoryView), imp, "@@:")
+        }
+    }
+}
