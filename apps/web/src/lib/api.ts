@@ -363,13 +363,14 @@ export function createApi(deps: ApiDeps) {
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
       request<EventPage>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
     eventStories: (eventId: string) => request<{ groups: EventStoryGroup[] }>('GET', `/events/${id(eventId)}/stories`),
-    createEventStory: async (eventId: string, file: Blob): Promise<EventStoryGroup> => {
+    /** `onProfile`: publica também no perfil, para os amigos verem na página inicial. */
+    createEventStory: async (eventId: string, file: Blob, onProfile = false): Promise<EventStoryGroup> => {
       const token = deps.getToken();
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
       if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
       let response;
       try {
-        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/stories`, { method: 'POST', headers, body: file });
+        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/stories${onProfile ? '?profile=1' : ''}`, { method: 'POST', headers, body: file });
       } catch {
         throw networkError();
       }
@@ -387,6 +388,11 @@ export function createApi(deps: ApiDeps) {
     deleteEventStory: (eventId: string, storyId: string) => request<{ deleted: true }>('DELETE', `/events/${id(eventId)}/stories/${id(storyId)}`),
     reportEventStory: (eventId: string, storyId: string, reason: ReportReason, details?: string) =>
       request<{ reported: true }>('POST', `/events/${id(eventId)}/stories/${id(storyId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+    /** Página inicial: os seus stories e os dos amigos publicados também no perfil. */
+    profileStories: () => request<{ groups: EventStoryGroup[] }>('GET', '/stories/friends'),
+    deleteProfileStory: (storyId: string) => request<{ deleted: true }>('DELETE', `/stories/${id(storyId)}`),
+    reportProfileStory: (storyId: string, reason: ReportReason, details?: string) =>
+      request<{ reported: true }>('POST', `/stories/${id(storyId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
     eventGo: (eventId: string) => request<EventPage>('POST', `/events/${id(eventId)}/going`),
     eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),

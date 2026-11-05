@@ -5,7 +5,7 @@ import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { BellOffIcon, CameraIcon, CheckIcon, ChevronDownIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { ArrowUpIcon, BellOffIcon, CameraIcon, CheckIcon, ChevronDownIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
 import { MessagePopup, ReactionSummary, ReactionsSheet, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';

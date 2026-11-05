@@ -12,6 +12,7 @@ import { showFlashCard } from '../lib/age.ts';
 import { PostList } from '../components/post.tsx';
 import { Link } from '../router.tsx';
 import { SuggestedPeople } from '../components/suggested-people.tsx';
+import { FriendStories } from '../components/friend-stories.tsx';
 import { EventCard } from './explore.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -29,6 +30,7 @@ export function HomeScreen() {
   const [feedKey, setFeedKey] = useState(0);
   const meetups = useAsync(() => api.myMeetups(), []);
   const going = useAsync(() => api.myGoingEvents(), []);
+  const stories = useAsync(() => api.profileStories(), []);
   const plan = useMemo(() => nextPlan(agendaEvents(meetups.data?.items ?? [], going.data?.items ?? []), new Date()), [meetups.data, going.data]);
 
   return (
@@ -41,9 +43,12 @@ export function HomeScreen() {
         sponsored.reload();
         meetups.reload();
         going.reload();
+        stories.reload();
         await new Promise((resolve) => setTimeout(resolve, 700));
       }}
     >
+      <FriendStories groups={stories.data?.groups ?? []} onChanged={stories.reload} />
+
       {plan ? (
         <Link to="/agenda" className="nextplan" aria-label={t('Seu próximo plano: {now}, {title}. Abrir a agenda', { now: planWhenLabel(plan, now), title: plan.title })}>
           <span className="nextplan__icon" aria-hidden="true">

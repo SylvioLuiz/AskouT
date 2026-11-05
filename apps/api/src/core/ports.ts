@@ -737,6 +737,8 @@ export interface EventRoomRepository {
   addStory(story: EventStoryRecord): Promise<void>;
   /** Stories ainda no ar (`expiresAt` depois de `now`) do evento, do mais antigo ao mais novo, sem os bytes. */
   listStories(ref: EventRef, now: Date): Promise<EventStoryMeta[]>;
+  /** Stories no ar publicados também no perfil por estas pessoas (de qualquer evento), do mais antigo ao mais novo, sem os bytes. */
+  listProfileStories(userIds: string[], now: Date): Promise<EventStoryMeta[]>;
   findStory(id: string): Promise<EventStoryMeta | undefined>;
   findStoryMedia(id: string): Promise<{ mime: string; data: Uint8Array; expiresAt: Date } | undefined>;
   deleteStory(id: string): Promise<void>;
