@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { shareOrigin } from '../lib/public-origin.ts';
 import { Sheet } from './agenda.tsx';
 import { MoreIcon } from './icons.tsx';
 import { ReasonSheet, ShareLinkSheet } from './post-actions.tsx';
@@ -99,7 +100,7 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
   }
 
   if (step === 'share') {
-    return <ShareLinkSheet url={profileLink(window.location.origin, profile.username)} text={profileShareText(profile.username)} onClose={onClose} />;
+    return <ShareLinkSheet url={profileLink(shareOrigin(), profile.username)} text={profileShareText(profile.username)} onClose={onClose} />;
   }
 
   const row = (label: string, hint: string, onClick: () => void, extra?: { danger?: boolean; on?: boolean; role?: 'switch'; disabled?: boolean }) => (

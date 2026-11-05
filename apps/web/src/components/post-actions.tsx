@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { shareOrigin } from '../lib/public-origin.ts';
 import { Sheet } from './agenda.tsx';
 import { CropEditor } from './crop.tsx';
 import { EventDates } from './event-dates.tsx';
@@ -508,7 +509,7 @@ export function AdjustSheet({ post, onClose, onSaved }: { post: PostView; onClos
 // ---------- Compartilhar ----------
 
 export function SharePostSheet({ post, onClose }: { post: PostView; onClose: () => void }) {
-  return <ShareLinkSheet url={postLink(window.location.origin, post.id)} text={postShareText(post.author.username)} onShared={() => trackShare('POST', post.id)} onClose={onClose} />;
+  return <ShareLinkSheet url={postLink(shareOrigin(), post.id)} text={postShareText(post.author.username)} onShared={() => trackShare('POST', post.id)} onClose={onClose} />;
 }
 
 /** Compartilhar um link: numa conversa do app (amigo ou grupo) ou fora dele (compartilhar do aparelho / copiar). */
