@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { distanceMeters, flashNoteProblem, flashRemainingShare, formatCountdown, formatAge, formatDistance, formatKm, formatRemaining, geolocationMessage, minutesLeft } from './flash.ts';
+import { distanceMeters, flashNoteProblem, flashRemainingShare, formatCountdown, formatAge, formatDistance, formatKm, formatRemaining, formatTravel, placeName, sortByFairness, geolocationMessage, minutesLeft } from './flash.ts';
 
 describe('distanceMeters', () => {
   it('é zero para o mesmo ponto', () => {
@@ -92,5 +92,26 @@ describe('formatKm', () => {
     assert.equal(formatKm(20), '0,1 km');
     assert.equal(formatKm(-1), '—');
     assert.equal(formatKm(Number.NaN), '—');
+  });
+});
+
+describe('formatTravel', () => {
+  it('arredonda para minutos, nunca menos de 1', () => {
+    assert.equal(formatTravel(20), '1 min');
+    assert.equal(formatTravel(700), '12 min');
+    assert.equal(formatTravel(4000), '1 h 7 min');
+    assert.equal(formatTravel(7200), '2 h');
+  });
+});
+
+describe('lugares entre os dois', () => {
+  const item = (key: string, me: number, them: number, venueName = 'Bar', title = 'Bar') => ({ key, distanceFromMeM: me, distanceFromThemM: them, venueName, title }) as never;
+  it('ordena pelo mais justo: quem fica mais longe de um dos dois perde posição', () => {
+    const sorted = sortByFairness([item('a', 100, 2000), item('b', 900, 1000), item('c', 300, 400)]);
+    assert.deepEqual(sorted.map((i: { key: string }) => i.key), ['c', 'b', 'a']);
+  });
+  it('usa o nome do local, não o título do evento; sem local, o título', () => {
+    assert.equal(placeName({ venueName: 'Bar do Zé', title: 'Samba' }), 'Bar do Zé');
+    assert.equal(placeName({ venueName: '  ', title: 'Praça' }), 'Praça');
   });
 });

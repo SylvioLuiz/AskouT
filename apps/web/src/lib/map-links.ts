@@ -12,6 +12,8 @@ export interface MapTarget {
   address?: string | null;
   /** Link do próprio Google para o lugar (vem do Places), preferido para ver no Google Maps. */
   googleUrl?: string | null;
+  /** Meio de transporte da rota (Google Maps e Apple Mapas). Sem ele, o app escolhe. */
+  travel?: 'walking' | 'driving';
 }
 
 export const MAP_APPS: readonly MapApp[] = ['google', 'apple', 'waze'];
@@ -35,12 +37,12 @@ export function mapAppLink(app: MapApp, target: MapTarget, mode: MapMode): strin
   const point = hasPoint(target) ? `${target.lat},${target.lng}` : undefined;
   const query = encodeURIComponent(point ?? searchText(target));
   if (app === 'google') {
-    if (mode === 'route') return `https://www.google.com/maps/dir/?api=1&destination=${query}`;
+    if (mode === 'route') return `https://www.google.com/maps/dir/?api=1&destination=${query}${target.travel ? `&travelmode=${target.travel}` : ''}`;
     if (target.googleUrl?.startsWith('https://')) return target.googleUrl;
     return `https://www.google.com/maps/search/?api=1&query=${query}`;
   }
   if (app === 'apple') {
-    if (mode === 'route') return `https://maps.apple.com/?daddr=${query}`;
+    if (mode === 'route') return `https://maps.apple.com/?daddr=${query}${target.travel ? `&dirflg=${target.travel === 'walking' ? 'w' : 'd'}` : ''}`;
     if (!point) return `https://maps.apple.com/?q=${query}`;
     const label = target.label?.trim();
     return `https://maps.apple.com/?ll=${point}&q=${label ? encodeURIComponent(label) : point}`;

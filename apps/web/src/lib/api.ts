@@ -32,6 +32,7 @@ import type {
   FlashInvite,
   FlashInvites,
   FlashMatch,
+  FlashRoutes,
   FlashStatus,
   FlashVisibility,
   SharedView,
@@ -300,6 +301,9 @@ export function createApi(deps: ApiDeps) {
     flashShareLocation: (inviteId: string, position: { lat: number; lng: number; accuracyM?: number }) =>
       request<{ ok: true }>('PUT', `/flash/matches/${id(inviteId)}/location`, { body: position }),
 
+    flashChooseDestination: (inviteId: string, place: { name: string; lat: number; lng: number }) => request<{ ok: true }>('PUT', `/flash/matches/${id(inviteId)}/destination`, { body: place }),
+    flashClearDestination: (inviteId: string) => request<{ ok: true }>('DELETE', `/flash/matches/${id(inviteId)}/destination`),
+    flashRoutes: (inviteId: string, mode: 'foot' | 'driving') => request<FlashRoutes>('GET', `/flash/matches/${id(inviteId)}/routes?modo=${mode === 'driving' ? 'carro' : 'a-pe'}`),
     flashSuggestions: (inviteId: string) => request<Suggestions>('GET', `/flash/matches/${id(inviteId)}/suggestions`),
 
     notificationMute: () => request<NotificationMute>('GET', '/notifications/settings'),

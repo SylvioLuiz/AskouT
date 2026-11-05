@@ -158,6 +158,17 @@ export interface FlashInviteRecord {
   expiresAt: Date;
   respondedAt: Date | null;
   endedAt: Date | null;
+  /** Lugar que um dos dois escolheu para se encontrarem. Some junto com o encontro. */
+  destination?: FlashDestination | null;
+}
+
+/** Lugar escolhido no mapa do encontro Flash. */
+export interface FlashDestination {
+  name: string;
+  lat: number;
+  lng: number;
+  chosenById: string;
+  chosenAt: Date;
 }
 
 /** Última posição de uma pessoa num encontro. Sem histórico: cada atualização substitui a anterior. */

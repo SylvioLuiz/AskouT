@@ -436,3 +436,9 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - O fluxo antigo (propor data → confirmar) continua para quem quiser escolher outra data. Depois de definida, "Transformar em evento" (evento público) segue disponível.
 - Testes do serviço passam; **não testado no celular nem com a API real**.
 - Build 1.0.1 (15) enviado ao TestFlight em 05/11/2026 pelo GitHub Actions (`.github/workflows/ios-testflight.yml`, disparado por push na branch `testflight`; chave de API do App Store Connect nos segredos `ASC_*`). A 1.0 já aprovada não aceita builds novos. Traz safe area do topo no iPhone e o tutorial do primeiro login. Não enviado para revisão.
+
+## Flash: destino e rotas
+- Na tela do match, as duas pessoas veem os lugares entre elas, escolhem um e cada uma recebe a rota até ele.
+- Migração `20261206120000_flash_destination` (roda sozinha no deploy da API).
+- Rotas via OSRM (servidor público de demonstração, uso leve). Para produção em escala, apontar `OSRM_URL` para um servidor próprio. Sem resposta do OSRM, o app mostra linha reta e tempo estimado.
+- Ainda não testado em aparelho real nem no mapa nativo.

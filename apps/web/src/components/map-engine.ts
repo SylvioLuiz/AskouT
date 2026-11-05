@@ -29,8 +29,16 @@ export interface MapEngine {
   /** Leva o mapa até o ponto. `raiseBy` deixa o ponto tantos pixels acima do centro (para não ficar atrás de um cartão). */
   moveTo(center: LatLng, options: { zoom?: number; raiseBy?: number; animate?: boolean }): void;
   /** Enquadra todos os pontos, sem passar do zoom máximo. */
-  fit(points: readonly LatLng[], padding: number | Padding, maxZoom: number): void;
+  fit(points: readonly LatLng[], padding: number | Padding, maxZoom: number, animate?: boolean): void;
+  /** Troca as linhas desenhadas (rotas). Tracejada para trajeto estimado em linha reta. */
+  setLines(lines: readonly MapLine[]): void;
   destroy(): void;
+}
+
+export interface MapLine {
+  points: readonly LatLng[];
+  color: string;
+  dashed: boolean;
 }
 
 interface CreateOptions {
@@ -78,7 +86,7 @@ function loadGoogle(key: string): Promise<void> {
 
 async function createGoogle(container: HTMLElement, options: CreateOptions, key: string): Promise<MapEngine> {
   await loadGoogle(key);
-  const [{ Map, OverlayView }, core] = await Promise.all([
+  const [{ Map, OverlayView, Polyline }, core] = await Promise.all([
     google.maps.importLibrary('maps') as Promise<google.maps.MapsLibrary>,
     google.maps.importLibrary('core') as Promise<google.maps.CoreLibrary>,
   ]);
@@ -111,7 +119,7 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
       this.box.style.transform = anchor === 'bottom' ? 'translate(-50%, -100%)' : 'translate(-50%, -50%)';
       this.box.append(element);
       // Toque num pin clicável não arrasta nem aproxima o mapa.
-      if (element instanceof HTMLButtonElement) OverlayView.preventMapHitsAndGesturesFrom(this.box);
+      if (element instanceof HTMLButtonElement || element.getAttribute('role') === 'button') OverlayView.preventMapHitsAndGesturesFrom(this.box);
       this.setMap(map);
     }
 
@@ -143,6 +151,7 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
   }
 
   const markers = new Set<HtmlMarker>();
+  let polylines: google.maps.Polyline[] = [];
   return {
     addMarker(element, at, anchor) {
       const marker = new HtmlMarker(element, at, anchor);
@@ -170,6 +179,7 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
       for (const marker of markers) marker.draw();
     },
     fit(points, padding, maxZoom) {
+      if (points.length === 0) return;
       const bounds = new core.LatLngBounds();
       for (const p of points) bounds.extend(p);
       map.fitBounds(bounds, padding);
@@ -177,8 +187,23 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
         if ((map.getZoom() ?? 0) > maxZoom) map.setZoom(maxZoom);
       });
     },
+    setLines(lines) {
+      for (const line of polylines) line.setMap(null);
+      polylines = lines.map(
+        (line) =>
+          new Polyline({
+            map,
+            path: [...line.points],
+            strokeColor: line.color,
+            strokeWeight: line.dashed ? 4 : 5,
+            strokeOpacity: line.dashed ? 0 : 0.85,
+            ...(line.dashed ? { icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.85, scale: 3 }, offset: '0', repeat: '14px' }] } : {}),
+          }),
+      );
+    },
     destroy() {
       authFailures.delete(fail);
+      for (const line of polylines) line.setMap(null);
       for (const marker of markers) marker.remove();
       markers.clear();
       core.event.clearInstanceListeners(map);
@@ -207,6 +232,23 @@ async function createMapLibre(container: HTMLElement, options: CreateOptions): P
     attributionControl: { compact: true },
   });
   map.addControl(new lib.NavigationControl({ showCompass: false }), 'top-right');
+  let pendingLines: readonly MapLine[] | undefined;
+  let styleLoaded = false;
+  const drawLines = (lines: readonly MapLine[]) => {
+    const source = map.getSource('lines') as { setData(data: unknown): void } | undefined;
+    source?.setData({
+      type: 'FeatureCollection',
+      features: lines.map((line) => ({ type: 'Feature', properties: { color: line.color, dashed: line.dashed }, geometry: { type: 'LineString', coordinates: line.points.map((p) => [p.lng, p.lat]) } })),
+    });
+  };
+  map.on('load', () => {
+    map.addSource('lines', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    const color = ['get', 'color'] as never;
+    map.addLayer({ id: 'lines-solid', type: 'line', source: 'lines', filter: ['!=', ['get', 'dashed'], true], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': color, 'line-width': 5, 'line-opacity': 0.85 } });
+    map.addLayer({ id: 'lines-dashed', type: 'line', source: 'lines', filter: ['==', ['get', 'dashed'], true], paint: { 'line-color': color, 'line-width': 4, 'line-dasharray': [2, 2], 'line-opacity': 0.85 } });
+    styleLoaded = true;
+    if (pendingLines) drawLines(pendingLines);
+  });
   return {
     addMarker(element, at, anchor) {
       const marker = new lib.Marker({ element, anchor }).setLngLat([at.lng, at.lat]).addTo(map);
@@ -215,12 +257,16 @@ async function createMapLibre(container: HTMLElement, options: CreateOptions): P
     moveTo(center, { zoom, raiseBy, animate }) {
       map.easeTo({ center: [center.lng, center.lat], ...(zoom === undefined ? {} : { zoom }), ...(raiseBy ? { offset: [0, -raiseBy] as [number, number] } : {}), duration: animate ? 350 : 0 });
     },
-    fit(points, padding, maxZoom) {
+    fit(points, padding, maxZoom, animate) {
       const first = points[0];
       if (!first) return;
       const bounds = new lib.LngLatBounds([first.lng, first.lat], [first.lng, first.lat]);
       for (const p of points) bounds.extend([p.lng, p.lat]);
-      map.fitBounds(bounds, { padding, maxZoom, duration: 0 });
+      map.fitBounds(bounds, { padding, maxZoom, duration: animate ? 400 : 0 });
+    },
+    setLines(lines) {
+      pendingLines = lines;
+      if (styleLoaded) drawLines(lines);
     },
     destroy() {
       map.remove();

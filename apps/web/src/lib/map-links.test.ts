@@ -15,6 +15,8 @@ describe('links dos apps de mapa', () => {
     assert.equal(mapAppLink('google', bar, 'route'), 'https://www.google.com/maps/dir/?api=1&destination=-23.5%2C-46.6');
     assert.equal(mapAppLink('apple', bar, 'route'), 'https://maps.apple.com/?daddr=-23.5%2C-46.6');
     assert.equal(mapAppLink('waze', bar, 'route'), 'https://waze.com/ul?ll=-23.5,-46.6&navigate=yes');
+    assert.equal(mapAppLink('google', { ...bar, travel: 'walking' }, 'route'), 'https://www.google.com/maps/dir/?api=1&destination=-23.5%2C-46.6&travelmode=walking');
+    assert.equal(mapAppLink('apple', { ...bar, travel: 'driving' }, 'route'), 'https://maps.apple.com/?daddr=-23.5%2C-46.6&dirflg=d');
   });
 
   it('usa o link do Google quando existe, só para ver', () => {

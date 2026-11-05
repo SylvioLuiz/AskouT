@@ -608,6 +608,18 @@ export interface PlaceSource {
   nearby(center: { lat: number; lng: number }, radiusM: number, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }>;
 }
 
+/** Rota entre dois pontos. Nunca lança: sem resposta, devolve `undefined` e o app desenha só uma linha reta. */
+export interface RouteSource {
+  route(from: { lat: number; lng: number }, to: { lat: number; lng: number }, mode: 'foot' | 'driving'): Promise<RouteResult | undefined>;
+}
+
+export interface RouteResult {
+  distanceM: number;
+  durationS: number;
+  /** Pontos do trajeto como [lng, lat], já simplificados. */
+  line: [number, number][];
+}
+
 export interface EmailSender {
   /** Falha com erro comum se o e-mail não puder ser enviado. */
   sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void>;
@@ -753,6 +765,8 @@ export interface CoreDeps {
   calendarFetcher: CalendarFetcher;
   admin: AdminRepository;
   placeSource: PlaceSource;
+  /** Rotas do encontro Flash até o lugar escolhido. Opcional: sem ela o app mostra só a linha reta. */
+  routes?: RouteSource;
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
   boosts: BoostRepository;
