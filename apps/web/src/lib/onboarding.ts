@@ -26,6 +26,14 @@ export function markOnboardingDone(storage: Pick<Storage, 'setItem'> | undefined
   }
 }
 
+/**
+ * Mostra o tutorial só no primeiro login: a conta guarda se a pessoa já passou por ele
+ * (vale em qualquer aparelho), e o navegador guarda também, para fechar na hora.
+ */
+export function shouldShowOnboarding(storage: Pick<Storage, 'getItem'> | undefined, user: { id: string; onboarded?: boolean }): boolean {
+  return user.onboarded !== true && !onboardingDone(storage, user.id);
+}
+
 /** Texto do progresso do passo “siga 3 rolês”. */
 export function followProgressLabel(count: number): string {
   if (count >= ONBOARDING_FOLLOW_GOAL) return t('Pronto! Sua Home já terá eventos.');

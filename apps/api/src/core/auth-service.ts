@@ -27,6 +27,8 @@ export interface SessionUser {
   email: string;
   role: UserRole;
   profile: PublicProfile;
+  /** Já passou pelo tutorial inicial: o app só o mostra no primeiro login. */
+  onboarded: boolean;
 }
 
 export interface AuthResult {
@@ -457,7 +459,13 @@ export class AuthService {
     const user = await this.deps.users.findById(actor.userId);
     const profile = user ? await this.deps.users.findProfileById(user.id) : undefined;
     if (!user || !profile || user.status === 'SUSPENDED') throw unauthorized('Sessão inválida');
-    return { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile) };
+    return { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile), onboarded: Boolean(user.onboardedAt) };
+  }
+
+  /** Tutorial inicial concluído ou pulado: não aparece mais em nenhum aparelho. */
+  async completeOnboarding(actor: Actor): Promise<{ onboarded: true }> {
+    await this.deps.users.markOnboarded(actor.userId, this.deps.clock.now());
+    return { onboarded: true };
   }
 
   /** Começa com @ -> usuário; tem @ no meio -> e-mail; senão -> usuário. */
@@ -496,7 +504,7 @@ export class AuthService {
 
   private session(user: User, profile: Profile): AuthResult {
     return {
-      user: { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile) },
+      user: { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile), onboarded: Boolean(user.onboardedAt) },
       token: this.deps.tokens.issue({ userId: user.id, role: user.role }),
     };
   }

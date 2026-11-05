@@ -160,6 +160,7 @@ export function createApi(deps: ApiDeps) {
     socialLogin: (input: { provider: SocialProviderId; idToken: string; username?: string; displayName?: string; birthDate?: string; acceptTerms?: boolean }) =>
       request<AuthResult | SocialNeedsProfile>('POST', '/auth/social', { body: input, auth: false }),
     me: () => request<SessionUser>('GET', '/auth/me'),
+    completeOnboarding: () => request<{ onboarded: true }>('POST', '/auth/me/onboarding'),
 
     // Perfis
     searchProfiles: (query: string, limit?: number) =>

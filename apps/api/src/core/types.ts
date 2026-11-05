@@ -15,6 +15,8 @@ export interface User {
   /** Quando e em qual versão dos Termos a pessoa deu o aceite. */
   termsAcceptedAt?: Date | null;
   termsVersion?: string | null;
+  /** Quando a pessoa terminou (ou pulou) o tutorial inicial. Vazio = ainda não viu. */
+  onboardedAt?: Date | null;
 }
 
 /** Pedido de nova senha em andamento: um por pessoa. `channel` deixa pronto o envio por celular (SMS) no futuro. */

@@ -14,6 +14,7 @@ function toUser(row: {
   birthDate: Date | null;
   termsAcceptedAt: Date | null;
   termsVersion: string | null;
+  onboardedAt: Date | null;
 }): User {
   return {
     id: row.id,
@@ -25,6 +26,7 @@ function toUser(row: {
     birthDate: row.birthDate ? row.birthDate.toISOString().slice(0, 10) : null,
     termsAcceptedAt: row.termsAcceptedAt,
     termsVersion: row.termsVersion,
+    onboardedAt: row.onboardedAt,
   };
 }
 
@@ -67,6 +69,7 @@ export class PrismaUserRepository implements UserRepository {
           birthDate: user.birthDate ? new Date(`${user.birthDate}T00:00:00.000Z`) : null,
           termsAcceptedAt: user.termsAcceptedAt ?? null,
           termsVersion: user.termsVersion ?? null,
+          onboardedAt: user.onboardedAt ?? null,
           profile: {
             create: {
               username: profile.username,
@@ -181,6 +184,11 @@ export class PrismaUserRepository implements UserRepository {
   async acceptTerms(userId: string, version: string, at: Date): Promise<void> {
     if (!isUuid(userId)) return;
     await this.prisma.user.updateMany({ where: { id: userId }, data: { termsVersion: version, termsAcceptedAt: at } });
+  }
+
+  async markOnboarded(userId: string, at: Date): Promise<void> {
+    if (!isUuid(userId)) return;
+    await this.prisma.user.updateMany({ where: { id: userId, onboardedAt: null }, data: { onboardedAt: at } });
   }
 
   async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {

@@ -4,7 +4,7 @@ import { useUser } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { takeInvite } from '../lib/invite.ts';
-import { followProgressLabel, markOnboardingDone, ONBOARDING_FOLLOW_GOAL, ONBOARDING_SLIDES, onboardingDone } from '../lib/onboarding.ts';
+import { followProgressLabel, markOnboardingDone, ONBOARDING_FOLLOW_GOAL, ONBOARDING_SLIDES, onboardingDone, shouldShowOnboarding } from '../lib/onboarding.ts';
 import { filterByThemes, saveThemes, THEMES, themeOfCategory } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 import type { ExplorePlace } from '../lib/types.ts';
@@ -104,10 +104,15 @@ function ThemeStep({ chosen, onToggle, onNext }: { chosen: ReadonlySet<ThemeId>;
   );
 }
 
-/** Primeira abertura: 3 telas curtas e o passo “siga 3 rolês”. Aparece uma vez por usuário. */
+/** Primeiro login: 3 telas curtas e o passo “siga 3 rolês”. Aparece uma vez por conta, em qualquer aparelho. */
 export function Onboarding() {
   const user = useUser();
-  const [open, setOpen] = useState(() => !onboardingDone(storage(), user.id));
+  const [open, setOpen] = useState(() => shouldShowOnboarding(storage(), user));
+  // Quem já viu o tutorial neste navegador antes de ele ser guardado na conta: registra na conta, sem mostrar de novo.
+  useEffect(() => {
+    if (user.onboarded === false && onboardingDone(storage(), user.id)) api.completeOnboarding().catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]);
   const [step, setStep] = useState(0);
   const [chosen, setChosen] = useState<ReadonlySet<ThemeId>>(new Set());
   const [invited, setInvited] = useState<string | undefined>();
@@ -134,6 +139,8 @@ export function Onboarding() {
     });
   const finish = () => {
     markOnboardingDone(storage(), user.id);
+    // Guarda na conta para não aparecer em outro aparelho; se falhar, o navegador já lembra.
+    api.completeOnboarding().catch(() => undefined);
     setOpen(false);
   };
   const slide = ONBOARDING_SLIDES[step];
