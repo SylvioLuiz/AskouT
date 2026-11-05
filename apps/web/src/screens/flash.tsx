@@ -368,7 +368,7 @@ function FlashContent() {
                 </span>
               </Link>
               <div className="person__aside row-actions">
-                <ChatButton userId={invite.other.userId} variant="primary" small />
+                <ChatButton userId={invite.other.userId} icon />
                 <Link to={`/now/encontro/${invite.id}`} className="btn btn--secondary btn--small">
                   {t('Mapa')}
                 </Link>

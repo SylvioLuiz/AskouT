@@ -52,9 +52,53 @@ function env(name: 'VITE_GOOGLE_MAPS_API_KEY' | 'VITE_GOOGLE_MAPS_MAP_ID' | 'VIT
   return (import.meta.env[name] as string | undefined)?.trim() || undefined;
 }
 
-export function createMapEngine(container: HTMLElement, options: CreateOptions): Promise<MapEngine> {
+export async function createMapEngine(container: HTMLElement, options: CreateOptions): Promise<MapEngine> {
   const key = env('VITE_GOOGLE_MAPS_API_KEY');
-  return key ? createGoogle(container, options, key) : createMapLibre(container, options);
+  const { engine, resize } = await (key ? createGoogle(container, options, key) : createMapLibre(container, options));
+  return followSize(container, engine, resize);
+}
+
+/**
+ * O mapa costuma ser criado antes de a tela terminar de montar (carregamento preguiçoso, cartões que entram depois),
+ * com a caixa ainda sem o tamanho final: o desenho fica deslocado até recarregar. Aqui o mapa acompanha o tamanho
+ * da caixa e, quando ele muda, refaz o último enquadramento.
+ */
+function followSize(container: HTMLElement, engine: MapEngine, resize: () => void): MapEngine {
+  let lastFit: Parameters<MapEngine['fit']> | undefined;
+  let lastSize = `${container.clientWidth}x${container.clientHeight}`;
+  let frame = 0;
+  const observer =
+    typeof ResizeObserver === 'undefined'
+      ? undefined
+      : new ResizeObserver(() => {
+          const size = `${container.clientWidth}x${container.clientHeight}`;
+          if (size === lastSize || container.clientWidth === 0 || container.clientHeight === 0) return;
+          lastSize = size;
+          cancelAnimationFrame(frame);
+          frame = requestAnimationFrame(() => {
+            resize();
+            if (lastFit) engine.fit(lastFit[0], lastFit[1], lastFit[2], false);
+          });
+        });
+  observer?.observe(container);
+  // Mesmo sem mudança detectada, confere uma vez depois do primeiro desenho da tela.
+  requestAnimationFrame(() => resize());
+  return {
+    ...engine,
+    fit(points, padding, maxZoom, animate) {
+      lastFit = [points, padding, maxZoom, animate];
+      engine.fit(points, padding, maxZoom, animate);
+    },
+    moveTo(center, opts) {
+      lastFit = undefined;
+      engine.moveTo(center, opts);
+    },
+    destroy() {
+      observer?.disconnect();
+      cancelAnimationFrame(frame);
+      engine.destroy();
+    },
+  };
 }
 
 // ---------- Google Maps ----------
@@ -84,7 +128,7 @@ function loadGoogle(key: string): Promise<void> {
   return googleLoading;
 }
 
-async function createGoogle(container: HTMLElement, options: CreateOptions, key: string): Promise<MapEngine> {
+async function createGoogle(container: HTMLElement, options: CreateOptions, key: string): Promise<{ engine: MapEngine; resize: () => void }> {
   await loadGoogle(key);
   const [{ Map, OverlayView, Polyline }, core] = await Promise.all([
     google.maps.importLibrary('maps') as Promise<google.maps.MapsLibrary>,
@@ -152,7 +196,7 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
 
   const markers = new Set<HtmlMarker>();
   let polylines: google.maps.Polyline[] = [];
-  return {
+  const engine: MapEngine = {
     addMarker(element, at, anchor) {
       const marker = new HtmlMarker(element, at, anchor);
       markers.add(marker);
@@ -210,6 +254,11 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
       container.replaceChildren();
     },
   };
+  return { engine, resize: () => {
+      // O Google acompanha o tamanho sozinho; só recentra para o desenho não ficar deslocado.
+      const center = map.getCenter();
+      if (center) map.setCenter(center);
+    } };
 }
 
 // ---------- MapLibre (sem chave do Google) ----------
@@ -222,7 +271,7 @@ const OSM_STYLE = {
   layers: [{ id: 'osm', type: 'raster' as const, source: 'osm' }],
 };
 
-async function createMapLibre(container: HTMLElement, options: CreateOptions): Promise<MapEngine> {
+async function createMapLibre(container: HTMLElement, options: CreateOptions): Promise<{ engine: MapEngine; resize: () => void }> {
   const [lib] = await Promise.all([import('maplibre-gl'), import('maplibre-gl/dist/maplibre-gl.css')]);
   const map = new lib.Map({
     container,
@@ -249,7 +298,7 @@ async function createMapLibre(container: HTMLElement, options: CreateOptions): P
     styleLoaded = true;
     if (pendingLines) drawLines(pendingLines);
   });
-  return {
+  const engine: MapEngine = {
     addMarker(element, at, anchor) {
       const marker = new lib.Marker({ element, anchor }).setLngLat([at.lng, at.lat]).addTo(map);
       return { element, setPosition: (p) => marker.setLngLat([p.lng, p.lat]), remove: () => marker.remove() };
@@ -272,4 +321,5 @@ async function createMapLibre(container: HTMLElement, options: CreateOptions): P
       map.remove();
     },
   };
+  return { engine, resize: () => map.resize() };
 }

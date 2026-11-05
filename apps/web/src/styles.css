@@ -198,6 +198,10 @@ button {
   background: transparent;
 }
 
+.iconbtn--chat { color: var(--brand-text); }
+.iconbtn--chat:hover { color: var(--brand-text); background: var(--surface-2, rgba(127, 127, 127, 0.12)); }
+.iconbtn--chat:disabled { opacity: 0.5; }
+
 .iconbtn[aria-current='page'] {
   color: var(--brand-text);
 }
