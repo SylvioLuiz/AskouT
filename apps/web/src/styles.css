@@ -4259,6 +4259,10 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .flashbar { height: 11px; overflow: hidden; border-radius: 999px; background: var(--line-strong); }
 .flashbar__fill { display: block; height: 100%; border-radius: 999px; background: var(--brand-grad, var(--brand)); transition: width 1s linear; }
 .flashcard__note { margin: 0; color: var(--ink-2); font-size: 0.9375rem; }
+/* Mapa do Explorar: rota até o local, dentro do cartão. */
+.evmaproute { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.evmaproute__modes { display: flex; gap: 6px; }
+.evmaproute__sum { margin: 0; color: var(--ink); font-weight: 600; font-size: 0.9375rem; }
 /* Encontro do NOW: raio da busca e "Sugerir outro lugar". */
 .matchradius { margin: -4px 0 12px; font-size: 0.8125rem; }
 .placesearch { display: grid; gap: 10px; margin-bottom: 16px; }

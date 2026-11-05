@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createMapEngine, type EngineMarker, type MapEngine } from './map-engine.ts';
+import { createMapEngine, type EngineMarker, type MapEngine, type MapLine } from './map-engine.ts';
 import { t } from '../lib/i18n/index.ts';
 
 // Mapa do Explorar: locais e eventos acontecendo agora. Google Maps (ou MapLibre sem a chave, ver map-engine.ts), carregado sob demanda.
@@ -19,9 +19,11 @@ interface Props {
   selectedId: string | undefined;
   onSelect: (id: string) => void;
   onFail: () => void;
+  /** Rota desenhada de você até o lugar escolhido. `dashed`: estimativa em linha reta. */
+  route?: { points: readonly { lat: number; lng: number }[]; dashed: boolean } | undefined;
 }
 
-export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Props) {
+export default function EventsMap({ pins, me, selectedId, onSelect, onFail, route }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const live = useRef<{ map: MapEngine; markers: Map<string, EngineMarker>; me?: EngineMarker; fitKey: string } | undefined>(undefined);
   const failRef = useRef(onFail);
@@ -111,6 +113,16 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Pr
     const pin = pins.find((p) => p.id === selectedId);
     if (pin) state.map.moveTo(pin, { raiseBy: 90, animate: true });
   }, [ready, selectedId, pins]);
+
+  // Rota até o lugar: desenha e enquadra o trajeto inteiro.
+  useEffect(() => {
+    const state = live.current;
+    if (!ready || !state) return;
+    const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+    const lines: MapLine[] = route && route.points.length >= 2 ? [{ points: route.points, color: css('--brand', 'blue'), dashed: route.dashed }] : [];
+    state.map.setLines(lines);
+    if (lines.length > 0) state.map.fit(route!.points, { top: 90, bottom: 320, left: 40, right: 40 }, 16, true);
+  }, [ready, route]);
 
   return <div ref={box} className="evmap__canvas" role="region" aria-label={t('Mapa com os locais e eventos perto')} />;
 }

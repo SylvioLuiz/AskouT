@@ -266,6 +266,11 @@ export interface FlashLeg {
   line: [number, number][] | null;
 }
 
+/** Rota de você até um lugar no mapa do Explorar. */
+export interface ExploreRoute extends FlashLeg {
+  mode: 'foot' | 'driving';
+}
+
 export interface FlashRoutes {
   mode: 'foot' | 'driving';
   me: FlashLeg | null;

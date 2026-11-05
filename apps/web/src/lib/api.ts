@@ -64,6 +64,7 @@ import type {
   ExploreParams,
   ExploreResult,
   ExplorePlace,
+  ExploreRoute,
   PageRequest,
   Profile,
   ProfilePatch,
@@ -339,6 +340,8 @@ export function createApi(deps: ApiDeps) {
       return request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
     },
     /** Locais perto (AskouT + Google/OSM) para os pins do mapa do Explorar. */
+    exploreRoute: (from: { lat: number; lng: number }, to: { lat: number; lng: number }, mode: 'foot' | 'driving') =>
+      request<ExploreRoute>('GET', `/explore/route?${new URLSearchParams({ deLat: String(from.lat), deLng: String(from.lng), paraLat: String(to.lat), paraLng: String(to.lng), modo: mode === 'driving' ? 'carro' : 'pe' }).toString()}`),
     explorePlaces: (params: { lat: number; lng: number; radiusKm?: number }) => {
       const query = new URLSearchParams({ lat: String(params.lat), lng: String(params.lng) });
       if (params.radiusKm !== undefined) query.set('radiusKm', String(params.radiusKm));

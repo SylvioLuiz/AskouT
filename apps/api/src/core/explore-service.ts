@@ -11,6 +11,16 @@ import { EVENT_KINDS } from './types.ts';
 export const EXPLORE_DEFAULT_RADIUS_KM = 10;
 export const EXPLORE_MAX_RADIUS_KM = 100;
 export const EXPLORE_MAX_SPAN_DAYS = 62;
+/** Rota no mapa do Explorar: até isto em linha reta. */
+export const EXPLORE_ROUTE_MAX_M = 200_000;
+
+export interface ExploreRouteView {
+  mode: 'foot' | 'driving';
+  distanceM: number;
+  durationS: number;
+  /** Trajeto como [lng, lat]; nulo sem serviço de rotas (o app desenha uma linha reta tracejada). */
+  line: [number, number][] | null;
+}
 export const EXPLORE_DEFAULT_SPAN_DAYS = 30;
 export const EXPLORE_QUERY_MAX = 80;
 /** "Bombando": mínimo de pessoas com presença confirmada num evento que está acontecendo agora. */
@@ -154,6 +164,24 @@ export class ExploreService {
     this.deps = deps;
     this.profiles = profiles;
   }
+  /** Rota de você até um lugar, para desenhar no mapa do Explorar. As posições só valem para esta consulta. */
+  async route(input: { deLat?: unknown; deLng?: unknown; paraLat?: unknown; paraLng?: unknown; modo?: unknown }): Promise<ExploreRouteView> {
+    const coord = (v: unknown, field: string, limit: number): number => {
+      const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+      if (typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > limit) throw validationError('Coordenada inválida', { [field]: 'Coordenada inválida' });
+      return n;
+    };
+    const from = { lat: coord(input.deLat, 'deLat', 90), lng: coord(input.deLng, 'deLng', 180) };
+    const to = { lat: coord(input.paraLat, 'paraLat', 90), lng: coord(input.paraLng, 'paraLng', 180) };
+    const mode: 'foot' | 'driving' = input.modo === 'carro' ? 'driving' : 'foot';
+    const straight = distanceMeters(from, to);
+    if (straight > EXPLORE_ROUTE_MAX_M) throw validationError('Lugar longe demais para traçar a rota', { paraLat: `Até ${EXPLORE_ROUTE_MAX_M / 1000} km` });
+    const found = await this.deps.routes?.route(from, to, mode).catch(() => undefined);
+    if (found) return { mode, distanceM: Math.round(found.distanceM), durationS: Math.round(found.durationS), line: found.line };
+    // Sem serviço de rotas: linha reta e tempo estimado (4,8 km/h a pé; 30 km/h de carro).
+    return { mode, distanceM: Math.round(straight), durationS: Math.round(straight / (mode === 'foot' ? 1.33 : 8.33)), line: null };
+  }
+
 
   /** Eventos que ainda não acabaram nos locais que a pessoa segue, para o feed. */
   async followedEvents(actorId: string): Promise<{ events: ExploreEventItem[] }> {
