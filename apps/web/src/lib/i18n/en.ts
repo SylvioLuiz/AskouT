@@ -702,6 +702,7 @@ export const EN: Readonly<Record<string, string>> = {
   "aprox. {km} km": "approx. {km} km",
   "aprox. {time}": "approx. {time}",
   "Distância e tempo aproximados, para não revelar onde cada um está.": "Approximate distance and time, so no one’s exact location is revealed.",
+  "Sua localização está ligada. Só vê onde você está quem você aprovar, aceitando ou mandando um convite.": "Your location is on. Only people you approve, by accepting or sending an invite, can see where you are.",
   "menos de 1 km": "less than 1 km",
   "{km} · {time} a pé": "{km} · {time} on foot",
   "{km} · {time} de carro": "{km} · {time} by car",

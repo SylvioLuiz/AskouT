@@ -127,7 +127,8 @@ function FlashContent() {
       invites.reload();
       matchViews.reload();
     },
-    active && matchIds.length > 0,
+    // Ligou o NOW, a localização já liga. Ela só vai para quem você aprovou (convite aceito).
+    active,
   );
   const [mapFailed, setMapFailed] = useState(false);
 
@@ -295,9 +296,12 @@ function FlashContent() {
             : t('Amigos que aceitaram sair com você, atualizados a cada poucos segundos.')}
       </p>
       {share.state.phase === 'sharing' ? (
-        <Button variant="secondary" full onClick={share.stop}>
-          {t('Parar de compartilhar')}
-        </Button>
+        <>
+          <p className="muted">{t('Sua localização está ligada. Só vê onde você está quem você aprovar, aceitando ou mandando um convite.')}</p>
+          <Button variant="secondary" full onClick={share.stop}>
+            {t('Parar de compartilhar')}
+          </Button>
+        </>
       ) : (
         <>
           {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
@@ -1031,11 +1035,21 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void, aut
     );
   }
 
-  // Com um encontro aceito, o envio começa sozinho (o navegador ainda pede a permissão do aparelho).
+  // Começa sozinho (o navegador ainda pede a permissão do aparelho). Só é enviada para os encontros aceitos.
   useEffect(() => {
     if (auto && !stoppedByUser.current && state.phase === 'idle') start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auto, state.phase]);
+
+  // Desligou (ex.: o NOW acabou): para de ler a posição e volta a ligar sozinho da próxima vez.
+  useEffect(() => {
+    if (auto) return;
+    if (watchId.current !== undefined) navigator.geolocation.clearWatch(watchId.current);
+    watchId.current = undefined;
+    stoppedByUser.current = false;
+    setMine(undefined);
+    setState({ phase: 'idle' });
+  }, [auto]);
 
   useEffect(
     () => () => {
