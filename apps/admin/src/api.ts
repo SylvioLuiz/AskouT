@@ -92,6 +92,11 @@ async function request<T>(method: string, path: string, body?: unknown, auth = t
 
 export const api = {
   login: (identifier: string, password: string) => request<AuthResult>('POST', '/admin/login', { identifier, password }, false),
+  socialProviders: () => request<{ items: { provider: string; clientId: string }[] }>('GET', '/auth/providers', undefined, false),
+  appleLogin: (idToken: string) => request<AuthResult>('POST', '/admin/social', { provider: 'APPLE', idToken }, false),
+  changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
+    await send('POST', '/admin/password', { currentPassword, newPassword });
+  },
   me: () => request<SessionUser>('GET', '/auth/me'),
   stats: () => request<Stats>('GET', '/admin/stats'),
   payments: () => request<PaymentsState>('GET', '/admin/payments'),

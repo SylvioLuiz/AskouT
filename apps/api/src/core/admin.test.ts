@@ -39,6 +39,38 @@ test('login do painel: admin entra; usuário comum e senha errada recebem a mesm
   assert.equal(actor.role, 'ADMIN');
 });
 
+test('login do painel com a Apple: só admin entra e nunca cria conta', async () => {
+  const { w } = await setup();
+  const tok = (sub: string, email: string) => JSON.stringify({ provider: 'APPLE', verified: true, sub, email });
+  const ok = await w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-adm', 'adm@exemplo.com') });
+  assert.equal(ok.user.role, 'ADMIN');
+  assert.equal((await w.core.auth.authenticate(ok.token)).role, 'ADMIN');
+  // Da segunda vez entra pelo ID fixo da Apple, mesmo com outro e-mail (ex.: ocultar e-mail).
+  assert.equal((await w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-adm', 'oculto@privaterelay.appleid.com') })).user.role, 'ADMIN');
+
+  await rejectsWith(w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-ana', 'ana@exemplo.com') }), 'UNAUTHORIZED');
+  await rejectsWith(w.core.admin.socialLogin({ provider: 'APPLE', idToken: 'lixo' }), 'UNAUTHORIZED');
+
+  await rejectsWith(w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-nova', 'nova@exemplo.com') }), 'UNAUTHORIZED');
+  assert.equal(await w.users.findByEmail('nova@exemplo.com'), undefined, 'não cria conta pelo painel');
+});
+
+test('trocar a própria senha no painel: confere a atual e valida a nova', async () => {
+  const { w, A, U, ana } = await setup();
+  const NOVA = 'outra-senha-forte-456';
+  await rejectsWith(w.core.admin.changeOwnPassword(U(ana), { currentPassword: PASSWORD, newPassword: NOVA }), 'FORBIDDEN');
+  const wrong = await rejectsWith(w.core.admin.changeOwnPassword(A, { currentPassword: 'errada-errada-1', newPassword: NOVA }), 'VALIDATION');
+  assert.equal(wrong.message, 'Senha atual incorreta');
+  await rejectsWith(w.core.admin.changeOwnPassword(A, { currentPassword: PASSWORD, newPassword: 'curta' }), 'VALIDATION');
+  await rejectsWith(w.core.admin.changeOwnPassword(A, { currentPassword: PASSWORD, newPassword: PASSWORD }), 'VALIDATION');
+  await rejectsWith(w.core.admin.changeOwnPassword(A, { currentPassword: PASSWORD, newPassword: 'adm' + '@exemplo.com' }), 'VALIDATION');
+  assert.ok(await w.core.admin.login({ identifier: 'adm', password: PASSWORD }), 'recusas não mudam a senha');
+
+  await w.core.admin.changeOwnPassword(A, { currentPassword: PASSWORD, newPassword: NOVA });
+  await rejectsWith(w.core.admin.login({ identifier: 'adm', password: PASSWORD }), 'UNAUTHORIZED');
+  assert.equal((await w.core.admin.login({ identifier: 'adm', password: NOVA })).user.role, 'ADMIN');
+});
+
 test('pedidos de donos: lista com documento, aprova e deixa no registro', async () => {
   const { w, A, ana, adm } = await setup();
   const c = await w.core.venues.requestClaim(ana, 'v1', { document: JPEG(), note: 'Sou o dono' });

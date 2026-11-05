@@ -2,7 +2,7 @@ import { MIN_ACCOUNT_AGE, parseBirthDate } from './age-service.ts';
 import { buildRetentionReport } from './retention.ts';
 import type { RetentionReport } from './retention.ts';
 import { conflict, forbidden, notFound, unauthorized, validationError } from './errors.ts';
-import type { AuthResult, AuthService, LoginInput } from './auth-service.ts';
+import type { AuthResult, AuthService, LoginInput, SocialLoginInput } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
 import type { VenueService } from './venue-service.ts';
 import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
@@ -74,6 +74,22 @@ export class AdminService {
     const result = await this.auth.login(input);
     if (result.user.role !== 'ADMIN') throw unauthorized();
     return result;
+  }
+
+  /**
+   * Entrada do painel pela plataforma (Apple). Nunca cria conta: nome de usuário e aceite do cadastro não são repassados,
+   * então conta externa nova para em `needsProfile` e é recusada. Quem não é admin também não entra.
+   */
+  async socialLogin(input: Pick<SocialLoginInput, 'provider' | 'idToken'>): Promise<AuthResult> {
+    const result = await this.auth.socialLogin({ provider: input.provider, idToken: input.idToken });
+    if ('needsProfile' in result || result.user.role !== 'ADMIN') throw unauthorized('Essa conta não tem acesso à gestão');
+    return result;
+  }
+
+  /** Troca a própria senha pelo painel. */
+  async changeOwnPassword(actor: Actor, input: { currentPassword: unknown; newPassword: unknown }): Promise<void> {
+    this.assertAdmin(actor);
+    await this.auth.changePassword(actor.userId, input);
   }
 
   private assertAdmin(actor: Actor): void {

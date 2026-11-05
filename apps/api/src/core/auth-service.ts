@@ -396,6 +396,28 @@ export class AuthService {
     return this.session({ ...user, passwordHash }, profile);
   }
 
+  /**
+   * Troca a senha de quem já está logado, conferindo a atual. Senha atual errada é VALIDATION, não UNAUTHORIZED:
+   * a sessão continua válida. Conta criada por Google/Apple não tem senha conhecida, então não passa daqui.
+   */
+  async changePassword(userId: string, input: { currentPassword: unknown; newPassword: unknown }): Promise<void> {
+    const { users, passwordResets, hasher } = this.deps;
+    const user = await users.findById(userId);
+    const profile = user ? await users.findProfileById(user.id) : undefined;
+    if (!user || !profile || user.status === 'SUSPENDED') throw unauthorized('Sessão inválida');
+
+    const current = asString(input.currentPassword);
+    const next = asString(input.newPassword);
+    const currentOk = current.length > 0 && current.length <= PASSWORD_MAX && (await hasher.verify(current, user.passwordHash));
+    if (!currentOk) throw validationError('Senha atual incorreta', { currentPassword: 'Senha atual incorreta' });
+
+    const problem = passwordProblem(next, user.email, profile.username) ?? (next === current ? 'A nova senha precisa ser diferente da atual' : undefined);
+    if (problem) throw validationError(problem, { newPassword: problem });
+
+    await users.updatePasswordHash(user.id, await hasher.hash(next));
+    await passwordResets.delete(user.id);
+  }
+
   /** Login por e-mail ou por nome de usuário (com ou sem @). */
   async login(input: LoginInput): Promise<AuthResult> {
     const { users, hasher } = this.deps;

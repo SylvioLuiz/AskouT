@@ -22,7 +22,7 @@ export const GUESS_PER_ACCOUNT = { limit: 10, windowMs: 15 * MIN };
 export const MAIL_PER_ACCOUNT = { limit: 6, windowMs: HOUR };
 
 /** Rotas de entrada e de ações sensíveis, no formato "MÉTODO /caminho". */
-const AUTH_ROUTES = new Set(['POST /auth/login', 'POST /auth/signup', 'POST /auth/signup/resend', 'POST /auth/signup/confirm', 'POST /auth/password-reset', 'POST /auth/password-reset/confirm', 'POST /auth/social', 'DELETE /me', 'GET /me/export']);
+const AUTH_ROUTES = new Set(['POST /auth/login', 'POST /auth/signup', 'POST /auth/signup/resend', 'POST /auth/signup/confirm', 'POST /auth/password-reset', 'POST /auth/password-reset/confirm', 'POST /auth/social', 'POST /admin/social', 'POST /admin/password', 'DELETE /me', 'GET /me/export']);
 /** Campo do corpo que identifica a conta em cada rota. */
 const GUESS_ROUTES: Record<string, string> = { 'POST /auth/login': 'identifier', 'POST /auth/signup/confirm': 'email', 'POST /auth/password-reset/confirm': 'identifier' };
 const MAIL_ROUTES: Record<string, string> = { 'POST /auth/signup': 'email', 'POST /auth/signup/resend': 'email', 'POST /auth/password-reset': 'identifier' };

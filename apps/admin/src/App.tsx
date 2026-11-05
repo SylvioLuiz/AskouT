@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, api, session, setUnauthorizedHandler } from './api.ts';
+import { APPLE_BUTTON_URL, appleIdToken } from './apple-login.ts';
 import { useDesktop } from './hooks.ts';
 import { MIN_DESKTOP_WIDTH } from './labels.ts';
 import { AuditPage } from './pages/audit.tsx';
@@ -13,7 +14,7 @@ import { RetentionPage } from './pages/retention.tsx';
 import { ReportsPage } from './pages/reports.tsx';
 import { UsersPage } from './pages/users.tsx';
 import { VenuesPage } from './pages/venues.tsx';
-import { CHANGED_EVENT } from './ui.tsx';
+import { CHANGED_EVENT, Modal } from './ui.tsx';
 import { go, useRoute } from './router.ts';
 import { ROUTES } from './routes.ts';
 import type { RoutePath } from './routes.ts';
@@ -26,8 +27,42 @@ function LoginScreen({ onLogin, expired }: { onLogin: (u: Admin) => void; expire
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [appleClientId, setAppleClientId] = useState<string>();
+  const [appleImageFailed, setAppleImageFailed] = useState(false);
   const idId = useId();
   const pwId = useId();
+
+  // Sem APPLE_CLIENT_ID na API (ou se a consulta falhar), o botão simplesmente não aparece.
+  useEffect(() => {
+    let cancelled = false;
+    api.socialProviders()
+      .then((r) => {
+        if (!cancelled) setAppleClientId(r.items.find((p) => p.provider === 'APPLE')?.clientId);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function withApple() {
+    if (busy || !appleClientId) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const idToken = await appleIdToken(appleClientId);
+      if (!idToken) {
+        setBusy(false); // a pessoa fechou a janela
+        return;
+      }
+      const result = await api.appleLogin(idToken);
+      session.set(result.token);
+      onLogin(result.user);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Algo deu errado. Tente de novo.');
+      setBusy(false);
+    }
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -68,8 +103,97 @@ function LoginScreen({ onLogin, expired }: { onLogin: (u: Admin) => void; expire
         <button type="submit" className="btn btn--primary btn--block" disabled={busy || identifier.trim() === '' || password === ''}>
           {busy ? 'Entrando…' : 'Entrar'}
         </button>
+        {appleClientId ? (
+          <>
+            <p className="login__or">ou</p>
+            {appleImageFailed ? (
+              <button type="button" className="btn btn--block" disabled={busy} onClick={() => void withApple()}>
+                Continuar com a Apple
+              </button>
+            ) : (
+              <button type="button" className="login__apple" aria-label="Continuar com a Apple" disabled={busy} onClick={() => void withApple()}>
+                <img src={APPLE_BUTTON_URL} alt="" width="316" height="40" onError={() => setAppleImageFailed(true)} />
+              </button>
+            )}
+          </>
+        ) : null}
       </form>
     </main>
+  );
+}
+
+function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [repeat, setRepeat] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string>();
+  const currentId = useId();
+  const nextId = useId();
+  const repeatId = useId();
+  const mismatch = repeat !== '' && next !== repeat;
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy || current === '' || next === '' || next !== repeat) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      await api.changePassword(current, next);
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Algo deu errado. Tente de novo.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <Modal title="Trocar senha" onClose={onClose}>
+        <p className="notice" role="status">Senha alterada. Use a nova senha na próxima entrada.</p>
+        <div className="modal__actions">
+          <button type="button" className="btn btn--primary" onClick={onClose}>
+            Fechar
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal title="Trocar senha" onClose={onClose}>
+      <form onSubmit={submit}>
+        <div className="field">
+          <label htmlFor={currentId}>Senha atual</label>
+          <input id={currentId} type="password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" autoFocus required />
+        </div>
+        <div className="field">
+          <label htmlFor={nextId}>Nova senha</label>
+          <input id={nextId} type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" minLength={8} required />
+          <span className="muted small">Pelo menos 8 caracteres.</span>
+        </div>
+        <div className="field">
+          <label htmlFor={repeatId}>Repita a nova senha</label>
+          <input id={repeatId} type="password" value={repeat} onChange={(e) => setRepeat(e.target.value)} autoComplete="new-password" required />
+          {mismatch ? <span className="muted small">As senhas não são iguais.</span> : null}
+        </div>
+        {error ? (
+          <p className="notice notice--bad" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="modal__actions">
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>
+            Cancelar
+          </button>
+          <button type="submit" className="btn btn--primary" disabled={busy || current === '' || next === '' || next !== repeat}>
+            {busy ? 'Aguarde…' : 'Trocar senha'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -101,6 +225,8 @@ function Page({ route }: { route: RoutePath }) {
 function Shell({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
   const route = useRoute();
   const [pending, setPending] = useState<{ claims: number; reports: number }>({ claims: 0, reports: 0 });
+  const [changingPassword, setChangingPassword] = useState(false);
+  const closePassword = useCallback(() => setChangingPassword(false), []);
 
   useEffect(() => {
     let alive = true;
@@ -151,14 +277,20 @@ function Shell({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
             <strong>{admin.profile.displayName}</strong>
             <div className="muted small">@{admin.profile.username}</div>
           </div>
-          <button type="button" className="btn btn--small" onClick={onLogout}>
-            Sair
-          </button>
+          <div className="side__actions">
+            <button type="button" className="btn btn--small" onClick={() => setChangingPassword(true)}>
+              Trocar senha
+            </button>
+            <button type="button" className="btn btn--small" onClick={onLogout}>
+              Sair
+            </button>
+          </div>
         </div>
       </aside>
       <main className="main">
         <Page route={route} />
       </main>
+      {changingPassword ? <ChangePasswordDialog onClose={closePassword} /> : null}
     </div>
   );
 }

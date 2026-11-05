@@ -22,6 +22,22 @@ export class AdminController {
     return this.core.admin.login({ identifier: b.identifier, password: b.password });
   }
 
+  @Public()
+  @Post('social')
+  @HttpCode(200)
+  social(@Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.socialLogin({ provider: b.provider, idToken: b.idToken });
+  }
+
+  /** `{currentPassword, newPassword}`: troca a senha de quem está logado. */
+  @Post('password')
+  @HttpCode(204)
+  changePassword(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.changeOwnPassword(actor, { currentPassword: b.currentPassword, newPassword: b.newPassword });
+  }
+
   @Get('stats')
   stats(@CurrentActor() actor: Actor) {
     return this.core.admin.stats(actor);
