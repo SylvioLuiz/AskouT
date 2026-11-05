@@ -202,6 +202,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const typingSentAt = useRef(0);
   const pressTimer = useRef<number | undefined>(undefined);
   const endRef = useRef<HTMLDivElement>(null);
+  /** A página inteira rola: vai até o fim do documento, para a última mensagem ficar acima da barra de envio (que é fixa no rodapé). */
+  const scrollToEnd = () => window.scrollTo({ top: document.documentElement.scrollHeight });
   const stickToEnd = useRef(true);
   const loadedFirst = useRef(false);
 
@@ -267,8 +269,20 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   }, []);
 
   useLayoutEffect(() => {
-    if (stickToEnd.current) endRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length]);
+    if (stickToEnd.current) scrollToEnd();
+  }, [messages.length, view.data?.typing.length, staged.length, replyTo]);
+
+  // Fotos e áudios que terminam de carregar depois aumentam a conversa: continua no fim se a pessoa estava lá.
+  const hasThread = view.data !== undefined;
+  useEffect(() => {
+    const el = threadRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      if (stickToEnd.current) scrollToEnd();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasThread]);
 
   if (view.loading && !view.data && !view.error) return <Loading />;
   if (view.error && !view.data) {
