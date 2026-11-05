@@ -3875,8 +3875,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .mediabubble__wait { display: grid; place-items: center; min-height: 160px; color: var(--muted); font-size: 0.875rem; }
 .mediabubble--video { min-height: 160px; }
 .mediabubble__play { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 0.8125rem; }
-.mediaviewer { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom)); background: rgba(0, 0, 0, 0.92); }
-.mediaviewer__media { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
+.mediaviewer { position: fixed; inset: 0; z-index: 1000; display: flex; padding: calc(56px + env(safe-area-inset-top)) 0 calc(16px + env(safe-area-inset-bottom)); background: rgb(0 0 0 / var(--fade, 1)); overscroll-behavior: contain; animation: msgpop-fade 160ms ease-out; }
+.mediaviewer__stage { flex: 1; min-height: 0; display: grid; place-items: center; overflow: hidden; touch-action: none; }
+.mediaviewer__media { display: block; max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; will-change: transform; }
 .mediaviewer__close { position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 1; background: rgba(255, 255, 255, 0.16); color: #fff; }
 .mediagrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 0 0 16px; padding: 0; list-style: none; }
 .mediathumb { display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 8px; background: var(--line); color: var(--ink); cursor: pointer; overflow: hidden; }
@@ -4746,3 +4747,124 @@ a.sharelist__item { text-decoration: none; }
 .matchdest__dot { flex: none; width: 14px; height: 14px; border-radius: 50%; }
 .matchdest__leg--me .matchdest__dot { background: var(--brand); }
 .matchdest__leg--them .matchdest__dot { background: var(--warn); }
+
+/* ---------- Conversa no estilo das DMs ---------- */
+.chat__thread { gap: 2px; }
+.chat__item--first, .chat__item--single { margin-top: 6px; }
+.chat__day { margin: 16px 0 8px; font-size: 0.75rem; font-weight: 600; }
+
+/* Foto da pessoa só no último balão do bloco; o espaço fica reservado nos outros. */
+.msg__face { flex: none; align-self: flex-end; width: 28px; height: 28px; margin-right: 4px; }
+.msg__face .avatar { width: 28px; height: 28px; }
+
+/* Balões em bloco: cantos arredondados, menos nas pontas que se encostam. */
+.msg .bubble { border-radius: 20px; }
+.msg:not(.msg--mine).msg--run-first .bubble { border-bottom-left-radius: 6px; }
+.msg:not(.msg--mine).msg--run-middle .bubble { border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.msg:not(.msg--mine).msg--run-last .bubble { border-top-left-radius: 6px; }
+.msg--mine.msg--run-first .bubble { border-bottom-right-radius: 6px; }
+.msg--mine.msg--run-middle .bubble { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+.msg--mine.msg--run-last .bubble { border-top-right-radius: 6px; }
+.msg .bubble__text { line-height: 1.35; }
+.msg .bubble:not(.bubble--card):not(.bubble--media):not(.bubble--voice) { padding: 8px 14px; }
+
+/* Seus textos em cor cheia. */
+.msg .bubble--mine:not(.bubble--card):not(.bubble--media):not(.bubble--voice):not(.bubble--deleted) { background: var(--brand); color: var(--brand-ink); }
+.msg .bubble--mine:not(.bubble--card):not(.bubble--media):not(.bubble--voice):not(.bubble--deleted) .bubble__quote { background: rgb(255 255 255 / 0.18); border-left-color: rgb(255 255 255 / 0.7); }
+.msg .bubble--mine:not(.bubble--card):not(.bubble--media):not(.bubble--voice):not(.bubble--deleted) .bubble__quote strong,
+.msg .bubble--mine:not(.bubble--card):not(.bubble--media):not(.bubble--voice):not(.bubble--deleted) .bubble__quote span { color: inherit; opacity: 0.9; }
+
+/* Hora escondida à direita; puxar a conversa para a esquerda mostra. */
+.chat__thread .msg, .chat__thread .albumrow { translate: calc(var(--reveal, 0px) * -1) 0; transition: translate 260ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.chat__thread.is-revealing .msg, .chat__thread.is-revealing .albumrow { transition: none; }
+.chat__thread .album .msg { translate: none; transition: none; }
+.msg__stamp { position: absolute; right: -60px; top: 50%; width: 52px; transform: translateY(-50%); color: var(--muted); font-size: 0.6875rem; white-space: nowrap; pointer-events: none; }
+.chat__thread { touch-action: pan-y; }
+
+/* Toque duplo: coração que aparece e some no balão. */
+.bubble__burst { position: absolute; inset: 0; display: grid; place-items: center; color: #ff3b5c; pointer-events: none; animation: heart-burst 900ms ease-out forwards; }
+.bubble__burst svg { width: 44px; height: 44px; filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.3)); }
+@keyframes heart-burst { 0% { opacity: 0; transform: scale(0.3); } 25% { opacity: 1; transform: scale(1.15); } 45% { transform: scale(0.95); } 70% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.1); } }
+@media (prefers-reduced-motion: reduce) { .bubble__burst { animation: heart-fade 900ms ease-out forwards; } @keyframes heart-fade { 0%, 60% { opacity: 1; } 100% { opacity: 0; } } }
+
+/* Reações: um chip só, encostado no canto do balão. */
+.msg--mine .reactions { left: auto; right: 10px; }
+.reactions__chip { min-height: 22px; padding: 0 6px; gap: 2px; font-size: 0.8125rem; }
+.bubble--reacted { min-width: 0; margin-bottom: 14px; }
+
+/* Visto */
+.chat__seen { margin: 2px 4px 0 0; text-align: right; color: var(--muted); font-size: 0.75rem; }
+
+/* Digitando: três pontinhos num balão. */
+.msg--typing { margin-top: 6px; }
+.typingdots { display: inline-flex; align-items: center; gap: 4px; padding: 12px 14px !important; }
+.typingdots span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); opacity: 0.4; animation: typing-dot 1.2s infinite ease-in-out; }
+.typingdots span:nth-child(2) { animation-delay: 0.15s; }
+.typingdots span:nth-child(3) { animation-delay: 0.3s; }
+.typingdots__who { align-self: center; margin-left: 6px; color: var(--muted); font-size: 0.75rem; }
+@keyframes typing-dot { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 0.9; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .typingdots span { animation: none; opacity: 0.6; } }
+
+/* Fotos enviadas juntas: grade. */
+.albumrow { position: relative; display: flex; align-items: flex-end; }
+.albumrow--mine { justify-content: flex-end; }
+.album { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; width: min(78%, 300px); }
+.album .msg { display: block; }
+.album .msg .bubble { max-width: none; width: 100%; padding: 0; border: 0; border-radius: 6px; background: transparent; }
+.album .mediabubble { min-width: 0; min-height: 0; aspect-ratio: 1; border-radius: 6px; }
+.album .mediabubble__img { height: 100%; max-height: none; }
+.album .mediabubble__wait { min-height: 0; height: 100%; }
+.album--3 .msg:first-child { grid-column: 1 / -1; }
+.album--3 .msg:first-child .mediabubble { aspect-ratio: 2; }
+.albumrow:not(.albumrow--mine) .album .msg:first-child .bubble { border-top-left-radius: 18px; }
+.albumrow--mine .album .msg:first-child .bubble, .albumrow--mine .album .msg:first-child .mediabubble { border-top-right-radius: 18px; }
+.albumrow:not(.albumrow--mine) .album .msg:first-child .mediabubble { border-top-left-radius: 18px; }
+.album .msg--selecting { padding-left: 0; }
+
+/* Mais emojis */
+.msgpop__emoji--more { display: grid; place-items: center; background: var(--bg); color: var(--muted); }
+.msgpop__emoji--more svg { width: 20px; height: 20px; }
+.msgpop__menu:has(.emojipick) { width: min(328px, calc(100vw - 24px)); }
+.emojipick { padding: 8px; }
+.emojipick__input { box-sizing: border-box; width: 100%; min-height: 40px; margin-bottom: 8px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg); color: var(--ink); font: inherit; font-size: 1rem; }
+.emojipick__grid { display: grid; grid-template-columns: repeat(8, 1fr); max-height: 232px; overflow-y: auto; overscroll-behavior: contain; }
+.emojipick__btn { aspect-ratio: 1; padding: 0; border: 0; border-radius: 10px; background: transparent; font-size: 1.5rem; line-height: 1; cursor: pointer; }
+.emojipick__btn.is-on, .emojipick__btn:hover { background: var(--brand-soft); }
+
+/* Quem reagiu */
+.reactlist { margin: 0; padding: 0; list-style: none; }
+.reactlist li + li { border-top: 1px solid var(--line); }
+.reactlist__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 56px; padding: 0 4px; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; }
+button.reactlist__row { cursor: pointer; }
+.reactlist__who { display: flex; flex-direction: column; min-width: 0; }
+.reactlist__who span { color: var(--muted); font-size: 0.8125rem; }
+.reactlist__emoji { font-size: 1.5rem; line-height: 1; }
+
+/* Barra de envio: câmera à esquerda, microfone e galeria à direita, "Enviar" ao digitar. */
+.composer__pill { display: flex; flex: 1; min-width: 0; align-items: flex-end; gap: 4px; padding: 4px; border: 1px solid var(--line-strong); border-radius: 26px; background: var(--surface); }
+.composer__pill:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.composer__input--pill { min-height: 40px; padding: 9px 6px; border: 0; border-radius: 0; background: transparent; }
+.composer__input--pill:focus-visible { border: 0; box-shadow: none; }
+.composer__camera { flex: none; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: var(--brand); color: var(--brand-ink); cursor: pointer; }
+.composer__camera svg { width: 22px; height: 22px; }
+.composer__tools { display: flex; flex: none; }
+.composer__tool { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; }
+.composer__tool svg { width: 24px; height: 24px; }
+.composer__tool:hover, .composer__tool:focus-visible { background: var(--bg); }
+.composer__sendtext { flex: none; height: 40px; padding: 0 14px; border: 0; border-radius: 20px; background: transparent; color: var(--brand); font: inherit; font-weight: 700; cursor: pointer; }
+.composer__sendtext:disabled { opacity: 0.5; }
+.composer button:disabled { cursor: default; }
+
+/* Prévia das fotos antes de enviar */
+.stagebar { margin: 0 -16px; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--surface); }
+.stagebar__list { display: flex; gap: 8px; margin: 0; padding: 4px 0; list-style: none; overflow-x: auto; }
+.stagebar__item { position: relative; flex: none; width: 72px; height: 72px; border-radius: 12px; overflow: hidden; background: var(--line); }
+.stagebar__item img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.stagebar__video { display: grid; place-items: center; width: 100%; height: 100%; background: rgb(0 0 0 / 0.6); color: #fff; }
+.stagebar__remove { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / 0.6); color: #fff; cursor: pointer; }
+.stagebar__remove svg { width: 14px; height: 14px; }
+.stagebar__add { display: grid; place-items: center; width: 72px; height: 72px; border: 1px dashed var(--line-strong); border-radius: 12px; background: transparent; color: var(--muted); cursor: pointer; }
+/* "⋯" só aparece ao passar o mouse (no celular, segurar o balão abre as opções). */
+@media (hover: hover) { .msg .msg__more { opacity: 0; } .msg:hover .msg__more, .msg .msg__more:focus-visible { opacity: 1; } }
+/* No toque fica fora da vista, mas o leitor de tela continua achando o botão. */
+@media (hover: none) { .msg .msg__more { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); } }

@@ -5,11 +5,11 @@ import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { ArrowUpIcon, BellOffIcon, CheckIcon, CopyIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { BellOffIcon, CameraIcon, CheckIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
-import { MessagePopup, hasActions } from '../components/message-actions.tsx';
+import { MessagePopup, ReactionSummary, ReactionsSheet, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';
-import { SwipeRow } from '../components/swipe-reply.tsx';
+import { SwipeRow, useTimeReveal } from '../components/swipe-reply.tsx';
 import { useChatBackground } from '../lib/chat-bg.ts';
 import { readDraft, saveDraft } from '../lib/chat-draft.ts';
 import { ChatPrefsSheet } from '../components/chat-prefs.tsx';
@@ -20,7 +20,8 @@ import { peopleLabel } from '../lib/meetup.ts';
 import { SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
-import { allDeletable, announceChatsChanged, copyText, dayLabel, filterConversations, formatClock, listTimeLabel, mergeMessages, previewOf, replyPreview } from '../lib/chat.ts';
+import { allDeletable, announceChatsChanged, breakLabel, copyText, filterConversations, formatClock, groupAlbums, isDoubleTap, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
+import type { RunPosition } from '../lib/chat.ts';
 import { mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
 import { toApiError } from '../lib/errors.ts';
 import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
@@ -154,6 +155,15 @@ export function ConversationsScreen() {
 // ---------- Conversa ----------
 
 const POLL_MS = 5_000;
+/** Quantas fotos ou vídeos dá para mandar de uma vez. */
+const STAGED_MAX = 10;
+
+interface StagedMedia {
+  id: string;
+  file: File;
+  kind: 'IMAGE' | 'VIDEO';
+  url: string;
+}
 
 export function ChatScreen({ conversationId }: { conversationId: string }) {
   const view = useAsync(() => api.messages(conversationId), [conversationId]);
@@ -171,6 +181,11 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [replyTo, setReplyTo] = useState<ChatMessage | undefined>();
   const background = useChatBackground(conversationId);
   const [actionsFor, setActionsFor] = useState<ChatMessage | undefined>();
+  const [reactionsFor, setReactionsFor] = useState<ChatMessage | undefined>();
+  const [burst, setBurst] = useState<string | undefined>();
+  const lastTap = useRef<{ id: string; at: number; x: number; y: number } | undefined>(undefined);
+  const threadRef = useRef<HTMLDivElement>(null);
+  const reveal = useTimeReveal(threadRef);
   const [uploading, setUploading] = useState(false);
   const [selected, setSelected] = useState<string[] | undefined>();
   const [deleting, setDeleting] = useState(false);
@@ -178,7 +193,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [pendingDelete, setPendingDelete] = useState<string[] | undefined>();
   const deleteTimer = useRef<number | undefined>(undefined);
   const deleteIds = useRef<string[] | undefined>(undefined);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const [staged, setStaged] = useState<StagedMedia[]>([]);
+  const stagedRef = useRef<StagedMedia[]>([]);
+  stagedRef.current = staged;
+  useEffect(() => () => stagedRef.current.forEach((x) => URL.revokeObjectURL(x.url)), []);
   const typingSentAt = useRef(0);
   const pressTimer = useRef<number | undefined>(undefined);
   const endRef = useRef<HTMLDivElement>(null);
@@ -196,6 +216,10 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     setSelected(undefined);
     setDeleting(false);
     setDraft(readDraft(conversationId));
+    setStaged((current) => {
+      current.forEach((x) => URL.revokeObjectURL(x.url));
+      return [];
+    });
   }, [conversationId]);
 
   useEffect(
@@ -298,28 +322,35 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     setMessages((current) => mergeMessages(current, [message]));
   }
 
-  async function pickMedia(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  /** Fotos e vídeos escolhidos (galeria, várias de uma vez, ou câmera) ficam numa prévia até a pessoa enviar. */
+  function pickMedia(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
     event.target.value = '';
-    if (!file || uploading) return;
-    const trouble = mediaProblem(file);
-    if (trouble) {
-      setProblem(trouble);
-      return;
-    }
-    setUploading(true);
+    if (files.length === 0) return;
     setProblem(undefined);
-    try {
-      const blob = mediaKind(file) === 'IMAGE' ? await prepareImage(file) : file;
-      const message = await api.sendMedia(conversationId, blob, replyTo?.id);
-      stickToEnd.current = true;
-      setReplyTo(undefined);
-      setMessages((current) => mergeMessages(current, [message]));
-    } catch (failure) {
-      setProblem(failure instanceof Error && failure.message === 'grande' ? t('Não consegui reduzir a foto para o tamanho permitido.') : toApiError(failure).message);
-    } finally {
-      setUploading(false);
+    const room = STAGED_MAX - staged.length;
+    const ok: StagedMedia[] = [];
+    for (const file of files) {
+      const trouble = mediaProblem(file);
+      if (trouble) {
+        setProblem(trouble);
+        continue;
+      }
+      if (ok.length >= room) {
+        setProblem(t('Dá para enviar até {max} fotos ou vídeos de uma vez.', { max: STAGED_MAX }));
+        break;
+      }
+      ok.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, file, kind: mediaKind(file) === 'IMAGE' ? 'IMAGE' : 'VIDEO', url: URL.createObjectURL(file) });
     }
+    if (ok.length > 0) setStaged((current) => [...current, ...ok]);
+  }
+
+  function unstage(id: string) {
+    setStaged((current) => {
+      const gone = current.find((x) => x.id === id);
+      if (gone) URL.revokeObjectURL(gone.url);
+      return current.filter((x) => x.id !== id);
+    });
   }
 
   async function toggleReaction(m: ChatMessage, emoji: string) {
@@ -357,20 +388,37 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   async function send(event: FormEvent) {
     event.preventDefault();
     const text = draft.trim();
-    if (text === '' || sending) return;
+    const media = staged;
+    if ((text === '' && media.length === 0) || sending) return;
     setSending(true);
+    setUploading(media.length > 0);
     setProblem(undefined);
+    let reply = replyTo?.id;
     try {
-      const message = await api.sendText(conversationId, text, replyTo?.id);
-      stickToEnd.current = true;
-      setMessages((current) => mergeMessages(current, [message]));
-      setDraft('');
+      // Primeiro as fotos (na ordem escolhida), depois o texto, como legenda logo abaixo.
+      for (const item of media) {
+        const blob = item.kind === 'IMAGE' ? await prepareImage(item.file) : item.file;
+        const message = await api.sendMedia(conversationId, blob, reply);
+        reply = undefined;
+        stickToEnd.current = true;
+        setMessages((current) => mergeMessages(current, [message]));
+        unstage(item.id);
+      }
+      setUploading(false);
+      if (text !== '') {
+        const message = await api.sendText(conversationId, text, reply);
+        stickToEnd.current = true;
+        setMessages((current) => mergeMessages(current, [message]));
+        setDraft('');
+        typingSentAt.current = 0;
+      }
       setReplyTo(undefined);
-      typingSentAt.current = 0;
     } catch (failure) {
-      setProblem(toApiError(failure).message);
+      if (reply === undefined) setReplyTo(undefined);
+      setProblem(failure instanceof Error && failure.message === 'grande' ? t('Não consegui reduzir a foto para o tamanho permitido.') : toApiError(failure).message);
     } finally {
       setSending(false);
+      setUploading(false);
     }
   }
 
@@ -448,7 +496,86 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     </button>
   );
 
-  let lastDay = '';
+  const visible = messages.filter((m) => !pendingDelete?.includes(m.id));
+  const positions = runPositions(visible);
+  const posOf = new Map(visible.map((m, i) => [m.id, positions[i] ?? 'single'] as const));
+  const albums = groupAlbums(visible);
+  const seen = seenLabel(visible, data.members, isGroup);
+  const profileOf = (senderId: string) => (data.other && data.other.userId === senderId ? data.other : data.members.find((x) => x.profile.userId === senderId)?.profile);
+  const face = (senderId: string) => {
+    const profile = profileOf(senderId);
+    return profile ? <Avatar profile={profile} size={28} /> : null;
+  };
+  const typingProfile = data.other ?? data.members.find((x) => data.typing.includes(x.profile.displayName))?.profile;
+  const typingFace = typingProfile ? <Avatar profile={typingProfile} size={28} /> : null;
+
+  /** Toque duplo no balão: coração, como nas DMs. Devolve true se foi o segundo toque. */
+  function registerTap(m: ChatMessage, x: number, y: number): boolean {
+    if (selected || !data.canSend || m.deleted || !hasActions(m)) return false;
+    const now = Date.now();
+    const previous = lastTap.current?.id === m.id ? lastTap.current : undefined;
+    if (isDoubleTap(previous, { at: now, x, y })) {
+      lastTap.current = undefined;
+      setBurst(m.id);
+      window.setTimeout(() => setBurst((b) => (b === m.id ? undefined : b)), 900);
+      if (m.reactions.find((r) => r.mine)?.emoji !== '❤️') void toggleReaction(m, '❤️');
+      return true;
+    }
+    lastTap.current = { id: m.id, at: now, x, y };
+    return false;
+  }
+  function tapBubble(m: ChatMessage, e: MouseEvent) {
+    if ((e.target as HTMLElement).closest('button, a, input, textarea, audio, video, [role="slider"]')) return;
+    registerTap(m, e.clientX, e.clientY);
+  }
+
+  const row = (m: ChatMessage, pos: RunPosition, cell: boolean) => (
+    <SwipeRow key={m.id} className={`msg${m.mine ? ' msg--mine' : ''} msg--run-${pos}${cell ? ' msg--cell' : ''}${selected ? ' msg--selecting' : ''}${selected?.includes(m.id) ? ' msg--selected' : ''}`} id={`msg-${m.id}`} enabled={data.canSend && hasActions(m) && !selected} onReply={() => setReplyTo(m)}>
+      {selected && hasActions(m) ? (
+        <button type="button" className="msg__pick" role="checkbox" aria-checked={selected.includes(m.id)} aria-label={t('Selecionar mensagem de {name}, {time}', { name: m.mine ? t('você') : (m.senderName ?? t('contato')), time: formatClock(m.createdAt) })} onClick={() => toggleChosen(m.id)}>
+          <span className={`msg__check${selected.includes(m.id) ? ' is-on' : ''}`} aria-hidden="true">{selected.includes(m.id) ? <CheckIcon /> : null}</span>
+        </button>
+      ) : null}
+      {!cell && !m.mine ? <span className="msg__face">{pos === 'last' || pos === 'single' ? face(m.senderId) : null}</span> : null}
+      {!cell && !selected && m.mine && hasActions(m) ? moreButton(m) : null}
+      <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.reactions.length > 0 ? ' bubble--reacted' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} title={formatClock(m.createdAt)} onClick={(e) => tapBubble(m, e)} {...pressHandlers(m)}>
+        {isGroup && !m.mine && m.senderName && (pos === 'first' || pos === 'single') ? <span className="bubble__sender">{m.senderName}</span> : null}
+        {m.replyTo && !m.deleted ? (
+          <button type="button" className="bubble__quote" aria-label={t('Ir para a mensagem respondida de {name}', { name: m.replyTo.mine ? t('você') : (m.replyTo.senderName ?? '') })} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+            <span className="bubble__quotetext">
+              <strong>{m.replyTo.mine ? t('Você') : m.replyTo.senderName}</strong>
+              <span>{m.replyTo.deleted ? t('Mensagem apagada') : m.replyTo.preview}</span>
+            </span>
+            {!m.replyTo.deleted && (m.replyTo.kind === 'IMAGE' || m.replyTo.kind === 'VIDEO') ? <ReplyThumb conversationId={conversationId} messageId={m.replyTo.id} kind={m.replyTo.kind} /> : null}
+          </button>
+        ) : null}
+        {m.deleted ? (
+          <p className="bubble__text bubble__text--deleted">{m.mine ? t('Você apagou esta mensagem') : t('Mensagem apagada')}</p>
+        ) : m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
+          <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} />
+        ) : m.kind === 'MEETUP' && m.meetup ? (
+          <MeetupBubble meetup={m.meetup} nowIso={data.now} onUpdated={(updated) => setMessages((current) => current.map((x) => (x.id === m.id || x.meetup?.id === updated.id ? { ...x, meetup: updated } : x)))} />
+        ) : m.kind === 'AUDIO' && m.audio ? (
+          <VoiceBubble message={m} conversationId={conversationId} />
+        ) : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? (
+          <MediaBubble message={m} conversationId={conversationId} onTap={(x, y) => registerTap(m, x, y)} />
+        ) : m.kind === 'EVENT' && m.event ? (
+          <EventBubble event={m.event} />
+        ) : (
+          <p className="bubble__text">{m.body}</p>
+        )}
+        <ReactionSummary reactions={m.reactions} onOpen={() => setReactionsFor(m)} />
+        {burst === m.id ? (
+          <span className="bubble__burst" aria-hidden="true">
+            <HeartIcon filled />
+          </span>
+        ) : null}
+      </div>
+      {!cell && !selected && !m.mine && hasActions(m) ? moreButton(m) : null}
+      {!cell ? <time className="msg__stamp" dateTime={m.createdAt}>{formatClock(m.createdAt)}</time> : null}
+    </SwipeRow>
+  );
+
   return (
     <div className={`chat${background ? ' chat--bg' : ''}`} style={background ? ({ '--chat-bg': `url(${background})` } as CSSProperties) : undefined}>
       {selected ? (
@@ -479,7 +606,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       />
       )}
 
-      <div className="chat__thread" aria-live="polite">
+      <div ref={threadRef} className="chat__thread" aria-live="polite" {...reveal}>
         {older.hasMore ? (
           <div className="chat__older">
             <Button small variant="quiet" loading={older.loading} onClick={loadOlder}>
@@ -488,77 +615,56 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           </div>
         ) : null}
         {messages.length === 0 ? <p className="muted chat__empty">Nenhuma mensagem ainda. Diga oi{data.other ? ` para ${data.other.displayName}` : ' para o grupo'}.</p> : null}
-        {messages.filter((m) => !pendingDelete?.includes(m.id)).map((m) => {
-          const day = dayLabel(m.createdAt, new Date(serverNow));
-          const showDay = day !== lastDay;
-          lastDay = day;
-          return (
-            <div key={m.id} className="chat__item">
-              {showDay ? <p className="chat__day">{day}</p> : null}
-              {m.kind === 'SYSTEM' ? (
-                <>
-                  <p className="chat__system">{m.body}</p>
-                  {match && m.id === matchMessageId ? matchCard : null}
-                </>
-              ) : (
-                <>
-                  <SwipeRow className={`msg${m.mine ? ' msg--mine' : ''}${selected ? ' msg--selecting' : ''}${selected?.includes(m.id) ? ' msg--selected' : ''}`} id={`msg-${m.id}`} enabled={data.canSend && hasActions(m) && !selected} onReply={() => setReplyTo(m)}>
-                    {selected && hasActions(m) ? (
-                      <button type="button" className="msg__pick" role="checkbox" aria-checked={selected.includes(m.id)} aria-label={t('Selecionar mensagem de {name}, {time}', { name: m.mine ? t('você') : (m.senderName ?? t('contato')), time: formatClock(m.createdAt) })} onClick={() => toggleChosen(m.id)}>
-                        <span className={`msg__check${selected.includes(m.id) ? ' is-on' : ''}`} aria-hidden="true">{selected.includes(m.id) ? <CheckIcon /> : null}</span>
-                      </button>
-                    ) : null}
-                    {!selected && m.mine && hasActions(m) ? moreButton(m) : null}
-                    <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.reactions.length > 0 ? ' bubble--reacted' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} {...pressHandlers(m)}>
-                      {isGroup && !m.mine && m.senderName ? <span className="bubble__sender">{m.senderName}</span> : null}
-                      {m.replyTo && !m.deleted ? (
-                        <button type="button" className="bubble__quote" aria-label={t('Ir para a mensagem respondida de {name}', { name: m.replyTo.mine ? t('você') : (m.replyTo.senderName ?? '') })} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
-                          <span className="bubble__quotetext">
-                            <strong>{m.replyTo.mine ? t('Você') : m.replyTo.senderName}</strong>
-                            <span>{m.replyTo.deleted ? t('Mensagem apagada') : m.replyTo.preview}</span>
-                          </span>
-                          {!m.replyTo.deleted && (m.replyTo.kind === 'IMAGE' || m.replyTo.kind === 'VIDEO') ? <ReplyThumb conversationId={conversationId} messageId={m.replyTo.id} kind={m.replyTo.kind} /> : null}
-                        </button>
-                      ) : null}
-                      {m.deleted ? (
-                        <p className="bubble__text bubble__text--deleted">{m.mine ? t('Você apagou esta mensagem') : t('Mensagem apagada')}</p>
-                      ) : m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
-                        <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} />
-                      ) : m.kind === 'MEETUP' && m.meetup ? (
-                        <MeetupBubble meetup={m.meetup} nowIso={data.now} onUpdated={(updated) => setMessages((current) => current.map((x) => (x.id === m.id || x.meetup?.id === updated.id ? { ...x, meetup: updated } : x)))} />
-                      ) : m.kind === 'AUDIO' && m.audio ? (
-                        <VoiceBubble message={m} conversationId={conversationId} />
-                      ) : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? (
-                        <MediaBubble message={m} conversationId={conversationId} />
-                      ) : m.kind === 'EVENT' && m.event ? (
-                        <EventBubble event={m.event} />
-                      ) : (
-                        <p className="bubble__text">{m.body}</p>
-                      )}
-                      <span className="bubble__time">{formatClock(m.createdAt)}</span>
-                      {m.reactions.length > 0 ? (
-                        <div className="reactions">
-                          {m.reactions.map((r) => (
-                            <button key={r.emoji} type="button" className={`reactions__chip${r.mine ? ' is-mine' : ''}`} aria-pressed={r.mine} aria-label={`${r.emoji} ${r.count === 1 ? t('1 reação') : t('{count} reações', { count: r.count })}${r.mine ? t(', sua. Toque para tirar') : ''}`} disabled={!data.canSend} onClick={() => void toggleReaction(m, r.emoji)}>
-                              <span aria-hidden="true">{r.emoji}</span>
-                              {r.count > 1 ? <span className="reactions__n">{r.count}</span> : null}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                    {!selected && !m.mine && hasActions(m) ? moreButton(m) : null}
-                  </SwipeRow>
-                </>
-              )}
-            </div>
-          );
-        })}
-        {match && !matchMessageId ? matchCard : null}
+        {(() => {
+          let prev: ChatMessage | undefined;
+          return albums.map((group) => {
+            const first = group[0] as ChatMessage;
+            const last = group[group.length - 1] as ChatMessage;
+            const showBreak = timeBreak(prev, first);
+            prev = last;
+            if (first.kind === 'SYSTEM') {
+              return (
+                <div key={first.id} className="chat__item">
+                  {showBreak ? <p className="chat__day">{breakLabel(first.createdAt, new Date(serverNow))}</p> : null}
+                  <p className="chat__system">{first.body}</p>
+                  {match && first.id === matchMessageId ? matchCard : null}
+                </div>
+              );
+            }
+            const pos = posOf.get(last.id) ?? 'single';
+            if (group.length === 1) {
+              return (
+                <div key={first.id} className={`chat__item chat__item--${pos}`}>
+                  {showBreak ? <p className="chat__day">{breakLabel(first.createdAt, new Date(serverNow))}</p> : null}
+                  {row(first, posOf.get(first.id) ?? 'single', false)}
+                </div>
+              );
+            }
+            return (
+              <div key={first.id} className={`chat__item chat__item--${pos}`}>
+                {showBreak ? <p className="chat__day">{breakLabel(first.createdAt, new Date(serverNow))}</p> : null}
+                <div className={`albumrow${first.mine ? ' albumrow--mine' : ''}`}>
+                  {!first.mine ? <span className="msg__face">{pos === 'last' || pos === 'single' ? face(first.senderId) : null}</span> : null}
+                  <div className={`album album--${Math.min(group.length, 4)}`} role="group" aria-label={t('{count} fotos', { count: group.length })}>
+                    {group.map((m) => row(m, 'middle', true))}
+                  </div>
+                  <time className="msg__stamp" dateTime={last.createdAt}>{formatClock(last.createdAt)}</time>
+                </div>
+              </div>
+            );
+          });
+        })()}
+        {seen ? <p className="chat__seen">{seen}</p> : null}
         {data.typing.length > 0 ? (
-          <p className="chat__typing" role="status">
-            {typingLabel(data.typing)}
-          </p>
+          <div className="msg msg--typing" role="status">
+            <span className="msg__face">{typingFace}</span>
+            <div className="bubble typingdots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+            <span className={isGroup ? 'typingdots__who' : 'visually-hidden'}>{typingLabel(data.typing)}</span>
+          </div>
         ) : null}
         <div ref={endRef} />
       </div>
@@ -598,53 +704,85 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           </button>
         </div>
       ) : data.canSend ? (
-        <form className="composer" onSubmit={send}>
-          <label className="visually-hidden" htmlFor="msg">
-            Mensagem para {chatName}
-          </label>
-          {recording ? null : (
-            <>
-              <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" aria-label={t('Escolher foto ou vídeo')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
-              <button type="button" className="iconbtn composer__attach" aria-label={t('Enviar foto ou vídeo')} disabled={uploading} onClick={() => fileRef.current?.click()}>
-                <PhotoIcon />
-              </button>
-            </>
-          )}
-          {recording ? (
-            <VoiceRecorderBar onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
-          ) : (
-            <div className="commentbox composer__box">
-              <textarea
-                id="msg"
-                className="composer__input"
-                rows={1}
-                value={draft}
-                maxLength={MESSAGE_MAX}
-                placeholder={t('Escreva uma mensagem')}
-                onChange={(e) => {
-                  setDraft(e.target.value);
-                  noteTyping(e.target.value);
-                }}
-                onKeyDown={(e) => {
-                  // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
-                  if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
-                }}
-              />
-              {draft.trim() !== '' ? (
-                <button type="submit" className="commentbox__send composer__send" disabled={sending} aria-label={t('Enviar mensagem')} aria-busy={sending || undefined}>
-                  <ArrowUpIcon />
-                </button>
-              ) : (
-                <button type="button" className="commentbox__send composer__send" aria-label={t('Gravar áudio')} onClick={() => {
-                    setProblem(undefined);
-                    setRecording(true);
-                  }}>
-                  <MicIcon />
-                </button>
-              )}
+        <>
+          {staged.length > 0 ? (
+            <div className="stagebar" role="group" aria-label={staged.length === 1 ? t('1 item para enviar') : t('{count} itens para enviar', { count: staged.length })}>
+              <ul className="stagebar__list">
+                {staged.map((item, i) => (
+                  <li key={item.id} className="stagebar__item">
+                    {item.kind === 'IMAGE' ? (
+                      <img src={item.url} alt={t('Foto {n}', { n: i + 1 })} draggable={false} />
+                    ) : (
+                      <span className="stagebar__video">
+                        <PlayIcon />
+                        <span className="visually-hidden">{t('Vídeo {n}', { n: i + 1 })}</span>
+                      </span>
+                    )}
+                    <button type="button" className="stagebar__remove" aria-label={item.kind === 'IMAGE' ? t('Tirar foto {n}', { n: i + 1 }) : t('Tirar vídeo {n}', { n: i + 1 })} disabled={sending} onClick={() => unstage(item.id)}>
+                      <XIcon />
+                    </button>
+                  </li>
+                ))}
+                {staged.length < STAGED_MAX ? (
+                  <li>
+                    <button type="button" className="stagebar__add" aria-label={t('Adicionar mais fotos ou vídeos')} disabled={sending} onClick={() => galleryRef.current?.click()}>
+                      <PlusIcon />
+                    </button>
+                  </li>
+                ) : null}
+              </ul>
             </div>
-          )}
-        </form>
+          ) : null}
+          <form className="composer" onSubmit={send}>
+            <label className="visually-hidden" htmlFor="msg">
+              Mensagem para {chatName}
+            </label>
+            <input ref={galleryRef} type="file" multiple accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" aria-label={t('Escolher fotos ou vídeos')} tabIndex={-1} onChange={pickMedia} />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="visually-hidden" aria-label={t('Tirar foto')} tabIndex={-1} onChange={pickMedia} />
+            {recording ? (
+              <VoiceRecorderBar onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
+            ) : (
+              <div className="composer__pill">
+                <button type="button" className="composer__camera" aria-label={t('Tirar foto')} disabled={sending} onClick={() => cameraRef.current?.click()}>
+                  <CameraIcon />
+                </button>
+                <textarea
+                  id="msg"
+                  className="composer__input composer__input--pill"
+                  rows={1}
+                  value={draft}
+                  maxLength={MESSAGE_MAX}
+                  placeholder={staged.length > 0 ? t('Adicione uma legenda…') : t('Mensagem…')}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    noteTyping(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
+                    if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
+                  }}
+                />
+                {draft.trim() !== '' || staged.length > 0 ? (
+                  <button type="submit" className="composer__sendtext" disabled={sending} aria-busy={sending || undefined}>
+                    {t('Enviar')}
+                  </button>
+                ) : (
+                  <span className="composer__tools">
+                    <button type="button" className="composer__tool" aria-label={t('Gravar áudio')} onClick={() => {
+                        setProblem(undefined);
+                        setRecording(true);
+                      }}>
+                      <MicIcon />
+                    </button>
+                    <button type="button" className="composer__tool" aria-label={t('Enviar fotos ou vídeos da galeria')} onClick={() => galleryRef.current?.click()}>
+                      <PhotoIcon />
+                    </button>
+                  </span>
+                )}
+              </div>
+            )}
+          </form>
+        </>
       ) : (
         <Notice>{t('Vocês não são mais amigos. O histórico continua aqui, mas não dá para enviar novas mensagens.')}</Notice>
       )}
@@ -659,6 +797,16 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           onSelect={() => setSelected([actionsFor.id])}
           onReacted={(reactions) => patchMessage(actionsFor.id, { reactions })}
           onDeleted={(updated) => setMessages((current) => mergeMessages(current, [updated]))}
+        />
+      ) : null}
+
+      {reactionsFor ? (
+        <ReactionsSheet
+          message={messages.find((m) => m.id === reactionsFor.id) ?? reactionsFor}
+          conversationId={conversationId}
+          canSend={data.canSend}
+          onClose={() => setReactionsFor(undefined)}
+          onReacted={(reactions) => patchMessage(reactionsFor.id, { reactions })}
         />
       ) : null}
 

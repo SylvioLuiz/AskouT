@@ -1,7 +1,7 @@
 import { useRef } from 'react';
-import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 import { ReplyIcon } from './icons.tsx';
-import { MAX_OFFSET, SLOP, TRIGGER_OFFSET, rubberOffset, swipeTriggered } from '../lib/swipe.ts';
+import { SLOP, TRIGGER_OFFSET, rubberOffset, swipeTriggered } from '../lib/swipe.ts';
 
 /**
  * Linha de mensagem que acompanha o dedo ao ser puxada para a direita e volta sozinha, como uma mola.
@@ -74,4 +74,54 @@ export function SwipeRow({ id, className, enabled, onReply, children }: { id?: s
       {children}
     </div>
   );
+}
+
+/** Até onde a conversa anda para a esquerda ao puxar, mostrando a hora de cada mensagem. */
+export const REVEAL_MAX = 64;
+
+/**
+ * Puxar a conversa para a esquerda (com o dedo) mostra a hora de todas as mensagens, como nas DMs;
+ * soltar faz tudo voltar. Mexe só numa variável de CSS da lista, sem redesenhar as mensagens.
+ */
+export function useTimeReveal(ref: RefObject<HTMLDivElement | null>) {
+  const gesture = useRef<{ pointer: number; x: number; y: number; mode: 'unknown' | 'reveal' | 'other' } | undefined>(undefined);
+
+  function set(offset: number, dragging: boolean) {
+    const el = ref.current;
+    if (!el) return;
+    el.classList.toggle('is-revealing', dragging);
+    if (offset === 0) el.style.removeProperty('--reveal');
+    else el.style.setProperty('--reveal', `${offset}px`);
+  }
+
+  return {
+    onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+      if (event.pointerType === 'mouse' || !event.isPrimary) return;
+      gesture.current = { pointer: event.pointerId, x: event.clientX, y: event.clientY, mode: 'unknown' };
+    },
+    onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+      const g = gesture.current;
+      if (!g || g.pointer !== event.pointerId || g.mode === 'other') return;
+      const dx = event.clientX - g.x;
+      const dy = event.clientY - g.y;
+      if (g.mode === 'unknown') {
+        if (Math.abs(dx) < SLOP && Math.abs(dy) < SLOP) return;
+        g.mode = dx < 0 && Math.abs(dx) > Math.abs(dy) ? 'reveal' : 'other';
+        if (g.mode === 'other') return;
+      }
+      set(Math.min(REVEAL_MAX, Math.max(0, -dx - SLOP)), true);
+    },
+    onPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+      const g = gesture.current;
+      if (!g || g.pointer !== event.pointerId) return;
+      gesture.current = undefined;
+      if (g.mode === 'reveal') set(0, false);
+    },
+    onPointerCancel(event: ReactPointerEvent<HTMLDivElement>) {
+      const g = gesture.current;
+      if (!g || g.pointer !== event.pointerId) return;
+      gesture.current = undefined;
+      set(0, false);
+    },
+  };
 }

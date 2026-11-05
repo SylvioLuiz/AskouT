@@ -362,6 +362,13 @@ export const PhotoIcon = () => (
   </Line>
 );
 
+export const CameraIcon = () => (
+  <Line>
+    <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5Z" />
+    <circle cx="12" cy="12.5" r="3.4" />
+  </Line>
+);
+
 export const CopyIcon = () => (
   <Line>
     <rect x="8" y="8" width="12" height="12" rx="2.5" />

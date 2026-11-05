@@ -313,6 +313,8 @@ export interface ConversationRepository {
   getCleared(conversationId: string, userId: string): Promise<Date | null>;
   /** Uma denúncia por pessoa e conversa: denunciar de novo atualiza motivo e detalhes. */
   addReport(report: ConversationReportRecord): Promise<void>;
+  /** Até quando cada participante leu a conversa (null = nunca abriu). */
+  listReads(conversationId: string): Promise<{ userId: string; lastReadAt: Date | null }[]>;
   /** Marca como lida até `now` para `userId`. */
   markRead(conversationId: string, userId: string, now: Date): Promise<void>;
   /**
