@@ -11,8 +11,10 @@ android {
         applicationId "br.com.askout"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // A loja exige um versionCode maior a cada envio. O GitHub Actions passa -PversionCode=... (e -PversionName=...);
+        // no Android Studio, sem as propriedades, fica 1 / "1.0".
+        versionCode((project.findProperty('versionCode') ?: '1') as Integer)
+        versionName((project.findProperty('versionName') ?: '1.0') as String)
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

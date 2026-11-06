@@ -389,6 +389,13 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - `apps/mobile/android/app/google-services.json` (projeto Firebase askout-2cdcd, pacote br.com.askout) adicionado; o plugin google-services passa a ser aplicado no build. É config de cliente, não segredo.
 - Falta: conta de serviço FCM (`GOOGLE_SERVICE_ACCOUNT_JSON` no Render), reconstruir o AAB e testar push em aparelho real (não testado).
 
+## Android: preparação para o Google Play (06/11/2026)
+- **Fotos e vídeos sem permissão de galeria:** `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`, `READ_MEDIA_VISUAL_USER_SELECTED` e `READ_EXTERNAL_STORAGE` saíram do `AndroidManifest.xml` (com `tools:node="remove"`, para nenhum plugin trazê-las de volta). O WebView já usa o seletor do Android e recebe só o arquivo escolhido; a ponte de vídeo copia esse arquivo para o cache antes de comprimir. **Testar em aparelho:** escolher foto, vídeo e foto de perfil (Android 10, 13 e 14 se possível).
+- **Contatos:** antes do pedido de permissão aparece a folha "Acesso aos seus contatos", que explica o que é lido e para quê, com os botões "Continuar" e "Agora não" (aviso em destaque exigido pelo Google Play).
+- **Exclusão de conta sem login:** página pública `https://askout.com.br/excluir-conta`. É o link para o formulário "Exclusão de conta" do Play Console. O texto sobre o que fica guardado (pagamentos, cópias de segurança) precisa de revisão jurídica.
+- **AAB pelo GitHub:** workflow `.github/workflows/android-aab.yml` (só manual). Precisa dos segredos `ANDROID_UPLOAD_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` e `ANDROID_KEY_PASSWORD`. O `versionCode` vem de `-PversionCode` (padrão: número da execução + 1).
+- **Play Console, lembrar:** o compressor de vídeo declara `FOREGROUND_SERVICE_DATA_SYNC`; o Google pede a declaração de serviço em primeiro plano (tipo "sincronização de dados", com vídeo curto mostrando o uso).
+
 ## Rejeição da Apple 1.2 / 2.3.6 (29/10)
 - 2.3.6: questionário de classificação etária → "Age Assurance" = Não (o app não tem controle parental nem verificação de idade além da data de nascimento). Resultado segue 18+ (Brasil 16).
 - 1.2: Termos agora dizem "Tolerância zero", análise de denúncias em até 24 horas e exclusão de quem publicar conteúdo ofensivo (sem colchetes pendentes). **Cumprir esse prazo é compromisso operacional:** olhar o painel de denúncias todo dia.

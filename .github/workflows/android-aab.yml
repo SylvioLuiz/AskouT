@@ -1,0 +1,114 @@
+# Gera o .aab ASSINADO para enviar ao Google Play (Play Console → Testar ou Produção → Criar versão → enviar o arquivo).
+# Só roda à mão: GitHub → Actions → "Android → AAB para o Google Play" → Run workflow (escolha a branch).
+# O .aab fica para baixar na página da execução, em "Artifacts" (vale 30 dias).
+#
+# Precisa destes segredos (Settings → Secrets and variables → Actions → New repository secret):
+#   ANDROID_UPLOAD_KEYSTORE_BASE64  conteúdo do askout-upload.jks em base64 (no Mac: base64 -i askout-upload.jks | pbcopy)
+#   ANDROID_KEYSTORE_PASSWORD       senha do arquivo .jks
+#   ANDROID_KEY_ALIAS               nome (alias) da chave dentro do .jks
+#   ANDROID_KEY_PASSWORD            senha da chave (muitas vezes igual à do arquivo)
+#
+# versionCode: cada envio à loja precisa de um número maior que o anterior. Sem preencher, usa o número desta
+# execução + 1 (sempre cresce). versionName é o que aparece para as pessoas na loja (ex.: 1.0.1).
+name: Android → AAB para o Google Play
+
+on:
+  workflow_dispatch:
+    inputs:
+      versionCode:
+        description: 'versionCode (número inteiro, maior que o último enviado). Vazio = automático.'
+        required: false
+        default: ''
+      versionName:
+        description: 'versionName (o que aparece na loja, ex.: 1.0.1)'
+        required: false
+        default: '1.0'
+
+concurrency:
+  group: android-aab
+  cancel-in-progress: false
+
+jobs:
+  aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      VITE_API_URL: https://api.askout.com.br
+      VITE_GOOGLE_MAPS_API_KEY: ${{ vars.VITE_GOOGLE_MAPS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Conferir os segredos da assinatura
+        env:
+          KS: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          missing=""
+          [ -n "$KS" ] || missing="$missing ANDROID_UPLOAD_KEYSTORE_BASE64"
+          [ -n "$KS_PASS" ] || missing="$missing ANDROID_KEYSTORE_PASSWORD"
+          [ -n "$KEY_ALIAS" ] || missing="$missing ANDROID_KEY_ALIAS"
+          [ -n "$KEY_PASS" ] || missing="$missing ANDROID_KEY_PASSWORD"
+          if [ -n "$missing" ]; then echo "::error::Faltam os segredos:$missing (ver o topo deste arquivo)"; exit 1; fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar o site e copiar para o Android
+        working-directory: apps/mobile
+        run: npm run build:web && npx cap sync android
+
+      - name: Preparar a chave de assinatura
+        working-directory: apps/mobile/android
+        env:
+          KS: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/upload.jks"
+            echo "storePassword=$KS_PASS"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASS"
+          } > keystore.properties
+
+      - name: Compilar o AAB assinado
+        working-directory: apps/mobile/android
+        env:
+          INPUT_CODE: ${{ inputs.versionCode }}
+          INPUT_NAME: ${{ inputs.versionName }}
+        run: |
+          code="${INPUT_CODE:-$(( GITHUB_RUN_NUMBER + 1 ))}"
+          name="${INPUT_NAME:-1.0}"
+          case "$code" in (*[!0-9]*|'') echo "::error::versionCode precisa ser um número inteiro"; exit 1;; esac
+          echo "versionCode=$code versionName=$name"
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon -PversionCode="$code" -PversionName="$name"
+          mkdir -p "$RUNNER_TEMP/aab"
+          cp app/build/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/aab/askout-$name-$code.aab"
+          echo "### AAB pronto: askout-$name-$code.aab (versionCode $code)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apagar a chave do runner
+        if: always()
+        working-directory: apps/mobile/android
+        run: rm -f keystore.properties "$RUNNER_TEMP/upload.jks"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: askout-aab
+          path: ${{ runner.temp }}/aab/*.aab
+          retention-days: 30

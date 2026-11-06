@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { api } from '../client.ts';
 import { Button, EmptyState, Notice, PageHead, PersonRow } from '../components/ui.tsx';
+import { Sheet } from '../components/agenda.tsx';
 import { useTitle } from '../hooks.ts';
 import { canPickContacts, canSyncDeviceContacts, hashContactKeys, keysFromVcf, pickContacts, readDeviceContacts } from '../lib/contacts.ts';
 import type { ContactKeys } from '../lib/contacts.ts';
@@ -25,6 +26,8 @@ export function ContactsScreen() {
   const [followed, setFollowed] = useState<Record<string, 'ACCEPTED' | 'PENDING'>>({});
   const [followingBusy, setFollowingBusy] = useState<string | undefined>();
   const [followingAll, setFollowingAll] = useState(false);
+  // Aviso antes do pedido de permissão do celular (exigência do Google Play para dados sensíveis como a agenda).
+  const [disclosure, setDisclosure] = useState(false);
   const native = canSyncDeviceContacts();
   const picker = canPickContacts();
 
@@ -103,7 +106,7 @@ export function ContactsScreen() {
       </p>
       <div className="stack">
         {native ? (
-          <Button loading={busy} onClick={() => void run(readDeviceContacts)}>
+          <Button loading={busy} onClick={() => setDisclosure(true)}>
             {t('Sincronizar agenda do celular')}
           </Button>
         ) : null}
@@ -116,6 +119,31 @@ export function ContactsScreen() {
           <Button variant={picker ? 'secondary' : 'primary'} loading={busy} onClick={() => fileRef.current?.click()}>
             {t('Enviar arquivo de contatos (.vcf)')}
           </Button>
+        ) : null}
+        {disclosure ? (
+          <Sheet title={t('Acesso aos seus contatos')} onClose={() => setDisclosure(false)}>
+            <div className="stack">
+              <p>{t('Para mostrar quais dos seus contatos já estão no AskouT, o app vai ler os celulares e e-mails da agenda deste aparelho.')}</p>
+              <ul className="disclosure__list">
+                <li>{t('Cada celular e e-mail vira um código irreversível antes de sair do aparelho. Nomes, fotos e o resto da agenda não são lidos.')}</li>
+                <li>{t('Os códigos servem só para conferir quem tem conta. O AskouT não guarda esses códigos nem a sua agenda, e não manda mensagens para os seus contatos.')}</li>
+                <li>{t('Você pode tirar a permissão quando quiser nos ajustes do celular.')}</li>
+              </ul>
+              <p className="muted">{t('Em seguida o celular vai pedir a sua permissão.')}</p>
+              <Button
+                full
+                onClick={() => {
+                  setDisclosure(false);
+                  void run(readDeviceContacts);
+                }}
+              >
+                {t('Continuar')}
+              </Button>
+              <Button full variant="quiet" onClick={() => setDisclosure(false)}>
+                {t('Agora não')}
+              </Button>
+            </div>
+          </Sheet>
         ) : null}
         <input ref={fileRef} type="file" accept=".vcf,text/vcard,text/x-vcard" hidden onChange={(e) => void onFile(e)} />
       </div>
