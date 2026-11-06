@@ -165,6 +165,12 @@ function trackUserMoves(container: HTMLElement, view: () => MapView | undefined)
   };
 }
 
+/** Tema escolhido no app (Configurações) vale também para o mapa; sem escolha, segue o aparelho. */
+function appColorScheme(): 'DARK' | 'LIGHT' | 'FOLLOW_SYSTEM' {
+  const theme = document.documentElement.getAttribute('data-theme');
+  return theme === 'dark' ? 'DARK' : theme === 'light' ? 'LIGHT' : 'FOLLOW_SYSTEM';
+}
+
 // ---------- Google Maps ----------
 
 let googleLoading: Promise<void> | undefined;
@@ -206,7 +212,7 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
     zoomControl: true,
     gestureHandling: 'greedy',
     clickableIcons: false,
-    colorScheme: 'FOLLOW_SYSTEM' as google.maps.ColorScheme,
+    colorScheme: appColorScheme() as google.maps.ColorScheme,
     // Sem Map ID: esconde os comércios do próprio Google para não brigar com os nossos pins. Com Map ID, o estilo vem do console.
     ...(mapId ? { mapId } : { styles: [{ featureType: 'poi.business', stylers: [{ visibility: 'off' }] }] }),
   });
