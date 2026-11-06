@@ -3,7 +3,7 @@ import type { AgendaEvent } from '../lib/agenda.ts';
 import type { FormEvent } from 'react';
 import { DayStrip, Sheet, StateMark } from '../components/agenda.tsx';
 import { CalendarSyncSheet, syncedCount } from '../components/calendar-sync.tsx';
-import { ChevronRightIcon, PlusIcon } from '../components/icons.tsx';
+import { ChevronRightIcon, PlusIcon, RefreshIcon } from '../components/icons.tsx';
 import { Button, Confirm, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -253,6 +253,7 @@ export function AgendaScreen() {
 
       <div className="agsync">
         <Button variant="quiet" small onClick={() => setSyncing(true)}>
+          <RefreshIcon />
           {syncedN > 0 ? `Sincronizar · ${syncedN} ${syncedN === 1 ? 'ligada' : 'ligadas'}` : t('Sincronizar')}
         </Button>
       </div>
