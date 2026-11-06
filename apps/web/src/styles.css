@@ -1398,6 +1398,8 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 /* O conteúdo do dia entra do lado para onde a pessoa foi; o dedo pode rolar a página na vertical. */
 .agday {
   touch-action: pan-y;
+  /* Espaço para o botão flutuante "Marcar horário" não cobrir o último item do dia. */
+  padding-bottom: 72px;
 }
 
 .agday--next { animation: agday-next 0.22s ease-out; }
@@ -1545,7 +1547,7 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 .fab {
   position: fixed;
   right: 16px;
-  bottom: calc(76px + env(safe-area-inset-bottom));
+  bottom: calc(98px + env(safe-area-inset-bottom));
   z-index: 15;
   display: inline-flex;
   align-items: center;
@@ -4679,6 +4681,8 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 
 /* ---------- Sincronizar agendas ---------- */
 .agsync { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.agsync .btn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; }
+.agsync .btn svg { width: 16px; height: 16px; flex: none; }
 .calsync { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .calsync__item { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .calsync__item--on { border-color: var(--ok); }
