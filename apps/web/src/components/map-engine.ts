@@ -1,3 +1,4 @@
+import { distanceMeters } from '../lib/flash.ts';
 import { intlLocale } from '../lib/i18n/index.ts';
 
 // Motor dos mapas do app. Com VITE_GOOGLE_MAPS_API_KEY definida usa o Google Maps (API JavaScript);
@@ -32,7 +33,19 @@ export interface MapEngine {
   fit(points: readonly LatLng[], padding: number | Padding, maxZoom: number, animate?: boolean): void;
   /** Troca as linhas desenhadas (rotas). Tracejada para trajeto estimado em linha reta. */
   setLines(lines: readonly MapLine[]): void;
+  /** Área visível agora: o centro e o raio (do centro até o canto), em km. */
+  view(): MapView | undefined;
+  /**
+   * Avisa quando o mapa para depois de a pessoa arrastar, dar zoom ou usar os botões de zoom.
+   * Os movimentos feitos pelo app (enquadrar, seguir o pin escolhido) não avisam. Devolve a função para parar.
+   */
+  onUserMove(listener: (view: MapView) => void): () => void;
   destroy(): void;
+}
+
+export interface MapView {
+  center: LatLng;
+  radiusKm: number;
 }
 
 export interface MapLine {
@@ -101,6 +114,57 @@ function followSize(container: HTMLElement, engine: MapEngine, resize: () => voi
   };
 }
 
+/** Raio da área visível: do centro até o canto mais distante. */
+function viewOf(center: LatLng, corners: readonly LatLng[]): MapView {
+  return { center, radiusKm: Math.max(...corners.map((corner) => distanceMeters(center, corner))) / 1000 };
+}
+
+/**
+ * Separa o movimento da pessoa do movimento do app: guarda a hora do último toque, roda ou arrasto no mapa
+ * (fora dos pins, que só escolhem) e, quando o mapa para logo depois disso, avisa quem estiver ouvindo.
+ */
+function trackUserMoves(container: HTMLElement, view: () => MapView | undefined) {
+  const listeners = new Set<(view: MapView) => void>();
+  let lastTouch = 0;
+  let pressed = false;
+  const touched = (event: Event) => {
+    if (event.target instanceof Element && event.target.closest('[data-map-marker]')) return;
+    lastTouch = Date.now();
+    if (event.type === 'pointerdown' || event.type === 'touchstart') pressed = true;
+  };
+  const released = () => {
+    if (pressed) lastTouch = Date.now();
+    pressed = false;
+  };
+  const moved = () => {
+    if (pressed) lastTouch = Date.now();
+  };
+  const types = ['pointerdown', 'touchstart', 'wheel'] as const;
+  for (const type of types) container.addEventListener(type, touched, { capture: true, passive: true });
+  container.addEventListener('pointermove', moved, { capture: true, passive: true });
+  window.addEventListener('pointerup', released, { passive: true });
+  window.addEventListener('touchend', released, { passive: true });
+  return {
+    /** Chamar quando o mapa parar de se mexer. A inércia do arrasto e a animação do zoom cabem nos 1,5 s. */
+    settled() {
+      if (listeners.size === 0 || (!pressed && Date.now() - lastTouch > 1500)) return;
+      const current = view();
+      if (current) for (const listener of listeners) listener(current);
+    },
+    on(listener: (view: MapView) => void) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    stop() {
+      listeners.clear();
+      for (const type of types) container.removeEventListener(type, touched, { capture: true });
+      container.removeEventListener('pointermove', moved, { capture: true });
+      window.removeEventListener('pointerup', released);
+      window.removeEventListener('touchend', released);
+    },
+  };
+}
+
 // ---------- Google Maps ----------
 
 let googleLoading: Promise<void> | undefined;
@@ -161,6 +225,7 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
       this.at = new core.LatLng(at.lat, at.lng);
       this.box.style.position = 'absolute';
       this.box.style.transform = anchor === 'bottom' ? 'translate(-50%, -100%)' : 'translate(-50%, -50%)';
+      this.box.dataset['mapMarker'] = '';
       this.box.append(element);
       // Toque num pin clicável não arrasta nem aproxima o mapa.
       if (element instanceof HTMLButtonElement || element.getAttribute('role') === 'button') OverlayView.preventMapHitsAndGesturesFrom(this.box);
@@ -196,6 +261,19 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
 
   const markers = new Set<HtmlMarker>();
   let polylines: google.maps.Polyline[] = [];
+  const view = (): MapView | undefined => {
+    const bounds = map.getBounds();
+    const center = map.getCenter();
+    if (!bounds || !center) return undefined;
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+    return viewOf({ lat: center.lat(), lng: center.lng() }, [
+      { lat: ne.lat(), lng: ne.lng() },
+      { lat: sw.lat(), lng: sw.lng() },
+    ]);
+  };
+  const moves = trackUserMoves(container, view);
+  map.addListener('idle', () => moves.settled());
   const engine: MapEngine = {
     addMarker(element, at, anchor) {
       const marker = new HtmlMarker(element, at, anchor);
@@ -245,7 +323,10 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
           }),
       );
     },
+    view,
+    onUserMove: (listener) => moves.on(listener),
     destroy() {
+      moves.stop();
       authFailures.delete(fail);
       for (const line of polylines) line.setMap(null);
       for (const marker of markers) marker.remove();
@@ -298,9 +379,20 @@ async function createMapLibre(container: HTMLElement, options: CreateOptions): P
     styleLoaded = true;
     if (pendingLines) drawLines(pendingLines);
   });
+  const view = (): MapView | undefined => {
+    const bounds = map.getBounds();
+    const center = map.getCenter();
+    return viewOf({ lat: center.lat, lng: center.lng }, [
+      { lat: bounds.getNorth(), lng: bounds.getEast() },
+      { lat: bounds.getSouth(), lng: bounds.getWest() },
+    ]);
+  };
+  const moves = trackUserMoves(container, view);
+  map.on('moveend', () => moves.settled());
   const engine: MapEngine = {
     addMarker(element, at, anchor) {
       const marker = new lib.Marker({ element, anchor }).setLngLat([at.lng, at.lat]).addTo(map);
+      marker.getElement().dataset['mapMarker'] = '';
       return { element, setPosition: (p) => marker.setLngLat([p.lng, p.lat]), remove: () => marker.remove() };
     },
     moveTo(center, { zoom, raiseBy, animate }) {
@@ -317,7 +409,10 @@ async function createMapLibre(container: HTMLElement, options: CreateOptions): P
       pendingLines = lines;
       if (styleLoaded) drawLines(lines);
     },
+    view,
+    onUserMove: (listener) => moves.on(listener),
     destroy() {
+      moves.stop();
       map.remove();
     },
   };

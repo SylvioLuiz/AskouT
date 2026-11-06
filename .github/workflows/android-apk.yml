@@ -1,0 +1,58 @@
+# Gera um .apk do app Android para testadores instalarem direto no celular (fora da Play Store).
+# Roda a cada push na homolog-ari e também à mão: GitHub → Actions → "Android → APK de teste" → Run workflow.
+# O .apk fica para baixar na página da execução, em "Artifacts" (vale 30 dias).
+# É um build de depuração (assinado com uma chave de teste do próprio runner): instala em qualquer Android com
+# "instalar apps desconhecidos" ligado. Como a chave muda a cada execução, para trocar de versão o testador
+# precisa desinstalar a anterior antes.
+name: Android → APK de teste
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [homolog-ari]
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      VITE_API_URL: https://api.askout.com.br
+      VITE_GOOGLE_MAPS_API_KEY: ${{ vars.VITE_GOOGLE_MAPS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar o site e copiar para o Android
+        working-directory: apps/mobile
+        run: npm run build:web && npx cap sync android
+
+      - name: Compilar o APK
+        working-directory: apps/mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          mkdir -p "$RUNNER_TEMP/apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/apk/askout-teste-$(date -u +%Y%m%d-%H%M)-${GITHUB_SHA::7}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: askout-apk-teste
+          path: ${{ runner.temp }}/apk/*.apk
+          retention-days: 30

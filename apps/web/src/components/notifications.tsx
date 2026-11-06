@@ -75,24 +75,18 @@ export function PushCard() {
 
   // Com os avisos já ligados não há o que mostrar (para desligar: Ajustes do aparelho ou do navegador).
   if (!state || state === 'on') return null;
-  if (state !== 'off' && state !== 'on') return <p className="muted pushcard__hint">{state === 'denied' && nativePushBridge() ? NATIVE_DENIED : COPY[state]}</p>;
+  if (state !== 'off') return <p className="muted pushcard__hint">{state === 'denied' && nativePushBridge() ? NATIVE_DENIED : COPY[state]}</p>;
   return (
     <div className="callout pushcard">
       <p className="callout__text">
-        <strong>{state === 'on' ? t('Avisos ligados neste aparelho') : t('Receba avisos fora do app')}</strong>
+        <strong>{t('Receba avisos fora do app')}</strong>
         <br />
-        {state === 'on' ? t('Você é avisado de mensagens, convites e encontros mesmo com o AskouT fechado. O texto das mensagens não aparece no aviso.') : t('Mensagens, convites e encontros chegam como notificação, mesmo com o AskouT fechado.')}
+        {t('Mensagens, convites e encontros chegam como notificação, mesmo com o AskouT fechado.')}
       </p>
       <div className="row-actions">
-        {state === 'on' ? (
-          <Button small variant="secondary" loading={busy} onClick={() => void toggle(false)}>
-            {t('Desligar neste aparelho')}
-          </Button>
-        ) : (
-          <Button small loading={busy} onClick={() => void toggle(true)}>
-            {t('Ativar avisos')}
-          </Button>
-        )}
+        <Button small loading={busy} onClick={() => void toggle(true)}>
+          {t('Ativar avisos')}
+        </Button>
       </div>
       {problem ? <Notice tone="error">{problem}</Notice> : null}
     </div>

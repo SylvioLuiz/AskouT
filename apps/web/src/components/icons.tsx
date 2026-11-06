@@ -492,3 +492,12 @@ export const ListIcon = () => (
     <path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
   </Svg>
 );
+
+/** Rota: dois pontos ligados por um caminho em curva. */
+export const RouteIcon = () => (
+  <Line>
+    <circle cx="6" cy="19" r="2" />
+    <circle cx="18" cy="5" r="2" />
+    <path d="M8 19h7.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H16" />
+  </Line>
+);

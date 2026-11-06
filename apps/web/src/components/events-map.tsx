@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createMapEngine, type EngineMarker, type MapEngine } from './map-engine.ts';
+import { createMapEngine, type EngineMarker, type MapEngine, type MapView } from './map-engine.ts';
 import { t } from '../lib/i18n/index.ts';
 
 // Mapa do Explorar: locais e eventos acontecendo agora. Google Maps (ou MapLibre sem a chave, ver map-engine.ts), carregado sob demanda.
@@ -19,15 +19,23 @@ interface Props {
   selectedId: string | undefined;
   onSelect: (id: string) => void;
   onFail: () => void;
+  /** Falso depois que a pessoa escolhe uma área ou centraliza em si: o mapa fica onde ela deixou, como no Google Maps. */
+  autoFit: boolean;
+  /** A pessoa arrastou ou deu zoom e o mapa parou: a área visível agora. */
+  onUserMove: (view: MapView) => void;
+  /** Muda a cada toque em "Centralizar na minha localização": leva o mapa até a sua posição. */
+  recenter: number;
 }
 
-export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Props) {
+export default function EventsMap({ pins, me, selectedId, onSelect, onFail, autoFit, onUserMove, recenter }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const live = useRef<{ map: MapEngine; markers: Map<string, EngineMarker>; me?: EngineMarker; fitKey: string } | undefined>(undefined);
   const failRef = useRef(onFail);
   failRef.current = onFail;
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
+  const moveRef = useRef(onUserMove);
+  moveRef.current = onUserMove;
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -41,6 +49,7 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Pr
           return;
         }
         live.current = { map, markers: new Map(), fitKey: '' };
+        map.onUserMove((view) => moveRef.current(view));
         setReady(true);
       } catch {
         if (!cancelled) failRef.current();
@@ -92,7 +101,8 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Pr
     }
     // Enquadra tudo só quando a lista de pins muda.
     const fitKey = pins.map((p) => p.id).sort().join(',');
-    if (fitKey !== state.fitKey && pins.length > 0) {
+    if (!autoFit) state.fitKey = fitKey;
+    else if (fitKey !== state.fitKey && pins.length > 0) {
       state.fitKey = fitKey;
       const first = pins[0]!;
       if (pins.length === 1) map.moveTo(first, { zoom: 15 });
@@ -101,7 +111,7 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Pr
       state.fitKey = 'me';
       map.moveTo(me, { zoom: 14 });
     }
-  }, [ready, pins, me]);
+  }, [ready, pins, me, autoFit]);
 
   // Destaque do pin escolhido e deslocamento do mapa até ele.
   useEffect(() => {
@@ -111,6 +121,16 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail }: Pr
     const pin = pins.find((p) => p.id === selectedId);
     if (pin) state.map.moveTo(pin, { raiseBy: 90, animate: true });
   }, [ready, selectedId, pins]);
+
+  // "Centralizar na minha localização". Só no toque do botão, não a cada atualização da posição.
+  const meRef = useRef(me);
+  meRef.current = me;
+  useEffect(() => {
+    const state = live.current;
+    const at = meRef.current;
+    if (!ready || !state || !at || recenter === 0) return;
+    state.map.moveTo(at, { zoom: 15, raiseBy: 90, animate: true });
+  }, [ready, recenter]);
 
   return <div ref={box} className="evmap__canvas" role="region" aria-label={t('Mapa com os locais e eventos perto')} />;
 }
