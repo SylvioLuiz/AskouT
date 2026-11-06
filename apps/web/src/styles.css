@@ -3269,8 +3269,8 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 .newscat--comment { background: var(--ok); color: #fff; }
 .newscat--system { background: var(--line-strong); color: var(--ink); }
 .newsmedia__icon.newscat--chat, .newsmedia__icon.newscat--system { background: var(--brand-soft); color: var(--brand-text); }
-/* Ícone de conversas do cabeçalho: sempre rosa e preenchido. */
-.topbar .iconbtn--chat svg { fill: currentColor; }
+/* Cabeçalho: o item da página aberta fica preenchido; conversas é sempre rosa, só com contorno quando não está aberta. */
+.topbar .iconbtn[aria-current='page'] svg { fill: currentColor; }
 
 /* ---------- Perfil: barra, estatísticas, grade de eventos ---------- */
 
