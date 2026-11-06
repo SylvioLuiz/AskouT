@@ -9,6 +9,7 @@
 #     2. o arquivo no repositório indicado pela variável IOS_DEV_CERT_P12_PATH (padrão: apps/mobile/ios/certs/askout.p12).
 #   A senha vem sempre do segredo IOS_DEV_CERT_PASSWORD (nunca do código).
 #   Se não achar o .p12, ou ele não tiver um certificado de assinatura válido, o build para com erro.
+#   O Archive é assinado só com esse certificado (assinatura manual, perfil criado pela API); o Xcode não cria certificado.
 # Não envia para revisão da loja: o build só aparece no TestFlight.
 name: iOS → TestFlight
 
@@ -92,6 +93,39 @@ jobs:
             echo "::error::O .p12 não tem um certificado de assinatura válido (expirado, revogado ou sem a chave privada)."
             exit 1
           fi
+          # Número de série do certificado (para achar o mesmo certificado na conta da Apple).
+          HASH="$(echo "$IDS" | awk 'NR==1{print $2}')"
+          SERIAL="$(security find-certificate -a -Z -p "$KC" | awk -v h="$HASH" '/^SHA-1 hash:/{on=($3==h)} on' | sed -n '/BEGIN CERT/,/END CERT/p' | openssl x509 -noout -serial | cut -d= -f2)"
+          echo "CERT_SERIAL=$SERIAL" >> "$GITHUB_ENV"
+
+      - name: Perfil de desenvolvimento com o certificado fixo
+        # Cria o perfil na Apple já com o certificado do .p12, para o Xcode não criar outro certificado.
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: node .github/scripts/ios-dev-profile.mjs
+
+      - name: Assinatura manual no build (só no CI)
+        # No Mac de vocês o projeto continua com assinatura automática; aqui o Release do app passa a usar
+        # o certificado fixo e o perfil acima. O aps-environment vai como development no Archive
+        # (perfil de desenvolvimento); no envio à loja o Xcode troca para production.
+        working-directory: apps/mobile/ios/App
+        run: |
+          python3 - <<'PY'
+          import os, re
+          p = 'App.xcodeproj/project.pbxproj'
+          s = open(p).read()
+          i = s.index('504EC3181FED79650016851F /* Release */ = {')
+          j = s.index('name = Release;', i)
+          block = s[i:j]
+          assert 'CODE_SIGN_STYLE = Automatic;' in block, 'bloco Release do app não encontrado'
+          block = block.replace('CODE_SIGN_STYLE = Automatic;',
+            'CODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_IDENTITY = "Apple Development";\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "%s";' % os.environ['PROFILE_NAME'])
+          open(p, 'w').write(s[:i] + block + s[j:])
+          e = 'App/App.entitlements'
+          t = open(e).read()
+          open(e, 'w').write(re.sub(r'(<key>aps-environment</key>\s*<string>)production(</string>)', r'\1development\2', t))
+          PY
 
       - name: Número do build
         # Sempre maior que o último enviado à mão (13) e que os envios anteriores deste fluxo.
@@ -104,11 +138,7 @@ jobs:
             -project App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$ASC_KEY_PATH" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
-            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
       - name: Enviar ao App Store Connect
