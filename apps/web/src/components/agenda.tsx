@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { dayChip, dayLongLabel, LEVEL_LABEL, PARTICIPANT_LABEL, STATE_LABEL } from '../lib/agenda.ts';
+import { dayChip, dayLongLabel, monthLabel, LEVEL_LABEL, PARTICIPANT_LABEL, STATE_LABEL } from '../lib/agenda.ts';
 import type { CompatibilityLevel, ParticipantStatus, SlotState } from '../lib/types.ts';
-import { AlertIcon, CheckIcon, ClockIcon, HalfIcon, XIcon } from './icons.tsx';
+import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, HalfIcon, XIcon } from './icons.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 // Cor nunca sozinha: todo estado de agenda vem com ícone e texto (acessibilidade e daltonismo).
@@ -71,47 +71,99 @@ interface DayStripProps {
   eventsOf?: (key: string) => number;
 }
 
-/** Faixa horizontal que rola com o dedo; o dia escolhido sempre fica visível. */
+/** Faixa horizontal que rola com o dedo; o dia escolhido desliza até o centro. Setas do teclado trocam o dia. */
 export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf }: DayStripProps) {
-  const selectedRef = useRef<HTMLButtonElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const firstScroll = useRef(true);
 
+  // Rola só a faixa (não a página) para centralizar o dia escolhido; na primeira vez, sem animação.
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    const strip = stripRef.current;
+    const chip = strip?.querySelector<HTMLElement>(`[data-day="${selected}"]`);
+    if (!strip || !chip) return;
+    const left = chip.offsetLeft - strip.offsetLeft - (strip.clientWidth - chip.offsetWidth) / 2;
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    strip.scrollTo({ left: Math.max(0, left), behavior: firstScroll.current || reduce ? 'auto' : 'smooth' });
+    firstScroll.current = false;
   }, [selected]);
 
+  const index = days.indexOf(selected);
+  function move(by: number) {
+    const next = days[Math.min(days.length - 1, Math.max(0, index + by))];
+    if (next && next !== selected) onSelect(next);
+  }
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    const keys: Record<string, () => void> = {
+      ArrowRight: () => move(1),
+      ArrowLeft: () => move(-1),
+      Home: () => onSelect(today),
+      End: () => days.length > 0 && onSelect(days[days.length - 1] as string),
+    };
+    const action = keys[event.key];
+    if (!action) return;
+    event.preventDefault();
+    action();
+    // O foco acompanha o dia escolhido.
+    window.requestAnimationFrame(() => stripRef.current?.querySelector<HTMLElement>('.daychip--selected')?.focus());
+  }
+
   return (
-    <div className="daystrip" role="group" aria-label={t('Escolha o dia')}>
-      {days.map((key) => {
-        const chip = dayChip(key);
-        const states = statesOf(key);
-        const isSelected = key === selected;
-        const events = eventsOf?.(key) ?? 0;
-        const slotSummary = states.length === 0 ? t('sem horários') : states.map((s) => STATE_LABEL[s].toLowerCase()).join(', ');
-        const summary = events > 0 ? `${slotSummary}, ${events === 1 ? '1 evento' : `${events} eventos`} confirmado${events === 1 ? '' : 's'}` : slotSummary;
-        return (
-          <button
-            key={key}
-            ref={isSelected ? selectedRef : undefined}
-            type="button"
-            className={`daychip${isSelected ? ' daychip--selected' : ''}${key === today ? ' daychip--today' : ''}${events > 0 ? ' daychip--event' : ''}`}
-            aria-pressed={isSelected}
-            aria-label={`${dayLongLabel(key)}${key === today ? ', hoje' : ''}: ${summary}`}
-            onClick={() => onSelect(key)}
-          >
-            <span className="daychip__weekday">{chip.weekday}</span>
-            <span className="daychip__day">{chip.day}</span>
-            <span className="daychip__marks" aria-hidden="true">
-              {events > 0 ? <span className="daymark daymark--event" /> : null}
-              {states.map((s) => (
-                <span key={s} className={`daymark daymark--${STATE_TONE[s]}`} />
-              ))}
-            </span>
+    <div className="daynav">
+      <div className="daynav__bar">
+        <span className="daynav__month" aria-live="polite">{capitalizeFirst(monthLabel(selected))}</span>
+        <div className="daynav__actions">
+          {selected !== today ? (
+            <button type="button" className="daynav__today" onClick={() => onSelect(today)}>
+              {t('Hoje')}
+            </button>
+          ) : null}
+          <button type="button" className="iconbtn daynav__arrow" onClick={() => move(-1)} disabled={index <= 0} aria-label={t('Dia anterior')}>
+            <ChevronLeftIcon />
           </button>
-        );
-      })}
+          <button type="button" className="iconbtn daynav__arrow" onClick={() => move(1)} disabled={index >= days.length - 1} aria-label={t('Próximo dia')}>
+            <ChevronRightIcon />
+          </button>
+        </div>
+      </div>
+      <div className="daystrip" role="group" aria-label={t('Escolha o dia')} ref={stripRef} onKeyDown={onKeyDown}>
+        {days.map((key) => {
+          const chip = dayChip(key);
+          const states = statesOf(key);
+          const isSelected = key === selected;
+          const isToday = key === today;
+          const events = eventsOf?.(key) ?? 0;
+          const slotSummary = states.length === 0 ? t('sem horários') : states.map((s) => STATE_LABEL[s].toLowerCase()).join(', ');
+          const summary = events > 0 ? `${slotSummary}, ${events === 1 ? '1 evento' : `${events} eventos`} confirmado${events === 1 ? '' : 's'}` : slotSummary;
+          return (
+            <button
+              key={key}
+              data-day={key}
+              type="button"
+              tabIndex={isSelected ? 0 : -1}
+              className={`daychip${isSelected ? ' daychip--selected' : ''}${isToday ? ' daychip--today' : ''}${events > 0 ? ' daychip--event' : ''}`}
+              aria-pressed={isSelected}
+              aria-current={isToday ? 'date' : undefined}
+              aria-label={`${dayLongLabel(key)}${isToday ? `, ${t('hoje')}` : ''}: ${summary}`}
+              onClick={() => onSelect(key)}
+            >
+              <span className="daychip__weekday">{isToday ? t('hoje') : chip.weekday}</span>
+              <span className="daychip__day">{chip.day}</span>
+              <span className="daychip__marks" aria-hidden="true">
+                {events > 0 ? <span className="daymark daymark--event" /> : null}
+                {states.map((s) => (
+                  <span key={s} className={`daymark daymark--${STATE_TONE[s]}`} />
+                ))}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
+
+const capitalizeFirst = (text: string) => text.charAt(0).toLocaleUpperCase() + text.slice(1);
 
 // ---------- Folha inferior ----------
 

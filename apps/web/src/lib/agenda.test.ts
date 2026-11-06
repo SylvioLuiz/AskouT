@@ -10,6 +10,8 @@ import {
   dayChip,
   dayLongLabel,
   daysFrom,
+  firstDayWith,
+  lastDayWithBefore,
   instantRangeLabel,
   localDateKey,
   rangeForDays,
@@ -159,5 +161,20 @@ describe('encontros em que você vai', () => {
     const balada: GoingEvent = { id: 'b', source: 'PLACE', title: 'Balada', startsAt: new Date(2026, 9, 24, 22, 0).toISOString(), endsAt: new Date(2026, 9, 25, 3, 0).toISOString(), venueName: null };
     const events = agendaEvents([], [festival, balada]);
     assert.deepEqual([23, 24, 25, 26].map((d) => agendaEventsOnDay(events, `2026-10-${d}`).map((e) => e.title)), [['Festival'], ['Festival', 'Balada'], ['Festival'], []]);
+  });
+});
+
+describe('navegação entre dias', () => {
+  const days = daysFrom('2026-11-06', 10);
+  const busy = new Set(['2026-11-09', '2026-11-12']);
+  const has = (key: string) => busy.has(key);
+  it('acha o primeiro dia com evento a partir de hoje', () => {
+    assert.equal(firstDayWith(days, has), '2026-11-09');
+    assert.equal(firstDayWith(days, has, '2026-11-10'), '2026-11-12');
+    assert.equal(firstDayWith(days, () => false), undefined);
+  });
+  it('acha o dia com evento anterior', () => {
+    assert.equal(lastDayWithBefore(days, has, '2026-11-12'), '2026-11-09');
+    assert.equal(lastDayWithBefore(days, has, '2026-11-09'), undefined);
   });
 });

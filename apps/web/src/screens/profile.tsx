@@ -10,6 +10,7 @@ import { PostedEvents } from '../components/profile-events.tsx';
 import { PostGrid } from '../components/post.tsx';
 import { ChatButton } from '../components/chat-button.tsx';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
+import { AvatarViewer } from '../components/photo-viewer.tsx';
 import { useAuthContext } from '../auth.tsx';
 import { resizeProfilePhoto } from '../lib/image.ts';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
@@ -54,6 +55,7 @@ export function ProfileScreen({ username }: { username: string }) {
   const [pending, setPending] = useState<Pending>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const { setOwnProfile } = useAuthContext();
   const search = useSearch();
@@ -134,7 +136,8 @@ export function ProfileScreen({ username }: { username: string }) {
           }}
         />
       ) : null}
-      {photoOpen ? <PhotoPickerSheet hasPhoto={profile.avatarUrl !== null} onPick={(file) => void changePhoto(file)} onRemove={() => void changePhoto(null)} onClose={() => setPhotoOpen(false)} /> : null}
+      {photoOpen ? <PhotoPickerSheet hasPhoto={profile.avatarUrl !== null} onPick={(file) => void changePhoto(file)} onRemove={() => void changePhoto(null)} onView={() => setViewOpen(true)} onClose={() => setPhotoOpen(false)} /> : null}
+      {viewOpen && profile.avatarUrl ? <AvatarViewer url={profile.avatarUrl} onClose={() => setViewOpen(false)} /> : null}
       <header className="profile">
         {relationship.isSelf ? (
           <div className="avatarbtn__wrap">
@@ -158,6 +161,10 @@ export function ProfileScreen({ username }: { username: string }) {
             <span className="storyring">
               <Avatar profile={profile} size={88} />
             </span>
+          </button>
+        ) : profile.avatarUrl ? (
+          <button type="button" className="avatarbtn" onClick={() => setViewOpen(true)} aria-label={t('Ver foto de perfil')} aria-haspopup="dialog">
+            <Avatar profile={profile} size={88} />
           </button>
         ) : (
           <Avatar profile={profile} size={88} />
