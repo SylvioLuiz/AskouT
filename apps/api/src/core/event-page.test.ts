@@ -34,13 +34,11 @@ test('tipo do evento criado: padrão OTHER, SPORT quando informado, inválido é
   assert.equal(changed.event?.kind, 'OUTDOOR');
 });
 
-test('evento do local: capa, tipo, confirmados e sem área de posts', async () => {
+test('evento do local: capa, tipo e confirmados', async () => {
   const { w, ana, bia } = await setup();
   const page = await w.core.eventPages.get(ana, 'e1', { lat: -23.58, lng: -46.65 });
   assert.deepEqual([page.source, page.kind, page.cover, page.venue.name, page.distanceM, page.sample], ['PLACE', 'OUTDOOR', { kind: 'URL', url: 'https://img.exemplo/capa.jpg' }, 'Parque Ibirapuera', 0, true]);
   assert.equal(page.confirmedCount, 0);
-  assert.equal(page.postsEnabled, false);
-  assert.equal(page.canPost, false);
   assert.equal(page.owner, null);
   const after = await w.core.eventPages.go(bia, 'e1');
   assert.deepEqual([after.going, after.confirmedCount, after.attendees.map((a) => a.username)], [true, 1, ['bia']]);
@@ -51,7 +49,6 @@ test('evento do local: capa, tipo, confirmados e sem área de posts', async () =
   assert.deepEqual((await w.core.eventPages.get(ana, 'e1')).attendees.map((a) => a.username), ['bia', 'ana'], 'em ordem, sem repetir');
   const left = await w.core.eventPages.cancel(bia, 'e1');
   assert.deepEqual([left.going, left.confirmedCount], [false, 1]);
-  await rejectsWith(w.core.eventPages.createPost(ana, 'e1', { caption: 'oi' }), 'FORBIDDEN');
   await rejectsWith(w.core.eventPages.get(ana, 'nao-existe'), 'NOT_FOUND');
 });
 
@@ -62,44 +59,10 @@ test('evento de pessoa: o dono conta como confirmado, capa vem da primeira foto 
   assert.deepEqual(page.cover, { kind: 'UPLOAD', imageId: ev.images[0]!.id });
   assert.deepEqual([page.confirmedCount, page.attendees.map((a) => a.username), page.owner?.username, page.going], [1, ['ana'], 'ana', false]);
   const own = await w.core.eventPages.get(ana, ev.id);
-  assert.deepEqual([own.isOwner, own.going, own.postsEnabled], [true, true, true]);
+  assert.deepEqual([own.isOwner, own.going], [true, true]);
   await rejectsWith(w.core.eventPages.cancel(ana, ev.id), 'FORBIDDEN');
   assert.equal((await w.core.eventPages.go(ana, ev.id)).confirmedCount, 1, 'o dono confirmar não duplica');
   assert.equal((await w.core.eventPages.go(bia, ev.id)).confirmedCount, 2);
-});
-
-test('posts do evento: privado só o dono; público dono + confirmados; dono apaga os de outros', async () => {
-  const { w, ana, bia, caio, ev } = await setup();
-  const mine = await w.core.eventPages.createPost(ana, ev.id, { caption: ' Ponto de encontro ', image: JPEG() });
-  assert.deepEqual([mine.caption, mine.hasImage, mine.mine], ['Ponto de encontro', true, true]);
-  await w.core.eventPages.go(bia, ev.id);
-  await rejectsWith(w.core.eventPages.createPost(bia, ev.id, { caption: 'oi' }), 'FORBIDDEN');
-  assert.equal((await w.core.eventPages.get(bia, ev.id)).canPost, false);
-  assert.equal((await w.core.eventPages.get(bia, ev.id)).posts.length, 1, 'todo mundo vê');
-  await rejectsWith(w.core.eventPages.setPostsPublic(bia, ev.id, true), 'FORBIDDEN');
-  await rejectsWith(w.core.eventPages.setPostsPublic(ana, ev.id, 'sim'), 'VALIDATION');
-  const open = await w.core.eventPages.setPostsPublic(ana, ev.id, true);
-  assert.equal(open.postsPublic, true);
-  assert.equal((await w.core.eventPages.get(bia, ev.id)).canPost, true);
-  w.clock.tick(1000);
-  const theirs = await w.core.eventPages.createPost(bia, ev.id, { caption: 'Chego já' });
-  await rejectsWith(w.core.eventPages.createPost(caio, ev.id, { caption: 'e eu?' }), 'FORBIDDEN', );
-  await w.core.eventPages.go(caio, ev.id);
-  await w.core.eventPages.createPost(caio, ev.id, { caption: 'agora vou' });
-  await rejectsWith(w.core.eventPages.createPost(bia, ev.id, { caption: '   ' }), 'VALIDATION');
-  await rejectsWith(w.core.eventPages.createPost(bia, ev.id, { caption: 'x'.repeat(501) }), 'VALIDATION');
-  await rejectsWith(w.core.eventPages.createPost(bia, ev.id, { caption: 'foto ruim', image: 'data:text/plain;base64,AAAA' }), 'VALIDATION');
-  const list = (await w.core.eventPages.get(ana, ev.id)).posts;
-  assert.deepEqual(list.map((p) => p.caption), ['agora vou', 'Chego já', 'Ponto de encontro'], 'mais recente primeiro');
-  assert.equal(list[1]!.canDelete, true, 'o dono apaga o de outro');
-  assert.equal((await w.core.eventPages.get(caio, ev.id)).posts.find((p) => p.id === theirs.id)!.canDelete, false);
-  await rejectsWith(w.core.eventPages.deletePost(caio, ev.id, theirs.id), 'FORBIDDEN');
-  await w.core.eventPages.deletePost(bia, ev.id, theirs.id);
-  await rejectsWith(w.core.eventPages.deletePost(bia, ev.id, theirs.id), 'NOT_FOUND');
-  // fechar de novo: quem confirmou deixa de postar
-  await w.core.eventPages.setPostsPublic(ana, ev.id, false);
-  await rejectsWith(w.core.eventPages.createPost(bia, ev.id, { caption: 'de novo' }), 'FORBIDDEN');
-  assert.deepEqual(Array.from((await w.core.eventPages.postImage(mine.id))!.data).slice(0, 3), [0xff, 0xd8, 0xff]);
 });
 
 test('privacidade: conta privada e bloqueio escondem o evento e quem confirmou', async () => {
@@ -117,10 +80,10 @@ test('privacidade: conta privada e bloqueio escondem o evento e quem confirmou',
   await rejectsWith(w.core.eventPages.get(duda, ev.id), 'NOT_FOUND');
 });
 
-test('apagar o evento leva presença e posts; arquivado some para os outros', async () => {
+test('apagar o evento leva presença e feed; arquivado some para os outros', async () => {
   const { w, ana, bia, ev } = await setup();
   await w.core.eventPages.go(bia, ev.id);
-  await w.core.eventPages.createPost(ana, ev.id, { caption: 'oi' });
+  await w.core.feed.create(ana, 'event', ev.id, { body: 'oi' });
   await w.core.posts.archive(ana, ev.id);
   await rejectsWith(w.core.eventPages.get(bia, ev.id), 'NOT_FOUND');
   assert.equal((await w.core.eventPages.get(ana, ev.id)).title, 'Corrida');

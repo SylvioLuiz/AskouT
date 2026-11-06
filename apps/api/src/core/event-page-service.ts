@@ -1,4 +1,3 @@
-import { decodeImageDataUrl } from './image.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
 import { distanceMeters } from './geo.ts';
 import { DomainError, forbidden, notFound, validationError } from './errors.ts';
@@ -7,11 +6,7 @@ import type { ProfileService } from './profile-service.ts';
 import type { EventKind, EventRef, EventStoryMeta, PostReportReason, PublicProfile, StoryHiddenRecord } from './types.ts';
 import { POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
-export const EVENT_POST_CAPTION_MAX = 500;
-/** Foto do post do evento: chega já reduzida pelo app, até 100 KB. */
-export const EVENT_POST_IMAGE_MAX_BYTES = 100 * 1024;
-/** Quantos posts e quantos avatares a página traz de uma vez. */
-export const EVENT_POSTS_LIMIT = 30;
+/** Quantos avatares a página traz de uma vez. */
 export const EVENT_ATTENDEES_LIMIT = 60;
 /** Como os stories estão ocultos entre mim e uma pessoa (só o que eu mesmo escolhi). */
 export interface StoryVisibilityView {
@@ -88,17 +83,6 @@ export type EventCoverView =
   | { kind: 'UPLOAD'; imageId: string }
   | { kind: 'PLACE'; photoRef: string; author: string | null };
 
-export interface EventPostView {
-  id: string;
-  author: PublicProfile;
-  caption: string;
-  hasImage: boolean;
-  createdAt: string;
-  mine: boolean;
-  /** Quem escreveu e o dono do evento apagam. */
-  canDelete: boolean;
-}
-
 export interface EventPageView {
   id: string;
   /** PLACE: evento do local (Explorar). USER: evento criado por uma pessoa. */
@@ -134,12 +118,6 @@ export interface EventPageView {
   storyUserIds: string[];
   /** O visitante pode publicar story: confirmou presença (ou é o dono) e o evento não acabou. */
   canStory: boolean;
-  /** Evento de pessoa tem área de posts; evento do local ainda não (não tem dono). */
-  postsEnabled: boolean;
-  /** true: o dono e quem confirmou postam; false: só o dono. */
-  postsPublic: boolean;
-  canPost: boolean;
-  posts: EventPostView[];
 }
 
 /** Evento em que a pessoa confirmou presença, no formato curto que a agenda usa. */
@@ -154,12 +132,6 @@ export interface GoingEventView {
 
 /** Quantos eventos confirmados a agenda recebe, no máximo. */
 export const MY_GOING_LIMIT = 100;
-
-export interface EventPostInput {
-  caption?: unknown;
-  /** Data URL da foto (opcional), já reduzida pelo app. */
-  image?: unknown;
-}
 
 function optionalText(value: unknown, max: number, field: string, label: string): string | null {
   if (value === undefined || value === null) return null;
@@ -234,9 +206,6 @@ export class EventPageService {
 
     const isOwner = owner?.userId === viewerId;
     const iGo = isOwner || going.some((g) => g.userId === viewerId);
-    const postsEnabled = ref.source === 'USER';
-    const postsPublic = base.postsPublic;
-    const posts = postsEnabled ? await this.postViews(viewerId, ref.id, owner?.userId ?? '', hidden) : [];
     return {
       ...base.view,
       confirmedCount: ordered.length,
@@ -246,21 +215,16 @@ export class EventPageService {
       isOwner,
       storyUserIds: [...new Set((await this.visibleStories(viewerId, ref, hidden)).map((s) => s.userId))],
       canStory: (isOwner || iGo) && Date.parse(base.view.endsAt) > this.deps.clock.now().getTime(),
-      postsEnabled,
-      postsPublic,
-      canPost: postsEnabled && (isOwner || (postsPublic && iGo)),
-      posts,
     };
   }
 
-  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'postsEnabled' | 'postsPublic' | 'canPost' | 'posts'>; postsPublic: boolean }> {
+  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory'> }> {
     if (ref.source === 'PLACE') {
       const found = await this.deps.places.findEvent(ref.id);
       if (!found) throw notFound('Evento não encontrado');
       const { event, venue } = found;
       const distance = input.lat !== undefined && input.lng !== undefined ? Math.round(distanceMeters({ lat: input.lat, lng: input.lng }, venue)) : null;
       return {
-        postsPublic: false,
         view: {
           id: event.id,
           source: 'PLACE',
@@ -290,7 +254,6 @@ export class EventPageService {
     const first = [...images].sort((a, b) => a.position - b.position)[0];
     const cover: EventCoverView | null = !first ? null : first.isUpload ? { kind: 'UPLOAD', imageId: first.id } : first.placePhotoRef ? { kind: 'PLACE', photoRef: first.placePhotoRef, author: first.placePhotoAuthor } : null;
     return {
-      postsPublic: post.eventPostsPublic,
       view: {
         id: post.id,
         source: 'USER',
@@ -312,16 +275,19 @@ export class EventPageService {
     };
   }
 
-  private async postViews(viewerId: string, eventId: string, ownerId: string, hidden: Set<string>): Promise<EventPostView[]> {
-    const rows = await this.deps.eventRoom.listPosts(eventId, { limit: EVENT_POSTS_LIMIT, offset: 0 });
-    const visible = rows.filter((r) => r.authorId === viewerId || !hidden.has(r.authorId));
-    const authors = await this.deps.users.findProfilesByIds([...new Set(visible.map((r) => r.authorId))]);
-    const byId = new Map(authors.map((a) => [a.userId, toPublicProfile(a)]));
-    return visible.flatMap((r) => {
-      const author = byId.get(r.authorId);
-      if (!author) return [];
-      return [{ id: r.id, author, caption: r.caption, hasImage: r.hasImage, createdAt: r.createdAt.toISOString(), mine: r.authorId === viewerId, canDelete: r.authorId === viewerId || ownerId === viewerId }];
-    });
+  /**
+   * Para o feed do evento: o visitante pode abrir o evento? Devolve quem modera (o dono do evento criado por uma pessoa
+   * ou quem administra o local do evento) e o título, para os avisos.
+   */
+  async access(viewerId: string, rawId: unknown): Promise<{ ref: EventRef; moderatorId: string | null; title: string }> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    if (ref.source === 'PLACE') {
+      const found = await this.deps.places.findEvent(ref.id);
+      if (!found) throw notFound('Evento não encontrado');
+      return { ref, moderatorId: found.venue.ownerId ?? null, title: found.event.title };
+    }
+    const found = await this.deps.posts.findById(ref.id);
+    return { ref, moderatorId: owner?.userId ?? null, title: found?.post.eventTitle ?? 'Evento' };
   }
 
   /** Eventos que ainda não acabaram e em que a pessoa vai: os que confirmou ("Eu vou") e os que ela criou, do mais próximo ao mais distante. Os que sumiram, foram arquivados ou ficaram inacessíveis (bloqueio) não entram. */
@@ -366,49 +332,6 @@ export class EventPageService {
     if (owner?.userId === viewerId) throw forbidden('Você é o dono: o evento já conta com você. Apague o evento se não vai mais acontecer.');
     await this.deps.eventRoom.removeGoing(ref, viewerId);
     return this.get(viewerId, ref.id);
-  }
-
-  /** Só o dono escolhe: posts públicos (dono e confirmados postam) ou privados (só o dono). */
-  async setPostsPublic(viewerId: string, rawId: unknown, value: unknown): Promise<EventPageView> {
-    const { ref, owner } = await this.resolve(viewerId, rawId);
-    if (ref.source !== 'USER') throw forbidden('Este evento não tem área de posts');
-    if (owner?.userId !== viewerId) throw forbidden('Só o dono do evento muda quem pode postar');
-    if (typeof value !== 'boolean') throw validationError('Valor inválido', { public: 'Use true ou false' });
-    if (!(await this.deps.eventRoom.setPostsPublic(ref.id, viewerId, value))) throw notFound('Evento não encontrado');
-    return this.get(viewerId, ref.id);
-  }
-
-  async createPost(viewerId: string, rawId: unknown, input: EventPostInput): Promise<EventPostView> {
-    const { ref, owner } = await this.resolve(viewerId, rawId);
-    if (ref.source !== 'USER') throw forbidden('Este evento não tem área de posts');
-    const isOwner = owner?.userId === viewerId;
-    if (!isOwner) {
-      const post = await this.deps.posts.findById(ref.id);
-      if (!post?.post.eventPostsPublic) throw forbidden('Neste evento só o dono posta');
-      if (!(await this.deps.eventRoom.isGoing(ref, viewerId))) throw forbidden('Confirme presença para postar neste evento');
-    }
-    const caption = optionalText(input.caption, EVENT_POST_CAPTION_MAX, 'caption', 'Texto');
-    if (!caption) throw validationError('Post vazio', { caption: 'Escreva algo para postar' });
-    let mime: string | null = null;
-    let data: Uint8Array | null = null;
-    if (input.image !== undefined && input.image !== null) {
-      const decoded = decodeImageDataUrl(input.image, EVENT_POST_IMAGE_MAX_BYTES, '100 KB');
-      mime = decoded.mime;
-      data = new Uint8Array(decoded.bytes);
-    }
-    const record = { id: this.deps.ids.next(), eventId: ref.id, authorId: viewerId, caption, mime, data, createdAt: this.deps.clock.now() };
-    await this.deps.eventRoom.addPost(record);
-    const me = await this.deps.users.findProfileById(viewerId);
-    return { id: record.id, author: toPublicProfile(me!), caption, hasImage: data !== null, createdAt: record.createdAt.toISOString(), mine: true, canDelete: true };
-  }
-
-  async deletePost(viewerId: string, rawId: unknown, postId: unknown): Promise<{ deleted: true }> {
-    const { ref, owner } = await this.resolve(viewerId, rawId);
-    const post = typeof postId === 'string' && postId.length <= 64 ? await this.deps.eventRoom.findPost(postId) : undefined;
-    if (!post || post.eventId !== ref.id) throw notFound('Post não encontrado');
-    if (post.authorId !== viewerId && owner?.userId !== viewerId) throw forbidden('Só quem escreveu ou o dono do evento apaga o post');
-    await this.deps.eventRoom.deletePost(post.id);
-    return { deleted: true };
   }
 
   /**
@@ -604,9 +527,4 @@ export class EventPageService {
     return { mime: media.mime, data: media.data };
   }
 
-  /** Foto de um post de evento, para o <img>. Quem tem o endereço (id aleatório) vê, como nas fotos dos posts. */
-  async postImage(postId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
-    if (typeof postId !== 'string' || postId === '' || postId.length > 64) return undefined;
-    return this.deps.eventRoom.findPostImage(postId);
-  }
 }

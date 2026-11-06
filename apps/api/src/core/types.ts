@@ -409,7 +409,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE';
 
 /** O que a pessoa silenciou no push (o aviso continua no sino). `all` vale para tudo; `chats` e `events` só para o seu grupo de avisos. */
 export interface NotificationMuteSettings {
@@ -460,8 +460,6 @@ export interface PostRecord {
   eventEndsAt: Date | null;
   /** Tipo do evento (ícone da página). Só vale quando o post é um evento. */
   eventKind: EventKind;
-  /** Evento público: o dono e quem confirmou presença postam no evento. Privado (padrão): só o dono. */
-  eventPostsPublic: boolean;
   /** Evento privado: só o dono vê nas listas; os demais chegam por cartão numa conversa. */
   eventPrivate?: boolean;
   /** Arquivado: some do feed e do perfil, só a própria pessoa vê. */
@@ -545,15 +543,63 @@ export interface EventAttendanceRecord {
   createdAt: Date;
 }
 
-/** Post dentro de um evento criado por uma pessoa. A foto (opcional) fica na própria linha. */
-export interface EventPostRecord {
+/** Onde fica um feed: evento do local, evento criado por uma pessoa ou a página de um rolê. */
+export type FeedTargetType = 'PLACE_EVENT' | 'USER_EVENT' | 'VENUE';
+
+export interface FeedTarget {
+  type: FeedTargetType;
   id: string;
-  eventId: string;
+}
+
+/** OPEN: quem vê a página publica. MODERATED: publica, mas só aparece depois que o dono aprova. OWNER_ONLY: só o dono. */
+export type FeedPolicy = 'OPEN' | 'MODERATED' | 'OWNER_ONLY';
+export type FeedPostKind = 'POST' | 'NOTICE';
+export type FeedPostStatus = 'PUBLISHED' | 'PENDING';
+
+export interface FeedPostRecord {
+  id: string;
+  target: FeedTarget;
   authorId: string;
-  caption: string;
-  mime: string | null;
-  data: Uint8Array | null;
+  kind: FeedPostKind;
+  body: string | null;
+  status: FeedPostStatus;
+  /** Publicado pelo dono do rolê, em nome do rolê. */
+  asVenue: boolean;
   createdAt: Date;
+  reviewedAt: Date | null;
+}
+
+/** A publicação com os ids das fotos, em ordem (sem os bytes). */
+export interface FeedPostWithImages {
+  post: FeedPostRecord;
+  imageIds: string[];
+}
+
+export interface FeedImageInput {
+  id: string;
+  mime: string;
+  data: Uint8Array;
+}
+
+export interface FeedCommentRecord {
+  id: string;
+  postId: string;
+  authorId: string;
+  body: string;
+  createdAt: Date;
+}
+
+/** Reações de uma publicação ou comentário: quantas de cada emoji e a minha. */
+export interface FeedReactionStats {
+  id: string;
+  counts: { emoji: string; count: number }[];
+  mine: string | null;
+}
+
+/** Posição na lista (mais recente primeiro): o par data + id do último item visto. */
+export interface FeedCursor {
+  createdAt: Date;
+  id: string;
 }
 
 /** Story de evento: foto ou vídeo. Vale 24 h ou até o fim do evento, o que vier primeiro. */

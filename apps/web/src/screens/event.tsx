@@ -5,7 +5,7 @@ import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { StoryCreateSheet, StoryViewer } from '../components/event-story.tsx';
 import { Sheet } from '../components/agenda.tsx';
-import { CalendarIcon, ChevronLeftIcon, EventKindIcon, MoreIcon, PlusIcon, ShareIcon, TicketIcon, TrashIcon, XIcon } from '../components/icons.tsx';
+import { CalendarIcon, CalendarPlusIcon, ChevronLeftIcon, EventKindIcon, LocationIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UserIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
@@ -23,8 +23,10 @@ import { addToCalendar } from '../lib/ics.ts';
 import { resizePostPhoto } from '../lib/image.ts';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
 import { timeAgo } from '../lib/format.ts';
-import type { EventPage, EventPost } from '../lib/types.ts';
-import { Link, navigate } from '../router.tsx';
+import type { EventPage, FeedSettings } from '../lib/types.ts';
+import { Feed } from '../components/feed.tsx';
+import { policyNote } from '../lib/feed.ts';
+import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -49,107 +51,16 @@ function goBack() {
   else navigate('/explorar');
 }
 
-// ---------- Posts dentro do evento ----------
-
-function EventPostSheet({ eventId, onClose, onCreated }: { eventId: string; onClose: () => void; onCreated: (post: EventPost) => void }) {
-  const [caption, setCaption] = useState('');
-  const [image, setImage] = useState<string | undefined>();
-  const [busy, setBusy] = useState(false);
+/** Menu ⋯ do evento: compartilhar e adicionar à agenda. */
+function EventMenuSheet({ page, onShare, onClose }: { page: EventPage; onShare: () => void; onClose: () => void }) {
   const [message, setMessage] = useState<string | undefined>();
-  const input = useRef<HTMLInputElement>(null);
-
-  async function pick(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    setMessage(undefined);
-    try {
-      setImage(await resizePostPhoto(file));
-    } catch (failure) {
-      setMessage(failure instanceof Error ? failure.message : t('Não foi possível usar essa foto.'));
-    }
-  }
-
-  async function send() {
-    setBusy(true);
-    setMessage(undefined);
-    try {
-      onCreated(await api.createEventPost(eventId, { caption: caption.trim(), ...(image ? { image } : {}) }));
-    } catch (failure) {
-      setMessage(toApiError(failure).message);
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Sheet title={t('Postar no evento')} onClose={onClose}>
-      {message ? <Notice tone="error">{message}</Notice> : null}
-      <Field label={t('Texto')} value={caption} onChange={setCaption} multiline maxLength={EVENT_POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${EVENT_POST_CAPTION_MAX}`} autoFocus />
-      {image ? (
-        <div className="evpost__preview">
-          <img src={image} alt={t('Foto do post')} />
-          <button type="button" className="iconbtn evpost__remove" onClick={() => setImage(undefined)} aria-label={t('Tirar a foto')}>
-            <XIcon />
-          </button>
-        </div>
-      ) : (
-        <Button variant="secondary" full onClick={() => input.current?.click()}>
-          {t('Adicionar foto')}
-        </Button>
-      )}
-      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => void pick(e)} />
-      <Button full loading={busy} disabled={caption.trim() === '' || Array.from(caption).length > EVENT_POST_CAPTION_MAX} onClick={() => void send()}>
-        {t('Postar')}
-      </Button>
-    </Sheet>
-  );
-}
-
-function EventPostCard({ post, onDelete, busy }: { post: EventPost; onDelete: () => void; busy: boolean }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <li className="evpost">
-      <header className="evpost__head">
-        <Link to={`/u/${encodeURIComponent(post.author.username)}`} className="evpost__author">
-          <Avatar profile={post.author} size={32} />
-          <strong>{post.author.username}</strong>
-        </Link>
-        <span className="muted evpost__when">{timeAgo(post.createdAt, new Date())}</span>
-        {post.canDelete ? (
-          <button type="button" className="iconbtn evpost__del" onClick={onDelete} disabled={busy} aria-label={t('Apagar este post do evento')}>
-            <TrashIcon />
-          </button>
-        ) : null}
-      </header>
-      {post.imagePath && !failed ? <img className="evpost__img" src={api.assetUrl(post.imagePath)} alt="" loading="lazy" onError={() => setFailed(true)} /> : null}
-      <p className="evpost__text">{post.caption}</p>
-    </li>
-  );
-}
-
-/** Menu ⋯ do evento: compartilhar e, para o dono, quem pode postar. */
-function EventMenuSheet({ page, onChange, onShare, onClose }: { page: EventPage; onChange: (page: EventPage) => void; onShare: () => void; onClose: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | undefined>();
-
-  async function choose(value: boolean) {
-    if (value === page.postsPublic || busy) return;
-    setBusy(true);
-    setMessage(undefined);
-    try {
-      onChange(await api.eventPostsPublic(page.id, value));
-      onClose();
-    } catch (failure) {
-      setMessage(toApiError(failure).message);
-      setBusy(false);
-    }
-  }
 
   return (
     <Sheet title={t('Opções do evento')} onClose={onClose}>
       {message ? <Notice tone="error">{message}</Notice> : null}
+      <div className="sheetactions">
       <Button full variant="secondary" onClick={onShare}>
-        <ShareIcon /> Compartilhar
+        <ShareIcon /> {t('Compartilhar')}
       </Button>
       <Button
         full
@@ -161,89 +72,8 @@ function EventMenuSheet({ page, onChange, onShare, onClose }: { page: EventPage;
       >
         <CalendarIcon /> {t('Adicionar à agenda')}
       </Button>
-      {page.isOwner && page.postsEnabled ? (
-      <>
-      <h3 className="radiolist__title">{t('Quem pode postar')}</h3>
-      <div className="radiolist" role="radiogroup" aria-label={t('Quem pode postar neste evento')}>
-        <label className="radiolist__item">
-          <input type="radio" name="quem-posta" checked={!page.postsPublic} disabled={busy} onChange={() => void choose(false)} />
-          <span>
-            <strong>{t('Só eu')}</strong>
-            <span className="muted radiolist__desc">{t('Todos veem, mas só você publica.')}</span>
-          </span>
-        </label>
-        <label className="radiolist__item">
-          <input type="radio" name="quem-posta" checked={page.postsPublic} disabled={busy} onChange={() => void choose(true)} />
-          <span>
-            <strong>{t('Eu e quem vai')}</strong>
-            <span className="muted radiolist__desc">{t('Quem confirmou presença também publica.')}</span>
-          </span>
-        </label>
       </div>
-      </>
-      ) : null}
     </Sheet>
-  );
-}
-
-function EventPosts({ page, onChange }: { page: EventPage; onChange: (page: EventPage) => void }) {
-  const [composing, setComposing] = useState(false);
-  const [busyId, setBusyId] = useState<string | undefined>();
-  const [message, setMessage] = useState<string | undefined>();
-
-  async function remove(post: EventPost) {
-    setBusyId(post.id);
-    setMessage(undefined);
-    try {
-      await api.deleteEventPost(page.id, post.id);
-      onChange({ ...page, posts: page.posts.filter((p) => p.id !== post.id) });
-    } catch (failure) {
-      setMessage(toApiError(failure).message);
-    } finally {
-      setBusyId(undefined);
-    }
-  }
-
-  return (
-    <section className="evposts" aria-labelledby="evposts-title">
-      <div className="evposts__head">
-        <h2 id="evposts-title" className="evposts__title">
-          {t('Posts do evento')}
-        </h2>
-        {page.canPost ? (
-          <Button small onClick={() => setComposing(true)}>
-            {t('Postar')}
-          </Button>
-        ) : null}
-      </div>
-      {page.isOwner ? (
-        <p className="muted">{page.postsPublic ? t('Você e quem confirmou presença podem postar.') : t('Só você posta neste evento.')} {t('Mude no menu ⋯ do topo.')}</p>
-      ) : page.postsPublic ? (
-        <p className="muted">{page.going ? t('Você confirmou presença: pode postar aqui.') : t('Confirme presença para postar neste evento.')}</p>
-      ) : (
-        <p className="muted">{t('Neste evento só quem organiza posta.')}</p>
-      )}
-      {message ? <Notice tone="error">{message}</Notice> : null}
-      {page.posts.length === 0 ? (
-        <p className="muted">{page.canPost ? t('Nenhum post ainda. Que tal abrir o assunto?') : t('Nenhum post ainda.')}</p>
-      ) : (
-        <ul className="evposts__list">
-          {page.posts.map((post) => (
-            <EventPostCard key={post.id} post={post} busy={busyId === post.id} onDelete={() => void remove(post)} />
-          ))}
-        </ul>
-      )}
-      {composing ? (
-        <EventPostSheet
-          eventId={page.id}
-          onClose={() => setComposing(false)}
-          onCreated={(post) => {
-            setComposing(false);
-            onChange({ ...page, posts: [post, ...page.posts] });
-          }}
-        />
-      ) : null}
-    </section>
   );
 }
 
@@ -279,6 +109,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [posted, setPosted] = useState<boolean | undefined>();
   const [goBusy, setGoBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  const [tab, setTab] = useState<'feed' | 'info'>('feed');
+  const [feedSettings, setFeedSettings] = useState<FeedSettings | undefined>();
+  const search = useSearch();
 
   async function toggleGoing() {
     if (!e) return;
@@ -349,8 +182,22 @@ export function EventScreen({ eventId }: { eventId: string }) {
               <dd className="evstats__main">{e.confirmedCount}</dd>
               <dd className="evstats__sub">{e.confirmedCount === 1 ? 'pessoa' : 'pessoas'}</dd>
             </div>
-            <div className="evstats__cell">
-              <dt>{t('Data')}</dt>
+            <div className="evstats__cell evstats__cell--date">
+              <dt>
+                {t('Data')}
+                <button
+                  type="button"
+                  className="evstats__cal"
+                  aria-label={t('Adicionar à agenda')}
+                  title={t('Adicionar à agenda')}
+                  onClick={() => {
+                    setCalMessage(undefined);
+                    addEventToCalendar(e).catch((failure: unknown) => setCalMessage(failure instanceof Error ? failure.message : t('Não foi possível adicionar à agenda.')));
+                  }}
+                >
+                  <CalendarPlusIcon />
+                </button>
+              </dt>
               <dd className="evstats__main">{date.main}</dd>
               {date.sub ? <dd className="evstats__sub">{date.sub}</dd> : null}
             </div>
@@ -360,18 +207,24 @@ export function EventScreen({ eventId }: { eventId: string }) {
               {time.sub ? <dd className="evstats__sub">{time.sub}</dd> : null}
             </div>
           </dl>
-          <div className="row-actions evcal">
-            <Button
-              small
-              variant="secondary"
-              onClick={() => {
-                setCalMessage(undefined);
-                addEventToCalendar(e).catch((failure: unknown) => setCalMessage(failure instanceof Error ? failure.message : t('Não foi possível adicionar à agenda.')));
-              }}
-            >
-              <CalendarIcon /> {t('Adicionar à agenda')}
-            </Button>
-          </div>
+          <nav className="quickacts" aria-label={t('Ações rápidas do evento')}>
+            {e.venue.lat !== null && e.venue.lng !== null ? (
+              <OpenInMaps className="quickacts__btn" mode="route" lat={e.venue.lat} lng={e.venue.lng} label={e.venue.name}>
+                <span className="quickacts__icon" aria-hidden="true"><RouteIcon /></span>
+                <span className="quickacts__label">{t('Rota')}</span>
+              </OpenInMaps>
+            ) : null}
+            {e.venue.name || e.venue.address || e.venue.lat !== null ? (
+              <OpenInMaps className="quickacts__btn" lat={e.venue.lat} lng={e.venue.lng} label={e.venue.name} address={e.venue.address}>
+                <span className="quickacts__icon" aria-hidden="true"><MapIcon /></span>
+                <span className="quickacts__label">{t('Mapa')}</span>
+              </OpenInMaps>
+            ) : null}
+            <button type="button" className="quickacts__btn" onClick={() => setSharing(true)}>
+              <span className="quickacts__icon" aria-hidden="true"><ShareIcon /></span>
+              <span className="quickacts__label">{t('Compartilhar')}</span>
+            </button>
+          </nav>
           {calMessage ? <Notice tone="error">{calMessage}</Notice> : null}
 
           <section className="evgoing" aria-label={t('Quem confirmou')}>
@@ -438,54 +291,108 @@ export function EventScreen({ eventId }: { eventId: string }) {
             {problem ? <Notice tone="error">{problem}</Notice> : null}
           </section>
 
-          <div className="sugcard__tags">
-            <span className="tag tag--event">{kindLabel(e.kind)}</span>
-            {e.isFree ? <span className="tag tag--free">{t('Grátis')}</span> : null}
-            {e.sample ? <SampleBadge /> : null}
-            {e.distanceM !== null ? <span className="muted">{t('a {distance} de você', { distance: formatDistance(e.distanceM) })}</span> : null}
+          <div className="segtabs segtabs--fill evtabs" role="tablist" aria-label={t('Seções do evento')}>
+            <button type="button" role="tab" aria-selected={tab === 'feed'} className="segtabs__tab" onClick={() => setTab('feed')}>
+              {t('Publicações')}
+            </button>
+            <button type="button" role="tab" aria-selected={tab === 'info'} className="segtabs__tab" onClick={() => setTab('info')}>
+              {t('Informações')}
+            </button>
           </div>
-          {e.owner ? (
-            <p className="muted">
-              Organizado por{' '}
-              <Link to={`/u/${encodeURIComponent(e.owner.username)}`}>
-                <strong>{e.owner.username}</strong>
-              </Link>
-            </p>
-          ) : null}
-          {e.description ? <p className="eventpage__text">{e.description}</p> : null}
-          {e.tags.length > 0 ? (
-            <ul className="tagchips">
-              {e.tags.map((t) => (
-                <li key={t}>
-                  <button type="button" className="fchip" onClick={() => navigate(`/explorar?q=${encodeURIComponent(`#${t}`)}`)}>
-                    #{t}
+
+          {tab === 'feed' ? (
+            <Feed
+              where="events"
+              targetId={e.id}
+              openPostId={search.get('post')}
+              openPending={search.get('pendentes') === '1'}
+              onSettings={setFeedSettings}
+              intro={
+                <div className="feedintro">
+                  {e.description ? <p className="feedintro__text">{e.description}</p> : null}
+                  <ul className="feedintro__facts">
+                    <li>
+                      <CalendarIcon /> {date.main}
+                      {date.sub ? ` · ${date.sub}` : ''} · {time.main}
+                    </li>
+                    {e.venue.name || e.venue.address ? (
+                      <li>
+                        <LocationIcon /> {venueLine(e.venue)}
+                      </li>
+                    ) : null}
+                    {e.owner ? (
+                      <li>
+                        <UserIcon /> {t('Organizado por')}{' '}
+                        <Link to={`/u/${encodeURIComponent(e.owner.username)}`}>
+                          <strong>{e.owner.username}</strong>
+                        </Link>
+                      </li>
+                    ) : null}
+                  </ul>
+                  <button type="button" className="linkbtn" onClick={() => setTab('info')}>
+                    {t('Ver todas as informações')}
                   </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {e.postsEnabled ? <EventPosts page={e} onChange={setFresh} /> : null}
-
-          <div className="evactions">
-            {e.source === 'PLACE' && !ended && e.isOwner ? (
-              <Button full variant="secondary" onClick={() => setPlanning(true)}>
-                {MEETUP_ACTION_LABEL}
-              </Button>
-            ) : null}
-            <div className="sugcard__actions">
-              {e.venue.lat !== null && e.venue.lng !== null ? (
-                <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={e.venue.lat} lng={e.venue.lng} label={e.venue.name}>
-                  {t('Rota até lá')}
-                </OpenInMaps>
+                </div>
+              }
+            />
+          ) : (
+            <section className="evinfo" aria-label={t('Informações do evento')}>
+              <div className="sugcard__tags">
+                <span className="tag tag--event">{kindLabel(e.kind)}</span>
+                {e.isFree ? <span className="tag tag--free">{t('Grátis')}</span> : null}
+                {e.sample ? <SampleBadge /> : null}
+                {e.distanceM !== null ? <span className="muted">{t('a {distance} de você', { distance: formatDistance(e.distanceM) })}</span> : null}
+              </div>
+              {e.owner ? (
+                <p className="muted">
+                  Organizado por{' '}
+                  <Link to={`/u/${encodeURIComponent(e.owner.username)}`}>
+                    <strong>{e.owner.username}</strong>
+                  </Link>
+                </p>
               ) : null}
-              {e.venue.name || e.venue.address || e.venue.lat !== null ? (
-                <OpenInMaps className="btn btn--quiet btn--small" lat={e.venue.lat} lng={e.venue.lng} label={e.venue.name} address={e.venue.address}>
-                  {t('Mapa')}
-                </OpenInMaps>
+              {e.description ? <p className="eventpage__text">{e.description}</p> : null}
+              {e.tags.length > 0 ? (
+                <ul className="tagchips">
+                  {e.tags.map((t) => (
+                    <li key={t}>
+                      <button type="button" className="fchip" onClick={() => navigate(`/explorar?q=${encodeURIComponent(`#${t}`)}`)}>
+                        #{t}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
-            </div>
-          </div>
+              <div className="evinfo__block">
+                <h2 className="evinfo__title">{t('Quando')}</h2>
+                <p>
+                  {date.main}
+                  {date.sub ? ` · ${date.sub}` : ''} · {time.main}
+                  {time.sub ? ` ${time.sub}` : ''}
+                </p>
+
+              </div>
+              {e.venue.name || e.venue.address ? (
+                <div className="evinfo__block">
+                  <h2 className="evinfo__title">{t('Onde')}</h2>
+                  <p>{venueLine(e.venue)}</p>
+                </div>
+              ) : null}
+              {e.source === 'PLACE' && !ended && e.isOwner ? (
+                <div className="evactions">
+                  <Button full variant="secondary" onClick={() => setPlanning(true)}>
+                    {MEETUP_ACTION_LABEL}
+                  </Button>
+                </div>
+              ) : null}
+              {feedSettings ? (
+                <div className="evinfo__block">
+                  <h2 className="evinfo__title">{t('Publicações')}</h2>
+                  <p className="muted">{policyNote(feedSettings)}</p>
+                </div>
+              ) : null}
+            </section>
+          )}
         </article>
       ) : null}
       {sharing && e ? (
@@ -500,7 +407,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
           onClose={() => setSharing(false)}
         />
       ) : null}
-      {menu && e ? <EventMenuSheet page={e} onChange={setFresh} onShare={() => { setMenu(false); setSharing(true); }} onClose={() => setMenu(false)} /> : null}
+      {menu && e ? <EventMenuSheet page={e} onShare={() => { setMenu(false); setSharing(true); }} onClose={() => setMenu(false)} /> : null}
       {creatingStory && e ? (
         <StoryCreateSheet
           eventId={e.id}

@@ -1,4 +1,4 @@
-import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventPostRecord, EventRef, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -739,12 +739,6 @@ export interface EventRoomRepository {
   listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date }[]>;
   /** Marca que o lembrete de começo deste evento já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
   markReminded(ref: EventRef, userId: string, at: Date): Promise<boolean>;
-  addPost(post: EventPostRecord): Promise<void>;
-  /** Mais recentes primeiro, sem os bytes da foto. */
-  listPosts(eventId: string, page: Page): Promise<(Omit<EventPostRecord, 'data'> & { hasImage: boolean })[]>;
-  findPost(id: string): Promise<(Omit<EventPostRecord, 'data'> & { hasImage: boolean }) | undefined>;
-  deletePost(id: string): Promise<void>;
-  findPostImage(id: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
   addStory(story: EventStoryRecord): Promise<void>;
   /** Stories ainda no ar (`expiresAt` depois de `now`) do evento, do mais antigo ao mais novo, sem os bytes. */
   listStories(ref: EventRef, now: Date): Promise<EventStoryMeta[]>;
@@ -761,8 +755,36 @@ export interface EventRoomRepository {
   setStoryHidden(record: StoryHiddenRecord): Promise<void>;
   /** As ocultações de stories em que `userId` aparece (as que ele escolheu e as que escolheram sobre ele). */
   listStoryHidden(userId: string): Promise<StoryHiddenRecord[]>;
-  /** Liga/desliga a publicação aberta. Só o dono. Devolve false se o evento não existe ou é de outra pessoa. */
-  setPostsPublic(postId: string, ownerId: string, value: boolean): Promise<boolean>;
+}
+
+/** Feed dos eventos e dos rolês: publicações, fotos, comentários e reações. */
+export interface FeedRepository {
+  /** Quem pode publicar no alvo. Sem alvo conhecido: OWNER_ONLY. */
+  getPolicy(target: FeedTarget): Promise<FeedPolicy>;
+  /** Devolve false se o alvo não existe. */
+  setPolicy(target: FeedTarget, policy: FeedPolicy): Promise<boolean>;
+  createPost(post: FeedPostRecord, images: FeedImageInput[]): Promise<void>;
+  findPost(id: string): Promise<FeedPostWithImages | undefined>;
+  /** Do mais recente ao mais antigo; com `before`, só os que vêm depois dele na lista. */
+  listPosts(target: FeedTarget, query: { status: FeedPostStatus; before?: FeedCursor; limit: number }): Promise<FeedPostWithImages[]>;
+  countPosts(target: FeedTarget, status: FeedPostStatus): Promise<number>;
+  /** Publica uma pendente. Devolve false se ela não está mais pendente. */
+  approvePost(id: string, at: Date): Promise<boolean>;
+  deletePost(id: string): Promise<boolean>;
+  findImage(id: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+  /** Uma reação por pessoa: reagir de novo troca o emoji. */
+  setReaction(postId: string, userId: string, emoji: string, at: Date): Promise<void>;
+  removeReaction(postId: string, userId: string): Promise<void>;
+  reactionStats(postIds: string[], viewerId: string): Promise<FeedReactionStats[]>;
+  commentCounts(postIds: string[]): Promise<Map<string, number>>;
+  addComment(comment: FeedCommentRecord): Promise<void>;
+  findComment(id: string): Promise<FeedCommentRecord | undefined>;
+  /** Do mais antigo ao mais novo; com `after`, só os que vêm depois dele. */
+  listComments(postId: string, query: { after?: FeedCursor; limit: number }): Promise<FeedCommentRecord[]>;
+  deleteComment(id: string): Promise<boolean>;
+  setCommentReaction(commentId: string, userId: string, emoji: string, at: Date): Promise<void>;
+  removeCommentReaction(commentId: string, userId: string): Promise<void>;
+  commentReactionStats(commentIds: string[], viewerId: string): Promise<FeedReactionStats[]>;
 }
 
 export interface CoreDeps {
@@ -778,6 +800,7 @@ export interface CoreDeps {
   profileEvents: ProfileEventRepository;
   posts: PostRepository;
   eventRoom: EventRoomRepository;
+  feed: FeedRepository;
   places: PlaceRepository;
   claims: VenueClaimRepository;
   calendars: CalendarRepository;
