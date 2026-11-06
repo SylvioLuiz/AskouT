@@ -2053,4 +2053,13 @@ export const ES: Readonly<Record<string, string>> = {
   "Dia anterior": "Día anterior",
   "Próximo dia": "Día siguiente",
   "Próximo evento": "Próximo evento",
+  "Filtrar notificações": "Filtrar notificaciones",
+  "Todas": "Todas",
+  "Menções": "Menciones",
+  "Curtidas": "Me gusta",
+  "Seguidores": "Seguidores",
+  "Convites": "Invitaciones",
+  "Eventos": "Eventos",
+  "Mensagens": "Mensajes",
+  "Nada por aqui neste filtro.": "No hay nada en este filtro.",
 };

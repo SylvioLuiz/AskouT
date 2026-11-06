@@ -680,8 +680,8 @@ export interface IdGenerator {
 
 export interface NotificationRepository {
   create(record: NotificationRecord): Promise<void>;
-  /** Mais recentes primeiro. */
-  listForUser(userId: string, limit: number): Promise<NotificationRecord[]>;
+  /** Mais recentes primeiro. Com `filter`, só os avisos que casam com alguma cláusula (chips da tela de notificações). */
+  listForUser(userId: string, limit: number, filter?: import('./notification-categories.ts').NotificationFilter): Promise<NotificationRecord[]>;
   unreadCount(userId: string): Promise<number>;
   /** Já existe aviso não lido com essa chave? */
   hasUnread(userId: string, dedupeKey: string): Promise<boolean>;

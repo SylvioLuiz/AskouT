@@ -2169,4 +2169,11 @@ export const EN: Readonly<Record<string, string>> = {
   "Dia anterior": "Previous day",
   "Próximo dia": "Next day",
   "Próximo evento": "Next event",
+  "Filtrar notificações": "Filter notifications",
+  "Menções": "Mentions",
+  "Curtidas": "Likes",
+  "Seguidores": "Followers",
+  "Convites": "Invites",
+  "Mensagens": "Messages",
+  "Nada por aqui neste filtro.": "Nothing here for this filter.",
 };

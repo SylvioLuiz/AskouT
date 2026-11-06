@@ -1,4 +1,5 @@
 import { conflict, validationError } from './errors.ts';
+import { isNotificationCategory, notificationFilter } from './notification-categories.ts';
 import type { Clock, ConversationRepository, IdGenerator, MeetupRepository, Notifier, NotificationRepository, PostRepository, PushSender, PushSubscriptionRepository, SchedulingRepository, UserRepository } from './ports.ts';
 import type { NotificationMuteSettings, NotificationRecord, NotificationType } from './types.ts';
 
@@ -137,9 +138,16 @@ export class NotificationService {
     this.deps = deps;
   }
 
-  async list(userId: string): Promise<{ items: NotificationView[]; unread: number }> {
+  /**
+   * Os avisos mais recentes. `category` (chips da tela: menções, comentários, curtidas...) filtra no banco, para a
+   * página trazer os 30 mais recentes daquela categoria e não só os que sobraram entre os 30 mais recentes de todos.
+   * `unread` é sempre o total, sem filtro.
+   */
+  async list(userId: string, category: unknown = 'all'): Promise<{ items: NotificationView[]; unread: number }> {
     const { notifications } = this.deps;
-    const [items, unread] = await Promise.all([notifications.listForUser(userId, NOTIFICATIONS_PAGE), notifications.unreadCount(userId)]);
+    const chosen = category === undefined || category === '' ? 'all' : category;
+    if (!isNotificationCategory(chosen)) throw validationError('Dados inválidos', { category: 'Categoria inválida' });
+    const [items, unread] = await Promise.all([notifications.listForUser(userId, NOTIFICATIONS_PAGE, notificationFilter(chosen)), notifications.unreadCount(userId)]);
     const resolved = await Promise.all(items.map((n) => this.actorOf(n).catch(() => null)));
     const actorIds = [...new Set(resolved.filter((id): id is string => typeof id === 'string'))];
     const profiles = actorIds.length > 0 ? await this.deps.users.findProfilesByIds(actorIds) : [];

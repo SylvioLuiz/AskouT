@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Post, Put, Query } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
@@ -13,9 +13,10 @@ export class NotificationsController {
     this.core = core;
   }
 
+  /** `?category=mentions|comments|likes|follows|invites|events|messages` filtra a lista (sem ela, ou `all`, vem tudo). */
   @Get()
-  list(@CurrentActor() actor: Actor) {
-    return this.core.notifications.list(actor.userId);
+  list(@CurrentActor() actor: Actor, @Query() q: { category?: unknown }) {
+    return this.core.notifications.list(actor.userId, q.category);
   }
 
   /** Só a contagem de não lidos (para a bolinha do sino). */

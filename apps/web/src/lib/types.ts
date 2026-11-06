@@ -340,6 +340,9 @@ export interface NotificationList {
   unread: number;
 }
 
+/** Chips da tela de notificações. O servidor filtra (`GET /notifications?category=`); `all` não filtra. */
+export type NotificationCategory = 'all' | 'mentions' | 'comments' | 'likes' | 'follows' | 'invites' | 'events' | 'messages';
+
 /** Resumo de um evento (cartão na conversa, grade do perfil). */
 export interface EventCard {
   id: string;

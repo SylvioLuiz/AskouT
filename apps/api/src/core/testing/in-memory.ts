@@ -48,6 +48,7 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
+import { matchesNotificationFilter, type NotificationFilter } from '../notification-categories.ts';
 import type {
   DirectActivityRow,
   DwellRecord,
@@ -1649,9 +1650,9 @@ export class InMemoryNotificationRepository implements NotificationRepository {
     this.rows.push({ ...record });
   }
 
-  async listForUser(userId: string, limit: number): Promise<NotificationRecord[]> {
+  async listForUser(userId: string, limit: number, filter?: NotificationFilter): Promise<NotificationRecord[]> {
     return this.rows
-      .filter((n) => n.userId === userId)
+      .filter((n) => n.userId === userId && matchesNotificationFilter(n, filter))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
       .slice(0, limit)
       .map((n) => ({ ...n }));

@@ -3254,6 +3254,10 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 .newsrow { align-items: center; }
 .newsrow__dot { margin-top: 0; }
 .newshead--end { justify-content: flex-end; }
+/* Chips de filtro das notificações: uma linha só, rolando de lado (a página nunca rola na horizontal). */
+.newsfilters { display: flex; flex-wrap: nowrap; gap: 8px; min-width: 0; max-width: 100%; margin: 12px 0 4px; padding: 2px 0 6px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.newsfilters::-webkit-scrollbar { display: none; }
+.newsfilters__chip { flex: none; min-height: 36px; padding: 0 14px; font-size: 0.875rem; white-space: nowrap; }
 /* Foto de quem causou o aviso com selo da categoria (ou só o ícone, nos avisos do sistema). */
 .newsmedia { position: relative; flex: none; width: 44px; height: 44px; }
 .newsmedia .avatarflash__bolt { display: none; }

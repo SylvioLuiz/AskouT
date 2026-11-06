@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
+import type { NotificationFilter } from '../../core/notification-categories.ts';
 import type { NotificationRepository, PushSubscriptionRepository } from '../../core/ports.ts';
 import type { NotificationMuteSettings, NotificationRecord, NotificationType, PushSubscriptionRecord } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
@@ -23,9 +24,13 @@ export class PrismaNotificationRepository implements NotificationRepository {
     await this.prisma.notification.create({ data: { id: record.id, userId: record.userId, type: record.type, payload: payload as unknown as Prisma.InputJsonObject, readAt: record.readAt, createdAt: record.createdAt } });
   }
 
-  async listForUser(userId: string, limit: number): Promise<NotificationRecord[]> {
+  async listForUser(userId: string, limit: number, filter?: NotificationFilter): Promise<NotificationRecord[]> {
     if (!isUuid(userId)) return [];
-    const rows = await this.prisma.notification.findMany({ where: { userId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit });
+    const where: Prisma.NotificationWhereInput = { userId };
+    if (filter) {
+      where.OR = filter.map((c) => (c.dedupePrefix === undefined ? { type: { in: c.types } } : { type: { in: c.types }, payload: { path: ['dedupeKey'], string_starts_with: c.dedupePrefix } }));
+    }
+    const rows = await this.prisma.notification.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit });
     return rows.map((r) => {
       const p = r.payload as unknown as Payload;
       return { id: r.id, userId: r.userId, type: r.type as NotificationType, title: p.title, body: p.body, url: p.url, dedupeKey: p.dedupeKey ?? null, actorId: typeof p.actorId === 'string' ? p.actorId : null, readAt: r.readAt, createdAt: r.createdAt };
