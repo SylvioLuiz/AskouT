@@ -4,6 +4,7 @@ import { Sheet } from './agenda.tsx';
 import { Carousel } from './post.tsx';
 import { PhotoViewer } from './photo-viewer.tsx';
 import { ArrowUpIcon, CommentIcon, MoreIcon, PhotoIcon, TrashIcon, XIcon } from './icons.tsx';
+import { ReasonSheet } from './post-actions.tsx';
 import { VenueLogo } from './venue-logo.tsx';
 import { Avatar, Button, Confirm, ErrorState, Field, Loading, Notice } from './ui.tsx';
 import { api } from '../client.ts';
@@ -138,6 +139,7 @@ function asImages(post: FeedPost): PostImage[] {
 function FeedPostCard({ post, onChange, onGone, onComments, onApprove, onReject }: { post: FeedPost; onChange: (post: FeedPost) => void; onGone: (id: string) => void; onComments: () => void; onApprove?: () => void; onReject?: () => void }) {
   const [menu, setMenu] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [viewing, setViewing] = useState<number | undefined>();
@@ -190,7 +192,7 @@ function FeedPostCard({ post, onChange, onGone, onComments, onApprove, onReject 
         )}
         {post.kind === 'NOTICE' ? <span className="feedpost__badge">{t('Aviso')}</span> : null}
         {!published ? <span className="feedpost__badge feedpost__badge--wait">{t('Aguardando aprovação')}</span> : null}
-        {post.canDelete ? (
+        {post.canDelete || post.canReport ? (
           <button type="button" className="iconbtn post__more" onClick={() => setMenu(true)} aria-label={t('Mais opções da publicação')} aria-haspopup="dialog">
             <MoreIcon />
           </button>
@@ -238,15 +240,37 @@ function FeedPostCard({ post, onChange, onGone, onComments, onApprove, onReject 
             <Confirm danger question={t('Apagar esta publicação? As fotos, reações e comentários saem junto.')} confirmLabel={t('Apagar')} busy={busy} onCancel={() => setConfirming(false)} onConfirm={() => void remove()} />
           ) : (
             <ul className="sharelist">
-              <li>
-                <button type="button" className="sharelist__item sharelist__item--danger" onClick={() => setConfirming(true)}>
-                  <strong>{t('Apagar')}</strong>
-                  <span>{post.mine ? t('Tira a sua publicação do feed.') : t('Como quem organiza, você pode tirar esta publicação do feed.')}</span>
-                </button>
-              </li>
+              {post.canDelete ? (
+                <li>
+                  <button type="button" className="sharelist__item sharelist__item--danger" onClick={() => setConfirming(true)}>
+                    <strong>{t('Apagar')}</strong>
+                    <span>{post.mine ? t('Tira a sua publicação do feed.') : t('Como quem organiza, você pode tirar esta publicação do feed.')}</span>
+                  </button>
+                </li>
+              ) : null}
+              {post.canReport ? (
+                <li>
+                  <button type="button" className="sharelist__item sharelist__item--danger" onClick={() => { setMenu(false); setReporting(true); }}>
+                    <strong>{t('Denunciar')}</strong>
+                    <span>{t('Conteúdo que não deveria estar aqui.')}</span>
+                  </button>
+                </li>
+              ) : null}
             </ul>
           )}
         </Sheet>
+      ) : null}
+      {reporting ? (
+        <ReasonSheet
+          title={t('Denunciar publicação')}
+          doneText={t('Obrigado por avisar. A equipe vai analisar, e você não verá mais esta publicação.')}
+          submit={(reason, details) => api.reportFeedPost(post.id, reason, details)}
+          onClose={() => setReporting(false)}
+          onDone={() => {
+            setReporting(false);
+            onGone(post.id);
+          }}
+        />
       ) : null}
     </article>
   );
@@ -417,7 +441,69 @@ function PendingSheet({ where, targetId, onClose, onApproved, onCountChange }: {
 
 // ---------- Comentários ----------
 
-function CommentRow({ comment, onChange, onDelete }: { comment: FeedComment; onChange: (c: FeedComment) => void; onDelete: () => void }) {
+/** Quanto arrastar para o lado para deixar o "Apagar" à mostra, e quanto tempo segurar para abrir as opções. */
+const SWIPE_OPEN = 80;
+const LONG_PRESS_MS = 450;
+
+/**
+ * Um comentário. Segurar (ou clique direito) abre as opções (apagar, denunciar); arrastar para a esquerda mostra o
+ * "Apagar" para quem pode apagar. Um botão escondido abre as mesmas opções pelo teclado e leitor de tela.
+ */
+function CommentRow({ comment, onChange, onDelete, onMenu }: { comment: FeedComment; onChange: (c: FeedComment) => void; onDelete: () => void; onMenu: () => void }) {
+  const [shift, setShift] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const gesture = useRef<{ x: number; y: number; id: number; base: number; mode: 'wait' | 'swipe' | 'scroll' } | undefined>(undefined);
+  const timer = useRef<number | undefined>(undefined);
+  const pressed = useRef(false);
+  const hasMenu = comment.canDelete || comment.canReport;
+
+  function clearTimer() {
+    if (timer.current !== undefined) window.clearTimeout(timer.current);
+    timer.current = undefined;
+  }
+  useEffect(() => clearTimer, []);
+
+  function down(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if ((event.target as HTMLElement).closest('.react')) return;
+    pressed.current = false;
+    gesture.current = { x: event.clientX, y: event.clientY, id: event.pointerId, base: shift, mode: 'wait' };
+    if (hasMenu) {
+      timer.current = window.setTimeout(() => {
+        pressed.current = true;
+        gesture.current = undefined;
+        setShift(0);
+        if ('vibrate' in navigator) navigator.vibrate?.(10);
+        onMenu();
+      }, LONG_PRESS_MS);
+    }
+  }
+  function move(event: React.PointerEvent<HTMLDivElement>) {
+    const g = gesture.current;
+    if (!g || g.id !== event.pointerId) return;
+    const dx = event.clientX - g.x;
+    const dy = event.clientY - g.y;
+    if (g.mode === 'wait') {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      clearTimer();
+      if (!comment.canDelete || Math.abs(dy) > Math.abs(dx)) {
+        g.mode = 'scroll';
+        return;
+      }
+      g.mode = 'swipe';
+      setDragging(true);
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    if (g.mode === 'swipe') setShift(Math.max(-SWIPE_OPEN - 24, Math.min(0, g.base + dx)));
+  }
+  function up() {
+    clearTimer();
+    const g = gesture.current;
+    gesture.current = undefined;
+    setDragging(false);
+    if (g?.mode === 'swipe') setShift((s) => (s < -SWIPE_OPEN / 2 ? -SWIPE_OPEN : 0));
+  }
+
   async function react(emoji: string | null) {
     const before = comment.reactions;
     onChange({ ...comment, reactions: applyReaction(before, emoji) });
@@ -428,26 +514,56 @@ function CommentRow({ comment, onChange, onDelete }: { comment: FeedComment; onC
     }
   }
   return (
-    <li className="comment feedcomment">
-      <Link to={`/u/${encodeURIComponent(comment.author.username)}`} aria-label={t('Perfil de {username}', { username: comment.author.username })}>
-        <Avatar profile={comment.author} size={32} />
-      </Link>
-      <div className="comment__body">
-        <div className="feedcomment__bubble">
-          <Link to={`/u/${encodeURIComponent(comment.author.username)}`} className="comment__name">
-            {comment.author.username}
-          </Link>
-          <RichText body={comment.body} mentions={comment.mentions} className="comment__text" />
-        </div>
-        <div className="feedcomment__meta">
-          <span className="muted">{timeAgo(comment.createdAt, new Date())}</span>
-          <ReactButton small reactions={comment.reactions} onReact={(emoji) => void react(emoji)} />
-          <ReactionSummary reactions={comment.reactions} />
-          {comment.canDelete ? (
-            <button type="button" className="comment__del" onClick={onDelete} aria-label={t('Apagar comentário')}>
-              <TrashIcon />
-            </button>
-          ) : null}
+    <li className="feedcomment__row">
+      {comment.canDelete ? (
+        <button type="button" className="feedcomment__swipedel" onClick={onDelete} tabIndex={shift < 0 ? 0 : -1} aria-hidden={shift < 0 ? undefined : true}>
+          <TrashIcon />
+          <span>{t('Apagar')}</span>
+        </button>
+      ) : null}
+      <div
+        className={`comment feedcomment${dragging ? ' feedcomment--dragging' : ''}`}
+        style={shift ? { transform: `translateX(${shift}px)` } : undefined}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+        onContextMenu={(event) => {
+          if (!hasMenu) return;
+          event.preventDefault();
+          clearTimer();
+          onMenu();
+        }}
+        onClickCapture={(event) => {
+          // O toque que abriu as opções (ou fechou o "Apagar") não abre o perfil.
+          if (pressed.current || shift !== 0) {
+            event.preventDefault();
+            event.stopPropagation();
+            pressed.current = false;
+            if (shift !== 0) setShift(0);
+          }
+        }}
+      >
+        <Link to={`/u/${encodeURIComponent(comment.author.username)}`} aria-label={t('Perfil de {username}', { username: comment.author.username })} draggable={false}>
+          <Avatar profile={comment.author} size={32} />
+        </Link>
+        <div className="comment__body">
+          <div className="feedcomment__bubble">
+            <Link to={`/u/${encodeURIComponent(comment.author.username)}`} className="comment__name" draggable={false}>
+              {comment.author.username}
+            </Link>
+            <RichText body={comment.body} mentions={comment.mentions} className="comment__text" />
+          </div>
+          <div className="feedcomment__meta">
+            <span className="muted feedcomment__when">{timeAgo(comment.createdAt, new Date())}</span>
+            <ReactButton small reactions={comment.reactions} onReact={(emoji) => void react(emoji)} />
+            <ReactionSummary reactions={comment.reactions} />
+            {hasMenu ? (
+              <button type="button" className="visually-hidden" onClick={onMenu}>
+                {t('Opções do comentário de {username}', { username: comment.author.username })}
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </li>
@@ -461,6 +577,9 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
   const [error, setError] = useState<string | undefined>();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
+  const [menuFor, setMenuFor] = useState<FeedComment | undefined>();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [reporting, setReporting] = useState<FeedComment | undefined>();
   const endRef = useRef<HTMLDivElement>(null);
   const { people } = useMentionPeople(text);
 
@@ -512,12 +631,78 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
 
   return (
     <Sheet title={t('Comentários')} onClose={onClose}>
+      {menuFor ? (
+        <Sheet title={t('Opções do comentário')} onClose={() => setMenuFor(undefined)}>
+          {confirmDelete ? (
+            <Confirm
+              danger
+              question={t('Apagar este comentário?')}
+              confirmLabel={t('Apagar')}
+              onCancel={() => setConfirmDelete(false)}
+              onConfirm={() => {
+                const target = menuFor;
+                setMenuFor(undefined);
+                void remove(target);
+              }}
+            />
+          ) : (
+            <ul className="sharelist">
+              {menuFor.canDelete ? (
+                <li>
+                  <button type="button" className="sharelist__item sharelist__item--danger" onClick={() => setConfirmDelete(true)}>
+                    <strong>{t('Apagar')}</strong>
+                    <span>{menuFor.mine ? t('Tira o seu comentário.') : t('Você pode tirar este comentário da publicação.')}</span>
+                  </button>
+                </li>
+              ) : null}
+              {menuFor.canReport ? (
+                <li>
+                  <button
+                    type="button"
+                    className="sharelist__item sharelist__item--danger"
+                    onClick={() => {
+                      setReporting(menuFor);
+                      setMenuFor(undefined);
+                    }}
+                  >
+                    <strong>{t('Denunciar')}</strong>
+                    <span>{t('Comentário que não deveria estar aqui.')}</span>
+                  </button>
+                </li>
+              ) : null}
+            </ul>
+          )}
+        </Sheet>
+      ) : null}
+      {reporting ? (
+        <ReasonSheet
+          title={t('Denunciar comentário')}
+          doneText={t('Obrigado por avisar. A equipe vai analisar, e você não verá mais este comentário.')}
+          submit={(reason, details) => api.reportFeedComment(reporting.id, reason, details)}
+          onClose={() => setReporting(undefined)}
+          onDone={() => {
+            const gone = reporting;
+            setReporting(undefined);
+            setItems((current) => current.filter((c) => c.id !== gone.id));
+            onCountChange(-1);
+          }}
+        />
+      ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
       {!loaded ? <Loading /> : null}
       {loaded && items.length === 0 && !error ? <p className="comments__empty">{t('Ainda não há nenhum comentário.')}</p> : null}
       <ul className="comments">
         {items.map((c) => (
-          <CommentRow key={c.id} comment={c} onChange={(next) => setItems((current) => current.map((x) => (x.id === next.id ? next : x)))} onDelete={() => void remove(c)} />
+          <CommentRow
+            key={c.id}
+            comment={c}
+            onChange={(next) => setItems((current) => current.map((x) => (x.id === next.id ? next : x)))}
+            onDelete={() => void remove(c)}
+            onMenu={() => {
+              setConfirmDelete(false);
+              setMenuFor(c);
+            }}
+          />
         ))}
       </ul>
       {cursor ? (

@@ -3,6 +3,8 @@ export function reportKind(method: string, path: string): string | undefined {
   if (method !== 'POST') return undefined;
   const p = path.split('?')[0]!.replace(/\/+$/, '');
   if (!p.endsWith('/report')) return undefined;
+  if (/\/feed\/comments\/[^/]+\/report$/.test(p)) return 'comentário do feed';
+  if (/\/feed\/posts\/[^/]+\/report$/.test(p)) return 'publicação do feed';
   if (/\/comments\/[^/]+\/report$/.test(p)) return 'comentário';
   if (/\/stories\/[^/]+\/report$/.test(p)) return 'story de evento';
   if (/\/posts\/[^/]+\/report$/.test(p)) return 'post';

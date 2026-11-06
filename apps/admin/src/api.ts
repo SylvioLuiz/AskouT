@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -141,8 +141,22 @@ export const api = {
   resolveUserReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/users/${encodeURIComponent(id)}/resolve`, { resolution, note }),
   resolveConversationReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/conversations/${encodeURIComponent(id)}/resolve`, { resolution, note }),
 
+  feedPosts: (p: { q: string; status?: 'pending' | 'published'; offset: number }) => request<Page<FeedPostRow>>('GET', `/admin/feed/posts${query(p)}`),
+  feedComments: (postId: string) => request<{ items: FeedCommentRow[] }>('GET', `/admin/feed/posts/${encodeURIComponent(postId)}/comments`),
+  deleteFeedPost: (id: string, note: string) => request<unknown>('DELETE', `/admin/feed/posts/${encodeURIComponent(id)}`, { note }),
+  deleteFeedComment: (id: string, note: string) => request<unknown>('DELETE', `/admin/feed/comments/${encodeURIComponent(id)}`, { note }),
+  feedReports: (p: { resolved: boolean; offset: number }) => request<Page<FeedReportRow>>('GET', `/admin/reports/feed${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
+  resolveFeedReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/feed/${encodeURIComponent(id)}/resolve`, { resolution, note }),
+
   audit: (offset: number) => request<Page<AuditRow>>('GET', `/admin/audit${query({ offset })}`),
 };
+
+/** Foto de uma publicação do feed (endereço público, como no app). */
+export const feedImageUrl = (imageId: string) => `${API_BASE}/feed/images/${encodeURIComponent(imageId)}`;
+
+/** Endereço do app para abrir a página de um evento ou rolê. */
+const APP_SITE = ((import.meta.env.VITE_APP_URL as string | undefined) ?? 'https://askout.com.br').replace(/\/+$/, '');
+export const appUrl = (path: string) => `${APP_SITE}${path}`;
 
 /** Endereço público da foto de um post (o id é aleatório, como no app). */
 export const postImageUrl = (imageId: string) => `${API_BASE}/posts/images/${encodeURIComponent(imageId)}`;

@@ -37,6 +37,8 @@ export interface Stats {
   openConversationReports: number;
   openUserReports: number;
   openStoryReports: number;
+  openFeedReports?: number;
+  pendingFeedPosts?: number;
 }
 
 export interface Claim {
@@ -105,6 +107,46 @@ export interface PostReportRow {
   createdAt: string;
   reporter: { id: string; username: string };
   post: PostRow;
+  resolvedAt: string | null;
+  resolution: Resolution | null;
+  resolutionNote: string | null;
+}
+
+/** Publicação do feed de um evento ou rolê. */
+export interface FeedPostRow {
+  id: string;
+  kind: 'POST' | 'NOTICE';
+  status: 'PUBLISHED' | 'PENDING';
+  body: string | null;
+  createdAt: string;
+  author: { id: string; username: string };
+  place: { type: 'PLACE_EVENT' | 'USER_EVENT' | 'VENUE'; id: string; title: string; url: string };
+  imageIds: string[];
+  commentsCount: number;
+  openReportsCount: number;
+}
+
+export interface FeedCommentRow {
+  id: string;
+  postId: string;
+  body: string;
+  createdAt: string;
+  author: { id: string; username: string };
+  openReportsCount: number;
+}
+
+export interface FeedReportRow {
+  id: string;
+  kind: 'POST' | 'COMMENT';
+  reason: ReportReason;
+  details: string | null;
+  evidence: string;
+  createdAt: string;
+  reporter: { id: string; username: string };
+  reported: { id: string; username: string; status: UserStatus };
+  post: FeedPostRow | null;
+  commentId: string | null;
+  commentAlive: boolean;
   resolvedAt: string | null;
   resolution: Resolution | null;
   resolutionNote: string | null;

@@ -5395,8 +5395,17 @@ button.reactlist__row { cursor: pointer; }
 .feedcomment { align-items: flex-start; }
 .feedcomment__bubble { display: inline-block; max-width: 100%; padding: 8px 12px; border-radius: 16px; background: var(--bg); }
 .feedcomment__bubble .comment__name { display: block; font-size: 0.8125rem; font-weight: 700; }
-.feedcomment__meta { display: flex; align-items: center; gap: 6px; padding-left: 8px; font-size: 0.8125rem; }
-.feedcomment__meta .comment__del { width: 32px; height: 32px; }
+.feedcomment__meta { display: flex; align-items: center; gap: 10px; min-height: 30px; padding-left: 12px; font-size: 0.8125rem; line-height: 1; }
+.feedcomment__meta > * { display: inline-flex; align-items: center; }
+.feedcomment__meta .react--small .react__btn { min-height: 30px; padding: 0 4px; font-size: 1rem; line-height: 1; }
+.feedcomment__meta .feedpost__reacts { font-size: 0.8125rem; color: var(--muted); }
+/* Arrastar para a esquerda mostra o "Apagar"; segurar abre as opções. */
+.feedcomment__row { position: relative; overflow: hidden; border-radius: 16px; }
+.feedcomment__row > .feedcomment { position: relative; z-index: 1; background: var(--bg); padding: 2px 0; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; transition: transform 0.2s ease; }
+.feedcomment__row > .feedcomment--dragging { transition: none; }
+.feedcomment__swipedel { position: absolute; inset: 0 0 0 auto; width: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: 0; padding: 0; background: #d92d20; color: #fff; font: inherit; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
+.feedcomment__swipedel svg { width: 20px; height: 20px; }
+@media (prefers-reduced-motion: reduce) { .feedcomment__row > .feedcomment { transition: none; } }
 .evstats__cell--date dt { display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
 .evstats__cal { display: inline-grid; place-items: center; width: 32px; height: 32px; margin: -8px -6px -8px 0; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--brand-text); cursor: pointer; }
 .evstats__cal svg, .evstats__cal .icon { width: 18px; height: 18px; }

@@ -200,3 +200,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tab__count--quiet { background: var(--ok-bg); color: var(--ok); }
 
 .seg { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+
+/* Comentários de uma publicação do feed (página Feed). */
+.feedcomments { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.feedcomments > li { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 5%, transparent); }

@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { FeedRepository } from '../../core/ports.ts';
-import type { FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedTarget } from '../../core/types.ts';
+import type { FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, Page, PostReportReason, ReportResolution } from '../../core/types.ts';
 import { isUuid, onlyUuids } from './helpers.ts';
 
 const postSelect = {
@@ -223,5 +223,109 @@ export class PrismaFeedRepository implements FeedRepository {
       groups.map((g) => ({ id: g.commentId, emoji: g.emoji, count: g._count._all })),
       mine.map((m) => ({ id: m.commentId, emoji: m.emoji })),
     );
+  }
+  // ---------- Denúncias ----------
+
+  private static reportKey(r: { reporterId: string; postId: string; commentId: string | null }): string {
+    return `${r.reporterId}|${r.postId}|${r.commentId ?? ''}`;
+  }
+
+  private static toReport(r: Prisma.FeedReportGetPayload<object>): FeedReportRecord {
+    return {
+      id: r.id, kind: r.kind === 'COMMENT' ? 'COMMENT' : 'POST', postId: r.postId, commentId: r.commentId, reporterId: r.reporterId, reportedUserId: r.reportedUserId,
+      reason: r.reason as PostReportReason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
+      resolvedAt: r.resolvedAt, resolvedBy: r.resolvedBy, resolution: r.resolution as ReportResolution | null, resolutionNote: r.resolutionNote,
+    };
+  }
+
+  async addReport(report: FeedReportRecord): Promise<boolean> {
+    if (!isUuid(report.postId) || !isUuid(report.reporterId) || !isUuid(report.reportedUserId) || (report.commentId !== null && !isUuid(report.commentId))) return false;
+    try {
+      const result = await this.prisma.feedReport.createMany({
+        data: [{
+          id: report.id, dedupeKey: PrismaFeedRepository.reportKey(report), kind: report.kind, postId: report.postId, commentId: report.commentId,
+          reporterId: report.reporterId, reportedUserId: report.reportedUserId, reason: report.reason, details: report.details, evidence: report.evidence, createdAt: report.createdAt,
+        }],
+        skipDuplicates: true,
+      });
+      return result.count > 0;
+    } catch (failure) {
+      // A publicação ou o comentário sumiu entre a leitura e a gravação.
+      if ((failure as { code?: string }).code === 'P2003') return false;
+      throw failure;
+    }
+  }
+
+  async reportedPostIds(userId: string, postIds: string[]): Promise<Set<string>> {
+    const ids = onlyUuids(postIds);
+    if (ids.length === 0 || !isUuid(userId)) return new Set();
+    const rows = await this.prisma.feedReport.findMany({ where: { reporterId: userId, commentId: null, postId: { in: ids } }, select: { postId: true } });
+    return new Set(rows.map((r) => r.postId));
+  }
+
+  async reportedCommentIds(userId: string, commentIds: string[]): Promise<Set<string>> {
+    const ids = onlyUuids(commentIds);
+    if (ids.length === 0 || !isUuid(userId)) return new Set();
+    const rows = await this.prisma.feedReport.findMany({ where: { reporterId: userId, commentId: { in: ids } }, select: { commentId: true } });
+    return new Set(rows.flatMap((r) => (r.commentId ? [r.commentId] : [])));
+  }
+
+  async listReports(open: boolean, page: Page): Promise<FeedReportRecord[]> {
+    const rows = await this.prisma.feedReport.findMany({
+      where: { resolvedAt: open ? null : { not: null } },
+      orderBy: open ? [{ createdAt: 'asc' }, { id: 'asc' }] : [{ resolvedAt: 'desc' }, { id: 'asc' }],
+      skip: page.offset,
+      take: page.limit,
+    });
+    return rows.map(PrismaFeedRepository.toReport);
+  }
+
+  async findReport(id: string): Promise<FeedReportRecord | undefined> {
+    if (!isUuid(id)) return undefined;
+    const row = await this.prisma.feedReport.findUnique({ where: { id } });
+    return row ? PrismaFeedRepository.toReport(row) : undefined;
+  }
+
+  async resolveReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean> {
+    if (!isUuid(id)) return false;
+    const result = await this.prisma.feedReport.updateMany({ where: { id, resolvedAt: null }, data: { resolvedAt: at, resolvedBy: adminId, resolution, resolutionNote: note } });
+    return result.count > 0;
+  }
+
+  async countOpenReports(): Promise<number> {
+    return this.prisma.feedReport.count({ where: { resolvedAt: null } });
+  }
+
+  async openReportCounts(postIds: string[], commentIds: string[]): Promise<{ posts: Map<string, number>; comments: Map<string, number> }> {
+    const posts = new Map<string, number>(postIds.map((id) => [id, 0]));
+    const comments = new Map<string, number>(commentIds.map((id) => [id, 0]));
+    const pIds = onlyUuids(postIds);
+    const cIds = onlyUuids(commentIds);
+    const [byPost, byComment] = await Promise.all([
+      pIds.length ? this.prisma.feedReport.groupBy({ by: ['postId'], where: { resolvedAt: null, commentId: null, postId: { in: pIds } }, _count: { _all: true } }) : Promise.resolve([]),
+      cIds.length ? this.prisma.feedReport.groupBy({ by: ['commentId'], where: { resolvedAt: null, commentId: { in: cIds } }, _count: { _all: true } }) : Promise.resolve([]),
+    ]);
+    for (const g of byPost) posts.set(g.postId, g._count._all);
+    for (const g of byComment) if (g.commentId) comments.set(g.commentId, g._count._all);
+    return { posts, comments };
+  }
+
+  async adminListPosts(query: { status?: FeedPostStatus; text: string; page: Page }): Promise<FeedPostWithImages[]> {
+    const q = query.text.trim();
+    const rows = await this.prisma.feedPost.findMany({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        ...(q ? { OR: [{ body: { contains: q, mode: 'insensitive' } }, { author: { profile: { username: { contains: q.replace(/^@/, ''), mode: 'insensitive' } } } }] } : {}),
+      },
+      select: postSelect,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: query.page.offset,
+      take: query.page.limit,
+    });
+    return rows.map(PrismaFeedRepository.toRecord);
+  }
+
+  async countAllPosts(status: FeedPostStatus): Promise<number> {
+    return this.prisma.feedPost.count({ where: { status } });
   }
 }

@@ -38,7 +38,7 @@ export class PrismaAdminRepository implements AdminRepository {
     this.prisma = prisma;
   }
 
-  async stats(): Promise<AdminStats> {
+  async stats(): Promise<Omit<AdminStats, 'openFeedReports' | 'pendingFeedPosts'>> {
     const p = this.prisma;
     const [users, suspendedUsers, venues, venuesWithOwner, placeEvents, userEvents, posts, pendingClaims, approvedClaims, openPostReports, openConversationReports, openStoryReports, openUserReports] = await Promise.all([
       p.user.count(),
@@ -74,6 +74,7 @@ export class PrismaAdminRepository implements AdminRepository {
       this.prisma.post.groupBy({ by: ['authorId'], where: { authorId: { in: ids } }, _count: { _all: true } }),
       this.prisma.postReport.findMany({ where: { post: { authorId: { in: ids } } }, select: { post: { select: { authorId: true } } } }),
       this.prisma.conversationReport.groupBy({ by: ['reportedUserId'], where: { reportedUserId: { in: ids } }, _count: { _all: true } }),
+      this.prisma.externalIdentity.findMany({ where: { userId: { in: ids } }, select: { userId: true, provider: true } }),
     ]);
     const postsBy = new Map(posts.map((r) => [r.authorId, r._count._all]));
     const reports = new Map<string, number>();

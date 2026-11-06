@@ -438,6 +438,8 @@ export function createApi(deps: ApiDeps) {
     addFeedComment: (postId: string, body: string) => request<FeedComment>('POST', `/feed/posts/${id(postId)}/comments`, { body: { body } }),
     deleteFeedComment: (commentId: string) => request<{ deleted: true }>('DELETE', `/feed/comments/${id(commentId)}`),
     reactFeedComment: (commentId: string, emoji: string | null) => request<FeedReactions>('PUT', `/feed/comments/${id(commentId)}/reaction`, { body: { emoji } }),
+    reportFeedPost: (postId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/feed/posts/${id(postId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+    reportFeedComment: (commentId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/feed/comments/${id(commentId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
 
     // Locais (painel do local)
     myVenues: () => request<MyVenues>('GET', '/me/venues'),

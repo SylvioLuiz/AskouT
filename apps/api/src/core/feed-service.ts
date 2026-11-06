@@ -3,6 +3,7 @@ import { DomainError, forbidden, notFound, validationError } from './errors.ts';
 import type { EventPageService } from './event-page-service.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { extractMentions } from './mentions.ts';
+import { parseReportInput } from './report-input.ts';
 import type { CoreDeps } from './ports.ts';
 import type { FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostKind, FeedPostRecord, FeedPostWithImages, FeedReactionStats, FeedTarget, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
@@ -52,6 +53,8 @@ export interface FeedPostView {
   canDelete: boolean;
   /** Quem modera aprova ou recusa (só nas pendentes). */
   canModerate: boolean;
+  /** Publicação de outra pessoa: dá para denunciar. */
+  canReport: boolean;
   reactions: FeedReactionsView;
   commentCount: number;
   /** Nomes de usuário marcados com @ que existem (a tela só faz link para estes). */
@@ -66,6 +69,8 @@ export interface FeedCommentView {
   createdAt: string;
   mine: boolean;
   canDelete: boolean;
+  /** Comentário de outra pessoa: dá para denunciar. */
+  canReport: boolean;
   reactions: FeedReactionsView;
   mentions: string[];
 }
@@ -281,7 +286,8 @@ export class FeedService {
   /** Monta as publicações para quem vê, sem as de quem tem bloqueio com ele. */
   private async views(viewerId: string, ctx: Ctx, rows: FeedPostWithImages[]): Promise<FeedPostView[]> {
     const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
-    const visible = rows.filter((r) => r.post.authorId === viewerId || !hidden.has(r.post.authorId));
+    const reported = await this.deps.feed.reportedPostIds(viewerId, rows.map((r) => r.post.id));
+    const visible = rows.filter((r) => r.post.authorId === viewerId || (!hidden.has(r.post.authorId) && !reported.has(r.post.id)));
     if (visible.length === 0) return [];
     const ids = visible.map((r) => r.post.id);
     const [profiles, stats, counts, mentions] = await Promise.all([
@@ -310,6 +316,7 @@ export class FeedService {
           mine,
           canDelete: mine || isModerator,
           canModerate: isModerator && post.status === 'PENDING',
+          canReport: !mine,
           reactions: FeedService.reactions(statsById.get(post.id)),
           commentCount: counts.get(post.id) ?? 0,
           mentions: post.body ? (mentions.get(post.body) ?? []) : [],
@@ -426,6 +433,29 @@ export class FeedService {
     return { deleted: true };
   }
 
+  // ---------- Denúncias ----------
+
+  /** Denuncia uma publicação de outra pessoa. Vai para a gestão e quem denunciou deixa de vê-la. Repetir não duplica. */
+  async reportPost(viewerId: string, postId: unknown, reason: unknown, details?: unknown): Promise<{ reported: true }> {
+    const { found } = await this.postFor(viewerId, postId);
+    const post = found.post;
+    if (post.authorId === viewerId) throw forbidden('Esta publicação é sua: apague-a se não quiser mais');
+    const input = parseReportInput(reason, details);
+    const photos = found.imageIds.length > 0 ? `[${found.imageIds.length} foto(s)]` : '';
+    const evidence = [post.body ?? '', photos].filter((x) => x !== '').join('\n');
+    await this.deps.feed.addReport({ id: this.deps.ids.next(), kind: 'POST', postId: post.id, commentId: null, reporterId: viewerId, reportedUserId: post.authorId, reason: input.reason, details: input.details, evidence, createdAt: this.deps.clock.now() });
+    return { reported: true };
+  }
+
+  /** Denuncia um comentário de outra pessoa. Vai para a gestão e quem denunciou deixa de vê-lo. */
+  async reportComment(viewerId: string, commentId: unknown, reason: unknown, details?: unknown): Promise<{ reported: true }> {
+    const { comment } = await this.commentFor(viewerId, commentId);
+    if (comment.authorId === viewerId) throw forbidden('Este comentário é seu: apague-o se não quiser mais');
+    const input = parseReportInput(reason, details);
+    await this.deps.feed.addReport({ id: this.deps.ids.next(), kind: 'COMMENT', postId: comment.postId, commentId: comment.id, reporterId: viewerId, reportedUserId: comment.authorId, reason: input.reason, details: input.details, evidence: comment.body, createdAt: this.deps.clock.now() });
+    return { reported: true };
+  }
+
   /** Foto de uma publicação, para o <img>. Quem tem o endereço (id aleatório) vê, como nas fotos dos posts. */
   async image(imageId: unknown): Promise<{ mime: string; data: Uint8Array } | undefined> {
     const id = shortId(imageId);
@@ -520,7 +550,8 @@ export class FeedService {
 
   private async commentViews(viewerId: string, ctx: Ctx, post: FeedPostRecord, rows: FeedCommentRecord[]): Promise<FeedCommentView[]> {
     const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
-    const visible = rows.filter((r) => r.authorId === viewerId || !hidden.has(r.authorId));
+    const reported = await this.deps.feed.reportedCommentIds(viewerId, rows.map((r) => r.id));
+    const visible = rows.filter((r) => r.authorId === viewerId || (!hidden.has(r.authorId) && !reported.has(r.id)));
     if (visible.length === 0) return [];
     const [profiles, stats, mentions] = await Promise.all([
       this.deps.users.findProfilesByIds([...new Set(visible.map((r) => r.authorId))]),
@@ -542,6 +573,7 @@ export class FeedService {
           createdAt: r.createdAt.toISOString(),
           mine,
           canDelete: mine || post.authorId === viewerId || ctx.moderatorId === viewerId,
+          canReport: !mine,
           reactions: FeedService.reactions(statsById.get(r.id)),
           mentions: mentions.get(r.body) ?? [],
         },

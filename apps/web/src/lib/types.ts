@@ -593,6 +593,8 @@ export interface FeedPost {
   mine: boolean;
   canDelete: boolean;
   canModerate: boolean;
+  /** Publicação de outra pessoa: dá para denunciar. */
+  canReport: boolean;
   reactions: FeedReactions;
   commentCount: number;
   mentions: string[];
@@ -606,6 +608,7 @@ export interface FeedComment {
   createdAt: string;
   mine: boolean;
   canDelete: boolean;
+  canReport: boolean;
   reactions: FeedReactions;
   mentions: string[];
 }

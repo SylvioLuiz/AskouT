@@ -197,6 +197,41 @@ export class AdminController {
     return this.core.admin.resolveConversationReport(actor, id, b.resolution, b.note);
   }
 
+  /** Publicações de todos os feeds de evento e rolê. `?status=pending|published`, `?q=` (texto ou @autor). */
+  @Get('feed/posts')
+  feedPosts(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; status?: unknown; limit?: unknown; offset?: unknown }) {
+    return this.core.admin.feedPosts(actor, q);
+  }
+
+  @Get('feed/posts/:id/comments')
+  feedComments(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.admin.feedComments(actor, id);
+  }
+
+  /** `{note}` (motivo obrigatório) */
+  @Delete('feed/posts/:id')
+  deleteFeedPost(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.admin.deleteFeedPost(actor, id, asBody(body).note);
+  }
+
+  @Delete('feed/comments/:id')
+  deleteFeedComment(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.admin.deleteFeedComment(actor, id, asBody(body).note);
+  }
+
+  @Get('reports/feed')
+  feedReports(@CurrentActor() actor: Actor, @Query() q: { status?: unknown; limit?: unknown; offset?: unknown }) {
+    return this.core.admin.feedReports(actor, q);
+  }
+
+  /** `{resolution: 'DISMISSED'|'ACTIONED', note?}` */
+  @Post('reports/feed/:id/resolve')
+  @HttpCode(200)
+  resolveFeedReport(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.resolveFeedReport(actor, id, b.resolution, b.note);
+  }
+
   @Get('audit')
   audit(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown; offset?: unknown }) {
     return this.core.admin.audit(actor, q);
