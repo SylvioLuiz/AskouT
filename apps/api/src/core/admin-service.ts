@@ -6,7 +6,7 @@ import type { AuthResult, AuthService, LoginInput, SocialLoginInput } from './au
 import type { CoreDeps } from './ports.ts';
 import type { VenueService } from './venue-service.ts';
 import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
-import type { Actor, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
+import type { Actor, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
 import { REPORT_RESOLUTIONS } from './types.ts';
 
 export const ADMIN_PAGE_DEFAULT = 25;
@@ -108,7 +108,8 @@ export class AdminService {
 
   async stats(actor: Actor): Promise<AdminStats> {
     this.assertAdmin(actor);
-    return this.deps.admin.stats();
+    const [base, openFeedReports, pendingFeedPosts] = await Promise.all([this.deps.admin.stats(), this.deps.feed.countOpenReports(), this.deps.feed.countAllPosts('PENDING')]);
+    return { ...base, openFeedReports, pendingFeedPosts };
   }
 
   /** Painel de retenção: bloco "Para você" contra o feed, e quem volta depois de um dia com atividade. */
@@ -360,6 +361,123 @@ export class AdminService {
   private parseResolution(value: unknown): ReportResolution {
     if (typeof value !== 'string' || !(REPORT_RESOLUTIONS as readonly string[]).includes(value)) throw validationError('Decisão inválida', { resolution: 'Use DISMISSED ou ACTIONED' });
     return value as ReportResolution;
+  }
+
+  // ---------- Feed dos eventos e rolês ----------
+
+  /** Nome e caminho da página onde está o feed (o evento ou o rolê). */
+  private async feedPlace(target: FeedTarget): Promise<AdminFeedPlace> {
+    if (target.type === 'PLACE_EVENT') {
+      const found = await this.deps.places.findEvent(target.id);
+      return { type: target.type, id: target.id, title: found ? `${found.event.title} · ${found.venue.name}` : '(evento removido)', url: `/eventos/${target.id}` };
+    }
+    if (target.type === 'USER_EVENT') {
+      const found = await this.deps.posts.findById(target.id);
+      return { type: target.type, id: target.id, title: found?.post.eventTitle ?? '(evento removido)', url: `/eventos/${target.id}` };
+    }
+    const venue = await this.deps.places.findVenue(target.id);
+    return { type: target.type, id: target.id, title: venue?.name ?? '(rolê removido)', url: `/bares/${target.id}` };
+  }
+
+  private async usernames(ids: string[]): Promise<Map<string, string>> {
+    const profiles = await this.deps.users.findProfilesByIds([...new Set(ids)]);
+    return new Map(profiles.map((p) => [p.userId, p.username]));
+  }
+
+  private async feedPostRows(rows: FeedPostWithImages[]): Promise<AdminFeedPostRow[]> {
+    if (rows.length === 0) return [];
+    const ids = rows.map((r) => r.post.id);
+    const [names, comments, reports] = await Promise.all([this.usernames(rows.map((r) => r.post.authorId)), this.deps.feed.commentCounts(ids), this.deps.feed.openReportCounts(ids, [])]);
+    const places = new Map<string, AdminFeedPlace>();
+    const out: AdminFeedPostRow[] = [];
+    for (const { post, imageIds } of rows) {
+      const key = `${post.target.type}:${post.target.id}`;
+      const place = places.get(key) ?? (await this.feedPlace(post.target));
+      places.set(key, place);
+      out.push({
+        id: post.id, kind: post.kind, status: post.status, body: post.body, createdAt: post.createdAt,
+        author: { id: post.authorId, username: names.get(post.authorId) ?? '(removido)' }, place, imageIds,
+        commentsCount: comments.get(post.id) ?? 0, openReportsCount: reports.posts.get(post.id) ?? 0,
+      });
+    }
+    return out;
+  }
+
+  /** Publicações de todos os feeds. `status=pending`: só as que esperam aprovação de quem organiza. */
+  async feedPosts(actor: Actor, query: { q?: unknown; status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminFeedPostRow>> {
+    this.assertAdmin(actor);
+    const text = queryText(query.q);
+    const status: FeedPostStatus | undefined = query.status === 'pending' ? 'PENDING' : query.status === 'published' ? 'PUBLISHED' : undefined;
+    return this.paged(query, async (page) => this.feedPostRows(await this.deps.feed.adminListPosts({ text, page, ...(status ? { status } : {}) })));
+  }
+
+  /** Comentários de uma publicação (do mais antigo ao mais novo), para conferir e apagar. */
+  async feedComments(actor: Actor, postId: unknown): Promise<{ items: AdminFeedCommentRow[] }> {
+    this.assertAdmin(actor);
+    const found = typeof postId === 'string' && postId.length <= 64 ? await this.deps.feed.findPost(postId) : undefined;
+    if (!found) throw notFound('Publicação não encontrada');
+    const rows = await this.deps.feed.listComments(found.post.id, { limit: 500 });
+    const [names, reports] = await Promise.all([this.usernames(rows.map((r) => r.authorId)), this.deps.feed.openReportCounts([], rows.map((r) => r.id))]);
+    return {
+      items: rows.map((c) => ({ id: c.id, postId: c.postId, body: c.body, createdAt: c.createdAt, author: { id: c.authorId, username: names.get(c.authorId) ?? '(removido)' }, openReportsCount: reports.comments.get(c.id) ?? 0 })),
+    };
+  }
+
+  /** Tira uma publicação do feed (com fotos, comentários e denúncias). Motivo obrigatório. */
+  async deleteFeedPost(actor: Actor, postId: unknown, note: unknown): Promise<{ deleted: true }> {
+    this.assertAdmin(actor);
+    const reason = noteText(note, true);
+    if (typeof postId !== 'string' || postId.length > 64 || !(await this.deps.feed.deletePost(postId))) throw notFound('Publicação não encontrada');
+    await this.log(actor.userId, 'FEED_POST_REMOVED', 'FEED_POST', postId, reason);
+    return { deleted: true };
+  }
+
+  /** Tira um comentário do feed (com as denúncias dele). Motivo obrigatório. */
+  async deleteFeedComment(actor: Actor, commentId: unknown, note: unknown): Promise<{ deleted: true }> {
+    this.assertAdmin(actor);
+    const reason = noteText(note, true);
+    if (typeof commentId !== 'string' || commentId.length > 64 || !(await this.deps.feed.deleteComment(commentId))) throw notFound('Comentário não encontrado');
+    await this.log(actor.userId, 'FEED_COMMENT_REMOVED', 'FEED_COMMENT', commentId, reason);
+    return { deleted: true };
+  }
+
+  async feedReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminFeedReportRow>> {
+    this.assertAdmin(actor);
+    const open = query.status !== 'resolved';
+    return this.paged(query, async (page) => {
+      const reports = await this.deps.feed.listReports(open, page);
+      if (reports.length === 0) return [];
+      const postIds = [...new Set(reports.map((r) => r.postId))];
+      const found = (await Promise.all(postIds.map((id) => this.deps.feed.findPost(id)))).flatMap((f) => (f ? [f] : []));
+      const posts = new Map((await this.feedPostRows(found)).map((p) => [p.id, p]));
+      const commentIds = reports.flatMap((r) => (r.commentId ? [r.commentId] : []));
+      const alive = new Set((await Promise.all(commentIds.map((id) => this.deps.feed.findComment(id)))).flatMap((c) => (c ? [c.id] : [])));
+      const people = new Map<string, { username: string; status: UserStatus }>();
+      for (const id of new Set(reports.flatMap((r) => [r.reporterId, r.reportedUserId]))) {
+        const [user, profile] = await Promise.all([this.deps.users.findById(id), this.deps.users.findProfileById(id)]);
+        people.set(id, { username: profile?.username ?? '(removido)', status: user?.status ?? 'ACTIVE' });
+      }
+      return reports.map((r) => ({
+        id: r.id, kind: r.kind, reason: r.reason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
+        reporter: { id: r.reporterId, username: people.get(r.reporterId)?.username ?? '(removido)' },
+        reported: { id: r.reportedUserId, username: people.get(r.reportedUserId)?.username ?? '(removido)', status: people.get(r.reportedUserId)?.status ?? 'ACTIVE' },
+        post: posts.get(r.postId) ?? null,
+        commentId: r.commentId,
+        commentAlive: r.commentId !== null && alive.has(r.commentId),
+        resolvedAt: r.resolvedAt ?? null, resolution: r.resolution ?? null, resolutionNote: r.resolutionNote ?? null,
+      }));
+    });
+  }
+
+  async resolveFeedReport(actor: Actor, reportId: unknown, resolution: unknown, note: unknown): Promise<{ resolved: true }> {
+    this.assertAdmin(actor);
+    const res = this.parseResolution(resolution);
+    const text = noteText(note, false);
+    const report = typeof reportId === 'string' && reportId.length <= 64 ? await this.deps.feed.findReport(reportId) : undefined;
+    if (!report) throw notFound('Denúncia não encontrada');
+    if (!(await this.deps.feed.resolveReport(report.id, actor.userId, res, text, this.deps.clock.now()))) throw conflict('Esta denúncia já foi decidida');
+    await this.log(actor.userId, res === 'DISMISSED' ? 'REPORT_DISMISSED' : 'REPORT_ACTIONED', 'FEED_REPORT', report.id, text);
+    return { resolved: true };
   }
 
   // ---------- Auditoria ----------

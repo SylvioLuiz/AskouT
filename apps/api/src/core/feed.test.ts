@@ -212,3 +212,57 @@ test('evento do local: quem modera é o dono do rolê; aviso chega a quem confir
   assert.deepEqual([got.length, got[0]?.url], [1, `/eventos/e1?post=${notice.id}`]);
   assert.equal((await news(w, caio, 'FEED_NOTICE')).length, 0);
 });
+
+test('denúncias: publicação e comentário vão para a gestão, somem para quem denunciou e a gestão decide ou apaga', async () => {
+  const { w, ana, bia, caio, ev } = await setup();
+  w.users.users.set(caio, { ...w.users.users.get(caio)!, role: 'ADMIN' });
+  const A = { userId: caio, role: 'ADMIN' as const };
+  await w.core.feed.setPolicy(ana, 'event', ev.id, 'OPEN');
+  const post = await w.core.feed.create(bia, 'event', ev.id, { body: 'Compre seguidores aqui', images: [JPEG()] });
+  const keep = await w.core.feed.create(bia, 'event', ev.id, { body: 'Chego às 8' });
+  const comment = await w.core.feed.addComment(bia, keep.id, 'comentário chato');
+  assert.equal(post.canReport, false, 'a própria publicação não se denuncia');
+  assert.equal((await w.core.feed.get(ana, post.id)).canReport, true);
+  await rejectsWith(w.core.feed.reportPost(bia, post.id, 'SPAM'), 'FORBIDDEN');
+  await rejectsWith(w.core.feed.reportPost(ana, post.id, 'NADA'), 'VALIDATION');
+  await rejectsWith(w.core.feed.reportComment(bia, comment.id, 'SPAM'), 'FORBIDDEN');
+
+  assert.deepEqual(await w.core.feed.reportPost(ana, post.id, 'SPAM', ' propaganda '), { reported: true });
+  assert.deepEqual(await w.core.feed.reportPost(ana, post.id, 'SPAM'), { reported: true }, 'repetir não dá erro nem duplica');
+  await w.core.feed.reportComment(ana, comment.id, 'OFFENSIVE');
+  assert.deepEqual((await w.core.feed.list(ana, 'event', ev.id)).items.map((p) => p.id), [keep.id], 'quem denunciou deixa de ver');
+  assert.deepEqual((await w.core.feed.comments(ana, keep.id)).items, []);
+  assert.equal((await w.core.feed.list(bia, 'event', ev.id)).items.length, 2, 'os outros continuam vendo até a gestão decidir');
+
+  const stats = await w.core.admin.stats(A);
+  assert.equal(stats.openFeedReports, 2);
+  const open = await w.core.admin.feedReports(A, {});
+  assert.deepEqual(open.items.map((r) => [r.kind, r.reason, r.reporter.username, r.reported.username]), [['POST', 'SPAM', 'ana', 'bia'], ['COMMENT', 'OFFENSIVE', 'ana', 'bia']]);
+  assert.equal(open.items[0]!.details, 'propaganda');
+  assert.equal(open.items[0]!.evidence, 'Compre seguidores aqui\n[1 foto(s)]');
+  assert.deepEqual([open.items[0]!.post?.place.title, open.items[0]!.post?.place.url, open.items[0]!.post?.openReportsCount], ['Corrida', `/eventos/${ev.id}`, 1]);
+  assert.deepEqual([open.items[1]!.evidence, open.items[1]!.commentAlive, open.items[1]!.post?.id], ['comentário chato', true, keep.id]);
+  await rejectsWith(w.core.admin.feedReports({ userId: ana, role: 'USER' }, {}), 'FORBIDDEN');
+
+  // Comentário: a gestão apaga (motivo obrigatório) e a denúncia sai junto.
+  assert.equal((await w.core.admin.feedComments(A, keep.id)).items[0]!.openReportsCount, 1);
+  await rejectsWith(w.core.admin.deleteFeedComment(A, comment.id, ''), 'VALIDATION');
+  await w.core.admin.deleteFeedComment(A, comment.id, 'ofensivo');
+  assert.deepEqual((await w.core.feed.comments(bia, keep.id)).items, []);
+  // Publicação: sem problema, depois não dá para decidir de novo.
+  await w.core.admin.resolveFeedReport(A, open.items[0]!.id, 'DISMISSED', 'ok');
+  await rejectsWith(w.core.admin.resolveFeedReport(A, open.items[0]!.id, 'ACTIONED', 'x'), 'CONFLICT');
+  assert.equal((await w.core.admin.feedReports(A, {})).items.length, 0);
+  assert.deepEqual((await w.core.admin.feedReports(A, { status: 'resolved' })).items.map((r) => r.resolution), ['DISMISSED']);
+
+  // Página Feed da gestão: busca, pendentes e apagar.
+  assert.deepEqual((await w.core.admin.feedPosts(A, { q: 'seguidores' })).items.map((p) => p.id), [post.id]);
+  await w.core.feed.setPolicy(ana, 'event', ev.id, 'MODERATED');
+  const pending = await w.core.feed.create(bia, 'event', ev.id, { body: 'espera' });
+  assert.deepEqual((await w.core.admin.feedPosts(A, { status: 'pending' })).items.map((p) => [p.id, p.status]), [[pending.id, 'PENDING']]);
+  assert.equal((await w.core.admin.stats(A)).pendingFeedPosts, 1);
+  await w.core.admin.deleteFeedPost(A, post.id, 'spam');
+  await rejectsWith(w.core.feed.get(bia, post.id), 'NOT_FOUND');
+  await rejectsWith(w.core.admin.deleteFeedPost(A, post.id, 'spam'), 'NOT_FOUND');
+  assert.deepEqual((await w.core.admin.audit(A, {})).items.map((a) => a.action).sort(), ['FEED_COMMENT_REMOVED', 'FEED_POST_REMOVED', 'REPORT_DISMISSED']);
+});

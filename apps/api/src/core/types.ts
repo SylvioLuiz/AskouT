@@ -591,6 +591,24 @@ export interface FeedCommentRecord {
   createdAt: Date;
 }
 
+/** Denúncia de uma publicação ou de um comentário do feed. `evidence`: o texto como estava na hora. */
+export interface FeedReportRecord {
+  id: string;
+  kind: 'POST' | 'COMMENT';
+  postId: string;
+  commentId: string | null;
+  reporterId: string;
+  reportedUserId: string;
+  reason: PostReportReason;
+  details: string | null;
+  evidence: string;
+  createdAt: Date;
+  resolvedAt?: Date | null;
+  resolvedBy?: string | null;
+  resolution?: ReportResolution | null;
+  resolutionNote?: string | null;
+}
+
 /** Reações de uma publicação ou comentário: quantas de cada emoji e a minha. */
 export interface FeedReactionStats {
   id: string;
@@ -717,6 +735,8 @@ export interface AdminStats {
   openConversationReports: number;
   openUserReports: number;
   openStoryReports: number;
+  openFeedReports: number;
+  pendingFeedPosts: number;
 }
 
 export interface AdminUserRow {
@@ -791,6 +811,57 @@ export interface AdminStoryReportRow {
   resolutionNote: string | null;
 }
 
+/** Onde fica a publicação do feed, para a gestão abrir a página. */
+export interface AdminFeedPlace {
+  type: FeedTargetType;
+  id: string;
+  title: string;
+  /** Caminho da página no app (ex.: `/eventos/<id>`). */
+  url: string;
+}
+
+/** Publicação do feed vista pela gestão (de qualquer evento ou rolê). */
+export interface AdminFeedPostRow {
+  id: string;
+  kind: FeedPostKind;
+  status: FeedPostStatus;
+  body: string | null;
+  createdAt: Date;
+  author: { id: string; username: string };
+  place: AdminFeedPlace;
+  imageIds: string[];
+  commentsCount: number;
+  openReportsCount: number;
+}
+
+export interface AdminFeedCommentRow {
+  id: string;
+  postId: string;
+  body: string;
+  createdAt: Date;
+  author: { id: string; username: string };
+  openReportsCount: number;
+}
+
+export interface AdminFeedReportRow {
+  id: string;
+  kind: 'POST' | 'COMMENT';
+  reason: PostReportReason;
+  details: string | null;
+  evidence: string;
+  createdAt: Date;
+  reporter: { id: string; username: string };
+  reported: { id: string; username: string; status: UserStatus };
+  /** A publicação (a denunciada, ou a do comentário denunciado). `null` se já foi apagada. */
+  post: AdminFeedPostRow | null;
+  /** O comentário denunciado ainda existe. */
+  commentId: string | null;
+  commentAlive: boolean;
+  resolvedAt: Date | null;
+  resolution: ReportResolution | null;
+  resolutionNote: string | null;
+}
+
 /** Denúncia de perfil ou de comentário. */
 export interface UserReportRecord {
   id: string;
@@ -846,6 +917,8 @@ export type AuditAction =
   | 'POST_REMOVED'
   | 'PLACE_EVENT_REMOVED'
   | 'STORY_REMOVED'
+  | 'FEED_POST_REMOVED'
+  | 'FEED_COMMENT_REMOVED'
   | 'REPORT_DISMISSED'
   | 'REPORT_ACTIONED'
   | 'PAYMENTS_ENABLED'
@@ -855,7 +928,7 @@ export interface AuditRecord {
   id: string;
   adminId: string;
   action: AuditAction;
-  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'USER_REPORT' | 'STORY' | 'STORY_REPORT' | 'SETTING';
+  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'USER_REPORT' | 'STORY' | 'STORY_REPORT' | 'FEED_POST' | 'FEED_COMMENT' | 'FEED_REPORT' | 'SETTING';
   targetId: string;
   note: string | null;
   createdAt: Date;

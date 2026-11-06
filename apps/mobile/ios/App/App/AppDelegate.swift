@@ -62,11 +62,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 }
 
 
-/// Tela principal: reforça a retirada da barra do teclado (setas e OK) direto no WebView que está na tela.
+/// Tela principal: reforça a retirada da barra do teclado (setas e OK) direto no WebView que está na tela
+/// e tira o "efeito mola" da página (ver `disableBounce`).
 class MainViewController: CAPBridgeViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         hideAccessory()
+        disableBounce()
+    }
+
+    /// Sem a mola do iOS, a página não passa do fim: no chat o campo de mensagem não se solta do rodapé nem mostra
+    /// um vão embaixo dele. O CSS (`overscroll-behavior-y: none`) só vale do iOS 16 em diante; aqui vale em todos.
+    /// O puxar-para-atualizar do app é feito em JavaScript (toques), então continua funcionando.
+    private func disableBounce() {
+        guard let scroll = self.webView?.scrollView else { return }
+        scroll.bounces = false
+        scroll.alwaysBounceVertical = false
+        scroll.alwaysBounceHorizontal = false
     }
 
     override func viewDidAppear(_ animated: Bool) {

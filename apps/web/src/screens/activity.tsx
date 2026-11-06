@@ -10,8 +10,20 @@ import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { pluralize } from '../lib/format.ts';
-import type { NotificationItem, NotificationType, PublicProfile } from '../lib/types.ts';
+import type { NotificationCategory, NotificationItem, NotificationType, PublicProfile } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
+
+/** Chips do topo da lista. Quais tipos entram em cada um é decidido no servidor (`notification-categories.ts`). */
+const NEWS_FILTERS: ReadonlyArray<{ id: NotificationCategory; label: () => string }> = [
+  { id: 'all', label: () => t('Todas') },
+  { id: 'mentions', label: () => t('Menções') },
+  { id: 'comments', label: () => t('Comentários') },
+  { id: 'likes', label: () => t('Curtidas') },
+  { id: 'follows', label: () => t('Seguidores') },
+  { id: 'invites', label: () => t('Convites') },
+  { id: 'events', label: () => t('Eventos') },
+  { id: 'messages', label: () => t('Mensagens') },
+];
 
 type Category = 'chat' | 'event' | 'social' | 'now' | 'like' | 'comment' | 'system';
 
@@ -104,7 +116,12 @@ export function ActivityScreen() {
     if (search.get('aba') === 'pedidos') setTab('requests');
   }, [search.get('aba')]);
   const requests = useAsync(() => api.followRequests({ limit: 50 }), []);
-  const news = useAsync(() => api.notifications(), []);
+  // Chips do topo (como no Instagram). O servidor filtra, para a página trazer os 30 mais recentes daquela categoria.
+  const [filter, setFilter] = useState<NotificationCategory>('all');
+  const newsState = useAsync(async () => ({ category: filter, list: await api.notifications(filter) }), [filter]);
+  // Ao trocar de chip, a lista anterior some na hora (em vez de mostrar avisos de outra categoria até a resposta chegar).
+  const news = { data: newsState.data?.category === filter ? newsState.data.list : undefined, error: newsState.error, reload: newsState.reload };
+  const totalUnread = newsState.data?.list.unread ?? 0;
   const tagReqs = useAsync(() => api.pendingTags({ limit: 20 }), []);
   const [tagBusy, setTagBusy] = useState<string | undefined>();
   async function answerTag(postId: string, action: 'accept' | 'decline') {
@@ -212,7 +229,7 @@ export function ActivityScreen() {
       <div className="segtabs segtabs--fill" role="tablist" aria-label={t('Notificações')}>
         <button type="button" role="tab" aria-selected={tab === 'news'} className="segtabs__tab" onClick={() => setTab('news')}>
           {t('Novidades')}
-          {news.data && news.data.unread > 0 ? <span className="segtabs__n">{news.data.unread > 99 ? '99+' : news.data.unread}</span> : null}
+          {totalUnread > 0 ? <span className="segtabs__n">{totalUnread > 99 ? '99+' : totalUnread}</span> : null}
         </button>
         <button type="button" role="tab" aria-selected={tab === 'requests'} className="segtabs__tab" onClick={() => setTab('requests')}>
           {t('Pedidos para seguir')}
@@ -221,6 +238,14 @@ export function ActivityScreen() {
       </div>
       {tab === 'news' ? (
         <>
+      <div className="newsfilters" role="group" aria-label={t('Filtrar notificações')}>
+        {NEWS_FILTERS.map((f) => (
+          <button key={f.id} type="button" className="chip newsfilters__chip" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+            {f.label()}
+          </button>
+        ))}
+      </div>
+      {!news.data && !news.error ? <Loading /> : null}
       {news.data && news.data.items.length > 0 ? (
         <>
           {news.data.unread > 0 ? (
@@ -248,9 +273,11 @@ export function ActivityScreen() {
           </ul>
         </>
       ) : null}
-      {news.data && news.data.items.length === 0 ? <p className="muted">{t('Nenhuma novidade ainda. Mensagens, convites e encontros aparecem aqui.')}</p> : null}
+      {news.data && news.data.items.length === 0 ? (
+        <p className="muted">{filter === 'all' ? t('Nenhuma novidade ainda. Mensagens, convites e encontros aparecem aqui.') : t('Nada por aqui neste filtro.')}</p>
+      ) : null}
       {news.error && !news.data ? <ErrorState message={news.error.message} onRetry={news.reload} /> : null}
-      {tagReqs.data && tagReqs.data.items.length > 0 ? (
+      {(filter === 'all' || filter === 'mentions') && tagReqs.data && tagReqs.data.items.length > 0 ? (
         <>
           <h2 className="results__h">{t('Marcações')}</h2>
           <ul className="list">

@@ -340,6 +340,9 @@ export interface NotificationList {
   unread: number;
 }
 
+/** Chips da tela de notificações. O servidor filtra (`GET /notifications?category=`); `all` não filtra. */
+export type NotificationCategory = 'all' | 'mentions' | 'comments' | 'likes' | 'follows' | 'invites' | 'events' | 'messages';
+
 /** Resumo de um evento (cartão na conversa, grade do perfil). */
 export interface EventCard {
   id: string;
@@ -593,6 +596,8 @@ export interface FeedPost {
   mine: boolean;
   canDelete: boolean;
   canModerate: boolean;
+  /** Publicação de outra pessoa: dá para denunciar. */
+  canReport: boolean;
   reactions: FeedReactions;
   commentCount: number;
   mentions: string[];
@@ -606,6 +611,7 @@ export interface FeedComment {
   createdAt: string;
   mine: boolean;
   canDelete: boolean;
+  canReport: boolean;
   reactions: FeedReactions;
   mentions: string[];
 }

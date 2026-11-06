@@ -125,6 +125,21 @@ export class FeedController {
     return this.core.feed.reactComment(actor.userId, commentId, asBody(body).emoji ?? null);
   }
 
+  /** `{reason, details?}`: denuncia a publicação para a gestão; quem denunciou deixa de vê-la. */
+  @Post('feed/posts/:postId/report')
+  @HttpCode(200)
+  reportPost(@CurrentActor() actor: Actor, @Param('postId') postId: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.feed.reportPost(actor.userId, postId, b.reason, b.details);
+  }
+
+  @Post('feed/comments/:commentId/report')
+  @HttpCode(200)
+  reportComment(@CurrentActor() actor: Actor, @Param('commentId') commentId: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.feed.reportComment(actor.userId, commentId, b.reason, b.details);
+  }
+
   /** Foto de uma publicação, para o <img> (que não manda o token). O id é aleatório, como nas fotos dos posts. */
   @Public()
   @Get('feed/images/:imageId')

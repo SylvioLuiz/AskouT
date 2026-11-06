@@ -1,4 +1,4 @@
-import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -567,7 +567,8 @@ export interface VenueClaimRepository {
 
 /** Consultas e ações de gestão que cruzam várias tabelas. Só o painel admin usa. */
 export interface AdminRepository {
-  stats(): Promise<AdminStats>;
+  /** Os números do feed vêm do repositório do feed (o serviço junta). */
+  stats(): Promise<Omit<AdminStats, 'openFeedReports' | 'pendingFeedPosts'>>;
   /** Busca em e-mail, @usuário e nome. Mais novos primeiro. */
   searchUsers(text: string, status: UserStatus | undefined, page: Page): Promise<AdminUserRow[]>;
   setUserStatus(userId: string, status: UserStatus): Promise<boolean>;
@@ -679,8 +680,8 @@ export interface IdGenerator {
 
 export interface NotificationRepository {
   create(record: NotificationRecord): Promise<void>;
-  /** Mais recentes primeiro. */
-  listForUser(userId: string, limit: number): Promise<NotificationRecord[]>;
+  /** Mais recentes primeiro. Com `filter`, só os avisos que casam com alguma cláusula (chips da tela de notificações). */
+  listForUser(userId: string, limit: number, filter?: import('./notification-categories.ts').NotificationFilter): Promise<NotificationRecord[]>;
   unreadCount(userId: string): Promise<number>;
   /** Já existe aviso não lido com essa chave? */
   hasUnread(userId: string, dedupeKey: string): Promise<boolean>;
@@ -785,6 +786,23 @@ export interface FeedRepository {
   setCommentReaction(commentId: string, userId: string, emoji: string, at: Date): Promise<void>;
   removeCommentReaction(commentId: string, userId: string): Promise<void>;
   commentReactionStats(commentIds: string[], viewerId: string): Promise<FeedReactionStats[]>;
+  /** Guarda uma denúncia. false se a mesma pessoa já denunciou isso ou se o alvo não existe mais. */
+  addReport(report: FeedReportRecord): Promise<boolean>;
+  /** Dentre os ids, as publicações que a pessoa denunciou (ela deixa de vê-las). */
+  reportedPostIds(userId: string, postIds: string[]): Promise<Set<string>>;
+  reportedCommentIds(userId: string, commentIds: string[]): Promise<Set<string>>;
+  // ---------- Gestão ----------
+  /** Abertas: as mais antigas primeiro. Decididas: as decididas por último primeiro. */
+  listReports(open: boolean, page: Page): Promise<FeedReportRecord[]>;
+  findReport(id: string): Promise<FeedReportRecord | undefined>;
+  /** Só encerra denúncia em aberto; false se já foi decidida. */
+  resolveReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean>;
+  countOpenReports(): Promise<number>;
+  /** Denúncias abertas por publicação (só as da própria publicação) e por comentário. */
+  openReportCounts(postIds: string[], commentIds: string[]): Promise<{ posts: Map<string, number>; comments: Map<string, number> }>;
+  /** Publicações de todos os feeds, das mais novas para as mais antigas. `text` busca no texto. */
+  adminListPosts(query: { status?: FeedPostStatus; text: string; page: Page }): Promise<FeedPostWithImages[]>;
+  countAllPosts(status: FeedPostStatus): Promise<number>;
 }
 
 export interface CoreDeps {

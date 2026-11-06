@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import { REASON_LABEL, RESOLUTION_LABEL, formatDateTime } from '../labels.ts';
-import type { ConversationReportRow, PostReportRow, StoryReportRow, UserReportRow } from '../types.ts';
+import type { ConversationReportRow, FeedReportRow, PostReportRow, StoryReportRow, UserReportRow } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead, Pager, Tabs } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
 import { PostThumb, deletePostAction } from './posts.tsx';
+import { FeedPostSummary, FeedThumb, deleteFeedCommentAction, deleteFeedPostAction } from './feed.tsx';
 
-type Kind = 'posts' | 'stories' | 'conversations' | 'users';
+type Kind = 'posts' | 'feed' | 'stories' | 'conversations' | 'users';
 
 function Outcome({ r }: { r: { resolution: PostReportRow['resolution']; resolutionNote: string | null; resolvedAt: string | null } }) {
   if (!r.resolution) return null;
@@ -49,6 +50,83 @@ function PostReportCard({ r, onAction }: { r: PostReportRow; onAction: (a: Actio
           <button type="button" className="btn btn--small btn--danger-quiet" onClick={() => onAction(deletePostAction(r.post))}>
             Apagar post
           </button>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function FeedReportCard({ r, onAction }: { r: FeedReportRow; onAction: (a: ActionSpec) => void }) {
+  const open = r.resolution === null;
+  const target = r.reported;
+  const isComment = r.kind === 'COMMENT';
+  return (
+    <article className="report">
+      {r.post ? <FeedThumb post={r.post} /> : <div className="thumb thumb--empty" aria-hidden="true" />}
+      <div className="report__main">
+        <div>
+          <Badge tone="info">{isComment ? 'Comentário' : 'Publicação'}</Badge> <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge>{' '}
+          <span className="muted small">denunciado por @{r.reporter.username} em {formatDateTime(r.createdAt)}</span>
+        </div>
+        <p className="muted small">
+          Pessoa denunciada: <span className="handle">@{target.username}</span> {target.status === 'SUSPENDED' ? <Badge tone="bad">Suspensa</Badge> : null}
+        </p>
+        {r.details ? <p className="pre">“{r.details}”</p> : null}
+        <details open>
+          <summary>{isComment ? 'Comentário denunciado' : 'Texto no momento da denúncia'}</summary>
+          <pre className="evidence">{r.evidence || 'Sem texto.'}</pre>
+          {isComment && !r.commentAlive ? <p className="muted small">O comentário já foi apagado.</p> : null}
+        </details>
+        {r.post ? (
+          <>
+            {isComment ? <div className="muted small">Na publicação:</div> : null}
+            <FeedPostSummary post={r.post} />
+          </>
+        ) : (
+          <p className="muted small">A publicação já foi apagada.</p>
+        )}
+        <Outcome r={r} />
+      </div>
+      {open ? (
+        <div className="report__actions">
+          <button type="button" className="btn btn--small" onClick={() => onAction({ title: 'Denúncia sem problema', description: <p>O conteúdo continua no ar e a denúncia sai da fila.</p>, confirmLabel: 'Marcar sem problema', noteLabel: 'Nota', run: (n) => api.resolveFeedReport(r.id, 'DISMISSED', n) })}>
+            Sem problema
+          </button>
+          <button type="button" className="btn btn--small" onClick={() => onAction({ title: 'Providência tomada', description: <p>Use quando você já agiu por outro caminho (ex.: falou com a pessoa).</p>, confirmLabel: 'Registrar providência', noteLabel: 'O que foi feito', noteRequired: true, run: (n) => api.resolveFeedReport(r.id, 'ACTIONED', n) })}>
+            Providência tomada
+          </button>
+          {isComment && r.commentId && r.commentAlive ? (
+            <button type="button" className="btn btn--small btn--danger-quiet" onClick={() => onAction(deleteFeedCommentAction({ id: r.commentId!, author: { username: target.username } }))}>
+              Apagar comentário
+            </button>
+          ) : null}
+          {r.post ? (
+            <button type="button" className="btn btn--small btn--danger-quiet" onClick={() => onAction(deleteFeedPostAction(r.post!))}>
+              Apagar publicação
+            </button>
+          ) : null}
+          {target.status !== 'SUSPENDED' ? (
+            <button
+              type="button"
+              className="btn btn--small btn--danger-quiet"
+              onClick={() =>
+                onAction({
+                  title: `Suspender @${target.username}`,
+                  description: <p>A conta perde o acesso agora e esta denúncia é encerrada como “providência tomada”.</p>,
+                  confirmLabel: 'Suspender e encerrar',
+                  danger: true,
+                  noteLabel: 'Motivo',
+                  noteRequired: true,
+                  run: async (n) => {
+                    await api.setUserStatus(target.id, 'SUSPENDED', n);
+                    await api.resolveFeedReport(r.id, 'ACTIONED', n);
+                  },
+                })
+              }
+            >
+              Suspender @{target.username}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </article>
@@ -244,12 +322,14 @@ export function ReportsPage() {
   const [action, setAction] = useState<ActionSpec>();
   const stats = useAsync(() => api.stats(), []);
   const posts = useAsync(() => (kind === 'posts' ? api.postReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
+  const feed = useAsync(() => (kind === 'feed' ? api.feedReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
   const stories = useAsync(() => (kind === 'stories' ? api.storyReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
   const users = useAsync(() => (kind === 'users' ? api.userReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
   const convs = useAsync(() => (kind === 'conversations' ? api.conversationReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
 
   const reload = () => {
     posts.reload();
+    feed.reload();
     stories.reload();
     convs.reload();
     users.reload();
@@ -265,6 +345,7 @@ export function ReportsPage() {
           onChange={(k) => { setKind(k); setOffset(0); }}
           options={[
             { value: 'posts', label: 'Posts', count: stats.data?.openPostReports },
+            { value: 'feed', label: 'Feed', count: stats.data?.openFeedReports },
             { value: 'stories', label: 'Stories', count: stats.data?.openStoryReports },
             { value: 'conversations', label: 'Conversas', count: stats.data?.openConversationReports },
             { value: 'users', label: 'Perfis e comentários', count: stats.data?.openUserReports },
@@ -278,6 +359,17 @@ export function ReportsPage() {
             page ? (
               <>
                 <div className="reports">{page.items.map((r) => <PostReportCard key={r.id} r={r} onAction={setAction} />)}</div>
+                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+              </>
+            ) : null
+          }
+        </Loadable>
+      ) : kind === 'feed' ? (
+        <Loadable state={feed} empty={resolved ? 'Nenhuma denúncia decidida ainda.' : 'Nenhuma denúncia aberta. 🎉'} isEmpty={(d) => d === undefined || d.items.length === 0}>
+          {(page) =>
+            page ? (
+              <>
+                <div className="reports">{page.items.map((r) => <FeedReportCard key={r.id} r={r} onAction={setAction} />)}</div>
                 <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
               </>
             ) : null

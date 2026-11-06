@@ -9,6 +9,7 @@ import { ClaimsPage } from './pages/claims.tsx';
 import { DashboardPage } from './pages/dashboard.tsx';
 import { EventsPage } from './pages/events.tsx';
 import { PostsPage } from './pages/posts.tsx';
+import { FeedPage } from './pages/feed.tsx';
 import { PaymentsPage } from './pages/payments.tsx';
 import { RetentionPage } from './pages/retention.tsx';
 import { ReportsPage } from './pages/reports.tsx';
@@ -218,6 +219,8 @@ function Page({ route }: { route: RoutePath }) {
       return <EventsPage />;
     case '/posts':
       return <PostsPage />;
+    case '/feed':
+      return <FeedPage />;
     case '/retencao':
       return <RetentionPage />;
     case '/pagamentos':
@@ -239,7 +242,7 @@ function Shell({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
     let alive = true;
     const load = () =>
       api.stats().then(
-        (s) => alive && setPending({ claims: s.pendingClaims, reports: s.openPostReports + s.openConversationReports + (s.openStoryReports ?? 0) + (s.openUserReports ?? 0) }),
+        (s) => alive && setPending({ claims: s.pendingClaims, reports: s.openPostReports + s.openConversationReports + (s.openStoryReports ?? 0) + (s.openUserReports ?? 0) + (s.openFeedReports ?? 0) }),
         () => {},
       );
     void load();

@@ -57,6 +57,7 @@ import type {
   GroupDetails,
   GoingEvent,
   MeetupView,
+  NotificationCategory,
   NotificationList,
   PostedEventsPage,
   PostComment,
@@ -438,6 +439,8 @@ export function createApi(deps: ApiDeps) {
     addFeedComment: (postId: string, body: string) => request<FeedComment>('POST', `/feed/posts/${id(postId)}/comments`, { body: { body } }),
     deleteFeedComment: (commentId: string) => request<{ deleted: true }>('DELETE', `/feed/comments/${id(commentId)}`),
     reactFeedComment: (commentId: string, emoji: string | null) => request<FeedReactions>('PUT', `/feed/comments/${id(commentId)}/reaction`, { body: { emoji } }),
+    reportFeedPost: (postId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/feed/posts/${id(postId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+    reportFeedComment: (commentId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/feed/comments/${id(commentId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
 
     // Locais (painel do local)
     myVenues: () => request<MyVenues>('GET', '/me/venues'),
@@ -580,7 +583,7 @@ export function createApi(deps: ApiDeps) {
     respondMeetup: (meetupId: string, action: 'accept' | 'decline') => request<MeetupView>('POST', `/meetups/${id(meetupId)}/respond`, { body: { action } }),
 
     // Avisos
-    notifications: () => request<NotificationList>('GET', '/notifications'),
+    notifications: (category: NotificationCategory = 'all') => request<NotificationList>('GET', `/notifications${toQuery({ category: category === 'all' ? undefined : category })}`),
     unreadNotifications: () => request<{ unread: number; latestUnreadAt: string | null }>('GET', '/notifications/unread'),
     markNotificationsRead: (notificationId?: string) => request<{ unread: number }>('POST', '/notifications/read', { body: notificationId ? { id: notificationId } : {} }),
     pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),

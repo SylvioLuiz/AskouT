@@ -214,6 +214,8 @@ model User {
   feedComments      FeedComment[]     @relation("FeedCommentAuthor")
   feedReactions     FeedReaction[]    @relation("FeedReactionUser")
   feedCommentReactions FeedCommentReaction[] @relation("FeedCommentReactionUser")
+  feedReportsMade      FeedReport[]          @relation("FeedReportsMade")
+  feedReportsReceived  FeedReport[]          @relation("FeedReportsReceived")
   postTags          PostTag[]
   postLikes         PostLike[]    @relation("PostLikes")
   postComments      PostComment[] @relation("PostComments")
@@ -1431,6 +1433,7 @@ model FeedPost {
   images     FeedPostImage[]
   comments   FeedComment[]
   reactions  FeedReaction[]
+  reports    FeedReport[]
 
   @@index([placeEventId, status, createdAt])
   @@index([userEventId, status, createdAt])
@@ -1476,6 +1479,7 @@ model FeedComment {
   post      FeedPost              @relation(fields: [postId], references: [id], onDelete: Cascade)
   author    User                  @relation("FeedCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   reactions FeedCommentReaction[]
+  reports   FeedReport[]
 
   @@index([postId, createdAt])
   @@index([authorId])
@@ -1493,4 +1497,36 @@ model FeedCommentReaction {
 
   @@id([commentId, userId])
   @@index([userId])
+}
+
+/// Denúncia de uma publicação (POST) ou de um comentário (COMMENT) do feed de evento ou rolê.
+/// `evidence` guarda o texto como estava na hora; `dedupeKey` (denunciante + publicação + comentário) impede repetir.
+/// Apagar a publicação ou o comentário leva as denúncias junto, como nos stories.
+model FeedReport {
+  id             String    @id @default(uuid()) @db.Uuid
+  dedupeKey      String    @unique
+  kind           String // POST | COMMENT
+  postId         String    @db.Uuid
+  commentId      String?   @db.Uuid
+  reporterId     String    @db.Uuid
+  reportedUserId String    @db.Uuid
+  reason         String
+  details        String?
+  evidence       String    @default("")
+  createdAt      DateTime  @default(now())
+  resolvedAt     DateTime?
+  resolvedBy     String?   @db.Uuid
+  resolution     String?
+  resolutionNote String?
+
+  post     FeedPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment  FeedComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reporter User         @relation("FeedReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User         @relation("FeedReportsReceived", fields: [reportedUserId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([resolvedAt])
+  @@index([reporterId])
+  @@index([postId])
+  @@index([commentId])
 }

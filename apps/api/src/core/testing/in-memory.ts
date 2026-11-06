@@ -48,10 +48,11 @@ import type {
 } from '../ports.ts';
 import { compareMatches, countTags, fold, matchEvent, matchVenue, type EventMatch } from '../explore-match.ts';
 import { distanceMeters } from '../geo.ts';
+import { matchesNotificationFilter, type NotificationFilter } from '../notification-categories.ts';
 import type {
   DirectActivityRow,
   DwellRecord,
-  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -1649,9 +1650,9 @@ export class InMemoryNotificationRepository implements NotificationRepository {
     this.rows.push({ ...record });
   }
 
-  async listForUser(userId: string, limit: number): Promise<NotificationRecord[]> {
+  async listForUser(userId: string, limit: number, filter?: NotificationFilter): Promise<NotificationRecord[]> {
     return this.rows
-      .filter((n) => n.userId === userId)
+      .filter((n) => n.userId === userId && matchesNotificationFilter(n, filter))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
       .slice(0, limit)
       .map((n) => ({ ...n }));
@@ -2166,6 +2167,7 @@ export class InMemoryFeedRepository implements FeedRepository {
     for (const [k, i] of this.images) if (i.postId === id) this.images.delete(k);
     for (const [k, r] of this.reactions) if (r.postId === id) this.reactions.delete(k);
     for (const c of [...this.comments.values()]) if (c.postId === id) await this.deleteComment(c.id);
+    for (const [k, r] of this.reports) if (r.postId === id) this.reports.delete(k);
     return true;
   }
 
@@ -2223,6 +2225,7 @@ export class InMemoryFeedRepository implements FeedRepository {
   async deleteComment(id: string): Promise<boolean> {
     if (!this.comments.delete(id)) return false;
     for (const [k, r] of this.commentReactions) if (r.commentId === id) this.commentReactions.delete(k);
+    for (const [k, r] of this.reports) if (r.commentId === id) this.reports.delete(k);
     return true;
   }
 
@@ -2236,6 +2239,84 @@ export class InMemoryFeedRepository implements FeedRepository {
 
   async commentReactionStats(commentIds: string[], viewerId: string): Promise<FeedReactionStats[]> {
     return InMemoryFeedRepository.stats(commentIds, [...this.commentReactions.values()].map((r) => ({ id: r.commentId, userId: r.userId, emoji: r.emoji })), viewerId);
+  }
+
+  // ---------- Denúncias ----------
+
+  readonly reports = new Map<string, FeedReportRecord>();
+
+  private static reportKey(r: { reporterId: string; postId: string; commentId: string | null }): string {
+    return `${r.reporterId}|${r.postId}|${r.commentId ?? ''}`;
+  }
+
+  async addReport(report: FeedReportRecord): Promise<boolean> {
+    const key = InMemoryFeedRepository.reportKey(report);
+    if (this.reports.has(key) || !this.posts.has(report.postId)) return false;
+    if (report.commentId !== null && !this.comments.has(report.commentId)) return false;
+    this.reports.set(key, { ...report });
+    return true;
+  }
+
+  async reportedPostIds(userId: string, postIds: string[]): Promise<Set<string>> {
+    return new Set(postIds.filter((id) => this.reports.has(`${userId}|${id}|`)));
+  }
+
+  async reportedCommentIds(userId: string, commentIds: string[]): Promise<Set<string>> {
+    const wanted = new Set(commentIds);
+    const out = new Set<string>();
+    for (const r of this.reports.values()) if (r.reporterId === userId && r.commentId !== null && wanted.has(r.commentId)) out.add(r.commentId);
+    return out;
+  }
+
+  async listReports(open: boolean, page: Page): Promise<FeedReportRecord[]> {
+    return [...this.reports.values()]
+      .filter((r) => (open ? !r.resolvedAt : !!r.resolvedAt))
+      .sort((a, b) => (open ? a.createdAt.getTime() - b.createdAt.getTime() : (b.resolvedAt?.getTime() ?? 0) - (a.resolvedAt?.getTime() ?? 0)) || (a.id < b.id ? -1 : 1))
+      .slice(page.offset, page.offset + page.limit)
+      .map((r) => ({ ...r }));
+  }
+
+  async findReport(id: string): Promise<FeedReportRecord | undefined> {
+    for (const r of this.reports.values()) if (r.id === id) return { ...r };
+    return undefined;
+  }
+
+  async resolveReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean> {
+    for (const [key, r] of this.reports) {
+      if (r.id !== id) continue;
+      if (r.resolvedAt) return false;
+      this.reports.set(key, { ...r, resolvedAt: at, resolvedBy: adminId, resolution, resolutionNote: note });
+      return true;
+    }
+    return false;
+  }
+
+  async countOpenReports(): Promise<number> {
+    return [...this.reports.values()].filter((r) => !r.resolvedAt).length;
+  }
+
+  async openReportCounts(postIds: string[], commentIds: string[]): Promise<{ posts: Map<string, number>; comments: Map<string, number> }> {
+    const posts = new Map<string, number>(postIds.map((id) => [id, 0]));
+    const comments = new Map<string, number>(commentIds.map((id) => [id, 0]));
+    for (const r of this.reports.values()) {
+      if (r.resolvedAt) continue;
+      if (r.commentId === null && posts.has(r.postId)) posts.set(r.postId, (posts.get(r.postId) ?? 0) + 1);
+      if (r.commentId !== null && comments.has(r.commentId)) comments.set(r.commentId, (comments.get(r.commentId) ?? 0) + 1);
+    }
+    return { posts, comments };
+  }
+
+  async adminListPosts(query: { status?: FeedPostStatus; text: string; page: Page }): Promise<FeedPostWithImages[]> {
+    const q = query.text.trim().toLowerCase();
+    return [...this.posts.values()]
+      .filter((p) => this.exists(p.target) && (!query.status || p.status === query.status) && (!q || (p.body ?? '').toLowerCase().includes(q)))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+      .slice(query.page.offset, query.page.offset + query.page.limit)
+      .map((p) => this.withImages(p));
+  }
+
+  async countAllPosts(status: FeedPostStatus): Promise<number> {
+    return [...this.posts.values()].filter((p) => this.exists(p.target) && p.status === status).length;
   }
 }
 
