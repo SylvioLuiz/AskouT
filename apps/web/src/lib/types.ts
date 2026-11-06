@@ -320,7 +320,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE';
 
 export interface NotificationItem {
   id: string;
@@ -570,15 +570,60 @@ export interface ExploreEvent {
   sponsored?: boolean;
 }
 
-export interface EventPost {
+/** Quem publica no feed: todos que veem a página, todos com aprovação do dono, ou só o dono. */
+export type FeedPolicy = 'OPEN' | 'MODERATED' | 'OWNER_ONLY';
+
+export interface FeedReactions {
+  counts: { emoji: string; count: number }[];
+  mine: string | null;
+}
+
+/** Publicação no feed de um evento ou de um rolê. */
+export interface FeedPost {
   id: string;
+  /** NOTICE: aviso, aparece destacado. */
+  kind: 'POST' | 'NOTICE';
+  body: string | null;
+  status: 'PUBLISHED' | 'PENDING';
+  createdAt: string;
   author: PublicProfile;
-  caption: string;
-  /** Endereço da foto, quando o post tem uma. */
-  imagePath: string | null;
+  /** Publicado pelo dono do rolê: mostra o rolê no lugar da pessoa. */
+  venue: { id: string; name: string; logoUrl: string | null } | null;
+  images: { id: string; path: string }[];
+  mine: boolean;
+  canDelete: boolean;
+  canModerate: boolean;
+  reactions: FeedReactions;
+  commentCount: number;
+  mentions: string[];
+}
+
+export interface FeedComment {
+  id: string;
+  postId: string;
+  author: PublicProfile;
+  body: string;
   createdAt: string;
   mine: boolean;
   canDelete: boolean;
+  reactions: FeedReactions;
+  mentions: string[];
+}
+
+export interface FeedSettings {
+  policy: FeedPolicy;
+  /** A página tem dono. Sem dono o feed fica fechado. */
+  hasModerator: boolean;
+  isModerator: boolean;
+  canPost: boolean;
+  needsApproval: boolean;
+  pendingCount: number;
+}
+
+export interface FeedPage extends FeedSettings {
+  items: FeedPost[];
+  myPending: FeedPost[];
+  nextCursor: string | null;
 }
 
 /** Página do evento: do local (PLACE) ou criado por uma pessoa (USER). */
@@ -652,10 +697,6 @@ export interface EventPage {
   canStory: boolean;
   owner: PublicProfile | null;
   isOwner: boolean;
-  postsEnabled: boolean;
-  postsPublic: boolean;
-  canPost: boolean;
-  posts: EventPost[];
 }
 
 export interface ExplorePlace {
