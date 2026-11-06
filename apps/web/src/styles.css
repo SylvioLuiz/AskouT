@@ -3895,7 +3895,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .pagehead__action { margin-left: auto; }
 .pagehead__action .btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .pagehead__action svg { width: 18px; height: 18px; }
-.evmap { position: fixed; inset: 0; z-index: 60; background: #1c1c1e; --evmap-float: rgba(255,255,255,.96); --evmap-float-ink: rgb(26 11 46); --evmap-float-muted: rgb(60 60 67); }
+.evmap { position: fixed; inset: 0; z-index: 60; background: var(--bg); animation: evmap-fade .22s ease-out both; --evmap-float: rgba(255,255,255,.96); --evmap-float-ink: rgb(26 11 46); --evmap-float-muted: rgb(60 60 67); }
 /* Tema escuro: botões e barras flutuantes do mapa na cor das superfícies do app. */
 :root[data-theme='dark'] .evmap { --evmap-float: rgb(38 40 51 / .96); --evmap-float-ink: #f5f5f7; --evmap-float-muted: #a0a3b4; }
 @media (prefers-color-scheme: dark) {
@@ -5328,3 +5328,9 @@ button.reactlist__row { cursor: pointer; }
 /* Explorar (lista): a busca fica presa no topo, logo abaixo da barra do app. */
 .explore__sticky { position: sticky; top: var(--topbar-h, 0px); z-index: 12; margin: 0 -16px 4px; padding: 6px 16px 2px; background: var(--bg); }
 .explore__sticky .search { margin-bottom: 8px; }
+/* Troca Lista ⇄ Mapa: crossfade curto; o mapa aparece aos poucos quando fica pronto. */
+.evmap .evmap__canvas { opacity: 0; transition: opacity .35s ease; }
+.evmap .evmap__canvas--ready, .evmap .evmap__canvas--off { opacity: 1; }
+.explore__sticky ~ * { animation: explore-fade .22s ease-out both; }
+:root.vt-explore::view-transition-old(root), :root.vt-explore::view-transition-new(root) { animation-duration: .22s; animation-timing-function: ease; }
+@media (prefers-reduced-motion: reduce) { .evmap, .explore__sticky ~ * { animation: none; } .evmap .evmap__canvas { transition: none; } }
