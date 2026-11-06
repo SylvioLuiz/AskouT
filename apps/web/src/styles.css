@@ -4698,7 +4698,7 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 :root[data-theme='dark'] .iconbtn__count { background: var(--brand-grad); }
 
 /* Faixa do próximo plano na Home */
-.nextplan { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 14px; border-radius: 16px; background: var(--brand-soft); color: var(--ink); text-decoration: none; }
+.nextplan { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 14px; border-radius: 16px; background: var(--brand-soft); color: var(--ink); text-decoration: none; margin-bottom: 16px; }
 .nextplan__icon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); }
 .nextplan__icon svg { width: 18px; height: 18px; }
 :root[data-theme='dark'] .nextplan__icon { background: var(--brand-grad); }
