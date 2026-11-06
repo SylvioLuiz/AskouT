@@ -124,7 +124,8 @@ export function Shell({ children }: { children: ReactNode }) {
     to: '/perfil',
     label: t('Perfil'),
     icon: <UserIcon />,
-    also: ['/amigos', '/bloqueados', '/configuracao', '/privacidade', '/privacidade/apagar-conta', '/interacoes', '/arquivados', '/ajuda', '/tema'],
+    // O próprio perfil também abre por /u/<usuario> (ex.: link do avatar).
+    also: ['/amigos', '/bloqueados', '/configuracao', '/privacidade', '/privacidade/apagar-conta', '/interacoes', '/arquivados', '/ajuda', '/tema', `/u/${user.profile.username}`, `/u/${encodeURIComponent(user.profile.username)}`],
   };
 
   return (
@@ -169,7 +170,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <BellIcon />
             {hasPending ? <span className="navlink__badge" aria-hidden="true" /> : null}
           </Link>
-          <Link to="/perfil" className="iconbtn" aria-label={t('Perfil')} aria-current={pathname === '/perfil' ? 'page' : undefined}>
+          <Link to="/perfil" className="iconbtn" aria-label={t('Perfil')} aria-current={isActive(profile, pathname) ? 'page' : undefined}>
             <UserIcon />
           </Link>
         </nav>
