@@ -1,5 +1,5 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { ExploreViews } from '../components/explore-views.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
 import { VenueLogo } from '../components/venue-logo.tsx';
@@ -112,11 +112,19 @@ function enterDelay(index: number): CSSProperties {
   return { animationDelay: `${Math.min(index, 3) * 50}ms` };
 }
 
-function MapCard({ event, selected, index }: { event: ExploreEvent; selected: boolean; index: number }) {
+/** Toque no cartão (fora dos links e botões) destaca o cartão e leva o mapa até ele. */
+function selectOnTap(id: string, onSelect: (id: string) => void) {
+  return (event: MouseEvent<HTMLLIElement>) => {
+    if (event.target instanceof Element && event.target.closest('a, button')) return;
+    onSelect(id);
+  };
+}
+
+function MapCard({ event, selected, index, onSelect }: { event: ExploreEvent; selected: boolean; index: number; onSelect: (id: string) => void }) {
   const [failed, setFailed] = useState(false);
   const image = failed ? null : safeImage(event.imageUrl);
   return (
-    <li className={`evmap__slide${selected ? ' evmap__slide--on' : ''}`} data-id={`e:${event.id}`} style={enterDelay(index)}>
+    <li className={`evmap__slide${selected ? ' evmap__slide--on' : ''}`} data-id={`e:${event.id}`} style={enterDelay(index)} onClick={selectOnTap(`e:${event.id}`, onSelect)}>
       <article className="evmapcard">
         <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evmapcard__link" aria-label={t('Abrir evento {title}', { title: event.title })}>
           <span className={`evmapcard__cover evcover--${event.kind.toLowerCase()}`}>
@@ -141,7 +149,7 @@ function MapCard({ event, selected, index }: { event: ExploreEvent; selected: bo
   );
 }
 
-function PlaceCard({ place, selected, index }: { place: ExplorePlace; selected: boolean; index: number }) {
+function PlaceCard({ place, selected, index, onSelect }: { place: ExplorePlace; selected: boolean; index: number; onSelect: (id: string) => void }) {
   const [opening, setOpening] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [failed, setFailed] = useState(false);
@@ -165,7 +173,7 @@ function PlaceCard({ place, selected, index }: { place: ExplorePlace; selected: 
   }
 
   return (
-    <li className={`evmap__slide${selected ? ' evmap__slide--on' : ''}`} data-id={`p:${place.key}`} style={enterDelay(index)}>
+    <li className={`evmap__slide${selected ? ' evmap__slide--on' : ''}`} data-id={`p:${place.key}`} style={enterDelay(index)} onClick={selectOnTap(`p:${place.key}`, onSelect)}>
       <article className="evmapcard evmapcard--place">
         <div className="evmapplace__head">
           {image ? (
@@ -257,7 +265,8 @@ export function EventsMapScreen() {
   );
 
   const ids = useMemo(() => (mode === 'places' ? places.map((p) => `p:${p.key}`) : events.map((e) => `e:${e.id}`)), [mode, places, events]);
-  const current = selectedId && ids.includes(selectedId) ? selectedId : ids[0];
+  // Centralizado em você: nenhum cartão destacado até a pessoa tocar num cartão ou pin.
+  const current = atMe ? undefined : selectedId && ids.includes(selectedId) ? selectedId : ids[0];
 
   // Pin tocado → troca para a lista do tipo dele e leva o carrossel até o cartão.
   function pick(id: string) {
@@ -444,8 +453,8 @@ export function EventsMapScreen() {
             </p>
             <ul ref={strip} key={resultsKey} className={`evmap__strip${refreshing ? ' evmap__strip--stale' : ''}`} aria-busy={refreshing || undefined}>
               {mode === 'places'
-                ? places.map((p, i) => <PlaceCard key={p.key} place={p} index={i} selected={`p:${p.key}` === current} />)
-                : events.map((e, i) => <MapCard key={e.id} event={e} index={i} selected={`e:${e.id}` === current} />)}
+                ? places.map((p, i) => <PlaceCard key={p.key} place={p} index={i} selected={`p:${p.key}` === current} onSelect={pick} />)
+                : events.map((e, i) => <MapCard key={e.id} event={e} index={i} selected={`e:${e.id}` === current} onSelect={pick} />)}
             </ul>
           </>
         )}

@@ -3730,7 +3730,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmap__top { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 56px 10px; pointer-events: none; }
 .evmap__top > * { pointer-events: auto; }
 .evmap__back { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 22px; background: rgba(255,255,255,.94); color: #111; box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer; }
-.evmap__bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 24px); }
+.evmap__bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 36px); }
 .evmap__status { margin: 0 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; border-radius: 18px; background: rgba(20,20,22,.92); color: #fff; text-align: center; }
 .evmap__status p { margin: 0; }
 .evmap__note { margin: 8px 16px 0; font-size: 12px; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.8); text-align: center; }
@@ -3772,6 +3772,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmap__strip--stale { opacity: .55; }
 .evmap__strip > .evmap__slide { animation: evmap-card-in .34s cubic-bezier(.2,.8,.2,1) both; }
 .evmapcard { transition: outline-color .2s ease, transform .2s ease; }
+.evmap__slide { cursor: pointer; }
 .fadeimg { opacity: 0; transition: opacity .3s ease; }
 .fadeimg--on { opacity: 1; }
 .evmapcard--skeleton { min-height: 0; }
