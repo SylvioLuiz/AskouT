@@ -8,6 +8,7 @@ interface Payload {
   body: string;
   url: string;
   dedupeKey: string | null;
+  actorId?: string | null;
 }
 
 export class PrismaNotificationRepository implements NotificationRepository {
@@ -18,7 +19,7 @@ export class PrismaNotificationRepository implements NotificationRepository {
   }
 
   async create(record: NotificationRecord): Promise<void> {
-    const payload: Payload = { title: record.title, body: record.body, url: record.url, dedupeKey: record.dedupeKey };
+    const payload: Payload = { title: record.title, body: record.body, url: record.url, dedupeKey: record.dedupeKey, actorId: record.actorId ?? null };
     await this.prisma.notification.create({ data: { id: record.id, userId: record.userId, type: record.type, payload: payload as unknown as Prisma.InputJsonObject, readAt: record.readAt, createdAt: record.createdAt } });
   }
 
@@ -27,7 +28,7 @@ export class PrismaNotificationRepository implements NotificationRepository {
     const rows = await this.prisma.notification.findMany({ where: { userId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit });
     return rows.map((r) => {
       const p = r.payload as unknown as Payload;
-      return { id: r.id, userId: r.userId, type: r.type as NotificationType, title: p.title, body: p.body, url: p.url, dedupeKey: p.dedupeKey ?? null, readAt: r.readAt, createdAt: r.createdAt };
+      return { id: r.id, userId: r.userId, type: r.type as NotificationType, title: p.title, body: p.body, url: p.url, dedupeKey: p.dedupeKey ?? null, actorId: typeof p.actorId === 'string' ? p.actorId : null, readAt: r.readAt, createdAt: r.createdAt };
     });
   }
 

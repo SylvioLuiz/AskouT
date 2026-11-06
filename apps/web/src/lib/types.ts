@@ -331,6 +331,8 @@ export interface NotificationItem {
   url: string;
   read: boolean;
   createdAt: string;
+  /** Quem causou o aviso (seguiu, curtiu, convidou...). Nulo em avisos do sistema e nos antigos. */
+  actor?: { userId: string; username: string; avatarUrl: string | null } | null;
 }
 
 export interface NotificationList {

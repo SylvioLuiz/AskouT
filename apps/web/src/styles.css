@@ -3100,6 +3100,26 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 .newsrow--unread .newsrow__title { font-weight: 700; }
 .newsrow__text { color: var(--muted, #6b6b7b); font-size: 0.875rem; overflow-wrap: anywhere; }
 .newsrow__time { flex: none; color: var(--muted, #6b6b7b); font-size: 0.75rem; margin-top: 3px; }
+.newsrow { align-items: center; }
+.newsrow__dot { margin-top: 0; }
+.newshead--end { justify-content: flex-end; }
+/* Foto de quem causou o aviso com selo da categoria (ou só o ícone, nos avisos do sistema). */
+.newsmedia { position: relative; flex: none; width: 44px; height: 44px; }
+.newsmedia .avatarflash__bolt { display: none; }
+.newsmedia__icon { display: grid; place-items: center; border-radius: 50%; }
+.newsmedia__icon svg { width: 22px; height: 22px; }
+.newsmedia__badge { position: absolute; right: -3px; bottom: -3px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; border: 2px solid var(--bg); box-sizing: content-box; }
+.newsmedia__badge svg { width: 12px; height: 12px; stroke-width: 2.4; }
+.newscat--chat { background: var(--brand); color: var(--brand-ink); }
+.newscat--event { background: #b56efc; color: #fff; }
+.newscat--social { background: #3b82f6; color: #fff; }
+.newscat--now { background: var(--brand-grad); color: #fff; }
+.newscat--like { background: #ff3b5c; color: #fff; }
+.newscat--comment { background: var(--ok); color: #fff; }
+.newscat--system { background: var(--line-strong); color: var(--ink); }
+.newsmedia__icon.newscat--chat, .newsmedia__icon.newscat--system { background: var(--brand-soft); color: var(--brand-text); }
+/* Ícone de conversas do cabeçalho: sempre rosa e preenchido. */
+.topbar .iconbtn--chat svg { fill: currentColor; }
 
 /* ---------- Perfil: barra, estatísticas, grade de eventos ---------- */
 

@@ -1,19 +1,108 @@
 import { useEffect, useState } from 'react';
 import { PushCard } from '../components/notifications.tsx';
 import { listTimeLabel } from '../lib/chat.ts';
-import { Link, navigate } from '../router.tsx';
+import { Link, navigate, useSearch } from '../router.tsx';
 import { announceNotificationsChanged, readActivitySeen, writeActivitySeen } from '../lib/notifications.ts';
 import { useUser } from '../auth.tsx';
-import { Button, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
+import { Avatar, Button, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
+import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, ClockIcon, CommentIcon, HeartIcon, PhotoIcon, ShieldIcon, UserPlusIcon } from '../components/icons.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { pluralize } from '../lib/format.ts';
-import type { PublicProfile } from '../lib/types.ts';
+import type { NotificationItem, NotificationType, PublicProfile } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
+
+type Category = 'chat' | 'event' | 'social' | 'now' | 'like' | 'comment' | 'system';
+
+/** Categoria de cada tipo de aviso: define o ícone e a cor do selo. */
+function categoryOf(type: NotificationType): Category {
+  switch (type) {
+    case 'MESSAGE':
+    case 'GROUP_REMOVED':
+      return 'chat';
+    case 'MEETUP_INVITE':
+    case 'MEETUP_ACCEPTED':
+    case 'MEETUP_CANCELLED':
+    case 'EVENT_REMINDER':
+    case 'VENUE_CALENDAR':
+    case 'VENUE_EVENT':
+      return 'event';
+    case 'FOLLOW_REQUEST':
+    case 'FOLLOW_ACCEPTED':
+    case 'FOLLOW_NEW':
+    case 'POST_TAG':
+      return 'social';
+    case 'FLASH_INVITE':
+      return 'now';
+    case 'POST_LIKE':
+      return 'like';
+    case 'POST_COMMENT':
+      return 'comment';
+    default:
+      return 'system';
+  }
+}
+
+function CategoryIcon({ type }: { type: NotificationType }) {
+  switch (type) {
+    case 'MESSAGE':
+    case 'GROUP_REMOVED':
+      return <ChatIcon />;
+    case 'EVENT_REMINDER':
+      return <ClockIcon />;
+    case 'MEETUP_INVITE':
+    case 'MEETUP_ACCEPTED':
+    case 'MEETUP_CANCELLED':
+    case 'VENUE_CALENDAR':
+    case 'VENUE_EVENT':
+      return <CalendarIcon />;
+    case 'FOLLOW_REQUEST':
+    case 'FOLLOW_ACCEPTED':
+    case 'FOLLOW_NEW':
+      return <UserPlusIcon />;
+    case 'POST_TAG':
+      return <PhotoIcon />;
+    case 'FLASH_INVITE':
+      return <BoltIcon filled />;
+    case 'POST_LIKE':
+      return <HeartIcon filled />;
+    case 'POST_COMMENT':
+      return <CommentIcon />;
+    case 'VENUE_CLAIM':
+      return <ShieldIcon />;
+    default:
+      return <BellIcon />;
+  }
+}
+
+/** Como no Instagram: foto de quem causou o aviso com um selo da categoria; sem pessoa, só o ícone da categoria. */
+function NewsMedia({ item }: { item: NotificationItem }) {
+  const category = categoryOf(item.type);
+  if (item.actor) {
+    return (
+      <span className="newsmedia">
+        <Avatar profile={{ ...item.actor, displayName: item.actor.username }} size={44} />
+        <span className={`newsmedia__badge newscat--${category}`} aria-hidden="true">
+          <CategoryIcon type={item.type} />
+        </span>
+      </span>
+    );
+  }
+  return (
+    <span className={`newsmedia newsmedia__icon newscat--${category}`} aria-hidden="true">
+      <CategoryIcon type={item.type} />
+    </span>
+  );
+}
 
 export function ActivityScreen() {
   useTitle(t('Notificações'));
+  const search = useSearch();
+  const [tab, setTab] = useState<'news' | 'requests'>(search.get('aba') === 'pedidos' ? 'requests' : 'news');
+  useEffect(() => {
+    if (search.get('aba') === 'pedidos') setTab('requests');
+  }, [search.get('aba')]);
   const requests = useAsync(() => api.followRequests({ limit: 50 }), []);
   const news = useAsync(() => api.notifications(), []);
   const tagReqs = useAsync(() => api.pendingTags({ limit: 20 }), []);
@@ -88,7 +177,7 @@ export function ActivityScreen() {
     }
   }
 
-  async function open(item: { id: string; url: string; read: boolean }) {
+  async function open(item: { id: string; url: string; read: boolean; type: NotificationType }) {
     if (!item.read) {
       try {
         await api.markNotificationsRead(item.id);
@@ -96,6 +185,11 @@ export function ActivityScreen() {
       } catch {
         // abrir o aviso é mais importante que marcar como lido
       }
+    }
+    // Pedido para seguir abre a aba de pedidos aqui mesmo (avisos antigos apontam só para /atividades).
+    if (item.type === 'FOLLOW_REQUEST' && item.url.startsWith('/atividades')) {
+      setTab('requests');
+      return;
     }
     navigate(item.url);
   }
@@ -113,28 +207,40 @@ export function ActivityScreen() {
   const now = new Date();
   return (
     <>
-      <PageHead title={t('Notificações')} subtitle={t('Novidades e pedidos para seguir você')} />
-      <PushCard />
+      <PageHead title={t('Notificações')} />
+      <PushCard hideInstallHint />
+      <div className="segtabs segtabs--fill" role="tablist" aria-label={t('Notificações')}>
+        <button type="button" role="tab" aria-selected={tab === 'news'} className="segtabs__tab" onClick={() => setTab('news')}>
+          {t('Novidades')}
+          {news.data && news.data.unread > 0 ? <span className="segtabs__n">{news.data.unread > 99 ? '99+' : news.data.unread}</span> : null}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === 'requests'} className="segtabs__tab" onClick={() => setTab('requests')}>
+          {t('Pedidos para seguir')}
+          {requests.data && requests.data.total > 0 ? <span className="segtabs__n">{requests.data.total > 99 ? '99+' : requests.data.total}</span> : null}
+        </button>
+      </div>
+      {tab === 'news' ? (
+        <>
       {news.data && news.data.items.length > 0 ? (
         <>
-          <div className="newshead">
-            <h2 className="results__h">{t('Novidades')}</h2>
-            {news.data.unread > 0 ? (
+          {news.data.unread > 0 ? (
+            <div className="newshead newshead--end">
               <Button small variant="quiet" onClick={() => void readAll()}>
                 {t('Marcar tudo como lido')}
               </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
           <ul className="newslist">
             {news.data.items.map((n) => (
               <li key={n.id}>
                 <button type="button" className={`newsrow${n.read ? '' : ' newsrow--unread'}`} onClick={() => void open(n)}>
-                  <span className="newsrow__dot" aria-hidden="true" />
+                  <NewsMedia item={n} />
                   <span className="newsrow__body">
                     <span className="newsrow__title">{n.title}</span>
                     <span className="newsrow__text">{n.body}</span>
                   </span>
                   <span className="newsrow__time">{listTimeLabel(n.createdAt, now)}</span>
+                  <span className="newsrow__dot" aria-hidden="true" />
                   {n.read ? null : <span className="visually-hidden">{t('não lido')}</span>}
                 </button>
               </li>
@@ -170,8 +276,11 @@ export function ActivityScreen() {
           </ul>
         </>
       ) : null}
-      <h2 className="results__h">{t('Pedidos para seguir')}</h2>
+        </>
+      ) : null}
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      {tab === 'requests' ? (
+        <>
       {requests.loading && !requests.data ? <Loading /> : null}
       {requests.error ? <ErrorState message={requests.error.message} onRetry={requests.reload} /> : null}
       {requests.data && requests.data.items.length === 0 ? (
@@ -198,6 +307,8 @@ export function ActivityScreen() {
               />
             ))}
           </ul>
+        </>
+      ) : null}
         </>
       ) : null}
     </>

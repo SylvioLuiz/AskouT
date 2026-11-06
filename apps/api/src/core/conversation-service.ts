@@ -704,7 +704,8 @@ export class ConversationService {
     const body = conversation.type === 'GROUP' ? `${actorName} ${what}` : what.charAt(0).toUpperCase() + what.slice(1);
     for (const id of memberIds) {
       if (id === actorId || hidden.has(id) || muted.has(id)) continue;
-      await this.deps.notifier.notify({ userId: id, type: 'MESSAGE', title, body, url: `/conversas/${conversation.id}`, dedupeKey: `msg:${conversation.id}` });
+      // Em conversa 1 a 1 o aviso mostra a foto de quem escreveu; no grupo fica o ícone (o aviso junta várias pessoas).
+      await this.deps.notifier.notify({ userId: id, type: 'MESSAGE', title, body, url: `/conversas/${conversation.id}`, dedupeKey: `msg:${conversation.id}`, ...(conversation.type === 'GROUP' ? {} : { actorId }) });
     }
   }
 
