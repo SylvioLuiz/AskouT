@@ -2155,4 +2155,7 @@ export const EN: Readonly<Record<string, string>> = {
   "{n} eventos agora": "{n} events now",
   "Centralizar na minha localização": "Center on my location",
   "Mostrando a sua localização": "Showing your location",
+  "Dia anterior": "Previous day",
+  "Próximo dia": "Next day",
+  "Próximo evento": "Next event",
 };
