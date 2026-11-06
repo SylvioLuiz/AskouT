@@ -2000,6 +2000,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Foto anterior": "Foto anterior",
   "Próxima foto": "Foto siguiente",
   "Foto de perfil": "Foto de perfil",
+  "Ver foto": "Ver foto",
+  "Ver foto de perfil": "Ver foto de perfil",
   "Escolher da galeria": "Elegir de la galería",
   "Celular": "Celular",
   "Seguir todos ({n})": "Seguir a todos ({n})",
@@ -2039,4 +2041,7 @@ export const ES: Readonly<Record<string, string>> = {
   "{n} eventos agora": "{n} eventos ahora",
   "Centralizar na minha localização": "Centrar en mi ubicación",
   "Mostrando a sua localização": "Mostrando tu ubicación",
+  "Dia anterior": "Día anterior",
+  "Próximo dia": "Día siguiente",
+  "Próximo evento": "Próximo evento",
 };

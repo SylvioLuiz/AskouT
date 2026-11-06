@@ -16,6 +16,23 @@ export interface PushPluginLike {
 
 const toPermission = (receive: string): PushPermission => (receive === 'granted' ? 'granted' : receive === 'denied' ? 'denied' : 'prompt');
 
+export interface InAppWindow {
+  location: { pathname: string; search: string };
+  history: { pushState(data: unknown, unused: string, url: string): void };
+  dispatchEvent(event: Event): boolean;
+}
+
+/**
+ * Abre um caminho do app sem recarregar a página: troca o endereço e avisa o roteador (ele escuta `popstate`).
+ * Recarregar (`location.assign`) quebrava no iPhone quando o caminho parece arquivo, como `/u/ana.souza`:
+ * a casca procura um arquivo `ana.souza` em vez de abrir o app, e o perfil não aparecia.
+ * Se o app web ainda não montou (app aberto pelo toque), ele já nasce no caminho trocado.
+ */
+export function openInApp(path: string, win: InAppWindow): void {
+  if (win.location.pathname + win.location.search !== path) win.history.pushState(null, '', path);
+  win.dispatchEvent(new Event('popstate'));
+}
+
 export function createPushBridge(deps: { push: PushPluginLike; open: (path: string) => void; timeoutMs?: number }) {
   const timeoutMs = deps.timeoutMs ?? 15_000;
   let listening = false;

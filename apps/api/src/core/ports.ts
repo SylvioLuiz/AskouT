@@ -720,7 +720,7 @@ export interface PushSender {
 
 /** Cria o aviso dentro do app e tenta o push. Nunca lança erro: falha de aviso não derruba a ação principal. */
 export interface Notifier {
-  notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string }): Promise<void>;
+  notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string; actorId?: string }): Promise<void>;
 }
 
 /** Presença ("Eu vou") e posts dentro de eventos criados por pessoas. */

@@ -1,5 +1,6 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import { lazyWithReload } from '../lib/chunk-reload.ts';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { ExploreViews } from '../components/explore-views.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
 import { VenueLogo } from '../components/venue-logo.tsx';
@@ -18,7 +19,7 @@ import { LocationIcon, RouteIcon, SearchIcon } from '../components/icons.tsx';
 import type { MapView } from '../components/map-engine.ts';
 import { t } from '../lib/i18n/index.ts';
 
-const EventsMap = lazy(() => import('../components/events-map.tsx'));
+const EventsMap = lazyWithReload(() => import('../components/events-map.tsx'));
 
 const RADIUS_KM = 30;
 const PLACES_RADIUS_KM = 10;
@@ -205,6 +206,42 @@ function PlaceCard({ place, selected, index, onSelect }: { place: ExplorePlace; 
   );
 }
 
+/** Busca no topo do mapa, igual à da lista: ao enviar, abre os resultados na lista do Explorar. */
+function MapSearch() {
+  const [query, setQuery] = useState('');
+  return (
+    <form
+      className="evmap__search"
+      role="search"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const q = query.trim();
+        if (q) navigate(`/explorar?q=${encodeURIComponent(q)}`, { replace: true });
+      }}
+    >
+      <span className="search__icon" aria-hidden="true">
+        <SearchIcon />
+      </span>
+      <label className="visually-hidden" htmlFor="busca-mapa">
+        {t('Buscar eventos, rolês, pessoas ou #')}
+      </label>
+      <input
+        id="busca-mapa"
+        className="evmap__searchinput"
+        type="search"
+        enterKeyHint="search"
+        placeholder={t('Eventos, rolês, pessoas ou #')}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        autoComplete="off"
+        autoCapitalize="none"
+        spellCheck={false}
+        maxLength={80}
+      />
+    </form>
+  );
+}
+
 /** Mapa em tela cheia com os locais perto e os eventos acontecendo agora; embaixo, o carrossel do que estiver escolhido. */
 export function EventsMapScreen() {
   useTitle(t('Mapa do Explorar'));
@@ -383,6 +420,7 @@ export function EventsMapScreen() {
         </Suspense>
       )}
       <header className="evmap__top">
+        <MapSearch />
         <ExploreViews current="map" floating />
         <div className="evmap__seg" role="group" aria-label={t('O que mostrar no carrossel')}>
           <button type="button" aria-pressed={mode === 'places'} className={mode === 'places' ? 'is-on' : ''} onClick={() => setMode('places')}>

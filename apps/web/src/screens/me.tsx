@@ -20,6 +20,7 @@ import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validat
 import { InviteSheet } from '../components/invite.tsx';
 import { ConnectContactsCard } from '../components/connect-contacts.tsx';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
+import { AvatarViewer } from '../components/photo-viewer.tsx';
 import { CameraIcon } from '../components/icons.tsx';
 import { formatPhone, normalizePhone } from '../lib/phone.ts';
 import { supportMailto } from '../lib/help-mailto.ts';
@@ -48,6 +49,7 @@ export function EditProfileScreen() {
   const [birth, setBirth] = useState('');
   const [photo, setPhoto] = useState<PendingPhoto>();
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<Message>();
   const [saving, setSaving] = useState(false);
@@ -146,9 +148,11 @@ export function EditProfileScreen() {
           hasPhoto={shownAvatar !== null}
           onPick={(file) => setPhoto({ file, preview: URL.createObjectURL(file) })}
           onRemove={() => setPhoto(saved.avatarUrl ? 'remove' : undefined)}
+          onView={() => setViewOpen(true)}
           onClose={() => setPhotoOpen(false)}
         />
       ) : null}
+      {viewOpen && shownAvatar ? <AvatarViewer url={shownAvatar} onClose={() => setViewOpen(false)} /> : null}
       <form className="form form--flat" onSubmit={save} noValidate>
         <div className="photoedit">
           <button type="button" className="avatarbtn" onClick={() => setPhotoOpen(true)} aria-label={shownAvatar ? t('Trocar foto') : t('Subir foto')} aria-haspopup="dialog">

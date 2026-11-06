@@ -27,6 +27,23 @@ describe('avisos', () => {
     assert.equal(item.title, 'ana');
   });
 
+  it('aviso ligado a uma pessoa traz a foto dela: DM, seguidor e avisos antigos sem actorId', async () => {
+    const w = makeWorld();
+    const { ana, bia } = await friends(w, 'ana', 'bia');
+    const { id } = await w.core.conversations.open(ana!, bia!);
+    await w.core.conversations.send(ana!, id, { body: 'oi' });
+    await w.core.flushNotifications();
+    const msg = (await w.core.notifications.list(bia!)).items.find((n) => n.type === 'MESSAGE')!;
+    assert.equal(msg.actor?.username, 'ana');
+    const follow = (await w.core.notifications.list(bia!)).items.find((n) => n.type === 'FOLLOW_NEW')!;
+    assert.equal(follow.actor?.username, 'ana');
+    // Aviso antigo (gravado antes do actorId): descobre pela chave.
+    for (const row of w.notifications.rows) delete row.actorId;
+    const old = (await w.core.notifications.list(bia!)).items;
+    assert.equal(old.find((n) => n.type === 'MESSAGE')!.actor?.username, 'ana');
+    assert.equal(old.find((n) => n.type === 'FOLLOW_NEW')!.actor?.username, 'ana');
+  });
+
   it('latestUnreadAt: o aviso não lido mais recente; nulo sem não lidos', async () => {
     const w = makeWorld();
     const { ana, bia } = await friends(w, 'ana', 'bia');

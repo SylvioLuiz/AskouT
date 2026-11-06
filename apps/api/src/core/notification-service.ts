@@ -1,5 +1,5 @@
 import { conflict, validationError } from './errors.ts';
-import type { Clock, IdGenerator, Notifier, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
+import type { Clock, ConversationRepository, IdGenerator, MeetupRepository, Notifier, NotificationRepository, PostRepository, PushSender, PushSubscriptionRepository, SchedulingRepository, UserRepository } from './ports.ts';
 import type { NotificationMuteSettings, NotificationRecord, NotificationType } from './types.ts';
 
 export const NOTIFICATIONS_PAGE = 30;
@@ -34,10 +34,18 @@ export interface NotificationView {
   url: string;
   read: boolean;
   createdAt: string;
+  /** Quem causou o aviso, para a tela mostrar a foto. Nulo em avisos do sistema, antigos ou de conta que sumiu. */
+  actor: NotificationActor | null;
 }
 
-export function toNotificationView(n: NotificationRecord): NotificationView {
-  return { id: n.id, type: n.type, title: n.title, body: n.body, url: n.url, read: n.readAt !== null, createdAt: n.createdAt.toISOString() };
+export interface NotificationActor {
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+}
+
+export function toNotificationView(n: NotificationRecord, actor: NotificationActor | null = null): NotificationView {
+  return { id: n.id, type: n.type, title: n.title, body: n.body, url: n.url, read: n.readAt !== null, createdAt: n.createdAt.toISOString(), actor };
 }
 
 interface NotifierDeps {
@@ -57,7 +65,7 @@ export class StoredNotifier implements Notifier {
     this.deps = deps;
   }
 
-  async notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string }): Promise<void> {
+  async notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string; actorId?: string }): Promise<void> {
     const { notifications, clock, ids } = this.deps;
     let muted = false;
     try {
@@ -74,6 +82,7 @@ export class StoredNotifier implements Notifier {
         body: input.body,
         url: input.url,
         dedupeKey: input.dedupeKey ?? null,
+        actorId: input.actorId ?? null,
         readAt: null,
         createdAt: clock.now(),
       });
@@ -110,17 +119,65 @@ export interface PushSubscribeInput {
   keys: unknown;
 }
 
-export class NotificationService {
-  private readonly deps: NotifierDeps;
+/** O que a lista usa para descobrir quem causou cada aviso (inclusive nos antigos, gravados sem `actorId`). */
+interface ActorLookupDeps {
+  users: Pick<UserRepository, 'findProfilesByIds'>;
+  conversations: Pick<ConversationRepository, 'findById' | 'participantIds' | 'listMessages'>;
+  posts: Pick<PostRepository, 'findById' | 'findComment'>;
+  meetups: Pick<MeetupRepository, 'find'>;
+  scheduling: Pick<SchedulingRepository, 'find'>;
+}
 
-  constructor(deps: NotifierDeps) {
+const DIRECT_ACTOR_KEYS = new Set(['follow-request', 'follow-new', 'follow-accepted', 'flash-invite', 'flash-accepted']);
+
+export class NotificationService {
+  private readonly deps: NotifierDeps & ActorLookupDeps;
+
+  constructor(deps: NotifierDeps & ActorLookupDeps) {
     this.deps = deps;
   }
 
   async list(userId: string): Promise<{ items: NotificationView[]; unread: number }> {
     const { notifications } = this.deps;
     const [items, unread] = await Promise.all([notifications.listForUser(userId, NOTIFICATIONS_PAGE), notifications.unreadCount(userId)]);
-    return { items: items.map(toNotificationView), unread };
+    const resolved = await Promise.all(items.map((n) => this.actorOf(n).catch(() => null)));
+    const actorIds = [...new Set(resolved.filter((id): id is string => typeof id === 'string'))];
+    const profiles = actorIds.length > 0 ? await this.deps.users.findProfilesByIds(actorIds) : [];
+    const byId = new Map(profiles.map((p) => [p.userId, { userId: p.userId, username: p.username, avatarUrl: p.avatarUrl }]));
+    return { items: items.map((n, i) => toNotificationView(n, byId.get(resolved[i] ?? '') ?? null)), unread };
+  }
+
+  /**
+   * Quem causou o aviso. Mensagem: quem escreveu por último na conversa (o sino guarda um aviso por conversa).
+   * Avisos antigos, sem `actorId`: descobre pela chave do aviso (seguidor, curtida, comentário, convite...).
+   */
+  private async actorOf(n: NotificationRecord): Promise<string | null> {
+    const notMe = (id: string | null | undefined): string | null => (id && id !== n.userId ? id : null);
+    if (n.type === 'MESSAGE') {
+      const conversationId = /^\/conversas\/([^/?#]+)/.exec(n.url)?.[1];
+      if (conversationId) {
+        const recent = await this.deps.conversations.listMessages(conversationId, 10);
+        const last = [...recent].reverse().find((m) => m.kind !== 'SYSTEM' && m.senderId !== n.userId);
+        if (last) return last.senderId;
+        const conversation = await this.deps.conversations.findById(conversationId);
+        if (conversation && conversation.type !== 'GROUP') {
+          const ids = (await this.deps.conversations.participantIds(conversationId)) ?? [];
+          return notMe(ids.find((id) => id !== n.userId));
+        }
+      }
+      return notMe(n.actorId);
+    }
+    if (n.actorId) return notMe(n.actorId);
+    const parts = (n.dedupeKey ?? '').split(':');
+    const [kind, first, second] = parts;
+    if (!kind || !first) return null;
+    if (DIRECT_ACTOR_KEYS.has(kind)) return notMe(first);
+    if ((kind === 'post-like' || kind === 'comment-like') && second) return notMe(second);
+    if (kind === 'post-comment' || kind === 'comment-mention') return notMe((await this.deps.posts.findComment(first))?.authorId);
+    if (kind === 'post-tag') return notMe((await this.deps.posts.findById(first))?.post.authorId);
+    if (kind === 'meetup-invite') return notMe((await this.deps.meetups.find(first))?.organizerId);
+    if (kind === 'poll') return notMe((await this.deps.scheduling.find(first))?.organizerId);
+    return null;
   }
 
   /** Quando chegou o aviso não lido mais recente (ISO), ou nulo. Serve para a bolinha do sino saber o que é novo desde a última visita. */
