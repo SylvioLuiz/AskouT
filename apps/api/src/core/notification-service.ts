@@ -1,5 +1,5 @@
 import { conflict, validationError } from './errors.ts';
-import type { Clock, IdGenerator, Notifier, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
+import type { Clock, IdGenerator, Notifier, NotificationRepository, PushSender, PushSubscriptionRepository, UserRepository } from './ports.ts';
 import type { NotificationMuteSettings, NotificationRecord, NotificationType } from './types.ts';
 
 export const NOTIFICATIONS_PAGE = 30;
@@ -34,10 +34,18 @@ export interface NotificationView {
   url: string;
   read: boolean;
   createdAt: string;
+  /** Quem causou o aviso, para a tela mostrar a foto. Nulo em avisos do sistema, antigos ou de conta que sumiu. */
+  actor: NotificationActor | null;
 }
 
-export function toNotificationView(n: NotificationRecord): NotificationView {
-  return { id: n.id, type: n.type, title: n.title, body: n.body, url: n.url, read: n.readAt !== null, createdAt: n.createdAt.toISOString() };
+export interface NotificationActor {
+  userId: string;
+  username: string;
+  avatarUrl: string | null;
+}
+
+export function toNotificationView(n: NotificationRecord, actor: NotificationActor | null = null): NotificationView {
+  return { id: n.id, type: n.type, title: n.title, body: n.body, url: n.url, read: n.readAt !== null, createdAt: n.createdAt.toISOString(), actor };
 }
 
 interface NotifierDeps {
@@ -57,7 +65,7 @@ export class StoredNotifier implements Notifier {
     this.deps = deps;
   }
 
-  async notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string }): Promise<void> {
+  async notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string; actorId?: string }): Promise<void> {
     const { notifications, clock, ids } = this.deps;
     let muted = false;
     try {
@@ -74,6 +82,7 @@ export class StoredNotifier implements Notifier {
         body: input.body,
         url: input.url,
         dedupeKey: input.dedupeKey ?? null,
+        actorId: input.actorId ?? null,
         readAt: null,
         createdAt: clock.now(),
       });
@@ -111,16 +120,19 @@ export interface PushSubscribeInput {
 }
 
 export class NotificationService {
-  private readonly deps: NotifierDeps;
+  private readonly deps: NotifierDeps & { users: Pick<UserRepository, 'findProfilesByIds'> };
 
-  constructor(deps: NotifierDeps) {
+  constructor(deps: NotifierDeps & { users: Pick<UserRepository, 'findProfilesByIds'> }) {
     this.deps = deps;
   }
 
   async list(userId: string): Promise<{ items: NotificationView[]; unread: number }> {
     const { notifications } = this.deps;
     const [items, unread] = await Promise.all([notifications.listForUser(userId, NOTIFICATIONS_PAGE), notifications.unreadCount(userId)]);
-    return { items: items.map(toNotificationView), unread };
+    const actorIds = [...new Set(items.map((n) => n.actorId).filter((id): id is string => typeof id === 'string'))];
+    const profiles = actorIds.length > 0 ? await this.deps.users.findProfilesByIds(actorIds) : [];
+    const byId = new Map(profiles.map((p) => [p.userId, { userId: p.userId, username: p.username, avatarUrl: p.avatarUrl }]));
+    return { items: items.map((n) => toNotificationView(n, (n.actorId && byId.get(n.actorId)) || null)), unread };
   }
 
   /** Quando chegou o aviso não lido mais recente (ISO), ou nulo. Serve para a bolinha do sino saber o que é novo desde a última visita. */

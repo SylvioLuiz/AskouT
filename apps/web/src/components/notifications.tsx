@@ -18,7 +18,7 @@ const COPY: Record<Exclude<PushState, 'off' | 'on'>, string> = {
 const NATIVE_DENIED = t('Os avisos do AskouT estão bloqueados neste iPhone. Para receber, libere em Ajustes > AskouT > Notificações e volte aqui.');
 
 /** Liga ou desliga os avisos fora do app neste aparelho. */
-export function PushCard() {
+export function PushCard({ hideInstallHint = false }: { hideInstallHint?: boolean } = {}) {
   const [state, setState] = useState<PushState | undefined>();
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -75,6 +75,7 @@ export function PushCard() {
 
   // Com os avisos já ligados não há o que mostrar (para desligar: Ajustes do aparelho ou do navegador).
   if (!state || state === 'on') return null;
+  if (hideInstallHint && state === 'needs-install') return null;
   if (state !== 'off') return <p className="muted pushcard__hint">{state === 'denied' && nativePushBridge() ? NATIVE_DENIED : COPY[state]}</p>;
   return (
     <div className="callout pushcard">
