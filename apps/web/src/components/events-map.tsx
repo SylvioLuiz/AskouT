@@ -25,9 +25,11 @@ interface Props {
   onUserMove: (view: MapView) => void;
   /** Muda a cada toque em "Centralizar na minha localização": leva o mapa até a sua posição. */
   recenter: number;
+  /** Falso logo depois de centralizar em você: o mapa não corre para o cartão destacado até a pessoa escolher outro. */
+  followSelection: boolean;
 }
 
-export default function EventsMap({ pins, me, selectedId, onSelect, onFail, autoFit, onUserMove, recenter }: Props) {
+export default function EventsMap({ pins, me, selectedId, onSelect, onFail, autoFit, onUserMove, recenter, followSelection }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const live = useRef<{ map: MapEngine; markers: Map<string, EngineMarker>; me?: EngineMarker; fitKey: string } | undefined>(undefined);
   const failRef = useRef(onFail);
@@ -119,8 +121,8 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail, auto
     if (!ready || !state) return;
     for (const [id, marker] of state.markers) marker.element.classList.toggle('evpin--on', id === selectedId);
     const pin = pins.find((p) => p.id === selectedId);
-    if (pin) state.map.moveTo(pin, { raiseBy: 90, animate: true });
-  }, [ready, selectedId, pins]);
+    if (pin && followSelection) state.map.moveTo(pin, { raiseBy: 90, animate: true });
+  }, [ready, selectedId, pins, followSelection]);
 
   // "Centralizar na minha localização". Só no toque do botão, não a cada atualização da posição.
   const meRef = useRef(me);
