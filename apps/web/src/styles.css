@@ -3766,6 +3766,43 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmapcard--place .tag-sponsored { align-self: flex-start; }
 .evpin--me { width: 18px; height: 18px; border: 3px solid #fff; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 6px var(--shadow-brand); cursor: default; }
 .evpin--me::before { content: none; }
+/* Mapa do Explorar: cartões do rodapé entram suaves, sem pulos de altura. */
+.evmap__bottom > * { animation: evmap-fade .22s ease-out both; }
+.evmap__strip { transition: opacity .2s ease; }
+.evmap__strip--stale { opacity: .55; }
+.evmap__strip > .evmap__slide { animation: evmap-card-in .34s cubic-bezier(.2,.8,.2,1) both; }
+.evmapcard { transition: outline-color .2s ease, transform .2s ease; }
+.fadeimg { opacity: 0; transition: opacity .3s ease; }
+.fadeimg--on { opacity: 1; }
+.evmapcard--skeleton { min-height: 0; }
+.evskel { display: block; border-radius: 8px; background: linear-gradient(90deg, rgba(255,255,255,.07) 25%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.07) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s ease-in-out infinite; }
+.evskel--logo { flex: none; width: 48px; height: 48px; border-radius: 12px; }
+.evskel__lines { flex: 1; gap: 8px; }
+.evskel--line { height: 13px; width: 75%; }
+.evskel--short { width: 45%; }
+.evskel--button { width: 104px; height: 36px; border-radius: 18px; }
+.evskel--quiet { width: 64px; opacity: .6; }
+.evskel--cover { height: 140px; border-radius: 0; }
+.evpin { animation: evpin-in .26s ease-out both; }
+.evmap__area { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border: 0; border-radius: 20px; background: rgba(255,255,255,.96); color: rgb(26 11 46); font: inherit; font-size: 14px; font-weight: 700; box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer; animation: evmap-drop .24s cubic-bezier(.2,.8,.2,1) both; }
+.evmap__area svg { width: 18px; height: 18px; }
+.evmap__area:disabled { cursor: default; opacity: .92; }
+.evmap__count { align-self: flex-start; margin: 0 0 6px 20px; padding: 3px 10px; border-radius: 12px; background: rgba(18,18,20,.62); color: rgba(255,255,255,.88); font-size: 12px; font-weight: 600; width: fit-content; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.evmapplace__route { display: inline-flex; align-items: center; gap: 6px; }
+.evmapplace__route .icon { width: 16px; height: 16px; }
+.evmap__bottom > .evmap__locate { position: absolute; right: 16px; bottom: calc(100% + 12px); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: rgba(255,255,255,.96); color: rgb(26 11 46); box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer; transition: transform .15s ease; }
+.evmap__locate:active { transform: scale(.94); }
+.evmap__locate svg { width: 22px; height: 22px; }
+.evmap__spin { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: evmap-spin .7s linear infinite; }
+@keyframes evmap-fade { from { opacity: 0; } }
+@keyframes evmap-card-in { from { opacity: 0; transform: translateY(18px); } }
+@keyframes evmap-drop { from { opacity: 0; transform: translateY(-8px) scale(.96); } }
+@keyframes evpin-in { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes evmap-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .evmap__bottom > *, .evmap__strip > .evmap__slide, .evpin, .evmap__area, .evskel { animation: none; }
+  .fadeimg, .evmap__strip, .evmapcard { transition: none; }
+}
 
 /* Ficha do lugar (aba Sobre) */
 .vinfolist { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
@@ -5074,3 +5111,6 @@ button.reactlist__row { cursor: pointer; }
 .flashmap > .muted { line-height: 1.45; }
 /* Na janela, o título da janela já diz "Ver no mapa". */
 [role='dialog'] .flashmap__title { display: none; }
+
+/* Explorar (lista): contador "N eventos a até X km" com respiro antes dos cartões. */
+.explore__count { margin: 4px 0 14px; font-size: 13px; }

@@ -576,7 +576,7 @@ export function ExploreScreen() {
             ) : (
               <>
                 {autoRange !== null && range === autoRange ? <p className="muted" role="status">{t('Nada para hoje. Mostrando: {periodo}.', { periodo: rangeLabel(autoRange) })}</p> : null}
-                <p className="muted" aria-live="polite">
+                <p className="muted explore__count" aria-live="polite">
                   {pluralize(data.events.length, t('evento'), t('eventos'))} {hot ? t('bombando agora') : data.located ? t('a até {km} km', { km: data.radiusKm }) : t('no período')}
                 </p>
                 <ul className="evgrid">
