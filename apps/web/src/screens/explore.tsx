@@ -7,7 +7,7 @@ import { ShareEventSheet } from '../components/share-event.tsx';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
 import { ClockIcon, EventKindIcon, SearchIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
-import { Button, EmptyState, ErrorState, Loading, PageHead, PersonRow } from '../components/ui.tsx';
+import { Button, EmptyState, ErrorState, Loading, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
 import { safeStorage } from '../lib/hints.ts';
@@ -448,78 +448,82 @@ export function ExploreScreen() {
 
   return (
     <>
-      <PageHead title={t('Explorar')} />
-      <ExploreViews current="list" />
+      {/* Sem título visível: a aba do rodapé já diz que é o Explorar. */}
+      <h1 className="visually-hidden">{t('Explorar')}</h1>
 
-      <div className="search search--explore" role="search">
-        <span className="search__icon" aria-hidden="true">
-          <SearchIcon />
-        </span>
-        <label className="visually-hidden" htmlFor="busca">
-          {t('Buscar eventos, rolês, pessoas ou #')}
-        </label>
-        <input
-          id="busca"
-          ref={inputRef}
-          className="search__input search__input--icon"
-          type="search"
-          placeholder={t('Eventos, rolês, pessoas ou #')}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') commitSearch(query);
-          }}
-          autoComplete="off"
-          autoCapitalize="none"
-          spellCheck={false}
-          maxLength={80}
-        />
-      </div>
-
-      {showPanel ? (
-        // onPointerDown evita que o campo perca o foco (e o painel suma) antes do toque valer.
-        <div className="searchpanel" onPointerDown={(event) => event.preventDefault()}>
-          {recent.length > 0 ? (
-            <section aria-label={t('Buscas recentes')}>
-              <div className="searchpanel__head">
-                <h2 className="searchpanel__h">{t('Recentes')}</h2>
-                <button type="button" className="searchpanel__clear" onClick={() => forgetSearch()}>
-                  {t('Limpar')}
-                </button>
-              </div>
-              <ul className="searchpanel__list">
-                {recent.map((term) => (
-                  <li key={term} className="searchpanel__row">
-                    <button type="button" className="searchpanel__item" onClick={() => pick(term)}>
-                      <ClockIcon />
-                      <span>{term}</span>
-                    </button>
-                    <button type="button" className="searchpanel__x" aria-label={t('Apagar a busca {term}', { term })} onClick={() => forgetSearch(term)}>
-                      ×
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-          {suggestions.length > 0 ? (
-            <section aria-label={t('Sugestões')}>
-              <h2 className="searchpanel__h">{t('Sugestões')}</h2>
-              <ul className="tagchips">
-                {suggestions.map((term) => (
-                  <li key={term}>
-                    <button type="button" className="fchip" onClick={() => pick(term)}>
-                      {term}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+      {/* Busca sempre no topo: fica presa logo abaixo da barra do app enquanto a lista rola. */}
+      <div className="explore__sticky">
+        <div className="search search--explore" role="search">
+          <span className="search__icon" aria-hidden="true">
+            <SearchIcon />
+          </span>
+          <label className="visually-hidden" htmlFor="busca">
+            {t('Buscar eventos, rolês, pessoas ou #')}
+          </label>
+          <input
+            id="busca"
+            ref={inputRef}
+            className="search__input search__input--icon"
+            type="search"
+            placeholder={t('Eventos, rolês, pessoas ou #')}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') commitSearch(query);
+            }}
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={80}
+          />
         </div>
-      ) : null}
+
+        {showPanel ? (
+          // onPointerDown evita que o campo perca o foco (e o painel suma) antes do toque valer.
+          <div className="searchpanel" onPointerDown={(event) => event.preventDefault()}>
+            {recent.length > 0 ? (
+              <section aria-label={t('Buscas recentes')}>
+                <div className="searchpanel__head">
+                  <h2 className="searchpanel__h">{t('Recentes')}</h2>
+                  <button type="button" className="searchpanel__clear" onClick={() => forgetSearch()}>
+                    {t('Limpar')}
+                  </button>
+                </div>
+                <ul className="searchpanel__list">
+                  {recent.map((term) => (
+                    <li key={term} className="searchpanel__row">
+                      <button type="button" className="searchpanel__item" onClick={() => pick(term)}>
+                        <ClockIcon />
+                        <span>{term}</span>
+                      </button>
+                      <button type="button" className="searchpanel__x" aria-label={t('Apagar a busca {term}', { term })} onClick={() => forgetSearch(term)}>
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {suggestions.length > 0 ? (
+              <section aria-label={t('Sugestões')}>
+                <h2 className="searchpanel__h">{t('Sugestões')}</h2>
+                <ul className="tagchips">
+                  {suggestions.map((term) => (
+                    <li key={term}>
+                      <button type="button" className="fchip" onClick={() => pick(term)}>
+                        {term}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      <ExploreViews current="list" />
 
       <div className="filters" role="group" aria-label={t('Filtros')}>
         {THEMES.map((theme) => (
