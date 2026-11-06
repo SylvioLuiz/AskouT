@@ -298,3 +298,20 @@ test('denúncia de perfil e de comentário: vai para a fila da gestão, com o te
   assert.equal((await w.core.admin.userReports(A, { status: 'resolved' })).items[0]!.resolution, 'ACTIONED');
   assert.equal((await w.core.admin.stats(A)).openUserReports, 1);
 });
+
+test('comentário denunciado: a gestão apaga com motivo e fica na auditoria', async () => {
+  const { w, A, U, ana, bia } = await setup();
+  const post = await w.core.posts.create(bia, { caption: 'oi', images: [JPEG()] });
+  const c = await w.core.posts.addComment(ana, post.id, 'comentário ruim');
+  await w.core.posts.reportComment(bia, post.id, c.id, 'OFFENSIVE');
+  const row = (await w.core.admin.userReports(A, {})).items.find((r) => r.kind === 'COMMENT')!;
+  assert.deepEqual([row.commentId, row.commentExists], [c.id, true]);
+
+  await rejectsWith(w.core.admin.deletePostComment(U(ana), c.id, 'x'), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.deletePostComment(A, c.id, ''), 'VALIDATION');
+  await w.core.admin.deletePostComment(A, c.id, 'Ofensivo');
+  await rejectsWith(w.core.admin.deletePostComment(A, c.id, 'de novo'), 'NOT_FOUND');
+  assert.equal((await w.core.posts.comments(bia, post.id)).items.length, 0);
+  assert.equal((await w.core.admin.userReports(A, {})).items.find((r) => r.kind === 'COMMENT')!.commentExists, false);
+  assert.equal((await w.core.admin.audit(A, {})).items[0]!.action, 'COMMENT_REMOVED');
+});

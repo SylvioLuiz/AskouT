@@ -1,3 +1,4 @@
+export { PrismaActivityRepository } from './prisma-activity.repository.ts';
 export { PrismaAvailabilityRepository } from './prisma-availability.repository.ts';
 export { PrismaBlockRepository } from './prisma-block.repository.ts';
 export { PrismaFlashRepository } from './prisma-flash.repository.ts';

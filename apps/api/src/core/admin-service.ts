@@ -272,6 +272,17 @@ export class AdminService {
     return { deleted: true };
   }
 
+  /** Apaga um comentário de post (ex.: o denunciado na aba "Perfis e comentários"). */
+  async deletePostComment(actor: Actor, commentId: unknown, note: unknown): Promise<{ deleted: true }> {
+    this.assertAdmin(actor);
+    const reason = noteText(note, true);
+    const comment = typeof commentId === 'string' && commentId.length <= 64 ? await this.deps.posts.findComment(commentId) : undefined;
+    if (!comment) throw notFound('Comentário não encontrado');
+    await this.deps.posts.deleteComment(comment.id);
+    await this.log(actor.userId, 'COMMENT_REMOVED', 'COMMENT', comment.id, reason);
+    return { deleted: true };
+  }
+
   // ---------- Denúncias ----------
 
   async postReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminPostReportRow>> {

@@ -55,6 +55,8 @@ import type {
   EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
+import type { ActivityRepository } from '../ports.ts';
+import type { ActivityAction, ActivityRecord, ActivityTarget } from '../types.ts';
 
 /**
  * Repositórios em memória. Servem para testar as regras sem banco e como
@@ -2088,7 +2090,7 @@ export class InMemoryFeedRepository implements FeedRepository {
   readonly policies = new Map<string, FeedPolicy>();
   readonly posts = new Map<string, FeedPostRecord>();
   readonly images = new Map<string, { postId: string; position: number; mime: string; data: Uint8Array }>();
-  readonly reactions = new Map<string, { postId: string; userId: string; emoji: string }>();
+  readonly reactions = new Map<string, { postId: string; userId: string; emoji: string; createdAt?: Date }>();
   readonly comments = new Map<string, FeedCommentRecord>();
   readonly commentReactions = new Map<string, { commentId: string; userId: string; emoji: string }>();
 
@@ -2176,8 +2178,8 @@ export class InMemoryFeedRepository implements FeedRepository {
     return img && this.posts.has(img.postId) ? { mime: img.mime, data: new Uint8Array(img.data) } : undefined;
   }
 
-  async setReaction(postId: string, userId: string, emoji: string): Promise<void> {
-    if (this.posts.has(postId)) this.reactions.set(`${postId}|${userId}`, { postId, userId, emoji });
+  async setReaction(postId: string, userId: string, emoji: string, at?: Date): Promise<void> {
+    if (this.posts.has(postId)) this.reactions.set(`${postId}|${userId}`, { postId, userId, emoji, ...(at ? { createdAt: at } : {}) });
   }
 
   async removeReaction(postId: string, userId: string): Promise<void> {
@@ -2484,8 +2486,9 @@ export class InMemoryAdminRepository implements AdminRepository {
       if (open === (r.resolvedAt !== null && r.resolvedAt !== undefined)) continue;
       const reported = this.users.users.get(r.reportedUserId);
       if (!reported) continue;
+      const commentId = r.kind === 'COMMENT' ? r.commentId ?? null : null;
       rows.push({
-        id: r.id, kind: r.kind, reason: r.reason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
+        id: r.id, kind: r.kind, commentId, commentExists: commentId !== null && this.posts.comments.has(commentId), reason: r.reason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
         reporter: { id: r.reporterId, username: this.username(r.reporterId) },
         reported: { id: r.reportedUserId, username: this.username(r.reportedUserId), status: reported.status },
         resolvedAt: r.resolvedAt ?? null, resolution: r.resolution ?? null, resolutionNote: r.resolutionNote ?? null,
@@ -2703,5 +2706,120 @@ export class InMemorySchedulingRepository implements SchedulingRepository {
 
   async listConfirmations(proposalId: string): Promise<PollConfirmationRecord[]> {
     return [...(this.confirmations.get(proposalId)?.values() ?? [])].map((c) => ({ ...c })).sort((a, b) => (a.userId < b.userId ? -1 : 1));
+  }
+}
+
+/** Lê o registro de atividades direto das tabelas dos outros repositórios em memória (como o Prisma faz no banco). */
+export class InMemoryActivityRepository implements ActivityRepository {
+  private readonly parts: { posts: InMemoryPostRepository; feed: InMemoryFeedRepository; eventRoom: InMemoryEventRoomRepository; follows: InMemoryFollowRepository; places: InMemoryPlaceRepository };
+
+  constructor(parts: { posts: InMemoryPostRepository; feed: InMemoryFeedRepository; eventRoom: InMemoryEventRoomRepository; follows: InMemoryFollowRepository; places: InMemoryPlaceRepository }) {
+    this.parts = parts;
+  }
+
+  private postInfo(postId: string): { target: ActivityTarget; ownerId: string; title: string | null; hidden: boolean } | undefined {
+    const p = this.parts.posts.posts.get(postId);
+    if (!p) return undefined;
+    return { target: { type: p.eventTitle ? 'USER_EVENT' : 'POST', id: p.id }, ownerId: p.authorId, title: p.eventTitle ?? (p.caption ? p.caption.slice(0, 120) : null), hidden: p.archivedAt !== null };
+  }
+
+  /** Onde fica o feed (evento ou local) e o nome dele; undefined se o alvo sumiu. */
+  private feedPlace(target: FeedTarget): { target: ActivityTarget; title: string | null } | undefined {
+    if (target.type === 'PLACE_EVENT') {
+      const e = this.parts.places.events.get(target.id);
+      return e ? { target: { type: 'PLACE_EVENT', id: e.id }, title: e.title } : undefined;
+    }
+    if (target.type === 'USER_EVENT') {
+      const p = this.parts.posts.posts.get(target.id);
+      return p ? { target: { type: 'USER_EVENT', id: p.id }, title: p.eventTitle } : undefined;
+    }
+    const v = this.parts.places.venues.get(target.id);
+    return v ? { target: { type: 'VENUE', id: v.id }, title: v.name } : undefined;
+  }
+
+  async listByUser(userId: string, query: { actions: readonly ActivityAction[]; before?: { at: Date; id: string }; limit: number }): Promise<ActivityRecord[]> {
+    const want = new Set(query.actions);
+    const out: ActivityRecord[] = [];
+    const push = (r: Omit<ActivityRecord, 'hidden' | 'pending'> & { hidden?: boolean; pending?: boolean }) => out.push({ hidden: false, pending: false, ...r });
+    const { posts, feed, eventRoom, follows, places } = this.parts;
+
+    if (want.has('POST_LIKE')) {
+      for (const [key, at] of posts.likes) {
+        const [postId, who] = key.split('|');
+        if (who !== userId || !postId) continue;
+        const info = this.postInfo(postId);
+        if (info) push({ id: `like:${postId}`, action: 'POST_LIKE', at, ...info, text: null });
+      }
+    }
+    if (want.has('POST_COMMENT')) {
+      for (const c of posts.comments.values()) {
+        if (c.authorId !== userId) continue;
+        const info = this.postInfo(c.postId);
+        if (info) push({ id: `comment:${c.id}`, action: 'POST_COMMENT', at: c.createdAt, ...info, text: c.body });
+      }
+    }
+    if (want.has('POST_CREATED') || want.has('EVENT_CREATED')) {
+      for (const p of posts.posts.values()) {
+        if (p.authorId !== userId) continue;
+        const action: ActivityAction = p.eventTitle ? 'EVENT_CREATED' : 'POST_CREATED';
+        if (!want.has(action)) continue;
+        push({ id: `post:${p.id}`, action, at: p.createdAt, target: { type: p.eventTitle ? 'USER_EVENT' : 'POST', id: p.id }, ownerId: userId, title: p.eventTitle, text: p.caption ? p.caption.slice(0, 280) : null });
+      }
+    }
+    if (want.has('FEED_POST')) {
+      for (const f of feed.posts.values()) {
+        if (f.authorId !== userId) continue;
+        const place = this.feedPlace(f.target);
+        if (place) push({ id: `feedpost:${f.id}`, action: 'FEED_POST', at: f.createdAt, target: place.target, ownerId: userId, title: place.title, text: f.body ? f.body.slice(0, 280) : null, pending: f.status === 'PENDING' });
+      }
+    }
+    if (want.has('FEED_REACTION')) {
+      for (const r of feed.reactions.values()) {
+        if (r.userId !== userId || !r.createdAt) continue;
+        const f = feed.posts.get(r.postId);
+        const place = f ? this.feedPlace(f.target) : undefined;
+        if (f && place) push({ id: `reaction:${f.id}`, action: 'FEED_REACTION', at: r.createdAt, target: place.target, ownerId: f.authorId, title: place.title, text: r.emoji });
+      }
+    }
+    if (want.has('FEED_COMMENT')) {
+      for (const c of feed.comments.values()) {
+        if (c.authorId !== userId) continue;
+        const f = feed.posts.get(c.postId);
+        const place = f ? this.feedPlace(f.target) : undefined;
+        if (f && place) push({ id: `feedcomment:${c.id}`, action: 'FEED_COMMENT', at: c.createdAt, target: place.target, ownerId: f.authorId, title: place.title, text: c.body });
+      }
+    }
+    if (want.has('EVENT_GOING')) {
+      for (const g of eventRoom.going.values()) {
+        if (g.userId !== userId) continue;
+        if (g.ref.source === 'PLACE') {
+          const e = places.events.get(g.ref.id);
+          if (e) push({ id: `going:${e.id}`, action: 'EVENT_GOING', at: g.createdAt, target: { type: 'PLACE_EVENT', id: e.id }, ownerId: null, title: e.title, text: null });
+        } else {
+          const p = posts.posts.get(g.ref.id);
+          if (p) push({ id: `going:${p.id}`, action: 'EVENT_GOING', at: g.createdAt, target: { type: 'USER_EVENT', id: p.id }, ownerId: p.authorId, title: p.eventTitle, text: null, hidden: p.archivedAt !== null });
+        }
+      }
+    }
+    if (want.has('FOLLOW_USER')) {
+      for (const f of follows.rows.values()) {
+        if (f.followerId !== userId) continue;
+        push({ id: `follow:${f.followeeId}`, action: 'FOLLOW_USER', at: f.createdAt, target: { type: 'USER', id: f.followeeId }, ownerId: f.followeeId, title: null, text: null, pending: f.status === 'PENDING' });
+      }
+    }
+    if (want.has('FOLLOW_VENUE')) {
+      for (const [key, at] of places.venueFollows) {
+        const [who, venueId] = key.split('|');
+        if (who !== userId || !venueId) continue;
+        const v = places.venues.get(venueId);
+        if (v) push({ id: `venue:${v.id}`, action: 'FOLLOW_VENUE', at, target: { type: 'VENUE', id: v.id }, ownerId: null, title: v.name, text: null });
+      }
+    }
+
+    const b = query.before;
+    return out
+      .filter((r) => !b || r.at.getTime() < b.at.getTime() || (r.at.getTime() === b.at.getTime() && r.id < b.id))
+      .sort((x, y) => y.at.getTime() - x.at.getTime() || (x.id < y.id ? 1 : x.id > y.id ? -1 : 0))
+      .slice(0, query.limit);
   }
 }

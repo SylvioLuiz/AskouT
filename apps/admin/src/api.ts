@@ -148,6 +148,8 @@ export const api = {
   feedReports: (p: { resolved: boolean; offset: number }) => request<Page<FeedReportRow>>('GET', `/admin/reports/feed${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
   resolveFeedReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/feed/${encodeURIComponent(id)}/resolve`, { resolution, note }),
 
+  deleteComment: (id: string, note: string) => request<unknown>('DELETE', `/admin/comments/${encodeURIComponent(id)}`, { note }),
+
   audit: (offset: number) => request<Page<AuditRow>>('GET', `/admin/audit${query({ offset })}`),
 };
 

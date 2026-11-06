@@ -5,6 +5,7 @@ import { MODERATION_ALERT, ReportAlertInterceptor } from './report-alert.interce
 import type { AppConfig } from './support/config.ts';
 import { AuthGuard } from './auth.guard.ts';
 import { RateLimitGuard } from './rate-limit.guard.ts';
+import { ActivityController } from './controllers/activity.controller.ts';
 import { AuthController } from './controllers/auth.controller.ts';
 import { AvailabilityController } from './controllers/availability.controller.ts';
 import { BlocksController } from './controllers/blocks.controller.ts';
@@ -36,7 +37,7 @@ import { loadConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
 
 @Module({
-  controllers: [AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, FlashController, ConversationsController, PlacesController, ExploreController, FeedController, VenuesController, BoostsController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AdminController],
+  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, FlashController, ConversationsController, PlacesController, ExploreController, FeedController, VenuesController, BoostsController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AdminController],
   providers: [
     { provide: CONFIG, useFactory: () => loadConfig(process.env) },
     prismaProvider,

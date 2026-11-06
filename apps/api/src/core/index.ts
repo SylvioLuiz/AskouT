@@ -1,3 +1,4 @@
+import { ActivityService } from './activity-service.ts';
 import { AvailabilityService } from './availability-service.ts';
 import { AuthService } from './auth-service.ts';
 import { BlockService } from './block-service.ts';
@@ -84,6 +85,7 @@ export function createCore(input: CoreInput) {
     profileEvents: new ProfileEventService(deps, profiles),
     posts,
     dwell: new DwellService(deps),
+    activity: new ActivityService(deps),
     recommendations: new RecommendationService(deps, posts, match),
     regions: new RegionService(deps),
     account: new AccountService(deps),
@@ -148,6 +150,8 @@ export type { ConversationListItem, ConversationView, GroupDetails, MessageView 
 export { RecommendationService } from './recommendation-service.ts';
 export type { RecommendationItem, RecommendationsView } from './recommendation-service.ts';
 export { DwellService } from './dwell-service.ts';
+export { ActivityService, ACTIVITY_ACTIONS, ACTIVITY_PAGE_DEFAULT, ACTIVITY_PAGE_MAX } from './activity-service.ts';
+export type { ActivityItemView, ActivityPage } from './activity-service.ts';
 export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_RADIUS_M, suggestionRadiusM } from './suggestion-service.ts';
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { EventPageService } from './event-page-service.ts';
