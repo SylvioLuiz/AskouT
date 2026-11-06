@@ -48,7 +48,12 @@ import type {
   EventPage,
   NotificationMute,
   EventStoryGroup,
-  EventPost,
+  FeedComment,
+  FeedPage,
+  FeedPolicy,
+  FeedPost,
+  FeedReactions,
+  FeedSettings,
   GroupDetails,
   GoingEvent,
   MeetupView,
@@ -114,6 +119,15 @@ function pageQuery(page: PageRequest | undefined): string {
 }
 
 const id = encodeURIComponent;
+
+/** De qual página é o feed: de um evento ou de um rolê (o trecho da rota na API). */
+export type FeedWhere = 'events' | 'venues';
+
+/** Query string só com o que veio preenchido. */
+function toQuery(values: Record<string, string | number | undefined>): string {
+  const params = Object.entries(values).flatMap(([key, value]) => (value === undefined || value === '' ? [] : [`${key}=${encodeURIComponent(String(value))}`]));
+  return params.length > 0 ? `?${params.join('&')}` : '';
+}
 
 export function createApi(deps: ApiDeps) {
   async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
@@ -408,9 +422,22 @@ export function createApi(deps: ApiDeps) {
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
     eventGo: (eventId: string) => request<EventPage>('POST', `/events/${id(eventId)}/going`),
     eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),
-    eventPostsPublic: (eventId: string, value: boolean) => request<EventPage>('PUT', `/events/${id(eventId)}/posts-public`, { body: { public: value } }),
-    createEventPost: (eventId: string, input: { caption: string; image?: string }) => request<EventPost>('POST', `/events/${id(eventId)}/posts`, { body: input }),
-    deleteEventPost: (eventId: string, postId: string) => request<{ deleted: true }>('DELETE', `/events/${id(eventId)}/posts/${id(postId)}`),
+
+    // Feed das páginas de evento (`events`) e de rolê (`venues`)
+    feed: (where: FeedWhere, targetId: string, query: { cursor?: string | null; limit?: number } = {}) =>
+      request<FeedPage>('GET', `/${where}/${id(targetId)}/feed${toQuery({ cursor: query.cursor ?? undefined, limit: query.limit })}`),
+    createFeedPost: (where: FeedWhere, targetId: string, input: { kind: 'POST' | 'NOTICE'; body?: string; images?: string[] }) => request<FeedPost>('POST', `/${where}/${id(targetId)}/feed`, { body: input }),
+    setFeedPolicy: (where: FeedWhere, targetId: string, policy: FeedPolicy) => request<FeedSettings>('PUT', `/${where}/${id(targetId)}/feed/policy`, { body: { policy } }),
+    feedPending: (where: FeedWhere, targetId: string) => request<{ items: FeedPost[] }>('GET', `/${where}/${id(targetId)}/feed/pending`),
+    feedPost: (postId: string) => request<FeedPost>('GET', `/feed/posts/${id(postId)}`),
+    deleteFeedPost: (postId: string) => request<{ deleted: true }>('DELETE', `/feed/posts/${id(postId)}`),
+    approveFeedPost: (postId: string) => request<FeedPost>('POST', `/feed/posts/${id(postId)}/approve`),
+    rejectFeedPost: (postId: string) => request<{ rejected: true }>('POST', `/feed/posts/${id(postId)}/reject`),
+    reactFeedPost: (postId: string, emoji: string | null) => request<FeedReactions>('PUT', `/feed/posts/${id(postId)}/reaction`, { body: { emoji } }),
+    feedComments: (postId: string, cursor?: string | null) => request<{ items: FeedComment[]; nextCursor: string | null }>('GET', `/feed/posts/${id(postId)}/comments${toQuery({ cursor: cursor ?? undefined })}`),
+    addFeedComment: (postId: string, body: string) => request<FeedComment>('POST', `/feed/posts/${id(postId)}/comments`, { body: { body } }),
+    deleteFeedComment: (commentId: string) => request<{ deleted: true }>('DELETE', `/feed/comments/${id(commentId)}`),
+    reactFeedComment: (commentId: string, emoji: string | null) => request<FeedReactions>('PUT', `/feed/comments/${id(commentId)}/reaction`, { body: { emoji } }),
 
     // Locais (painel do local)
     myVenues: () => request<MyVenues>('GET', '/me/venues'),

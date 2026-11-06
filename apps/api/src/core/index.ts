@@ -9,6 +9,7 @@ import { SchedulingService } from './scheduling-service.ts';
 import { ProfileEventService } from './profile-event-service.ts';
 import { PostService } from './post-service.ts';
 import { EventPageService } from './event-page-service.ts';
+import { FeedService } from './feed-service.ts';
 import { EventReminderService } from './event-reminder-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { VenueService } from './venue-service.ts';
@@ -48,6 +49,7 @@ export function createCore(input: CoreInput) {
   const venues = new VenueService(deps);
   const auth = new AuthService(deps);
   const posts = new PostService(deps, profiles);
+  const eventPages = new EventPageService(deps, profiles);
   const interests = new InterestService(deps);
   const match = new MatchService(deps, interests);
   const paymentsSwitch = new PaymentsSwitch(deps, input.boostsEnabled ?? true);
@@ -71,7 +73,8 @@ export function createCore(input: CoreInput) {
     conversations: new ConversationService(deps),
     suggestions: new SuggestionService(deps, flash),
     explore: new ExploreService(deps, profiles, boosts),
-    eventPages: new EventPageService(deps, profiles),
+    eventPages,
+    feed: new FeedService(deps, eventPages),
     eventReminders: new EventReminderService(deps),
     venues,
     calendarImport: new CalendarImportService(deps, venues),
@@ -149,7 +152,8 @@ export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_RADIUS_M, sugges
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
 export { EventPageService } from './event-page-service.ts';
 export { EventReminderService } from './event-reminder-service.ts';
-export type { EventPageView, EventPostView, EventCoverView } from './event-page-service.ts';
+export type { EventPageView, EventCoverView } from './event-page-service.ts';
+export type { FeedCommentView, FeedCommentsPage, FeedPageView, FeedPostView, FeedReactionsView, FeedSettingsView } from './feed-service.ts';
 export { BoostService, BOOST_DAY_OPTIONS, BOOST_DEFAULT_PRICE_PER_DAY_CENTS, BOOST_DEFAULT_PACKAGE_PRICES_CENTS, boostPhase, boostProductId } from './boost-service.ts';
 export type { BoostPricing, BoostView, BoostPhase } from './boost-service.ts';
 export { ExploreService, EXPLORE_DEFAULT_RADIUS_KM, EXPLORE_MAX_RADIUS_KM } from './explore-service.ts';

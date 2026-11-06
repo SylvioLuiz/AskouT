@@ -210,7 +210,10 @@ model User {
   photo             ProfilePhoto?
   posts             Post[]
   eventAttendances  EventAttendance[]
-  eventPosts        EventPost[]       @relation("EventPostAuthor")
+  feedPosts         FeedPost[]        @relation("FeedPostAuthor")
+  feedComments      FeedComment[]     @relation("FeedCommentAuthor")
+  feedReactions     FeedReaction[]    @relation("FeedReactionUser")
+  feedCommentReactions FeedCommentReaction[] @relation("FeedCommentReactionUser")
   postTags          PostTag[]
   postLikes         PostLike[]    @relation("PostLikes")
   postComments      PostComment[] @relation("PostComments")
@@ -758,6 +761,9 @@ model Venue {
   ratings   VenueRating[]
   posts  Post[]
   comments PostComment[]
+  /// Quem pode publicar no feed da página do rolê.
+  feedPolicy FeedPolicy @default(OWNER_ONLY)
+  feedPosts  FeedPost[]
 
   @@index([lat, lng])
   @@index([ownerId])
@@ -809,6 +815,8 @@ model PlaceEvent {
   tags        String[]  @default([])
   /// Link https para comprar ingresso (informado por quem criou o evento).
   ticketUrl   String?
+  /// Quem pode publicar no feed do evento (o moderador é quem administra o local).
+  feedPolicy  FeedPolicy @default(OWNER_ONLY)
   isSample    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -820,6 +828,7 @@ model PlaceEvent {
   attendees EventAttendance[]
   stories   EventStory[]
   cover    PlaceEventCover?
+  feedPosts FeedPost[]
 
   @@index([startsAt])
   @@index([venueId])
@@ -838,8 +847,8 @@ model Post {
   eventStartsAt DateTime?
   eventEndsAt   DateTime?
   eventKind     EventKind @default(OTHER)
-  /// false (padrão): só o dono posta no evento; true: o dono e quem confirmou presença.
-  eventPostsPublic Boolean @default(false)
+  /// Evento criado pela pessoa: quem pode publicar no feed do evento.
+  feedPolicy       FeedPolicy @default(OWNER_ONLY)
   /// Evento privado: some das listas e do perfil de quem não é o dono; só chega por cartão enviado numa conversa e ninguém o reposta.
   eventPrivate     Boolean @default(false)
   archivedAt    DateTime?
@@ -858,7 +867,7 @@ model Post {
   hiddenBy PostHidden[]
   attendees EventAttendance[]
   stories   EventStory[]
-  eventPosts EventPost[]
+  feedPosts  FeedPost[]
   sharedInMessages Message[] @relation("MessagePostEvent")
   repostedBy PostedUserEvent[]
   datePolls  DatePoll[] @relation("PollEventPost")
@@ -993,22 +1002,6 @@ model EventAttendance {
   @@unique([userId, postId])
   @@index([placeEventId, createdAt])
   @@index([postId, createdAt])
-}
-
-// Post dentro de um evento criado por uma pessoa: legenda e uma foto opcional (até 100 KB).
-model EventPost {
-  id        String   @id @default(uuid()) @db.Uuid
-  eventId   String   @db.Uuid
-  authorId  String   @db.Uuid
-  caption   String
-  mime      String?
-  data      Bytes?
-  createdAt DateTime @default(now())
-
-  event  Post @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  author User @relation("EventPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-
-  @@index([eventId, createdAt])
 }
 
 /// Story de um evento: foto ou vídeo, 24 h no ar e some junto com o evento (o fim do evento vira `expiresAt` se vier antes).
@@ -1396,4 +1389,108 @@ model VenueCalendarDraft {
   @@unique([venueId, occKey])
   @@index([status, publishAt])
   @@index([venueId, startsAt])
+}
+
+/// Quem publica no feed de um evento ou rolê: todos que veem a página, todos com aprovação do dono, ou só o dono.
+enum FeedPolicy {
+  OPEN
+  MODERATED
+  OWNER_ONLY
+}
+
+/// POST: foto ou texto do rolê. NOTICE: aviso (aparece destacado e, vindo do dono, avisa quem vai/segue).
+enum FeedPostKind {
+  POST
+  NOTICE
+}
+
+enum FeedPostStatus {
+  PUBLISHED
+  PENDING
+}
+
+/// Publicação no feed de um evento (do local ou criado por uma pessoa) ou de um rolê. Exatamente um dos três alvos.
+model FeedPost {
+  id           String         @id @default(uuid()) @db.Uuid
+  authorId     String         @db.Uuid
+  placeEventId String?        @db.Uuid
+  userEventId  String?        @db.Uuid
+  venueId      String?        @db.Uuid
+  kind         FeedPostKind   @default(POST)
+  body         String?
+  status       FeedPostStatus @default(PUBLISHED)
+  /// Publicado pelo dono do rolê: a tela mostra o rolê no lugar da pessoa.
+  asVenue      Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  reviewedAt   DateTime?
+
+  author     User        @relation("FeedPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  placeEvent PlaceEvent? @relation(fields: [placeEventId], references: [id], onDelete: Cascade)
+  userEvent  Post?       @relation(fields: [userEventId], references: [id], onDelete: Cascade)
+  venue      Venue?      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  images     FeedPostImage[]
+  comments   FeedComment[]
+  reactions  FeedReaction[]
+
+  @@index([placeEventId, status, createdAt])
+  @@index([userEventId, status, createdAt])
+  @@index([venueId, status, createdAt])
+  @@index([authorId])
+}
+
+/// Foto da publicação do feed (já reduzida pelo app, até 100 KB).
+model FeedPostImage {
+  id       String @id @default(uuid()) @db.Uuid
+  postId   String @db.Uuid
+  position Int
+  mime     String
+  data     Bytes
+
+  post FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, position])
+}
+
+/// Reação com emoji a uma publicação do feed: uma por pessoa.
+model FeedReaction {
+  postId    String   @db.Uuid
+  userId    String   @db.Uuid
+  emoji     String
+  createdAt DateTime @default(now())
+
+  post FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User     @relation("FeedReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([userId])
+}
+
+/// Comentário numa publicação do feed (com @menções).
+model FeedComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @db.Uuid
+  authorId  String   @db.Uuid
+  body      String
+  createdAt DateTime @default(now())
+
+  post      FeedPost              @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User                  @relation("FeedCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  reactions FeedCommentReaction[]
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+}
+
+/// Reação com emoji a um comentário do feed: uma por pessoa.
+model FeedCommentReaction {
+  commentId String   @db.Uuid
+  userId    String   @db.Uuid
+  emoji     String
+  createdAt DateTime @default(now())
+
+  comment FeedComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User        @relation("FeedCommentReactionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([commentId, userId])
+  @@index([userId])
 }

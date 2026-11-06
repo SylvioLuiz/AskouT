@@ -303,11 +303,16 @@ try {
   check('criar evento com tipo Esporte', uev.status === 200 && uev.body.event?.kind === 'SPORT', uev.body);
   const evp = await call('GET', `/events/${uev.body.id}`, { token: a.token });
   check('página do evento da pessoa: dono, capa e 1 confirmado', evp.status === 200 && evp.body.source === 'USER' && evp.body.isOwner === true && evp.body.confirmedCount === 1 && evp.body.coverPath?.startsWith('/posts/images/'), evp.body);
-  const evPost = await call('POST', `/events/${uev.body.id}/posts`, { token: a.token, body: { caption: 'Ponto de encontro' } });
-  check('dono posta no evento', evPost.status === 200 && evPost.body.mine === true, evPost.body);
+  const evPost = await call('POST', `/events/${uev.body.id}/feed`, { token: a.token, body: { body: 'Ponto de encontro', images: [tinyJpeg] } });
+  check('dono publica no feed do evento', evPost.status === 200 && evPost.body.mine === true && evPost.body.images?.[0]?.path?.startsWith('/feed/images/'), evPost.body);
+  const evFeed = await call('GET', `/events/${uev.body.id}/feed`, { token: a.token });
+  check('feed do evento traz a publicação', evFeed.status === 200 && evFeed.body.items?.[0]?.id === evPost.body.id && evFeed.body.policy === 'OWNER_ONLY', evFeed.body);
+  const evCom = await call('POST', `/feed/posts/${evPost.body.id}/comments`, { token: a.token, body: { body: `Chega cedo @${b.username}` } });
+  check('comentário com menção', evCom.status === 200 && evCom.body.mentions?.[0] === b.username, evCom.body);
+  check('reagir à publicação', (await call('PUT', `/feed/posts/${evPost.body.id}/reaction`, { token: a.token, body: { emoji: '🔥' } })).body?.mine === '🔥');
   check('Eu vou em evento inexistente: 404', (await call('POST', '/events/nao-existe/going', { token: a.token })).status === 404);
-  const evOpen = await call('PUT', `/events/${uev.body.id}/posts-public`, { token: a.token, body: { public: true } });
-  check('dono abre os posts para quem vai', evOpen.status === 200 && evOpen.body.postsPublic === true, evOpen.body);
+  const evOpen = await call('PUT', `/events/${uev.body.id}/feed/policy`, { token: a.token, body: { policy: 'MODERATED' } });
+  check('dono liga a aprovação de publicações', evOpen.status === 200 && evOpen.body.policy === 'MODERATED', evOpen.body);
   check('explorar sem login: 401', (await call('GET', '/explore')).status === 401);
 
   console.log('\nPosts');

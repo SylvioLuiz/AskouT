@@ -28,7 +28,7 @@ export class PrismaAccountRepository implements AccountRepository {
   async exportData(userId: string): Promise<Record<string, unknown>> {
     if (!isUuid(userId)) return {};
     const p = this.prisma;
-    const [user, settings, notificationSetting, region, following, followers, blocks, slots, posts, comments, likes, eventPosts, stories, attendances, messages, participations, flashSent, flashReceived, meetingsOrganized, meetingParticipations, pollVotes, venueFollows, venueRatings, claims, boosts, notifications, dwell, identities, pushCount, groups] = await Promise.all([
+    const [user, settings, notificationSetting, region, following, followers, blocks, slots, posts, comments, likes, feedPosts, stories, attendances, messages, participations, flashSent, flashReceived, meetingsOrganized, meetingParticipations, pollVotes, venueFollows, venueRatings, claims, boosts, notifications, dwell, identities, pushCount, groups] = await Promise.all([
       p.user.findUnique({ where: { id: userId }, include: { profile: true } }),
       p.userSettings.findUnique({ where: { userId } }),
       p.notificationSetting.findUnique({ where: { userId } }),
@@ -40,7 +40,7 @@ export class PrismaAccountRepository implements AccountRepository {
       p.post.findMany({ where: { authorId: userId }, include: { tags: true, images: { select: { id: true, position: true, mime: true, placePhotoRef: false } } }, orderBy: { createdAt: 'asc' } }),
       p.postComment.findMany({ where: { authorId: userId }, orderBy: { createdAt: 'asc' } }),
       p.postLike.findMany({ where: { userId } }),
-      p.eventPost.findMany({ where: { authorId: userId }, select: { id: true, eventId: true, caption: true, mime: true, createdAt: true } }),
+      p.feedPost.findMany({ where: { authorId: userId }, select: { id: true, placeEventId: true, userEventId: true, venueId: true, kind: true, body: true, status: true, createdAt: true, _count: { select: { images: true } } }, orderBy: { createdAt: 'asc' } }),
       p.eventStory.findMany({ where: { userId }, select: { id: true, placeEventId: true, postId: true, mime: true, isVideo: true, createdAt: true, expiresAt: true } }),
       p.eventAttendance.findMany({ where: { userId } }),
       p.message.findMany({ where: { senderId: userId }, select: { id: true, conversationId: true, kind: true, body: true, createdAt: true, deletedAt: true }, orderBy: { createdAt: 'asc' } }),
@@ -75,7 +75,8 @@ export class PrismaAccountRepository implements AccountRepository {
       posts: posts.map((x) => ({ id: x.id, caption: x.caption, place: x.placeName, event: x.eventTitle, eventStartsAt: iso(x.eventStartsAt), photos: x.images.length, tags: x.tags.length, archivedAt: iso(x.archivedAt), createdAt: iso(x.createdAt) })),
       comments: comments.map((c) => ({ postId: c.postId, body: c.body, createdAt: iso(c.createdAt) })),
       likes: likes.map((l) => ({ postId: l.postId, createdAt: iso(l.createdAt) })),
-      eventPosts: eventPosts.map((e) => ({ id: e.id, eventId: e.eventId, caption: e.caption, hasImage: e.mime !== null, createdAt: iso(e.createdAt) })),
+      feedPosts: feedPosts.map((f) => ({ id: f.id, eventId: f.placeEventId ?? f.userEventId, venueId: f.venueId, kind: f.kind, body: f.body, status: f.status, photos: f._count.images, createdAt: iso(f.createdAt) })),
+      feedComments: (await p.feedComment.findMany({ where: { authorId: userId }, select: { postId: true, body: true, createdAt: true }, orderBy: { createdAt: 'asc' } })).map((c) => ({ postId: c.postId, body: c.body, createdAt: iso(c.createdAt) })),
       eventStories: stories.map((s) => ({ id: s.id, eventId: s.placeEventId, postId: s.postId, isVideo: s.isVideo, createdAt: iso(s.createdAt), expiresAt: iso(s.expiresAt) })),
       eventAttendances: attendances.map((a) => ({ eventId: a.placeEventId, postId: a.postId, createdAt: iso(a.createdAt) })),
       messagesSent: messages.map((m) => ({ id: m.id, conversationId: m.conversationId, kind: m.kind, body: m.deletedAt ? null : m.body, deleted: m.deletedAt !== null, createdAt: iso(m.createdAt) })),

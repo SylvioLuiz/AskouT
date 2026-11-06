@@ -22,7 +22,6 @@ export class PrismaPostRepository implements PostRepository {
         eventStartsAt: post.eventStartsAt,
         eventEndsAt: post.eventEndsAt,
         eventKind: post.eventKind,
-        eventPostsPublic: post.eventPostsPublic,
         eventPrivate: post.eventPrivate ?? false,
         archivedAt: post.archivedAt,
         editedAt: post.editedAt,
@@ -54,7 +53,6 @@ export class PrismaPostRepository implements PostRepository {
     eventStartsAt: Date | null;
     eventEndsAt: Date | null;
     eventKind: PostRecord['eventKind'];
-    eventPostsPublic: boolean;
     eventPrivate: boolean;
     archivedAt: Date | null;
     editedAt: Date | null;
@@ -63,7 +61,7 @@ export class PrismaPostRepository implements PostRepository {
     images: { id: string; position: number; mime: string | null; placePhotoRef: string | null; placePhotoAuthor: string | null; videoMime: string | null }[];
   }): PostWithImages {
     return {
-      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, eventKind: row.eventKind, eventPostsPublic: row.eventPostsPublic, eventPrivate: row.eventPrivate, archivedAt: row.archivedAt, editedAt: row.editedAt, createdAt: row.createdAt, venueId: row.venueId ?? null },
+      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, eventKind: row.eventKind, eventPrivate: row.eventPrivate, archivedAt: row.archivedAt, editedAt: row.editedAt, createdAt: row.createdAt, venueId: row.venueId ?? null },
       images: row.images.map((i) => ({ id: i.id, position: i.position, isUpload: i.mime !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor, videoMime: i.videoMime })),
     };
   }

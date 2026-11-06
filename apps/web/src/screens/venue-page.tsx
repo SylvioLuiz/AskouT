@@ -6,7 +6,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { CoverPicker } from '../components/cover-picker.tsx';
 import { PostList } from '../components/post.tsx';
 import { PlacePhoto, SampleBadge } from '../components/suggestions.tsx';
-import { BellIcon, BellOffIcon, ChevronDownIcon, ChevronLeftIcon, ClockIcon, LocationIcon, ShareIcon, StarIcon } from '../components/icons.tsx';
+import { BellIcon, BellOffIcon, CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ClockIcon, LocationIcon, ShareIcon, StarIcon } from '../components/icons.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -17,14 +17,16 @@ import { useCurrentPosition } from './explore.tsx';
 import { toApiError } from '../lib/errors.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { resizePostPhoto } from '../lib/image.ts';
-import type { VenueEvent, VenueProfile } from '../lib/types.ts';
+import type { FeedSettings, VenueEvent, VenueProfile } from '../lib/types.ts';
+import { Feed } from '../components/feed.tsx';
+import { policyNote } from '../lib/feed.ts';
 import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX, VENUE_NAME_MAX, VENUE_POST_CAPTION_MAX, VENUE_POST_PHOTOS_MAX, applyToAll, daysSummary, draftFromProfile, friendsWentLabel, hoursLines, openStatus, profileBody, profileProblem } from '../lib/venue-profile.ts';
 import type { VenueProfileDraft } from '../lib/venue-profile.ts';
-import { Link, navigate } from '../router.tsx';
+import { Link, navigate, useSearch } from '../router.tsx';
 import { ClaimSheet, VenueEventRow, VenueEventSheet } from './venues.tsx';
 import { t } from '../lib/i18n/index.ts';
 
-type Tab = 'about' | 'events' | 'regulars' | 'posts';
+type Tab = 'feed' | 'about' | 'events' | 'regulars' | 'posts';
 
 function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -439,7 +441,9 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const page = useAsync(() => api.venueProfile(venueId), [venueId]);
   const v = page.data;
   useTitle(v?.name ?? t('Rolê'));
-  const [tab, setTab] = useState<Tab>('about');
+  const [tab, setTab] = useState<Tab>('feed');
+  const [feedSettings, setFeedSettings] = useState<FeedSettings | undefined>();
+  const search = useSearch();
   const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | undefined>();
   const [followBusy, setFollowBusy] = useState(false);
   const [bellBusy, setBellBusy] = useState(false);
@@ -505,11 +509,14 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
 
   const lines = hoursLines(v.hours, now);
   const tabs: { id: Tab; label: string; n?: number }[] = [
+    { id: 'feed', label: t('Publicações') },
     { id: 'about', label: t('Sobre') },
     { id: 'events', label: t('Eventos'), n: v.upcomingEvents.length },
     { id: 'regulars', label: t('Ranking') },
-    { id: 'posts', label: t('Posts') },
+    { id: 'posts', label: t('Fotos') },
   ];
+  const status = openStatus(v.hours, now);
+  const today = lines.find((l) => l.today);
 
   return (
     <>
@@ -578,6 +585,45 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         ))}
       </div>
 
+      {tab === 'feed' ? (
+        <Feed
+          where="venues"
+          targetId={v.id}
+          openPostId={search.get('post')}
+          openPending={search.get('pendentes') === '1'}
+          onSettings={setFeedSettings}
+          intro={
+            <div className="feedintro">
+              {v.description ? <p className="feedintro__text">{v.description}</p> : null}
+              <ul className="feedintro__facts">
+                {status || today ? (
+                  <li>
+                    <ClockIcon /> {status?.label ?? t('Horário de funcionamento')}
+                    {today ? ` · ${t('Hoje')}: ${today.text}` : ''}
+                  </li>
+                ) : null}
+                {v.address ? (
+                  <li>
+                    <LocationIcon /> {v.address}
+                  </li>
+                ) : null}
+                {v.upcomingEvents[0] ? (
+                  <li>
+                    <CalendarIcon />{' '}
+                    <Link to={`/eventos/${encodeURIComponent(v.upcomingEvents[0].id)}`}>{v.upcomingEvents[0].title}</Link>
+                    {' · '}
+                    {formatWhen(v.upcomingEvents[0].startsAt, v.upcomingEvents[0].endsAt, now)}
+                  </li>
+                ) : null}
+              </ul>
+              <button type="button" className="linkbtn" onClick={() => setTab('about')}>
+                {t('Ver todas as informações')}
+              </button>
+            </div>
+          }
+        />
+      ) : null}
+
       {tab === 'about' ? (
         <section className="vabout">
           {v.description ? <p className="vabout__text">{v.description}</p> : v.isOwner ? <p className="muted">{t('Conte o que as pessoas encontram aí. Toque em Editar perfil.')}</p> : null}
@@ -597,6 +643,12 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             ) : null}
             <RatingInfo venue={v} onChanged={page.reload} />
           </div>
+          {feedSettings ? (
+            <div className="evinfo__block">
+              <h2 className="evinfo__title">{t('Publicações')}</h2>
+              <p className="muted">{policyNote(feedSettings)}</p>
+            </div>
+          ) : null}
         </section>
       ) : null}
 

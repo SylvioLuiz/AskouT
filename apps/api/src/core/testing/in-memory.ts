@@ -5,6 +5,7 @@ import { evaluateFriendship } from '../friendship.ts';
 import type {
   PostRepository,
   EventRoomRepository,
+  FeedRepository,
   ConversationRepository,
   MeetupRepository,
   SchedulingRepository,
@@ -50,7 +51,7 @@ import { distanceMeters } from '../geo.ts';
 import type {
   DirectActivityRow,
   DwellRecord,
-  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventPostRecord, EventRef, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
@@ -1943,7 +1944,6 @@ export class InMemoryPostRepository implements PostRepository {
 export class InMemoryEventRoomRepository implements EventRoomRepository {
   private readonly postsRepo: InMemoryPostRepository;
   readonly going = new Map<string, { ref: EventRef; userId: string; createdAt: Date }>();
-  readonly eventPosts = new Map<string, EventPostRecord>();
   readonly reminded = new Set<string>();
 
   constructor(postsRepo: InMemoryPostRepository) {
@@ -2078,41 +2078,164 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     return [...this.storyHidden.values()].filter((r) => r.ownerId === userId || r.otherId === userId).map((r) => ({ ...r }));
   }
 
-  async addPost(post: EventPostRecord): Promise<void> {
-    this.eventPosts.set(post.id, { ...post, data: post.data ? new Uint8Array(post.data) : null });
+}
+
+/** Feed em memória. Os alvos são conferidos nos repositórios de posts (evento de pessoa) e de locais. */
+export class InMemoryFeedRepository implements FeedRepository {
+  private readonly postsRepo: InMemoryPostRepository;
+  private readonly places: InMemoryPlaceRepository;
+  readonly policies = new Map<string, FeedPolicy>();
+  readonly posts = new Map<string, FeedPostRecord>();
+  readonly images = new Map<string, { postId: string; position: number; mime: string; data: Uint8Array }>();
+  readonly reactions = new Map<string, { postId: string; userId: string; emoji: string }>();
+  readonly comments = new Map<string, FeedCommentRecord>();
+  readonly commentReactions = new Map<string, { commentId: string; userId: string; emoji: string }>();
+
+  constructor(postsRepo: InMemoryPostRepository, places: InMemoryPlaceRepository) {
+    this.postsRepo = postsRepo;
+    this.places = places;
   }
 
-  private static meta(p: EventPostRecord): Omit<EventPostRecord, 'data'> & { hasImage: boolean } {
-    return { id: p.id, eventId: p.eventId, authorId: p.authorId, caption: p.caption, mime: p.mime, createdAt: p.createdAt, hasImage: p.data !== null };
+  private static key(target: FeedTarget): string {
+    return `${target.type}:${target.id}`;
   }
 
-  async listPosts(eventId: string, page: Page): Promise<(Omit<EventPostRecord, 'data'> & { hasImage: boolean })[]> {
-    return [...this.eventPosts.values()]
-      .filter((p) => p.eventId === eventId && this.postsRepo.posts.has(eventId))
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
-      .slice(page.offset ?? 0, (page.offset ?? 0) + (page.limit ?? 50))
-      .map(InMemoryEventRoomRepository.meta);
+  /** O alvo ainda existe (apagar o evento ou o local leva o feed junto, como no banco). */
+  private exists(target: FeedTarget): boolean {
+    if (target.type === 'USER_EVENT') return this.postsRepo.posts.get(target.id)?.eventTitle != null;
+    if (target.type === 'PLACE_EVENT') return this.places.events.has(target.id);
+    return this.places.venues.has(target.id);
   }
 
-  async findPost(id: string): Promise<(Omit<EventPostRecord, 'data'> & { hasImage: boolean }) | undefined> {
-    const p = this.eventPosts.get(id);
-    return p ? InMemoryEventRoomRepository.meta(p) : undefined;
+  async getPolicy(target: FeedTarget): Promise<FeedPolicy> {
+    return this.policies.get(InMemoryFeedRepository.key(target)) ?? 'OWNER_ONLY';
   }
 
-  async deletePost(id: string): Promise<void> {
-    this.eventPosts.delete(id);
-  }
-
-  async findPostImage(id: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
-    const p = this.eventPosts.get(id);
-    return p && p.mime && p.data ? { mime: p.mime, data: new Uint8Array(p.data) } : undefined;
-  }
-
-  async setPostsPublic(postId: string, ownerId: string, value: boolean): Promise<boolean> {
-    const post = this.postsRepo.posts.get(postId);
-    if (!post || post.authorId !== ownerId || post.eventTitle === null) return false;
-    post.eventPostsPublic = value;
+  async setPolicy(target: FeedTarget, policy: FeedPolicy): Promise<boolean> {
+    if (!this.exists(target)) return false;
+    this.policies.set(InMemoryFeedRepository.key(target), policy);
     return true;
+  }
+
+  async createPost(post: FeedPostRecord, images: FeedImageInput[]): Promise<void> {
+    this.posts.set(post.id, { ...post, target: { ...post.target } });
+    images.forEach((img, position) => this.images.set(img.id, { postId: post.id, position, mime: img.mime, data: new Uint8Array(img.data) }));
+  }
+
+  private withImages(post: FeedPostRecord): FeedPostWithImages {
+    const imageIds = [...this.images.entries()]
+      .filter(([, i]) => i.postId === post.id)
+      .sort((a, b) => a[1].position - b[1].position)
+      .map(([id]) => id);
+    return { post: { ...post, target: { ...post.target } }, imageIds };
+  }
+
+  async findPost(id: string): Promise<FeedPostWithImages | undefined> {
+    const post = this.posts.get(id);
+    return post && this.exists(post.target) ? this.withImages(post) : undefined;
+  }
+
+  async listPosts(target: FeedTarget, query: { status: FeedPostStatus; before?: FeedCursor; limit: number }): Promise<FeedPostWithImages[]> {
+    if (!this.exists(target)) return [];
+    const key = InMemoryFeedRepository.key(target);
+    const before = query.before;
+    return [...this.posts.values()]
+      .filter((p) => InMemoryFeedRepository.key(p.target) === key && p.status === query.status)
+      .filter((p) => !before || p.createdAt.getTime() < before.createdAt.getTime() || (p.createdAt.getTime() === before.createdAt.getTime() && p.id < before.id))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+      .slice(0, query.limit)
+      .map((p) => this.withImages(p));
+  }
+
+  async countPosts(target: FeedTarget, status: FeedPostStatus): Promise<number> {
+    if (!this.exists(target)) return 0;
+    const key = InMemoryFeedRepository.key(target);
+    return [...this.posts.values()].filter((p) => InMemoryFeedRepository.key(p.target) === key && p.status === status).length;
+  }
+
+  async approvePost(id: string, at: Date): Promise<boolean> {
+    const post = this.posts.get(id);
+    if (!post || post.status !== 'PENDING') return false;
+    post.status = 'PUBLISHED';
+    post.reviewedAt = at;
+    return true;
+  }
+
+  async deletePost(id: string): Promise<boolean> {
+    if (!this.posts.delete(id)) return false;
+    for (const [k, i] of this.images) if (i.postId === id) this.images.delete(k);
+    for (const [k, r] of this.reactions) if (r.postId === id) this.reactions.delete(k);
+    for (const c of [...this.comments.values()]) if (c.postId === id) await this.deleteComment(c.id);
+    return true;
+  }
+
+  async findImage(id: string): Promise<{ mime: string; data: Uint8Array } | undefined> {
+    const img = this.images.get(id);
+    return img && this.posts.has(img.postId) ? { mime: img.mime, data: new Uint8Array(img.data) } : undefined;
+  }
+
+  async setReaction(postId: string, userId: string, emoji: string): Promise<void> {
+    if (this.posts.has(postId)) this.reactions.set(`${postId}|${userId}`, { postId, userId, emoji });
+  }
+
+  async removeReaction(postId: string, userId: string): Promise<void> {
+    this.reactions.delete(`${postId}|${userId}`);
+  }
+
+  private static stats(ids: string[], rows: { id: string; userId: string; emoji: string }[], viewerId: string): FeedReactionStats[] {
+    return ids.map((id) => {
+      const mine = rows.find((r) => r.id === id && r.userId === viewerId)?.emoji ?? null;
+      const counts = new Map<string, number>();
+      for (const r of rows) if (r.id === id) counts.set(r.emoji, (counts.get(r.emoji) ?? 0) + 1);
+      return { id, mine, counts: [...counts].map(([emoji, count]) => ({ emoji, count })).sort((a, b) => b.count - a.count || (a.emoji < b.emoji ? -1 : 1)) };
+    });
+  }
+
+  async reactionStats(postIds: string[], viewerId: string): Promise<FeedReactionStats[]> {
+    return InMemoryFeedRepository.stats(postIds, [...this.reactions.values()].map((r) => ({ id: r.postId, userId: r.userId, emoji: r.emoji })), viewerId);
+  }
+
+  async commentCounts(postIds: string[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>(postIds.map((id) => [id, 0]));
+    for (const c of this.comments.values()) if (out.has(c.postId)) out.set(c.postId, (out.get(c.postId) ?? 0) + 1);
+    return out;
+  }
+
+  async addComment(comment: FeedCommentRecord): Promise<void> {
+    this.comments.set(comment.id, { ...comment });
+  }
+
+  async findComment(id: string): Promise<FeedCommentRecord | undefined> {
+    const c = this.comments.get(id);
+    return c && this.posts.has(c.postId) ? { ...c } : undefined;
+  }
+
+  async listComments(postId: string, query: { after?: FeedCursor; limit: number }): Promise<FeedCommentRecord[]> {
+    const after = query.after;
+    return [...this.comments.values()]
+      .filter((c) => c.postId === postId)
+      .filter((c) => !after || c.createdAt.getTime() > after.createdAt.getTime() || (c.createdAt.getTime() === after.createdAt.getTime() && c.id > after.id))
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .slice(0, query.limit)
+      .map((c) => ({ ...c }));
+  }
+
+  async deleteComment(id: string): Promise<boolean> {
+    if (!this.comments.delete(id)) return false;
+    for (const [k, r] of this.commentReactions) if (r.commentId === id) this.commentReactions.delete(k);
+    return true;
+  }
+
+  async setCommentReaction(commentId: string, userId: string, emoji: string): Promise<void> {
+    if (this.comments.has(commentId)) this.commentReactions.set(`${commentId}|${userId}`, { commentId, userId, emoji });
+  }
+
+  async removeCommentReaction(commentId: string, userId: string): Promise<void> {
+    this.commentReactions.delete(`${commentId}|${userId}`);
+  }
+
+  async commentReactionStats(commentIds: string[], viewerId: string): Promise<FeedReactionStats[]> {
+    return InMemoryFeedRepository.stats(commentIds, [...this.commentReactions.values()].map((r) => ({ id: r.commentId, userId: r.userId, emoji: r.emoji })), viewerId);
   }
 }
 
