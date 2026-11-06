@@ -4,11 +4,8 @@
 # Precisa dos segredos (Settings → Secrets and variables → Actions):
 #   ASC_KEY_ID, ASC_ISSUER_ID e ASC_KEY_P8 (conteúdo do arquivo .p8 da chave de API do App Store Connect, acesso Admin).
 # Certificado fixo (obrigatório): todo build usa SEMPRE o mesmo .p12, nunca pede um novo à Apple.
-#   De onde vem o .p12, nesta ordem:
-#     1. segredo IOS_DEV_CERT_P12_BASE64 (o .p12 em base64), ou
-#     2. o arquivo no repositório indicado pela variável IOS_DEV_CERT_P12_PATH (padrão: apps/mobile/ios/certs/askout.p12).
-#   A senha vem sempre do segredo IOS_DEV_CERT_PASSWORD (nunca do código).
-#   Se não achar o .p12, ou ele não tiver um certificado de assinatura válido, o build para com erro.
+#   O .p12 vem do segredo IOS_DEV_CERT_P12_BASE64 (em base64) e a senha do segredo IOS_DEV_CERT_PASSWORD.
+#   Se o segredo estiver vazio, ou ele não tiver um certificado de assinatura válido, o build para com erro.
 #   O Archive é assinado só com esse certificado (assinatura manual, perfil criado pela API); o Xcode não cria certificado.
 # Não envia para revisão da loja: o build só aparece no TestFlight.
 name: iOS → TestFlight
@@ -61,20 +58,14 @@ jobs:
         env:
           P12_BASE64: ${{ secrets.IOS_DEV_CERT_P12_BASE64 }}
           P12_PASSWORD: ${{ secrets.IOS_DEV_CERT_PASSWORD }}
-          P12_PATH: ${{ vars.IOS_DEV_CERT_P12_PATH || 'apps/mobile/ios/certs/askout.p12' }}
         run: |
           set -euo pipefail
           P12="$RUNNER_TEMP/cert.p12"
-          if [ -n "$P12_BASE64" ]; then
-            echo "Usando o .p12 do segredo IOS_DEV_CERT_P12_BASE64."
-            echo "$P12_BASE64" | base64 --decode > "$P12"
-          elif [ -f "$P12_PATH" ]; then
-            echo "Usando o .p12 do repositório: $P12_PATH"
-            cp "$P12_PATH" "$P12"
-          else
-            echo "::error::Certificado .p12 não encontrado (nem no segredo IOS_DEV_CERT_P12_BASE64, nem em $P12_PATH). O build não cria outro certificado."
+          if [ -z "$P12_BASE64" ]; then
+            echo "::error::Segredo IOS_DEV_CERT_P12_BASE64 vazio. O build não cria outro certificado."
             exit 1
           fi
+          echo "$P12_BASE64" | base64 --decode > "$P12"
           if [ -z "$P12_PASSWORD" ]; then
             echo "::warning::Segredo IOS_DEV_CERT_PASSWORD vazio: tentando importar o .p12 sem senha."
           fi

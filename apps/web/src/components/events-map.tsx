@@ -134,5 +134,5 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail, auto
     state.map.moveTo(at, { zoom: 15, raiseBy: 90, animate: true });
   }, [ready, recenter]);
 
-  return <div ref={box} className="evmap__canvas" role="region" aria-label={t('Mapa com os locais e eventos perto')} />;
+  return <div ref={box} className={`evmap__canvas${ready ? ' evmap__canvas--ready' : ''}`} role="region" aria-label={t('Mapa com os locais e eventos perto')} />;
 }
