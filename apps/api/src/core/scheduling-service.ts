@@ -580,7 +580,7 @@ export class SchedulingService {
     const hidden = new Set(await this.deps.blocks.listRelatedIds(actorId));
     for (const userId of userIds) {
       if (userId === actorId || hidden.has(userId)) continue;
-      await this.deps.notifier.notify({ userId, type: 'MEETUP_INVITE', title, body, url: `/planejar/${poll.id}`, dedupeKey: `poll:${poll.id}:${title}` });
+      await this.deps.notifier.notify({ userId, type: 'MEETUP_INVITE', title, body, url: `/planejar/${poll.id}`, dedupeKey: `poll:${poll.id}:${title}`, actorId });
     }
   }
 

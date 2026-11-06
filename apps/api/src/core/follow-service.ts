@@ -56,8 +56,8 @@ export class FollowService {
     const status: FollowStatus = target.isPrivate ? 'PENDING' : 'ACCEPTED';
     await follows.save({ followerId: actorId, followeeId: targetId, status, createdAt: clock.now() });
     const name = await this.nameOf(actorId);
-    if (status === 'PENDING') await this.deps.notifier.notify({ userId: targetId, type: 'FOLLOW_REQUEST', title: `${name} quer seguir você`, body: 'Toque para ver o pedido', url: '/atividades', dedupeKey: `follow-request:${actorId}` });
-    else await this.deps.notifier.notify({ userId: targetId, type: 'FOLLOW_NEW', title: `${name} começou a seguir você`, body: 'Toque para ver o perfil', url: await this.profileUrl(actorId), dedupeKey: `follow-new:${actorId}` });
+    if (status === 'PENDING') await this.deps.notifier.notify({ userId: targetId, type: 'FOLLOW_REQUEST', title: `${name} quer seguir você`, body: 'Toque para ver o pedido', url: '/atividades?aba=pedidos', dedupeKey: `follow-request:${actorId}`, actorId });
+    else await this.deps.notifier.notify({ userId: targetId, type: 'FOLLOW_NEW', title: `${name} começou a seguir você`, body: 'Toque para ver o perfil', url: await this.profileUrl(actorId), dedupeKey: `follow-new:${actorId}`, actorId });
     return { status, isFriend: await this.areFriends(actorId, targetId) };
   }
 
@@ -79,7 +79,7 @@ export class FollowService {
     }
 
     await follows.save({ ...request, status: 'ACCEPTED', createdAt: request.createdAt ?? clock.now() });
-    await this.deps.notifier.notify({ userId: followerId, type: 'FOLLOW_ACCEPTED', title: `${await this.nameOf(actorId)} aceitou seu pedido`, body: 'Agora você segue essa pessoa', url: await this.profileUrl(actorId), dedupeKey: `follow-accepted:${actorId}` });
+    await this.deps.notifier.notify({ userId: followerId, type: 'FOLLOW_ACCEPTED', title: `${await this.nameOf(actorId)} aceitou seu pedido`, body: 'Agora você segue essa pessoa', url: await this.profileUrl(actorId), dedupeKey: `follow-accepted:${actorId}`, actorId });
     return { isFriend: await this.areFriends(actorId, followerId) };
   }
 
