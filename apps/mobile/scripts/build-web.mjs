@@ -1,7 +1,7 @@
 // Empacota o app web (apps/web) dentro da casca: gera `www/` com o site já apontando para a API de produção
 // e injeta as pontes nativas (src/main.ts) antes do app.
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,6 +22,8 @@ function run(command, args, cwd, env = {}) {
 }
 
 run('npx', ['vite', 'build', '--outDir', www, '--emptyOutDir'], web, { VITE_API_URL: apiUrl.replace(/\/+$/, '') });
+// Imagens da ficha das lojas (public/loja) servem só ao site: não entram no app.
+rmSync(join(www, 'loja'), { recursive: true, force: true });
 run('npx', ['esbuild', 'src/main.ts', '--bundle', '--format=esm', '--minify', '--target=es2022', `--outfile=${join(www, 'native-bridge.js')}`], mobile);
 
 const indexPath = join(www, 'index.html');
