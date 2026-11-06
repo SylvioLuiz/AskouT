@@ -347,3 +347,15 @@ test('seguir perfil público avisa a pessoa; perfil privado avisa como pedido', 
   assert.equal(items[0]!.title, 'leo começou a seguir você');
   assert.equal(items[0]!.url, '/u/leo');
 });
+
+test('aceitar pedido avisa com o caminho do perfil de quem aceitou', async () => {
+  const { makeWorld } = await import('./testing/world.ts');
+  const w = makeWorld();
+  const { leo, maria } = (await w.signUpMany('leo', 'maria')) as Record<string, string>;
+  await w.core.profiles.setPrivacy(maria!, true);
+  await w.core.follows.follow(leo!, maria!);
+  await w.core.follows.approve(maria!, leo!);
+  await w.core.flushNotifications();
+  const accepted = (await w.core.notifications.list(leo!)).items.find((n) => n.type === 'FOLLOW_ACCEPTED');
+  assert.equal(accepted?.url, '/u/maria');
+});

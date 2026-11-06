@@ -5,7 +5,7 @@ import { createStoreBridge } from './store-bridge.ts';
 import { createAppleBridge } from './apple-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
 import { createContactsBridge } from './contacts-bridge.ts';
-import { createPushBridge, type PushPluginLike } from './push-bridge.ts';
+import { createPushBridge, openInApp, type PushPluginLike } from './push-bridge.ts';
 
 function fakeVideoDeps(overrides: Partial<VideoBridgeDeps> = {}) {
   const log: string[] = [];
@@ -221,6 +221,22 @@ describe('ponte de avisos (push)', () => {
     tap('//golpe.example');
     tap(42);
     assert.deepEqual(opened, ['/conversas/1']);
+  });
+
+  it('abre o caminho sem recarregar, inclusive perfil com ponto no nome', () => {
+    const pushed: string[] = [];
+    const events: string[] = [];
+    const win = {
+      location: { pathname: '/', search: '' },
+      history: { pushState: (_d: unknown, _u: string, url: string) => void pushed.push(url) },
+      dispatchEvent: (e: Event) => (events.push(e.type), true),
+    };
+    openInApp('/u/ana.souza', win);
+    assert.deepEqual(pushed, ['/u/ana.souza']);
+    assert.deepEqual(events, ['popstate']);
+    win.location.pathname = '/u/ana.souza';
+    openInApp('/u/ana.souza', win);
+    assert.deepEqual(pushed, ['/u/ana.souza'], 'já está lá: não empilha de novo');
   });
 });
 

@@ -11,7 +11,7 @@ import { SocialLogin } from '@capgo/capacitor-social-login';
 import { createAppleBridge } from './apple-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
 import { createContactsBridge } from './contacts-bridge.ts';
-import { createPushBridge } from './push-bridge.ts';
+import { createPushBridge, openInApp } from './push-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createVideoBridge } from './video-bridge.ts';
 
@@ -57,7 +57,7 @@ if (Capacitor.isNativePlatform()) {
     // O botão da Apple da web não abre dentro do app; no iPhone entra a janela nativa.
     w['AskouTApple'] = createAppleBridge({ login: SocialLogin as never });
     // Avisos fora do app: o token vai para o servidor pelo app web; tocar no aviso abre a tela certa.
-    w['AskouTPush'] = createPushBridge({ push: PushNotifications as never, open: (path) => window.location.assign(path) });
+    w['AskouTPush'] = createPushBridge({ push: PushNotifications as never, open: (path) => openInApp(path, window) });
   }
   void StatusBar.setStyle({ style: Style.Default }).catch(() => undefined);
   void SplashScreen.hide().catch(() => undefined);
