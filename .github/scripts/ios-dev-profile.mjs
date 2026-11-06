@@ -40,6 +40,8 @@ const norm = (s) => String(s).toUpperCase().replace(/[^0-9A-F]/g, '').replace(/^
 const certs = (await api('/v1/certificates?limit=200&fields[certificates]=name,serialNumber,certificateType,expirationDate')).data ?? [];
 const cert = certs.find((c) => norm(c.attributes.serialNumber) === norm(CERT_SERIAL));
 if (!cert) {
+  console.log(`Certificados na conta (${certs.length}):`);
+  for (const c of certs) console.log(`  - ${c.attributes.name} | ${c.attributes.certificateType} | série ${c.attributes.serialNumber} | vence ${c.attributes.expirationDate}`);
   throw new Error(`O certificado do .p12 (série ${CERT_SERIAL}) não está mais na conta da Apple (revogado ou de outro time). Exporte um certificado válido e atualize o segredo IOS_DEV_CERT_P12_BASE64.`);
 }
 console.log(`Certificado fixo: ${cert.attributes.name} (${cert.attributes.certificateType}), vence em ${cert.attributes.expirationDate}.`);
