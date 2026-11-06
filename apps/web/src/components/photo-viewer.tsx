@@ -83,7 +83,7 @@ export function PhotoViewer({ images, start, onClose }: { images: PostImage[]; s
       >
         {photos.map((photo, i) => (
           <figure key={photo.id} className="photoview__slide" aria-label={t('Foto {index} de {total}', { index: i + 1, total: photos.length })}>
-            <img src={api.assetUrl(photo.path!)} alt="" referrerPolicy="no-referrer" draggable={false} />
+            <img src={/^(https?:|blob:|data:)/.test(photo.path!) ? photo.path! : api.assetUrl(photo.path!)} alt="" referrerPolicy="no-referrer" draggable={false} />
             {photo.kind === 'PLACE' ? <figcaption>Foto: {photo.photoAuthor ? `${photo.photoAuthor} · ` : ''}Google</figcaption> : null}
           </figure>
         ))}
@@ -118,4 +118,9 @@ export function PhotoViewer({ images, start, onClose }: { images: PostImage[]; s
     </div>,
     document.body,
   );
+}
+
+/** Foto de perfil em tela cheia (mesmo visualizador das fotos de post). */
+export function AvatarViewer({ url, onClose }: { url: string; onClose: () => void }) {
+  return <PhotoViewer images={[{ id: 'avatar', kind: 'UPLOAD', path: url, photoAuthor: null }]} start={0} onClose={onClose} />;
 }

@@ -109,6 +109,33 @@ export function dayChip(key: string): { weekday: string; day: string } {
   return { weekday: weekdayShort.format(noon(key)).replace('.', ''), day: String(parts(key).d) };
 }
 
+const monthYear = new Intl.DateTimeFormat(intlLocale(), { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const dayShort = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+/** "novembro de 2026" */
+export function monthLabel(key: string): string {
+  return monthYear.format(noon(key));
+}
+
+/** "sáb., 14 de nov." */
+export function dayShortLabel(key: string): string {
+  return dayShort.format(noon(key));
+}
+
+/** Primeiro dia da lista (a partir de `from`, inclusive) que tem algo; `undefined` se nenhum. */
+export function firstDayWith(days: readonly string[], has: (key: string) => boolean, from?: string): string | undefined {
+  return days.find((key) => (from === undefined || key >= from) && has(key));
+}
+
+/** Último dia da lista antes de `before` que tem algo. */
+export function lastDayWithBefore(days: readonly string[], has: (key: string) => boolean, before: string): string | undefined {
+  for (let i = days.length - 1; i >= 0; i--) {
+    const key = days[i] as string;
+    if (key < before && has(key)) return key;
+  }
+  return undefined;
+}
+
 /** "terça-feira, 20 de outubro" */
 export function dayLongLabel(key: string): string {
   return dayLong.format(noon(key));
