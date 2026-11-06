@@ -73,7 +73,8 @@ export function PushCard() {
     }
   }
 
-  if (!state) return null;
+  // Com os avisos já ligados não há o que mostrar (para desligar: Ajustes do aparelho ou do navegador).
+  if (!state || state === 'on') return null;
   if (state !== 'off' && state !== 'on') return <p className="muted pushcard__hint">{state === 'denied' && nativePushBridge() ? NATIVE_DENIED : COPY[state]}</p>;
   return (
     <div className="callout pushcard">
