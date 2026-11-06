@@ -1,5 +1,6 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import { lazyWithReload } from '../lib/chunk-reload.ts';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { ExploreViews } from '../components/explore-views.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
 import { VenueLogo } from '../components/venue-logo.tsx';
@@ -18,7 +19,7 @@ import { LocationIcon, RouteIcon, SearchIcon } from '../components/icons.tsx';
 import type { MapView } from '../components/map-engine.ts';
 import { t } from '../lib/i18n/index.ts';
 
-const EventsMap = lazy(() => import('../components/events-map.tsx'));
+const EventsMap = lazyWithReload(() => import('../components/events-map.tsx'));
 
 const RADIUS_KM = 30;
 const PLACES_RADIUS_KM = 10;
