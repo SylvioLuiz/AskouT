@@ -88,7 +88,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn--danger-quiet { color: var(--danger); }
 .btn--small { padding: 4px 10px; min-height: 28px; font-size: 13px; }
 .btn--block { width: 100%; }
-.search, .select { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; min-height: 34px; }
+.search, .select { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 7px 12px; min-height: 34px; }
+.select option, .select optgroup { color: var(--ink); background-color: var(--surface); }
 .search { width: 280px; }
 .check { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 .field { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }

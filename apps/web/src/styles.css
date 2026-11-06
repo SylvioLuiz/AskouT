@@ -3559,7 +3559,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 /* ---------- Estética Apple ---------- */
 .evcard, .welcome { border: 0; box-shadow: 0 0.5px 0 rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.06); }
 .fchip { border-width: 0; background: var(--surface); box-shadow: 0 0 0 0.5px var(--line-strong); font-weight: 500; }
-.fchip--on, .fchip[aria-pressed='true'] { box-shadow: none; }
+.fchip--on, .fchip[aria-pressed='true'] { box-shadow: none; color: var(--brand-ink); background: var(--brand); }
 :root[data-theme='dark'] .evcard, :root[data-theme='dark'] .welcome { box-shadow: none; }
 
 /* ---------- Painel do local ---------- */
@@ -3862,6 +3862,10 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .kindpick__icon { display: grid; place-items: center; padding-left: 14px; color: var(--brand-text); }
 .kindpick__icon svg { width: 20px; height: 20px; }
 .kindpick__select { appearance: none; -webkit-appearance: none; padding-right: 40px; cursor: pointer; }
+/* Selects nativos: a lista aberta e o valor escolhido seguem o tema (sem texto preto no fundo escuro). */
+select { color: var(--ink); }
+select option, select optgroup { color: var(--ink); background-color: var(--surface); }
+select option:checked { color: var(--brand-ink); background-color: var(--brand); }
 .kindpick__chev { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: grid; pointer-events: none; color: var(--muted); }
 .kindpick__chev svg { width: 20px; height: 20px; }
 
