@@ -4798,10 +4798,23 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .sponsored-sec { display: flex; flex-direction: column; gap: 8px; }
 
 /* ---------- Para você ---------- */
-.foryou { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; }
-.foryou__list { list-style: none; margin: 0; padding: 0 16px 4px; display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x proximity; }
-.foryou__card { flex: none; width: 200px; display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; }
-.foryou__post { flex: none; width: 280px; display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; }
+/* Carrossel com cara de app: vai de borda a borda da tela, o próximo cartão aparece pela metade,
+   para encaixado no cartão (alinhado com o texto da página), inércia no iOS, sem barra e sem
+   prender a rolagem vertical da Home nem puxar o "voltar" do navegador ao chegar na ponta. */
+.foryou { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; margin-inline: -16px; min-width: 0; }
+.foryou > .section__title { padding-inline: 16px; }
+.foryou__list {
+  list-style: none; margin: 0; padding: 0 16px 4px;
+  display: flex; gap: 12px;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory; scroll-padding-inline: 16px;
+  -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; touch-action: pan-x pan-y;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+.foryou__list::-webkit-scrollbar { display: none; }
+.foryou__card { flex: none; width: min(200px, calc(100vw - 96px)); display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; scroll-snap-stop: normal; }
+.foryou__post { flex: none; width: min(300px, calc(100vw - 72px)); display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; scroll-snap-stop: normal; }
+@media (hover: hover) and (pointer: fine) { .foryou__list { scroll-snap-type: x proximity; } }
 .foryou__link { display: flex; flex-direction: column; gap: 4px; color: inherit; text-decoration: none; }
 .foryou__cover { display: grid; place-items: center; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; background: var(--brand-soft); }
 .foryou__cover img { width: 100%; height: 100%; object-fit: cover; }
