@@ -162,22 +162,108 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
 }
 
 // ---------- Ouvir ----------
+//
+// O áudio toca pela Web Audio API, não por <audio>/new Audio(): no iPhone, um HTMLMediaElement
+// vira "mídia do sistema" e aparece no player da central de controle e da tela de bloqueio
+// (Now Playing). Um AudioBufferSourceNode não é registrado ali.
 
-let playing: HTMLAudioElement | undefined;
+type Player = { pause(): void };
+let playing: Player | undefined;
+let sharedCtx: AudioContext | undefined;
+
+function audioContext(): AudioContext | undefined {
+  if (sharedCtx) return sharedCtx;
+  const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctor) return undefined;
+  sharedCtx = new Ctor();
+  return sharedCtx;
+}
+
+function decode(ctx: AudioContext, data: ArrayBuffer): Promise<AudioBuffer> {
+  // Safari antigo só aceita a forma com callbacks.
+  return new Promise((resolve, reject) => {
+    const p = ctx.decodeAudioData(data, resolve, reject);
+    if (p && typeof p.then === 'function') p.then(resolve, reject);
+  });
+}
 
 /** Balão de mensagem de voz: baixa o áudio (com o token) na primeira vez que toca. */
 export function VoiceBubble({ message, conversationId }: { message: ChatMessage; conversationId: string }) {
-  const total = message.audio?.durationMs ?? 0;
   const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'paused' | 'error'>('idle');
   const [position, setPosition] = useState(0);
-  const audio = useRef<HTMLAudioElement | undefined>(undefined);
-  const url = useRef<string | undefined>(undefined);
+  const [decodedMs, setDecodedMs] = useState<number | undefined>(undefined);
+  const total = message.audio?.durationMs || decodedMs || 0;
+  const buffer = useRef<AudioBuffer | undefined>(undefined);
+  const source = useRef<AudioBufferSourceNode | undefined>(undefined);
+  const offset = useRef(0); // segundos já tocados quando pausado
+  const startedAt = useRef(0); // ctx.currentTime - offset no início do trecho atual
+  const raf = useRef<number | undefined>(undefined);
+  const player = useRef<Player>({ pause: () => pause() });
+
+  function stopTicking() {
+    if (raf.current !== undefined) cancelAnimationFrame(raf.current);
+    raf.current = undefined;
+  }
+
+  function stopSource() {
+    const src = source.current;
+    source.current = undefined;
+    if (!src) return;
+    src.onended = null;
+    try {
+      src.stop();
+    } catch {
+      /* já parado */
+    }
+    src.disconnect();
+  }
+
+  function pause() {
+    const ctx = sharedCtx;
+    if (!source.current || !ctx) return;
+    offset.current = Math.max(0, ctx.currentTime - startedAt.current);
+    stopSource();
+    stopTicking();
+    if (playing === player.current) playing = undefined;
+    setPosition(offset.current * 1000);
+    setState('paused');
+  }
+
+  function finished() {
+    source.current = undefined;
+    stopTicking();
+    offset.current = 0;
+    if (playing === player.current) playing = undefined;
+    setPosition(0);
+    setState('idle');
+  }
+
+  function start(ctx: AudioContext) {
+    const buf = buffer.current;
+    if (!buf) return;
+    if (offset.current >= buf.duration) offset.current = 0;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.onended = finished;
+    startedAt.current = ctx.currentTime - offset.current;
+    src.start(0, offset.current);
+    source.current = src;
+    if (playing && playing !== player.current) playing.pause();
+    playing = player.current;
+    setState('playing');
+    const tick = () => {
+      setPosition(Math.min(buf.duration, ctx.currentTime - startedAt.current) * 1000);
+      raf.current = requestAnimationFrame(tick);
+    };
+    tick();
+  }
 
   useEffect(
     () => () => {
-      audio.current?.pause();
-      if (playing === audio.current) playing = undefined;
-      if (url.current) URL.revokeObjectURL(url.current);
+      stopSource();
+      stopTicking();
+      if (playing === player.current) playing = undefined;
     },
     [],
   );
@@ -185,28 +271,25 @@ export function VoiceBubble({ message, conversationId }: { message: ChatMessage;
   async function toggle() {
     if (state === 'loading') return;
     if (state === 'playing') {
-      audio.current?.pause();
+      pause();
       return;
     }
+    // Cria/retoma o contexto ainda dentro do toque: o iOS só libera o som num gesto do usuário.
+    const ctx = audioContext();
+    if (!ctx) {
+      setState('error');
+      return;
+    }
+    const resumed = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
     try {
-      if (!audio.current) {
+      if (!buffer.current) {
         setState('loading');
         const blob = await api.messageAudio(conversationId, message.id);
-        url.current = URL.createObjectURL(blob);
-        const el = new Audio(url.current);
-        el.onplay = () => setState('playing');
-        el.onpause = () => setState(el.ended ? 'idle' : 'paused');
-        el.onended = () => {
-          setState('idle');
-          setPosition(0);
-        };
-        el.ontimeupdate = () => setPosition(el.currentTime * 1000);
-        el.onerror = () => setState('error');
-        audio.current = el;
+        buffer.current = await decode(ctx, await blob.arrayBuffer());
+        setDecodedMs(buffer.current.duration * 1000);
       }
-      if (playing && playing !== audio.current) playing.pause();
-      playing = audio.current;
-      await audio.current.play();
+      await resumed;
+      start(ctx);
     } catch {
       setState('error');
     }
