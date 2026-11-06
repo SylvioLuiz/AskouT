@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgendaEvent } from '../lib/agenda.ts';
 import type { FormEvent } from 'react';
 import { DayStrip, Sheet, StateMark } from '../components/agenda.tsx';
 import { CalendarSyncSheet, syncedCount } from '../components/calendar-sync.tsx';
-import { PlusIcon } from '../components/icons.tsx';
+import { ChevronRightIcon, PlusIcon } from '../components/icons.tsx';
 import { Button, Confirm, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -15,7 +15,9 @@ import {
   agendaEventsOnDay,
   buildSlot,
   dayLongLabel,
+  dayShortLabel,
   daysFrom,
+  firstDayWith,
   deviceTimeZone,
   localDateKey,
   rangeForDays,
@@ -168,6 +170,10 @@ export function AgendaScreen() {
   useTitle(t('Agenda'));
   const { today, days, range } = useDayWindow();
   const [selected, setSelected] = useState(today);
+  /** De onde veio a troca de dia, para o conteúdo deslizar do lado certo. */
+  const [direction, setDirection] = useState<'next' | 'prev' | 'none'>('none');
+  /** Depois que a pessoa escolhe um dia, a tela não muda de dia sozinha. */
+  const picked = useRef(false);
   const [adding, setAdding] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncedN, setSyncedN] = useState(syncedCount);
@@ -181,6 +187,50 @@ export function AgendaScreen() {
   const goingEvents = useAsync(() => api.myGoingEvents(), []);
   const events = useMemo(() => agendaEvents(meetups.data?.items ?? [], goingEvents.data?.items ?? []), [meetups.data, goingEvents.data]);
   const eventsToday = agendaEventsOnDay(events, selected);
+  const hasEvent = (key: string) => agendaEventsOnDay(events, key).length > 0;
+  const eventsLoaded = !meetups.loading && !goingEvents.loading && (meetups.data !== undefined || goingEvents.data !== undefined);
+
+  // Ao abrir, vai direto para o primeiro dia (de hoje em diante) que tem evento.
+  useEffect(() => {
+    if (!eventsLoaded || picked.current) return;
+    picked.current = true;
+    const first = firstDayWith(days, hasEvent);
+    if (first) setSelected(first);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventsLoaded]);
+
+  function choose(key: string) {
+    picked.current = true;
+    if (key === selected) return;
+    setDirection(key > selected ? 'next' : 'prev');
+    setSelected(key);
+    setMessage(undefined);
+    setRemoving(undefined);
+  }
+
+  function shift(by: number) {
+    const next = days[days.indexOf(selected) + by];
+    if (next) choose(next);
+  }
+
+  const nextEventDay = firstDayWith(days, hasEvent, addDays(selected, 1));
+
+  // Deslizar o dedo para os lados no conteúdo do dia troca de dia.
+  const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
+  function onTouchStart(event: React.TouchEvent) {
+    const touch = event.touches[0];
+    swipe.current = event.touches.length === 1 && touch ? { x: touch.clientX, y: touch.clientY } : undefined;
+  }
+  function onTouchEnd(event: React.TouchEvent) {
+    const start = swipe.current;
+    const touch = event.changedTouches[0];
+    swipe.current = undefined;
+    if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    shift(dx < 0 ? 1 : -1);
+  }
 
   async function remove(slot: Slot) {
     setBusy(true);
@@ -207,12 +257,18 @@ export function AgendaScreen() {
         </Button>
       </div>
 
-      <DayStrip days={days} selected={selected} today={today} onSelect={(key) => { setSelected(key); setMessage(undefined); setRemoving(undefined); }} statesOf={(key) => statesOnDay(all, key)} eventsOf={(key) => agendaEventsOnDay(events, key).length} />
+      <DayStrip days={days} selected={selected} today={today} onSelect={choose} statesOf={(key) => statesOnDay(all, key)} eventsOf={(key) => agendaEventsOnDay(events, key).length} />
 
-      <section className="section" aria-labelledby="dia-titulo">
+      <section
+        key={selected}
+        className={`section agday agday--${direction}`}
+        aria-labelledby="dia-titulo"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
         <h2 id="dia-titulo" className="section__title section__title--day">
           {capitalize(dayLongLabel(selected))}
-          {selected === today ? <span className="today-tag">hoje</span> : null}
+          {selected === today ? <span className="today-tag">{t('hoje')}</span> : null}
         </h2>
 
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
@@ -224,6 +280,13 @@ export function AgendaScreen() {
         ) : null}
         {ofDay.length > 0 ? <SlotList slots={ofDay} day={selected} onRemove={(slot) => setRemoving(slot)} /> : null}
         {eventsToday.length > 0 ? <EventList events={eventsToday} /> : null}
+        {eventsLoaded && eventsToday.length === 0 && nextEventDay ? (
+          <button type="button" className="agjump" onClick={() => choose(nextEventDay)}>
+            <span className="agjump__label">{t('Próximo evento')}</span>
+            <span className="agjump__day">{dayShortLabel(nextEventDay)}</span>
+            <ChevronRightIcon />
+          </button>
+        ) : null}
         {removing ? (
           <Confirm
             question={t('Remover o horário {selected}?', { selected: timeRangeLabel(removing, selected) })}

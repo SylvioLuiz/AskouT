@@ -2116,6 +2116,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Foto anterior": "Previous photo",
   "Próxima foto": "Next photo",
   "Foto de perfil": "Profile photo",
+  "Ver foto": "View photo",
+  "Ver foto de perfil": "View profile photo",
   "Escolher da galeria": "Choose from gallery",
   "Celular": "Phone",
   "Seguir todos ({n})": "Follow all ({n})",
@@ -2155,4 +2157,7 @@ export const EN: Readonly<Record<string, string>> = {
   "{n} eventos agora": "{n} events now",
   "Centralizar na minha localização": "Center on my location",
   "Mostrando a sua localização": "Showing your location",
+  "Dia anterior": "Previous day",
+  "Próximo dia": "Next day",
+  "Próximo evento": "Next event",
 };

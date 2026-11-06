@@ -427,6 +427,8 @@ export interface NotificationRecord {
   body: string;
   url: string;
   dedupeKey: string | null;
+  /** Quem causou o aviso (seguiu, curtiu, convidou...), para a tela mostrar a foto da pessoa. Avisos antigos não têm. */
+  actorId?: string | null;
   readAt: Date | null;
   createdAt: Date;
 }
