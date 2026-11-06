@@ -3,8 +3,12 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
 import './styles.css';
 
+import { installChunkReload } from './lib/chunk-reload.ts';
+
 import { getLocale } from './lib/i18n/index.ts';
 import { applyTheme, readTheme } from './lib/theme.ts';
+
+installChunkReload();
 
 document.documentElement.lang = getLocale();
 

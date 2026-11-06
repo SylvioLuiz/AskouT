@@ -1,0 +1,5 @@
+# Cloudflare Pages. A página (index.html e as rotas do SPA) precisa ser conferida a cada visita: é ela que aponta
+# para os arquivos de /assets do deploy atual. Os arquivos de /assets/* têm o hash no nome e recebem cache longo
+# no _worker.js, que sobrescreve este cabeçalho.
+/*
+  Cache-Control: no-cache
