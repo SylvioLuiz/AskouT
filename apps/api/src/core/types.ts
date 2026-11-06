@@ -1150,3 +1150,52 @@ export interface CalendarDraftRecord {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// ---------- Registro de atividades (o que a própria pessoa fez) ----------
+
+/** Grupos dos chips da tela "Suas interações". */
+export const ACTIVITY_KINDS = ['LIKE', 'COMMENT', 'POST', 'FOLLOW', 'EVENT'] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+
+/** O que a pessoa fez. */
+export type ActivityAction =
+  /** Curtiu um post (ou um evento criado por alguém). */
+  | 'POST_LIKE'
+  /** Reagiu com emoji a uma publicação no feed de um evento ou local. */
+  | 'FEED_REACTION'
+  | 'POST_COMMENT'
+  | 'FEED_COMMENT'
+  | 'POST_CREATED'
+  | 'EVENT_CREATED'
+  /** Publicou no feed de um evento ou local. */
+  | 'FEED_POST'
+  /** Confirmou presença ("Eu vou"). */
+  | 'EVENT_GOING'
+  /** Passou a seguir (ou pediu para seguir) uma pessoa. */
+  | 'FOLLOW_USER'
+  | 'FOLLOW_VENUE';
+
+/** Para onde o item leva no app. */
+export interface ActivityTarget {
+  type: 'POST' | 'USER_EVENT' | 'PLACE_EVENT' | 'VENUE' | 'USER';
+  id: string;
+}
+
+/** Uma linha do registro, como o banco devolve. */
+export interface ActivityRecord {
+  /** Único no registro da pessoa (ex.: `like:<postId>`). Desempata a ordem. */
+  id: string;
+  action: ActivityAction;
+  at: Date;
+  target: ActivityTarget;
+  /** Dono do conteúdo de origem (autor do post, pessoa seguida). null em evento ou local. */
+  ownerId: string | null;
+  /** Título do evento, nome do local ou começo da legenda do post de origem. */
+  title: string | null;
+  /** O que a pessoa escreveu (comentário, publicação, legenda) ou o emoji da reação. */
+  text: string | null;
+  /** O conteúdo existe mas não está mais visível (post arquivado por quem publicou). */
+  hidden: boolean;
+  /** Pedido para seguir ainda não aceito. */
+  pending: boolean;
+}

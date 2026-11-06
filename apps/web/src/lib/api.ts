@@ -1,6 +1,7 @@
 import { errorFromResponse, networkError } from './errors.ts';
 import type { ConfirmationAnswer, PollInput, PollSummary, PollView, VoteStatus } from './date-poll.ts';
 import type { DwellEntry } from './dwell.ts';
+import type { ActivityFilter, ActivityPage } from './activity-log.ts';
 import type { SuggestedPerson } from './suggested-people.ts';
 import type {
   BoostPricing,
@@ -581,6 +582,9 @@ export function createApi(deps: ApiDeps) {
     finalizePoll: (pollId: string) => request<PollView>('POST', `/date-polls/${id(pollId)}/finalize`),
     cancelPoll: (pollId: string) => request<PollView>('POST', `/date-polls/${id(pollId)}/cancel`),
     respondMeetup: (meetupId: string, action: 'accept' | 'decline') => request<MeetupView>('POST', `/meetups/${id(meetupId)}/respond`, { body: { action } }),
+
+    /** Registro de atividades (o que eu fiz), do mais recente ao mais antigo. `cursor`: o `nextCursor` da página anterior. */
+    myActivity: (kind: ActivityFilter = 'ALL', cursor?: string | null) => request<ActivityPage>('GET', `/me/activity${toQuery({ kind: kind === 'ALL' ? undefined : kind, cursor: cursor ?? undefined })}`),
 
     // Avisos
     notifications: (category: NotificationCategory = 'all') => request<NotificationList>('GET', `/notifications${toQuery({ category: category === 'all' ? undefined : category })}`),

@@ -19,6 +19,7 @@ import type { ThemeChoice } from '../lib/theme.ts';
 import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validation.ts';
 import { InviteSheet } from '../components/invite.tsx';
 import { ConnectContactsCard } from '../components/connect-contacts.tsx';
+import { ActivityLog } from '../components/activity-log.tsx';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
 import { AvatarViewer } from '../components/photo-viewer.tsx';
 import { CameraIcon } from '../components/icons.tsx';
@@ -561,6 +562,7 @@ export function InteractionsScreen() {
           {t('Veja e tire eventos do seu perfil. Para postar, abra um evento e use Compartilhar.')}
         </span>
       </Link>
+      <ActivityLog />
     </>
   );
 }

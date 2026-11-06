@@ -1,4 +1,4 @@
-import type { PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { ActivityAction, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -805,7 +805,17 @@ export interface FeedRepository {
   countAllPosts(status: FeedPostStatus): Promise<number>;
 }
 
+/** Registro de atividades: o que a própria pessoa fez (curtidas, comentários, posts, presença, quem passou a seguir). */
+export interface ActivityRepository {
+  /**
+   * Do mais recente ao mais antigo (por `at`, depois por `id` decrescente), só das `actions` pedidas.
+   * Com `before`, só o que vem depois dele na lista. Conteúdo apagado não aparece (sai junto com a origem).
+   */
+  listByUser(userId: string, query: { actions: readonly ActivityAction[]; before?: { at: Date; id: string }; limit: number }): Promise<ActivityRecord[]>;
+}
+
 export interface CoreDeps {
+  activity: ActivityRepository;
   notifier: Notifier;
   users: UserRepository;
   follows: FollowRepository;
