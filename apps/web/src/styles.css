@@ -5114,3 +5114,9 @@ button.reactlist__row { cursor: pointer; }
 
 /* Explorar (lista): contador "N eventos a até X km" com respiro antes dos cartões. */
 .explore__count { margin: 4px 0 14px; font-size: 13px; }
+/* Explorar (lista): o aviso de período ampliado e os cartões entram com fade, sem o vazio antes. */
+.explore__auto { margin: 4px 0 0; animation: explore-fade .3s ease-out both; }
+.explore__auto + .explore__count { margin-top: 2px; }
+.explore__count + .evgrid { animation: explore-fade .3s ease-out both; }
+@keyframes explore-fade { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .explore__auto, .explore__count + .evgrid { animation: none; } }
