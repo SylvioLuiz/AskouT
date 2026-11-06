@@ -287,6 +287,30 @@ function UserReportCard({ r, onAction }: { r: UserReportRow; onAction: (a: Actio
           <button type="button" className="btn btn--small" onClick={() => onAction({ title: 'Providência tomada', description: <p>Use quando você já agiu por outro caminho (por exemplo, pediu para a pessoa mudar o texto).</p>, confirmLabel: 'Registrar providência', noteLabel: 'O que foi feito', noteRequired: true, run: (n) => api.resolveUserReport(r.id, 'ACTIONED', n) })}>
             Providência tomada
           </button>
+          {r.kind === 'COMMENT' && r.commentId && r.commentExists ? (
+            <button
+              type="button"
+              className="btn btn--small btn--danger-quiet"
+              onClick={() =>
+                onAction({
+                  title: 'Apagar comentário',
+                  description: <p>O comentário de @{target.username} sai do post e esta denúncia é encerrada como “providência tomada”. Isso não pode ser desfeito.</p>,
+                  confirmLabel: 'Apagar e encerrar',
+                  danger: true,
+                  noteLabel: 'Motivo',
+                  noteRequired: true,
+                  run: async (n) => {
+                    await api.deleteComment(r.commentId!, n);
+                    await api.resolveUserReport(r.id, 'ACTIONED', n);
+                  },
+                })
+              }
+            >
+              Apagar comentário
+            </button>
+          ) : r.kind === 'COMMENT' && r.commentId ? (
+            <span className="muted small">Comentário já apagado</span>
+          ) : null}
           {target.status !== 'SUSPENDED' ? (
             <button
               type="button"

@@ -183,13 +183,16 @@ export class PrismaAdminRepository implements AdminRepository {
       orderBy: open ? [{ createdAt: 'asc' }, { id: 'asc' }] : [{ resolvedAt: 'desc' }, { id: 'asc' }],
       skip: page.offset, take: page.limit,
       select: {
-        id: true, kind: true, reason: true, details: true, evidence: true, createdAt: true, resolvedAt: true, resolution: true, resolutionNote: true,
+        id: true, kind: true, commentId: true, reason: true, details: true, evidence: true, createdAt: true, resolvedAt: true, resolution: true, resolutionNote: true,
         reporter: { select: { id: true, profile: { select: { username: true } } } },
         reported: { select: { id: true, status: true, profile: { select: { username: true } } } },
       },
     });
+    const commentIds = rows.map((r) => (r.kind === 'COMMENT' ? r.commentId : null)).filter((id): id is string => id !== null && isUuid(id));
+    const existing = new Set(commentIds.length ? (await this.prisma.postComment.findMany({ where: { id: { in: commentIds } }, select: { id: true } })).map((c) => c.id) : []);
     return rows.map((r) => ({
-      id: r.id, kind: r.kind === 'COMMENT' ? 'COMMENT' as const : 'PROFILE' as const, reason: r.reason as PostReportReason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
+      id: r.id, kind: r.kind === 'COMMENT' ? 'COMMENT' as const : 'PROFILE' as const,
+      commentId: r.kind === 'COMMENT' ? r.commentId : null, commentExists: r.kind === 'COMMENT' && r.commentId !== null && existing.has(r.commentId), reason: r.reason as PostReportReason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
       reporter: { id: r.reporter.id, username: r.reporter.profile?.username ?? MISSING },
       reported: { id: r.reported.id, username: r.reported.profile?.username ?? MISSING, status: r.reported.status },
       resolvedAt: r.resolvedAt, resolution: r.resolution as ReportResolution | null, resolutionNote: r.resolutionNote,

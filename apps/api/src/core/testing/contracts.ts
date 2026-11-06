@@ -1329,6 +1329,7 @@ export function defineRepositoryContract(
         const uopen = await h.admin.listUserReports(true, page);
         assert.deepEqual(uopen.map((r) => [r.kind, r.reason, r.reporter.username, r.reported.username, r.reported.status]), [['PROFILE', 'SPAM', 'bia', 'ana', 'ACTIVE'], ['COMMENT', 'OTHER', 'bia', 'ana', 'ACTIVE']], 'denunciar o mesmo perfil de novo atualiza, não duplica');
         assert.equal(uopen[0]!.evidence, 'Ana (@ana) — bio nova');
+        assert.deepEqual([uopen[0]!.commentId, uopen[0]!.commentExists, uopen[1]!.commentId, uopen[1]!.commentExists], [null, false, 'c-1', false], 'comentário que não existe mais não pode ser apagado');
         assert.equal((await h.admin.stats()).openUserReports, 2);
         assert.equal((await h.admin.findUserReport(uopen[0]!.id))?.reportedUserId, ana);
         assert.equal(await h.admin.findUserReport('nao-e-uuid'), undefined);

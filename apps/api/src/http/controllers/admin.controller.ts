@@ -133,6 +133,12 @@ export class AdminController {
     return this.core.admin.deletePost(actor, id, asBody(body).note);
   }
 
+  /** Apaga um comentário de post (ex.: denunciado). `{note}` obrigatório. */
+  @Delete('comments/:id')
+  deleteComment(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.admin.deletePostComment(actor, id, asBody(body).note);
+  }
+
   @Get('reports/posts')
   postReports(@CurrentActor() actor: Actor, @Query() q: { status?: unknown; limit?: unknown; offset?: unknown }) {
     return this.core.admin.postReports(actor, q);

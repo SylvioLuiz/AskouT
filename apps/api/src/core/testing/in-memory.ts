@@ -2486,8 +2486,9 @@ export class InMemoryAdminRepository implements AdminRepository {
       if (open === (r.resolvedAt !== null && r.resolvedAt !== undefined)) continue;
       const reported = this.users.users.get(r.reportedUserId);
       if (!reported) continue;
+      const commentId = r.kind === 'COMMENT' ? r.commentId ?? null : null;
       rows.push({
-        id: r.id, kind: r.kind, reason: r.reason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
+        id: r.id, kind: r.kind, commentId, commentExists: commentId !== null && this.posts.comments.has(commentId), reason: r.reason, details: r.details, evidence: r.evidence, createdAt: r.createdAt,
         reporter: { id: r.reporterId, username: this.username(r.reporterId) },
         reported: { id: r.reportedUserId, username: this.username(r.reportedUserId), status: reported.status },
         resolvedAt: r.resolvedAt ?? null, resolution: r.resolution ?? null, resolutionNote: r.resolutionNote ?? null,

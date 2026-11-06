@@ -181,6 +181,10 @@ export interface ConversationReportRow {
 export interface UserReportRow {
   id: string;
   kind: 'PROFILE' | 'COMMENT';
+  /** Comentário de post denunciado (null em perfil). */
+  commentId?: string | null;
+  /** O comentário ainda existe. */
+  commentExists?: boolean;
   reason: ReportReason;
   details: string | null;
   /** O texto denunciado como estava quando a pessoa denunciou. */

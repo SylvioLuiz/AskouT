@@ -881,6 +881,10 @@ export interface UserReportRecord {
 export interface AdminUserReportRow {
   id: string;
   kind: 'PROFILE' | 'COMMENT';
+  /** Comentário de post denunciado (kind COMMENT); null se for perfil. */
+  commentId: string | null;
+  /** O comentário ainda existe (dá para apagar pela gestão). */
+  commentExists: boolean;
   reason: PostReportReason;
   details: string | null;
   evidence: string;
@@ -919,6 +923,7 @@ export type AuditAction =
   | 'STORY_REMOVED'
   | 'FEED_POST_REMOVED'
   | 'FEED_COMMENT_REMOVED'
+  | 'COMMENT_REMOVED'
   | 'REPORT_DISMISSED'
   | 'REPORT_ACTIONED'
   | 'PAYMENTS_ENABLED'
@@ -928,7 +933,7 @@ export interface AuditRecord {
   id: string;
   adminId: string;
   action: AuditAction;
-  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'USER_REPORT' | 'STORY' | 'STORY_REPORT' | 'FEED_POST' | 'FEED_COMMENT' | 'FEED_REPORT' | 'SETTING';
+  targetType: 'USER' | 'CLAIM' | 'VENUE' | 'POST' | 'PLACE_EVENT' | 'POST_REPORT' | 'CONVERSATION_REPORT' | 'USER_REPORT' | 'STORY' | 'STORY_REPORT' | 'FEED_POST' | 'FEED_COMMENT' | 'FEED_REPORT' | 'COMMENT' | 'SETTING';
   targetId: string;
   note: string | null;
   createdAt: Date;
