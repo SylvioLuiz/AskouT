@@ -1,5 +1,6 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazyWithReload } from '../lib/chunk-reload.ts';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { BoltIcon, CalendarIcon, ChatIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, RefreshIcon, ShieldIcon, UserPlusIcon, UsersIcon, BulbIcon } from '../components/icons.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { RingLoader } from '../components/ring-loader.tsx';
@@ -48,7 +49,7 @@ const DURATIONS: readonly { minutes: number; value: string; unit: string; label:
 ];
 
 // O mapa (MapLibre) é pesado: só é baixado quando alguém abre um encontro.
-const MatchMap = lazy(() => import('../components/match-map.tsx'));
+const MatchMap = lazyWithReload(() => import('../components/match-map.tsx'));
 
 const ORDER_KEY = 'askout.now.order';
 
