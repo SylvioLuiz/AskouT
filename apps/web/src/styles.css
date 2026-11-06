@@ -2097,6 +2097,8 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   flex-direction: column;
   gap: 8px;
 }
+/* Aviso antes de pedir permissão (contatos). */
+.disclosure__list { margin: 0; padding-left: 20px; list-style: disc; display: flex; flex-direction: column; gap: 6px; color: var(--ink-2); }
 
 /* Mapa do encontro */
 .matchmap {
@@ -5048,8 +5050,8 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .legal__meta { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
 .legal__draft { margin: 0 0 16px; padding: 10px 14px; border-radius: var(--radius-control); background: var(--brand-soft); color: var(--ink); font-size: 14px; }
 .legal__section h2 { margin: 28px 0 6px; font-size: 18px; }
-.legal__section p, .legal__section ul { margin: 8px 0; }
-.legal__section ul { padding-left: 20px; }
+.legal__section p, .legal__section ul, .legal__section ol { margin: 8px 0; }
+.legal__section ul, .legal__section ol { padding-left: 20px; }
 .legal__section li { margin: 6px 0; }
 .legal__switch { margin-top: 32px; }
 .auth__legal { margin: 14px 0 0; text-align: center; font-size: 13px; line-height: 1.45; color: var(--muted); }
