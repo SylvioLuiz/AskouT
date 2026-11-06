@@ -214,6 +214,14 @@ export function EventsMapScreen() {
   // O mapa só se enquadra sozinho até a pessoa escolher uma área ou centralizar em si.
   const [manual, setManual] = useState(false);
   const [recenter, setRecenter] = useState(0);
+  // Logo depois de "Centralizar na minha localização": o mapa fica em você até a pessoa escolher um cartão ou pin.
+  const [atMe, setAtMe] = useState(false);
+  const [meHint, setMeHint] = useState(0);
+  useEffect(() => {
+    if (meHint === 0) return;
+    const timer = window.setTimeout(() => setMeHint(0), 2600);
+    return () => window.clearTimeout(timer);
+  }, [meHint]);
 
   const eventsResult = useAsync<{ events: ExploreEvent[] } | null>(async () => {
     if (waiting) return null;
@@ -253,6 +261,7 @@ export function EventsMapScreen() {
 
   // Pin tocado → troca para a lista do tipo dele e leva o carrossel até o cartão.
   function pick(id: string) {
+    setAtMe(false);
     const nextMode: Mode = id.startsWith('p:') ? 'places' : 'events';
     setMode(nextMode);
     setSelectedId(id);
@@ -285,7 +294,10 @@ export function EventsMapScreen() {
           const d = Math.abs(r.left + r.width / 2 - mid);
           if (!best || d < best.d) best = { id: item.dataset['id'] ?? '', d };
         }
-        if (best?.id) setSelectedId(best.id);
+        if (best?.id) {
+          setAtMe(false);
+          setSelectedId(best.id);
+        }
       }, 80);
     };
     list.addEventListener('scroll', onScroll, { passive: true });
@@ -324,6 +336,8 @@ export function EventsMapScreen() {
     setMoved(undefined);
     setSelectedId(undefined);
     setRecenter((n) => n + 1);
+    setAtMe(true);
+    setMeHint((n) => n + 1);
   }
 
   const searching = !!area && refreshing;
@@ -355,6 +369,7 @@ export function EventsMapScreen() {
             autoFit={!manual}
             onUserMove={onUserMove}
             recenter={recenter}
+            followSelection={!atMe}
           />
         </Suspense>
       )}
@@ -368,6 +383,12 @@ export function EventsMapScreen() {
             Acontecendo agora{eventsResult.data ? ` ${events.length}` : ''}
           </button>
         </div>
+        {meHint && !moved && !searching ? (
+          <p key={meHint} className="evmap__hint" role="status">
+            <LocationIcon />
+            {t('Mostrando a sua localização')}
+          </p>
+        ) : null}
         {moved || searching ? (
           <button type="button" className="evmap__area" onClick={searchHere} disabled={searching} aria-busy={searching || undefined}>
             {searching ? <span className="evmap__spin" aria-hidden="true" /> : <SearchIcon />}

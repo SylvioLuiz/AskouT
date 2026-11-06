@@ -3559,7 +3559,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 /* ---------- Estética Apple ---------- */
 .evcard, .welcome { border: 0; box-shadow: 0 0.5px 0 rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.06); }
 .fchip { border-width: 0; background: var(--surface); box-shadow: 0 0 0 0.5px var(--line-strong); font-weight: 500; }
-.fchip--on, .fchip[aria-pressed='true'] { box-shadow: none; }
+.fchip--on, .fchip[aria-pressed='true'] { box-shadow: none; color: var(--brand-ink); background: var(--brand); }
 :root[data-theme='dark'] .evcard, :root[data-theme='dark'] .welcome { box-shadow: none; }
 
 /* ---------- Painel do local ---------- */
@@ -3730,7 +3730,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmap__top { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 56px 10px; pointer-events: none; }
 .evmap__top > * { pointer-events: auto; }
 .evmap__back { display: grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 22px; background: rgba(255,255,255,.94); color: #111; box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer; }
-.evmap__bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 14px); }
+.evmap__bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 24px); }
 .evmap__status { margin: 0 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; border-radius: 18px; background: rgba(20,20,22,.92); color: #fff; text-align: center; }
 .evmap__status p { margin: 0; }
 .evmap__note { margin: 8px 16px 0; font-size: 12px; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.8); text-align: center; }
@@ -3793,6 +3793,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmap__bottom > .evmap__locate { position: absolute; right: 16px; bottom: calc(100% + 12px); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: rgba(255,255,255,.96); color: rgb(26 11 46); box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer; transition: transform .15s ease; }
 .evmap__locate:active { transform: scale(.94); }
 .evmap__locate svg { width: 22px; height: 22px; }
+.evmap__hint { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 7px 14px; border-radius: 18px; background: rgba(18,18,20,.82); color: #fff; font-size: 13px; font-weight: 600; box-shadow: 0 2px 10px rgba(0,0,0,.25); pointer-events: none; animation: evmap-hint 2.6s ease both; }
+.evmap__hint svg { width: 16px; height: 16px; }
+@keyframes evmap-hint { 0% { opacity: 0; transform: translateY(-8px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 .evmap__spin { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: evmap-spin .7s linear infinite; }
 @keyframes evmap-fade { from { opacity: 0; } }
 @keyframes evmap-card-in { from { opacity: 0; transform: translateY(18px); } }
@@ -3801,6 +3804,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 @keyframes evmap-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .evmap__bottom > *, .evmap__strip > .evmap__slide, .evpin, .evmap__area, .evskel { animation: none; }
+  .evmap__hint { animation: evmap-fade .2s ease both; }
   .fadeimg, .evmap__strip, .evmapcard { transition: none; }
 }
 
@@ -3862,6 +3866,10 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .kindpick__icon { display: grid; place-items: center; padding-left: 14px; color: var(--brand-text); }
 .kindpick__icon svg { width: 20px; height: 20px; }
 .kindpick__select { appearance: none; -webkit-appearance: none; padding-right: 40px; cursor: pointer; }
+/* Selects nativos: a lista aberta e o valor escolhido seguem o tema (sem texto preto no fundo escuro). */
+select { color: var(--ink); }
+select option, select optgroup { color: var(--ink); background-color: var(--surface); }
+select option:checked { color: var(--brand-ink); background-color: var(--brand); }
 .kindpick__chev { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: grid; pointer-events: none; color: var(--muted); }
 .kindpick__chev svg { width: 20px; height: 20px; }
 
@@ -5114,3 +5122,9 @@ button.reactlist__row { cursor: pointer; }
 
 /* Explorar (lista): contador "N eventos a até X km" com respiro antes dos cartões. */
 .explore__count { margin: 4px 0 14px; font-size: 13px; }
+/* Explorar (lista): o aviso de período ampliado e os cartões entram com fade, sem o vazio antes. */
+.explore__auto { margin: 4px 0 0; animation: explore-fade .3s ease-out both; }
+.explore__auto + .explore__count { margin-top: 2px; }
+.explore__count + .evgrid { animation: explore-fade .3s ease-out both; }
+@keyframes explore-fade { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .explore__auto, .explore__count + .evgrid { animation: none; } }

@@ -361,6 +361,11 @@ export function ExploreScreen() {
   const autoTried = useRef(false);
   const alive = useRef(true);
   const [autoRange, setAutoRange] = useState<RangeId | null>(null);
+  // Enquanto procura um período mais amplo, a tela segue "buscando" em vez de piscar o vazio antes da troca.
+  // 'found': achou e trocou os filtros; segue buscando até o resultado novo chegar (o antigo, vazio, ainda está em `raw`).
+  const [widening, setWidening] = useState<false | 'searching' | 'found'>(false);
+  const staleRaw = useRef<ExploreResult | null | undefined>(undefined);
+  const untouched = q === '' && range === 'today' && kind === null && !free && !hot && radiusKm === RADIUS_DEFAULT_KM;
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -370,8 +375,8 @@ export function ExploreScreen() {
   useEffect(() => {
     if (autoTried.current || waiting || result.loading || !raw) return;
     autoTried.current = true;
-    const untouched = q === '' && range === 'today' && kind === null && !free && !hot && radiusKm === RADIUS_DEFAULT_KM;
     if (!untouched || filterByThemes(raw.events, themes, themeOfEvent).length > 0) return;
+    setWidening('searching');
     void (async () => {
       for (const step of widenSteps({ hasThemes: themes.size > 0, located: position !== undefined })) {
         const { from, to } = rangeFor(step.range, new Date());
@@ -388,6 +393,8 @@ export function ExploreScreen() {
           if (!alive.current) return;
           const events = step.clearThemes ? r.events : filterByThemes(r.events, themes, themeOfEvent);
           if (events.length > 0) {
+            staleRaw.current = raw;
+            setWidening('found');
             if (step.clearThemes) setThemes(new Set());
             if (step.radiusKm !== RADIUS_DEFAULT_KM) setRadiusKm(step.radiusKm);
             setRange(step.range);
@@ -395,13 +402,22 @@ export function ExploreScreen() {
             return;
           }
         } catch {
+          if (alive.current) setWidening(false);
           return;
         }
       }
+      if (alive.current) setWidening(false);
     })();
     // Roda uma vez, quando o primeiro resultado chega.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [raw, waiting, result.loading]);
+  useEffect(() => {
+    if (widening === 'found' && !result.loading && (raw !== staleRaw.current || result.error)) setWidening(false);
+  }, [widening, result.loading, raw]);
+  // Primeiro desenho com o vazio de hoje, antes de o efeito acima começar a procurar: já conta como buscando.
+  const autoPending =
+    !autoTried.current && !waiting && !result.loading && !!raw && untouched && filterByThemes(raw.events, themes, themeOfEvent).length === 0;
+  const busy = waiting || result.loading || widening !== false || autoPending;
 
   const hasResults = data !== undefined && data !== null && data.events.length + data.places.length + data.people.length > 0;
   // Buscou, achou e ficou na tela: entra nas recentes (sem salvar cada letra digitada).
@@ -552,10 +568,10 @@ export function ExploreScreen() {
         </div>
       ) : null}
 
-      {waiting || result.loading ? <Loading label={waiting ? t('Buscando a sua localização') : t('Buscando')} /> : null}
+      {busy ? <Loading label={waiting ? t('Buscando a sua localização') : t('Buscando')} /> : null}
       {!waiting && result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
 
-      {!waiting && !result.loading && data ? (
+      {!busy && data ? (
         <>
           {!searching ? (
             data.events.length === 0 ? (
@@ -575,7 +591,7 @@ export function ExploreScreen() {
               </EmptyState>
             ) : (
               <>
-                {autoRange !== null && range === autoRange ? <p className="muted" role="status">{t('Nada para hoje. Mostrando: {periodo}.', { periodo: rangeLabel(autoRange) })}</p> : null}
+                {autoRange !== null && range === autoRange ? <p className="muted explore__auto" role="status">{t('Nada para hoje. Mostrando: {periodo}.', { periodo: rangeLabel(autoRange) })}</p> : null}
                 <p className="muted explore__count" aria-live="polite">
                   {pluralize(data.events.length, t('evento'), t('eventos'))} {hot ? t('bombando agora') : data.located ? t('a até {km} km', { km: data.radiusKm }) : t('no período')}
                 </p>
