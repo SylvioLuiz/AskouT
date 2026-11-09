@@ -114,6 +114,8 @@ export function Shell({ children }: { children: ReactNode }) {
   const hasUnread = unreadChats > 0;
   const inChat = /^\/conversas\/[^/]+$/.test(pathname);
   const inEvent = /^\/eventos\/[^/]+$/.test(pathname);
+  // Criar publicação: tela cheia, como nos apps de foto (sem a barra de cima e a de baixo).
+  const inCompose = pathname === '/criar';
   const flashOn = flash.data?.active === true;
   const flashInvited = (flashInvites.data?.received.length ?? 0) > 0;
 
@@ -129,7 +131,7 @@ export function Shell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className={`shell${inChat ? ' shell--chat' : ''}${inEvent ? ' shell--detail' : ''}`}>
+    <div className={`shell${inChat ? ' shell--chat' : ''}${inEvent ? ' shell--detail' : ''}${inCompose ? ' shell--compose' : ''}`}>
       <a className="skip" href="#conteudo">
         {t('Ir para o conteúdo')}
       </a>
