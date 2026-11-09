@@ -1583,11 +1583,11 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   display: block;
 }
 
-/* Folha inferior */
+/* Folha inferior. Fica acima do mapa em tela cheia (.evmap, 60), senão "Rota" abria a folha por trás do mapa. */
 .sheet {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 70;
   display: flex;
   align-items: flex-end;
   justify-content: center;
