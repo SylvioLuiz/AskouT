@@ -175,9 +175,14 @@ export function cellLabel(stats: DateStats, mine: VoteStatus | undefined): strin
 export function pollLine(p: PollSummary, now: Date): { name: string; status: string } | null {
   if (p.status === 'CANCELLED') return null;
   if (p.status === 'FINALIZED') {
-    if (!p.finalDate || (p.finalEndsAt && new Date(p.finalEndsAt).getTime() < now.getTime())) return null;
+    // Passou o evento: sai da linha fixa (sem horário de fim, vale até o fim do dia marcado).
+    if (!p.finalDate) return null;
+    const endIso = p.finalEndsAt ?? p.event?.endsAt ?? null;
+    if (endIso ? new Date(endIso).getTime() < now.getTime() : p.finalDate < dayInZone(now.toISOString())) return null;
     return { name: p.title, status: `marcado para ${weekdayName(p.finalDate)}, ${shortDay(p.finalDate)}` };
   }
+  // Votação ainda aberta cujo período já passou: não há mais o que votar.
+  if (p.rangeEnd < dayInZone(now.toISOString())) return null;
   if (p.status === 'CONFIRMING') return { name: p.title, status: p.proposedDate ? t('confirmando {day}', { day: shortDay(p.proposedDate) }) : t('confirmando a data') };
   const share = p.participantCount > 0 ? Math.round((p.votedCount / p.participantCount) * 100) : 0;
   return { name: p.title, status: t('em votação: {share}% dos votos', { share }) };
