@@ -5447,3 +5447,65 @@ button.reactlist__row { cursor: pointer; }
 .explore__sticky ~ * { animation: explore-fade .22s ease-out both; }
 :root.vt-explore::view-transition-old(root), :root.vt-explore::view-transition-new(root) { animation-duration: .22s; animation-timing-function: ease; }
 @media (prefers-reduced-motion: reduce) { .evmap, .explore__sticky ~ * { animation: none; } .evmap .evmap__canvas { transition: none; } }
+
+/* ---------- Nova publicação no padrão dos apps de foto ---------- */
+/* Tela cheia no celular: sem a barra de cima e a de baixo, cabeçalho próprio fixo. */
+@media (max-width: 899px) {
+  .shell--compose .topbar, .shell--compose .tabbar { display: none; }
+  .shell--compose .content { padding-top: 0; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+}
+.compose__bar { position: sticky; top: 0; z-index: 5; margin: 0 -16px; padding: calc(6px + env(safe-area-inset-top)) 16px 6px; background: var(--bg); border-bottom: 0.5px solid var(--line); grid-template-columns: 64px 1fr 64px; }
+.compose__bar .iconbtn { margin-left: -10px; }
+.compose__bar .iconbtn svg { width: 24px; height: 24px; }
+.compose__next { justify-self: end; min-height: 44px; padding: 0 2px; border: 0; background: transparent; color: var(--brand-text); font-weight: 700; font-size: 1rem; cursor: pointer; }
+.compose__next:disabled { color: var(--ink-2); opacity: 0.45; cursor: default; }
+.compose__stage { aspect-ratio: 4 / 5; }
+.compose__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 0; cursor: default; font-weight: 500; }
+.compose__emptyicon { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--brand-soft); color: var(--brand-text); margin-bottom: 4px; }
+.compose__emptyicon svg { width: 30px; height: 30px; }
+.compose__emptytitle { font-family: var(--font-display); font-size: 1.0625rem; font-weight: 700; color: var(--ink); }
+.compose__emptyhint { color: var(--ink-2); font-size: 0.875rem; margin-bottom: 6px; }
+.stage__count { position: absolute; top: 10px; right: 10px; padding: 2px 9px; border-radius: 999px; background: rgb(0 0 0 / 0.6); color: #fff; font-size: 0.75rem; font-weight: 700; }
+/* Miniaturas numa faixa que rola de lado, como o carrossel dos apps de foto. */
+.composegrid { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.composegrid::-webkit-scrollbar { display: none; }
+.composegrid__item { flex: none; width: 68px; height: 68px; }
+.compose__meta { color: var(--ink-2); font-size: 0.8125rem; margin-top: -4px; }
+
+/* Detalhes: legenda ao lado da miniatura, opções em linhas e botão fixo embaixo. */
+.compose__caption { display: flex; gap: 12px; align-items: flex-start; padding: 4px 0 12px; border-bottom: 1px solid var(--line); }
+.compose__thumb { position: relative; flex: none; width: 72px; height: 90px; padding: 0; border: 0; border-radius: 8px; overflow: hidden; background: var(--line); cursor: pointer; }
+.compose__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.compose__thumbicon { position: absolute; top: 4px; right: 4px; color: #fff; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6)); }
+.compose__thumbicon svg { width: 16px; height: 16px; }
+.compose__thumbplay { position: absolute; left: 6px; bottom: 4px; color: #fff; font-size: 0.75rem; text-shadow: 0 1px 2px rgb(0 0 0 / 0.7); }
+.compose__text { flex: 1; min-width: 0; min-height: 90px; padding: 4px 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 1rem; line-height: 1.4; resize: none; outline: none; }
+.compose__text::placeholder { color: var(--ink-2); }
+.compose__count { align-self: flex-end; margin-top: -8px; color: var(--ink-2); font-size: 0.8125rem; }
+.compose__count--over { color: var(--danger); font-weight: 700; }
+.optrows { display: flex; flex-direction: column; border-bottom: 1px solid var(--line); }
+.optrow { display: flex; align-items: center; border-top: 1px solid var(--line); }
+.optrow:first-child { border-top: 0; }
+.optrow__main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 0; border: 0; background: transparent; color: var(--ink); text-align: left; font: inherit; cursor: pointer; }
+div.optrow__main { cursor: default; }
+.optrow__icon { flex: none; display: grid; place-items: center; width: 24px; color: var(--ink); }
+.optrow__icon svg { width: 22px; height: 22px; }
+.optrow__text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.optrow__label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.optrow__sub { color: var(--ink-2); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.optrow__avatars { display: flex; flex: none; }
+.optrow__avatars > * + * { margin-left: -8px; }
+.optrow__chev { flex: none; color: var(--ink-2); display: grid; place-items: center; }
+.optrow__chev svg { width: 18px; height: 18px; }
+.optrow__clear { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin-right: -10px; border: 0; border-radius: 50%; background: transparent; color: var(--ink-2); cursor: pointer; }
+.optrow__clear svg { width: 18px; height: 18px; }
+.compose--details { padding-bottom: 88px; }
+.compose__footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--bg) 88%, transparent); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); border-top: 0.5px solid var(--line); }
+.compose__footer .btn { max-width: calc(var(--column) - 32px); margin: 0 auto; display: flex; }
+@media (min-width: 900px) {
+  .compose__bar { position: static; margin: 0; padding: 0; border: 0; background: transparent; }
+  .compose__footer { position: sticky; left: auto; right: auto; margin: 0 -16px; }
+}
+.compose .check > span { display: flex; flex-direction: column; gap: 2px; }
+.compose--details .compose__caption { border-top: 1px solid var(--line); padding-top: 12px; }
+.compose--details .segmented + .compose__caption { border-top: 0; padding-top: 4px; }

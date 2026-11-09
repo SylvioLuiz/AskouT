@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
-import { CropIcon, XIcon } from '../components/icons.tsx';
+import { CarouselIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, LocationIcon, PhotoIcon, UsersIcon, XIcon } from '../components/icons.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { ConversationPick } from '../components/conversation-pick.tsx';
 import { CropEditor } from '../components/crop.tsx';
@@ -134,6 +134,7 @@ export function CreatePostScreen() {
   const [eventPrivate, setEventPrivate] = useState(false);
   const [shareTo, setShareTo] = useState<string[]>(fromPoll && prefill.get('conversa') ? [prefill.get('conversa') as string] : []);
   const [createdId, setCreatedId] = useState<string | undefined>();
+  const [discarding, setDiscarding] = useState(false);
   const friends = useAsync(() => api.friends(), []);
 
   const room = POST_IMAGES_MAX - items.length;
@@ -271,17 +272,35 @@ export function CreatePostScreen() {
 
   const fileInput = <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="visually-hidden" aria-label={t('Escolher fotos ou vídeo')} id="fotos-post" onChange={addFiles} />;
 
+  const captionLength = Array.from(caption).length;
+  const cover = items[0];
+
+  function leave() {
+    if (items.length === 0 && caption.trim() === '') navigate('/');
+    else setDiscarding(true);
+  }
+
+  const discardSheet = discarding ? (
+    <Sheet title={t('Descartar publicação?')} onClose={() => setDiscarding(false)}>
+      <p className="muted">{t('Se sair agora, as fotos e o texto que você escolheu não serão salvos.')}</p>
+      <Button variant="danger" full onClick={() => navigate('/')}>
+        {t('Descartar')}
+      </Button>
+      <Button variant="quiet" full onClick={() => setDiscarding(false)}>
+        {t('Continuar editando')}
+      </Button>
+    </Sheet>
+  ) : null;
+
   if (step === 'details') {
     return (
-      <div className="compose">
+      <div className="compose compose--details">
         <header className="compose__bar">
-          <button type="button" className="iconbtn" onClick={() => setStep('photos')} aria-label={t('Voltar para as fotos')}>
-            <span aria-hidden="true">‹</span>
+          <button type="button" className="iconbtn" onClick={() => setStep('photos')} aria-label={t('Voltar para as fotos')} disabled={busy}>
+            <ChevronLeftIcon />
           </button>
-          <h1 className="compose__title">{t('Detalhes')}</h1>
-          <Button small loading={busy} disabled={Array.from(caption).length > POST_CAPTION_MAX} onClick={publish}>
-            {t('Compartilhar')}
-          </Button>
+          <h1 className="compose__title">{t('Nova publicação')}</h1>
+          <span aria-hidden="true" />
         </header>
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
         {busy && prep ? (
@@ -298,18 +317,6 @@ export function CreatePostScreen() {
             <p className="uploadbar__hint">{t('Mantenha esta tela aberta até terminar.')}</p>
           </div>
         ) : null}
-        {createdId ? (
-          <Link to={`/eventos/${encodeURIComponent(createdId)}`} className="btn btn--secondary">
-            {t('Abrir o evento criado')}
-          </Link>
-        ) : null}
-        <ul className="composestrip" aria-label={t('Fotos do post')}>
-          {items.map((item, i) => (
-            <li key={item.key}>
-              <img src={item.preview} alt={t('Foto {i}', { i: i + 1 })} referrerPolicy="no-referrer" />
-            </li>
-          ))}
-        </ul>
         <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
           <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
             {t('Post')}
@@ -336,60 +343,82 @@ export function CreatePostScreen() {
             <p className="muted">{eventPrivate ? t('Escolha com quem compartilhar.') : t('Opcional. Quem estiver no grupo poderá postar o evento no próprio perfil.')}</p>
           </section>
         ) : null}
-        <Field label={t('Descrição (opcional)')} value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />
-
-        <section className="compose__row" aria-labelledby="lugar-titulo">
-          <h2 id="lugar-titulo" className="compose__h">
-            {t('Rolê')}
-          </h2>
-          {place ? (
-            <p className="compose__value">
-              <strong>{place.name}</strong>
-              {place.address ? <span className="muted"> {place.address}</span> : null}
-            </p>
-          ) : (
-            <p className="muted">{t('Nenhum rolê vinculado.')}</p>
-          )}
-          {placeFromPhoto ? (
-            <p className="muted">{t('O rolê vem da foto do rolê que você escolheu.')}</p>
-          ) : (
-            <div className="row-actions">
-              <Button variant="secondary" small onClick={() => setLinking(true)}>
-                {linked ? t('Trocar rolê') : t('Vincular um rolê')}
-              </Button>
-              {linked ? (
-                <Button variant="quiet" small onClick={() => setLinked(null)}>
-                  {t('Remover')}
-                </Button>
+        <div className="compose__caption">
+          <button type="button" className="compose__thumb" onClick={() => setStep('photos')} disabled={busy} aria-label={t('Editar fotos ({count})', { count: items.length })}>
+            {cover ? <img src={cover.preview} alt="" referrerPolicy="no-referrer" /> : null}
+            {items.length > 1 ? (
+              <span className="compose__thumbicon" aria-hidden="true">
+                <CarouselIcon />
+              </span>
+            ) : null}
+            {cover && cover.kind === 'UPLOAD' && cover.video ? <span className="compose__thumbplay" aria-hidden="true">▶</span> : null}
+          </button>
+          <textarea
+            className="compose__text"
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder={kind === 'EVENT' ? t('Conte mais sobre o evento…') : t('Escreva uma legenda…')}
+            aria-label={t('Legenda')}
+            maxLength={POST_CAPTION_MAX + 20}
+            rows={4}
+            aria-invalid={captionLength > POST_CAPTION_MAX || undefined}
+          />
+        </div>
+        {captionLength > POST_CAPTION_MAX * 0.8 ? (
+          <p className={`compose__count${captionLength > POST_CAPTION_MAX ? ' compose__count--over' : ''}`} aria-live="polite">
+            {captionLength}/{POST_CAPTION_MAX}
+          </p>
+        ) : null}
+        <ul className="optrows">
+          <li className="optrow">
+            {placeFromPhoto ? (
+              <div className="optrow__main">
+                <span className="optrow__icon"><LocationIcon /></span>
+                <span className="optrow__text">
+                  <span className="optrow__label">{place?.name}</span>
+                  <span className="optrow__sub">{t('O rolê vem da foto do rolê que você escolheu.')}</span>
+                </span>
+              </div>
+            ) : (
+              <button type="button" className="optrow__main" onClick={() => setLinking(true)}>
+                <span className="optrow__icon"><LocationIcon /></span>
+                <span className="optrow__text">
+                  <span className="optrow__label">{place ? place.name : t('Vincular um rolê')}</span>
+                  {place?.address ? <span className="optrow__sub">{place.address}</span> : null}
+                </span>
+                {linked ? null : <span className="optrow__chev"><ChevronRightIcon /></span>}
+              </button>
+            )}
+            {linked && !placeFromPhoto ? (
+              <button type="button" className="optrow__clear" onClick={() => setLinked(null)} aria-label={t('Remover o rolê vinculado')}>
+                <XIcon />
+              </button>
+            ) : null}
+          </li>
+          <li className="optrow">
+            <button type="button" className="optrow__main" onClick={() => setTagging(true)}>
+              <span className="optrow__icon"><UsersIcon /></span>
+              <span className="optrow__text">
+                <span className="optrow__label">{t('Marcar pessoas')}</span>
+                {tagged.length > 0 ? <span className="optrow__sub">{tagged.map((f) => `@${f.username}`).join(', ')}</span> : null}
+              </span>
+              {tagged.length > 0 ? (
+                <span className="optrow__avatars" aria-hidden="true">
+                  {tagged.slice(0, 3).map((f) => (
+                    <Avatar key={f.userId} profile={f} size={24} />
+                  ))}
+                </span>
               ) : null}
-            </div>
-          )}
-        </section>
+              <span className="optrow__chev"><ChevronRightIcon /></span>
+            </button>
+          </li>
+        </ul>
 
-        <section className="compose__row" aria-labelledby="pessoas-titulo">
-          <h2 id="pessoas-titulo" className="compose__h">
-            {t('Marcar pessoas')}
-          </h2>
-          {tagged.length > 0 ? (
-            <ul className="chips" aria-label={t('Pessoas marcadas')}>
-              {tagged.map((f) => (
-                <li key={f.userId} className="tagchip">
-                  <Avatar profile={f} size={24} />
-                  <span>{f.username}</span>
-                  <button type="button" onClick={() => setTags((c) => c.filter((id) => id !== f.userId))} aria-label={t('Tirar a marcação de {username}', { username: f.username })}>
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          <div className="row-actions">
-            <Button variant="secondary" small onClick={() => setTagging(true)}>
-              {tags.length > 0 ? t('Mudar marcações') : t('Marcar amigos')}
-            </Button>
-          </div>
-          <p className="muted">{t('Só amigos. Cada pessoa precisa aceitar a marcação para o post aparecer no perfil e no feed dela.')}</p>
-        </section>
+        <div className="compose__footer">
+          <Button full loading={busy} disabled={captionLength > POST_CAPTION_MAX} onClick={() => void publish()}>
+            {createdId ? t('Abrir o evento criado') : kind === 'EVENT' ? t('Criar evento') : t('Compartilhar')}
+          </Button>
+        </div>
 
         {linking ? (
           <LinkPlaceSheet
@@ -402,6 +431,7 @@ export function CreatePostScreen() {
         ) : null}
         {tagging ? (
           <Sheet title={t('Marcar pessoas')} onClose={() => setTagging(false)}>
+            <p className="muted">{t('Só amigos. Cada pessoa precisa aceitar a marcação para o post aparecer no perfil e no feed dela.')}</p>
             <FriendPicker picked={tags} onToggle={(id) => setTags((c) => toggleId(c, id))} />
             <Button full onClick={() => setTagging(false)}>
               {t('Concluir')}
@@ -415,13 +445,13 @@ export function CreatePostScreen() {
   return (
     <div className="compose">
       <header className="compose__bar">
-        <Link to="/" className="iconbtn" aria-label={t('Cancelar')}>
+        <button type="button" className="iconbtn" onClick={leave} aria-label={t('Cancelar')}>
           <XIcon />
-        </Link>
+        </button>
         <h1 className="compose__title">{t('Nova publicação')}</h1>
-        <Button small disabled={items.length === 0 || reading || cropKey !== undefined} onClick={() => setStep('details')}>
+        <button type="button" className="compose__next" disabled={items.length === 0 || reading || cropKey !== undefined} onClick={() => setStep('details')}>
           {t('Avançar')}
-        </Button>
+        </button>
       </header>
       {fileInput}
 
@@ -446,12 +476,25 @@ export function CreatePostScreen() {
             {focused.kind === 'UPLOAD' && focused.video ? <span className="stage__video" aria-label={t('Vídeo')}>▶ Vídeo</span> : null}
           </>
         ) : source === 'photos' ? (
-          <button type="button" className="compose__empty" onClick={() => fileRef.current?.click()} disabled={reading}>
-            {reading ? t('Preparando as fotos…') : t('Toque para abrir a galeria')}
-          </button>
+          <div className="compose__empty">
+            <span className="compose__emptyicon" aria-hidden="true">
+              <PhotoIcon />
+            </span>
+            <p className="compose__emptytitle">{reading ? t('Preparando as fotos…') : t('Fotos e vídeos do rolê')}</p>
+            <p className="compose__emptyhint">{t('Até {max} itens, com no máximo 1 vídeo.', { max: POST_IMAGES_MAX })}</p>
+            <Button small loading={reading} onClick={() => fileRef.current?.click()}>
+              {t('Escolher da galeria')}
+            </Button>
+          </div>
         ) : (
-          <p className="compose__empty">{t('Busque um rolê abaixo para usar a foto dele.')}</p>
+          <div className="compose__empty">
+            <span className="compose__emptyicon" aria-hidden="true">
+              <LocationIcon />
+            </span>
+            <p className="compose__emptyhint">{t('Busque um rolê abaixo para usar a foto dele.')}</p>
+          </div>
         )}
+        {items.length > 0 ? <span className="stage__count">{items.findIndex((i) => i.key === focused?.key) + 1}/{items.length}</span> : null}
         {focused && focused.kind === 'UPLOAD' && focused.source ? (
           <button type="button" className="stage__crop" onClick={() => setCropKey(focused.key)} aria-label={t('Recortar foto')} title={t('Recortar')}>
             <CropIcon />
@@ -483,9 +526,10 @@ export function CreatePostScreen() {
           ) : null}
         </ul>
       ) : null}
-      <p className="muted">{t('{count}/{max} fotos. As fotos são reduzidas antes de enviar.', { count: items.length, max: POST_IMAGES_MAX })}</p>
+      {items.length > 0 ? <p className="compose__meta">{t('{count} de {max} · toque para ver, × para tirar', { count: items.length, max: POST_IMAGES_MAX })}</p> : null}
 
       {source === 'place' ? <PlacePhotoGrid picked={placePhoto?.placeName} onPick={pickPlacePhoto} /> : null}
+      {discardSheet}
     </div>
   );
 }
