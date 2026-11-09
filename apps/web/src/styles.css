@@ -3645,6 +3645,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 
 /* Informações da conversa */
 .chatinfo { display: flex; justify-content: center; margin: 4px 0 14px; }
+.chatinfo--stack { flex-direction: column; align-items: center; gap: 4px; }
 .chatinfo__who { display: flex; flex-direction: column; align-items: center; gap: 4px; color: inherit; text-decoration: none; text-align: center; }
 .chatinfo__name { font-family: var(--font-display); font-weight: 700; font-size: 1.0625rem; margin-top: 8px; }
 .chatinfo__handle { color: var(--muted); }

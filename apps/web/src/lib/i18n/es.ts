@@ -2011,6 +2011,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Foto de perfil": "Foto de perfil",
   "Ver foto": "Ver foto",
   "Ver foto de perfil": "Ver foto de perfil",
+  "Ver foto do grupo": "Ver foto del grupo",
   "Escolher da galeria": "Elegir de la galería",
   "Celular": "Celular",
   "Seguir todos ({n})": "Seguir a todos ({n})",

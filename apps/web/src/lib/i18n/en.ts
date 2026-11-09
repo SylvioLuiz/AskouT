@@ -2127,6 +2127,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Foto de perfil": "Profile photo",
   "Ver foto": "View photo",
   "Ver foto de perfil": "View profile photo",
+  "Ver foto do grupo": "View group photo",
   "Escolher da galeria": "Choose from gallery",
   "Celular": "Phone",
   "Seguir todos ({n})": "Follow all ({n})",
