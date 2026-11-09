@@ -26,10 +26,16 @@ export interface EventCardView {
 
 export async function buildEventCards(deps: CoreDeps, ids: string[]): Promise<Map<string, EventCardView>> {
   const out = new Map<string, EventCardView>();
-  for (const id of [...new Set(ids)]) {
-    const found = await deps.places.findEvent(id);
+  // Busca em paralelo; o preenchimento do mapa segue a ordem original.
+  const unique = [...new Set(ids)];
+  const looked = await Promise.all(
+    unique.map(async (id) => {
+      const found = await deps.places.findEvent(id);
+      return { id, found, post: found ? undefined : await deps.posts.findById(id) };
+    }),
+  );
+  for (const { id, found, post } of looked) {
     if (!found) {
-      const post = await deps.posts.findById(id);
       const p = post?.post;
       if (!p || !p.eventTitle || !p.eventStartsAt || !p.eventEndsAt || p.archivedAt) continue;
       // Capa: a primeira foto enviada (a rota da imagem é pública, o id é aleatório). Foto do Google fica de fora.
