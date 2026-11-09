@@ -20,7 +20,7 @@ const SLOTS: readonly { id: DaySlot; label: string; icon: ReactNode; tone: strin
   { id: 'AFTERNOON', label: t('Tarde'), icon: <SunIcon />, tone: 'sun' },
   { id: 'NIGHT', label: t('Noite'), icon: <MoonIcon />, tone: 'moon' },
 ];
-const POLICY_TEXT: Record<Policy, string> = {
+export const POLICY_TEXT: Record<Policy, string> = {
   MAJORITY: t('A data será aprovada quando mais da metade confirmar.'),
   MANUAL: t('Você escolhe a data entre as mais votadas.'),
   UNANIMITY: t('A data só fecha quando todos confirmam.'),
@@ -210,7 +210,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
 }
 
 /** Toque no primeiro dia e depois no último (o mesmo dia duas vezes vale um dia só). */
-function RangeCalendar({ start, end, min, max, onPick }: { start: string; end: string; min: string; max?: string; onPick: (start: string, end: string) => void }) {
+export function RangeCalendar({ start, end, min, max, onPick }: { start: string; end: string; min: string; max?: string; onPick: (start: string, end: string) => void }) {
   const base = start || min;
   const [view, setView] = useState({ year: Number(base.slice(0, 4)), month: Number(base.slice(5, 7)) });
   const [anchor, setAnchor] = useState<string | undefined>();

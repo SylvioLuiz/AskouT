@@ -546,6 +546,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Este navegador não permite avisos fora do app. Os avisos continuam aparecendo aqui dentro.": "This browser doesn't allow notifications outside the app. Notifications still appear in here.",
   "Este perfil é privado": "This profile is private",
   "Estou livre agora. Para o futuro, use a Agenda.": "I'm free now. For the future, use the Calendar.",
+  "Editar votação": "Edit poll",
   "Eu decido": "I decide",
   "Eu e quem vai": "Me and who's going",
   "Eu vou": "I'm going",

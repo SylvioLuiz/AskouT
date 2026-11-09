@@ -192,7 +192,7 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
     await this.prisma.datePollParticipant.updateMany({ where: { pollId, userId }, data: { finishedAt: at } });
   }
 
-  async updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null; deadlineNotifiedAt?: Date | null }): Promise<void> {
+  async updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; rangeStart?: string; rangeEnd?: string; confirmationPolicy?: 'UNANIMITY' | 'MAJORITY' | 'MANUAL'; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null; deadlineNotifiedAt?: Date | null }): Promise<void> {
     if (!isUuid(pollId)) return;
     await this.prisma.datePoll.updateMany({ where: { id: pollId }, data: patch });
   }

@@ -236,6 +236,79 @@ export class SchedulingService {
     return this.view(actorId, poll);
   }
 
+  // ---------- Editar ----------
+
+  /**
+   * Quem organiza muda o nome, as datas (período) e a regra de escolha enquanto a votação está aberta.
+   * Os votos de dias que saem do período ficam guardados (voltam se o dia voltar), mas não contam nem aparecem.
+   * Se entram dias novos, quem já tinha concluído volta a poder votar neles.
+   */
+  async update(actorId: string, pollId: unknown, input: { title?: unknown; rangeStart?: unknown; rangeEnd?: unknown; confirmationPolicy?: unknown }): Promise<PollView> {
+    const { scheduling, clock } = this.deps;
+    const poll = await this.accessible(actorId, pollId);
+    if (poll.organizerId !== actorId) throw forbidden('Só quem criou a votação a edita');
+    this.requireVotingOpen(poll);
+    const now = clock.now();
+    const today = todayIn(poll.timezone, now);
+
+    const patch: { title?: string; rangeStart?: string; rangeEnd?: string; confirmationPolicy?: ConfirmationPolicy } = {};
+    const changes: string[] = [];
+
+    if (input.title !== undefined) {
+      const title = typeof input.title === 'string' ? input.title.trim() : '';
+      if (title === '' || CONTROL_RE.test(title) || Array.from(title).length > POLL_TITLE_MAX) throw validationError('Nome inválido', { title: `Use de 1 a ${POLL_TITLE_MAX} caracteres` });
+      if (title !== poll.title) {
+        patch.title = title;
+        changes.push('o nome');
+      }
+    }
+
+    if (input.rangeStart !== undefined || input.rangeEnd !== undefined) {
+      const rangeStart = input.rangeStart === undefined ? poll.rangeStart : input.rangeStart;
+      const rangeEnd = input.rangeEnd === undefined ? poll.rangeEnd : input.rangeEnd;
+      if (!isDay(rangeStart)) throw validationError('Data inicial inválida', { rangeStart: 'Use o formato AAAA-MM-DD' });
+      if (!isDay(rangeEnd)) throw validationError('Data final inválida', { rangeEnd: 'Use o formato AAAA-MM-DD' });
+      if (rangeStart !== poll.rangeStart && rangeStart < today) throw validationError('A data inicial já passou', { rangeStart: 'Escolha hoje ou um dia futuro' });
+      if (rangeEnd < today) throw validationError('A data final já passou', { rangeEnd: 'Escolha hoje ou um dia futuro' });
+      if (rangeEnd < rangeStart) throw validationError('Período inválido', { rangeEnd: 'A data final vem depois da inicial' });
+      if (daysBetween(rangeStart, rangeEnd) + 1 > POLL_MAX_DAYS) throw validationError('Período longo demais', { rangeEnd: `No máximo ${POLL_MAX_DAYS} dias` });
+      if (rangeStart !== poll.rangeStart || rangeEnd !== poll.rangeEnd) {
+        patch.rangeStart = rangeStart;
+        patch.rangeEnd = rangeEnd;
+        changes.push('as datas');
+      }
+    }
+
+    if (input.confirmationPolicy !== undefined) {
+      const policy = input.confirmationPolicy;
+      if (typeof policy !== 'string' || !POLICIES.includes(policy as ConfirmationPolicy)) throw validationError('Regra inválida', { confirmationPolicy: 'Use unanimidade, maioria ou decisão manual' });
+      if (policy !== poll.confirmationPolicy) {
+        patch.confirmationPolicy = policy as ConfirmationPolicy;
+        changes.push('quem escolhe a data');
+      }
+    }
+
+    if (changes.length === 0) return this.view(actorId, poll);
+    await scheduling.updatePoll(poll.id, patch);
+    const updated: PollRecord = { ...poll, ...patch };
+
+    // Dias novos no período: quem já tinha concluído precisa poder votar neles.
+    const oldDays = new Set(dateRange(poll.rangeStart, poll.rangeEnd));
+    const addedDays = patch.rangeStart !== undefined && dateRange(updated.rangeStart, updated.rangeEnd).some((d) => !oldDays.has(d));
+    const participants = await scheduling.listParticipants(poll.id);
+    if (addedDays) {
+      for (const p of participants) if (p.finishedAt !== null) await scheduling.setFinished(poll.id, p.userId, null);
+    }
+
+    const name = await this.nameOf(actorId);
+    const what = changes.length === 1 ? changes[0]! : `${changes.slice(0, -1).join(', ')} e ${changes[changes.length - 1]!}`;
+    await this.postSystem(poll.conversationId, actorId, `${name} mudou ${what} da votação "${updated.title}"${addedDays ? '. Há dias novos para votar.' : ''}`, now);
+    if (patch.rangeStart !== undefined || patch.title !== undefined) {
+      await this.notifyAll(actorId, participants.map((p) => p.userId).filter((id) => id !== actorId), updated, 'Votação atualizada', `${name} mudou ${what} de "${updated.title}". Confira seus votos.`);
+    }
+    return this.view(actorId, updated);
+  }
+
   // ---------- Ler ----------
 
   async get(actorId: string, pollId: unknown): Promise<PollView> {
@@ -637,7 +710,7 @@ export class SchedulingService {
     const answers = new Map(confirmations.map((c) => [c.userId, c.status] as const));
     const final = poll.status === 'FINALIZED' ? proposals.find((p) => p.id === poll.finalProposalId) : undefined;
     const myVotes: Record<string, VoteStatus> = {};
-    for (const v of votes) if (v.userId === actorId) myVotes[v.date] = v.status;
+    for (const v of votes) if (v.userId === actorId && v.date >= poll.rangeStart && v.date <= poll.rangeEnd) myVotes[v.date] = v.status;
     const me = participants.find((p) => p.userId === actorId);
 
     return {
