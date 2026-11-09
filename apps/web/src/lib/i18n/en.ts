@@ -547,6 +547,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Este perfil é privado": "This profile is private",
   "Estou livre agora. Para o futuro, use a Agenda.": "I'm free now. For the future, use the Calendar.",
   "Editar votação": "Edit poll",
+  "Abrir a página de {name}": "Open the page of {name}",
+  "Foto: {author}": "Photo: {author}",
   "Eu decido": "I decide",
   "Eu e quem vai": "Me and who's going",
   "Eu vou": "I'm going",
