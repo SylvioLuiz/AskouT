@@ -17,7 +17,10 @@ if (!apiUrl || !/^https:\/\//.test(apiUrl)) {
 }
 
 function run(command, args, cwd, env = {}) {
-  const result = spawnSync(command, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } });
+  // No Windows o `npx` é um .cmd: sem `shell` o spawn falha com ENOENT (e, nas versões recentes do Node, com EINVAL).
+  // Os argumentos aqui são fixos e sem espaços, então o shell não muda nada além de achar o executável.
+  const result = spawnSync(command, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, ...env } });
+  if (result.error) console.error(result.error.message);
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
