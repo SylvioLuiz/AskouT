@@ -3952,7 +3952,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmap__seg button.is-on { background: var(--brand-grad, var(--brand, rgb(58 54 245))); color: rgb(26 11 46); }
 .evpin--place::before { background: rgb(124 77 255); }
 .evpin--on { z-index: 2; }
-.evmapcard--place { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; }
+.evmapcard--place { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 16px 18px; }
 .evmapplace__bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /* Película escura sobre a foto do Google: o nome continua legível em qualquer imagem. */
 .evmapcard--photo::before { content: ''; position: absolute; inset: 0; z-index: 1; background: linear-gradient(to bottom, rgba(0,0,0,.55), rgba(0,0,0,.78)); }
@@ -3961,7 +3961,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmapplace__info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .evmapplace__name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-size: 17px; font-weight: 700; line-height: 1.25; text-align: left; text-decoration: underline; text-decoration-color: rgba(255,255,255,.35); text-underline-offset: 3px; overflow-wrap: anywhere; cursor: pointer; }
 .evmapplace__line { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; opacity: .85; }
-.evmapplace__route { flex: none; }
+.evmapplace__route.btn { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 15px; font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+.evmapplace__route.btn:active { transform: scale(.97); }
+.evmapplace__route.btn svg { width: 18px; height: 18px; }
 .evmapplace__credit { font-size: 10px; opacity: .6; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
 .evmapcard--place .tag-sponsored { align-self: flex-start; }
 .evpin--me { width: 18px; height: 18px; border: 3px solid #fff; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 6px var(--shadow-brand); cursor: default; }
