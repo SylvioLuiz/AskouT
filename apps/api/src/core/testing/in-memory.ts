@@ -1623,6 +1623,24 @@ export class InMemoryProfileEventRepository implements ProfileEventRepository {
     return this.postRows.has(this.key(userId, postId));
   }
 
+  async listPlaceReposts(userIds: string[], limit: number): Promise<{ userId: string; eventId: string; createdAt: Date }[]> {
+    const who = new Set(userIds);
+    return [...this.rows.values()]
+      .filter((r) => who.has(r.userId))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.eventId < b.eventId ? 1 : a.eventId > b.eventId ? -1 : a.userId < b.userId ? 1 : -1))
+      .slice(0, limit)
+      .map((r) => ({ ...r }));
+  }
+
+  async listPostReposts(userIds: string[], limit: number): Promise<{ userId: string; postId: string; createdAt: Date }[]> {
+    const who = new Set(userIds);
+    return [...this.postRows.values()]
+      .filter((r) => who.has(r.userId))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.postId < b.postId ? 1 : a.postId > b.postId ? -1 : a.userId < b.userId ? 1 : -1))
+      .slice(0, limit)
+      .map((r) => ({ ...r }));
+  }
+
   async list(userId: string, page: Page): Promise<{ eventId: string; postId?: string; createdAt: Date }[]> {
     const places = [...this.rows.values()].filter((r) => r.userId === userId).map((r) => ({ eventId: r.eventId, createdAt: r.createdAt }));
     const people = [...this.postRows.values()].filter((r) => r.userId === userId).map((r) => ({ eventId: r.postId, postId: r.postId, createdAt: r.createdAt }));
@@ -1848,6 +1866,10 @@ export class InMemoryPostRepository implements PostRepository {
 
   async hide(postId: string, userId: string): Promise<void> {
     this.hidden.add(`${postId}|${userId}`);
+  }
+
+  async hiddenAmong(userId: string, postIds: string[]): Promise<string[]> {
+    return [...new Set(postIds)].filter((id) => this.hidden.has(`${id}|${userId}`));
   }
 
   async like(postId: string, userId: string, at: Date): Promise<void> {

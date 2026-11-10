@@ -106,3 +106,69 @@ test('evento sem lugar vale, e o cartão leva a foto de capa enviada', async () 
   assert.equal(card.venueName, '');
   assert.equal(card.imageUrl, `/posts/images/${post.images[0]!.id}`);
 });
+
+test('repost no Início: quem segue quem repostou vê o evento com "repostou", uma vez só e na data do repost', async () => {
+  const { w, ana, bia, caio, duda, group, make } = await setup();
+  const post = await make(false);
+  // duda segue bia (aceita), mas não segue ana: só vê o evento pelo repost.
+  await w.core.follows.follow(duda, bia);
+  assert.equal((await w.core.posts.feed(duda)).items.length, 0, 'antes do repost, nada');
+
+  await w.core.conversations.send(ana, group.id, { eventId: post.id });
+  w.clock.tick(H);
+  await w.core.profileEvents.post(bia, post.id);
+
+  const dudaFeed = await w.core.posts.feed(duda);
+  assert.equal(dudaFeed.items.length, 1);
+  assert.equal(dudaFeed.items[0]!.id, post.id);
+  assert.equal(dudaFeed.items[0]!.repostedBy?.username, 'bia');
+  assert.ok(dudaFeed.items[0]!.repostedAt);
+
+  // caio segue ana e bia: o evento aparece uma vez, como repost (a entrada mais recente).
+  const caioFeed = await w.core.posts.feed(caio);
+  assert.deepEqual(caioFeed.items.map((p) => p.id), [post.id]);
+  assert.equal(caioFeed.items[0]!.repostedBy?.username, 'bia');
+
+  // "Não tenho interesse" tira o repost também.
+  await w.core.posts.notInterested(duda, post.id);
+  assert.equal((await w.core.posts.feed(duda)).items.length, 0);
+
+  // Tirar do perfil tira do Início.
+  await w.core.profileEvents.unpost(bia, post.id);
+  const after = await w.core.posts.feed(caio);
+  assert.deepEqual(after.items.map((p) => p.id), [post.id]);
+  assert.equal(after.items[0]!.repostedBy, undefined, 'volta a ser o post de ana');
+});
+
+test('repost no Início: arquivado ou de quem bloqueou não aparece; paginação não repete', async () => {
+  const { w, ana, bia, caio, group, make } = await setup();
+  const post = await make(false);
+  await w.core.conversations.send(ana, group.id, { eventId: post.id });
+  // caio cria vários posts para paginar junto com o repost.
+  for (let i = 0; i < 4; i += 1) {
+    w.clock.tick(H);
+    await w.core.posts.create(caio, { images: [JPEG], caption: `p${i}` });
+  }
+  w.clock.tick(H);
+  await w.core.profileEvents.post(bia, post.id);
+  w.clock.tick(H);
+  await w.core.posts.create(caio, { images: [JPEG], caption: 'último' });
+
+  const seen: string[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await w.core.posts.feed(bia, { limit: 2, offset });
+    seen.push(...page.items.map((p) => p.id));
+    offset += page.items.length;
+    if (!page.hasMore) break;
+  }
+  assert.equal(new Set(seen).size, seen.length, 'sem repetidos');
+  assert.equal(seen.length, 6, '5 posts de caio + o evento de ana');
+  assert.equal(seen[1], post.id, 'o repost entra na data dele');
+
+  await w.core.posts.archive(ana, post.id);
+  assert.ok(!(await w.core.posts.feed(caio)).items.some((p) => p.id === post.id), 'arquivado some');
+  await w.core.posts.unarchive(ana, post.id);
+  await w.core.blocks.block(ana, caio);
+  assert.ok(!(await w.core.posts.feed(caio)).items.some((p) => p.id === post.id), 'bloqueio some com o repost');
+});

@@ -786,6 +786,9 @@ export interface PostView {
   commentCount: number;
   archived: boolean;
   edited: boolean;
+  /** Só no Início: alguém que você segue (ou você) repostou este evento. */
+  repostedBy?: PublicProfile;
+  repostedAt?: string;
 }
 
 export interface PostComment {
@@ -817,6 +820,21 @@ export interface PostEdit {
   placeName?: string | null;
   placeAddress?: string | null;
   event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null } | null;
+}
+
+/** Evento de bar repostado por alguém que você segue, como item do Início (só com `mixed=1`). */
+export interface PlaceEventFeedItem {
+  type: 'PLACE_EVENT';
+  id: string;
+  event: EventCard;
+  repostedBy: PublicProfile;
+  repostedAt: string;
+}
+
+export type HomeFeedItem = PostView | PlaceEventFeedItem;
+
+export interface HomeFeedPage extends Omit<PostsPage, 'items'> {
+  items: HomeFeedItem[];
 }
 
 export interface PostsPage {

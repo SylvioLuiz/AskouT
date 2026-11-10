@@ -400,6 +400,10 @@ export interface ProfileEventRepository {
   addPost(userId: string, postId: string, at: Date): Promise<boolean>;
   removePost(userId: string, postId: string): Promise<boolean>;
   hasPost(userId: string, postId: string): Promise<boolean>;
+  /** Reposts de eventos de pessoas feitos por qualquer um de `userIds`, mais recentes primeiro (alimenta o Início). */
+  listPostReposts(userIds: string[], limit: number): Promise<{ userId: string; postId: string; createdAt: Date }[]>;
+  /** Eventos de local postados no perfil por qualquer um de `userIds`, mais recentes primeiro (alimenta o Início). */
+  listPlaceReposts(userIds: string[], limit: number): Promise<{ userId: string; eventId: string; createdAt: Date }[]>;
 }
 
 export interface PostRepository {
@@ -432,6 +436,8 @@ export interface PostRepository {
   replaceImage(postId: string, imageId: string, newId: string, mime: string, data: Uint8Array): Promise<boolean>;
   /** "Não tenho interesse": o post some das listas de `userId` (`listFor` com `scope.hideFor`). */
   hide(postId: string, userId: string): Promise<void>;
+  /** Dos `postIds`, os que `userId` escondeu com "Não tenho interesse". */
+  hiddenAmong(userId: string, postIds: string[]): Promise<string[]>;
   like(postId: string, userId: string, at: Date): Promise<void>;
   unlike(postId: string, userId: string): Promise<void>;
   /** Curtidas de cada post e se `viewerId` curtiu. */

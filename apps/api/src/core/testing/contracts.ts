@@ -1874,6 +1874,10 @@ export function defineRepositoryContract(
         assert.equal(await h.profileEvents.has(bia, e2.id), false);
         assert.deepEqual((await h.profileEvents.list(ana, { limit: 10, offset: 0 })).map((r) => r.eventId), [e3.id, e2.id, e.id], 'mais recente primeiro');
         assert.deepEqual((await h.profileEvents.list(ana, { limit: 1, offset: 1 })).map((r) => r.eventId), [e2.id]);
+        assert.deepEqual((await h.profileEvents.listPlaceReposts([ana, bia], 10)).map((r) => [r.userId, r.eventId]), [[bia, e.id], [ana, e3.id], [ana, e2.id], [ana, e.id]], 'eventos de local de várias pessoas, mais recente primeiro');
+        assert.deepEqual((await h.profileEvents.listPlaceReposts([bia], 10)).map((r) => r.eventId), [e.id]);
+        assert.equal((await h.profileEvents.listPlaceReposts([ana, bia], 2)).length, 2);
+        assert.deepEqual(await h.profileEvents.listPlaceReposts([], 10), []);
         assert.equal(await h.profileEvents.remove(ana, e2.id), true);
         assert.equal(await h.profileEvents.remove(ana, e2.id), false);
         assert.equal(await h.profileEvents.count(ana), 2);
@@ -1891,6 +1895,16 @@ export function defineRepositoryContract(
         assert.equal(mixed[0]!.eventId, postId, 'o repost mais recente vem primeiro');
         assert.equal(mixed[0]!.postId, postId);
         assert.equal(mixed.length, 3);
+        await h.profileEvents.addPost(bia, postId, at(22));
+        assert.deepEqual((await h.profileEvents.listPostReposts([ana, bia], 10)).map((r) => [r.userId, r.postId]), [[bia, postId], [ana, postId]], 'reposts de várias pessoas, mais recente primeiro');
+        assert.deepEqual((await h.profileEvents.listPostReposts([ana, bia], 1)).map((r) => r.userId), [bia]);
+        assert.deepEqual(await h.profileEvents.listPostReposts([], 10), []);
+        assert.equal((await h.profileEvents.listPostReposts([ana], 10))[0]!.createdAt.getTime(), at(20).getTime());
+        await h.profileEvents.removePost(bia, postId);
+        assert.deepEqual(await h.posts.hiddenAmong(ana, [postId]), []);
+        await h.posts.hide(postId, ana);
+        assert.deepEqual(await h.posts.hiddenAmong(ana, [postId, randomUUID()]), [postId]);
+        assert.deepEqual(await h.posts.hiddenAmong(bia, [postId]), []);
         assert.equal(await h.profileEvents.removePost(ana, postId), true);
         assert.equal(await h.profileEvents.count(ana), 2);
 

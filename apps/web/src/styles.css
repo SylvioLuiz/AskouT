@@ -3448,6 +3448,10 @@ a.actlog__row:hover { background: var(--surface); }
 .postlist { display: flex; flex-direction: column; gap: 22px; }
 .post { display: flex; flex-direction: column; gap: 8px; }
 .post__head { display: flex; align-items: center; gap: 10px; }
+.post__repost { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 0.8125rem; }
+.post__repost .icon { width: 16px; height: 16px; flex: none; }
+.post__repost a { color: var(--ink-2); font-weight: 600; text-decoration: none; }
+.post__repostwhen { color: var(--muted); }
 .post__author { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--ink); text-decoration: none; }
 .post__author strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .post__when { margin-right: auto; color: var(--muted); font-size: 0.8125rem; text-decoration: none; }
@@ -5504,3 +5508,6 @@ div.optrow__main { cursor: default; }
 .compose .check > span { display: flex; flex-direction: column; gap: 2px; }
 .compose--details .compose__caption { border-top: 1px solid var(--line); padding-top: 12px; }
 .compose--details .segmented + .compose__caption { border-top: 0; padding-top: 4px; }
+
+.post--placeevent { display: flex; flex-direction: column; gap: 8px; }
+.post__placeimg { display: block; width: 100%; max-height: 360px; object-fit: cover; border-radius: var(--radius-panel); }

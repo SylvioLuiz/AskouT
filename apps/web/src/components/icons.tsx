@@ -436,6 +436,16 @@ export const RefreshIcon = () => (
   </Svg>
 );
 
+/** Repostar: duas setas em volta. */
+export const RepostIcon = () => (
+  <Svg>
+    <path d="M17 3l3 3-3 3" />
+    <path d="M4 11V9a3 3 0 0 1 3-3h13" />
+    <path d="M7 21l-3-3 3-3" />
+    <path d="M20 13v2a3 3 0 0 1-3 3H4" />
+  </Svg>
+);
+
 export const PartyIcon = () => (
   <Svg>
     <path d="m4 20 4.500-12.500 8 8z" />
