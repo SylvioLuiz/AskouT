@@ -5504,3 +5504,16 @@ div.optrow__main { cursor: default; }
 .compose .check > span { display: flex; flex-direction: column; gap: 2px; }
 .compose--details .compose__caption { border-top: 1px solid var(--line); padding-top: 12px; }
 .compose--details .segmented + .compose__caption { border-top: 0; padding-top: 4px; }
+
+/* Lista VIP na página do evento */
+.evguest { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line, rgba(127,127,127,.25)); border-radius: 16px; }
+.evguest__companions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.evguest__companions select { min-width: 72px; padding: 8px 10px; border-radius: 10px; font: inherit; }
+.evguest__privacy { font-size: 0.8125rem; margin: 0; }
+.evguest__manage { display: flex; flex-direction: column; gap: 12px; padding-bottom: 12px; }
+.evguest__totals { margin: 4px 0 0; font-weight: 600; }
+.evguest__list { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.evguest__row { display: flex; align-items: center; gap: 10px; }
+.evguest__who { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.evguest__who strong, .evguest__who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evguest__in { display: flex; align-items: center; gap: 6px; font-size: 0.875rem; }

@@ -11,6 +11,7 @@ import {
   InMemoryPostRepository,
   InMemoryEventRoomRepository,
   InMemoryFeedRepository,
+  InMemoryGuestListRepository,
   InMemorySchedulingRepository,
   InMemoryPushSubscriptionRepository,
   FakePushSender,
@@ -61,6 +62,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const places = new InMemoryPlaceRepository();
   const claims = new InMemoryVenueClaimRepository();
   const feed = new InMemoryFeedRepository(posts, places);
+  const guestLists = new InMemoryGuestListRepository(places);
   const calendars = new InMemoryCalendarRepository();
   const calendarFetcher = new FakeCalendarFetcher();
   const placeSource = new FakePlaceSource();
@@ -87,7 +89,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), pending, passwordResets, boosts, dwell, activity, regions, account, payments, settings, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), pending, passwordResets, boosts, dwell, activity, regions, account, payments, settings, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string; minor?: boolean } = {}): Promise<AuthResult> {
@@ -107,5 +109,5 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
     return out;
   }
 
-  return { core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, boosts, dwell, regions, account, payments, settings, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+  return { core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, boosts, dwell, regions, account, payments, settings, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
 }

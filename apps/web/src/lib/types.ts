@@ -320,7 +320,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'GUEST_LIST';
 
 export interface NotificationItem {
   id: string;
@@ -1112,4 +1112,37 @@ export interface RecommendationSource {
 export interface Recommendations {
   personalized: boolean;
   items: RecommendationItem[];
+}
+
+// ---------- Lista VIP (nome na lista) ----------
+
+export interface GuestListConfig {
+  limit: number | null;
+  closesAt: string | null;
+  maxCompanions: number;
+}
+
+export interface GuestListView {
+  enabled: boolean;
+  isOwner: boolean;
+  config: GuestListConfig | null;
+  count: number;
+  spotsLeft: number | null;
+  open: boolean;
+  mine: { companions: number; checkedIn: boolean } | null;
+}
+
+export interface GuestListEntry {
+  user: PublicProfile;
+  companions: number;
+  checkedIn: boolean;
+  createdAt: string;
+}
+
+export interface GuestListOwnerView {
+  config: GuestListConfig;
+  count: number;
+  people: number;
+  checkedInPeople: number;
+  entries: GuestListEntry[];
 }

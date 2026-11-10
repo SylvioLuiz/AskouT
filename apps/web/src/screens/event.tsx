@@ -25,6 +25,7 @@ import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
 import { timeAgo } from '../lib/format.ts';
 import type { EventPage, FeedSettings } from '../lib/types.ts';
 import { Feed } from '../components/feed.tsx';
+import { GuestListCard } from '../components/guest-list.tsx';
 import { policyNote } from '../lib/feed.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
@@ -290,6 +291,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
             )}
             {problem ? <Notice tone="error">{problem}</Notice> : null}
           </section>
+
+          {e.source === 'PLACE' ? <GuestListCard eventId={e.id} ended={ended} /> : null}
 
           <div className="segtabs segtabs--fill evtabs" role="tablist" aria-label={t('Seções do evento')}>
             <button type="button" role="tab" aria-selected={tab === 'feed'} className="segtabs__tab" onClick={() => setTab('feed')}>

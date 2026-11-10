@@ -6,6 +6,7 @@ import type {
   PostRepository,
   EventRoomRepository,
   FeedRepository,
+  GuestListRepository,
   ConversationRepository,
   MeetupRepository,
   SchedulingRepository,
@@ -52,7 +53,7 @@ import { matchesNotificationFilter, type NotificationFilter } from '../notificat
 import type {
   DirectActivityRow,
   DwellRecord,
-  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+  GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 import type { ActivityRepository } from '../ports.ts';
@@ -2821,5 +2822,72 @@ export class InMemoryActivityRepository implements ActivityRepository {
       .filter((r) => !b || r.at.getTime() < b.at.getTime() || (r.at.getTime() === b.at.getTime() && r.id < b.id))
       .sort((x, y) => y.at.getTime() - x.at.getTime() || (x.id < y.id ? 1 : x.id > y.id ? -1 : 0))
       .slice(0, query.limit);
+  }
+}
+
+/** Lista VIP em memória. Quem confere se o evento existe é o repositório de locais. */
+export class InMemoryGuestListRepository implements GuestListRepository {
+  private readonly places: InMemoryPlaceRepository;
+  readonly lists = new Map<string, GuestListRecord>();
+  readonly entries = new Map<string, GuestListEntryRecord>();
+
+  constructor(places: InMemoryPlaceRepository) {
+    this.places = places;
+  }
+
+  private static key(eventId: string, userId: string): string {
+    return `${eventId}|${userId}`;
+  }
+
+  async get(eventId: string): Promise<GuestListRecord | undefined> {
+    return this.places.events.has(eventId) ? this.lists.get(eventId) : undefined;
+  }
+
+  async upsert(list: GuestListRecord): Promise<boolean> {
+    if (!this.places.events.has(list.eventId)) return false;
+    const before = this.lists.get(list.eventId);
+    this.lists.set(list.eventId, { ...list, createdAt: before?.createdAt ?? list.createdAt });
+    return true;
+  }
+
+  async remove(eventId: string): Promise<boolean> {
+    for (const [key, e] of this.entries) if (e.eventId === eventId) this.entries.delete(key);
+    return this.lists.delete(eventId);
+  }
+
+  async join(entry: { eventId: string; userId: string; companions: number; at: Date }, limit: number | null): Promise<'created' | 'updated' | 'full'> {
+    const key = InMemoryGuestListRepository.key(entry.eventId, entry.userId);
+    const before = this.entries.get(key);
+    if (before) {
+      this.entries.set(key, { ...before, companions: entry.companions });
+      return 'updated';
+    }
+    if (limit !== null && (await this.count(entry.eventId)) >= limit) return 'full';
+    this.entries.set(key, { eventId: entry.eventId, userId: entry.userId, companions: entry.companions, checkedInAt: null, createdAt: entry.at });
+    return 'created';
+  }
+
+  async leave(eventId: string, userId: string): Promise<boolean> {
+    return this.entries.delete(InMemoryGuestListRepository.key(eventId, userId));
+  }
+
+  async find(eventId: string, userId: string): Promise<GuestListEntryRecord | undefined> {
+    return this.entries.get(InMemoryGuestListRepository.key(eventId, userId));
+  }
+
+  async list(eventId: string): Promise<GuestListEntryRecord[]> {
+    return [...this.entries.values()].filter((e) => e.eventId === eventId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.userId.localeCompare(b.userId));
+  }
+
+  async count(eventId: string): Promise<number> {
+    return (await this.list(eventId)).length;
+  }
+
+  async setCheckedIn(eventId: string, userId: string, at: Date | null): Promise<boolean> {
+    const key = InMemoryGuestListRepository.key(eventId, userId);
+    const e = this.entries.get(key);
+    if (!e) return false;
+    this.entries.set(key, { ...e, checkedInAt: at });
+    return true;
   }
 }

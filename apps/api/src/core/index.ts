@@ -11,6 +11,7 @@ import { ProfileEventService } from './profile-event-service.ts';
 import { PostService } from './post-service.ts';
 import { EventPageService } from './event-page-service.ts';
 import { FeedService } from './feed-service.ts';
+import { GuestListService } from './guest-list-service.ts';
 import { EventReminderService } from './event-reminder-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { VenueService } from './venue-service.ts';
@@ -76,6 +77,7 @@ export function createCore(input: CoreInput) {
     explore: new ExploreService(deps, profiles, boosts),
     eventPages,
     feed: new FeedService(deps, eventPages),
+    guestList: new GuestListService(deps, eventPages),
     eventReminders: new EventReminderService(deps),
     venues,
     calendarImport: new CalendarImportService(deps, venues),
@@ -154,6 +156,8 @@ export { ActivityService, ACTIVITY_ACTIONS, ACTIVITY_PAGE_DEFAULT, ACTIVITY_PAGE
 export type { ActivityItemView, ActivityPage } from './activity-service.ts';
 export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_RADIUS_M, suggestionRadiusM } from './suggestion-service.ts';
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
+export { GuestListService, GUEST_LIST_COMPANIONS_MAX, GUEST_LIST_LIMIT_MAX } from './guest-list-service.ts';
+export type { GuestListView, GuestListOwnerView, GuestListEntryView, GuestListConfigView } from './guest-list-service.ts';
 export { EventPageService } from './event-page-service.ts';
 export { EventReminderService } from './event-reminder-service.ts';
 export type { EventPageView, EventCoverView } from './event-page-service.ts';

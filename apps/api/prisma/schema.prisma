@@ -229,6 +229,7 @@ model User {
   region            UserRegion?
   venueRatings      VenueRating[]
   reviewedClaims    VenueClaim[]  @relation("ClaimReviewer")
+  guestListEntries GuestListEntry[]
 }
 
 model Profile {
@@ -831,6 +832,7 @@ model PlaceEvent {
   stories   EventStory[]
   cover    PlaceEventCover?
   feedPosts FeedPost[]
+  guestList GuestList?
 
   @@index([startsAt])
   @@index([venueId])
@@ -1529,4 +1531,33 @@ model FeedReport {
   @@index([reporterId])
   @@index([postId])
   @@index([commentId])
+}
+
+/// Lista VIP de um evento de local (sem pagamento): ligada por quem administra o local.
+model GuestList {
+  eventId       String   @id @db.Uuid
+  /// Quantos nomes cabem (sem contar acompanhantes). Nulo: sem limite.
+  limit         Int?
+  /// Depois deste horário ninguém entra. Nulo: até o fim do evento.
+  closesAt      DateTime?
+  maxCompanions Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  event   PlaceEvent        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  entries GuestListEntry[]
+}
+
+/// Um nome na lista VIP. O dono do local vê o nome e o @usuário (ponto de privacidade no GOLIVE.md).
+model GuestListEntry {
+  eventId     String    @db.Uuid
+  userId      String    @db.Uuid
+  companions  Int       @default(0)
+  checkedInAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  list GuestList @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, userId])
+  @@index([userId])
 }

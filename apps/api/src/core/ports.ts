@@ -1,4 +1,4 @@
-import type { ActivityAction, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { GuestListRecord, GuestListEntryRecord, ActivityAction, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -814,7 +814,29 @@ export interface ActivityRepository {
   listByUser(userId: string, query: { actions: readonly ActivityAction[]; before?: { at: Date; id: string }; limit: number }): Promise<ActivityRecord[]>;
 }
 
+/** Lista VIP (nome na lista) dos eventos de locais. */
+export interface GuestListRepository {
+  get(eventId: string): Promise<GuestListRecord | undefined>;
+  /** Liga ou ajusta a lista. false se o evento não existe. */
+  upsert(list: GuestListRecord): Promise<boolean>;
+  /** Desliga a lista e apaga os nomes. */
+  remove(eventId: string): Promise<boolean>;
+  /**
+   * Põe o nome (ou troca os acompanhantes). Com `limit`, recusa um nome novo quando a lista já está cheia.
+   * 'full' é lista cheia; 'created' e 'updated' dizem se a pessoa já estava.
+   */
+  join(entry: { eventId: string; userId: string; companions: number; at: Date }, limit: number | null): Promise<'created' | 'updated' | 'full'>;
+  leave(eventId: string, userId: string): Promise<boolean>;
+  find(eventId: string, userId: string): Promise<GuestListEntryRecord | undefined>;
+  /** Na ordem em que entraram (mais antigo primeiro). */
+  list(eventId: string): Promise<GuestListEntryRecord[]>;
+  count(eventId: string): Promise<number>;
+  /** Marca (ou desmarca) que a pessoa entrou. false se ela não está na lista. */
+  setCheckedIn(eventId: string, userId: string, at: Date | null): Promise<boolean>;
+}
+
 export interface CoreDeps {
+  guestLists: GuestListRepository;
   activity: ActivityRepository;
   notifier: Notifier;
   users: UserRepository;
