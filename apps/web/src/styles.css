@@ -3593,7 +3593,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .mentionlist__item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 4px 8px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .mentionlist__item:hover, .mentionlist__item:focus-visible { background: var(--brand-soft); outline: none; }
 .comments__form { margin-top: 8px; }
-.comments__empty { margin: 8px 0 16px; text-align: center; color: var(--muted); }
+.comments__empty { margin: 8px 0 16px; text-align: left; color: var(--muted); }
 .commentbox { position: relative; display: flex; align-items: center; }
 .commentbox__input { width: 100%; min-height: 48px; padding: 0 52px 0 16px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; }
 .commentbox__input:focus { outline: none; border-color: var(--brand-text); box-shadow: 0 0 0 3px var(--brand-soft); }
@@ -5518,3 +5518,16 @@ div.optrow__main { cursor: default; }
 .albumgrid__item { display: block; aspect-ratio: 1; padding: 0; border: 0; background: var(--line); overflow: hidden; cursor: pointer; }
 .albumgrid__img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .albumgrid__img--empty { display: grid; place-items: center; color: var(--muted); }
+
+/* Rolando agora (Explorar) e stories de locais */
+.rolling { margin: 12px 0 4px; }
+.rolling__title { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 1rem; }
+.rolling__live { width: 8px; height: 8px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent); }
+.rolling__item { width: 96px; text-decoration: none; }
+.rolling__plain { padding: 3px; border-radius: 50%; border: 2px dashed var(--line, #ccc); }
+.rolling__event { max-width: 100%; font-size: 0.75rem; font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.rolling__meta, .rolling__kind { max-width: 100%; font-size: 0.6875rem; color: var(--muted, #666); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vstories { list-style: none; margin: 8px 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.vstories__item { position: relative; aspect-ratio: 9 / 16; border-radius: 10px; overflow: hidden; background: #000; }
+.vstories__item img, .vstories__item video { width: 100%; height: 100%; object-fit: cover; }
+.vstories__del { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgb(0 0 0 / 0.6); color: #fff; cursor: pointer; }

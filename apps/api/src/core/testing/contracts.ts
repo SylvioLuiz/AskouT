@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { AppSettingsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+import type { AppSettingsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, VenueStoryRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
   CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -36,6 +36,7 @@ export interface RepoHarness {
   posts: PostRepository;
   eventRoom: EventRoomRepository;
   albums: AlbumRepository;
+  venueStories: VenueStoryRepository;
   feed: FeedRepository;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
@@ -2314,6 +2315,83 @@ export function defineRepositoryContract(
         assert.equal(await h.albums.markSummarized(album.id, bia, at(900)), true);
         assert.equal(await h.albums.markSummarized(album.id, bia, at(901)), false, 'nunca avisa duas vezes');
         assert.equal(await h.albums.markSummarized(album.id, ana, at(901)), true);
+      });
+    });
+
+    // ---------- Stories de locais ----------
+
+    describe('stories de locais', () => {
+      it('guarda, lista os que estão no ar, denuncia uma vez por pessoa e apaga junto das denúncias', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const mk = async (name: string) => {
+          const v: VenueRecord = { id: randomUUID(), name, address: null, category: 'bar', lat: -23.55, lng: -46.63, isSample: false };
+          await h.places.createVenue(v);
+          return v.id;
+        };
+        const venueId = await mk('Bar A');
+        const other = await mk('Bar B');
+        const story = { id: randomUUID(), venueId, authorId: ana, mime: 'image/jpeg', video: false, data: new Uint8Array([0xff, 0xd8, 1]), createdAt: at(10), expiresAt: at(1000) };
+        await h.venueStories.add(story);
+        await h.venueStories.add({ ...story, id: randomUUID(), createdAt: at(20), expiresAt: at(50), video: true, mime: 'video/mp4' });
+        await h.venueStories.add({ ...story, id: randomUUID(), venueId: other, createdAt: at(30) });
+        assert.deepEqual((await h.venueStories.listLive([venueId], at(40))).map((s) => s.createdAt.getTime() - at(0).getTime()), [10000, 20000]);
+        assert.deepEqual((await h.venueStories.listLive([venueId], at(60))).map((s) => s.id), [story.id], 'o vencido sai');
+        assert.equal((await h.venueStories.listLive([venueId, other], at(60))).length, 2);
+        assert.deepEqual(await h.venueStories.listLive([], at(60)), []);
+        const meta = (await h.venueStories.find(story.id))!;
+        assert.deepEqual([meta.venueId, meta.authorId, meta.video, 'data' in meta], [venueId, ana, false, false]);
+        const media = (await h.venueStories.findMedia(story.id))!;
+        assert.deepEqual([media.mime, [...media.data]], ['image/jpeg', [0xff, 0xd8, 1]]);
+        assert.equal(await h.venueStories.find('nao-e-uuid'), undefined);
+
+        const report = (id: string, storyId: string, reporterId: string, createdAt: Date) => ({ id, storyId, reporterId, reason: 'SPAM' as const, details: null, createdAt, resolvedAt: null, resolution: null, resolutionNote: null });
+        const r1 = randomUUID();
+        assert.equal(await h.venueStories.report(report(r1, story.id, bia, at(100))), true);
+        assert.equal(await h.venueStories.report(report(randomUUID(), story.id, bia, at(101))), false, 'uma denúncia por pessoa');
+        assert.equal(await h.venueStories.report(report(randomUUID(), randomUUID(), bia, at(101))), false, 'story que não existe');
+        assert.equal(await h.venueStories.report(report(randomUUID(), story.id, caio, at(102))), true);
+        assert.deepEqual([...(await h.venueStories.reportedIds(bia, [story.id, meta.id]))], [story.id]);
+        assert.equal(await h.venueStories.countOpenReporters(venueId, at(0)), 2);
+        assert.equal(await h.venueStories.countOpenReporters(venueId, at(101)), 1, 'só desde a data');
+        assert.equal(await h.venueStories.countOpenReporters(other, at(0)), 0);
+        assert.deepEqual((await h.venueStories.listReports(true, { limit: 10, offset: 0 })).map((r) => r.reporterId), [bia, caio], 'as mais antigas primeiro');
+        assert.equal((await h.venueStories.findReport(r1))?.storyId, story.id);
+        assert.equal(await h.venueStories.resolveReport(r1, ana, 'DISMISSED', 'ok', at(200)), true);
+        assert.equal(await h.venueStories.resolveReport(r1, ana, 'ACTIONED', null, at(201)), false, 'decide uma vez só');
+        assert.equal(await h.venueStories.countOpenReporters(venueId, at(0)), 1, 'denúncia decidida não conta');
+        assert.equal((await h.venueStories.listReports(false, { limit: 10, offset: 0 })).length, 1);
+        assert.equal((await h.venueStories.listReports(true, { limit: 10, offset: 1 })).length, 0);
+
+        assert.equal(await h.venueStories.delete(story.id), true);
+        assert.equal(await h.venueStories.delete(story.id), false);
+        assert.equal(await h.venueStories.findReport(r1), undefined, 'as denúncias vão junto');
+      });
+
+      it('silencia locais e guarda a preferência de não ver stories de locais', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const mk = async (name: string) => {
+          const v: VenueRecord = { id: randomUUID(), name, address: null, category: 'bar', lat: -23.55, lng: -46.63, isSample: false };
+          await h.places.createVenue(v);
+          return v.id;
+        };
+        const v1 = await mk('Bar A');
+        const v2 = await mk('Bar B');
+        assert.deepEqual(await h.venueStories.getPrefs(ana), { hideAll: false });
+        await h.venueStories.setMuted(ana, v1, true);
+        await h.venueStories.setMuted(ana, v1, true);
+        await h.venueStories.setMuted(ana, v2, true);
+        await h.venueStories.setMuted(bia, v1, true);
+        assert.deepEqual(await h.venueStories.listMuted(ana), [v1, v2].sort());
+        await h.venueStories.setMuted(ana, v1, false);
+        assert.deepEqual(await h.venueStories.listMuted(ana), [v2]);
+        await h.venueStories.setPrefs(ana, { hideAll: true });
+        assert.deepEqual(await h.venueStories.getPrefs(ana), { hideAll: true });
+        assert.deepEqual(await h.venueStories.getPrefs(bia), { hideAll: false });
+        await h.venueStories.setPrefs(ana, { hideAll: false });
+        assert.deepEqual(await h.venueStories.getPrefs(ana), { hideAll: false });
       });
     });
   });

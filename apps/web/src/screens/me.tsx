@@ -229,6 +229,7 @@ export function SettingsScreen() {
       </dl>
       <p className="muted">{t('Ainda não dá para trocar o e-mail ou a senha por aqui. Isso entra numa próxima etapa.')}</p>
       <NowRadiusSetting />
+      <VenueStoriesSetting />
       <h2 className="profile__section">{t('Avisos no aparelho')}</h2>
       <PushCard />
       <h2 className="profile__section">{t('Silenciar push')}</h2>
@@ -237,6 +238,70 @@ export function SettingsScreen() {
         <Link to="/amigos">{t('Amigos')}</Link>
         <Link to="/bloqueados">{t('Pessoas bloqueadas')}</Link>
       </nav>
+    </>
+  );
+}
+
+/** Stories de locais: desligar de vez, ou desfazer o "não tenho interesse" de um local. */
+function VenueStoriesSetting() {
+  const settings = useAsync(() => api.venueStorySettings(), []);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | undefined>();
+  const data = settings.data;
+  async function change(hide: boolean) {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await api.setVenueStorySettings(hide);
+      settings.reload();
+    } catch (failure) {
+      setMessage(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function unmute(venueId: string) {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await api.muteVenueStories(venueId, false);
+      settings.reload();
+    } catch (failure) {
+      setMessage(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!data) return settings.error ? <Notice tone="error">{settings.error.message}</Notice> : null;
+  return (
+    <>
+      {message ? <Notice tone="error">{message}</Notice> : null}
+      <section className="setting">
+        <div className="setting__text">
+          <h2 className="setting__title" id="stories-locais-titulo">
+            {t('Não ver stories de locais')}
+          </h2>
+          <p className="setting__help">{t('Esconde os stories de bares, casas e organizações na página inicial e no Rolando agora. Os stories dos seus amigos continuam.')}</p>
+        </div>
+        <button type="button" role="switch" aria-checked={data.hideVenueStories} aria-labelledby="stories-locais-titulo" className="switch" onClick={() => void change(!data.hideVenueStories)} disabled={busy}>
+          <span className="switch__thumb" />
+        </button>
+      </section>
+      {data.mutedVenues.length > 0 ? (
+        <section className="setting setting--stack">
+          <h2 className="setting__title">{t('Locais sem interesse')}</h2>
+          <ul className="linklist" aria-label={t('Locais sem interesse')}>
+            {data.mutedVenues.map((v) => (
+              <li key={v.id}>
+                <span>{v.name}</span>{' '}
+                <Button variant="quiet" small disabled={busy} onClick={() => void unmute(v.id)}>
+                  {t('Voltar a mostrar')}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </>
   );
 }

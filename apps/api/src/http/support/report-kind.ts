@@ -6,6 +6,7 @@ export function reportKind(method: string, path: string): string | undefined {
   if (/\/feed\/comments\/[^/]+\/report$/.test(p)) return 'comentário do feed';
   if (/\/feed\/posts\/[^/]+\/report$/.test(p)) return 'publicação do feed';
   if (/\/comments\/[^/]+\/report$/.test(p)) return 'comentário';
+  if (/\/venue-stories\/[^/]+\/report$/.test(p)) return 'story de local';
   if (/\/stories\/[^/]+\/report$/.test(p)) return 'story de evento';
   if (/\/posts\/[^/]+\/report$/.test(p)) return 'post';
   if (/\/conversations\/[^/]+\/report$/.test(p)) return 'conversa';

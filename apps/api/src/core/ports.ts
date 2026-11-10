@@ -1,4 +1,5 @@
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from './album.ts';
+import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from './venue-story.ts';
 import type { ActivityAction, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
@@ -840,7 +841,34 @@ export interface AlbumRepository {
   markSummarized(albumId: string, userId: string, at: Date): Promise<boolean>;
 }
 
+/** Stories públicos de locais verificados, denúncias, silenciar local e preferência de quem vê. */
+export interface VenueStoryRepository {
+  add(story: VenueStoryRecord): Promise<void>;
+  find(id: string): Promise<VenueStoryMeta | undefined>;
+  /** Os bytes, mesmo vencido (a gestão confere denúncias). */
+  findMedia(id: string): Promise<{ mime: string; data: Uint8Array; expiresAt: Date } | undefined>;
+  /** No ar agora nestes locais, do mais antigo ao mais novo. */
+  listLive(venueIds: string[], now: Date): Promise<VenueStoryMeta[]>;
+  /** Apaga o story e as denúncias dele. */
+  delete(id: string): Promise<boolean>;
+  /** Uma denúncia por pessoa e story. Devolve false se já existia. */
+  report(report: VenueStoryReportRecord): Promise<boolean>;
+  reportedIds(userId: string, storyIds: string[]): Promise<Set<string>>;
+  /** Denúncias abertas (ou já decididas), as mais antigas primeiro nas abertas. */
+  listReports(open: boolean, page: Page): Promise<VenueStoryReportRecord[]>;
+  findReport(id: string): Promise<VenueStoryReportRecord | undefined>;
+  resolveReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean>;
+  /** Quantas pessoas diferentes têm denúncia ainda aberta contra stories deste local, desde `since`. */
+  countOpenReporters(venueId: string, since: Date): Promise<number>;
+  /** "Não tenho interesse": o local deixa de aparecer para a pessoa. */
+  setMuted(userId: string, venueId: string, muted: boolean): Promise<void>;
+  listMuted(userId: string): Promise<string[]>;
+  getPrefs(userId: string): Promise<VenueStoryPrefs>;
+  setPrefs(userId: string, prefs: VenueStoryPrefs): Promise<void>;
+}
+
 export interface CoreDeps {
+  venueStories: VenueStoryRepository;
   albums: AlbumRepository;
   activity: ActivityRepository;
   notifier: Notifier;

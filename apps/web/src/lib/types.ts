@@ -672,6 +672,49 @@ export interface EventStoryGroup {
   items: EventStoryItem[];
 }
 
+/** Story público de um local verificado (foto ou vídeo, 24 h). */
+export interface VenueStoryItem {
+  id: string;
+  kind: 'IMAGE' | 'VIDEO';
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface VenueStoryVenue {
+  id: string;
+  name: string;
+  category: string | null;
+  logoUrl: string | null;
+}
+
+/** Os stories de um local que a pessoa segue (faixa da Home). */
+export interface VenueStoryGroup {
+  venue: VenueStoryVenue;
+  items: VenueStoryItem[];
+}
+
+/** Um item da faixa "Rolando agora" do Explorar: local com story no ar e/ou evento em andamento. */
+export interface RollingNowItem {
+  venue: VenueStoryVenue;
+  stories: VenueStoryItem[];
+  event: { id: string; title: string; kind: EventKind; startsAt: string; endsAt: string; isFree: boolean; goingCount: number } | null;
+  /** Em metros, em passos de 100 m; null sem posição. */
+  distanceM: number | null;
+  interest: boolean;
+  friendsGoingCount: number;
+  friendsGoing: PublicProfile[];
+}
+
+export interface VenueStorySettings {
+  hideVenueStories: boolean;
+  mutedVenues: { id: string; name: string }[];
+}
+
+export interface VenueStoryOwnerView {
+  suspended: boolean;
+  items: VenueStoryItem[];
+}
+
 export interface EventPage {
   id: string;
   source: 'PLACE' | 'USER';

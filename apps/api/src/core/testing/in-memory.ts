@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from '../album.ts';
+import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from '../venue-story.ts';
 import { conflict } from '../errors.ts';
 import { CalendarFetchError } from '../ports.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
   AlbumRepository,
+  VenueStoryRepository,
   PostRepository,
   EventRoomRepository,
   FeedRepository,
@@ -2907,5 +2909,102 @@ export class InMemoryAlbumRepository implements AlbumRepository {
     if (this.summarized.has(key)) return false;
     this.summarized.add(key);
     return true;
+  }
+}
+
+export class InMemoryVenueStoryRepository implements VenueStoryRepository {
+  readonly stories = new Map<string, VenueStoryRecord>();
+  readonly reports = new Map<string, VenueStoryReportRecord>();
+  readonly muted = new Set<string>();
+  readonly prefs = new Map<string, VenueStoryPrefs>();
+
+  async add(story: VenueStoryRecord): Promise<void> {
+    this.stories.set(story.id, { ...story, data: new Uint8Array(story.data) });
+  }
+
+  private static meta(s: VenueStoryRecord): VenueStoryMeta {
+    const { data: _data, ...meta } = s;
+    return { ...meta };
+  }
+
+  async find(id: string): Promise<VenueStoryMeta | undefined> {
+    const s = this.stories.get(id);
+    return s ? InMemoryVenueStoryRepository.meta(s) : undefined;
+  }
+
+  async findMedia(id: string): Promise<{ mime: string; data: Uint8Array; expiresAt: Date } | undefined> {
+    const s = this.stories.get(id);
+    return s ? { mime: s.mime, data: new Uint8Array(s.data), expiresAt: s.expiresAt } : undefined;
+  }
+
+  async listLive(venueIds: string[], now: Date): Promise<VenueStoryMeta[]> {
+    const wanted = new Set(venueIds);
+    return [...this.stories.values()]
+      .filter((s) => wanted.has(s.venueId) && s.expiresAt.getTime() > now.getTime())
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map(InMemoryVenueStoryRepository.meta);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    for (const [key, r] of this.reports) if (r.storyId === id) this.reports.delete(key);
+    return this.stories.delete(id);
+  }
+
+  async report(report: VenueStoryReportRecord): Promise<boolean> {
+    const key = `${report.storyId}|${report.reporterId}`;
+    if (this.reports.has(key) || !this.stories.has(report.storyId)) return false;
+    this.reports.set(key, { ...report });
+    return true;
+  }
+
+  async reportedIds(userId: string, storyIds: string[]): Promise<Set<string>> {
+    return new Set(storyIds.filter((id) => this.reports.has(`${id}|${userId}`)));
+  }
+
+  async listReports(open: boolean, page: Page): Promise<VenueStoryReportRecord[]> {
+    const rows = [...this.reports.values()].filter((r) => (r.resolvedAt === null) === open);
+    rows.sort((a, b) => (open ? a.createdAt.getTime() - b.createdAt.getTime() : b.createdAt.getTime() - a.createdAt.getTime()) || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit).map((r) => ({ ...r }));
+  }
+
+  async findReport(id: string): Promise<VenueStoryReportRecord | undefined> {
+    const r = [...this.reports.values()].find((x) => x.id === id);
+    return r ? { ...r } : undefined;
+  }
+
+  async resolveReport(id: string, _adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean> {
+    for (const [key, r] of this.reports) {
+      if (r.id === id && r.resolvedAt === null) {
+        this.reports.set(key, { ...r, resolvedAt: at, resolution, resolutionNote: note });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async countOpenReporters(venueId: string, since: Date): Promise<number> {
+    const reporters = new Set<string>();
+    for (const r of this.reports.values()) {
+      if (r.resolvedAt === null && r.createdAt.getTime() >= since.getTime() && this.stories.get(r.storyId)?.venueId === venueId) reporters.add(r.reporterId);
+    }
+    return reporters.size;
+  }
+
+  async setMuted(userId: string, venueId: string, muted: boolean): Promise<void> {
+    if (muted) this.muted.add(`${userId}|${venueId}`);
+    else this.muted.delete(`${userId}|${venueId}`);
+  }
+
+  async listMuted(userId: string): Promise<string[]> {
+    return [...this.muted].filter((k) => k.startsWith(`${userId}|`)).map((k) => k.slice(userId.length + 1)).sort();
+  }
+
+  async getPrefs(userId: string): Promise<VenueStoryPrefs> {
+    return { ...(this.prefs.get(userId) ?? { hideAll: false }) };
+  }
+
+  async setPrefs(userId: string, prefs: VenueStoryPrefs): Promise<void> {
+    if (prefs.hideAll) this.prefs.set(userId, { ...prefs });
+    else this.prefs.delete(userId);
   }
 }

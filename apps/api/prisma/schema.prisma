@@ -212,6 +212,10 @@ model User {
   eventAttendances  EventAttendance[]
   albumMembers      AlbumMember[]
   albumPhotos       AlbumPhoto[]
+  venueStories      VenueStory[]       @relation("VenueStoryAuthor")
+  venueStoryReports VenueStoryReport[] @relation("VenueStoryReports")
+  venueStoryMutes   VenueStoryMute[]
+  venueStoryPref    VenueStoryPref?
   feedPosts         FeedPost[]        @relation("FeedPostAuthor")
   feedComments      FeedComment[]     @relation("FeedCommentAuthor")
   feedReactions     FeedReaction[]    @relation("FeedReactionUser")
@@ -762,6 +766,8 @@ model Venue {
   calendar       VenueCalendar?
   calendarDrafts VenueCalendarDraft[]
   followers VenueFollow[]
+  stories   VenueStory[]
+  storyMutes VenueStoryMute[]
   ratings   VenueRating[]
   posts  Post[]
   comments PostComment[]
@@ -1578,4 +1584,65 @@ model AlbumPhoto {
 
   @@index([albumId, createdAt])
   @@index([authorId])
+}
+
+/// Story público de um local verificado (com responsável): foto ou vídeo, 24 h. Quem segue vê na Home; o Explorar mostra na faixa "Rolando agora".
+model VenueStory {
+  id        String   @id @default(uuid()) @db.Uuid
+  venueId   String   @db.Uuid
+  authorId  String   @db.Uuid
+  mime      String
+  isVideo   Boolean  @default(false)
+  data      Bytes
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  venue   Venue              @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  author  User               @relation("VenueStoryAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  reports VenueStoryReport[]
+
+  @@index([venueId, expiresAt])
+  @@index([expiresAt])
+}
+
+/// Denúncia de story de local: uma por pessoa. Denúncias abertas de várias pessoas suspendem a publicação do local até a gestão decidir.
+model VenueStoryReport {
+  id         String   @id @default(uuid()) @db.Uuid
+  storyId    String   @db.Uuid
+  reporterId String   @db.Uuid
+  reason     String
+  details    String?
+  createdAt  DateTime @default(now())
+  /// Decisão da gestão: DISMISSED (sem problema) ou ACTIONED (providência tomada).
+  resolvedAt     DateTime?
+  resolvedBy     String?   @db.Uuid
+  resolution     String?
+  resolutionNote String?
+
+  story    VenueStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  reporter User       @relation("VenueStoryReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, reporterId])
+  @@index([reporterId])
+  @@index([resolvedAt, createdAt])
+}
+
+/// "Não tenho interesse": a pessoa não vê mais o local na Home nem no "Rolando agora".
+model VenueStoryMute {
+  userId    String   @db.Uuid
+  venueId   String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([userId, venueId])
+}
+
+/// Preferência de quem vê: não ver stories de locais. Sem linha = vê.
+model VenueStoryPref {
+  userId  String  @id @db.Uuid
+  hideAll Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

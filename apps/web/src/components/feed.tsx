@@ -690,7 +690,7 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
       ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
       {!loaded ? <Loading /> : null}
-      {loaded && items.length === 0 && !error ? <p className="comments__empty">{t('Ainda não há nenhum comentário.')}</p> : null}
+      {loaded && items.length === 0 && !error ? <p className="comments__empty">{t('Seja o primeiro a comentar')}</p> : null}
       <ul className="comments">
         {items.map((c) => (
           <CommentRow

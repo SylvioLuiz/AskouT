@@ -49,6 +49,11 @@ import type {
   EventPage,
   NotificationMute,
   EventStoryGroup,
+  RollingNowItem,
+  VenueStoryGroup,
+  VenueStoryItem,
+  VenueStoryOwnerView,
+  VenueStorySettings,
   FeedComment,
   FeedPage,
   FeedPolicy,
@@ -425,6 +430,40 @@ export function createApi(deps: ApiDeps) {
     reportProfileStory: (storyId: string, reason: ReportReason, details?: string) =>
       request<{ reported: true }>('POST', `/stories/${id(storyId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
+
+    // Stories públicos de locais verificados
+    venueStoriesHome: () => request<{ groups: VenueStoryGroup[] }>('GET', '/venue-stories/home'),
+    /** A posição vale só nesta consulta (o servidor arredonda e não guarda). */
+    rollingNow: (position?: { lat: number; lng: number }) => request<{ items: RollingNowItem[] }>('GET', `/venue-stories/rolling-now${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
+    venueStoryMediaUrl: (storyId: string) => `${deps.baseUrl}/venue-stories/${id(storyId)}/media`,
+    reportVenueStory: (storyId: string, reason: ReportReason, details?: string) =>
+      request<{ reported: true }>('POST', `/venue-stories/${id(storyId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+    muteVenueStories: (venueId: string, muted: boolean) => request<{ muted: boolean }>('PUT', `/venue-stories/venues/${id(venueId)}/mute`, { body: { muted } }),
+    venueStorySettings: () => request<VenueStorySettings>('GET', '/venue-stories/settings'),
+    setVenueStorySettings: (hideVenueStories: boolean) => request<VenueStorySettings>('PUT', '/venue-stories/settings', { body: { hideVenueStories } }),
+    ownerVenueStories: (venueId: string) => request<VenueStoryOwnerView>('GET', `/me/venues/${id(venueId)}/stories`),
+    publishVenueStory: async (venueId: string, file: Blob): Promise<VenueStoryItem> => {
+      const token = deps.getToken();
+      const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
+      if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/me/venues/${id(venueId)}/stories`, { method: 'POST', headers, body: file });
+      } catch {
+        throw networkError();
+      }
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+      if (response.ok) return payload as VenueStoryItem;
+      const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+      if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+      throw error;
+    },
+    deleteVenueStory: (venueId: string, storyId: string) => request<{ deleted: true }>('DELETE', `/me/venues/${id(venueId)}/stories/${id(storyId)}`),
     eventGo: (eventId: string) => request<EventPage>('POST', `/events/${id(eventId)}/going`),
     eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),
 

@@ -3,6 +3,7 @@ import { shareOrigin } from '../lib/public-origin.ts';
 import { useRef, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { Sheet } from '../components/agenda.tsx';
+import { VenueStorySheet } from '../components/venue-story.tsx';
 import { CoverPicker } from '../components/cover-picker.tsx';
 import { PostList } from '../components/post.tsx';
 import { PlacePhoto, SampleBadge } from '../components/suggestions.tsx';
@@ -444,7 +445,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const [tab, setTab] = useState<Tab>('feed');
   const [feedSettings, setFeedSettings] = useState<FeedSettings | undefined>();
   const search = useSearch();
-  const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | undefined>();
+  const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | 'story' | undefined>();
   const [followBusy, setFollowBusy] = useState(false);
   const [bellBusy, setBellBusy] = useState(false);
   const [bellNote, setBellNote] = useState<string | undefined>();
@@ -532,6 +533,9 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             </Button>
             <Button small variant="secondary" onClick={() => setSheet('post')}>
               {t('Novo post')}
+            </Button>
+            <Button small variant="secondary" onClick={() => setSheet('story')}>
+              {t('Novo story')}
             </Button>
             <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/impulsionar`)}>
               {t('Impulsionar')}
@@ -696,6 +700,8 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
       ) : null}
 
       {tab === 'posts' ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={v.isOwner ? t('Toque em Novo post para publicar fotos do rolê.') : t('Os posts do rolê aparecem aqui e no seu feed se você seguir.')} reloadKey={String(postsKey)} /> : null}
+
+      {sheet === 'story' ? <VenueStorySheet venueId={v.id} onClose={() => setSheet(undefined)} /> : null}
 
       {sheet === 'edit' ? (
         <ProfileEditSheet
