@@ -19,6 +19,7 @@ import { lazyWithReload } from './lib/chunk-reload.ts';
 const DatePollScreen = lazyWithReload(() => import('./screens/date-poll.tsx').then((m) => ({ default: m.DatePollScreen })));
 const AgendaScreen = lazyWithReload(() => import('./screens/agenda.tsx').then((m) => ({ default: m.AgendaScreen })));
 const AccountDeletionInfoScreen = lazyWithReload(() => import('./screens/legal.tsx').then((m) => ({ default: m.AccountDeletionInfoScreen })));
+const CsaeStandardsScreen = lazyWithReload(() => import('./screens/legal.tsx').then((m) => ({ default: m.CsaeStandardsScreen })));
 const LegalScreen = lazyWithReload(() => import('./screens/legal.tsx').then((m) => ({ default: m.LegalScreen })));
 const SupportScreen = lazyWithReload(() => import('./screens/legal.tsx').then((m) => ({ default: m.SupportScreen })));
 const DeleteAccountScreen = lazyWithReload(() => import('./screens/delete-account.tsx').then((m) => ({ default: m.DeleteAccountScreen })));
@@ -108,6 +109,7 @@ const LEGAL_ROUTES: RouteDef[] = [
   { path: '/termos-de-uso', render: () => <LegalScreen doc="terms" /> },
   { path: '/suporte', render: () => <SupportScreen /> },
   { path: '/excluir-conta', render: () => <AccountDeletionInfoScreen /> },
+  { path: '/padroes-de-seguranca-infantil', render: () => <CsaeStandardsScreen /> },
 ];
 
 const GUEST_ROUTES: RouteDef[] = [

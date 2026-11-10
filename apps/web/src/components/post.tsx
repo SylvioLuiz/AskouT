@@ -7,6 +7,7 @@ import { AdjustSheet, CommentsSheet, EditPostSheet, PostMenuSheet, ReportSheet, 
 import type { PostGone } from './post-actions.tsx';
 import { VenueLogo } from './venue-logo.tsx';
 import { PosterEvent } from './poster.tsx';
+import { ShareEventPostSheet } from './share-event.tsx';
 import { VenueLink } from './venue-link.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Loading } from './ui.tsx';
 import { api } from '../client.ts';
@@ -445,7 +446,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
       ) : null}
       {sheet === 'report' ? <ReportSheet postId={post.id} onClose={() => setSheet(undefined)} onDone={() => { setSheet(undefined); onGone?.(post.id, 'hidden'); }} /> : null}
       {sheet === 'comments' ? <CommentsSheet postId={post.id} onClose={() => setSheet(undefined)} onCountChange={(delta) => setPost((current) => ({ ...current, commentCount: Math.max(0, current.commentCount + delta) }))} /> : null}
-      {sheet === 'share' ? <SharePostSheet post={post} onClose={() => setSheet(undefined)} /> : null}
+      {sheet === 'share' ? (post.event ? <ShareEventPostSheet eventId={post.id} title={post.event.title} mine={post.mine} onClose={() => setSheet(undefined)} /> : <SharePostSheet post={post} onClose={() => setSheet(undefined)} />) : null}
     </article>
   );
 }

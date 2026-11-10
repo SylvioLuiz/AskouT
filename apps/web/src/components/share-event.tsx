@@ -66,6 +66,42 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
   );
 }
 
+/**
+ * Compartilhar um evento a partir de um post (Início, perfil): mesmo comportamento da página do evento — na conversa vai
+ * o cartão do evento, não um link. Busca a página do evento para saber se já foi repostado e se é privado.
+ */
+export function ShareEventPostSheet({ eventId, title, mine, onClose }: { eventId: string; title: string; mine: boolean; onClose: () => void }) {
+  const [page, setPage] = useState<{ source: 'PLACE' | 'USER'; isOwner: boolean; isPrivate: boolean; postedByMe: boolean } | undefined>();
+  const [posted, setPosted] = useState<boolean | undefined>();
+  useEffect(() => {
+    let cancelled = false;
+    api.eventPage(eventId).then(
+      (p) => {
+        if (!cancelled) setPage({ source: p.source, isOwner: p.isOwner, isPrivate: p.isPrivate === true, postedByMe: p.postedByMe });
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
+  const source = page?.source ?? 'USER';
+  const isOwner = page?.isOwner ?? mine;
+  const isPrivate = page?.isPrivate ?? false;
+  return (
+    <ShareEventSheet
+      eventId={eventId}
+      source={source}
+      title={title}
+      posted={posted ?? page?.postedByMe ?? false}
+      onPostedChange={setPosted}
+      profile={source === 'PLACE' ? 'toggle' : isPrivate ? 'private' : isOwner ? 'owner' : 'toggle'}
+      outside={!isPrivate}
+      onClose={onClose}
+    />
+  );
+}
+
 /** Cartão do evento dentro da conversa. */
 export function EventBubble({ event }: { event: EventCard }) {
   const [failed, setFailed] = useState(false);

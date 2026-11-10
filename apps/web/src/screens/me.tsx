@@ -290,6 +290,7 @@ export function SettingsScreen() {
         <SettingsRow to="/ajuda" icon={<HelpIcon />} label={t('Central de ajuda')} />
         <SettingsRow to="/termos-de-uso" icon={<DocIcon />} label={t('Termos de Uso')} />
         <SettingsRow to="/politica-de-privacidade" icon={<DocIcon />} label={t('Política de Privacidade')} />
+        <SettingsRow to="/padroes-de-seguranca-infantil" icon={<ShieldIcon />} label={t('Segurança infantil')} />
       </ul>
 
       <h2 className="settingshub__group">{t('Login')}</h2>
