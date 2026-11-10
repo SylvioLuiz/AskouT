@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { api, session, setUnauthorizedHandler } from './client.ts';
 import { toApiError } from './lib/errors.ts';
-import type { AuthResult, PublicProfile, SessionUser } from './lib/types.ts';
+import type { AuthResult, MfaChallenge, PublicProfile, SessionUser } from './lib/types.ts';
+import { MfaStep } from './components/mfa-step.tsx';
 import { navigate } from './router.tsx';
 import { t } from './lib/i18n/index.ts';
 
@@ -14,7 +15,8 @@ type AuthState =
 
 interface AuthContextValue {
   state: AuthState;
-  signIn: (result: AuthResult) => void;
+  /** Com verificação em duas etapas ligada, mostra a tela do código antes de entrar. */
+  signIn: (result: AuthResult | MfaChallenge) => void;
   signOut: () => void;
   setOwnProfile: (profile: PublicProfile) => void;
   retry: () => void;
@@ -25,6 +27,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
+  const [challenge, setChallenge] = useState<MfaChallenge | undefined>();
 
   const signOut = useCallback(() => {
     session.clear();
@@ -73,6 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       signIn: (result) => {
+        if ('mfaRequired' in result) {
+          setChallenge(result);
+          return;
+        }
+        setChallenge(undefined);
         session.set(result.token);
         setState({ status: 'user', user: result.user });
       },
@@ -84,7 +92,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [state, signOut],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {challenge ? <MfaStep challenge={challenge} onDone={(result) => value.signIn(result)} onCancel={() => setChallenge(undefined)} /> : children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuthContext(): AuthContextValue {

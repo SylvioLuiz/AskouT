@@ -262,6 +262,7 @@ export function SettingsScreen() {
       <ul className="menulist">
         <SettingsRow to="/configuracao/conta" icon={<UserIcon />} label={t('Informações da conta')} />
         <SettingsRow to="/configuracao/senha" icon={<LockIcon />} label={t('Senha e segurança')} />
+        <SettingsRow to="/configuracao/verificacao-em-duas-etapas" icon={<ShieldIcon />} label={t('Verificação em duas etapas')} />
         <SettingsRow to="/configuracao/privacidade-e-dados" icon={<ShieldIcon />} label={t('Privacidade e dados')} />
       </ul>
 

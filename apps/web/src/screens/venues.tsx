@@ -372,7 +372,7 @@ export function VenueEventSheet({ venueId, event, onClose, onSaved, custom }: { 
   return (
     <Sheet title={custom ? custom.heading : event ? t('Editar evento') : t('Novo evento')} onClose={onClose}>
       <div className="claim">
-        <CoverPicker linkOnly={custom?.linkOnlyCover === true} imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
+        <CoverPicker venueId={venueId} linkOnly={custom?.linkOnlyCover === true} imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
         <Field label={t('Nome do evento')} value={draft.title} onChange={(v) => set('title', v)} maxLength={VENUE_EVENT_TITLE_MAX} />
         <EventKindPicker value={draft.kind} onChange={(k) => set('kind', k)} />
         <EventDates starts={draft.starts} ends={draft.ends} onStarts={(v) => set('starts', v)} onEnds={(v) => set('ends', v)} />

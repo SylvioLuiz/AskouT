@@ -47,6 +47,26 @@ export interface AuthResult {
   token: string;
 }
 
+/** Senha (ou Google/Apple) conferida, mas a conta tem verificação em duas etapas: falta o código do app autenticador. */
+export interface MfaChallenge {
+  mfaRequired: true;
+  mfaToken: string;
+  expiresInSeconds: number;
+}
+
+export interface MfaStatus {
+  enabled: boolean;
+  pendingSetup: boolean;
+  recoveryCodesLeft: number;
+}
+
+export interface MfaSetup {
+  secret: string;
+  otpauthUrl: string;
+  issuer: string;
+  account: string;
+}
+
 export type SocialProviderId = 'GOOGLE' | 'APPLE';
 
 export interface SocialProvider {

@@ -23,6 +23,13 @@ export interface AuthResult {
   user: SessionUser;
 }
 
+/** Senha conferida, mas a conta tem verificação em duas etapas: falta o código do app autenticador. */
+export interface MfaChallenge {
+  mfaRequired: true;
+  mfaToken: string;
+  expiresInSeconds: number;
+}
+
 export interface Stats {
   users: number;
   suspendedUsers: number;
