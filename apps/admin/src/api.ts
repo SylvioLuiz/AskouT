@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -91,9 +91,10 @@ async function request<T>(method: string, path: string, body?: unknown, auth = t
 }
 
 export const api = {
-  login: (identifier: string, password: string) => request<AuthResult>('POST', '/admin/login', { identifier, password }, false),
+  login: (identifier: string, password: string) => request<AuthResult | MfaChallenge>('POST', '/admin/login', { identifier, password }, false),
+  mfaVerify: (mfaToken: string, code: string) => request<AuthResult>('POST', '/admin/mfa/verify', { mfaToken, code }, false),
   socialProviders: () => request<{ items: { provider: string; clientId: string }[] }>('GET', '/auth/providers', undefined, false),
-  appleLogin: (idToken: string) => request<AuthResult>('POST', '/admin/social', { provider: 'APPLE', idToken }, false),
+  appleLogin: (idToken: string) => request<AuthResult | MfaChallenge>('POST', '/admin/social', { provider: 'APPLE', idToken }, false),
   changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
     await send('POST', '/admin/password', { currentPassword, newPassword });
   },

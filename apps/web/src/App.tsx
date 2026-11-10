@@ -15,6 +15,7 @@ import { AgendaScreen } from './screens/agenda.tsx';
 import { AccountDeletionInfoScreen, LegalScreen, SupportScreen } from './screens/legal.tsx';
 import { DeleteAccountScreen } from './screens/delete-account.tsx';
 import { ChangePasswordScreen } from './screens/change-password.tsx';
+import { MfaSettingsScreen } from './screens/mfa-settings.tsx';
 import { ActivityScreen } from './screens/activity.tsx';
 import { ForgotPasswordScreen, LoginScreen, SignupScreen } from './screens/auth.tsx';
 import { ChatScreen, ConversationsScreen } from './screens/conversations.tsx';
@@ -83,6 +84,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/configuracao', render: () => <SettingsScreen /> },
   { path: '/configuracao/senha', render: () => <ChangePasswordScreen /> },
   { path: '/configuracao/conta', render: () => <AccountInfoScreen /> },
+  { path: '/configuracao/verificacao-em-duas-etapas', render: () => <MfaSettingsScreen /> },
   { path: '/configuracao/notificacoes', render: () => <NotificationSettingsScreen /> },
   { path: '/configuracao/now', render: () => <NowSettingsScreen /> },
   { path: '/privacidade', render: () => <PrivacyScreen /> },

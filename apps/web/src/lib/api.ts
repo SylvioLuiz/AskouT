@@ -28,6 +28,9 @@ import type {
   VenueProfileBody,
   VenuePanel,
   AuthResult,
+  MfaChallenge,
+  MfaSetup,
+  MfaStatus,
   PasswordResetStarted,
   AvailableFriend,
   AvailableList,
@@ -180,12 +183,19 @@ export function createApi(deps: ApiDeps) {
     requestPasswordReset: (identifier: string) =>
       request<PasswordResetStarted>('POST', '/auth/password-reset', { body: { identifier }, auth: false }),
     confirmPasswordReset: (identifier: string, code: string, password: string) =>
-      request<AuthResult>('POST', '/auth/password-reset/confirm', { body: { identifier, code, password }, auth: false }),
+      request<AuthResult | MfaChallenge>('POST', '/auth/password-reset/confirm', { body: { identifier, code, password }, auth: false }),
     login: (identifier: string, password: string) =>
-      request<AuthResult>('POST', '/auth/login', { body: { identifier, password }, auth: false }),
+      request<AuthResult | MfaChallenge>('POST', '/auth/login', { body: { identifier, password }, auth: false }),
     socialProviders: () => request<{ items: SocialProvider[] }>('GET', '/auth/providers', { auth: false }),
     socialLogin: (input: { provider: SocialProviderId; idToken: string; username?: string; displayName?: string; birthDate?: string; acceptTerms?: boolean; marketingEmail?: boolean }) =>
-      request<AuthResult | SocialNeedsProfile>('POST', '/auth/social', { body: input, auth: false }),
+      request<AuthResult | MfaChallenge | SocialNeedsProfile>('POST', '/auth/social', { body: input, auth: false }),
+    mfaVerify: (mfaToken: string, code: string) =>
+      request<AuthResult>('POST', '/auth/mfa/verify', { body: { mfaToken, code }, auth: false }),
+    mfaStatus: () => request<MfaStatus>('GET', '/auth/mfa'),
+    mfaSetup: () => request<MfaSetup>('POST', '/auth/mfa/setup'),
+    mfaEnable: (code: string) => request<{ recoveryCodes: string[] }>('POST', '/auth/mfa/enable', { body: { code } }),
+    mfaDisable: (code: string) => request<{ enabled: false }>('POST', '/auth/mfa/disable', { body: { code } }),
+    mfaRecoveryCodes: (code: string) => request<{ recoveryCodes: string[] }>('POST', '/auth/mfa/recovery-codes', { body: { code } }),
     me: () => request<SessionUser>('GET', '/auth/me'),
     completeOnboarding: () => request<{ onboarded: true }>('POST', '/auth/me/onboarding'),
 

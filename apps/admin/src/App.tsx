@@ -30,6 +30,8 @@ function LoginScreen({ onLogin, expired }: { onLogin: (u: Admin) => void; expire
   const [error, setError] = useState<string>();
   const [appleClientId, setAppleClientId] = useState<string>();
   const [appleImageFailed, setAppleImageFailed] = useState(false);
+  const [mfaToken, setMfaToken] = useState<string>();
+  const [code, setCode] = useState('');
   const idId = useId();
   const pwId = useId();
 
@@ -57,6 +59,11 @@ function LoginScreen({ onLogin, expired }: { onLogin: (u: Admin) => void; expire
         return;
       }
       const result = await api.appleLogin(idToken);
+      if ('mfaRequired' in result) {
+        setMfaToken(result.mfaToken);
+        setBusy(false);
+        return;
+      }
       session.set(result.token);
       onLogin(result.user);
     } catch (err) {
@@ -72,11 +79,38 @@ function LoginScreen({ onLogin, expired }: { onLogin: (u: Admin) => void; expire
     setError(undefined);
     try {
       const result = await api.login(identifier.trim(), password);
+      if ('mfaRequired' in result) {
+        setMfaToken(result.mfaToken);
+        setBusy(false);
+        return;
+      }
       if (result.user.role !== 'ADMIN') throw new ApiError(403, 'FORBIDDEN', 'Acesso restrito a administradores');
       session.set(result.token);
       onLogin(result.user);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Algo deu errado. Tente de novo.');
+      setBusy(false);
+    }
+  }
+
+  async function submitCode(e: FormEvent) {
+    e.preventDefault();
+    if (busy || !mfaToken) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const result = await api.mfaVerify(mfaToken, code.trim());
+      session.set(result.token);
+      onLogin(result.user);
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'UNAUTHORIZED') {
+        // O comprovante da senha vale poucos minutos: expirou, entra de novo.
+        setMfaToken(undefined);
+        setCode('');
+        setError('O tempo para digitar o código acabou. Entre de novo.');
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Algo deu errado. Tente de novo.');
+      }
       setBusy(false);
     }
   }
@@ -87,31 +121,42 @@ function LoginScreen({ onLogin, expired }: { onLogin: (u: Admin) => void; expire
         <img className="login__scene" src="/auth-hero.jpg" alt="AskouT" width="780" height="540" />
         <p className="login__headline">Menos tempo combinando. Mais tempo juntos.</p>
       </section>
-      <form className="login__card" onSubmit={submit}>
+      <form className="login__card" onSubmit={mfaToken ? submitCode : submit}>
         <div className="login__brand">
           <img className="login__logo" src="/logo.png" alt="" width="40" height="40" />
           <span>AskouT Gestão</span>
         </div>
-        <h1>Entrar</h1>
-        <p className="login__sub">Acesso restrito a administradores.</p>
-        {expired ? <p className="notice">Sua sessão acabou. Entre de novo.</p> : null}
-        <div className="field">
+        <h1>{mfaToken ? 'Verificação em duas etapas' : 'Entrar'}</h1>
+        <p className="login__sub">{mfaToken ? 'Digite o código de 6 dígitos do app autenticador (ou um código de recuperação).' : 'Acesso restrito a administradores.'}</p>
+        {expired && !mfaToken ? <p className="notice">Sua sessão acabou. Entre de novo.</p> : null}
+        {mfaToken ? (
+          <div className="field">
+            <label htmlFor={idId}>Código</label>
+            <input id={idId} value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" maxLength={12} autoFocus required />
+          </div>
+        ) : null}
+        {mfaToken ? null : <div className="field">
           <label htmlFor={idId}>E-mail ou @usuário</label>
           <input id={idId} value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoComplete="username" autoFocus required />
-        </div>
-        <div className="field">
+        </div>}
+        {mfaToken ? null : <div className="field">
           <label htmlFor={pwId}>Senha</label>
           <input id={pwId} type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
-        </div>
+        </div>}
         {error ? (
           <p className="notice notice--bad" role="alert">
             {error}
           </p>
         ) : null}
-        <button type="submit" className="btn btn--primary btn--block login__submit" disabled={busy || identifier.trim() === '' || password === ''}>
-          {busy ? 'Entrando…' : 'Entrar'}
+        <button type="submit" className="btn btn--primary btn--block login__submit" disabled={busy || (mfaToken ? code.trim() === '' : identifier.trim() === '' || password === '')}>
+          {busy ? 'Entrando…' : mfaToken ? 'Confirmar' : 'Entrar'}
         </button>
-        {appleClientId ? (
+        {mfaToken ? (
+          <button type="button" className="btn btn--block" disabled={busy} onClick={() => { setMfaToken(undefined); setCode(''); setError(undefined); }}>
+            Voltar
+          </button>
+        ) : null}
+        {appleClientId && !mfaToken ? (
           <>
             <p className="login__or">ou</p>
             {appleImageFailed ? (
