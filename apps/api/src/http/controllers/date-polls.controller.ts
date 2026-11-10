@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
@@ -37,6 +37,13 @@ export class DatePollsController {
   @Get(':id')
   get(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
     return this.core.scheduling.get(actor.userId, id);
+  }
+
+  /** Quem organiza edita: `{title?, rangeStart?, rangeEnd?, confirmationPolicy?}`. */
+  @Patch(':id')
+  update(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.scheduling.update(actor.userId, id, { title: b.title, rangeStart: b.rangeStart, rangeEnd: b.rangeEnd, confirmationPolicy: b.confirmationPolicy });
   }
 
   /** Marca dias: `{status: 'YES'|'MAYBE'|'NO'|'CLEAR', dates: ['AAAA-MM-DD']}`. */

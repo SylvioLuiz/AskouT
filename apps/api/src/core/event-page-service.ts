@@ -294,17 +294,21 @@ export class EventPageService {
   async listMyGoing(viewerId: string): Promise<GoingEventView[]> {
     const now = this.deps.clock.now().getTime();
     const rows = await this.deps.eventRoom.listGoingByUser(viewerId, MY_GOING_LIMIT);
-    const out: GoingEventView[] = [];
-    for (const row of rows) {
-      try {
-        await this.resolve(viewerId, row.ref.id);
-        const { view } = await this.base(viewerId, row.ref, {});
-        if (Date.parse(view.endsAt) < now) continue;
-        out.push({ id: view.id, source: view.source, title: view.title, startsAt: view.startsAt, endsAt: view.endsAt, venueName: view.venue.name === '' ? null : view.venue.name });
-      } catch (failure) {
-        if (!(failure instanceof DomainError)) throw failure;
-      }
-    }
+    // Cada evento monta a página inteira; em paralelo (a ordem final é refeita pelo sort no fim).
+    const resolved = await Promise.all(
+      rows.map(async (row): Promise<GoingEventView | undefined> => {
+        try {
+          await this.resolve(viewerId, row.ref.id);
+          const { view } = await this.base(viewerId, row.ref, {});
+          if (Date.parse(view.endsAt) < now) return undefined;
+          return { id: view.id, source: view.source, title: view.title, startsAt: view.startsAt, endsAt: view.endsAt, venueName: view.venue.name === '' ? null : view.venue.name };
+        } catch (failure) {
+          if (!(failure instanceof DomainError)) throw failure;
+          return undefined;
+        }
+      }),
+    );
+    const out: GoingEventView[] = resolved.filter((v): v is GoingEventView => v !== undefined);
     // Os que ela criou: o dono já conta como confirmado.
     const seen = new Set(out.map((e) => e.id));
     const created = await this.deps.posts.listFor([viewerId], [], { limit: MY_GOING_LIMIT, offset: 0 }, 'EVENT');
@@ -390,11 +394,9 @@ export class EventPageService {
     const rows = all.filter((r) => !reported.has(r.id));
     const profiles = await this.deps.users.findProfilesByIds([...new Set(rows.map((r) => r.userId))]);
     const byId = new Map(profiles.map((p) => [p.userId, toPublicProfile(p)]));
-    const events = new Map<string, ProfileStoryEventView | null>();
-    for (const r of rows) {
-      if (events.has(r.ref.id)) continue;
-      events.set(r.ref.id, await this.eventLabel(viewerId, r.ref));
-    }
+    // Um evento por vez era lento (cada um monta a página inteira); em paralelo, um por referência distinta.
+    const refs = new Map(rows.map((r) => [r.ref.id, r.ref] as const));
+    const events = new Map<string, ProfileStoryEventView | null>(await Promise.all([...refs.values()].map(async (ref) => [ref.id, await this.eventLabel(viewerId, ref)] as const)));
     const groups = new Map<string, ProfileStoryGroupView>();
     for (const r of rows) {
       const author = byId.get(r.userId);

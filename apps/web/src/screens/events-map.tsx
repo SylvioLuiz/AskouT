@@ -82,15 +82,11 @@ function StripSkeleton({ mode }: { mode: Mode }) {
         <div key={i} className="evmap__slide" aria-hidden="true">
           {mode === 'places' ? (
             <div className="evmapcard evmapcard--place evmapcard--skeleton">
-              <div className="evmapplace__head">
-                <span className="evskel evskel--logo" />
+              <div className="evmapplace__row">
                 <span className="evmapplace__info evskel__lines">
                   <span className="evskel evskel--line" />
                   <span className="evskel evskel--line evskel--short" />
                 </span>
-              </div>
-              <div className="evmapplace__actions">
-                <span className="evskel evskel--button" />
                 <span className="evskel evskel--button evskel--quiet" />
               </div>
             </div>
@@ -155,7 +151,6 @@ function PlaceCard({ place, selected, index, onSelect }: { place: ExplorePlace; 
   const [opening, setOpening] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [failed, setFailed] = useState(false);
-  const image = failed ? null : safeImage(place.venue?.logoUrl ?? null);
   const adRef = useSponsoredView<HTMLLIElement>(place.sponsored === true && place.venue !== null && place.venue !== undefined, 'EXPLORE', { venueId: place.venue?.id });
 
   // Local do AskouT abre direto; de fora (Google/OSM) ganha página na primeira vez.
@@ -176,34 +171,30 @@ function PlaceCard({ place, selected, index, onSelect }: { place: ExplorePlace; 
     }
   }
 
+  const photo = failed || !place.photoPath ? null : api.assetUrl(place.photoPath);
+
   return (
     <li ref={adRef} className={`evmap__slide${selected ? ' evmap__slide--on' : ''}`} data-id={`p:${place.key}`} style={enterDelay(index)} onClick={selectOnTap(`p:${place.key}`, onSelect)}>
-      <article className="evmapcard evmapcard--place">
-        <div className="evmapplace__head">
-          {image ? (
-            <FadeImage className="evmapplace__logo" src={image} onError={() => setFailed(true)} />
-          ) : (
-            <VenueLogo name={place.name} logoUrl={null} size={48} />
-          )}
+      <article className={`evmapcard evmapcard--place${photo ? ' evmapcard--photo' : ''}`}>
+        {photo ? <img className="evmapplace__bg" src={photo} alt="" referrerPolicy="no-referrer" loading="lazy" onError={() => setFailed(true)} /> : null}
+        <div className="evmapplace__row">
           <span className="evmapplace__info">
-            <strong className="evmapplace__name">{place.name}</strong>
+            <button type="button" className="evmapplace__name" disabled={opening} onClick={() => void openPage()} aria-label={t('Abrir a página de {name}', { name: place.name })}>
+              {place.name}
+            </button>
             <span className="evmapplace__line">
               {[place.category ?? 'Local', place.distanceM !== null ? `a ${formatDistance(place.distanceM)}` : null].filter(Boolean).join(' · ')}
             </span>
             {place.rating !== null ? <Rating rating={place.rating} count={place.ratingCount} /> : null}
+            {place.sponsored ? <span className="tag-sponsored">{t('Patrocinado')}</span> : null}
           </span>
-        </div>
-        {place.sponsored ? <span className="tag-sponsored">{t('Patrocinado')}</span> : null}
-        {problem ? <p className="field__error">{problem}</p> : null}
-        <div className="evmapplace__actions">
-          <Button small loading={opening} onClick={() => void openPage()}>
-            {t('Ver página')}
-          </Button>
           <OpenInMaps className="btn btn--quiet btn--small evmapplace__route" mode="route" lat={place.lat} lng={place.lng} label={place.name}>
             <RouteIcon />
             {t('Rota')}
           </OpenInMaps>
         </div>
+        {problem ? <p className="field__error">{problem}</p> : null}
+        {photo && place.photoAuthor ? <span className="evmapplace__credit">{t('Foto: {author}', { author: place.photoAuthor })}</span> : null}
       </article>
     </li>
   );

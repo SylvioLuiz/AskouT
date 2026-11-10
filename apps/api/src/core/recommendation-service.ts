@@ -241,6 +241,16 @@ export class RecommendationService {
       if (!postCache.has(id)) postCache.set(id, await posts.findById(id));
       return postCache.get(id);
     };
+    const eventCache = new Map<string, Awaited<ReturnType<typeof places.findEvent>>>();
+    const eventOf = async (id: string) => {
+      if (!eventCache.has(id)) eventCache.set(id, await places.findEvent(id));
+      return eventCache.get(id);
+    };
+    // Aquece os caches em paralelo (em lotes): os laços abaixo leem do cache e deixam de ir ao banco um por vez.
+    const warm = async (ids: Iterable<string>, load: (id: string) => Promise<unknown>) => {
+      const list = [...new Set(ids)];
+      for (let i = 0; i < list.length; i += 25) await Promise.all(list.slice(i, i + 25).map(load));
+    };
     const postFeatures = (p: PostRecord): Features => ({ tags: hashtagsOf(p.caption), kind: p.eventTitle ? p.eventKind : null, venueId: p.venueId ?? null, authorId: p.authorId, category: null });
     const eventFeatures = (e: { tags: string[]; kind: EventKind; venueId: string }, category: string | null): Features => ({ tags: e.tags, kind: e.kind, venueId: e.venueId, authorId: null, category: category ? fold(category) : null });
 
@@ -259,6 +269,8 @@ export class RecommendationService {
     };
     const mine = await posts.listEngagement(viewerId, since, 500);
     const viewerEngaged = new Set(mine.map((m) => m.postId));
+    await warm([...mine.map((m) => m.postId), ...dwell.filter((d) => d.targetType === 'POST').map((d) => d.targetId)], postOf);
+    await warm(dwell.filter((d) => d.targetType !== 'POST').map((d) => d.targetId), eventOf);
     for (const row of mine) add((await postOf(row.postId))?.post.authorId, (row.kind === 'COMMENT' ? 2 : 1) * decay(row.at, now));
     for (const d of dwell) {
       const w = d.targetType === 'POST' ? stickyWeight(d.ms, threshold) : 0;
@@ -280,7 +292,7 @@ export class RecommendationService {
       for (const { ref, createdAt } of await eventRoom.listGoingByUser(viewerId, RECO_GOING_HISTORY)) {
         const w = RECO_TASTE_GOING * decay(createdAt, now, 30);
         if (ref.source === 'PLACE') {
-          const e = await places.findEvent(ref.id);
+          const e = await eventOf(ref.id);
           if (e) addFeatures(taste, eventFeatures(e.event, e.venue.category), w);
         } else {
           const p = await postOf(ref.id);
@@ -294,7 +306,7 @@ export class RecommendationService {
           const p = await postOf(d.targetId);
           if (p) addFeatures(taste, postFeatures(p.post), w);
         } else {
-          const e = await places.findEvent(d.targetId);
+          const e = await eventOf(d.targetId);
           if (e) addFeatures(taste, eventFeatures(e.event, e.venue.category), w);
         }
       }
@@ -305,7 +317,7 @@ export class RecommendationService {
           const p = await postOf(d.targetId);
           if (p) addFeatures(taste, postFeatures(p.post), w);
         } else {
-          const e = await places.findEvent(d.targetId);
+          const e = await eventOf(d.targetId);
           if (e) addFeatures(taste, eventFeatures(e.event, e.venue.category), w);
         }
       }
@@ -336,12 +348,16 @@ export class RecommendationService {
 
     // O que cada amigo próximo foi ou curtiu, lido uma vez só: serve de candidato e de gosto.
     const friendData = new Map<string, { going: Awaited<ReturnType<typeof eventRoom.listGoingByUser>>; engaged: Awaited<ReturnType<typeof posts.listEngagement>> }>();
-    for (const friendId of circle) {
-      friendData.set(friendId, {
+    const friendRows = await Promise.all(
+      circle.map(async (friendId) => ({
+        friendId,
         going: await eventRoom.listGoingByUser(friendId, 20),
         engaged: await posts.listEngagement(friendId, new Date(now.getTime() - RECO_FRIEND_DAYS * 86_400_000), 30),
-      });
-    }
+      })),
+    );
+    for (const { friendId, going, engaged } of friendRows) friendData.set(friendId, { going, engaged });
+    await warm([...friendRows.flatMap((f) => f.engaged.map((r) => r.postId)), ...friendRows.flatMap((f) => f.going.filter((g) => g.ref.source === 'USER').map((g) => g.ref.id))], postOf);
+    await warm(friendRows.flatMap((f) => f.going.filter((g) => g.ref.source === 'PLACE').map((g) => g.ref.id)), eventOf);
 
     // Gosto dos amigos mais próximos, com peso menor que o das ações da própria pessoa.
     if (personalize) {
@@ -358,7 +374,7 @@ export class RecommendationService {
         for (const { ref, createdAt } of data.going) {
           const w = k * RECO_TASTE_GOING * decay(createdAt, now, 30);
           if (ref.source === 'PLACE') {
-            const e = await places.findEvent(ref.id);
+            const e = await eventOf(ref.id);
             if (e) addFeatures(taste, eventFeatures(e.event, e.venue.category), w);
           } else if (visible.has(ref.id)) {
             const p = await postOf(ref.id);
@@ -373,7 +389,7 @@ export class RecommendationService {
       const data = friendData.get(friendId)!;
       for (const { ref } of data.going) {
         if (ref.source === 'PLACE') {
-          const e = await places.findEvent(ref.id);
+          const e = await eventOf(ref.id);
           if (!e || e.event.endsAt <= now) continue;
           const c = candidate('EVENT', e.event.id, eventFeatures(e.event, e.venue.category), upcomingFreshness(e.event.startsAt));
           c.social += w;

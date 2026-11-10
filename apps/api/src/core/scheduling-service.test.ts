@@ -303,3 +303,34 @@ test('confirmar a melhor data: sem informar o dia, usa o 1º do ranking; vale de
   const v = await w.core.scheduling.confirmBest(ana, poll.id);
   assert.equal(v.final?.date, '2026-10-25');
 });
+
+test('editar: só quem organiza muda nome, datas e regra; dias novos reabrem quem concluiu', async () => {
+  const { w, ana, bia, caio, group, poll } = await setup('MAJORITY');
+  await w.core.scheduling.vote(bia, poll.id, { status: 'YES', dates: ['2026-10-26'] });
+  await w.core.scheduling.finish(bia, poll.id, true);
+  await rejectsWith(w.core.scheduling.update(bia, poll.id, { title: 'Outro' }), 'FORBIDDEN');
+  await rejectsWith(w.core.scheduling.update(ana, poll.id, { title: '' }), 'VALIDATION');
+  await rejectsWith(w.core.scheduling.update(ana, poll.id, { rangeEnd: '2026-10-10' }), 'VALIDATION');
+  await rejectsWith(w.core.scheduling.update(ana, poll.id, { confirmationPolicy: 'X' }), 'VALIDATION');
+
+  // nome + regra
+  let v = await w.core.scheduling.update(ana, poll.id, { title: 'Feijoada', confirmationPolicy: 'MANUAL' });
+  assert.equal(v.title, 'Feijoada');
+  assert.equal(v.confirmationPolicy, 'MANUAL');
+
+  // tirar dias: voto de fora some da visão, mas volta se o dia voltar
+  v = await w.core.scheduling.update(ana, poll.id, { rangeEnd: '2026-10-24' });
+  assert.equal(v.days.length, 5);
+  assert.equal((await w.core.scheduling.get(bia, poll.id)).myVotes['2026-10-26'], undefined);
+
+  // dias novos: quem já tinha concluído volta a poder votar
+  v = await w.core.scheduling.update(ana, poll.id, { rangeEnd: '2026-10-28' });
+  assert.equal(v.days.length, 9);
+  assert.equal((await w.core.scheduling.get(bia, poll.id)).myVotes['2026-10-26'], 'YES');
+  const chat = await w.core.conversations.messages(caio, group.id);
+  assert.ok(chat.messages.some((m) => /mudou/.test(m.body ?? '')));
+
+  // votação cancelada ou encerrada não se edita
+  await w.core.scheduling.cancel(ana, poll.id);
+  await rejectsWith(w.core.scheduling.update(ana, poll.id, { title: 'Tarde demais' }), 'CONFLICT');
+});

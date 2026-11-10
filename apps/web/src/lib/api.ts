@@ -589,6 +589,7 @@ export function createApi(deps: ApiDeps) {
     datePolls: () => request<{ items: PollSummary[] }>('GET', '/date-polls'),
     conversationPolls: (conversationId: string) => request<{ items: PollSummary[] }>('GET', `/date-polls/conversation/${id(conversationId)}`),
     createPoll: (input: PollInput) => request<PollView>('POST', '/date-polls', { body: input }),
+    updatePoll: (pollId: string, input: { title?: string; rangeStart?: string; rangeEnd?: string; confirmationPolicy?: 'MAJORITY' | 'UNANIMITY' | 'MANUAL' }) => request<PollView>('PATCH', `/date-polls/${id(pollId)}`, { body: input }),
     poll: (pollId: string) => request<PollView>('GET', `/date-polls/${id(pollId)}`),
     votePoll: (pollId: string, status: VoteStatus | 'CLEAR', dates: string[]) => request<PollView>('POST', `/date-polls/${id(pollId)}/votes`, { body: { status, dates } }),
     finishPoll: (pollId: string, finished: boolean) => request<PollView>('POST', `/date-polls/${id(pollId)}/finish`, { body: { finished } }),

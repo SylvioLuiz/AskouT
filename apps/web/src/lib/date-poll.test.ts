@@ -29,6 +29,12 @@ test('linha da conversa: em votação, marcado e some depois da data', async () 
   assert.deepEqual(pollLine(done, now), { name: 'Churrasco', status: 'marcado para sábado, 24/10' });
   assert.equal(pollLine(done, new Date('2026-10-26T00:00:00Z')), null);
   assert.equal(pollLine({ ...base, status: 'CANCELLED' }, now), null);
+  // sem horário de fim: vale até o fim do dia marcado
+  const noEnd = { ...done, finalEndsAt: null };
+  assert.notEqual(pollLine(noEnd, new Date('2026-10-24T20:00:00Z')), null);
+  assert.equal(pollLine(noEnd, new Date('2026-10-25T12:00:00Z')), null);
+  // votação aberta com período já vencido não aparece mais
+  assert.equal(pollLine({ ...base, status: 'VOTING' }, new Date('2026-10-28T12:00:00Z')), null);
 });
 
 test('período com evento não passa do dia do evento', () => {

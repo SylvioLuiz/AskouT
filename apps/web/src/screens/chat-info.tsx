@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SharedEvents, SharedLinks, SharedMedia } from '../components/shared-tabs.tsx';
+import { AvatarViewer } from '../components/photo-viewer.tsx';
 import { Avatar, EmptyState, ErrorState, Loading, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -12,6 +13,7 @@ type Tab = 'events' | 'media' | 'links';
 export function ChatInfoScreen({ conversationId }: { conversationId: string }) {
   const shared = useAsync(() => api.shared(conversationId), [conversationId]);
   const [tab, setTab] = useState<Tab>('events');
+  const [photoOpen, setPhotoOpen] = useState(false);
   const data = shared.data;
   useTitle(data?.other ? data.other.displayName : t('Informações da conversa'));
 
@@ -40,9 +42,16 @@ export function ChatInfoScreen({ conversationId }: { conversationId: string }) {
   return (
     <>
       <PageHead title={t('Informações')} back={back} />
-      <div className="chatinfo">
-        <Link to={`/u/${encodeURIComponent(other.username)}`} className="chatinfo__who" aria-label={t('Ver perfil de {displayName}', { displayName: other.displayName })}>
+      {photoOpen && other.avatarUrl ? <AvatarViewer url={other.avatarUrl} onClose={() => setPhotoOpen(false)} /> : null}
+      <div className="chatinfo chatinfo--stack">
+        {other.avatarUrl ? (
+          <button type="button" className="avatarbtn" onClick={() => setPhotoOpen(true)} aria-label={t('Ver foto de perfil')} aria-haspopup="dialog">
+            <Avatar profile={other} size={96} />
+          </button>
+        ) : (
           <Avatar profile={other} size={96} />
+        )}
+        <Link to={`/u/${encodeURIComponent(other.username)}`} className="chatinfo__who" aria-label={t('Ver perfil de {displayName}', { displayName: other.displayName })}>
           <span className="chatinfo__name">{other.displayName}</span>
           <span className="chatinfo__handle">@{other.username}</span>
         </Link>

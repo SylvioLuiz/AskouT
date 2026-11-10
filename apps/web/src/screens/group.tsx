@@ -4,6 +4,7 @@ import { GroupPolls } from '../components/date-poll-summary.tsx';
 import { GroupEvent, SharedLinks, SharedMedia } from '../components/shared-tabs.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { EditIcon, MoreIcon } from '../components/icons.tsx';
+import { AvatarViewer } from '../components/photo-viewer.tsx';
 import { Button, EmptyState, ErrorState, Field, GroupAvatar, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { useUser } from '../auth.tsx';
 import { toApiError } from '../lib/errors.ts';
@@ -25,6 +26,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   const polls = useAsync(() => api.conversationPolls(conversationId), [conversationId]);
   const me = useUser();
   const [tab, setTab] = useState<Tab>('people');
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [sheet, setSheet] = useState<'edit' | 'leave' | 'delete' | 'add' | { member: string } | { remove: string } | { block: string } | { meetup: MeetupView } | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -94,8 +96,15 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
           ) : undefined
         }
       />
+      {photoOpen && data.imageUrl ? <AvatarViewer url={data.imageUrl} onClose={() => setPhotoOpen(false)} /> : null}
       <div className="grouphead">
-        <GroupAvatar name={data.name} size={96} imageUrl={data.imageUrl} />
+        {data.imageUrl ? (
+          <button type="button" className="avatarbtn" onClick={() => setPhotoOpen(true)} aria-label={t('Ver foto do grupo')} aria-haspopup="dialog">
+            <GroupAvatar name={data.name} size={96} imageUrl={data.imageUrl} />
+          </button>
+        ) : (
+          <GroupAvatar name={data.name} size={96} imageUrl={null} />
+        )}
       </div>
       {problem && !sheet ? <p className="sugcard__problem" role="alert">{problem}</p> : null}
       <div className="segtabs segtabs--fill" role="tablist" aria-label={t('Detalhes do grupo')}>

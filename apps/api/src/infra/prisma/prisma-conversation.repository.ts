@@ -193,27 +193,33 @@ export class PrismaConversationRepository implements ConversationRepository {
         conversation: { include: { group: true, participants: { select: { userId: true } } } },
       },
     });
-    const out: ConversationSummaryRecord[] = [];
-    for (const p of mine) {
-      const c = p.conversation;
-      const ids = c.participants.map((x: { userId: string }) => x.userId).sort();
-      if (c.type === 'DIRECT' && ids.length !== 2) continue;
-      const visible = { ...(hiddenSenderIds.length > 0 ? { senderId: { notIn: [...hiddenSenderIds] } } : {}), ...(p.clearedAt ? { createdAt: { gt: p.clearedAt } } : {}) };
-      const lastReadFloor = [p.lastReadAt, p.clearedAt].filter((d): d is Date => d !== null).sort((x, y) => y.getTime() - x.getTime())[0];
-      const unread = await this.prisma.message.count({
-        where: { conversationId: c.id, senderId: { notIn: [userId, ...hiddenSenderIds] }, ...(lastReadFloor ? { createdAt: { gt: lastReadFloor } } : {}) },
-      });
-      const last = await this.prisma.message.findFirst({ where: { conversationId: c.id, ...visible }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] });
-      out.push({
-        conversation: toConversation(c),
-        participantIds: ids,
-        lastMessage: last ? toMessage(last as MessageRow) : null,
-        unread,
-        pinnedAt: p.pinnedAt,
-        muted: p.muted,
-        clearedAt: p.clearedAt,
-      });
-    }
+    // Por conversa há dois acessos ao banco (não lidas e última mensagem). Em paralelo: antes eram em fila,
+    // e com o banco longe do celular (Oregon) cada ida e volta somava na abertura da lista.
+    const built = await Promise.all(
+      mine.map(async (p): Promise<ConversationSummaryRecord | undefined> => {
+        const c = p.conversation;
+        const ids = c.participants.map((x: { userId: string }) => x.userId).sort();
+        if (c.type === 'DIRECT' && ids.length !== 2) return undefined;
+        const visible = { ...(hiddenSenderIds.length > 0 ? { senderId: { notIn: [...hiddenSenderIds] } } : {}), ...(p.clearedAt ? { createdAt: { gt: p.clearedAt } } : {}) };
+        const lastReadFloor = [p.lastReadAt, p.clearedAt].filter((d): d is Date => d !== null).sort((x, y) => y.getTime() - x.getTime())[0];
+        const [unread, last] = await Promise.all([
+          this.prisma.message.count({
+            where: { conversationId: c.id, senderId: { notIn: [userId, ...hiddenSenderIds] }, ...(lastReadFloor ? { createdAt: { gt: lastReadFloor } } : {}) },
+          }),
+          this.prisma.message.findFirst({ where: { conversationId: c.id, ...visible }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] }),
+        ]);
+        return {
+          conversation: toConversation(c),
+          participantIds: ids,
+          lastMessage: last ? toMessage(last as MessageRow) : null,
+          unread,
+          pinnedAt: p.pinnedAt,
+          muted: p.muted,
+          clearedAt: p.clearedAt,
+        };
+      }),
+    );
+    const out = built.filter((x): x is ConversationSummaryRecord => x !== undefined);
     const stamp = (s: ConversationSummaryRecord) => (s.lastMessage ?? s.conversation).createdAt.getTime();
     return out.sort((a, b) => stamp(b) - stamp(a));
   }

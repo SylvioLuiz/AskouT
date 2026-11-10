@@ -426,7 +426,7 @@ export interface SchedulingRepository {
   setVotes(pollId: string, userId: string, dates: string[], status: 'YES' | 'MAYBE' | 'NO' | null, at: Date): Promise<void>;
   /** "Concluí minha votação" (ou `null` para reabrir). */
   setFinished(pollId: string, userId: string, at: Date | null): Promise<void>;
-  updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null; deadlineNotifiedAt?: Date | null }): Promise<void>;
+  updatePoll(pollId: string, patch: { status?: PollStatus; title?: string; rangeStart?: string; rangeEnd?: string; confirmationPolicy?: 'UNANIMITY' | 'MAJORITY' | 'MANUAL'; finalProposalId?: string | null; meetupId?: string | null; votingClosedAt?: Date | null; eventPostId?: string | null; deadlineNotifiedAt?: Date | null }): Promise<void>;
   createProposal(proposal: PollProposalRecord): Promise<void>;
   findProposal(id: string): Promise<PollProposalRecord | undefined>;
   /** Propostas da votação, a mais recente primeiro. */

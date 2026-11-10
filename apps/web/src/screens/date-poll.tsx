@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Sheet } from '../components/agenda.tsx';
-import { Avatar, Button, Confirm, ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { RangeCalendar, POLICY_TEXT } from '../components/date-poll-create.tsx';
+import { EditIcon } from '../components/icons.tsx';
+import { Avatar, Button, Confirm, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { agendaEvents, agendaEventsOnDay } from '../lib/agenda.ts';
 import type { AgendaEvent } from '../lib/agenda.ts';
-import { LEVEL_LABEL, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLabel, longDay, monthTitle, percent, podiumDay, shortDay } from '../lib/date-poll.ts';
+import { LEVEL_LABEL, chipDay, dayInZone, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLabel, longDay, monthTitle, percent, podiumDay, shortDay } from '../lib/date-poll.ts';
 import type { ConfirmationAnswer, DateStats, PollView, VoteStatus } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
@@ -42,6 +44,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
   const [confirming, setConfirming] = useState<'cancel' | undefined>();
   const [showAll, setShowAll] = useState(false);
   const [bestDismissed, setBestDismissed] = useState(false);
+  const [editing, setEditing] = useState(false);
   // Dias em que você já tem compromisso (encontros e eventos confirmados ou criados por você).
   const myMeetups = useAsync(() => api.myMeetups(), []);
   const myGoing = useAsync(() => api.myGoingEvents(), []);
@@ -94,7 +97,16 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
   return (
     <div className="dpoll">
-      <PageHead title={poll.title} back={`/conversas/${poll.conversationId}`} subtitle={`${shortDay(poll.rangeStart)} a ${shortDay(poll.rangeEnd)}`} />
+      <PageHead title={poll.title} back={`/conversas/${poll.conversationId}`} subtitle={`${shortDay(poll.rangeStart)} a ${shortDay(poll.rangeEnd)}`}
+        action={
+          poll.isOrganizer && poll.status === 'VOTING' && !poll.votingClosed ? (
+            <button type="button" className="iconbtn" aria-label={t('Editar votação')} onClick={() => setEditing(true)}>
+              <EditIcon />
+            </button>
+          ) : undefined
+        }
+      />
+      {editing ? <EditPollSheet poll={poll} onClose={() => setEditing(false)} onSaved={(p) => { setPoll(p); setEditing(false); }} /> : null}
       {problem ? <Notice tone="error">{problem}</Notice> : null}
 
       {poll.status === 'FINALIZED' && poll.final ? (
@@ -520,5 +532,79 @@ function ProposalCard({ poll, busy, act }: { poll: PollView; busy: boolean; act:
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** Quem organiza muda nome, datas e quem escolhe o dia enquanto a votação está aberta. */
+function EditPollSheet({ poll, onClose, onSaved }: { poll: PollView; onClose: () => void; onSaved: (p: PollView) => void }) {
+  const [title, setTitle] = useState(poll.title);
+  const [start, setStart] = useState(poll.rangeStart);
+  const [end, setEnd] = useState(poll.rangeEnd);
+  const [policy, setPolicy] = useState<'MAJORITY' | 'UNANIMITY' | 'MANUAL'>(poll.confirmationPolicy);
+  const [calendar, setCalendar] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+  const today = dayInZone(new Date().toISOString());
+  const min = poll.rangeStart < today ? poll.rangeStart : today;
+  const changed = title.trim() !== poll.title || start !== poll.rangeStart || end !== poll.rangeEnd || policy !== poll.confirmationPolicy;
+
+  async function save() {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      onSaved(await api.updatePoll(poll.id, { title: title.trim(), rangeStart: start, rangeEnd: end, confirmationPolicy: policy }));
+    } catch (error) {
+      setProblem(toApiError(error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet title={calendar ? t('Período de datas') : t('Editar votação')} onClose={calendar ? () => setCalendar(false) : onClose}>
+      {calendar ? (
+        <RangeCalendar
+          start={start}
+          end={end}
+          min={min}
+          onPick={(a, b) => {
+            setStart(a);
+            setEnd(b);
+            setCalendar(false);
+          }}
+        />
+      ) : (
+        <div className="pollcard__body">
+          {problem ? <Notice tone="error">{problem}</Notice> : null}
+          <Field label={t('Nome do encontro')} value={title} onChange={setTitle} maxLength={120} autoComplete="off" />
+          <p className="pollcard__label">{t('Período de datas')}</p>
+          <button type="button" className="pollrange" onClick={() => setCalendar(true)} aria-label={t('Período: {from} a {to}. Alterar', { from: longDay(start), to: longDay(end) })}>
+            <span className="pollrange__value">
+              {chipDay(start)}
+              {end !== start ? (
+                <>
+                  <span className="pollrange__arrow" aria-hidden="true">
+                    →
+                  </span>
+                  {chipDay(end)}
+                </>
+              ) : null}
+            </span>
+          </button>
+          <p className="pollcard__label">{t('Como escolher a data?')}</p>
+          <div className="pollpolicy" role="group" aria-label={t('Como escolher a data')}>
+            <button type="button" className="pollpolicy__opt" aria-pressed={policy !== 'MANUAL'} onClick={() => setPolicy('MAJORITY')}>
+              {t('Maioria')}
+            </button>
+            <button type="button" className="pollpolicy__opt" aria-pressed={policy === 'MANUAL'} onClick={() => setPolicy('MANUAL')}>
+              {t('Eu decido')}
+            </button>
+          </div>
+          <p className="pollcard__hint pollcard__hint--wide">{POLICY_TEXT[policy]}</p>
+          <Button onClick={save} full loading={busy} disabled={!changed || title.trim() === ''}>
+            {t('Salvar')}
+          </Button>
+        </div>
+      )}
+    </Sheet>
   );
 }

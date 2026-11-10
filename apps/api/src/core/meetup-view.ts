@@ -46,14 +46,21 @@ export async function buildMeetupViews(deps: CoreDeps, actorId: string, records:
   const now = deps.clock.now();
   const organizerIds = [...new Set(records.map((r) => r.organizerId))];
   const profiles = new Map((await users.findProfilesByIds(organizerIds)).map((p) => [p.userId, p] as const));
-  const conversationCache = new Map<string, Awaited<ReturnType<typeof conversations.findById>>>();
+  // Conversas e eventos buscados de uma vez, em paralelo (antes: dois acessos ao banco por encontro, em fila).
+  const conversationIds = [...new Set(records.map((r) => r.conversationId))];
+  const eventIds = [...new Set(records.flatMap((r) => (r.eventId ? [r.eventId] : [])))];
+  const [conversationList, eventList] = await Promise.all([
+    Promise.all(conversationIds.map(async (id) => [id, await conversations.findById(id)] as const)),
+    Promise.all(eventIds.map(async (id) => [id, await places.findEvent(id)] as const)),
+  ]);
+  const conversationCache = new Map(conversationList);
+  const eventCache = new Map(eventList);
   const out: MeetupView[] = [];
   for (const r of records) {
     const organizer = profiles.get(r.organizerId);
     if (!organizer) continue;
-    if (!conversationCache.has(r.conversationId)) conversationCache.set(r.conversationId, await conversations.findById(r.conversationId));
     const conversation = conversationCache.get(r.conversationId);
-    const found = r.eventId ? await places.findEvent(r.eventId) : undefined;
+    const found = r.eventId ? eventCache.get(r.eventId) : undefined;
     const mine = r.participants.find((p) => p.userId === actorId);
     const count = (s: string) => r.participants.filter((p) => p.status === s).length;
     out.push({
