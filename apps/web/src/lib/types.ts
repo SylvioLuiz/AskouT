@@ -975,7 +975,7 @@ export interface VenueProfile {
   followerCount: number;
   rating: VenueRating;
   upcomingEvents: VenueEvent[];
-  /** Quem mais frequenta, por presenças confirmadas em eventos do local. */
+  /** Quem mais frequenta, por check-ins e presenças confirmadas em eventos do local. */
   regulars: VenueRegular[];
   /** Amigos que já confirmaram presença aqui. */
   friendsWent: { count: number; sample: PublicProfile[] };
@@ -984,7 +984,21 @@ export interface VenueProfile {
 export interface VenueRegular {
   rank: number;
   user: PublicProfile;
+  /** Idas ao local: check-ins por QR mais presenças confirmadas. */
   visits: number;
+  /** Quantas foram check-ins por QR (valem mais no ranking). */
+  checkins: number;
+}
+
+/** Código secreto do QR do local (só quem administra vê). */
+export interface VenueCheckinCode {
+  code: string;
+}
+
+export interface VenueCheckinResult {
+  venueId: string;
+  venueName: string;
+  at: string;
 }
 
 export interface VenueProfileBody {

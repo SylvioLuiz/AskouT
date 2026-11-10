@@ -99,6 +99,25 @@ export class VenuesController {
     return this.core.venues.requestOrganization(actor.userId, { name: b.name, type: b.type, campus: b.campus, description: b.description, lat: b.lat, lng: b.lng, document: b.document, note: b.note });
   }
 
+  /** QR do local: o dono lê o código (gerado na primeira vez) e pode trocá-lo, invalidando o QR impresso. */
+  @Get('me/venues/:id/checkin')
+  checkinCode(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.venues.checkinCode(actor.userId, id);
+  }
+
+  @Post('me/venues/:id/checkin/rotate')
+  @HttpCode(200)
+  rotateCheckinCode(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.venues.rotateCheckinCode(actor.userId, id);
+  }
+
+  /** "Estive aqui": quem leu o QR manda o código do link. */
+  @Post('venues/:id/checkin')
+  @HttpCode(200)
+  checkIn(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.venues.checkIn(actor.userId, id, asBody(body).code);
+  }
+
   @Put('venues/:id/rating')
   rate(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: { stars?: unknown }) {
     return this.core.venues.rate(actor.userId, id, body?.stars);

@@ -21,6 +21,7 @@ import { FlashScreen, MatchScreen } from './screens/flash.tsx';
 import { DatePollCreateScreen } from './components/date-poll-create.tsx';
 import { ChatInfoScreen } from './screens/chat-info.tsx';
 import { GroupScreen } from './screens/group.tsx';
+import { CheckinScreen } from './screens/checkin.tsx';
 import { VenueCalendarScreen } from './screens/venue-calendar.tsx';
 import { BoostScreen } from './screens/boost.tsx';
 import { VenuePageScreen } from './screens/venue-page.tsx';
@@ -33,6 +34,8 @@ import { ContactsScreen } from './screens/contacts.tsx';
 import { BlockedScreen, EditProfileScreen, FriendsScreen, HelpScreen, InteractionsScreen, PrivacyScreen, SettingsScreen, ThemeScreen } from './screens/me.tsx';
 import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
 import { ArchivedScreen, CreatePostScreen, PostScreen } from './screens/posts.tsx';
+import { rememberCheckinReturn, takeCheckinReturn } from './lib/checkin.ts';
+import { safeStorage } from './lib/hints.ts';
 import { t } from './lib/i18n/index.ts';
 
 // Telas para quem ainda não entrou.
@@ -86,6 +89,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/ajuda', render: () => <HelpScreen /> },
   { path: '/tema', render: () => <ThemeScreen /> },
   { path: '/locais', render: () => <VenuesScreen /> },
+  { path: '/checkin/:id', render: (p) => <CheckinScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id/agenda', render: (p) => <VenueCalendarScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/locais/:id/agenda', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}/agenda`} /> },
   { path: '/bares/:id/impulsionar', render: (p) => <BoostScreen key={p['id']} venueId={p['id'] ?? ''} /> },
@@ -138,8 +142,12 @@ function AppRoutes() {
 
   useEffect(() => {
     if (legal) return;
-    if (state.status === 'user' && guest) navigate('/', { replace: true });
-    if (state.status === 'guest' && !guest) navigate('/entrar', { replace: true });
+    if (state.status === 'user' && guest) navigate(takeCheckinReturn(safeStorage()) ?? '/', { replace: true });
+    if (state.status === 'guest' && !guest) {
+      // Quem abriu o QR do local sem ter entrado volta ao check-in depois do login.
+      rememberCheckinReturn(safeStorage(), window.location.pathname + window.location.search);
+      navigate('/entrar', { replace: true });
+    }
   }, [state.status, guest, legal, pathname]);
 
   if (legal) return <>{legal.route.render(legal.params)}</>;

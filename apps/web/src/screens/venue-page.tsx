@@ -23,6 +23,7 @@ import { policyNote } from '../lib/feed.ts';
 import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX, VENUE_NAME_MAX, VENUE_POST_CAPTION_MAX, VENUE_POST_PHOTOS_MAX, applyToAll, daysSummary, draftFromProfile, friendsWentLabel, hoursLines, openStatus, profileBody, profileProblem } from '../lib/venue-profile.ts';
 import type { VenueProfileDraft } from '../lib/venue-profile.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
+import { CheckinQrSheet } from './checkin.tsx';
 import { ClaimSheet, VenueEventRow, VenueEventSheet } from './venues.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -444,7 +445,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const [tab, setTab] = useState<Tab>('feed');
   const [feedSettings, setFeedSettings] = useState<FeedSettings | undefined>();
   const search = useSearch();
-  const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | undefined>();
+  const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | 'qr' | undefined>();
   const [followBusy, setFollowBusy] = useState(false);
   const [bellBusy, setBellBusy] = useState(false);
   const [bellNote, setBellNote] = useState<string | undefined>();
@@ -532,6 +533,9 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             </Button>
             <Button small variant="secondary" onClick={() => setSheet('post')}>
               {t('Novo post')}
+            </Button>
+            <Button small variant="secondary" onClick={() => setSheet('qr')}>
+              {t('QR code')}
             </Button>
             <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/impulsionar`)}>
               {t('Impulsionar')}
@@ -668,7 +672,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
 
       {tab === 'regulars' ? (
         v.regulars.length === 0 ? (
-          <EmptyState title={t('O ranking ainda está vazio')}>Quem confirmar presença nos eventos de {v.name} e for aparece aqui.</EmptyState>
+          <EmptyState title={t('O ranking ainda está vazio')}>Quem fizer check-in no QR de {v.name} ou confirmar presença nos eventos e for aparece aqui.</EmptyState>
         ) : (
           <>
             <ol className="vrank" aria-label={t('Quem mais frequenta')}>
@@ -685,18 +689,20 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
                     </span>
                   </Link>
                   <span className="vrank__n">
-                    {r.visits === 1 ? t('1 presença') : t('{count} presenças', { count: r.visits })}
+                    {r.visits === 1 ? t('1 ida') : t('{count} idas', { count: r.visits })}
+                    {r.checkins > 0 ? <span className="muted"> · {r.checkins === 1 ? t('1 check-in') : t('{count} check-ins', { count: r.checkins })}</span> : null}
                   </span>
                 </li>
               ))}
             </ol>
-            <p className="muted vrank__note">{t('Conta as presenças confirmadas em eventos do local que já aconteceram. Perfis privados só aparecem para quem os segue.')}</p>
+            <p className="muted vrank__note">{t('Conta os check-ins pelo QR do local (valem mais) e as presenças confirmadas em eventos que já aconteceram. Perfis privados só aparecem para quem os segue.')}</p>
           </>
         )
       ) : null}
 
       {tab === 'posts' ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={v.isOwner ? t('Toque em Novo post para publicar fotos do rolê.') : t('Os posts do rolê aparecem aqui e no seu feed se você seguir.')} reloadKey={String(postsKey)} /> : null}
 
+      {sheet === 'qr' ? <CheckinQrSheet venueId={v.id} venueName={v.name} onClose={() => setSheet(undefined)} /> : null}
       {sheet === 'edit' ? (
         <ProfileEditSheet
           venue={v}
