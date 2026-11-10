@@ -505,6 +505,9 @@ model Message {
   postEventId    String?  @db.Uuid
   /// Duração da mensagem de voz em ms (kind = AUDIO); os bytes ficam em MessageAudio.
   audioMs        Int?
+  /// GIF da Giphy (mensagem de texto com `body` "GIF"): id e endereço (https, servidor da Giphy).
+  gifId          String?
+  gifUrl         String?
   /// Mensagem respondida (na mesma conversa).
   replyToId      String?  @db.Uuid
   /// Apagada por quem enviou: some para todos.
@@ -937,10 +940,14 @@ model PostComment {
   id        String   @id @default(uuid()) @db.Uuid
   postId    String   @db.Uuid
   authorId  String   @db.Uuid
+  /// Pode ser vazio quando o comentário é só um GIF.
   body      String
   createdAt DateTime @default(now())
   /// Comentário feito como estabelecimento (quem administra, num post do próprio bar).
   venueId   String?  @db.Uuid
+  /// GIF da Giphy anexado: id e endereço (https, servidor da Giphy).
+  gifId     String?
+  gifUrl    String?
 
   post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   venue  Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
@@ -1527,8 +1534,12 @@ model FeedComment {
   id        String   @id @default(uuid()) @db.Uuid
   postId    String   @db.Uuid
   authorId  String   @db.Uuid
+  /// Pode ser vazio quando o comentário é só um GIF.
   body      String
   createdAt DateTime @default(now())
+  /// GIF da Giphy anexado: id e endereço (https, servidor da Giphy).
+  gifId     String?
+  gifUrl    String?
 
   post      FeedPost              @relation(fields: [postId], references: [id], onDelete: Cascade)
   author    User                  @relation("FeedCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)

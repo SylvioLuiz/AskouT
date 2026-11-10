@@ -1,6 +1,6 @@
 import { AesGcmSecretBox, HmacMfaChallengeTokens, HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../adapters/crypto.ts';
 import { createCore } from '../index.ts';
-import type { RouteSource } from '../ports.ts';
+import type { GifSource, RouteSource } from '../ports.ts';
 import type { AuthResult, MfaChallenge } from '../auth-service.ts';
 import {
   FakeClock,
@@ -46,7 +46,7 @@ export const TEST_SECRET = 'segredo-de-teste-com-mais-de-32-caracteres';
 export const PASSWORD = 'uma-senha-forte-123';
 
 /** Monta o núcleo com repositórios em memória e hash rápido (custo baixo, só para testes). */
-export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnabled?: boolean; store?: FakeStoreVerifier; storePricePerDayCents?: number; pricePerDayCents?: number; routes?: RouteSource } = {}) {
+export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnabled?: boolean; store?: FakeStoreVerifier; storePricePerDayCents?: number; pricePerDayCents?: number; routes?: RouteSource; gifs?: GifSource } = {}) {
   const blocks = new InMemoryBlockRepository();
   const follows = new InMemoryFollowRepository(blocks);
   const availability = new InMemoryAvailabilityRepository();
@@ -95,7 +95,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), pending, passwordResets, mfa, secretBox, mfaChallenges, boosts, boostStats, dwell, activity, regions, consents, cloakroom, account, payments, settings, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), ...(options.gifs ? { gifs: options.gifs } : {}), pending, passwordResets, mfa, secretBox, mfaChallenges, boosts, boostStats, dwell, activity, regions, consents, cloakroom, account, payments, settings, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string; minor?: boolean } = {}): Promise<AuthResult> {

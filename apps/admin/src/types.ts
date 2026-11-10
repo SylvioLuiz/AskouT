@@ -139,6 +139,7 @@ export interface FeedCommentRow {
   id: string;
   postId: string;
   body: string;
+  gifUrl?: string | null;
   createdAt: string;
   author: { id: string; username: string };
   openReportsCount: number;

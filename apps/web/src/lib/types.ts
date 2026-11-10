@@ -483,6 +483,8 @@ export interface ChatMessage {
   suggestion: SuggestionCard | null;
   /** Mensagem de voz (kind AUDIO): só a duração; o áudio é baixado ao tocar. */
   audio: { durationMs: number } | null;
+  /** GIF (Giphy): mensagem de texto com este anexo. */
+  gif?: CommentGif | null;
   /** Apagada por quem enviou: no lugar do conteúdo aparece "Mensagem apagada". */
   deleted: boolean;
   /** Mensagem a que esta responde. */
@@ -634,11 +636,30 @@ export interface FeedPost {
   mentions: string[];
 }
 
+/** GIF (Giphy) anexado a um comentário. */
+export interface CommentGif {
+  id: string;
+  url: string;
+}
+
+export interface GifItem extends CommentGif {
+  title: string;
+  width: number;
+  height: number;
+}
+
+export interface GifResults {
+  enabled: boolean;
+  items: GifItem[];
+  nextOffset: number | null;
+}
+
 export interface FeedComment {
   id: string;
   postId: string;
   author: PublicProfile;
   body: string;
+  gif?: CommentGif | null;
   createdAt: string;
   mine: boolean;
   canDelete: boolean;
@@ -828,6 +849,7 @@ export interface PostComment {
   /** Comentário do estabelecimento: mostra o local no lugar do autor. */
   venue?: { id: string; name: string; logoUrl: string | null } | null;
   body: string;
+  gif?: CommentGif | null;
   createdAt: string;
   mine: boolean;
   canDelete: boolean;

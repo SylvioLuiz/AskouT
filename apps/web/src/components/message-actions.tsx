@@ -178,7 +178,7 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
                 </button>
               </li>
             ) : null}
-            {message.kind === 'TEXT' ? (
+            {message.kind === 'TEXT' && !message.gif ? (
               <li>
                 <button type="button" className="msgpop__item" onClick={() => void copy()}>
                   <span>{copied ? t('Copiado') : t('Copiar texto')}</span>

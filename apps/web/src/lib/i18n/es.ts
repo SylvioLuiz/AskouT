@@ -2287,4 +2287,12 @@ export const ES: Readonly<Record<string, string>> = {
   "Devolver itens": "Devolver artículos",
   "Tickets": "Tickets",
   "Nenhum ticket ainda.": "Aún no hay tickets.",
+  "Escolher um GIF": "Elige un GIF",
+  "Buscar GIFs": "Buscar GIFs",
+  "Nenhum GIF encontrado.": "No se encontraron GIFs.",
+  "GIF": "GIF",
+  "Ver mais": "Ver más",
+  "Powered by GIPHY": "Powered by GIPHY",
+  "Emojis": "Emojis",
+  "Adicionar um GIF": "Añadir un GIF",
 };

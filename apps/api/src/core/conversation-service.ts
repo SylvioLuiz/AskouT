@@ -3,6 +3,8 @@ import type { EventCardView } from './event-card.ts';
 import { decodeAudioDataUrl, parseAudioDuration } from './audio.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { parseChatMedia } from './media.ts';
+import { commentEvidence, gifOf, parseCommentGif } from './gif.ts';
+import type { CommentGif } from './gif.ts';
 import type { ChatMedia } from './media.ts';
 import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
@@ -50,6 +52,8 @@ export interface MessageView {
   event: EventCardView | null;
   /** Mensagem de voz (kind AUDIO): só a duração; o áudio vem de `GET .../messages/:id/audio`. */
   audio: { durationMs: number } | null;
+  /** GIF (Giphy): mensagem de texto com `body` "GIF" e este anexo. */
+  gif: CommentGif | null;
   /** Apagada por quem enviou: o conteúdo some para todos. */
   deleted: boolean;
   /** Mensagem a que esta responde. */
@@ -207,6 +211,8 @@ export interface SendInput {
   audioMs?: unknown;
   /** Foto ou vídeo já lido do corpo da requisição (bytes e tipo). */
   media?: { mime: unknown; data: unknown };
+  /** GIF da Giphy: `{ id, url }`, validado em `parseCommentGif`. */
+  gif?: unknown;
   /** Responde a esta mensagem (junto de qualquer conteúdo). */
   replyToId?: unknown;
 }
@@ -234,6 +240,7 @@ function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {
     meetup: gone ? null : (extras.meetup ?? null),
     event: gone ? null : (extras.event ?? null),
     audio: !gone && m.kind === 'AUDIO' && m.audioMs ? { durationMs: m.audioMs } : null,
+    gif: gone ? null : gifOf(m),
     deleted: gone,
     replyTo: gone ? null : (extras.replyTo ?? null),
     reactions: gone ? [] : (extras.reactions ?? []),
@@ -500,7 +507,8 @@ export class ConversationService {
     const hasEvent = input.eventId !== undefined && input.eventId !== null;
     const hasAudio = input.audio !== undefined && input.audio !== null;
     const hasMedia = input.media !== undefined && input.media !== null;
-    if ([hasText, hasSuggestion, hasEvent, hasAudio, hasMedia].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo', { body: 'Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo' });
+    const hasGif = input.gif !== undefined && input.gif !== null;
+    if ([hasText, hasSuggestion, hasEvent, hasAudio, hasMedia, hasGif].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo', { body: 'Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo' });
     if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de rolê só em conversas 1 a 1', { suggestion: 'Sugestões de rolê só em conversas 1 a 1' });
 
     let kind: MessageKind = 'TEXT';
@@ -512,7 +520,11 @@ export class ConversationService {
     let audio: { mime: string; data: Uint8Array } | undefined;
     let media: ChatMedia | undefined;
     let audioMs: number | null = null;
-    if (hasMedia) {
+    let gif: CommentGif | null = null;
+    if (hasGif) {
+      gif = parseCommentGif(input.gif);
+      body = 'GIF';
+    } else if (hasMedia) {
       media = parseChatMedia((input.media as { mime: unknown }).mime, (input.media as { data: unknown }).data);
       kind = media.kind;
       body = media.kind === 'IMAGE' ? 'Foto' : 'Vídeo';
@@ -557,7 +569,7 @@ export class ConversationService {
     if (recent >= MESSAGES_PER_MINUTE) throw rateLimited('Você está enviando mensagens rápido demais. Espere um instante.', 30);
 
     const replyToId = await this.parseReply(conversationId, input.replyToId);
-    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, createdAt: now };
+    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, ...(gif ? { gifId: gif.id, gifUrl: gif.url } : {}), createdAt: now };
     await conversations.addMessage(message, audio ?? (media ? { mime: media.mime, data: media.data } : undefined));
     this.typingUntil.delete(`${conversationId}|${actorId}`);
     await conversations.markRead(conversationId, actorId, now);
@@ -566,7 +578,7 @@ export class ConversationService {
     const actorName = actorProfile?.username ?? 'Alguém';
     // Dentro da conversa aparece o nome real; o aviso (sino/push) usa só o usuário.
     const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
-    await this.notifyMembers(actorId, actorName, conversation, memberIds, audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um rolê' : 'enviou uma mensagem');
+    await this.notifyMembers(actorId, actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um rolê' : 'enviou uma mensagem');
     const decor = await this.decorate(actorId, [message]);
     return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard, replyTo: decor.replies.get(message.id) ?? null });
   }
@@ -754,7 +766,7 @@ export class ConversationService {
       if (text !== null && text.length > CONVERSATION_REPORT_DETAILS_MAX) throw validationError('Detalhes longos demais', { details: `Use no máximo ${CONVERSATION_REPORT_DETAILS_MAX} caracteres` });
     }
     const recent = (await conversations.listMessages(conversationId, 20)).filter((m) => m.kind === 'TEXT');
-    const evidence = recent.map((m) => `[${m.createdAt.toISOString()}] ${m.senderId === actorId ? 'quem denunciou' : otherId ? 'denunciado' : 'membro'}: ${m.body.replace(/\s+/g, ' ')}`).join('\n').slice(-4000);
+    const evidence = recent.map((m) => `[${m.createdAt.toISOString()}] ${m.senderId === actorId ? 'quem denunciou' : otherId ? 'denunciado' : 'membro'}: ${commentEvidence(m.body.replace(/\s+/g, ' '), m.gifUrl, 2000)}`).join('\n').slice(-4000);
     await conversations.addReport({ id: ids.next(), conversationId, reporterId: actorId, reportedUserId: otherId, reason: reason as PostReportReason, details: text, evidence, createdAt: clock.now() });
     return { reported: true };
   }

@@ -42,6 +42,7 @@ import { GooglePlaceSource } from '../infra/google/google-place-source.ts';
 import { FallbackPlaceSource } from '../infra/places/fallback-place-source.ts';
 import { OverpassPlaceSource } from '../infra/overpass/overpass-place-source.ts';
 import { OsrmRouteSource } from '../infra/routing/osrm-route-source.ts';
+import { GiphyGifSource } from '../infra/giphy/giphy-gif-source.ts';
 import { SandboxPaymentGateway, UnconfiguredPaymentGateway } from '../infra/payments/sandbox-payment-gateway.ts';
 import { StripePaymentGateway } from '../infra/payments/stripe-payment-gateway.ts';
 import { ConsoleEmailSender } from './console-email-sender.ts';
@@ -93,6 +94,7 @@ export const coreProvider = {
       calendarFetcher: new HttpCalendarFetcher(),
       admin: new PrismaAdminRepository(prisma),
       placeSource: google ? new FallbackPlaceSource(google, new OverpassPlaceSource({ contact: config.osmContact })) : new OverpassPlaceSource({ contact: config.osmContact }),
+      ...(config.giphyApiKey ? { gifs: new GiphyGifSource({ apiKey: config.giphyApiKey }) } : {}),
       routes: new OsrmRouteSource({ baseUrl: process.env['OSRM_URL']?.trim() || undefined }),
       pending: new PrismaPendingSignupRepository(prisma),
       passwordResets: new PrismaPasswordResetRepository(prisma),

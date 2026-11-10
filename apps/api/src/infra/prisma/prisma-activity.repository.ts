@@ -55,8 +55,8 @@ export class PrismaActivityRepository implements ActivityRepository {
     }
     if (want.has('POST_COMMENT')) {
       tasks.push(
-        this.prisma.postComment.findMany({ where: { authorId: userId, ...(createdAt ? { createdAt } : {}) }, orderBy: order, take, select: { id: true, body: true, createdAt: true, post: { select: postSelect } } }).then((rows) => {
-          for (const r of rows) push({ id: `comment:${r.id}`, action: 'POST_COMMENT', at: r.createdAt, ...postTarget(r.post), text: r.body });
+        this.prisma.postComment.findMany({ where: { authorId: userId, ...(createdAt ? { createdAt } : {}) }, orderBy: order, take, select: { id: true, body: true, gifId: true, createdAt: true, post: { select: postSelect } } }).then((rows) => {
+          for (const r of rows) push({ id: `comment:${r.id}`, action: 'POST_COMMENT', at: r.createdAt, ...postTarget(r.post), text: r.body || (r.gifId ? 'GIF' : r.body) });
         }),
       );
     }
@@ -98,10 +98,10 @@ export class PrismaActivityRepository implements ActivityRepository {
     }
     if (want.has('FEED_COMMENT')) {
       tasks.push(
-        this.prisma.feedComment.findMany({ where: { authorId: userId, ...(createdAt ? { createdAt } : {}) }, orderBy: order, take, select: { id: true, body: true, createdAt: true, post: { select: { authorId: true, ...feedPlaceSelect } } } }).then((rows) => {
+        this.prisma.feedComment.findMany({ where: { authorId: userId, ...(createdAt ? { createdAt } : {}) }, orderBy: order, take, select: { id: true, body: true, gifId: true, createdAt: true, post: { select: { authorId: true, ...feedPlaceSelect } } } }).then((rows) => {
           for (const c of rows) {
             const place = feedPlace(c.post);
-            if (place) push({ id: `feedcomment:${c.id}`, action: 'FEED_COMMENT', at: c.createdAt, target: place.target, ownerId: c.post.authorId, title: place.title, text: c.body });
+            if (place) push({ id: `feedcomment:${c.id}`, action: 'FEED_COMMENT', at: c.createdAt, target: place.target, ownerId: c.post.authorId, title: place.title, text: c.body || (c.gifId ? 'GIF' : c.body) });
           }
         }),
       );

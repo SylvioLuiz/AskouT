@@ -3,6 +3,8 @@ import { DomainError, forbidden, notFound, validationError } from './errors.ts';
 import type { EventPageService } from './event-page-service.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { extractMentions } from './mentions.ts';
+import { commentEvidence, gifOf, parseCommentGif } from './gif.ts';
+import type { CommentGif } from './gif.ts';
 import { parseReportInput } from './report-input.ts';
 import type { CoreDeps } from './ports.ts';
 import type { FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostKind, FeedPostRecord, FeedPostWithImages, FeedReactionStats, FeedTarget, PublicProfile } from './types.ts';
@@ -66,6 +68,8 @@ export interface FeedCommentView {
   postId: string;
   author: PublicProfile;
   body: string;
+  /** GIF anexado (Giphy), se houver. */
+  gif: CommentGif | null;
   createdAt: string;
   mine: boolean;
   canDelete: boolean;
@@ -452,7 +456,7 @@ export class FeedService {
     const { comment } = await this.commentFor(viewerId, commentId);
     if (comment.authorId === viewerId) throw forbidden('Este comentário é seu: apague-o se não quiser mais');
     const input = parseReportInput(reason, details);
-    await this.deps.feed.addReport({ id: this.deps.ids.next(), kind: 'COMMENT', postId: comment.postId, commentId: comment.id, reporterId: viewerId, reportedUserId: comment.authorId, reason: input.reason, details: input.details, evidence: comment.body, createdAt: this.deps.clock.now() });
+    await this.deps.feed.addReport({ id: this.deps.ids.next(), kind: 'COMMENT', postId: comment.postId, commentId: comment.id, reporterId: viewerId, reportedUserId: comment.authorId, reason: input.reason, details: input.details, evidence: commentEvidence(comment.body, comment.gifUrl), createdAt: this.deps.clock.now() });
     return { reported: true };
   }
 
@@ -500,12 +504,13 @@ export class FeedService {
     return { items: await this.commentViews(viewerId, ctx, found.post, page), nextCursor: rows.length > limit && last ? encodeCursor(last) : null };
   }
 
-  async addComment(viewerId: string, postId: unknown, rawBody: unknown): Promise<FeedCommentView> {
+  async addComment(viewerId: string, postId: unknown, rawBody: unknown, rawGif?: unknown): Promise<FeedCommentView> {
     const { found, ctx } = await this.postFor(viewerId, postId);
     if (found.post.status !== 'PUBLISHED') throw forbidden('Espere a publicação ser aprovada');
-    const body = text(rawBody, FEED_COMMENT_MAX, 'body', 'Comentário');
-    if (!body) throw validationError('Comentário vazio', { body: 'Escreva algo para comentar' });
-    const record: FeedCommentRecord = { id: this.deps.ids.next(), postId: found.post.id, authorId: viewerId, body, createdAt: this.deps.clock.now() };
+    const body = text(rawBody, FEED_COMMENT_MAX, 'body', 'Comentário') ?? '';
+    const gif = parseCommentGif(rawGif);
+    if (!body && !gif) throw validationError('Comentário vazio', { body: 'Escreva algo para comentar' });
+    const record: FeedCommentRecord = { id: this.deps.ids.next(), postId: found.post.id, authorId: viewerId, body, createdAt: this.deps.clock.now(), gifId: gif?.id ?? null, gifUrl: gif?.url ?? null };
     await this.deps.feed.addComment(record);
     const me = await this.deps.users.findProfileById(viewerId);
     const name = me?.username ?? 'Alguém';
@@ -570,6 +575,7 @@ export class FeedService {
           postId: r.postId,
           author,
           body: r.body,
+          gif: gifOf(r),
           createdAt: r.createdAt.toISOString(),
           mine,
           canDelete: mine || post.authorId === viewerId || ctx.moderatorId === viewerId,

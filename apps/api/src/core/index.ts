@@ -28,6 +28,7 @@ import { CloakroomService } from './cloakroom-service.ts';
 import { RegionService } from './region-service.ts';
 import { AccountService } from './account-service.ts';
 import { AgeService } from './age-service.ts';
+import { GifService } from './gif.ts';
 import { RecommendationService } from './recommendation-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
 import { NotificationService, StoredNotifier } from './notification-service.ts';
@@ -96,6 +97,7 @@ export function createCore(input: CoreInput) {
     cloakroom: new CloakroomService(deps),
     account: new AccountService(deps, auth),
     age: new AgeService(deps),
+    gifs: new GifService(deps),
     notifications: new NotificationService(input),
     /** Espera os pushes em andamento (testes e desligamento). */
     flushNotifications: () => notifier.flush(),

@@ -25,7 +25,8 @@ import type { RunPosition } from '../lib/chat.ts';
 import { mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
 import { toApiError } from '../lib/errors.ts';
 import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
-import type { ChatMessage, ConversationItem } from '../lib/types.ts';
+import { CommentGifView, CommentTools } from '../components/comment-tools.tsx';
+import type { ChatMessage, CommentGif, ConversationItem } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -456,6 +457,22 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     }
   }
 
+  async function sendGif(gif: CommentGif) {
+    if (sending) return;
+    setSending(true);
+    setProblem(undefined);
+    try {
+      const message = await api.sendGif(conversationId, gif, replyTo?.id);
+      stickToEnd.current = true;
+      setMessages((current) => mergeMessages(current, [message]));
+      setReplyTo(undefined);
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setSending(false);
+    }
+  }
+
   // O botão de sugerir lugar vive na mensagem "Flash combinado" mais recente. Encontro antigo, sem essa mensagem, mostra o cartão no fim.
   const matchMessageId = [...messages].reverse().find((m) => m.kind === 'SYSTEM' && m.body === FLASH_MATCH_MESSAGE)?.id;
   const matchCard = match ? (
@@ -595,6 +612,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           <MediaBubble message={m} conversationId={conversationId} onTap={(x, y) => registerTap(m, x, y)} />
         ) : m.kind === 'EVENT' && m.event ? (
           <EventBubble event={m.event} />
+        ) : m.gif ? (
+          <CommentGifView gif={m.gif} />
         ) : (
           <p className="bubble__text">{m.body}</p>
         )}
@@ -829,6 +848,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 )}
               </div>
             )}
+            {!recording ? <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => void sendGif(gif)} /> : null}
           </form>
         </>
       ) : (

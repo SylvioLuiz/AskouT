@@ -274,6 +274,9 @@ export interface MessageRecord {
   postEventId?: string | null;
   /** Duração da mensagem de voz em ms (kind AUDIO). O áudio em si fica à parte. */
   audioMs?: number | null;
+  /** GIF (Giphy) anexado: mensagem kind TEXT com `body` "GIF". */
+  gifId?: string | null;
+  gifUrl?: string | null;
   /** Mensagem que esta responde (na mesma conversa). */
   replyToId?: string | null;
   /** Apagada por quem enviou: some para todos, vira "Mensagem apagada". */
@@ -542,6 +545,9 @@ export interface PostCommentRecord {
   createdAt: Date;
   /** Comentário feito como estabelecimento (quem administra comentando num post do próprio bar). */
   venueId?: string | null;
+  /** GIF (Giphy) anexado: id e endereço em servidor da Giphy. O texto pode ficar vazio quando há GIF. */
+  gifId?: string | null;
+  gifUrl?: string | null;
 }
 
 export const POST_REPORT_REASONS = ['SPAM', 'OFFENSIVE', 'NUDITY', 'VIOLENCE', 'FALSE_INFO', 'OTHER'] as const;
@@ -621,6 +627,9 @@ export interface FeedCommentRecord {
   authorId: string;
   body: string;
   createdAt: Date;
+  /** GIF (Giphy) anexado; o texto pode ficar vazio quando há GIF. */
+  gifId?: string | null;
+  gifUrl?: string | null;
 }
 
 /** Denúncia de uma publicação ou de um comentário do feed. `evidence`: o texto como estava na hora. */
@@ -872,6 +881,8 @@ export interface AdminFeedCommentRow {
   id: string;
   postId: string;
   body: string;
+  /** GIF anexado ao comentário (a gestão vê junto do texto). */
+  gifUrl: string | null;
   createdAt: Date;
   author: { id: string; username: string };
   openReportsCount: number;

@@ -705,6 +705,27 @@ export interface RouteResult {
   line: [number, number][];
 }
 
+/** Um GIF da busca: `url` é o que o comentário guarda; `width`/`height` reservam o espaço na tela. */
+export interface GifItem {
+  id: string;
+  title: string;
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface GifPage {
+  items: GifItem[];
+  /** Posição da próxima página; `null` quando acabou. */
+  nextOffset: number | null;
+}
+
+/** Fonte de GIFs (Giphy). A chave fica só no servidor. Nunca lança: se falhar, devolve página vazia. */
+export interface GifSource {
+  trending(query: { limit: number; offset: number; lang: string }): Promise<GifPage>;
+  search(q: string, query: { limit: number; offset: number; lang: string }): Promise<GifPage>;
+}
+
 export interface EmailSender {
   /** Falha com erro comum se o e-mail não puder ser enviado. */
   sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void>;
@@ -908,6 +929,8 @@ export interface CoreDeps {
   placeSource: PlaceSource;
   /** Rotas do encontro Flash até o lugar escolhido. Opcional: sem ela o app mostra só a linha reta. */
   routes?: RouteSource;
+  /** GIFs nos comentários (Giphy). Opcional: sem a chave GIPHY_API_KEY o recurso fica desligado. */
+  gifs?: GifSource;
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
   mfa: MfaRepository;

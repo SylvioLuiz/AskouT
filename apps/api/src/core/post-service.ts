@@ -1,6 +1,8 @@
 import { decodeImageDataUrl } from './image.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
 import { extractMentions } from './mentions.ts';
+import { commentEvidence, gifOf, parseCommentGif } from './gif.ts';
+import type { CommentGif } from './gif.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
@@ -124,6 +126,8 @@ export interface PostCommentView {
   /** Preenchido quando o comentário é do estabelecimento: a tela mostra o local no lugar do autor. */
   venue: PostVenueView | null;
   body: string;
+  /** GIF anexado (Giphy), se houver. */
+  gif: CommentGif | null;
   createdAt: string;
   mine: boolean;
   /** Quem escreveu e o dono do post podem apagar. */
@@ -323,22 +327,23 @@ export class PostService {
     return { items: await this.commentViews(viewerId, post.authorId, rows.slice(0, page.limit)), ...page, hasMore };
   }
 
-  async addComment(viewerId: string, postId: unknown, body: unknown): Promise<PostCommentView> {
+  async addComment(viewerId: string, postId: unknown, body: unknown, rawGif?: unknown): Promise<PostCommentView> {
     const { post } = await this.seeable(viewerId, postId);
-    const text = optionalText(body, POST_COMMENT_MAX, 'body', 'Comentário');
-    if (!text) throw validationError('Comentário vazio', { body: 'Escreva algo para comentar' });
+    const text = optionalText(body, POST_COMMENT_MAX, 'body', 'Comentário') ?? '';
+    const gif = parseCommentGif(rawGif);
+    if (!text && !gif) throw validationError('Comentário vazio', { body: 'Escreva algo para comentar' });
     // Quem administra o bar e comenta num post do próprio bar comenta como o bar.
     let asVenue: string | null = null;
     if (post.venueId) {
       const venue = await this.deps.places.findVenue(post.venueId);
       if (venue && venue.ownerId === viewerId) asVenue = venue.id;
     }
-    const record: PostCommentRecord = { id: this.deps.ids.next(), postId: post.id, authorId: viewerId, body: text, createdAt: this.deps.clock.now(), venueId: asVenue };
+    const record: PostCommentRecord = { id: this.deps.ids.next(), postId: post.id, authorId: viewerId, body: text, createdAt: this.deps.clock.now(), venueId: asVenue, gifId: gif?.id ?? null, gifUrl: gif?.url ?? null };
     await this.deps.posts.addComment(record);
     const me = await this.deps.users.findProfileById(viewerId);
     const mentioned = await this.notifyMentions(viewerId, me?.username ?? 'Alguém', post, record.id, text);
     if (post.authorId !== viewerId && !mentioned.has(post.authorId)) {
-      await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_COMMENT', title: `${me?.username ?? 'Alguém'} comentou no seu post`, body: text.slice(0, 80), url: `/posts/${post.id}`, dedupeKey: `post-comment:${record.id}`, actorId: viewerId });
+      await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_COMMENT', title: `${me?.username ?? 'Alguém'} comentou no seu post`, body: text.slice(0, 80) || 'GIF', url: `/posts/${post.id}`, dedupeKey: `post-comment:${record.id}`, actorId: viewerId });
     }
     return (await this.commentViews(viewerId, post.authorId, [record]))[0] as PostCommentView;
   }
@@ -367,7 +372,7 @@ export class PostService {
       await this.deps.posts.likeComment(comment.id, viewerId, this.deps.clock.now());
       if (comment.authorId !== viewerId) {
         const me = await this.deps.users.findProfileById(viewerId);
-        await this.deps.notifier.notify({ userId: comment.authorId, type: 'POST_LIKE', title: `${me?.username ?? 'Alguém'} curtiu seu comentário`, body: comment.body.slice(0, 80), url: `/posts/${post.id}`, dedupeKey: `comment-like:${comment.id}:${viewerId}`, actorId: viewerId });
+        await this.deps.notifier.notify({ userId: comment.authorId, type: 'POST_LIKE', title: `${me?.username ?? 'Alguém'} curtiu seu comentário`, body: comment.body.slice(0, 80) || 'GIF', url: `/posts/${post.id}`, dedupeKey: `comment-like:${comment.id}:${viewerId}`, actorId: viewerId });
       }
     } else {
       await this.deps.posts.unlikeComment(comment.id, viewerId);
@@ -408,12 +413,12 @@ export class PostService {
       if (!author) continue;
       const venue = (row.venueId ? venues.get(row.venueId) : undefined) ?? null;
       if (venue) {
-        out.push({ id: row.id, author, venue, body: row.body, createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId, ...(await extra(row)) });
+        out.push({ id: row.id, author, venue, body: row.body, gif: gifOf(row), createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId, ...(await extra(row)) });
         continue;
       }
       if (!memo.has(row.authorId)) memo.set(row.authorId, row.authorId === viewerId || (await this.canSee(viewerId, row.authorId)));
       if (!memo.get(row.authorId)) continue;
-      out.push({ id: row.id, author, venue: null, body: row.body, createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId, ...(await extra(row)) });
+      out.push({ id: row.id, author, venue: null, body: row.body, gif: gifOf(row), createdAt: row.createdAt.toISOString(), mine: row.authorId === viewerId, canDelete: row.authorId === viewerId || postAuthorId === viewerId, ...(await extra(row)) });
     }
     return out;
   }
@@ -436,7 +441,7 @@ export class PostService {
     if (!comment || comment.postId !== post.id) throw notFound('Comentário não encontrado');
     if (comment.authorId === viewerId) throw forbidden('Você não pode denunciar o seu próprio comentário');
     const input = parseReportInput(reason, details);
-    await this.deps.users.addReport({ id: this.deps.ids.next(), kind: 'COMMENT', reporterId: viewerId, reportedUserId: comment.authorId, commentId: comment.id, evidence: comment.body.slice(0, 600), reason: input.reason, details: input.details, createdAt: this.deps.clock.now() });
+    await this.deps.users.addReport({ id: this.deps.ids.next(), kind: 'COMMENT', reporterId: viewerId, reportedUserId: comment.authorId, commentId: comment.id, evidence: commentEvidence(comment.body, comment.gifUrl), reason: input.reason, details: input.details, createdAt: this.deps.clock.now() });
     return { reported: true };
   }
 

@@ -21,6 +21,8 @@ import type {
   CalendarFetcher,
   AdminRepository,
   PlaceSource,
+  GifSource,
+  GifPage,
   AvailabilityRepository,
   FlashRepository,
   BlockRepository,
@@ -1624,6 +1626,25 @@ export class InMemoryCalendarRepository implements CalendarRepository {
   }
 }
 
+/** Giphy falsa dos testes: devolve os GIFs de `items` e guarda as chamadas. */
+export class FakeGifSource implements GifSource {
+  items: GifPage['items'] = [
+    { id: 'abc123XYZ', title: 'dança', url: 'https://media2.giphy.com/media/abc123XYZ/200w.gif', width: 200, height: 150 },
+    { id: 'def456UVW', title: 'festa', url: 'https://media3.giphy.com/media/def456UVW/200w.gif', width: 200, height: 200 },
+  ];
+  readonly calls: { kind: 'trending' | 'search'; q?: string; limit: number; offset: number; lang: string }[] = [];
+
+  async trending(query: { limit: number; offset: number; lang: string }): Promise<GifPage> {
+    this.calls.push({ kind: 'trending', ...query });
+    return { items: this.items, nextOffset: null };
+  }
+
+  async search(q: string, query: { limit: number; offset: number; lang: string }): Promise<GifPage> {
+    this.calls.push({ kind: 'search', q, ...query });
+    return { items: this.items.filter((i) => i.title.includes(q)), nextOffset: null };
+  }
+}
+
 /** Agenda falsa dos testes: devolve o texto de `texts[url]` ou falha com `errors[url]`. */
 export class FakeCalendarFetcher implements CalendarFetcher {
   readonly texts = new Map<string, string>();
@@ -2950,7 +2971,7 @@ export class InMemoryActivityRepository implements ActivityRepository {
       for (const c of posts.comments.values()) {
         if (c.authorId !== userId) continue;
         const info = this.postInfo(c.postId);
-        if (info) push({ id: `comment:${c.id}`, action: 'POST_COMMENT', at: c.createdAt, ...info, text: c.body });
+        if (info) push({ id: `comment:${c.id}`, action: 'POST_COMMENT', at: c.createdAt, ...info, text: c.body || (c.gifId ? 'GIF' : c.body) });
       }
     }
     if (want.has('POST_CREATED') || want.has('EVENT_CREATED')) {
@@ -2981,7 +3002,7 @@ export class InMemoryActivityRepository implements ActivityRepository {
         if (c.authorId !== userId) continue;
         const f = feed.posts.get(c.postId);
         const place = f ? this.feedPlace(f.target) : undefined;
-        if (f && place) push({ id: `feedcomment:${c.id}`, action: 'FEED_COMMENT', at: c.createdAt, target: place.target, ownerId: f.authorId, title: place.title, text: c.body });
+        if (f && place) push({ id: `feedcomment:${c.id}`, action: 'FEED_COMMENT', at: c.createdAt, target: place.target, ownerId: f.authorId, title: place.title, text: c.body || (c.gifId ? 'GIF' : c.body) });
       }
     }
     if (want.has('EVENT_GOING')) {

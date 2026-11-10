@@ -73,7 +73,8 @@ function Comments({ postId, onAction }: { postId: string; onAction: (a: ActionSp
               <div>
                 <span className="handle">@{c.author.username}</span> <span className="muted small">{formatDateTime(c.createdAt)}</span>{' '}
                 {c.openReportsCount > 0 ? <Badge tone="bad">{c.openReportsCount} denúncia(s)</Badge> : null}
-                <div className="pre">{c.body}</div>
+                {c.body ? <div className="pre">{c.body}</div> : null}
+                {c.gifUrl ? <img src={c.gifUrl} alt="GIF" style={{ display: 'block', maxWidth: 160, borderRadius: 8 }} referrerPolicy="no-referrer" /> : null}
               </div>
               <button type="button" className="btn btn--small btn--danger-quiet" onClick={() => onAction({ ...deleteFeedCommentAction(c), run: async (n) => { await api.deleteFeedComment(c.id, n); list.reload(); } })}>
                 Apagar

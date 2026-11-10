@@ -437,7 +437,7 @@ export class AdminService {
     const rows = await this.deps.feed.listComments(found.post.id, { limit: 500 });
     const [names, reports] = await Promise.all([this.usernames(rows.map((r) => r.authorId)), this.deps.feed.openReportCounts([], rows.map((r) => r.id))]);
     return {
-      items: rows.map((c) => ({ id: c.id, postId: c.postId, body: c.body, createdAt: c.createdAt, author: { id: c.authorId, username: names.get(c.authorId) ?? '(removido)' }, openReportsCount: reports.comments.get(c.id) ?? 0 })),
+      items: rows.map((c) => ({ id: c.id, postId: c.postId, body: c.body, gifUrl: c.gifUrl ?? null, createdAt: c.createdAt, author: { id: c.authorId, username: names.get(c.authorId) ?? '(removido)' }, openReportsCount: reports.comments.get(c.id) ?? 0 })),
     };
   }
 

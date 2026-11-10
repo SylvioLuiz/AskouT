@@ -175,13 +175,13 @@ export class PrismaFeedRepository implements FeedRepository {
   }
 
   async addComment(comment: FeedCommentRecord): Promise<void> {
-    await this.prisma.feedComment.create({ data: { id: comment.id, postId: comment.postId, authorId: comment.authorId, body: comment.body, createdAt: comment.createdAt } });
+    await this.prisma.feedComment.create({ data: { id: comment.id, postId: comment.postId, authorId: comment.authorId, body: comment.body, createdAt: comment.createdAt, gifId: comment.gifId ?? null, gifUrl: comment.gifUrl ?? null } });
   }
 
   async findComment(id: string): Promise<FeedCommentRecord | undefined> {
     if (!isUuid(id)) return undefined;
     const row = await this.prisma.feedComment.findUnique({ where: { id } });
-    return row ? { id: row.id, postId: row.postId, authorId: row.authorId, body: row.body, createdAt: row.createdAt } : undefined;
+    return row ? { id: row.id, postId: row.postId, authorId: row.authorId, body: row.body, createdAt: row.createdAt, gifId: row.gifId, gifUrl: row.gifUrl } : undefined;
   }
 
   async listComments(postId: string, query: { after?: FeedCursor; limit: number }): Promise<FeedCommentRecord[]> {
@@ -192,7 +192,7 @@ export class PrismaFeedRepository implements FeedRepository {
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       take: query.limit,
     });
-    return rows.map((r) => ({ id: r.id, postId: r.postId, authorId: r.authorId, body: r.body, createdAt: r.createdAt }));
+    return rows.map((r) => ({ id: r.id, postId: r.postId, authorId: r.authorId, body: r.body, createdAt: r.createdAt, gifId: r.gifId, gifUrl: r.gifUrl }));
   }
 
   async deleteComment(id: string): Promise<boolean> {

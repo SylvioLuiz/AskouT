@@ -5641,3 +5641,20 @@ div.optrow__main { cursor: default; }
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 90; max-width: min(90vw, 420px); padding: 12px 18px; border-radius: 999px; background: rgba(20,20,22,.92); color: #fff; font-size: 15px; font-weight: 600; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,.4); transform: translateX(-50%); animation: toast-in .15s ease-out; pointer-events: none; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+.comment__gif { display: block; max-width: min(220px, 100%); max-height: 220px; margin-top: 6px; border-radius: 12px; background: var(--bg); }
+.feedcomment__bubble .comment__gif { margin-top: 4px; }
+.commenttools { display: flex; gap: 8px; margin-top: 6px; }
+.commenttools__btn { min-width: 40px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.8125rem; font-weight: 800; cursor: pointer; }
+.commenttools__btn--on { border-color: var(--brand-text); background: var(--brand-soft); }
+.commenttools__btn:disabled { opacity: 0.6; }
+.emojipanel { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 2px; max-height: 148px; margin-top: 8px; padding: 6px; overflow-y: auto; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--surface); }
+.emojipanel__item { min-height: 40px; border: 0; border-radius: 10px; background: transparent; font-size: 1.375rem; cursor: pointer; }
+.emojipanel__item:active { background: var(--brand-soft); }
+.gifpicker__search { width: 100%; min-height: 44px; margin-bottom: 10px; padding: 0 16px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; }
+.gifpicker__grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.gifpicker__item { display: block; width: 100%; padding: 0; border: 0; border-radius: 10px; background: var(--bg); overflow: hidden; cursor: pointer; }
+.gifpicker__item img { display: block; width: 100%; height: auto; }
+.gifpicker__credit { margin: 12px 0 0; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-align: center; text-transform: uppercase; }
+.comment__like { justify-content: flex-start; padding-top: 9px; box-sizing: border-box; }
+.comment__like svg, .comment__del svg { display: block; }
+.comment__del { align-self: flex-start; box-sizing: border-box; }

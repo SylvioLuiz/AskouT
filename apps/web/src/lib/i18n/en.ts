@@ -2394,4 +2394,12 @@ export const EN: Readonly<Record<string, string>> = {
   "Devolver itens": "Return items",
   "Tickets": "Tickets",
   "Nenhum ticket ainda.": "No tickets yet.",
+  "Escolher um GIF": "Choose a GIF",
+  "Buscar GIFs": "Search GIFs",
+  "Nenhum GIF encontrado.": "No GIFs found.",
+  "GIF": "GIF",
+  "Ver mais": "See more",
+  "Powered by GIPHY": "Powered by GIPHY",
+  "Emojis": "Emojis",
+  "Adicionar um GIF": "Add a GIF",
 };

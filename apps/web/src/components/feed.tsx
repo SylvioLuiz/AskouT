@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
+import { CommentGifView, CommentTools } from './comment-tools.tsx';
 import { Carousel } from './post.tsx';
 import { PhotoViewer } from './photo-viewer.tsx';
 import { ArrowUpIcon, CommentIcon, MoreIcon, PhotoIcon, TrashIcon, XIcon } from './icons.tsx';
@@ -17,7 +18,7 @@ import { FEED_BODY_MAX, FEED_COMMENT_MAX, FEED_IMAGES_MAX, FEED_POLICIES, FEED_R
 import { timeAgo } from '../lib/format.ts';
 import { resizePostPhoto } from '../lib/image.ts';
 import { applyMention, mentionQueryAt, splitMentions } from '../lib/mentions.ts';
-import type { FeedComment, FeedPolicy, FeedPost, FeedReactions, FeedSettings, PostImage, PublicProfile } from '../lib/types.ts';
+import type { CommentGif, FeedComment, FeedPolicy, FeedPost, FeedReactions, FeedSettings, PostImage, PublicProfile } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -552,7 +553,8 @@ function CommentRow({ comment, onChange, onDelete, onMenu }: { comment: FeedComm
             <Link to={`/u/${encodeURIComponent(comment.author.username)}`} className="comment__name" draggable={false}>
               {comment.author.username}
             </Link>
-            <RichText body={comment.body} mentions={comment.mentions} className="comment__text" />
+            {comment.body ? <RichText body={comment.body} mentions={comment.mentions} className="comment__text" /> : null}
+            {comment.gif ? <CommentGifView gif={comment.gif} /> : null}
           </div>
           <div className="feedcomment__meta">
             <span className="muted feedcomment__when">{timeAgo(comment.createdAt, new Date())}</span>
@@ -600,13 +602,13 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post.id]);
 
-  async function send() {
+  async function send(gif?: CommentGif) {
     const body = text.trim();
-    if (!body) return;
+    if (!body && !gif) return;
     setBusy(true);
     setError(undefined);
     try {
-      const created = await api.addFeedComment(post.id, body);
+      const created = await api.addFeedComment(post.id, body, gif);
       setItems((current) => [...current, created]);
       onCountChange(1);
       setText('');
@@ -730,6 +732,7 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
             </button>
           ) : null}
         </div>
+        <CommentTools disabled={busy} onEmoji={(emoji) => setText((current) => current + emoji)} onGif={(gif) => void send(gif)} />
       </form>
     </Sheet>
   );

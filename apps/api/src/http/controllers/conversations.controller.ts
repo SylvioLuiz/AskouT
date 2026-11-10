@@ -46,7 +46,7 @@ export class ConversationsController {
   @Post(':id/messages')
   send(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.conversations.send(actor.userId, id, { body: b.body, suggestion: b.suggestion, eventId: b.eventId, audio: b.audio, audioMs: b.audioMs, replyToId: b.replyToId });
+    return this.core.conversations.send(actor.userId, id, { body: b.body, suggestion: b.suggestion, eventId: b.eventId, audio: b.audio, audioMs: b.audioMs, gif: b.gif, replyToId: b.replyToId });
   }
 
   /**

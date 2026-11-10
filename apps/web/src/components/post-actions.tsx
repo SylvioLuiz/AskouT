@@ -3,6 +3,7 @@ import { shareOrigin } from '../lib/public-origin.ts';
 import { Sheet } from './agenda.tsx';
 import { CropEditor } from './crop.tsx';
 import { EventDates } from './event-dates.tsx';
+import { CommentGifView, CommentTools } from './comment-tools.tsx';
 import { EventKindPicker } from './event-kind-picker.tsx';
 import { ArrowUpIcon, CropIcon, HeartIcon, TrashIcon } from './icons.tsx';
 import { VenueLogo } from './venue-logo.tsx';
@@ -19,7 +20,7 @@ import { applyMention, mentionQueryAt, splitMentions } from '../lib/mentions.ts'
 import { eventProblem, isoToLocalInput, localToIso, POST_CAPTION_MAX } from '../lib/post-draft.ts';
 import { postLink, postShareText } from '../lib/share.ts';
 import { chatLinkMessage } from '../lib/share-targets.ts';
-import type { EventKind, PostComment, PostView, PublicProfile, ReportReason } from '../lib/types.ts';
+import type { CommentGif, EventKind, PostComment, PostView, PublicProfile, ReportReason } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -181,6 +182,7 @@ function CommentRow({ comment, onDelete, onLike, onReport, busy }: { comment: Po
           )}{' '}
           <span className="muted">{timeAgo(comment.createdAt, new Date())}</span>
         </p>
+        {comment.body ? (
         <p className="comment__text">
           {splitMentions(comment.body, comment.mentions ?? []).map((part, index) =>
             part.mention ? (
@@ -192,6 +194,8 @@ function CommentRow({ comment, onDelete, onLike, onReport, busy }: { comment: Po
             ),
           )}
         </p>
+        ) : null}
+        {comment.gif ? <CommentGifView gif={comment.gif} /> : null}
       </div>
       <button type="button" className={`comment__like${comment.likedByMe ? ' comment__like--on' : ''}`} onClick={onLike} aria-pressed={comment.likedByMe} aria-label={comment.likedByMe ? t('Descurtir comentário') : t('Curtir comentário')}>
         <HeartIcon filled={comment.likedByMe} />
@@ -266,13 +270,13 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId]);
 
-  async function send() {
+  async function send(gif?: CommentGif) {
     const body = text.trim();
-    if (!body) return;
+    if (!body && !gif) return;
     setBusy(true);
     setError(undefined);
     try {
-      const created = await api.addComment(postId, body);
+      const created = await api.addComment(postId, body, gif);
       setItems((current) => [...current, created]);
       onCountChange(1);
       setText('');
@@ -356,6 +360,7 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
             </button>
           ) : null}
         </div>
+        <CommentTools disabled={busy} onEmoji={(emoji) => setText((current) => current + emoji)} onGif={(gif) => void send(gif)} />
       </form>
     </Sheet>
   );

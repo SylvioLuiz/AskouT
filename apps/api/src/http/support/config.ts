@@ -24,6 +24,8 @@ export interface AppConfig {
   osmContact: string | undefined;
   /** Chave do Google Places. Sem ela, a fonte Google fica desligada e o app usa só OpenStreetMap. */
   googlePlacesKey: string | undefined;
+  /** Chave da Giphy (GIPHY_API_KEY) para GIFs nos comentários. Sem ela o recurso fica desligado e o app esconde o botão. */
+  giphyApiKey: string | undefined;
   /** Teto de buscas ao Google por dia, para não estourar o crédito gratuito sem perceber. */
   googleDailyLimit: number;
   /** ID do aplicativo Google (client ID web) para "Entrar com Google". Sem ele, o botão não aparece. */
@@ -207,5 +209,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, moderationEmail: env.MODERATION_EMAIL?.trim() || 'suporte@askout.com.br', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, moderationEmail: env.MODERATION_EMAIL?.trim() || 'suporte@askout.com.br', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, giphyApiKey: env.GIPHY_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
 }
