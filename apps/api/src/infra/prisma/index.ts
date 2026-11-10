@@ -17,6 +17,7 @@ export { PrismaEventRoomRepository } from './prisma-event-room.repository.ts';
 export { PrismaFeedRepository } from './prisma-feed.repository.ts';
 export { PrismaPasswordResetRepository } from './prisma-password-reset.repository.ts';
 export { PrismaBoostRepository } from './prisma-boost.repository.ts';
+export { PrismaOfferRepository } from './prisma-offer.repository.ts';
 export { PrismaAppSettingsRepository } from './prisma-app-settings.repository.ts';
 export { PrismaDwellRepository } from './prisma-dwell.repository.ts';
 export { PrismaAccountRepository } from './prisma-account.repository.ts';

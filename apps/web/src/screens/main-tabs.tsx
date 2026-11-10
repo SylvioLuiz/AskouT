@@ -3,6 +3,7 @@ import { EmptyState, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
 import { ForYou } from '../components/for-you.tsx';
+import { OfferBanner } from '../components/offer-banner.tsx';
 import { useMemo, useState } from 'react';
 import { agendaEvents, nextPlan, planWhenLabel } from '../lib/agenda.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -48,6 +49,8 @@ export function HomeScreen() {
       }}
     >
       <FriendStories groups={stories.data?.groups ?? []} onChanged={stories.reload} />
+
+      <OfferBanner reloadKey={feedKey} />
 
       {plan ? (
         <Link to="/agenda" className="nextplan" aria-label={t('Seu próximo plano: {now}, {title}. Abrir a agenda', { now: planWhenLabel(plan, now), title: plan.title })}>

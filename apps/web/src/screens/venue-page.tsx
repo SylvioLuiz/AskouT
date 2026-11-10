@@ -536,6 +536,9 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/impulsionar`)}>
               {t('Impulsionar')}
             </Button>
+            <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/oferta`)}>
+              {t('Oferta relâmpago')}
+            </Button>
             <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/agenda`)}>
               {t('Agenda')}
             </Button>

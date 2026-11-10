@@ -21,6 +21,7 @@ import { SuggestionService } from './suggestion-service.ts';
 import { DwellService } from './dwell-service.ts';
 import { InterestService } from './interest-service.ts';
 import { MatchService } from './match-service.ts';
+import { OfferService } from './offer-service.ts';
 import { PaymentsSwitch } from './payments-switch.ts';
 import { RegionService } from './region-service.ts';
 import { AccountService } from './account-service.ts';
@@ -65,6 +66,7 @@ export function createCore(input: CoreInput) {
   );
   return {
     boosts,
+    offers: new OfferService(deps),
     auth,
     profiles,
     follows: new FollowService(deps),
@@ -158,6 +160,8 @@ export { EventPageService } from './event-page-service.ts';
 export { EventReminderService } from './event-reminder-service.ts';
 export type { EventPageView, EventCoverView } from './event-page-service.ts';
 export type { FeedCommentView, FeedCommentsPage, FeedPageView, FeedPostView, FeedReactionsView, FeedSettingsView } from './feed-service.ts';
+export { OfferService, OFFER_TEXT_MAX, OFFER_MAX_PER_DAY, OFFER_MAX_MINUTES, OFFER_RADIUS_M } from './offer-service.ts';
+export type { OfferView, NearbyOfferView, OfferLimits } from './offer-service.ts';
 export { BoostService, BOOST_DAY_OPTIONS, BOOST_DEFAULT_PRICE_PER_DAY_CENTS, BOOST_DEFAULT_PACKAGE_PRICES_CENTS, boostPhase, boostProductId } from './boost-service.ts';
 export type { BoostPricing, BoostView, BoostPhase } from './boost-service.ts';
 export { ExploreService, EXPLORE_DEFAULT_RADIUS_KM, EXPLORE_MAX_RADIUS_KM } from './explore-service.ts';

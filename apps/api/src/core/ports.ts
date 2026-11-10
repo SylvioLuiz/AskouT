@@ -1,4 +1,4 @@
-import type { ActivityAction, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { ActivityAction, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, VenueOfferRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -154,6 +154,23 @@ export interface BoostRepository {
   transition(id: string, from: BoostStatus[], to: BoostStatus): Promise<boolean>;
   /** Pagos cuja janela inclui `now`. */
   listActive(now: Date): Promise<BoostRecord[]>;
+}
+
+/** Ofertas relâmpago dos locais. */
+export interface OfferRepository {
+  /** Insere a oferta. CONFLICT se o local já tem uma ativa (uma por vez, mesmo com publicações ao mesmo tempo). */
+  create(offer: VenueOfferRecord, now: Date): Promise<void>;
+  find(id: string): Promise<VenueOfferRecord | undefined>;
+  /** Do mais novo para o mais antigo. */
+  listByVenue(venueId: string, limit: number): Promise<VenueOfferRecord[]>;
+  /** Oferta do local no ar em `now` (não encerrada e dentro da janela). */
+  findActiveByVenue(venueId: string, now: Date): Promise<VenueOfferRecord | undefined>;
+  /** Quantas ofertas o local publicou desde `since` (inclui as encerradas). */
+  countSince(venueId: string, since: Date): Promise<number>;
+  /** Encerra antes do fim. Devolve se havia uma no ar. */
+  end(id: string, now: Date): Promise<boolean>;
+  /** Todas as ofertas no ar em `now`. */
+  listActive(now: Date): Promise<VenueOfferRecord[]>;
 }
 
 /** Cobrança criada no provedor de pagamento. */
@@ -840,6 +857,7 @@ export interface CoreDeps {
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
   boosts: BoostRepository;
+  offers: OfferRepository;
   dwell: DwellRepository;
   regions: RegionRepository;
   account: AccountRepository;

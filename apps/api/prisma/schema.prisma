@@ -162,6 +162,7 @@ model User {
   settings UserSettings?
   passwordReset PasswordReset?
   boosts        Boost[]
+  venueOffers   VenueOffer[]
   dwells        ContentDwell[]
 
   following Follow[] @relation("Follower")
@@ -770,6 +771,7 @@ model Venue {
   @@index([lat, lng])
   @@index([ownerId])
   boosts Boost[]
+  offers VenueOffer[]
 }
 
 enum ClaimStatus {
@@ -1306,6 +1308,26 @@ model Boost {
 
   @@index([venueId, createdAt])
   @@index([status, startsAt, endsAt])
+}
+
+/// Oferta relâmpago do bar: texto curto com hora de fim, mostrada como "Patrocinado" a quem está perto.
+/// Grátis por enquanto (ver GOLIVE.md). Uma no ar por local; o limite por dia é conferido pelo núcleo.
+model VenueOffer {
+  id        String    @id @default(uuid()) @db.Uuid
+  venueId   String    @db.Uuid
+  ownerId   String    @db.Uuid
+  text      String
+  createdAt DateTime
+  startsAt  DateTime
+  endsAt    DateTime
+  /// Preenchido quando o responsável encerra antes do fim.
+  endedAt   DateTime?
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  owner User  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, createdAt])
+  @@index([endsAt])
 }
 
 /// Quanto tempo um conteúdo ficou visível na tela da pessoa. Alimenta as recomendações da Home.

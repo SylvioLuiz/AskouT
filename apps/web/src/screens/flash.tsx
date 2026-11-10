@@ -9,6 +9,7 @@ import { nowRadiusKm } from '../lib/now-radius.ts';
 import { ChatButton } from '../components/chat-button.tsx';
 import { InviteSheet } from '../components/invite.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { OfferBanner } from '../components/offer-banner.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import {
@@ -606,6 +607,7 @@ function FlashContent() {
     <>
       {active ? <PageHead title={t('NOW')} subtitle={t('Estou livre agora. Para o futuro, use a Agenda.')} /> : null}
       {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
+      <OfferBanner />
       {started ? (
         <div className="flashtoast" role="status">
           <span className="flashtoast__bolt">

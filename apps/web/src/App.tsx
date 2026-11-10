@@ -23,6 +23,7 @@ import { ChatInfoScreen } from './screens/chat-info.tsx';
 import { GroupScreen } from './screens/group.tsx';
 import { VenueCalendarScreen } from './screens/venue-calendar.tsx';
 import { BoostScreen } from './screens/boost.tsx';
+import { VenueOffersScreen } from './screens/venue-offers.tsx';
 import { VenuePageScreen } from './screens/venue-page.tsx';
 import { VenuesScreen } from './screens/venues.tsx';
 import { EventScreen } from './screens/event.tsx';
@@ -88,6 +89,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/locais', render: () => <VenuesScreen /> },
   { path: '/bares/:id/agenda', render: (p) => <VenueCalendarScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/locais/:id/agenda', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}/agenda`} /> },
+  { path: '/bares/:id/oferta', render: (p) => <VenueOffersScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id/impulsionar', render: (p) => <BoostScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id', render: (p) => <VenuePageScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/locais/:id', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}`} /> },
