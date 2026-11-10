@@ -118,6 +118,7 @@ function ChooseUsername({ pending, onBack }: { pending: Pending; onBack: () => v
   const [username, setUsername] = useState(pending.offer.suggestedUsername);
   const [birth, setBirth] = useState('');
   const [accepted, setAccepted] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   const [consentErrors, setConsentErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -136,7 +137,7 @@ function ChooseUsername({ pending, onBack }: { pending: Pending; onBack: () => v
     setError(undefined);
     setBusy(true);
     try {
-      const result = await api.socialLogin({ provider: pending.provider, idToken: pending.idToken, username: clean, displayName: pending.offer.displayName, birthDate: birth, acceptTerms: true });
+      const result = await api.socialLogin({ provider: pending.provider, idToken: pending.idToken, username: clean, displayName: pending.offer.displayName, birthDate: birth, acceptTerms: true, ...(marketing ? { marketingEmail: true } : {}) });
       if ('needsProfile' in result) setError(t('Não foi possível criar a conta. Tente de novo.'));
       else signIn(result);
     } catch (failure) {
@@ -154,7 +155,7 @@ function ChooseUsername({ pending, onBack }: { pending: Pending; onBack: () => v
       <h3 className="form__title">{t('Quase lá')}</h3>
       <p className="muted">{t('Escolha seu nome de usuário no AskouT. Sua conta {provider} entra com ele.', { provider: providerLabel(pending.provider) })}</p>
       <Field label={t('Nome de usuário')} value={username} onChange={setUsername} error={error} autoComplete="username" autoFocus />
-      <ConsentFields birth={birth} onBirth={setBirth} accepted={accepted} onAccepted={setAccepted} errors={consentErrors} />
+      <ConsentFields birth={birth} onBirth={setBirth} accepted={accepted} onAccepted={setAccepted} marketing={marketing} onMarketing={setMarketing} errors={consentErrors} />
       <Button type="submit" full loading={busy}>
         {t('Criar conta')}
       </Button>

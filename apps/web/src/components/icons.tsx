@@ -511,3 +511,62 @@ export const RouteIcon = () => (
     <path d="M8 19h7.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H16" />
   </Line>
 );
+
+/** Link (dois elos). */
+export const LinkIcon = () => (
+  <Line>
+    <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+    <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+  </Line>
+);
+
+/** E-mail (envelope). */
+export const MailIcon = () => (
+  <Line>
+    <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+    <path d="m4 7 8 6 8-6" />
+  </Line>
+);
+
+/** Balão com telefone, para o atalho de mensagem do WhatsApp. */
+export const WhatsAppIcon = () => (
+  <Line>
+    <path d="M4.5 19.5l1.2-3.6A8 8 0 1 1 8.4 18.5Z" />
+    <path d="M9.2 8.6c.2-.4.6-.4.9-.4l.6 1.4c.1.3 0 .5-.2.7l-.4.4a5.5 5.5 0 0 0 3 3l.4-.4c.2-.2.5-.3.7-.2l1.4.6c0 .3 0 .7-.4.9a2.4 2.4 0 0 1-2.3.4 7.2 7.2 0 0 1-4-4 2.4 2.4 0 0 1 .3-2.4Z" />
+  </Line>
+);
+
+/** Globo, para idioma. */
+export const GlobeIcon = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18" />
+    <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18Z" />
+  </Svg>
+);
+
+/** Círculo cortado, para pessoas bloqueadas. */
+export const BlockIcon = () => (
+  <Svg>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m5.6 5.6 12.8 12.8" />
+  </Svg>
+);
+
+/** Seta saindo da porta, para sair da conta. */
+export const LogoutIcon = () => (
+  <Svg>
+    <path d="M14 4.5H6.5a1.5 1.5 0 0 0-1.5 1.5v12a1.5 1.5 0 0 0 1.5 1.5H14" />
+    <path d="M10 12h10" />
+    <path d="m16.5 8.5 3.5 3.5-3.5 3.5" />
+  </Svg>
+);
+
+/** Documento, para termos e políticas. */
+export const DocIcon = () => (
+  <Svg>
+    <path d="M14 3.5H7.5A1.5 1.5 0 0 0 6 5v14a1.5 1.5 0 0 0 1.5 1.5h9A1.5 1.5 0 0 0 18 19V7.5Z" />
+    <path d="M14 3.5v4h4" />
+    <path d="M9 12.5h6M9 16h6" />
+  </Svg>
+);

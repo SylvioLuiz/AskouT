@@ -32,6 +32,21 @@ export interface PasswordReset {
   lastSentAt: Date;
 }
 
+/** Verificação em duas etapas por app autenticador (TOTP). Sem `enabledAt`, a configuração começou mas ainda não foi confirmada. */
+export interface UserMfa {
+  userId: string;
+  /** Segredo TOTP cifrado (AES-256-GCM); nunca fica em texto puro no banco. */
+  secretSealed: string;
+  enabledAt: Date | null;
+  /** HMAC dos códigos de recuperação que ainda não foram usados. */
+  recoveryCodeHashes: string[];
+  /** Último passo de 30 s aceito: o mesmo código não vale duas vezes. */
+  lastUsedStep: number;
+  failedAttempts: number;
+  lockedUntil: Date | null;
+  createdAt: Date;
+}
+
 export interface Profile {
   userId: string;
   username: string; // sempre minúsculo
@@ -65,6 +80,21 @@ export interface IdentityClaims {
   name: string | null;
 }
 
+/** Usos opcionais dos dados que a pessoa liga e desliga (LGPD, art. 8º): nada disso é preciso para usar o app. */
+export type ConsentPurpose = 'MARKETING_EMAIL' | 'MARKETING_PUSH';
+/** Onde a pessoa deu ou tirou o consentimento. */
+export type ConsentSource = 'SIGNUP' | 'SETTINGS';
+
+/** Registro imutável de cada vez que a pessoa deu ou tirou um consentimento. O estado atual é o registro mais recente. */
+export interface ConsentEventRecord {
+  id: string;
+  userId: string;
+  purpose: ConsentPurpose;
+  granted: boolean;
+  source: ConsentSource;
+  at: Date;
+}
+
 export interface PendingSignup {
   email: string; // chave; sempre minúsculo
   username: string;
@@ -73,6 +103,8 @@ export interface PendingSignup {
   /** Data de nascimento (AAAA-MM-DD) e versão dos Termos aceita, guardadas até o código ser confirmado. */
   birthDate: string;
   termsVersion: string;
+  /** Aceitou receber novidades por e-mail no cadastro (opcional, desmarcado por padrão). */
+  marketingEmail?: boolean;
   codeHash: string;
   expiresAt: Date;
   /** Tentativas erradas de código. */
@@ -752,6 +784,8 @@ export interface AdminUserRow {
   reportsCount: number;
   /** Data de nascimento (AAAA-MM-DD) para a gestão conferir idade; null se ainda não informou. */
   birthDate: string | null;
+  /** Contas de outra plataforma ligadas (Google, Apple), em ordem alfabética; vazio se só usa e-mail e senha. */
+  loginProviders: ExternalProvider[];
 }
 
 export interface AdminVenueRow {
@@ -1033,6 +1067,21 @@ export type BoostAudience = 'ALL' | 'MATCH';
  * APPLE e GOOGLE: compra dentro do app, obrigatória nas lojas para bens digitais; o recibo é conferido no servidor.
  */
 export type BoostChannel = 'WEB' | 'APPLE' | 'GOOGLE';
+
+/** O que o relatório do anúncio conta: viu o cartão patrocinado, abriu, ou tocou em "Comprar ingresso" depois de ver. */
+export type BoostStatKind = 'IMPRESSION' | 'OPEN' | 'TICKET';
+
+/** Onde o anúncio foi visto: Explorar, Home ("Rolês em destaque"), Match no "Para você" ou a página do evento (ingresso). */
+export type BoostPlacement = 'EXPLORE' | 'HOME' | 'MATCH' | 'EVENT_PAGE';
+
+/** Contador do relatório do anúncio: só números, nunca quem. `day` é a data no fuso de Brasília (AAAA-MM-DD). */
+export interface BoostStatRow {
+  boostId: string;
+  day: string;
+  placement: BoostPlacement;
+  kind: BoostStatKind;
+  count: number;
+}
 
 export interface BoostRecord {
   id: string;

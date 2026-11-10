@@ -1,5 +1,5 @@
-import { createHmac, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
-import type { OneTimeCodes, PasswordHasher, TokenClaims, TokenService } from '../ports.ts';
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
+import type { MfaChallengeTokens, OneTimeCodes, PasswordHasher, SecretBox, TokenClaims, TokenService } from '../ports.ts';
 import type { UserRole } from '../types.ts';
 
 /**
@@ -175,5 +175,87 @@ export class HmacOneTimeCodes implements OneTimeCodes {
     const actual = Buffer.from(this.hash(email, code));
     const expected = Buffer.from(expectedHash);
     return actual.length === expected.length && timingSafeEqual(actual, expected);
+  }
+}
+
+// ---------- Verificação em duas etapas ----------
+
+/** Chave de 32 bytes derivada do segredo do servidor, separada por finalidade (o mesmo segredo nunca é usado cru em dois lugares). */
+function deriveSubkey(secret: string, purpose: string): Buffer {
+  if (typeof secret !== 'string' || secret.length < 32) throw new Error('O segredo precisa ter ao menos 32 caracteres');
+  return Buffer.from(hkdfSync('sha256', secret, 'askout', purpose, 32));
+}
+
+/**
+ * AES-256-GCM: o segredo do autenticador fica cifrado no banco, então um vazamento só do banco não permite gerar códigos.
+ * Formato: `v1.<iv>.<tag>.<cifrado>` em base64url.
+ */
+export class AesGcmSecretBox implements SecretBox {
+  private readonly key: Buffer;
+
+  constructor(options: { secret: string }) {
+    this.key = deriveSubkey(options.secret, 'mfa-secret-box');
+  }
+
+  seal(plain: string): string {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.key, iv);
+    const data = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+    return ['v1', iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), data.toString('base64url')].join('.');
+  }
+
+  open(sealed: string): string | undefined {
+    const [version, iv, tag, data] = typeof sealed === 'string' ? sealed.split('.') : [];
+    if (version !== 'v1' || !iv || !tag || data === undefined) return undefined;
+    try {
+      const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64url'));
+      decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+      return Buffer.concat([decipher.update(Buffer.from(data, 'base64url')), decipher.final()]).toString('utf8');
+    } catch {
+      return undefined;
+    }
+  }
+}
+
+/**
+ * Comprovante da 1ª etapa do login (senha ok, falta o código). Formato próprio (`mfa.<dados>.<assinatura>`) e chave própria:
+ * nunca passa como sessão no AuthGuard, que só aceita o JWT.
+ */
+export class HmacMfaChallengeTokens implements MfaChallengeTokens {
+  readonly ttlSeconds: number;
+  private readonly key: Buffer;
+  private readonly nowMs: () => number;
+
+  constructor(options: { secret: string; ttlSeconds?: number; nowMs?: () => number }) {
+    this.key = deriveSubkey(options.secret, 'mfa-challenge');
+    this.ttlSeconds = options.ttlSeconds ?? 300;
+    this.nowMs = options.nowMs ?? Date.now;
+  }
+
+  issue(userId: string): string {
+    const exp = Math.floor(this.nowMs() / 1000) + this.ttlSeconds;
+    const payload = Buffer.from(JSON.stringify({ sub: userId, exp })).toString('base64url');
+    return `mfa.${payload}.${this.sign(payload)}`;
+  }
+
+  verify(token: string): string | undefined {
+    if (typeof token !== 'string' || token.length > 1000) return undefined;
+    const [prefix, payload, signature] = token.split('.');
+    if (prefix !== 'mfa' || !payload || !signature) return undefined;
+    const expected = Buffer.from(this.sign(payload));
+    const received = Buffer.from(signature);
+    if (expected.length !== received.length || !timingSafeEqual(expected, received)) return undefined;
+    try {
+      const { sub, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>;
+      if (typeof sub !== 'string' || sub === '' || typeof exp !== 'number') return undefined;
+      if (Math.floor(this.nowMs() / 1000) >= exp) return undefined;
+      return sub;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private sign(payload: string): string {
+    return createHmac('sha256', this.key).update(payload).digest('base64url');
   }
 }

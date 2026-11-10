@@ -2,7 +2,7 @@ import { MIN_ACCOUNT_AGE, parseBirthDate } from './age-service.ts';
 import { buildRetentionReport } from './retention.ts';
 import type { RetentionReport } from './retention.ts';
 import { conflict, forbidden, notFound, unauthorized, validationError } from './errors.ts';
-import type { AuthResult, AuthService, LoginInput, SocialLoginInput } from './auth-service.ts';
+import type { AuthResult, AuthService, LoginInput, MfaChallenge, SocialLoginInput } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
 import type { VenueService } from './venue-service.ts';
 import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
@@ -70,18 +70,25 @@ export class AdminService {
    * Entrada do painel. Mesma senha da conta, mas só entra quem é admin; para os demais a resposta é a mesma de
    * senha errada, sem revelar que a conta existe ou que não é admin.
    */
-  async login(input: LoginInput): Promise<AuthResult> {
-    const result = await this.auth.login(input);
+  async login(input: LoginInput): Promise<AuthResult | MfaChallenge> {
+    const result = await this.auth.login(input, { requireRole: 'ADMIN' });
+    if ('mfaRequired' in result) return result;
     if (result.user.role !== 'ADMIN') throw unauthorized();
     return result;
+  }
+
+  /** Segunda etapa da entrada no painel (conta com verificação em duas etapas). */
+  async verifyMfaLogin(input: { mfaToken: unknown; code: unknown }): Promise<AuthResult> {
+    return this.auth.verifyMfaLogin(input, { requireRole: 'ADMIN' });
   }
 
   /**
    * Entrada do painel pela plataforma (Apple). Nunca cria conta: nome de usuário e aceite do cadastro não são repassados,
    * então conta externa nova para em `needsProfile` e é recusada. Quem não é admin também não entra.
    */
-  async socialLogin(input: Pick<SocialLoginInput, 'provider' | 'idToken'>): Promise<AuthResult> {
-    const result = await this.auth.socialLogin({ provider: input.provider, idToken: input.idToken });
+  async socialLogin(input: Pick<SocialLoginInput, 'provider' | 'idToken'>): Promise<AuthResult | MfaChallenge> {
+    const result = await this.auth.socialLogin({ provider: input.provider, idToken: input.idToken }, { requireRole: 'ADMIN' });
+    if ('mfaRequired' in result) return result;
     if ('needsProfile' in result || result.user.role !== 'ADMIN') throw unauthorized('Essa conta não tem acesso à gestão');
     return result;
   }

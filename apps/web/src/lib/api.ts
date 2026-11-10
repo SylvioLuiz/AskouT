@@ -1,12 +1,16 @@
 import { errorFromResponse, networkError } from './errors.ts';
 import type { ConfirmationAnswer, PollInput, PollSummary, PollView, VoteStatus } from './date-poll.ts';
 import type { DwellEntry } from './dwell.ts';
+import type { BoostStatEntry } from './boost-stats.ts';
 import type { ActivityFilter, ActivityPage } from './activity-log.ts';
 import type { SuggestedPerson } from './suggested-people.ts';
 import type {
+  ConsentPurpose,
+  ConsentStatus,
   BoostPricing,
   Recommendations,
   BoostView,
+  BoostReport,
   MatchReach,
   RegionView,
   ClaimableVenue,
@@ -180,7 +184,7 @@ export function createApi(deps: ApiDeps) {
     login: (identifier: string, password: string) =>
       request<AuthResult>('POST', '/auth/login', { body: { identifier, password }, auth: false }),
     socialProviders: () => request<{ items: SocialProvider[] }>('GET', '/auth/providers', { auth: false }),
-    socialLogin: (input: { provider: SocialProviderId; idToken: string; username?: string; displayName?: string; birthDate?: string; acceptTerms?: boolean }) =>
+    socialLogin: (input: { provider: SocialProviderId; idToken: string; username?: string; displayName?: string; birthDate?: string; acceptTerms?: boolean; marketingEmail?: boolean }) =>
       request<AuthResult | SocialNeedsProfile>('POST', '/auth/social', { body: input, auth: false }),
     me: () => request<SessionUser>('GET', '/auth/me'),
     completeOnboarding: () => request<{ onboarded: true }>('POST', '/auth/me/onboarding'),
@@ -382,10 +386,21 @@ export function createApi(deps: ApiDeps) {
     declareAge: (birthDate: string) => request<AgeStatus>('POST', '/me/age', { body: { birthDate } }),
     termsStatus: () => request<TermsStatus>('GET', '/me/terms'),
     acceptTerms: (version: string) => request<TermsStatus>('POST', '/me/terms', { body: { version } }),
+    /** Consentimentos opcionais, aceite dos Termos e histórico. */
+    consents: () => request<ConsentStatus>('GET', '/me/consents'),
+    setConsent: (purpose: ConsentPurpose, granted: boolean) => request<ConsentStatus>('PUT', '/me/consents', { body: { purpose, granted } }),
     exportMyData: () => request<{ filename: string; data: Record<string, unknown> }>('GET', '/me/export'),
+    /** Se a minha conta tem senha própria (quem entra só com Google/Apple não tem). */
+    passwordStatus: () => request<{ hasPassword: boolean }>('GET', '/me/password'),
+    /** Troca a minha senha, conferindo a atual. */
+    changePassword: (input: { currentPassword: string; newPassword: string }) => request<void>('POST', '/me/password', { body: input }),
     /** Apaga a minha conta de vez. Conta que entra com Google/Apple não manda senha. */
     deleteMyAccount: (input: { username: string; password?: string }) => request<{ deleted: true }>('DELETE', '/me', { body: input }),
     clearRegion: () => request<{ removed: boolean }>('DELETE', '/me/region'),
+    /** Relatório do anúncio (só para quem pagou). */
+    boostReport: (boostId: string) => request<BoostReport>('GET', `/me/boosts/${id(boostId)}/report`),
+    /** O que apareceu como "Patrocinado" (o servidor decide a qual anúncio pertence). */
+    trackBoostStats: (items: BoostStatEntry[]) => request<{ counted: number }>('POST', '/me/boost-stats', { body: { items } }),
     cancelBoost: (boostId: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/cancel`),
     simulateBoostPayment: (boostId: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/simulate-payment`),
     confirmStorePurchase: (boostId: string, receipt: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/store-purchase`, { body: { receipt } }),

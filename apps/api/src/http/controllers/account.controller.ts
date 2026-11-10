@@ -5,7 +5,7 @@ import { CurrentActor } from '../decorators.ts';
 import { asBody } from '../support/parse.ts';
 import { CORE } from '../tokens.ts';
 
-/** Direitos do titular (LGPD): cópia dos dados e exclusão da conta. */
+/** Direitos do titular (LGPD): cópia dos dados e exclusão da conta. Também a troca de senha. */
 @Controller()
 export class AccountController {
   private readonly core: Core;
@@ -27,6 +27,20 @@ export class AccountController {
   deleteAccount(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = asBody(body);
     return this.core.account.deleteAccount(actor.userId, { username: b.username, password: b.password });
+  }
+
+  /** `{hasPassword}`: se a conta tem senha própria (quem entra só com Google/Apple não tem). */
+  @Get('me/password')
+  passwordStatus(@CurrentActor() actor: Actor) {
+    return this.core.account.passwordStatus(actor.userId);
+  }
+
+  /** `{currentPassword, newPassword}`: troca a senha de quem está logado. */
+  @Post('me/password')
+  @HttpCode(204)
+  async changePassword(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    await this.core.account.changePassword(actor.userId, { currentPassword: b.currentPassword, newPassword: b.newPassword });
   }
 
   /** Se a pessoa já informou a data de nascimento e se tem 18 anos ou mais (libera o Flash). */
@@ -53,6 +67,20 @@ export class AccountController {
   @HttpCode(200)
   acceptTerms(@CurrentActor() actor: Actor, @Body() body: unknown) {
     return this.core.age.acceptTerms(actor.userId, { version: asBody(body).version });
+  }
+
+  /** Consentimentos opcionais (novidades por e-mail e push), aceite dos Termos e histórico de mudanças. */
+  @Get('me/consents')
+  @Header('Cache-Control', 'no-store')
+  consents(@CurrentActor() actor: Actor) {
+    return this.core.consents.status(actor.userId);
+  }
+
+  /** `{purpose, granted}`: liga ou desliga um consentimento opcional. */
+  @Put('me/consents')
+  setConsent(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.consents.set(actor.userId, { purpose: b.purpose, granted: b.granted });
   }
 
   /** Informa a data de nascimento (AAAA-MM-DD) quando ainda não existe uma. */

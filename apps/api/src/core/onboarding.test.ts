@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PASSWORD, makeWorld } from './testing/world.ts';
+import { PASSWORD, makeWorld, asSession } from './testing/world.ts';
 
 test('tutorial inicial: conta nova ainda não viu; depois de concluir, vale em qualquer login', async () => {
   const w = makeWorld();
@@ -11,7 +11,7 @@ test('tutorial inicial: conta nova ainda não viu; depois de concluir, vale em q
 
   assert.deepEqual(await w.core.auth.completeOnboarding(actor), { onboarded: true });
   assert.equal((await w.core.auth.me(actor)).onboarded, true);
-  const again = await w.core.auth.login({ identifier: 'ana', password: PASSWORD });
+  const again = await asSession(w.core.auth.login({ identifier: 'ana', password: PASSWORD }));
   assert.equal(again.user.onboarded, true, 'outro aparelho/login não mostra de novo');
 });
 

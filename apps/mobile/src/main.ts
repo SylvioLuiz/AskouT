@@ -51,6 +51,8 @@ if (Capacitor.isNativePlatform()) {
     writeFile: (o) => Filesystem.writeFile({ path: o.path, data: o.data, directory: Directory.Cache, encoding: Encoding.UTF8 }),
     share: (o) => Share.share(o),
   });
+  // "Mais opções" da folha de compartilhar: abre o menu nativo do aparelho (o WebView do Android não tem navigator.share).
+  w['AskouTShare'] = { share: (o: { title?: string; text?: string; url?: string; dialogTitle?: string }) => Share.share(o) };
   // "Achar nos contatos": lê celulares e e-mails da agenda (iPhone e Android), com a permissão do aparelho.
   w['AskouTContacts'] = createContactsBridge({ contacts: Contacts as never });
   if (Capacitor.getPlatform() === 'ios') {

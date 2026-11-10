@@ -30,6 +30,14 @@ export class AdminController {
     return this.core.admin.socialLogin({ provider: b.provider, idToken: b.idToken });
   }
 
+  @Public()
+  @Post('mfa/verify')
+  @HttpCode(200)
+  mfaVerify(@Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.verifyMfaLogin({ mfaToken: b.mfaToken, code: b.code });
+  }
+
   /** `{currentPassword, newPassword}`: troca a senha de quem está logado. */
   @Post('password')
   @HttpCode(204)

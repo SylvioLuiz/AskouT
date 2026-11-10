@@ -71,6 +71,7 @@ export function UsersPage() {
                   <th>Pessoa</th>
                   <th>E-mail</th>
                   <th>Situação</th>
+                  <th>Login</th>
                   <th className="num">Posts</th>
                   <th className="num">Denúncias</th>
                   <th>Nascimento</th>
@@ -88,6 +89,17 @@ export function UsersPage() {
                     <td>{u.email}</td>
                     <td>
                       <Badge tone={u.status === 'ACTIVE' ? 'ok' : u.status === 'SUSPENDED' ? 'bad' : 'warn'}>{STATUS_LABEL[u.status]}</Badge>
+                    </td>
+                    <td>
+                      {(u.loginProviders ?? []).length === 0 ? (
+                        <span className="handle">E-mail</span>
+                      ) : (
+                        (u.loginProviders ?? []).map((p) => (
+                          <span key={p}>
+                            <Badge tone="info">{p === 'APPLE' ? 'Apple' : 'Google'}</Badge>{' '}
+                          </span>
+                        ))
+                      )}
                     </td>
                     <td className="num">{u.postsCount}</td>
                     <td className="num">{u.reportsCount > 0 ? <strong className="alert">{u.reportsCount}</strong> : 0}</td>

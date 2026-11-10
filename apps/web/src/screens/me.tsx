@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NOW_RADIUS_CHOICES_KM, nowRadiusKm, setNowRadiusKm } from '../lib/now-radius.ts';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { MuteCard, PushCard } from '../components/notifications.tsx';
 import { api } from '../client.ts';
@@ -11,7 +11,6 @@ import { readPersonalize, savePersonalize } from '../lib/dwell.ts';
 import { toApiError } from '../lib/errors.ts';
 import { roundCoordinate } from '../lib/boost.ts';
 import { pluralize } from '../lib/format.ts';
-import { resizeProfilePhoto } from '../lib/image.ts';
 import { statusLabel } from '../lib/meetup.ts';
 import type { RegionView } from '../lib/types.ts';
 import { applyTheme, readTheme, saveTheme, THEME_LABELS } from '../lib/theme.ts';
@@ -21,8 +20,9 @@ import { InviteSheet } from '../components/invite.tsx';
 import { ConnectContactsCard } from '../components/connect-contacts.tsx';
 import { ActivityLog } from '../components/activity-log.tsx';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
+import { AvatarCropper } from '../components/avatar-cropper.tsx';
 import { AvatarViewer } from '../components/photo-viewer.tsx';
-import { CameraIcon } from '../components/icons.tsx';
+import { BellIcon, BlockIcon, BoltIcon, ChevronLeftIcon, ChevronRightIcon, DocIcon, GlobeIcon, HelpIcon, LockIcon, LogoutIcon, MoonIcon, ShieldIcon, SunIcon, UserIcon, UsersIcon } from '../components/icons.tsx';
 import { formatPhone, normalizePhone } from '../lib/phone.ts';
 import { supportMailto } from '../lib/help-mailto.ts';
 import { downloadJson } from '../lib/account.ts';
@@ -30,10 +30,13 @@ import { birthDateProblem, MIN_ACCOUNT_AGE, ageOnDate, todayIso } from '../lib/a
 import { Link } from '../router.tsx';
 import { LOCALES, chooseLocale, getLocale, intlLocale, t } from '../lib/i18n/index.ts';
 
+/** Versão mostrada no rodapé das configurações. */
+const APP_VERSION = (import.meta.env['VITE_APP_VERSION'] as string | undefined) ?? '0.1.0';
+
 type Message = { tone: 'ok' | 'error'; text: string } | undefined;
 
-/** Foto escolhida que ainda não foi salva: o arquivo e a prévia, ou o pedido de remover. */
-type PendingPhoto = { file: File; preview: string } | 'remove' | undefined;
+/** Foto escolhida que ainda não foi salva: já enquadrada no círculo (data URL JPEG), ou o pedido de remover. */
+type PendingPhoto = { image: string } | 'remove' | undefined;
 
 /**
  * Editar perfil: foto, nome, descrição, celular e data de nascimento num formulário só.
@@ -50,6 +53,7 @@ export function EditProfileScreen() {
   const [birth, setBirth] = useState('');
   const [photo, setPhoto] = useState<PendingPhoto>();
   const [photoOpen, setPhotoOpen] = useState(false);
+  const [cropFile, setCropFile] = useState<File>();
   const [viewOpen, setViewOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<Message>();
@@ -70,19 +74,13 @@ export function EditProfileScreen() {
     setPhoto(undefined);
   }, [loaded]);
 
-  // Libera a prévia da foto escolhida quando ela é trocada ou a tela fecha.
-  useEffect(() => {
-    if (!photo || photo === 'remove') return;
-    return () => URL.revokeObjectURL(photo.preview);
-  }, [photo]);
-
   if (view.loading && !loaded) return <Loading />;
   if (view.error && !loaded) return <ErrorState message={view.error.message} onRetry={view.reload} />;
   if (!loaded || !saved) return null;
   const age = loaded[2];
   const support = supportMailto(import.meta.env['VITE_SUPPORT_EMAIL'] as string | undefined, user.profile.username);
 
-  const shownAvatar = photo === 'remove' ? null : photo ? photo.preview : saved.avatarUrl;
+  const shownAvatar = photo === 'remove' ? null : photo ? photo.image : saved.avatarUrl;
   const changed = photo !== undefined || displayName !== saved.displayName || bio !== saved.bio || phone !== saved.phone || (!age.locked && birth !== saved.birth);
 
   function problems(): Record<string, string> {
@@ -104,7 +102,7 @@ export function EditProfileScreen() {
     const next = { ...saved! };
     try {
       if (photo !== undefined) {
-        const image = photo === 'remove' ? null : await resizeProfilePhoto(photo.file);
+        const image = photo === 'remove' ? null : photo.image;
         const updated = await api.setProfilePhoto(image);
         next.avatarUrl = updated.avatarUrl;
         setPhoto(undefined);
@@ -143,31 +141,45 @@ export function EditProfileScreen() {
 
   return (
     <>
-      <PageHead title={t('Editar perfil')} back="/perfil" />
+      {/* Cabeçalho fixo como em apps nativos: voltar · título · Salvar sempre à vista. */}
+      <header className="edithead">
+        <Link to="/perfil" className="pagehead__back" aria-label={t('Voltar')}>
+          <ChevronLeftIcon />
+        </Link>
+        <h1 className="edithead__title">{t('Editar perfil')}</h1>
+        <button type="submit" form="edit-profile" className="edithead__save" disabled={!changed || saving} aria-busy={saving || undefined}>
+          {saving ? t('Salvando…') : t('Salvar')}
+        </button>
+      </header>
       {photoOpen ? (
         <PhotoPickerSheet
           hasPhoto={shownAvatar !== null}
-          onPick={(file) => setPhoto({ file, preview: URL.createObjectURL(file) })}
+          onPick={setCropFile}
           onRemove={() => setPhoto(saved.avatarUrl ? 'remove' : undefined)}
           onView={() => setViewOpen(true)}
           onClose={() => setPhotoOpen(false)}
         />
       ) : null}
+      {cropFile ? (
+        <AvatarCropper
+          file={cropFile}
+          onCancel={() => setCropFile(undefined)}
+          onDone={(image) => {
+            setPhoto({ image });
+            setCropFile(undefined);
+          }}
+        />
+      ) : null}
       {viewOpen && shownAvatar ? <AvatarViewer url={shownAvatar} onClose={() => setViewOpen(false)} /> : null}
-      <form className="form form--flat" onSubmit={save} noValidate>
+      <form id="edit-profile" className="form form--flat" onSubmit={save} noValidate>
         <div className="photoedit">
-          <button type="button" className="avatarbtn" onClick={() => setPhotoOpen(true)} aria-label={shownAvatar ? t('Trocar foto') : t('Subir foto')} aria-haspopup="dialog">
+          <button type="button" className="avatarbtn" onClick={() => setPhotoOpen(true)} aria-label={t('Editar foto')} aria-haspopup="dialog">
             <Avatar profile={{ userId: user.profile.userId, username: user.profile.username, displayName: displayName || user.profile.displayName, avatarUrl: shownAvatar }} size={96} />
-            <span className="avatarbtn__badge" aria-hidden="true">
-              <CameraIcon />
-            </span>
           </button>
-          <div className="photoedit__actions">
-            <Button variant="secondary" small onClick={() => setPhotoOpen(true)}>
-              {shownAvatar ? t('Trocar foto') : t('Subir foto')}
-            </Button>
-            {photo !== undefined ? <span className="muted">{t('A foto muda quando você salvar.')}</span> : null}
-          </div>
+          <button type="button" className="photoedit__link" onClick={() => setPhotoOpen(true)} aria-haspopup="dialog">
+            {t('Editar foto')}
+          </button>
+          {photo !== undefined ? <span className="muted photoedit__note">{t('A foto muda quando você salvar.')}</span> : null}
         </div>
         <Field label={t('Nome')} value={displayName} onChange={setDisplayName} error={errors['displayName']} maxLength={60} autoComplete="name" />
         <Field label={t('Descrição')} value={bio} onChange={setBio} error={errors['bio']} hint={`${Array.from(bio).length}/${BIO_MAX}`} multiline maxLength={BIO_MAX + 20} />
@@ -201,22 +213,107 @@ export function EditProfileScreen() {
           />
         )}
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-        <div>
-          <Button type="submit" loading={saving} disabled={!changed && !saving}>
-            {t('Salvar alterações')}
-          </Button>
-        </div>
       </form>
     </>
   );
 }
 
+/** Uma linha da central de configurações: ícone, rótulo, valor atual (opcional) e seta. */
+function SettingsRow({ to, icon, label, value }: { to: string; icon: ReactNode; label: string; value?: string | undefined }) {
+  return (
+    <li>
+      <Link to={to} className="menulist__item">
+        <span className="menulist__lead" aria-hidden="true">
+          {icon}
+        </span>
+        <span className="menulist__label">{label}</span>
+        {value ? <span className="menulist__value">{value}</span> : null}
+        <ChevronRightIcon />
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * Central de configurações, no padrão dos apps grandes (Instagram, WhatsApp, iOS):
+ * cartão da conta no topo, grupos com título, cada linha mostrando o valor atual, e "Sair" por último.
+ */
 export function SettingsScreen() {
-  useTitle(t('Configuração'));
+  useTitle(t('Configurações e privacidade'));
+  const user = useUser();
+  const { signOut } = useAuthContext();
+  const theme = readTheme(window.localStorage);
+  const language = LOCALES.find((item) => item.code === getLocale())?.label;
+  const radius = nowRadiusKm();
+  return (
+    <>
+      <PageHead title={t('Configurações e privacidade')} back="/perfil" />
+      <Link to="/perfil/editar" className="settingshub__account">
+        <Avatar profile={user.profile} size={56} />
+        <span className="settingshub__who">
+          <span className="settingshub__name">{user.profile.displayName}</span>
+          <span className="settingshub__sub">@{user.profile.username}</span>
+          <span className="settingshub__sub">{t('Editar perfil, foto e dados pessoais')}</span>
+        </span>
+        <ChevronRightIcon />
+      </Link>
+
+      <h2 className="settingshub__group">{t('Sua conta')}</h2>
+      <ul className="menulist">
+        <SettingsRow to="/configuracao/conta" icon={<UserIcon />} label={t('Informações da conta')} />
+        <SettingsRow to="/configuracao/senha" icon={<LockIcon />} label={t('Senha e segurança')} />
+        <SettingsRow to="/configuracao/privacidade-e-dados" icon={<ShieldIcon />} label={t('Privacidade e dados')} />
+      </ul>
+
+      <h2 className="settingshub__group">{t('Como você usa o AskouT')}</h2>
+      <ul className="menulist">
+        <SettingsRow to="/configuracao/notificacoes" icon={<BellIcon />} label={t('Notificações')} />
+        <SettingsRow to="/configuracao/now" icon={<BoltIcon />} label={t('NOW')} value={radius === null ? t('Automático') : `${radius} km`} />
+      </ul>
+
+      <h2 className="settingshub__group">{t('Quem pode ver seu conteúdo')}</h2>
+      <ul className="menulist">
+        <SettingsRow to="/privacidade" icon={<ShieldIcon />} label={t('Privacidade da conta')} value={user.profile.isPrivate ? t('Privada') : t('Pública')} />
+        <SettingsRow to="/amigos" icon={<UsersIcon />} label={t('Amigos')} />
+        <SettingsRow to="/bloqueados" icon={<BlockIcon />} label={t('Pessoas bloqueadas')} />
+      </ul>
+
+      <h2 className="settingshub__group">{t('Preferências do app')}</h2>
+      <ul className="menulist">
+        <SettingsRow to="/tema" icon={theme === 'dark' ? <MoonIcon /> : <SunIcon />} label={t('Tema')} value={theme === 'system' ? t('Automático') : THEME_LABELS[theme]} />
+        <SettingsRow to="/tema" icon={<GlobeIcon />} label={t('Idioma')} value={language} />
+      </ul>
+
+      <h2 className="settingshub__group">{t('Suporte e sobre')}</h2>
+      <ul className="menulist">
+        <SettingsRow to="/ajuda" icon={<HelpIcon />} label={t('Central de ajuda')} />
+        <SettingsRow to="/termos-de-uso" icon={<DocIcon />} label={t('Termos de Uso')} />
+        <SettingsRow to="/politica-de-privacidade" icon={<DocIcon />} label={t('Política de Privacidade')} />
+      </ul>
+
+      <h2 className="settingshub__group">{t('Login')}</h2>
+      <ul className="menulist">
+        <li>
+          <button type="button" className="menulist__item menulist__item--danger menulist__item--start" onClick={signOut}>
+            <span className="menulist__lead" aria-hidden="true">
+              <LogoutIcon />
+            </span>
+            <span className="menulist__label">{t('Sair de @{username}', { username: user.profile.username })}</span>
+          </button>
+        </li>
+      </ul>
+      <p className="settingshub__foot">AskouT · {t('versão {version}', { version: APP_VERSION })}</p>
+    </>
+  );
+}
+
+/** Informações da conta: dados de login, baixar uma cópia dos dados e apagar a conta (LGPD). */
+export function AccountInfoScreen() {
+  useTitle(t('Informações da conta'));
   const user = useUser();
   return (
     <>
-      <PageHead title={t('Configuração')} back="/perfil" />
+      <PageHead title={t('Informações da conta')} back="/configuracao" />
       <dl className="eventpage__facts">
         <div>
           <dt>{t('Usuário')}</dt>
@@ -227,16 +324,37 @@ export function SettingsScreen() {
           <dd>{user.email}</dd>
         </div>
       </dl>
-      <p className="muted">{t('Ainda não dá para trocar o e-mail ou a senha por aqui. Isso entra numa próxima etapa.')}</p>
-      <NowRadiusSetting />
+      <p className="muted">{t('Ainda não dá para trocar o e-mail por aqui.')}</p>
+      <nav className="linklist" aria-label={t('Sua conta')}>
+        <Link to="/perfil/editar">{t('Celular e data de nascimento')}</Link>
+        <Link to="/configuracao/senha">{t('Trocar senha')}</Link>
+      </nav>
+      <MyDataSection />
+    </>
+  );
+}
+
+/** Notificações: avisos no aparelho e silenciar por um tempo. */
+export function NotificationSettingsScreen() {
+  useTitle(t('Notificações'));
+  return (
+    <>
+      <PageHead title={t('Notificações')} back="/configuracao" />
       <h2 className="profile__section">{t('Avisos no aparelho')}</h2>
       <PushCard />
       <h2 className="profile__section">{t('Silenciar push')}</h2>
       <MuteCard />
-      <nav className="linklist" aria-label={t('Sua conta')}>
-        <Link to="/amigos">{t('Amigos')}</Link>
-        <Link to="/bloqueados">{t('Pessoas bloqueadas')}</Link>
-      </nav>
+    </>
+  );
+}
+
+/** Preferências do NOW. */
+export function NowSettingsScreen() {
+  useTitle(t('NOW'));
+  return (
+    <>
+      <PageHead title={t('NOW')} back="/configuracao" />
+      <NowRadiusSetting />
     </>
   );
 }
@@ -304,7 +422,7 @@ export function PrivacyScreen() {
 
   return (
     <>
-      <PageHead title={t('Privacidade')} back="/perfil" />
+      <PageHead title={t('Privacidade')} back="/configuracao" />
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       <section className="setting">
         <div className="setting__text">
@@ -326,7 +444,9 @@ export function PrivacyScreen() {
         <Link to="/politica-de-privacidade">{t('Política de Privacidade')}</Link>
         <Link to="/termos-de-uso">{t('Termos de Uso')}</Link>
       </nav>
-      <MyDataSection />
+      <nav className="linklist" aria-label={t('Seus dados')}>
+        <Link to="/configuracao/privacidade-e-dados">{t('Privacidade e dados: consentimentos, baixar dados ou apagar a conta')}</Link>
+      </nav>
     </>
   );
 }
@@ -585,7 +705,7 @@ export function HelpScreen() {
   const mailto = supportMailto(import.meta.env.VITE_SUPPORT_EMAIL as string | undefined, user.profile.username);
   return (
     <>
-      <PageHead title={t('Ajuda')} back="/perfil" />
+      <PageHead title={t('Ajuda')} back="/configuracao" />
       <div className="faq">
         {FAQ.map((item) => (
           <details key={item.q} className="faq__item">
@@ -615,7 +735,7 @@ export function ThemeScreen() {
   }
   return (
     <>
-      <PageHead title={t('Tema e idioma')} back="/perfil" />
+      <PageHead title={t('Tema e idioma')} back="/configuracao" />
       <div className="radios" role="radiogroup" aria-label={t('Tema')}>
         {(['system', 'light', 'dark'] as const).map((id) => (
           <label key={id} className="radios__item">

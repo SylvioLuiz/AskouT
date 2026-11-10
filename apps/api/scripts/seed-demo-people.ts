@@ -2,7 +2,8 @@
 // Tudo é marcado "[TESTE]" e as contas usam e-mail @teste.askout.invalid, que não existe: ninguém consegue entrar nelas.
 //
 //   npm run seed:demo                       (cria/atualiza as pessoas e posts de exemplo)
-//   npm run seed:demo -- --follow sylvio    (e faz @sylvio e as pessoas de exemplo se seguirem: viram amigos)
+//   npm run seed:demo -- --follow sylvio    (e faz @sylvio e as pessoas de exemplo se seguirem: viram amigos,
+//                                            com conversas 1 a 1 e dois grupos de exemplo)
 //   npm run seed:demo -- --clear            (apaga tudo que veio daqui)
 //
 // Pode rodar quantas vezes quiser: não duplica. Não roda em produção.
@@ -83,11 +84,55 @@ const PEOPLE = [
   { slug: 'bruno', name: 'Bruno', bio: 'Perfil de exemplo para testar o AskouT. Não é uma pessoa real.', color: [250, 114, 201] as [number, number, number], posts: ['[TESTE] Show de rock no sábado.'] },
   { slug: 'carla', name: 'Carla', bio: 'Perfil de exemplo para testar o AskouT. Não é uma pessoa real.', color: [77, 163, 255] as [number, number, number], posts: ['[TESTE] Feira de artesanato no domingo de manhã.', '[TESTE] Cinema de clássicos na quarta.'] },
   { slug: 'diego', name: 'Diego', bio: 'Perfil de exemplo para testar o AskouT. Não é uma pessoa real.', color: [52, 199, 89] as [number, number, number], posts: ['[TESTE] Noite de jogos de tabuleiro.'] },
+  ...(
+    [
+      ['elisa', 'Elisa', [255, 159, 10], ['[TESTE] Piquenique no parque no sábado.']],
+      ['felipe', 'Felipe', [94, 92, 230], ['[TESTE] Pedal de domingo cedo, bora?']],
+      ['gabi', 'Gabi', [255, 55, 95], ['[TESTE] Karaokê na quinta à noite.', '[TESTE] Brunch novo no centro.']],
+      ['heitor', 'Heitor', [48, 176, 199], ['[TESTE] Jogo do time no bar da esquina.']],
+      ['isa', 'Isa', [191, 90, 242], ['[TESTE] Exposição de fotografia aberta até domingo.']],
+      ['joao', 'João', [100, 210, 255], ['[TESTE] Samba de roda na praça.']],
+      ['karina', 'Karina', [255, 214, 10], ['[TESTE] Aula de dança grátis no sábado.']],
+      ['lucas', 'Lucas', [172, 142, 104], ['[TESTE] Trilha leve com vista bonita.']],
+      ['marina', 'Marina', [255, 105, 180], ['[TESTE] Clube do livro na livraria.']],
+      ['nico', 'Nico', [0, 199, 190], ['[TESTE] Festa à fantasia sexta.']],
+      ['olivia', 'Olívia', [142, 142, 147], ['[TESTE] Feirinha gastronômica no domingo.']],
+      ['pedro', 'Pedro', [52, 120, 246], ['[TESTE] Stand-up comedy na terça.']],
+    ] as const
+  ).map(([slug, name, color, posts]) => ({ slug, name, bio: 'Perfil de exemplo para testar o AskouT. Não é uma pessoa real.', color: [...color] as [number, number, number], posts: [...posts] })),
 ];
+
+/** Conversas 1 a 1 com quem roda o --follow (as primeiras pessoas da lista), da mais recente para a mais antiga. */
+const CHATS: { slug: string; text: string }[] = [
+  { slug: 'ana', text: '[TESTE] Vai no happy hour de sexta?' },
+  { slug: 'bruno', text: '[TESTE] Viu o show de sábado?' },
+  { slug: 'gabi', text: '[TESTE] Karaokê confirmado!' },
+  { slug: 'carla', text: '[TESTE] Bora na feira domingo?' },
+  { slug: 'joao', text: '[TESTE] Samba hoje às 18h.' },
+  { slug: 'marina', text: '[TESTE] Terminei o livro do clube.' },
+  { slug: 'felipe', text: '[TESTE] Pedal amanhã 7h?' },
+  { slug: 'isa', text: '[TESTE] A exposição vale muito a pena.' },
+];
+
+/** Grupos de exemplo (o dono é a primeira pessoa; quem roda o --follow entra como membro). */
+const GROUPS: { name: string; slugs: string[]; text: string }[] = [
+  { name: '[TESTE] Rolê de sexta', slugs: ['ana', 'bruno', 'carla', 'diego'], text: '[TESTE] Onde vai ser hoje?' },
+  { name: '[TESTE] Pedal de domingo', slugs: ['felipe', 'lucas', 'karina'], text: '[TESTE] Saída às 7h do parque.' },
+];
+
+const directKeyOf = (a: string, b: string) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
 const prisma = new PrismaClient({ datasourceUrl: databaseUrl() });
 try {
-  const removed = process.argv.includes('--clear') ? await prisma.user.deleteMany({ where: { email: { endsWith: DOMAIN } } }) : undefined;
+  let removed: { count: number } | undefined;
+  if (process.argv.includes('--clear')) {
+    // Mensagens não somem junto com quem enviou: apaga antes as conversas e grupos de exemplo e o que elas mandaram.
+    const ids = (await prisma.user.findMany({ where: { email: { endsWith: DOMAIN } }, select: { id: true } })).map((u) => u.id);
+    await prisma.group.deleteMany({ where: { ownerId: { in: ids } } });
+    await prisma.conversation.deleteMany({ where: { type: 'DIRECT', participants: { some: { userId: { in: ids } } } } });
+    await prisma.message.deleteMany({ where: { senderId: { in: ids } } });
+    removed = await prisma.user.deleteMany({ where: { id: { in: ids } } });
+  }
   if (removed) {
     console.log(`Apagadas ${removed.count} conta(s) de exemplo, com posts e vínculos. Pronto.`);
   } else {
@@ -133,6 +178,46 @@ try {
         await prisma.follow.upsert({ where: { followerId_followeeId: { followerId: id, followeeId: profile.userId } }, create: { followerId: id, followeeId: profile.userId, status: 'ACCEPTED' }, update: {} });
       }
       console.log(`@${target} e as pessoas de exemplo agora se seguem (amigos).`);
+
+      const idOf = (slug: string) => demoIds[PEOPLE.findIndex((p) => p.slug === slug)]!;
+      const me = profile.userId;
+      const now = Date.now();
+      let chats = 0;
+      for (const [i, chat] of CHATS.entries()) {
+        const other = idOf(chat.slug);
+        const directKey = directKeyOf(me, other);
+        if (await prisma.conversation.findUnique({ where: { directKey } })) continue;
+        const at = new Date(now - (i + 1) * 37 * 60_000);
+        await prisma.conversation.create({
+          data: { id: randomUUID(), type: 'DIRECT', directKey, createdAt: at, participants: { create: [{ userId: me }, { userId: other }] }, messages: { create: [{ id: randomUUID(), senderId: other, body: chat.text, createdAt: at }] } },
+        });
+        chats++;
+      }
+      let groups = 0;
+      for (const [i, g] of GROUPS.entries()) {
+        const ownerId = idOf(g.slugs[0]!);
+        const found = await prisma.group.findFirst({ where: { ownerId, name: g.name }, include: { conversation: true } });
+        if (found) {
+          // O grupo já existe (de outro --follow): só coloca esta pessoa nele.
+          await prisma.groupMember.upsert({ where: { groupId_userId: { groupId: found.id, userId: me } }, create: { groupId: found.id, userId: me }, update: {} });
+          if (found.conversation) await prisma.conversationParticipant.upsert({ where: { conversationId_userId: { conversationId: found.conversation.id, userId: me } }, create: { conversationId: found.conversation.id, userId: me }, update: {} });
+          continue;
+        }
+        const members = [...g.slugs.map(idOf), me];
+        const at = new Date(now - (i + 2) * 53 * 60_000);
+        await prisma.group.create({
+          data: {
+            id: randomUUID(),
+            ownerId,
+            name: g.name,
+            createdAt: at,
+            members: { create: members.map((userId) => ({ userId, role: userId === ownerId ? 'OWNER' : 'MEMBER', joinedAt: at })) },
+            conversation: { create: { id: randomUUID(), type: 'GROUP', createdAt: at, participants: { create: members.map((userId) => ({ userId })) }, messages: { create: [{ id: randomUUID(), senderId: ownerId, body: g.text, createdAt: at }] } } },
+          },
+        });
+        groups++;
+      }
+      console.log(`Conversas de exemplo com @${target}: ${chats} criada(s); grupos: ${groups} criado(s).`);
     }
     console.log('Elas aparecem como "[TESTE]" e não conseguem entrar no app. Para apagar: npm run seed:demo -- --clear');
   }

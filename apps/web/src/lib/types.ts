@@ -109,6 +109,17 @@ export interface SignupInput {
   password: string;
   birthDate: string;
   acceptTerms: true;
+  /** Opcional: aceita receber novidades por e-mail. */
+  marketingEmail?: boolean;
+}
+
+/** Usos opcionais dos dados que a pessoa liga e desliga. */
+export type ConsentPurpose = 'MARKETING_EMAIL' | 'MARKETING_PUSH';
+
+export interface ConsentStatus {
+  terms: { currentVersion: string; acceptedVersion: string | null; acceptedAt: string | null };
+  consents: { purpose: ConsentPurpose; granted: boolean; updatedAt: string | null }[];
+  history: { purpose: ConsentPurpose; granted: boolean; source: 'SIGNUP' | 'SETTINGS'; at: string }[];
 }
 
 export interface ProfilePatch {
@@ -1073,6 +1084,25 @@ export interface BoostView {
   startsAt: string | null;
   endsAt: string | null;
   payment: { pixCode: string | null; checkoutUrl: string | null } | null;
+}
+
+/** Número do relatório do anúncio. `null` = "menos de 10" (só no Match). */
+export type BoostStatValue = number | null;
+
+/** Relatório do anúncio para quem pagou: só números, nunca quem. */
+export interface BoostReport {
+  boostId: string;
+  phase: BoostPhase;
+  audience: 'ALL' | 'MATCH';
+  startsAt: string | null;
+  endsAt: string | null;
+  /** No Match os números vêm arredondados de 10 em 10. */
+  rounded: boolean;
+  totals: { impressions: BoostStatValue; opens: BoostStatValue; ticketClicks: BoostStatValue };
+  openRatePct: number | null;
+  /** Data AAAA-MM-DD (fuso de Brasília). */
+  days: { day: string; impressions: BoostStatValue; opens: BoostStatValue; ticketClicks: BoostStatValue }[];
+  placements: { placement: 'EXPLORE' | 'HOME' | 'MATCH' | 'EVENT_PAGE'; impressions: BoostStatValue }[];
 }
 
 /** Quantas pessoas combinam hoje com um Match. Só o número, arredondado; nunca quem. */

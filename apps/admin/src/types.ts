@@ -65,6 +65,8 @@ export interface UserRow {
   reportsCount: number;
   /** AAAA-MM-DD, ou null se a pessoa ainda não informou. */
   birthDate: string | null;
+  /** Contas Google/Apple ligadas; vazio = só e-mail e senha. */
+  loginProviders: ('GOOGLE' | 'APPLE')[];
 }
 
 export interface VenueRow {

@@ -14,6 +14,7 @@ import type { RouteDef } from './router.tsx';
 import { AgendaScreen } from './screens/agenda.tsx';
 import { AccountDeletionInfoScreen, LegalScreen, SupportScreen } from './screens/legal.tsx';
 import { DeleteAccountScreen } from './screens/delete-account.tsx';
+import { ChangePasswordScreen } from './screens/change-password.tsx';
 import { ActivityScreen } from './screens/activity.tsx';
 import { ForgotPasswordScreen, LoginScreen, SignupScreen } from './screens/auth.tsx';
 import { ChatScreen, ConversationsScreen } from './screens/conversations.tsx';
@@ -30,7 +31,8 @@ import { ExploreScreen } from './screens/explore.tsx';
 import { EventsMapScreen } from './screens/events-map.tsx';
 import { HomeScreen } from './screens/main-tabs.tsx';
 import { ContactsScreen } from './screens/contacts.tsx';
-import { BlockedScreen, EditProfileScreen, FriendsScreen, HelpScreen, InteractionsScreen, PrivacyScreen, SettingsScreen, ThemeScreen } from './screens/me.tsx';
+import { PrivacyDataScreen } from './screens/privacy-data.tsx';
+import { AccountInfoScreen, BlockedScreen, EditProfileScreen, FriendsScreen, HelpScreen, InteractionsScreen, NotificationSettingsScreen, NowSettingsScreen, PrivacyScreen, SettingsScreen, ThemeScreen } from './screens/me.tsx';
 import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
 import { ArchivedScreen, CreatePostScreen, PostScreen } from './screens/posts.tsx';
 import { t } from './lib/i18n/index.ts';
@@ -79,7 +81,12 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/perfil', render: () => <OwnProfile /> },
   { path: '/perfil/editar', render: () => <EditProfileScreen /> },
   { path: '/configuracao', render: () => <SettingsScreen /> },
+  { path: '/configuracao/senha', render: () => <ChangePasswordScreen /> },
+  { path: '/configuracao/conta', render: () => <AccountInfoScreen /> },
+  { path: '/configuracao/notificacoes', render: () => <NotificationSettingsScreen /> },
+  { path: '/configuracao/now', render: () => <NowSettingsScreen /> },
   { path: '/privacidade', render: () => <PrivacyScreen /> },
+  { path: '/configuracao/privacidade-e-dados', render: () => <PrivacyDataScreen /> },
   { path: '/privacidade/apagar-conta', render: () => <DeleteAccountScreen /> },
   { path: '/arquivados', render: () => <ArchivedScreen /> },
   { path: '/interacoes', render: () => <InteractionsScreen /> },

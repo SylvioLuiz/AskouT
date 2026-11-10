@@ -39,6 +39,7 @@ import { formatDistance } from '../lib/flash.ts';
 import { pluralize } from '../lib/format.ts';
 import type { EventKind, ExploreEvent, ExplorePlace, ExploreResult } from '../lib/types.ts';
 import { trackClick, useDwell } from '../components/dwell.tsx';
+import { trackSponsoredOpen, useSponsoredView } from '../components/sponsored-view.tsx';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
 import { DateBadge, PosterEvent } from '../components/poster.tsx';
@@ -106,9 +107,15 @@ function EventCover({ event, shape, badge = false }: { event: ExploreEvent; shap
 
 export function EventCard({ event, now, poster }: { event: ExploreEvent; now: Date; poster?: boolean }) {
   if (poster) return <PosterEventCard event={event} now={now} />;
+  return <ListEventCard event={event} now={now} />;
+}
+
+/** Evento em lista (Explorar). */
+function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
+  const adRef = useSponsoredView<HTMLLIElement>(event.sponsored === true, 'EXPLORE', { eventId: event.id });
   return (
-    <li className="evcard">
-      <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link">
+    <li className="evcard" ref={adRef}>
+      <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link" onClick={() => { if (event.sponsored) trackSponsoredOpen('EXPLORE', { eventId: event.id }); }}>
         <EventCover event={event} shape={coverShape(event.id)} badge />
         <div className="evcard__body">
           <h3 className="evcard__title">{event.title}</h3>
@@ -127,8 +134,10 @@ export function EventCard({ event, now, poster }: { event: ExploreEvent; now: Da
 /** Evento em formato de cartaz (Home): foto inteira, data em destaque e "Eu vou". */
 function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
   const dwellRef = useDwell<HTMLLIElement>('EVENT', event.id, 'FEED');
+  // O cartaz patrocinado aparece na Home ("Rolês em destaque").
+  useSponsoredView<HTMLLIElement>(event.sponsored === true, 'HOME', { eventId: event.id }, dwellRef);
   return (
-    <li className="poster-item" ref={dwellRef} onClickCapture={(ev) => { if ((ev.target as Element).closest('a')) trackClick('EVENT', event.id, 'FEED'); }}>
+    <li className="poster-item" ref={dwellRef} onClickCapture={(ev) => { if ((ev.target as Element).closest('a')) { trackClick('EVENT', event.id, 'FEED'); if (event.sponsored) trackSponsoredOpen('HOME', { eventId: event.id }); } }}>
       <PosterEvent
         eventId={event.id}
         title={event.title}
@@ -177,6 +186,7 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
   }
 
   const venue = place.source === 'ASKOUT' ? place.venue : null;
+  const adRef = useSponsoredView<HTMLLIElement>(place.sponsored === true && venue !== null, 'EXPLORE', { venueId: venue?.id });
   const [following, setFollowing] = useState(venue?.following ?? false);
   const [followers, setFollowers] = useState(venue?.followerCount ?? 0);
   const [busy, setBusy] = useState(false);
@@ -198,8 +208,8 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
   if (venue) {
     const status = openStatus(venue.hours, new Date());
     return (
-      <li className="placerow placerow--venue">
-        <button type="button" className="placerow__profile" onClick={() => void openPage()} aria-label={t('Abrir página de {name}', { name: place.name })}>
+      <li className="placerow placerow--venue" ref={adRef}>
+        <button type="button" className="placerow__profile" onClick={() => { if (place.sponsored) trackSponsoredOpen('EXPLORE', { venueId: venue.id }); void openPage(); }} aria-label={t('Abrir página de {name}', { name: place.name })}>
           <VenueLogo name={place.name} logoUrl={venue.logoUrl} size={48} />
           <span className="placerow__info">
             <span className="placerow__name">{place.name}{place.sponsored ? <span className="tag-sponsored">{t('Patrocinado')}</span> : null}</span>

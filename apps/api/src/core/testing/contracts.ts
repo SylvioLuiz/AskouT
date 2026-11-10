@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { AppSettingsRepository, DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+import type { AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
   CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -20,6 +20,7 @@ export interface RepoHarness {
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
   boosts: BoostRepository;
+  boostStats: BoostStatsRepository;
   settings: AppSettingsRepository;
   dwell: DwellRepository;
   regions: RegionRepository;
@@ -516,6 +517,33 @@ export function defineRepositoryContract(
         assert.equal(await h.boosts.transition(b.id, ['PAID'], 'CANCELLED'), false, 'estado de origem errado não muda');
         assert.equal(await h.boosts.transition(b.id, ['PENDING_PAYMENT'], 'CANCELLED'), true);
         assert.equal(await h.boosts.markPaid(b.id, window), false, 'cancelado não paga');
+      });
+
+      it('relatório do anúncio: conta cada chave uma vez por dia e tipo, lista por dia e apaga só as marcações velhas', async () => {
+        const owner = await newUser('relatorio');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar Relatório', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: owner };
+        await h.places.createVenue(v);
+        const t0 = new Date(Date.UTC(2030, 0, 10, 12));
+        const boost: BoostRecord = { id: randomUUID(), venueId: v.id, channel: 'WEB', ownerId: owner, target: 'VENUE', eventId: null, days: 3, amountCents: 3490, status: 'PAID', chargeId: `ch_stats_${v.id}`, payCode: null, payUrl: null, createdAt: t0, paidAt: t0, startsAt: t0, endsAt: new Date(t0.getTime() + 3 * 86_400_000), audience: 'ALL', radiusM: null, matchTags: [] };
+        await h.boosts.create(boost);
+        const base = { boostId: boost.id, kind: 'IMPRESSION' as const, placement: 'EXPLORE' as const };
+        assert.equal(await h.boostStats.countOnce({ ...base, day: '2030-01-10', viewerKey: 'k1' }), true);
+        assert.equal(await h.boostStats.countOnce({ ...base, day: '2030-01-10', viewerKey: 'k1' }), false, 'mesma chave no mesmo dia não conta de novo');
+        assert.equal(await h.boostStats.countOnce({ ...base, day: '2030-01-10', placement: 'HOME', viewerKey: 'k1' }), false, 'nem em outro lugar do app');
+        assert.equal(await h.boostStats.countOnce({ ...base, day: '2030-01-10', placement: 'HOME', viewerKey: 'k2' }), true);
+        assert.equal(await h.boostStats.countOnce({ ...base, day: '2030-01-10', kind: 'OPEN', viewerKey: 'k1' }), true, 'outro tipo conta');
+        assert.equal(await h.boostStats.countOnce({ ...base, day: '2030-01-11', viewerKey: 'k1' }), true, 'outro dia conta');
+        assert.equal(await h.boostStats.wasCounted({ boostId: boost.id, day: '2030-01-10', kind: 'OPEN', viewerKey: 'k1' }), true);
+        assert.equal(await h.boostStats.wasCounted({ boostId: boost.id, day: '2030-01-10', kind: 'OPEN', viewerKey: 'k2' }), false);
+        assert.deepEqual(
+          (await h.boostStats.listByBoost(boost.id)).map((r) => [r.day, r.placement, r.kind, r.count]),
+          [['2030-01-10', 'EXPLORE', 'IMPRESSION', 1], ['2030-01-10', 'EXPLORE', 'OPEN', 1], ['2030-01-10', 'HOME', 'IMPRESSION', 1], ['2030-01-11', 'EXPLORE', 'IMPRESSION', 1]],
+        );
+        assert.equal(await h.boostStats.purgeSeenBefore('2030-01-11'), 3, 'apaga as marcações do dia 10');
+        assert.equal(await h.boostStats.wasCounted({ boostId: boost.id, day: '2030-01-11', kind: 'IMPRESSION', viewerKey: 'k1' }), true, 'as do dia 11 ficam');
+        assert.equal((await h.boostStats.listByBoost(boost.id)).length, 4, 'os contadores ficam');
+        assert.deepEqual(await h.boostStats.listByBoost(randomUUID()), []);
+        assert.deepEqual(await h.boostStats.listByBoost('nao-e-uuid'), []);
       });
 
       it('configurações: sem valor devolve nada; grava, troca e guarda quem mudou', async () => {

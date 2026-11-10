@@ -303,12 +303,14 @@ export function VenuesScreen() {
               ))}
             </ul>
           )}
-          <Button full onClick={() => setClaiming(true)}>
-            {t('Reivindicar um local')}
-          </Button>
-          <Button full variant="secondary" onClick={() => setCreatingOrg(true)}>
-            {t('Criar página de organização (bateria, atlética...)')}
-          </Button>
+          <div className="venueactions">
+            <Button full onClick={() => setClaiming(true)}>
+              {t('Reivindicar um local')}
+            </Button>
+            <Button full variant="secondary" onClick={() => setCreatingOrg(true)}>
+              {t('Criar página de organização (bateria, atlética...)')}
+            </Button>
+          </div>
         </>
       ) : null}
       {creatingOrg ? (

@@ -1,7 +1,7 @@
-import { HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../adapters/crypto.ts';
+import { AesGcmSecretBox, HmacMfaChallengeTokens, HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../adapters/crypto.ts';
 import { createCore } from '../index.ts';
 import type { RouteSource } from '../ports.ts';
-import type { AuthResult } from '../auth-service.ts';
+import type { AuthResult, MfaChallenge } from '../auth-service.ts';
 import {
   FakeClock,
   FakePlaceSource,
@@ -21,10 +21,12 @@ import {
   InMemoryBlockRepository,
   InMemoryFollowRepository,
   InMemoryPasswordResetRepository,
+  InMemoryMfaRepository,
   InMemoryBoostRepository,
   InMemoryActivityRepository,
   InMemoryDwellRepository,
-  InMemoryRegionRepository,
+  InMemoryBoostStatsRepository,
+  InMemoryConsentRepository, InMemoryRegionRepository,
   InMemoryAccountRepository,
   FakePaymentGateway,
   FakeStoreVerifier,
@@ -65,15 +67,18 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const calendarFetcher = new FakeCalendarFetcher();
   const placeSource = new FakePlaceSource();
   const users = new InMemoryUserRepository();
-  const admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom });
+  const identitiesRepo = new InMemoryIdentityRepository();
+  const admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom, identities: identitiesRepo });
   const pending = new InMemoryPendingSignupRepository();
   const passwordResets = new InMemoryPasswordResetRepository();
+  const mfa = new InMemoryMfaRepository();
   const boosts = new InMemoryBoostRepository();
+  const boostStats = new InMemoryBoostStatsRepository();
   const dwell = new InMemoryDwellRepository();
   const activity = new InMemoryActivityRepository({ posts, feed, eventRoom, follows, places });
   const regions = new InMemoryRegionRepository();
-  const identitiesRepo = new InMemoryIdentityRepository();
-  const account = new InMemoryAccountRepository(users, follows, blocks, regions, identitiesRepo);
+  const consents = new InMemoryConsentRepository();
+  const account = new InMemoryAccountRepository(users, follows, blocks, regions, identitiesRepo, consents);
   const payments = options.payments ?? new FakePaymentGateway();
   const store = options.store;
   const settings = new InMemoryAppSettingsRepository();
@@ -84,10 +89,12 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const ids = new SequentialIds();
   const hasher = new ScryptPasswordHasher({ N: 2 ** 10 });
   const tokens = new Hs256TokenService({ secret: TEST_SECRET, nowMs: () => clock.now().getTime() });
+  const secretBox = new AesGcmSecretBox({ secret: TEST_SECRET });
+  const mfaChallenges = new HmacMfaChallengeTokens({ secret: TEST_SECRET, nowMs: () => clock.now().getTime() });
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), pending, passwordResets, boosts, dwell, activity, regions, account, payments, settings, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), pending, passwordResets, mfa, secretBox, mfaChallenges, boosts, boostStats, dwell, activity, regions, consents, account, payments, settings, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string; minor?: boolean } = {}): Promise<AuthResult> {
@@ -107,5 +114,12 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
     return out;
   }
 
-  return { core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, boosts, dwell, regions, account, payments, settings, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+  return { mfa, secretBox, mfaChallenges, core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, boosts, boostStats, dwell, regions, consents, account, payments, settings, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+}
+
+/** Nos testes sem verificação em duas etapas, o login sempre devolve a sessão. */
+export async function asSession(pending: Promise<AuthResult | MfaChallenge>): Promise<AuthResult> {
+  const result = await pending;
+  if ('mfaRequired' in result) throw new Error('Esperava sessão, veio desafio de MFA');
+  return result;
 }

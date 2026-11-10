@@ -60,14 +60,11 @@ export function ConversationsScreen() {
 
   return (
     <div className={`convscreen${cameBack ? ' convscreen--back' : ''}`}>
-      <PageHead
-        title={t('Conversas')}
-        action={
-          <button type="button" className="iconbtn" aria-label={t('Nova conversa')} onClick={() => setCreating(true)}>
-            <PlusIcon />
-          </button>
-        }
-      />
+      <PageHead title={t('Conversas')} />
+      <button type="button" className="fab" onClick={() => setCreating(true)}>
+        <PlusIcon />
+        {t('Nova conversa')}
+      </button>
       {creating ? <NewConversationSheet onClose={() => setCreating(false)} /> : null}
       {items.length === 0 ? (
         <EmptyState

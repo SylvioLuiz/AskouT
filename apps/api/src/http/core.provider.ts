@@ -3,7 +3,7 @@ import { GooglePlayPurchaseVerifier, StorePurchaseRouter } from '../infra/store/
 import { GoogleAccessTokens } from '../infra/google/service-account.ts';
 import { FcmSender, NativePushRouter } from '../infra/push/fcm-sender.ts';
 import type { PrismaClient } from '@prisma/client';
-import { HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../core/adapters/crypto.ts';
+import { AesGcmSecretBox, HmacMfaChallengeTokens, HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../core/adapters/crypto.ts';
 import { SystemClock, UuidGenerator } from '../core/adapters/system.ts';
 import { createCore } from '../core/index.ts';
 import {
@@ -25,9 +25,11 @@ import {
   PrismaFlashRepository,
   PrismaFollowRepository,
   PrismaPasswordResetRepository,
+  PrismaMfaRepository,
   PrismaBoostRepository,
+  PrismaBoostStatsRepository,
   PrismaAppSettingsRepository,
-  PrismaDwellRepository, PrismaRegionRepository, PrismaAccountRepository,
+  PrismaDwellRepository, PrismaRegionRepository, PrismaConsentRepository, PrismaAccountRepository,
   PrismaActivityRepository,
   PrismaPendingSignupRepository,
   PrismaIdentityRepository,
@@ -94,11 +96,17 @@ export const coreProvider = {
       routes: new OsrmRouteSource({ baseUrl: process.env['OSRM_URL']?.trim() || undefined }),
       pending: new PrismaPendingSignupRepository(prisma),
       passwordResets: new PrismaPasswordResetRepository(prisma),
+      // Verificação em duas etapas (TOTP): grátis, sem serviço externo. As chaves saem do CODE_SECRET.
+      mfa: new PrismaMfaRepository(prisma),
+      secretBox: new AesGcmSecretBox({ secret: config.codeSecret }),
+      mfaChallenges: new HmacMfaChallengeTokens({ secret: config.codeSecret }),
       boosts: new PrismaBoostRepository(prisma),
+      boostStats: new PrismaBoostStatsRepository(prisma),
       settings: new PrismaAppSettingsRepository(prisma),
       dwell: new PrismaDwellRepository(prisma),
       activity: new PrismaActivityRepository(prisma),
       regions: new PrismaRegionRepository(prisma),
+      consents: new PrismaConsentRepository(prisma),
       account: new PrismaAccountRepository(prisma),
       payments: config.stripe ? new StripePaymentGateway(config.stripe) : config.paymentProvider === 'sandbox' ? new SandboxPaymentGateway() : new UnconfiguredPaymentGateway(),
       ...(config.boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents: config.boostPricePerDayCents }),

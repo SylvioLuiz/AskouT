@@ -3,7 +3,7 @@ import { isUuid } from './helpers.ts';
 import type { AdminRepository } from '../../core/ports.ts';
 import type {
   AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
-  AuditAction, AuditRecord, AuditRow, Page, PostReportReason, ReportResolution, UserStatus,
+  AuditAction, AuditRecord, AuditRow, ExternalProvider, Page, PostReportReason, ReportResolution, UserStatus,
 } from '../../core/types.ts';
 
 const MISSING = '(removido)';
@@ -70,12 +70,19 @@ export class PrismaAdminRepository implements AdminRepository {
       select: { id: true, email: true, status: true, role: true, createdAt: true, birthDate: true, profile: { select: { username: true, displayName: true } } },
     });
     const ids = users.map((u) => u.id);
-    const [posts, postReports, convReports] = await Promise.all([
+    const [posts, postReports, convReports, identities] = await Promise.all([
       this.prisma.post.groupBy({ by: ['authorId'], where: { authorId: { in: ids } }, _count: { _all: true } }),
       this.prisma.postReport.findMany({ where: { post: { authorId: { in: ids } } }, select: { post: { select: { authorId: true } } } }),
       this.prisma.conversationReport.groupBy({ by: ['reportedUserId'], where: { reportedUserId: { in: ids } }, _count: { _all: true } }),
       this.prisma.externalIdentity.findMany({ where: { userId: { in: ids } }, select: { userId: true, provider: true } }),
     ]);
+    const providersBy = new Map<string, Set<ExternalProvider>>();
+    for (const i of identities) {
+      if (i.provider !== 'GOOGLE' && i.provider !== 'APPLE') continue;
+      const set = providersBy.get(i.userId) ?? new Set<ExternalProvider>();
+      set.add(i.provider);
+      providersBy.set(i.userId, set);
+    }
     const postsBy = new Map(posts.map((r) => [r.authorId, r._count._all]));
     const reports = new Map<string, number>();
     for (const r of postReports) reports.set(r.post.authorId, (reports.get(r.post.authorId) ?? 0) + 1);
@@ -84,6 +91,7 @@ export class PrismaAdminRepository implements AdminRepository {
       id: u.id, email: u.email, username: u.profile?.username ?? MISSING, displayName: u.profile?.displayName ?? '', status: u.status, role: u.role,
       createdAt: u.createdAt, postsCount: postsBy.get(u.id) ?? 0, reportsCount: reports.get(u.id) ?? 0,
       birthDate: u.birthDate ? u.birthDate.toISOString().slice(0, 10) : null,
+      loginProviders: [...(providersBy.get(u.id) ?? [])].sort(),
     }));
   }
 
