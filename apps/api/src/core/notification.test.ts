@@ -57,7 +57,7 @@ describe('avisos', () => {
     assert.equal(await w.core.notifications.latestUnreadAt(bia!), null);
   });
 
-  it('mensagem avisa quem recebe, sem o texto, e junta avisos enquanto não leu', async () => {
+  it('mensagem avisa quem recebe, com um pedaço do texto, e junta avisos enquanto não leu', async () => {
     const w = makeWorld();
     const { ana, bia } = await friends(w, 'ana', 'bia');
     const { id } = await w.core.conversations.open(ana!, bia!);
@@ -67,7 +67,7 @@ describe('avisos', () => {
     const list = await w.core.notifications.list(bia!);
     assert.equal(list.unread, 1, 'um aviso só por conversa enquanto não lido');
     assert.equal(list.items[0]!.type, 'MESSAGE');
-    assert.ok(!list.items[0]!.body.includes('segredo'), 'o texto da mensagem não vai no aviso');
+    assert.equal(list.items[0]!.body, 'segredo 123', 'o aviso do sino mostra um pedaço da primeira mensagem não lida');
     assert.equal(list.items[0]!.url, `/conversas/${id}`);
     assert.equal((await w.core.notifications.list(ana!)).unread, 0, 'quem escreveu não é avisado');
     await w.core.notifications.markRead(bia!, list.items[0]!.id);
@@ -83,6 +83,7 @@ describe('avisos', () => {
     for (const body of ['oi', 'tá aí?', 'bora?']) await w.core.conversations.send(ana!, id, { body });
     await w.core.flushNotifications();
     assert.equal(w.push.sent.filter((s) => s.message.url === `/conversas/${id}`).length, 3, 'um push por mensagem');
+    assert.deepEqual(w.push.sent.filter((s) => s.message.url === `/conversas/${id}`).map((s) => s.message.body), ['oi', 'tá aí?', 'bora?'], 'cada push mostra o texto da mensagem');
     assert.equal((await w.core.notifications.list(bia!)).unread, 1, 'o sino continua com um aviso só por conversa');
   });
 

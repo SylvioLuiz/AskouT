@@ -1,6 +1,6 @@
 /**
- * Ponte `window.AskouTPush`: avisos (push) no app. No iPhone, pede permissão, registra o aparelho na Apple e devolve o token,
- * que o app web manda para o servidor (`apns:<token>`). Também avisa quando a pessoa toca num aviso, com o caminho a abrir.
+ * Ponte `window.AskouTPush`: avisos (push) no app. Pede permissão, registra o aparelho (na Apple no iPhone, no FCM no Android)
+ * e devolve o token, que o app web manda para o servidor (`apns:<token>` ou `fcm:<token>`). Também avisa quando a pessoa toca num aviso, com o caminho a abrir.
  */
 
 export type PushPermission = 'granted' | 'denied' | 'prompt';
@@ -66,7 +66,7 @@ export function createPushBridge(deps: { push: PushPluginLike; open: (path: stri
           for (const h of handles) void h.then((x) => x.remove()).catch(() => undefined);
           fn();
         };
-        const timer = setTimeout(() => done(() => reject(new Error('O iPhone não respondeu ao registrar os avisos. Tente de novo.'))), timeoutMs);
+        const timer = setTimeout(() => done(() => reject(new Error('O aparelho não respondeu ao registrar os avisos. Tente de novo.'))), timeoutMs);
         handles.push(deps.push.addListener('registration', (t) => done(() => resolve(t.value))));
         handles.push(deps.push.addListener('registrationError', (e) => done(() => reject(new Error(e.error || 'Não foi possível registrar os avisos.')))));
         deps.push.register().catch((e: unknown) => done(() => reject(e instanceof Error ? e : new Error(String(e)))));

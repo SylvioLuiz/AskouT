@@ -58,9 +58,10 @@ if (Capacitor.isNativePlatform()) {
   if (Capacitor.getPlatform() === 'ios') {
     // O botão da Apple da web não abre dentro do app; no iPhone entra a janela nativa.
     w['AskouTApple'] = createAppleBridge({ login: SocialLogin as never });
-    // Avisos fora do app: o token vai para o servidor pelo app web; tocar no aviso abre a tela certa.
-    w['AskouTPush'] = createPushBridge({ push: PushNotifications as never, open: (path) => openInApp(path, window) });
   }
+  // Avisos fora do app (iPhone pela Apple, Android pelo FCM): o token vai para o servidor pelo app web
+  // (`apns:` ou `fcm:`); tocar no aviso abre a tela certa.
+  w['AskouTPush'] = createPushBridge({ push: PushNotifications as never, open: (path) => openInApp(path, window) });
   void StatusBar.setStyle({ style: Style.Default }).catch(() => undefined);
   void SplashScreen.hide().catch(() => undefined);
 }

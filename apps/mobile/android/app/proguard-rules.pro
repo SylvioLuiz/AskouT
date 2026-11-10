@@ -1,21 +1,32 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Regras do R8 para o build de release do AskouT.
+# O Capacitor já traz regras para as classes de plugin (@CapacitorPlugin, @PluginMethod). Aqui guardamos também
+# os pacotes inteiros dos plugins: são pequenos e alguns leem classes ou JSON por reflexão. O R8 continua
+# enxugando AndroidX, Google Play Services e as demais bibliotecas grandes.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Pontes entre o WebView e o código nativo.
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keepattributes JavascriptInterface
+-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod, Exceptions
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Capacitor e Cordova.
+-keep class com.getcapacitor.** { *; }
+-keep class org.apache.cordova.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# App (MainActivity e o que mais houver no pacote).
+-keep class br.com.askout.** { *; }
+
+# Plugins usados pelo app (ver capacitor.settings.gradle).
+-keep class com.capacitorjs.plugins.** { *; }
+-keep class getcapacitor.community.contacts.** { *; }
+-keep class ee.forgr.capacitor.social.login.** { *; }
+-keep class ee.forgr.nativepurchases.** { *; }
+-keep class com.atomic.videocompressor.** { *; }
+
+# Compras no Google Play (Billing).
+-keep class com.android.vending.billing.** { *; }
+
+# Mantém as linhas nos relatórios de erro (o Play Console desofusca com o mapping.txt que sai junto do AAB).
+-keepattributes SourceFile, LineNumberTable
+-renamesourcefileattribute SourceFile

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PINNED_MAX, REACTIONS, TYPING_TTL_MS } from './conversation-service.ts';
+import { PINNED_MAX, REACTIONS, TYPING_TTL_MS, messagePreview } from './conversation-service.ts';
 import { CHAT_IMAGE_MAX_BYTES, parseChatMedia } from './media.ts';
 import { rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
@@ -257,4 +257,14 @@ test('digitando: em grupo lista quem digita e some para quem tem bloqueio', asyn
   assert.deepEqual((await w.core.conversations.messages(ana, g.id)).typing, ['bia']);
   const outsider = (await w.signUp('zeca')).user.id;
   await rejectsWith(w.core.conversations.typing(outsider, g.id), 'NOT_FOUND');
+});
+test('texto: o aviso mostra um pedaço da mensagem (1 a 1)', async () => {
+  const { w, ana, bia, id } = await setup();
+  await w.core.conversations.send(ana, id, { body: '  Bora   sair\nhoje?  ' });
+  const notices = (await w.core.notifications.list(bia)).items.filter((n) => n.type === 'MESSAGE');
+  assert.deepEqual(notices.map((n) => [n.title, n.body]), [['ana', 'Bora sair hoje?']]);
+  assert.equal(messagePreview('a'.repeat(150))?.length, 100);
+  assert.ok(messagePreview('a'.repeat(150))?.endsWith('…'));
+  assert.equal(messagePreview('😀'.repeat(120))?.startsWith('😀'.repeat(99)), true);
+  assert.equal(messagePreview('   '), undefined);
 });

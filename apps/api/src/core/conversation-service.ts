@@ -578,7 +578,9 @@ export class ConversationService {
     const actorName = actorProfile?.username ?? 'Alguém';
     // Dentro da conversa aparece o nome real; o aviso (sino/push) usa só o usuário.
     const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
-    await this.notifyMembers(actorId, actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um rolê' : 'enviou uma mensagem');
+    // Mensagem de texto: o aviso (sino/push) mostra um pedaço do que foi escrito; os outros tipos dizem o que foi enviado.
+    const preview = kind === 'TEXT' && !gif ? messagePreview(body) : undefined;
+    await this.notifyMembers(actorId, actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um rolê' : 'enviou uma mensagem', preview);
     const decor = await this.decorate(actorId, [message]);
     return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard, replyTo: decor.replies.get(message.id) ?? null });
   }
@@ -709,11 +711,14 @@ export class ConversationService {
   }
 
   /** Avisa os outros membros (menos quem bloqueou ou foi bloqueado por quem escreveu). O texto da mensagem não vai no aviso. */
-  private async notifyMembers(actorId: string, actorName: string, conversation: ConversationRecord, memberIds: string[], what: string): Promise<void> {
+  /** `preview`: trecho do texto da mensagem; quando vem, entra no lugar de "enviou uma mensagem". */
+  private async notifyMembers(actorId: string, actorName: string, conversation: ConversationRecord, memberIds: string[], what: string, preview?: string): Promise<void> {
     const hidden = new Set(await this.deps.blocks.listRelatedIds(actorId));
     const muted = new Set(await this.deps.conversations.mutedUserIds(conversation.id));
     const title = conversation.type === 'GROUP' ? (conversation.name ?? 'Grupo') : actorName;
-    const body = conversation.type === 'GROUP' ? `${actorName} ${what}` : what.charAt(0).toUpperCase() + what.slice(1);
+    const body = preview
+      ? conversation.type === 'GROUP' ? `${actorName}: ${preview}` : preview
+      : conversation.type === 'GROUP' ? `${actorName} ${what}` : what.charAt(0).toUpperCase() + what.slice(1);
     for (const id of memberIds) {
       if (id === actorId || hidden.has(id) || muted.has(id)) continue;
       // O aviso mostra a foto de quem escreveu (a lista troca pela de quem escreveu por último na conversa).
@@ -1002,4 +1007,12 @@ export class ConversationService {
     if (!other) throw notFound('Conversa não encontrada');
     return { conversation, memberIds, otherId, other };
   }
+}
+
+/** Pedaço da mensagem para o aviso: uma linha só, até 100 caracteres (sem cortar emoji ao meio), com "…" se passar. */
+export function messagePreview(text: string, max = 100): string | undefined {
+  const line = text.replace(/\s+/g, ' ').trim();
+  if (line === '') return undefined;
+  const chars = Array.from(line);
+  return chars.length <= max ? line : `${chars.slice(0, max - 1).join('').trimEnd()}…`;
 }
