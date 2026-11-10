@@ -62,7 +62,8 @@ export function Shell({ children }: { children: ReactNode }) {
   }, []);
   // Solicitações de seguir pendentes: alimentam a bolinha em Atividades.
   const pending = useAsync(() => api.followRequests({ limit: 1 }), [pathname]);
-  const unreadNews = useAsync(() => api.unreadNotifications(), [pathname]);
+  // As bolinhas (avisos, NOW, conversas) não pedem de novo a cada troca de tela: já atualizam por polling e por eventos.
+  const unreadNews = useAsync(() => api.unreadNotifications(), []);
   usePolling(unreadNews.reload, 20_000);
   // O sino só mostra bolinha para o que chegou depois da última vez que Atividades foi aberta.
   const [, setSeenTick] = useState(0);
@@ -92,8 +93,8 @@ export function Shell({ children }: { children: ReactNode }) {
   }
   const hasPending = hasNewActivity({ latestUnreadAt: unreadNews.data?.latestUnreadAt ?? null, requests: pending.data?.total ?? 0 }, readActivitySeen(storage, user.id));
   // Flash: o raio fica cheio com o Flash ligado e ganha uma bolinha quando alguém te convida.
-  const flash = useAsync(() => api.flashStatus(), [pathname]);
-  const flashInvites = useAsync(() => api.flashInvites(), [pathname]);
+  const flash = useAsync(() => api.flashStatus(), []);
+  const flashInvites = useAsync(() => api.flashInvites(), []);
   const reloadFlash = () => {
     flash.reload();
     flashInvites.reload();
@@ -104,7 +105,7 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(FLASH_CHANGED_EVENT, reloadFlash);
   });
   // Conversas: bolinha quando há mensagem não lida.
-  const convs = useAsync(() => api.conversations(), [pathname]);
+  const convs = useAsync(() => api.conversations(), []);
   usePolling(convs.reload, 15_000);
   useEffect(() => {
     window.addEventListener(CHATS_CHANGED_EVENT, convs.reload);

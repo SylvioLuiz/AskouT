@@ -1,11 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from './App.tsx';
 import './styles.css';
 
 import { installChunkReload } from './lib/chunk-reload.ts';
 
-import { getLocale } from './lib/i18n/index.ts';
+import { getLocale, loadLocale } from './lib/i18n/index.ts';
 import { applyTheme, readTheme } from './lib/theme.ts';
 
 installChunkReload();
@@ -21,8 +20,12 @@ try {
 const root = document.getElementById('root');
 if (!root) throw new Error('Elemento #root não encontrado');
 
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+// O app é importado só depois do dicionário: vários textos são traduzidos já ao carregar os módulos.
+void loadLocale().then(async () => {
+  const { App } = await import('./App.tsx');
+  createRoot(root).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+});

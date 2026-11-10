@@ -1,6 +1,3 @@
-import { EN } from './en.ts';
-import { ES } from './es.ts';
-
 /**
  * Idiomas do app. O texto original (português do Brasil) é a própria chave: `t('Entrar')`.
  * Se faltar tradução, aparece o português (nunca uma chave quebrada).
@@ -15,7 +12,23 @@ export const LOCALES: ReadonlyArray<{ code: Locale; label: string }> = [
 ];
 
 const STORAGE_KEY = 'askout.locale';
-const DICTIONARIES: Record<Locale, Readonly<Record<string, string>>> = { 'pt-BR': {}, en: EN, es: ES };
+// Os dicionários en/es pesam ~360 kB; só o do idioma em uso é baixado (ver loadLocale, chamada antes de abrir o app).
+const DICTIONARIES: Record<Locale, Readonly<Record<string, string>>> = { 'pt-BR': {}, en: {}, es: {} };
+
+/** Baixa o dicionário do idioma atual (pt-BR não precisa). Chame e espere antes de desenhar a primeira tela. */
+export async function loadLocale(): Promise<void> {
+  try {
+    if (current === 'en') DICTIONARIES.en = (await import('./en.ts')).EN;
+    else if (current === 'es') DICTIONARIES.es = (await import('./es.ts')).ES;
+  } catch {
+    /* sem o dicionário, aparece o português */
+  }
+}
+
+/** Só para testes. */
+export function registerDictionaryForTests(locale: Locale, dictionary: Readonly<Record<string, string>>): void {
+  DICTIONARIES[locale] = dictionary;
+}
 
 /** Escolha do idioma a partir de um código do aparelho (`en-US`, `es-MX`, `pt-PT`...). */
 export function pickLocale(code: string | undefined): Locale {

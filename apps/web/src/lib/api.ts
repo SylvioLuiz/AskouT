@@ -141,7 +141,24 @@ function toQuery(values: Record<string, string | number | undefined>): string {
 }
 
 export function createApi(deps: ApiDeps) {
-  async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+  // Pedidos GET idênticos feitos ao mesmo tempo (ex.: duas telas pedindo a mesma lista) viram uma só ida à rede.
+  const inFlight = new Map<string, Promise<unknown>>();
+
+  function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+    if (method !== 'GET') return send<T>(method, path, options);
+    const key = `${options.auth === false ? '' : (deps.getToken() ?? '')}|${path}`;
+    const running = inFlight.get(key);
+    if (running) return running as Promise<T>;
+    const started = send<T>(method, path, options);
+    inFlight.set(key, started);
+    const done = () => {
+      if (inFlight.get(key) === started) inFlight.delete(key);
+    };
+    started.then(done, done);
+    return started;
+  }
+
+  async function send<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
     const useAuth = options.auth !== false;
     const token = useAuth ? deps.getToken() : undefined;
 
@@ -499,6 +516,14 @@ export function createApi(deps: ApiDeps) {
     venuePosts: (venueId: string, page?: PageRequest) => request<PostsPage>('GET', `/venues/${id(venueId)}/posts${pageQuery(page)}`),
     createVenuePost: (venueId: string, input: { images: string[]; caption?: string }) => request<PostView>('POST', `/me/venues/${id(venueId)}/posts`, { body: input }),
     openExternalVenue: (input: { key: string; lat: number; lng: number }) => request<{ venueId: string }>('POST', '/venues/external', { body: input }),
+    cloakroom: (eventId: string) => request<CloakroomPublic>('GET', `/events/${id(eventId)}/cloakroom`),
+    requestCloakroomTicket: (eventId: string, body: { description: string; itemCount: number }) => request<CloakroomTicket>('POST', `/events/${id(eventId)}/cloakroom/tickets`, { body }),
+    cancelCloakroomTicket: (ticketId: string) => request<CloakroomTicket>('DELETE', `/cloakroom/tickets/${id(ticketId)}`),
+    cloakroomPanel: (venueId: string, eventId: string) => request<CloakroomPanel>('GET', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom`),
+    saveCloakroom: (venueId: string, eventId: string, body: CloakroomSettingBody) => request<CloakroomPanel>('PUT', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom`, { body }),
+    cloakroomLookup: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/lookup`, { body: { code } }),
+    cloakroomReceive: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/receive`, { body: { code } }),
+    cloakroomReturn: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/return`, { body: { code } }),
     deleteVenueEvent: (venueId: string, eventId: string) => request<{ deleted: true }>('DELETE', `/me/venues/${id(venueId)}/events/${id(eventId)}`),
 
     // Conversas
@@ -516,14 +541,6 @@ export function createApi(deps: ApiDeps) {
     sendAudio: (conversationId: string, audio: string, audioMs: number, replyToId?: string) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { audio, audioMs, ...(replyToId ? { replyToId } : {}) } }),
     /** Foto ou vídeo: o arquivo vai cru no corpo (sem base64), com o tipo no Content-Type. */
-    cloakroom: (eventId: string) => request<CloakroomPublic>('GET', `/events/${id(eventId)}/cloakroom`),
-    requestCloakroomTicket: (eventId: string, body: { description: string; itemCount: number }) => request<CloakroomTicket>('POST', `/events/${id(eventId)}/cloakroom/tickets`, { body }),
-    cancelCloakroomTicket: (ticketId: string) => request<CloakroomTicket>('DELETE', `/cloakroom/tickets/${id(ticketId)}`),
-    cloakroomPanel: (venueId: string, eventId: string) => request<CloakroomPanel>('GET', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom`),
-    saveCloakroom: (venueId: string, eventId: string, body: CloakroomSettingBody) => request<CloakroomPanel>('PUT', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom`, { body }),
-    cloakroomLookup: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/lookup`, { body: { code } }),
-    cloakroomReceive: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/receive`, { body: { code } }),
-    cloakroomReturn: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/return`, { body: { code } }),
     sendMedia: async (conversationId: string, file: Blob, replyToId?: string): Promise<ChatMessage> => {
       const token = deps.getToken();
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
