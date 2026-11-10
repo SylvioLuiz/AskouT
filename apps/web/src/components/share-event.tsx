@@ -1,7 +1,7 @@
 import { VenueLink } from './venue-link.tsx';
 import { shareOrigin } from '../lib/public-origin.ts';
 import { trackShare } from './dwell.tsx';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckIcon, PlusIcon, RepostIcon } from './icons.tsx';
 import { ShareSheet } from './share-sheet.tsx';
 import type { ShareAction } from './share-sheet.tsx';
@@ -68,7 +68,23 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
 /** Cartão do evento dentro da conversa. */
 export function EventBubble({ event }: { event: EventCard }) {
   const [failed, setFailed] = useState(false);
-  const image = failed ? null : safeImage(event.imageUrl);
+  // O cartão traz só capas públicas; foto do Google (assinada) só a página do evento entrega. Sem capa no cartão, busca lá.
+  const cardImage = safeImage(event.imageUrl);
+  const [fetched, setFetched] = useState<string | null>(null);
+  useEffect(() => {
+    if (cardImage) return;
+    let cancelled = false;
+    api.eventPage(event.id).then(
+      (page) => {
+        if (!cancelled && page.coverPath) setFetched(page.coverPath.startsWith('/') ? api.assetUrl(page.coverPath) : safeImage(page.coverPath));
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [event.id, cardImage]);
+  const image = failed ? null : (cardImage ?? fetched);
   return (
     <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evbubble">
       <span className={`evcover evcover--wide evcover--${event.kind.toLowerCase()}`}>
