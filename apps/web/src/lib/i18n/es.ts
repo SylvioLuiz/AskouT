@@ -1329,6 +1329,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Ver como os outros veem": "Ver cómo lo ven los demás",
   "Ver conversas": "Ver conversaciones",
   "Ver encontro": "Ver quedada",
+  "Ver evento": "Ver evento",
   "Ver eventos de agora": "Ver eventos de ahora",
   "Ver eventos de hoje": "Ver eventos de hoy",
   "Ver item {i}": "Ver elemento {i}",
