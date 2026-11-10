@@ -133,6 +133,7 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
       eventId={post.id}
       title={event.title}
       startsAt={event.startsAt}
+      endsAt={event.endsAt}
       whenText={formatWhen(event.startsAt, event.endsAt, new Date())}
       venue={<VenueLink venueId={post.placeVenueId} name={post.placeName ?? t('Evento')} />}
       image={first?.path ? api.assetUrl(first.path) : null}

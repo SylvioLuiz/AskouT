@@ -8,6 +8,7 @@ import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { emailLink, filterTargets, nativeShare, nativeShareAvailable, sentText, shareTargets, telegramLink, whatsappLink } from '../lib/share-targets.ts';
 import type { ShareTarget } from '../lib/share-targets.ts';
+import { showToast } from '../lib/toast.ts';
 import { t } from '../lib/i18n/index.ts';
 import './share-sheet.css';
 
@@ -60,7 +61,7 @@ async function copyText(text: string): Promise<void> {
  * (toque em um ou mais, mensagem opcional, Enviar) e, embaixo, uma linha de atalhos (copiar link, WhatsApp...).
  * `link` vazio = só dentro do app (ex.: evento privado).
  */
-export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, actions = [], note, onClose }: {
+export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, actions = [], note, sentToast, onClose }: {
   title?: string;
   link?: { title: string; text: string; url: string };
   /** Envia para uma conversa; `message` é o texto opcional que a pessoa escreveu. */
@@ -68,6 +69,8 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
   onShared?: () => void;
   actions?: ShareAction[];
   note?: ReactNode;
+  /** Texto do aviso rápido depois de enviar a todos (recebe os nomes). Com ele, a folha fecha sozinha ao enviar. */
+  sentToast?: (names: string[]) => string;
   onClose: () => void;
 }) {
   const data = useAsync(() => Promise.all([api.conversations(), api.friends().catch(() => [])]), []);
@@ -112,6 +115,12 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
     setSent((current) => [...current, ...ok.map((target) => target.key)]);
     setPicked(failed.map((target) => target.key));
     if (ok.length > 0) onShared?.();
+    if (failed.length === 0 && sentToast) {
+      showToast(sentToast(ok.map((target) => target.name)), 800);
+      setBusy(false);
+      onClose();
+      return;
+    }
     if (failed.length === 0) {
       setMessage('');
       setFeedback({ tone: 'ok', text: sentText(ok.map((target) => target.name)) });

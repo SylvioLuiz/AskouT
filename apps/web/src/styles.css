@@ -5636,3 +5636,8 @@ div.optrow__main { cursor: default; }
   place-items: center;
   min-height: 50vh;
 }
+
+/* Aviso rápido (lib/toast.ts): aparece sobre tudo, no pé da tela, e some sozinho. */
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); z-index: 90; max-width: min(90vw, 420px); padding: 12px 18px; border-radius: 999px; background: rgba(20,20,22,.92); color: #fff; font-size: 15px; font-weight: 600; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,.4); transform: translateX(-50%); animation: toast-in .15s ease-out; pointer-events: none; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }

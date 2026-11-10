@@ -58,6 +58,7 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
       link={allowOutside ? { title, text: eventShareText(title), url: eventLink(shareOrigin(), eventId) } : undefined}
       send={send}
       onShared={shared}
+      sentToast={(names) => (names.length === 1 ? t('Evento enviado para: {name}', { name: names[0]! }) : t('Evento enviado para: {name} e mais {n}', { name: names[0]!, n: names.length - 1 }))}
       actions={actions}
       note={note}
       onClose={onClose}

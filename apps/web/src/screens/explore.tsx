@@ -142,6 +142,7 @@ function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
         eventId={event.id}
         title={event.title}
         startsAt={event.startsAt}
+        endsAt={event.endsAt}
         whenText={formatWhen(event.startsAt, event.endsAt, now)}
         venue={<VenueLink venueId={event.venue.id} name={event.venue.name} />}
         image={safeImage(event.imageUrl)}

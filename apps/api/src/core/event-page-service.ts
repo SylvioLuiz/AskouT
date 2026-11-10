@@ -1,6 +1,6 @@
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
 import { distanceMeters } from './geo.ts';
-import { DomainError, forbidden, notFound, validationError } from './errors.ts';
+import { DomainError, conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
 import type { EventKind, EventRef, EventStoryMeta, PostReportReason, PublicProfile, StoryHiddenRecord } from './types.ts';
@@ -326,6 +326,9 @@ export class EventPageService {
     if (owner?.userId !== viewerId) {
       const found = ref.source === 'PLACE' ? await this.deps.places.findEvent(ref.id) : await this.deps.posts.findById(ref.id);
       if (!found) throw notFound('Evento não encontrado');
+      // Depois que o evento termina não se confirma mais presença (a tela também esconde o botão).
+      const endsAt = 'event' in found ? found.event.endsAt : found.post.eventEndsAt;
+      if (endsAt && endsAt.getTime() <= this.deps.clock.now().getTime()) throw conflict('Esse evento já terminou');
       await this.deps.eventRoom.addGoing(ref, viewerId, this.deps.clock.now());
     }
     return this.get(viewerId, ref.id);

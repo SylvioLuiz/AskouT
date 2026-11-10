@@ -27,6 +27,7 @@ export function PosterEvent({
   eventId,
   title,
   startsAt,
+  endsAt,
   whenText,
   venue,
   image,
@@ -38,6 +39,8 @@ export function PosterEvent({
   eventId: string;
   title: string;
   startsAt: string;
+  /** Fim do evento: depois dele não há mais "Eu vou". Sem fim, vale o começo. */
+  endsAt?: string;
   whenText: string;
   venue: ReactNode;
   image: string | null;
@@ -67,6 +70,7 @@ export function PosterEvent({
     }
   }
 
+  const over = Date.parse(endsAt ?? startsAt) <= Date.now();
   const label = confirmedLabel(confirmed);
   return (
     <article className={`poster poster--event${className ? ` ${className}` : ''}`}>
@@ -91,9 +95,11 @@ export function PosterEvent({
         {problem ? <p className="poster__problem" role="alert">{problem}</p> : null}
         <div className="poster__row">
           {label ? <span className="poster__glass">{label}</span> : <span />}
-          <button type="button" className="poster__cta" onClick={() => void toggle()} aria-pressed={going} disabled={busy}>
-            {going ? t('Confirmado') : t('Eu vou')}
-          </button>
+          {over ? null : (
+            <button type="button" className="poster__cta" onClick={() => void toggle()} aria-pressed={going} disabled={busy}>
+              {going ? t('Confirmado') : t('Eu vou')}
+            </button>
+          )}
         </div>
       </div>
     </article>

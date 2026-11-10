@@ -549,6 +549,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Editar votação": "Edit poll",
   "Abrir a página de {name}": "Open the page of {name}",
   "Foto: {author}": "Photo: {author}",
+  "Evento enviado para: {name}": "Event sent to: {name}",
+  "Evento enviado para: {name} e mais {n}": "Event sent to: {name} and {n} more",
   "Eu decido": "I decide",
   "Eu e quem vai": "Me and who's going",
   "Eu vou": "I'm going",
