@@ -55,6 +55,10 @@ services:
       # Android: aviso (FCM) e conferência de compra do Google Play. Colar o JSON da conta de serviço direto no Render (é segredo).
       - key: GOOGLE_SERVICE_ACCOUNT_JSON
         sync: false
+      # Projeto do Firebase do app Android (google-services.json). A conta de serviço acima é de outro projeto
+      # (askout-512422) e precisa do papel "Administrador da API Firebase Cloud Messaging" no askout-2cdcd.
+      - key: FCM_PROJECT_ID
+        value: askout-2cdcd
 databases:
   - name: askout-db
     plan: basic-256mb

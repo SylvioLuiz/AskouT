@@ -30,5 +30,8 @@ test('config: Google é opcional e o teto diário é validado', () => {
   assert.equal(c.googlePlacesKey, undefined);
   assert.equal(c.googleDailyLimit, 500);
   assert.equal(loadConfig({ ...good, GOOGLE_PLACES_API_KEY: ' k ', GOOGLE_DAILY_LIMIT: '50' }).googlePlacesKey, 'k');
+  assert.equal(loadConfig(good).fcmProjectId, undefined);
+  assert.equal(loadConfig({ ...good, FCM_PROJECT_ID: ' askout-2cdcd ' }).fcmProjectId, 'askout-2cdcd');
+  assert.throws(() => loadConfig({ ...good, FCM_PROJECT_ID: 'Projeto Errado' }), /FCM_PROJECT_ID/);
   assert.throws(() => loadConfig({ ...good, GOOGLE_DAILY_LIMIT: '0' }), /GOOGLE_DAILY_LIMIT/);
 });

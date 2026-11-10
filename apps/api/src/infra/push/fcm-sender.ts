@@ -15,10 +15,13 @@ export class FcmSender implements PushSender {
   readonly nativeEnabled = true;
   private readonly tokens: Pick<GoogleAccessTokens, 'get' | 'projectId'>;
   private readonly fetcher: FetchLike;
+  /** Projeto do Firebase do app; sem ele, o da conta de serviço. */
+  private readonly projectId: string | undefined;
 
-  constructor(options: { tokens: Pick<GoogleAccessTokens, 'get' | 'projectId'>; fetch?: FetchLike }) {
+  constructor(options: { tokens: Pick<GoogleAccessTokens, 'get' | 'projectId'>; fetch?: FetchLike; projectId?: string | undefined }) {
     this.tokens = options.tokens;
     this.fetcher = options.fetch ?? ((url, init) => fetch(url, init));
+    this.projectId = options.projectId;
   }
 
   async send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
@@ -32,7 +35,7 @@ export class FcmSender implements PushSender {
         android: { priority: 'HIGH', notification: { tag: message.tag.slice(0, 64) } },
       },
     });
-    const url = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(this.tokens.projectId)}/messages:send`;
+    const url = `https://fcm.googleapis.com/v1/projects/${encodeURIComponent(this.projectId ?? this.tokens.projectId)}/messages:send`;
     const attempt = async (forceNew: boolean) =>
       this.fetcher(url, { method: 'POST', headers: { authorization: `Bearer ${await this.tokens.get(FCM_SCOPE, forceNew)}`, 'content-type': 'application/json' }, body });
     try {

@@ -84,6 +84,13 @@ describe('FCM (aviso no Android)', () => {
     assert.equal(body.message.data.url, '/conversas/1');
   });
 
+  it('com FCM_PROJECT_ID, envia para o projeto do Firebase em vez do da conta de serviço', async () => {
+    const g = fakeGoogle(() => ok({ name: 'projects/askout-2cdcd/messages/1' }));
+    const sender = new FcmSender({ tokens: g.tokens, fetch: g.fetcher, projectId: 'askout-2cdcd' });
+    assert.equal(await sender.send(sub(`fcm:${FCM_TOKEN}`), msg), 'SENT');
+    assert.ok(g.calls.some((c) => c.url === 'https://fcm.googleapis.com/v1/projects/askout-2cdcd/messages:send'));
+  });
+
   it('recusa endereço que não é do Android e trata token inválido como GONE', async () => {
     const g = fakeGoogle(() => ok({ error: { status: 'NOT_FOUND', details: [{ errorCode: 'UNREGISTERED' }] } }, 404));
     const sender = new FcmSender({ tokens: g.tokens, fetch: g.fetcher });

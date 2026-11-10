@@ -40,6 +40,11 @@ export interface AppConfig {
   apns: { keyId: string; teamId: string; privateKey: string; bundleId: string; production: boolean } | undefined;
   /** Conta de serviço do Google (aviso no Android pelo FCM e conferência de compra no Google Play). */
   googleServiceAccount: ServiceAccountCredentials | undefined;
+  /**
+   * Projeto do Firebase onde o app Android está registrado (FCM_PROJECT_ID). Sem isso, o push vai para o projeto da
+   * conta de serviço. Serve quando a conta é de outro projeto (a do Google Play) e recebeu acesso ao FCM do Firebase.
+   */
+  fcmProjectId: string | undefined;
   /** Nome do pacote do app no Google Play. */
   googlePlayPackage: string;
   /** Provedor de pagamento do impulsionamento. “sandbox” é só de teste (não cobra); “stripe” cobra de verdade; sem valor, recusa criar pedidos. */
@@ -154,6 +159,8 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     googleServiceAccount = parseServiceAccount(googleSaRaw);
     if (!googleServiceAccount) problems.push('GOOGLE_SERVICE_ACCOUNT_JSON não é o arquivo JSON de uma conta de serviço do Google (cole o conteúdo inteiro do arquivo baixado)');
   }
+  const fcmProjectId = env.FCM_PROJECT_ID?.trim() || undefined;
+  if (fcmProjectId !== undefined && !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(fcmProjectId)) problems.push('FCM_PROJECT_ID deve ser o ID do projeto do Firebase (ex.: askout-2cdcd), como aparece em Configurações do projeto');
   const googlePlayPackage = env.GOOGLE_PLAY_PACKAGE_NAME?.trim() || 'br.com.askout';
 
   const enabledRaw = env.PAYMENTS_ENABLED?.trim().toLowerCase() ?? '';
@@ -209,5 +216,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, moderationEmail: env.MODERATION_EMAIL?.trim() || 'suporte@askout.com.br', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, giphyApiKey: env.GIPHY_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, moderationEmail: env.MODERATION_EMAIL?.trim() || 'suporte@askout.com.br', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, giphyApiKey: env.GIPHY_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, fcmProjectId, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
 }

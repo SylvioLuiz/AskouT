@@ -87,7 +87,7 @@ export const coreProvider = {
       feed: new PrismaFeedRepository(prisma),
       notifications: new PrismaNotificationRepository(prisma),
       pushSubscriptions: new PrismaPushSubscriptionRepository(prisma),
-      push: new CompositePushSender(config.vapid ? new WebPushSender({ keys: { publicKey: config.vapid.publicKey, privateKey: config.vapid.privateKey }, subject: config.vapid.subject }) : new DisabledPushSender(), googleTokens || config.apns ? new NativePushRouter({ apns: config.apns ? new ApnsSender({ config: config.apns }) : undefined, fcm: googleTokens ? new FcmSender({ tokens: googleTokens }) : undefined }) : undefined),
+      push: new CompositePushSender(config.vapid ? new WebPushSender({ keys: { publicKey: config.vapid.publicKey, privateKey: config.vapid.privateKey }, subject: config.vapid.subject }) : new DisabledPushSender(), googleTokens || config.apns ? new NativePushRouter({ apns: config.apns ? new ApnsSender({ config: config.apns }) : undefined, fcm: googleTokens ? new FcmSender({ tokens: googleTokens, projectId: config.fcmProjectId }) : undefined }) : undefined),
       places: new PrismaPlaceRepository(prisma),
       claims: new PrismaVenueClaimRepository(prisma),
       calendars: new PrismaCalendarRepository(prisma),
