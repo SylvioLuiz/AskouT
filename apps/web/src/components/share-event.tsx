@@ -83,6 +83,7 @@ export function EventBubble({ event }: { event: EventCard }) {
       ) : null}
       {event.going ? <span className="evbubble__going">{t('Você vai')}</span> : null}
       {event.sample ? <span className="tag tag--sample">{t('Exemplo de teste')}</span> : null}
+      <span className="evbubble__cta">{t('Ver evento')}</span>
     </Link>
   );
 }
