@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { DomainError, conflict, forbidden, notFound, rateLimited, unauthorized, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import { checkSignupConsent } from './age-service.ts';
+import { confirmReferralReturn } from './referral-service.ts';
 import type { Actor, ExternalProvider, PendingSignup, Profile, PublicProfile, User, UserRole } from './types.ts';
 import { toPublicProfile } from './types.ts';
 import {
@@ -459,6 +460,8 @@ export class AuthService {
     const user = await this.deps.users.findById(actor.userId);
     const profile = user ? await this.deps.users.findProfileById(user.id) : undefined;
     if (!user || !profile || user.status === 'SUSPENDED') throw unauthorized('Sessão inválida');
+    // Abrir o app em outro dia confirma o convite que trouxe essa pessoa (conta para o selo de quem convidou).
+    await confirmReferralReturn(this.deps, user.id, user.createdAt);
     return { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile), onboarded: Boolean(user.onboardedAt) };
   }
 

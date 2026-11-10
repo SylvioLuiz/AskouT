@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { AppSettingsRepository, DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+import type { ReferralRepository, AppSettingsRepository, DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
   CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -17,6 +17,7 @@ export interface RepoHarness {
   users: UserRepository;
   follows: FollowRepository;
   blocks: BlockRepository;
+  referrals: ReferralRepository;
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
   boosts: BoostRepository;
@@ -230,6 +231,51 @@ export function defineRepositoryContract(
     });
 
     // ---------- Seguimentos ----------
+
+    describe('convites (quem trouxe quem)', () => {
+      it('guarda um convite por pessoa, lista do mais novo ao mais antigo e confirma uma vez só', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const dani = await newUser('dani');
+        assert.equal(await h.referrals.create({ inviteeId: bia, inviterId: ana, createdAt: at(10), qualifiedAt: null }), true);
+        assert.equal(await h.referrals.create({ inviteeId: caio, inviterId: ana, createdAt: at(20), qualifiedAt: null }), true);
+        // o primeiro convite vale: a mesma pessoa não troca de quem a trouxe
+        assert.equal(await h.referrals.create({ inviteeId: bia, inviterId: dani, createdAt: at(30), qualifiedAt: null }), false);
+        assert.deepEqual((await h.referrals.listByInviter(ana, 10)).map((r) => r.inviteeId), [caio, bia]);
+        assert.deepEqual(await h.referrals.listByInviter(dani, 10), []);
+        assert.equal((await h.referrals.listByInviter(ana, 1)).length, 1);
+
+        assert.equal(await h.referrals.qualify(bia, at(100)), true);
+        assert.equal(await h.referrals.qualify(bia, at(200)), false);
+        assert.equal(await h.referrals.qualify(dani, at(200)), false);
+        const rows = await h.referrals.listByInviter(ana, 10);
+        assert.deepEqual(rows.find((r) => r.inviteeId === bia)!.qualifiedAt, at(100));
+        assert.equal(rows.find((r) => r.inviteeId === caio)!.qualifiedAt, null);
+      });
+
+      it('ranking: confirmados primeiro, depois o total, e ignora convidados suspensos', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const dani = await newUser('dani');
+        const edu = await newUser('edu');
+        const fabi = await newUser('fabi');
+        await h.referrals.create({ inviteeId: caio, inviterId: ana, createdAt: at(1), qualifiedAt: null });
+        await h.referrals.create({ inviteeId: dani, inviterId: ana, createdAt: at(2), qualifiedAt: null });
+        await h.referrals.create({ inviteeId: edu, inviterId: bia, createdAt: at(3), qualifiedAt: null });
+        await h.referrals.create({ inviteeId: fabi, inviterId: bia, createdAt: at(4), qualifiedAt: null });
+        await h.referrals.qualify(edu, at(50));
+        assert.deepEqual(await h.referrals.top(10), [
+          { inviterId: bia, total: 2, confirmed: 1 },
+          { inviterId: ana, total: 2, confirmed: 0 },
+        ]);
+        await h.setUserStatus(fabi, 'SUSPENDED');
+        await h.setUserStatus(edu, 'SUSPENDED');
+        assert.deepEqual(await h.referrals.top(10), [{ inviterId: ana, total: 2, confirmed: 0 }]);
+        assert.equal((await h.referrals.top(1)).length, 1);
+      });
+    });
 
     describe('seguimentos', () => {
       it('salva, lê e atualiza o status preservando a data de criação', async () => {

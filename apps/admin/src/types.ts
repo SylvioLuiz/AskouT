@@ -267,3 +267,10 @@ export interface RetentionReport {
   d7: ReturnGroup;
   minSample: number;
 }
+
+/** Quem mais trouxe gente pelo convite (entraram = todos; confirmados = voltaram ao app em outro dia). */
+export interface TopInviter {
+  profile: { userId: string; username: string; displayName: string; avatarUrl: string | null };
+  brought: number;
+  confirmed: number;
+}

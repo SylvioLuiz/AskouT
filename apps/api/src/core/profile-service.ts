@@ -1,3 +1,4 @@
+import type { ReferralService } from './referral-service.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { normalizePhone } from './phone.ts';
 import { forbidden, notFound, validationError } from './errors.ts';
@@ -36,6 +37,8 @@ export interface ProfileView {
   };
   /** Fonte única para liberar conteúdo (publicações etc.): perfil público, próprio ou seguidor aprovado. */
   canViewContent: boolean;
+  /** Selo de quem trouxe amigos: quantos amigos confirmados, ou null sem selo (não alcançou ou escondeu). */
+  referralBadge: number | null;
 }
 
 export interface ProfilePatch {
@@ -49,9 +52,11 @@ export const SEARCH_MAX_LIMIT = 50;
 
 export class ProfileService {
   private readonly deps: CoreDeps;
+  private readonly referrals: ReferralService;
 
-  constructor(deps: CoreDeps) {
+  constructor(deps: CoreDeps, referrals: ReferralService) {
     this.deps = deps;
+    this.referrals = referrals;
   }
 
   async getByUsername(viewerId: string, rawUsername: unknown): Promise<ProfileView> {
@@ -66,6 +71,7 @@ export class ProfileService {
       this.deps.profileEvents.count(profile.userId),
     ]);
     const counts = { followers, following, events };
+    const referralBadge = await this.referrals.badgeFor(profile.userId);
 
     if (viewerId === profile.userId) {
       return {
@@ -73,6 +79,7 @@ export class ProfileService {
         counts,
         relationship: { isSelf: true, following: 'NONE', followsYou: 'NONE', isFriend: false, blockedByViewer: false },
         canViewContent: true,
+        referralBadge,
       };
     }
 
@@ -96,6 +103,7 @@ export class ProfileService {
         blockedByViewer,
       },
       canViewContent: !blockedByViewer && (!profile.isPrivate || viewerFollows?.status === 'ACCEPTED'),
+      referralBadge,
     };
   }
 

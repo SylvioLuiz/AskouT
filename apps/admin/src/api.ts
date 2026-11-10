@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -101,6 +101,7 @@ export const api = {
   stats: () => request<Stats>('GET', '/admin/stats'),
   payments: () => request<PaymentsState>('GET', '/admin/payments'),
   setPayments: (enabled: boolean, note: string) => request<PaymentsState>('PUT', '/admin/payments', { enabled, note }),
+  topInviters: (limit = 20) => request<TopInviter[]>('GET', `/admin/referrals/top${query({ limit })}`),
   retention: (days: number) => request<RetentionReport>('GET', `/admin/retention${query({ days })}`),
 
   claims: (status: ClaimStatus) => request<Claim[]>('GET', `/admin/claims${query({ status })}`),

@@ -29,6 +29,7 @@ import { RecommendationService } from './recommendation-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
 import { NotificationService, StoredNotifier } from './notification-service.ts';
 import { ProfileService } from './profile-service.ts';
+import { ReferralService } from './referral-service.ts';
 
 export type CoreInput = Omit<CoreDeps, 'notifier'> & {
   /** Valor do impulsionamento por dia, em centavos. */
@@ -46,7 +47,8 @@ export function createCore(input: CoreInput) {
   const notifier = new StoredNotifier(input);
   const deps: CoreDeps = { ...input, notifier };
   const flash = new FlashService(deps);
-  const profiles = new ProfileService(deps);
+  const referrals = new ReferralService(deps);
+  const profiles = new ProfileService(deps, referrals);
   const venues = new VenueService(deps);
   const auth = new AuthService(deps);
   const posts = new PostService(deps, profiles);
@@ -66,6 +68,7 @@ export function createCore(input: CoreInput) {
   return {
     boosts,
     auth,
+    referrals,
     profiles,
     follows: new FollowService(deps),
     blocks: new BlockService(deps),
@@ -174,6 +177,8 @@ export type { EventCardView } from './event-card.ts';
 export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';
 export type { ConnectionsPage, FollowResult } from './follow-service.ts';
+export { ReferralService, REFERRAL_BADGE_THRESHOLD } from './referral-service.ts';
+export type { ReferralOverview, ReferralPersonView, TopInviterView } from './referral-service.ts';
 export { ProfileService } from './profile-service.ts';
 export type { ProfilePatch, ProfileView, RelationState } from './profile-service.ts';
 export { DomainError } from './errors.ts';
@@ -196,6 +201,8 @@ export type {
   PasswordHasher,
   PasswordResetRepository,
   PendingSignupRepository,
+  ReferralRecord,
+  ReferralRepository,
   TokenClaims,
   TokenService,
   UserRepository,

@@ -8,6 +8,7 @@ export const ROUTES = [
   { path: '/posts', label: 'Posts' },
   { path: '/feed', label: 'Feed' },
   { path: '/retencao', label: 'Retenção' },
+  { path: '/convites', label: 'Convites' },
   { path: '/pagamentos', label: 'Pagamentos' },
   { path: '/auditoria', label: 'Auditoria' },
 ] as const;

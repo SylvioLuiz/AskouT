@@ -814,6 +814,26 @@ export interface ActivityRepository {
   listByUser(userId: string, query: { actions: readonly ActivityAction[]; before?: { at: Date; id: string }; limit: number }): Promise<ActivityRecord[]>;
 }
 
+/** Quem trouxe quem: uma linha por pessoa convidada (a chave é a convidada, então só dá para ter um convite). */
+export interface ReferralRecord {
+  inviteeId: string;
+  inviterId: string;
+  createdAt: Date;
+  /** Preenchido quando a pessoa voltou ao app em outro dia: só então o convite conta para o selo. */
+  qualifiedAt: Date | null;
+}
+
+export interface ReferralRepository {
+  /** Guarda o convite. Devolve false se a pessoa já tinha um (o primeiro vale; nunca troca). */
+  create(record: ReferralRecord): Promise<boolean>;
+  /** Marca o convite da pessoa como confirmado, se houver e ainda não estiver. Devolve true se mudou. */
+  qualify(inviteeId: string, at: Date): Promise<boolean>;
+  /** Convites de quem convidou, do mais novo ao mais antigo (no máximo `limit`). */
+  listByInviter(inviterId: string, limit: number): Promise<ReferralRecord[]>;
+  /** Maiores convidantes pelo número de convites confirmados (contas ativas), depois pelo total. */
+  top(limit: number): Promise<{ inviterId: string; total: number; confirmed: number }[]>;
+}
+
 export interface CoreDeps {
   activity: ActivityRepository;
   notifier: Notifier;
@@ -847,6 +867,7 @@ export interface CoreDeps {
   settings: AppSettingsRepository;
   /** Conferência das compras dentro do app. Sem ela, só a compra pela web funciona. */
   storeVerifier?: StorePurchaseVerifier;
+  referrals: ReferralRepository;
   identities: IdentityRepository;
   verifier: IdentityVerifier;
   mailer: EmailSender;

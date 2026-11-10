@@ -121,6 +121,8 @@ export function Onboarding() {
     if (!open) return;
     const who = takeInvite(storage());
     if (!who || who === user.profile.username) return;
+    // Registra quem trouxe esta pessoa (conta para a contagem de quem convidou); o convite inválido é ignorado pela API.
+    api.claimReferral(who).catch(() => undefined);
     api
       .getProfile(who)
       .then((view) => api.follow(view.profile.userId))
