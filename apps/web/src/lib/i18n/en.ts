@@ -2268,4 +2268,5 @@ export const EN: Readonly<Record<string, string>> = {
   "Só quem foi ao encontro vê o álbum.": "Only people who were at the meetup can see the album.",
   "Nenhuma foto ainda": "No photos yet",
   "Seja o primeiro a adicionar uma foto do encontro.": "Be the first to add a photo from the meetup.",
+  "Foto ou vídeo de capa do evento": "Event cover photo or video",
 };

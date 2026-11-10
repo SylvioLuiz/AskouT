@@ -2155,4 +2155,5 @@ export const ES: Readonly<Record<string, string>> = {
   "Só quem foi ao encontro vê o álbum.": "Solo ven el álbum quienes fueron al encuentro.",
   "Nenhuma foto ainda": "Aún no hay fotos",
   "Seja o primeiro a adicionar uma foto do encontro.": "Sé el primero en agregar una foto del encuentro.",
+  "Foto ou vídeo de capa do evento": "Foto o video de portada del evento",
 };

@@ -292,6 +292,17 @@ export function CreatePostScreen() {
     </Sheet>
   ) : null;
 
+  const kindTabs = (
+    <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
+      <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
+        {t('Post')}
+      </button>
+      <button type="button" className={`segmented__tab${kind === 'EVENT' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'EVENT'} onClick={() => setKind('EVENT')}>
+        {t('Evento')}
+      </button>
+    </div>
+  );
+
   if (step === 'details') {
     return (
       <div className="compose compose--details">
@@ -299,7 +310,7 @@ export function CreatePostScreen() {
           <button type="button" className="iconbtn" onClick={() => setStep('photos')} aria-label={t('Voltar para as fotos')} disabled={busy}>
             <ChevronLeftIcon />
           </button>
-          <h1 className="compose__title">{t('Nova publicação')}</h1>
+          <h1 className="compose__title">{kind === 'EVENT' ? t('Novo evento') : t('Nova publicação')}</h1>
           <span aria-hidden="true" />
         </header>
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
@@ -317,14 +328,7 @@ export function CreatePostScreen() {
             <p className="uploadbar__hint">{t('Mantenha esta tela aberta até terminar.')}</p>
           </div>
         ) : null}
-        <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
-          <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
-            {t('Post')}
-          </button>
-          <button type="button" className={`segmented__tab${kind === 'EVENT' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'EVENT'} onClick={() => setKind('EVENT')}>
-            {t('Evento')}
-          </button>
-        </div>
+        {kindTabs}
         {kind === 'EVENT' ? (
           <section className="compose__row" aria-label={t('Dados do evento')}>
             <Field label={t('Nome do evento')} value={eventTitle} onChange={setEventTitle} maxLength={120} />
@@ -448,12 +452,13 @@ export function CreatePostScreen() {
         <button type="button" className="iconbtn" onClick={leave} aria-label={t('Cancelar')}>
           <XIcon />
         </button>
-        <h1 className="compose__title">{t('Nova publicação')}</h1>
+        <h1 className="compose__title">{kind === 'EVENT' ? t('Novo evento') : t('Nova publicação')}</h1>
         <button type="button" className="compose__next" disabled={items.length === 0 || reading || cropKey !== undefined} onClick={() => setStep('details')}>
           {t('Avançar')}
         </button>
       </header>
       {fileInput}
+      {kindTabs}
 
       <div className="segmented" role="tablist" aria-label={t('De onde vem a foto')}>
         <button type="button" role="tab" aria-selected={source === 'photos'} className={`segmented__tab${source === 'photos' ? ' segmented__tab--on' : ''}`} onClick={() => setSource('photos')}>
@@ -480,7 +485,7 @@ export function CreatePostScreen() {
             <span className="compose__emptyicon" aria-hidden="true">
               <PhotoIcon />
             </span>
-            <p className="compose__emptytitle">{reading ? t('Preparando as fotos…') : t('Fotos e vídeos do rolê')}</p>
+            <p className="compose__emptytitle">{reading ? t('Preparando as fotos…') : kind === 'EVENT' ? t('Foto ou vídeo de capa do evento') : t('Fotos e vídeos do rolê')}</p>
             <p className="compose__emptyhint">{t('Até {max} itens, com no máximo 1 vídeo.', { max: POST_IMAGES_MAX })}</p>
             <Button small loading={reading} onClick={() => fileRef.current?.click()}>
               {t('Escolher da galeria')}
