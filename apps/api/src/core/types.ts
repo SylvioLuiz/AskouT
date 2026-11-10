@@ -927,7 +927,10 @@ export type AuditAction =
   | 'REPORT_DISMISSED'
   | 'REPORT_ACTIONED'
   | 'PAYMENTS_ENABLED'
-  | 'PAYMENTS_DISABLED';
+  | 'PAYMENTS_DISABLED'
+  | 'RECO_EXPERIMENT_ENABLED'
+  | 'RECO_EXPERIMENT_CHANGED'
+  | 'RECO_EXPERIMENT_DISABLED';
 
 export interface AuditRecord {
   id: string;

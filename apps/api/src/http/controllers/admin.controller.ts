@@ -56,6 +56,17 @@ export class AdminController {
     return this.core.admin.setPayments(actor, b.enabled, b.note);
   }
 
+  @Get('reco-experiment')
+  recoExperiment(@CurrentActor() actor: Actor) {
+    return this.core.admin.recoExperimentState(actor);
+  }
+
+  @Put('reco-experiment')
+  setRecoExperiment(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.setRecoExperiment(actor, b.enabled, b.controlPercent, b.note);
+  }
+
   @Get('retention')
   retention(@CurrentActor() actor: Actor, @Query() q: { days?: unknown }) {
     return this.core.admin.retention(actor, q);

@@ -1111,5 +1111,7 @@ export interface RecommendationSource {
 
 export interface Recommendations {
   personalized: boolean;
+  /** Teste A/B do bloco: no controle só vêm os anúncios Match e o título "Para você" não aparece. null = teste desligado. */
+  group?: 'control' | 'treatment' | null;
   items: RecommendationItem[];
 }

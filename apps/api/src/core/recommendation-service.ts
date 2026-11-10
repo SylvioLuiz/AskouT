@@ -3,6 +3,7 @@ import type { EventCardView } from './event-card.ts';
 import { fold, normalizeTag } from './explore-match.ts';
 import type { MatchPick, MatchService } from './match-service.ts';
 import { MATCH_MAX_PER_VIEW } from './match.ts';
+import type { RecoExperiment } from './reco-experiment.ts';
 import type { PostService, PostView } from './post-service.ts';
 import type { CoreDeps } from './ports.ts';
 import type { DirectActivityRow, DwellRecord, EventKind, PostRecord, PublicProfile } from './types.ts';
@@ -180,6 +181,12 @@ export interface RecommendationItem {
 export interface RecommendationsView {
   /** false quando a pessoa desligou o uso do comportamento dela: só vale o que amigos fizeram. */
   personalized: boolean;
+  /**
+   * Grupo do teste A/B do bloco, ou null com o teste desligado.
+   * No `control` o bloco "Para você" não aparece: só vêm os anúncios Match (`sponsored`), que são pagos e têm de ser entregues.
+   * O app não mostra o título "Para você" para o controle.
+   */
+  group: 'control' | 'treatment' | null;
   items: RecommendationItem[];
 }
 
@@ -206,8 +213,10 @@ export class RecommendationService {
   private readonly deps: CoreDeps;
   private readonly postService: PostService;
   private readonly matchService: MatchService;
+  private readonly experiment: RecoExperiment;
 
-  constructor(deps: CoreDeps, postService: PostService, matchService: MatchService) {
+  constructor(deps: CoreDeps, postService: PostService, matchService: MatchService, experiment: RecoExperiment) {
+    this.experiment = experiment;
     this.deps = deps;
     this.postService = postService;
     this.matchService = matchService;
@@ -232,6 +241,7 @@ export class RecommendationService {
       throw validationError('Limite inválido', { limit: `Entre 1 e ${RECO_MAX_LIMIT}` });
     }
     const limit = (input.limit as number | undefined) ?? RECO_DEFAULT_LIMIT;
+    const group = await this.experiment.groupFor(viewerId);
     const { clock, posts, places, eventRoom } = this.deps;
     const now = clock.now();
     const since = new Date(now.getTime() - RECO_HISTORY_DAYS * 86_400_000);
@@ -478,6 +488,8 @@ export class RecommendationService {
       }
       if (items.length > limit) items.length = limit;
     }
-    return { personalized: personalize, items };
+    // Teste A/B: o controle não recebe nada orgânico. O anúncio Match fica, porque é pago (e o app esconde o título do bloco).
+    if (group === 'control') items.splice(0, items.length, ...items.filter((i) => i.sponsored));
+    return { personalized: personalize, group, items };
   }
 }

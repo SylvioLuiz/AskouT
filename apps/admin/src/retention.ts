@@ -1,4 +1,4 @@
-import type { ReturnRate } from './types.ts';
+import type { ProportionDiff, ReturnRate } from './types.ts';
 
 export const pct = (v: number | null, digits = 1): string => (v === null ? '—' : `${(v * 100).toFixed(digits).replace('.', ',')}%`);
 
@@ -26,4 +26,14 @@ export function returnVerdict(withReco: ReturnRate, withoutReco: ReturnRate, min
   const abs = Math.abs(d).toFixed(1).replace('.', ',');
   if (Math.abs(d) < 2) return `Quem viu o bloco voltou quase igual a quem não viu (diferença de ${abs} ponto percentual).`;
   return `Quem viu o bloco voltou ${abs} pontos percentuais ${d > 0 ? 'mais' : 'menos'} que quem não viu. Isso não prova causa: quem usa mais o app também vê mais o bloco.`;
+}
+
+/** Frase da diferença tratamento − controle, em pontos percentuais, com o intervalo de 95%. Só afirma efeito com amostra suficiente. */
+export function experimentVerdict(d: ProportionDiff | null, thin: boolean, min: number): string {
+  if (d === null) return 'Sem dados nos dois grupos ainda.';
+  const p = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(1).replace('.', ',')}`;
+  const range = `${p(d.diff)} pontos percentuais (intervalo de 95%: ${p(d.low)} a ${p(d.high)})`;
+  if (thin) return `Poucos dados (menos de ${min} pessoas em algum grupo): ${range}. Ainda é palpite.`;
+  if (!d.significant) return `Diferença de ${range}. O intervalo inclui zero: não dá para dizer que o bloco muda o retorno.`;
+  return `Diferença de ${range}. O intervalo não inclui zero: com quem foi sorteado, ver o bloco ${d.diff > 0 ? 'aumentou' : 'diminuiu'} o retorno.`;
 }

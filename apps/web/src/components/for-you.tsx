@@ -101,18 +101,20 @@ function PostReco({ item }: { item: RecommendationItem }) {
 export function ForYou({ reloadKey }: { reloadKey?: string }) {
   const me = useUser().profile.userId;
   const [items, setItems] = useState<RecommendationItem[]>([]);
+  const [control, setControl] = useState(false);
   useEffect(() => {
     let cancelled = false;
     api.recommendations(readPersonalize(me)).then(
-      (r) => { if (!cancelled) setItems(r.items); },
+      (r) => { if (!cancelled) { setItems(r.items); setControl(r.group === 'control'); } },
       () => { if (!cancelled) setItems([]); },
     );
     return () => { cancelled = true; };
   }, [me, reloadKey]);
   if (items.length === 0) return null;
   return (
-    <section className="foryou" aria-labelledby="foryou-titulo">
-      <h2 id="foryou-titulo" className="section__title">{t('Para você')}</h2>
+    <section className="foryou" {...(control ? {} : { 'aria-labelledby': 'foryou-titulo' })}>
+      {/* Grupo de controle do teste A/B: sem o bloco, só o anúncio pago, sem o título "Para você". */}
+      {control ? null : <h2 id="foryou-titulo" className="section__title">{t('Para você')}</h2>}
       <ul className="foryou__list">
         {items.map((item) => (item.type === 'EVENT' && item.event ? <EventReco key={`e${item.event.id}`} item={item} /> : item.post ? <PostReco key={`p${item.post.id}`} item={item} /> : null))}
       </ul>

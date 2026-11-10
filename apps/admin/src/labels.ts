@@ -43,6 +43,9 @@ export const ACTION_LABEL: Record<string, string> = {
   REPORT_ACTIONED: 'Denúncia: providência tomada',
   PAYMENTS_ENABLED: 'Ligou o pagamento do impulsionamento',
   PAYMENTS_DISABLED: 'Desligou o pagamento do impulsionamento',
+  RECO_EXPERIMENT_ENABLED: 'Ligou o teste A/B do “Para você”',
+  RECO_EXPERIMENT_CHANGED: 'Mudou o tamanho do controle do teste A/B',
+  RECO_EXPERIMENT_DISABLED: 'Desligou o teste A/B do “Para você”',
 };
 
 export const TARGET_LABEL: Record<string, string> = {

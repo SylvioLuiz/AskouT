@@ -22,6 +22,7 @@ import { DwellService } from './dwell-service.ts';
 import { InterestService } from './interest-service.ts';
 import { MatchService } from './match-service.ts';
 import { PaymentsSwitch } from './payments-switch.ts';
+import { RecoExperiment } from './reco-experiment.ts';
 import { RegionService } from './region-service.ts';
 import { AccountService } from './account-service.ts';
 import { AgeService } from './age-service.ts';
@@ -54,6 +55,7 @@ export function createCore(input: CoreInput) {
   const interests = new InterestService(deps);
   const match = new MatchService(deps, interests);
   const paymentsSwitch = new PaymentsSwitch(deps, input.boostsEnabled ?? true);
+  const recoExperiment = new RecoExperiment(deps);
   const boosts = new BoostService(
     deps,
     {
@@ -79,14 +81,14 @@ export function createCore(input: CoreInput) {
     eventReminders: new EventReminderService(deps),
     venues,
     calendarImport: new CalendarImportService(deps, venues),
-    admin: new AdminService(deps, venues, auth, paymentsSwitch),
+    admin: new AdminService(deps, venues, auth, paymentsSwitch, recoExperiment),
     meetups: new MeetupService(deps),
     scheduling: new SchedulingService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
     posts,
     dwell: new DwellService(deps),
     activity: new ActivityService(deps),
-    recommendations: new RecommendationService(deps, posts, match),
+    recommendations: new RecommendationService(deps, posts, match, recoExperiment),
     regions: new RegionService(deps),
     account: new AccountService(deps),
     age: new AgeService(deps),

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isThin, pct, pointsDiff, returnVerdict, seconds } from './retention.ts';
+import { experimentVerdict, isThin, pct, pointsDiff, returnVerdict, seconds } from './retention.ts';
 
 const r = (sample: number, returned: number) => ({ sample, returned, rate: sample ? returned / sample : null });
 
@@ -27,4 +27,13 @@ test('veredito: avisa quando há poucos dados, nunca afirma causa', () => {
   assert.match(returnVerdict(r(100, 50), r(100, 40), 30), /10,0 pontos percentuais mais.*não prova causa/);
   assert.match(returnVerdict(r(100, 30), r(100, 40), 30), /10,0 pontos percentuais menos/);
   assert.match(returnVerdict(r(100, 41), r(100, 40), 30), /quase igual/);
+});
+
+test('frase do teste A/B: palpite, sem efeito e com efeito', () => {
+  const d = { diff: 0.05, low: 0.01, high: 0.09, significant: true };
+  assert.match(experimentVerdict(null, true, 30), /Sem dados/);
+  assert.match(experimentVerdict(d, true, 30), /Poucos dados.*\+5,0.*palpite/);
+  assert.match(experimentVerdict({ ...d, low: -0.01, significant: false }, false, 30), /inclui zero/);
+  assert.match(experimentVerdict(d, false, 30), /aumentou o retorno/);
+  assert.match(experimentVerdict({ diff: -0.05, low: -0.09, high: -0.01, significant: true }, false, 30), /diminuiu/);
 });
