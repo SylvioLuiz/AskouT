@@ -320,7 +320,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'ALBUM_SUMMARY' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE';
 
 export interface NotificationItem {
   id: string;
@@ -1112,4 +1112,29 @@ export interface RecommendationSource {
 export interface Recommendations {
   personalized: boolean;
   items: RecommendationItem[];
+}
+
+/** Álbum do encontro (NOW ou evento): fotos só de quem foi. */
+export interface AlbumSummary {
+  id: string;
+  kind: 'FLASH' | 'EVENT';
+  title: string | null;
+  placeName: string | null;
+  startedAt: string;
+  /** Quem foi, sem contar você nem quem tem bloqueio com você. */
+  friendCount: number;
+  photoCount: number;
+  coverPhotoId: string | null;
+}
+
+export interface AlbumPhoto {
+  id: string;
+  author: PublicProfile;
+  createdAt: string;
+  mine: boolean;
+}
+
+export interface AlbumDetail extends AlbumSummary {
+  members: PublicProfile[];
+  photos: AlbumPhoto[];
 }

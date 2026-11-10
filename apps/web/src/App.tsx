@@ -32,6 +32,7 @@ import { HomeScreen } from './screens/main-tabs.tsx';
 import { ContactsScreen } from './screens/contacts.tsx';
 import { BlockedScreen, EditProfileScreen, FriendsScreen, HelpScreen, InteractionsScreen, PrivacyScreen, SettingsScreen, ThemeScreen } from './screens/me.tsx';
 import { ConnectionsScreen, ProfileScreen } from './screens/profile.tsx';
+import { AlbumScreen, AlbumsScreen } from './screens/albums.tsx';
 import { ArchivedScreen, CreatePostScreen, PostScreen } from './screens/posts.tsx';
 import { t } from './lib/i18n/index.ts';
 
@@ -81,6 +82,8 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/configuracao', render: () => <SettingsScreen /> },
   { path: '/privacidade', render: () => <PrivacyScreen /> },
   { path: '/privacidade/apagar-conta', render: () => <DeleteAccountScreen /> },
+  { path: '/albuns', render: () => <AlbumsScreen /> },
+  { path: '/albuns/:id', render: (p) => <AlbumScreen key={p['id']} albumId={p['id'] ?? ''} /> },
   { path: '/arquivados', render: () => <ArchivedScreen /> },
   { path: '/interacoes', render: () => <InteractionsScreen /> },
   { path: '/ajuda', render: () => <HelpScreen /> },

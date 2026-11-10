@@ -9,6 +9,7 @@ import { MeetupService } from './meetup-service.ts';
 import { SchedulingService } from './scheduling-service.ts';
 import { ProfileEventService } from './profile-event-service.ts';
 import { PostService } from './post-service.ts';
+import { AlbumService } from './album-service.ts';
 import { EventPageService } from './event-page-service.ts';
 import { FeedService } from './feed-service.ts';
 import { EventReminderService } from './event-reminder-service.ts';
@@ -84,6 +85,7 @@ export function createCore(input: CoreInput) {
     scheduling: new SchedulingService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
     posts,
+    albums: new AlbumService(deps, posts),
     dwell: new DwellService(deps),
     activity: new ActivityService(deps),
     recommendations: new RecommendationService(deps, posts, match),
@@ -168,6 +170,8 @@ export { distanceMeters, midpoint, boundingBox } from './geo.ts';
 export { NotificationService, StoredNotifier } from './notification-service.ts';
 export type { NotificationView } from './notification-service.ts';
 export { ProfileEventService } from './profile-event-service.ts';
+export { AlbumService, ALBUM_LIST_DAYS, ALBUM_PHOTOS_PER_USER, ALBUM_SUMMARY_HOUR } from './album-service.ts';
+export type { AlbumSummaryView, AlbumView, AlbumPhotoView } from './album-service.ts';
 export { PostService, POST_IMAGES_MAX, POST_CAPTION_MAX } from './post-service.ts';
 export type { PostedEventsPage, PostedEventView } from './profile-event-service.ts';
 export type { EventCardView } from './event-card.ts';

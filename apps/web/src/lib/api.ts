@@ -58,6 +58,9 @@ import type {
   GroupDetails,
   GoingEvent,
   MeetupView,
+  AlbumDetail,
+  AlbumPhoto,
+  AlbumSummary,
   NotificationCategory,
   NotificationList,
   PostedEventsPage,
@@ -593,6 +596,25 @@ export function createApi(deps: ApiDeps) {
     pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),
     pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
     pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),
+
+    // Álbuns dos encontros
+    albums: () => request<{ items: AlbumSummary[] }>('GET', '/albums'),
+    album: (albumId: string) => request<AlbumDetail>('GET', `/albums/${id(albumId)}`),
+    addAlbumPhoto: (albumId: string, image: string) => request<AlbumPhoto>('POST', `/albums/${id(albumId)}/photos`, { body: { image } }),
+    deleteAlbumPhoto: (albumId: string, photoId: string) => request<{ ok: true }>('DELETE', `/albums/${id(albumId)}/photos/${id(photoId)}`),
+    postAlbumPhoto: (albumId: string, photoId: string, caption?: string) => request<{ id: string }>('POST', `/albums/${id(albumId)}/photos/${id(photoId)}/post`, { body: caption === undefined || caption.trim() === '' ? {} : { caption } }),
+    /** Baixa a foto do álbum (a rota exige o token, então não dá para usar <img src>). */
+    albumPhoto: async (albumId: string, photoId: string): Promise<Blob> => {
+      const token = deps.getToken();
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/albums/${id(albumId)}/photos/${id(photoId)}`, { method: 'GET', headers: token !== undefined ? { Authorization: t('Bearer {token}', { token }) } : {} });
+      } catch {
+        throw networkError();
+      }
+      if (!response.ok) throw errorFromResponse(response.status, undefined, response.headers.get('Retry-After'));
+      return response.blob();
+    },
 
     // Bloqueios
     block: (userId: string) => request<{ ok: true }>('POST', `/users/${id(userId)}/block`),

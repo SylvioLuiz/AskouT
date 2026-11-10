@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { AppSettingsRepository, DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+import type { AppSettingsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
   CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -35,6 +35,7 @@ export interface RepoHarness {
   profileEvents: ProfileEventRepository;
   posts: PostRepository;
   eventRoom: EventRoomRepository;
+  albums: AlbumRepository;
   feed: FeedRepository;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
@@ -2265,6 +2266,54 @@ export function defineRepositoryContract(
         assert.equal(done.status, 'FINALIZED');
         assert.equal(done.finalProposalId, proposal.id);
         assert.deepEqual(await h.scheduling.listOpenForUser(bia, 10), []);
+      });
+    });
+    // ---------- Álbuns dos encontros ----------
+
+    describe('álbuns', () => {
+      it('cria uma vez por encontro, guarda quem foi, as fotos e o aviso do dia seguinte', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const album = { id: randomUUID(), kind: 'EVENT' as const, refId: `PLACE:${randomUUID()}`, title: 'Samba', placeName: 'Bar do Zé', startedAt: at(100), createdAt: at(100) };
+        const created = await h.albums.ensure(album);
+        assert.deepEqual(created, album);
+        const again = await h.albums.ensure({ ...album, id: randomUUID(), title: 'outro' });
+        assert.equal(again.id, album.id, 'mesmo encontro, mesmo álbum');
+        assert.equal(again.title, 'Samba');
+        assert.deepEqual(await h.albums.find(album.id), album);
+        assert.equal(await h.albums.find(randomUUID()), undefined);
+        assert.equal(await h.albums.find('nao-e-uuid'), undefined);
+
+        await h.albums.addMembers(album.id, [bia, ana], at(101));
+        await h.albums.addMembers(album.id, [ana, caio], at(102));
+        assert.deepEqual(await h.albums.listMembers(album.id), [ana, bia, caio].sort((a, b) => (a < b ? -1 : 1)).filter((id) => id !== caio).concat(caio), 'ordem de entrada; quem já estava não muda');
+        assert.equal(await h.albums.isMember(album.id, caio), true);
+        assert.equal(await h.albums.isMember(album.id, randomUUID()), false);
+
+        const other = await h.albums.ensure({ id: randomUUID(), kind: 'FLASH', refId: randomUUID(), title: null, placeName: null, startedAt: at(500), createdAt: at(500) });
+        await h.albums.addMembers(other.id, [ana], at(500));
+        assert.deepEqual((await h.albums.listForUser(ana, at(0), 10)).map((a) => a.id), [other.id, album.id], 'o mais recente primeiro');
+        assert.deepEqual((await h.albums.listForUser(ana, at(200), 10)).map((a) => a.id), [other.id]);
+        assert.deepEqual(await h.albums.listForUser(bia, at(200), 10), []);
+        assert.deepEqual((await h.albums.listStartedBetween(at(100), at(500), 10)).map((a) => a.id), [other.id], 'exclui o início, inclui o fim');
+
+        const photo = { id: randomUUID(), albumId: album.id, authorId: bia, mime: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff, 1, 2]), createdAt: at(110) };
+        await h.albums.addPhoto(photo);
+        await h.albums.addPhoto({ ...photo, id: randomUUID(), authorId: ana, createdAt: at(111) });
+        assert.deepEqual((await h.albums.listPhotos(album.id)).map((p) => [p.id, p.authorId]), [[photo.id, bia], [(await h.albums.listPhotos(album.id))[1]!.id, ana]]);
+        assert.equal(await h.albums.countPhotos(album.id), 2);
+        assert.equal(await h.albums.countPhotos(album.id, bia), 1);
+        const found = (await h.albums.findPhoto(album.id, photo.id))!;
+        assert.deepEqual([found.mime, [...found.data], found.authorId], ['image/jpeg', [0xff, 0xd8, 0xff, 1, 2], bia]);
+        assert.equal(await h.albums.findPhoto(other.id, photo.id), undefined, 'a foto é daquele álbum');
+        assert.equal(await h.albums.deletePhoto(album.id, photo.id, ana), false, 'só o autor apaga');
+        assert.equal(await h.albums.deletePhoto(album.id, photo.id, bia), true);
+        assert.equal(await h.albums.countPhotos(album.id), 1);
+
+        assert.equal(await h.albums.markSummarized(album.id, bia, at(900)), true);
+        assert.equal(await h.albums.markSummarized(album.id, bia, at(901)), false, 'nunca avisa duas vezes');
+        assert.equal(await h.albums.markSummarized(album.id, ana, at(901)), true);
       });
     });
   });

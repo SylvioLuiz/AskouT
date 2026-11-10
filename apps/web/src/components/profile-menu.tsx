@@ -11,6 +11,7 @@ export const PROFILE_MENU: { to: string; label: string }[] = [
   { to: '/configuracao', label: t('Configuração') },
   { to: '/privacidade', label: t('Privacidade') },
   { to: '/locais', label: t('Meus locais') },
+  { to: '/albuns', label: t('Álbuns dos encontros') },
   { to: '/arquivados', label: t('Arquivados') },
   { to: '/interacoes', label: t('Suas interações') },
   { to: '/ajuda', label: t('Ajuda') },

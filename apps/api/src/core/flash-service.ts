@@ -1,3 +1,4 @@
+import { openFlashAlbum } from './album-service.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps, RouteResult } from './ports.ts';
 import { distanceMeters, midpoint } from './geo.ts';
@@ -445,6 +446,7 @@ export class FlashService {
       toApprox: options.approx === true,
       expiresAt: new Date(Math.min(mine.expiresAt.getTime(), theirs.expiresAt.getTime())),
     });
+    await openFlashAlbum(this.deps, invite, now);
     const conversation = await this.deps.conversations.getOrCreateDirect(invite.fromUserId, invite.toUserId, this.deps.ids.next(), now);
     await this.deps.conversations.addMessage({ id: this.deps.ids.next(), conversationId: conversation.id, senderId: actorId, kind: 'SYSTEM', body: FLASH_MATCH_MESSAGE, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: now });
     const accepter = (await this.deps.users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';

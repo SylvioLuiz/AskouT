@@ -449,3 +449,10 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Migração `20261206120000_flash_destination` (roda sozinha no deploy da API).
 - Rotas via OSRM (servidor público de demonstração, uso leve). Para produção em escala, apontar `OSRM_URL` para um servidor próprio. Sem resposta do OSRM, o app mostra linha reta e tempo estimado.
 - Ainda não testado em aparelho real nem no mapa nativo.
+
+## Álbum do encontro e resumo do dia seguinte
+- Quem foi a um encontro do NOW (convite aceito) ou a um evento que já começou (presença confirmada, mais o dono do evento de pessoa) ganha um álbum de fotos só deles: menu do perfil → **Álbuns dos encontros** (`/albuns`). Dá para adicionar fotos (até 100 KB cada, 30 por pessoa), apagar as próprias e **postar uma foto própria no perfil** (reaproveita `PostService.create`; foto de outra pessoa não pode ser postada).
+- No dia seguinte, a partir das 10 h (São Paulo), cada pessoa recebe o aviso "Ontem: Bar X com 4 amigos" (tipo `ALBUM_SUMMARY`, conta como aviso de eventos). Job `AlbumJobs` (`apps/api/src/http/album-jobs.ts`, a cada 2 min): abre o álbum dos eventos que começaram nas últimas 48 h e manda os resumos, uma vez por pessoa.
+- Bloqueio em qualquer sentido: a pessoa não vê fotos nem presença de quem bloqueou/foi bloqueado, e não entra na conta de "amigos". Álbum de quem não foi dá "não encontrado". As fotos exigem o token (o app baixa como blob), nunca ficam públicas.
+- O álbum do NOW nasce no aceite do convite e guarda os dois participantes (o convite some do banco 24 h depois). Sem endereço do lugar no aceite, o aviso diz "um encontro do NOW".
+- **Falta:** migração `20261215120000_album_encontro` **nunca rodada em Postgres** (nem o `prisma generate`/contrato Prisma de álbuns); **texto da Política de Privacidade** precisa citar as fotos de álbum (visíveis só a quem foi, guardadas no banco, apagadas junto com a conta); não há atalho para o álbum na tela do evento nem na do encontro NOW (só pelo menu do perfil e pelo aviso); álbuns não são apagados com o tempo (só somem da lista após 30 dias) — decidir retenção; não testado no celular nem com a API real.

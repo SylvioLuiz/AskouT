@@ -210,6 +210,8 @@ model User {
   photo             ProfilePhoto?
   posts             Post[]
   eventAttendances  EventAttendance[]
+  albumMembers      AlbumMember[]
+  albumPhotos       AlbumPhoto[]
   feedPosts         FeedPost[]        @relation("FeedPostAuthor")
   feedComments      FeedComment[]     @relation("FeedCommentAuthor")
   feedReactions     FeedReaction[]    @relation("FeedReactionUser")
@@ -1529,4 +1531,51 @@ model FeedReport {
   @@index([reporterId])
   @@index([postId])
   @@index([commentId])
+}
+
+/// Álbum do encontro: fotos só de quem foi. No NOW `refId` é o id do convite (sem chave estrangeira: o convite some em 24 h);
+/// no evento é `PLACE:<id>` ou `USER:<id>`. Quem foi fica gravado em AlbumMember.
+model Album {
+  id        String   @id @default(uuid()) @db.Uuid
+  kind      String
+  refId     String
+  title     String?
+  placeName String?
+  startedAt DateTime
+  createdAt DateTime @default(now())
+
+  members AlbumMember[]
+  photos  AlbumPhoto[]
+
+  @@unique([kind, refId])
+  @@index([startedAt])
+}
+
+model AlbumMember {
+  albumId      String    @db.Uuid
+  userId       String    @db.Uuid
+  joinedAt     DateTime  @default(now())
+  /// Quando o aviso "Ontem em..." saiu para esta pessoa (nunca sai duas vezes).
+  summarizedAt DateTime?
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([albumId, userId])
+  @@index([userId])
+}
+
+model AlbumPhoto {
+  id        String   @id @default(uuid()) @db.Uuid
+  albumId   String   @db.Uuid
+  authorId  String   @db.Uuid
+  mime      String
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  album  Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([albumId, createdAt])
+  @@index([authorId])
 }

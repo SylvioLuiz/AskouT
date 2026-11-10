@@ -1,3 +1,4 @@
+import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from './album.ts';
 import type { ActivityAction, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
 
 /**
@@ -814,7 +815,33 @@ export interface ActivityRepository {
   listByUser(userId: string, query: { actions: readonly ActivityAction[]; before?: { at: Date; id: string }; limit: number }): Promise<ActivityRecord[]>;
 }
 
+/** Álbuns dos encontros: criação a partir do NOW e dos eventos, fotos e aviso do dia seguinte. */
+export interface AlbumRepository {
+  /** Cria o álbum ou devolve o que já existe para o mesmo `kind` + `refId` (idempotente). */
+  ensure(album: AlbumRecord): Promise<AlbumRecord>;
+  find(id: string): Promise<AlbumRecord | undefined>;
+  /** Idempotente: quem já estava continua. */
+  addMembers(albumId: string, userIds: string[], at: Date): Promise<void>;
+  /** Quem foi, na ordem em que entrou. */
+  listMembers(albumId: string): Promise<string[]>;
+  isMember(albumId: string, userId: string): Promise<boolean>;
+  /** Álbuns de que a pessoa faz parte, começados depois de `since`, o mais recente primeiro. */
+  listForUser(userId: string, since: Date, limit: number): Promise<AlbumRecord[]>;
+  /** Álbuns começados entre `from` (exclusive) e `to` (inclusive), do mais antigo ao mais novo. */
+  listStartedBetween(from: Date, to: Date, limit: number): Promise<AlbumRecord[]>;
+  addPhoto(photo: AlbumPhotoRecord): Promise<void>;
+  /** Sem os bytes, da mais antiga à mais nova. */
+  listPhotos(albumId: string): Promise<AlbumPhotoMeta[]>;
+  countPhotos(albumId: string, authorId?: string): Promise<number>;
+  findPhoto(albumId: string, photoId: string): Promise<AlbumPhotoRecord | undefined>;
+  /** Só apaga se `authorId` é o autor. */
+  deletePhoto(albumId: string, photoId: string, authorId: string): Promise<boolean>;
+  /** Marca que o aviso do dia seguinte já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
+  markSummarized(albumId: string, userId: string, at: Date): Promise<boolean>;
+}
+
 export interface CoreDeps {
+  albums: AlbumRepository;
   activity: ActivityRepository;
   notifier: Notifier;
   users: UserRepository;

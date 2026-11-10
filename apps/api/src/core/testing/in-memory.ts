@@ -1,8 +1,10 @@
 import { createHash } from 'node:crypto';
+import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from '../album.ts';
 import { conflict } from '../errors.ts';
 import { CalendarFetchError } from '../ports.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
+  AlbumRepository,
   PostRepository,
   EventRoomRepository,
   FeedRepository,
@@ -2821,5 +2823,89 @@ export class InMemoryActivityRepository implements ActivityRepository {
       .filter((r) => !b || r.at.getTime() < b.at.getTime() || (r.at.getTime() === b.at.getTime() && r.id < b.id))
       .sort((x, y) => y.at.getTime() - x.at.getTime() || (x.id < y.id ? 1 : x.id > y.id ? -1 : 0))
       .slice(0, query.limit);
+  }
+}
+
+export class InMemoryAlbumRepository implements AlbumRepository {
+  readonly albums = new Map<string, AlbumRecord>();
+  readonly members = new Map<string, Map<string, Date>>();
+  readonly photos = new Map<string, AlbumPhotoRecord>();
+  readonly summarized = new Set<string>();
+
+  async ensure(album: AlbumRecord): Promise<AlbumRecord> {
+    const existing = [...this.albums.values()].find((a) => a.kind === album.kind && a.refId === album.refId);
+    if (existing) return { ...existing };
+    this.albums.set(album.id, { ...album });
+    return { ...album };
+  }
+
+  async find(id: string): Promise<AlbumRecord | undefined> {
+    const a = this.albums.get(id);
+    return a ? { ...a } : undefined;
+  }
+
+  async addMembers(albumId: string, userIds: string[], at: Date): Promise<void> {
+    if (!this.albums.has(albumId)) return;
+    const map = this.members.get(albumId) ?? new Map<string, Date>();
+    for (const id of userIds) if (!map.has(id)) map.set(id, at);
+    this.members.set(albumId, map);
+  }
+
+  async listMembers(albumId: string): Promise<string[]> {
+    return [...(this.members.get(albumId) ?? new Map<string, Date>()).entries()].sort((a, b) => a[1].getTime() - b[1].getTime() || (a[0] < b[0] ? -1 : 1)).map(([id]) => id);
+  }
+
+  async isMember(albumId: string, userId: string): Promise<boolean> {
+    return this.members.get(albumId)?.has(userId) ?? false;
+  }
+
+  async listForUser(userId: string, since: Date, limit: number): Promise<AlbumRecord[]> {
+    return [...this.albums.values()]
+      .filter((a) => a.startedAt > since && this.members.get(a.id)?.has(userId))
+      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+      .slice(0, limit)
+      .map((a) => ({ ...a }));
+  }
+
+  async listStartedBetween(from: Date, to: Date, limit: number): Promise<AlbumRecord[]> {
+    return [...this.albums.values()]
+      .filter((a) => a.startedAt > from && a.startedAt <= to)
+      .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
+      .slice(0, limit)
+      .map((a) => ({ ...a }));
+  }
+
+  async addPhoto(photo: AlbumPhotoRecord): Promise<void> {
+    if (this.albums.has(photo.albumId)) this.photos.set(photo.id, { ...photo });
+  }
+
+  async listPhotos(albumId: string): Promise<AlbumPhotoMeta[]> {
+    return [...this.photos.values()]
+      .filter((p) => p.albumId === albumId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map((p) => ({ id: p.id, albumId: p.albumId, authorId: p.authorId, createdAt: p.createdAt }));
+  }
+
+  async countPhotos(albumId: string, authorId?: string): Promise<number> {
+    return [...this.photos.values()].filter((p) => p.albumId === albumId && (authorId === undefined || p.authorId === authorId)).length;
+  }
+
+  async findPhoto(albumId: string, photoId: string): Promise<AlbumPhotoRecord | undefined> {
+    const p = this.photos.get(photoId);
+    return p && p.albumId === albumId ? { ...p } : undefined;
+  }
+
+  async deletePhoto(albumId: string, photoId: string, authorId: string): Promise<boolean> {
+    const p = this.photos.get(photoId);
+    if (!p || p.albumId !== albumId || p.authorId !== authorId) return false;
+    this.photos.delete(photoId);
+    return true;
+  }
+
+  async markSummarized(albumId: string, userId: string): Promise<boolean> {
+    const key = `${albumId}|${userId}`;
+    if (this.summarized.has(key)) return false;
+    this.summarized.add(key);
+    return true;
   }
 }
