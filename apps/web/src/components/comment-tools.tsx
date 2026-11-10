@@ -67,11 +67,17 @@ export function GifPicker({ onPick, onClose }: { onPick: (gif: CommentGif) => vo
       <input className="gifpicker__search" type="search" value={q} onChange={(event) => setQ(event.target.value)} maxLength={50} placeholder={t('Buscar GIFs')} aria-label={t('Buscar GIFs')} autoComplete="off" />
       {error ? <p className="muted" role="alert">{error}</p> : null}
       {!loading && !error && items.length === 0 ? <p className="muted">{t('Nenhum GIF encontrado.')}</p> : null}
+      {loading && items.length === 0 ? (
+        <p className="gifpicker__loading muted" role="status">
+          <span className="gifpicker__spinner" aria-hidden="true" />
+          {t('Carregando GIFs…')}
+        </p>
+      ) : null}
       <ul className="gifpicker__grid">
         {items.map((gif) => (
           <li key={gif.id}>
             <button type="button" className="gifpicker__item" onClick={() => onPick({ id: gif.id, url: gif.url })} aria-label={gif.title || t('GIF')}>
-              <img src={gif.url} alt="" width={gif.width} height={gif.height} loading="lazy" decoding="async" />
+              <GifImage url={gif.url} alt="" width={gif.width} height={gif.height} />
             </button>
           </li>
         ))}
@@ -124,7 +130,20 @@ export function CommentTools({ onEmoji, onGif, disabled }: { onEmoji: (emoji: st
   );
 }
 
-/** O GIF dentro de um comentário. */
+/** Imagem de GIF com "carregando" até chegar; se a Giphy não entregar, um aviso no lugar. */
+export function GifImage({ url, className, alt = t('GIF'), width, height }: { url: string; className?: string; alt?: string; width?: number; height?: number }) {
+  const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  useEffect(() => setState('loading'), [url]);
+  if (state === 'failed') return <span className={`gifimg gifimg--failed ${className ?? ''}`}>{t('GIF indisponível')}</span>;
+  return (
+    <span className={`gifimg${state === 'loading' ? ' gifimg--loading' : ''} ${className ?? ''}`} role={state === 'loading' ? 'status' : undefined} aria-busy={state === 'loading' || undefined}>
+      {state === 'loading' ? <span className="visually-hidden">{t('Carregando GIF…')}</span> : null}
+      <img src={url} alt={alt} width={width} height={height} loading="lazy" decoding="async" referrerPolicy="no-referrer" onLoad={() => setState('ready')} onError={() => setState('failed')} />
+    </span>
+  );
+}
+
+/** O GIF dentro de um comentário ou de uma mensagem. */
 export function CommentGifView({ gif }: { gif: CommentGif }) {
-  return <img className="comment__gif" src={gif.url} alt={t('GIF')} loading="lazy" decoding="async" referrerPolicy="no-referrer" />;
+  return <GifImage url={gif.url} className="comment__gif" />;
 }

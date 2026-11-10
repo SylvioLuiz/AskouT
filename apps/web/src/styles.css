@@ -5317,6 +5317,10 @@ button.reactlist__row { cursor: pointer; }
 .stagebar__video { display: grid; place-items: center; width: 100%; height: 100%; background: rgb(0 0 0 / 0.6); color: #fff; }
 .stagebar__remove { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / 0.6); color: #fff; cursor: pointer; }
 .stagebar__remove svg { width: 14px; height: 14px; }
+/* GIF escolhido no chat, antes de enviar. */
+.gifstage { margin: 0 -16px; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--surface); }
+.gifstage__item { position: relative; display: inline-block; max-width: min(240px, 70%); border-radius: 12px; overflow: hidden; background: var(--line); vertical-align: top; }
+.gifstage__item .gifimg { max-height: 180px; }
 .stagebar__add { display: grid; place-items: center; width: 72px; height: 72px; border: 1px dashed var(--line-strong); border-radius: 12px; background: transparent; color: var(--muted); cursor: pointer; }
 /* "⋯" só aparece ao passar o mouse (no celular, segurar o balão abre as opções). */
 @media (hover: hover) { .msg .msg__more { opacity: 0; } .msg:hover .msg__more, .msg .msg__more:focus-visible { opacity: 1; } }
@@ -5642,6 +5646,20 @@ div.optrow__main { cursor: default; }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 .comment__gif { display: block; max-width: min(220px, 100%); max-height: 220px; margin-top: 6px; border-radius: 12px; background: var(--bg); }
+/* GIF: "carregando" até a imagem chegar. */
+.gifimg { position: relative; display: block; overflow: hidden; }
+.gifimg img { display: block; max-width: 100%; max-height: inherit; width: auto; height: auto; }
+.gifimg--loading { min-width: 120px; min-height: 90px; background: var(--line); }
+.gifimg--loading img { opacity: 0; }
+.gifimg--loading::after { content: ''; position: absolute; top: 50%; left: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 2px solid var(--muted); border-right-color: transparent; border-radius: 50%; animation: gifspin 0.8s linear infinite; }
+.gifimg--failed { display: grid; place-items: center; min-width: 120px; min-height: 60px; padding: 8px; background: var(--line); color: var(--muted); font-size: 0.85em; }
+.gifpicker__item .gifimg { width: 100%; }
+.gifpicker__item .gifimg img { width: 100%; }
+.gifpicker__item .gifimg--loading { min-width: 0; min-height: 80px; }
+.gifpicker__loading { display: flex; align-items: center; gap: 8px; }
+.gifpicker__spinner { width: 16px; height: 16px; border: 2px solid var(--muted); border-right-color: transparent; border-radius: 50%; animation: gifspin 0.8s linear infinite; }
+@keyframes gifspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .gifimg--loading::after, .gifpicker__spinner { animation-duration: 2.4s; } }
 .feedcomment__bubble .comment__gif { margin-top: 4px; }
 .commenttools { display: flex; gap: 8px; margin-top: 6px; }
 .commenttools__btn { min-width: 40px; min-height: 36px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.8125rem; font-weight: 800; cursor: pointer; }

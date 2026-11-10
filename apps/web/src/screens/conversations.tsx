@@ -25,7 +25,7 @@ import type { RunPosition } from '../lib/chat.ts';
 import { mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
 import { toApiError } from '../lib/errors.ts';
 import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
-import { CommentGifView, CommentTools } from '../components/comment-tools.tsx';
+import { CommentGifView, CommentTools, GifImage } from '../components/comment-tools.tsx';
 import type { ChatMessage, CommentGif, ConversationItem } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
@@ -200,6 +200,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [staged, setStaged] = useState<StagedMedia[]>([]);
+  /** GIF escolhido, ainda não enviado: aparece acima do campo até tocar em enviar. */
+  const [pendingGif, setPendingGif] = useState<CommentGif | undefined>();
   const stagedRef = useRef<StagedMedia[]>([]);
   stagedRef.current = staged;
   useEffect(() => () => stagedRef.current.forEach((x) => URL.revokeObjectURL(x.url)), []);
@@ -424,13 +426,14 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     event.preventDefault();
     const text = draft.trim();
     const media = staged;
-    if ((text === '' && media.length === 0) || sending) return;
+    const gif = pendingGif;
+    if ((text === '' && media.length === 0 && !gif) || sending) return;
     setSending(true);
     setUploading(media.length > 0);
     setProblem(undefined);
     let reply = replyTo?.id;
     try {
-      // Primeiro as fotos (na ordem escolhida), depois o texto, como legenda logo abaixo.
+      // Primeiro as fotos (na ordem escolhida), depois o GIF, depois o texto, logo abaixo.
       for (const item of media) {
         const blob = item.kind === 'IMAGE' ? await prepareImage(item.file) : item.file;
         const message = await api.sendMedia(conversationId, blob, reply);
@@ -440,6 +443,13 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         unstage(item.id);
       }
       setUploading(false);
+      if (gif) {
+        const message = await api.sendGif(conversationId, gif, reply);
+        reply = undefined;
+        stickToEnd.current = true;
+        setMessages((current) => mergeMessages(current, [message]));
+        setPendingGif(undefined);
+      }
       if (text !== '') {
         const message = await api.sendText(conversationId, text, reply);
         stickToEnd.current = true;
@@ -454,22 +464,6 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     } finally {
       setSending(false);
       setUploading(false);
-    }
-  }
-
-  async function sendGif(gif: CommentGif) {
-    if (sending) return;
-    setSending(true);
-    setProblem(undefined);
-    try {
-      const message = await api.sendGif(conversationId, gif, replyTo?.id);
-      stickToEnd.current = true;
-      setMessages((current) => mergeMessages(current, [message]));
-      setReplyTo(undefined);
-    } catch (failure) {
-      setProblem(toApiError(failure).message);
-    } finally {
-      setSending(false);
     }
   }
 
@@ -772,6 +766,16 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         </div>
       ) : data.canSend ? (
         <>
+          {pendingGif ? (
+            <div className="gifstage" role="group" aria-label={t('GIF para enviar')}>
+              <span className="gifstage__item">
+                <GifImage url={pendingGif.url} />
+                <button type="button" className="stagebar__remove" aria-label={t('Tirar o GIF')} disabled={sending} onClick={() => setPendingGif(undefined)}>
+                  <XIcon />
+                </button>
+              </span>
+            </div>
+          ) : null}
           {staged.length > 0 ? (
             <div className="stagebar" role="group" aria-label={staged.length === 1 ? t('1 item para enviar') : t('{count} itens para enviar', { count: staged.length })}>
               <ul className="stagebar__list">
@@ -829,7 +833,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
                   }}
                 />
-                {draft.trim() !== '' || staged.length > 0 ? (
+                {draft.trim() !== '' || staged.length > 0 || pendingGif ? (
                   <button type="submit" className="composer__sendtext" disabled={sending} aria-busy={sending || undefined} aria-label={t('Enviar')}>
                     <ArrowUpIcon />
                   </button>
@@ -848,7 +852,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 )}
               </div>
             )}
-            {!recording ? <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => void sendGif(gif)} /> : null}
+            {!recording ? <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} /> : null}
           </form>
         </>
       ) : (

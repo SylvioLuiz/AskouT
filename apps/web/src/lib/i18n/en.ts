@@ -2427,4 +2427,9 @@ export const EN: Readonly<Record<string, string>> = {
   "Atendemos pedidos e ordens das autoridades nas investigações.": "We respond to requests and orders from authorities in investigations.",
   "Contato de segurança infantil": "Child safety contact",
   "Para assuntos de segurança infantil, inclusive pedidos de autoridades, escreva para": "For child safety matters, including requests from authorities, write to",
+  "GIF para enviar": "GIF to send",
+  "Tirar o GIF": "Remove the GIF",
+  "GIF indisponível": "GIF unavailable",
+  "Carregando GIF…": "Loading GIF…",
+  "Carregando GIFs…": "Loading GIFs…",
 };
