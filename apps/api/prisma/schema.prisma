@@ -165,6 +165,7 @@ model User {
   boosts        Boost[]
   dwells        ContentDwell[]
   consentEvents ConsentEvent[]
+  cloakroomTickets CloakroomTicket[]
 
   following Follow[] @relation("Follower")
   followers Follow[] @relation("Followee")
@@ -851,6 +852,8 @@ model PlaceEvent {
   stories   EventStory[]
   cover    PlaceEventCover?
   feedPosts FeedPost[]
+  cloakroom CloakroomSetting?
+  cloakroomTickets CloakroomTicket[]
 
   @@index([startsAt])
   @@index([venueId])
@@ -1599,4 +1602,48 @@ model ConsentEvent {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, at])
+}
+
+enum CloakroomStatus {
+  ISSUED
+  STORED
+  RETURNED
+  CANCELED
+}
+
+/// Chapelaria do evento (guarda-volumes). Sem linha, o evento não tem chapelaria.
+model CloakroomSetting {
+  placeEventId String   @id @db.Uuid
+  enabled      Boolean  @default(true)
+  /// Preço por item, em centavos, cobrado na porta. Nulo: grátis.
+  priceCents   Int?
+  /// Máximo de itens ao mesmo tempo. Nulo: sem limite.
+  capacity     Int?
+  note         String?
+  updatedAt    DateTime @updatedAt
+
+  placeEvent PlaceEvent @relation(fields: [placeEventId], references: [id], onDelete: Cascade)
+}
+
+/// Ticket da chapelaria: o participante pede, a equipe confere o código ao receber e ao devolver.
+model CloakroomTicket {
+  id           String          @id @default(uuid()) @db.Uuid
+  placeEventId String          @db.Uuid
+  userId       String          @db.Uuid
+  /// Etiqueta sequencial dentro do evento.
+  number       Int
+  code         String
+  description  String
+  itemCount    Int             @default(1)
+  status       CloakroomStatus @default(ISSUED)
+  createdAt    DateTime        @default(now())
+  storedAt     DateTime?
+  returnedAt   DateTime?
+
+  placeEvent PlaceEvent @relation(fields: [placeEventId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([placeEventId, code])
+  @@unique([placeEventId, number])
+  @@index([userId, createdAt])
 }

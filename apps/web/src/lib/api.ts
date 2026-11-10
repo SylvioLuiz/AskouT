@@ -93,6 +93,7 @@ import type {
   SocialProvider,
   SocialProviderId,
 } from './types.ts';
+import type { CloakroomPanel, CloakroomPublic, CloakroomSettingBody, CloakroomStaffTicket, CloakroomTicket } from './cloakroom.ts';
 import { t } from '../lib/i18n/index.ts';
 
 /** O mínimo de `fetch` que o cliente usa (facilita testar sem navegador). */
@@ -515,6 +516,14 @@ export function createApi(deps: ApiDeps) {
     sendAudio: (conversationId: string, audio: string, audioMs: number, replyToId?: string) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { audio, audioMs, ...(replyToId ? { replyToId } : {}) } }),
     /** Foto ou vídeo: o arquivo vai cru no corpo (sem base64), com o tipo no Content-Type. */
+    cloakroom: (eventId: string) => request<CloakroomPublic>('GET', `/events/${id(eventId)}/cloakroom`),
+    requestCloakroomTicket: (eventId: string, body: { description: string; itemCount: number }) => request<CloakroomTicket>('POST', `/events/${id(eventId)}/cloakroom/tickets`, { body }),
+    cancelCloakroomTicket: (ticketId: string) => request<CloakroomTicket>('DELETE', `/cloakroom/tickets/${id(ticketId)}`),
+    cloakroomPanel: (venueId: string, eventId: string) => request<CloakroomPanel>('GET', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom`),
+    saveCloakroom: (venueId: string, eventId: string, body: CloakroomSettingBody) => request<CloakroomPanel>('PUT', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom`, { body }),
+    cloakroomLookup: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/lookup`, { body: { code } }),
+    cloakroomReceive: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/receive`, { body: { code } }),
+    cloakroomReturn: (venueId: string, eventId: string, code: string) => request<CloakroomStaffTicket>('POST', `/me/venues/${id(venueId)}/events/${id(eventId)}/cloakroom/return`, { body: { code } }),
     sendMedia: async (conversationId: string, file: Blob, replyToId?: string): Promise<ChatMessage> => {
       const token = deps.getToken();
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };

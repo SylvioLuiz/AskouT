@@ -32,6 +32,11 @@ export const SearchIcon = () => (
     <path d="M16 16l4.5 4.5" />
   </Svg>
 );
+export const BackIcon = () => (
+  <Svg>
+    <path d="M15 5l-7 7 7 7" />
+  </Svg>
+);
 export const ChatIcon = () => (
   <Svg>
     <path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 16h-8l-4.5 3.5V16H5a1.5 1.5 0 0 1-1.5-1.5v-8A1.5 1.5 0 0 1 5 5z" />

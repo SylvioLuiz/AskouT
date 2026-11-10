@@ -23,6 +23,7 @@ export { PrismaAppSettingsRepository } from './prisma-app-settings.repository.ts
 export { PrismaDwellRepository } from './prisma-dwell.repository.ts';
 export { PrismaAccountRepository } from './prisma-account.repository.ts';
 export { PrismaRegionRepository } from './prisma-region.repository.ts';
+export { PrismaCloakroomRepository } from './prisma-cloakroom.repository.ts';
 export { PrismaConsentRepository } from './prisma-consent.repository.ts';
 export { PrismaPostRepository } from './prisma-post.repository.ts';
 export { PrismaAdminRepository } from './prisma-admin.repository.ts';

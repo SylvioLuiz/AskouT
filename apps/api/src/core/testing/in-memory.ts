@@ -33,6 +33,7 @@ import type {
   BoostStatsRepository,
   RegionRepository,
   ConsentRepository,
+  CloakroomRepository,
   AccountRepository,
   DwellRepository,
   PaymentCharge,
@@ -55,6 +56,8 @@ import type {
   DirectActivityRow,
   DwellRecord,
   ConsentEventRecord,
+  CloakroomSettingRecord,
+  CloakroomTicketRecord,
   EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -693,6 +696,52 @@ export class InMemoryDwellRepository implements DwellRepository {
     this.rows.length = 0;
     this.rows.push(...keep);
     return removed;
+  }
+}
+
+export class InMemoryCloakroomRepository implements CloakroomRepository {
+  readonly settings = new Map<string, CloakroomSettingRecord>();
+  readonly tickets = new Map<string, CloakroomTicketRecord>();
+
+  async findSetting(placeEventId: string) {
+    const s = this.settings.get(placeEventId);
+    return s ? { ...s } : undefined;
+  }
+
+  async saveSetting(setting: CloakroomSettingRecord): Promise<void> {
+    this.settings.set(setting.placeEventId, { ...setting });
+  }
+
+  async createTicket(ticket: Omit<CloakroomTicketRecord, 'number'>): Promise<CloakroomTicketRecord> {
+    const number = [...this.tickets.values()].filter((t) => t.placeEventId === ticket.placeEventId).length + 1;
+    const row = { ...ticket, number };
+    this.tickets.set(row.id, row);
+    return { ...row };
+  }
+
+  async findTicket(id: string) {
+    const t = this.tickets.get(id);
+    return t ? { ...t } : undefined;
+  }
+
+  async findTicketByCode(placeEventId: string, code: string) {
+    const t = [...this.tickets.values()].find((x) => x.placeEventId === placeEventId && x.code === code);
+    return t ? { ...t } : undefined;
+  }
+
+  async updateTicket(ticket: CloakroomTicketRecord): Promise<void> {
+    this.tickets.set(ticket.id, { ...ticket });
+  }
+
+  async listByEvent(placeEventId: string) {
+    return [...this.tickets.values()].filter((t) => t.placeEventId === placeEventId).sort((a, b) => b.number - a.number).map((t) => ({ ...t }));
+  }
+
+  async listByUser(userId: string, placeEventId?: string) {
+    return [...this.tickets.values()]
+      .filter((t) => t.userId === userId && (placeEventId === undefined || t.placeEventId === placeEventId))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.number - a.number)
+      .map((t) => ({ ...t }));
   }
 }
 

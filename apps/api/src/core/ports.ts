@@ -1,4 +1,4 @@
-import type { ActivityAction, ConsentEventRecord, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
+import type { ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -146,6 +146,20 @@ export interface DwellRepository {
   deleteByUser(userId: string): Promise<number>;
   /** Apaga as da pessoa anteriores a `before`. Devolve quantas. */
   deleteOlderThan(userId: string, before: Date): Promise<number>;
+}
+
+export interface CloakroomRepository {
+  findSetting(placeEventId: string): Promise<CloakroomSettingRecord | undefined>;
+  saveSetting(setting: CloakroomSettingRecord): Promise<void>;
+  /** Cria o ticket com o próximo número do evento (sequencial, sem repetir). Devolve o ticket gravado. */
+  createTicket(ticket: Omit<CloakroomTicketRecord, 'number'>): Promise<CloakroomTicketRecord>;
+  findTicket(id: string): Promise<CloakroomTicketRecord | undefined>;
+  findTicketByCode(placeEventId: string, code: string): Promise<CloakroomTicketRecord | undefined>;
+  updateTicket(ticket: CloakroomTicketRecord): Promise<void>;
+  /** Tickets do evento, do mais novo para o mais antigo. */
+  listByEvent(placeEventId: string): Promise<CloakroomTicketRecord[]>;
+  /** Tickets da pessoa no evento (ou em todos, sem `placeEventId`), do mais novo para o mais antigo. */
+  listByUser(userId: string, placeEventId?: string): Promise<CloakroomTicketRecord[]>;
 }
 
 export interface ConsentRepository {
@@ -904,6 +918,7 @@ export interface CoreDeps {
   dwell: DwellRepository;
   regions: RegionRepository;
   consents: ConsentRepository;
+  cloakroom: CloakroomRepository;
   account: AccountRepository;
   payments: PaymentGateway;
   settings: AppSettingsRepository;
