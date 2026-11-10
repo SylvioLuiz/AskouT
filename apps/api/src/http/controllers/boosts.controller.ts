@@ -41,6 +41,22 @@ export class BoostsController {
     return this.core.boosts.create(actor.userId, venueId, asBody(body));
   }
 
+  /** Relatório do anúncio (só para quem pagou): exibições, aberturas e cliques no ingresso por dia. */
+  @Get('me/boosts/:id/report')
+  report(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.boostStats.report(actor.userId, id);
+  }
+
+  /**
+   * O app avisa o que mostrou como "Patrocinado": `{items: [{kind, placement, eventId?, venueId?}]}`.
+   * O servidor decide a qual anúncio o registro pertence; o que não bate é ignorado.
+   */
+  @Post('me/boost-stats')
+  @HttpCode(200)
+  track(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.boostStats.track(actor.userId, asBody(body)['items']);
+  }
+
   @Post('me/boosts/:id/cancel')
   @HttpCode(200)
   cancel(@CurrentActor() actor: Actor, @Param('id') id: string) {

@@ -1,4 +1,5 @@
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
+import type { AuthService } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
 
 export interface AccountExportFile {
@@ -12,9 +13,24 @@ export interface AccountExportFile {
  */
 export class AccountService {
   private readonly deps: CoreDeps;
+  private readonly auth: AuthService;
 
-  constructor(deps: CoreDeps) {
+  constructor(deps: CoreDeps, auth: AuthService) {
     this.deps = deps;
+    this.auth = auth;
+  }
+
+  /** Se a conta tem senha própria. Quem entra só com Google ou Apple não tem senha para trocar. */
+  async passwordStatus(userId: string): Promise<{ hasPassword: boolean }> {
+    return { hasPassword: !(await this.deps.account.hasExternalIdentity(userId)) };
+  }
+
+  /** Troca a senha de quem está logado, conferindo a atual. Conta só com Google/Apple não tem senha conhecida. */
+  async changePassword(userId: string, input: { currentPassword: unknown; newPassword: unknown }): Promise<void> {
+    if (await this.deps.account.hasExternalIdentity(userId)) {
+      throw forbidden('Sua conta entra com Google ou Apple e não tem senha própria no AskouT.');
+    }
+    await this.auth.changePassword(userId, input);
   }
 
   /** Cópia dos dados da pessoa em JSON. Não inclui arquivos de imagem e vídeo, só o que existe sobre eles. */
@@ -29,6 +45,7 @@ export class AccountService {
         generatedAt: now.toISOString(),
         notes: 'Cópia dos seus dados no AskouT. Fotos e vídeos não vão neste arquivo, apenas o registro de que existem. Mensagens de outras pessoas não são suas e não aparecem aqui.',
         ...sections,
+        consents: (await this.deps.consents.listByUser(userId, 1000)).map((e) => ({ purpose: e.purpose, granted: e.granted, source: e.source, at: e.at.toISOString() })),
       },
     };
   }

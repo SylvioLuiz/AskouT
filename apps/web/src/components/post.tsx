@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { CarouselIcon, CommentIcon, HeartIcon, MoreIcon, SendIcon } from './icons.tsx';
+import { CarouselIcon, CommentIcon, HeartIcon, MoreIcon, RepostIcon, SendIcon } from './icons.tsx';
 import { SoundToggle } from './sound-toggle.tsx';
 import { hasSound } from '../lib/sound.ts';
 import { AdjustSheet, CommentsSheet, EditPostSheet, PostMenuSheet, ReportSheet, SharePostSheet } from './post-actions.tsx';
@@ -17,7 +17,7 @@ import { feedRatio } from '../lib/crop.ts';
 import { trackClick, useDwell } from './dwell.tsx';
 import type { DwellSource } from '../lib/dwell.ts';
 import { timeAgo } from '../lib/format.ts';
-import type { PostImage, PostView, PostsPage } from '../lib/types.ts';
+import type { HomeFeedItem, HomeFeedPage, PlaceEventFeedItem, PostImage, PostView, PostsPage } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { PhotoViewer } from './photo-viewer.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
@@ -224,6 +224,15 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
   const hasVideo = post.images.some((i) => i.videoPath);
   return (
     <article className="post" ref={dwellRef} onClickCapture={track ? (ev) => { if ((ev.target as Element).closest('a')) trackClick('POST', initial.id, track); } : undefined}>
+      {post.repostedBy ? (
+        <p className="post__repost">
+          <RepostIcon />
+          <span>
+            <Link to={`/u/${encodeURIComponent(post.repostedBy.username)}`}>{post.repostedBy.username}</Link> {t('repostou')}
+            {post.repostedAt ? <span className="post__repostwhen"> · {timeAgo(post.repostedAt, new Date())}</span> : null}
+          </span>
+        </p>
+      ) : null}
       {cartaz ? null : (
       <header className="post__head">
         {post.venue ? (
@@ -440,11 +449,35 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
   );
 }
 
+/** Evento de bar que alguém que você segue repostou, no Início. */
+function PlaceEventFeedCard({ item }: { item: PlaceEventFeedItem }) {
+  const e = item.event;
+  return (
+    <article className="post post--placeevent">
+      <p className="post__repost">
+        <RepostIcon />
+        <span>
+          <Link to={`/u/${encodeURIComponent(item.repostedBy.username)}`}>{item.repostedBy.username}</Link> {t('repostou')}
+          <span className="post__repostwhen"> · {timeAgo(item.repostedAt, new Date())}</span>
+        </span>
+      </p>
+      <Link to={`/eventos/${encodeURIComponent(e.id)}`} className="evcard__link">
+        {e.imageUrl ? <img className="post__placeimg" src={e.imageUrl} alt="" loading="lazy" /> : null}
+        <div className="evcard__body">
+          <h3 className="evcard__title">{e.title}</h3>
+          <p className="evcard__venue">{e.venueName}</p>
+          <p className="evcard__when">{eventWhen(e.startsAt)}</p>
+        </div>
+      </Link>
+    </article>
+  );
+}
+
 /** Lista de posts com "Carregar mais". `load` busca uma página a partir de um deslocamento. */
 /** `inject`: bloco que entra depois de `after` posts (ou no fim, se houver menos). */
-export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { load: (offset: number) => Promise<PostsPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } | { after: number; node: ReactNode }[] }) {
-  const [page, setPage] = useState<PostsPage | undefined>();
-  const [items, setItems] = useState<PostView[]>([]);
+export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { load: (offset: number) => Promise<PostsPage | HomeFeedPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } | { after: number; node: ReactNode }[] }) {
+  const [page, setPage] = useState<{ hasMore: boolean } | undefined>();
+  const [items, setItems] = useState<HomeFeedItem[]>([]);
   const [error, setError] = useState<ApiError | undefined>();
   const [loading, setLoading] = useState(false);
   const sentinel = useRef<HTMLDivElement>(null);
@@ -455,7 +488,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
     try {
       const next = await load(offset);
       setPage(next);
-      setItems((current) => (offset === 0 ? next.items : [...current, ...next.items]));
+      setItems((current) => (offset === 0 ? (next.items as HomeFeedItem[]) : [...current, ...(next.items as HomeFeedItem[]).filter((p) => !current.some((c) => c.id === p.id && 'type' in c === 'type' in p))]));
     } catch (failure) {
       setError(toApiError(failure));
     } finally {
@@ -496,8 +529,12 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
   return (
     <div className="postlist">
       {items.map((post, index) => (
-        <Fragment key={post.id}>
-          <PostCard post={post} asEvent poster track="FEED" onGone={(id) => setItems((current) => current.filter((p) => p.id !== id))} />
+        <Fragment key={'type' in post ? `place:${post.id}` : post.id}>
+          {'type' in post ? (
+            <PlaceEventFeedCard item={post} />
+          ) : (
+            <PostCard post={post} asEvent poster track="FEED" onGone={(id) => setItems((current) => current.filter((p) => 'type' in p || p.id !== id))} />
+          )}
           {injected.filter((i) => index === Math.min(i.after, items.length) - 1).map((i) => (<Fragment key={i.after}>{i.node}</Fragment>))}
         </Fragment>
       ))}

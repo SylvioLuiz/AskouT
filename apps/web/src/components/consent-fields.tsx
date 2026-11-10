@@ -8,11 +8,14 @@ interface Props {
   onBirth: (value: string) => void;
   accepted: boolean;
   onAccepted: (value: boolean) => void;
+  /** Opcional e desmarcado por padrão: receber novidades por e-mail. */
+  marketing?: boolean;
+  onMarketing?: (value: boolean) => void;
   errors: Record<string, string>;
 }
 
 /** Data de nascimento e aceite dos Termos, pedidos ao criar a conta. */
-export function ConsentFields({ birth, onBirth, accepted, onAccepted, errors }: Props) {
+export function ConsentFields({ birth, onBirth, accepted, onAccepted, marketing, onMarketing, errors }: Props) {
   return (
     <>
       <Field label={t('Data de nascimento')} type="date" value={birth} onChange={onBirth} error={errors['birthDate']} hint={t('Não aparece para ninguém. Você pode corrigir depois em Editar perfil.')} max={todayIso()} autoComplete="bday" />
@@ -29,6 +32,14 @@ export function ConsentFields({ birth, onBirth, accepted, onAccepted, errors }: 
           </p>
         ) : null}
       </div>
+      {onMarketing ? (
+        <div className="consent consent--optional">
+          <label className="consent__row">
+            <input type="checkbox" checked={marketing === true} onChange={(e) => onMarketing(e.target.checked)} />
+            <span>{t('Quero receber novidades e ofertas do AskouT por e-mail (opcional). Dá para desligar quando quiser em Privacidade e dados.')}</span>
+          </label>
+        </div>
+      ) : null}
     </>
   );
 }

@@ -7,14 +7,11 @@ import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 export const PROFILE_MENU: { to: string; label: string }[] = [
+  { to: '/configuracao', label: t('Configurações e privacidade') },
   { to: '/amigos/contatos', label: t('Achar amigos') },
-  { to: '/configuracao', label: t('Configuração') },
-  { to: '/privacidade', label: t('Privacidade') },
-  { to: '/locais', label: t('Meus locais') },
-  { to: '/arquivados', label: t('Arquivados') },
   { to: '/interacoes', label: t('Suas interações') },
-  { to: '/ajuda', label: t('Ajuda') },
-  { to: '/tema', label: t('Tema e idioma') },
+  { to: '/arquivados', label: t('Arquivados') },
+  { to: '/locais', label: t('Meus locais') },
 ];
 
 /** Menu do perfil numa folha que sobe da base da tela, como nos apps nativos. Fecha puxando para baixo, com Esc ou tocando fora. */

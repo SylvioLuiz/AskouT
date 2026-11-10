@@ -1367,7 +1367,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
           {radiusKm === null
             ? t('Buscando até {km} km do meio do caminho (automático).', { km: Math.round(suggestions.data.radiusM / 100) / 10 })
             : t('Buscando até {km} km do meio do caminho.', { km: radiusKm })}{' '}
-          <Link to="/configuracao">{t('Mudar')}</Link>
+          <Link to="/configuracao/now">{t('Mudar')}</Link>
         </p>
       ) : null}
       <MatchPlaceSearch center={myPoint ?? (them ? { lat: them.lat, lng: them.lng } : undefined)} otherName={data.other.username} busy={destBusy} onSuggest={(place) => void suggestPlace(place)} />

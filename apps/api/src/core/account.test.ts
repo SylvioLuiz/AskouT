@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { PASSWORD, makeWorld } from './testing/world.ts';
+import { PASSWORD, makeWorld, asSession } from './testing/world.ts';
 import { rejectsWith } from './testing/helpers.ts';
 
 async function setup() {
@@ -35,7 +35,7 @@ describe('conta: exportar e apagar', () => {
 
   it('depois de apagar, a sessão antiga para de valer e os vínculos somem', async () => {
     const { w, ana } = await setup();
-    const session = await w.core.auth.login({ identifier: 'ana', password: PASSWORD });
+    const session = await asSession(w.core.auth.login({ identifier: 'ana', password: PASSWORD }));
     await w.core.account.deleteAccount(ana, { username: 'ana', password: PASSWORD });
     await rejectsWith(w.core.auth.authenticate(session.token), 'UNAUTHORIZED');
     await rejectsWith(w.core.auth.login({ identifier: 'ana', password: PASSWORD }), 'UNAUTHORIZED');
@@ -72,5 +72,34 @@ describe('e-mail de conta apagada', () => {
     w.mailer.failNotices = true;
     await w.core.account.deleteAccount(bia, { username: 'bia', password: PASSWORD });
     assert.equal(await w.users.findById(bia), undefined, 'apagou mesmo com o e-mail falhando');
+  });
+});
+
+describe('conta: trocar a senha', () => {
+  const NOVA = 'outra-senha-forte-456';
+
+  it('confere a senha atual e valida a nova; recusas não mudam nada', async () => {
+    const { w, ana } = await setup();
+    assert.deepEqual(await w.core.account.passwordStatus(ana), { hasPassword: true });
+    const wrong = await rejectsWith(w.core.account.changePassword(ana, { currentPassword: 'errada-errada-1', newPassword: NOVA }), 'VALIDATION');
+    assert.equal(wrong.message, 'Senha atual incorreta');
+    await rejectsWith(w.core.account.changePassword(ana, { currentPassword: PASSWORD, newPassword: 'curta' }), 'VALIDATION');
+    await rejectsWith(w.core.account.changePassword(ana, { currentPassword: PASSWORD, newPassword: PASSWORD }), 'VALIDATION');
+    await rejectsWith(w.core.account.changePassword(ana, { currentPassword: undefined, newPassword: undefined }), 'VALIDATION');
+    assert.ok(await w.core.auth.login({ identifier: 'ana', password: PASSWORD }));
+  });
+
+  it('depois de trocar, entra só com a nova', async () => {
+    const { w, ana } = await setup();
+    await w.core.account.changePassword(ana, { currentPassword: PASSWORD, newPassword: NOVA });
+    await rejectsWith(w.core.auth.login({ identifier: 'ana', password: PASSWORD }), 'UNAUTHORIZED');
+    assert.ok(await w.core.auth.login({ identifier: 'ana', password: NOVA }));
+  });
+
+  it('conta que entra com Google/Apple não tem senha para trocar', async () => {
+    const { w, ana } = await setup();
+    w.identities.rows.set('GOOGLE|sub-1', ana);
+    assert.deepEqual(await w.core.account.passwordStatus(ana), { hasPassword: false });
+    await rejectsWith(w.core.account.changePassword(ana, { currentPassword: PASSWORD, newPassword: NOVA }), 'FORBIDDEN');
   });
 });

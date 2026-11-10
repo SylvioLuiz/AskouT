@@ -1,4 +1,4 @@
-import type { ActivityAction, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostRecord, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserRole } from './types.ts';
+import type { ActivityAction, ConsentEventRecord, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -105,6 +105,36 @@ export interface PasswordResetRepository {
   incrementAttempts(userId: string): Promise<number | undefined>;
 }
 
+export interface MfaRepository {
+  find(userId: string): Promise<UserMfa | undefined>;
+  /** Insere ou substitui. */
+  save(record: UserMfa): Promise<void>;
+  delete(userId: string): Promise<void>;
+  /** Grava `step` como último usado só se for maior que o atual, de forma ATÔMICA, e zera as falhas. Devolve false se o código já foi usado. */
+  useStep(userId: string, step: number): Promise<boolean>;
+  /** Remove esse código de recuperação de forma ATÔMICA e zera as falhas. Devolve false se não existia (ou já foi usado). */
+  useRecoveryCode(userId: string, codeHash: string): Promise<boolean>;
+  /** Soma 1 às falhas de forma ATÔMICA e devolve o total (undefined se não existe). */
+  incrementFailures(userId: string): Promise<number | undefined>;
+  /** Bloqueia até `until` e zera as falhas. */
+  lock(userId: string, until: Date): Promise<void>;
+}
+
+/** Cifra com chave do servidor (para segredos que precisam ser lidos de volta, como o do TOTP). */
+export interface SecretBox {
+  seal(plain: string): string;
+  /** undefined se adulterado ou cifrado com outra chave. */
+  open(sealed: string): string | undefined;
+}
+
+/** Comprovante curto de que a senha (ou a plataforma) já foi conferida e falta o código do autenticador. Não serve como sessão. */
+export interface MfaChallengeTokens {
+  readonly ttlSeconds: number;
+  issue(userId: string): string;
+  /** userId, ou undefined se inválido ou expirado. */
+  verify(token: string): string | undefined;
+}
+
 /** Tempo que cada conteúdo ficou na tela de cada pessoa. Dado de comportamento: tem prazo e a pessoa pode apagar. */
 export interface DwellRepository {
   addMany(records: DwellRecord[]): Promise<void>;
@@ -116,6 +146,12 @@ export interface DwellRepository {
   deleteByUser(userId: string): Promise<number>;
   /** Apaga as da pessoa anteriores a `before`. Devolve quantas. */
   deleteOlderThan(userId: string, before: Date): Promise<number>;
+}
+
+export interface ConsentRepository {
+  add(event: ConsentEventRecord): Promise<void>;
+  /** Histórico da pessoa, mais recente primeiro, até `limit`. */
+  listByUser(userId: string, limit: number): Promise<ConsentEventRecord[]>;
 }
 
 export interface RegionRepository {
@@ -154,6 +190,21 @@ export interface BoostRepository {
   transition(id: string, from: BoostStatus[], to: BoostStatus): Promise<boolean>;
   /** Pagos cuja janela inclui `now`. */
   listActive(now: Date): Promise<BoostRecord[]>;
+}
+
+/**
+ * Contadores do relatório do anúncio. Cada pessoa conta no máximo uma vez por anúncio, dia e tipo.
+ * A marcação de "já contei" guarda só uma chave embaralhada (nunca o id da pessoa) e é apagada em 2 dias.
+ */
+export interface BoostStatsRepository {
+  /** Se a chave ainda não foi contada nesse anúncio, dia e tipo, marca e soma 1 no contador do local de exibição. Devolve se contou. */
+  countOnce(entry: { boostId: string; day: string; kind: BoostStatKind; placement: BoostPlacement; viewerKey: string }): Promise<boolean>;
+  /** Se a chave já foi contada (serve para só contar o clique no ingresso de quem viu o anúncio). */
+  wasCounted(entry: { boostId: string; day: string; kind: BoostStatKind; viewerKey: string }): Promise<boolean>;
+  /** Contadores do anúncio, do dia mais antigo para o mais novo. */
+  listByBoost(boostId: string): Promise<BoostStatRow[]>;
+  /** Apaga as marcações de dias anteriores a `day` (os contadores ficam). Devolve quantas apagou. */
+  purgeSeenBefore(day: string): Promise<number>;
 }
 
 /** Cobrança criada no provedor de pagamento. */
@@ -400,6 +451,10 @@ export interface ProfileEventRepository {
   addPost(userId: string, postId: string, at: Date): Promise<boolean>;
   removePost(userId: string, postId: string): Promise<boolean>;
   hasPost(userId: string, postId: string): Promise<boolean>;
+  /** Reposts de eventos de pessoas feitos por qualquer um de `userIds`, mais recentes primeiro (alimenta o Início). */
+  listPostReposts(userIds: string[], limit: number): Promise<{ userId: string; postId: string; createdAt: Date }[]>;
+  /** Eventos de local postados no perfil por qualquer um de `userIds`, mais recentes primeiro (alimenta o Início). */
+  listPlaceReposts(userIds: string[], limit: number): Promise<{ userId: string; eventId: string; createdAt: Date }[]>;
 }
 
 export interface PostRepository {
@@ -432,6 +487,8 @@ export interface PostRepository {
   replaceImage(postId: string, imageId: string, newId: string, mime: string, data: Uint8Array): Promise<boolean>;
   /** "Não tenho interesse": o post some das listas de `userId` (`listFor` com `scope.hideFor`). */
   hide(postId: string, userId: string): Promise<void>;
+  /** Dos `postIds`, os que `userId` escondeu com "Não tenho interesse". */
+  hiddenAmong(userId: string, postIds: string[]): Promise<string[]>;
   like(postId: string, userId: string, at: Date): Promise<void>;
   unlike(postId: string, userId: string): Promise<void>;
   /** Curtidas de cada post e se `viewerId` curtiu. */
@@ -839,9 +896,14 @@ export interface CoreDeps {
   routes?: RouteSource;
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
+  mfa: MfaRepository;
+  secretBox: SecretBox;
+  mfaChallenges: MfaChallengeTokens;
   boosts: BoostRepository;
+  boostStats: BoostStatsRepository;
   dwell: DwellRepository;
   regions: RegionRepository;
+  consents: ConsentRepository;
   account: AccountRepository;
   payments: PaymentGateway;
   settings: AppSettingsRepository;

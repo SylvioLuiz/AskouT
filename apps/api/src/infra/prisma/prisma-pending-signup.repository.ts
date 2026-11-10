@@ -13,6 +13,7 @@ function toPending(row: PendingRow): PendingSignup {
     passwordHash: row.passwordHash,
     birthDate: row.birthDate.toISOString().slice(0, 10),
     termsVersion: row.termsVersion,
+    marketingEmail: row.marketingEmail,
     codeHash: row.codeHash,
     expiresAt: row.expiresAt,
     attempts: row.attempts,

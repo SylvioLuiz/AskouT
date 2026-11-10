@@ -161,8 +161,10 @@ model User {
   profile  Profile?
   settings UserSettings?
   passwordReset PasswordReset?
+  mfa           UserMfa?
   boosts        Boost[]
   dwells        ContentDwell[]
+  consentEvents ConsentEvent[]
 
   following Follow[] @relation("Follower")
   followers Follow[] @relation("Followee")
@@ -704,6 +706,22 @@ model PasswordReset {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+/// Verificação em duas etapas por app autenticador (TOTP). Sem enabledAt, a configuração ainda não foi confirmada.
+model UserMfa {
+  userId             String    @id @db.Uuid
+  /// Segredo TOTP cifrado com AES-256-GCM (chave derivada do CODE_SECRET).
+  secretSealed       String
+  enabledAt          DateTime?
+  /// HMAC dos códigos de recuperação ainda não usados.
+  recoveryCodeHashes String[]  @default([])
+  lastUsedStep       Int       @default(-1)
+  failedAttempts     Int       @default(0)
+  lockedUntil        DateTime?
+  createdAt          DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model PendingSignup {
   email        String   @id // minúsculo
   username     String
@@ -711,6 +729,8 @@ model PendingSignup {
   passwordHash String
   birthDate    DateTime @db.Date
   termsVersion String
+  /// Marcou "quero receber novidades por e-mail" no cadastro (opcional).
+  marketingEmail Boolean @default(false)
   codeHash     String
   expiresAt    DateTime
   attempts     Int      @default(0) // incrementar de forma atômica (attempts: { increment: 1 })
@@ -1303,9 +1323,40 @@ model Boost {
 
   venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
   owner User  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  stats BoostDailyStat[]
+  seen  BoostSeen[]
 
   @@index([venueId, createdAt])
   @@index([status, startsAt, endsAt])
+}
+
+/// Relatório do anúncio: contador por dia, lugar do app e tipo. Só números, nunca quem.
+model BoostDailyStat {
+  boostId   String @db.Uuid
+  /// Data no fuso de Brasília (AAAA-MM-DD).
+  day       String
+  /// 'EXPLORE', 'HOME', 'MATCH' ou 'EVENT_PAGE'.
+  placement String
+  /// 'IMPRESSION', 'OPEN' ou 'TICKET'.
+  kind      String
+  count     Int    @default(0)
+
+  boost Boost @relation(fields: [boostId], references: [id], onDelete: Cascade)
+
+  @@id([boostId, day, placement, kind])
+}
+
+/// "Já contei esta pessoa hoje neste anúncio": guarda só uma chave embaralhada (nunca o id) e é apagada em 2 dias.
+model BoostSeen {
+  boostId   String @db.Uuid
+  day       String
+  kind      String
+  viewerKey String
+
+  boost Boost @relation(fields: [boostId], references: [id], onDelete: Cascade)
+
+  @@id([boostId, day, kind, viewerKey])
+  @@index([day])
 }
 
 /// Quanto tempo um conteúdo ficou visível na tela da pessoa. Alimenta as recomendações da Home.
@@ -1529,4 +1580,23 @@ model FeedReport {
   @@index([reporterId])
   @@index([postId])
   @@index([commentId])
+}
+
+/// Consentimentos opcionais (LGPD): cada vez que a pessoa liga ou desliga um uso dos dados.
+/// Só cresce; o estado atual é o registro mais recente de cada finalidade.
+model ConsentEvent {
+  id      String   @id @db.Uuid
+  /// Desempate quando dois registros têm o mesmo instante.
+  seq     Int      @default(autoincrement())
+  userId  String   @db.Uuid
+  /// 'MARKETING_EMAIL' ou 'MARKETING_PUSH'.
+  purpose String
+  granted Boolean
+  /// 'SIGNUP' ou 'SETTINGS'.
+  source  String
+  at      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, at])
 }

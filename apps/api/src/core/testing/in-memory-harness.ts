@@ -22,6 +22,7 @@ import {
   InMemoryAppSettingsRepository,
   InMemoryBoostRepository,
   InMemoryDwellRepository,
+  InMemoryBoostStatsRepository,
   InMemoryRegionRepository,
   InMemoryPendingSignupRepository,
   InMemoryUserRepository,
@@ -34,6 +35,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let pending = new InMemoryPendingSignupRepository();
   let passwordResets = new InMemoryPasswordResetRepository();
   let boosts = new InMemoryBoostRepository();
+  let boostStats = new InMemoryBoostStatsRepository();
   let settings = new InMemoryAppSettingsRepository();
   let dwell = new InMemoryDwellRepository();
   let regions = new InMemoryRegionRepository();
@@ -72,6 +74,9 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
     },
     get boosts() {
       return boosts;
+    },
+    get boostStats() {
+      return boostStats;
     },
     get settings() {
       return settings;
@@ -138,6 +143,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
       pending = new InMemoryPendingSignupRepository();
       passwordResets = new InMemoryPasswordResetRepository();
       boosts = new InMemoryBoostRepository();
+      boostStats = new InMemoryBoostStatsRepository();
       settings = new InMemoryAppSettingsRepository();
       dwell = new InMemoryDwellRepository();
       regions = new InMemoryRegionRepository();

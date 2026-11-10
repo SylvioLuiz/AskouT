@@ -114,7 +114,7 @@ export function HomeScreen() {
           </h2>
           <Link to="/criar">{t('Criar post')}</Link>
         </div>
-        <PostList load={(offset) => api.postsFeed({ limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os de quem você segue aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
+        <PostList load={(offset) => api.homeFeed({ limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os de quem você segue aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
       </section>
     </PullRefresh>
   );

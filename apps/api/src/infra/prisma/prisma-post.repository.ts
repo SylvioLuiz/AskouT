@@ -200,6 +200,13 @@ export class PrismaPostRepository implements PostRepository {
     await this.prisma.postHidden.createMany({ data: [{ postId, userId }], skipDuplicates: true });
   }
 
+  async hiddenAmong(userId: string, postIds: string[]): Promise<string[]> {
+    const ids = [...new Set(postIds)].filter(isUuid);
+    if (!isUuid(userId) || ids.length === 0) return [];
+    const rows = await this.prisma.postHidden.findMany({ where: { userId, postId: { in: ids } }, select: { postId: true } });
+    return rows.map((r) => r.postId);
+  }
+
   async like(postId: string, userId: string, at: Date): Promise<void> {
     if (!isUuid(postId) || !isUuid(userId)) return;
     await this.prisma.postLike.createMany({ data: [{ postId, userId, createdAt: at }], skipDuplicates: true });

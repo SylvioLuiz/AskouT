@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, EmptyState, ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { BoostResults, hasResults } from '../components/boost-results.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { BOOST_PHASE_LABEL, boostTitle, canCancelBoost, daysLabel, formatBrl, matchLabel, reachText, sortBoosts, toggleTag } from '../lib/boost.ts';
@@ -158,6 +159,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
             </div>
           ) : null}
           {b.phase === 'PENDING_PAYMENT' && b.storeProductId && storeReady ? <Button small loading={busy} onClick={() => void run(() => finishStorePurchase(b))}>{t('Concluir compra')}</Button> : null}
+          {hasResults(b.phase) ? <BoostResults boostId={b.id} /> : null}
           {canCancelBoost(b) ? <Button small variant="quiet" disabled={busy} onClick={() => void run(() => api.cancelBoost(b.id))}>{t('Cancelar pedido')}</Button> : null}
         </li>
       ))}

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MAX_CODE_ATTEMPTS, RESEND_COOLDOWN_SECONDS } from './auth-service.ts';
 import { rejectsWith } from './testing/helpers.ts';
-import { makeWorld } from './testing/world.ts';
+import { makeWorld, asSession } from './testing/world.ts';
 
 async function setup() {
   const w = makeWorld();
@@ -17,11 +17,11 @@ test('esqueci a senha: código por e-mail (ou @usuário), nova senha, entra na c
   assert.equal(w.mailer.sentReset.length, 1);
   assert.equal(w.mailer.sentReset[0]!.to, email);
   const code = w.mailer.lastResetCodeFor(email);
-  const result = await w.core.auth.confirmPasswordReset({ identifier: email, code, password: 'Nova-senha-123' });
+  const result = await asSession(w.core.auth.confirmPasswordReset({ identifier: email, code, password: 'Nova-senha-123' }));
   assert.equal(result.user.id, ana);
   assert.ok(result.token);
   await rejectsWith(w.core.auth.login({ identifier: email, password: 'senha-antiga-xyz' }), 'UNAUTHORIZED');
-  assert.equal((await w.core.auth.login({ identifier: email, password: 'Nova-senha-123' })).user.id, ana);
+  assert.equal((await asSession(w.core.auth.login({ identifier: email, password: 'Nova-senha-123' }))).user.id, ana);
   await rejectsWith(w.core.auth.confirmPasswordReset({ identifier: email, code, password: 'Outra-senha-123' }), 'VALIDATION');
 });
 

@@ -1,0 +1,179 @@
+/* ---------- Folha de compartilhar (busca + pessoas + atalhos) ---------- */
+
+.sharesheet { display: flex; flex-direction: column; gap: 12px; }
+
+/*
+ * A folha não rola inteira: só a lista de pessoas rola, e o rodapé (mensagem, atalhos) fica sempre embaixo.
+ * Antes o rodapé "grudava" por cima do fim da lista quando a mensagem aparecia, e cortava as últimas pessoas.
+ */
+.sheet__panel:has(> .sharesheet) { display: flex; flex-direction: column; overflow: hidden; }
+.sheet__panel > .sharesheet { flex: 1 1 auto; min-height: 0; }
+.sheet__panel:has(> .sharesheet) > .sheet__drag, .sharesheet > * { flex: none; }
+.sheet__panel > .sharesheet > .sharesheet__grid { flex: 0 1 auto; min-height: 96px; }
+
+.sharesheet__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.sharesheet__search .icon { width: 20px; height: 20px; flex: none; }
+.sharesheet__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+}
+.sharesheet__search:focus-within { border-color: var(--brand-text); }
+
+.sharesheet__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 6px;
+  max-height: min(46dvh, 340px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  /* Folga embaixo para a última linha (nome + "Enviado" + contorno de selecionado) não ficar colada/cortada. */
+  padding: 6px 4px 20px;
+  scroll-padding-bottom: 20px;
+  list-style: none;
+}
+@media (min-width: 420px) { .sharesheet__grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+
+.sharesheet__person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sharesheet__person:disabled { opacity: 0.6; }
+.sharesheet__face { position: relative; display: inline-grid; border-radius: 50%; transition: transform 0.12s ease-out; }
+.sharesheet__person:active .sharesheet__face { transform: scale(0.94); }
+.sharesheet__person--on .sharesheet__face { outline: 2.5px solid var(--brand-text); outline-offset: 2px; }
+.sharesheet__check {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--brand-ink);
+  border: 2px solid var(--bg);
+}
+.sharesheet__check .icon { width: 14px; height: 14px; stroke-width: 3; }
+.sharesheet__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+.sharesheet__sent { margin-top: -4px; color: var(--muted); font-size: 0.6875rem; }
+
+.sharesheet__empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 14px;
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  border: 1px dashed var(--line-strong, var(--line));
+  text-align: center;
+}
+.sharesheet__empty span { color: var(--muted); font-size: 0.875rem; }
+.sharesheet__none { margin: 0; color: var(--muted); text-align: center; font-size: 0.875rem; }
+.sharesheet__note { margin: 0; font-size: 0.8125rem; }
+
+.sharesheet__foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: 0 -16px calc(-20px - env(safe-area-inset-bottom));
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 900px) {
+  .sharesheet__foot { margin-bottom: -20px; padding-bottom: 16px; border-radius: 0 0 20px 20px; }
+}
+
+.sharesheet__compose { display: flex; flex-direction: column; gap: 10px; }
+.sharesheet__message {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+}
+.sharesheet__message:focus { outline: none; border-color: var(--brand-text); }
+
+.sharesheet__actions {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sharesheet__actions::-webkit-scrollbar { display: none; }
+.sharesheet__actions > li { flex: none; }
+.sharesheet__action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 72px;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sharesheet__action:disabled { opacity: 0.6; }
+.sharesheet__bubble {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  transition: transform 0.12s ease-out;
+}
+.sharesheet__action:active .sharesheet__bubble { transform: scale(0.94); }
+.sharesheet__bubble--whatsapp { background: #25d366; border-color: #25d366; color: #fff; }
+.sharesheet__bubble--telegram { background: #2aabee; border-color: #2aabee; color: #fff; }
+.sharesheet__action--on .sharesheet__bubble { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sharesheet__face, .sharesheet__bubble { transition: none; }
+}

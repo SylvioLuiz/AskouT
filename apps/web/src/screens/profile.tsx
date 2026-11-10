@@ -12,7 +12,7 @@ import { ChatButton } from '../components/chat-button.tsx';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
 import { AvatarViewer } from '../components/photo-viewer.tsx';
 import { useAuthContext } from '../auth.tsx';
-import { resizeProfilePhoto } from '../lib/image.ts';
+import { AvatarCropper } from '../components/avatar-cropper.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -57,6 +57,7 @@ export function ProfileScreen({ username }: { username: string }) {
   const [photoOpen, setPhotoOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [cropFile, setCropFile] = useState<File>();
   const { setOwnProfile } = useAuthContext();
   const search = useSearch();
   const [tab, setTab] = useState<'events' | 'posts'>(search.get('aba') === 'posts' ? 'posts' : 'events');
@@ -93,17 +94,18 @@ export function ProfileScreen({ username }: { username: string }) {
     }
   }
 
-  async function changePhoto(file: File | null) {
+  async function changePhoto(image: string | null): Promise<boolean> {
     setPhotoBusy(true);
     setMessage(undefined);
     try {
-      const image = file ? await resizeProfilePhoto(file) : null;
       const updated = await api.setProfilePhoto(image);
       setOwnProfile({ userId: updated.userId, username: updated.username, displayName: updated.displayName, avatarUrl: updated.avatarUrl, isPrivate: updated.isPrivate });
-      setMessage({ tone: 'ok', text: file ? t('Foto atualizada.') : t('Foto removida.') });
+      setMessage({ tone: 'ok', text: image ? t('Foto atualizada.') : t('Foto removida.') });
       view.reload();
+      return true;
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
+      return false;
     } finally {
       setPhotoBusy(false);
     }
@@ -136,7 +138,17 @@ export function ProfileScreen({ username }: { username: string }) {
           }}
         />
       ) : null}
-      {photoOpen ? <PhotoPickerSheet hasPhoto={profile.avatarUrl !== null} onPick={(file) => void changePhoto(file)} onRemove={() => void changePhoto(null)} onView={() => setViewOpen(true)} onClose={() => setPhotoOpen(false)} /> : null}
+      {photoOpen ? <PhotoPickerSheet hasPhoto={profile.avatarUrl !== null} onPick={setCropFile} onRemove={() => void changePhoto(null)} onView={() => setViewOpen(true)} onClose={() => setPhotoOpen(false)} /> : null}
+      {cropFile ? (
+        <AvatarCropper
+          file={cropFile}
+          onCancel={() => setCropFile(undefined)}
+          onDone={async (image) => {
+            if (await changePhoto(image)) setCropFile(undefined);
+            else throw new Error(t('Não foi possível salvar a foto. Tente de novo.'));
+          }}
+        />
+      ) : null}
       {viewOpen && profile.avatarUrl ? <AvatarViewer url={profile.avatarUrl} onClose={() => setViewOpen(false)} /> : null}
       <header className="profile">
         {relationship.isSelf ? (

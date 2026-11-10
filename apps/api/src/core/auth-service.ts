@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { DomainError, conflict, forbidden, notFound, rateLimited, unauthorized, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import { checkSignupConsent } from './age-service.ts';
+import { MfaService } from './mfa-service.ts';
 import type { Actor, ExternalProvider, PendingSignup, Profile, PublicProfile, User, UserRole } from './types.ts';
 import { toPublicProfile } from './types.ts';
 import {
@@ -36,6 +37,19 @@ export interface AuthResult {
   token: string;
 }
 
+/** Senha (ou Google/Apple) conferida, mas a conta tem verificação em duas etapas: falta o código do app autenticador. */
+export interface MfaChallenge {
+  mfaRequired: true;
+  /** Comprovante curto da 1ª etapa, para mandar junto com o código em /auth/mfa/verify. Não serve como sessão. */
+  mfaToken: string;
+  expiresInSeconds: number;
+}
+
+/** Só para o painel de gestão: recusa antes de pedir o código quem não tem esse papel. */
+export interface LoginOptions {
+  requireRole?: UserRole;
+}
+
 export interface SignupInput {
   email: unknown;
   username: unknown;
@@ -45,6 +59,8 @@ export interface SignupInput {
   birthDate?: unknown;
   /** Tem que ser `true`: aceite dos Termos de Uso e da Política de Privacidade. */
   acceptTerms?: unknown;
+  /** Opcional: aceita receber novidades por e-mail. Só `true` conta como sim. */
+  marketingEmail?: unknown;
 }
 
 export interface SignupStarted {
@@ -73,6 +89,8 @@ export interface SocialLoginInput {
   /** Só na criação da conta: data de nascimento e aceite dos Termos. */
   birthDate?: unknown;
   acceptTerms?: unknown;
+  /** Opcional, só na criação da conta: aceita receber novidades por e-mail. */
+  marketingEmail?: unknown;
 }
 
 /** A conta externa é nova: falta a pessoa escolher o nome de usuário. */
@@ -98,9 +116,11 @@ const INVALID_CODE = 'Código inválido ou expirado';
 export class AuthService {
   private readonly deps: CoreDeps;
   private dummyHash: Promise<string> | undefined;
+  readonly mfa: MfaService;
 
   constructor(deps: CoreDeps) {
     this.deps = deps;
+    this.mfa = new MfaService(deps);
   }
 
   /** Etapa 1: valida, guarda o cadastro pendente e envia o código. Nenhuma conta é criada ainda. */
@@ -140,6 +160,7 @@ export class AuthService {
       passwordHash: await hasher.hash(password),
       birthDate: consent.birthDate,
       termsVersion: consent.termsVersion,
+      marketingEmail: input.marketingEmail === true,
       codeHash: codes.hash(email, code),
       expiresAt: addMs(now, CODE_TTL_MINUTES * 60_000),
       attempts: 0,
@@ -231,6 +252,7 @@ export class AuthService {
       throw error;
     }
     await pending.delete(email);
+    await this.recordSignupConsents(user.id, record.marketingEmail === true, now);
     await this.welcome(user.email, profile.username);
     return this.session(user, profile);
   }
@@ -247,7 +269,7 @@ export class AuthService {
    *  3. senão é conta nova: pede o nome de usuário (`needsProfile`) e cria quando ele vem.
    * Conta criada assim não tem senha utilizável; o acesso é sempre pela plataforma.
    */
-  async socialLogin(input: SocialLoginInput): Promise<AuthResult | SocialNeedsProfile> {
+  async socialLogin(input: SocialLoginInput, options: LoginOptions = {}): Promise<AuthResult | SocialNeedsProfile | MfaChallenge> {
     const { users, identities, verifier, hasher, clock, ids } = this.deps;
     const provider = asString(input.provider).toUpperCase();
     if (provider !== 'GOOGLE' && provider !== 'APPLE') throw validationError('Plataforma inválida', { provider: 'Plataforma inválida' });
@@ -258,7 +280,7 @@ export class AuthService {
 
     const now = clock.now();
     const linkedId = await identities.find(provider, claims.subject);
-    if (linkedId) return this.sessionFor(linkedId);
+    if (linkedId) return this.sessionFor(linkedId, options);
 
     const email = claims.email && claims.emailVerified ? normalizeEmail(claims.email) : '';
     if (email === '' || emailProblem(email)) throw validationError('A conta não trouxe um e-mail verificado', { provider: 'Use uma conta com e-mail verificado' });
@@ -267,7 +289,7 @@ export class AuthService {
     const existing = await users.findByEmail(email);
     if (existing) {
       await identities.link(provider, claims.subject, existing.id, now);
-      return this.sessionFor(existing.id);
+      return this.sessionFor(existing.id, options);
     }
 
     const rawUsername = asString(input.username);
@@ -287,8 +309,15 @@ export class AuthService {
     const profile: Profile = { userId: user.id, username, displayName, bio: null, avatarUrl: null, isPrivate: false };
     await users.create(user, profile);
     await identities.link(provider, claims.subject, user.id, now);
+    await this.recordSignupConsents(user.id, input.marketingEmail === true, now);
     await this.welcome(user.email, profile.username);
     return this.session(user, profile);
+  }
+
+  /** Consentimentos opcionais marcados no cadastro. Só o "sim" vira registro: sem registro, vale "não". */
+  private async recordSignupConsents(userId: string, marketingEmail: boolean, at: Date): Promise<void> {
+    if (!marketingEmail) return;
+    await this.deps.consents.add({ id: this.deps.ids.next(), userId, purpose: 'MARKETING_EMAIL', granted: true, source: 'SIGNUP', at });
   }
 
   /** Boas-vindas por e-mail. Se o envio falhar, a conta já foi criada e o cadastro segue normalmente. */
@@ -300,11 +329,35 @@ export class AuthService {
     }
   }
 
-  private async sessionFor(userId: string): Promise<AuthResult> {
+  private async sessionFor(userId: string, options: LoginOptions = {}): Promise<AuthResult | MfaChallenge> {
     const user = await this.deps.users.findById(userId);
     const profile = user ? await this.deps.users.findProfileById(user.id) : undefined;
     if (!user || !profile) throw unauthorized();
     if (user.status === 'SUSPENDED') throw forbidden('Conta suspensa');
+    if (options.requireRole && user.role !== options.requireRole) throw unauthorized('Essa conta não tem acesso à gestão');
+    return this.sessionOrChallenge(user, profile);
+  }
+
+  /** Com verificação em duas etapas ligada, a sessão só sai depois do código (em `verifyMfaLogin`). */
+  private async sessionOrChallenge(user: User, profile: Profile): Promise<AuthResult | MfaChallenge> {
+    if (await this.mfa.isEnabled(user.id)) {
+      const { mfaChallenges } = this.deps;
+      return { mfaRequired: true, mfaToken: mfaChallenges.issue(user.id), expiresInSeconds: mfaChallenges.ttlSeconds };
+    }
+    return this.session(user, profile);
+  }
+
+  /** Segunda etapa do login: código do app autenticador (ou de recuperação) + o comprovante da primeira etapa. */
+  async verifyMfaLogin(input: { mfaToken: unknown; code: unknown }, options: LoginOptions = {}): Promise<AuthResult> {
+    const { users, mfaChallenges } = this.deps;
+    const userId = mfaChallenges.verify(asString(input.mfaToken));
+    if (!userId) throw unauthorized('A verificação expirou. Entre de novo.');
+    const user = await users.findById(userId);
+    const profile = user ? await users.findProfileById(user.id) : undefined;
+    if (!user || !profile) throw unauthorized();
+    if (user.status === 'SUSPENDED') throw forbidden('Conta suspensa');
+    if (options.requireRole && user.role !== options.requireRole) throw unauthorized();
+    await this.mfa.verifyLogin(user.id, input.code);
     return this.session(user, profile);
   }
 
@@ -361,7 +414,7 @@ export class AuthService {
   }
 
   /** Confere o código, grava a nova senha e já entra na conta. */
-  async confirmPasswordReset(input: { identifier: unknown; code: unknown; password: unknown }): Promise<AuthResult> {
+  async confirmPasswordReset(input: { identifier: unknown; code: unknown; password: unknown }): Promise<AuthResult | MfaChallenge> {
     const { users, passwordResets, codes, hasher, clock } = this.deps;
     const identifier = asString(input.identifier).trim();
     const code = asString(input.code).trim();
@@ -395,7 +448,8 @@ export class AuthService {
     const passwordHash = await hasher.hash(password);
     await users.updatePasswordHash(user.id, passwordHash);
     await passwordResets.delete(user.id);
-    return this.session({ ...user, passwordHash }, profile);
+    // Quem só tem acesso ao e-mail troca a senha, mas não passa da verificação em duas etapas.
+    return this.sessionOrChallenge({ ...user, passwordHash }, profile);
   }
 
   /**
@@ -421,7 +475,7 @@ export class AuthService {
   }
 
   /** Login por e-mail ou por nome de usuário (com ou sem @). */
-  async login(input: LoginInput): Promise<AuthResult> {
+  async login(input: LoginInput, options: LoginOptions = {}): Promise<AuthResult | MfaChallenge> {
     const { users, hasher } = this.deps;
     const identifier = asString(input.identifier).trim();
     const password = asString(input.password);
@@ -435,10 +489,11 @@ export class AuthService {
     if (!user || !passwordOk) throw unauthorized();
 
     if (user.status === 'SUSPENDED') throw forbidden('Conta suspensa');
+    if (options.requireRole && user.role !== options.requireRole) throw unauthorized();
 
     const profile = await users.findProfileById(user.id);
     if (!profile) throw unauthorized();
-    return this.session(user, profile);
+    return this.sessionOrChallenge(user, profile);
   }
 
   /**

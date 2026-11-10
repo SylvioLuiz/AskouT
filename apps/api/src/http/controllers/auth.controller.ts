@@ -25,6 +25,7 @@ export class AuthController {
       password: b.password,
       birthDate: b.birthDate,
       acceptTerms: b.acceptTerms,
+      marketingEmail: b.marketingEmail,
     });
   }
 
@@ -77,7 +78,46 @@ export class AuthController {
   @HttpCode(200)
   social(@Body() body: unknown) {
     const b = asBody(body);
-    return this.core.auth.socialLogin({ provider: b.provider, idToken: b.idToken, username: b.username, displayName: b.displayName, birthDate: b.birthDate, acceptTerms: b.acceptTerms });
+    return this.core.auth.socialLogin({ provider: b.provider, idToken: b.idToken, username: b.username, displayName: b.displayName, birthDate: b.birthDate, acceptTerms: b.acceptTerms, marketingEmail: b.marketingEmail });
+  }
+
+  /** Segunda etapa do login quando a conta tem verificação em duas etapas. */
+  @Public()
+  @Post('mfa/verify')
+  @HttpCode(200)
+  mfaVerify(@Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.auth.verifyMfaLogin({ mfaToken: b.mfaToken, code: b.code });
+  }
+
+  @Get('mfa')
+  mfaStatus(@CurrentActor() actor: Actor) {
+    return this.core.auth.mfa.status(actor.userId);
+  }
+
+  /** Gera o segredo e o QR code. Só liga depois de confirmar com um código em mfa/enable. */
+  @Post('mfa/setup')
+  @HttpCode(200)
+  mfaSetup(@CurrentActor() actor: Actor) {
+    return this.core.auth.mfa.setup(actor.userId);
+  }
+
+  @Post('mfa/enable')
+  @HttpCode(200)
+  mfaEnable(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.auth.mfa.enable(actor.userId, asBody(body).code);
+  }
+
+  @Post('mfa/disable')
+  @HttpCode(200)
+  mfaDisable(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.auth.mfa.disable(actor.userId, asBody(body).code);
+  }
+
+  @Post('mfa/recovery-codes')
+  @HttpCode(200)
+  mfaRecoveryCodes(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.auth.mfa.regenerateRecoveryCodes(actor.userId, asBody(body).code);
   }
 
   @Get('me')

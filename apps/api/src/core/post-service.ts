@@ -7,6 +7,8 @@ import type { ProfileService } from './profile-service.ts';
 import type { PollRecord, PostCommentRecord, PostPatch, PostReportReason, PostKindFilter, PostImageRecord, PostRecord, PostTagStatus, PostWithImages, PublicProfile } from './types.ts';
 import type { EventKind } from './types.ts';
 import { parseReportInput } from './report-input.ts';
+import { buildEventCards } from './event-card.ts';
+import type { EventCardView } from './event-card.ts';
 import { EVENT_KINDS, POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
 export const POST_IMAGES_MAX = 5;
@@ -94,6 +96,26 @@ export interface PostView {
   /** Só a própria pessoa vê posts arquivados. */
   archived: boolean;
   edited: boolean;
+  /** Só no Início: o evento entrou porque alguém que você segue (ou você) repostou. Mostra quem repostou e quando. */
+  repostedBy?: PublicProfile;
+  repostedAt?: string;
+}
+
+/** Evento de local (bar) que alguém que você segue (ou você) postou no perfil, como item do Início. */
+export interface PlaceEventFeedItem {
+  type: 'PLACE_EVENT';
+  /** O id do evento (não colide com ids de post). */
+  id: string;
+  event: EventCardView;
+  repostedBy: PublicProfile;
+  repostedAt: string;
+}
+
+/** Item do Início: um post (com ou sem repost) ou um evento de local repostado. */
+export type HomeFeedItem = PostView | PlaceEventFeedItem;
+
+export interface HomeFeedPage extends Omit<PostsPage, 'items'> {
+  items: HomeFeedItem[];
 }
 
 export interface PostCommentView {
@@ -497,17 +519,74 @@ export class PostService {
     return { items: await this.views(viewerId, visible), total, ...page, hasMore };
   }
 
-  /** Posts seus e de quem você segue (amigos ou não; perfil privado só aparece para quem já foi aceito), do mais recente ao mais antigo. */
-  async feed(viewerId: string, query: { limit?: unknown; offset?: unknown } = {}): Promise<PostsPage> {
+  /**
+   * Posts seus e de quem você segue (amigos ou não; perfil privado só aparece para quem já foi aceito), do mais recente ao mais antigo.
+   * Eventos de pessoas repostados por você ou por quem você segue entram também, na data do repost, com quem repostou.
+   * Cada post aparece uma vez só, na entrada mais recente (o post em si ou o repost mais novo).
+   */
+  async feed(viewerId: string, query: { limit?: unknown; offset?: unknown } = {}, options: { placeEvents?: boolean } = {}): Promise<HomeFeedPage> {
     const page = parsePage(query);
     const following = await this.deps.follows.listFollowingIds(viewerId);
     // Quem administra um local vê os posts dele no próprio Início, mesmo sem segui-lo.
     const owned = (await this.deps.places.listVenuesByOwner(viewerId)).map((v) => v.id);
     const venueIds = [...new Set([...(await this.deps.places.listFollowedVenueIds(viewerId)), ...owned])];
-    const rows = await this.deps.posts.listFor([viewerId, ...following], [viewerId], { limit: page.limit + 1, offset: page.offset }, undefined, { hideFor: viewerId, venueIds });
-    const hasMore = rows.length > page.limit;
-    const visible = await this.onlySeeable(viewerId, rows.slice(0, page.limit));
-    return { items: await this.views(viewerId, visible), total: null, ...page, hasMore };
+    // As listas vêm do começo até o fim desta página e são unidas aqui (mesma regra da lista de eventos do perfil).
+    const want = page.offset + page.limit + 1;
+    const people = [viewerId, ...following];
+    const [rows, reposts, placeReposts] = await Promise.all([
+      this.deps.posts.listFor(people, [viewerId], { limit: want, offset: 0 }, undefined, { hideFor: viewerId, venueIds }),
+      this.deps.profileEvents.listPostReposts(people, want),
+      options.placeEvents ? this.deps.profileEvents.listPlaceReposts(people, want) : Promise.resolve([]),
+    ]);
+    type Entry = { key: string; id: string; at: number; place?: boolean; row?: PostWithImages; by?: string };
+    const entries: Entry[] = [
+      ...rows.map((row): Entry => ({ key: `p:${row.post.id}`, id: row.post.id, at: row.post.createdAt.getTime(), row })),
+      ...reposts.map((r): Entry => ({ key: `p:${r.postId}`, id: r.postId, at: r.createdAt.getTime(), by: r.userId })),
+      ...placeReposts.map((r): Entry => ({ key: `e:${r.eventId}`, id: r.eventId, at: r.createdAt.getTime(), by: r.userId, place: true })),
+    ].sort((x, y) => y.at - x.at || (x.key < y.key ? 1 : x.key > y.key ? -1 : 0));
+    // Cada post ou evento aparece uma vez só, na entrada mais recente.
+    const seen = new Set<string>();
+    const merged = entries.filter((e) => (seen.has(e.key) ? false : (seen.add(e.key), true)));
+    const hasMore = rows.length >= want || reposts.length >= want || placeReposts.length >= want || merged.length > page.offset + page.limit;
+    const slice = merged.slice(page.offset, page.offset + page.limit);
+
+    // Repostados ainda não carregados: o post precisa existir, ser um evento, não estar arquivado nem escondido por quem vê.
+    const missing = slice.filter((e) => !e.row && !e.place).map((e) => e.id);
+    const hidden = new Set(await this.deps.posts.hiddenAmong(viewerId, missing));
+    const loaded = new Map<string, PostWithImages>();
+    for (const id of missing) {
+      if (hidden.has(id)) continue;
+      const found = await this.deps.posts.findById(id);
+      if (found && found.post.eventTitle && found.post.archivedAt === null) loaded.set(id, found);
+    }
+    const postEntries = slice.flatMap((e) => {
+      if (e.place) return [];
+      const row = e.row ?? loaded.get(e.id);
+      return row ? [{ row, entry: e }] : [];
+    });
+    const visible = new Set((await this.onlySeeable(viewerId, postEntries.map((o) => o.row))).map((r) => r.post.id));
+    // Quem repostou também precisa estar visível para quem vê (perfil privado só para seguidor aceito).
+    const reposterIds = [...new Set(slice.flatMap((e) => (e.by ? [e.by] : [])))];
+    const reposterOk = new Map<string, boolean>();
+    for (const by of reposterIds) reposterOk.set(by, await this.canSee(viewerId, by));
+    const reposters = new Map((await this.deps.users.findProfilesByIds(reposterIds)).map((p) => [p.userId, toPublicProfile(p)]));
+    const views = new Map((await this.views(viewerId, postEntries.filter((o) => visible.has(o.row.post.id)).map((o) => o.row))).map((v) => [v.id, v]));
+    const cards = await buildEventCards(this.deps, slice.filter((e) => e.place).map((e) => e.id));
+    const items = slice.flatMap((e): HomeFeedItem[] => {
+      const by = e.by && reposterOk.get(e.by) ? reposters.get(e.by) : undefined;
+      if (e.by && !by) return [];
+      const at = new Date(e.at).toISOString();
+      if (e.place) {
+        const card = cards.get(e.id);
+        // Só eventos de local (o de pessoa vem como post); o que sumiu fica de fora.
+        if (!card || card.userEvent || !by) return [];
+        return [{ type: 'PLACE_EVENT', id: e.id, event: card, repostedBy: by, repostedAt: at }];
+      }
+      const view = views.get(e.id);
+      if (!view) return [];
+      return [by ? { ...view, repostedBy: by, repostedAt: at } : view];
+    });
+    return { items, total: null, ...page, hasMore };
   }
 
   /** Posts publicados em nome de um estabelecimento, abertos a qualquer pessoa. */

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { rejectsWith } from './testing/helpers.ts';
-import { makeWorld, PASSWORD } from './testing/world.ts';
+import { makeWorld, PASSWORD, asSession } from './testing/world.ts';
 
 const H = 3_600_000;
 const JPEG = (n = 10) => `data:image/jpeg;base64,${Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(n, 1)]).toString('base64')}`;
@@ -30,7 +30,7 @@ test('só admin usa a gestão', async () => {
 
 test('login do painel: admin entra; usuário comum e senha errada recebem a mesma resposta', async () => {
   const { w } = await setup();
-  const ok = await w.core.admin.login({ identifier: 'adm', password: PASSWORD });
+  const ok = await asSession(w.core.admin.login({ identifier: 'adm', password: PASSWORD }));
   assert.equal(ok.user.role, 'ADMIN');
   const common = await rejectsWith(w.core.admin.login({ identifier: 'ana', password: PASSWORD }), 'UNAUTHORIZED');
   const wrong = await rejectsWith(w.core.admin.login({ identifier: 'adm', password: 'errada-errada-1' }), 'UNAUTHORIZED');
@@ -42,11 +42,11 @@ test('login do painel: admin entra; usuário comum e senha errada recebem a mesm
 test('login do painel com a Apple: só admin entra e nunca cria conta', async () => {
   const { w } = await setup();
   const tok = (sub: string, email: string) => JSON.stringify({ provider: 'APPLE', verified: true, sub, email });
-  const ok = await w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-adm', 'adm@exemplo.com') });
+  const ok = await asSession(w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-adm', 'adm@exemplo.com') }));
   assert.equal(ok.user.role, 'ADMIN');
   assert.equal((await w.core.auth.authenticate(ok.token)).role, 'ADMIN');
   // Da segunda vez entra pelo ID fixo da Apple, mesmo com outro e-mail (ex.: ocultar e-mail).
-  assert.equal((await w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-adm', 'oculto@privaterelay.appleid.com') })).user.role, 'ADMIN');
+  assert.equal((await asSession(w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-adm', 'oculto@privaterelay.appleid.com') }))).user.role, 'ADMIN');
 
   await rejectsWith(w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-ana', 'ana@exemplo.com') }), 'UNAUTHORIZED');
   await rejectsWith(w.core.admin.socialLogin({ provider: 'APPLE', idToken: 'lixo' }), 'UNAUTHORIZED');
@@ -68,7 +68,7 @@ test('trocar a própria senha no painel: confere a atual e valida a nova', async
 
   await w.core.admin.changeOwnPassword(A, { currentPassword: PASSWORD, newPassword: NOVA });
   await rejectsWith(w.core.admin.login({ identifier: 'adm', password: PASSWORD }), 'UNAUTHORIZED');
-  assert.equal((await w.core.admin.login({ identifier: 'adm', password: NOVA })).user.role, 'ADMIN');
+  assert.equal((await asSession(w.core.admin.login({ identifier: 'adm', password: NOVA }))).user.role, 'ADMIN');
 });
 
 test('pedidos de donos: lista com documento, aprova e deixa no registro', async () => {
@@ -110,6 +110,12 @@ test('busca de pessoas e suspensão: motivo obrigatório, trava o login e a sess
   assert.deepEqual((await w.core.admin.searchUsers(A, { q: 'ANA@exemplo' })).items.map((r) => r.username), ['ana']);
   assert.deepEqual((await w.core.admin.searchUsers(A, { q: 'ana', limit: '1' })).hasMore, false);
   assert.equal((await w.core.admin.searchUsers(A, { limit: '2' })).hasMore, true);
+  assert.deepEqual(all.items.map((r) => r.loginProviders), [[], [], [], []], 'sem conta Google/Apple ligada');
+  await w.identities.link('GOOGLE', 'g-ana', ana);
+  await w.identities.link('APPLE', 'a-ana', ana);
+  await w.identities.link('APPLE', 'a-bia', bia);
+  const linked = new Map((await w.core.admin.searchUsers(A, {})).items.map((r) => [r.username, r.loginProviders]));
+  assert.deepEqual([linked.get('ana'), linked.get('bia'), linked.get('caio')], [['APPLE', 'GOOGLE'], ['APPLE'], []]);
   await rejectsWith(w.core.admin.setUserStatus(A, ana, 'SUSPENDED', ''), 'VALIDATION');
   await rejectsWith(w.core.admin.setUserStatus(A, ana, 'TALVEZ', 'x'), 'VALIDATION');
   await rejectsWith(w.core.admin.setUserStatus(A, adm, 'SUSPENDED', 'x'), 'CONFLICT');

@@ -16,12 +16,14 @@ import { ExploreService } from './explore-service.ts';
 import { VenueService } from './venue-service.ts';
 import { CalendarImportService } from './calendar-import-service.ts';
 import { BoostService } from './boost-service.ts';
+import { BoostStatsService } from './boost-stats-service.ts';
 import { AdminService } from './admin-service.ts';
 import { SuggestionService } from './suggestion-service.ts';
 import { DwellService } from './dwell-service.ts';
 import { InterestService } from './interest-service.ts';
 import { MatchService } from './match-service.ts';
 import { PaymentsSwitch } from './payments-switch.ts';
+import { ConsentService } from './consent-service.ts';
 import { RegionService } from './region-service.ts';
 import { AccountService } from './account-service.ts';
 import { AgeService } from './age-service.ts';
@@ -65,6 +67,7 @@ export function createCore(input: CoreInput) {
   );
   return {
     boosts,
+    boostStats: new BoostStatsService(deps),
     auth,
     profiles,
     follows: new FollowService(deps),
@@ -88,7 +91,8 @@ export function createCore(input: CoreInput) {
     activity: new ActivityService(deps),
     recommendations: new RecommendationService(deps, posts, match),
     regions: new RegionService(deps),
-    account: new AccountService(deps),
+    consents: new ConsentService(deps),
+    account: new AccountService(deps, auth),
     age: new AgeService(deps),
     notifications: new NotificationService(input),
     /** Espera os pushes em andamento (testes e desligamento). */
@@ -99,14 +103,19 @@ export function createCore(input: CoreInput) {
 export type Core = ReturnType<typeof createCore>;
 
 export { AuthService } from './auth-service.ts';
+export { CONSENT_PURPOSES, ConsentService } from './consent-service.ts';
+export type { ConsentHistoryItem, ConsentStatus, ConsentView } from './consent-service.ts';
 export {
   CODE_TTL_MINUTES,
   MAX_CODE_ATTEMPTS,
   MAX_CODE_SENDS,
   RESEND_COOLDOWN_SECONDS,
 } from './auth-service.ts';
+export { MfaService } from './mfa-service.ts';
+export type { MfaRecoveryCodes, MfaSetup, MfaStatus } from './mfa-service.ts';
 export type {
   AuthResult,
+  MfaChallenge,
   ConfirmSignupInput,
   LoginInput,
   SessionUser,
@@ -160,6 +169,8 @@ export type { EventPageView, EventCoverView } from './event-page-service.ts';
 export type { FeedCommentView, FeedCommentsPage, FeedPageView, FeedPostView, FeedReactionsView, FeedSettingsView } from './feed-service.ts';
 export { BoostService, BOOST_DAY_OPTIONS, BOOST_DEFAULT_PRICE_PER_DAY_CENTS, BOOST_DEFAULT_PACKAGE_PRICES_CENTS, boostPhase, boostProductId } from './boost-service.ts';
 export type { BoostPricing, BoostView, BoostPhase } from './boost-service.ts';
+export { BoostStatsService, BOOST_TRACK_BATCH_MAX, BOOST_STATS_MATCH_FLOOR, statDay } from './boost-stats-service.ts';
+export type { BoostReport, BoostStatsDay, BoostStatValue } from './boost-stats-service.ts';
 export { ExploreService, EXPLORE_DEFAULT_RADIUS_KM, EXPLORE_MAX_RADIUS_KM } from './explore-service.ts';
 export type { ExploreEventItem, ExplorePlaceItem, ExploreView } from './explore-service.ts';
 export { MeetupService, MEETUP_MAX_GUESTS } from './meetup-service.ts';

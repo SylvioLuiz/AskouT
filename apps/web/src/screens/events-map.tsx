@@ -18,6 +18,7 @@ import { useCurrentPosition } from './explore.tsx';
 import { LocationIcon, RouteIcon, SearchIcon } from '../components/icons.tsx';
 import type { MapView } from '../components/map-engine.ts';
 import { t } from '../lib/i18n/index.ts';
+import { trackSponsoredOpen, useSponsoredView } from '../components/sponsored-view.tsx';
 
 const EventsMap = lazyWithReload(() => import('../components/events-map.tsx'));
 
@@ -150,10 +151,12 @@ function PlaceCard({ place, selected, index, onSelect }: { place: ExplorePlace; 
   const [opening, setOpening] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [failed, setFailed] = useState(false);
+  const adRef = useSponsoredView<HTMLLIElement>(place.sponsored === true && place.venue !== null && place.venue !== undefined, 'EXPLORE', { venueId: place.venue?.id });
 
   // Local do AskouT abre direto; de fora (Google/OSM) ganha página na primeira vez.
   async function openPage() {
     setProblem(undefined);
+    if (place.sponsored && place.venue) trackSponsoredOpen('EXPLORE', { venueId: place.venue.id });
     if (place.source === 'ASKOUT') {
       navigate(`/bares/${encodeURIComponent(place.key.replace(/^askout:/, ''))}`);
       return;
@@ -171,7 +174,7 @@ function PlaceCard({ place, selected, index, onSelect }: { place: ExplorePlace; 
   const photo = failed || !place.photoPath ? null : api.assetUrl(place.photoPath);
 
   return (
-    <li className={`evmap__slide${selected ? ' evmap__slide--on' : ''}`} data-id={`p:${place.key}`} style={enterDelay(index)} onClick={selectOnTap(`p:${place.key}`, onSelect)}>
+    <li ref={adRef} className={`evmap__slide${selected ? ' evmap__slide--on' : ''}`} data-id={`p:${place.key}`} style={enterDelay(index)} onClick={selectOnTap(`p:${place.key}`, onSelect)}>
       <article className={`evmapcard evmapcard--place${photo ? ' evmapcard--photo' : ''}`}>
         {photo ? <img className="evmapplace__bg" src={photo} alt="" referrerPolicy="no-referrer" loading="lazy" onError={() => setFailed(true)} /> : null}
         <div className="evmapplace__row">

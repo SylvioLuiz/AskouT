@@ -6,9 +6,10 @@ import { EventDates } from './event-dates.tsx';
 import { EventKindPicker } from './event-kind-picker.tsx';
 import { ArrowUpIcon, CropIcon, HeartIcon, TrashIcon } from './icons.tsx';
 import { VenueLogo } from './venue-logo.tsx';
-import { Avatar, Button, Confirm, ErrorState, Field, GroupAvatar, Loading, Notice } from './ui.tsx';
+import { Avatar, Button, Confirm, Field, Loading, Notice } from './ui.tsx';
+import { ShareSheet } from './share-sheet.tsx';
 import { api } from '../client.ts';
-import { useAsync, useDebounced } from '../hooks.ts';
+import { useDebounced } from '../hooks.ts';
 import { cropPostPhoto } from '../lib/image.ts';
 import type { CropRect } from '../lib/crop.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -17,7 +18,8 @@ import { timeAgo } from '../lib/format.ts';
 import { applyMention, mentionQueryAt, splitMentions } from '../lib/mentions.ts';
 import { eventProblem, isoToLocalInput, localToIso, POST_CAPTION_MAX } from '../lib/post-draft.ts';
 import { postLink, postShareText } from '../lib/share.ts';
-import type { ConversationItem, EventKind, PostComment, PostView, PublicProfile, ReportReason } from '../lib/types.ts';
+import { chatLinkMessage } from '../lib/share-targets.ts';
+import type { EventKind, PostComment, PostView, PublicProfile, ReportReason } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -512,84 +514,14 @@ export function SharePostSheet({ post, onClose }: { post: PostView; onClose: () 
   return <ShareLinkSheet url={postLink(shareOrigin(), post.id)} text={postShareText(post.author.username)} onShared={() => trackShare('POST', post.id)} onClose={onClose} />;
 }
 
-/** Compartilhar um link: numa conversa do app (amigo ou grupo) ou fora dele (compartilhar do aparelho / copiar). */
+/** Compartilhar um link: numa ou mais conversas do app (com mensagem opcional) ou fora dele (copiar, WhatsApp, menu do aparelho). */
 export function ShareLinkSheet({ url, text, onShared, onClose }: { url: string; text: string; onShared?: () => void; onClose: () => void }) {
-  const [step, setStep] = useState<'menu' | 'chat'>('menu');
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
-  const chats = useAsync(() => (step === 'chat' ? api.conversations() : Promise.resolve(null)), [step]);
-
-  async function outside() {
-    setMessage(undefined);
-    try {
-      if (typeof navigator.share === 'function') {
-        await navigator.share({ title: t('AskouT'), text, url });
-        onShared?.();
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      onShared?.();
-      setMessage({ tone: 'ok', text: t('Link copiado. Cole onde quiser, por exemplo no WhatsApp.') });
-    } catch (failure) {
-      if (failure instanceof DOMException && failure.name === 'AbortError') return;
-      setMessage({ tone: 'error', text: t('Não foi possível copiar. O link é {url}', { url }) });
-    }
-  }
-
-  async function sendTo(conversation: ConversationItem) {
-    setBusy(true);
-    setMessage(undefined);
-    try {
-      await api.sendText(conversation.id, `${text}: ${url}`);
-      onShared?.();
-      setMessage({ tone: 'ok', text: `Enviado para ${conversation.type === 'GROUP' ? (conversation.name ?? 'o grupo') : (conversation.other?.username ?? 'a conversa')}.` });
-      setStep('menu');
-    } catch (failure) {
-      setMessage({ tone: 'error', text: toApiError(failure).message });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const sendable = (chats.data?.items ?? []).filter((c) => c.canSend);
   return (
-    <Sheet title={t('Compartilhar')} onClose={onClose}>
-      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      {step === 'menu' ? (
-        <ul className="sharelist">
-          <li>
-            <button type="button" className="sharelist__item" onClick={() => setStep('chat')}>
-              <strong>{t('Enviar em uma conversa')}</strong>
-              <span>{t('Mande o link para um amigo ou um grupo.')}</span>
-            </button>
-          </li>
-          <li>
-            <button type="button" className="sharelist__item" onClick={() => void outside()}>
-              <strong>{t('Fora do app')}</strong>
-              <span>{t('WhatsApp, redes sociais ou copiar o link.')}</span>
-            </button>
-          </li>
-        </ul>
-      ) : (
-        <>
-          {chats.loading && !chats.data ? <Loading /> : null}
-          {chats.error ? <ErrorState message={chats.error.message} onRetry={chats.reload} /> : null}
-          {chats.data && sendable.length === 0 ? <p className="muted">{t('Você ainda não tem conversas. Siga alguém que também te segue para conversar.')}</p> : null}
-          <ul className="sharelist">
-            {sendable.map((c) => (
-              <li key={c.id}>
-                <button type="button" className="sharelist__item sharelist__item--person" onClick={() => void sendTo(c)} disabled={busy}>
-                  {c.type === 'GROUP' ? <GroupAvatar name={c.name ?? 'Grupo'} size={40} imageUrl={c.imageUrl} /> : c.other ? <Avatar profile={c.other} size={40} /> : null}
-                  <strong>{c.type === 'GROUP' ? (c.name ?? 'Grupo') : (c.other?.username ?? 'Conversa')}</strong>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <Button variant="quiet" small onClick={() => setStep('menu')}>
-            {t('Voltar')}
-          </Button>
-        </>
-      )}
-    </Sheet>
+    <ShareSheet
+      link={{ title: t('AskouT'), text, url }}
+      send={(conversationId, message) => api.sendText(conversationId, chatLinkMessage(text, url, message))}
+      onShared={onShared}
+      onClose={onClose}
+    />
   );
 }

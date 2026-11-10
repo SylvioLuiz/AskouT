@@ -123,6 +123,7 @@ export function SignupScreen() {
   const [password, setPassword] = useState('');
   const [birth, setBirth] = useState('');
   const [accepted, setAccepted] = useState(false);
+  const [marketing, setMarketing] = useState(false);
   const [code, setCode] = useState('');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -153,6 +154,7 @@ export function SignupScreen() {
         password,
         birthDate: birth,
         acceptTerms: true,
+        ...(marketing ? { marketingEmail: true } : {}),
         ...(displayName.trim() !== '' ? { displayName: displayName.trim() } : {}),
       });
       setStarted(result);
@@ -253,7 +255,7 @@ export function SignupScreen() {
         <Field label={t('Nome de usuário')} value={username} onChange={(v) => setUsername(v.toLowerCase())} error={errors['username']} hint={t('Letras minúsculas, números, ponto e sublinhado. Não dá para trocar depois.')} prefix="@" autoComplete="username" maxLength={31} />
         <Field label={t('Nome (opcional)')} value={displayName} onChange={setDisplayName} error={errors['displayName']} autoComplete="name" maxLength={60} />
         <PasswordField label={t('Senha')} value={password} onChange={setPassword} error={errors['password']} hint={t('Pelo menos 8 caracteres.')} autoComplete="new-password" />
-        <ConsentFields birth={birth} onBirth={setBirth} accepted={accepted} onAccepted={setAccepted} errors={errors} />
+        <ConsentFields birth={birth} onBirth={setBirth} accepted={accepted} onAccepted={setAccepted} marketing={marketing} onMarketing={setMarketing} errors={errors} />
         <Button type="submit" full loading={busy}>
           {t('Continuar')}
         </Button>

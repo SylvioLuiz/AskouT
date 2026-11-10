@@ -121,6 +121,23 @@ export async function cropPostPhoto(source: string, rect: CropRect): Promise<str
   return jpegWithin(paint(img, region, size), POST_PHOTO_MAX_BYTES);
 }
 
+/**
+ * Foto de perfil já enquadrada no círculo: recorta o quadrado escolhido e reduz para 384 px / 56 KB.
+ * `source` é qualquer URL que um <img> abra (blob: do arquivo escolhido, data: ...).
+ */
+export async function cropProfilePhoto(source: string, rect: CropRect): Promise<string> {
+  const img = new Image();
+  img.src = source;
+  try {
+    await img.decode();
+  } catch {
+    throw new Error(t('Não foi possível ler essa imagem. Tente uma foto JPEG ou PNG.'));
+  }
+  const region = cropToPixels(rect, img.naturalWidth, img.naturalHeight);
+  const side = Math.max(1, Math.min(PROFILE_PHOTO_SIDE, region.sw, region.sh));
+  return jpegWithin(paint(img, region, { width: side, height: side }), PROFILE_PHOTO_MAX_BYTES);
+}
+
 // Capa de evento (enviada do aparelho pelo dono do local)
 export const EVENT_COVER_SIDE = 1280;
 export const EVENT_COVER_MAX_BYTES = 240 * 1024;

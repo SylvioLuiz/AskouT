@@ -6,7 +6,7 @@ import {
   MAX_CODE_SENDS,
   RESEND_COOLDOWN_SECONDS,
 } from './auth-service.ts';
-import { PASSWORD, makeWorld } from './testing/world.ts';
+import { PASSWORD, makeWorld, asSession } from './testing/world.ts';
 import { rejectsWith } from './testing/helpers.ts';
 
 const MIN = 60_000;
@@ -351,7 +351,7 @@ test('login: por e-mail, por usuario e por @usuario, sem diferenciar maiúsculas
   const w = makeWorld();
   const reg = await w.signUp('ana.silva', { email: 'ana@exemplo.com' });
   for (const identifier of ['ana@exemplo.com', '  ANA@Exemplo.com ', 'ana.silva', '@ana.silva', '@ANA.Silva']) {
-    const login = await w.core.auth.login({ identifier, password: PASSWORD });
+    const login = await asSession(w.core.auth.login({ identifier, password: PASSWORD }));
     assert.equal(login.user.id, reg.user.id, identifier);
   }
 });
@@ -359,7 +359,7 @@ test('login: por e-mail, por usuario e por @usuario, sem diferenciar maiúsculas
 test('login: o token devolvido autentica o usuário', async () => {
   const w = makeWorld();
   const reg = await w.signUp('ana');
-  const login = await w.core.auth.login({ identifier: 'ana@exemplo.com', password: PASSWORD });
+  const login = await asSession(w.core.auth.login({ identifier: 'ana@exemplo.com', password: PASSWORD }));
   assert.deepEqual(await w.core.auth.authenticate(login.token), { userId: reg.user.id, role: 'USER' });
 });
 
@@ -427,7 +427,7 @@ test('login: conta com exclusão solicitada ainda pode entrar', async () => {
   const w = makeWorld();
   const ana = await w.signUp('ana');
   w.users.users.get(ana.user.id)!.status = 'DELETION_REQUESTED';
-  const login = await w.core.auth.login({ identifier: 'ana', password: PASSWORD });
+  const login = await asSession(w.core.auth.login({ identifier: 'ana', password: PASSWORD }));
   assert.equal(login.user.id, ana.user.id);
 });
 

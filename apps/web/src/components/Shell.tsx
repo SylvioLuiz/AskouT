@@ -127,7 +127,7 @@ export function Shell({ children }: { children: ReactNode }) {
     label: t('Perfil'),
     icon: <UserIcon />,
     // O próprio perfil também abre por /u/<usuario> (ex.: link do avatar).
-    also: ['/amigos', '/bloqueados', '/configuracao', '/privacidade', '/privacidade/apagar-conta', '/interacoes', '/arquivados', '/ajuda', '/tema', `/u/${user.profile.username}`, `/u/${encodeURIComponent(user.profile.username)}`],
+    also: ['/amigos', '/bloqueados', '/configuracao', '/configuracao/senha', '/configuracao/conta', '/configuracao/notificacoes', '/configuracao/now', '/privacidade', '/privacidade/apagar-conta', '/interacoes', '/arquivados', '/ajuda', '/tema', `/u/${user.profile.username}`, `/u/${encodeURIComponent(user.profile.username)}`],
   };
 
   return (

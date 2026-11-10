@@ -3448,6 +3448,10 @@ a.actlog__row:hover { background: var(--surface); }
 .postlist { display: flex; flex-direction: column; gap: 22px; }
 .post { display: flex; flex-direction: column; gap: 8px; }
 .post__head { display: flex; align-items: center; gap: 10px; }
+.post__repost { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 0.8125rem; }
+.post__repost .icon { width: 16px; height: 16px; flex: none; }
+.post__repost a { color: var(--ink-2); font-weight: 600; text-decoration: none; }
+.post__repostwhen { color: var(--muted); }
 .post__author { display: flex; align-items: center; gap: 10px; min-width: 0; color: var(--ink); text-decoration: none; }
 .post__author strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .post__when { margin-right: auto; color: var(--muted); font-size: 0.8125rem; text-decoration: none; }
@@ -3754,6 +3758,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 :root[data-theme='dark'] .evcard, :root[data-theme='dark'] .welcome { box-shadow: none; }
 
 /* ---------- Painel do local ---------- */
+.venueactions { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
 .venuelist { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
 .venuerow { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 56px; padding: 12px 16px; color: var(--ink); text-align: left; text-decoration: none; background: var(--surface); border: 0; border-radius: var(--radius-control); cursor: pointer; font: inherit; }
 .venuerow:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -4995,6 +5000,30 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .boost__code { width: 100%; box-sizing: border-box; padding: 10px; font: 0.8125rem/1.4 ui-monospace, monospace; color: var(--ink); background: var(--surface); border: 1.5px solid var(--control-border); border-radius: 10px; resize: none; }
 .boost__code-label { font-size: 0.875rem; font-weight: 600; }
 .boost__sub { margin: 4px 0 0; font-size: 0.9375rem; font-weight: 600; }
+
+/* Resultados do impulsionamento (relatório do dono) */
+.bres { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+.bres__tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.bres__tile { display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 10px; border: 0.5px solid var(--line); border-radius: 12px; }
+.bres__label { color: var(--muted); font-size: 0.75rem; }
+.bres__value { font-size: 1.25rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.bres__hint { color: var(--muted); font-size: 0.75rem; }
+.bres__chart { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.bres__caption { color: var(--muted); font-size: 0.8125rem; min-height: 1.2em; }
+.bres__bars { display: flex; align-items: flex-end; gap: 2px; height: 96px; border-bottom: 1px solid var(--line); }
+.bres__col { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.bres__col:focus-visible { outline: 2px solid var(--brand-text); outline-offset: 2px; }
+.bres__bar { display: block; width: 100%; max-width: 28px; margin: 0 auto; background: var(--brand-text); border-radius: 4px 4px 0 0; opacity: 0.85; }
+.bres__col--on .bres__bar { opacity: 1; }
+.bres__axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.75rem; }
+.bres__places { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; }
+.bres__places li { display: flex; justify-content: space-between; gap: 8px; }
+.bres__places strong { font-variant-numeric: tabular-nums; }
+.bres__table summary { cursor: pointer; font-size: 0.875rem; color: var(--brand-text); }
+.bres__table table { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.bres__table th, .bres__table td { padding: 4px 6px; text-align: right; border-bottom: 0.5px solid var(--line); }
+.bres__table th:first-child { text-align: left; }
+.bres__note { margin: 0; color: var(--muted); font-size: 0.75rem; }
 .boost__match { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: var(--surface); border: 0.5px solid var(--line-strong); }
 .boost__reach { margin: 0; min-height: 1.25em; font-weight: 600; color: var(--ink); }
 .boost__rule { color: var(--muted); font-size: 0.875rem; }
@@ -5302,6 +5331,8 @@ button.reactlist__row { cursor: pointer; }
 
 /* Transição entre a lista de conversas e o chat: o chat entra da direita; ao voltar, a lista entra da esquerda. */
 .chat--enter { animation: chat-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+/* Espaço para o botão flutuante "Nova conversa" não cobrir a última conversa. */
+.convscreen { padding-bottom: 72px; }
 .convscreen--back { animation: convscreen-back 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @keyframes chat-enter { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 @keyframes convscreen-back { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
@@ -5450,6 +5481,47 @@ button.reactlist__row { cursor: pointer; }
 :root.vt-explore::view-transition-old(root), :root.vt-explore::view-transition-new(root) { animation-duration: .22s; animation-timing-function: ease; }
 @media (prefers-reduced-motion: reduce) { .evmap, .explore__sticky ~ * { animation: none; } .evmap .evmap__canvas { transition: none; } }
 
+/* ---------- Central de configurações (lista agrupada, padrão iOS/Instagram) ---------- */
+
+.settingshub__account { display: flex; align-items: center; gap: 14px; margin: 4px 0 20px; padding: 14px 16px; border-radius: var(--radius-panel); background: var(--surface); color: var(--ink); text-decoration: none; }
+.settingshub__account:hover { color: var(--ink); }
+.settingshub__account:active { background: var(--line); }
+.settingshub__who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.settingshub__name { font-weight: 650; font-size: 1.0625rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settingshub__sub { color: var(--muted); font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settingshub__account > .icon { flex: none; width: 18px; height: 18px; color: var(--muted); }
+.settingshub__group { margin: 20px 16px 6px; color: var(--muted); font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+.settingshub__foot { margin: 8px 16px 24px; color: var(--muted); font-size: 0.8125rem; text-align: center; }
+.menulist__lead { flex: none; display: inline-flex; width: 24px; justify-content: center; }
+.menulist__item .menulist__lead .icon { width: 22px; height: 22px; color: var(--ink); }
+.menulist__item--danger .menulist__lead .icon { color: var(--danger); }
+.menulist__label { flex: 1; min-width: 0; }
+.menulist__value { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 0.9375rem; }
+.menulist__item--start, .menulist__item--start:hover { justify-content: flex-start; }
+
+/* Enquadrar a foto de perfil (padrão Instagram/TikTok/Facebook): círculo fixo, foto se mexe por baixo. */
+.avatarcrop { position: fixed; inset: 0; z-index: 1001; display: flex; flex-direction: column; background: #000; color: #fff; animation: photoview-in 180ms ease-out; }
+.avatarcrop__head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: max(8px, env(safe-area-inset-top)) 8px 8px; }
+.avatarcrop__title { margin: 0; font-size: 1rem; font-weight: 700; text-align: center; }
+.avatarcrop__cancel { justify-self: start; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #fff; cursor: pointer; }
+.avatarcrop__save { justify-self: end; min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--brand); font: inherit; font-weight: 700; cursor: pointer; }
+.avatarcrop__save:disabled, .avatarcrop__cancel:disabled { opacity: 0.45; cursor: default; }
+.avatarcrop__stage { position: relative; flex: 1; min-height: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.avatarcrop__stage--moving { cursor: grabbing; }
+.avatarcrop__img { position: absolute; left: 50%; top: 50%; max-width: none; pointer-events: none; will-change: transform; }
+.avatarcrop__mask { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.62); outline: 1px solid rgb(255 255 255 / 0.85); pointer-events: none; overflow: hidden; }
+.avatarcrop__grid { position: absolute; inset: 0; opacity: 0; transition: opacity 160ms ease; background-image: linear-gradient(90deg, transparent calc(33.333% - 0.5px), rgb(255 255 255 / 0.45) calc(33.333% - 0.5px), rgb(255 255 255 / 0.45) calc(33.333% + 0.5px), transparent calc(33.333% + 0.5px), transparent calc(66.666% - 0.5px), rgb(255 255 255 / 0.45) calc(66.666% - 0.5px), rgb(255 255 255 / 0.45) calc(66.666% + 0.5px), transparent calc(66.666% + 0.5px)), linear-gradient(transparent calc(33.333% - 0.5px), rgb(255 255 255 / 0.45) calc(33.333% - 0.5px), rgb(255 255 255 / 0.45) calc(33.333% + 0.5px), transparent calc(33.333% + 0.5px), transparent calc(66.666% - 0.5px), rgb(255 255 255 / 0.45) calc(66.666% - 0.5px), rgb(255 255 255 / 0.45) calc(66.666% + 0.5px), transparent calc(66.666% + 0.5px)); }
+.avatarcrop__stage--moving .avatarcrop__grid { opacity: 1; }
+.avatarcrop__loading { position: absolute; inset: 0; display: grid; place-items: center; color: rgb(255 255 255 / 0.7); }
+.avatarcrop__foot { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px 24px max(20px, env(safe-area-inset-bottom)); }
+.avatarcrop__hint, .avatarcrop__error { margin: 0; font-size: 0.875rem; text-align: center; color: rgb(255 255 255 / 0.7); }
+.avatarcrop__error { color: #ffb4b4; }
+.avatarcrop__zoom { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 360px; }
+.avatarcrop__zoom input { flex: 1; accent-color: var(--brand); }
+.avatarcrop__zoomicon { width: 18px; height: 18px; border: 2px solid rgb(255 255 255 / 0.8); border-radius: 4px; flex: none; }
+.avatarcrop__zoomicon--small { width: 11px; height: 11px; }
+@media (prefers-reduced-motion: reduce) { .avatarcrop { animation: none; } .avatarcrop__grid { transition: none; } }
+
 /* ---------- Nova publicação no padrão dos apps de foto ---------- */
 /* Tela cheia no celular: sem a barra de cima e a de baixo, cabeçalho próprio fixo. */
 @media (max-width: 899px) {
@@ -5511,3 +5583,28 @@ div.optrow__main { cursor: default; }
 .compose .check > span { display: flex; flex-direction: column; gap: 2px; }
 .compose--details .compose__caption { border-top: 1px solid var(--line); padding-top: 12px; }
 .compose--details .segmented + .compose__caption { border-top: 0; padding-top: 4px; }
+
+/* ---------- Editar perfil: cabeçalho fixo com "Salvar" (padrão nativo) ---------- */
+.edithead { position: sticky; top: var(--topbar-h, 0px); z-index: 15; display: grid; grid-template-columns: 64px 1fr 64px; align-items: center; gap: 8px; min-height: 52px; margin: 0 -16px 12px; padding: 4px 16px; background: var(--bg); border-bottom: 0.5px solid var(--line); }
+.edithead .pagehead__back { margin-left: -12px; }
+.edithead__title { font-family: var(--font-display); font-size: 1.0625rem; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.edithead__save { justify-self: end; min-height: 44px; padding: 0 2px; border: 0; background: transparent; color: var(--brand-text); font: inherit; font-weight: 700; font-size: 1rem; cursor: pointer; white-space: nowrap; }
+.edithead__save:disabled { color: var(--ink-2); opacity: 0.45; cursor: default; }
+.edithead__save:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 6px; }
+.photoedit { flex-direction: column; justify-content: center; gap: 10px; margin: 4px 0 20px; text-align: center; }
+.photoedit__link { min-height: 32px; padding: 0 8px; border: 0; background: transparent; color: var(--brand-text); font: inherit; font-weight: 600; font-size: 0.9375rem; cursor: pointer; }
+.photoedit__link:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 6px; }
+.photoedit__note { font-size: 0.8125rem; }
+
+/* ---------- Privacidade e dados ---------- */
+.privacyhub__intro { margin: -6px 0 8px; }
+.privacyhub__note { margin: 8px 4px 0; font-size: 0.8125rem; }
+.privacyhub__history { margin: 24px 0 8px; padding: 12px 16px; border: 0.5px solid var(--line); border-radius: 14px; background: var(--surface); }
+.privacyhub__history summary { min-height: 32px; display: flex; align-items: center; font-weight: 600; cursor: pointer; }
+.privacyhub__history ul { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
+.privacyhub__history li { display: flex; flex-direction: column; gap: 2px; font-size: 0.875rem; }
+.privacyhub__history time { color: var(--muted); font-size: 0.8125rem; }
+.consent--optional { margin-top: -4px; }
+
+.post--placeevent { display: flex; flex-direction: column; gap: 8px; }
+.post__placeimg { display: block; width: 100%; max-height: 360px; object-fit: cover; border-radius: var(--radius-panel); }

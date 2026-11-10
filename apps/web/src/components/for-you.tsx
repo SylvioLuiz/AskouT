@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Avatar, Button } from './ui.tsx';
 import { PostCard } from './post.tsx';
 import { trackClick, useDwell } from './dwell.tsx';
+import { trackSponsoredOpen, useSponsoredView } from './sponsored-view.tsx';
 import { EventKindIcon } from './icons.tsx';
 import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
@@ -68,10 +69,12 @@ function FollowSource({ source }: { source: RecommendationSource | null }) {
 function EventReco({ item }: { item: RecommendationItem }) {
   const e = item.event!;
   const ref = useDwell<HTMLLIElement>('EVENT', e.id, 'RECO');
+  // No "Para você", o patrocinado é sempre o Match.
+  useSponsoredView<HTMLLIElement>(item.sponsored, 'MATCH', { eventId: e.id }, ref);
   const image = safeImage(e.imageUrl);
   return (
     <li ref={ref} className="foryou__card">
-      <Link to={`/eventos/${encodeURIComponent(e.id)}`} className="foryou__link" onClick={() => trackClick('EVENT', e.id, 'RECO')}>
+      <Link to={`/eventos/${encodeURIComponent(e.id)}`} className="foryou__link" onClick={() => { trackClick('EVENT', e.id, 'RECO'); if (item.sponsored) trackSponsoredOpen('MATCH', { eventId: e.id }); }}>
         <span className={`foryou__cover evcover--${e.kind.toLowerCase()}`}>
           {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <EventKindIcon kind={e.kind} />}
         </span>

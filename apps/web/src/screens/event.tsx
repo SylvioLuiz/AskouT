@@ -29,6 +29,7 @@ import { policyNote } from '../lib/feed.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { trackTicketClick } from '../components/sponsored-view.tsx';
 
 /** O mesmo texto máximo que a API aceita num post de evento. */
 const EVENT_POST_CAPTION_MAX = 500;
@@ -266,7 +267,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
             )}
             {e.ticketUrl && !ended ? (
               <div className="evticket">
-                <a className="btn btn--secondary btn--full evticket__link" href={e.ticketUrl} target="_blank" rel="noopener noreferrer nofollow sponsored">
+                <a className="btn btn--secondary btn--full evticket__link" href={e.ticketUrl} target="_blank" rel="noopener noreferrer nofollow sponsored" onClick={() => trackTicketClick(e.id)}>
                   <TicketIcon />
                   {t('Comprar ingresso')}
                 </a>

@@ -67,9 +67,10 @@ export class PostsController {
 
   /** Posts seus e dos seus amigos. */
   @Get('posts/feed')
-  async feed(@CurrentActor() actor: Actor, @Query('limit') limit?: string, @Query('offset') offset?: string) {
-    const page = await this.core.posts.feed(actor.userId, { limit, offset });
-    return { ...page, items: page.items.map((p) => this.present(p)) };
+  /** `mixed=1`: inclui eventos de bares repostados (itens com `type: 'PLACE_EVENT'`). Sem ele, só posts, como antes. */
+  async feed(@CurrentActor() actor: Actor, @Query('limit') limit?: string, @Query('offset') offset?: string, @Query('mixed') mixed?: string) {
+    const page = await this.core.posts.feed(actor.userId, { limit, offset }, { placeEvents: mixed === '1' });
+    return { ...page, items: page.items.map((p) => ('type' in p ? p : this.present(p))) };
   }
 
   /** Posts em que você foi marcado e ainda não respondeu. */

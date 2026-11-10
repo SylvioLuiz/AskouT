@@ -30,7 +30,9 @@ import type {
   IdGenerator,
   PasswordResetRepository,
   BoostRepository,
+  BoostStatsRepository,
   RegionRepository,
+  ConsentRepository,
   AccountRepository,
   DwellRepository,
   PaymentCharge,
@@ -52,10 +54,12 @@ import { matchesNotificationFilter, type NotificationFilter } from '../notificat
 import type {
   DirectActivityRow,
   DwellRecord,
+  ConsentEventRecord,
   EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
-import type { RegionRecord, BoostRecord, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
+import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
-import type { ActivityRepository } from '../ports.ts';
+import type { ActivityRepository, MfaRepository } from '../ports.ts';
+import type { UserMfa } from '../types.ts';
 import type { ActivityAction, ActivityRecord, ActivityTarget } from '../types.ts';
 
 /**
@@ -579,6 +583,55 @@ export class InMemoryPendingSignupRepository implements PendingSignupRepository 
   }
 }
 
+export class InMemoryMfaRepository implements MfaRepository {
+  readonly rows = new Map<string, UserMfa>();
+
+  async find(userId: string) {
+    const r = this.rows.get(userId);
+    return r ? { ...r, recoveryCodeHashes: [...r.recoveryCodeHashes] } : undefined;
+  }
+
+  async save(record: UserMfa): Promise<void> {
+    this.rows.set(record.userId, { ...record, recoveryCodeHashes: [...record.recoveryCodeHashes] });
+  }
+
+  async delete(userId: string): Promise<void> {
+    this.rows.delete(userId);
+  }
+
+  async useStep(userId: string, step: number): Promise<boolean> {
+    const r = this.rows.get(userId);
+    if (!r || r.lastUsedStep >= step) return false;
+    r.lastUsedStep = step;
+    r.failedAttempts = 0;
+    return true;
+  }
+
+  async useRecoveryCode(userId: string, codeHash: string): Promise<boolean> {
+    const r = this.rows.get(userId);
+    const i = r ? r.recoveryCodeHashes.indexOf(codeHash) : -1;
+    if (!r || i < 0) return false;
+    r.recoveryCodeHashes.splice(i, 1);
+    r.failedAttempts = 0;
+    return true;
+  }
+
+  async incrementFailures(userId: string): Promise<number | undefined> {
+    const r = this.rows.get(userId);
+    if (!r) return undefined;
+    r.failedAttempts += 1;
+    return r.failedAttempts;
+  }
+
+  async lock(userId: string, until: Date): Promise<void> {
+    const r = this.rows.get(userId);
+    if (r) {
+      r.lockedUntil = until;
+      r.failedAttempts = 0;
+    }
+  }
+}
+
 export class InMemoryPasswordResetRepository implements PasswordResetRepository {
   readonly rows = new Map<string, PasswordReset>();
 
@@ -640,6 +693,23 @@ export class InMemoryDwellRepository implements DwellRepository {
     this.rows.length = 0;
     this.rows.push(...keep);
     return removed;
+  }
+}
+
+export class InMemoryConsentRepository implements ConsentRepository {
+  readonly rows: ConsentEventRecord[] = [];
+
+  async add(event: ConsentEventRecord): Promise<void> {
+    this.rows.push({ ...event });
+  }
+
+  async listByUser(userId: string, limit: number): Promise<ConsentEventRecord[]> {
+    return this.rows
+      .map((r, i) => ({ r, i }))
+      .filter(({ r }) => r.userId === userId)
+      .sort((a, b) => b.r.at.getTime() - a.r.at.getTime() || b.i - a.i)
+      .slice(0, limit)
+      .map(({ r }) => ({ ...r }));
   }
 }
 
@@ -712,6 +782,45 @@ export class InMemoryBoostRepository implements BoostRepository {
     return [...this.rows.values()]
       .filter((b) => b.status === 'PAID' && b.startsAt !== null && b.endsAt !== null && b.startsAt.getTime() <= now.getTime() && b.endsAt.getTime() > now.getTime())
       .map((b) => ({ ...b }));
+  }
+}
+
+/** Contadores do relatório do anúncio, em memória. */
+export class InMemoryBoostStatsRepository implements BoostStatsRepository {
+  readonly stats = new Map<string, BoostStatRow>();
+  readonly seen = new Set<string>();
+
+  async countOnce(entry: { boostId: string; day: string; kind: BoostStatKind; placement: BoostPlacement; viewerKey: string }): Promise<boolean> {
+    const seenKey = `${entry.boostId}|${entry.day}|${entry.kind}|${entry.viewerKey}`;
+    if (this.seen.has(seenKey)) return false;
+    this.seen.add(seenKey);
+    const statKey = `${entry.boostId}|${entry.day}|${entry.placement}|${entry.kind}`;
+    const row = this.stats.get(statKey) ?? { boostId: entry.boostId, day: entry.day, placement: entry.placement, kind: entry.kind, count: 0 };
+    row.count += 1;
+    this.stats.set(statKey, row);
+    return true;
+  }
+
+  async wasCounted(entry: { boostId: string; day: string; kind: BoostStatKind; viewerKey: string }): Promise<boolean> {
+    return this.seen.has(`${entry.boostId}|${entry.day}|${entry.kind}|${entry.viewerKey}`);
+  }
+
+  async listByBoost(boostId: string): Promise<BoostStatRow[]> {
+    return [...this.stats.values()]
+      .filter((r) => r.boostId === boostId)
+      .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.placement < b.placement ? -1 : a.placement > b.placement ? 1 : a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : 0))
+      .map((r) => ({ ...r }));
+  }
+
+  async purgeSeenBefore(day: string): Promise<number> {
+    let removed = 0;
+    for (const k of [...this.seen]) {
+      if (k.split('|')[1]! < day) {
+        this.seen.delete(k);
+        removed += 1;
+      }
+    }
+    return removed;
   }
 }
 
@@ -1534,8 +1643,10 @@ export class InMemoryAccountRepository implements AccountRepository {
   private readonly blocks: InMemoryBlockRepository;
   private readonly regions: InMemoryRegionRepository;
   private readonly identities: InMemoryIdentityRepository;
+  private readonly consents: InMemoryConsentRepository | undefined;
 
-  constructor(users: InMemoryUserRepository, follows: InMemoryFollowRepository, blocks: InMemoryBlockRepository, regions: InMemoryRegionRepository, identities: InMemoryIdentityRepository) {
+  constructor(users: InMemoryUserRepository, follows: InMemoryFollowRepository, blocks: InMemoryBlockRepository, regions: InMemoryRegionRepository, identities: InMemoryIdentityRepository, consents?: InMemoryConsentRepository) {
+    this.consents = consents;
     this.users = users;
     this.follows = follows;
     this.blocks = blocks;
@@ -1568,6 +1679,11 @@ export class InMemoryAccountRepository implements AccountRepository {
     for (const [key, f] of this.follows.rows) if (f.followerId === userId || f.followeeId === userId) this.follows.rows.delete(key);
     for (const key of this.blocks.rows.keys()) if (key.startsWith(`${userId}>`) || key.endsWith(`>${userId}`)) this.blocks.rows.delete(key);
     this.regions.rows.delete(userId);
+    if (this.consents) {
+      const keep = this.consents.rows.filter((r) => r.userId !== userId);
+      this.consents.rows.length = 0;
+      this.consents.rows.push(...keep);
+    }
     for (const [key, id] of this.identities.rows) if (id === userId) this.identities.rows.delete(key);
   }
 }
@@ -1621,6 +1737,24 @@ export class InMemoryProfileEventRepository implements ProfileEventRepository {
 
   async hasPost(userId: string, postId: string): Promise<boolean> {
     return this.postRows.has(this.key(userId, postId));
+  }
+
+  async listPlaceReposts(userIds: string[], limit: number): Promise<{ userId: string; eventId: string; createdAt: Date }[]> {
+    const who = new Set(userIds);
+    return [...this.rows.values()]
+      .filter((r) => who.has(r.userId))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.eventId < b.eventId ? 1 : a.eventId > b.eventId ? -1 : a.userId < b.userId ? 1 : -1))
+      .slice(0, limit)
+      .map((r) => ({ ...r }));
+  }
+
+  async listPostReposts(userIds: string[], limit: number): Promise<{ userId: string; postId: string; createdAt: Date }[]> {
+    const who = new Set(userIds);
+    return [...this.postRows.values()]
+      .filter((r) => who.has(r.userId))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.postId < b.postId ? 1 : a.postId > b.postId ? -1 : a.userId < b.userId ? 1 : -1))
+      .slice(0, limit)
+      .map((r) => ({ ...r }));
   }
 
   async list(userId: string, page: Page): Promise<{ eventId: string; postId?: string; createdAt: Date }[]> {
@@ -1848,6 +1982,10 @@ export class InMemoryPostRepository implements PostRepository {
 
   async hide(postId: string, userId: string): Promise<void> {
     this.hidden.add(`${postId}|${userId}`);
+  }
+
+  async hiddenAmong(userId: string, postIds: string[]): Promise<string[]> {
+    return [...new Set(postIds)].filter((id) => this.hidden.has(`${id}|${userId}`));
   }
 
   async like(postId: string, userId: string, at: Date): Promise<void> {
@@ -2331,9 +2469,11 @@ export class InMemoryAdminRepository implements AdminRepository {
   private readonly places: InMemoryPlaceRepository;
   private readonly claims: InMemoryVenueClaimRepository;
   private readonly eventRoom: InMemoryEventRoomRepository;
+  private readonly identities: InMemoryIdentityRepository | undefined;
 
-  constructor(parts: { users: InMemoryUserRepository; posts: InMemoryPostRepository; conversations: InMemoryConversationRepository; places: InMemoryPlaceRepository; claims: InMemoryVenueClaimRepository; eventRoom: InMemoryEventRoomRepository }) {
+  constructor(parts: { users: InMemoryUserRepository; posts: InMemoryPostRepository; conversations: InMemoryConversationRepository; places: InMemoryPlaceRepository; claims: InMemoryVenueClaimRepository; eventRoom: InMemoryEventRoomRepository; identities?: InMemoryIdentityRepository }) {
     this.eventRoom = parts.eventRoom;
+    this.identities = parts.identities;
     this.users = parts.users;
     this.posts = parts.posts;
     this.conversations = parts.conversations;
@@ -2379,10 +2519,16 @@ export class InMemoryAdminRepository implements AdminRepository {
       if (!p) continue;
       if (status && u.status !== status) continue;
       if (q && !fold(`${u.email} ${p.username} ${p.displayName}`).includes(q)) continue;
-      rows.push({ id: u.id, email: u.email, username: p.username, displayName: p.displayName, status: u.status, role: u.role, createdAt: u.createdAt, postsCount: [...this.posts.posts.values()].filter((x) => x.authorId === u.id).length, reportsCount: this.reportsAgainst(u.id), birthDate: u.birthDate ?? null });
+      rows.push({ id: u.id, email: u.email, username: p.username, displayName: p.displayName, status: u.status, role: u.role, createdAt: u.createdAt, postsCount: [...this.posts.posts.values()].filter((x) => x.authorId === u.id).length, reportsCount: this.reportsAgainst(u.id), birthDate: u.birthDate ?? null, loginProviders: this.providersOf(u.id) });
     }
     rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : 1));
     return rows.slice(page.offset, page.offset + page.limit);
+  }
+
+  private providersOf(userId: string): ExternalProvider[] {
+    const set = new Set<ExternalProvider>();
+    for (const [key, id] of this.identities?.rows ?? []) if (id === userId) set.add(key.split('|')[0] as ExternalProvider);
+    return [...set].sort();
   }
 
   async setUserStatus(userId: string, status: UserStatus) {
