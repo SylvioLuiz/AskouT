@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
-import { afterEach, describe, it } from 'node:test';
+import { afterEach, before, describe, it } from 'node:test';
 import { EN } from './en.ts';
 import { ES } from './es.ts';
-import { decimal, pickLocale, setLocaleForTests, t } from './index.ts';
+import { decimal, pickLocale, registerDictionaryForTests, setLocaleForTests, t } from './index.ts';
+
+before(() => {
+  registerDictionaryForTests('en', EN);
+  registerDictionaryForTests('es', ES);
+});
 
 describe('i18n', () => {
   afterEach(() => setLocaleForTests('pt-BR'));

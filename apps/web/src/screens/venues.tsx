@@ -436,6 +436,11 @@ export function VenueEventRow({ venueId, event, now, onEdit, onChanged }: { venu
           <Button small variant="secondary" onClick={onEdit}>
             {t('Editar')}
           </Button>
+          {event.phase === 'PAST' ? null : (
+            <Link to={`/bares/${encodeURIComponent(venueId)}/eventos/${encodeURIComponent(event.id)}/chapelaria`} className="btn btn--secondary btn--small">
+              {t('Chapelaria')}
+            </Link>
+          )}
           <Button small variant="quiet" onClick={() => setAsking(true)}>
             {t('Apagar')}
           </Button>

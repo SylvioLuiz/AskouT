@@ -1,3 +1,4 @@
+import { CloakroomCard } from '../components/cloakroom-card.tsx';
 import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { shareOrigin } from '../lib/public-origin.ts';
 import { useEffect, useRef, useState } from 'react';
@@ -386,6 +387,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   </Button>
                 </div>
               ) : null}
+              {e.source === 'PLACE' && !ended ? <CloakroomCard eventId={e.id} /> : null}
               {feedSettings ? (
                 <div className="evinfo__block">
                   <h2 className="evinfo__title">{t('Publicações')}</h2>

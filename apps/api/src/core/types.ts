@@ -1253,3 +1253,33 @@ export interface ActivityRecord {
   /** Pedido para seguir ainda não aceito. */
   pending: boolean;
 }
+
+/** Chapelaria do evento: configuração de quem organiza. Sem registro, o evento não tem chapelaria. */
+export interface CloakroomSettingRecord {
+  placeEventId: string;
+  enabled: boolean;
+  /** Preço por item, em centavos (cobrado na porta, fora do app). Nulo: grátis. */
+  priceCents: number | null;
+  /** Máximo de itens guardados ao mesmo tempo. Nulo: sem limite. */
+  capacity: number | null;
+  note: string | null;
+}
+
+/** ISSUED: ticket emitido, itens ainda não entregues. STORED: itens guardados. RETURNED: retirados. CANCELED: desistiu antes de entregar. */
+export type CloakroomStatus = 'ISSUED' | 'STORED' | 'RETURNED' | 'CANCELED';
+
+export interface CloakroomTicketRecord {
+  id: string;
+  placeEventId: string;
+  userId: string;
+  /** Número sequencial no evento (etiqueta física). */
+  number: number;
+  /** Código curto, único no evento, que a equipe digita ou lê do QR. */
+  code: string;
+  description: string;
+  itemCount: number;
+  status: CloakroomStatus;
+  createdAt: Date;
+  storedAt: Date | null;
+  returnedAt: Date | null;
+}

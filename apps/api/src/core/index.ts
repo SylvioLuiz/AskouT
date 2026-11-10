@@ -24,6 +24,7 @@ import { InterestService } from './interest-service.ts';
 import { MatchService } from './match-service.ts';
 import { PaymentsSwitch } from './payments-switch.ts';
 import { ConsentService } from './consent-service.ts';
+import { CloakroomService } from './cloakroom-service.ts';
 import { RegionService } from './region-service.ts';
 import { AccountService } from './account-service.ts';
 import { AgeService } from './age-service.ts';
@@ -92,6 +93,7 @@ export function createCore(input: CoreInput) {
     recommendations: new RecommendationService(deps, posts, match),
     regions: new RegionService(deps),
     consents: new ConsentService(deps),
+    cloakroom: new CloakroomService(deps),
     account: new AccountService(deps, auth),
     age: new AgeService(deps),
     notifications: new NotificationService(input),
@@ -111,6 +113,8 @@ export {
   MAX_CODE_SENDS,
   RESEND_COOLDOWN_SECONDS,
 } from './auth-service.ts';
+export { CloakroomService } from './cloakroom-service.ts';
+export type { CloakroomPanel, CloakroomPublicView, CloakroomStaffTicket, CloakroomTicketView } from './cloakroom-service.ts';
 export { MfaService } from './mfa-service.ts';
 export type { MfaRecoveryCodes, MfaSetup, MfaStatus } from './mfa-service.ts';
 export type {

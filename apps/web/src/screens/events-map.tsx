@@ -15,7 +15,7 @@ import { toApiError } from '../lib/errors.ts';
 import type { ExploreEvent, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
-import { LocationIcon, RouteIcon, SearchIcon } from '../components/icons.tsx';
+import { BackIcon, LocationIcon, RouteIcon, SearchIcon } from '../components/icons.tsx';
 import type { MapView } from '../components/map-engine.ts';
 import { t } from '../lib/i18n/index.ts';
 import { trackSponsoredOpen, useSponsoredView } from '../components/sponsored-view.tsx';
@@ -414,6 +414,9 @@ export function EventsMapScreen() {
         </Suspense>
       )}
       <header className="evmap__top">
+        <button type="button" className="evmap__back" onClick={() => navigate('/explorar', { replace: true })} aria-label={t('Voltar')} title={t('Voltar')}>
+          <BackIcon />
+        </button>
         <MapSearch />
         <ExploreViews current="map" floating />
         <div className="evmap__seg" role="group" aria-label={t('O que mostrar no carrossel')}>
