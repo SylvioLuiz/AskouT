@@ -2438,4 +2438,6 @@ export const ES: Readonly<Record<string, string>> = {
   "{name} conectada. Escolha abaixo quais agendas entram.": "{name} conectada. Elige abajo qué agendas incluir.",
   "Mês": "Mes",
   "Visualização da agenda": "Vista de la agenda",
+  "Eventos do AskouT": "Eventos de AskouT",
+  "tem compromisso em agenda ligada": "ocupado en una agenda conectada",
 };

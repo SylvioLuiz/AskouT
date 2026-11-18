@@ -144,3 +144,22 @@ export function syncButtonLabel(count: number): string {
   if (count === 0) return t('Sincronizar');
   return count === 1 ? t('Sincronizar · 1 ligada') : t('Sincronizar · {count} ligadas', { count });
 }
+
+/** Cor padrão de cada tipo de agenda, quando a agenda não informa a sua (nunca rosa, que é dos eventos do AskouT). */
+const PROVIDER_COLOR: Record<CalendarSource, string> = { GOOGLE: '#4285f4', MICROSOFT: '#0078d4', DEVICE: '#34c759', ICS: '#8e8e93' };
+const HEX = /^#[0-9a-f]{6}$/i;
+
+/**
+ * Cor dos compromissos de uma agenda ligada: a da primeira agenda escolhida que tem cor (a mesma do app de agenda),
+ * senão a do tipo de agenda. Os horários ocupados chegam juntos por conexão, então a cor é por conexão.
+ */
+export function connectionColor(connection: Pick<CalendarConnection, 'provider' | 'calendars'>): string {
+  const picked = connection.calendars.filter((c) => c.selected);
+  const color = [...picked, ...connection.calendars].map((c) => c.color?.trim() ?? '').find((c) => HEX.test(c));
+  return color ?? PROVIDER_COLOR[connection.provider] ?? PROVIDER_COLOR.ICS;
+}
+
+/** Cores (sem repetir) das agendas ligadas que têm compromisso no dia. */
+export function busyColorsOnDay(blocks: readonly BusyBlock[], key: string, colorOf: (block: BusyBlock) => string): string[] {
+  return [...new Set(busyOnDay(blocks, key).map(colorOf))];
+}
