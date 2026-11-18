@@ -2112,7 +2112,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Repita a nova senha": "Repite la nueva contraseña",
   "Segurança": "Seguridad",
   "Senha atual": "Contraseña actual",
-  "Senha trocada. Use a nova senha da próxima vez que entrar.": "Contraseña cambiada. Usa la nueva la próxima vez que entres.",
+  "Senha trocada. Você continua conectado aqui; os outros aparelhos precisam entrar de novo com a nova senha.": "Contraseña cambiada. Sigues conectado aquí; los otros dispositivos deben entrar de nuevo con la nueva contraseña.",
   "Sua conta entra com Google ou Apple e não tem senha própria no AskouT. Para mudar a senha, troque-a na sua conta Google ou Apple.": "Tu cuenta entra con Google o Apple y no tiene contraseña propia en AskouT. Para cambiarla, hazlo en tu cuenta de Google o Apple.",
   "Trocar senha": "Cambiar contraseña",
   "Filtrar atividades": "Filtrar actividad",
@@ -2438,4 +2438,6 @@ export const ES: Readonly<Record<string, string>> = {
   "{name} conectada. Escolha abaixo quais agendas entram.": "{name} conectada. Elige abajo qué agendas incluir.",
   "Mês": "Mes",
   "Visualização da agenda": "Vista de la agenda",
+  "Eventos do AskouT": "Eventos de AskouT",
+  "tem compromisso em agenda ligada": "ocupado en una agenda conectada",
 };

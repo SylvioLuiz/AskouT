@@ -90,14 +90,14 @@ export class Hs256TokenService implements TokenService {
       throw new Error('O segredo do token precisa ter ao menos 32 caracteres');
     }
     this.secret = options.secret;
-    this.ttlSeconds = options.ttlSeconds ?? 3600;
+    this.ttlSeconds = options.ttlSeconds ?? 86_400 * 90;
     this.nowMs = options.nowMs ?? Date.now;
   }
 
   issue(claims: TokenClaims): string {
     const iat = Math.floor(this.nowMs() / 1000);
     const payload = Buffer.from(
-      JSON.stringify({ sub: claims.userId, role: claims.role, iat, exp: iat + this.ttlSeconds }),
+      JSON.stringify({ sub: claims.userId, role: claims.role, ...(claims.pwd ? { pwd: claims.pwd } : {}), iat, exp: iat + this.ttlSeconds }),
     ).toString('base64url');
     const signingInput = `${HEADER}.${payload}`;
     return `${signingInput}.${this.sign(signingInput)}`;
@@ -123,13 +123,15 @@ export class Hs256TokenService implements TokenService {
       return undefined;
     }
     if (typeof data !== 'object' || data === null) return undefined;
-    const { sub, role, exp } = data as Record<string, unknown>;
+    const { sub, role, exp, pwd } = data as Record<string, unknown>;
     if (typeof sub !== 'string' || sub.length === 0) return undefined;
     if (typeof role !== 'string' || !ROLES.has(role)) return undefined;
     if (typeof exp !== 'number' || !Number.isFinite(exp)) return undefined;
     if (Math.floor(this.nowMs() / 1000) >= exp) return undefined;
 
-    return { userId: sub, role: role as UserRole };
+    if (pwd !== undefined && typeof pwd !== 'string') return undefined;
+
+    return typeof pwd === 'string' ? { userId: sub, role: role as UserRole, pwd } : { userId: sub, role: role as UserRole };
   }
 
   private sign(input: string): string {

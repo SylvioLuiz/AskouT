@@ -1514,6 +1514,31 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   border-color: var(--brand);
 }
 
+.daymark--busy { flex: none; }
+
+.mcal__legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.mcal__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mcal__legend .daymark {
+  width: 7px;
+  height: 7px;
+}
+
 .mcal__foot {
   display: flex;
   justify-content: center;

@@ -127,6 +127,13 @@ export class AuthController {
     return this.core.auth.me(actor);
   }
 
+  /** `{token}` renovado. O app chama ao abrir, para a sessão só expirar depois de muito tempo sem uso. */
+  @Post('refresh')
+  @HttpCode(200)
+  refresh(@CurrentActor() actor: Actor) {
+    return this.core.auth.refresh(actor);
+  }
+
   /** Marca o tutorial inicial como visto (concluído ou pulado), para não aparecer de novo. */
   @Post('me/onboarding')
   @HttpCode(200)

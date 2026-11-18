@@ -26,6 +26,23 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/** No máximo uma renovação a cada 12 horas. */
+const RENEW_EVERY_MS = 12 * 60 * 60 * 1000;
+let lastRenewAt = 0;
+
+/**
+ * Troca o token por um novo, com prazo zerado, para a sessão só expirar depois de muito tempo sem abrir o app
+ * (como nas redes sociais). Falha de rede é ignorada: o token atual continua valendo.
+ */
+function renewSession(): void {
+  const now = Date.now();
+  if (now - lastRenewAt < RENEW_EVERY_MS) return;
+  lastRenewAt = now;
+  api.refreshSession().catch(() => {
+    lastRenewAt = 0;
+  });
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
@@ -56,7 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'loading' });
     api.me().then(
       (user) => {
-        if (!cancelled) setState({ status: 'user', user });
+        if (cancelled) return;
+        setState({ status: 'user', user });
+        renewSession();
       },
       (failure: unknown) => {
         if (cancelled) return;
@@ -74,6 +93,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [attempt]);
 
+  // App aberto por dias (aba esquecida, app em segundo plano): renova quando volta para a frente.
+  useEffect(() => {
+    if (state.status !== 'user') return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') renewSession();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [state.status]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       state,
@@ -84,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         setChallenge(undefined);
         session.set(result.token);
+        lastRenewAt = Date.now();
         setState({ status: 'user', user: result.user });
       },
       signOut,

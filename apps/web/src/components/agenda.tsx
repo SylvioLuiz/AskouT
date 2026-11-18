@@ -73,12 +73,14 @@ interface DayStripProps {
   onMonth: (by: number) => void;
   /** Abre o calendário do mês para pular para qualquer data. */
   onOpenCalendar: () => void;
+  /** Cores das agendas ligadas com compromisso no dia (uma bolinha de cada). */
+  busyOf?: (key: string) => readonly string[];
   /** 'month' troca a faixa de dias pela grade do mês inteiro. */
   view?: 'day' | 'month';
 }
 
 /** Faixa horizontal que rola com o dedo; o dia escolhido desliza até o centro. Setas do teclado trocam o dia. */
-export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, onMonth, onOpenCalendar, view = 'day' }: DayStripProps) {
+export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, onMonth, onOpenCalendar, busyOf, view = 'day' }: DayStripProps) {
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
   const stripRef = useRef<HTMLDivElement>(null);
   const firstScroll = useRef(true);
@@ -161,7 +163,7 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, 
             today={today}
             label={capitalizeFirst(monthLabel(selected))}
             onSelect={onSelect}
-            marksOf={(key) => ({ event: (eventsOf?.(key) ?? 0) > 0, slot: statesOf(key).length > 0 })}
+            marksOf={(key) => ({ event: (eventsOf?.(key) ?? 0) > 0, slot: statesOf(key).length > 0, busy: busyOf?.(key) })}
           />
         </div>
       ) : (
@@ -193,6 +195,9 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, 
                 {states.map((s) => (
                   <span key={s} className={`daymark daymark--${STATE_TONE[s]}`} />
                 ))}
+                {(busyOf?.(key) ?? []).slice(0, Math.max(0, MAX_MARKS - states.length - (events > 0 ? 1 : 0))).map((color) => (
+                  <span key={color} className="daymark daymark--busy" style={{ background: color }} />
+                ))}
               </span>
             </button>
           );
@@ -205,6 +210,29 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, 
 
 // ---------- Calendário do mês ----------
 
+/** O que aparece embaixo de cada dia: evento do AskouT (rosa), horário marcado e uma bolinha por agenda ligada com compromisso (na cor dela). */
+export interface DayMarks {
+  event: boolean;
+  slot: boolean;
+  busy?: readonly string[];
+}
+
+/** No máximo 4 bolinhas por dia, para caber na célula. */
+const MAX_MARKS = 4;
+
+function Marks({ marks, className }: { marks: DayMarks; className: string }) {
+  const busy = (marks.busy ?? []).slice(0, Math.max(0, MAX_MARKS - (marks.event ? 1 : 0) - (marks.slot ? 1 : 0)));
+  return (
+    <span className={className} aria-hidden="true">
+      {marks.event ? <span className="daymark daymark--event" /> : null}
+      {marks.slot ? <span className="daymark daymark--ok" /> : null}
+      {busy.map((color) => (
+        <span key={color} className="daymark daymark--busy" style={{ background: color }} />
+      ))}
+    </span>
+  );
+}
+
 interface MonthGridProps {
   /** Qualquer dia do mês mostrado. */
   month: string;
@@ -212,7 +240,7 @@ interface MonthGridProps {
   today: string;
   label: string;
   onSelect: (key: string) => void;
-  marksOf: (key: string) => { event: boolean; slot: boolean };
+  marksOf: (key: string) => DayMarks;
   /** Células maiores, para a visualização de mês na própria tela. */
   large?: boolean;
 }
@@ -243,14 +271,11 @@ export function MonthGrid({ month, selected, today, label, onSelect, marksOf, la
                 className={`mcal__day${outside ? ' mcal__day--outside' : ''}${isSelected ? ' mcal__day--selected' : ''}${isToday ? ' mcal__day--today' : ''}`}
                 aria-selected={isSelected}
                 aria-current={isToday ? 'date' : undefined}
-                aria-label={`${dayLongLabel(key)}${isToday ? `, ${t('hoje')}` : ''}${marks.event ? `, ${t('tem evento')}` : ''}${marks.slot ? `, ${t('tem horário marcado')}` : ''}`}
+                aria-label={`${dayLongLabel(key)}${isToday ? `, ${t('hoje')}` : ''}${marks.event ? `, ${t('tem evento')}` : ''}${marks.slot ? `, ${t('tem horário marcado')}` : ''}${marks.busy?.length ? `, ${t('tem compromisso em agenda ligada')}` : ''}`}
                 onClick={() => onSelect(key)}
               >
                 <span>{dayChip(key).day}</span>
-                <span className="mcal__marks" aria-hidden="true">
-                  {marks.event ? <span className="daymark daymark--event" /> : null}
-                  {marks.slot ? <span className="daymark daymark--ok" /> : null}
-                </span>
+                <Marks marks={marks} className="mcal__marks" />
               </button>
             );
           })}
@@ -264,16 +289,21 @@ interface MonthCalendarProps {
   selected: string;
   today: string;
   onSelect: (key: string) => void;
-  /** Marcas do dia: evento confirmado e/ou horário marcado. */
-  marksOf: (key: string) => { event: boolean; slot: boolean };
+  /** Marcas do dia: evento confirmado, horário marcado e compromissos das agendas ligadas. */
+  marksOf: (key: string) => DayMarks;
+  /** Avisa o mês que está na tela, para buscar os compromissos dele. */
+  onMonthShown?: (month: string) => void;
+  /** Legenda das cores das agendas ligadas (os eventos do AskouT, em rosa, sempre aparecem). */
+  legend?: readonly { color: string; label: string }[];
 }
 
 /**
  * Grade do mês, como no calendário do celular: setas (ou deslizar o dedo) trocam de mês sem limite,
  * e tocar no nome do mês mostra os 12 meses do ano, com setas para trocar de ano.
  */
-export function MonthCalendar({ selected, today, onSelect, marksOf }: MonthCalendarProps) {
+export function MonthCalendar({ selected, today, onSelect, marksOf, onMonthShown, legend = [] }: MonthCalendarProps) {
   const [month, setMonth] = useState(() => monthStart(selected));
+  useEffect(() => onMonthShown?.(month), [month, onMonthShown]);
   const [mode, setMode] = useState<'days' | 'months'>('days');
   const year = Number(month.slice(0, 4));
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
@@ -343,6 +373,21 @@ export function MonthCalendar({ selected, today, onSelect, marksOf }: MonthCalen
       ) : (
         <MonthGrid month={month} selected={selected} today={today} marksOf={marksOf} onSelect={onSelect} label={label} />
       )}
+
+      {mode === 'days' ? (
+        <ul className="mcal__legend">
+          <li>
+            <span className="daymark daymark--event" aria-hidden="true" />
+            {t('Eventos do AskouT')}
+          </li>
+          {legend.map((item) => (
+            <li key={`${item.color}-${item.label}`}>
+              <span className="daymark daymark--busy" style={{ background: item.color }} aria-hidden="true" />
+              {item.label}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <div className="mcal__foot">
         <button

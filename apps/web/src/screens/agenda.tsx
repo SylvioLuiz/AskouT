@@ -3,8 +3,8 @@ import type { AgendaEvent } from '../lib/agenda.ts';
 import type { FormEvent } from 'react';
 import { DayStrip, MonthCalendar, Sheet, StateMark } from '../components/agenda.tsx';
 import { CalendarSyncSheet, refreshDeviceCalendarsIfDue } from '../components/calendar-sync.tsx';
-import { busyOnDay, syncButtonLabel } from '../lib/calendar-sync.ts';
-import type { BusyBlock } from '../lib/calendar-sync.ts';
+import { busyColorsOnDay, busyOnDay, connectionColor, syncButtonLabel } from '../lib/calendar-sync.ts';
+import type { BusyBlock, CalendarConnection } from '../lib/calendar-sync.ts';
 import { ChevronRightIcon, PlusIcon, RefreshIcon } from '../components/icons.tsx';
 import { Button, Confirm, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -71,13 +71,13 @@ function EventList({ events }: { events: AgendaEvent[] }) {
 }
 
 /** Compromissos das agendas ligadas: só "ocupado" e de qual agenda veio (o título nunca sai da agenda da pessoa). */
-function BusyList({ blocks, day }: { blocks: BusyBlock[]; day: string }) {
+function BusyList({ blocks, day, colorOf }: { blocks: BusyBlock[]; day: string; colorOf: (block: BusyBlock) => string }) {
   return (
     <div className="agbusy">
       <h3 className="agevents__title">{t('Ocupado nas suas agendas')}</h3>
       <ul className="slots">
         {blocks.map((b) => (
-          <li key={`${b.connectionId}-${b.start}`} className="slot slot--busy">
+          <li key={`${b.connectionId}-${b.start}`} className="slot slot--busy" style={{ borderLeftColor: colorOf(b) }}>
             <div className="slot__body">
               <span className="slot__time">{timeRangeLabel(b, day)}</span>
               <span className="agbusy__label">{t('Ocupado')} · {b.label}</span>
@@ -248,7 +248,30 @@ export function AgendaScreen() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendars.data]);
+  /** Agendas ligadas (atualizadas também quando a pessoa mexe na folha Sincronizar), para a cor de cada uma. */
+  const [connections, setConnections] = useState<readonly CalendarConnection[]>([]);
+  useEffect(() => {
+    if (calendars.data) setConnections(calendars.data.connections);
+  }, [calendars.data]);
+  const colorByConnection = useMemo(() => new Map(connections.map((c) => [c.id, connectionColor(c)])), [connections]);
+  const colorOf = (block: BusyBlock) => colorByConnection.get(block.connectionId) ?? connectionColor({ provider: block.provider, calendars: [] });
   const busyToday = busyOnDay(busyBlocks.data ?? [], selected);
+  /** Mês aberto no "Ir para a data": busca os compromissos e horários dele para mostrar as bolinhas. */
+  const [pickerMonth, setPickerMonth] = useState<string | undefined>();
+  const pickerRange = useMemo(() => {
+    if (!pickerMonth || !picking) return undefined;
+    // A grade mostra até 6 dias dos meses vizinhos: busca uma semana a mais de cada lado.
+    const first = addDays(pickerMonth, -7);
+    return rangeForDays(first, monthDays(pickerMonth).length + 14);
+  }, [pickerMonth, picking]);
+  const pickerBusy = useAsync(
+    () => (pickerRange ? api.calendarBusy(pickerRange.from, pickerRange.to).catch(() => [] as BusyBlock[]) : Promise.resolve([] as BusyBlock[])),
+    [pickerRange?.from, pickerRange?.to],
+  );
+  const pickerSlots = useAsync(
+    () => (pickerRange ? api.mySlots(pickerRange.from, pickerRange.to).catch(() => [] as Slot[]) : Promise.resolve([] as Slot[])),
+    [pickerRange?.from, pickerRange?.to],
+  );
   const [removing, setRemoving] = useState<Slot | undefined>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
@@ -352,6 +375,7 @@ export function AgendaScreen() {
         eventsOf={(key) => agendaEventsOnDay(events, key).length}
         onMonth={changeMonth}
         onOpenCalendar={() => setPicking(true)}
+        busyOf={(key) => busyColorsOnDay(busyBlocks.data ?? [], key, colorOf)}
         view={view}
       />
 
@@ -375,7 +399,7 @@ export function AgendaScreen() {
           <p className="muted">{t('Nenhum horário marcado neste dia.')}</p>
         ) : null}
         {ofDay.length > 0 ? <SlotList slots={ofDay} day={selected} onRemove={(slot) => setRemoving(slot)} /> : null}
-        {busyToday.length > 0 ? <BusyList blocks={busyToday} day={selected} /> : null}
+        {busyToday.length > 0 ? <BusyList blocks={busyToday} day={selected} colorOf={colorOf} /> : null}
         {eventsToday.length > 0 ? <EventList events={eventsToday} /> : null}
         {eventsLoaded && eventsToday.length === 0 && nextEventDay ? (
           <button type="button" className="agjump" onClick={() => choose(nextEventDay)}>
@@ -411,6 +435,7 @@ export function AgendaScreen() {
           }}
           onChange={(o) => {
             setSyncedN(o.connections.length);
+            setConnections(o.connections);
             busyBlocks.reload();
           }}
         />
@@ -421,7 +446,14 @@ export function AgendaScreen() {
           <MonthCalendar
             selected={selected}
             today={today}
-            marksOf={(key) => ({ event: hasEvent(key), slot: statesOnDay(all, key).length > 0 })}
+            onMonthShown={setPickerMonth}
+            legend={connections.filter((c) => c.status === 'ACTIVE').map((c) => ({ color: connectionColor(c), label: c.label }))}
+            marksOf={(key) => {
+              const inMain = key.slice(0, 7) === selected.slice(0, 7);
+              const slotList = inMain ? all : (pickerSlots.data ?? []);
+              const busyList = inMain ? (busyBlocks.data ?? []) : (pickerBusy.data ?? []);
+              return { event: hasEvent(key), slot: statesOnDay(slotList, key).length > 0, busy: busyColorsOnDay(busyList, key, colorOf) };
+            }}
             onSelect={(key) => {
               choose(key);
               setPicking(false);
