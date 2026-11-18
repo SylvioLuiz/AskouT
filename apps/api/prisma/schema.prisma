@@ -442,6 +442,8 @@ model ConversationParticipant {
   pinnedAt       DateTime?
   /// Sem avisos de mensagem nova (só para essa pessoa).
   muted          Boolean   @default(false)
+  /// Cor escolhida para a conversa (só para essa pessoa); nula = cor padrão do app.
+  color          String?
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)

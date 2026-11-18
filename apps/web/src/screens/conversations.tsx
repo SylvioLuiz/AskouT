@@ -11,6 +11,7 @@ import { MessagePopup, ReactionSummary, ReactionsSheet, hasActions } from '../co
 import { Sheet } from '../components/agenda.tsx';
 import { SwipeRow, useTimeReveal } from '../components/swipe-reply.tsx';
 import { useChatBackground } from '../lib/chat-bg.ts';
+import { chatColorStyle } from '../lib/chat-color.ts';
 import { readDraft, saveDraft } from '../lib/chat-draft.ts';
 import { ChatPrefsSheet } from '../components/chat-prefs.tsx';
 import { PollLine } from '../components/date-poll-strip.tsx';
@@ -184,6 +185,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [suggesting, setSuggesting] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | undefined>();
   const background = useChatBackground(conversationId);
+  /** Cor escolhida agora há pouco: aparece na hora, antes de a conversa recarregar do servidor. */
+  const [pickedColor, setPickedColor] = useState<string | null | undefined>();
   const [actionsFor, setActionsFor] = useState<ChatMessage | undefined>();
   const [reactionsFor, setReactionsFor] = useState<ChatMessage | undefined>();
   const [burst, setBurst] = useState<string | undefined>();
@@ -222,6 +225,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     loadedFirst.current = false;
     setMessages([]);
     setReplyTo(undefined);
+    setPickedColor(undefined);
     setActionsFor(undefined);
     setSelected(undefined);
     setDeleting(false);
@@ -330,6 +334,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   }
   const data = view.data!;
   const isGroup = data.type === 'GROUP';
+  const color = pickedColor !== undefined ? pickedColor : (data.color ?? null);
+  const colorStyle = chatColorStyle(color);
   const match = data.other ? flash.data?.matches.find((m) => m.other.userId === data.other?.userId) : undefined;
   const serverNow = Date.parse(data.now);
 
@@ -624,7 +630,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   );
 
   return (
-    <div className={`chat chat--enter${background ? ' chat--bg' : ''}`} style={background ? ({ '--chat-bg': `url(${background})` } as CSSProperties) : undefined}>
+    <div className={`chat chat--enter${background ? ' chat--bg' : ''}${colorStyle ? ' chat--colored' : ''}`} style={background || colorStyle ? ({ ...colorStyle, ...(background ? { '--chat-bg': `url(${background})` } : {}) } as CSSProperties) : undefined}>
       {selected ? (
         <header className="selectbar">
           <p className="selectbar__count" role="status">
@@ -644,6 +650,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         pinned={data.pinned}
         muted={data.muted}
         onPrefsChanged={view.reload}
+        color={color}
+        onColorChange={setPickedColor}
         subtitle={isGroup ? `${peopleLabel(data.memberCount)} · toque para ver o grupo` : data.other ? `@${data.other.username}` : undefined}
         onCleared={() => {
           setMessages([]);

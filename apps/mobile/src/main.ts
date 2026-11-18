@@ -1,4 +1,6 @@
+import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 import { Contacts } from '@capacitor-community/contacts';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
@@ -10,6 +12,8 @@ import { NativeVideoCompressor } from 'capacitor-native-video-compressor';
 import { SocialLogin } from '@capgo/capacitor-social-login';
 import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';
 import { createAppleBridge } from './apple-bridge.ts';
+import { installBackButton } from './back-button.ts';
+import { createLocationBridge, guardGeolocation } from './location-bridge.ts';
 import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
 import { createDeviceCalendarBridge } from './device-calendar-bridge.ts';
@@ -31,6 +35,21 @@ function toBase64(chunk: Blob): Promise<string> {
 }
 
 if (Capacitor.isNativePlatform()) {
+  if (Capacitor.getPlatform() === 'android') {
+    installBackButton({
+      addListener: (event, cb) => App.addListener(event, cb),
+      minimizeApp: () => App.minimizeApp(),
+      goBack: () => window.history.back(),
+      dispatch: () => window.dispatchEvent(new Event('askout:back', { cancelable: true })),
+    });
+  }
+  const location = createLocationBridge({
+    checkPermissions: () => Geolocation.checkPermissions(),
+    requestPermissions: () => Geolocation.requestPermissions(),
+  });
+  w['AskouTLocation'] = location;
+  // O WebView do Android não mostra o pedido de localização sozinho: toda leitura de posição pede antes pelo sistema.
+  if (typeof navigator !== 'undefined' && navigator.geolocation) guardGeolocation(navigator.geolocation, () => location.ensure());
   w['AskouTVideo'] = createVideoBridge({
     filesystem: {
       writeFile: (o) => Filesystem.writeFile({ path: o.path, data: o.data, directory: Directory.Cache }),

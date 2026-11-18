@@ -412,3 +412,52 @@ describe('ponte da agenda do celular', () => {
     await assert.rejects(createDeviceCalendarBridge({ calendar: cal(false).calendar, platform: () => 'ios' }).listCalendars(), /Ajustes/);
   });
 });
+
+it('botão voltar do Android: volta uma tela, e na primeira manda o app para segundo plano', async () => {
+  const { installBackButton } = await import('./back-button.ts');
+  let handler: ((e: { canGoBack: boolean }) => void) | undefined;
+  const calls: string[] = [];
+  let allow = true;
+  installBackButton({ addListener: (_e, cb) => { handler = cb; }, minimizeApp: () => calls.push('min'), goBack: () => calls.push('back'), dispatch: () => allow });
+  handler?.({ canGoBack: true });
+  handler?.({ canGoBack: false });
+  allow = false;
+  handler?.({ canGoBack: true });
+  assert.deepEqual(calls, ['back', 'min']);
+});
+
+it('localização: pede a permissão do aparelho quando ainda não tem', async () => {
+  const { createLocationBridge } = await import('./location-bridge.ts');
+  let asked = 0;
+  const bridge = createLocationBridge({ checkPermissions: async () => ({ location: 'prompt' }), requestPermissions: async () => { asked += 1; return { location: 'granted' }; } });
+  assert.equal(await bridge.ensure(), 'granted');
+  assert.equal(asked, 1);
+  const denied = createLocationBridge({ checkPermissions: async () => ({ location: 'denied' }), requestPermissions: async () => ({ location: 'denied' }) });
+  assert.equal(await denied.ensure(), 'denied');
+  const has = createLocationBridge({ checkPermissions: async () => ({ location: 'denied', coarseLocation: 'granted' }), requestPermissions: async () => { throw new Error('não devia pedir'); } });
+  assert.equal(await has.ensure(), 'granted');
+});
+
+it('localização: as telas pedem a permissão antes de ler a posição, e o cancelamento funciona', async () => {
+  const { guardGeolocation } = await import('./location-bridge.ts');
+  const log: string[] = [];
+  const geo = {
+    getCurrentPosition: () => { log.push('get'); },
+    watchPosition: () => { log.push('watch'); return 7; },
+    clearWatch: (id: number) => { log.push(`clear ${id}`); },
+  } as unknown as Geolocation;
+  let result: 'granted' | 'denied' = 'granted';
+  guardGeolocation(geo, async () => result);
+  geo.getCurrentPosition(() => undefined);
+  const id = geo.watchPosition(() => undefined);
+  await new Promise((r) => setTimeout(r, 0));
+  geo.clearWatch(id);
+  result = 'denied';
+  let code = 0;
+  geo.getCurrentPosition(() => undefined, (e) => { code = e.code; });
+  const cancelled = geo.watchPosition(() => undefined);
+  geo.clearWatch(cancelled);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(log, ['get', 'watch', 'clear 7']);
+  assert.equal(code, 1);
+});

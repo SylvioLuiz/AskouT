@@ -379,8 +379,8 @@ export interface ConversationRepository {
   /** Define a reação da pessoa à mensagem; `emoji` nulo remove. Uma por pessoa. */
   setReaction(messageId: string, userId: string, emoji: string | null, at: Date): Promise<void>;
   listReactions(messageIds: readonly string[]): Promise<MessageReactionRecord[]>;
-  /** Fixar e silenciar são só de quem pediu. */
-  setPrefs(conversationId: string, userId: string, patch: { pinnedAt?: Date | null; muted?: boolean }): Promise<void>;
+  /** Fixar, silenciar e a cor da conversa são só de quem pediu. */
+  setPrefs(conversationId: string, userId: string, patch: { pinnedAt?: Date | null; muted?: boolean; color?: string | null }): Promise<void>;
   getPrefs(conversationId: string, userId: string): Promise<ConversationPrefsRecord>;
   countPinned(userId: string): Promise<number>;
   /** Quem silenciou a conversa (não recebe aviso das mensagens dela). */

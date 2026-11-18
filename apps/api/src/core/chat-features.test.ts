@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { PINNED_MAX, REACTIONS, TYPING_TTL_MS, messagePreview } from './conversation-service.ts';
+import { CHAT_COLORS, PINNED_MAX, REACTIONS, TYPING_TTL_MS, messagePreview } from './conversation-service.ts';
 import { CHAT_IMAGE_MAX_BYTES, parseChatMedia } from './media.ts';
 import { rejectsWith } from './testing/helpers.ts';
 import { makeWorld } from './testing/world.ts';
@@ -189,7 +189,7 @@ test('fixar: sobe para o topo só para quem fixou, com limite', async () => {
   // Ordem natural: a mais recente primeiro (p6 ... p1)
   assert.equal((await w.core.conversations.list(ana))[0]!.id, convs[5]);
   const pinned = await w.core.conversations.setPreferences(ana, convs[0]!, { pinned: true });
-  assert.deepEqual(pinned, { pinned: true, muted: false });
+  assert.deepEqual(pinned, { pinned: true, muted: false, color: null });
   let list = await w.core.conversations.list(ana);
   assert.equal(list[0]!.id, convs[0]);
   assert.equal(list[0]!.pinned, true);
@@ -213,9 +213,22 @@ test('fixar: sobe para o topo só para quem fixou, com limite', async () => {
   await rejectsWith(w.core.conversations.setPreferences(ids['pes2']!, convs[0]!, { pinned: true }), 'NOT_FOUND');
 });
 
+test('cor da conversa: só para quem escolheu, só cores da lista, nula volta ao padrão', async () => {
+  const { w, ana, bia, id } = await setup();
+  assert.equal((await w.core.conversations.messages(ana, id)).color, null);
+  assert.deepEqual(await w.core.conversations.setPreferences(ana, id, { color: 'blue' }), { pinned: false, muted: false, color: 'blue' });
+  assert.equal((await w.core.conversations.messages(ana, id)).color, 'blue');
+  assert.equal((await w.core.conversations.messages(bia, id)).color, null, 'a outra pessoa continua com a cor dela');
+  await rejectsWith(w.core.conversations.setPreferences(ana, id, { color: '#ff0000' }), 'VALIDATION');
+  await rejectsWith(w.core.conversations.setPreferences(ana, id, { color: 3 }), 'VALIDATION');
+  assert.equal((await w.core.conversations.messages(ana, id)).color, 'blue');
+  for (const c of CHAT_COLORS) assert.equal((await w.core.conversations.setPreferences(ana, id, { color: c })).color, c);
+  assert.equal((await w.core.conversations.setPreferences(ana, id, { color: null })).color, null);
+});
+
 test('silenciar: sem aviso para quem silenciou, mas a mensagem e o contador continuam', async () => {
   const { w, ana, bia, id } = await setup();
-  assert.deepEqual(await w.core.conversations.setPreferences(bia, id, { muted: true }), { pinned: false, muted: true });
+  assert.deepEqual(await w.core.conversations.setPreferences(bia, id, { muted: true }), { pinned: false, muted: true, color: null });
   await w.core.conversations.send(ana, id, { body: 'oi' });
   const messageNotices = async (u: string) => (await w.core.notifications.list(u)).items.filter((n) => n.type === 'MESSAGE');
   assert.equal((await messageNotices(bia)).length, 0);

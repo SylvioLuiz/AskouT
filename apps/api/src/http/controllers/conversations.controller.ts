@@ -80,11 +80,11 @@ export class ConversationsController {
     return this.core.conversations.deleteMessage(actor.userId, id, messageId);
   }
 
-  /** `{pinned?, muted?}`: fixar no topo e silenciar os avisos (só para você). */
+  /** `{pinned?, muted?, color?}`: fixar no topo, silenciar os avisos e a cor da conversa (só para você). */
   @Put(':id/preferences')
   preferences(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.conversations.setPreferences(actor.userId, id, { pinned: b.pinned, muted: b.muted });
+    return this.core.conversations.setPreferences(actor.userId, id, { pinned: b.pinned, muted: b.muted, color: b.color });
   }
 
   /** Sinal de "digitando…". */

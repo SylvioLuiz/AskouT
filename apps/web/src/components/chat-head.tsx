@@ -4,6 +4,7 @@ import { Sheet } from './agenda.tsx';
 import { ChevronLeftIcon, MoreIcon } from './icons.tsx';
 import { ChatPrefsSheet } from './chat-prefs.tsx';
 import { ChatBackgroundSheet } from './chat-background.tsx';
+import { ChatColorSheet } from './chat-color.tsx';
 import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Confirm, GroupAvatar, Notice } from './ui.tsx';
 import { api } from '../client.ts';
@@ -12,10 +13,10 @@ import type { PublicProfile } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
-type Step = 'menu' | 'clear' | 'remove' | 'block' | 'report' | 'prefs' | 'background';
+type Step = 'menu' | 'clear' | 'remove' | 'block' | 'report' | 'prefs' | 'background' | 'color';
 
 /** Topo da conversa: voltar, foto e nome (preso ao rolar) e o menu ⋯ no canto oposto. */
-export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared, below, pinned, muted, onPrefsChanged }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode; pinned: boolean; muted: boolean; onPrefsChanged: () => void }) {
+export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared, below, pinned, muted, onPrefsChanged, color, onColorChange }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode; pinned: boolean; muted: boolean; onPrefsChanged: () => void; color: string | null; onColorChange: (color: string | null) => void }) {
   const isGroup = !other;
   const name = other ? other.displayName : (groupName ?? t('Grupo'));
   const to = isGroup ? `/conversas/${conversationId}/grupo` : `/conversas/${conversationId}/info`;
@@ -36,12 +37,12 @@ export function ChatHead({ conversationId, other, groupName, groupImageUrl, subt
         <MoreIcon />
       </button>
       {below ? <div className="chathead__below">{below}</div> : null}
-      {open ? <ChatMenu conversationId={conversationId} title={name} other={other} pinned={pinned} muted={muted} onPrefsChanged={onPrefsChanged} onClose={() => setOpen(false)} onCleared={onCleared} /> : null}
+      {open ? <ChatMenu conversationId={conversationId} title={name} other={other} pinned={pinned} muted={muted} onPrefsChanged={onPrefsChanged} color={color} onColorChange={onColorChange} onClose={() => setOpen(false)} onCleared={onCleared} /> : null}
     </header>
   );
 }
 
-function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged, onClose, onCleared }: { conversationId: string; title: string; other: PublicProfile | null; pinned: boolean; muted: boolean; onPrefsChanged: () => void; onClose: () => void; onCleared: () => void }) {
+function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged, color, onColorChange, onClose, onCleared }: { conversationId: string; title: string; other: PublicProfile | null; pinned: boolean; muted: boolean; onPrefsChanged: () => void; color: string | null; onColorChange: (color: string | null) => void; onClose: () => void; onCleared: () => void }) {
   const [step, setStep] = useState<Step>('menu');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
@@ -59,6 +60,7 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
   }
 
   if (step === 'background') return <ChatBackgroundSheet conversationId={conversationId} onClose={onClose} />;
+  if (step === 'color') return <ChatColorSheet conversationId={conversationId} current={color} onClose={onClose} onChange={onColorChange} />;
   if (step === 'prefs') return <ChatPrefsSheet conversationId={conversationId} title={title} pinned={pinned} muted={muted} onClose={onClose} onChanged={onPrefsChanged} />;
 
   if (step === 'report') {
@@ -118,6 +120,7 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
             navigate(`/planejar/nova/${conversationId}`);
           })}
           {row(pinned || muted ? t('Fixar e silenciar (ativo)') : t('Fixar e silenciar'), () => setStep('prefs'))}
+          {row(t('Cor da conversa'), () => setStep('color'))}
           {row(t('Imagem de fundo'), () => setStep('background'))}
           {row(t('Limpar conversa'), () => setStep('clear'))}
           {other ? row(t('Apagar conversa'), () => setStep('remove'), true) : null}

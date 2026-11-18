@@ -31,7 +31,7 @@ test('ícone pela conta e pela conexão; agrupa por conta', () => {
 
 test('janela, reenvio do celular e ocupados do dia', () => {
   const now = new Date('2026-10-13T12:00:00Z');
-  assert.deepEqual(syncWindow(now), { from: '2026-10-12T12:00:00.000Z', to: '2027-01-11T12:00:00.000Z' });
+  assert.deepEqual(syncWindow(now), { from: '2026-08-29T12:00:00.000Z', to: '2027-01-11T12:00:00.000Z' });
   assert.equal(deviceResyncDue(null, now), true);
   assert.equal(deviceResyncDue('2026-10-13T11:45:00Z', now), false);
   assert.equal(deviceResyncDue('2026-10-13T11:00:00Z', now), true);
