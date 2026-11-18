@@ -16,6 +16,8 @@ function toUser(row: {
   termsAcceptedAt: Date | null;
   termsVersion: string | null;
   onboardedAt: Date | null;
+  profilePending?: boolean;
+  passwordless?: boolean;
   phone?: string | null;
 }): User {
   return {
@@ -29,6 +31,8 @@ function toUser(row: {
     termsAcceptedAt: row.termsAcceptedAt,
     termsVersion: row.termsVersion,
     onboardedAt: row.onboardedAt,
+    profilePending: row.profilePending === true,
+    passwordless: row.passwordless === true,
     phone: row.phone ?? null,
   };
 }
@@ -73,6 +77,8 @@ export class PrismaUserRepository implements UserRepository {
           termsAcceptedAt: user.termsAcceptedAt ?? null,
           termsVersion: user.termsVersion ?? null,
           onboardedAt: user.onboardedAt ?? null,
+          profilePending: user.profilePending === true,
+          passwordless: user.passwordless === true,
           profile: {
             create: {
               username: profile.username,
@@ -212,9 +218,26 @@ export class PrismaUserRepository implements UserRepository {
     await this.prisma.user.updateMany({ where: { id: userId, onboardedAt: null }, data: { onboardedAt: at } });
   }
 
+  async completePendingProfile(userId: string, data: { username: string; displayName: string; birthDate: string; termsVersion: string; termsAcceptedAt: Date }): Promise<void> {
+    if (!isUuid(userId)) return;
+    try {
+      await this.prisma.$transaction([
+        this.prisma.profile.update({ where: { userId }, data: { username: data.username, displayName: data.displayName } }),
+        this.prisma.user.update({
+          where: { id: userId },
+          data: { birthDate: new Date(`${data.birthDate}T00:00:00.000Z`), termsVersion: data.termsVersion, termsAcceptedAt: data.termsAcceptedAt, profilePending: false },
+        }),
+      ]);
+    } catch (error) {
+      const targets = uniqueViolationTargets(error);
+      if (targets?.some((t) => t.includes('username'))) throw conflict('Este nome de usuário já está em uso', { username: 'Este nome de usuário já está em uso' });
+      throw error;
+    }
+  }
+
   async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
     if (!isUuid(userId)) return;
-    await this.prisma.user.updateMany({ where: { id: userId }, data: { passwordHash } });
+    await this.prisma.user.updateMany({ where: { id: userId }, data: { passwordHash, passwordless: false } });
   }
 
   async updateProfile(profile: Profile): Promise<void> {

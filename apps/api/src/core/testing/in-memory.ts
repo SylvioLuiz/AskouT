@@ -189,9 +189,20 @@ export class InMemoryUserRepository implements UserRepository {
     if (u && !u.onboardedAt) this.users.set(userId, { ...u, onboardedAt: at });
   }
 
+  async completePendingProfile(userId: string, data: { username: string; displayName: string; birthDate: string; termsVersion: string; termsAcceptedAt: Date }): Promise<void> {
+    for (const p of this.profiles.values()) {
+      if (p.userId !== userId && p.username === data.username) throw conflict('Este nome de usuário já está em uso', { username: 'Este nome de usuário já está em uso' });
+    }
+    const u = this.users.get(userId);
+    const p = this.profiles.get(userId);
+    if (!u || !p) return;
+    this.users.set(userId, { ...u, birthDate: data.birthDate, termsVersion: data.termsVersion, termsAcceptedAt: data.termsAcceptedAt, profilePending: false });
+    this.profiles.set(userId, { ...p, username: data.username, displayName: data.displayName });
+  }
+
   async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
     const u = this.users.get(userId);
-    if (u) this.users.set(userId, { ...u, passwordHash });
+    if (u) this.users.set(userId, { ...u, passwordHash, passwordless: false });
   }
 
   async updateProfile(profile: Profile): Promise<void> {
@@ -537,13 +548,36 @@ export class InMemoryFollowRepository implements FollowRepository {
 
 export class InMemoryIdentityRepository implements IdentityRepository {
   readonly rows = new Map<string, string>();
+  private readonly linkedAt = new Map<string, Date>();
 
   async find(provider: ExternalProvider, subject: string): Promise<string | undefined> {
     return this.rows.get(`${provider}|${subject}`);
   }
 
-  async link(provider: ExternalProvider, subject: string, userId: string): Promise<void> {
-    this.rows.set(`${provider}|${subject}`, userId);
+  async link(provider: ExternalProvider, subject: string, userId: string, at?: Date): Promise<void> {
+    const key = `${provider}|${subject}`;
+    if (this.rows.has(key)) return;
+    this.rows.set(key, userId);
+    this.linkedAt.set(key, at ?? new Date(0));
+  }
+
+  async listForUser(userId: string): Promise<{ provider: ExternalProvider; subject: string; createdAt: Date }[]> {
+    const out: { provider: ExternalProvider; subject: string; createdAt: Date }[] = [];
+    for (const [key, owner] of this.rows) {
+      if (owner !== userId) continue;
+      const [provider, subject] = key.split('|') as [ExternalProvider, string];
+      out.push({ provider, subject, createdAt: this.linkedAt.get(key) ?? new Date(0) });
+    }
+    return out.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async unlink(provider: ExternalProvider, userId: string): Promise<void> {
+    for (const [key, owner] of [...this.rows]) {
+      if (owner === userId && key.startsWith(`${provider}|`)) {
+        this.rows.delete(key);
+        this.linkedAt.delete(key);
+      }
+    }
   }
 }
 
@@ -555,9 +589,9 @@ export class FakeIdentityVerifier implements IdentityVerifier {
 
   async verify(provider: ExternalProvider, idToken: string): Promise<IdentityClaims | undefined> {
     try {
-      const v = JSON.parse(idToken) as { provider?: string; sub?: string; email?: string | null; verified?: boolean; name?: string | null };
+      const v = JSON.parse(idToken) as { provider?: string; sub?: string; email?: string | null; verified?: boolean; name?: string | null; picture?: string | null };
       if (v.provider !== provider || typeof v.sub !== 'string') return undefined;
-      return { subject: v.sub, email: v.email ?? null, emailVerified: v.verified === true, name: v.name ?? null };
+      return { subject: v.sub, email: v.email ?? null, emailVerified: v.verified === true, name: v.name ?? null, picture: v.picture ?? null };
     } catch {
       return undefined;
     }

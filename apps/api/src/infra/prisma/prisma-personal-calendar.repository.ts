@@ -3,7 +3,7 @@ import type { BusyIntervalRecord, PersonalCalendarChoice, PersonalCalendarConnec
 import type { ExternalProvider } from '../../core/types.ts';
 import { isUuid, onlyUuids } from './helpers.ts';
 
-const SOURCES: readonly PersonalCalendarSource[] = ['GOOGLE', 'DEVICE', 'ICS'];
+const SOURCES: readonly PersonalCalendarSource[] = ['GOOGLE', 'MICROSOFT', 'DEVICE', 'ICS'];
 
 type Row = {
   id: string;
@@ -46,7 +46,7 @@ function toRecord(r: Row): PersonalCalendarConnection {
   };
 }
 
-/** Agendas pessoais ligadas (tabela CalendarConnection, só os tipos GOOGLE, DEVICE e ICS) e seus horários ocupados. */
+/** Agendas pessoais ligadas (tabela CalendarConnection, só os tipos GOOGLE, MICROSOFT, DEVICE e ICS) e seus horários ocupados. */
 export class PrismaPersonalCalendarRepository implements PersonalCalendarRepository {
   private readonly prisma: PrismaClient;
 
@@ -111,7 +111,7 @@ export class PrismaPersonalCalendarRepository implements PersonalCalendarReposit
 
   async listDue(before: Date, limit: number): Promise<PersonalCalendarConnection[]> {
     const rows = await this.prisma.calendarConnection.findMany({
-      where: { status: 'ACTIVE', provider: { in: ['GOOGLE', 'ICS'] }, OR: [{ lastSyncAt: null }, { lastSyncAt: { lt: before } }] },
+      where: { status: 'ACTIVE', provider: { in: ['GOOGLE', 'MICROSOFT', 'ICS'] }, OR: [{ lastSyncAt: null }, { lastSyncAt: { lt: before } }] },
       orderBy: { lastSyncAt: { sort: 'asc', nulls: 'first' } },
       take: limit,
     });

@@ -17,6 +17,10 @@ export interface User {
   termsVersion?: string | null;
   /** Quando a pessoa terminou (ou pulou) o tutorial inicial. Vazio = ainda não viu. */
   onboardedAt?: Date | null;
+  /** Conta criada pelo Google/Apple que ainda não escolheu o nome de usuário nem informou a data de nascimento. Até concluir, o app só mostra essa etapa. */
+  profilePending?: boolean;
+  /** Conta criada pelo Google/Apple que nunca definiu senha: só entra pela plataforma (ou criando uma senha pelo "Esqueci a senha"). */
+  passwordless?: boolean;
   /** Celular (E.164). Privado: nunca vai para o perfil público. */
   phone?: string | null;
 }
@@ -78,6 +82,8 @@ export interface IdentityClaims {
   /** Só um e-mail verificado pela plataforma pode ligar a uma conta que já existe. */
   emailVerified: boolean;
   name: string | null;
+  /** Foto do perfil na plataforma (o Google manda; a Apple não). */
+  picture?: string | null;
 }
 
 /** Usos opcionais dos dados que a pessoa liga e desliga (LGPD, art. 8º): nada disso é preciso para usar o app. */

@@ -3,6 +3,7 @@ import { FlashPresenceProvider } from './components/flash-presence.tsx';
 import { AuthProvider, useAuthContext, useUser } from './auth.tsx';
 import { Shell } from './components/Shell.tsx';
 import { TermsGate } from './components/terms-gate.tsx';
+import { CompleteProfileScreen } from './components/complete-profile.tsx';
 import { Onboarding } from './components/onboarding.tsx';
 import { PushAutoAsk } from './components/push-auto-ask.tsx';
 import { RingLoader } from './components/ring-loader.tsx';
@@ -24,6 +25,7 @@ const LegalScreen = lazyWithReload(() => import('./screens/legal.tsx').then((m) 
 const SupportScreen = lazyWithReload(() => import('./screens/legal.tsx').then((m) => ({ default: m.SupportScreen })));
 const DeleteAccountScreen = lazyWithReload(() => import('./screens/delete-account.tsx').then((m) => ({ default: m.DeleteAccountScreen })));
 const ChangePasswordScreen = lazyWithReload(() => import('./screens/change-password.tsx').then((m) => ({ default: m.ChangePasswordScreen })));
+const LinkedAccountsScreen = lazyWithReload(() => import('./screens/linked-accounts.tsx').then((m) => ({ default: m.LinkedAccountsScreen })));
 const MfaSettingsScreen = lazyWithReload(() => import('./screens/mfa-settings.tsx').then((m) => ({ default: m.MfaSettingsScreen })));
 const ActivityScreen = lazyWithReload(() => import('./screens/activity.tsx').then((m) => ({ default: m.ActivityScreen })));
 const ForgotPasswordScreen = lazyWithReload(() => import('./screens/auth.tsx').then((m) => ({ default: m.ForgotPasswordScreen })));
@@ -148,6 +150,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/perfil/editar', render: () => <EditProfileScreen /> },
   { path: '/configuracao', render: () => <SettingsScreen /> },
   { path: '/configuracao/senha', render: () => <ChangePasswordScreen /> },
+  { path: '/configuracao/contas-vinculadas', render: () => <LinkedAccountsScreen /> },
   { path: '/configuracao/verificacao-em-duas-etapas', render: () => <MfaSettingsScreen /> },
   { path: '/configuracao/conta', render: () => <AccountInfoScreen /> },
   { path: '/configuracao/notificacoes', render: () => <NotificationSettingsScreen /> },
@@ -244,6 +247,9 @@ function AppRoutes() {
   if (state.status === 'guest') return guest ? <Suspense fallback={<Splash />}>{guest.route.render(guest.params)}</Suspense> : null;
 
   if (guest) return null; // redirecionando para a Home
+
+  // Conta nova do Google/Apple: até escolher o nome de usuário e informar a data de nascimento, só esta etapa aparece.
+  if (state.user.profilePending) return <CompleteProfileScreen />;
 
   return (
     <FlashPresenceProvider>

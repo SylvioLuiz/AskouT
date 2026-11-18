@@ -22,15 +22,27 @@ export class AccountService {
 
   /** Se a conta tem senha própria. Quem entra só com Google ou Apple não tem senha para trocar. */
   async passwordStatus(userId: string): Promise<{ hasPassword: boolean }> {
-    return { hasPassword: !(await this.deps.account.hasExternalIdentity(userId)) };
+    return { hasPassword: !(await this.isPasswordless(userId)) };
+  }
+
+  /** Conta criada pelo Google/Apple que nunca definiu senha. Quem tem senha e só ligou o Google continua com senha. */
+  private async isPasswordless(userId: string): Promise<boolean> {
+    const user = await this.deps.users.findById(userId);
+    return user?.passwordless === true;
   }
 
   /** Troca a senha de quem está logado, conferindo a atual. Conta só com Google/Apple não tem senha conhecida. */
   async changePassword(userId: string, input: { currentPassword: unknown; newPassword: unknown }): Promise<void> {
-    if (await this.deps.account.hasExternalIdentity(userId)) {
+    if (await this.isPasswordless(userId)) {
       throw forbidden('Sua conta entra com Google ou Apple e não tem senha própria no AskouT.');
     }
     await this.auth.changePassword(userId, input);
+  }
+
+  /** Cria a primeira senha de quem entrou só pelo Google/Apple. */
+  async createPassword(userId: string, input: { newPassword: unknown }): Promise<{ hasPassword: true }> {
+    await this.auth.createPassword(userId, input);
+    return { hasPassword: true };
   }
 
   /** Cópia dos dados da pessoa em JSON. Não inclui arquivos de imagem e vídeo, só o que existe sobre eles. */
@@ -65,7 +77,7 @@ export class AccountService {
     }
     if (user.role === 'ADMIN') throw forbidden('Contas de administração não podem ser apagadas por aqui. Peça para outra pessoa da gestão mudar o seu papel antes.');
 
-    if (!(await account.hasExternalIdentity(user.id))) {
+    if (user.passwordless !== true) {
       if (typeof input.password !== 'string' || input.password === '') throw validationError('Confirmação incorreta', { password: 'Digite a sua senha' });
       if (!(await hasher.verify(input.password, user.passwordHash))) throw validationError('Confirmação incorreta', { password: 'Senha incorreta' });
     }

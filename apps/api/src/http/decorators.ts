@@ -6,6 +6,10 @@ export const IS_PUBLIC = 'askout:isPublic';
 /** Rota aberta (cadastro, login). Todas as outras exigem token. */
 export const Public = () => SetMetadata(IS_PUBLIC, true);
 
+export const ALLOW_PENDING_PROFILE = 'askout:allowPendingProfile';
+/** Rota liberada para quem entrou pelo Google/Apple e ainda não completou o cadastro (as outras respondem 403 até concluir). */
+export const AllowPendingProfile = () => SetMetadata(ALLOW_PENDING_PROFILE, true);
+
 export interface AuthedRequest {
   headers: Record<string, string | string[] | undefined>;
   actor?: Actor;

@@ -37,6 +37,7 @@ enum CalendarProvider {
   GOOGLE
   APPLE
   DEVICE // agenda do celular (lida pelo app; traz as contas Google, Outlook, iCloud ligadas no aparelho)
+  MICROSOFT // Outlook / Microsoft 365 (OAuth, Microsoft Graph)
   ICS // link iCal privado (Outlook, iCloud, Google ou qualquer agenda que publique .ics)
 }
 
@@ -155,6 +156,10 @@ model User {
   termsVersion    String?
   /// Quando a pessoa terminou (ou pulou) o tutorial inicial; o app só o mostra enquanto estiver vazio.
   onboardedAt     DateTime?
+  /// Conta criada pelo Google/Apple que ainda não escolheu o nome de usuário nem informou a data de nascimento: o app só mostra essa etapa até concluir.
+  profilePending  Boolean   @default(false)
+  /// Criada pelo Google/Apple e sem senha definida: não dá para desligar a última conta vinculada até criar uma senha.
+  passwordless    Boolean   @default(false)
   /// Celular (E.164, ex.: +5511987654321). Privado: nunca aparece no perfil, só serve para amigos acharem a pessoa na agenda.
   phone           String?   @unique
   /// SHA-256 (hex) do celular, comparado com os códigos que o app manda da agenda de quem procura amigos.

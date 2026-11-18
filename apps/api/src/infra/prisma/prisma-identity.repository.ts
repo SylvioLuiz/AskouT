@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type { IdentityRepository } from '../../core/ports.ts';
 import type { ExternalProvider } from '../../core/types.ts';
+import { isUuid } from './helpers.ts';
 
 export class PrismaIdentityRepository implements IdentityRepository {
   private readonly prisma: PrismaClient;
@@ -20,5 +21,16 @@ export class PrismaIdentityRepository implements IdentityRepository {
       create: { provider, subject, userId, createdAt: at },
       update: {},
     });
+  }
+
+  async listForUser(userId: string): Promise<{ provider: ExternalProvider; subject: string; createdAt: Date }[]> {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.externalIdentity.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } });
+    return rows.filter((r) => r.provider === 'GOOGLE' || r.provider === 'APPLE').map((r) => ({ provider: r.provider as ExternalProvider, subject: r.subject, createdAt: r.createdAt }));
+  }
+
+  async unlink(provider: ExternalProvider, userId: string): Promise<void> {
+    if (!isUuid(userId)) return;
+    await this.prisma.externalIdentity.deleteMany({ where: { provider, userId } });
   }
 }

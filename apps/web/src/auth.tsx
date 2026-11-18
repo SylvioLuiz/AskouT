@@ -19,6 +19,8 @@ interface AuthContextValue {
   signIn: (result: AuthResult | MfaChallenge) => void;
   signOut: () => void;
   setOwnProfile: (profile: PublicProfile) => void;
+  /** Troca os dados da sessão (ex.: depois de completar o cadastro do Google/Apple). */
+  setSessionUser: (user: SessionUser) => void;
   retry: () => void;
 }
 
@@ -87,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       setOwnProfile: (profile) =>
         setState((current) => (current.status === 'user' ? { status: 'user', user: { ...current.user, profile } } : current)),
+      setSessionUser: (user) => setState({ status: 'user', user }),
       retry: () => setAttempt((n) => n + 1),
     }),
     [state, signOut],

@@ -47,6 +47,7 @@ describe('conta: exportar e apagar', () => {
   it('conta que entra com Google/Apple confirma só digitando o @usuário', async () => {
     const { w, ana } = await setup();
     w.identities.rows.set('GOOGLE|sub-1', ana);
+    w.users.users.get(ana)!.passwordless = true;
     assert.deepEqual(await w.core.account.deleteAccount(ana, { username: 'ana' }), { deleted: true });
   });
 
@@ -99,7 +100,15 @@ describe('conta: trocar a senha', () => {
   it('conta que entra com Google/Apple não tem senha para trocar', async () => {
     const { w, ana } = await setup();
     w.identities.rows.set('GOOGLE|sub-1', ana);
+    w.users.users.get(ana)!.passwordless = true;
     assert.deepEqual(await w.core.account.passwordStatus(ana), { hasPassword: false });
     await rejectsWith(w.core.account.changePassword(ana, { currentPassword: PASSWORD, newPassword: NOVA }), 'FORBIDDEN');
+  });
+
+  it('conta com senha que só ligou o Google continua com senha', async () => {
+    const { w, ana } = await setup();
+    w.identities.rows.set('GOOGLE|sub-1', ana);
+    assert.deepEqual(await w.core.account.passwordStatus(ana), { hasPassword: true });
+    await w.core.account.changePassword(ana, { currentPassword: PASSWORD, newPassword: NOVA });
   });
 });

@@ -4904,6 +4904,20 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .calsync__pick[aria-pressed='true'] { border-color: var(--brand); color: var(--brand-text); }
 .calsync__note { font-size: 0.8125rem; margin-bottom: 12px; }
 .calsync__section { margin-top: 16px; }
+/* Lista no jeito dos apps de agenda: ícone do app, nome e "Conectar". */
+.calsync__list { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; }
+.calsync__list > li + li { border-top: 1px solid var(--line); }
+.calsync__row-btn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 14px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.calsync__row-btn:disabled { cursor: default; }
+.calsync__row-btn:disabled .callogo { filter: grayscale(1); opacity: 0.55; }
+.calsync__row-btn:focus-visible { outline: 3px solid var(--brand-text); outline-offset: -3px; }
+.calsync__cta { flex: none; padding: 7px 14px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 0.8125rem; font-weight: 700; white-space: nowrap; }
+.callogo { flex: none; display: block; border-radius: 10px; }
+.calsync__conn { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.calsync__conn--warn { background: color-mix(in srgb, var(--bad) 6%, transparent); }
+.calsync__conn-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.calsync__ok { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--ok); color: #fff; font-size: 0.875rem; font-weight: 700; }
+.calsync__account { display: flex; align-items: center; gap: 8px; }
 .calsync__heading { margin: 0 0 4px; font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted, inherit); }
 .calsync__item--col { flex-direction: column; align-items: stretch; }
 .calsync__item--warn { border-color: var(--bad); }
@@ -5868,3 +5882,33 @@ div.optrow__main { cursor: default; }
 .comment__like { justify-content: flex-start; padding-top: 9px; box-sizing: border-box; }
 .comment__like svg, .comment__del svg { display: block; }
 .comment__del { align-self: flex-start; box-sizing: border-box; }
+
+/* Botões do Google/Apple reaproveitados (entrada e contas vinculadas). */
+.social__buttons { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+
+/* Complete seu cadastro (conta nova do Google/Apple), no estilo do Instagram/TikTok. */
+.completeprofile { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); }
+.completeprofile__card { display: flex; flex-direction: column; gap: 16px; max-width: 420px; width: 100%; }
+.completeprofile__steps { display: flex; gap: 6px; margin: 0; }
+.completeprofile__steps span { flex: 1; height: 4px; border-radius: 2px; background: var(--line); }
+.completeprofile__steps span.is-on { background: var(--accent, var(--ink)); }
+.completeprofile__who { display: flex; justify-content: center; }
+.completeprofile .form__title { text-align: center; }
+.completeprofile .muted { margin: 0; text-align: center; }
+.completeprofile__foot { margin: 0; text-align: center; color: var(--muted); font-size: 0.875rem; }
+
+/* Contas vinculadas. */
+.linked { display: flex; flex-direction: column; gap: 14px; padding: 12px 16px 24px; }
+.linked > .muted { margin: 0; }
+.linked__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.linked__row { display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+.linked__head { display: flex; align-items: center; gap: 12px; }
+.linked__logo { flex: none; display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid #dadce0; background: #fff; overflow: hidden; }
+.linked__logo img { display: block; }
+.linked__who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.linked__name { font-weight: 600; color: var(--ink); }
+.linked__status { color: var(--muted); font-size: 0.875rem; }
+.linked__confirm { display: flex; flex-direction: column; gap: 10px; }
+.linked__confirm p { margin: 0; color: var(--muted); }
+.linked__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.linked__logo .social__glogo { position: static; }

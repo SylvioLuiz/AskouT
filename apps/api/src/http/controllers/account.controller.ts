@@ -43,6 +43,13 @@ export class AccountController {
     await this.core.account.changePassword(actor.userId, { currentPassword: b.currentPassword, newPassword: b.newPassword });
   }
 
+  /** `{newPassword}`: cria a primeira senha de quem entrou só pelo Google/Apple (sem senha atual). */
+  @Post('me/password/create')
+  @HttpCode(200)
+  createPassword(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.account.createPassword(actor.userId, { newPassword: asBody(body).newPassword });
+  }
+
   /** Se a pessoa já informou a data de nascimento e se tem 18 anos ou mais (libera o Flash). */
   @Get('me/age')
   ageStatus(@CurrentActor() actor: Actor) {
