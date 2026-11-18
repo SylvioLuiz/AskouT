@@ -32,7 +32,7 @@ O código está pronto e desligado: sem os IDs abaixo, os botões não aparecem.
 ## Sincronizar agendas (celular, Google, Outlook)
 Feito em 18/11/2026 (código; não testado em aparelho nem contra o Google real). Só horários ocupados entram (nunca título), ficam na conta (`CalendarConnection`/`CalendarBusyInterval`) e contam na comparação de agendas com amigos.
 - Agenda do celular (app): plugin `@ebarooni/capacitor-calendar`, ponte `window.AskouTDeviceCalendar`; lista as agendas por conta (Google, Outlook, iCloud ligados no aparelho), a pessoa escolhe, o app manda os horários e reenvia ao abrir a agenda (no máximo a cada 30 min).
-- Google Agenda (site e app): OAuth no servidor, escopos `calendar.calendarlist.readonly` + `calendar.freebusy`; relido a cada 30 min (`CalendarSyncJob`).
+- Google Agenda (site e app): OAuth no servidor, escopos `calendar.calendarlist.readonly` + `calendar.events.freebusy`; relido a cada 30 min (`CalendarSyncJob`).
 - Outlook / Microsoft 365 (site e app): OAuth no servidor pela Microsoft Graph, escopo `Calendars.ReadBasic`; relido a cada 30 min.
 - iCloud: pela agenda do celular no app. Sem opção de colar link iCal (só sincronização direta); a tela mostra os ícones de cada app e "Em breve" quando falta chave no servidor.
 - Sugestões: "Encontramos para você" usa o login com Google e o domínio do e-mail; no app, a agenda do celular vem primeiro.
