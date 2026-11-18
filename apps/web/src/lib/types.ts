@@ -40,6 +40,29 @@ export interface SessionUser {
   profile: PublicProfile;
   /** Já passou pelo tutorial inicial (guardado na conta). Ausente em versões antigas da API. */
   onboarded?: boolean;
+  /**
+   * Conta criada agora pelo Google/Apple: falta escolher o nome de usuário e informar a data de nascimento.
+   * Enquanto for true, o app só mostra a etapa "Complete seu cadastro" (mesmo depois de sair e entrar de novo).
+   */
+  profilePending?: boolean;
+}
+
+/** Conta do Google ou da Apple ligada ao perfil. */
+export interface LinkedAccount {
+  provider: SocialProviderId;
+  linkedAt: string;
+}
+
+export interface LinkedAccounts {
+  items: LinkedAccount[];
+  /** false = conta criada pelo Google/Apple sem senha: a última conta ligada só sai depois de criar uma senha. */
+  hasPassword: boolean;
+}
+
+export interface UsernameCheck {
+  username: string;
+  available: boolean;
+  problem?: string;
 }
 
 export interface AuthResult {

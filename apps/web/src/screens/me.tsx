@@ -22,7 +22,7 @@ import { ActivityLog } from '../components/activity-log.tsx';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
 import { AvatarCropper } from '../components/avatar-cropper.tsx';
 import { AvatarViewer } from '../components/photo-viewer.tsx';
-import { BellIcon, BlockIcon, BoltIcon, ChevronLeftIcon, ChevronRightIcon, DocIcon, GlobeIcon, HelpIcon, LockIcon, LogoutIcon, MoonIcon, ShieldIcon, SunIcon, UserIcon, UsersIcon } from '../components/icons.tsx';
+import { BellIcon, BlockIcon, BoltIcon, ChevronLeftIcon, ChevronRightIcon, DocIcon, GlobeIcon, HelpIcon, LinkIcon, LockIcon, LogoutIcon, MoonIcon, ShieldIcon, SunIcon, UserIcon, UsersIcon } from '../components/icons.tsx';
 import { formatPhone, normalizePhone } from '../lib/phone.ts';
 import { supportMailto } from '../lib/help-mailto.ts';
 import { downloadJson } from '../lib/account.ts';
@@ -262,6 +262,7 @@ export function SettingsScreen() {
       <ul className="menulist">
         <SettingsRow to="/configuracao/conta" icon={<UserIcon />} label={t('Informações da conta')} />
         <SettingsRow to="/configuracao/senha" icon={<LockIcon />} label={t('Senha e segurança')} />
+        <SettingsRow to="/configuracao/contas-vinculadas" icon={<LinkIcon />} label={t('Contas vinculadas')} />
         <SettingsRow to="/configuracao/verificacao-em-duas-etapas" icon={<ShieldIcon />} label={t('Verificação em duas etapas')} />
         <SettingsRow to="/configuracao/privacidade-e-dados" icon={<ShieldIcon />} label={t('Privacidade e dados')} />
       </ul>

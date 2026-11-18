@@ -6,6 +6,8 @@ import type { BoostStatEntry } from './boost-stats.ts';
 import type { ActivityFilter, ActivityPage } from './activity-log.ts';
 import type { SuggestedPerson } from './suggested-people.ts';
 import type {
+  LinkedAccounts,
+  UsernameCheck,
   ConsentPurpose,
   ConsentStatus,
   BoostPricing,
@@ -219,6 +221,13 @@ export function createApi(deps: ApiDeps) {
     mfaRecoveryCodes: (code: string) => request<{ recoveryCodes: string[] }>('POST', '/auth/mfa/recovery-codes', { body: { code } }),
     me: () => request<SessionUser>('GET', '/auth/me'),
     completeOnboarding: () => request<{ onboarded: true }>('POST', '/auth/me/onboarding'),
+    /** "Complete seu cadastro" de quem entrou pela primeira vez com Google/Apple. */
+    completeProfile: (input: { username: string; birthDate: string; acceptTerms: boolean; marketingEmail?: boolean }) =>
+      request<SessionUser>('POST', '/auth/me/profile', { body: input }),
+    usernameAvailable: (username: string) => request<UsernameCheck>('GET', `/auth/me/username-available?username=${id(username)}`),
+    linkedAccounts: () => request<LinkedAccounts>('GET', '/auth/me/linked-accounts'),
+    linkAccount: (provider: SocialProviderId, idToken: string) => request<LinkedAccounts>('POST', '/auth/me/linked-accounts', { body: { provider, idToken } }),
+    unlinkAccount: (provider: SocialProviderId) => request<LinkedAccounts>('DELETE', `/auth/me/linked-accounts/${id(provider)}`),
 
     // Perfis
     searchProfiles: (query: string, limit?: number) =>
@@ -438,6 +447,7 @@ export function createApi(deps: ApiDeps) {
     /** Se a minha conta tem senha própria (quem entra só com Google/Apple não tem). */
     passwordStatus: () => request<{ hasPassword: boolean }>('GET', '/me/password'),
     /** Troca a minha senha, conferindo a atual. */
+    createPassword: (newPassword: string) => request<{ hasPassword: true }>('POST', '/me/password/create', { body: { newPassword } }),
     changePassword: (input: { currentPassword: string; newPassword: string }) => request<void>('POST', '/me/password', { body: input }),
     /** Apaga a minha conta de vez. Conta que entra com Google/Apple não manda senha. */
     deleteMyAccount: (input: { username: string; password?: string }) => request<{ deleted: true }>('DELETE', '/me', { body: input }),

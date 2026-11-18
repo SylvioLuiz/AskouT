@@ -681,6 +681,15 @@ export class AuthService {
     // Sempre calcula um hash, mesmo sem usuário, para não revelar pelo tempo se a conta existe.
     const stored = user?.passwordHash ?? (await this.getDummyHash());
     const passwordOk = await hasher.verify(password, stored);
+    if (user && !passwordOk && user.passwordless === true) {
+      // Conta criada pelo Google/Apple, sem senha: avisa por onde ela entra (como o Instagram faz com contas do Facebook).
+      const linked = await this.deps.identities.listForUser(user.id);
+      const provider = linked[0]?.provider;
+      if (provider) {
+        const label = provider === 'GOOGLE' ? 'o Google' : 'a Apple';
+        throw new DomainError('UNAUTHORIZED', `Essa conta entra com ${label}. Toque em "Continuar com ${label}" para entrar.`, { socialProvider: provider });
+      }
+    }
     if (!user || !passwordOk) throw unauthorized();
 
     if (user.status === 'SUSPENDED') throw forbidden('Conta suspensa');

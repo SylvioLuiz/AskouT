@@ -49,8 +49,10 @@ test('conta nova: cria já no login (pendente); só depois de completar o cadast
   assert.ok('token' in again);
   assert.equal(again.user.id, first.user.id);
   assert.equal(again.user.profilePending, false);
-  // Quem criou assim não tem senha: o login por senha não funciona.
-  await rejectsWith(w.core.auth.login({ identifier: 'bia', password: 'qualquer-senha-123' }), 'UNAUTHORIZED');
+  // Quem criou assim não tem senha: o login por senha não funciona e avisa que a conta entra com o Google.
+  const refused = await rejectsWith(w.core.auth.login({ identifier: 'bia', password: 'qualquer-senha-123' }), 'UNAUTHORIZED');
+  assert.match(refused.message, /entra com o Google/);
+  assert.deepEqual(refused.details, { socialProvider: 'GOOGLE' });
 });
 
 test('completar cadastro: pode manter o nome sugerido; nome de outra pessoa é recusado', async () => {

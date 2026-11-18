@@ -53,9 +53,7 @@ export function ChangePasswordScreen() {
       <PageHead title={t('Trocar senha')} back="/configuracao" />
       {status.loading && !status.data ? <Loading /> : null}
       {status.error && !status.data ? <ErrorState message={status.error.message} onRetry={status.reload} /> : null}
-      {status.data && !status.data.hasPassword ? (
-        <Notice>{t('Sua conta entra com Google ou Apple e não tem senha própria no AskouT. Para mudar a senha, troque-a na sua conta Google ou Apple.')}</Notice>
-      ) : null}
+      {status.data && !status.data.hasPassword ? <CreatePasswordForm onCreated={status.reload} /> : null}
       {status.data?.hasPassword ? (
         <form className="form" onSubmit={(e) => void submit(e)} noValidate>
           {done ? <Notice tone="ok">{t('Senha trocada. Use a nova senha da próxima vez que entrar.')}</Notice> : null}
@@ -72,5 +70,47 @@ export function ChangePasswordScreen() {
         </form>
       ) : null}
     </>
+  );
+}
+
+/** Conta criada pelo Google/Apple: cria a primeira senha (sem pedir uma atual), para também entrar com e-mail ou @usuário. */
+function CreatePasswordForm({ onCreated }: { onCreated: () => void }) {
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const problems: Record<string, string> = {};
+    const p = passwordProblem(next);
+    if (p) problems['newPassword'] = p;
+    else if (confirm !== next) problems['confirm'] = t('As senhas não são iguais');
+    setErrors(problems);
+    setError(undefined);
+    if (Object.keys(problems).length > 0) return;
+    setBusy(true);
+    try {
+      await api.createPassword(next);
+      onCreated();
+    } catch (failure) {
+      const e = toApiError(failure);
+      setErrors(e.fields);
+      setError(Object.keys(e.fields).length === 0 ? e.message : undefined);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="form" onSubmit={(e) => void submit(e)} noValidate>
+      <Notice>{t('Sua conta entra com Google ou Apple e ainda não tem senha no AskouT. Crie uma para entrar também com seu e-mail ou @usuário.')}</Notice>
+      {error ? <Notice tone="error">{error}</Notice> : null}
+      <PasswordField label={t('Nova senha')} value={next} onChange={setNext} error={errors['newPassword']} hint={t('Use ao menos 8 caracteres')} autoComplete="new-password" />
+      <PasswordField label={t('Repita a nova senha')} value={confirm} onChange={setConfirm} error={errors['confirm']} autoComplete="new-password" />
+      <Button type="submit" full loading={busy}>
+        {t('Criar senha')}
+      </Button>
+    </form>
   );
 }

@@ -70,8 +70,14 @@ export function LoginScreen() {
       signIn(await api.login(identifier.trim(), password));
     } catch (failure) {
       const error = toApiError(failure);
-      setErrors(error.fields);
-      setFormError(Object.keys(error.fields).length === 0 ? error.message : undefined);
+      if (error.fields['socialProvider']) {
+        // Conta criada pelo Google/Apple, sem senha: avisa por onde ela entra.
+        setErrors({});
+        setFormError(error.message);
+      } else {
+        setErrors(error.fields);
+        setFormError(Object.keys(error.fields).length === 0 ? error.message : undefined);
+      }
       setBusy(false);
     }
   }
