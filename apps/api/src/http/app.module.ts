@@ -33,13 +33,15 @@ import { coreProvider, googleProvider, placePhotosProvider } from './core.provid
 import { FlashPurge } from './flash-purge.ts';
 import { EventReminders } from './event-reminders.ts';
 import { CalendarImportJob } from './calendar-import-job.ts';
+import { CalendarSyncJob } from './calendar-sync-job.ts';
+import { CalendarsController } from './controllers/calendars.controller.ts';
 import { PollDeadlines } from './poll-deadlines.ts';
 import { PrismaShutdown, prismaProvider } from './prisma.provider.ts';
 import { loadConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
 
 @Module({
-  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, FlashController, ConversationsController, PlacesController, ExploreController, GifsController, FeedController, VenuesController, BoostsController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AdminController],
+  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, GifsController, FeedController, VenuesController, BoostsController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AdminController],
   providers: [
     { provide: CONFIG, useFactory: () => loadConfig(process.env) },
     prismaProvider,
@@ -51,6 +53,7 @@ import { CONFIG } from './tokens.ts';
     PollDeadlines,
     EventReminders,
     CalendarImportJob,
+    CalendarSyncJob,
     {
       provide: MODERATION_ALERT,
       inject: [CONFIG],

@@ -34,3 +34,11 @@ Tudo no **mesmo projeto** do Google Cloud do cliente web (`askout-512422`, não 
 ```
 
 Sem `GOOGLE_IOS_CLIENT_ID` o iPhone não mostra o botão do Google (o SDK do Google fecha o app se o URL scheme faltar, então faça os dois juntos). No Android, falha com `[28444] Developer console is not set up correctly` = SHA-1 ou pacote não cadastrado no cliente Android (o Logcat, filtro `GoogleProvider`, mostra o SHA-1 que está assinando).
+
+## Agenda do celular (Sincronizar agendas)
+
+Ponte `window.AskouTDeviceCalendar` (`src/device-calendar-bridge.ts`, plugin `@ebarooni/capacitor-calendar`). Lê as agendas do aparelho (que já reúnem as contas Google, Outlook/Exchange e iCloud) e manda para a API só início e fim dos compromissos das agendas escolhidas.
+
+- Android: `READ_CALENDAR` no `AndroidManifest.xml`.
+- iPhone: `NSCalendarsFullAccessUsageDescription` e `NSCalendarsUsageDescription` no `Info.plist` (no iOS 17+ ler a agenda exige o acesso completo).
+- Depois de `npm install`, rode `npm run sync` para o plugin entrar nos projetos nativos (o `CapApp-SPM/Package.swift` e o Gradle são atualizados pelo Capacitor).

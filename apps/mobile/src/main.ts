@@ -8,9 +8,11 @@ import { StatusBar, Style } from '@capacitor/status-bar';
 import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
 import { NativeVideoCompressor } from 'capacitor-native-video-compressor';
 import { SocialLogin } from '@capgo/capacitor-social-login';
+import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';
 import { createAppleBridge } from './apple-bridge.ts';
 import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
+import { createDeviceCalendarBridge } from './device-calendar-bridge.ts';
 import { createContactsBridge } from './contacts-bridge.ts';
 import { createPushBridge, openInApp } from './push-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
@@ -52,6 +54,8 @@ if (Capacitor.isNativePlatform()) {
     writeFile: (o) => Filesystem.writeFile({ path: o.path, data: o.data, directory: Directory.Cache, encoding: Encoding.UTF8 }),
     share: (o) => Share.share(o),
   });
+  // "Sincronizar agendas": lê as agendas do aparelho (Google, Outlook, iCloud ligados no celular), só horários ocupados.
+  w['AskouTDeviceCalendar'] = createDeviceCalendarBridge({ calendar: CapacitorCalendar as never, platform: () => Capacitor.getPlatform() });
   // "Mais opções" da folha de compartilhar: abre o menu nativo do aparelho (o WebView do Android não tem navigator.share).
   w['AskouTShare'] = { share: (o: { title?: string; text?: string; url?: string; dialogTitle?: string }) => Share.share(o) };
   // "Achar nos contatos": lê celulares e e-mails da agenda (iPhone e Android), com a permissão do aparelho.

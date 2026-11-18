@@ -32,6 +32,8 @@ export interface AppConfig {
   googleClientId: string | undefined;
   /** ID do cliente OAuth "iOS" do Google (login nativo no iPhone). Sem ele, o app do iPhone não mostra "Continuar com o Google". */
   googleIosClientId: string | undefined;
+  /** Google Agenda (sincronizar agenda). Liga com GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET. */
+  googleCalendar: { clientId: string; clientSecret: string; redirectUri: string; webBaseUrl: string } | undefined;
   /** ID de serviço da Apple (Services ID) para "Entrar com a Apple". Sem ele, o botão não aparece. */
   appleClientId: string | undefined;
   /** Bundle id do app nativo na Apple (aceito como público do token de "Entrar com a Apple"). */
@@ -197,6 +199,17 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     paymentProvider = 'sandbox';
   }
 
+  // Google Agenda: o mesmo cliente web do login, com a chave secreta (só o servidor usa) e o endereço de retorno cadastrado no Google.
+  let googleCalendar: AppConfig['googleCalendar'];
+  const gcSecret = env.GOOGLE_CLIENT_SECRET?.trim() ?? '';
+  const gcClient = env.GOOGLE_CLIENT_ID?.trim() ?? '';
+  if (gcSecret !== '' && gcClient !== '') {
+    const redirectUri = env.GOOGLE_CALENDAR_REDIRECT_URI?.trim() || 'https://api.askout.com.br/calendar/google/callback';
+    const webBaseUrl = (env.PUBLIC_WEB_URL?.trim() || 'https://askout.com.br').replace(/\/+$/, '');
+    if (!/^https?:\/\/[^\s]+\/calendar\/google\/callback$/.test(redirectUri)) problems.push('GOOGLE_CALENDAR_REDIRECT_URI deve terminar em /calendar/google/callback (ex.: https://api.askout.com.br/calendar/google/callback)');
+    else googleCalendar = { clientId: gcClient, clientSecret: gcSecret, redirectUri, webBaseUrl };
+  }
+
   // Sem esta variável valem os pacotes com desconto progressivo (ver BOOST_DEFAULT_PACKAGE_PRICES_CENTS).
   const priceRaw = env.BOOST_PRICE_PER_DAY_CENTS?.trim() ?? '';
   const boostPricePerDayCents = priceRaw === '' ? undefined : Number(priceRaw);
@@ -218,5 +231,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, moderationEmail: env.MODERATION_EMAIL?.trim() || 'suporte@askout.com.br', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, giphyApiKey: env.GIPHY_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, googleIosClientId: env.GOOGLE_IOS_CLIENT_ID?.trim() || undefined, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, fcmProjectId, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, moderationEmail: env.MODERATION_EMAIL?.trim() || 'suporte@askout.com.br', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, giphyApiKey: env.GIPHY_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, googleIosClientId: env.GOOGLE_IOS_CLIENT_ID?.trim() || undefined, googleCalendar, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, fcmProjectId, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
 }

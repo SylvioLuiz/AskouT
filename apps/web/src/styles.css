@@ -4730,10 +4730,27 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .calsync__item--picked { border-color: var(--brand); box-shadow: var(--shadow-brand); }
 .calsync__text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .calsync__badge { font-size: 0.75rem; font-weight: 600; color: var(--ok-ink); border: 1px solid currentColor; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
-.calsync__item--on .calsync__text .muted { display: none; }
 .calsync__pick { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: inherit; font: inherit; font-weight: 600; cursor: pointer; }
 .calsync__pick[aria-pressed='true'] { border-color: var(--brand); color: var(--brand-text); }
 .calsync__note { font-size: 0.8125rem; margin-bottom: 12px; }
+.calsync__section { margin-top: 16px; }
+.calsync__heading { margin: 0 0 4px; font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted, inherit); }
+.calsync__item--col { flex-direction: column; align-items: stretch; }
+.calsync__item--warn { border-color: var(--bad); }
+.calsync__row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.calsync__text strong { overflow-wrap: anywhere; }
+.calsync__badge--warn { color: var(--bad); }
+.calsync__actions { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.calsync__calendars { margin: 8px 0 12px; padding: 0; border: 0; display: flex; flex-direction: column; gap: 2px; }
+.calsync__calendars legend { padding: 0; margin-bottom: 4px; font-size: 0.8125rem; }
+.calsync__account { font-weight: 700; overflow-wrap: anywhere; }
+.calsync__check { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.calsync__check input { width: 20px; height: 20px; flex: none; accent-color: var(--brand); }
+.calsync__dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.calsync__steps { margin: 0 0 12px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 0.875rem; }
+.agbusy { margin-top: 12px; }
+.slot--busy { border-left-color: var(--line); background: transparent; }
+.agbusy__label { font-size: 0.8125rem; color: var(--muted, inherit); overflow-wrap: anywhere; }
 
 /* ---------- Entrar com Google / Apple ---------- */
 .social { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-top: 16px; }

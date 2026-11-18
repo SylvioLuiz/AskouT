@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
-import type { MfaChallengeTokens, OneTimeCodes, PasswordHasher, SecretBox, TokenClaims, TokenService } from '../ports.ts';
+import type { MfaChallengeTokens, OAuthStateTokens, OneTimeCodes, PasswordHasher, SecretBox, TokenClaims, TokenService } from '../ports.ts';
 import type { UserRole } from '../types.ts';
 
 /**
@@ -257,5 +257,43 @@ export class HmacMfaChallengeTokens implements MfaChallengeTokens {
 
   private sign(payload: string): string {
     return createHmac('sha256', this.key).update(payload).digest('base64url');
+  }
+}
+
+/**
+ * "state" do OAuth da Google Agenda: quem pediu e de onde (site ou app), assinado e com validade curta (15 min),
+ * para ninguém ligar a própria Google Agenda na conta de outra pessoa forjando o retorno.
+ */
+export class HmacOAuthStateTokens implements OAuthStateTokens {
+  private readonly key: Buffer;
+  private readonly nowMs: () => number;
+  private readonly ttlSeconds: number;
+
+  constructor(options: { secret: string; ttlSeconds?: number; nowMs?: () => number }) {
+    this.key = deriveSubkey(options.secret, 'oauth-state');
+    this.ttlSeconds = options.ttlSeconds ?? 900;
+    this.nowMs = options.nowMs ?? Date.now;
+  }
+
+  sign(payload: { userId: string; from: 'web' | 'app' }): string {
+    const exp = Math.floor(this.nowMs() / 1000) + this.ttlSeconds;
+    const body = Buffer.from(JSON.stringify({ sub: payload.userId, f: payload.from, exp, n: randomBytes(8).toString('base64url') })).toString('base64url');
+    return `${body}.${createHmac('sha256', this.key).update(body).digest('base64url')}`;
+  }
+
+  verify(token: string): { userId: string; from: 'web' | 'app' } | undefined {
+    if (typeof token !== 'string' || token.length > 1000) return undefined;
+    const [body, signature] = token.split('.');
+    if (!body || !signature) return undefined;
+    const expected = Buffer.from(createHmac('sha256', this.key).update(body).digest('base64url'));
+    const received = Buffer.from(signature);
+    if (expected.length !== received.length || !timingSafeEqual(expected, received)) return undefined;
+    try {
+      const { sub, f, exp } = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as Record<string, unknown>;
+      if (typeof sub !== 'string' || sub === '' || typeof exp !== 'number' || Math.floor(this.nowMs() / 1000) >= exp) return undefined;
+      return { userId: sub, from: f === 'app' ? 'app' : 'web' };
+    } catch {
+      return undefined;
+    }
   }
 }

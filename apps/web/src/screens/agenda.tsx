@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgendaEvent } from '../lib/agenda.ts';
 import type { FormEvent } from 'react';
 import { DayStrip, Sheet, StateMark } from '../components/agenda.tsx';
-import { CalendarSyncSheet, syncedCount } from '../components/calendar-sync.tsx';
+import { CalendarSyncSheet, refreshDeviceCalendarsIfDue } from '../components/calendar-sync.tsx';
+import { busyOnDay, syncButtonLabel } from '../lib/calendar-sync.ts';
+import type { BusyBlock } from '../lib/calendar-sync.ts';
 import { ChevronRightIcon, PlusIcon, RefreshIcon } from '../components/icons.tsx';
 import { Button, Confirm, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -27,7 +29,7 @@ import {
 } from '../lib/agenda.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { Slot, SlotState } from '../lib/types.ts';
-import { Link } from '../router.tsx';
+import { Link, navigate, useSearch } from '../router.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
 /** Quantos dias a faixa mostra a partir de hoje. */
@@ -56,6 +58,25 @@ function EventList({ events }: { events: AgendaEvent[] }) {
                 {e.venueName ? <span className="muted">{e.venueName}</span> : null}
               </span>
             </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Compromissos das agendas ligadas: só "ocupado" e de qual agenda veio (o título nunca sai da agenda da pessoa). */
+function BusyList({ blocks, day }: { blocks: BusyBlock[]; day: string }) {
+  return (
+    <div className="agbusy">
+      <h3 className="agevents__title">{t('Ocupado nas suas agendas')}</h3>
+      <ul className="slots">
+        {blocks.map((b) => (
+          <li key={`${b.connectionId}-${b.start}`} className="slot slot--busy">
+            <div className="slot__body">
+              <span className="slot__time">{timeRangeLabel(b, day)}</span>
+              <span className="agbusy__label">{t('Ocupado')} · {b.label}</span>
+            </div>
           </li>
         ))}
       </ul>
@@ -176,7 +197,31 @@ export function AgendaScreen() {
   const picked = useRef(false);
   const [adding, setAdding] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [syncedN, setSyncedN] = useState(syncedCount);
+  const [syncedN, setSyncedN] = useState(0);
+  const search = useSearch();
+  /** Volta da Google Agenda (site): abre a folha com o aviso e limpa o endereço. */
+  const [syncNotice, setSyncNotice] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
+  useEffect(() => {
+    const result = search.get('agendas');
+    if (!result) return;
+    setSyncNotice(result === 'google' ? { tone: 'ok', text: t('Google Agenda ligada. Escolha abaixo quais agendas entram.') } : { tone: 'error', text: search.get('motivo') || t('Não foi possível ligar a agenda.') });
+    setSyncing(true);
+    navigate('/agenda', { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const busyBlocks = useAsync(() => api.calendarBusy(range.from, range.to).catch(() => [] as BusyBlock[]), [range.from, range.to]);
+  const calendars = useAsync(() => api.calendarOverview().catch(() => undefined), []);
+  useEffect(() => {
+    const list = calendars.data?.connections;
+    if (!list) return;
+    setSyncedN(list.length);
+    // No app: reenvia a agenda do celular ao abrir (no máximo a cada 30 min).
+    void refreshDeviceCalendarsIfDue(list).then((changed) => {
+      if (changed) busyBlocks.reload();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendars.data]);
+  const busyToday = busyOnDay(busyBlocks.data ?? [], selected);
   const [removing, setRemoving] = useState<Slot | undefined>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
@@ -254,7 +299,7 @@ export function AgendaScreen() {
       <div className="agsync">
         <Button variant="quiet" small onClick={() => setSyncing(true)}>
           <RefreshIcon />
-          {syncedN > 0 ? `Sincronizar · ${syncedN} ${syncedN === 1 ? 'ligada' : 'ligadas'}` : t('Sincronizar')}
+          {syncButtonLabel(syncedN)}
         </Button>
       </div>
 
@@ -276,10 +321,11 @@ export function AgendaScreen() {
         {slots.loading && !slots.data ? <Loading /> : null}
         {slots.error ? <ErrorState message={slots.error.message} onRetry={slots.reload} /> : null}
 
-        {slots.data && ofDay.length === 0 ? (
+        {slots.data && ofDay.length === 0 && busyToday.length === 0 ? (
           <p className="muted">{t('Nenhum horário marcado neste dia.')}</p>
         ) : null}
         {ofDay.length > 0 ? <SlotList slots={ofDay} day={selected} onRemove={(slot) => setRemoving(slot)} /> : null}
+        {busyToday.length > 0 ? <BusyList blocks={busyToday} day={selected} /> : null}
         {eventsToday.length > 0 ? <EventList events={eventsToday} /> : null}
         {eventsLoaded && eventsToday.length === 0 && nextEventDay ? (
           <button type="button" className="agjump" onClick={() => choose(nextEventDay)}>
@@ -305,7 +351,20 @@ export function AgendaScreen() {
         {t('Marcar horário')}
       </button>
 
-      {syncing ? <CalendarSyncSheet onClose={() => setSyncing(false)} onChange={(list) => setSyncedN(list.length)} /> : null}
+      {syncing ? (
+        <CalendarSyncSheet
+          notice={syncNotice}
+          onClose={() => {
+            setSyncing(false);
+            setSyncNotice(undefined);
+            busyBlocks.reload();
+          }}
+          onChange={(o) => {
+            setSyncedN(o.connections.length);
+            busyBlocks.reload();
+          }}
+        />
+      ) : null}
 
       {adding ? (
         <AddSlotSheet

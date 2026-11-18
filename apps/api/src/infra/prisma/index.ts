@@ -28,3 +28,4 @@ export { PrismaConsentRepository } from './prisma-consent.repository.ts';
 export { PrismaPostRepository } from './prisma-post.repository.ts';
 export { PrismaAdminRepository } from './prisma-admin.repository.ts';
 export { PrismaIdentityRepository } from './prisma-identity.repository.ts';
+export { PrismaPersonalCalendarRepository } from './prisma-personal-calendar.repository.ts';

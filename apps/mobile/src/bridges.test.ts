@@ -5,6 +5,7 @@ import { createStoreBridge } from './store-bridge.ts';
 import { createAppleBridge } from './apple-bridge.ts';
 import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
+import { createDeviceCalendarBridge } from './device-calendar-bridge.ts';
 import { createContactsBridge } from './contacts-bridge.ts';
 import { createPushBridge, openInApp, type PushPluginLike } from './push-bridge.ts';
 
@@ -348,5 +349,66 @@ describe('ponte do Google', () => {
     });
     await assert.rejects(bridge.signIn({ webClientId: 'w' }), /falhou/);
     assert.equal(await bridge.signIn({ webClientId: 'w' }), 'ok');
+  });
+});
+
+describe('ponte da agenda do celular', () => {
+  const cal = (granted = true) => {
+    const asked: string[] = [];
+    return {
+      asked,
+      calendar: {
+        async requestReadOnlyCalendarAccess() {
+          asked.push('read');
+          return { result: granted ? 'granted' : 'denied' };
+        },
+        async requestFullCalendarAccess() {
+          asked.push('full');
+          return { result: granted ? 'granted' : 'denied' };
+        },
+        async listCalendars() {
+          return {
+            result: [
+              { id: '2', title: 'Trabalho', color: '#f00', accountName: 'ana@empresa.com', source: { title: 'Exchange' } },
+              { id: '1', title: 'Ana', color: null, accountName: null, source: { title: 'iCloud' } },
+              { id: '3', title: 'Oculta', color: null, accountName: 'x', source: null, visible: false },
+            ],
+          };
+        },
+        async listEventsInRange() {
+          return {
+            result: [
+              { calendarId: '1', startDate: Date.parse('2026-10-14T13:00Z'), endDate: Date.parse('2026-10-14T14:00Z'), isAllDay: false, availability: 0, status: 'confirmed' },
+              { calendarId: '1', startDate: Date.parse('2026-10-15T00:00Z'), endDate: Date.parse('2026-10-16T00:00Z'), isAllDay: true, availability: 0, status: null },
+              { calendarId: '1', startDate: Date.parse('2026-10-14T16:00Z'), endDate: Date.parse('2026-10-14T17:00Z'), isAllDay: false, availability: 1, status: null },
+              { calendarId: '1', startDate: Date.parse('2026-10-14T18:00Z'), endDate: Date.parse('2026-10-14T19:00Z'), isAllDay: false, availability: 0, status: 'canceled' },
+              { calendarId: '9', startDate: Date.parse('2026-10-14T20:00Z'), endDate: Date.parse('2026-10-14T21:00Z'), isAllDay: false, availability: 0, status: null },
+            ],
+          };
+        },
+      },
+    };
+  };
+
+  it('lista as agendas visíveis com a conta, pedindo a permissão certa em cada sistema', async () => {
+    const a = cal();
+    const android = createDeviceCalendarBridge({ calendar: a.calendar, platform: () => 'android' });
+    assert.deepEqual(await android.listCalendars(), [
+      { id: '2', name: 'Trabalho', account: 'ana@empresa.com', color: '#f00' },
+      { id: '1', name: 'Ana', account: 'iCloud', color: null },
+    ]);
+    const i = cal();
+    await createDeviceCalendarBridge({ calendar: i.calendar, platform: () => 'ios' }).listCalendars();
+    assert.deepEqual([a.asked, i.asked], [['read'], ['full']]);
+  });
+
+  it('só horários ocupados com hora: sem dia inteiro, livres, cancelados nem de outra agenda', async () => {
+    const b = createDeviceCalendarBridge({ calendar: cal().calendar, platform: () => 'android' });
+    assert.deepEqual(await b.busy({ calendarIds: ['1'], from: '2026-10-13T00:00:00Z', to: '2026-10-20T00:00:00Z' }), [{ start: '2026-10-14T13:00:00.000Z', end: '2026-10-14T14:00:00.000Z' }]);
+    assert.deepEqual(await b.busy({ calendarIds: [], from: '2026-10-13T00:00:00Z', to: '2026-10-20T00:00:00Z' }), []);
+  });
+
+  it('sem permissão avisa com mensagem clara', async () => {
+    await assert.rejects(createDeviceCalendarBridge({ calendar: cal(false).calendar, platform: () => 'ios' }).listCalendars(), /Ajustes/);
   });
 });

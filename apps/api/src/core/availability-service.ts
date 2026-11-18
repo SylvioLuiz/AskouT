@@ -285,9 +285,11 @@ export class AvailabilityService {
 
   private async loadParticipants(actorId: string, friendIds: string[], from: Date, to: Date) {
     const everyone = [actorId, ...friendIds];
-    const [rows, profileList] = await Promise.all([
+    const [rows, profileList, busyRows] = await Promise.all([
       this.deps.availability.listForUsers(everyone, from, to),
       this.deps.users.findProfilesByIds(everyone),
+      // Horários ocupados das agendas ligadas (celular, Google, iCal): só início e fim.
+      this.deps.personalCalendars.listBusy(everyone, from, to),
     ]);
     const profiles = new Map(profileList.map((p) => [p.userId, p] as const));
     if (!everyone.every((id) => profiles.has(id))) throw forbidden('Só amigos veem a agenda e comparam horários');
@@ -301,7 +303,7 @@ export class AvailabilityService {
           end: r.endsAt.getTime(),
           state: r.state === 'AVAILABLE' ? 'available' : r.state === 'PARTIAL' ? 'partial' : 'unavailable',
         })),
-      busy: [],
+      busy: busyRows.filter((b) => b.userId === userId).map((b) => ({ start: b.start.getTime(), end: b.end.getTime() })),
     }));
     return { people, profiles };
   }

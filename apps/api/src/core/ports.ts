@@ -631,6 +631,97 @@ export interface CalendarFetcher {
 
 export class CalendarFetchError extends Error {}
 
+// ---------- Sincronizar agendas da pessoa (só horários ocupados) ----------
+
+export type PersonalCalendarSource = 'GOOGLE' | 'DEVICE' | 'ICS';
+export type PersonalCalendarStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+
+/** Uma agenda dentro da conexão (ex.: "Trabalho" na conta Google). A pessoa escolhe quais entram. */
+export interface PersonalCalendarChoice {
+  id: string;
+  name: string;
+  selected: boolean;
+  color: string | null;
+  /** Conta de onde vem (ex.: "ana@gmail.com", "Outlook", "iCloud"), quando se sabe. */
+  account: string | null;
+}
+
+export interface PersonalCalendarConnection {
+  id: string;
+  userId: string;
+  provider: PersonalCalendarSource;
+  status: PersonalCalendarStatus;
+  label: string | null;
+  accountEmail: string | null;
+  /** Google: refresh token cifrado (SecretBox). */
+  refreshTokenSealed: string | null;
+  /** ICS: link cifrado (SecretBox). */
+  sourceSealed: string | null;
+  calendars: PersonalCalendarChoice[];
+  lastSyncAt: Date | null;
+  lastError: string | null;
+  createdAt: Date;
+}
+
+export interface BusyIntervalRecord {
+  start: Date;
+  end: Date;
+}
+
+export interface UserBusyRecord extends BusyIntervalRecord {
+  userId: string;
+  connectionId: string;
+  provider: PersonalCalendarSource;
+  label: string | null;
+}
+
+export interface PersonalCalendarRepository {
+  list(userId: string): Promise<PersonalCalendarConnection[]>;
+  find(id: string): Promise<PersonalCalendarConnection | undefined>;
+  /** Insere ou atualiza (pelo id). */
+  save(connection: PersonalCalendarConnection): Promise<void>;
+  /** Remove só se for da pessoa. */
+  delete(userId: string, id: string): Promise<boolean>;
+  /** Troca todos os horários ocupados da conexão. */
+  replaceBusy(connectionId: string, intervals: BusyIntervalRecord[]): Promise<void>;
+  /** Horários ocupados (de conexões ativas) que se sobrepõem a [from, to), ordenados por início. */
+  listBusy(userIds: string[], from: Date, to: Date): Promise<UserBusyRecord[]>;
+  /** Google e ICS ativos que não são lidos desde `before` (ou nunca), mais atrasados primeiro. */
+  listDue(before: Date, limit: number): Promise<PersonalCalendarConnection[]>;
+  /** Plataformas de login ligadas à conta (ex.: GOOGLE), para sugerir a agenda certa. */
+  loginProvidersOf(userId: string): Promise<ExternalProvider[]>;
+}
+
+/** O Google recusou o acesso (a pessoa tirou a permissão ou o token venceu). */
+export class CalendarAccessRevoked extends Error {}
+
+export interface GoogleCalendarAgenda {
+  id: string;
+  name: string;
+  primary: boolean;
+  /** Visível na Google Agenda da pessoa. */
+  visible: boolean;
+  color: string | null;
+}
+
+/** Google Agenda pela API do Google (OAuth com acesso só de leitura a agendas e horários livres/ocupados). */
+export interface GoogleCalendarClient {
+  authUrl(state: string): string;
+  /** Troca o código do retorno do Google. Lança `CalendarAccessRevoked` se o código não vale. */
+  exchange(code: string): Promise<{ refreshToken: string | null; accessToken: string; email: string | null }>;
+  /** Lança `CalendarAccessRevoked` se o Google não aceitar mais o refresh token. */
+  accessToken(refreshToken: string): Promise<string>;
+  listCalendars(accessToken: string): Promise<GoogleCalendarAgenda[]>;
+  freeBusy(accessToken: string, calendarIds: string[], from: Date, to: Date): Promise<BusyIntervalRecord[]>;
+  revoke(token: string): Promise<void>;
+}
+
+/** Assina o "state" do OAuth (quem pediu, de onde, validade), para o retorno do Google não ser forjado. */
+export interface OAuthStateTokens {
+  sign(payload: { userId: string; from: 'web' | 'app' }): string;
+  verify(token: string): { userId: string; from: 'web' | 'app' } | undefined;
+}
+
 export interface VenueClaimRepository {
   create(claim: VenueClaimRecord, document: Uint8Array): Promise<void>;
   findById(id: string): Promise<VenueClaimRecord | undefined>;
@@ -932,6 +1023,10 @@ export interface CoreDeps {
   claims: VenueClaimRepository;
   calendars: CalendarRepository;
   calendarFetcher: CalendarFetcher;
+  personalCalendars: PersonalCalendarRepository;
+  /** Google Agenda. Sem ele (falta GOOGLE_CLIENT_SECRET), a opção do Google não aparece. */
+  googleCalendar?: GoogleCalendarClient;
+  oauthStates: OAuthStateTokens;
   admin: AdminRepository;
   placeSource: PlaceSource;
   /** Rotas do encontro Flash até o lugar escolhido. Opcional: sem ela o app mostra só a linha reta. */

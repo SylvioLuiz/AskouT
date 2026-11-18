@@ -30,10 +30,16 @@ O código está pronto e desligado: sem os IDs abaixo, os botões não aparecem.
 - [ ] Outras plataformas (Microsoft, Facebook), se quiser.
 
 ## Sincronizar agendas (celular, Google, Outlook)
-A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só no aparelho.
-- [ ] Ligação real com Google Agenda e Outlook (precisa de chaves OAuth).
-- [ ] Ligação com a agenda do celular (precisa do app nativo).
-- [ ] Mover a escolha de agendas ligadas para a conta, no servidor.
+Feito em 18/11/2026 (código; não testado em aparelho nem contra o Google real). Só horários ocupados entram (nunca título), ficam na conta (`CalendarConnection`/`CalendarBusyInterval`) e contam na comparação de agendas com amigos.
+- Agenda do celular (app): plugin `@ebarooni/capacitor-calendar`, ponte `window.AskouTDeviceCalendar`; lista as agendas por conta (Google, Outlook, iCloud ligados no aparelho), a pessoa escolhe, o app manda os horários e reenvia ao abrir a agenda (no máximo a cada 30 min).
+- Google Agenda (site e app): OAuth no servidor, escopos `calendar.calendarlist.readonly` + `calendar.freebusy`; relido a cada 30 min (`CalendarSyncJob`).
+- Outlook, iCloud e outros: link iCal privado (cifrado no banco), relido a cada 30 min.
+- Sugestões: "Encontramos para você" usa o login com Google e o domínio do e-mail; no app, a agenda do celular vem primeiro.
+- [ ] Google Cloud (askout-512422): ativar Google Calendar API; no cliente web, URI de redirecionamento `https://api.askout.com.br/calendar/google/callback`; na tela de consentimento, adicionar os 2 escopos; `GOOGLE_CLIENT_SECRET` no Render.
+- [ ] Verificação do app no Google (escopos sensíveis): até aprovar, aparece "o Google não verificou este app" e há limite de 100 usuários.
+- [ ] Rodar `npx prisma migrate deploy` (migração `20261222120000_calendar_sync`).
+- [ ] Lojas: Apple pede o texto de uso da agenda (já no Info.plist); Google Play: permissão READ_CALENDAR declarada (atualizar Segurança dos dados: "Agenda", coletado, funcionalidade do app).
+- [ ] Outlook direto (Microsoft Graph, sem link iCal), se quiser no futuro.
 
 ## Outros itens já combinados
 - [ ] E-mail real: o envio pelo Resend está escrito e testado com respostas simuladas, mas NUNCA rodou contra a conta real. Falta: criar a conta no Resend, adicionar o domínio e publicar no DNS os registros que ele mostrar (SPF e DKIM; DMARC recomendado), gerar a chave, e na API de produção definir `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY` e `EMAIL_FROM`. Depois, testar cadastro e recuperação de senha com um e-mail seu (e conferir se não cai no spam no Gmail, Outlook e iCloud).
