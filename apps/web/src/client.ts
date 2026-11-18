@@ -29,4 +29,5 @@ export const api = createApi({
   fetch: (input, init) => window.fetch(input, init),
   getToken: () => session.get(),
   onUnauthorized: () => onUnauthorized(),
+  onToken: (token) => session.set(token),
 });

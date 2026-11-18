@@ -38,9 +38,9 @@ export class AdminController {
     return this.core.admin.verifyMfaLogin({ mfaToken: b.mfaToken, code: b.code });
   }
 
-  /** `{currentPassword, newPassword}`: troca a senha de quem está logado. */
+  /** `{currentPassword, newPassword}`: troca a senha de quem está logado. Devolve `{token}` novo para este aparelho. */
   @Post('password')
-  @HttpCode(204)
+  @HttpCode(200)
   changePassword(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = asBody(body);
     return this.core.admin.changeOwnPassword(actor, { currentPassword: b.currentPassword, newPassword: b.newPassword });

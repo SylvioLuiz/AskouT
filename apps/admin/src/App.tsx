@@ -369,20 +369,23 @@ export function App() {
     });
   }, []);
 
-  // Sessão guardada na aba: confirma que ainda vale e que a conta continua sendo de admin.
+  // Sessão guardada no navegador: confirma que ainda vale e que a conta continua sendo de admin, e renova o prazo.
+  // Só sai de vez quando a API recusa o token (401); falha de rede ou API fora do ar mantém o token para a próxima vez.
   useEffect(() => {
     if (session.get() === undefined) return;
     let alive = true;
     api.me().then(
       (me) => {
         if (!alive) return;
-        if (me.role === 'ADMIN') setAdmin(me);
-        else session.clear();
+        if (me.role === 'ADMIN') {
+          setAdmin(me);
+          api.refreshSession().catch(() => undefined);
+        } else session.clear();
         setChecking(false);
       },
-      () => {
+      (err: unknown) => {
         if (!alive) return;
-        session.clear();
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) session.clear();
         setChecking(false);
       },
     );

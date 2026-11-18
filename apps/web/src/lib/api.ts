@@ -119,6 +119,8 @@ export interface ApiDeps {
   getToken: () => string | undefined;
   /** Chamado quando uma chamada autenticada recebe 401 (sessão expirada ou inválida). */
   onUnauthorized: () => void;
+  /** Token novo emitido pelo servidor (renovação ou troca de senha): guarde no lugar do atual. */
+  onToken?: (token: string) => void;
 }
 
 interface RequestOptions {
@@ -192,7 +194,8 @@ export function createApi(deps: ApiDeps) {
     if (response.ok) return payload as T;
 
     const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
-    if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+    // Só derruba a sessão se o token recusado ainda é o atual (outra chamada pode já ter trocado por um novo).
+    if (error.code === 'UNAUTHORIZED' && token !== undefined && token === deps.getToken()) deps.onUnauthorized();
     throw error;
   }
 
@@ -220,6 +223,11 @@ export function createApi(deps: ApiDeps) {
     mfaDisable: (code: string) => request<{ enabled: false }>('POST', '/auth/mfa/disable', { body: { code } }),
     mfaRecoveryCodes: (code: string) => request<{ recoveryCodes: string[] }>('POST', '/auth/mfa/recovery-codes', { body: { code } }),
     me: () => request<SessionUser>('GET', '/auth/me'),
+    /** Renova o token (o app chama ao abrir): a sessão só expira depois de muito tempo sem uso. */
+    refreshSession: async () => {
+      const { token } = await request<{ token: string }>('POST', '/auth/refresh');
+      deps.onToken?.(token);
+    },
     completeOnboarding: () => request<{ onboarded: true }>('POST', '/auth/me/onboarding'),
     /** "Complete seu cadastro" de quem entrou pela primeira vez com Google/Apple. */
     completeProfile: (input: { username: string; birthDate: string; acceptTerms: boolean; marketingEmail?: boolean }) =>
@@ -297,7 +305,8 @@ export function createApi(deps: ApiDeps) {
       }
       if (status >= 200 && status < 300) return payload as PostView;
       const error = errorFromResponse(status, payload, retryAfter);
-      if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+      // Só derruba a sessão se o token recusado ainda é o atual (outra chamada pode já ter trocado por um novo).
+      if (error.code === 'UNAUTHORIZED' && token !== undefined && token === deps.getToken()) deps.onUnauthorized();
       throw error;
     },
     deletePost: (postId: string) => request<{ deleted: true }>('DELETE', `/posts/${id(postId)}`),
@@ -447,8 +456,16 @@ export function createApi(deps: ApiDeps) {
     /** Se a minha conta tem senha própria (quem entra só com Google/Apple não tem). */
     passwordStatus: () => request<{ hasPassword: boolean }>('GET', '/me/password'),
     /** Troca a minha senha, conferindo a atual. */
-    createPassword: (newPassword: string) => request<{ hasPassword: true }>('POST', '/me/password/create', { body: { newPassword } }),
-    changePassword: (input: { currentPassword: string; newPassword: string }) => request<void>('POST', '/me/password', { body: input }),
+    createPassword: async (newPassword: string) => {
+      const result = await request<{ hasPassword: true; token?: string }>('POST', '/me/password/create', { body: { newPassword } });
+      if (result.token) deps.onToken?.(result.token);
+      return { hasPassword: true as const };
+    },
+    /** Os outros aparelhos saem; este recebe um token novo e continua logado. */
+    changePassword: async (input: { currentPassword: string; newPassword: string }) => {
+      const result = await request<{ token?: string } | undefined>('POST', '/me/password', { body: input });
+      if (result?.token) deps.onToken?.(result.token);
+    },
     /** Apaga a minha conta de vez. Conta que entra com Google/Apple não manda senha. */
     deleteMyAccount: (input: { username: string; password?: string }) => request<{ deleted: true }>('DELETE', '/me', { body: input }),
     clearRegion: () => request<{ removed: boolean }>('DELETE', '/me/region'),
@@ -483,7 +500,8 @@ export function createApi(deps: ApiDeps) {
       }
       if (response.ok) return payload as EventStoryGroup;
       const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
-      if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+      // Só derruba a sessão se o token recusado ainda é o atual (outra chamada pode já ter trocado por um novo).
+      if (error.code === 'UNAUTHORIZED' && token !== undefined && token === deps.getToken()) deps.onUnauthorized();
       throw error;
     },
     deleteEventStory: (eventId: string, storyId: string) => request<{ deleted: true }>('DELETE', `/events/${id(eventId)}/stories/${id(storyId)}`),
@@ -586,7 +604,8 @@ export function createApi(deps: ApiDeps) {
       }
       if (response.ok) return payload as ChatMessage;
       const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
-      if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+      // Só derruba a sessão se o token recusado ainda é o atual (outra chamada pode já ter trocado por um novo).
+      if (error.code === 'UNAUTHORIZED' && token !== undefined && token === deps.getToken()) deps.onUnauthorized();
       throw error;
     },
     /** Baixa a foto ou o vídeo de uma mensagem (a rota exige o token, então não dá para usar <img src>). */

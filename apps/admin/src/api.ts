@@ -19,12 +19,15 @@ const API_BASE = ((import.meta.env.VITE_API_URL as string | undefined) ?? '/api'
 
 const TOKEN_KEY = 'askout.admin.token';
 
-/** O token fica só na sessão da aba (some ao fechar) e, se o navegador bloquear, na memória. */
+/**
+ * O token fica guardado no navegador (continua logado ao fechar e reabrir) e, se o navegador bloquear, na memória.
+ * A sessão é renovada a cada abertura e só cai depois de muito tempo sem uso, troca de senha ou perda do acesso.
+ */
 let memoryToken: string | undefined;
 export const session = {
   get(): string | undefined {
     try {
-      return window.sessionStorage.getItem(TOKEN_KEY) ?? memoryToken;
+      return window.localStorage.getItem(TOKEN_KEY) ?? memoryToken;
     } catch {
       return memoryToken;
     }
@@ -32,7 +35,7 @@ export const session = {
   set(token: string): void {
     memoryToken = token;
     try {
-      window.sessionStorage.setItem(TOKEN_KEY, token);
+      window.localStorage.setItem(TOKEN_KEY, token);
     } catch {
       /* só na memória */
     }
@@ -40,7 +43,7 @@ export const session = {
   clear(): void {
     memoryToken = undefined;
     try {
-      window.sessionStorage.removeItem(TOKEN_KEY);
+      window.localStorage.removeItem(TOKEN_KEY);
     } catch {
       /* nada */
     }
@@ -79,7 +82,8 @@ async function send(method: string, path: string, body?: unknown, auth = true): 
       payload = undefined;
     }
     const { code, message } = messageFor(response.status, payload);
-    if (response.status === 401 && token) onUnauthorized();
+    // Só derruba a sessão se o token recusado ainda é o atual (outra chamada pode já ter trocado por um novo).
+    if (response.status === 401 && token && token === session.get()) onUnauthorized();
     throw new ApiError(response.status, code, message);
   }
   return response;
@@ -95,8 +99,16 @@ export const api = {
   mfaVerify: (mfaToken: string, code: string) => request<AuthResult>('POST', '/admin/mfa/verify', { mfaToken, code }, false),
   socialProviders: () => request<{ items: { provider: string; clientId: string }[] }>('GET', '/auth/providers', undefined, false),
   appleLogin: (idToken: string) => request<AuthResult | MfaChallenge>('POST', '/admin/social', { provider: 'APPLE', idToken }, false),
+  /** Os outros aparelhos saem; este recebe um token novo e continua logado. */
   changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
-    await send('POST', '/admin/password', { currentPassword, newPassword });
+    const response = await send('POST', '/admin/password', { currentPassword, newPassword });
+    const payload = (await response.json().catch(() => undefined)) as { token?: unknown } | undefined;
+    if (typeof payload?.token === 'string') session.set(payload.token);
+  },
+  /** Renova o token: a sessão só expira depois de muito tempo sem abrir a gestão. */
+  refreshSession: async (): Promise<void> => {
+    const { token } = await request<{ token: string }>('POST', '/auth/refresh');
+    session.set(token);
   },
   me: () => request<SessionUser>('GET', '/auth/me'),
   stats: () => request<Stats>('GET', '/admin/stats'),

@@ -17,7 +17,7 @@ describe('loadConfig', () => {
   it('aceita configuração válida e aplica padrões', () => {
     const c = loadConfig(good);
     assert.equal(c.port, 3000);
-    assert.equal(c.tokenTtlSeconds, 3600);
+    assert.equal(c.tokenTtlSeconds, 86_400 * 90);
     assert.deepEqual(c.corsOrigins, []);
     assert.equal(c.nodeEnv, 'development');
   });
