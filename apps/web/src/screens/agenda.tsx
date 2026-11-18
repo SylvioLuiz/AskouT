@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgendaEvent } from '../lib/agenda.ts';
 import type { FormEvent } from 'react';
-import { DayStrip, Sheet, StateMark } from '../components/agenda.tsx';
+import { DayStrip, MonthCalendar, Sheet, StateMark } from '../components/agenda.tsx';
 import { CalendarSyncSheet, refreshDeviceCalendarsIfDue } from '../components/calendar-sync.tsx';
 import { busyOnDay, syncButtonLabel } from '../lib/calendar-sync.ts';
 import type { BusyBlock } from '../lib/calendar-sync.ts';
@@ -13,6 +13,7 @@ import {
   PRESETS,
   STATE_HELP,
   addDays,
+  addMonths,
   agendaEvents,
   agendaEventsOnDay,
   buildSlot,
@@ -22,6 +23,8 @@ import {
   firstDayWith,
   deviceTimeZone,
   localDateKey,
+  monthDays,
+  nextEventDayAfter,
   rangeForDays,
   slotsOnDay,
   statesOnDay,
@@ -32,16 +35,17 @@ import type { Slot, SlotState } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
-/** Quantos dias a faixa mostra a partir de hoje. */
-const WINDOW_DAYS = 28;
+/** Ao abrir, procura o primeiro dia com evento só nestes dias a partir de hoje. */
+const OPEN_LOOKAHEAD_DAYS = 28;
 const capitalize = (text: string) => text.charAt(0).toLocaleUpperCase('pt-BR') + text.slice(1);
 const STATES: readonly SlotState[] = ['AVAILABLE', 'PARTIAL', 'UNAVAILABLE'];
 
-function useDayWindow() {
-  const today = useMemo(() => localDateKey(new Date()), []);
-  const days = useMemo(() => daysFrom(today, WINDOW_DAYS), [today]);
-  const range = useMemo(() => rangeForDays(today, WINDOW_DAYS), [today]);
-  return { today, days, range };
+/** A faixa mostra o mês do dia escolhido, qualquer que seja; trocar de mês busca os horários daquele mês. */
+function useMonthWindow(selected: string) {
+  const month = selected.slice(0, 7);
+  const days = useMemo(() => monthDays(`${month}-01`), [month]);
+  const range = useMemo(() => rangeForDays(days[0] as string, days.length), [days]);
+  return { days, range };
 }
 
 function EventList({ events }: { events: AgendaEvent[] }) {
@@ -189,8 +193,10 @@ function AddSlotSheet({ day, onClose, onSaved }: { day: string; onClose: () => v
 
 export function AgendaScreen() {
   useTitle(t('Agenda'));
-  const { today, days, range } = useDayWindow();
+  const today = useMemo(() => localDateKey(new Date()), []);
   const [selected, setSelected] = useState(today);
+  const { days, range } = useMonthWindow(selected);
+  const [picking, setPicking] = useState(false);
   /** De onde veio a troca de dia, para o conteúdo deslizar do lado certo. */
   const [direction, setDirection] = useState<'next' | 'prev' | 'none'>('none');
   /** Depois que a pessoa escolhe um dia, a tela não muda de dia sozinha. */
@@ -239,7 +245,7 @@ export function AgendaScreen() {
   useEffect(() => {
     if (!eventsLoaded || picked.current) return;
     picked.current = true;
-    const first = firstDayWith(days, hasEvent);
+    const first = firstDayWith(daysFrom(today, OPEN_LOOKAHEAD_DAYS), hasEvent);
     if (first) setSelected(first);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventsLoaded]);
@@ -254,11 +260,16 @@ export function AgendaScreen() {
   }
 
   function shift(by: number) {
-    const next = days[days.indexOf(selected) + by];
-    if (next) choose(next);
+    choose(addDays(selected, by));
   }
 
-  const nextEventDay = firstDayWith(days, hasEvent, addDays(selected, 1));
+  /** Vai para outro mês: cai em hoje se for o mês atual, senão no dia 1. */
+  function changeMonth(by: number) {
+    const target = addMonths(selected, by);
+    choose(target.slice(0, 7) === today.slice(0, 7) ? today : target);
+  }
+
+  const nextEventDay = nextEventDayAfter(events, selected);
 
   // Deslizar o dedo para os lados no conteúdo do dia troca de dia.
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
@@ -303,7 +314,16 @@ export function AgendaScreen() {
         </Button>
       </div>
 
-      <DayStrip days={days} selected={selected} today={today} onSelect={choose} statesOf={(key) => statesOnDay(all, key)} eventsOf={(key) => agendaEventsOnDay(events, key).length} />
+      <DayStrip
+        days={days}
+        selected={selected}
+        today={today}
+        onSelect={choose}
+        statesOf={(key) => statesOnDay(all, key)}
+        eventsOf={(key) => agendaEventsOnDay(events, key).length}
+        onMonth={changeMonth}
+        onOpenCalendar={() => setPicking(true)}
+      />
 
       <section
         key={selected}
@@ -330,7 +350,7 @@ export function AgendaScreen() {
         {eventsLoaded && eventsToday.length === 0 && nextEventDay ? (
           <button type="button" className="agjump" onClick={() => choose(nextEventDay)}>
             <span className="agjump__label">{t('Próximo evento')}</span>
-            <span className="agjump__day">{dayShortLabel(nextEventDay)}</span>
+            <span className="agjump__day">{dayShortLabel(nextEventDay, nextEventDay.slice(0, 4) !== selected.slice(0, 4))}</span>
             <ChevronRightIcon />
           </button>
         ) : null}
@@ -364,6 +384,20 @@ export function AgendaScreen() {
             busyBlocks.reload();
           }}
         />
+      ) : null}
+
+      {picking ? (
+        <Sheet title={t('Ir para a data')} onClose={() => setPicking(false)}>
+          <MonthCalendar
+            selected={selected}
+            today={today}
+            marksOf={(key) => ({ event: hasEvent(key), slot: statesOnDay(all, key).length > 0 })}
+            onSelect={(key) => {
+              choose(key);
+              setPicking(false);
+            }}
+          />
+        </Sheet>
       ) : null}
 
       {adding ? (

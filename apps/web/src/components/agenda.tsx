@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { dayChip, dayLongLabel, monthLabel, LEVEL_LABEL, PARTICIPANT_LABEL, STATE_LABEL } from '../lib/agenda.ts';
+import { addDays, addMonths, dayChip, dayLongLabel, monthLabel, monthShortLabel, monthStart, monthWeeks, weekdayInitials, LEVEL_LABEL, PARTICIPANT_LABEL, STATE_LABEL } from '../lib/agenda.ts';
 import type { CompatibilityLevel, ParticipantStatus, SlotState } from '../lib/types.ts';
-import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, HalfIcon, XIcon } from './icons.tsx';
+import { AlertIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, HalfIcon, XIcon } from './icons.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 // Cor nunca sozinha: todo estado de agenda vem com ícone e texto (acessibilidade e daltonismo).
@@ -69,10 +69,14 @@ interface DayStripProps {
   statesOf: (key: string) => readonly SlotState[];
   /** Quantos eventos em que você vai caem no dia (viram uma marca própria no dia). */
   eventsOf?: (key: string) => number;
+  /** Vai para o mês anterior (-1) ou o próximo (+1). */
+  onMonth: (by: number) => void;
+  /** Abre o calendário do mês para pular para qualquer data. */
+  onOpenCalendar: () => void;
 }
 
 /** Faixa horizontal que rola com o dedo; o dia escolhido desliza até o centro. Setas do teclado trocam o dia. */
-export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf }: DayStripProps) {
+export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, onMonth, onOpenCalendar }: DayStripProps) {
   const stripRef = useRef<HTMLDivElement>(null);
   const firstScroll = useRef(true);
 
@@ -87,10 +91,9 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf }
     firstScroll.current = false;
   }, [selected]);
 
-  const index = days.indexOf(selected);
+  // Sem limite: passar do último dia do mês leva ao mês seguinte (e o contrário).
   function move(by: number) {
-    const next = days[Math.min(days.length - 1, Math.max(0, index + by))];
-    if (next && next !== selected) onSelect(next);
+    onSelect(addDays(selected, by));
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
@@ -111,17 +114,20 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf }
   return (
     <div className="daynav">
       <div className="daynav__bar">
-        <span className="daynav__month" aria-live="polite">{capitalizeFirst(monthLabel(selected))}</span>
+        <button type="button" className="daynav__month" onClick={onOpenCalendar} aria-haspopup="dialog" aria-label={t('{month}: abrir calendário', { month: capitalizeFirst(monthLabel(selected)) })}>
+          <span aria-live="polite">{capitalizeFirst(monthLabel(selected))}</span>
+          <ChevronDownIcon />
+        </button>
         <div className="daynav__actions">
           {selected !== today ? (
             <button type="button" className="daynav__today" onClick={() => onSelect(today)}>
               {t('Hoje')}
             </button>
           ) : null}
-          <button type="button" className="iconbtn daynav__arrow" onClick={() => move(-1)} disabled={index <= 0} aria-label={t('Dia anterior')}>
+          <button type="button" className="iconbtn daynav__arrow" onClick={() => onMonth(-1)} aria-label={t('Mês anterior')}>
             <ChevronLeftIcon />
           </button>
-          <button type="button" className="iconbtn daynav__arrow" onClick={() => move(1)} disabled={index >= days.length - 1} aria-label={t('Próximo dia')}>
+          <button type="button" className="iconbtn daynav__arrow" onClick={() => onMonth(1)} aria-label={t('Próximo mês')}>
             <ChevronRightIcon />
           </button>
         </div>
@@ -158,6 +164,141 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf }
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Calendário do mês ----------
+
+interface MonthCalendarProps {
+  selected: string;
+  today: string;
+  onSelect: (key: string) => void;
+  /** Marcas do dia: evento confirmado e/ou horário marcado. */
+  marksOf: (key: string) => { event: boolean; slot: boolean };
+}
+
+/**
+ * Grade do mês, como no calendário do celular: setas (ou deslizar o dedo) trocam de mês sem limite,
+ * e tocar no nome do mês mostra os 12 meses do ano, com setas para trocar de ano.
+ */
+export function MonthCalendar({ selected, today, onSelect, marksOf }: MonthCalendarProps) {
+  const [month, setMonth] = useState(() => monthStart(selected));
+  const [mode, setMode] = useState<'days' | 'months'>('days');
+  const year = Number(month.slice(0, 4));
+  const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
+
+  function step(by: number) {
+    setMonth((m) => addMonths(m, mode === 'months' ? by * 12 : by));
+  }
+  function onTouchStart(event: React.TouchEvent) {
+    const touch = event.touches[0];
+    swipe.current = event.touches.length === 1 && touch ? { x: touch.clientX, y: touch.clientY } : undefined;
+  }
+  function onTouchEnd(event: React.TouchEvent) {
+    const start = swipe.current;
+    const touch = event.changedTouches[0];
+    swipe.current = undefined;
+    if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(touch.clientY - start.y) * 1.5) return;
+    step(dx < 0 ? 1 : -1);
+  }
+
+  const label = mode === 'months' ? String(year) : capitalizeFirst(monthLabel(month));
+  return (
+    <div className="mcal" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <div className="mcal__bar">
+        <button type="button" className="iconbtn daynav__arrow" onClick={() => step(-1)} aria-label={mode === 'months' ? t('Ano anterior') : t('Mês anterior')}>
+          <ChevronLeftIcon />
+        </button>
+        <button
+          type="button"
+          className="mcal__title"
+          aria-live="polite"
+          aria-label={mode === 'months' ? t('{year}: voltar aos dias', { year }) : t('{month}: escolher outro mês ou ano', { month: label })}
+          onClick={() => setMode(mode === 'days' ? 'months' : 'days')}
+        >
+          {label}
+          <ChevronDownIcon />
+        </button>
+        <button type="button" className="iconbtn daynav__arrow" onClick={() => step(1)} aria-label={mode === 'months' ? t('Próximo ano') : t('Próximo mês')}>
+          <ChevronRightIcon />
+        </button>
+      </div>
+
+      {mode === 'months' ? (
+        <div className="mcal__months" role="group" aria-label={t('Escolha o mês')}>
+          {Array.from({ length: 12 }, (_, i) => {
+            const key = `${year}-${String(i + 1).padStart(2, '0')}-01`;
+            const isCurrent = key.slice(0, 7) === today.slice(0, 7);
+            const isShown = key.slice(0, 7) === selected.slice(0, 7);
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`mcal__month${isShown ? ' mcal__month--selected' : ''}${isCurrent ? ' mcal__month--today' : ''}`}
+                aria-pressed={isShown}
+                aria-label={capitalizeFirst(monthLabel(key))}
+                onClick={() => {
+                  setMonth(key);
+                  setMode('days');
+                }}
+              >
+                {capitalizeFirst(monthShortLabel(key))}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="mcal__grid" role="grid" aria-label={label}>
+          <div className="mcal__row" role="row">
+            {weekdayInitials().map((w, i) => (
+              <span key={i} className="mcal__weekday" role="columnheader" aria-hidden="true">
+                {w}
+              </span>
+            ))}
+          </div>
+          {monthWeeks(month).map((week) => (
+            <div key={week[0]} className="mcal__row" role="row">
+              {week.map((key) => {
+                const outside = key.slice(0, 7) !== month.slice(0, 7);
+                const marks = marksOf(key);
+                const isSelected = key === selected;
+                const isToday = key === today;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="gridcell"
+                    className={`mcal__day${outside ? ' mcal__day--outside' : ''}${isSelected ? ' mcal__day--selected' : ''}${isToday ? ' mcal__day--today' : ''}`}
+                    aria-selected={isSelected}
+                    aria-current={isToday ? 'date' : undefined}
+                    aria-label={`${dayLongLabel(key)}${isToday ? `, ${t('hoje')}` : ''}${marks.event ? `, ${t('tem evento')}` : ''}${marks.slot ? `, ${t('tem horário marcado')}` : ''}`}
+                    onClick={() => onSelect(key)}
+                  >
+                    <span>{dayChip(key).day}</span>
+                    <span className="mcal__marks" aria-hidden="true">
+                      {marks.event ? <span className="daymark daymark--event" /> : null}
+                      {marks.slot ? <span className="daymark daymark--ok" /> : null}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mcal__foot">
+        <button
+          type="button"
+          className="daynav__today"
+          onClick={() => onSelect(today)}
+        >
+          {t('Ir para hoje')}
+        </button>
       </div>
     </div>
   );
