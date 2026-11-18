@@ -7,7 +7,9 @@ import { formatRating, formatWhen } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { TeamMember, VenueEvent } from '../lib/types.ts';
 import { navigate } from '../router.tsx';
-import { OwnerEvents, ProfileEditSheet, VenuePostSheet } from './venue-page.tsx';
+import { AgendaRow, HoursInfo, InfoRow, OwnerEvents, ProfileEditSheet, VenueHero, VenuePostSheet } from './venue-page.tsx';
+import { LocationIcon } from '../components/icons.tsx';
+import type { VenueProfile } from '../lib/types.ts';
 import { VenueEventSheet } from './venues.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -20,6 +22,52 @@ function NotAllowed() {
   return <EmptyState title={t('Você não administra este local')}>{t('Peça ao responsável pelo local para convidar você para a equipe.')}</EmptyState>;
 }
 
+/** Como as pessoas veem a página do local: a mesma capa, informações e próximos eventos, só para olhar. */
+function PublicPreview({ venue, now }: { venue: VenueProfile; now: Date }) {
+  return (
+    <div className="vpreview">
+      <Notice>{t('É assim que as pessoas veem a página de {name}. Aqui você só olha.', { name: venue.name })}</Notice>
+      <div className="vpreview__page" aria-label={t('Prévia da página')}>
+        <VenueHero venue={venue} now={now} onShare={() => undefined} preview />
+        <div className="vhead">
+          <div className="vhead__actions">
+            <Button variant="primary" disabled>
+              {t('Seguir')}
+            </Button>
+            <Button variant="secondary" disabled>
+              {t('Rota')}
+            </Button>
+          </div>
+          <p className="muted">{venue.followerCount === 1 ? t('1 pessoa segue esta página') : t('{count} pessoas seguem esta página', { count: venue.followerCount })}</p>
+        </div>
+        {venue.description ? <p className="vabout__text">{venue.description}</p> : <p className="muted">{t('Sem descrição ainda. Toque em Editar perfil para contar o que as pessoas encontram aí.')}</p>}
+        <div className="vinfolist">
+          <HoursInfo venue={venue} now={now} />
+          {venue.address ? (
+            <InfoRow icon={<LocationIcon />}>
+              <span className="vinfo__addr">{venue.address}</span>
+            </InfoRow>
+          ) : (
+            <InfoRow icon={<LocationIcon />}>
+              <span className="muted">{t('Sem endereço ainda.')}</span>
+            </InfoRow>
+          )}
+        </div>
+        <h2 className="section__title">{t('Próximos eventos')}</h2>
+        {venue.upcomingEvents.length === 0 ? (
+          <p className="muted">{t('Nenhum evento marcado. Quando o rolê divulgar eventos, eles aparecem aqui.')}</p>
+        ) : (
+          <ul className="vagenda" aria-label={t('Próximos eventos')}>
+            {venue.upcomingEvents.map((e) => (
+              <AgendaRow key={e.id} event={e} now={now} preview />
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Painel: resumo do local e atalhos do dia a dia. */
 export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
   const page = useAsync(() => api.venueProfile(venueId), [venueId]);
@@ -27,6 +75,7 @@ export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
   useTitle(v ? t('Painel · {name}', { name: v.name }) : t('Painel'));
   const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | undefined>();
   const [done, setDone] = useState<string | undefined>();
+  const [view, setView] = useState<'manage' | 'public'>('manage');
   const now = new Date();
 
   if (page.loading && !v) return <Loading />;
@@ -37,6 +86,17 @@ export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
   return (
     <>
       <PageHead title={t('Painel')} subtitle={v.name} />
+      <div className="segtabs segtabs--fill" role="tablist" aria-label={t('Visão do painel')}>
+        <button type="button" role="tab" aria-selected={view === 'manage'} className="segtabs__tab" onClick={() => setView('manage')}>
+          {t('Gerenciar')}
+        </button>
+        <button type="button" role="tab" aria-selected={view === 'public'} className="segtabs__tab" onClick={() => setView('public')}>
+          {t('Como as pessoas veem')}
+        </button>
+      </div>
+      {view === 'public' ? <PublicPreview venue={v} now={now} /> : null}
+      {view === 'manage' ? (
+        <>
       <section className="vadmin__hero" aria-label={t('Resumo do local')}>
         <VenueLogo name={v.name} logoUrl={v.logoUrl} size={56} />
         <div className="vadmin__who">
@@ -83,6 +143,8 @@ export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
           <p className="muted">{t('Nenhum evento marcado. Crie o primeiro em Novo evento.')}</p>
         )}
       </section>
+        </>
+      ) : null}
       {sheet === 'edit' ? (
         <ProfileEditSheet
           venue={v}
