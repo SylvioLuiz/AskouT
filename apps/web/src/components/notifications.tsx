@@ -5,7 +5,7 @@ import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { currentSubscription, disableNativePush, disablePush, enableNativePush, enablePush, nativePushBridge, pushState, readEnvironment, readNativeState, refreshNativeToken } from '../lib/push.ts';
 import type { PushState } from '../lib/push.ts';
-import type { NotificationMute } from '../lib/types.ts';
+import type { NotificationMute, PushTestResult } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
 const COPY: Record<Exclude<PushState, 'off' | 'on'>, string> = {
@@ -149,3 +149,49 @@ export function MuteCard() {
   );
 }
 
+
+/** Texto do resultado do aviso de teste. Exportado para os testes. */
+export function pushTestSummary(r: PushTestResult): { tone: 'ok' | 'error'; text: string } {
+  if (r.devices === 0) return { tone: 'error', text: t('Nenhum aparelho com avisos ligados na sua conta. Ative os avisos acima e tente de novo.') };
+  const parts: string[] = [];
+  const label: Record<'ios' | 'android' | 'web', string> = { ios: 'iPhone', android: 'Android', web: t('navegador') };
+  for (const kind of ['android', 'ios', 'web'] as const) {
+    const k = r.byKind[kind];
+    if (k.sent + k.failed === 0) continue;
+    parts.push(k.failed === 0 ? t('{where}: enviado', { where: label[kind] }) : t('{where}: {sent} enviado(s), {failed} recusado(s)', { where: label[kind], sent: k.sent, failed: k.failed }));
+  }
+  const detail = parts.join(' · ');
+  if (r.failed === 0) return { tone: 'ok', text: t('Aviso de teste enviado ({detail}). Se não apareceu, confira se as notificações do AskouT estão liberadas nos ajustes do aparelho.', { detail }) };
+  return { tone: 'error', text: t('Alguns aparelhos recusaram o aviso de teste ({detail}). Desligue e ligue os avisos de novo neste aparelho e tente outra vez.', { detail }) };
+}
+
+/** Botão para mandar um aviso de teste aos próprios aparelhos (confere se o push está chegando). */
+export function PushTestCard() {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
+  async function send() {
+    setBusy(true);
+    setResult(undefined);
+    try {
+      setResult(pushTestSummary(await api.pushTest()));
+    } catch (failure) {
+      setResult({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="setting">
+      <div className="setting__text">
+        <h3 className="setting__title">{t('Testar avisos')}</h3>
+        <p className="setting__help">{t('Manda um aviso para os seus aparelhos 5 segundos depois de tocar. Minimize o app nesse meio tempo para ver a notificação chegar com a prévia.')}</p>
+        <div className="row-actions">
+          <Button small variant="secondary" loading={busy} onClick={() => void send()}>
+            {t('Enviar teste')}
+          </Button>
+        </div>
+        {result ? <Notice tone={result.tone}>{result.text}</Notice> : null}
+      </div>
+    </section>
+  );
+}

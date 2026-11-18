@@ -72,6 +72,7 @@ import type {
   MeetupView,
   NotificationCategory,
   NotificationList,
+  PushTestResult,
   PostedEventsPage,
   PostComment,
   PostCommentsPage,
@@ -690,7 +691,10 @@ export function createApi(deps: ApiDeps) {
     // Avisos
     notifications: (category: NotificationCategory = 'all') => request<NotificationList>('GET', `/notifications${toQuery({ category: category === 'all' ? undefined : category })}`),
     unreadNotifications: () => request<{ unread: number; latestUnreadAt: string | null }>('GET', '/notifications/unread'),
-    markNotificationsRead: (notificationId?: string) => request<{ unread: number }>('POST', '/notifications/read', { body: notificationId ? { id: notificationId } : {} }),
+    /** Um aviso (id), os selecionados (lista de ids) ou todos (sem argumento). */
+    markNotificationsRead: (notificationId?: string | string[]) => request<{ unread: number }>('POST', '/notifications/read', { body: Array.isArray(notificationId) ? { ids: notificationId } : notificationId ? { id: notificationId } : {} }),
+    /** Manda um aviso de teste para os aparelhos da própria pessoa. */
+    pushTest: () => request<PushTestResult>('POST', '/notifications/push/test'),
     pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),
     pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
     pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),

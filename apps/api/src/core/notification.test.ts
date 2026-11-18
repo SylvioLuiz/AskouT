@@ -75,6 +75,26 @@ describe('avisos', () => {
     assert.equal((await w.core.notifications.list(bia!)).unread, 1, 'depois de lido, volta a avisar');
   });
 
+  it('marca como lidos só os avisos selecionados', async () => {
+    const w = makeWorld();
+    const { ana, bia, cia, dani } = await friends(w, 'ana', 'bia', 'cia', 'dani');
+    for (const who of [ana!, cia!, dani!]) {
+      const { id } = await w.core.conversations.open(who, bia!);
+      await w.core.conversations.send(who, id, { body: 'oi' });
+    }
+    await w.core.flushNotifications();
+    const list = await w.core.notifications.list(bia!);
+    assert.equal(list.unread, 3);
+    const [first, second, third] = list.items.filter((n) => !n.read);
+    const res = await w.core.notifications.markRead(bia!, [first!.id, second!.id, first!.id]);
+    assert.equal(res.unread, 1);
+    const after = await w.core.notifications.list(bia!);
+    assert.deepEqual(after.items.filter((n) => !n.read).map((n) => n.id), [third!.id]);
+    assert.equal((await w.core.notifications.markRead(bia!, [])).unread, 1, 'lista vazia não marca nada');
+    await assert.rejects(w.core.notifications.markRead(bia!, Array.from({ length: 101 }, (_, i) => `x${i}`)), /Dados inválidos/);
+    await assert.rejects(w.core.notifications.markRead(bia!, [42 as unknown as string]), /Dados inválidos/);
+  });
+
   it('push de mensagem: cada mensagem nova chega no celular, mesmo com o aviso da conversa ainda não lido no sino', async () => {
     const w = makeWorld();
     const { ana, bia } = await friends(w, 'ana', 'bia');

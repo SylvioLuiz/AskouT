@@ -396,6 +396,15 @@ export interface NotificationList {
   unread: number;
 }
 
+/** Resultado do aviso de teste: quantos aparelhos a pessoa tem e quantos o serviço (Apple, Google, navegador) aceitou. */
+export interface PushTestResult {
+  devices: number;
+  sent: number;
+  failed: number;
+  removed: number;
+  byKind: Record<'ios' | 'android' | 'web', { sent: number; failed: number }>;
+}
+
 /** Chips da tela de notificações. O servidor filtra (`GET /notifications?category=`); `all` não filtra. */
 export type NotificationCategory = 'all' | 'mentions' | 'comments' | 'likes' | 'follows' | 'invites' | 'events' | 'messages';
 

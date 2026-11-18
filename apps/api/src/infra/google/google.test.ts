@@ -82,6 +82,20 @@ describe('FCM (aviso no Android)', () => {
     assert.equal(body.message.token, FCM_TOKEN);
     assert.deepEqual(body.message.notification, { title: 'Ana', body: 'Nova mensagem' });
     assert.equal(body.message.data.url, '/conversas/1');
+    // Canal de importância alta + público: o Android mostra a prévia (título e texto) no topo e na tela bloqueada.
+    const android = (JSON.parse(call.body!) as { message: { android: { priority: string; notification: Record<string, unknown> } } }).message.android;
+    assert.equal(android.priority, 'HIGH');
+    assert.equal(android.notification['channel_id'], 'avisos');
+    assert.equal(android.notification['visibility'], 'PUBLIC');
+  });
+
+  it('registra no log por que o FCM recusou, com a dica de como resolver', async () => {
+    const lines: string[] = [];
+    const g = fakeGoogle(() => ok({ error: { status: 'PERMISSION_DENIED' } }, 403));
+    assert.equal(await new FcmSender({ tokens: g.tokens, fetch: g.fetcher, log: (l) => lines.push(l) }).send(sub(`fcm:${FCM_TOKEN}`), msg), 'FAILED');
+    assert.equal(lines.length, 1);
+    assert.match(lines[0]!, /\[push Android\] FCM recusou .*HTTP 403 PERMISSION_DENIED — .*Firebase Cloud Messaging/);
+    assert.ok(!lines[0]!.includes(FCM_TOKEN), 'não mostra o token inteiro');
   });
 
   it('com FCM_PROJECT_ID, envia para o projeto do Firebase em vez do da conta de serviço', async () => {
@@ -93,7 +107,7 @@ describe('FCM (aviso no Android)', () => {
 
   it('recusa endereço que não é do Android e trata token inválido como GONE', async () => {
     const g = fakeGoogle(() => ok({ error: { status: 'NOT_FOUND', details: [{ errorCode: 'UNREGISTERED' }] } }, 404));
-    const sender = new FcmSender({ tokens: g.tokens, fetch: g.fetcher });
+    const sender = new FcmSender({ tokens: g.tokens, fetch: g.fetcher, log: () => undefined });
     assert.equal(await sender.send(sub('apns:abc'), msg), 'FAILED');
     assert.equal(await sender.send(sub(`fcm:${FCM_TOKEN}`), msg), 'GONE');
   });
@@ -104,7 +118,7 @@ describe('FCM (aviso no Android)', () => {
     assert.equal(await new FcmSender({ tokens: g.tokens, fetch: g.fetcher }).send(sub(`fcm:${FCM_TOKEN}`), msg), 'SENT');
     assert.equal(g.calls.filter((c) => c.url.includes('oauth2')).length, 2);
     const g2 = fakeGoogle(() => ok({ error: { status: 'UNAVAILABLE' } }, 503));
-    assert.equal(await new FcmSender({ tokens: g2.tokens, fetch: g2.fetcher }).send(sub(`fcm:${FCM_TOKEN}`), msg), 'FAILED');
+    assert.equal(await new FcmSender({ tokens: g2.tokens, fetch: g2.fetcher, log: () => undefined }).send(sub(`fcm:${FCM_TOKEN}`), msg), 'FAILED');
   });
 
   it('o roteador escolhe pelo prefixo e falha se o caminho não está configurado', async () => {

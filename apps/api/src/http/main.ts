@@ -33,4 +33,5 @@ if (config.corsOrigins.length > 0) {
 await app.listen(config.port);
 console.log(`AskouT API ouvindo na porta ${config.port} (${config.nodeEnv})`);
 // Para conferir no log da hospedagem se o aviso no iPhone está ligado (sem mostrar a chave).
+console.log(config.googleServiceAccount ? `[push Android] ligado: projeto do Firebase ${config.fcmProjectId ?? `${config.googleServiceAccount.project_id} (o da conta de serviço; defina FCM_PROJECT_ID se o app for de outro projeto)`}` : '[push Android] desligado: falta GOOGLE_SERVICE_ACCOUNT_JSON');
 console.log(config.apns ? `[push iPhone] ligado: ${config.apns.production ? 'production (TestFlight/loja)' : 'sandbox (Xcode)'}, app ${config.apns.bundleId}, chave ${config.apns.keyId}` : '[push iPhone] desligado: faltam APNS_KEY_ID, APNS_TEAM_ID e APNS_PRIVATE_KEY');

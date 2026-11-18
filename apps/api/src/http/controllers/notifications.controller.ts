@@ -2,8 +2,11 @@ import { Body, Controller, Get, HttpCode, Inject, Post, Put, Query } from '@nest
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
+import { validationError } from '../../core/errors.ts';
 import { asBody } from '../support/parse.ts';
 import { CORE } from '../tokens.ts';
+
+const PUSH_TEST_DELAY_MS = 5000;
 
 @Controller('notifications')
 export class NotificationsController {
@@ -26,12 +29,27 @@ export class NotificationsController {
     return { unread, latestUnreadAt };
   }
 
-  /** `{id}` marca um aviso; sem corpo, marca todos. */
+  /** `{id}` marca um aviso; `{ids: [...]}` marca os selecionados; sem corpo, marca todos. */
   @Post('read')
   @HttpCode(200)
   read(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = body === undefined || body === null ? {} : asBody(body);
+    if (b.ids !== undefined) {
+      if (!Array.isArray(b.ids)) throw validationError('Dados inválidos', { ids: 'Envie uma lista de avisos' });
+      return this.core.notifications.markRead(actor.userId, b.ids as string[]);
+    }
     return this.core.notifications.markRead(actor.userId, typeof b.id === 'string' ? b.id : undefined);
+  }
+
+  /**
+   * Manda um aviso de teste para os aparelhos de quem pediu e devolve quantos foram aceitos. Espera 5 s antes de enviar:
+   * com o app aberto o celular não mostra a notificação, então dá tempo de minimizar o app para ver a prévia chegar.
+   */
+  @Post('push/test')
+  @HttpCode(200)
+  async testPush(@CurrentActor() actor: Actor) {
+    await new Promise((resolve) => setTimeout(resolve, PUSH_TEST_DELAY_MS));
+    return this.core.notifications.testPush(actor.userId);
   }
 
   /** O que está silenciado: `{all, chats, events}`. */

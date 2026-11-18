@@ -69,6 +69,12 @@ if (Capacitor.isNativePlatform()) {
   // Avisos fora do app (iPhone pela Apple, Android pelo FCM): o token vai para o servidor pelo app web
   // (`apns:` ou `fcm:`); tocar no aviso abre a tela certa.
   w['AskouTPush'] = createPushBridge({ push: PushNotifications as never, open: (path) => openInApp(path, window) });
+  if (Capacitor.getPlatform() === 'android') {
+    // Canal "avisos" com importância alta: o Android mostra o aviso no topo da tela, com o título e o texto (a prévia).
+    // Sem ele, o aviso cai no canal genérico, de importância normal, e só aparece como ícone na barra.
+    // O servidor manda os avisos neste canal (FCM_CHANNEL_ID em apps/api/src/infra/push/fcm-sender.ts).
+    void PushNotifications.createChannel({ id: 'avisos', name: 'Avisos', description: 'Mensagens, convites e eventos do AskouT', importance: 5, visibility: 1, vibration: true, lights: true }).catch(() => undefined);
+  }
   void StatusBar.setStyle({ style: Style.Default }).catch(() => undefined);
   void SplashScreen.hide().catch(() => undefined);
 }
