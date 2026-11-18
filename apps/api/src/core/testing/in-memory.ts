@@ -60,7 +60,7 @@ import type {
   ConsentEventRecord,
   CloakroomSettingRecord,
   CloakroomTicketRecord,
-  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 import type { ActivityRepository, MfaRepository } from '../ports.ts';
@@ -1373,6 +1373,8 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   /** Sininho ligado (`userId|venueId`). Só vale enquanto a pessoa segue. */
   readonly venueNotify = new Set<string>();
   readonly venueRatings = new Map<string, number>();
+  /** Equipe dos locais (`venueId|userId`). */
+  readonly venueManagers = new Map<string, VenueManagerRecord>();
 
   async updateVenueProfile(venueId: string, patch: VenueProfilePatch) {
     const v = this.venues.get(venueId);
@@ -1481,6 +1483,37 @@ export class InMemoryPlaceRepository implements PlaceRepository {
 
   async listVenuesByOwner(ownerId: string) {
     return [...this.venues.values()].filter((v) => v.ownerId === ownerId).map((v) => ({ ...v })).sort((a, b) => a.name.localeCompare(b.name) || (a.id < b.id ? -1 : 1));
+  }
+
+  async listVenueManagers(venueId: string) {
+    return [...this.venueManagers.values()].filter((m) => m.venueId === venueId).map((m) => ({ ...m })).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.userId < b.userId ? -1 : 1));
+  }
+
+  async findVenueManager(venueId: string, userId: string) {
+    const m = this.venueManagers.get(`${venueId}|${userId}`);
+    return m ? { ...m } : undefined;
+  }
+
+  async saveVenueManager(m: VenueManagerRecord) {
+    this.venueManagers.set(`${m.venueId}|${m.userId}`, { ...m });
+  }
+
+  async deleteVenueManager(venueId: string, userId: string) {
+    return this.venueManagers.delete(`${venueId}|${userId}`);
+  }
+
+  async listVenuesManagedBy(userId: string) {
+    const ids = new Set([...this.venueManagers.values()].filter((m) => m.userId === userId && m.status === 'ACCEPTED').map((m) => m.venueId));
+    return [...this.venues.values()].filter((v) => ids.has(v.id)).map((v) => ({ ...v })).sort((a, b) => a.name.localeCompare(b.name) || (a.id < b.id ? -1 : 1));
+  }
+
+  async listVenueManagerInvites(userId: string) {
+    const out: { venue: VenueRecord; record: VenueManagerRecord }[] = [];
+    for (const m of this.venueManagers.values()) {
+      const venue = this.venues.get(m.venueId);
+      if (m.userId === userId && m.status === 'PENDING' && venue) out.push({ venue: { ...venue }, record: { ...m } });
+    }
+    return out.sort((a, b) => b.record.createdAt.getTime() - a.record.createdAt.getTime() || (a.venue.id < b.venue.id ? -1 : 1));
   }
 
   async listVenueEvents(venueId: string) {

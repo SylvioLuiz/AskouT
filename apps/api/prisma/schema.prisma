@@ -235,6 +235,7 @@ model User {
   postHidden        PostHidden[]  @relation("PostHidden")
   ownedVenues       Venue[]       @relation("VenueOwner")
   venueClaims       VenueClaim[]  @relation("ClaimUser")
+  venueManagerships VenueManager[] @relation("VenueManagerUser")
   venueFollows      VenueFollow[]
   region            UserRegion?
   venueRatings      VenueRating[]
@@ -794,6 +795,7 @@ model Venue {
   owner  User?        @relation("VenueOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   events PlaceEvent[]
   claims VenueClaim[]
+  managers VenueManager[]
   cover  VenueCover?
   logo   VenueLogo?
   calendar       VenueCalendar?
@@ -809,6 +811,28 @@ model Venue {
   @@index([lat, lng])
   @@index([ownerId])
   boosts Boost[]
+}
+
+enum VenueManagerStatus {
+  PENDING
+  ACCEPTED
+}
+
+/// Administrador adicional do local: convidado pelo dono e só vale depois do aceite. Edita perfil, eventos, agenda, posts e
+/// chapelaria; não mexe na equipe nem impulsiona (isso é só do dono, `Venue.ownerId`).
+model VenueManager {
+  venueId     String             @db.Uuid
+  userId      String             @db.Uuid
+  status      VenueManagerStatus @default(PENDING)
+  invitedById String             @db.Uuid
+  createdAt   DateTime           @default(now())
+  acceptedAt  DateTime?
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user  User  @relation("VenueManagerUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([venueId, userId])
+  @@index([userId, status])
 }
 
 enum ClaimStatus {

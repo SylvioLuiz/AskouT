@@ -40,6 +40,9 @@ const ChatInfoScreen = lazyWithReload(() => import('./screens/chat-info.tsx').th
 const GroupScreen = lazyWithReload(() => import('./screens/group.tsx').then((m) => ({ default: m.GroupScreen })));
 const VenueCalendarScreen = lazyWithReload(() => import('./screens/venue-calendar.tsx').then((m) => ({ default: m.VenueCalendarScreen })));
 const CloakroomPanelScreen = lazyWithReload(() => import('./screens/cloakroom-panel.tsx').then((m) => ({ default: m.CloakroomPanelScreen })));
+const VenueAdminHomeScreen = lazyWithReload(() => import('./screens/venue-admin.tsx').then((m) => ({ default: m.VenueAdminHomeScreen })));
+const VenueAdminEventsScreen = lazyWithReload(() => import('./screens/venue-admin.tsx').then((m) => ({ default: m.VenueAdminEventsScreen })));
+const VenueTeamScreen = lazyWithReload(() => import('./screens/venue-admin.tsx').then((m) => ({ default: m.VenueTeamScreen })));
 const BoostScreen = lazyWithReload(() => import('./screens/boost.tsx').then((m) => ({ default: m.BoostScreen })));
 const VenuePageScreen = lazyWithReload(() => import('./screens/venue-page.tsx').then((m) => ({ default: m.VenuePageScreen })));
 const VenuesScreen = lazyWithReload(() => import('./screens/venues.tsx').then((m) => ({ default: m.VenuesScreen })));
@@ -164,6 +167,9 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/tema', render: () => <ThemeScreen /> },
   { path: '/locais', render: () => <VenuesScreen /> },
   { path: '/bares/:id/eventos/:eventId/chapelaria', render: (p) => <CloakroomPanelScreen key={p['eventId']} venueId={p['id'] ?? ''} eventId={p['eventId'] ?? ''} /> },
+  { path: '/bares/:id/painel', render: (p) => <VenueAdminHomeScreen key={p['id']} venueId={p['id'] ?? ''} /> },
+  { path: '/bares/:id/eventos', render: (p) => <VenueAdminEventsScreen key={p['id']} venueId={p['id'] ?? ''} /> },
+  { path: '/bares/:id/equipe', render: (p) => <VenueTeamScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id/agenda', render: (p) => <VenueCalendarScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/locais/:id/agenda', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}/agenda`} /> },
   { path: '/bares/:id/impulsionar', render: (p) => <BoostScreen key={p['id']} venueId={p['id'] ?? ''} /> },

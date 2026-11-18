@@ -3,7 +3,7 @@ import { isUuid } from './helpers.ts';
 import { boundingBox, distanceMeters } from '../../core/geo.ts';
 import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../../core/explore-match.ts';
 import type { EventSearchQuery, PlaceRepository } from '../../core/ports.ts';
-import type { PlaceEventRecord, VenueHours, VenueProfilePatch, VenueRecord } from '../../core/types.ts';
+import type { PlaceEventRecord, VenueHours, VenueManagerRecord, VenueProfilePatch, VenueRecord } from '../../core/types.ts';
 
 /** Teto de linhas trazidas da caixa antes do filtro exato; evita ler a cidade inteira. */
 const PREFILTER_CAP = 500;
@@ -169,6 +169,45 @@ export class PrismaPlaceRepository implements PlaceRepository {
     return rows.map(toVenue);
   }
 
+  async listVenueManagers(venueId: string) {
+    if (!isUuid(venueId)) return [];
+    const rows = await this.prisma.venueManager.findMany({ where: { venueId }, orderBy: [{ createdAt: 'asc' }, { userId: 'asc' }] });
+    return rows.map(toManager);
+  }
+
+  async findVenueManager(venueId: string, userId: string) {
+    if (!isUuid(venueId) || !isUuid(userId)) return undefined;
+    const r = await this.prisma.venueManager.findUnique({ where: { venueId_userId: { venueId, userId } } });
+    return r ? toManager(r) : undefined;
+  }
+
+  async saveVenueManager(m: VenueManagerRecord) {
+    const data = { status: m.status, invitedById: m.invitedById, acceptedAt: m.acceptedAt };
+    await this.prisma.venueManager.upsert({
+      where: { venueId_userId: { venueId: m.venueId, userId: m.userId } },
+      create: { venueId: m.venueId, userId: m.userId, createdAt: m.createdAt, ...data },
+      update: data,
+    });
+  }
+
+  async deleteVenueManager(venueId: string, userId: string) {
+    if (!isUuid(venueId) || !isUuid(userId)) return false;
+    const res = await this.prisma.venueManager.deleteMany({ where: { venueId, userId } });
+    return res.count > 0;
+  }
+
+  async listVenuesManagedBy(userId: string) {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.venue.findMany({ where: { managers: { some: { userId, status: 'ACCEPTED' } } }, orderBy: [{ name: 'asc' }, { id: 'asc' }] });
+    return rows.map(toVenue);
+  }
+
+  async listVenueManagerInvites(userId: string) {
+    if (!isUuid(userId)) return [];
+    const rows = await this.prisma.venueManager.findMany({ where: { userId, status: 'PENDING' }, include: { venue: true }, orderBy: [{ createdAt: 'desc' }, { venueId: 'asc' }] });
+    return rows.map((r) => ({ venue: toVenue(r.venue), record: toManager(r) }));
+  }
+
   async listVenueEvents(venueId: string) {
     if (!isUuid(venueId)) return [];
     const rows = await this.prisma.placeEvent.findMany({ where: { venueId }, orderBy: [{ startsAt: 'desc' }, { id: 'asc' }], take: 500 });
@@ -311,4 +350,8 @@ function parseHours(json: string | null | undefined): VenueHours | null {
   } catch {
     return null;
   }
+}
+
+function toManager(r: { venueId: string; userId: string; status: 'PENDING' | 'ACCEPTED'; invitedById: string; createdAt: Date; acceptedAt: Date | null }): VenueManagerRecord {
+  return { venueId: r.venueId, userId: r.userId, status: r.status, invitedById: r.invitedById, createdAt: r.createdAt, acceptedAt: r.acceptedAt };
 }

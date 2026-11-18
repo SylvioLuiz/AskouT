@@ -466,3 +466,9 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - Migração `20261206120000_flash_destination` (roda sozinha no deploy da API).
 - Rotas via OSRM (servidor público de demonstração, uso leve). Para produção em escala, apontar `OSRM_URL` para um servidor próprio. Sem resposta do OSRM, o app mostra linha reta e tempo estimado.
 - Ainda não testado em aparelho real nem no mapa nativo.
+
+## Modo estabelecimento e equipe (18/11/2026)
+- Ao abrir o estabelecimento (Meus locais → toque no local, ou "Administrar" na página do bar) o app entra no **modo estabelecimento**: menu de baixo próprio (Painel, Eventos, Agenda, Equipe e, só para o responsável, Impulsionar) e o botão "Voltar para o perfil" é a única saída. Rotas: `/bares/:id/painel|eventos|agenda|equipe|impulsionar`.
+- **Administrador adicional** (tabela `VenueManager`, convite do responsável + aceite): edita perfil, eventos, agenda importada, posts e chapelaria. **Não** convida nem remove pessoas e **não** impulsiona; a API responde "não encontrado" nesses casos. Pode sair da equipe sozinho. Limite de 10 por local.
+- Migração `20261226120000_venue_managers` escrita à mão e **nunca rodada em Postgres**: rodar `prisma migrate deploy` + `prisma generate` e a suíte de contrato Prisma (`equipe do local`). A tela não foi conferida num navegador.
+- Os avisos da agenda importada (aprovar rascunhos) ainda vão só para o responsável.

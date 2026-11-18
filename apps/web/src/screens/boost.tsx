@@ -17,7 +17,7 @@ function formatWhen(iso: string): string {
 /** Tela do responsável pelo local: escolhe o que impulsionar, por quantos dias, e paga (Pix/cartão no site, compra da loja no aplicativo). */
 export function BoostScreen({ venueId }: { venueId: string }) {
   useTitle(t('Impulsionar'));
-  const back = `/bares/${encodeURIComponent(venueId)}`;
+  const back = `/bares/${encodeURIComponent(venueId)}/painel`;
   const profile = useAsync(() => api.venueProfile(venueId), [venueId]);
   const pricing = useAsync(() => api.boostPricing(), []);
   const boosts = useAsync(() => api.venueBoosts(venueId), [venueId]);
