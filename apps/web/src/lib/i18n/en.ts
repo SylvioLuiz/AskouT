@@ -2516,4 +2516,6 @@ export const EN: Readonly<Record<string, string>> = {
   "Outlook.com, Hotmail ou Microsoft 365": "Outlook.com, Hotmail or Microsoft 365",
   "Pela agenda do celular": "Through your phone calendar",
   "{name} conectada. Escolha abaixo quais agendas entram.": "{name} connected. Choose below which calendars to include.",
+  "Mês": "Month",
+  "Visualização da agenda": "Calendar view",
 };
