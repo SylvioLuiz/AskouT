@@ -12,6 +12,8 @@ export interface PublicProfile {
 
 export interface Profile extends PublicProfile {
   bio: string | null;
+  /** A aba "Participou" aparece para visitantes. Ausente = privada (só a dona vê). */
+  attendedEventsPublic?: boolean;
 }
 
 export type RelationState = 'NONE' | 'PENDING' | 'ACCEPTED';
@@ -426,6 +428,20 @@ export interface EventCard {
 
 export interface PostedEvent extends EventCard {
   postedAt: string;
+}
+
+/** Evento que a pessoa já participou (aba "Participou" do perfil). */
+export interface AttendedEvent extends EventCard {
+  attendedAt: string;
+  /** Evento privado criado por uma pessoa (só aparece para quem tem acesso a ele). */
+  private?: boolean;
+}
+
+export interface AttendedEventsPage {
+  items: AttendedEvent[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface PostedEventsPage {
@@ -924,6 +940,8 @@ export type HomeFeedItem = PostView | PlaceEventFeedItem;
 
 export interface HomeFeedPage extends Omit<PostsPage, 'items'> {
   items: HomeFeedItem[];
+  /** Data do post mais antigo (só na primeira página), para a régua de datas. */
+  oldestAt?: string | null;
 }
 
 export interface PostsPage {

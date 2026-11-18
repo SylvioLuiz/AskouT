@@ -32,6 +32,13 @@ export class ProfilesController {
     return this.core.profiles.setPrivacy(actor.userId, asBody(body).isPrivate);
   }
 
+  /** `{attendedEventsPublic: true|false}`: mostra ou esconde dos visitantes a aba "Participou". */
+  @Patch('me/attended-visibility')
+  @HttpCode(200)
+  setAttendedVisibility(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.profiles.setAttendedVisibility(actor.userId, asBody(body).attendedEventsPublic);
+  }
+
   /** `{image: "data:image/jpeg;base64,..."}` (até 60 KB, já reduzida pelo app) ou `{image: null}` para remover. */
   @Put('me/photo')
   setPhoto(@CurrentActor() actor: Actor, @Body() body: unknown) {
@@ -56,6 +63,12 @@ export class ProfilesController {
   @Get(':username/events')
   events(@CurrentActor() actor: Actor, @Param('username') username: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
     return this.core.profileEvents.list(actor.userId, username, { limit, offset });
+  }
+
+  /** Eventos que a pessoa já participou (aba "Participou"): a dona sempre vê; visitante só se a aba for pública. */
+  @Get(':username/attended')
+  attended(@CurrentActor() actor: Actor, @Param('username') username: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
+    return this.core.eventPages.listAttended(actor.userId, username, { limit, offset });
   }
 
   /** Denunciar um perfil. `{reason: SPAM|OFFENSIVE|NUDITY|VIOLENCE|FALSE_INFO|OTHER, details?}` */

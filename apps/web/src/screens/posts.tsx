@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
-import { CarouselIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, LocationIcon, PhotoIcon, UsersIcon, XIcon } from '../components/icons.tsx';
+import { CarouselIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, LocationIcon, PhotoIcon, SendIcon, UsersIcon, XIcon } from '../components/icons.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
-import { ConversationPick } from '../components/conversation-pick.tsx';
+import { ShareEventSheet } from '../components/share-event.tsx';
 import { CropEditor } from '../components/crop.tsx';
 import { EventDates } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
@@ -130,12 +130,17 @@ export function CreatePostScreen() {
   const [kind, setKind] = useState<'POST' | 'EVENT'>(startAsEvent ? 'EVENT' : 'POST');
   const [eventTitle, setEventTitle] = useState(fromPoll ? (prefill.get('titulo') ?? '').slice(0, 120) : '');
   const [eventKind, setEventKind] = useState<EventKind>('OTHER');
-  const [eventStart, setEventStart] = useState(fromPoll ? (prefill.get('inicio') ?? '') : '');
-  const [eventEnd, setEventEnd] = useState(fromPoll ? (prefill.get('fim') ?? '') : '');
+  // Data e horário também vêm de um compromisso da agenda (`/criar?tipo=evento&inicio=...&fim=...`).
+  const [eventStart, setEventStart] = useState(startAsEvent ? (prefill.get('inicio') ?? '') : '');
+  const [eventEnd, setEventEnd] = useState(startAsEvent ? (prefill.get('fim') ?? '') : '');
   const [eventPrivate, setEventPrivate] = useState(false);
-  const [shareTo, setShareTo] = useState<string[]>(fromPoll && prefill.get('conversa') ? [prefill.get('conversa') as string] : []);
-  useTitle(kind === 'EVENT' ? t('Novo evento') : t('Nova publicação'));
-  const [createdId, setCreatedId] = useState<string | undefined>();
+  // A conversa da votação já vem marcada no passo de enviar, que aparece depois que o evento é criado.
+  const pollConversation = fromPoll ? prefill.get('conversa') : null;
+  // Evento criado: em vez de sair direto, mostra o passo "Enviar para conversas".
+  const [created, setCreated] = useState<{ id: string; title: string; private: boolean; cover: string | undefined } | undefined>();
+  const [sharing, setSharing] = useState(false);
+  const [sharedOnce, setSharedOnce] = useState(false);
+  useTitle(created ? t('Evento criado') : kind === 'EVENT' ? t('Novo evento') : t('Nova publicação'));
   const [discarding, setDiscarding] = useState(false);
   const friends = useAsync(() => api.friends(), []);
 
@@ -217,7 +222,6 @@ export function CreatePostScreen() {
   }
 
   async function publish() {
-    if (createdId) return navigate(`/eventos/${encodeURIComponent(createdId)}`);
     setBusy(true);
     setMessage(undefined);
     const eventDraft = kind === 'EVENT' ? { title: eventTitle, kind: eventKind, startsAt: eventStart, endsAt: eventEnd, private: eventPrivate } : null;
@@ -252,18 +256,15 @@ export function CreatePostScreen() {
           throw failure;
         }
       }
-      if (created.event && shareTo.length > 0) {
-        const results = await Promise.allSettled(shareTo.map((conversationId) => api.sendEvent(conversationId, created.id)));
-        const failed = results.filter((r) => r.status === 'rejected').length;
-        if (failed > 0) {
-          setCreatedId(created.id);
-          setMessage({ tone: 'error', text: failed === 1 ? t('O evento foi criado, mas não consegui enviar para 1 conversa. Abra o evento e use Compartilhar.') : t('O evento foi criado, mas não consegui enviar para {count} conversas. Abra o evento e use Compartilhar.', { count: failed }) });
-          setBusy(false);
-          return;
-        }
-      }
       setUpload(undefined);
-      navigate(created.event ? (eventPrivate ? `/eventos/${encodeURIComponent(created.id)}` : '/perfil?aba=eventos') : `/posts/${encodeURIComponent(created.id)}`);
+      if (created.event) {
+        // O evento já existe: agora (e só agora) vem o passo de enviar para conversas, que dá para pular.
+        setCreated({ id: created.id, title: created.event.title, private: eventPrivate, cover: items[0]?.preview });
+        setSharing(true);
+        setBusy(false);
+        return;
+      }
+      navigate(`/posts/${encodeURIComponent(created.id)}`);
     } catch (failure) {
       setMessage({ tone: 'error', text: toApiError(failure).message });
       setUpload(undefined);
@@ -305,6 +306,57 @@ export function CreatePostScreen() {
     </Sheet>
   ) : null;
 
+  if (created) {
+    const eventPath = `/eventos/${encodeURIComponent(created.id)}`;
+    const finish = () => navigate(created.private ? eventPath : '/perfil?aba=eventos');
+    return (
+      <div className="compose compose--created">
+        <header className="compose__bar">
+          <span aria-hidden="true" />
+          <h1 className="compose__title">{t('Evento criado')}</h1>
+          <button type="button" className="compose__next" onClick={finish}>
+            {t('Concluir')}
+          </button>
+        </header>
+        <div className="created">
+          <span className="created__cover">
+            {created.cover ? <img src={created.cover} alt="" referrerPolicy="no-referrer" /> : null}
+            <span className="created__check" aria-hidden="true">
+              <CheckIcon />
+            </span>
+          </span>
+          <strong className="created__title">{created.title}</strong>
+          <p className="muted">
+            {created.private
+              ? t('Seu evento privado está pronto. Ele só chega a quem receber nas conversas.')
+              : t('Seu evento está pronto e já aparece no seu perfil.')}
+          </p>
+          <Button full onClick={() => setSharing(true)}>
+            <SendIcon /> {sharedOnce ? t('Enviar para mais conversas') : t('Enviar para conversas e grupos')}
+          </Button>
+          <Button variant="quiet" full onClick={() => navigate(eventPath)}>
+            {t('Ver evento')}
+          </Button>
+        </div>
+        {sharing ? (
+          <ShareEventSheet
+            eventId={created.id}
+            source="USER"
+            title={created.title}
+            sheetTitle={t('Enviar o evento')}
+            posted={false}
+            onPostedChange={() => undefined}
+            profile={created.private ? 'private' : 'owner'}
+            outside={!created.private}
+            {...(pollConversation && !sharedOnce ? { initialConversations: [pollConversation] } : {})}
+            onShared={() => setSharedOnce(true)}
+            onClose={() => setSharing(false)}
+          />
+        ) : null}
+      </div>
+    );
+  }
+
   if (step === 'details') {
     return (
       <div className="compose compose--details">
@@ -344,9 +396,7 @@ export function CreatePostScreen() {
                 <span className="muted">{t('Não aparece no seu perfil nem no feed, e ninguém o posta no próprio perfil. Só chega a quem receber nas conversas.')}</span>
               </span>
             </label>
-            <h3 className="compose__h">{t('Enviar para conversas e grupos')}</h3>
-            <ConversationPick selected={shareTo} onChange={setShareTo} label={t('Conversas que vão receber o evento')} />
-            <p className="muted">{eventPrivate ? t('Escolha com quem compartilhar.') : t('Opcional. Quem estiver no grupo poderá postar o evento no próprio perfil.')}</p>
+            <p className="muted">{t('Depois de criar, você escolhe as conversas e grupos que vão receber o evento.')}</p>
           </section>
         ) : null}
         <div className="compose__caption">
@@ -422,7 +472,7 @@ export function CreatePostScreen() {
 
         <div className="compose__footer">
           <Button full loading={busy} disabled={captionLength > POST_CAPTION_MAX} onClick={() => void publish()}>
-            {createdId ? t('Abrir o evento criado') : kind === 'EVENT' ? t('Criar evento') : t('Compartilhar')}
+            {kind === 'EVENT' ? t('Criar evento') : t('Compartilhar')}
           </Button>
         </div>
 

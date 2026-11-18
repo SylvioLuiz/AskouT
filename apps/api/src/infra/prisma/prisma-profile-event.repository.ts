@@ -44,17 +44,17 @@ export class PrismaProfileEventRepository implements ProfileEventRepository {
     return (await this.prisma.postedUserEvent.count({ where: { userId, postId } })) > 0;
   }
 
-  async listPlaceReposts(userIds: string[], limit: number): Promise<{ userId: string; eventId: string; createdAt: Date }[]> {
+  async listPlaceReposts(userIds: string[], limit: number, before?: Date): Promise<{ userId: string; eventId: string; createdAt: Date }[]> {
     const ids = [...new Set(userIds)].filter(isUuid);
     if (ids.length === 0 || limit <= 0) return [];
-    const rows = await this.prisma.postedEvent.findMany({ where: { userId: { in: ids } }, orderBy: [{ createdAt: 'desc' }, { eventId: 'desc' }, { userId: 'desc' }], take: limit });
+    const rows = await this.prisma.postedEvent.findMany({ where: { userId: { in: ids }, ...(before ? { createdAt: { lt: before } } : {}) }, orderBy: [{ createdAt: 'desc' }, { eventId: 'desc' }, { userId: 'desc' }], take: limit });
     return rows.map((r) => ({ userId: r.userId, eventId: r.eventId, createdAt: r.createdAt }));
   }
 
-  async listPostReposts(userIds: string[], limit: number): Promise<{ userId: string; postId: string; createdAt: Date }[]> {
+  async listPostReposts(userIds: string[], limit: number, before?: Date): Promise<{ userId: string; postId: string; createdAt: Date }[]> {
     const ids = [...new Set(userIds)].filter(isUuid);
     if (ids.length === 0 || limit <= 0) return [];
-    const rows = await this.prisma.postedUserEvent.findMany({ where: { userId: { in: ids } }, orderBy: [{ createdAt: 'desc' }, { postId: 'desc' }, { userId: 'desc' }], take: limit });
+    const rows = await this.prisma.postedUserEvent.findMany({ where: { userId: { in: ids }, ...(before ? { createdAt: { lt: before } } : {}) }, orderBy: [{ createdAt: 'desc' }, { postId: 'desc' }, { userId: 'desc' }], take: limit });
     return rows.map((r) => ({ userId: r.userId, postId: r.postId, createdAt: r.createdAt }));
   }
 

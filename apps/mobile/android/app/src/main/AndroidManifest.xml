@@ -25,10 +25,10 @@
 
         </activity>
 
-        <!-- Avisos (push) chegam no canal "avisos", de importância alta, para mostrar a prévia no topo da tela. O app cria o canal ao abrir. -->
+        <!-- Avisos (push) chegam no canal "notificacoes", de importância alta, para mostrar a prévia no topo da tela. O app cria o canal ao abrir. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="avisos" />
+            android:value="notificacoes" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

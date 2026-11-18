@@ -1,6 +1,9 @@
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
 import { distanceMeters } from './geo.ts';
 import { DomainError, conflict, forbidden, notFound, validationError } from './errors.ts';
+import { buildEventCards } from './event-card.ts';
+import type { EventCardView } from './event-card.ts';
+import { parsePage } from './profile-event-service.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ProfileService } from './profile-service.ts';
 import type { EventKind, EventRef, EventStoryMeta, PostReportReason, PublicProfile, StoryHiddenRecord } from './types.ts';
@@ -129,6 +132,22 @@ export interface GoingEventView {
   endsAt: string;
   venueName: string | null;
 }
+
+/** Evento que a pessoa já foi (confirmou presença ou criou, e já acabou). */
+export interface AttendedEventView extends EventCardView {
+  /** Quando ela confirmou presença (ou criou o evento). */
+  attendedAt: string;
+}
+
+export interface AttendedEventsPage {
+  items: AttendedEventView[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** Quantas presenças e eventos criados a aba "Participou" percorre, no máximo. */
+export const ATTENDED_SCAN_LIMIT = 500;
 
 /** Quantos eventos confirmados a agenda recebe, no máximo. */
 export const MY_GOING_LIMIT = 100;
@@ -318,6 +337,52 @@ export class EventPageService {
       out.push({ id: post.id, source: 'USER', title: post.eventTitle, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString(), venueName: post.placeName });
     }
     return out.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+  }
+
+  /**
+   * Aba "Participou" do perfil: eventos que já acabaram em que a pessoa confirmou presença ou que ela criou, do mais recente
+   * ao mais antigo. A dona sempre vê a aba. O visitante só vê quando a dona deixou a aba pública e ele pode ver o conteúdo
+   * do perfil; mesmo assim, cada evento passa pela regra do próprio evento (evento privado só aparece para quem tem acesso a ele).
+   */
+  async listAttended(viewerId: string, username: unknown, query: { limit?: unknown; offset?: unknown } = {}): Promise<AttendedEventsPage> {
+    const view = await this.profiles.getByUsername(viewerId, username);
+    if (view.relationship.blockedByViewer) throw notFound('Usuário não encontrado');
+    const isSelf = view.relationship.isSelf;
+    if (!isSelf && view.profile.attendedEventsPublic !== true) throw forbidden('Os eventos que esta pessoa participou são privados');
+    if (!view.canViewContent) throw forbidden('Esta conta é privada');
+    const page = parsePage(query);
+    const ownerId = view.profile.userId;
+    const now = this.deps.clock.now().getTime();
+
+    const attended = new Map<string, Date>();
+    for (const row of await this.deps.eventRoom.listGoingByUser(ownerId, ATTENDED_SCAN_LIMIT)) attended.set(row.ref.id, row.createdAt);
+    const created = await this.deps.posts.listFor([ownerId], [], { limit: ATTENDED_SCAN_LIMIT, offset: 0 }, 'EVENT');
+    for (const { post } of created) {
+      if (post.authorId !== ownerId || post.eventTitle === null || attended.has(post.id)) continue;
+      attended.set(post.id, post.createdAt);
+    }
+
+    const cards = await buildEventCards(this.deps, [...attended.keys()]);
+    const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
+    const checked = await Promise.all(
+      [...attended].map(async ([id, at]): Promise<AttendedEventView | undefined> => {
+        const card = cards.get(id);
+        if (!card || Date.parse(card.endsAt) > now) return undefined;
+        if (card.ownerId && card.ownerId !== viewerId && hidden.has(card.ownerId)) return undefined;
+        // O visitante só vê o evento se ele mesmo poderia abri-lo (evento privado: só com acesso a ele).
+        if (!isSelf) {
+          try {
+            await this.resolve(viewerId, id);
+          } catch (failure) {
+            if (!(failure instanceof DomainError)) throw failure;
+            return undefined;
+          }
+        }
+        return { ...card, attendedAt: at.toISOString() };
+      }),
+    );
+    const all = checked.filter((v): v is AttendedEventView => v !== undefined).sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
+    return { items: all.slice(page.offset, page.offset + page.limit), total: all.length, ...page };
   }
 
   /** "Eu vou". O dono já conta como confirmado: confirmar de novo não muda nada. */

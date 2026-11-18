@@ -482,9 +482,9 @@ export interface ProfileEventRepository {
   removePost(userId: string, postId: string): Promise<boolean>;
   hasPost(userId: string, postId: string): Promise<boolean>;
   /** Reposts de eventos de pessoas feitos por qualquer um de `userIds`, mais recentes primeiro (alimenta o Início). */
-  listPostReposts(userIds: string[], limit: number): Promise<{ userId: string; postId: string; createdAt: Date }[]>;
+  listPostReposts(userIds: string[], limit: number, before?: Date): Promise<{ userId: string; postId: string; createdAt: Date }[]>;
   /** Eventos de local postados no perfil por qualquer um de `userIds`, mais recentes primeiro (alimenta o Início). */
-  listPlaceReposts(userIds: string[], limit: number): Promise<{ userId: string; eventId: string; createdAt: Date }[]>;
+  listPlaceReposts(userIds: string[], limit: number, before?: Date): Promise<{ userId: string; eventId: string; createdAt: Date }[]>;
 }
 
 export interface PostRepository {
@@ -492,6 +492,8 @@ export interface PostRepository {
   findById(id: string): Promise<PostWithImages | undefined>;
   /** Posts escritos por qualquer um de `authorIds` OU em que alguém de `taggedIds` aceitou a marcação. Mais recentes primeiro. */
   listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter, scope?: PostScope): Promise<PostWithImages[]>;
+  /** Data do post mais antigo que `listFor` traria com os mesmos filtros (sem página). */
+  oldestFor(authorIds: string[], taggedIds: string[], scope?: PostScope): Promise<Date | undefined>;
   /** Eventos de pessoa (não arquivados) que começam depois de `from` e até `to`. Mais cedo primeiro. */
   listEventsStartingBetween(from: Date, to: Date, limit: number): Promise<PostWithImages[]>;
   /** Mesma regra de `listFor`, para uma pessoa só (escritos por ela ou em que ela aceitou a marcação). */

@@ -387,3 +387,22 @@ test('comentário: @usuario avisa quem foi marcado, ignora a si mesmo, bloqueio 
   await w.core.posts.addComment(bia, post.id, 'Oi de novo @caio');
   assert.equal(await count(caio), 1, 'não avisa quem bloqueou ou foi bloqueado por quem comenta');
 });
+
+test('Início: régua de datas pula para antes de uma data e informa o post mais antigo', async () => {
+  const { w, ana, bia } = await setup();
+  const first = w.clock.now();
+  await w.core.posts.create(bia, { caption: 'velho', images: [JPEG()] });
+  w.clock.tick(10 * 86_400_000);
+  const middle = w.clock.now();
+  await w.core.posts.create(ana, { caption: 'meio', images: [JPEG()] });
+  w.clock.tick(10 * 86_400_000);
+  await w.core.posts.create(bia, { caption: 'novo', images: [JPEG()] });
+  const top = await w.core.posts.feed(ana);
+  assert.equal(top.oldestAt, first.toISOString());
+  const jumped = await w.core.posts.feed(ana, { before: new Date(middle.getTime() + 1).toISOString() });
+  assert.deepEqual(jumped.items.map((p) => ('caption' in p ? p.caption : '')), ['meio', 'velho']);
+  assert.equal(jumped.oldestAt, undefined, 'só a primeira página traz o limite');
+  const next = await w.core.posts.feed(ana, { before: new Date(middle.getTime() + 1).toISOString(), offset: '1', limit: '1' });
+  assert.deepEqual(next.items.map((p) => ('caption' in p ? p.caption : '')), ['velho']);
+  await rejectsWith(w.core.posts.feed(ana, { before: 'ontem' }), 'VALIDATION');
+});
