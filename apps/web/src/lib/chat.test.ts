@@ -216,3 +216,8 @@ test('primeiro emoji digitado no "+"', () => {
   assert.equal(firstEmoji('oi'), undefined);
   assert.equal(firstEmoji(''), undefined);
 });
+
+test('formatWhen: evento que já terminou não aparece como acontecendo agora', () => {
+  assert.match(formatWhen(iso(at(10, 20, 0)), iso(at(11, 2, 0)), NOW), /^Aconteceu em 10 de out\.$/);
+  assert.match(formatWhen(iso(at(11, 20, 0)), null, NOW), /^Aconteceu em 11 de out\.$/);
+});

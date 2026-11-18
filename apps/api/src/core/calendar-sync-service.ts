@@ -15,8 +15,8 @@ import type { BusyIntervalRecord, CoreDeps, OAuthCalendarClient, OAuthCalendarSo
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
-/** Janela importada: de ontem até 90 dias para a frente. */
-export const SYNC_PAST_DAYS = 1;
+/** Janela importada: de 45 dias atrás (para o mês na tela vir inteiro) até 90 dias para a frente. */
+export const SYNC_PAST_DAYS = 45;
 export const SYNC_FUTURE_DAYS = 90;
 /** Google e iCal são relidos a cada 30 minutos (e na hora, quando a pessoa pede). */
 export const RESYNC_MS = 30 * 60_000;

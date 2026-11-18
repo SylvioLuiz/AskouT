@@ -122,9 +122,9 @@ export function groupByAccount<T extends { account: string | null }>(list: reado
   return [...map.entries()].map(([account, items]) => ({ account, items }));
 }
 
-/** Janela importada: de ontem a 90 dias para a frente (igual ao servidor). */
+/** Janela importada: de 45 dias atrás (o mês na tela inteiro) a 90 dias para a frente (igual ao servidor). */
 export function syncWindow(now: Date): { from: string; to: string } {
-  return { from: new Date(now.getTime() - 86_400_000).toISOString(), to: new Date(now.getTime() + 90 * 86_400_000).toISOString() };
+  return { from: new Date(now.getTime() - 45 * 86_400_000).toISOString(), to: new Date(now.getTime() + 90 * 86_400_000).toISOString() };
 }
 
 /** A agenda do celular é reenviada ao abrir a agenda, no máximo a cada 30 minutos. */
