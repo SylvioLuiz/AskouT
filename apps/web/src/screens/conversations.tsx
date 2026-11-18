@@ -842,25 +842,28 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                   }}
                 />
                 {draft.trim() !== '' || staged.length > 0 || pendingGif ? (
-                  <button type="submit" className="composer__sendtext" disabled={sending} aria-busy={sending || undefined} aria-label={t('Enviar')}>
-                    <ArrowUpIcon />
-                  </button>
+                  <>
+                    {/* Emoji e GIF só aparecem enquanto você escreve; com a caixa vazia o canto fica para o microfone, como nos outros apps. */}
+                    <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
+                    <button type="submit" className="composer__sendtext" disabled={sending} aria-busy={sending || undefined} aria-label={t('Enviar')}>
+                      <ArrowUpIcon />
+                    </button>
+                  </>
                 ) : (
                   <span className="composer__tools">
+                    <button type="button" className="composer__tool" aria-label={t('Enviar fotos ou vídeos da galeria')} onClick={() => galleryRef.current?.click()}>
+                      <PhotoIcon />
+                    </button>
                     <button type="button" className="composer__tool" aria-label={t('Gravar áudio')} onClick={() => {
                         setProblem(undefined);
                         setRecording(true);
                       }}>
                       <MicIcon />
                     </button>
-                    <button type="button" className="composer__tool" aria-label={t('Enviar fotos ou vídeos da galeria')} onClick={() => galleryRef.current?.click()}>
-                      <PhotoIcon />
-                    </button>
                   </span>
                 )}
               </div>
             )}
-            {!recording ? <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} /> : null}
           </form>
         </>
       ) : (
