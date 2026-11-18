@@ -2388,4 +2388,6 @@ export const ES: Readonly<Record<string, string>> = {
   "tem horário marcado": "tiene horario marcado",
   "Ir para hoje": "Ir a hoy",
   "Ir para a data": "Ir a la fecha",
+  "Mês": "Mes",
+  "Visualização da agenda": "Vista de la agenda",
 };

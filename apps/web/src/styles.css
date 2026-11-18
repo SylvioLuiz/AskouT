@@ -4881,7 +4881,17 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .dpcal__cell { position: relative; }
 
 /* ---------- Sincronizar agendas ---------- */
-.agsync { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.agsync { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+/* Alterna entre a faixa de dias e o mês inteiro. */
+.agview { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+.agview__opt { min-height: 34px; padding: 0 16px; font: inherit; font-size: 0.8125rem; font-weight: 700; color: var(--muted); background: transparent; border: 0; border-radius: 999px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.agview__opt--on { color: var(--brand-ink); background: var(--brand); }
+/* Mês inteiro na própria tela: células maiores e dedo pode rolar a página na vertical. */
+.agmonth { margin-bottom: 16px; touch-action: pan-y; }
+.mcal__grid--large { gap: 4px; }
+.mcal__grid--large .mcal__row { gap: 4px; }
+.mcal__grid--large .mcal__day { min-height: 52px; font-size: 1rem; }
+.mcal__grid--large .mcal__marks .daymark { width: 6px; height: 6px; }
 .agsync .btn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; }
 .agsync .btn svg { width: 16px; height: 16px; flex: none; }
 .calsync { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
