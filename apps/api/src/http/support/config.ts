@@ -34,6 +34,10 @@ export interface AppConfig {
   googleIosClientId: string | undefined;
   /** Google Agenda (sincronizar agenda). Liga com GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET. */
   googleCalendar: { clientId: string; clientSecret: string; redirectUri: string; webBaseUrl: string } | undefined;
+  /** Outlook (Microsoft Graph) em Sincronizar agendas. Liga com MICROSOFT_CLIENT_ID + MICROSOFT_CLIENT_SECRET. */
+  microsoftCalendar: { clientId: string; clientSecret: string; redirectUri: string } | undefined;
+  /** Endereço do site, para voltar depois de ligar uma agenda. */
+  webBaseUrl: string;
   /** ID de serviço da Apple (Services ID) para "Entrar com a Apple". Sem ele, o botão não aparece. */
   appleClientId: string | undefined;
   /** Bundle id do app nativo na Apple (aceito como público do token de "Entrar com a Apple"). */
@@ -210,6 +214,16 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     else googleCalendar = { clientId: gcClient, clientSecret: gcSecret, redirectUri, webBaseUrl };
   }
 
+  // Outlook: app registrado no Microsoft Entra (portal.azure.com > Registros de aplicativo), contas pessoais e de trabalho.
+  let microsoftCalendar: AppConfig['microsoftCalendar'];
+  const msClient = env.MICROSOFT_CLIENT_ID?.trim() ?? '';
+  const msSecret = env.MICROSOFT_CLIENT_SECRET?.trim() ?? '';
+  if (msClient !== '' && msSecret !== '') {
+    const redirectUri = env.MICROSOFT_CALENDAR_REDIRECT_URI?.trim() || 'https://api.askout.com.br/calendar/microsoft/callback';
+    if (!/^https?:\/\/[^\s]+\/calendar\/microsoft\/callback$/.test(redirectUri)) problems.push('MICROSOFT_CALENDAR_REDIRECT_URI deve terminar em /calendar/microsoft/callback');
+    else microsoftCalendar = { clientId: msClient, clientSecret: msSecret, redirectUri };
+  }
+
   // Sem esta variável valem os pacotes com desconto progressivo (ver BOOST_DEFAULT_PACKAGE_PRICES_CENTS).
   const priceRaw = env.BOOST_PRICE_PER_DAY_CENTS?.trim() ?? '';
   const boostPricePerDayCents = priceRaw === '' ? undefined : Number(priceRaw);
@@ -231,5 +245,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, moderationEmail: env.MODERATION_EMAIL?.trim() || 'suporte@askout.com.br', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, giphyApiKey: env.GIPHY_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, googleIosClientId: env.GOOGLE_IOS_CLIENT_ID?.trim() || undefined, googleCalendar, appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, fcmProjectId, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, moderationEmail: env.MODERATION_EMAIL?.trim() || 'suporte@askout.com.br', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, giphyApiKey: env.GIPHY_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, googleIosClientId: env.GOOGLE_IOS_CLIENT_ID?.trim() || undefined, googleCalendar, microsoftCalendar, webBaseUrl: (env.PUBLIC_WEB_URL?.trim() || 'https://askout.com.br').replace(/\/+$/, ''), appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, fcmProjectId, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
 }

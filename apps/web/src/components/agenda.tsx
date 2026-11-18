@@ -73,12 +73,17 @@ interface DayStripProps {
   onMonth: (by: number) => void;
   /** Abre o calendário do mês para pular para qualquer data. */
   onOpenCalendar: () => void;
+  /** 'month' troca a faixa de dias pela grade do mês inteiro. */
+  view?: 'day' | 'month';
 }
 
 /** Faixa horizontal que rola com o dedo; o dia escolhido desliza até o centro. Setas do teclado trocam o dia. */
-export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, onMonth, onOpenCalendar }: DayStripProps) {
+export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, onMonth, onOpenCalendar, view = 'day' }: DayStripProps) {
+  const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
   const stripRef = useRef<HTMLDivElement>(null);
   const firstScroll = useRef(true);
+  // A faixa volta a aparecer ao sair do mês inteiro: centraliza o dia de uma vez, sem animação.
+  if (view === 'month') firstScroll.current = true;
 
   // Rola só a faixa (não a página) para centralizar o dia escolhido; na primeira vez, sem animação.
   useEffect(() => {
@@ -89,7 +94,7 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, 
     const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     strip.scrollTo({ left: Math.max(0, left), behavior: firstScroll.current || reduce ? 'auto' : 'smooth' });
     firstScroll.current = false;
-  }, [selected]);
+  }, [selected, view]);
 
   // Sem limite: passar do último dia do mês leva ao mês seguinte (e o contrário).
   function move(by: number) {
@@ -132,6 +137,34 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, 
           </button>
         </div>
       </div>
+      {view === 'month' ? (
+        <div
+          className="agmonth"
+          onTouchStart={(event) => {
+            const touch = event.touches[0];
+            swipe.current = event.touches.length === 1 && touch ? { x: touch.clientX, y: touch.clientY } : undefined;
+          }}
+          onTouchEnd={(event) => {
+            const start = swipe.current;
+            const touch = event.changedTouches[0];
+            swipe.current = undefined;
+            if (!start || !touch) return;
+            const dx = touch.clientX - start.x;
+            if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(touch.clientY - start.y) * 1.5) return;
+            onMonth(dx < 0 ? 1 : -1);
+          }}
+        >
+          <MonthGrid
+            large
+            month={selected}
+            selected={selected}
+            today={today}
+            label={capitalizeFirst(monthLabel(selected))}
+            onSelect={onSelect}
+            marksOf={(key) => ({ event: (eventsOf?.(key) ?? 0) > 0, slot: statesOf(key).length > 0 })}
+          />
+        </div>
+      ) : (
       <div className="daystrip" role="group" aria-label={t('Escolha o dia')} ref={stripRef} onKeyDown={onKeyDown}>
         {days.map((key) => {
           const chip = dayChip(key);
@@ -165,11 +198,67 @@ export function DayStrip({ days, selected, today, onSelect, statesOf, eventsOf, 
           );
         })}
       </div>
+      )}
     </div>
   );
 }
 
 // ---------- Calendário do mês ----------
+
+interface MonthGridProps {
+  /** Qualquer dia do mês mostrado. */
+  month: string;
+  selected: string;
+  today: string;
+  label: string;
+  onSelect: (key: string) => void;
+  marksOf: (key: string) => { event: boolean; slot: boolean };
+  /** Células maiores, para a visualização de mês na própria tela. */
+  large?: boolean;
+}
+
+/** Grade do mês (domingo a sábado), com marcas de evento e de horário em cada dia. */
+export function MonthGrid({ month, selected, today, label, onSelect, marksOf, large }: MonthGridProps) {
+  return (
+    <div className={`mcal__grid${large ? ' mcal__grid--large' : ''}`} role="grid" aria-label={label}>
+      <div className="mcal__row" role="row">
+        {weekdayInitials().map((w, i) => (
+          <span key={i} className="mcal__weekday" role="columnheader" aria-hidden="true">
+            {w}
+          </span>
+        ))}
+      </div>
+      {monthWeeks(month).map((week) => (
+        <div key={week[0]} className="mcal__row" role="row">
+          {week.map((key) => {
+            const outside = key.slice(0, 7) !== month.slice(0, 7);
+            const marks = marksOf(key);
+            const isSelected = key === selected;
+            const isToday = key === today;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="gridcell"
+                className={`mcal__day${outside ? ' mcal__day--outside' : ''}${isSelected ? ' mcal__day--selected' : ''}${isToday ? ' mcal__day--today' : ''}`}
+                aria-selected={isSelected}
+                aria-current={isToday ? 'date' : undefined}
+                aria-label={`${dayLongLabel(key)}${isToday ? `, ${t('hoje')}` : ''}${marks.event ? `, ${t('tem evento')}` : ''}${marks.slot ? `, ${t('tem horário marcado')}` : ''}`}
+                onClick={() => onSelect(key)}
+              >
+                <span>{dayChip(key).day}</span>
+                <span className="mcal__marks" aria-hidden="true">
+                  {marks.event ? <span className="daymark daymark--event" /> : null}
+                  {marks.slot ? <span className="daymark daymark--ok" /> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 interface MonthCalendarProps {
   selected: string;
@@ -252,43 +341,7 @@ export function MonthCalendar({ selected, today, onSelect, marksOf }: MonthCalen
           })}
         </div>
       ) : (
-        <div className="mcal__grid" role="grid" aria-label={label}>
-          <div className="mcal__row" role="row">
-            {weekdayInitials().map((w, i) => (
-              <span key={i} className="mcal__weekday" role="columnheader" aria-hidden="true">
-                {w}
-              </span>
-            ))}
-          </div>
-          {monthWeeks(month).map((week) => (
-            <div key={week[0]} className="mcal__row" role="row">
-              {week.map((key) => {
-                const outside = key.slice(0, 7) !== month.slice(0, 7);
-                const marks = marksOf(key);
-                const isSelected = key === selected;
-                const isToday = key === today;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    role="gridcell"
-                    className={`mcal__day${outside ? ' mcal__day--outside' : ''}${isSelected ? ' mcal__day--selected' : ''}${isToday ? ' mcal__day--today' : ''}`}
-                    aria-selected={isSelected}
-                    aria-current={isToday ? 'date' : undefined}
-                    aria-label={`${dayLongLabel(key)}${isToday ? `, ${t('hoje')}` : ''}${marks.event ? `, ${t('tem evento')}` : ''}${marks.slot ? `, ${t('tem horário marcado')}` : ''}`}
-                    onClick={() => onSelect(key)}
-                  >
-                    <span>{dayChip(key).day}</span>
-                    <span className="mcal__marks" aria-hidden="true">
-                      {marks.event ? <span className="daymark daymark--event" /> : null}
-                      {marks.slot ? <span className="daymark daymark--ok" /> : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
+        <MonthGrid month={month} selected={selected} today={today} marksOf={marksOf} onSelect={onSelect} label={label} />
       )}
 
       <div className="mcal__foot">

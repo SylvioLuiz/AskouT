@@ -37,6 +37,7 @@ import { intlLocale, t } from '../lib/i18n/index.ts';
 
 /** Ao abrir, procura o primeiro dia com evento só nestes dias a partir de hoje. */
 const OPEN_LOOKAHEAD_DAYS = 28;
+const VIEW_KEY = 'askout.agenda.view';
 const capitalize = (text: string) => text.charAt(0).toLocaleUpperCase('pt-BR') + text.slice(1);
 const STATES: readonly SlotState[] = ['AVAILABLE', 'PARTIAL', 'UNAVAILABLE'];
 
@@ -197,6 +198,22 @@ export function AgendaScreen() {
   const [selected, setSelected] = useState(today);
   const { days, range } = useMonthWindow(selected);
   const [picking, setPicking] = useState(false);
+  /** Dia (faixa de dias) ou mês inteiro (grade); a escolha fica guardada neste aparelho. */
+  const [view, setView] = useState<'day' | 'month'>(() => {
+    try {
+      return window.localStorage.getItem(VIEW_KEY) === 'month' ? 'month' : 'day';
+    } catch {
+      return 'day';
+    }
+  });
+  function changeView(next: 'day' | 'month') {
+    setView(next);
+    try {
+      window.localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // Sem armazenamento: vale só até fechar a tela.
+    }
+  }
   /** De onde veio a troca de dia, para o conteúdo deslizar do lado certo. */
   const [direction, setDirection] = useState<'next' | 'prev' | 'none'>('none');
   /** Depois que a pessoa escolhe um dia, a tela não muda de dia sozinha. */
@@ -210,7 +227,11 @@ export function AgendaScreen() {
   useEffect(() => {
     const result = search.get('agendas');
     if (!result) return;
-    setSyncNotice(result === 'google' ? { tone: 'ok', text: t('Google Agenda ligada. Escolha abaixo quais agendas entram.') } : { tone: 'error', text: search.get('motivo') || t('Não foi possível ligar a agenda.') });
+    setSyncNotice(
+      result === 'google' || result === 'microsoft'
+        ? { tone: 'ok', text: t('{name} conectada. Escolha abaixo quais agendas entram.', { name: result === 'google' ? 'Google Agenda' : 'Outlook' }) }
+        : { tone: 'error', text: search.get('motivo') || t('Não foi possível ligar a agenda.') },
+    );
     setSyncing(true);
     navigate('/agenda', { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -308,6 +329,14 @@ export function AgendaScreen() {
       <PageHead title={t('Agenda')} subtitle={t('Só você vê esta agenda. Marque quando topa sair.')} />
 
       <div className="agsync">
+        <div className="agview" role="group" aria-label={t('Visualização da agenda')}>
+          <button type="button" className={`agview__opt${view === 'day' ? ' agview__opt--on' : ''}`} aria-pressed={view === 'day'} onClick={() => changeView('day')}>
+            {t('Dia')}
+          </button>
+          <button type="button" className={`agview__opt${view === 'month' ? ' agview__opt--on' : ''}`} aria-pressed={view === 'month'} onClick={() => changeView('month')}>
+            {t('Mês')}
+          </button>
+        </div>
         <Button variant="quiet" small onClick={() => setSyncing(true)}>
           <RefreshIcon />
           {syncButtonLabel(syncedN)}
@@ -323,6 +352,7 @@ export function AgendaScreen() {
         eventsOf={(key) => agendaEventsOnDay(events, key).length}
         onMonth={changeMonth}
         onOpenCalendar={() => setPicking(true)}
+        view={view}
       />
 
       <section

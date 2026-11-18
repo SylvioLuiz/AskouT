@@ -2,7 +2,7 @@ import { normalizeCalendarUrl } from './calendar-import-service.ts';
 import { forbidden, notFound, validationError } from './errors.ts';
 import { parseIcs } from './ical.ts';
 import { CalendarAccessRevoked, CalendarFetchError } from './ports.ts';
-import type { BusyIntervalRecord, CoreDeps, PersonalCalendarChoice, PersonalCalendarConnection, PersonalCalendarSource, PersonalCalendarStatus } from './ports.ts';
+import type { BusyIntervalRecord, CoreDeps, OAuthCalendarClient, OAuthCalendarSource, PersonalCalendarChoice, PersonalCalendarConnection, PersonalCalendarSource, PersonalCalendarStatus } from './ports.ts';
 
 /**
  * Sincronizar agendas da pessoa com a agenda do AskouT, como os apps de agenda fazem:
@@ -50,6 +50,8 @@ export interface CalendarOverview {
   suggestions: CalendarSuggestion[];
   /** A opção "Google Agenda" (OAuth) está configurada no servidor. */
   googleAvailable: boolean;
+  /** A opção "Outlook" (conta Microsoft) está configurada no servidor. */
+  microsoftAvailable: boolean;
 }
 
 export interface BusyView {
@@ -60,7 +62,8 @@ export interface BusyView {
   label: string;
 }
 
-const DEFAULT_LABEL: Record<PersonalCalendarSource, string> = { GOOGLE: 'Google Agenda', DEVICE: 'Agenda do celular', ICS: 'Agenda (iCal)' };
+const DEFAULT_LABEL: Record<PersonalCalendarSource, string> = { GOOGLE: 'Google Agenda', MICROSOFT: 'Outlook', DEVICE: 'Agenda do celular', ICS: 'Agenda (iCal)' };
+const OAUTH_NAME: Record<OAuthCalendarSource, string> = { GOOGLE: 'a Google Agenda', MICROSOFT: 'o Outlook' };
 
 function labelOf(c: PersonalCalendarConnection): string {
   return c.label ?? DEFAULT_LABEL[c.provider];
@@ -188,7 +191,7 @@ export class CalendarSyncService {
     if (logins.includes('GOOGLE')) suggestions.push({ kind: 'GOOGLE', reason: 'login' });
     const byEmail = suggestionFromEmail(user?.email);
     if (byEmail && !suggestions.some((s) => s.kind === byEmail)) suggestions.push({ kind: byEmail, reason: 'email' });
-    return { connections: list.map(toView), suggestions, googleAvailable: this.deps.googleCalendar !== undefined };
+    return { connections: list.map(toView), suggestions, googleAvailable: this.deps.googleCalendar !== undefined, microsoftAvailable: this.deps.microsoftCalendar !== undefined };
   }
 
   /** Horários ocupados das agendas ligadas, para a tela da agenda. */
@@ -253,76 +256,92 @@ export class CalendarSyncService {
     return mergeBusy(parsed.events.map((e) => ({ start: e.start, end: e.end })), from, to);
   }
 
-  // ---------- Google Agenda ----------
+  // ---------- Contas com login (Google Agenda e Outlook) ----------
 
-  /** Endereço da tela de permissão do Google. `from`: de onde a pessoa veio (o app abre no navegador e volta sozinho). */
-  async googleStart(userId: string, fromRaw: unknown): Promise<{ url: string }> {
-    const google = this.deps.googleCalendar;
-    if (!google) throw validationError('A ligação com a Google Agenda ainda não está disponível');
-    await this.ensureRoomFor(userId, 'GOOGLE');
+  private client(provider: OAuthCalendarSource): OAuthCalendarClient | undefined {
+    return provider === 'GOOGLE' ? this.deps.googleCalendar : this.deps.microsoftCalendar;
+  }
+
+  /** Endereço da tela de permissão (Google ou Microsoft). `from`: de onde a pessoa veio (o app abre no navegador). */
+  async oauthStart(userId: string, providerRaw: unknown, fromRaw: unknown): Promise<{ url: string }> {
+    const provider: OAuthCalendarSource = providerRaw === 'MICROSOFT' ? 'MICROSOFT' : 'GOOGLE';
+    const client = this.client(provider);
+    if (!client) throw validationError(`A ligação com ${OAUTH_NAME[provider]} ainda não está disponível`);
+    await this.ensureRoomFor(userId, provider);
     const from = fromRaw === 'app' ? 'app' : 'web';
-    return { url: google.authUrl(this.deps.oauthStates.sign({ userId, from })) };
+    return { url: client.authUrl(this.deps.oauthStates.sign({ userId, from, provider })) };
+  }
+
+  /** Compatibilidade: começar pela Google Agenda. */
+  async googleStart(userId: string, fromRaw: unknown): Promise<{ url: string }> {
+    return this.oauthStart(userId, 'GOOGLE', fromRaw);
   }
 
   private async ensureRoomFor(userId: string, provider: PersonalCalendarSource): Promise<void> {
     const list = await this.deps.personalCalendars.list(userId);
-    // Reconectar uma conta Google já ligada não conta como agenda nova.
+    // Reconectar uma conta já ligada não conta como agenda nova.
     if (list.length >= MAX_CONNECTIONS && !list.some((c) => c.provider === provider)) await this.ensureRoom(userId);
   }
 
-  /** Retorno do Google: guarda o acesso (cifrado), lista as agendas da conta e já importa os horários. */
-  async googleCallback(query: { code?: unknown; state?: unknown; error?: unknown }): Promise<{ from: 'web' | 'app'; ok: boolean; message?: string }> {
+  /** Retorno do Google ou da Microsoft: guarda o acesso (cifrado), lista as agendas da conta e já importa os horários. */
+  async oauthCallback(expected: OAuthCalendarSource, query: { code?: unknown; state?: unknown; error?: unknown }): Promise<{ from: 'web' | 'app'; ok: boolean; message?: string }> {
+    const name = OAUTH_NAME[expected];
     const state = typeof query.state === 'string' ? this.deps.oauthStates.verify(query.state) : undefined;
-    if (!state) return { from: 'web', ok: false, message: 'O pedido venceu. Tente ligar a Google Agenda de novo.' };
-    const google = this.deps.googleCalendar;
-    if (!google) return { from: state.from, ok: false, message: 'A ligação com a Google Agenda não está disponível.' };
+    if (!state || (state.provider ?? 'GOOGLE') !== expected) return { from: state?.from ?? 'web', ok: false, message: `O pedido venceu. Tente ligar ${name} de novo.` };
+    const client = this.client(expected);
+    if (!client) return { from: state.from, ok: false, message: `A ligação com ${name} não está disponível.` };
     if (typeof query.error === 'string' || typeof query.code !== 'string' || query.code === '') {
-      return { from: state.from, ok: false, message: query.error === 'access_denied' ? 'Você não deu acesso à Google Agenda.' : 'O Google não completou a ligação.' };
+      return { from: state.from, ok: false, message: query.error === 'access_denied' ? `Você não deu acesso ${expected === 'GOOGLE' ? 'à Google Agenda' : 'ao Outlook'}.` : 'A ligação não foi concluída.' };
     }
     let tokens: { refreshToken: string | null; accessToken: string; email: string | null };
     try {
-      tokens = await google.exchange(query.code);
+      tokens = await client.exchange(query.code);
     } catch {
-      return { from: state.from, ok: false, message: 'O Google não completou a ligação. Tente de novo.' };
+      return { from: state.from, ok: false, message: 'A ligação não foi concluída. Tente de novo.' };
     }
     const userId = state.userId;
     const list = await this.deps.personalCalendars.list(userId);
-    const existing = list.find((c) => c.provider === 'GOOGLE' && tokens.email !== null && c.accountEmail === tokens.email);
+    const existing = list.find((c) => c.provider === expected && tokens.email !== null && c.accountEmail === tokens.email);
     const refreshTokenSealed = tokens.refreshToken ? this.deps.secretBox.seal(tokens.refreshToken) : existing?.refreshTokenSealed ?? null;
-    if (!refreshTokenSealed) return { from: state.from, ok: false, message: 'O Google não liberou o acesso contínuo. Tente de novo.' };
+    if (!refreshTokenSealed) return { from: state.from, ok: false, message: 'O acesso contínuo não foi liberado. Tente de novo.' };
     if (!existing && list.length >= MAX_CONNECTIONS) return { from: state.from, ok: false, message: `Você já ligou ${MAX_CONNECTIONS} agendas.` };
     const now = this.deps.clock.now();
+    const prefix = expected === 'GOOGLE' ? 'Google' : 'Outlook';
     const connection: PersonalCalendarConnection = existing
       ? { ...existing, refreshTokenSealed, status: 'ACTIVE', lastError: null }
-      : { id: this.deps.ids.next(), userId, provider: 'GOOGLE', status: 'ACTIVE', label: tokens.email ? `Google · ${tokens.email}` : null, accountEmail: tokens.email, refreshTokenSealed, sourceSealed: null, calendars: [], lastSyncAt: null, lastError: null, createdAt: now };
+      : { id: this.deps.ids.next(), userId, provider: expected, status: 'ACTIVE', label: tokens.email ? `${prefix} · ${tokens.email}` : null, accountEmail: tokens.email, refreshTokenSealed, sourceSealed: null, calendars: [], lastSyncAt: null, lastError: null, createdAt: now };
     try {
-      await this.syncGoogle(connection, tokens.accessToken);
+      await this.syncOAuth(connection, tokens.accessToken);
     } catch {
-      connection.lastError = 'Não foi possível ler a Google Agenda agora. Vamos tentar de novo em instantes.';
+      connection.lastError = `Não foi possível ler ${name} agora. Vamos tentar de novo em instantes.`;
       await this.deps.personalCalendars.save(connection);
     }
     return { from: state.from, ok: true };
   }
 
+  async googleCallback(query: { code?: unknown; state?: unknown; error?: unknown }) {
+    return this.oauthCallback('GOOGLE', query);
+  }
+
   /** Lista as agendas da conta (mantendo a escolha da pessoa) e importa os horários ocupados das escolhidas. */
-  private async syncGoogle(connection: PersonalCalendarConnection, accessToken?: string): Promise<void> {
-    const google = this.deps.googleCalendar;
-    if (!google) throw new Error('google-off');
-    const token = accessToken ?? (await google.accessToken(this.deps.secretBox.open(connection.refreshTokenSealed ?? '') ?? ''));
-    const agendas = await google.listCalendars(token);
+  private async syncOAuth(connection: PersonalCalendarConnection, accessToken?: string): Promise<void> {
+    const client = this.client(connection.provider as OAuthCalendarSource);
+    if (!client) throw new Error('oauth-off');
+    const token = accessToken ?? (await client.accessToken(this.deps.secretBox.open(connection.refreshTokenSealed ?? '') ?? ''));
+    const agendas = await client.listCalendars(token);
     const known = new Map(connection.calendars.map((c) => [c.id, c.selected] as const));
     const firstTime = connection.calendars.length === 0;
     connection.calendars = agendas.map((a) => ({
       id: a.id,
       name: a.name,
-      // Na primeira vez entram a principal e as que a pessoa deixa visíveis na Google Agenda; depois vale a escolha dela.
+      // Na primeira vez entram a principal e as que a pessoa deixa visíveis; depois vale a escolha dela.
       selected: known.get(a.id) ?? (firstTime ? a.primary || a.visible : false),
       color: a.color,
       account: connection.accountEmail,
     }));
     const ids = connection.calendars.filter((c) => c.selected).map((c) => c.id);
     const { from, to } = this.window();
-    const busy = ids.length > 0 ? await google.freeBusy(token, ids, from, to) : [];
+    const busy = ids.length > 0 ? await client.freeBusy(token, ids, from, to) : [];
     connection.lastSyncAt = this.deps.clock.now();
     connection.lastError = null;
     connection.status = 'ACTIVE';
@@ -332,12 +351,12 @@ export class CalendarSyncService {
 
   // ---------- Comum ----------
 
-  /** Escolhe quais agendas de uma conexão Google entram. */
+  /** Escolhe quais agendas de uma conta Google ou Outlook entram. */
   async setSelection(userId: string, id: string, body: Record<string, unknown>): Promise<CalendarConnectionView> {
     const c = await this.own(userId, id);
     const raw = body['calendarIds'];
     if (!Array.isArray(raw) || !raw.every((x) => typeof x === 'string')) throw validationError('Agendas inválidas', { calendarIds: 'Envie a lista de agendas' });
-    if (c.provider !== 'GOOGLE') throw validationError('Essa agenda não tem agendas para escolher');
+    if (c.provider !== 'GOOGLE' && c.provider !== 'MICROSOFT') throw validationError('Essa agenda não tem agendas para escolher');
     const chosen = new Set(raw as string[]);
     c.calendars = c.calendars.map((x) => ({ ...x, selected: chosen.has(x.id) }));
     if (!c.calendars.some((x) => x.selected)) throw validationError('Escolha ao menos uma agenda', { calendarIds: 'Escolha ao menos uma agenda' });
@@ -355,16 +374,17 @@ export class CalendarSyncService {
   async remove(userId: string, id: string): Promise<void> {
     const c = await this.own(userId, id);
     await this.deps.personalCalendars.delete(userId, id);
-    if (c.provider === 'GOOGLE' && c.refreshTokenSealed && this.deps.googleCalendar) {
+    const client = c.provider === 'GOOGLE' || c.provider === 'MICROSOFT' ? this.client(c.provider) : undefined;
+    if (client && c.refreshTokenSealed) {
       const token = this.deps.secretBox.open(c.refreshTokenSealed);
-      if (token) await this.deps.googleCalendar.revoke(token).catch(() => undefined);
+      if (token) await client.revoke(token).catch(() => undefined);
     }
   }
 
   /** Relê uma conexão; erro fica guardado na conexão (e o Google recusando vira "reconectar"). */
   private async syncOne(c: PersonalCalendarConnection): Promise<void> {
     try {
-      if (c.provider === 'GOOGLE') await this.syncGoogle(c);
+      if (c.provider === 'GOOGLE' || c.provider === 'MICROSOFT') await this.syncOAuth(c);
       else if (c.provider === 'ICS') {
         const url = this.deps.secretBox.open(c.sourceSealed ?? '');
         if (!url) throw new CalendarAccessRevoked();
@@ -378,7 +398,7 @@ export class CalendarSyncService {
     } catch (e) {
       if (e instanceof CalendarAccessRevoked) {
         c.status = 'REVOKED';
-        c.lastError = c.provider === 'GOOGLE' ? 'O Google tirou o acesso. Ligue a Google Agenda de novo.' : 'Não foi possível abrir o link. Ligue a agenda de novo.';
+        c.lastError = c.provider === 'GOOGLE' ? 'O Google tirou o acesso. Ligue a Google Agenda de novo.' : c.provider === 'MICROSOFT' ? 'A Microsoft tirou o acesso. Ligue o Outlook de novo.' : 'Não foi possível abrir o link. Ligue a agenda de novo.';
         await this.deps.personalCalendars.replaceBusy(c.id, []);
       } else {
         c.lastError = e instanceof Error && 'code' in e && (e as { code?: unknown }).code === 'VALIDATION' ? e.message : 'Não foi possível ler a agenda agora. Vamos tentar de novo.';

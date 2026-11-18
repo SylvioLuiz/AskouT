@@ -642,7 +642,9 @@ export class CalendarFetchError extends Error {}
 
 // ---------- Sincronizar agendas da pessoa (só horários ocupados) ----------
 
-export type PersonalCalendarSource = 'GOOGLE' | 'DEVICE' | 'ICS';
+export type PersonalCalendarSource = 'GOOGLE' | 'MICROSOFT' | 'DEVICE' | 'ICS';
+/** Agendas ligadas por login na conta (OAuth). */
+export type OAuthCalendarSource = 'GOOGLE' | 'MICROSOFT';
 export type PersonalCalendarStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';
 
 /** Uma agenda dentro da conexão (ex.: "Trabalho" na conta Google). A pessoa escolhe quais entram. */
@@ -662,7 +664,7 @@ export interface PersonalCalendarConnection {
   status: PersonalCalendarStatus;
   label: string | null;
   accountEmail: string | null;
-  /** Google: refresh token cifrado (SecretBox). */
+  /** Google/Microsoft: refresh token cifrado (SecretBox). */
   refreshTokenSealed: string | null;
   /** ICS: link cifrado (SecretBox). */
   sourceSealed: string | null;
@@ -695,13 +697,13 @@ export interface PersonalCalendarRepository {
   replaceBusy(connectionId: string, intervals: BusyIntervalRecord[]): Promise<void>;
   /** Horários ocupados (de conexões ativas) que se sobrepõem a [from, to), ordenados por início. */
   listBusy(userIds: string[], from: Date, to: Date): Promise<UserBusyRecord[]>;
-  /** Google e ICS ativos que não são lidos desde `before` (ou nunca), mais atrasados primeiro. */
+  /** Google, Microsoft e ICS ativos que não são lidos desde `before` (ou nunca), mais atrasados primeiro. */
   listDue(before: Date, limit: number): Promise<PersonalCalendarConnection[]>;
   /** Plataformas de login ligadas à conta (ex.: GOOGLE), para sugerir a agenda certa. */
   loginProvidersOf(userId: string): Promise<ExternalProvider[]>;
 }
 
-/** O Google recusou o acesso (a pessoa tirou a permissão ou o token venceu). */
+/** O Google/Microsoft recusou o acesso (a pessoa tirou a permissão ou o token venceu). */
 export class CalendarAccessRevoked extends Error {}
 
 export interface GoogleCalendarAgenda {
@@ -713,8 +715,8 @@ export interface GoogleCalendarAgenda {
   color: string | null;
 }
 
-/** Google Agenda pela API do Google (OAuth com acesso só de leitura a agendas e horários livres/ocupados). */
-export interface GoogleCalendarClient {
+/** Agenda de uma conta com login (Google Agenda, Outlook): OAuth com acesso só de leitura a agendas e horários ocupados. */
+export interface OAuthCalendarClient {
   authUrl(state: string): string;
   /** Troca o código do retorno do Google. Lança `CalendarAccessRevoked` se o código não vale. */
   exchange(code: string): Promise<{ refreshToken: string | null; accessToken: string; email: string | null }>;
@@ -727,9 +729,11 @@ export interface GoogleCalendarClient {
 
 /** Assina o "state" do OAuth (quem pediu, de onde, validade), para o retorno do Google não ser forjado. */
 export interface OAuthStateTokens {
-  sign(payload: { userId: string; from: 'web' | 'app' }): string;
-  verify(token: string): { userId: string; from: 'web' | 'app' } | undefined;
+  sign(payload: { userId: string; from: 'web' | 'app'; provider?: OAuthCalendarSource }): string;
+  verify(token: string): { userId: string; from: 'web' | 'app'; provider?: OAuthCalendarSource } | undefined;
 }
+
+export type GoogleCalendarClient = OAuthCalendarClient;
 
 export interface VenueClaimRepository {
   create(claim: VenueClaimRecord, document: Uint8Array): Promise<void>;
@@ -1034,7 +1038,9 @@ export interface CoreDeps {
   calendarFetcher: CalendarFetcher;
   personalCalendars: PersonalCalendarRepository;
   /** Google Agenda. Sem ele (falta GOOGLE_CLIENT_SECRET), a opção do Google não aparece. */
-  googleCalendar?: GoogleCalendarClient;
+  googleCalendar?: OAuthCalendarClient;
+  /** Outlook (Microsoft Graph). Sem ele (falta MICROSOFT_CLIENT_ID/SECRET), a opção do Outlook fica "em breve". */
+  microsoftCalendar?: OAuthCalendarClient;
   oauthStates: OAuthStateTokens;
   admin: AdminRepository;
   placeSource: PlaceSource;

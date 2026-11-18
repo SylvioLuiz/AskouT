@@ -50,7 +50,7 @@ export class InMemoryPersonalCalendarRepository implements PersonalCalendarRepos
 
   async listDue(before: Date, limit: number): Promise<PersonalCalendarConnection[]> {
     return [...this.rows.values()]
-      .filter((c) => c.status === 'ACTIVE' && (c.provider === 'GOOGLE' || c.provider === 'ICS') && (c.lastSyncAt === null || c.lastSyncAt < before))
+      .filter((c) => c.status === 'ACTIVE' && (c.provider === 'GOOGLE' || c.provider === 'MICROSOFT' || c.provider === 'ICS') && (c.lastSyncAt === null || c.lastSyncAt < before))
       .sort((a, b) => (a.lastSyncAt?.getTime() ?? 0) - (b.lastSyncAt?.getTime() ?? 0))
       .slice(0, limit)
       .map((r) => structuredClone(r));
@@ -106,14 +106,14 @@ export class FakeGoogleCalendarClient implements GoogleCalendarClient {
 
 /** "state" de teste: JSON em texto, recusa o que não for nosso. */
 export class FakeOAuthStates implements OAuthStateTokens {
-  sign(payload: { userId: string; from: 'web' | 'app' }): string {
+  sign(payload: { userId: string; from: 'web' | 'app'; provider?: 'GOOGLE' | 'MICROSOFT' }): string {
     return `st:${JSON.stringify(payload)}`;
   }
 
-  verify(token: string): { userId: string; from: 'web' | 'app' } | undefined {
+  verify(token: string): { userId: string; from: 'web' | 'app'; provider?: 'GOOGLE' | 'MICROSOFT' } | undefined {
     if (!token.startsWith('st:')) return undefined;
     try {
-      return JSON.parse(token.slice(3)) as { userId: string; from: 'web' | 'app' };
+      return JSON.parse(token.slice(3)) as { userId: string; from: 'web' | 'app'; provider?: 'GOOGLE' | 'MICROSOFT' };
     } catch {
       return undefined;
     }

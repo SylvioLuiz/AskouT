@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
-import { Button, Field, Loading, Notice } from './ui.tsx';
+import { Button, Loading, Notice } from './ui.tsx';
 import { Sheet } from './agenda.tsx';
+import { CalendarLogo } from './calendar-logos.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
-import { calendarOptions, deviceCalendarBridge, deviceResyncDue, groupByAccount, icsHelp, syncWindow } from '../lib/calendar-sync.ts';
-import type { CalendarConnection, CalendarOption, CalendarOptionKind, CalendarOverview, DeviceCalendar } from '../lib/calendar-sync.ts';
+import { calendarOptions, deviceCalendarBridge, deviceResyncDue, groupByAccount, logoForAccount, logoForConnection, syncWindow } from '../lib/calendar-sync.ts';
+import type { CalendarConnection, CalendarOption, CalendarOverview, DeviceCalendar } from '../lib/calendar-sync.ts';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
 const DEVICE_SYNC_KEY = 'askout.deviceCalendarSyncAt';
@@ -25,6 +25,11 @@ function writeLocal(key: string, value: string): void {
   } catch {
     // sem armazenamento: só reenvia mais vezes
   }
+}
+
+function messageOf(failure: unknown, fallback: string): string {
+  if (failure instanceof Error && !('code' in failure)) return failure.message || fallback;
+  return toApiError(failure).message;
 }
 
 /** Lê as agendas escolhidas no aparelho e manda só os horários ocupados para a conta. */
@@ -63,15 +68,13 @@ function syncedAgo(iso: string | null): string {
   return t('Atualizada {when}', { when: new Date(iso).toLocaleString(intlLocale(), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) });
 }
 
-type View = { kind: 'home' } | { kind: 'device' } | { kind: 'ics'; option: CalendarOptionKind };
-
 /**
- * "Sincronizar agendas": mostra primeiro as agendas que a pessoa provavelmente tem (celular, conta Google do login,
- * provedor do e-mail), depois as outras opções. Cada conexão mostra as agendas dela para escolher quais entram.
+ * "Sincronizar agendas", no jeito dos apps de agenda: uma lista com o ícone de cada app (celular, Google, Outlook, iCloud),
+ * as que a pessoa provavelmente tem primeiro, e "Conectar" que liga direto (permissão do aparelho ou login na conta).
  */
 export function CalendarSyncSheet({ onClose, onChange, notice }: { onClose: () => void; onChange?: (overview: CalendarOverview) => void; notice?: { tone: 'ok' | 'error'; text: string } }) {
   const overview = useAsync(() => api.calendarOverview(), []);
-  const [view, setView] = useState<View>({ kind: 'home' });
+  const [picking, setPicking] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>(notice);
   const [busyId, setBusyId] = useState<string | undefined>();
   const inApp = deviceCalendarBridge() !== undefined;
@@ -81,7 +84,7 @@ export function CalendarSyncSheet({ onClose, onChange, notice }: { onClose: () =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overview.data]);
 
-  // Voltando do navegador (Google Agenda pelo app): recarrega para mostrar a conta ligada.
+  // Voltando do navegador (login do Google/Microsoft pelo app): recarrega para mostrar a conta ligada.
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') overview.reload();
@@ -99,57 +102,42 @@ export function CalendarSyncSheet({ onClose, onChange, notice }: { onClose: () =
       if (ok) setMessage({ tone: 'ok', text: ok });
       overview.reload();
     } catch (failure) {
-      setMessage({ tone: 'error', text: failure instanceof Error && !('code' in failure) ? failure.message : toApiError(failure).message });
+      setMessage({ tone: 'error', text: messageOf(failure, t('Não foi possível ligar a agenda.')) });
     } finally {
       setBusyId(undefined);
     }
   }
 
-  async function connectGoogle() {
-    setBusyId('google');
+  async function connectAccount(via: 'google' | 'microsoft') {
+    setBusyId(via);
     setMessage(undefined);
     try {
-      const { url } = await api.startGoogleCalendar(inApp ? 'app' : 'web');
-      // No app abre o navegador do celular (o Google não permite login dentro do app); no site, volta para /agenda.
+      const from = inApp ? 'app' : 'web';
+      const { url } = via === 'google' ? await api.startGoogleCalendar(from) : await api.startMicrosoftCalendar(from);
+      // No app abre o navegador do celular (Google e Microsoft não deixam entrar dentro do app); no site, volta para /agenda.
       window.location.assign(url);
     } catch (failure) {
-      setMessage({ tone: 'error', text: toApiError(failure).message });
+      setMessage({ tone: 'error', text: messageOf(failure, t('Não foi possível ligar a agenda.')) });
     } finally {
       setBusyId(undefined);
     }
   }
 
-  function choose(option: CalendarOption) {
-    if (option.via === 'device') setView({ kind: 'device' });
-    else if (option.via === 'google') void connectGoogle();
-    else setView({ kind: 'ics', option: option.kind });
+  function connect(option: CalendarOption) {
+    if (!option.available) return;
+    if (option.via === 'device') setPicking(true);
+    else void connectAccount(option.via);
   }
 
-  if (view.kind === 'device') {
+  if (picking) {
     return (
       <Sheet title={t('Agenda do celular')} onClose={onClose}>
         <DevicePicker
           current={overview.data?.connections.find((c) => c.provider === 'DEVICE')}
-          onBack={() => setView({ kind: 'home' })}
+          onBack={() => setPicking(false)}
           onSaved={() => {
-            setView({ kind: 'home' });
+            setPicking(false);
             setMessage({ tone: 'ok', text: t('Agenda do celular sincronizada.') });
-            overview.reload();
-          }}
-        />
-      </Sheet>
-    );
-  }
-
-  if (view.kind === 'ics') {
-    return (
-      <Sheet title={t('Ligar agenda por link')} onClose={onClose}>
-        <IcsForm
-          option={view.option}
-          onBack={() => setView({ kind: 'home' })}
-          onSaved={(c) => {
-            setView({ kind: 'home' });
-            setMessage({ tone: 'ok', text: t('{label} sincronizada.', { label: c.label }) });
             overview.reload();
           }}
         />
@@ -159,33 +147,29 @@ export function CalendarSyncSheet({ onClose, onChange, notice }: { onClose: () =
 
   const data = overview.data;
   const options = data ? calendarOptions(data, inApp) : [];
-  const detected = options.filter((o) => o.detected);
-  const others = options.filter((o) => !o.detected);
+  const detected = options.filter((o) => o.detected && o.available);
+  const others = options.filter((o) => !(o.detected && o.available));
 
   return (
     <Sheet title={t('Sincronizar agendas')} onClose={onClose}>
-      <p className="muted">{t('Seus compromissos aparecem como "ocupado" na agenda do AskouT e na hora de achar horário com amigos. Títulos e detalhes não saem da sua agenda.')}</p>
+      <p className="muted">{t('Conecte suas agendas: os compromissos aparecem como "ocupado" no AskouT e na hora de achar horário com amigos. Títulos e detalhes não saem da sua agenda.')}</p>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       {overview.loading && !data ? <Loading /> : null}
       {overview.error ? <Notice tone="error">{overview.error.message}</Notice> : null}
 
       {data && data.connections.length > 0 ? (
         <section className="calsync__section">
-          <h3 className="calsync__heading">{t('Ligadas')}</h3>
-          <ul className="calsync">
+          <h3 className="calsync__heading">{t('Conectadas')}</h3>
+          <ul className="calsync__list">
             {data.connections.map((c) => (
               <ConnectionItem
                 key={c.id}
                 connection={c}
                 busy={busyId === c.id}
-                onSync={() =>
-                  c.provider === 'DEVICE'
-                    ? setView({ kind: 'device' })
-                    : void run(c.id, () => api.syncMyCalendar(c.id), t('Agenda atualizada.'))
-                }
-                onReconnect={c.provider === 'GOOGLE' ? () => void connectGoogle() : undefined}
+                onSync={() => (c.provider === 'DEVICE' ? setPicking(true) : void run(c.id, () => api.syncMyCalendar(c.id), t('Agenda atualizada.')))}
+                onReconnect={c.provider === 'GOOGLE' ? () => void connectAccount('google') : c.provider === 'MICROSOFT' ? () => void connectAccount('microsoft') : undefined}
                 onToggle={(calendarIds) => void run(c.id, () => api.setCalendarSelection(c.id, calendarIds))}
-                onRemove={() => void run(c.id, () => api.removeMyCalendar(c.id), t('{label} dessincronizada.', { label: c.label }))}
+                onRemove={() => void run(c.id, () => api.removeMyCalendar(c.id), t('{label} desconectada.', { label: c.label }))}
               />
             ))}
           </ul>
@@ -195,32 +179,33 @@ export function CalendarSyncSheet({ onClose, onChange, notice }: { onClose: () =
       {detected.length > 0 ? (
         <section className="calsync__section">
           <h3 className="calsync__heading">{t('Encontramos para você')}</h3>
-          <OptionList options={detected} busyId={busyId} onChoose={choose} />
+          <OptionList options={detected} busyId={busyId} onConnect={connect} />
         </section>
       ) : null}
       {others.length > 0 ? (
         <section className="calsync__section">
-          <h3 className="calsync__heading">{detected.length > 0 ? t('Outras agendas') : t('Escolha de onde trazer seus compromissos')}</h3>
-          <OptionList options={others} busyId={busyId} onChoose={choose} />
+          <h3 className="calsync__heading">{detected.length > 0 || (data?.connections.length ?? 0) > 0 ? t('Outras agendas') : t('Escolha uma agenda')}</h3>
+          <OptionList options={others} busyId={busyId} onConnect={connect} />
         </section>
       ) : null}
-      {data && !inApp ? <p className="muted calsync__note">{t('No app do AskouT dá para ligar direto a agenda do celular, com todas as contas dele.')}</p> : null}
+      {data && !inApp ? <p className="muted calsync__note">{t('No app do AskouT dá para conectar a agenda do celular, com iCloud e todas as contas dele.')}</p> : null}
     </Sheet>
   );
 }
 
-function OptionList({ options, busyId, onChoose }: { options: CalendarOption[]; busyId: string | undefined; onChoose: (o: CalendarOption) => void }) {
+function OptionList({ options, busyId, onConnect }: { options: CalendarOption[]; busyId: string | undefined; onConnect: (o: CalendarOption) => void }) {
   return (
-    <ul className="calsync">
+    <ul className="calsync__list">
       {options.map((o) => (
-        <li key={o.kind} className="calsync__item">
-          <div className="calsync__text">
-            <strong>{o.name}</strong>
-            <span className="muted">{o.hint}</span>
-          </div>
-          <Button small variant="secondary" loading={busyId === 'google' && o.via === 'google'} onClick={() => onChoose(o)} aria-label={t('Ligar {name}', { name: o.name })}>
-            {t('Ligar')}
-          </Button>
+        <li key={o.kind}>
+          <button type="button" className="calsync__row-btn" disabled={!o.available || busyId === o.via} onClick={() => onConnect(o)} aria-label={o.available ? t('Conectar {name}', { name: o.name }) : t('{name} em breve', { name: o.name })}>
+            <CalendarLogo kind={o.logo} />
+            <span className="calsync__text">
+              <strong>{o.name}</strong>
+              <span className="muted">{o.available ? o.hint : t('Em breve')}</span>
+            </span>
+            {o.available ? <span className="calsync__cta">{busyId === o.via ? t('Abrindo…') : t('Conectar')}</span> : null}
+          </button>
         </li>
       ))}
     </ul>
@@ -231,29 +216,26 @@ function ConnectionItem({ connection: c, busy, onSync, onReconnect, onToggle, on
   const [open, setOpen] = useState(false);
   const revoked = c.status !== 'ACTIVE';
   const selected = c.calendars.filter((x) => x.selected);
+  const canChoose = (c.provider === 'GOOGLE' || c.provider === 'MICROSOFT') && c.calendars.length > 0 && !revoked;
   return (
-    <li className={`calsync__item calsync__item--col${revoked ? ' calsync__item--warn' : ' calsync__item--on'}`}>
-      <div className="calsync__row">
-        <div className="calsync__text">
+    <li className={`calsync__conn${revoked ? ' calsync__conn--warn' : ''}`}>
+      <div className="calsync__conn-head">
+        <CalendarLogo kind={logoForConnection(c)} />
+        <span className="calsync__text">
           <strong>{c.label}</strong>
           <span className="muted">
-            {revoked ? t('Precisa ligar de novo') : c.calendars.length > 0 ? t('{n} de {total} agendas · {when}', { n: selected.length, total: c.calendars.length, when: syncedAgo(c.lastSyncAt) }) : syncedAgo(c.lastSyncAt)}
+            {revoked ? t('Precisa conectar de novo') : c.calendars.length > 0 ? t('{n} de {total} agendas · {when}', { n: selected.length, total: c.calendars.length, when: syncedAgo(c.lastSyncAt) }) : syncedAgo(c.lastSyncAt)}
           </span>
-        </div>
-        <span className={`calsync__badge${revoked ? ' calsync__badge--warn' : ''}`}>{revoked ? t('Desligada') : <><span aria-hidden="true">✓</span> {t('Sincronizado')}</>}</span>
+        </span>
+        {revoked ? <span className="calsync__badge calsync__badge--warn">{t('Desconectada')}</span> : <span className="calsync__ok" aria-label={t('Sincronizado')}>✓</span>}
       </div>
       {c.lastError ? <Notice tone="error">{c.lastError}</Notice> : null}
-      {open && c.provider === 'GOOGLE' && c.calendars.length > 0 ? (
+      {open && canChoose ? (
         <fieldset className="calsync__calendars">
           <legend className="muted">{t('Agendas que entram')}</legend>
           {c.calendars.map((x) => (
             <label key={x.id} className="calsync__check">
-              <input
-                type="checkbox"
-                checked={x.selected}
-                disabled={busy}
-                onChange={(e) => onToggle(c.calendars.filter((y) => (y.id === x.id ? e.target.checked : y.selected)).map((y) => y.id))}
-              />
+              <input type="checkbox" checked={x.selected} disabled={busy} onChange={(e) => onToggle(c.calendars.filter((y) => (y.id === x.id ? e.target.checked : y.selected)).map((y) => y.id))} />
               {x.color ? <span className="calsync__dot" style={{ background: x.color }} aria-hidden="true" /> : null}
               <span>{x.name}</span>
             </label>
@@ -263,27 +245,31 @@ function ConnectionItem({ connection: c, busy, onSync, onReconnect, onToggle, on
       <div className="calsync__actions">
         {revoked && onReconnect ? (
           <Button small onClick={onReconnect}>
-            {t('Ligar de novo')}
+            {t('Conectar de novo')}
           </Button>
-        ) : (
+        ) : c.provider === 'DEVICE' ? (
+          <Button small variant="quiet" onClick={onSync}>
+            {t('Escolher agendas')}
+          </Button>
+        ) : c.provider === 'ICS' ? null : (
           <Button small variant="quiet" loading={busy} onClick={onSync}>
-            {c.provider === 'DEVICE' ? t('Escolher agendas') : t('Atualizar agora')}
+            {t('Atualizar agora')}
           </Button>
         )}
-        {c.provider === 'GOOGLE' && c.calendars.length > 0 && !revoked ? (
+        {canChoose ? (
           <Button small variant="quiet" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
             {open ? t('Fechar agendas') : t('Escolher agendas')}
           </Button>
         ) : null}
-        <Button small variant="quiet" disabled={busy} onClick={onRemove} aria-label={t('Dessincronizar {name}', { name: c.label })}>
-          {t('Dessincronizar')}
+        <Button small variant="quiet" disabled={busy} onClick={onRemove} aria-label={t('Desconectar {name}', { name: c.label })}>
+          {t('Desconectar')}
         </Button>
       </div>
     </li>
   );
 }
 
-/** Lista as agendas do aparelho por conta (Google, Outlook, iCloud...) para a pessoa escolher quais entram. */
+/** Lista as agendas do aparelho por conta (com o ícone de cada uma: Google, Outlook, iCloud...) para escolher quais entram. */
 function DevicePicker({ current, onBack, onSaved }: { current: CalendarConnection | undefined; onBack: () => void; onSaved: () => void }) {
   const [calendars, setCalendars] = useState<DeviceCalendar[] | undefined>();
   const [chosen, setChosen] = useState<Set<string>>(new Set());
@@ -304,7 +290,7 @@ function DevicePicker({ current, onBack, onSaved }: { current: CalendarConnectio
         // Primeira vez: já vêm todas marcadas (como nos apps de agenda); depois vale o que a pessoa escolheu.
         setChosen(before.size > 0 ? before : new Set(list.map((c) => c.id)));
       })
-      .catch((failure: unknown) => setError(failure instanceof Error ? failure.message : t('Não foi possível ler a agenda do celular.')));
+      .catch((failure: unknown) => setError(messageOf(failure, t('Não foi possível ler a agenda do celular.'))));
   }, [current]);
 
   async function save() {
@@ -315,7 +301,7 @@ function DevicePicker({ current, onBack, onSaved }: { current: CalendarConnectio
       await pushDeviceCalendars(calendars.map((c) => ({ ...c, selected: chosen.has(c.id) })));
       onSaved();
     } catch (failure) {
-      setError(failure instanceof Error && !('code' in failure) ? failure.message : toApiError(failure).message);
+      setError(messageOf(failure, t('Não foi possível ler a agenda do celular.')));
     } finally {
       setSaving(false);
     }
@@ -332,14 +318,17 @@ function DevicePicker({ current, onBack, onSaved }: { current: CalendarConnectio
 
   return (
     <div>
-      <p className="muted">{t('Estas são as agendas das contas ligadas no seu celular. Escolha quais entram.')}</p>
+      <p className="muted">{t('Estas são as agendas das contas do seu celular. Escolha quais entram.')}</p>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {!calendars && !error ? <Loading /> : null}
       {calendars && calendars.length === 0 ? <Notice>{t('Nenhuma agenda encontrada no aparelho.')}</Notice> : null}
       {calendars
         ? groupByAccount(calendars).map((group) => (
             <fieldset key={group.account} className="calsync__calendars">
-              <legend className="calsync__account">{group.account}</legend>
+              <legend className="calsync__account">
+                <CalendarLogo kind={logoForAccount(group.account)} size={24} />
+                <span>{group.account}</span>
+              </legend>
               {group.items.map((c) => (
                 <label key={c.id} className="calsync__check">
                   <input type="checkbox" checked={chosen.has(c.id)} onChange={() => toggle(c.id)} />
@@ -357,45 +346,5 @@ function DevicePicker({ current, onBack, onSaved }: { current: CalendarConnectio
         {t('Voltar')}
       </Button>
     </div>
-  );
-}
-
-function IcsForm({ option, onBack, onSaved }: { option: CalendarOptionKind; onBack: () => void; onSaved: (c: CalendarConnection) => void }) {
-  const [url, setUrl] = useState('');
-  const [error, setError] = useState<string | undefined>();
-  const [saving, setSaving] = useState(false);
-  const name = option === 'GOOGLE' ? t('Google Agenda') : option === 'OUTLOOK' ? t('Outlook') : option === 'ICLOUD' ? t('iCloud') : undefined;
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    setError(undefined);
-    try {
-      onSaved(await api.addIcsCalendar({ url: url.trim(), ...(name ? { label: name } : {}) }));
-    } catch (failure) {
-      const e = toApiError(failure);
-      setError(e.fields['url'] ?? e.message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form className="form form--flat" onSubmit={submit} noValidate>
-      {name ? <h3 className="form__title">{name}</h3> : null}
-      <ol className="calsync__steps">
-        {icsHelp(option).map((step) => (
-          <li key={step}>{step}</li>
-        ))}
-      </ol>
-      <Field label={t('Link da agenda')} value={url} onChange={setUrl} error={error} inputMode="url" placeholder="webcal://… ou https://….ics" autoFocus />
-      <p className="muted calsync__note">{t('O link fica guardado cifrado e é relido a cada 30 minutos. Só os horários ocupados entram.')}</p>
-      <Button type="submit" full loading={saving} disabled={url.trim() === ''}>
-        {t('Ligar agenda')}
-      </Button>
-      <Button variant="quiet" full onClick={onBack}>
-        {t('Voltar')}
-      </Button>
-    </form>
   );
 }

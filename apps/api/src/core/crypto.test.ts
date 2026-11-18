@@ -161,7 +161,8 @@ test('state do OAuth: assinado, com validade, e recusa adulterado', async () => 
   let now = 1_000_000;
   const s = new HmacOAuthStateTokens({ secret: SECRET, nowMs: () => now });
   const token = s.sign({ userId: 'u1', from: 'app' });
-  assert.deepEqual(s.verify(token), { userId: 'u1', from: 'app' });
+  assert.deepEqual(s.verify(token), { userId: 'u1', from: 'app', provider: 'GOOGLE' });
+  assert.equal(s.verify(s.sign({ userId: 'u1', from: 'web', provider: 'MICROSOFT' }))?.provider, 'MICROSOFT');
   assert.equal(s.verify(token.slice(0, -2) + 'xx'), undefined);
   assert.equal(new HmacOAuthStateTokens({ secret: SECRET + 'x' }).verify(token), undefined);
   now += 901_000;
