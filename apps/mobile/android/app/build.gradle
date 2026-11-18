@@ -33,6 +33,11 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // APK de teste do GitHub: assina com a mesma chave de upload, para o SHA-1 ser sempre o mesmo
+            // (o login com o Google só funciona com um SHA-1 cadastrado no cliente Android do Google Cloud).
+            if (keystoreFile.exists()) { signingConfig signingConfigs.release }
+        }
         release {
             if (keystoreFile.exists()) { signingConfig signingConfigs.release }
             // R8: encolhe e otimiza o código e tira recursos sem uso. As regras dos plugins ficam em proguard-rules.pro.

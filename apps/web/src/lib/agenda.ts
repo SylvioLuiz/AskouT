@@ -27,6 +27,35 @@ export function daysFrom(startKey: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => addDays(startKey, i));
 }
 
+/** Primeiro dia do mês de `key` ('AAAA-MM-01'). */
+export function monthStart(key: string): string {
+  return `${key.slice(0, 7)}-01`;
+}
+
+/** Primeiro dia do mês `months` meses depois (ou antes, se negativo) do mês de `key`. */
+export function addMonths(key: string, months: number): string {
+  const { y, m } = parts(key);
+  return new Date(Date.UTC(y, m - 1 + months, 1)).toISOString().slice(0, 10);
+}
+
+/** Todos os dias do mês de `key`, do dia 1 ao último. */
+export function monthDays(key: string): string[] {
+  const { y, m } = parts(key);
+  const count = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return daysFrom(monthStart(key), count);
+}
+
+/** Semanas (domingo a sábado) que cobrem o mês de `key`, com os dias dos meses vizinhos completando as pontas. */
+export function monthWeeks(key: string): string[][] {
+  const first = monthStart(key);
+  const { y, m } = parts(first);
+  const lead = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+  const days = monthDays(key);
+  const total = Math.ceil((lead + days.length) / 7) * 7;
+  const cells = daysFrom(addDays(first, -lead), total);
+  return Array.from({ length: total / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
+}
+
 /** Instante em que começa o dia local `key` (meia-noite local). */
 export function startOfDay(key: string): Date {
   const { y, m, d } = parts(key);
@@ -111,20 +140,48 @@ export function dayChip(key: string): { weekday: string; day: string } {
 
 const monthYear = new Intl.DateTimeFormat(intlLocale(), { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const dayShort = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+const dayShortYear = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+const monthShortFmt = new Intl.DateTimeFormat(intlLocale(), { month: 'short', timeZone: 'UTC' });
+const weekdayNarrow = new Intl.DateTimeFormat(intlLocale(), { weekday: 'narrow', timeZone: 'UTC' });
+
+/** "nov" */
+export function monthShortLabel(key: string): string {
+  return monthShortFmt.format(noon(key)).replace('.', '');
+}
+
+/** Iniciais dos dias da semana, de domingo a sábado: ['D', 'S', 'T', ...]. */
+export function weekdayInitials(): string[] {
+  // 2023-01-01 foi um domingo.
+  return daysFrom('2023-01-01', 7).map((key) => weekdayNarrow.format(noon(key)).toLocaleUpperCase());
+}
 
 /** "novembro de 2026" */
 export function monthLabel(key: string): string {
   return monthYear.format(noon(key));
 }
 
-/** "sáb., 14 de nov." */
-export function dayShortLabel(key: string): string {
-  return dayShort.format(noon(key));
+/** "sáb., 14 de nov."; com `withYear`, "sáb., 14 de nov. de 2027". */
+export function dayShortLabel(key: string, withYear = false): string {
+  return (withYear ? dayShortYear : dayShort).format(noon(key));
 }
 
 /** Primeiro dia da lista (a partir de `from`, inclusive) que tem algo; `undefined` se nenhum. */
 export function firstDayWith(days: readonly string[], has: (key: string) => boolean, from?: string): string | undefined {
   return days.find((key) => (from === undefined || key >= from) && has(key));
+}
+
+/** Primeiro dia depois de `after` em que cai algum evento (sem limite de data); `undefined` se nenhum. */
+export function nextEventDayAfter(events: readonly AgendaEvent[], after: string): string | undefined {
+  const tomorrow = addDays(after, 1);
+  let best: string | undefined;
+  for (const e of events) {
+    const { first, last } = eventDays(e);
+    if (last < tomorrow) continue;
+    const day = first > tomorrow ? first : tomorrow;
+    if (best === undefined || day < best) best = day;
+  }
+  return best;
 }
 
 /** Último dia da lista antes de `before` que tem algo. */
@@ -222,13 +279,18 @@ export function agendaEvents(meetups: readonly MeetupView[], going: readonly Goi
 
 const NIGHT_MS = 6 * 3_600_000;
 
+/** Primeiro e último dia (locais) que o evento ocupa na agenda. */
+function eventDays(e: Pick<AgendaEvent, 'startsAt' | 'endsAt'>): { first: string; last: string } {
+  const first = localDateKey(new Date(e.startsAt));
+  const endMs = Date.parse(e.endsAt) - NIGHT_MS;
+  return { first, last: endMs > Date.parse(e.startsAt) ? localDateKey(new Date(endMs)) : first };
+}
+
 /** Os que acontecem no dia (data local do aparelho), por horário. Evento de vários dias aparece em todos eles; o que termina de madrugada (até 6h) não invade o dia seguinte. */
 export function agendaEventsOnDay(events: readonly AgendaEvent[], key: string): AgendaEvent[] {
   return events
     .filter((e) => {
-      const first = localDateKey(new Date(e.startsAt));
-      const endMs = Date.parse(e.endsAt) - NIGHT_MS;
-      const last = endMs > Date.parse(e.startsAt) ? localDateKey(new Date(endMs)) : first;
+      const { first, last } = eventDays(e);
       return key >= first && key <= last;
     })
     .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));

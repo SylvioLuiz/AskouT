@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   PRESETS,
   addDays,
+  addMonths,
   agendaEvents,
   agendaEventsOnDay,
   buildSlot,
@@ -14,6 +15,10 @@ import {
   lastDayWithBefore,
   instantRangeLabel,
   localDateKey,
+  monthDays,
+  monthStart,
+  monthWeeks,
+  nextEventDayAfter,
   rangeForDays,
   slotsOnDay,
   startOfDay,
@@ -176,5 +181,40 @@ describe('navegação entre dias', () => {
   it('acha o dia com evento anterior', () => {
     assert.equal(lastDayWithBefore(days, has, '2026-11-12'), '2026-11-09');
     assert.equal(lastDayWithBefore(days, has, '2026-11-09'), undefined);
+  });
+});
+
+describe('navegação sem limite (meses e anos)', () => {
+  it('troca de mês e de ano', () => {
+    assert.equal(monthStart('2026-11-18'), '2026-11-01');
+    assert.equal(addMonths('2026-11-18', 1), '2026-12-01');
+    assert.equal(addMonths('2026-12-31', 1), '2027-01-01');
+    assert.equal(addMonths('2026-01-31', -1), '2025-12-01');
+    assert.equal(addMonths('2026-03-15', -27), '2023-12-01');
+    assert.equal(addMonths('2026-03-15', 120), '2036-03-01');
+  });
+  it('lista os dias do mês, com fevereiro bissexto', () => {
+    assert.equal(monthDays('2026-11-18').length, 30);
+    assert.equal(monthDays('2028-02-10').length, 29);
+    assert.equal(monthDays('2027-02-10').at(-1), '2027-02-28');
+    assert.equal(monthDays('2026-12-05')[0], '2026-12-01');
+  });
+  it('monta as semanas do mês de domingo a sábado', () => {
+    const weeks = monthWeeks('2026-11-18');
+    // 1/nov/2026 é domingo; 30/nov é segunda.
+    assert.equal(weeks[0]?.[0], '2026-11-01');
+    assert.equal(weeks.length, 5);
+    assert.equal(weeks.at(-1)?.at(-1), '2026-12-05');
+    assert.ok(weeks.every((w) => w.length === 7));
+    // Agosto/2026 começa num sábado: a primeira semana vem do fim de julho.
+    assert.equal(monthWeeks('2026-08-01')[0]?.[0], '2026-07-26');
+  });
+  it('acha o próximo evento em qualquer data futura', () => {
+    const ev = (startsAt: string, endsAt: string) => ({ key: startsAt, title: 'x', startsAt, endsAt, venueName: null, to: '/' });
+    const events = [ev('2027-05-10T23:00:00.000Z', '2027-05-11T02:00:00.000Z'), ev('2026-12-20T20:00:00.000Z', '2026-12-22T20:00:00.000Z')];
+    assert.equal(nextEventDayAfter(events, '2026-11-18'), '2026-12-20');
+    assert.equal(nextEventDayAfter(events, '2026-12-20'), '2026-12-21');
+    assert.equal(nextEventDayAfter(events, '2026-12-22'), '2027-05-10');
+    assert.equal(nextEventDayAfter(events, '2027-05-10'), undefined);
   });
 });

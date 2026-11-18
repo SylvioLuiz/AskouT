@@ -1353,11 +1353,171 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   margin-bottom: 4px;
 }
 
+/* O nome do mês abre o calendário para pular para qualquer data. */
 .daynav__month {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 38px;
+  padding: 0 6px 0 0;
   font-family: var(--font-display);
   font-size: 1rem;
   font-weight: 700;
   color: var(--ink);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.daynav__month svg {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+/* ---------- Calendário do mês (folha "Ir para a data") ---------- */
+
+.mcal {
+  padding: 0 4px 8px;
+  touch-action: pan-y;
+}
+
+.mcal__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.mcal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 12px;
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.mcal__title svg {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+
+.mcal__grid {
+  display: grid;
+  gap: 2px;
+}
+
+.mcal__row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.mcal__weekday {
+  padding: 4px 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--muted);
+}
+
+.mcal__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 46px;
+  padding: 4px 0;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mcal__day--outside {
+  color: var(--muted);
+  opacity: 0.55;
+}
+
+.mcal__day--today {
+  color: var(--brand-text);
+  border-color: var(--brand-text);
+  font-weight: 800;
+}
+
+.mcal__day--selected {
+  color: var(--brand-ink);
+  background: var(--brand);
+  border-color: var(--brand);
+  opacity: 1;
+}
+
+.mcal__day--selected .daymark--event,
+.mcal__day--selected .daymark--ok {
+  background: var(--brand-ink);
+}
+
+.mcal__marks {
+  display: flex;
+  gap: 3px;
+  min-height: 6px;
+}
+
+.mcal__marks .daymark {
+  width: 5px;
+  height: 5px;
+}
+
+.mcal__months {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.mcal__month {
+  min-height: 52px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.mcal__month--today {
+  color: var(--brand-text);
+  border-color: var(--brand-text);
+}
+
+.mcal__month--selected {
+  color: var(--brand-ink);
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.mcal__foot {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
 }
 
 .daynav__actions {
@@ -4721,7 +4881,17 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .dpcal__cell { position: relative; }
 
 /* ---------- Sincronizar agendas ---------- */
-.agsync { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.agsync { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+/* Alterna entre a faixa de dias e o mês inteiro. */
+.agview { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+.agview__opt { min-height: 34px; padding: 0 16px; font: inherit; font-size: 0.8125rem; font-weight: 700; color: var(--muted); background: transparent; border: 0; border-radius: 999px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.agview__opt--on { color: var(--brand-ink); background: var(--brand); }
+/* Mês inteiro na própria tela: células maiores e dedo pode rolar a página na vertical. */
+.agmonth { margin-bottom: 16px; touch-action: pan-y; }
+.mcal__grid--large { gap: 4px; }
+.mcal__grid--large .mcal__row { gap: 4px; }
+.mcal__grid--large .mcal__day { min-height: 52px; font-size: 1rem; }
+.mcal__grid--large .mcal__marks .daymark { width: 6px; height: 6px; }
 .agsync .btn { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; }
 .agsync .btn svg { width: 16px; height: 16px; flex: none; }
 .calsync { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
