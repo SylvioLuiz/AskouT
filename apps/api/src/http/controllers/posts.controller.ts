@@ -67,9 +67,9 @@ export class PostsController {
 
   /** Posts seus e dos seus amigos. */
   @Get('posts/feed')
-  /** `mixed=1`: inclui eventos de bares repostados (itens com `type: 'PLACE_EVENT'`). Sem ele, só posts, como antes. */
-  async feed(@CurrentActor() actor: Actor, @Query('limit') limit?: string, @Query('offset') offset?: string, @Query('mixed') mixed?: string) {
-    const page = await this.core.posts.feed(actor.userId, { limit, offset }, { placeEvents: mixed === '1' });
+  /** `mixed=1`: inclui eventos de bares repostados (itens com `type: 'PLACE_EVENT'`). Sem ele, só posts, como antes. `before` (ISO): só o que veio antes dessa data. */
+  async feed(@CurrentActor() actor: Actor, @Query('limit') limit?: string, @Query('offset') offset?: string, @Query('mixed') mixed?: string, @Query('before') before?: string) {
+    const page = await this.core.posts.feed(actor.userId, { limit, offset, before }, { placeEvents: mixed === '1' });
     return { ...page, items: page.items.map((p) => ('type' in p ? p : this.present(p))) };
   }
 

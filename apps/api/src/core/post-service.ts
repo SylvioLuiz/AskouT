@@ -119,6 +119,8 @@ export type HomeFeedItem = PostView | PlaceEventFeedItem;
 
 export interface HomeFeedPage extends Omit<PostsPage, 'items'> {
   items: HomeFeedItem[];
+  /** Data do post mais antigo do Início (só na primeira página), para a régua de datas. */
+  oldestAt?: string | null;
 }
 
 export interface PostCommentView {
@@ -530,8 +532,14 @@ export class PostService {
    * Eventos de pessoas repostados por você ou por quem você segue entram também, na data do repost, com quem repostou.
    * Cada post aparece uma vez só, na entrada mais recente (o post em si ou o repost mais novo).
    */
-  async feed(viewerId: string, query: { limit?: unknown; offset?: unknown } = {}, options: { placeEvents?: boolean } = {}): Promise<HomeFeedPage> {
+  async feed(viewerId: string, query: { limit?: unknown; offset?: unknown; before?: unknown } = {}, options: { placeEvents?: boolean } = {}): Promise<HomeFeedPage> {
     const page = parsePage(query);
+    // `before`: a régua de datas pula para o que foi publicado antes deste instante; `offset` conta a partir daí.
+    let before: Date | undefined;
+    if (query.before !== undefined && query.before !== null && query.before !== '') {
+      before = typeof query.before === 'string' && query.before.length <= 40 ? new Date(query.before) : new Date(NaN);
+      if (Number.isNaN(before.getTime())) throw validationError('Data inválida', { before: 'Use uma data ISO' });
+    }
     const following = await this.deps.follows.listFollowingIds(viewerId);
     // Quem administra um local vê os posts dele no próprio Início, mesmo sem segui-lo.
     const owned = await managedVenueIds(this.deps.places, viewerId);
@@ -540,9 +548,9 @@ export class PostService {
     const want = page.offset + page.limit + 1;
     const people = [viewerId, ...following];
     const [rows, reposts, placeReposts] = await Promise.all([
-      this.deps.posts.listFor(people, [viewerId], { limit: want, offset: 0 }, undefined, { hideFor: viewerId, venueIds }),
-      this.deps.profileEvents.listPostReposts(people, want),
-      options.placeEvents ? this.deps.profileEvents.listPlaceReposts(people, want) : Promise.resolve([]),
+      this.deps.posts.listFor(people, [viewerId], { limit: want, offset: 0 }, undefined, { hideFor: viewerId, venueIds, before }),
+      this.deps.profileEvents.listPostReposts(people, want, before),
+      options.placeEvents ? this.deps.profileEvents.listPlaceReposts(people, want, before) : Promise.resolve([]),
     ]);
     type Entry = { key: string; id: string; at: number; place?: boolean; row?: PostWithImages; by?: string };
     const entries: Entry[] = [
@@ -592,7 +600,9 @@ export class PostService {
       if (!view) return [];
       return [by ? { ...view, repostedBy: by, repostedAt: at } : view];
     });
-    return { items, total: null, ...page, hasMore };
+    if (page.offset > 0 || before) return { items, total: null, ...page, hasMore };
+    const oldest = await this.deps.posts.oldestFor(people, [viewerId], { hideFor: viewerId, venueIds });
+    return { items, total: null, ...page, hasMore, oldestAt: oldest ? oldest.toISOString() : null };
   }
 
   /** Posts publicados em nome de um estabelecimento, abertos a qualquer pessoa. */

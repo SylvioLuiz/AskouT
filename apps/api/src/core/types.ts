@@ -727,6 +727,8 @@ export interface PostScope {
   hideFor?: string;
   /** Inclui também os posts feitos em nome destes estabelecimentos (os que a pessoa segue, ou o da página). */
   venueIds?: string[];
+  /** Só posts criados antes deste instante (a régua de datas do Início). */
+  before?: Date;
 }
 
 /** Só eventos (posts com dados de evento) ou só posts comuns. */

@@ -85,7 +85,8 @@ export class PrismaPostRepository implements PostRepository {
     return only === undefined ? {} : only === 'EVENT' ? { eventTitle: { not: null } } : { eventTitle: null };
   }
 
-  async listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter, scope: PostScope = {}): Promise<PostWithImages[]> {
+  /** Filtro de `listFor`/`oldestFor`. `undefined` quando nada pode entrar. */
+  private static forWhere(authorIds: string[], taggedIds: string[], only: PostKindFilter | undefined, scope: PostScope) {
     const authors = authorIds.filter(isUuid);
     const tagged = taggedIds.filter(isUuid);
     const venues = (scope.venueIds ?? []).filter(isUuid);
@@ -95,22 +96,36 @@ export class PrismaPostRepository implements PostRepository {
       ...(tagged.length > 0 ? [{ AND: [PrismaPostRepository.viaTag(tagged), { venueId: null }] }] : []),
       ...(venues.length > 0 ? [{ venueId: { in: venues } }] : []),
     ];
-    if (or.length === 0) return [];
+    if (or.length === 0) return undefined;
+    return {
+      AND: [
+        { OR: or },
+        PrismaPostRepository.kindWhere(only),
+        scope.archived ? { archivedAt: { not: null } } : { archivedAt: null },
+        ...(scope.hideFor && isUuid(scope.hideFor) ? [{ hiddenBy: { none: { userId: scope.hideFor } } }] : []),
+        ...(scope.before ? [{ createdAt: { lt: scope.before } }] : []),
+      ],
+    };
+  }
+
+  async listFor(authorIds: string[], taggedIds: string[], page: Page, only?: PostKindFilter, scope: PostScope = {}): Promise<PostWithImages[]> {
+    const where = PrismaPostRepository.forWhere(authorIds, taggedIds, only, scope);
+    if (!where) return [];
     const rows = await this.prisma.post.findMany({
-      where: {
-        AND: [
-          { OR: or },
-          PrismaPostRepository.kindWhere(only),
-          scope.archived ? { archivedAt: { not: null } } : { archivedAt: null },
-          ...(scope.hideFor && isUuid(scope.hideFor) ? [{ hiddenBy: { none: { userId: scope.hideFor } } }] : []),
-        ],
-      },
+      where,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: page.offset,
       take: page.limit,
       include: PrismaPostRepository.include,
     });
     return rows.map(PrismaPostRepository.toView);
+  }
+
+  async oldestFor(authorIds: string[], taggedIds: string[], scope: PostScope = {}): Promise<Date | undefined> {
+    const where = PrismaPostRepository.forWhere(authorIds, taggedIds, undefined, scope);
+    if (!where) return undefined;
+    const row = await this.prisma.post.findFirst({ where, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], select: { createdAt: true } });
+    return row?.createdAt;
   }
 
   async listEventsStartingBetween(from: Date, to: Date, limit: number): Promise<PostWithImages[]> {

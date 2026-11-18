@@ -1876,19 +1876,19 @@ export class InMemoryProfileEventRepository implements ProfileEventRepository {
     return this.postRows.has(this.key(userId, postId));
   }
 
-  async listPlaceReposts(userIds: string[], limit: number): Promise<{ userId: string; eventId: string; createdAt: Date }[]> {
+  async listPlaceReposts(userIds: string[], limit: number, before?: Date): Promise<{ userId: string; eventId: string; createdAt: Date }[]> {
     const who = new Set(userIds);
     return [...this.rows.values()]
-      .filter((r) => who.has(r.userId))
+      .filter((r) => who.has(r.userId) && (!before || r.createdAt < before))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.eventId < b.eventId ? 1 : a.eventId > b.eventId ? -1 : a.userId < b.userId ? 1 : -1))
       .slice(0, limit)
       .map((r) => ({ ...r }));
   }
 
-  async listPostReposts(userIds: string[], limit: number): Promise<{ userId: string; postId: string; createdAt: Date }[]> {
+  async listPostReposts(userIds: string[], limit: number, before?: Date): Promise<{ userId: string; postId: string; createdAt: Date }[]> {
     const who = new Set(userIds);
     return [...this.postRows.values()]
-      .filter((r) => who.has(r.userId))
+      .filter((r) => who.has(r.userId) && (!before || r.createdAt < before))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.postId < b.postId ? 1 : a.postId > b.postId ? -1 : a.userId < b.userId ? 1 : -1))
       .slice(0, limit)
       .map((r) => ({ ...r }));
@@ -2028,7 +2028,8 @@ export class InMemoryPostRepository implements PostRepository {
       (p) =>
         (p.venueId ? venues.has(p.venueId) : authors.has(p.authorId) || viaTag.has(p.id)) &&
         (scope.archived ? p.archivedAt !== null : p.archivedAt === null) &&
-        !(scope.hideFor && this.hidden.has(`${p.id}|${scope.hideFor}`)),
+        !(scope.hideFor && this.hidden.has(`${p.id}|${scope.hideFor}`)) &&
+        !(scope.before && p.createdAt >= scope.before),
     );
   }
 
@@ -2044,6 +2045,11 @@ export class InMemoryPostRepository implements PostRepository {
     return this.newestFirst(this.visibleFor(authorIds, taggedIds, scope).filter((p) => InMemoryPostRepository.matches(p, only)))
       .slice(page.offset, page.offset + page.limit)
       .map((p) => this.withImages(p));
+  }
+
+  async oldestFor(authorIds: string[], taggedIds: string[], scope?: PostScope): Promise<Date | undefined> {
+    const all = this.newestFirst(this.visibleFor(authorIds, taggedIds, scope));
+    return all.length > 0 ? new Date(all[all.length - 1]!.createdAt) : undefined;
   }
 
   async countFor(userId: string, only?: PostKindFilter): Promise<number> {

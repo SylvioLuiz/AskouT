@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { CarouselIcon, CommentIcon, HeartIcon, MoreIcon, RepostIcon, SendIcon } from './icons.tsx';
 import { SoundToggle } from './sound-toggle.tsx';
@@ -21,6 +21,9 @@ import { timeAgo } from '../lib/format.ts';
 import type { HomeFeedItem, HomeFeedPage, PlaceEventFeedItem, PostImage, PostView, PostsPage } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { PhotoViewer } from './photo-viewer.tsx';
+import { DateRail } from './date-rail.tsx';
+import { railBefore, railMonths } from '../lib/date-rail.ts';
+import type { RailMonth } from '../lib/date-rail.ts';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
 function Slide({ image, index, total, onFirstLoad, onOpen }: { image: PostImage; index: number; total: number; onFirstLoad?: (w: number, h: number) => void; onOpen?: (index: number) => void }) {
@@ -477,19 +480,32 @@ function PlaceEventFeedCard({ item }: { item: PlaceEventFeedItem }) {
 
 /** Lista de posts com "Carregar mais". `load` busca uma página a partir de um deslocamento. */
 /** `inject`: bloco que entra depois de `after` posts (ou no fim, se houver menos). */
-export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { load: (offset: number) => Promise<PostsPage | HomeFeedPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } | { after: number; node: ReactNode }[] }) {
+/** Data em que o item entrou no feed (o repost conta pela data do repost). */
+function feedAt(item: HomeFeedItem): string {
+  if ('type' in item) return item.repostedAt;
+  return item.repostedAt ?? item.createdAt;
+}
+
+export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateRail }: { load: (offset: number, before?: string) => Promise<PostsPage | HomeFeedPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } | { after: number; node: ReactNode }[]; dateRail?: boolean }) {
   const [page, setPage] = useState<{ hasMore: boolean } | undefined>();
   const [items, setItems] = useState<HomeFeedItem[]>([]);
   const [error, setError] = useState<ApiError | undefined>();
   const [loading, setLoading] = useState(false);
+  // Régua de datas: até onde o feed vai e, depois de um pulo, o mês escolhido (o feed mostra dali para trás).
+  const [oldest, setOldest] = useState<string | null | undefined>();
+  const [jump, setJump] = useState<RailMonth | undefined>();
   const sentinel = useRef<HTMLDivElement>(null);
-  const injected = inject === undefined ? [] : Array.isArray(inject) ? inject : [inject];
-  async function more(offset: number) {
+  const top = useRef<HTMLDivElement>(null);
+  const injected = jump || inject === undefined ? [] : Array.isArray(inject) ? inject : [inject];
+  const before = jump ? railBefore(jump) : undefined;
+  const months = useMemo(() => (dateRail ? railMonths(new Date(), oldest) : []), [dateRail, oldest]);
+  async function more(offset: number, from = before) {
     setLoading(true);
     setError(undefined);
     try {
-      const next = await load(offset);
+      const next = await load(offset, from);
       setPage(next);
+      if (offset === 0 && !from && 'oldestAt' in next && next.oldestAt !== undefined) setOldest(next.oldestAt);
       setItems((current) => (offset === 0 ? (next.items as HomeFeedItem[]) : [...current, ...(next.items as HomeFeedItem[]).filter((p) => !current.some((c) => c.id === p.id && 'type' in c === 'type' in p))]));
     } catch (failure) {
       setError(toApiError(failure));
@@ -497,10 +513,19 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
       setLoading(false);
     }
   }
-  useEffect(() => {
+  function jumpTo(month: RailMonth | undefined) {
+    setJump(month);
     setPage(undefined);
     setItems([]);
-    void more(0);
+    void more(0, month ? railBefore(month) : undefined);
+    const node = top.current;
+    if (node) window.scrollTo({ top: Math.max(0, node.getBoundingClientRect().top + window.scrollY - 72), behavior: 'auto' });
+  }
+  useEffect(() => {
+    setJump(undefined);
+    setPage(undefined);
+    setItems([]);
+    void more(0, undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey]);
   // Rolar até perto do fim carrega a próxima página sozinho. Depois de um erro, só o "Tentar de novo" continua.
@@ -518,27 +543,37 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
     return () => watcher.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, loading, error, items.length]);
-  if (error && items.length === 0) return <ErrorState message={error.message} onRetry={() => void more(0)} />;
-  if (!page) return <Loading />;
+  const rail = months.length > 0 ? <DateRail months={months} onJump={(i) => jumpTo(i === 0 ? undefined : months[i])} /> : null;
+  const banner = jump ? (
+    <div className="feedjump">
+      <span>{t('Mostrando desde {month}', { month: jumpLabel.format(new Date(jump.year, jump.month, 15)) })}</span>
+      <button type="button" className="btn btn--ghost btn--small" onClick={() => jumpTo(undefined)}>{t('Voltar ao mais recente')}</button>
+    </div>
+  ) : null;
+  if (error && items.length === 0) return <div ref={top}>{banner}<ErrorState message={error.message} onRetry={() => void more(0)} />{rail}</div>;
+  if (!page) return <div ref={top}>{banner}<Loading />{rail}</div>;
   if (items.length === 0) {
     return (
-      <>
-        <EmptyState title={emptyTitle}>{emptyHint}</EmptyState>
+      <div ref={top}>
+        {banner}
+        <EmptyState title={jump ? t('Nada publicado até aqui') : emptyTitle}>{jump ? null : emptyHint}</EmptyState>
         {injected.map((i) => (<Fragment key={i.after}>{i.node}</Fragment>))}
-      </>
+        {rail}
+      </div>
     );
   }
   return (
-    <div className="postlist">
+    <div className="postlist" ref={top}>
+      {banner}
       {items.map((post, index) => (
-        <Fragment key={'type' in post ? `place:${post.id}` : post.id}>
+        <div className="postlist__item" data-feed-at={dateRail ? feedAt(post) : undefined} key={'type' in post ? `place:${post.id}` : post.id}>
           {'type' in post ? (
             <PlaceEventFeedCard item={post} />
           ) : (
             <PostCard post={post} asEvent poster track="FEED" onGone={(id) => setItems((current) => current.filter((p) => 'type' in p || p.id !== id))} />
           )}
           {injected.filter((i) => index === Math.min(i.after, items.length) - 1).map((i) => (<Fragment key={i.after}>{i.node}</Fragment>))}
-        </Fragment>
+        </div>
       ))}
       {error ? <ErrorState message={error.message} onRetry={() => void more(items.length)} /> : null}
       {page.hasMore ? (
@@ -546,9 +581,12 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject }: { l
           {loading ? <Loading /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => void more(items.length)}>{t('Carregar mais')}</Button> : null}
         </div>
       ) : null}
+      {rail}
     </div>
   );
 }
+
+const jumpLabel = new Intl.DateTimeFormat(intlLocale(), { month: 'long', year: 'numeric' });
 
 /** Grade de quadrados do perfil: toque abre o post. */
 const eventFmt = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });

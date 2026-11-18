@@ -334,7 +334,7 @@ export function createApi(deps: ApiDeps) {
     archivedPosts: (page?: PageRequest) => request<PostsPage>('GET', `/posts/archived${pageQuery(page)}`),
     postsFeed: (page?: PageRequest) => request<PostsPage>('GET', `/posts/feed${pageQuery(page)}`),
     /** Início com eventos de bares repostados misturados (`type: 'PLACE_EVENT'`). */
-    homeFeed: (page?: PageRequest) => request<HomeFeedPage>('GET', `/posts/feed${pageQuery(page)}${pageQuery(page) ? '&' : '?'}mixed=1`),
+    homeFeed: (page?: PageRequest, before?: string) => request<HomeFeedPage>('GET', `/posts/feed${pageQuery(page)}${pageQuery(page) ? '&' : '?'}mixed=1${before ? `&before=${encodeURIComponent(before)}` : ''}`),
     userPosts: (username: string, page?: PageRequest, kind?: 'event' | 'post') => request<PostsPage>('GET', `/profiles/${id(username)}/posts${pageQuery(page)}${kind ? `${page ? '&' : '?'}kind=${kind}` : ''}`),
     myMeetups: () => request<{ items: MeetupView[] }>('GET', '/meetups'),
     myGoingEvents: () => request<{ items: GoingEvent[] }>('GET', '/me/events/going'),

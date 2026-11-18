@@ -924,6 +924,8 @@ export type HomeFeedItem = PostView | PlaceEventFeedItem;
 
 export interface HomeFeedPage extends Omit<PostsPage, 'items'> {
   items: HomeFeedItem[];
+  /** Data do post mais antigo (só na primeira página), para a régua de datas. */
+  oldestAt?: string | null;
 }
 
 export interface PostsPage {
