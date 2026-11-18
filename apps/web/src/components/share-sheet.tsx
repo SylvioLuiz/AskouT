@@ -61,7 +61,7 @@ async function copyText(text: string): Promise<void> {
  * (toque em um ou mais, mensagem opcional, Enviar) e, embaixo, uma linha de atalhos (copiar link, WhatsApp...).
  * `link` vazio = só dentro do app (ex.: evento privado).
  */
-export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, actions = [], note, sentToast, onClose }: {
+export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, actions = [], note, sentToast, initialConversations = [], onClose }: {
   title?: string;
   link?: { title: string; text: string; url: string };
   /** Envia para uma conversa; `message` é o texto opcional que a pessoa escreveu. */
@@ -71,11 +71,13 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
   note?: ReactNode;
   /** Texto do aviso rápido depois de enviar a todos (recebe os nomes). Com ele, a folha fecha sozinha ao enviar. */
   sentToast?: (names: string[]) => string;
+  /** Conversas que já abrem marcadas (ex.: a conversa da votação de data que virou evento). */
+  initialConversations?: string[];
   onClose: () => void;
 }) {
   const data = useAsync(() => Promise.all([api.conversations(), api.friends().catch(() => [])]), []);
   const [query, setQuery] = useState('');
-  const [picked, setPicked] = useState<string[]>([]);
+  const [picked, setPicked] = useState<string[]>(() => initialConversations.map((id) => `c:${id}`));
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<string[]>([]);

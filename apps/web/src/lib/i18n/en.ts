@@ -2645,4 +2645,10 @@ export const EN: Readonly<Record<string, string>> = {
   "Os eventos que essa pessoa participou aparecem aqui.": "Events this person attended show up here.",
   "Eventos que participou": "Events attended",
   "Só você vê": "Only you see this",
+  "Evento criado": "Event created",
+  "Enviar o evento": "Send the event",
+  "Enviar para mais conversas": "Send to more chats",
+  "Seu evento privado está pronto. Ele só chega a quem receber nas conversas.": "Your private event is ready. Only people who get it in a chat will see it.",
+  "Seu evento está pronto e já aparece no seu perfil.": "Your event is ready and already shows on your profile.",
+  "Depois de criar, você escolhe as conversas e grupos que vão receber o evento.": "After creating it, you'll pick the chats and groups that get the event.",
 };
