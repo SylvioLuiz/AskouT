@@ -14,7 +14,7 @@ export const GOOGLE_CALENDAR_SCOPES = [
   'openid',
   'email',
   'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
-  'https://www.googleapis.com/auth/calendar.freebusy',
+  'https://www.googleapis.com/auth/calendar.events.freebusy',
 ];
 
 export interface GoogleCalendarOptions {
