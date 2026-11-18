@@ -31,6 +31,7 @@ import {
   timeRangeLabel,
 } from '../lib/agenda.ts';
 import { toApiError } from '../lib/errors.ts';
+import { isoToLocalInput } from '../lib/post-draft.ts';
 import type { Slot, SlotState } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
@@ -82,6 +83,13 @@ function BusyList({ blocks, day, colorOf }: { blocks: BusyBlock[]; day: string; 
               <span className="slot__time">{timeRangeLabel(b, day)}</span>
               <span className="agbusy__label">{t('Ocupado')} · {b.label}</span>
             </div>
+            <Link
+              to={`/criar?${new URLSearchParams({ tipo: 'evento', inicio: isoToLocalInput(b.start), fim: isoToLocalInput(b.end) }).toString()}`}
+              className="btn btn--ghost btn--small"
+              aria-label={t('Criar evento das {time}', { time: timeRangeLabel(b, day) })}
+            >
+              {t('Criar evento')}
+            </Link>
           </li>
         ))}
       </ul>

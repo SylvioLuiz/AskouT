@@ -130,8 +130,9 @@ export function CreatePostScreen() {
   const [kind, setKind] = useState<'POST' | 'EVENT'>(startAsEvent ? 'EVENT' : 'POST');
   const [eventTitle, setEventTitle] = useState(fromPoll ? (prefill.get('titulo') ?? '').slice(0, 120) : '');
   const [eventKind, setEventKind] = useState<EventKind>('OTHER');
-  const [eventStart, setEventStart] = useState(fromPoll ? (prefill.get('inicio') ?? '') : '');
-  const [eventEnd, setEventEnd] = useState(fromPoll ? (prefill.get('fim') ?? '') : '');
+  // Data e horário também vêm de um compromisso da agenda (`/criar?tipo=evento&inicio=...&fim=...`).
+  const [eventStart, setEventStart] = useState(startAsEvent ? (prefill.get('inicio') ?? '') : '');
+  const [eventEnd, setEventEnd] = useState(startAsEvent ? (prefill.get('fim') ?? '') : '');
   const [eventPrivate, setEventPrivate] = useState(false);
   const [shareTo, setShareTo] = useState<string[]>(fromPoll && prefill.get('conversa') ? [prefill.get('conversa') as string] : []);
   useTitle(kind === 'EVENT' ? t('Novo evento') : t('Nova publicação'));

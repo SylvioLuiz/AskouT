@@ -314,6 +314,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Criar conta": "Crear cuenta",
   "Criar encontro": "Crear quedada",
   "Criar evento": "Crear evento",
+  "Criar evento das {time}": "Crear evento a las {time}",
   "Criar evento agora": "Crear evento ahora",
   "Criar grupo com {length} pessoas": "Crear grupo con {length} personas",
   "Criar nova senha": "Crear nueva contraseña",
