@@ -86,7 +86,7 @@ function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
 }
 
 /** Linha de informação no estilo "ficha do lugar": ícone, conteúdo e, quando abre, uma seta. */
-function InfoRow({ icon, children, open, onToggle, label }: { icon: ReactNode; children: ReactNode; open?: boolean; onToggle?: () => void; label?: string }) {
+export function InfoRow({ icon, children, open, onToggle, label }: { icon: ReactNode; children: ReactNode; open?: boolean; onToggle?: () => void; label?: string }) {
   const body = (
     <>
       <span className="vinfo__icon" aria-hidden="true">
@@ -110,7 +110,7 @@ function InfoRow({ icon, children, open, onToggle, label }: { icon: ReactNode; c
 }
 
 /** Horário de funcionamento: fechado mostra o estado e o dia de hoje; aberto (sanfona), a semana toda. */
-function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
+export function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
   const [open, setOpen] = useState(false);
   const lines = hoursLines(venue.hours, now);
   const status = openStatus(venue.hours, now);
@@ -163,7 +163,7 @@ function RatingInfo({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
   );
 }
 
-function VenueHero({ venue, now, onShare }: { venue: VenueProfile; now: Date; onShare: () => void }) {
+export function VenueHero({ venue, now, onShare, preview = false }: { venue: VenueProfile; now: Date; onShare: () => void; preview?: boolean }) {
   const [coverFailed, setCoverFailed] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
   const own = safeImage(venue.coverUrl);
@@ -177,12 +177,16 @@ function VenueHero({ venue, now, onShare }: { venue: VenueProfile; now: Date; on
     <header className="vhero">
       {bg ? <img className="vhero__bg" src={bg} alt="" referrerPolicy="no-referrer" onError={() => setCoverFailed(true)} /> : null}
       <div className="vhero__shade" />
-      <button type="button" className="vhero__back" onClick={goBack} aria-label={t('Voltar')}>
-        <ChevronLeftIcon />
-      </button>
-      <button type="button" className="vhero__share" onClick={onShare} aria-label={t('Compartilhar página do rolê')}>
-        <ShareIcon />
-      </button>
+      {preview ? null : (
+        <>
+          <button type="button" className="vhero__back" onClick={goBack} aria-label={t('Voltar')}>
+            <ChevronLeftIcon />
+          </button>
+          <button type="button" className="vhero__share" onClick={onShare} aria-label={t('Compartilhar página do rolê')}>
+            <ShareIcon />
+          </button>
+        </>
+      )}
       <div className="vhero__body">
         {logo ? (
           <img className="vhero__logo" src={logo} alt={t('Logo de {name}', { name: venue.name })} onError={() => setLogoFailed(true)} />
@@ -239,18 +243,27 @@ function VenueHero({ venue, now, onShare }: { venue: VenueProfile; now: Date; on
   );
 }
 
-function AgendaRow({ event, now }: { event: VenueEvent; now: Date }) {
+export function AgendaRow({ event, now, preview = false }: { event: VenueEvent; now: Date; preview?: boolean }) {
+  const body = (
+    <>
+      <strong className="vagenda__title">{event.title}</strong>
+      <span className="vagenda__when">{formatWhen(event.startsAt, event.endsAt, now)}</span>
+      <span className="vagenda__meta">
+        {kindLabel(event.kind)}
+        {event.isFree ? t(' · Grátis') : ''}
+        {event.phase === 'LIVE' ? ' · Acontecendo agora' : ''}
+      </span>
+    </>
+  );
   return (
     <li className="vagenda__item">
-      <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="vagenda__link">
-        <strong className="vagenda__title">{event.title}</strong>
-        <span className="vagenda__when">{formatWhen(event.startsAt, event.endsAt, now)}</span>
-        <span className="vagenda__meta">
-          {kindLabel(event.kind)}
-          {event.isFree ? t(' · Grátis') : ''}
-          {event.phase === 'LIVE' ? ' · Acontecendo agora' : ''}
-        </span>
-      </Link>
+      {preview ? (
+        <div className="vagenda__link">{body}</div>
+      ) : (
+        <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="vagenda__link">
+          {body}
+        </Link>
+      )}
     </li>
   );
 }
