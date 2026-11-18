@@ -556,7 +556,8 @@ export function createApi(deps: ApiDeps) {
     removeVenueManager: (venueId: string, userId: string) => request<VenueTeam>('DELETE', `/me/venues/${id(venueId)}/team/${id(userId)}`),
     respondVenueInvite: (venueId: string, accept: boolean) => request<{ accepted: boolean }>('POST', `/me/venues/${id(venueId)}/team/invite`, { body: { accept } }),
     leaveVenueTeam: (venueId: string) => request<{ left: true }>('DELETE', `/me/venues/${id(venueId)}/team`),
-    venueProfile: (venueId: string) => request<VenueProfile>('GET', `/venues/${id(venueId)}/profile`),
+    // A API ainda sem equipe não manda canManage/role: o responsável continua administrando.
+    venueProfile: (venueId: string) => request<VenueProfile>('GET', `/venues/${id(venueId)}/profile`).then((v) => ({ ...v, canManage: v.canManage ?? v.isOwner, role: v.role ?? (v.isOwner ? ('OWNER' as const) : null) })),
     updateVenueProfile: (venueId: string, body: VenueProfileBody) => request<VenueProfile>('PUT', `/me/venues/${id(venueId)}/profile`, { body }),
     followVenue: (venueId: string) => request<{ following: true; followerCount: number }>('POST', `/venues/${id(venueId)}/follow`),
     rateVenue: (venueId: string, stars: number) => request<VenueRating>('PUT', `/venues/${id(venueId)}/rating`, { body: { stars } }),

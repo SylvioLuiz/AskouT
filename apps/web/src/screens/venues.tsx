@@ -300,7 +300,7 @@ function InviteRow({ invite, onChanged }: { invite: TeamInvite; onChanged: () =>
 
 export function VenuesScreen() {
   useTitle(t('Meus locais'));
-  const mine = useAsync(() => api.myVenues(), []);
+  const mine = useAsync(() => api.myVenues().then((m) => ({ ...m, managed: m.managed ?? [], invites: m.invites ?? [] })), []);
   const [claiming, setClaiming] = useState(false);
   const [creatingOrg, setCreatingOrg] = useState(false);
   const [sent, setSent] = useState(false);
