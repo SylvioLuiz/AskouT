@@ -1,9 +1,9 @@
 # Gera um .apk do app Android para testadores instalarem direto no celular (fora da Play Store).
 # Roda a cada push na homolog-ari e também à mão: GitHub → Actions → "Android → APK de teste" → Run workflow.
 # O .apk fica para baixar na página da execução, em "Artifacts" (vale 30 dias).
-# É um build de depuração (assinado com uma chave de teste do próprio runner): instala em qualquer Android com
-# "instalar apps desconhecidos" ligado. Como a chave muda a cada execução, para trocar de versão o testador
-# precisa desinstalar a anterior antes.
+# É um build de depuração assinado com a chave de UPLOAD (os mesmos segredos do workflow do AAB), para o SHA-1 ser
+# sempre o mesmo: o login com o Google exige esse SHA-1 cadastrado num cliente Android do Google Cloud, e assim uma
+# versão nova instala por cima da anterior. Sem os segredos, cai na chave de teste do runner (o login Google não funciona).
 name: Android → APK de teste
 
 on:
@@ -43,6 +43,23 @@ jobs:
         working-directory: apps/mobile
         run: npm run build:web && npx cap sync android
 
+      - name: Preparar a chave de assinatura
+        working-directory: apps/mobile/android
+        env:
+          KS: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KS" ]; then echo "::warning::Sem ANDROID_UPLOAD_KEYSTORE_BASE64: APK com chave de teste do runner (login Google não funciona)"; exit 0; fi
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          {
+            echo "storeFile=$RUNNER_TEMP/upload.jks"
+            echo "storePassword=$KS_PASS"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASS"
+          } > keystore.properties
+
       - name: Compilar o APK
         working-directory: apps/mobile/android
         run: |
@@ -50,6 +67,16 @@ jobs:
           ./gradlew assembleDebug --no-daemon
           mkdir -p "$RUNNER_TEMP/apk"
           cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/apk/askout-teste-$(date -u +%Y%m%d-%H%M)-${GITHUB_SHA::7}.apk"
+          # SHA-1 que assina este APK: é o que precisa estar no cliente Android (br.com.askout) do Google Cloud.
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          sha1=$("$apksigner" verify --print-certs app/build/outputs/apk/debug/app-debug.apk | grep -m1 'SHA-1 digest' | sed 's/.*: *//' | tr 'a-f' 'A-F' | sed 's/../&:/g; s/:$//')
+          echo "### SHA-1 deste APK: \`$sha1\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Cadastre em Google Cloud (askout-512422) → Credenciais → cliente OAuth Android, pacote br.com.askout." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apagar a chave do runner
+        if: always()
+        working-directory: apps/mobile/android
+        run: rm -f keystore.properties "$RUNNER_TEMP/upload.jks"
 
       - uses: actions/upload-artifact@v4
         with:
