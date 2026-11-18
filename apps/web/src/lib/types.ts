@@ -553,6 +553,8 @@ export interface ChatView {
   canSend: boolean;
   pinned: boolean;
   muted: boolean;
+  /** Cor escolhida para a conversa (só para você); nula = cor padrão do app. Servidor antigo não manda. */
+  color?: string | null;
   /** Nomes de quem está digitando agora. */
   typing: string[];
   /** As outras pessoas da conversa, com até quando leram (para o "Visto" e as fotos ao lado dos balões). */

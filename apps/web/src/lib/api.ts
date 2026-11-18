@@ -625,9 +625,9 @@ export function createApi(deps: ApiDeps) {
       request<{ reactions: ChatReaction[] }>('PUT', `/conversations/${id(conversationId)}/messages/${id(messageId)}/reaction`, { body: { emoji } }),
     /** Apaga a própria mensagem para todos. */
     deleteMessage: (conversationId: string, messageId: string) => request<ChatMessage>('DELETE', `/conversations/${id(conversationId)}/messages/${id(messageId)}`),
-    /** Fixar no topo e silenciar os avisos (só para você). */
-    setChatPrefs: (conversationId: string, prefs: { pinned?: boolean; muted?: boolean }) =>
-      request<{ pinned: boolean; muted: boolean }>('PUT', `/conversations/${id(conversationId)}/preferences`, { body: prefs }),
+    /** Fixar no topo, silenciar os avisos e a cor da conversa (só para você). */
+    setChatPrefs: (conversationId: string, prefs: { pinned?: boolean; muted?: boolean; color?: string | null }) =>
+      request<{ pinned: boolean; muted: boolean; color: string | null }>('PUT', `/conversations/${id(conversationId)}/preferences`, { body: prefs }),
     /** Sinal de "digitando…". */
     sendTyping: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/typing`),
     /** Baixa o áudio de uma mensagem de voz (a rota exige o token, então não dá para usar <audio src>). */

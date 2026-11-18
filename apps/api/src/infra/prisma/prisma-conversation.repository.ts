@@ -292,15 +292,18 @@ export class PrismaConversationRepository implements ConversationRepository {
     return rows.map((r) => ({ messageId: r.messageId, userId: r.userId, emoji: r.emoji }));
   }
 
-  async setPrefs(conversationId: string, userId: string, patch: { pinnedAt?: Date | null; muted?: boolean }): Promise<void> {
+  async setPrefs(conversationId: string, userId: string, patch: { pinnedAt?: Date | null; muted?: boolean; color?: string | null }): Promise<void> {
     if (!isUuid(conversationId) || !isUuid(userId)) return;
-    await this.prisma.conversationParticipant.updateMany({ where: { conversationId, userId }, data: { ...(patch.pinnedAt !== undefined ? { pinnedAt: patch.pinnedAt } : {}), ...(patch.muted !== undefined ? { muted: patch.muted } : {}) } });
+    await this.prisma.conversationParticipant.updateMany({
+      where: { conversationId, userId },
+      data: { ...(patch.pinnedAt !== undefined ? { pinnedAt: patch.pinnedAt } : {}), ...(patch.muted !== undefined ? { muted: patch.muted } : {}), ...(patch.color !== undefined ? { color: patch.color } : {}) },
+    });
   }
 
   async getPrefs(conversationId: string, userId: string): Promise<ConversationPrefsRecord> {
-    if (!isUuid(conversationId) || !isUuid(userId)) return { pinnedAt: null, muted: false };
-    const row = await this.prisma.conversationParticipant.findUnique({ where: { conversationId_userId: { conversationId, userId } }, select: { pinnedAt: true, muted: true } });
-    return { pinnedAt: row?.pinnedAt ?? null, muted: row?.muted ?? false };
+    if (!isUuid(conversationId) || !isUuid(userId)) return { pinnedAt: null, muted: false, color: null };
+    const row = await this.prisma.conversationParticipant.findUnique({ where: { conversationId_userId: { conversationId, userId } }, select: { pinnedAt: true, muted: true, color: true } });
+    return { pinnedAt: row?.pinnedAt ?? null, muted: row?.muted ?? false, color: row?.color ?? null };
   }
 
   async countPinned(userId: string): Promise<number> {

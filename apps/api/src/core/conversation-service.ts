@@ -29,6 +29,8 @@ export function isEmoji(value: unknown): value is string {
 }
 /** Conversas fixadas por pessoa. */
 export const PINNED_MAX = 5;
+/** Cores que dá para escolher para uma conversa (só para você). Sem cor = a cor padrão do app. */
+export const CHAT_COLORS = ['purple', 'blue', 'teal', 'green', 'yellow', 'orange', 'red', 'graphite'] as const;
 /** "Digitando…" some sozinho depois disso sem novo sinal. */
 export const TYPING_TTL_MS = 8_000;
 const REPLY_PREVIEW_MAX = 100;
@@ -127,6 +129,8 @@ export interface ConversationView {
   isOwner: boolean;
   pinned: boolean;
   muted: boolean;
+  /** Cor escolhida para a conversa (só para você); nula = cor padrão do app. */
+  color: string | null;
   /** Nomes de quem está digitando agora. */
   typing: string[];
   /** As outras pessoas da conversa (sem você e sem quem tem bloqueio com você), com até quando leram. */
@@ -481,6 +485,7 @@ export class ConversationService {
       isOwner: conversation.ownerId === actorId,
       pinned: prefs.pinnedAt !== null,
       muted: prefs.muted,
+      color: prefs.color,
       typing: await this.typingNames(actorId, conversationId, memberIds, hiddenIds, now),
       members,
       canSend: isGroup ? true : otherId !== null && friends.includes(otherId),
@@ -621,23 +626,25 @@ export class ConversationService {
     return toMessageView({ ...message, body: DELETED_BODY, deletedAt: now }, actorId);
   }
 
-  /** Fixar no topo da lista e silenciar os avisos: só valem para quem pediu. */
-  async setPreferences(actorId: string, conversationId: string, input: { pinned?: unknown; muted?: unknown }): Promise<{ pinned: boolean; muted: boolean }> {
+  /** Fixar no topo da lista, silenciar os avisos e a cor da conversa: só valem para quem pediu. */
+  async setPreferences(actorId: string, conversationId: string, input: { pinned?: unknown; muted?: unknown; color?: unknown }): Promise<{ pinned: boolean; muted: boolean; color: string | null }> {
     const { conversations, clock } = this.deps;
     await this.access(actorId, conversationId);
     if ((input.pinned !== undefined && typeof input.pinned !== 'boolean') || (input.muted !== undefined && typeof input.muted !== 'boolean')) throw validationError('Valor inválido', { pinned: 'Use verdadeiro ou falso' });
-    if (input.pinned === undefined && input.muted === undefined) throw validationError('Nada para mudar', { pinned: 'Envie pinned e/ou muted' });
+    if (input.color !== undefined && input.color !== null && !(CHAT_COLORS as readonly unknown[]).includes(input.color)) throw validationError('Cor inválida', { color: 'Escolha uma das cores da lista' });
+    if (input.pinned === undefined && input.muted === undefined && input.color === undefined) throw validationError('Nada para mudar', { pinned: 'Envie pinned, muted e/ou color' });
     const before = await conversations.getPrefs(conversationId, actorId);
-    const patch: { pinnedAt?: Date | null; muted?: boolean } = {};
+    const patch: { pinnedAt?: Date | null; muted?: boolean; color?: string | null } = {};
     if (input.pinned === true && before.pinnedAt === null) {
       if ((await conversations.countPinned(actorId)) >= PINNED_MAX) throw conflict(`Você pode fixar até ${PINNED_MAX} conversas. Solte uma para fixar esta.`);
       patch.pinnedAt = clock.now();
     }
     if (input.pinned === false) patch.pinnedAt = null;
     if (typeof input.muted === 'boolean') patch.muted = input.muted;
+    if (input.color !== undefined) patch.color = input.color as string | null;
     await conversations.setPrefs(conversationId, actorId, patch);
     const after = await conversations.getPrefs(conversationId, actorId);
-    return { pinned: after.pinnedAt !== null, muted: after.muted };
+    return { pinned: after.pinnedAt !== null, muted: after.muted, color: after.color };
   }
 
   /** "Digitando…": sinal efêmero (some em poucos segundos) guardado só na memória do servidor. */

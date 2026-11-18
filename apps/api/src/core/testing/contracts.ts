@@ -1030,12 +1030,12 @@ export function defineRepositoryContract(
         const cia = await newUser('cia');
         const c1 = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
         const c2 = await h.conversations.getOrCreateDirect(ana, cia, randomUUID(), at(1));
-        assert.deepEqual(await h.conversations.getPrefs(c1.id, ana), { pinnedAt: null, muted: false });
+        assert.deepEqual(await h.conversations.getPrefs(c1.id, ana), { pinnedAt: null, muted: false, color: null });
         await h.conversations.setPrefs(c1.id, ana, { pinnedAt: at(5) });
-        await h.conversations.setPrefs(c2.id, ana, { pinnedAt: at(6), muted: true });
+        await h.conversations.setPrefs(c2.id, ana, { pinnedAt: at(6), muted: true, color: null });
         await h.conversations.setPrefs(c1.id, bia, { muted: true });
-        assert.deepEqual(await h.conversations.getPrefs(c1.id, ana), { pinnedAt: at(5), muted: false });
-        assert.deepEqual(await h.conversations.getPrefs(c2.id, ana), { pinnedAt: at(6), muted: true });
+        assert.deepEqual(await h.conversations.getPrefs(c1.id, ana), { pinnedAt: at(5), muted: false, color: null });
+        assert.deepEqual(await h.conversations.getPrefs(c2.id, ana), { pinnedAt: at(6), muted: true, color: null });
         assert.equal(await h.conversations.countPinned(ana), 2);
         assert.equal(await h.conversations.countPinned(bia), 0);
         assert.deepEqual(await h.conversations.mutedUserIds(c1.id), [bia]);
@@ -1046,11 +1046,17 @@ export function defineRepositoryContract(
         assert.equal((await h.conversations.listForUser(bia))[0]!.pinnedAt ?? null, null);
         await h.conversations.setPrefs(c1.id, ana, { pinnedAt: null });
         assert.equal(await h.conversations.countPinned(ana), 1);
-        assert.deepEqual(await h.conversations.getPrefs(c1.id, ana), { pinnedAt: null, muted: false }, 'soltar não mexe no silêncio');
+        assert.deepEqual(await h.conversations.getPrefs(c1.id, ana), { pinnedAt: null, muted: false, color: null }, 'soltar não mexe no silêncio');
+        await h.conversations.setPrefs(c1.id, ana, { color: 'blue' });
+        assert.deepEqual(await h.conversations.getPrefs(c1.id, ana), { pinnedAt: null, muted: false, color: 'blue' }, 'a cor fica guardada');
+        assert.equal((await h.conversations.getPrefs(c1.id, bia)).color, null, 'a cor é só de quem escolheu');
+        await h.conversations.setPrefs(c1.id, ana, { muted: true });
+        assert.equal((await h.conversations.getPrefs(c1.id, ana)).color, 'blue', 'silenciar não mexe na cor');
+        await h.conversations.setPrefs(c1.id, ana, { color: null, muted: false });
         // Quem não participa não ganha preferências.
         await h.conversations.setPrefs(c1.id, cia, { muted: true });
         assert.deepEqual(await h.conversations.mutedUserIds(c1.id), [bia]);
-        assert.deepEqual(await h.conversations.getPrefs(randomUUID(), ana), { pinnedAt: null, muted: false });
+        assert.deepEqual(await h.conversations.getPrefs(randomUUID(), ana), { pinnedAt: null, muted: false, color: null });
       });
 
       it('guarda o cartão de sugestão e devolve igual', async () => {
