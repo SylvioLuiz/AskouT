@@ -153,12 +153,33 @@ export async function enableNativePush(api: Api, bridge: NativePushBridge): Prom
   if (!token) throw new Error(t('Os avisos não foram liberados. Você pode liberar em Ajustes do iPhone > AskouT > Notificações.'));
   await api.pushSubscribe({ endpoint: nativeEndpoint(token) });
   storeNativeToken(token);
+  setOptedOut(false);
 }
 
 export async function disableNativePush(api: Api): Promise<void> {
   const token = storedNativeToken();
   if (token) await api.pushUnsubscribe(nativeEndpoint(token));
   storeNativeToken(null);
+  setOptedOut(true);
+}
+
+const OPTED_OUT_KEY = 'askout.push.native-off';
+
+function optedOut(): boolean {
+  try {
+    return localStorage.getItem(OPTED_OUT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setOptedOut(off: boolean): void {
+  try {
+    if (off) localStorage.setItem(OPTED_OUT_KEY, '1');
+    else localStorage.removeItem(OPTED_OUT_KEY);
+  } catch {
+    /* sem armazenamento */
+  }
 }
 
 /** O iPhone pode trocar o token do aparelho; ao abrir, quem já ligou registra de novo em silêncio. */
@@ -177,6 +198,19 @@ const ASKED_KEY = 'askout.push.asked';
 /** Só pede sozinho uma vez por aparelho, e só se o iPhone ainda não decidiu. Função pura. */
 export function shouldAutoAskPush(input: { serverNative: boolean; permission: 'granted' | 'denied' | 'prompt'; alreadyAsked: boolean }): boolean {
   return input.serverNative && input.permission === 'prompt' && !input.alreadyAsked;
+}
+
+/**
+ * O que fazer com os avisos ao abrir o app. Função pura.
+ * - `ask`: o aparelho ainda não decidiu; mostra o pedido do sistema (uma vez só).
+ * - `register`: permissão já dada mas este aparelho nunca mandou o token ao servidor. Acontece no Android até a versão 12,
+ *   que libera avisos sem perguntar: antes o app não registrava nada e as mensagens não chegavam.
+ * - `refresh`: já registrado; manda o token de novo (o aparelho pode trocar o token).
+ */
+export function nativePushAction(input: { serverNative: boolean; permission: 'granted' | 'denied' | 'prompt'; alreadyAsked: boolean; hasToken: boolean; optedOut: boolean }): 'ask' | 'register' | 'refresh' | 'none' {
+  if (!input.serverNative || input.optedOut) return 'none';
+  if (input.permission === 'granted') return input.hasToken ? 'refresh' : 'register';
+  return shouldAutoAskPush(input) ? 'ask' : 'none';
 }
 
 function wasAsked(): boolean {
@@ -206,7 +240,12 @@ export async function autoAskNativePush(api: Api, bridge: NativePushBridge, serv
   } catch {
     return;
   }
-  if (!shouldAutoAskPush({ serverNative, permission, alreadyAsked: wasAsked() })) return;
+  const action = nativePushAction({ serverNative, permission, alreadyAsked: wasAsked(), hasToken: storedNativeToken() !== null, optedOut: optedOut() });
+  if (action === 'none') return;
+  if (action === 'refresh') {
+    await refreshNativeToken(api, bridge).catch(() => undefined);
+    return;
+  }
   markAsked();
   try {
     await enableNativePush(api, bridge);
