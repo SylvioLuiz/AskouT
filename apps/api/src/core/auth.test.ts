@@ -445,8 +445,33 @@ test('autenticação: token adulterado, vazio ou de outro tipo é recusado', asy
 test('autenticação: token expirado é recusado', async () => {
   const w = makeWorld();
   const ana = await w.signUp('ana');
-  w.clock.tick(2 * 60 * 60 * 1000); // TTL padrão é 1 hora
+  w.clock.tick(91 * 24 * 60 * 60 * 1000); // TTL padrão é 90 dias
   await rejectsWith(w.core.auth.authenticate(ana.token), 'UNAUTHORIZED');
+});
+
+test('autenticação: a sessão dura semanas e renovar ao abrir o app estende o prazo', async () => {
+  const w = makeWorld();
+  const ana = await w.signUp('ana');
+  w.clock.tick(30 * 24 * 60 * 60 * 1000);
+  const actor = await w.core.auth.authenticate(ana.token);
+  const { token } = await w.core.auth.refresh(actor);
+  w.clock.tick(80 * 24 * 60 * 60 * 1000); // 110 dias desde o login, 80 desde a renovação
+  await rejectsWith(w.core.auth.authenticate(ana.token), 'UNAUTHORIZED');
+  assert.equal((await w.core.auth.authenticate(token)).userId, ana.user.id);
+});
+
+test('autenticação: senha redefinida pelo e-mail derruba as sessões abertas', async () => {
+  const w = makeWorld();
+  const ana = await w.signUp('ana');
+  w.users.users.get(ana.user.id)!.passwordHash = 'outro-hash';
+  await rejectsWith(w.core.auth.authenticate(ana.token), 'UNAUTHORIZED');
+});
+
+test('autenticação: renovar recusa conta suspensa', async () => {
+  const w = makeWorld();
+  const ana = await w.signUp('ana');
+  w.users.users.get(ana.user.id)!.status = 'SUSPENDED';
+  await rejectsWith(w.core.auth.refresh({ userId: ana.user.id, role: 'USER' }), 'UNAUTHORIZED');
 });
 
 test('autenticação: suspensão vale na hora, mesmo com token ainda válido', async () => {

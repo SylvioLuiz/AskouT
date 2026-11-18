@@ -32,17 +32,17 @@ export class AccountService {
   }
 
   /** Troca a senha de quem está logado, conferindo a atual. Conta só com Google/Apple não tem senha conhecida. */
-  async changePassword(userId: string, input: { currentPassword: unknown; newPassword: unknown }): Promise<void> {
+  async changePassword(userId: string, input: { currentPassword: unknown; newPassword: unknown }): Promise<{ token: string }> {
     if (await this.isPasswordless(userId)) {
       throw forbidden('Sua conta entra com Google ou Apple e não tem senha própria no AskouT.');
     }
-    await this.auth.changePassword(userId, input);
+    return this.auth.changePassword(userId, input);
   }
 
   /** Cria a primeira senha de quem entrou só pelo Google/Apple. */
-  async createPassword(userId: string, input: { newPassword: unknown }): Promise<{ hasPassword: true }> {
-    await this.auth.createPassword(userId, input);
-    return { hasPassword: true };
+  async createPassword(userId: string, input: { newPassword: unknown }): Promise<{ hasPassword: true; token: string }> {
+    const { token } = await this.auth.createPassword(userId, input);
+    return { hasPassword: true, token };
   }
 
   /** Cópia dos dados da pessoa em JSON. Não inclui arquivos de imagem e vídeo, só o que existe sobre eles. */

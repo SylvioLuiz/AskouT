@@ -2225,7 +2225,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Repita a nova senha": "Repeat the new password",
   "Segurança": "Security",
   "Senha atual": "Current password",
-  "Senha trocada. Use a nova senha da próxima vez que entrar.": "Password changed. Use the new password next time you sign in.",
+  "Senha trocada. Você continua conectado aqui; os outros aparelhos precisam entrar de novo com a nova senha.": "Password changed. You stay signed in here; other devices need to sign in again with the new password.",
   "Sua conta entra com Google ou Apple e não tem senha própria no AskouT. Para mudar a senha, troque-a na sua conta Google ou Apple.": "Your account signs in with Google or Apple and has no AskouT password of its own. To change it, update it in your Google or Apple account.",
   "Trocar senha": "Change password",
   "Filtrar atividades": "Filter activity",

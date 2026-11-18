@@ -94,9 +94,9 @@ export class AdminService {
   }
 
   /** Troca a própria senha pelo painel. */
-  async changeOwnPassword(actor: Actor, input: { currentPassword: unknown; newPassword: unknown }): Promise<void> {
+  async changeOwnPassword(actor: Actor, input: { currentPassword: unknown; newPassword: unknown }): Promise<{ token: string }> {
     this.assertAdmin(actor);
-    await this.auth.changePassword(actor.userId, input);
+    return this.auth.changePassword(actor.userId, input);
   }
 
   private assertAdmin(actor: Actor): void {

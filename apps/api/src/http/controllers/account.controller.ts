@@ -35,12 +35,12 @@ export class AccountController {
     return this.core.account.passwordStatus(actor.userId);
   }
 
-  /** `{currentPassword, newPassword}`: troca a senha de quem está logado. */
+  /** `{currentPassword, newPassword}`: troca a senha de quem está logado. Devolve `{token}` novo: os outros aparelhos saem, este continua. */
   @Post('me/password')
-  @HttpCode(204)
-  async changePassword(@CurrentActor() actor: Actor, @Body() body: unknown) {
+  @HttpCode(200)
+  changePassword(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = asBody(body);
-    await this.core.account.changePassword(actor.userId, { currentPassword: b.currentPassword, newPassword: b.newPassword });
+    return this.core.account.changePassword(actor.userId, { currentPassword: b.currentPassword, newPassword: b.newPassword });
   }
 
   /** `{newPassword}`: cria a primeira senha de quem entrou só pelo Google/Apple (sem senha atual). */

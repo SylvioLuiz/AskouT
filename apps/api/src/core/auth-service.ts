@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { DomainError, conflict, forbidden, notFound, rateLimited, unauthorized, validationError } from './errors.ts';
 import type { CoreDeps, SocialProviderInfo } from './ports.ts';
 import { checkSignupConsent } from './age-service.ts';
@@ -140,6 +140,14 @@ function socialPicture(raw: string | null | undefined): string | null {
   // As fotos do Google aceitam o tamanho no fim (=s96-c). Pede maior, para não ficar borrada.
   const sized = /googleusercontent\.com\//.test(raw) ? raw.replace(/=s\d+(-c)?$/, '=s400-c') : raw;
   return avatarUrlProblem(sized) ? raw : sized;
+}
+
+/**
+ * Carimbo curto derivado do hash da senha, gravado no token. Quando a senha muda, o carimbo muda e os tokens antigos
+ * (outros aparelhos) deixam de valer, sem precisar de tabela de sessões.
+ */
+export function passwordStamp(passwordHash: string): string {
+  return createHash('sha256').update(`askout-session:${passwordHash}`).digest('base64url').slice(0, 16);
 }
 
 function sessionUser(user: User, profile: Profile): SessionUser {
@@ -634,7 +642,7 @@ export class AuthService {
    * Troca a senha de quem já está logado, conferindo a atual. Senha atual errada é VALIDATION, não UNAUTHORIZED:
    * a sessão continua válida. Conta criada por Google/Apple não tem senha conhecida, então não passa daqui.
    */
-  async changePassword(userId: string, input: { currentPassword: unknown; newPassword: unknown }): Promise<void> {
+  async changePassword(userId: string, input: { currentPassword: unknown; newPassword: unknown }): Promise<{ token: string }> {
     const { users, passwordResets, hasher } = this.deps;
     const user = await users.findById(userId);
     const profile = user ? await users.findProfileById(user.id) : undefined;
@@ -648,15 +656,18 @@ export class AuthService {
     const problem = passwordProblem(next, user.email, profile.username) ?? (next === current ? 'A nova senha precisa ser diferente da atual' : undefined);
     if (problem) throw validationError(problem, { newPassword: problem });
 
-    await users.updatePasswordHash(user.id, await hasher.hash(next));
+    const passwordHash = await hasher.hash(next);
+    await users.updatePasswordHash(user.id, passwordHash);
     await passwordResets.delete(user.id);
+    // Os outros aparelhos saem; este recebe um token novo e continua logado.
+    return { token: this.issueToken({ ...user, passwordHash }) };
   }
 
   /**
    * Criar senha (conta que nasceu pelo Google/Apple e nunca teve senha), como no Instagram: logado, define a senha sem pedir
    * uma atual. Depois disso dá para entrar com e-mail/@usuário e senha, e desligar o Google/Apple.
    */
-  async createPassword(userId: string, input: { newPassword: unknown }): Promise<void> {
+  async createPassword(userId: string, input: { newPassword: unknown }): Promise<{ token: string }> {
     const { users, passwordResets, hasher } = this.deps;
     const user = await users.findById(userId);
     const profile = user ? await users.findProfileById(user.id) : undefined;
@@ -665,8 +676,10 @@ export class AuthService {
     const next = asString(input.newPassword);
     const problem = passwordProblem(next, user.email, profile.username);
     if (problem) throw validationError(problem, { newPassword: problem });
-    await users.updatePasswordHash(user.id, await hasher.hash(next));
+    const passwordHash = await hasher.hash(next);
+    await users.updatePasswordHash(user.id, passwordHash);
     await passwordResets.delete(user.id);
+    return { token: this.issueToken({ ...user, passwordHash }) };
   }
 
   /** Login por e-mail ou por nome de usuário (com ou sem @). */
@@ -710,6 +723,8 @@ export class AuthService {
     if (!claims) throw unauthorized('Sessão inválida');
     const user = await this.deps.users.findById(claims.userId);
     if (!user || user.status === 'SUSPENDED') throw unauthorized('Sessão inválida');
+    // Senha trocada (aqui ou em "esqueci a senha") derruba as sessões emitidas antes. Tokens antigos sem carimbo valem até expirar.
+    if (claims.pwd !== undefined && claims.pwd !== passwordStamp(user.passwordHash)) throw unauthorized('Sua senha foi alterada. Entre novamente.');
     return user.profilePending ? { userId: user.id, role: user.role, profilePending: true } : { userId: user.id, role: user.role };
   }
 
@@ -761,10 +776,24 @@ export class AuthService {
     }
   }
 
+  /**
+   * Renova o token de quem já está logado (o app chama ao abrir). Assim a sessão desliza: só expira depois de um
+   * longo período sem abrir o app, como nas redes sociais.
+   */
+  async refresh(actor: Actor): Promise<{ token: string }> {
+    const user = await this.deps.users.findById(actor.userId);
+    if (!user || user.status === 'SUSPENDED') throw unauthorized('Sessão inválida');
+    return { token: this.issueToken(user) };
+  }
+
+  private issueToken(user: User): string {
+    return this.deps.tokens.issue({ userId: user.id, role: user.role, pwd: passwordStamp(user.passwordHash) });
+  }
+
   private session(user: User, profile: Profile): AuthResult {
     return {
       user: sessionUser(user, profile),
-      token: this.deps.tokens.issue({ userId: user.id, role: user.role }),
+      token: this.issueToken(user),
     };
   }
 

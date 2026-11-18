@@ -115,7 +115,9 @@ test('conta criada pelo Google sem senha: não desliga a última forma de entrar
 
   // Cria uma senha (sem pedir atual): aí pode desligar a última e entrar com senha.
   await rejectsWith(w.core.account.createPassword(actor.userId, { newPassword: '123' }), 'VALIDATION');
-  assert.deepEqual(await w.core.account.createPassword(actor.userId, { newPassword: 'Senha-Forte-2026' }), { hasPassword: true });
+  const created = await w.core.account.createPassword(actor.userId, { newPassword: 'Senha-Forte-2026' });
+  assert.equal(created.hasPassword, true);
+  assert.ok((await w.core.auth.authenticate(created.token)).userId === actor.userId, 'este aparelho continua logado');
   assert.deepEqual(await w.core.account.passwordStatus(actor.userId), { hasPassword: true });
   await rejectsWith(w.core.account.createPassword(actor.userId, { newPassword: 'Outra-Senha-2026' }), 'CONFLICT');
   assert.deepEqual((await w.core.auth.unlinkAccount(actor, 'APPLE')).items, []);

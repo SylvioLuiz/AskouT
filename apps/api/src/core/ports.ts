@@ -865,6 +865,8 @@ export interface PasswordHasher {
 export interface TokenClaims {
   userId: string;
   role: UserRole;
+  /** Carimbo da senha no momento do login: trocar a senha invalida as sessões abertas em outros aparelhos. */
+  pwd?: string;
 }
 
 export interface TokenService {

@@ -73,6 +73,9 @@ export interface AppConfig {
 const MIN_SECRET = 32;
 
 /** Valida o ambiente de uma vez e lista TODOS os problemas, para o erro de subida ser útil. */
+/** 90 dias. */
+export const DEFAULT_TOKEN_TTL_SECONDS = 86_400 * 90;
+
 export function loadConfig(env: Record<string, string | undefined>): AppConfig {
   const problems: string[] = [];
 
@@ -97,9 +100,11 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     problems.push('JWT_SECRET e CODE_SECRET devem ser diferentes');
   }
 
-  const tokenTtlSeconds = Number(env.TOKEN_TTL_SECONDS ?? '3600');
-  if (!Number.isInteger(tokenTtlSeconds) || tokenTtlSeconds < 60 || tokenTtlSeconds > 86_400 * 30) {
-    problems.push('TOKEN_TTL_SECONDS deve ficar entre 60 e 2592000');
+  // Sessão longa como nas redes sociais: o app renova o token sempre que é aberto, então só cai depois de 90 dias sem uso
+  // (ou antes, se a senha mudar, a conta for suspensa ou apagada).
+  const tokenTtlSeconds = Number(env.TOKEN_TTL_SECONDS ?? String(DEFAULT_TOKEN_TTL_SECONDS));
+  if (!Number.isInteger(tokenTtlSeconds) || tokenTtlSeconds < 60 || tokenTtlSeconds > 86_400 * 365) {
+    problems.push('TOKEN_TTL_SECONDS deve ficar entre 60 e 31536000');
   }
 
   const emailRaw = env.EMAIL_TRANSPORT ?? 'console';

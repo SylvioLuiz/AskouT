@@ -56,7 +56,7 @@ export function ChangePasswordScreen() {
       {status.data && !status.data.hasPassword ? <CreatePasswordForm onCreated={status.reload} /> : null}
       {status.data?.hasPassword ? (
         <form className="form" onSubmit={(e) => void submit(e)} noValidate>
-          {done ? <Notice tone="ok">{t('Senha trocada. Use a nova senha da próxima vez que entrar.')}</Notice> : null}
+          {done ? <Notice tone="ok">{t('Senha trocada. Você continua conectado aqui; os outros aparelhos precisam entrar de novo com a nova senha.')}</Notice> : null}
           {error ? <Notice tone="error">{error}</Notice> : null}
           <PasswordField label={t('Senha atual')} value={current} onChange={setCurrent} error={errors['currentPassword']} autoComplete="current-password" />
           <PasswordField label={t('Nova senha')} value={next} onChange={setNext} error={errors['newPassword']} hint={t('Use ao menos 8 caracteres')} autoComplete="new-password" />

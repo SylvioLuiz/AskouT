@@ -97,6 +97,16 @@ describe('conta: trocar a senha', () => {
     assert.ok(await w.core.auth.login({ identifier: 'ana', password: NOVA }));
   });
 
+  it('trocar a senha derruba os outros aparelhos e mantém este logado', async () => {
+    const { w, ana } = await setup();
+    const outro = await w.core.auth.login({ identifier: 'ana', password: PASSWORD });
+    assert.ok('token' in outro);
+    assert.equal((await w.core.auth.authenticate(outro.token)).userId, ana);
+    const { token } = await w.core.account.changePassword(ana, { currentPassword: PASSWORD, newPassword: NOVA });
+    await rejectsWith(w.core.auth.authenticate(outro.token), 'UNAUTHORIZED');
+    assert.equal((await w.core.auth.authenticate(token)).userId, ana);
+  });
+
   it('conta que entra com Google/Apple não tem senha para trocar', async () => {
     const { w, ana } = await setup();
     w.identities.rows.set('GOOGLE|sub-1', ana);
