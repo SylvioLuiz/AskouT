@@ -89,10 +89,13 @@ if (Capacitor.isNativePlatform()) {
   // (`apns:` ou `fcm:`); tocar no aviso abre a tela certa.
   w['AskouTPush'] = createPushBridge({ push: PushNotifications as never, open: (path) => openInApp(path, window) });
   if (Capacitor.getPlatform() === 'android') {
-    // Canal "avisos" com importância alta: o Android mostra o aviso no topo da tela, com o título e o texto (a prévia).
+    // Canal "notificacoes" com importância alta: o Android mostra o aviso no topo da tela, com o título e o texto (a prévia).
     // Sem ele, o aviso cai no canal genérico, de importância normal, e só aparece como ícone na barra.
     // O servidor manda os avisos neste canal (FCM_CHANNEL_ID em apps/api/src/infra/push/fcm-sender.ts).
-    void PushNotifications.createChannel({ id: 'avisos', name: 'Avisos', description: 'Mensagens, convites e eventos do AskouT', importance: 5, visibility: 1, vibration: true, lights: true }).catch(() => undefined);
+    // visibility 0 (privado): na tela bloqueada o texto da mensagem fica escondido; desbloqueado, aparece.
+    // O id não pode ser reaproveitado com outra configuração (o Android guarda o canal), por isso não é mais "avisos".
+    void PushNotifications.deleteChannel({ id: 'avisos' }).catch(() => undefined);
+    void PushNotifications.createChannel({ id: 'notificacoes', name: 'Notificações', description: 'Mensagens, convites e eventos do AskouT', importance: 5, visibility: 0, vibration: true, lights: true }).catch(() => undefined);
   }
   void StatusBar.setStyle({ style: Style.Default }).catch(() => undefined);
   void SplashScreen.hide().catch(() => undefined);

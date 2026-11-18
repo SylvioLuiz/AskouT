@@ -9,7 +9,7 @@ import type { FetchLike, GoogleAccessTokens } from '../google/service-account.ts
 
 export const FCM_PREFIX = 'fcm:';
 /** Canal de avisos do app Android (o app cria com esse id, ver apps/mobile/src/main.ts). */
-export const FCM_CHANNEL_ID = 'avisos';
+export const FCM_CHANNEL_ID = 'notificacoes';
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 
 /** O que costuma resolver cada recusa do FCM, para quem lê o log do servidor. */
@@ -56,12 +56,12 @@ export class FcmSender implements PushSender {
         token: deviceToken,
         notification: { title: message.title, body: message.body },
         data: { url: message.url },
-        // Canal "avisos" (criado pelo app com importância alta): é o que faz o Android mostrar o aviso no topo da tela,
-        // com o título e o texto, em vez de só um ícone na barra. `visibility: PUBLIC` mostra o texto também na tela bloqueada
-        // (a pessoa ainda pode esconder em Ajustes do Android).
+        // Canal "notificacoes" (criado pelo app com importância alta): é o que faz o Android mostrar o aviso no topo da tela,
+        // com o título e o texto, em vez de só um ícone na barra. `visibility: PRIVATE`: com o celular bloqueado o Android
+        // esconde o texto (quando o aparelho está para ocultar conteúdo sensível); desbloqueado, mostra a mensagem.
         android: {
           priority: 'HIGH',
-          notification: { tag: message.tag.slice(0, 64), channel_id: FCM_CHANNEL_ID, notification_priority: 'PRIORITY_HIGH', visibility: 'PUBLIC', default_sound: true },
+          notification: { tag: message.tag.slice(0, 64), channel_id: FCM_CHANNEL_ID, notification_priority: 'PRIORITY_HIGH', visibility: 'PRIVATE', default_sound: true },
         },
       },
     });

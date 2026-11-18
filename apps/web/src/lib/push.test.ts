@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { nativeEndpoint, nativePushBridge, nativePushState, pushState, shouldAutoAskPush, subscriptionBody, urlBase64ToBytes } from './push.ts';
+import { nativeEndpoint, nativePushAction, nativePushBridge, nativePushState, pushState, shouldAutoAskPush, subscriptionBody, urlBase64ToBytes } from './push.ts';
 import type { PushEnvironment } from './push.ts';
 
 const base: PushEnvironment = { hasServiceWorker: true, hasPushManager: true, hasNotification: true, secureContext: true, permission: 'default', isApple: false, standalone: false, serverKey: 'k', subscribed: false };
@@ -52,5 +52,16 @@ describe('push no app do iPhone', () => {
     assert.equal(shouldAutoAskPush({ ...ok, permission: 'denied' }), false);
     assert.equal(shouldAutoAskPush({ ...ok, permission: 'granted' }), false);
     assert.equal(shouldAutoAskPush({ ...ok, serverNative: false }), false);
+  });
+  it('ao abrir o app: pede, registra (Android que já libera sem perguntar), atualiza ou não faz nada', () => {
+    const base = { serverNative: true, permission: 'prompt' as const, alreadyAsked: false, hasToken: false, optedOut: false };
+    assert.equal(nativePushAction(base), 'ask');
+    assert.equal(nativePushAction({ ...base, alreadyAsked: true }), 'none');
+    assert.equal(nativePushAction({ ...base, permission: 'granted' }), 'register');
+    assert.equal(nativePushAction({ ...base, permission: 'granted', alreadyAsked: true }), 'register');
+    assert.equal(nativePushAction({ ...base, permission: 'granted', hasToken: true }), 'refresh');
+    assert.equal(nativePushAction({ ...base, permission: 'granted', optedOut: true }), 'none');
+    assert.equal(nativePushAction({ ...base, permission: 'denied' }), 'none');
+    assert.equal(nativePushAction({ ...base, permission: 'granted', serverNative: false }), 'none');
   });
 });

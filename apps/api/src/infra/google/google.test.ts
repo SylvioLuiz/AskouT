@@ -82,11 +82,11 @@ describe('FCM (aviso no Android)', () => {
     assert.equal(body.message.token, FCM_TOKEN);
     assert.deepEqual(body.message.notification, { title: 'Ana', body: 'Nova mensagem' });
     assert.equal(body.message.data.url, '/conversas/1');
-    // Canal de importância alta + público: o Android mostra a prévia (título e texto) no topo e na tela bloqueada.
+    // Canal de importância alta + privado: prévia no topo com o celular desbloqueado; texto escondido na tela bloqueada.
     const android = (JSON.parse(call.body!) as { message: { android: { priority: string; notification: Record<string, unknown> } } }).message.android;
     assert.equal(android.priority, 'HIGH');
-    assert.equal(android.notification['channel_id'], 'avisos');
-    assert.equal(android.notification['visibility'], 'PUBLIC');
+    assert.equal(android.notification['channel_id'], 'notificacoes');
+    assert.equal(android.notification['visibility'], 'PRIVATE');
   });
 
   it('registra no log por que o FCM recusou, com a dica de como resolver', async () => {
