@@ -317,6 +317,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Continuar": "Continue",
   "Continuar assim mesmo": "Continue anyway",
   "Continuar com a Apple": "Continue with Apple",
+  "Continuar com o Google": "Continue with Google",
+  "Falha ao abrir o login do Google: {message}": "Failed to open Google sign-in: {message}",
   "Conversa": "Chat",
   "Conversa não encontrada": "Chat not found",
   "Mensagem": "Message",

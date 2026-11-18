@@ -76,9 +76,16 @@ export interface IdentityRepository {
 }
 
 /** Confere o token que a plataforma entrega ao navegador (assinatura, emissor, público e validade). */
+/** O que o app precisa para abrir o login da plataforma. `iosClientId`: cliente nativo do iPhone (só Google). */
+export interface SocialProviderInfo {
+  provider: ExternalProvider;
+  clientId: string;
+  iosClientId?: string;
+}
+
 export interface IdentityVerifier {
   /** Plataformas configuradas, com o ID público do aplicativo (o navegador precisa dele para abrir o login). */
-  providers(): { provider: ExternalProvider; clientId: string }[];
+  providers(): SocialProviderInfo[];
   /** undefined se o token for inválido, adulterado, expirado ou de outro aplicativo. */
   verify(provider: ExternalProvider, idToken: string): Promise<IdentityClaims | undefined>;
 }

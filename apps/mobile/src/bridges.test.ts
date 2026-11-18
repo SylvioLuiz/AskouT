@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import { CHUNK_BYTES, createVideoBridge, qualityFor, type VideoBridgeDeps } from './video-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createAppleBridge } from './apple-bridge.ts';
+import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
 import { createContactsBridge } from './contacts-bridge.ts';
 import { createPushBridge, openInApp, type PushPluginLike } from './push-bridge.ts';
@@ -288,5 +289,64 @@ describe('ponte dos contatos', () => {
     });
     await assert.rejects(bridge.readAll(), /permissão/);
     assert.equal(read, false);
+  });
+});
+
+describe('ponte do Google', () => {
+  it('Android: inicializa uma vez com o cliente web e devolve o token', async () => {
+    const inits: unknown[] = [];
+    let logins = 0;
+    const bridge = createGoogleBridge({
+      platform: () => 'android',
+      login: {
+        async initialize(o) {
+          inits.push(o.google);
+        },
+        async login(o) {
+          logins += 1;
+          assert.deepEqual(o, { provider: 'google', options: {} });
+          return { result: { idToken: 'jwt-do-google' } };
+        },
+      },
+    });
+    assert.equal(bridge.available({ webClientId: 'web' }), true);
+    assert.equal(await bridge.signIn({ webClientId: 'web' }), 'jwt-do-google');
+    assert.equal(await bridge.signIn({ webClientId: 'web' }), 'jwt-do-google');
+    assert.deepEqual(inits, [{ webClientId: 'web', mode: 'online', skipAuthOnlyAuthorizationAfterSignIn: true }]);
+    assert.equal(logins, 2);
+  });
+
+  it('iPhone: precisa do cliente iOS e pede o token para o cliente web', async () => {
+    const inits: unknown[] = [];
+    const bridge = createGoogleBridge({
+      platform: () => 'ios',
+      login: { initialize: async (o) => void inits.push(o.google), login: async () => ({ result: { idToken: 't' } }) },
+    });
+    assert.equal(bridge.available({ webClientId: 'web' }), false);
+    assert.equal(bridge.available({ webClientId: 'web', iosClientId: 'ios' }), true);
+    await assert.rejects(bridge.signIn({ webClientId: 'web' }), /iPhone/);
+    assert.equal(await bridge.signIn({ webClientId: 'web', iosClientId: 'ios' }), 't');
+    assert.deepEqual(inits, [{ webClientId: 'web', iOSClientId: 'ios', iOSServerClientId: 'web', mode: 'online' }]);
+  });
+
+  it('cancelar não é erro; falha de verdade sobe; inicialização que falhou é refeita', async () => {
+    const mk = (login: () => Promise<{ result: { idToken?: string | null } }>) => createGoogleBridge({ platform: () => 'android', login: { initialize: async () => undefined, login } });
+    assert.equal(await mk(async () => { throw new Error('GetCredentialCancellationException: activity is cancelled by the user.'); }).signIn({ webClientId: 'w' }), undefined);
+    assert.equal(await mk(async () => { throw new Error('The user canceled the sign-in flow.'); }).signIn({ webClientId: 'w' }), undefined);
+    await assert.rejects(mk(async () => { throw new Error('[28444] Developer console is not set up correctly.'); }).signIn({ webClientId: 'w' }), /28444/);
+    assert.equal(await mk(async () => ({ result: { idToken: null } })).signIn({ webClientId: 'w' }), undefined);
+    let n = 0;
+    const bridge = createGoogleBridge({
+      platform: () => 'android',
+      login: {
+        async initialize() {
+          n += 1;
+          if (n === 1) throw new Error('falhou');
+        },
+        login: async () => ({ result: { idToken: 'ok' } }),
+      },
+    });
+    await assert.rejects(bridge.signIn({ webClientId: 'w' }), /falhou/);
+    assert.equal(await bridge.signIn({ webClientId: 'w' }), 'ok');
   });
 });

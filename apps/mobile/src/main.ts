@@ -9,6 +9,7 @@ import { NativePurchases, PURCHASE_TYPE } from '@capgo/native-purchases';
 import { NativeVideoCompressor } from 'capacitor-native-video-compressor';
 import { SocialLogin } from '@capgo/capacitor-social-login';
 import { createAppleBridge } from './apple-bridge.ts';
+import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
 import { createContactsBridge } from './contacts-bridge.ts';
 import { createPushBridge, openInApp } from './push-bridge.ts';
@@ -55,6 +56,8 @@ if (Capacitor.isNativePlatform()) {
   w['AskouTShare'] = { share: (o: { title?: string; text?: string; url?: string; dialogTitle?: string }) => Share.share(o) };
   // "Achar nos contatos": lê celulares e e-mails da agenda (iPhone e Android), com a permissão do aparelho.
   w['AskouTContacts'] = createContactsBridge({ contacts: Contacts as never });
+  // O botão do Google da web não abre dentro do app (o Google bloqueia login em WebView): entra a janela nativa.
+  w['AskouTGoogle'] = createGoogleBridge({ login: SocialLogin as never, platform: () => Capacitor.getPlatform() });
   if (Capacitor.getPlatform() === 'ios') {
     // O botão da Apple da web não abre dentro do app; no iPhone entra a janela nativa.
     w['AskouTApple'] = createAppleBridge({ login: SocialLogin as never });

@@ -7,7 +7,7 @@ import { useAuthContext } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { consentProblems } from '../lib/age.ts';
 import { toApiError } from '../lib/errors.ts';
-import { GOOGLE_SCRIPT, appleIdToken, appleLogoUrl, googleApi, loadScript, providerLabel } from '../lib/social-login.ts';
+import { GOOGLE_SCRIPT, appleIdToken, appleLogoUrl, googleApi, googleMode, loadScript, nativeGoogleBridge, providerLabel } from '../lib/social-login.ts';
 import type { SocialNeedsProfile, SocialProviderId } from '../lib/types.ts';
 import { usernameProblem, normalizeUsername } from '../lib/validation.ts';
 import { getLocale, t } from '../lib/i18n/index.ts';
@@ -28,7 +28,10 @@ export function SocialLogin() {
   const [error, setError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Pending | undefined>();
-  const google = providers.data?.items.find((p) => p.provider === 'GOOGLE');
+  const googleItem = providers.data?.items.find((p) => p.provider === 'GOOGLE');
+  const gMode = googleItem ? googleMode(googleItem) : 'none';
+  /** Dentro do app sem a configuração nativa do Google, o botão some (o da web não funciona no WebView). */
+  const google = gMode === 'none' ? undefined : googleItem;
   const apple = providers.data?.items.find((p) => p.provider === 'APPLE');
   const googleBox = useRef<HTMLDivElement>(null);
   const [appleLogoFailed, setAppleLogoFailed] = useState(false);
@@ -60,7 +63,7 @@ export function SocialLogin() {
   finishRef.current = finish;
 
   useEffect(() => {
-    if (!google || !googleBox.current || width === 0) return;
+    if (!google || gMode !== 'web' || !googleBox.current || width === 0) return;
     let cancelled = false;
     loadScript(GOOGLE_SCRIPT)
       .then(() => {
@@ -79,7 +82,19 @@ export function SocialLogin() {
     return () => {
       cancelled = true;
     };
-  }, [google?.clientId, width]);
+  }, [google?.clientId, gMode, width]);
+
+  async function withGoogleNative() {
+    const bridge = nativeGoogleBridge();
+    if (!google || !bridge) return;
+    setError(undefined);
+    try {
+      const idToken = await bridge.signIn({ webClientId: google.clientId, ...(google.iosClientId ? { iosClientId: google.iosClientId } : {}) });
+      if (idToken) await finish('GOOGLE', idToken);
+    } catch (failure) {
+      setError(failure instanceof Error ? t('Falha ao abrir o login do Google: {message}', { message: failure.message }) : t('Falha ao carregar o login do Google.'));
+    }
+  }
 
   async function withApple() {
     if (!apple) return;
@@ -102,7 +117,13 @@ export function SocialLogin() {
     <div className="social" ref={box}>
       <p className="social__or">ou</p>
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {google ? <div ref={googleBox} className="social__google" aria-busy={busy || undefined} /> : null}
+      {google && gMode === 'web' ? <div ref={googleBox} className="social__google" aria-busy={busy || undefined} /> : null}
+      {google && gMode === 'native' && width > 0 ? (
+        <button type="button" className="social__gnative" style={{ width }} aria-busy={busy || undefined} disabled={busy} onClick={() => void withGoogleNative()}>
+          <GoogleLogo />
+          <span>{t('Continuar com o Google')}</span>
+        </button>
+      ) : null}
       {apple && width > 0 ? (
         <button type="button" className="social__apple" style={{ width }} aria-busy={busy || undefined} disabled={busy} onClick={() => void withApple()}>
           {appleLogoFailed ? null : <img className="social__apple-logo" src={appleLogoUrl(40)} alt="" width="38" height="38" onError={() => setAppleLogoFailed(true)} />}
@@ -110,6 +131,18 @@ export function SocialLogin() {
         </button>
       ) : null}
     </div>
+  );
+}
+
+/** "G" oficial do Google (cores da marca), para o botão nativo dentro do app. */
+function GoogleLogo() {
+  return (
+    <svg className="social__glogo" viewBox="0 0 48 48" width="20" height="20" aria-hidden="true">
+      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+    </svg>
   );
 }
 

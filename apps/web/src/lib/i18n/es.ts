@@ -290,6 +290,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Conteúdo que não deveria estar aqui.": "Contenido que no debería estar aquí.",
   "Continuar assim mesmo": "Continuar de todos modos",
   "Continuar com a Apple": "Continuar con Apple",
+  "Continuar com o Google": "Continuar con Google",
+  "Falha ao abrir o login do Google: {message}": "Error al abrir el inicio de sesión de Google: {message}",
   "Conversa": "Conversación",
   "Conversa não encontrada": "Conversación no encontrada",
   "Conversar e sugerir um rolê": "Conversar y sugerir un plan",

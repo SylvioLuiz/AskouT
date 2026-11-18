@@ -47,6 +47,27 @@ export function nativeAppleBridge(host: unknown = globalThis): NativeAppleBridge
   return b && typeof b.signIn === 'function' ? (b as NativeAppleBridge) : undefined;
 }
 
+/** Ponte do app (`window.AskouTGoogle`, ver apps/mobile): abre a janela nativa do Google no Android/iPhone. */
+export interface NativeGoogleBridge {
+  available(ids: { webClientId?: string; iosClientId?: string }): boolean;
+  signIn(ids: { webClientId: string; iosClientId?: string }): Promise<string | undefined>;
+}
+
+export function nativeGoogleBridge(host: unknown = globalThis): NativeGoogleBridge | undefined {
+  const b = (host as { AskouTGoogle?: Partial<NativeGoogleBridge> } | undefined)?.AskouTGoogle;
+  return b && typeof b.signIn === 'function' && typeof b.available === 'function' ? (b as NativeGoogleBridge) : undefined;
+}
+
+/**
+ * Como o Google entra nesta tela: `native` (janela do aparelho, dentro do app), `web` (botão oficial do Google no navegador)
+ * ou `none` (dentro do app sem a configuração nativa: o botão da web não funciona ali, então não aparece).
+ */
+export function googleMode(provider: { clientId: string; iosClientId?: string }, host: unknown = globalThis): 'native' | 'web' | 'none' {
+  const native = nativeGoogleBridge(host);
+  if (native) return native.available({ webClientId: provider.clientId, ...(provider.iosClientId ? { iosClientId: provider.iosClientId } : {}) }) ? 'native' : 'none';
+  return 'web';
+}
+
 /** Abre a janela da Apple (a nativa dentro do app do iPhone, a do site no navegador) e devolve o token de identidade. Recusar ou fechar a janela devolve undefined. */
 export async function appleIdToken(clientId: string): Promise<string | undefined> {
   const native = nativeAppleBridge();

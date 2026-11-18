@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { DomainError, conflict, forbidden, notFound, rateLimited, unauthorized, validationError } from './errors.ts';
-import type { CoreDeps } from './ports.ts';
+import type { CoreDeps, SocialProviderInfo } from './ports.ts';
 import { checkSignupConsent } from './age-service.ts';
 import { MfaService } from './mfa-service.ts';
 import type { Actor, ExternalProvider, PendingSignup, Profile, PublicProfile, User, UserRole } from './types.ts';
@@ -258,7 +258,7 @@ export class AuthService {
   }
 
   /** Plataformas de login configuradas, com o ID público do aplicativo (o navegador precisa dele). */
-  socialProviders(): { provider: ExternalProvider; clientId: string }[] {
+  socialProviders(): SocialProviderInfo[] {
     return this.deps.verifier.providers();
   }
 

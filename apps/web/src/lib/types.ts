@@ -73,6 +73,8 @@ export interface SocialProvider {
   provider: SocialProviderId;
   /** ID público do aplicativo na plataforma. */
   clientId: string;
+  /** Google: cliente nativo do iPhone, quando configurado na API. */
+  iosClientId?: string;
 }
 
 /** A conta da plataforma é nova: falta escolher o nome de usuário. */

@@ -4746,6 +4746,11 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .social__apple-logo { position: absolute; top: 0; left: 1px; display: block; width: 38px; height: 38px; } /* toda a altura interna, sem cobrir a borda; centro do logo alinhado ao G do Google */
 .social__apple:disabled { opacity: 0.6; cursor: default; }
 .social__apple:focus-visible { outline: 3px solid var(--brand-text); outline-offset: 2px; }
+/* Google dentro do app (janela nativa): mesmo desenho do botão oficial do Google na web. */
+.social__gnative { position: relative; display: flex; align-items: center; justify-content: center; gap: 10px; box-sizing: border-box; max-width: 100%; height: 40px; margin: 0 auto; padding: 0 12px; border: 1px solid #dadce0; border-radius: 4px; background: #fff; color: #3c4043; font-family: 'Google Sans', Roboto, -apple-system, 'Segoe UI', system-ui, sans-serif; font-size: 14px; font-weight: 500; letter-spacing: 0.25px; white-space: nowrap; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.social__glogo { position: absolute; left: 11px; top: 9px; }
+.social__gnative:disabled { opacity: 0.6; cursor: default; }
+.social__gnative:focus-visible { outline: 3px solid var(--brand-text); outline-offset: 2px; }
 .social__choose { margin-top: 16px; }
 
 /* ---------- Vídeo no post ---------- */
