@@ -1,3 +1,4 @@
+import { canManageVenue } from './venue-access.ts';
 import { conflict, notFound, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import type { CloakroomSettingRecord, CloakroomStatus, CloakroomTicketRecord, PlaceEventRecord, PublicProfile, VenueRecord } from './types.ts';
@@ -262,7 +263,7 @@ export class CloakroomService {
   /** Quem não é responsável pelo local recebe "não encontrado", como no painel do local. */
   private async ownedEvent(userId: string, venueId: unknown, eventId: unknown): Promise<PlaceEventRecord> {
     const venue: VenueRecord | undefined = typeof venueId === 'string' && venueId !== '' && venueId.length <= 64 ? await this.deps.places.findVenue(venueId) : undefined;
-    if (!venue || venue.ownerId !== userId) throw notFound('Local não encontrado');
+    if (!venue || !(await canManageVenue(this.deps.places, userId, venue))) throw notFound('Local não encontrado');
     const event = await this.eventOrThrow(eventId);
     if (event.venueId !== venue.id) throw notFound('Evento não encontrado');
     return event;

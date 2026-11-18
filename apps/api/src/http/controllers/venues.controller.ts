@@ -74,6 +74,36 @@ export class VenuesController {
     return this.present(await this.core.venues.updateProfile(actor.userId, id, asBody(body)));
   }
 
+  /** Equipe do local: o dono e os administradores adicionais veem; só o dono convida e remove. */
+  @Get('me/venues/:id/team')
+  team(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.venues.team(actor.userId, id);
+  }
+
+  @Post('me/venues/:id/team')
+  @HttpCode(200)
+  invite(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.venues.inviteManager(actor.userId, id, asBody(body).username);
+  }
+
+  @Delete('me/venues/:id/team/:userId')
+  removeManager(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('userId') userId: string) {
+    return this.core.venues.removeManager(actor.userId, id, userId);
+  }
+
+  /** Quem foi convidado aceita (`{accept: true}`) ou recusa (`{accept: false}`). */
+  @Post('me/venues/:id/team/invite')
+  @HttpCode(200)
+  respondInvite(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.venues.respondInvite(actor.userId, id, asBody(body).accept);
+  }
+
+  /** O administrador adicional sai da equipe. */
+  @Delete('me/venues/:id/team')
+  leaveTeam(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.venues.leaveTeam(actor.userId, id);
+  }
+
   @Post('venues/:id/follow')
   @HttpCode(200)
   follow(@CurrentActor() actor: Actor, @Param('id') id: string) {

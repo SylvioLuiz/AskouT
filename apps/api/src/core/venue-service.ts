@@ -2,8 +2,9 @@ import { decodeImageDataUrl } from './image.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import { normalizeTag } from './explore-match.ts';
 import type { CoreDeps } from './ports.ts';
-import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, PlaceEventRecord, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
+import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, PlaceEventRecord, Profile, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
 import { EVENT_KINDS, toPublicProfile } from './types.ts';
+import { canManageVenue, venueRoleOf, type VenueRole } from './venue-access.ts';
 
 export const CLAIM_DOCUMENT_MAX_BYTES = 2 * 1024 * 1024;
 export const CLAIM_NOTE_MAX = 300;
@@ -52,6 +53,29 @@ export interface ClaimableVenueView {
   sample: boolean;
   state: ClaimableState;
 }
+
+/** Convite para administrar um local, como a pessoa convidada o vê. */
+export interface TeamInviteView {
+  venue: VenueSummaryView;
+  invitedBy: PublicProfile | null;
+  createdAt: string;
+}
+
+export interface TeamMemberView {
+  user: PublicProfile;
+  role: 'OWNER' | 'MANAGER';
+  status: 'ACCEPTED' | 'PENDING';
+  since: string | null;
+}
+
+export interface TeamView {
+  /** O que quem pergunta é no local: só o dono mexe na equipe. */
+  role: Exclude<VenueRole, null>;
+  members: TeamMemberView[];
+}
+
+/** Limite de administradores adicionais (com convites pendentes) por local. */
+export const VENUE_TEAM_MAX = 10;
 
 export interface VenueSummaryView {
   id: string;
@@ -171,6 +195,9 @@ export interface VenueProfileView {
   /** Tem alguém administrando (a página é "oficial"). */
   claimed: boolean;
   isOwner: boolean;
+  /** Dono ou administrador adicional: vê as ferramentas do estabelecimento. */
+  canManage: boolean;
+  role: VenueRole;
   following: boolean;
   /** Sininho ligado: quem consulta recebe aviso de cada evento novo. */
   notify: boolean;
@@ -291,6 +318,10 @@ export interface ClaimInput {
   note?: unknown;
 }
 
+function clipName(name: string): string {
+  return Array.from(name).length > 40 ? `${Array.from(name).slice(0, 39).join('')}…` : name;
+}
+
 function summary(v: VenueRecord): VenueSummaryView {
   return { id: v.id, name: v.name, address: v.address, category: v.category, sample: v.isSample, organization: v.isOrganization === true };
 }
@@ -353,8 +384,13 @@ export class VenueService {
   }
 
   /** Meus locais e meus pedidos (do mais novo para o mais antigo). */
-  async mine(userId: string): Promise<{ venues: VenueSummaryView[]; claims: ClaimView[] }> {
-    const venues = (await this.deps.places.listVenuesByOwner(userId)).map(summary);
+  async mine(userId: string): Promise<{ venues: VenueSummaryView[]; managed: VenueSummaryView[]; invites: TeamInviteView[]; claims: ClaimView[] }> {
+    const [ownedRows, managedRows, inviteRows] = await Promise.all([this.deps.places.listVenuesByOwner(userId), this.deps.places.listVenuesManagedBy(userId), this.deps.places.listVenueManagerInvites(userId)]);
+    const venues = ownedRows.map(summary);
+    const managed = managedRows.map(summary);
+    const inviterIds = [...new Set(inviteRows.map((i) => i.record.invitedById))];
+    const inviters = new Map((inviterIds.length > 0 ? await this.deps.users.findProfilesByIds(inviterIds) : []).map((p) => [p.userId, p]));
+    const invites: TeamInviteView[] = inviteRows.map((i) => ({ venue: summary(i.venue), invitedBy: inviters.has(i.record.invitedById) ? toPublicProfile(inviters.get(i.record.invitedById) as Profile) : null, createdAt: i.record.createdAt.toISOString() }));
     const claims: ClaimView[] = [];
     for (const claim of await this.deps.claims.listByUser(userId)) {
       if (claim.status === 'APPROVED') continue;
@@ -362,7 +398,7 @@ export class VenueService {
       if (!venue) continue;
       claims.push({ id: claim.id, venue: summary(venue), status: claim.status, reviewNote: claim.reviewNote, createdAt: claim.createdAt.toISOString() });
     }
-    return { venues, claims };
+    return { venues, managed, invites, claims };
   }
 
   async requestClaim(userId: string, venueId: unknown, input: ClaimInput): Promise<ClaimView> {
@@ -421,13 +457,13 @@ export class VenueService {
   }
 
   async panel(userId: string, venueId: unknown): Promise<VenuePanelView> {
-    const venue = await this.ownedOrThrow(userId, venueId);
+    const venue = await this.managedOrThrow(userId, venueId);
     const events = (await this.deps.places.listVenueEvents(venue.id)).slice(0, VENUE_EVENTS_LIMIT);
     return { venue: summary(venue), events: events.map((e) => this.eventView(e)) };
   }
 
   async createEvent(userId: string, venueId: unknown, input: VenueEventInput): Promise<VenueEventView> {
-    const venue = await this.ownedOrThrow(userId, venueId);
+    const venue = await this.managedOrThrow(userId, venueId);
     const { cover, ...fields } = this.parseEvent(input);
     const id = this.deps.ids.next();
     const event: PlaceEventRecord = { id, venueId: venue.id, ...fields, imageUrl: cover.mode === 'url' ? cover.url : null, isSample: false };
@@ -463,7 +499,7 @@ export class VenueService {
   }
 
   async updateEvent(userId: string, venueId: unknown, eventId: unknown, input: VenueEventInput): Promise<VenueEventView> {
-    const venue = await this.ownedOrThrow(userId, venueId);
+    const venue = await this.managedOrThrow(userId, venueId);
     const current = typeof eventId === 'string' && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;
     if (!current || current.event.venueId !== venue.id) throw notFound('Evento não encontrado');
     const { cover, ...fields } = this.parseEvent(input, current.event.startsAt, current.event);
@@ -478,7 +514,7 @@ export class VenueService {
   }
 
   async deleteEvent(userId: string, venueId: unknown, eventId: unknown): Promise<{ deleted: true }> {
-    const venue = await this.ownedOrThrow(userId, venueId);
+    const venue = await this.managedOrThrow(userId, venueId);
     if (typeof eventId !== 'string' || eventId.length > 64 || !(await this.deps.places.deleteEvent(venue.id, eventId))) throw notFound('Evento não encontrado');
     return { deleted: true };
   }
@@ -493,6 +529,7 @@ export class VenueService {
   async profile(viewerId: string, venueId: unknown): Promise<VenueProfileView> {
     const venue = await this.venueOrThrow(venueId);
     const now = this.deps.clock.now().getTime();
+    const role = await venueRoleOf(this.deps.places, viewerId, venue);
     const [following, notify, followerCount, events, rating] = await Promise.all([this.deps.places.isFollowingVenue(viewerId, venue.id), this.deps.places.isVenueNotifyOn(viewerId, venue.id), this.deps.places.countVenueFollowers(venue.id), this.deps.places.listVenueEvents(venue.id), this.deps.places.venueRating(venue.id, viewerId)]);
     const upcoming = events
       .filter((e) => e.endsAt.getTime() > now)
@@ -514,7 +551,9 @@ export class VenueService {
       lng: venue.lng,
       sample: venue.isSample,
       claimed: (venue.ownerId ?? null) !== null,
-      isOwner: venue.ownerId === viewerId,
+      isOwner: role === 'OWNER',
+      canManage: role !== null,
+      role,
       following,
       notify: following && notify,
       organization: venue.isOrganization === true,
@@ -561,7 +600,7 @@ export class VenueService {
 
   /** Dono edita nome, endereço, categoria, descrição, horários e capa. Só o que vier muda; vazio apaga o que é opcional. */
   async updateProfile(userId: string, venueId: unknown, input: VenueProfileInput): Promise<VenueProfileView> {
-    const venue = await this.ownedOrThrow(userId, venueId);
+    const venue = await this.managedOrThrow(userId, venueId);
     if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Perfil inválido', { profile: 'Dados do perfil inválidos' });
     const name = input.name === undefined ? venue.name : (text(input.name, VENUE_NAME_MAX, 'name', 'Nome', true) as string);
     if (Array.from(name).length < 2) throw validationError('Dados inválidos', { name: 'O nome precisa de pelo menos 2 caracteres' });
@@ -644,7 +683,7 @@ export class VenueService {
   async rate(userId: string, venueId: unknown, stars: unknown): Promise<VenueRatingView> {
     const venue = await this.venueOrThrow(venueId);
     if (typeof stars !== 'number' || !Number.isInteger(stars) || stars < 1 || stars > 5) throw validationError('Nota inválida', { stars: 'Use um número inteiro de 1 a 5' });
-    if (venue.ownerId === userId) throw forbidden('Você não pode avaliar o seu próprio estabelecimento');
+    if (await canManageVenue(this.deps.places, userId, venue)) throw forbidden('Você não pode avaliar o seu próprio estabelecimento');
     await this.deps.places.rateVenue(userId, venue.id, stars, this.deps.clock.now());
     return ratingView(await this.deps.places.venueRating(venue.id, userId));
   }
@@ -706,6 +745,85 @@ export class VenueService {
     return this.deps.claims.findDocument(claimId);
   }
 
+  // ---- Equipe: só o dono convida e remove; quem aceita vira administrador adicional ----
+
+  /** Equipe do local. O dono vê também os convites pendentes; o administrador adicional vê quem já aceitou. */
+  async team(userId: string, venueId: unknown): Promise<TeamView> {
+    const venue = await this.managedOrThrow(userId, venueId);
+    const role = (await venueRoleOf(this.deps.places, userId, venue)) as Exclude<VenueRole, null>;
+    const records = (await this.deps.places.listVenueManagers(venue.id)).filter((m) => role === 'OWNER' || m.status === 'ACCEPTED');
+    const ids = [...new Set([...(venue.ownerId ? [venue.ownerId] : []), ...records.map((m) => m.userId)])];
+    const profiles = new Map((await this.deps.users.findProfilesByIds(ids)).map((p) => [p.userId, p]));
+    const members: TeamMemberView[] = [];
+    const owner = venue.ownerId ? profiles.get(venue.ownerId) : undefined;
+    if (owner) members.push({ user: toPublicProfile(owner), role: 'OWNER', status: 'ACCEPTED', since: null });
+    for (const m of records) {
+      const profile = profiles.get(m.userId);
+      if (profile) members.push({ user: toPublicProfile(profile), role: 'MANAGER', status: m.status, since: (m.acceptedAt ?? m.createdAt).toISOString() });
+    }
+    return { role, members };
+  }
+
+  /** O dono convida uma pessoa pelo @usuário. A pessoa só vira administradora ao aceitar. */
+  async inviteManager(ownerId: string, venueId: unknown, username: unknown): Promise<TeamView> {
+    const venue = await this.ownedOrThrow(ownerId, venueId);
+    const name = typeof username === 'string' ? username.trim().replace(/^@/, '').toLowerCase() : '';
+    if (name === '' || name.length > 40) throw validationError('Usuário inválido', { username: 'Informe o @usuário da pessoa' });
+    const profile = await this.deps.users.findProfileByUsername(name);
+    const target = profile ? await this.deps.users.findById(profile.userId) : undefined;
+    if (!profile || !target || target.status !== 'ACTIVE' || (await this.deps.blocks.existsEitherWay(ownerId, profile.userId))) throw notFound('Pessoa não encontrada');
+    if (profile.userId === ownerId) throw conflict('Você já é o responsável por este local');
+    const current = await this.deps.places.findVenueManager(venue.id, profile.userId);
+    if (current?.status === 'ACCEPTED') throw conflict('Essa pessoa já está na equipe');
+    if (current?.status === 'PENDING') throw conflict('Esse convite já foi enviado');
+    if ((await this.deps.places.listVenueManagers(venue.id)).length >= VENUE_TEAM_MAX) throw conflict(`A equipe pode ter até ${VENUE_TEAM_MAX} administradores adicionais`);
+    const now = this.deps.clock.now();
+    await this.deps.places.saveVenueManager({ venueId: venue.id, userId: profile.userId, status: 'PENDING', invitedById: ownerId, createdAt: now, acceptedAt: null });
+    await this.notifyTeam(profile.userId, ownerId, `Convite para administrar ${clipName(venue.name)}`, 'Toque para aceitar ou recusar. Quem administra edita o perfil, os eventos, a agenda, os posts e a chapelaria do local.', '/locais', `venue-team:${venue.id}:${profile.userId}:${now.getTime()}`);
+    return this.team(ownerId, venue.id);
+  }
+
+  /** A pessoa convidada aceita ou recusa. Recusar apaga o convite. */
+  async respondInvite(userId: string, venueId: unknown, accept: unknown): Promise<{ accepted: boolean }> {
+    if (typeof accept !== 'boolean') throw validationError('Resposta inválida', { accept: 'Informe se aceita ou recusa' });
+    const venue = await this.venueOrThrow(venueId);
+    const record = await this.deps.places.findVenueManager(venue.id, userId);
+    if (!record || record.status !== 'PENDING') throw notFound('Convite não encontrado');
+    if (!accept) {
+      await this.deps.places.deleteVenueManager(venue.id, userId);
+      return { accepted: false };
+    }
+    await this.deps.places.saveVenueManager({ ...record, status: 'ACCEPTED', acceptedAt: this.deps.clock.now() });
+    if (venue.ownerId && venue.ownerId !== userId) {
+      const who = await this.deps.users.findProfilesByIds([userId]);
+      await this.notifyTeam(venue.ownerId, userId, `${who[0]?.displayName ?? 'Alguém'} aceitou administrar ${clipName(venue.name)}`, 'Ela já aparece na equipe do local.', `/bares/${venue.id}`, `venue-team:${venue.id}:${userId}:accepted`);
+    }
+    return { accepted: true };
+  }
+
+  /** O dono tira uma pessoa da equipe (ou cancela o convite). */
+  async removeManager(ownerId: string, venueId: unknown, targetId: unknown): Promise<TeamView> {
+    const venue = await this.ownedOrThrow(ownerId, venueId);
+    if (typeof targetId !== 'string' || targetId === '' || targetId.length > 64) throw notFound('Pessoa não encontrada na equipe');
+    if (!(await this.deps.places.deleteVenueManager(venue.id, targetId))) throw notFound('Pessoa não encontrada na equipe');
+    return this.team(ownerId, venue.id);
+  }
+
+  /** O administrador adicional sai da equipe por conta própria. */
+  async leaveTeam(userId: string, venueId: unknown): Promise<{ left: true }> {
+    const venue = await this.venueOrThrow(venueId);
+    if (!(await this.deps.places.deleteVenueManager(venue.id, userId))) throw notFound('Você não está na equipe deste local');
+    return { left: true };
+  }
+
+  private async notifyTeam(userId: string, actorId: string, title: string, body: string, url: string, dedupeKey: string): Promise<void> {
+    try {
+      await this.deps.notifier.notify({ userId, type: 'VENUE_TEAM', title, body, url, dedupeKey, actorId });
+    } catch {
+      // aviso que falha não derruba o convite
+    }
+  }
+
   private async venueOrThrow(venueId: unknown): Promise<VenueRecord> {
     const venue = typeof venueId === 'string' && venueId !== '' && venueId.length <= 64 ? await this.deps.places.findVenue(venueId) : undefined;
     if (!venue) throw notFound('Local não encontrado');
@@ -716,6 +834,13 @@ export class VenueService {
   private async ownedOrThrow(userId: string, venueId: unknown): Promise<VenueRecord> {
     const venue = await this.venueOrThrow(venueId);
     if (venue.ownerId !== userId) throw notFound('Local não encontrado');
+    return venue;
+  }
+
+  /** Dono ou administrador adicional (dia a dia do local). Quem não é recebe "não encontrado". */
+  private async managedOrThrow(userId: string, venueId: unknown): Promise<VenueRecord> {
+    const venue = await this.venueOrThrow(venueId);
+    if (!(await canManageVenue(this.deps.places, userId, venue))) throw notFound('Local não encontrado');
     return venue;
   }
 

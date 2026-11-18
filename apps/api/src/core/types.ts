@@ -369,6 +369,16 @@ export const CLAIM_DOCUMENT_MIMES = ['application/pdf', 'image/jpeg', 'image/png
 export type ClaimDocumentMime = (typeof CLAIM_DOCUMENT_MIMES)[number];
 
 /** Pedido de uma pessoa para administrar um local. O documento (CNPJ, alvará) só o admin vê. */
+/** Convite/vínculo de administrador adicional de um local. Só vale com `ACCEPTED`. */
+export interface VenueManagerRecord {
+  venueId: string;
+  userId: string;
+  status: 'PENDING' | 'ACCEPTED';
+  invitedById: string;
+  createdAt: Date;
+  acceptedAt: Date | null;
+}
+
 export interface VenueClaimRecord {
   id: string;
   venueId: string;
@@ -452,7 +462,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM';
 
 /** O que a pessoa silenciou no push (o aviso continua no sino). `all` vale para tudo; `chats` e `events` só para o seu grupo de avisos. */
 export interface NotificationMuteSettings {

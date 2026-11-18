@@ -7,7 +7,9 @@ import { CHATS_CHANGED_EVENT } from '../lib/chat.ts';
 import { FLASH_CHANGED_EVENT } from '../lib/flash.ts';
 import { hasNewActivity, NOTIFICATIONS_CHANGED_EVENT, readActivitySeen } from '../lib/notifications.ts';
 import { Link, navigate, usePathname } from '../router.tsx';
-import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, HomeIcon, PlusBigIcon, SearchIcon, UserIcon } from './icons.tsx';
+import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, ChevronLeftIcon, HomeIcon, ListIcon, PlusBigIcon, SearchIcon, UserIcon, UsersIcon } from './icons.tsx';
+import { venueAdminRoute, venueAdminTabs } from '../lib/venue-admin-mode.ts';
+import type { VenueAdminRoute, VenueAdminSection } from '../lib/venue-admin-mode.ts';
 import { Avatar } from './ui.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -42,7 +44,83 @@ function NavLink({ item, pathname, badge }: { item: NavItem; pathname: string; b
   );
 }
 
+const ADMIN_ICONS: Record<VenueAdminSection, ReactNode> = {
+  painel: <HomeIcon />,
+  eventos: <CalendarIcon />,
+  agenda: <ListIcon />,
+  equipe: <UsersIcon />,
+  impulsionar: <BoltIcon />,
+};
+
+/**
+ * Modo estabelecimento: o app vira outra área, com menu próprio embaixo (painel, eventos, agenda, equipe, impulsionar).
+ * O único caminho de volta é o botão "Voltar para o perfil".
+ */
+function VenueAdminShell({ route, children }: { route: VenueAdminRoute; children: ReactNode }) {
+  const profile = useAsync(() => api.venueProfile(route.venueId), [route.venueId]);
+  const topbarRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const el = topbarRef.current;
+    if (!el) return;
+    const apply = () => document.documentElement.style.setProperty('--topbar-h', `${el.offsetHeight}px`);
+    apply();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(apply) : undefined;
+    observer?.observe(el);
+    window.addEventListener('resize', apply);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', apply);
+    };
+  }, []);
+  const tabs = venueAdminTabs(route.venueId, profile.data?.isOwner === true, { painel: t('Painel'), eventos: t('Eventos'), agenda: t('Agenda'), equipe: t('Equipe'), impulsionar: t('Impulsionar') });
+  const name = profile.data?.name;
+  const back = (
+    <Link to="/perfil" className="vadminback">
+      <ChevronLeftIcon />
+      <span>{t('Voltar para o perfil')}</span>
+    </Link>
+  );
+  const link = (tab: (typeof tabs)[number]) => {
+    const active = tab.section === route.section;
+    return (
+      <Link key={tab.section} to={tab.to} className={`navlink${active ? ' navlink--active' : ''}`} aria-current={active ? 'page' : undefined}>
+        <span className="navlink__icon">{ADMIN_ICONS[tab.section]}</span>
+        <span className="navlink__label">{tab.label}</span>
+      </Link>
+    );
+  };
+  return (
+    <div className="shell shell--venueadmin">
+      <a className="skip" href="#conteudo">
+        {t('Ir para o conteúdo')}
+      </a>
+      <aside className="rail">
+        {back}
+        {name ? <p className="rail__venue">{name}</p> : null}
+        <nav className="rail__nav" aria-label={t('Estabelecimento')}>
+          {tabs.map(link)}
+        </nav>
+      </aside>
+      <header className="topbar topbar--venueadmin" ref={topbarRef}>
+        {back}
+        {name ? <span className="topbar__venue">{name}</span> : null}
+      </header>
+      <main id="conteudo" className="content" tabIndex={-1}>
+        {children}
+      </main>
+      <nav className="tabbar tabbar--venueadmin" aria-label={t('Estabelecimento')} style={{ gridTemplateColumns: `repeat(${tabs.length}, 1fr)` }}>
+        {tabs.map(link)}
+      </nav>
+    </div>
+  );
+}
+
 export function Shell({ children }: { children: ReactNode }) {
+  const route = venueAdminRoute(usePathname());
+  return route ? <VenueAdminShell route={route}>{children}</VenueAdminShell> : <MainShell>{children}</MainShell>;
+}
+
+function MainShell({ children }: { children: ReactNode }) {
   const user = useUser();
   const pathname = usePathname();
   // Faixas coladas no topo (como o cabeçalho da conversa) precisam saber a altura da barra do app.

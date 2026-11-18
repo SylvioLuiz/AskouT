@@ -23,7 +23,7 @@ import { policyNote } from '../lib/feed.ts';
 import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX, VENUE_NAME_MAX, VENUE_POST_CAPTION_MAX, VENUE_POST_PHOTOS_MAX, applyToAll, daysSummary, draftFromProfile, friendsWentLabel, hoursLines, openStatus, profileBody, profileProblem } from '../lib/venue-profile.ts';
 import type { VenueProfileDraft } from '../lib/venue-profile.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
-import { ClaimSheet, VenueEventRow, VenueEventSheet } from './venues.tsx';
+import { ClaimSheet, VenueEventRow } from './venues.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 type Tab = 'feed' | 'about' | 'events' | 'regulars' | 'posts';
@@ -115,7 +115,7 @@ function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
   const lines = hoursLines(venue.hours, now);
   const status = openStatus(venue.hours, now);
   if (lines.length === 0) {
-    return <InfoRow icon={<ClockIcon />}><span className="muted">{venue.isOwner ? t('Informe os horários em Editar perfil.') : t('O rolê ainda não informou os horários.')}</span></InfoRow>;
+    return <InfoRow icon={<ClockIcon />}><span className="muted">{venue.canManage ? t('Informe os horários em Administrar > Painel > Editar perfil.') : t('O rolê ainda não informou os horários.')}</span></InfoRow>;
   }
   const today = lines.find((l) => l.today);
   return (
@@ -158,7 +158,7 @@ function RatingInfo({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
           <span className="vinfo__sub vinfo__sub--inline">{t('Ainda sem avaliações')}</span>
         )}
       </span>
-      {!venue.isOwner ? <StarPicker venue={venue} onChanged={onChanged} /> : null}
+      {!venue.canManage ? <StarPicker venue={venue} onChanged={onChanged} /> : null}
     </InfoRow>
   );
 }
@@ -291,7 +291,7 @@ function HoursEditor({ draft, onChange }: { draft: VenueProfileDraft; onChange: 
   );
 }
 
-function ProfileEditSheet({ venue, onClose, onSaved }: { venue: VenueProfile; onClose: () => void; onSaved: () => void }) {
+export function ProfileEditSheet({ venue, onClose, onSaved }: { venue: VenueProfile; onClose: () => void; onSaved: () => void }) {
   const [draft, setDraft] = useState<VenueProfileDraft>(() => draftFromProfile(venue));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | undefined>();
@@ -333,7 +333,7 @@ function ProfileEditSheet({ venue, onClose, onSaved }: { venue: VenueProfile; on
   );
 }
 
-function VenuePostSheet({ venueId, onClose, onSaved }: { venueId: string; onClose: () => void; onSaved: () => void }) {
+export function VenuePostSheet({ venueId, onClose, onSaved }: { venueId: string; onClose: () => void; onSaved: () => void }) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [caption, setCaption] = useState('');
   const [busy, setBusy] = useState(false);
@@ -406,7 +406,7 @@ function VenuePostSheet({ venueId, onClose, onSaved }: { venueId: string; onClos
 }
 
 /** Aba de eventos de quem administra: todos (os que já passaram também), com editar e apagar. */
-function OwnerEvents({ venueId, now, reloadKey, onNew, onEdit, onChanged }: { venueId: string; now: Date; reloadKey: number; onNew: () => void; onEdit: (e: VenueEvent) => void; onChanged: () => void }) {
+export function OwnerEvents({ venueId, now, reloadKey, onNew, onEdit, onChanged }: { venueId: string; now: Date; reloadKey: number; onNew: () => void; onEdit: (e: VenueEvent) => void; onChanged: () => void }) {
   const panel = useAsync(() => api.venuePanel(venueId), [venueId, reloadKey]);
   return (
     <section className="vowner">
@@ -444,7 +444,6 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const [tab, setTab] = useState<Tab>('feed');
   const [feedSettings, setFeedSettings] = useState<FeedSettings | undefined>();
   const search = useSearch();
-  const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | undefined>();
   const [followBusy, setFollowBusy] = useState(false);
   const [bellBusy, setBellBusy] = useState(false);
   const [bellNote, setBellNote] = useState<string | undefined>();
@@ -453,9 +452,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const [claiming, setClaiming] = useState(false);
   const [claimSent, setClaimSent] = useState(false);
   const where = useCurrentPosition();
-  const [postsKey, setPostsKey] = useState(0);
-  const [eventsKey, setEventsKey] = useState(0);
-  const [editing, setEditing] = useState<VenueEvent | undefined>();
+  const [postsKey] = useState(0);
   const now = new Date();
 
   /** Sininho: ligar já segue e avisa de cada evento novo; desligar só para os avisos. */
@@ -522,23 +519,11 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
     <>
       <VenueHero venue={v} now={now} onShare={() => setSharing(true)} />
       <div className="vhead">
-        {v.isOwner ? (
+        {v.canManage ? (
           <div className="vhead__actions">
-            <Button small onClick={() => setSheet('edit')}>
-              {t('Editar perfil')}
-            </Button>
-            <Button small variant="secondary" onClick={() => setSheet('event')}>
-              {t('Novo evento')}
-            </Button>
-            <Button small variant="secondary" onClick={() => setSheet('post')}>
-              {t('Novo post')}
-            </Button>
-            <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/impulsionar`)}>
-              {t('Impulsionar')}
-            </Button>
-            <Button small variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/agenda`)}>
-              {t('Agenda')}
-            </Button>
+            <Link to={`/bares/${encodeURIComponent(v.id)}/painel`} className="btn btn--primary">
+              {t('Administrar')}
+            </Link>
           </div>
         ) : (
           <div className="vhead__actions">
@@ -626,7 +611,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
 
       {tab === 'about' ? (
         <section className="vabout">
-          {v.description ? <p className="vabout__text">{v.description}</p> : v.isOwner ? <p className="muted">{t('Conte o que as pessoas encontram aí. Toque em Editar perfil.')}</p> : null}
+          {v.description ? <p className="vabout__text">{v.description}</p> : v.canManage ? <p className="muted">{t('Conte o que as pessoas encontram aí. Abra Administrar e toque em Editar perfil.')}</p> : null}
           <div className="vinfolist">
             <HoursInfo venue={v} now={now} />
             {v.address ? (
@@ -636,9 +621,9 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
                   {t('Como chegar')}
                 </OpenInMaps>
               </InfoRow>
-            ) : v.isOwner ? (
+            ) : v.canManage ? (
               <InfoRow icon={<LocationIcon />}>
-                <span className="muted">{t('Informe o endereço em Editar perfil.')}</span>
+                <span className="muted">{t('Informe o endereço em Administrar > Painel > Editar perfil.')}</span>
               </InfoRow>
             ) : null}
             <RatingInfo venue={v} onChanged={page.reload} />
@@ -653,9 +638,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
       ) : null}
 
       {tab === 'events' ? (
-        v.isOwner ? (
-          <OwnerEvents venueId={v.id} now={now} reloadKey={eventsKey} onNew={() => setSheet('event')} onEdit={(e) => setEditing(e)} onChanged={page.reload} />
-        ) : v.upcomingEvents.length === 0 ? (
+        v.upcomingEvents.length === 0 ? (
           <EmptyState title={t('Nenhum evento marcado')}>{t('Quando o rolê divulgar eventos, eles aparecem aqui.')}</EmptyState>
         ) : (
           <ul className="vagenda" aria-label={t('Próximos eventos')}>
@@ -695,46 +678,8 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         )
       ) : null}
 
-      {tab === 'posts' ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={v.isOwner ? t('Toque em Novo post para publicar fotos do rolê.') : t('Os posts do rolê aparecem aqui e no seu feed se você seguir.')} reloadKey={String(postsKey)} /> : null}
+      {tab === 'posts' ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={v.canManage ? t('Abra Administrar e toque em Novo post para publicar fotos do rolê.') : t('Os posts do rolê aparecem aqui e no seu feed se você seguir.')} reloadKey={String(postsKey)} /> : null}
 
-      {sheet === 'edit' ? (
-        <ProfileEditSheet
-          venue={v}
-          onClose={() => setSheet(undefined)}
-          onSaved={() => {
-            setSheet(undefined);
-            page.reload();
-          }}
-        />
-      ) : null}
-      {sheet === 'event' || editing ? (
-        <VenueEventSheet
-          venueId={v.id}
-          {...(editing ? { event: editing } : {})}
-          onClose={() => {
-            setSheet(undefined);
-            setEditing(undefined);
-          }}
-          onSaved={() => {
-            setSheet(undefined);
-            setEditing(undefined);
-            setEventsKey((k) => k + 1);
-            page.reload();
-            setTab('events');
-          }}
-        />
-      ) : null}
-      {sheet === 'post' ? (
-        <VenuePostSheet
-          venueId={v.id}
-          onClose={() => setSheet(undefined)}
-          onSaved={() => {
-            setSheet(undefined);
-            setPostsKey((k) => k + 1);
-            setTab('posts');
-          }}
-        />
-      ) : null}
       {sharing ? <ShareLinkSheet url={`${shareOrigin()}/bares/${encodeURIComponent(v.id)}`} text={t('{name} no AskouT', { name: v.name })} onClose={() => setSharing(false)} /> : null}
     </>
   );

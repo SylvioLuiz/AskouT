@@ -71,7 +71,7 @@ export function CloakroomPanelScreen({ venueId, eventId }: { venueId: string; ev
 
   return (
     <>
-      <PageHead title={t('Chapelaria')} subtitle={panel.event.title} back={`/bares/${encodeURIComponent(venueId)}`} />
+      <PageHead title={t('Chapelaria')} subtitle={panel.event.title} back={`/bares/${encodeURIComponent(venueId)}/eventos`} />
       <section className="cloak" aria-label={t('Configuração')}>
         <Field label={t('Preço por item (R$)')} value={price ?? centsToInput(setting.priceCents)} onChange={setPrice} inputMode="text" hint={t('Deixe em branco para grátis. A cobrança é feita na porta.')} />
         <Field label={t('Limite de itens')} value={limit ?? (setting.capacity === null ? '' : String(setting.capacity))} onChange={setLimit} inputMode="numeric" hint={t('Deixe em branco para sem limite.')} />

@@ -162,7 +162,7 @@ export function VenueCalendarScreen({ venueId }: { venueId: string }) {
 
   return (
     <>
-      <PageHead title={t('Agenda do local')} back={`/bares/${encodeURIComponent(venueId)}`} subtitle={venue.data?.venue.name ?? t('Traga os eventos do Google Agenda ou de outro calendário.')} />
+      <PageHead title={t('Agenda do local')} back={`/bares/${encodeURIComponent(venueId)}/painel`} subtitle={venue.data?.venue.name ?? t('Traga os eventos do Google Agenda ou de outro calendário.')} />
       {panel.loading && !panel.data ? <Loading /> : null}
       {panel.error && !panel.data ? <ErrorState message={panel.error.message} onRetry={panel.reload} /> : null}
       {notice ? <Notice tone="ok">{notice}</Notice> : null}

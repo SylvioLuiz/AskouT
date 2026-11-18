@@ -1,3 +1,4 @@
+import { canManageVenue, managedVenueIds } from './venue-access.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
 import { extractMentions } from './mentions.ts';
@@ -201,7 +202,7 @@ export class PostService {
   /** Post em nome de um estabelecimento: só quem administra o local. Sem marcações nem evento próprio (eventos têm o painel do local). */
   async createForVenue(actorId: string, venueId: unknown, input: PostInput): Promise<PostView> {
     const venue = typeof venueId === 'string' && venueId !== '' && venueId.length <= 64 ? await this.deps.places.findVenue(venueId) : undefined;
-    if (!venue || venue.ownerId !== actorId) throw notFound('Local não encontrado');
+    if (!venue || !(await canManageVenue(this.deps.places, actorId, venue))) throw notFound('Local não encontrado');
     if (!Array.isArray(input.images) || input.images.some((i) => typeof i !== 'string')) throw validationError('Fotos inválidas', { images: 'Envie fotos do aparelho' });
     return this.create(actorId, { caption: input.caption, images: input.images }, venue);
   }
@@ -336,7 +337,7 @@ export class PostService {
     let asVenue: string | null = null;
     if (post.venueId) {
       const venue = await this.deps.places.findVenue(post.venueId);
-      if (venue && venue.ownerId === viewerId) asVenue = venue.id;
+      if (venue && (await canManageVenue(this.deps.places, viewerId, venue))) asVenue = venue.id;
     }
     const record: PostCommentRecord = { id: this.deps.ids.next(), postId: post.id, authorId: viewerId, body: text, createdAt: this.deps.clock.now(), venueId: asVenue, gifId: gif?.id ?? null, gifUrl: gif?.url ?? null };
     await this.deps.posts.addComment(record);
@@ -533,7 +534,7 @@ export class PostService {
     const page = parsePage(query);
     const following = await this.deps.follows.listFollowingIds(viewerId);
     // Quem administra um local vê os posts dele no próprio Início, mesmo sem segui-lo.
-    const owned = (await this.deps.places.listVenuesByOwner(viewerId)).map((v) => v.id);
+    const owned = await managedVenueIds(this.deps.places, viewerId);
     const venueIds = [...new Set([...(await this.deps.places.listFollowedVenueIds(viewerId)), ...owned])];
     // As listas vêm do começo até o fim desta página e são unidas aqui (mesma regra da lista de eventos do perfil).
     const want = page.offset + page.limit + 1;
