@@ -5997,3 +5997,8 @@ div.optrow__main { cursor: default; }
 .vteam__invite { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 .venuerow--static { cursor: default; }
 .claimrow__actions { display: flex; gap: 8px; }
+
+/* Painel: prévia de como as pessoas veem a página */
+.vpreview { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.vpreview__page { display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; overflow: hidden; border: 1px dashed var(--line-strong); border-radius: var(--radius-control); pointer-events: none; user-select: none; }
+.vpreview__page > :not(.vhero) { margin-inline: 16px; }
