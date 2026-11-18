@@ -1185,15 +1185,15 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return [...this.reactions.values()].filter((r) => wanted.has(r.messageId)).map((r) => ({ ...r })).sort((a, b) => (a.userId < b.userId ? -1 : a.userId > b.userId ? 1 : 0));
   }
 
-  async setPrefs(conversationId: string, userId: string, patch: { pinnedAt?: Date | null; muted?: boolean }): Promise<void> {
+  async setPrefs(conversationId: string, userId: string, patch: { pinnedAt?: Date | null; muted?: boolean; color?: string | null }): Promise<void> {
     if (!this.participants.get(conversationId)?.has(userId)) return;
     const key = `${conversationId}|${userId}`;
-    const current = this.prefs.get(key) ?? { pinnedAt: null, muted: false };
-    this.prefs.set(key, { pinnedAt: patch.pinnedAt === undefined ? current.pinnedAt : patch.pinnedAt, muted: patch.muted ?? current.muted });
+    const current = this.prefs.get(key) ?? { pinnedAt: null, muted: false, color: null };
+    this.prefs.set(key, { pinnedAt: patch.pinnedAt === undefined ? current.pinnedAt : patch.pinnedAt, muted: patch.muted ?? current.muted, color: patch.color === undefined ? current.color : patch.color });
   }
 
   async getPrefs(conversationId: string, userId: string): Promise<ConversationPrefsRecord> {
-    return { ...(this.prefs.get(`${conversationId}|${userId}`) ?? { pinnedAt: null, muted: false }) };
+    return { ...(this.prefs.get(`${conversationId}|${userId}`) ?? { pinnedAt: null, muted: false, color: null }) };
   }
 
   async countPinned(userId: string): Promise<number> {

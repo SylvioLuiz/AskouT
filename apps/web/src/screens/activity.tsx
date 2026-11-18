@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PushCard } from '../components/notifications.tsx';
 import { listTimeLabel } from '../lib/chat.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
@@ -211,6 +211,79 @@ export function ActivityScreen() {
     navigate(item.url);
   }
 
+  // Seleção (como no Gmail/Instagram): "Selecionar" ou segurar um aviso; tocar marca/desmarca; "Marcar como vistas" lê só os escolhidos.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [markingSelected, setMarkingSelected] = useState(false);
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const skipClick = useRef(false);
+  const visibleIds = news.data?.items.map((n) => n.id) ?? [];
+  // A lista recarrega sozinha a cada 15 s: só contam os escolhidos que ainda estão na tela.
+  const chosen = visibleIds.filter((id) => selected.has(id));
+  useEffect(() => {
+    setSelecting(false);
+    setSelected(new Set());
+  }, [filter, tab]);
+
+  function stopSelecting() {
+    setSelecting(false);
+    setSelected(new Set());
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function startPress(id: string) {
+    if (selecting) return;
+    clearTimeout(pressTimer.current);
+    pressTimer.current = setTimeout(() => {
+      skipClick.current = true;
+      setSelecting(true);
+      setSelected(new Set([id]));
+    }, 500);
+  }
+
+  function cancelPress() {
+    clearTimeout(pressTimer.current);
+  }
+
+  function rowClick(item: NotificationItem) {
+    if (skipClick.current) {
+      skipClick.current = false;
+      return;
+    }
+    if (selecting) toggleSelected(item.id);
+    else void open(item);
+  }
+
+  async function readSelected() {
+    if (chosen.length === 0) return;
+    setMarkingSelected(true);
+    setMessage(undefined);
+    try {
+      await api.markNotificationsRead(chosen);
+      if (newsState.data) {
+        const marked = new Set(chosen);
+        const list = newsState.data.list;
+        const newlyRead = list.items.filter((n) => marked.has(n.id) && !n.read).length;
+        newsState.setData({ ...newsState.data, list: { items: list.items.map((n) => (marked.has(n.id) ? { ...n, read: true } : n)), unread: Math.max(0, list.unread - newlyRead) } });
+      }
+      announceNotificationsChanged();
+      stopSelecting();
+      news.reload();
+    } catch (failure) {
+      setMessage({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setMarkingSelected(false);
+    }
+  }
+
   async function readAll() {
     try {
       await api.markNotificationsRead();
@@ -248,28 +321,64 @@ export function ActivityScreen() {
       {!news.data && !news.error ? <Loading /> : null}
       {news.data && news.data.items.length > 0 ? (
         <>
-          {news.data.unread > 0 ? (
-            <div className="newshead newshead--end">
-              <Button small variant="quiet" onClick={() => void readAll()}>
-                {t('Marcar tudo como lido')}
+          {selecting ? (
+            <div className="newshead newshead--select" role="toolbar" aria-label={t('Avisos selecionados')}>
+              <span className="newshead__count" aria-live="polite">
+                {chosen.length === 0 ? t('Toque nos avisos para escolher') : chosen.length === 1 ? t('1 selecionado') : t('{n} selecionados', { n: chosen.length })}
+              </span>
+              <Button small variant="quiet" onClick={stopSelecting}>
+                {t('Cancelar')}
+              </Button>
+              <Button small variant="quiet" onClick={() => setSelected(chosen.length === visibleIds.length ? new Set() : new Set(visibleIds))}>
+                {chosen.length === visibleIds.length ? t('Desmarcar todos') : t('Selecionar todos')}
+              </Button>
+              <Button small loading={markingSelected} disabled={chosen.length === 0} onClick={() => void readSelected()}>
+                {t('Marcar como vistas')}
               </Button>
             </div>
-          ) : null}
+          ) : (
+            <div className="newshead">
+              <Button small variant="quiet" onClick={() => setSelecting(true)}>
+                {t('Selecionar')}
+              </Button>
+              {news.data.unread > 0 ? (
+                <Button small variant="quiet" onClick={() => void readAll()}>
+                  {t('Marcar tudo como lido')}
+                </Button>
+              ) : null}
+            </div>
+          )}
           <ul className="newslist">
-            {news.data.items.map((n) => (
-              <li key={n.id}>
-                <button type="button" className={`newsrow${n.read ? '' : ' newsrow--unread'}`} onClick={() => void open(n)}>
-                  <NewsMedia item={n} />
-                  <span className="newsrow__body">
-                    <span className="newsrow__title">{n.title}</span>
-                    <span className="newsrow__text">{n.body}</span>
-                  </span>
-                  <span className="newsrow__time">{listTimeLabel(n.createdAt, now)}</span>
-                  <span className="newsrow__dot" aria-hidden="true" />
-                  {n.read ? null : <span className="visually-hidden">{t('não lido')}</span>}
-                </button>
-              </li>
-            ))}
+            {news.data.items.map((n) => {
+              const isChosen = selecting && selected.has(n.id);
+              return (
+                <li key={n.id}>
+                  <button
+                    type="button"
+                    className={`newsrow${n.read ? '' : ' newsrow--unread'}${selecting ? ' newsrow--selecting' : ''}${isChosen ? ' newsrow--chosen' : ''}`}
+                    aria-pressed={selecting ? isChosen : undefined}
+                    onClick={() => rowClick(n)}
+                    onPointerDown={() => startPress(n.id)}
+                    onPointerUp={cancelPress}
+                    onPointerLeave={cancelPress}
+                    onPointerCancel={cancelPress}
+                    onContextMenu={(e) => {
+                      if (!selecting) e.preventDefault();
+                    }}
+                  >
+                    {selecting ? <span className="newsrow__check" aria-hidden="true" /> : null}
+                    <NewsMedia item={n} />
+                    <span className="newsrow__body">
+                      <span className="newsrow__title">{n.title}</span>
+                      <span className="newsrow__text">{n.body}</span>
+                    </span>
+                    <span className="newsrow__time">{listTimeLabel(n.createdAt, now)}</span>
+                    <span className="newsrow__dot" aria-hidden="true" />
+                    {n.read ? null : <span className="visually-hidden">{t('não lido')}</span>}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </>
       ) : null}

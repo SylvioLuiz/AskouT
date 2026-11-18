@@ -5,6 +5,8 @@ import type { NotificationMuteSettings, NotificationRecord, NotificationType } f
 
 export const NOTIFICATIONS_PAGE = 30;
 export const MAX_PUSH_SUBSCRIPTIONS = 10;
+/** Quantos avisos dá para marcar como lidos de uma vez pela seleção. */
+export const MARK_READ_MAX = 100;
 const ENDPOINT_MAX = 1000;
 const KEY_MAX = 200;
 /** Aparelhos do app guardam o token da Apple como `apns:<token em hexadecimal>` no lugar do endereço do navegador. */
@@ -214,11 +216,42 @@ export class NotificationService {
     return next;
   }
 
-  /** Marca um aviso (ou todos, sem `id`) como lido. */
-  async markRead(userId: string, id?: string): Promise<{ unread: number }> {
+  /** Marca um aviso, vários (lista de ids, da seleção na tela) ou todos (sem `id`) como lidos. */
+  async markRead(userId: string, id?: string | string[]): Promise<{ unread: number }> {
     const { notifications, clock } = this.deps;
-    await notifications.markRead(userId, clock.now(), id ? [id] : undefined);
+    let ids: string[] | undefined;
+    if (Array.isArray(id)) {
+      if (id.length === 0) return { unread: await notifications.unreadCount(userId) };
+      if (id.length > MARK_READ_MAX || id.some((x) => typeof x !== 'string' || x === '' || x.length > 100)) throw validationError('Dados inválidos', { ids: `Envie de 1 a ${MARK_READ_MAX} avisos` });
+      ids = [...new Set(id)];
+    } else if (id !== undefined) ids = [id];
+    await notifications.markRead(userId, clock.now(), ids);
     return { unread: await notifications.unreadCount(userId) };
+  }
+
+  /**
+   * Manda um aviso de teste para os aparelhos da própria pessoa e diz quantos o serviço (Apple, Google, navegador)
+   * aceitou. Serve para conferir se o push está chegando no aparelho sem depender de outra pessoa.
+   */
+  async testPush(userId: string): Promise<{ devices: number; sent: number; failed: number; removed: number; byKind: Record<'ios' | 'android' | 'web', { sent: number; failed: number }> }> {
+    const { pushSubscriptions, push } = this.deps;
+    const subs = await pushSubscriptions.listForUser(userId);
+    const byKind = { ios: { sent: 0, failed: 0 }, android: { sent: 0, failed: 0 }, web: { sent: 0, failed: 0 } };
+    let removed = 0;
+    await Promise.all(
+      subs.map(async (sub) => {
+        const kind = sub.endpoint.startsWith(FCM_ENDPOINT_PREFIX) ? 'android' : sub.endpoint.startsWith(NATIVE_ENDPOINT_PREFIX) ? 'ios' : 'web';
+        const result = await push.send(sub, { title: 'AskouT', body: 'Aviso de teste: se você está lendo isto, as notificações estão funcionando.', url: '/atividades', tag: 'push-test' }).catch(() => 'FAILED' as const);
+        if (result === 'SENT') byKind[kind].sent += 1;
+        else byKind[kind].failed += 1;
+        if (result === 'GONE') {
+          removed += 1;
+          await pushSubscriptions.remove(sub.endpoint);
+        }
+      }),
+    );
+    const sent = byKind.ios.sent + byKind.android.sent + byKind.web.sent;
+    return { devices: subs.length, sent, failed: subs.length - sent, removed, byKind };
   }
 
   /** Chave pública para o navegador se inscrever; `null` quando o servidor não tem chaves de push. `native`: o app do iPhone pode se registrar. */

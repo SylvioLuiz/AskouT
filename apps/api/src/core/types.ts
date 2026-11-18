@@ -301,6 +301,8 @@ export interface ConversationPrefsRecord {
   /** Quando a pessoa fixou a conversa; nulo = não fixada. */
   pinnedAt: Date | null;
   muted: boolean;
+  /** Cor escolhida para a conversa (uma de CHAT_COLORS); nula = cor padrão do app. */
+  color: string | null;
 }
 
 export interface ConversationSummaryRecord {

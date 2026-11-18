@@ -72,6 +72,7 @@ import type {
   MeetupView,
   NotificationCategory,
   NotificationList,
+  PushTestResult,
   PostedEventsPage,
   PostComment,
   PostCommentsPage,
@@ -625,9 +626,9 @@ export function createApi(deps: ApiDeps) {
       request<{ reactions: ChatReaction[] }>('PUT', `/conversations/${id(conversationId)}/messages/${id(messageId)}/reaction`, { body: { emoji } }),
     /** Apaga a própria mensagem para todos. */
     deleteMessage: (conversationId: string, messageId: string) => request<ChatMessage>('DELETE', `/conversations/${id(conversationId)}/messages/${id(messageId)}`),
-    /** Fixar no topo e silenciar os avisos (só para você). */
-    setChatPrefs: (conversationId: string, prefs: { pinned?: boolean; muted?: boolean }) =>
-      request<{ pinned: boolean; muted: boolean }>('PUT', `/conversations/${id(conversationId)}/preferences`, { body: prefs }),
+    /** Fixar no topo, silenciar os avisos e a cor da conversa (só para você). */
+    setChatPrefs: (conversationId: string, prefs: { pinned?: boolean; muted?: boolean; color?: string | null }) =>
+      request<{ pinned: boolean; muted: boolean; color: string | null }>('PUT', `/conversations/${id(conversationId)}/preferences`, { body: prefs }),
     /** Sinal de "digitando…". */
     sendTyping: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/typing`),
     /** Baixa o áudio de uma mensagem de voz (a rota exige o token, então não dá para usar <audio src>). */
@@ -690,7 +691,10 @@ export function createApi(deps: ApiDeps) {
     // Avisos
     notifications: (category: NotificationCategory = 'all') => request<NotificationList>('GET', `/notifications${toQuery({ category: category === 'all' ? undefined : category })}`),
     unreadNotifications: () => request<{ unread: number; latestUnreadAt: string | null }>('GET', '/notifications/unread'),
-    markNotificationsRead: (notificationId?: string) => request<{ unread: number }>('POST', '/notifications/read', { body: notificationId ? { id: notificationId } : {} }),
+    /** Um aviso (id), os selecionados (lista de ids) ou todos (sem argumento). */
+    markNotificationsRead: (notificationId?: string | string[]) => request<{ unread: number }>('POST', '/notifications/read', { body: Array.isArray(notificationId) ? { ids: notificationId } : notificationId ? { id: notificationId } : {} }),
+    /** Manda um aviso de teste para os aparelhos da própria pessoa. */
+    pushTest: () => request<PushTestResult>('POST', '/notifications/push/test'),
     pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),
     pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
     pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),

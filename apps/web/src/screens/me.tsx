@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NOW_RADIUS_CHOICES_KM, nowRadiusKm, setNowRadiusKm } from '../lib/now-radius.ts';
 import type { FormEvent, ReactNode } from 'react';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
-import { MuteCard, PushCard } from '../components/notifications.tsx';
+import { MuteCard, PushCard, PushTestCard } from '../components/notifications.tsx';
 import { api } from '../client.ts';
 import { useAuthContext, useUser } from '../auth.tsx';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -345,6 +345,7 @@ export function NotificationSettingsScreen() {
       <PageHead title={t('Notificações')} back="/configuracao" />
       <h2 className="profile__section">{t('Avisos no aparelho')}</h2>
       <PushCard />
+      <PushTestCard />
       <h2 className="profile__section">{t('Silenciar push')}</h2>
       <MuteCard />
     </>
