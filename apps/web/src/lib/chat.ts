@@ -49,6 +49,8 @@ export function formatWhen(startsAt: string | null, endsAt: string | null, now: 
     const d = -dayDiff(e, now);
     return d === 0 ? t('hoje') : d === 1 ? t('amanhã') : dayMonth.format(e);
   };
+  // Já terminou (ou, sem horário de fim, começou há mais de 24 h): não é mais "acontecendo agora".
+  if ((hasEnd && end.getTime() <= now.getTime()) || (!hasEnd && now.getTime() - start.getTime() > 86_400_000)) return t('Aconteceu em {day}', { day: dayMonth.format(start) });
   const reference = start.getTime() <= now.getTime() ? now : start;
   const until = hasEnd ? (sameDay(end, reference) ? t(' até {time}', { time: clock.format(end) }) : t(' até {day} às {time}', { day: endDay(end), time: clock.format(end) })) : '';
   if (start.getTime() <= now.getTime()) return t('Acontecendo agora{until}', { until });

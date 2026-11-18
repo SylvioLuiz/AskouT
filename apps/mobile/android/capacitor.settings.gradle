@@ -5,8 +5,14 @@ project(':capacitor-android').projectDir = new File('../../../node_modules/@capa
 include ':capacitor-community-contacts'
 project(':capacitor-community-contacts').projectDir = new File('../../../node_modules/@capacitor-community/contacts/android')
 
+include ':capacitor-app'
+project(':capacitor-app').projectDir = new File('../../../node_modules/@capacitor/app/android')
+
 include ':capacitor-filesystem'
 project(':capacitor-filesystem').projectDir = new File('../../../node_modules/@capacitor/filesystem/android')
+
+include ':capacitor-geolocation'
+project(':capacitor-geolocation').projectDir = new File('../../../node_modules/@capacitor/geolocation/android')
 
 include ':capacitor-push-notifications'
 project(':capacitor-push-notifications').projectDir = new File('../../../node_modules/@capacitor/push-notifications/android')
@@ -25,6 +31,9 @@ project(':capgo-capacitor-social-login').projectDir = new File('../../../node_mo
 
 include ':capgo-native-purchases'
 project(':capgo-native-purchases').projectDir = new File('../../../node_modules/@capgo/native-purchases/android')
+
+include ':ebarooni-capacitor-calendar'
+project(':ebarooni-capacitor-calendar').projectDir = new File('../../../node_modules/@ebarooni/capacitor-calendar/android')
 
 include ':capacitor-native-video-compressor'
 project(':capacitor-native-video-compressor').projectDir = new File('../../../node_modules/capacitor-native-video-compressor/android')

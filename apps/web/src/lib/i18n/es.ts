@@ -77,6 +77,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Achar nos contatos": "Buscar en contactos",
   "Acontecendo agora": "Ocurriendo ahora",
   "Acontecendo agora{until}": "Ocurriendo ahora{until}",
+  "Aconteceu em {day}": "Ocurrió el {day}",
   "Adicionar": "Añadir",
   "Adicionar ao grupo": "Añadir al grupo",
   "Adicionar foto": "Añadir foto",
