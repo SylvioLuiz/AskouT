@@ -3,7 +3,7 @@ import { GooglePlayPurchaseVerifier, StorePurchaseRouter } from '../infra/store/
 import { GoogleAccessTokens } from '../infra/google/service-account.ts';
 import { FcmSender, NativePushRouter } from '../infra/push/fcm-sender.ts';
 import type { PrismaClient } from '@prisma/client';
-import { AesGcmSecretBox, HmacMfaChallengeTokens, HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../core/adapters/crypto.ts';
+import { AesGcmSecretBox, HmacMfaChallengeTokens, HmacOAuthStateTokens, HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../core/adapters/crypto.ts';
 import { SystemClock, UuidGenerator } from '../core/adapters/system.ts';
 import { createCore } from '../core/index.ts';
 import {
@@ -48,6 +48,8 @@ import { StripePaymentGateway } from '../infra/payments/stripe-payment-gateway.t
 import { ConsoleEmailSender } from './console-email-sender.ts';
 import { ResendEmailSender } from '../infra/email/resend-email-sender.ts';
 import { HttpCalendarFetcher } from '../infra/calendar/http-calendar-fetcher.ts';
+import { HttpGoogleCalendarClient } from '../infra/google/google-calendar-client.ts';
+import { PrismaPersonalCalendarRepository } from '../infra/prisma/prisma-personal-calendar.repository.ts';
 import type { AppConfig } from './support/config.ts';
 import { PhotoSigner } from './support/photo-signing.ts';
 import { CONFIG, CORE, PLACE_PHOTOS, PRISMA } from './tokens.ts';
@@ -92,6 +94,9 @@ export const coreProvider = {
       claims: new PrismaVenueClaimRepository(prisma),
       calendars: new PrismaCalendarRepository(prisma),
       calendarFetcher: new HttpCalendarFetcher(),
+      personalCalendars: new PrismaPersonalCalendarRepository(prisma),
+      ...(config.googleCalendar ? { googleCalendar: new HttpGoogleCalendarClient(config.googleCalendar) } : {}),
+      oauthStates: new HmacOAuthStateTokens({ secret: config.codeSecret }),
       admin: new PrismaAdminRepository(prisma),
       placeSource: google ? new FallbackPlaceSource(google, new OverpassPlaceSource({ contact: config.osmContact })) : new OverpassPlaceSource({ contact: config.osmContact }),
       ...(config.giphyApiKey ? { gifs: new GiphyGifSource({ apiKey: config.giphyApiKey }) } : {}),
@@ -125,7 +130,7 @@ export const coreProvider = {
           }
         : {}),
       identities: new PrismaIdentityRepository(prisma),
-      verifier: new OidcIdentityVerifier({ googleClientId: config.googleClientId, appleClientId: config.appleClientId, appleAppId: config.appleAppId }),
+      verifier: new OidcIdentityVerifier({ googleClientId: config.googleClientId, googleIosClientId: config.googleIosClientId, appleClientId: config.appleClientId, appleAppId: config.appleAppId }),
       mailer: config.resend ? new ResendEmailSender(config.resend) : new ConsoleEmailSender(),
       codes: new HmacOneTimeCodes({ secret: config.codeSecret }),
       hasher: new ScryptPasswordHasher(),

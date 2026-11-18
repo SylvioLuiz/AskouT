@@ -3,7 +3,9 @@ import { describe, it } from 'node:test';
 import { CHUNK_BYTES, createVideoBridge, qualityFor, type VideoBridgeDeps } from './video-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createAppleBridge } from './apple-bridge.ts';
+import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
+import { createDeviceCalendarBridge } from './device-calendar-bridge.ts';
 import { createContactsBridge } from './contacts-bridge.ts';
 import { createPushBridge, openInApp, type PushPluginLike } from './push-bridge.ts';
 
@@ -288,5 +290,125 @@ describe('ponte dos contatos', () => {
     });
     await assert.rejects(bridge.readAll(), /permissão/);
     assert.equal(read, false);
+  });
+});
+
+describe('ponte do Google', () => {
+  it('Android: inicializa uma vez com o cliente web e devolve o token', async () => {
+    const inits: unknown[] = [];
+    let logins = 0;
+    const bridge = createGoogleBridge({
+      platform: () => 'android',
+      login: {
+        async initialize(o) {
+          inits.push(o.google);
+        },
+        async login(o) {
+          logins += 1;
+          assert.deepEqual(o, { provider: 'google', options: {} });
+          return { result: { idToken: 'jwt-do-google' } };
+        },
+      },
+    });
+    assert.equal(bridge.available({ webClientId: 'web' }), true);
+    assert.equal(await bridge.signIn({ webClientId: 'web' }), 'jwt-do-google');
+    assert.equal(await bridge.signIn({ webClientId: 'web' }), 'jwt-do-google');
+    assert.deepEqual(inits, [{ webClientId: 'web', mode: 'online', skipAuthOnlyAuthorizationAfterSignIn: true }]);
+    assert.equal(logins, 2);
+  });
+
+  it('iPhone: precisa do cliente iOS e pede o token para o cliente web', async () => {
+    const inits: unknown[] = [];
+    const bridge = createGoogleBridge({
+      platform: () => 'ios',
+      login: { initialize: async (o) => void inits.push(o.google), login: async () => ({ result: { idToken: 't' } }) },
+    });
+    assert.equal(bridge.available({ webClientId: 'web' }), false);
+    assert.equal(bridge.available({ webClientId: 'web', iosClientId: 'ios' }), true);
+    await assert.rejects(bridge.signIn({ webClientId: 'web' }), /iPhone/);
+    assert.equal(await bridge.signIn({ webClientId: 'web', iosClientId: 'ios' }), 't');
+    assert.deepEqual(inits, [{ webClientId: 'web', iOSClientId: 'ios', iOSServerClientId: 'web', mode: 'online' }]);
+  });
+
+  it('cancelar não é erro; falha de verdade sobe; inicialização que falhou é refeita', async () => {
+    const mk = (login: () => Promise<{ result: { idToken?: string | null } }>) => createGoogleBridge({ platform: () => 'android', login: { initialize: async () => undefined, login } });
+    assert.equal(await mk(async () => { throw new Error('GetCredentialCancellationException: activity is cancelled by the user.'); }).signIn({ webClientId: 'w' }), undefined);
+    assert.equal(await mk(async () => { throw new Error('The user canceled the sign-in flow.'); }).signIn({ webClientId: 'w' }), undefined);
+    await assert.rejects(mk(async () => { throw new Error('[28444] Developer console is not set up correctly.'); }).signIn({ webClientId: 'w' }), /28444/);
+    assert.equal(await mk(async () => ({ result: { idToken: null } })).signIn({ webClientId: 'w' }), undefined);
+    let n = 0;
+    const bridge = createGoogleBridge({
+      platform: () => 'android',
+      login: {
+        async initialize() {
+          n += 1;
+          if (n === 1) throw new Error('falhou');
+        },
+        login: async () => ({ result: { idToken: 'ok' } }),
+      },
+    });
+    await assert.rejects(bridge.signIn({ webClientId: 'w' }), /falhou/);
+    assert.equal(await bridge.signIn({ webClientId: 'w' }), 'ok');
+  });
+});
+
+describe('ponte da agenda do celular', () => {
+  const cal = (granted = true) => {
+    const asked: string[] = [];
+    return {
+      asked,
+      calendar: {
+        async requestReadOnlyCalendarAccess() {
+          asked.push('read');
+          return { result: granted ? 'granted' : 'denied' };
+        },
+        async requestFullCalendarAccess() {
+          asked.push('full');
+          return { result: granted ? 'granted' : 'denied' };
+        },
+        async listCalendars() {
+          return {
+            result: [
+              { id: '2', title: 'Trabalho', color: '#f00', accountName: 'ana@empresa.com', source: { title: 'Exchange' } },
+              { id: '1', title: 'Ana', color: null, accountName: null, source: { title: 'iCloud' } },
+              { id: '3', title: 'Oculta', color: null, accountName: 'x', source: null, visible: false },
+            ],
+          };
+        },
+        async listEventsInRange() {
+          return {
+            result: [
+              { calendarId: '1', startDate: Date.parse('2026-10-14T13:00Z'), endDate: Date.parse('2026-10-14T14:00Z'), isAllDay: false, availability: 0, status: 'confirmed' },
+              { calendarId: '1', startDate: Date.parse('2026-10-15T00:00Z'), endDate: Date.parse('2026-10-16T00:00Z'), isAllDay: true, availability: 0, status: null },
+              { calendarId: '1', startDate: Date.parse('2026-10-14T16:00Z'), endDate: Date.parse('2026-10-14T17:00Z'), isAllDay: false, availability: 1, status: null },
+              { calendarId: '1', startDate: Date.parse('2026-10-14T18:00Z'), endDate: Date.parse('2026-10-14T19:00Z'), isAllDay: false, availability: 0, status: 'canceled' },
+              { calendarId: '9', startDate: Date.parse('2026-10-14T20:00Z'), endDate: Date.parse('2026-10-14T21:00Z'), isAllDay: false, availability: 0, status: null },
+            ],
+          };
+        },
+      },
+    };
+  };
+
+  it('lista as agendas visíveis com a conta, pedindo a permissão certa em cada sistema', async () => {
+    const a = cal();
+    const android = createDeviceCalendarBridge({ calendar: a.calendar, platform: () => 'android' });
+    assert.deepEqual(await android.listCalendars(), [
+      { id: '2', name: 'Trabalho', account: 'ana@empresa.com', color: '#f00' },
+      { id: '1', name: 'Ana', account: 'iCloud', color: null },
+    ]);
+    const i = cal();
+    await createDeviceCalendarBridge({ calendar: i.calendar, platform: () => 'ios' }).listCalendars();
+    assert.deepEqual([a.asked, i.asked], [['read'], ['full']]);
+  });
+
+  it('só horários ocupados com hora: sem dia inteiro, livres, cancelados nem de outra agenda', async () => {
+    const b = createDeviceCalendarBridge({ calendar: cal().calendar, platform: () => 'android' });
+    assert.deepEqual(await b.busy({ calendarIds: ['1'], from: '2026-10-13T00:00:00Z', to: '2026-10-20T00:00:00Z' }), [{ start: '2026-10-14T13:00:00.000Z', end: '2026-10-14T14:00:00.000Z' }]);
+    assert.deepEqual(await b.busy({ calendarIds: [], from: '2026-10-13T00:00:00Z', to: '2026-10-20T00:00:00Z' }), []);
+  });
+
+  it('sem permissão avisa com mensagem clara', async () => {
+    await assert.rejects(createDeviceCalendarBridge({ calendar: cal(false).calendar, platform: () => 'ios' }).listCalendars(), /Ajustes/);
   });
 });

@@ -22,6 +22,7 @@
     "@capacitor/status-bar": "^8.0.4",
     "@capgo/capacitor-social-login": "^8.7.5",
     "@capgo/native-purchases": "^8.9.6",
+    "@ebarooni/capacitor-calendar": "^8.11.0",
     "capacitor-native-video-compressor": "^1.1.2"
   },
   "devDependencies": {

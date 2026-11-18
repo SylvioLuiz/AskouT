@@ -24,6 +24,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>O AskouT usa suas fotos e vídeos para você publicar em posts, stories e conversas.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>O AskouT lê só os horários ocupados das agendas que você escolher, para mostrar na sua agenda e achar horários livres com seus amigos. Títulos e detalhes não saem do celular.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>O AskouT lê só os horários ocupados das agendas que você escolher, para mostrar na sua agenda e achar horários livres com seus amigos. Títulos e detalhes não saem do celular.</string>
 	<key>NSContactsUsageDescription</key>
 	<string>O AskouT confere quais dos seus contatos já estão no app para você seguir. Só um código de cada celular e e-mail é enviado, e sua agenda não fica guardada.</string>
 	<key>NSCameraUsageDescription</key>

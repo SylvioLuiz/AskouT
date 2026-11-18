@@ -37,6 +37,11 @@ services:
         value: 427546548243-44jukkdjh3sgl1rooj0hbs4oi21ig0a4.apps.googleusercontent.com
       - key: RESEND_API_KEY
         sync: false
+      # Sincronizar agenda (Google Agenda) e login Google no iPhone. Colar direto no Render.
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_IOS_CLIENT_ID
+        sync: false
       - key: GOOGLE_PLACES_API_KEY
         sync: false
       - key: VAPID_PUBLIC_KEY

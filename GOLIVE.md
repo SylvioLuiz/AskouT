@@ -30,10 +30,16 @@ O código está pronto e desligado: sem os IDs abaixo, os botões não aparecem.
 - [ ] Outras plataformas (Microsoft, Facebook), se quiser.
 
 ## Sincronizar agendas (celular, Google, Outlook)
-A tela de escolha existe, mas nada é importado ainda e a escolha fica salva só no aparelho.
-- [ ] Ligação real com Google Agenda e Outlook (precisa de chaves OAuth).
-- [ ] Ligação com a agenda do celular (precisa do app nativo).
-- [ ] Mover a escolha de agendas ligadas para a conta, no servidor.
+Feito em 18/11/2026 (código; não testado em aparelho nem contra o Google real). Só horários ocupados entram (nunca título), ficam na conta (`CalendarConnection`/`CalendarBusyInterval`) e contam na comparação de agendas com amigos.
+- Agenda do celular (app): plugin `@ebarooni/capacitor-calendar`, ponte `window.AskouTDeviceCalendar`; lista as agendas por conta (Google, Outlook, iCloud ligados no aparelho), a pessoa escolhe, o app manda os horários e reenvia ao abrir a agenda (no máximo a cada 30 min).
+- Google Agenda (site e app): OAuth no servidor, escopos `calendar.calendarlist.readonly` + `calendar.freebusy`; relido a cada 30 min (`CalendarSyncJob`).
+- Outlook, iCloud e outros: link iCal privado (cifrado no banco), relido a cada 30 min.
+- Sugestões: "Encontramos para você" usa o login com Google e o domínio do e-mail; no app, a agenda do celular vem primeiro.
+- [ ] Google Cloud (askout-512422): ativar Google Calendar API; no cliente web, URI de redirecionamento `https://api.askout.com.br/calendar/google/callback`; na tela de consentimento, adicionar os 2 escopos; `GOOGLE_CLIENT_SECRET` no Render.
+- [ ] Verificação do app no Google (escopos sensíveis): até aprovar, aparece "o Google não verificou este app" e há limite de 100 usuários.
+- [ ] Rodar `npx prisma migrate deploy` (migração `20261222120000_calendar_sync`).
+- [ ] Lojas: Apple pede o texto de uso da agenda (já no Info.plist); Google Play: permissão READ_CALENDAR declarada (atualizar Segurança dos dados: "Agenda", coletado, funcionalidade do app).
+- [ ] Outlook direto (Microsoft Graph, sem link iCal), se quiser no futuro.
 
 ## Outros itens já combinados
 - [ ] E-mail real: o envio pelo Resend está escrito e testado com respostas simuladas, mas NUNCA rodou contra a conta real. Falta: criar a conta no Resend, adicionar o domínio e publicar no DNS os registros que ele mostrar (SPF e DKIM; DMARC recomendado), gerar a chave, e na API de produção definir `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY` e `EMAIL_FROM`. Depois, testar cadastro e recuperação de senha com um e-mail seu (e conferir se não cai no spam no Gmail, Outlook e iCloud).
@@ -323,7 +329,7 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - `GOOGLE_CLIENT_ID` (público, não é segredo) = 427546548243-44jukkdjh3sgl1rooj0hbs4oi21ig0a4.apps.googleusercontent.com
 - A chave secreta do cliente não é usada pela API (não guardar).
 - Tela de consentimento: Externa, **publicada em produção em 2026-10-23** (escopos básicos, sem logotipo, então sem verificação). Branding com página inicial, /privacidade, /termos-de-uso e domínio askout.com.br. E-mail de suporte exibido ao usuário ainda é pessoal (sylviofox@gmail.com); trocar por suporte@askout.com.br exige um grupo do Google.
-- Login nativo (app Capacitor) exigirá clientes Android/iOS próprios depois.
+- Login nativo (app Capacitor), 18/11/2026: código pronto (`apps/mobile/src/google-bridge.ts`; no app o botão da web foi trocado pela janela nativa). **Falta no Google Cloud (projeto askout-512422):** cliente Android (br.com.askout + SHA-1 de upload, debug e Play App Signing) e cliente iOS (`GOOGLE_IOS_CLIENT_ID` no Render + URL scheme no Info.plist). Passo a passo em `apps/mobile/README.md`.
 
 ## Mapa (feito em 2026-10-23)
 - Chave MapTiler "AskouT Web" criada (plano gratuito), restrita às origens askout.com.br, *.askout.com.br e localhost (a chave é de frontend, pública por design; a restrição de origem é a proteção).

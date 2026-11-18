@@ -15,6 +15,7 @@ import { EventReminderService } from './event-reminder-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { VenueService } from './venue-service.ts';
 import { CalendarImportService } from './calendar-import-service.ts';
+import { CalendarSyncService } from './calendar-sync-service.ts';
 import { BoostService } from './boost-service.ts';
 import { BoostStatsService } from './boost-stats-service.ts';
 import { AdminService } from './admin-service.ts';
@@ -84,6 +85,7 @@ export function createCore(input: CoreInput) {
     eventReminders: new EventReminderService(deps),
     venues,
     calendarImport: new CalendarImportService(deps, venues),
+    calendarSync: new CalendarSyncService(deps),
     admin: new AdminService(deps, venues, auth, paymentsSwitch),
     meetups: new MeetupService(deps),
     scheduling: new SchedulingService(deps),

@@ -1,5 +1,5 @@
 import { createPublicKey, verify as verifySignature } from 'node:crypto';
-import type { IdentityVerifier } from '../../core/ports.ts';
+import type { IdentityVerifier, SocialProviderInfo } from '../../core/ports.ts';
 import type { ExternalProvider, IdentityClaims } from '../../core/types.ts';
 
 interface Jwk {
@@ -26,6 +26,11 @@ const CLOCK_SKEW_S = 60;
 export interface OidcVerifierOptions {
   /** ID do aplicativo no Google (client ID web). Sem ele, o login Google fica desligado. */
   googleClientId?: string;
+  /**
+   * Cliente OAuth "iOS" do Google, para o login nativo no iPhone. Vai para o app (que precisa dele para abrir a janela do Google)
+   * e também vale como público do token, por garantia: o app pede o token para o cliente web (`iOSServerClientId`).
+   */
+  googleIosClientId?: string;
   /** ID de serviço da Apple ("Services ID"). Sem ele, o login Apple fica desligado. */
   appleClientId?: string;
   /** ID do app nativo na Apple (bundle id, ex.: br.com.askout). O login nativo da Apple assina o token para ele, não para o Services ID. */
@@ -56,6 +61,7 @@ async function defaultFetchJson(url: string): Promise<unknown> {
 export class OidcIdentityVerifier implements IdentityVerifier {
   private readonly clients: Partial<Record<ExternalProvider, string>>;
   private readonly extraAudiences: Partial<Record<ExternalProvider, string[]>> = {};
+  private readonly googleIosClientId: string | undefined;
   private readonly fetchJson: (url: string) => Promise<unknown>;
   private readonly now: () => Date;
   private readonly cache = new Map<ExternalProvider, { keys: Jwk[]; at: number }>();
@@ -64,13 +70,19 @@ export class OidcIdentityVerifier implements IdentityVerifier {
     this.clients = {};
     if (options.googleClientId) this.clients.GOOGLE = options.googleClientId;
     if (options.appleClientId) this.clients.APPLE = options.appleClientId;
+    if (options.googleClientId && options.googleIosClientId && options.googleIosClientId !== options.googleClientId) {
+      this.googleIosClientId = options.googleIosClientId;
+      this.extraAudiences.GOOGLE = [options.googleIosClientId];
+    }
     if (options.appleClientId && options.appleAppId && options.appleAppId !== options.appleClientId) this.extraAudiences.APPLE = [options.appleAppId];
     this.fetchJson = options.fetchJson ?? defaultFetchJson;
     this.now = options.now ?? (() => new Date());
   }
 
-  providers(): { provider: ExternalProvider; clientId: string }[] {
-    return (Object.entries(this.clients) as [ExternalProvider, string][]).map(([provider, clientId]) => ({ provider, clientId }));
+  providers(): SocialProviderInfo[] {
+    return (Object.entries(this.clients) as [ExternalProvider, string][]).map(([provider, clientId]) =>
+      provider === 'GOOGLE' && this.googleIosClientId ? { provider, clientId, iosClientId: this.googleIosClientId } : { provider, clientId },
+    );
   }
 
   async verify(provider: ExternalProvider, idToken: string): Promise<IdentityClaims | undefined> {

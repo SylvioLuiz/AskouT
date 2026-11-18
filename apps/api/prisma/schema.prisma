@@ -36,6 +36,8 @@ enum AvailabilityState {
 enum CalendarProvider {
   GOOGLE
   APPLE
+  DEVICE // agenda do celular (lida pelo app; traz as contas Google, Outlook, iCloud ligadas no aparelho)
+  ICS // link iCal privado (Outlook, iCloud, Google ou qualquer agenda que publique .ics)
 }
 
 enum CalendarConnectionStatus {
@@ -298,6 +300,11 @@ model CalendarConnection {
   provider       CalendarProvider
   status         CalendarConnectionStatus @default(ACTIVE)
   refreshTokenEnc String? // criptografado em repouso; nunca em texto puro
+  sourceEnc      String? // link iCal (ICS), criptografado: o link privado dá acesso à agenda
+  label          String? // nome para a pessoa reconhecer (ex.: "Google Agenda", "Agenda do celular")
+  accountEmail   String? // conta Google ligada (uma conexão por conta)
+  calendars      Json? // agendas da conexão: [{ id, name, selected, color, account }]
+  lastError      String?
   lastSyncAt     DateTime?
   createdAt      DateTime                 @default(now())
 
@@ -317,6 +324,7 @@ model CalendarBusyInterval {
   connection CalendarConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   @@index([connectionId, startsAt])
+  @@index([startsAt])
 }
 
 model Group {

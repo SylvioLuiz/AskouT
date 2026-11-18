@@ -66,3 +66,14 @@ test('Apple: token do app nativo (bundle id) vale só se o bundle id foi configu
   assert.equal(await semApp.verify('APPLE', token({ ...apple, aud: 'br.com.app' })), undefined, 'sem configurar, bundle id não vale');
   assert.deepEqual(comApp.providers(), [{ provider: 'APPLE', clientId: 'cli-apple' }], 'o site continua recebendo só o Services ID');
 });
+
+test('Google: cliente iOS vai para o app e vale como público; sem ele, só o cliente web', async () => {
+  const fetchJson = async () => ({ keys: [jwk] });
+  const comIos = new OidcIdentityVerifier({ googleClientId: 'cli-google', googleIosClientId: 'cli-ios', now: () => NOW, fetchJson });
+  assert.deepEqual(comIos.providers(), [{ provider: 'GOOGLE', clientId: 'cli-google', iosClientId: 'cli-ios' }]);
+  assert.equal((await comIos.verify('GOOGLE', token({ ...good, aud: 'cli-ios' })))?.subject, '123', 'token do iPhone');
+  assert.equal((await comIos.verify('GOOGLE', token({ ...good, aud: 'cli-google' })))?.subject, '123', 'token do site/Android');
+  assert.equal(await comIos.verify('GOOGLE', token({ ...good, aud: 'outro' })), undefined);
+  const semIos = new OidcIdentityVerifier({ googleClientId: 'cli-google', now: () => NOW, fetchJson });
+  assert.equal(await semIos.verify('GOOGLE', token({ ...good, aud: 'cli-ios' })), undefined);
+});

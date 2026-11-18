@@ -1,5 +1,6 @@
 import { errorFromResponse, networkError } from './errors.ts';
 import type { ConfirmationAnswer, PollInput, PollSummary, PollView, VoteStatus } from './date-poll.ts';
+import type { BusyBlock, CalendarChoice, CalendarConnection, CalendarOverview } from './calendar-sync.ts';
 import type { DwellEntry } from './dwell.ts';
 import type { BoostStatEntry } from './boost-stats.ts';
 import type { ActivityFilter, ActivityPage } from './activity-log.ts';
@@ -346,6 +347,16 @@ export function createApi(deps: ApiDeps) {
       request<Slot[]>('GET', `/me/availability?from=${id(from)}&to=${id(to)}`),
     addSlot: (input: SlotInput) => request<Slot>('POST', '/me/availability', { body: input }),
     removeSlot: (slotId: string) => request<{ removed: boolean }>('DELETE', `/me/availability/${id(slotId)}`),
+
+    // Sincronizar agendas (celular, Google Agenda, links iCal): só horários ocupados
+    calendarOverview: () => request<CalendarOverview>('GET', '/me/calendars'),
+    calendarBusy: (from: string, to: string) => request<BusyBlock[]>('GET', `/me/calendars/busy?from=${id(from)}&to=${id(to)}`),
+    saveDeviceCalendars: (input: { calendars: CalendarChoice[]; intervals: { start: string; end: string }[] }) => request<CalendarConnection>('PUT', '/me/calendars/device', { body: input }),
+    addIcsCalendar: (input: { url: string; label?: string }) => request<CalendarConnection>('POST', '/me/calendars/ics', { body: input }),
+    startGoogleCalendar: (from: 'web' | 'app') => request<{ url: string }>('POST', '/me/calendars/google/start', { body: { from } }),
+    setCalendarSelection: (connectionId: string, calendarIds: string[]) => request<CalendarConnection>('PUT', `/me/calendars/${id(connectionId)}/selection`, { body: { calendarIds } }),
+    syncMyCalendar: (connectionId: string) => request<CalendarConnection>('POST', `/me/calendars/${id(connectionId)}/sync`),
+    removeMyCalendar: (connectionId: string) => request<void>('DELETE', `/me/calendars/${id(connectionId)}`),
 
     // Flash
     flashStatus: () => request<FlashStatus>('GET', '/me/flash'),

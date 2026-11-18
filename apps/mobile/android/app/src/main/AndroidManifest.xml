@@ -54,6 +54,8 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Achar amigos na agenda (só celulares e e-mails, que viram código antes de sair do aparelho). -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Sincronizar agendas: lê só os horários ocupados das agendas que a pessoa escolher. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 </manifest>
