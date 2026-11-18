@@ -3,11 +3,11 @@ import { addDays, startOfDay } from './agenda.ts';
 
 /**
  * Sincronizar agendas, como nos apps de agenda: a agenda do celular (que já reúne Google, Outlook e iCloud ligados no aparelho),
- * a Google Agenda (permissão do Google) e links iCal (Outlook, iCloud e outras). Só horários ocupados entram.
+ * a Google Agenda e o Outlook (login na conta). Tudo direto, sem colar link. Só horários ocupados entram.
  */
 
-export type CalendarSource = 'GOOGLE' | 'DEVICE' | 'ICS';
-export type CalendarOptionKind = 'DEVICE' | 'GOOGLE' | 'OUTLOOK' | 'ICLOUD' | 'ICS';
+export type CalendarSource = 'GOOGLE' | 'MICROSOFT' | 'DEVICE' | 'ICS';
+export type CalendarOptionKind = 'DEVICE' | 'GOOGLE' | 'OUTLOOK' | 'ICLOUD';
 
 export interface CalendarChoice {
   id: string;
@@ -32,6 +32,7 @@ export interface CalendarOverview {
   connections: CalendarConnection[];
   suggestions: { kind: 'GOOGLE' | 'OUTLOOK' | 'ICLOUD'; reason: 'login' | 'email' }[];
   googleAvailable: boolean;
+  microsoftAvailable: boolean;
 }
 
 export interface BusyBlock {
@@ -60,45 +61,55 @@ export function deviceCalendarBridge(host: unknown = globalThis): DeviceCalendar
   return b && typeof b.listCalendars === 'function' && typeof b.busy === 'function' ? (b as DeviceCalendarBridge) : undefined;
 }
 
+export type CalendarLogoKind = 'DEVICE' | 'GOOGLE' | 'OUTLOOK' | 'ICLOUD' | 'OTHER';
+
 export interface CalendarOption {
   kind: CalendarOptionKind;
+  logo: CalendarLogoKind;
   name: string;
   hint: string;
   /** Detectada: provavelmente a pessoa tem (está no celular, entrou com o Google, e-mail do provedor). */
   detected: boolean;
-  /** Como liga: no próprio app (celular), pela permissão do Google ou colando o link iCal. */
-  via: 'device' | 'google' | 'ics';
+  /** Como liga, sempre direto: a agenda do aparelho ou o login na conta (Google, Microsoft). */
+  via: 'device' | 'google' | 'microsoft';
+  /** Falso quando o servidor ainda não tem a chave daquele provedor ("em breve"). */
+  available: boolean;
 }
 
-/** Opções na ordem certa: as detectadas primeiro. A agenda do celular só aparece dentro do app. */
-export function calendarOptions(overview: Pick<CalendarOverview, 'suggestions' | 'googleAvailable' | 'connections'>, inApp: boolean): CalendarOption[] {
+/**
+ * Opções na ordem certa: as detectadas primeiro. Tudo é ligação direta (sem colar link).
+ * A agenda do celular e o iCloud (que no iPhone vive na agenda do aparelho) só aparecem dentro do app.
+ */
+export function calendarOptions(overview: Pick<CalendarOverview, 'suggestions' | 'googleAvailable' | 'microsoftAvailable' | 'connections'>, inApp: boolean): CalendarOption[] {
   const detected = new Set<CalendarOptionKind>(overview.suggestions.map((s) => s.kind));
   if (inApp) detected.add('DEVICE');
   // Já ligada: não fica em "Encontramos" (dá para ligar outra conta pelas outras opções).
   if (overview.connections.some((c) => c.provider === 'GOOGLE')) detected.delete('GOOGLE');
-  const list: CalendarOption[] = [];
-  if (inApp) list.push({ kind: 'DEVICE', name: t('Agenda do celular'), hint: t('Google, Outlook, iCloud e outras contas já ligadas no aparelho'), detected: true, via: 'device' });
-  list.push({ kind: 'GOOGLE', name: t('Google Agenda'), hint: overview.googleAvailable ? t('Entre com sua conta Google e escolha as agendas') : t('Cole o endereço secreto em formato iCal'), detected: detected.has('GOOGLE'), via: overview.googleAvailable ? 'google' : 'ics' });
-  list.push({ kind: 'OUTLOOK', name: t('Outlook'), hint: t('Cole o link de publicação da agenda (ICS)'), detected: detected.has('OUTLOOK'), via: 'ics' });
-  list.push({ kind: 'ICLOUD', name: t('iCloud'), hint: t('Cole o link da agenda pública'), detected: detected.has('ICLOUD'), via: 'ics' });
-  list.push({ kind: 'ICS', name: t('Outro link iCal'), hint: t('Qualquer agenda que tenha link .ics ou webcal://'), detected: false, via: 'ics' });
-  // Celular já ligado não precisa aparecer de novo como opção.
+  if (overview.connections.some((c) => c.provider === 'MICROSOFT')) detected.delete('OUTLOOK');
   const hasDevice = overview.connections.some((c) => c.provider === 'DEVICE');
-  return list.filter((o) => !(o.kind === 'DEVICE' && hasDevice)).sort((a, b) => Number(b.detected) - Number(a.detected));
+  const list: CalendarOption[] = [];
+  if (inApp && !hasDevice) list.push({ kind: 'DEVICE', logo: 'DEVICE', name: t('Agenda do celular'), hint: t('Todas as contas do aparelho: iCloud, Google, Outlook e outras'), detected: true, via: 'device', available: true });
+  list.push({ kind: 'GOOGLE', logo: 'GOOGLE', name: t('Google Agenda'), hint: t('Entre com sua conta Google'), detected: detected.has('GOOGLE'), via: 'google', available: overview.googleAvailable });
+  list.push({ kind: 'OUTLOOK', logo: 'OUTLOOK', name: t('Outlook'), hint: t('Outlook.com, Hotmail ou Microsoft 365'), detected: detected.has('OUTLOOK'), via: 'microsoft', available: overview.microsoftAvailable });
+  if (inApp) list.push({ kind: 'ICLOUD', logo: 'ICLOUD', name: t('iCloud'), hint: t('Pela agenda do celular'), detected: detected.has('ICLOUD'), via: 'device', available: true });
+  return list.sort((a, b) => Number(b.detected && b.available) - Number(a.detected && a.available));
 }
 
-/** Passo a passo curto para achar o link iCal em cada provedor. */
-export function icsHelp(kind: CalendarOptionKind): string[] {
-  switch (kind) {
-    case 'GOOGLE':
-      return [t('No computador, abra a Google Agenda e vá em Configurações.'), t('Clique na agenda, em "Integrar agenda".'), t('Copie o "Endereço secreto no formato iCal" e cole aqui.')];
-    case 'OUTLOOK':
-      return [t('No Outlook na web, abra Configurações > Calendário > Calendários compartilhados.'), t('Em "Publicar um calendário", escolha a agenda e "Pode ver quando estou ocupado".'), t('Clique em Publicar e copie o link ICS.')];
-    case 'ICLOUD':
-      return [t('No app Calendário do iPhone, toque em Calendários e no (i) da agenda.'), t('Ative "Calendário público" e toque em Compartilhar Link.'), t('Copie o link (webcal://) e cole aqui.')];
-    default:
-      return [t('Cole o endereço da agenda em formato iCal (.ics ou webcal://).')];
-  }
+/** Ícone pela conta da agenda (no celular, o nome da conta diz de onde ela vem). */
+export function logoForAccount(account: string | null | undefined): CalendarLogoKind {
+  const a = (account ?? '').toLowerCase();
+  if (/gmail|google/.test(a)) return 'GOOGLE';
+  if (/outlook|hotmail|live\.|msn|exchange|office|microsoft/.test(a)) return 'OUTLOOK';
+  if (/icloud|me\.com|mac\.com/.test(a)) return 'ICLOUD';
+  return 'OTHER';
+}
+
+/** Ícone de uma agenda já ligada. */
+export function logoForConnection(c: Pick<CalendarConnection, 'provider' | 'label'>): CalendarLogoKind {
+  if (c.provider === 'GOOGLE') return 'GOOGLE';
+  if (c.provider === 'MICROSOFT') return 'OUTLOOK';
+  if (c.provider === 'DEVICE') return 'DEVICE';
+  return logoForAccount(c.label);
 }
 
 /** Agendas agrupadas por conta, como no app de agenda do celular. */

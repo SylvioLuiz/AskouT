@@ -152,3 +152,19 @@ test('Google tirou o acesso: o job marca para reconectar e os horários saem; o 
   assert.notEqual((await w.core.availability.compatibility(ana!, q)).participants.find((p) => !p.isMe)?.status, 'unavailable');
   assert.deepEqual(await w.core.calendarSync.runDue(), { synced: 0 }, 'revogada não é relida');
 });
+
+test('Outlook (Microsoft): mesmo fluxo, state de um provedor não vale no outro', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  w.microsoftCalendar!.email = 'ana@outlook.com';
+  w.microsoftCalendar!.busy.set('primary@gmail.com', [{ start: T('2026-10-15T20:00Z'), end: T('2026-10-15T21:00Z') }]);
+  const { url } = await w.core.calendarSync.oauthStart(ana!, 'MICROSOFT', 'web');
+  const state = new URL(url).searchParams.get('state')!;
+  assert.equal((await w.core.calendarSync.oauthCallback('GOOGLE', { code: 'codigo-bom', state })).ok, false, 'state do Outlook no retorno do Google');
+  assert.deepEqual(await w.core.calendarSync.oauthCallback('MICROSOFT', { code: 'codigo-bom', state }), { from: 'web', ok: true });
+  const o = await w.core.calendarSync.overview(ana!);
+  assert.equal(o.microsoftAvailable, true);
+  assert.equal(o.connections[0]!.provider, 'MICROSOFT');
+  assert.equal(o.connections[0]!.label, 'Outlook · ana@outlook.com');
+  assert.equal((await w.core.calendarSync.busy(ana!, '2026-10-13T00:00:00Z', '2026-10-20T00:00:00Z')).length, 1);
+});

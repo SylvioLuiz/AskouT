@@ -210,7 +210,11 @@ export function AgendaScreen() {
   useEffect(() => {
     const result = search.get('agendas');
     if (!result) return;
-    setSyncNotice(result === 'google' ? { tone: 'ok', text: t('Google Agenda ligada. Escolha abaixo quais agendas entram.') } : { tone: 'error', text: search.get('motivo') || t('Não foi possível ligar a agenda.') });
+    setSyncNotice(
+      result === 'google' || result === 'microsoft'
+        ? { tone: 'ok', text: t('{name} conectada. Escolha abaixo quais agendas entram.', { name: result === 'google' ? 'Google Agenda' : 'Outlook' }) }
+        : { tone: 'error', text: search.get('motivo') || t('Não foi possível ligar a agenda.') },
+    );
     setSyncing(true);
     navigate('/agenda', { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps

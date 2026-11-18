@@ -15,9 +15,9 @@ interface RedirectResponse {
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** Página curta para quem ligou a Google Agenda pelo app: o login abriu no navegador do celular, então é só voltar ao app. */
-function backToAppPage(ok: boolean, message: string | undefined): string {
-  const title = ok ? 'Google Agenda ligada' : 'Não deu certo';
+/** Página curta para quem ligou uma agenda pelo app: o login abriu no navegador do celular, então é só voltar ao app. */
+function backToAppPage(ok: boolean, name: string, message: string | undefined): string {
+  const title = ok ? `${name} ligada` : 'Não deu certo';
   const text = ok ? 'Pronto! Pode voltar ao AskouT: seus horários ocupados já aparecem na agenda.' : message ?? 'Tente de novo pelo app.';
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>
 <style>body{font-family:system-ui,-apple-system,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;box-sizing:border-box;background:#fff;color:#1d1d1f;text-align:center}@media(prefers-color-scheme:dark){body{background:#111;color:#f5f5f7}}h1{font-size:1.4rem}p{max-width:22rem;line-height:1.5}</style>
@@ -61,23 +61,39 @@ export class CalendarsController {
   @Post('me/calendars/google/start')
   @HttpCode(200)
   googleStart(@CurrentActor() actor: Actor, @Body() body: unknown) {
-    return this.core.calendarSync.googleStart(actor.userId, asBody(body)['from']);
+    return this.core.calendarSync.oauthStart(actor.userId, 'GOOGLE', asBody(body)['from']);
   }
 
-  /** Endereço de retorno cadastrado no Google (GOOGLE_CALENDAR_REDIRECT_URI). Quem chega aqui é o navegador, sem a sessão do app. */
+  @Post('me/calendars/microsoft/start')
+  @HttpCode(200)
+  microsoftStart(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.calendarSync.oauthStart(actor.userId, 'MICROSOFT', asBody(body)['from']);
+  }
+
+  /** Endereços de retorno cadastrados no Google e na Microsoft. Quem chega aqui é o navegador, sem a sessão do app. */
   @Public()
   @Get('calendar/google/callback')
   async googleCallback(@Query('code') code: unknown, @Query('state') state: unknown, @Query('error') error: unknown, @Res() res: RedirectResponse) {
-    const r = await this.core.calendarSync.googleCallback({ code, state, error });
+    await this.finish('GOOGLE', { code, state, error }, res);
+  }
+
+  @Public()
+  @Get('calendar/microsoft/callback')
+  async microsoftCallback(@Query('code') code: unknown, @Query('state') state: unknown, @Query('error') error: unknown, @Res() res: RedirectResponse) {
+    await this.finish('MICROSOFT', { code, state, error }, res);
+  }
+
+  private async finish(provider: 'GOOGLE' | 'MICROSOFT', query: { code: unknown; state: unknown; error: unknown }, res: RedirectResponse) {
+    const r = await this.core.calendarSync.oauthCallback(provider, query);
+    const name = provider === 'GOOGLE' ? 'Google Agenda' : 'Outlook';
     if (r.from === 'app') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store');
-      res.status(r.ok ? 200 : 400).send(backToAppPage(r.ok, r.message));
+      res.status(r.ok ? 200 : 400).send(backToAppPage(r.ok, name, r.message));
       return;
     }
-    const base = this.config.googleCalendar?.webBaseUrl ?? 'https://askout.com.br';
-    const q = new URLSearchParams(r.ok ? { agendas: 'google' } : { agendas: 'erro', motivo: r.message ?? '' });
-    res.redirect(302, `${base}/agenda?${q.toString()}`);
+    const q = new URLSearchParams(r.ok ? { agendas: provider.toLowerCase() } : { agendas: 'erro', motivo: r.message ?? '' });
+    res.redirect(302, `${this.config.webBaseUrl}/agenda?${q.toString()}`);
   }
 
   @Put('me/calendars/:id/selection')

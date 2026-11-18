@@ -37,6 +37,7 @@ enum CalendarProvider {
   GOOGLE
   APPLE
   DEVICE // agenda do celular (lida pelo app; traz as contas Google, Outlook, iCloud ligadas no aparelho)
+  MICROSOFT // Outlook / Microsoft 365 (OAuth, Microsoft Graph)
   ICS // link iCal privado (Outlook, iCloud, Google ou qualquer agenda que publique .ics)
 }
 

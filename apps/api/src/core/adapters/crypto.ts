@@ -275,13 +275,13 @@ export class HmacOAuthStateTokens implements OAuthStateTokens {
     this.nowMs = options.nowMs ?? Date.now;
   }
 
-  sign(payload: { userId: string; from: 'web' | 'app' }): string {
+  sign(payload: { userId: string; from: 'web' | 'app'; provider?: 'GOOGLE' | 'MICROSOFT' }): string {
     const exp = Math.floor(this.nowMs() / 1000) + this.ttlSeconds;
-    const body = Buffer.from(JSON.stringify({ sub: payload.userId, f: payload.from, exp, n: randomBytes(8).toString('base64url') })).toString('base64url');
+    const body = Buffer.from(JSON.stringify({ sub: payload.userId, f: payload.from, p: payload.provider ?? 'GOOGLE', exp, n: randomBytes(8).toString('base64url') })).toString('base64url');
     return `${body}.${createHmac('sha256', this.key).update(body).digest('base64url')}`;
   }
 
-  verify(token: string): { userId: string; from: 'web' | 'app' } | undefined {
+  verify(token: string): { userId: string; from: 'web' | 'app'; provider: 'GOOGLE' | 'MICROSOFT' } | undefined {
     if (typeof token !== 'string' || token.length > 1000) return undefined;
     const [body, signature] = token.split('.');
     if (!body || !signature) return undefined;
@@ -289,9 +289,9 @@ export class HmacOAuthStateTokens implements OAuthStateTokens {
     const received = Buffer.from(signature);
     if (expected.length !== received.length || !timingSafeEqual(expected, received)) return undefined;
     try {
-      const { sub, f, exp } = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as Record<string, unknown>;
+      const { sub, f, p, exp } = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as Record<string, unknown>;
       if (typeof sub !== 'string' || sub === '' || typeof exp !== 'number' || Math.floor(this.nowMs() / 1000) >= exp) return undefined;
-      return { userId: sub, from: f === 'app' ? 'app' : 'web' };
+      return { userId: sub, from: f === 'app' ? 'app' : 'web', provider: p === 'MICROSOFT' ? 'MICROSOFT' : 'GOOGLE' };
     } catch {
       return undefined;
     }

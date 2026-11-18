@@ -1,26 +1,32 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { busyOnDay, calendarOptions, deviceCalendarBridge, deviceResyncDue, groupByAccount, icsHelp, syncWindow } from './calendar-sync.ts';
+import { busyOnDay, calendarOptions, deviceCalendarBridge, deviceResyncDue, groupByAccount, logoForAccount, logoForConnection, syncWindow } from './calendar-sync.ts';
 
-const base = { suggestions: [], googleAvailable: true, connections: [] };
+const base = { suggestions: [], googleAvailable: true, microsoftAvailable: true, connections: [] };
+const conn = (provider: 'GOOGLE' | 'MICROSOFT' | 'DEVICE') => ({ id: provider, provider, status: 'ACTIVE' as const, label: 'x', accountEmail: null, calendars: [], lastSyncAt: null, lastError: null });
 
-test('opções: no app a agenda do celular vem primeiro; detectadas antes das outras', () => {
-  assert.deepEqual(calendarOptions(base, true).map((o) => o.kind), ['DEVICE', 'GOOGLE', 'OUTLOOK', 'ICLOUD', 'ICS']);
-  assert.deepEqual(calendarOptions(base, false).map((o) => o.kind), ['GOOGLE', 'OUTLOOK', 'ICLOUD', 'ICS'], 'no site não há agenda do celular');
+test('opções só diretas: no app, celular e iCloud; no site, Google e Outlook; detectadas primeiro', () => {
+  assert.deepEqual(calendarOptions(base, true).map((o) => o.kind), ['DEVICE', 'GOOGLE', 'OUTLOOK', 'ICLOUD']);
+  assert.deepEqual(calendarOptions(base, false).map((o) => o.kind), ['GOOGLE', 'OUTLOOK']);
+  assert.ok(calendarOptions(base, true).every((o) => o.via !== ('ics' as never)), 'nada de colar link');
   const outlook = calendarOptions({ ...base, suggestions: [{ kind: 'OUTLOOK', reason: 'email' }] }, false);
-  assert.deepEqual(outlook.map((o) => [o.kind, o.detected]).slice(0, 2), [['OUTLOOK', true], ['GOOGLE', false]]);
-  const semOauth = calendarOptions({ ...base, googleAvailable: false }, false);
-  assert.equal(semOauth.find((o) => o.kind === 'GOOGLE')?.via, 'ics', 'sem OAuth, Google pelo link iCal');
-  const comCelular = calendarOptions({ ...base, connections: [{ id: '1', provider: 'DEVICE', status: 'ACTIVE', label: 'x', accountEmail: null, calendars: [], lastSyncAt: null, lastError: null }] }, true);
-  assert.ok(!comCelular.some((o) => o.kind === 'DEVICE'), 'celular já ligado não repete');
-  const comGoogle = calendarOptions({ ...base, suggestions: [{ kind: 'GOOGLE', reason: 'login' }], connections: [{ id: '2', provider: 'GOOGLE', status: 'ACTIVE', label: 'g', accountEmail: 'a@gmail.com', calendars: [], lastSyncAt: null, lastError: null }] }, false);
+  assert.deepEqual(outlook.map((o) => [o.kind, o.detected]), [['OUTLOOK', true], ['GOOGLE', false]]);
+  const semChave = calendarOptions({ ...base, googleAvailable: false, suggestions: [{ kind: 'GOOGLE', reason: 'login' }] }, false);
+  assert.equal(semChave.find((o) => o.kind === 'GOOGLE')?.available, false, 'sem chave: em breve');
+  assert.ok(!calendarOptions({ ...base, connections: [conn('DEVICE')] }, true).some((o) => o.kind === 'DEVICE'), 'celular já ligado não repete');
+  const comGoogle = calendarOptions({ ...base, suggestions: [{ kind: 'GOOGLE', reason: 'login' }], connections: [conn('GOOGLE')] }, false);
   assert.equal(comGoogle.find((o) => o.kind === 'GOOGLE')?.detected, false, 'Google já ligado sai de "Encontramos"');
 });
 
-test('agrupa por conta e ajuda tem passos', () => {
+test('ícone pela conta e pela conexão; agrupa por conta', () => {
+  assert.equal(logoForAccount('ana@gmail.com'), 'GOOGLE');
+  assert.equal(logoForAccount('Exchange'), 'OUTLOOK');
+  assert.equal(logoForAccount('ana@hotmail.com'), 'OUTLOOK');
+  assert.equal(logoForAccount('iCloud'), 'ICLOUD');
+  assert.equal(logoForAccount(null), 'OTHER');
+  assert.equal(logoForConnection(conn('MICROSOFT')), 'OUTLOOK');
   const g = groupByAccount([{ id: '1', account: 'ana@gmail.com' }, { id: '2', account: null }, { id: '3', account: 'ana@gmail.com' }]);
   assert.deepEqual(g.map((x) => [x.account, x.items.length]), [['ana@gmail.com', 2], ['Neste aparelho', 1]]);
-  assert.equal(icsHelp('OUTLOOK').length, 3);
 });
 
 test('janela, reenvio do celular e ocupados do dia', () => {

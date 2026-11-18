@@ -49,6 +49,7 @@ import { ConsoleEmailSender } from './console-email-sender.ts';
 import { ResendEmailSender } from '../infra/email/resend-email-sender.ts';
 import { HttpCalendarFetcher } from '../infra/calendar/http-calendar-fetcher.ts';
 import { HttpGoogleCalendarClient } from '../infra/google/google-calendar-client.ts';
+import { GraphMicrosoftCalendarClient } from '../infra/microsoft/microsoft-calendar-client.ts';
 import { PrismaPersonalCalendarRepository } from '../infra/prisma/prisma-personal-calendar.repository.ts';
 import type { AppConfig } from './support/config.ts';
 import { PhotoSigner } from './support/photo-signing.ts';
@@ -96,6 +97,7 @@ export const coreProvider = {
       calendarFetcher: new HttpCalendarFetcher(),
       personalCalendars: new PrismaPersonalCalendarRepository(prisma),
       ...(config.googleCalendar ? { googleCalendar: new HttpGoogleCalendarClient(config.googleCalendar) } : {}),
+      ...(config.microsoftCalendar ? { microsoftCalendar: new GraphMicrosoftCalendarClient(config.microsoftCalendar) } : {}),
       oauthStates: new HmacOAuthStateTokens({ secret: config.codeSecret }),
       admin: new PrismaAdminRepository(prisma),
       placeSource: google ? new FallbackPlaceSource(google, new OverpassPlaceSource({ contact: config.osmContact })) : new OverpassPlaceSource({ contact: config.osmContact }),

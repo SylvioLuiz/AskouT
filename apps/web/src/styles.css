@@ -4894,6 +4894,20 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .calsync__pick[aria-pressed='true'] { border-color: var(--brand); color: var(--brand-text); }
 .calsync__note { font-size: 0.8125rem; margin-bottom: 12px; }
 .calsync__section { margin-top: 16px; }
+/* Lista no jeito dos apps de agenda: ícone do app, nome e "Conectar". */
+.calsync__list { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; }
+.calsync__list > li + li { border-top: 1px solid var(--line); }
+.calsync__row-btn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 14px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.calsync__row-btn:disabled { cursor: default; }
+.calsync__row-btn:disabled .callogo { filter: grayscale(1); opacity: 0.55; }
+.calsync__row-btn:focus-visible { outline: 3px solid var(--brand-text); outline-offset: -3px; }
+.calsync__cta { flex: none; padding: 7px 14px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 0.8125rem; font-weight: 700; white-space: nowrap; }
+.callogo { flex: none; display: block; border-radius: 10px; }
+.calsync__conn { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.calsync__conn--warn { background: color-mix(in srgb, var(--bad) 6%, transparent); }
+.calsync__conn-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.calsync__ok { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--ok); color: #fff; font-size: 0.875rem; font-weight: 700; }
+.calsync__account { display: flex; align-items: center; gap: 8px; }
 .calsync__heading { margin: 0 0 4px; font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted, inherit); }
 .calsync__item--col { flex-direction: column; align-items: stretch; }
 .calsync__item--warn { border-color: var(--bad); }
