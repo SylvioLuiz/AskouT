@@ -75,6 +75,7 @@ import type {
   NotificationList,
   PushTestResult,
   PostedEventsPage,
+  AttendedEventsPage,
   PostComment,
   PostCommentsPage,
   PostEdit,
@@ -250,6 +251,9 @@ export function createApi(deps: ApiDeps) {
     getPhone: () => request<{ phone: string | null }>('GET', '/profiles/me/phone'),
     setPhone: (phone: string | null) => request<{ phone: string | null }>('PUT', '/profiles/me/phone', { body: { phone } }),
     profileEvents: (username: string, page?: PageRequest) => request<PostedEventsPage>('GET', `/profiles/${id(username)}/events${pageQuery(page)}`),
+    attendedEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/attended${pageQuery(page)}`),
+    setAttendedVisibility: (attendedEventsPublic: boolean) =>
+      request<{ attendedEventsPublic: boolean }>('PATCH', '/profiles/me/attended-visibility', { body: { attendedEventsPublic } }),
     postEvent: (eventId: string) => request<{ posted: true }>('POST', `/events/${id(eventId)}/post`),
     unpostEvent: (eventId: string) => request<{ posted: false }>('DELETE', `/events/${id(eventId)}/post`),
     sendGif: (conversationId: string, gif: CommentGif, replyToId?: string) =>

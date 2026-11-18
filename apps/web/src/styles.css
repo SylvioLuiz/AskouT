@@ -3644,6 +3644,9 @@ a.actlog__row:hover { background: var(--surface); }
 .tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); margin: 6px 0 14px; }
 .tabs__tab { padding: 12px 8px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); font-weight: 700; cursor: pointer; }
 .tabs__tab--on { color: var(--ink); border-bottom-color: var(--brand); }
+.tabs--3 { grid-template-columns: repeat(3, 1fr); }
+.tabs__label { display: inline-flex; align-items: center; gap: 4px; }
+.tabs__label svg { width: 14px; height: 14px; flex: none; }
 
 .postlist { display: flex; flex-direction: column; gap: 22px; }
 .post { display: flex; flex-direction: column; gap: 8px; }

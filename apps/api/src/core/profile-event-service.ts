@@ -19,7 +19,7 @@ export interface PostedEventsPage {
   offset: number;
 }
 
-function parsePage(raw: { limit?: unknown; offset?: unknown }): { limit: number; offset: number } {
+export function parsePage(raw: { limit?: unknown; offset?: unknown }): { limit: number; offset: number } {
   const num = (v: unknown, def: number, min: number, max: number, field: string) => {
     if (v === undefined || v === null || v === '') return def;
     const n = typeof v === 'number' ? v : typeof v === 'string' && /^\d{1,9}$/.test(v) ? Number(v) : Number.NaN;
