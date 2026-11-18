@@ -119,7 +119,7 @@ export class OidcIdentityVerifier implements IdentityVerifier {
     const email = typeof payload['email'] === 'string' && payload['email'] !== '' ? payload['email'] : null;
     // O Google manda booleano; a Apple às vezes manda a palavra "true".
     const verified = payload['email_verified'] === true || payload['email_verified'] === 'true';
-    return { subject: sub, email, emailVerified: email !== null && verified, name: typeof payload['name'] === 'string' ? payload['name'] : null };
+    return { subject: sub, email, emailVerified: email !== null && verified, name: typeof payload['name'] === 'string' ? payload['name'] : null, ...(typeof payload['picture'] === 'string' && payload['picture'].startsWith('https://') ? { picture: payload['picture'] } : {}) };
   }
 
   private async findKey(provider: ExternalProvider, kid: string): Promise<Jwk | undefined> {

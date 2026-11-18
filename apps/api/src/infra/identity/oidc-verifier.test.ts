@@ -23,6 +23,8 @@ function make(fetches: { n: number } = { n: 0 }) {
 test('aceita token válido do Google e devolve o que a plataforma garante', async () => {
   const claims = await make().verify('GOOGLE', token(good));
   assert.deepEqual(claims, { subject: '123', email: 'ana@exemplo.com', emailVerified: true, name: 'Ana' });
+  const withPic = await make().verify('GOOGLE', token({ ...good, picture: 'https://lh3.googleusercontent.com/a/x=s96-c' }));
+  assert.equal(withPic?.picture, 'https://lh3.googleusercontent.com/a/x=s96-c', 'traz a foto do perfil Google');
 });
 
 test('recusa assinatura falsa, aplicativo errado, emissor errado, expirado e algoritmo diferente', async () => {

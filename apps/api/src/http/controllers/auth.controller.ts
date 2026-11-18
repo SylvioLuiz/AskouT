@@ -1,10 +1,12 @@
-import { Body, Controller, Get, HttpCode, Inject, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
-import { CurrentActor, Public } from '../decorators.ts';
+import { AllowPendingProfile, CurrentActor, Public } from '../decorators.ts';
 import { asBody } from '../support/parse.ts';
 import { CORE } from '../tokens.ts';
 
+/** Rotas de conta: liberadas também para quem ainda está completando o cadastro do Google/Apple. */
+@AllowPendingProfile()
 @Controller('auth')
 export class AuthController {
   private readonly core: Core;
@@ -130,5 +132,39 @@ export class AuthController {
   @HttpCode(200)
   completeOnboarding(@CurrentActor() actor: Actor) {
     return this.core.auth.completeOnboarding(actor);
+  }
+
+  /** "Complete seu cadastro" de quem entrou pela primeira vez com Google/Apple: nome de usuário, data de nascimento e aceite. */
+  @Post('me/profile')
+  @HttpCode(200)
+  completeProfile(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.auth.completeProfile(actor, { username: b.username, displayName: b.displayName, birthDate: b.birthDate, acceptTerms: b.acceptTerms, marketingEmail: b.marketingEmail });
+  }
+
+  /** Nome de usuário livre? (conferência enquanto a pessoa digita) */
+  @Get('me/username-available')
+  usernameAvailable(@CurrentActor() actor: Actor, @Query('username') username: unknown) {
+    return this.core.auth.usernameAvailable(actor, username);
+  }
+
+  /** Contas do Google e da Apple ligadas a este perfil. */
+  @Get('me/linked-accounts')
+  linkedAccounts(@CurrentActor() actor: Actor) {
+    return this.core.auth.linkedAccounts(actor);
+  }
+
+  /** Liga uma conta do Google/Apple ao perfil (token de identidade da plataforma). */
+  @Post('me/linked-accounts')
+  @HttpCode(200)
+  linkAccount(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.auth.linkAccount(actor, { provider: b.provider, idToken: b.idToken });
+  }
+
+  @Delete('me/linked-accounts/:provider')
+  @HttpCode(200)
+  unlinkAccount(@CurrentActor() actor: Actor, @Param('provider') provider: string) {
+    return this.core.auth.unlinkAccount(actor, provider);
   }
 }

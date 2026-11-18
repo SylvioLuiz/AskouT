@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Core } from '../core/index.ts';
-import { unauthorized } from '../core/errors.ts';
-import { IS_PUBLIC } from './decorators.ts';
+import { forbidden, unauthorized } from '../core/errors.ts';
+import { ALLOW_PENDING_PROFILE, IS_PUBLIC } from './decorators.ts';
 import type { AuthedRequest } from './decorators.ts';
 import { CORE } from './tokens.ts';
 import { bearerToken } from './support/parse.ts';
@@ -32,7 +32,12 @@ export class AuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthedRequest>();
     const token = bearerToken(request.headers['authorization']);
     if (!token) throw unauthorized('Faça login para continuar');
-    request.actor = await this.core.auth.authenticate(token);
+    const actor = await this.core.auth.authenticate(token);
+    if (actor.profilePending) {
+      const allowed = this.reflector.getAllAndOverride<boolean | undefined>(ALLOW_PENDING_PROFILE, [context.getHandler(), context.getClass()]);
+      if (!allowed) throw forbidden('Complete seu cadastro para continuar');
+    }
+    request.actor = { userId: actor.userId, role: actor.role };
     return true;
   }
 }

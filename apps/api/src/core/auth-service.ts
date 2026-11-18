@@ -8,6 +8,7 @@ import { toPublicProfile } from './types.ts';
 import {
   PASSWORD_MAX,
   asString,
+  avatarUrlProblem,
   assertNoProblems,
   displayNameProblem,
   emailProblem,
@@ -30,6 +31,32 @@ export interface SessionUser {
   profile: PublicProfile;
   /** Já passou pelo tutorial inicial: o app só o mostra no primeiro login. */
   onboarded: boolean;
+  /**
+   * Conta criada pelo Google/Apple que ainda não escolheu o nome de usuário nem informou a data de nascimento.
+   * Enquanto for true, o app só mostra a etapa "Complete seu cadastro" (em qualquer login, até concluir).
+   */
+  profilePending: boolean;
+}
+
+/** Conta do Google ou da Apple ligada ao perfil (o e-mail fica só para a própria pessoa). */
+export interface LinkedAccount {
+  provider: ExternalProvider;
+  linkedAt: string;
+}
+
+export interface LinkedAccounts {
+  items: LinkedAccount[];
+  /** false = conta criada pelo Google/Apple sem senha: a última conta ligada não pode ser desligada. */
+  hasPassword: boolean;
+}
+
+/** Etapa "Complete seu cadastro" de quem entrou pelo Google/Apple. */
+export interface CompleteProfileInput {
+  username: unknown;
+  displayName?: unknown;
+  birthDate: unknown;
+  acceptTerms: unknown;
+  marketingEmail?: unknown;
 }
 
 export interface AuthResult {
@@ -106,6 +133,18 @@ export interface PasswordResetStarted {
 }
 
 const INVALID_CODE = 'Código inválido ou expirado';
+
+/** Foto vinda do Google, num tamanho bom para o perfil. Só https e endereço curto (como qualquer foto por URL). */
+function socialPicture(raw: string | null | undefined): string | null {
+  if (!raw || avatarUrlProblem(raw)) return null;
+  // As fotos do Google aceitam o tamanho no fim (=s96-c). Pede maior, para não ficar borrada.
+  const sized = /googleusercontent\.com\//.test(raw) ? raw.replace(/=s\d+(-c)?$/, '=s400-c') : raw;
+  return avatarUrlProblem(sized) ? raw : sized;
+}
+
+function sessionUser(user: User, profile: Profile): SessionUser {
+  return { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile), onboarded: Boolean(user.onboardedAt), profilePending: user.profilePending === true };
+}
 
 /**
  * Cadastro e login no estilo do Instagram:
@@ -266,7 +305,9 @@ export class AuthService {
    * Entrar com Google ou Apple. A plataforma garante quem é a pessoa; aqui:
    *  1. conta externa já ligada -> entra;
    *  2. e-mail verificado igual ao de uma conta existente -> liga e entra;
-   *  3. senão é conta nova: pede o nome de usuário (`needsProfile`) e cria quando ele vem.
+   *  3. senão é conta nova: cria na hora, com um nome de usuário sugerido, e entra com `profilePending`.
+   *     O app então pede o nome de usuário e a data de nascimento (`completeProfile`) antes de liberar o resto.
+   *     (Apps antigos que já mandam `username`, `birthDate` e `acceptTerms` aqui criam a conta completa, como antes.)
    * Conta criada assim não tem senha utilizável; o acesso é sempre pela plataforma.
    */
   async socialLogin(input: SocialLoginInput, options: LoginOptions = {}): Promise<AuthResult | SocialNeedsProfile | MfaChallenge> {
@@ -279,8 +320,12 @@ export class AuthService {
     if (!claims) throw unauthorized('Não foi possível entrar com essa conta');
 
     const now = clock.now();
+    const picture = socialPicture(claims.picture);
     const linkedId = await identities.find(provider, claims.subject);
-    if (linkedId) return this.sessionFor(linkedId, options);
+    if (linkedId) {
+      await this.adoptPicture(linkedId, picture);
+      return this.sessionFor(linkedId, options);
+    }
 
     const email = claims.email && claims.emailVerified ? normalizeEmail(claims.email) : '';
     if (email === '' || emailProblem(email)) throw validationError('A conta não trouxe um e-mail verificado', { provider: 'Use uma conta com e-mail verificado' });
@@ -289,13 +334,24 @@ export class AuthService {
     const existing = await users.findByEmail(email);
     if (existing) {
       await identities.link(provider, claims.subject, existing.id, now);
+      await this.adoptPicture(existing.id, picture);
       return this.sessionFor(existing.id, options);
     }
+
+    // Painel de gestão: nunca cria conta nova.
+    if (options.requireRole) throw unauthorized('Essa conta não tem acesso à gestão');
 
     const rawUsername = asString(input.username);
     const displayName0 = normalizeDisplayName(asString(input.displayName) || claims.name || '');
     if (rawUsername.trim() === '') {
-      return { needsProfile: true, suggestedUsername: await this.freeUsername(email), displayName: displayName0 };
+      // Conta criada já no login; nome de usuário e data de nascimento ficam para a etapa seguinte, já logado.
+      const username = await this.freeUsername(email);
+      const displayName = displayName0 === '' || displayNameProblem(displayName0) ? username : displayName0;
+      const user: User = { id: ids.next(), email, passwordHash: await hasher.hash(randomBytes(32).toString('hex')), status: 'ACTIVE', role: 'USER', createdAt: now, birthDate: null, termsAcceptedAt: null, termsVersion: null, profilePending: true, passwordless: true };
+      const profile: Profile = { userId: user.id, username, displayName, bio: null, avatarUrl: picture, isPrivate: false };
+      await users.create(user, profile);
+      await identities.link(provider, claims.subject, user.id, now);
+      return this.session(user, profile);
     }
     const username = normalizeUsername(rawUsername);
     const displayName = displayName0 === '' ? username : displayName0;
@@ -305,13 +361,131 @@ export class AuthService {
     }
 
     const consent = checkSignupConsent({ birthDate: input.birthDate, acceptTerms: input.acceptTerms }, now);
-    const user: User = { id: ids.next(), email, passwordHash: await hasher.hash(randomBytes(32).toString('hex')), status: 'ACTIVE', role: 'USER', createdAt: now, birthDate: consent.birthDate, termsAcceptedAt: now, termsVersion: consent.termsVersion };
-    const profile: Profile = { userId: user.id, username, displayName, bio: null, avatarUrl: null, isPrivate: false };
+    const user: User = { id: ids.next(), email, passwordHash: await hasher.hash(randomBytes(32).toString('hex')), status: 'ACTIVE', role: 'USER', createdAt: now, birthDate: consent.birthDate, termsAcceptedAt: now, termsVersion: consent.termsVersion, passwordless: true };
+    const profile: Profile = { userId: user.id, username, displayName, bio: null, avatarUrl: picture, isPrivate: false };
     await users.create(user, profile);
     await identities.link(provider, claims.subject, user.id, now);
     await this.recordSignupConsents(user.id, input.marketingEmail === true, now);
     await this.welcome(user.email, profile.username);
     return this.session(user, profile);
+  }
+
+  /**
+   * "Complete seu cadastro": quem entrou pela primeira vez com Google/Apple escolhe o nome de usuário (pode manter o sugerido),
+   * informa a data de nascimento (18+) e aceita os Termos. Só depois disso o app libera o resto.
+   */
+  async completeProfile(actor: Actor, input: CompleteProfileInput): Promise<SessionUser> {
+    const { users, clock } = this.deps;
+    const user = await users.findById(actor.userId);
+    const profile = user ? await users.findProfileById(user.id) : undefined;
+    if (!user || !profile || user.status === 'SUSPENDED') throw unauthorized('Sessão inválida');
+    if (!user.profilePending) throw conflict('O cadastro já foi concluído');
+
+    const now = clock.now();
+    const username = normalizeUsername(asString(input.username));
+    const rawName = normalizeDisplayName(asString(input.displayName));
+    const displayName = rawName === '' ? (profile.displayName === profile.username ? username : profile.displayName) : rawName;
+    const problems: Record<string, string> = {};
+    const up = usernameProblem(username);
+    if (up) problems.username = up;
+    const dp = displayNameProblem(displayName);
+    if (dp) problems.displayName = dp;
+    if (!problems.username && username !== profile.username) {
+      const taken = await users.findProfileByUsername(username);
+      if (taken && taken.userId !== user.id) problems.username = 'Este nome de usuário já está em uso';
+    }
+    let consent: { birthDate: string; termsVersion: string } | undefined;
+    try {
+      consent = checkSignupConsent({ birthDate: input.birthDate, acceptTerms: input.acceptTerms }, now);
+    } catch (error) {
+      if (!(error instanceof DomainError)) throw error;
+      Object.assign(problems, (error as DomainError & { details?: Record<string, string> }).details ?? {});
+    }
+    if (Object.keys(problems).length > 0 || !consent) {
+      if (problems.username === 'Este nome de usuário já está em uso' && Object.keys(problems).length === 1) throw conflict(problems.username, problems);
+      throw validationError(Object.values(problems)[0] ?? 'Dados inválidos', problems);
+    }
+
+    await users.completePendingProfile(user.id, { username, displayName, birthDate: consent.birthDate, termsVersion: consent.termsVersion, termsAcceptedAt: now });
+    await this.recordSignupConsents(user.id, input.marketingEmail === true, now);
+    await this.welcome(user.email, username);
+    return this.me(actor);
+  }
+
+  /** Confere, enquanto a pessoa digita, se o nome de usuário pode ser usado por ela (o próprio atual conta como livre). */
+  async usernameAvailable(actor: Actor, raw: unknown): Promise<{ username: string; available: boolean; problem?: string }> {
+    const username = normalizeUsername(asString(raw));
+    const problem = usernameProblem(username);
+    if (problem) return { username, available: false, problem };
+    const taken = await this.deps.users.findProfileByUsername(username);
+    if (taken && taken.userId !== actor.userId) return { username, available: false, problem: 'Este nome de usuário já está em uso' };
+    return { username, available: true };
+  }
+
+  /** Contas do Google e da Apple ligadas a este perfil. */
+  async linkedAccounts(actor: Actor): Promise<LinkedAccounts> {
+    const user = await this.deps.users.findById(actor.userId);
+    const rows = await this.deps.identities.listForUser(actor.userId);
+    const seen = new Set<string>();
+    const items: LinkedAccount[] = [];
+    for (const r of rows) {
+      if (seen.has(r.provider)) continue;
+      seen.add(r.provider);
+      items.push({ provider: r.provider, linkedAt: r.createdAt.toISOString() });
+    }
+    return { items, hasPassword: user ? user.passwordless !== true : true };
+  }
+
+  /**
+   * Liga uma conta do Google/Apple a um perfil que já existe (ex.: criado com e-mail e senha), para entrar por ela depois.
+   * O e-mail da plataforma não precisa ser o mesmo; o que vale é a conta externa, que só pode estar em um perfil.
+   */
+  async linkAccount(actor: Actor, input: { provider: unknown; idToken: unknown }): Promise<LinkedAccounts> {
+    const { identities, verifier, clock } = this.deps;
+    const provider = asString(input.provider).toUpperCase();
+    if (provider !== 'GOOGLE' && provider !== 'APPLE') throw validationError('Plataforma inválida', { provider: 'Plataforma inválida' });
+    if (!verifier.providers().some((p) => p.provider === provider)) throw validationError('Esse tipo de login não está disponível', { provider: 'Indisponível' });
+    const idToken = asString(input.idToken);
+    const claims = idToken !== '' ? await verifier.verify(provider, idToken) : undefined;
+    if (!claims) throw unauthorized('Não foi possível confirmar essa conta');
+    const label = provider === 'GOOGLE' ? 'Google' : 'Apple';
+    const owner = await identities.find(provider, claims.subject);
+    if (owner && owner !== actor.userId) throw conflict(`Essa conta ${label} já está ligada a outro perfil do AskouT`);
+    if (!owner) {
+      const mine = await identities.listForUser(actor.userId);
+      if (mine.some((r) => r.provider === provider)) throw conflict(`Já existe uma conta ${label} ligada a este perfil. Desvincule a atual antes de ligar outra.`);
+      await identities.link(provider, claims.subject, actor.userId, clock.now());
+      await this.adoptPicture(actor.userId, socialPicture(claims.picture));
+    }
+    return this.linkedAccounts(actor);
+  }
+
+  /**
+   * Desliga a conta do Google/Apple. Quem criou o perfil pela plataforma e nunca definiu senha não pode desligar a última
+   * (ficaria sem como entrar): primeiro cria uma senha pelo código enviado ao e-mail.
+   */
+  async unlinkAccount(actor: Actor, rawProvider: unknown): Promise<LinkedAccounts> {
+    const provider = asString(rawProvider).toUpperCase();
+    if (provider !== 'GOOGLE' && provider !== 'APPLE') throw validationError('Plataforma inválida', { provider: 'Plataforma inválida' });
+    const current = await this.linkedAccounts(actor);
+    if (!current.items.some((i) => i.provider === provider)) return current;
+    // Como no Instagram/TikTok: sem senha, a última forma de entrar não pode ser desligada.
+    if (!current.hasPassword && current.items.length <= 1) {
+      throw conflict('Essa é a única forma de entrar na sua conta. Crie uma senha antes de desvincular.', { provider: 'Crie uma senha antes' });
+    }
+    await this.deps.identities.unlink(provider, actor.userId);
+    return this.linkedAccounts(actor);
+  }
+
+  /** Quem ainda não tem foto de perfil fica com a da conta Google (melhor esforço: nunca troca uma foto já escolhida). */
+  private async adoptPicture(userId: string, picture: string | null): Promise<void> {
+    if (!picture) return;
+    try {
+      const profile = await this.deps.users.findProfileById(userId);
+      if (profile && !profile.avatarUrl) await this.deps.users.updateProfile({ ...profile, avatarUrl: picture });
+    } catch {
+      // a foto é cortesia: não pode impedir a entrada
+    }
   }
 
   /** Consentimentos opcionais marcados no cadastro. Só o "sim" vira registro: sem registro, vale "não". */
@@ -367,6 +541,10 @@ export class AuthService {
     const root = base.length >= 3 ? base : `${base}user`.slice(0, 24);
     for (let i = 0; i < 20; i += 1) {
       const candidate = i === 0 ? root : `${root}${i + 1}`;
+      if (!usernameProblem(candidate) && !(await this.deps.users.findProfileByUsername(candidate))) return candidate;
+    }
+    for (let i = 0; i < 20; i += 1) {
+      const candidate = `user${randomBytes(4).readUInt32BE(0) % 100_000_000}`;
       if (!usernameProblem(candidate) && !(await this.deps.users.findProfileByUsername(candidate))) return candidate;
     }
     return '';
@@ -474,6 +652,23 @@ export class AuthService {
     await passwordResets.delete(user.id);
   }
 
+  /**
+   * Criar senha (conta que nasceu pelo Google/Apple e nunca teve senha), como no Instagram: logado, define a senha sem pedir
+   * uma atual. Depois disso dá para entrar com e-mail/@usuário e senha, e desligar o Google/Apple.
+   */
+  async createPassword(userId: string, input: { newPassword: unknown }): Promise<void> {
+    const { users, passwordResets, hasher } = this.deps;
+    const user = await users.findById(userId);
+    const profile = user ? await users.findProfileById(user.id) : undefined;
+    if (!user || !profile || user.status === 'SUSPENDED') throw unauthorized('Sessão inválida');
+    if (user.passwordless !== true) throw conflict('Sua conta já tem senha. Use "Trocar senha".');
+    const next = asString(input.newPassword);
+    const problem = passwordProblem(next, user.email, profile.username);
+    if (problem) throw validationError(problem, { newPassword: problem });
+    await users.updatePasswordHash(user.id, await hasher.hash(next));
+    await passwordResets.delete(user.id);
+  }
+
   /** Login por e-mail ou por nome de usuário (com ou sem @). */
   async login(input: LoginInput, options: LoginOptions = {}): Promise<AuthResult | MfaChallenge> {
     const { users, hasher } = this.deps;
@@ -500,13 +695,13 @@ export class AuthService {
    * Valida o token e confere o usuário no banco a cada chamada, para que
    * suspensão e mudança de papel valham imediatamente.
    */
-  async authenticate(token: unknown): Promise<Actor> {
+  async authenticate(token: unknown): Promise<Actor & { profilePending?: boolean }> {
     const raw = asString(token);
     const claims = raw ? this.deps.tokens.verify(raw) : undefined;
     if (!claims) throw unauthorized('Sessão inválida');
     const user = await this.deps.users.findById(claims.userId);
     if (!user || user.status === 'SUSPENDED') throw unauthorized('Sessão inválida');
-    return { userId: user.id, role: user.role };
+    return user.profilePending ? { userId: user.id, role: user.role, profilePending: true } : { userId: user.id, role: user.role };
   }
 
   /** Dados da própria sessão (inclui o e-mail, que só o dono vê). */
@@ -514,7 +709,7 @@ export class AuthService {
     const user = await this.deps.users.findById(actor.userId);
     const profile = user ? await this.deps.users.findProfileById(user.id) : undefined;
     if (!user || !profile || user.status === 'SUSPENDED') throw unauthorized('Sessão inválida');
-    return { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile), onboarded: Boolean(user.onboardedAt) };
+    return sessionUser(user, profile);
   }
 
   /** Tutorial inicial concluído ou pulado: não aparece mais em nenhum aparelho. */
@@ -559,7 +754,7 @@ export class AuthService {
 
   private session(user: User, profile: Profile): AuthResult {
     return {
-      user: { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile), onboarded: Boolean(user.onboardedAt) },
+      user: sessionUser(user, profile),
       token: this.deps.tokens.issue({ userId: user.id, role: user.role }),
     };
   }

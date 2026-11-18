@@ -26,6 +26,11 @@ export interface UserRepository {
   acceptTerms(userId: string, version: string, at: Date): Promise<void>;
   /** Registra que a pessoa já passou pelo tutorial inicial. Não sobrescreve a data se já houver uma. */
   markOnboarded(userId: string, at: Date): Promise<void>;
+  /**
+   * Conclui o cadastro de uma conta criada pelo Google/Apple: troca o nome de usuário, guarda a data de nascimento e o aceite
+   * dos Termos e tira a marca de pendente, tudo junto. Lança DomainError CONFLICT se o nome de usuário já for de outra pessoa.
+   */
+  completePendingProfile(userId: string, data: { username: string; displayName: string; birthDate: string; termsVersion: string; termsAcceptedAt: Date }): Promise<void>;
   /** Troca o hash da senha. */
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
   findProfileById(userId: string): Promise<Profile | undefined>;
@@ -73,6 +78,10 @@ export interface IdentityRepository {
   /** Conta do AskouT ligada a essa conta externa. */
   find(provider: ExternalProvider, subject: string): Promise<string | undefined>;
   link(provider: ExternalProvider, subject: string, userId: string, at: Date): Promise<void>;
+  /** Contas externas ligadas a esta pessoa, mais antigas primeiro. */
+  listForUser(userId: string): Promise<{ provider: ExternalProvider; subject: string; createdAt: Date }[]>;
+  /** Desliga todas as contas dessa plataforma da pessoa. */
+  unlink(provider: ExternalProvider, userId: string): Promise<void>;
 }
 
 /** Confere o token que a plataforma entrega ao navegador (assinatura, emissor, público e validade). */
