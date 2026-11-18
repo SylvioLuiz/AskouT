@@ -12,7 +12,7 @@ import { toApiError } from '../lib/errors.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { kindLabel } from '../lib/explore.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
-import type { ClaimableVenue, VenueClaim, VenueEvent, VenueEventBody, VenueSummary } from '../lib/types.ts';
+import type { ClaimableVenue, TeamInvite, VenueClaim, VenueEvent, VenueEventBody, VenueSummary } from '../lib/types.ts';
 import { CLAIM_NOTE_MAX, EMPTY_VENUE_EVENT, VENUE_EVENT_DESCRIPTION_MAX, VENUE_EVENT_TITLE_MAX, claimStateLabel, claimStatusLabel, documentProblem, draftFromEvent, phaseLabel, venueEventBody, venueEventProblem } from '../lib/venue.ts';
 import type { VenueEventDraft } from '../lib/venue.ts';
 import { Link } from '../router.tsx';
@@ -263,9 +263,44 @@ function ClaimRow({ claim, onChanged }: { claim: VenueClaim; onChanged: () => vo
   );
 }
 
+function InviteRow({ invite, onChanged }: { invite: TeamInvite; onChanged: () => void }) {
+  const [busy, setBusy] = useState<'yes' | 'no' | undefined>();
+  const [error, setError] = useState<string | undefined>();
+
+  async function answer(accept: boolean) {
+    setBusy(accept ? 'yes' : 'no');
+    setError(undefined);
+    try {
+      await api.respondVenueInvite(invite.venue.id, accept);
+      onChanged();
+    } catch (failure) {
+      setError(toApiError(failure).message);
+      setBusy(undefined);
+    }
+  }
+
+  return (
+    <li className="claimrow">
+      <div className="venuerow venuerow--static">
+        <VenueLine venue={invite.venue} />
+        <span className="venuerow__sub">{invite.invitedBy ? t('Convite de @{username}', { username: invite.invitedBy.username }) : t('Convite para a equipe')}</span>
+      </div>
+      <div className="claimrow__actions">
+        <Button small loading={busy === 'yes'} disabled={busy !== undefined} onClick={() => void answer(true)}>
+          {t('Aceitar')}
+        </Button>
+        <Button small variant="quiet" loading={busy === 'no'} disabled={busy !== undefined} onClick={() => void answer(false)}>
+          {t('Recusar')}
+        </Button>
+      </div>
+      {error ? <Notice tone="error">{error}</Notice> : null}
+    </li>
+  );
+}
+
 export function VenuesScreen() {
   useTitle(t('Meus locais'));
-  const mine = useAsync(() => api.myVenues(), []);
+  const mine = useAsync(() => api.myVenues().then((m) => ({ ...m, managed: m.managed ?? [], invites: m.invites ?? [] })), []);
   const [claiming, setClaiming] = useState(false);
   const [creatingOrg, setCreatingOrg] = useState(false);
   const [sent, setSent] = useState(false);
@@ -278,6 +313,18 @@ export function VenuesScreen() {
       {mine.error && !mine.data ? <ErrorState message={mine.error.message} onRetry={mine.reload} /> : null}
       {mine.data ? (
         <>
+          {mine.data.invites.length > 0 ? (
+            <section aria-labelledby="convites-titulo">
+              <h2 id="convites-titulo" className="section__title">
+                {t('Convites para a equipe')}
+              </h2>
+              <ul className="claimlist">
+                {mine.data.invites.map((i) => (
+                  <InviteRow key={i.venue.id} invite={i} onChanged={mine.reload} />
+                ))}
+              </ul>
+            </section>
+          ) : null}
           {mine.data.claims.length > 0 ? (
             <section aria-labelledby="pedidos-titulo">
               <h2 id="pedidos-titulo" className="section__title">
@@ -290,14 +337,15 @@ export function VenuesScreen() {
               </ul>
             </section>
           ) : null}
-          {mine.data.venues.length === 0 && mine.data.claims.length === 0 ? (
+          {mine.data.venues.length === 0 && mine.data.managed.length === 0 && mine.data.invites.length === 0 && mine.data.claims.length === 0 ? (
             <EmptyState title={t('Você ainda não administra nenhum local')}>{t('Reivindique o seu rolê (bar, balada ou casa) para criar os eventos dele. O pedido é analisado por um administrador.')}</EmptyState>
-          ) : mine.data.venues.length === 0 ? null : (
+          ) : mine.data.venues.length + mine.data.managed.length === 0 ? null : (
             <ul className="venuelist" aria-label={t('Locais que você administra')}>
-              {mine.data.venues.map((v) => (
+              {[...mine.data.venues, ...mine.data.managed].map((v) => (
                 <li key={v.id}>
-                  <Link to={`/bares/${encodeURIComponent(v.id)}`} className="venuerow">
+                  <Link to={`/bares/${encodeURIComponent(v.id)}/painel`} className="venuerow">
                     <VenueLine venue={v} />
+                    {mine.data?.managed.some((m) => m.id === v.id) ? <span className="venuerow__sub">{t('Você é administrador')}</span> : null}
                   </Link>
                 </li>
               ))}

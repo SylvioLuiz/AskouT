@@ -1,3 +1,4 @@
+import { canManageVenue } from './venue-access.ts';
 import { conflict, DomainError, notFound, validationError } from './errors.ts';
 import { parseIcs, plainText } from './ical.ts';
 import type { IcsOccurrence } from './ical.ts';
@@ -406,7 +407,7 @@ export class CalendarImportService {
 
   private async owned(userId: string, venueId: unknown): Promise<VenueRecord> {
     const venue = typeof venueId === 'string' && venueId !== '' && venueId.length <= 64 ? await this.deps.places.findVenue(venueId) : undefined;
-    if (!venue || venue.ownerId !== userId) throw notFound('Local não encontrado');
+    if (!venue || !(await canManageVenue(this.deps.places, userId, venue))) throw notFound('Local não encontrado');
     return venue;
   }
 

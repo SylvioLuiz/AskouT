@@ -490,6 +490,26 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.posts.listEngagement('nao-e-uuid', t0, 10), []);
       });
 
+      it('equipe do local: convite, aceite, lista e remoção', async () => {
+        const owner = await newUser('dona-equipe');
+        const guest = await newUser('convidada-equipe');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar Equipe', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: owner };
+        await h.places.createVenue(v);
+        const t0 = new Date(Date.UTC(2030, 0, 10, 12));
+        assert.equal(await h.places.findVenueManager(v.id, guest), undefined);
+        await h.places.saveVenueManager({ venueId: v.id, userId: guest, status: 'PENDING', invitedById: owner, createdAt: t0, acceptedAt: null });
+        assert.deepEqual((await h.places.listVenueManagerInvites(guest)).map((i) => [i.venue.id, i.record.status]), [[v.id, 'PENDING']]);
+        assert.deepEqual(await h.places.listVenuesManagedBy(guest), [], 'convite pendente não administra');
+        await h.places.saveVenueManager({ venueId: v.id, userId: guest, status: 'ACCEPTED', invitedById: owner, createdAt: t0, acceptedAt: new Date(t0.getTime() + 1000) });
+        assert.deepEqual(await h.places.listVenueManagerInvites(guest), []);
+        assert.deepEqual((await h.places.listVenuesManagedBy(guest)).map((x) => x.id), [v.id]);
+        assert.deepEqual((await h.places.listVenueManagers(v.id)).map((m) => [m.userId, m.status]), [[guest, 'ACCEPTED']]);
+        assert.equal((await h.places.findVenueManager(v.id, guest))?.acceptedAt?.getTime(), t0.getTime() + 1000);
+        assert.equal(await h.places.deleteVenueManager(v.id, guest), true);
+        assert.equal(await h.places.deleteVenueManager(v.id, guest), false);
+        assert.deepEqual(await h.places.listVenueManagers('nao-e-uuid'), []);
+      });
+
       it('impulsionamento: cria, confirma o pagamento uma única vez e lista só os ativos', async () => {
         const owner = await newUser('impulsiona');
         const v: VenueRecord = { id: randomUUID(), name: 'Bar Boost', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: owner };

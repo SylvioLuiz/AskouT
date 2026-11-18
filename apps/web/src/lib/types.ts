@@ -376,7 +376,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM';
 
 export interface NotificationItem {
   id: string;
@@ -984,8 +984,34 @@ export interface VenueClaim {
 }
 
 export interface MyVenues {
+  /** Locais em que a pessoa é a responsável (dona). */
   venues: VenueSummary[];
+  /** Locais em que a pessoa é administradora adicional. */
+  managed: VenueSummary[];
+  /** Convites para administrar um local, ainda sem resposta. */
+  invites: TeamInvite[];
   claims: VenueClaim[];
+}
+
+export type VenueRole = 'OWNER' | 'MANAGER';
+
+export interface TeamInvite {
+  venue: VenueSummary;
+  invitedBy: PublicProfile | null;
+  createdAt: string;
+}
+
+export interface TeamMember {
+  user: PublicProfile;
+  role: VenueRole;
+  status: 'ACCEPTED' | 'PENDING';
+  since: string | null;
+}
+
+export interface VenueTeam {
+  /** O que quem pergunta é no local: só o dono convida e remove. */
+  role: VenueRole;
+  members: TeamMember[];
 }
 
 export interface VenueEvent {
@@ -1074,6 +1100,9 @@ export interface VenueProfile {
   sample: boolean;
   claimed: boolean;
   isOwner: boolean;
+  /** Dono ou administrador adicional. */
+  canManage: boolean;
+  role: VenueRole | null;
   following: boolean;
   /** Sininho ligado: recebe aviso de cada evento novo. */
   notify?: boolean;
