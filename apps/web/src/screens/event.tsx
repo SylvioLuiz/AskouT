@@ -373,18 +373,18 @@ export function EventScreen({ eventId }: { eventId: string }) {
               <ul className="evgoing__faces">
                 {canStory ? (
                   <li>
-                    <button type="button" className="evgoing__story" onClick={() => setCreatingStory(true)} aria-label={t('Criar story neste evento')}>
+                    <button type="button" className="evgoing__story" onClick={() => setCreatingStory(true)} aria-label={t('Criar flash neste evento')}>
                       <span className="evgoing__storyring">
                         <PlusIcon />
                       </span>
-                      <span className="evgoing__storylabel">{t('Seu story')}</span>
+                      <span className="evgoing__storylabel">{t('Seu flash')}</span>
                     </button>
                   </li>
                 ) : null}
                 {strip.shown.map((p) => (
                   <li key={p.userId} className="evwho__person">
                     {e.storyUserIds.includes(p.userId) && startOf(storyGroups, p.userId) ? (
-                      <button type="button" className="evgoing__face evgoing__face--story" onClick={() => setViewing(startOf(storyGroups, p.userId) ?? undefined)} aria-label={t('Ver o story de {username}', { username: p.username })}>
+                      <button type="button" className="evgoing__face evgoing__face--story" onClick={() => setViewing(startOf(storyGroups, p.userId) ?? undefined)} aria-label={t('Ver o flash de {username}', { username: p.username })}>
                         <Avatar profile={p} size={40} />
                       </button>
                     ) : (

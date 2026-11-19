@@ -116,7 +116,7 @@ export function VenueStoryViewer({ groups, start, onClose, onChanged }: { groups
   const src = api.venueStoryMediaUrl(item.id);
   const target = group.event ? `/eventos/${encodeURIComponent(group.event.id)}` : `/bares/${encodeURIComponent(group.venue.id)}`;
   return (
-    <div className="storyview storyview--placed" role="dialog" aria-modal="true" aria-label={t('Story de {name}', { name: group.venue.name })}>
+    <div className="storyview storyview--placed" role="dialog" aria-modal="true" aria-label={t('Flash de {name}', { name: group.venue.name })}>
       <div className="storyview__bars" aria-hidden="true">
         {group.items.map((it, index) => (
           <span key={it.id} className="storyview__bar">
@@ -134,7 +134,7 @@ export function VenueStoryViewer({ groups, start, onClose, onChanged }: { groups
             </span>
           </span>
         </Link>
-        <button type="button" className="storyview__btn storyview__btn--quiet" onClick={() => setMenu(true)} aria-label={t('Mais opções do story')} aria-haspopup="dialog">
+        <button type="button" className="storyview__btn storyview__btn--quiet" onClick={() => setMenu(true)} aria-label={t('Mais opções do flash')} aria-haspopup="dialog">
           <MoreIcon />
         </button>
         <button type="button" className="storyview__btn" onClick={onClose} aria-label={t('Fechar')}>
@@ -147,8 +147,8 @@ export function VenueStoryViewer({ groups, start, onClose, onChanged }: { groups
         ) : (
           <img key={item.id} className="storyview__media" src={src} alt="" onError={() => setError(t('Não foi possível abrir esta foto.'))} />
         )}
-        <button type="button" className="storyview__tap storyview__tap--prev" onClick={() => setPos(prevStory(groups, pos))} aria-label={t('Story anterior')} />
-        <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo story')} />
+        <button type="button" className="storyview__tap storyview__tap--prev" onClick={() => setPos(prevStory(groups, pos))} aria-label={t('Flash anterior')} />
+        <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo flash')} />
         {item.kind === 'VIDEO' ? <SoundToggle muted={muted} onToggle={() => setMuted((m) => !m)} /> : null}
       </div>
       <Link to={target} className="storyplace" aria-label={group.event ? t('Abrir o evento {title}', { title: group.event.title }) : t('Abrir a página de {name}', { name: group.venue.name })}>
@@ -165,7 +165,7 @@ export function VenueStoryViewer({ groups, start, onClose, onChanged }: { groups
       </Link>
       {error ? <p className="storyview__error">{error}</p> : null}
       {menu ? (
-        <Sheet title={t('Story de {name}', { name: group.venue.name })} onClose={() => setMenu(false)}>
+        <Sheet title={t('Flash de {name}', { name: group.venue.name })} onClose={() => setMenu(false)}>
           <div className="storysheet__actions">
             <Button
               variant="secondary"
@@ -174,7 +174,7 @@ export function VenueStoryViewer({ groups, start, onClose, onChanged }: { groups
                 setReporting(true);
               }}
             >
-              {t('Denunciar story')}
+              {t('Denunciar flash')}
             </Button>
             <Button variant="secondary" loading={busy} onClick={() => void mute()}>
               {t('Não tenho interesse neste local')}
@@ -185,8 +185,8 @@ export function VenueStoryViewer({ groups, start, onClose, onChanged }: { groups
       ) : null}
       {reporting ? (
         <ReasonSheet
-          title={t('Denunciar story')}
-          doneText={t('Denúncia enviada. Você não verá mais este story.')}
+          title={t('Denunciar flash')}
+          doneText={t('Denúncia enviada. Você não verá mais este flash.')}
           submit={(reason, details) => api.reportVenueStory(item.id, reason, details)}
           onClose={() => setReporting(false)}
           onDone={() => {
@@ -206,11 +206,11 @@ export function VenueStoriesStrip({ groups, onChanged }: { groups: VenueStoryGro
   const [viewing, setViewing] = useState<StoryPos | undefined>();
   if (groups.length === 0) return null;
   return (
-    <section className="homestories" aria-label={t('Stories dos locais que você segue')}>
+    <section className="homestories" aria-label={t('Flashes dos locais que você segue')}>
       <ul className="homestories__list">
         {groups.map((group, index) => (
           <li key={group.venue.id}>
-            <button type="button" className="homestories__item" onClick={() => setViewing({ group: index, item: 0 })} aria-label={t('Ver o story de {name}', { name: group.venue.name })}>
+            <button type="button" className="homestories__item" onClick={() => setViewing({ group: index, item: 0 })} aria-label={t('Ver o flash de {name}', { name: group.venue.name })}>
               <span className="homestories__ring">
                 <VenueLogo name={group.venue.name} logoUrl={group.venue.logoUrl} size={60} />
               </span>
@@ -271,7 +271,7 @@ export function RollingNowStrip({ position, waiting }: { position: { lat: number
           return (
             <li key={item.venue.id}>
               {index >= 0 ? (
-                <button type="button" className="homestories__item rolling__item" onClick={() => setViewing({ group: index, item: 0 })} aria-label={t('Ver o story de {name}', { name: item.venue.name }) + (item.event ? `. ${item.event.title}` : '') + (friendsLine(item) ? `. ${friendsLine(item)}` : '')}>
+                <button type="button" className="homestories__item rolling__item" onClick={() => setViewing({ group: index, item: 0 })} aria-label={t('Ver o flash de {name}', { name: item.venue.name }) + (item.event ? `. ${item.event.title}` : '') + (friendsLine(item) ? `. ${friendsLine(item)}` : '')}>
                   {body}
                 </button>
               ) : (
@@ -360,27 +360,27 @@ export function VenueStorySheet({ venueId, onClose }: { venueId: string; onClose
 
   const data = list.data;
   return (
-    <Sheet title={t('Stories do local')} onClose={onClose}>
+    <Sheet title={t('Flashes do local')} onClose={onClose}>
       <p className="muted">{t('Foto ou vídeo. Quem segue o local vê na página inicial e o Explorar mostra em Rolando agora. Fica no ar por 24 h.')}</p>
       <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" onChange={(event) => void pick(event)} aria-label={t('Escolher foto ou vídeo')} />
       {list.loading && !data ? <Loading /> : null}
       {list.error && !data ? <ErrorState message={list.error.message} onRetry={list.reload} /> : null}
-      {data?.suspended ? <Notice tone="error">{t('A publicação de stories deste local está suspensa até a equipe do AskouT analisar as denúncias.')}</Notice> : null}
+      {data?.suspended ? <Notice tone="error">{t('A publicação de flashes deste local está suspensa até a equipe do AskouT analisar as denúncias.')}</Notice> : null}
       {problem ? <Notice tone="error">{problem}</Notice> : null}
-      {askDelete ? <Confirm danger question={t('Apagar este story? Ele sai do ar na hora e não dá para desfazer.')} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => void remove(askDelete)} onCancel={() => setAskDelete(undefined)} /> : null}
+      {askDelete ? <Confirm danger question={t('Apagar este flash? Ele sai do ar na hora e não dá para desfazer.')} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => void remove(askDelete)} onCancel={() => setAskDelete(undefined)} /> : null}
       {data && data.items.length > 0 ? (
-        <ul className="vstories" aria-label={t('Stories no ar')}>
+        <ul className="vstories" aria-label={t('Flashes no ar')}>
           {data.items.map((s) => (
             <li key={s.id} className="vstories__item">
               {s.kind === 'VIDEO' ? <video src={api.venueStoryMediaUrl(s.id)} muted playsInline preload="metadata" /> : <img src={api.venueStoryMediaUrl(s.id)} alt="" />}
-              <button type="button" className="vstories__del" onClick={() => setAskDelete(s.id)} disabled={busy} aria-label={t('Apagar este story')}>
+              <button type="button" className="vstories__del" onClick={() => setAskDelete(s.id)} disabled={busy} aria-label={t('Apagar este flash')}>
                 <TrashIcon />
               </button>
             </li>
           ))}
         </ul>
       ) : data ? (
-        <p className="muted">{t('Nenhum story no ar.')}</p>
+        <p className="muted">{t('Nenhum flash no ar.')}</p>
       ) : null}
       <div className="storysheet__actions">
         <Button loading={busy} disabled={data?.suspended === true} onClick={() => fileRef.current?.click()}>

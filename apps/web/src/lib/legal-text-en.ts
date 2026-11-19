@@ -145,7 +145,7 @@ export function buildTermsEn(email: string): LegalDoc {
       {
         title: '5. Reports, blocking and moderation',
         items: [
-          'You can report profiles, posts, comments, stories and conversations in the app itself (the options menu of each item) and block anyone at any time.',
+          'You can report profiles, posts, comments, flashes and conversations in the app itself (the options menu of each item) and block anyone at any time.',
           'Our team reviews reports within 24 hours, removes content that breaks these terms and removes from the platform the person who posted it. Blocking someone also notifies our team and makes that person\'s content disappear from your feed immediately.',
           `For reports that do not fit in the app or urgent cases, write to ${email}.`,
         ],

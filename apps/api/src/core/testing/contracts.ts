@@ -2257,7 +2257,7 @@ export function defineRepositoryContract(
         assert.deepEqual([...(await h.eventRoom.likedStoryIds(ana, [storyA.id]))], []);
         assert.equal(await h.eventRoom.setStoryLike(storyA.id, bia, false, at(6)), true);
         assert.equal(await h.eventRoom.setStoryLike(storyA.id, bia, false, at(6)), false);
-        assert.equal(await h.eventRoom.setStoryLike(randomUUID(), bia, true, at(6)), false, 'story que não existe');
+        assert.equal(await h.eventRoom.setStoryLike(randomUUID(), bia, true, at(6)), false, 'flash que não existe');
         // ocultação de stories: uma linha por dono; tudo desligado apaga
         assert.deepEqual(await h.eventRoom.listStoryHidden(ana), []);
         await h.eventRoom.setStoryHidden({ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: false });
@@ -2540,7 +2540,7 @@ export function defineRepositoryContract(
 
     // ---------- Stories de locais ----------
 
-    describe('stories de locais', () => {
+    describe('flashes de locais', () => {
       it('guarda, lista os que estão no ar, denuncia uma vez por pessoa e apaga junto das denúncias', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');
@@ -2570,7 +2570,7 @@ export function defineRepositoryContract(
         const r1 = randomUUID();
         assert.equal(await h.venueStories.report(report(r1, story.id, bia, at(100))), true);
         assert.equal(await h.venueStories.report(report(randomUUID(), story.id, bia, at(101))), false, 'uma denúncia por pessoa');
-        assert.equal(await h.venueStories.report(report(randomUUID(), randomUUID(), bia, at(101))), false, 'story que não existe');
+        assert.equal(await h.venueStories.report(report(randomUUID(), randomUUID(), bia, at(101))), false, 'flash que não existe');
         assert.equal(await h.venueStories.report(report(randomUUID(), story.id, caio, at(102))), true);
         assert.deepEqual([...(await h.venueStories.reportedIds(bia, [story.id, meta.id]))], [story.id]);
         assert.equal(await h.venueStories.countOpenReporters(venueId, at(0)), 2);
@@ -2589,7 +2589,7 @@ export function defineRepositoryContract(
         assert.equal(await h.venueStories.findReport(r1), undefined, 'as denúncias vão junto');
       });
 
-      it('silencia locais e guarda a preferência de não ver stories de locais', async () => {
+      it('silencia locais e guarda a preferência de não ver flashes de locais', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');
         const mk = async (name: string) => {

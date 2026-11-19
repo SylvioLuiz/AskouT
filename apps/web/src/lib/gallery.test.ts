@@ -17,7 +17,7 @@ test('duração do vídeo na miniatura', () => {
   assert.equal(durationLabel(NaN), '');
 });
 
-test('texto do story fica entre 10% e 90% da tela', () => {
+test('texto do flash fica entre 10% e 90% da tela', () => {
   assert.equal(clampCaptionY(0), 0.1);
   assert.equal(clampCaptionY(1), 0.9);
   assert.equal(clampCaptionY(0.42), 0.42);

@@ -56,6 +56,8 @@ export interface EventStoryItemView {
   overlays?: StoryOverlay[];
   /** Você curtiu este story (só nos stories de outras pessoas). */
   liked?: boolean;
+  /** Quantas pessoas viram o story (só nos seus: quem publicou é o único que vê). */
+  views?: number;
 }
 
 /** Os stories de uma pessoa no evento. */
@@ -483,8 +485,8 @@ export class EventPageService {
   async reportStory(viewerId: string, rawId: unknown, storyId: unknown, reason: unknown, details?: unknown): Promise<{ reported: true }> {
     const { ref } = await this.resolve(viewerId, rawId);
     const story = typeof storyId === 'string' && storyId.length <= 64 ? await this.deps.eventRoom.findStory(storyId) : undefined;
-    if (!story || story.ref.id !== ref.id || story.expiresAt.getTime() <= this.deps.clock.now().getTime()) throw notFound('Story não encontrado');
-    if (story.userId === viewerId) throw forbidden('Este story é seu: apague-o se não quiser mais');
+    if (!story || story.ref.id !== ref.id || story.expiresAt.getTime() <= this.deps.clock.now().getTime()) throw notFound('Flash não encontrado');
+    if (story.userId === viewerId) throw forbidden('Este flash é seu: apague-o se não quiser mais');
     if (typeof reason !== 'string' || !(POST_REPORT_REASONS as readonly string[]).includes(reason)) throw validationError('Motivo inválido', { reason: 'Escolha um motivo da lista' });
     const text = optionalText(details, EVENT_STORY_REPORT_DETAILS_MAX, 'details', 'Detalhes');
     await this.deps.eventRoom.reportStory({ id: this.deps.ids.next(), storyId: story.id, reporterId: viewerId, reason: reason as PostReportReason, details: text, createdAt: this.deps.clock.now() });
@@ -497,6 +499,7 @@ export class EventPageService {
     const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
     const rows = await this.visibleStories(viewerId, ref, hidden);
     const liked = await this.deps.eventRoom.likedStoryIds(viewerId, rows.filter((r) => r.userId !== viewerId).map((r) => r.id));
+    const views = await this.deps.eventRoom.storyViewCounts(rows.filter((r) => r.userId === viewerId).map((r) => r.id));
     const profiles = await this.deps.users.findProfilesByIds([...new Set(rows.map((r) => r.userId))]);
     const byId = new Map(profiles.map((p) => [p.userId, toPublicProfile(p)]));
     const groups = new Map<string, EventStoryGroupView>();
@@ -504,7 +507,7 @@ export class EventPageService {
       const author = byId.get(r.userId);
       if (!author) continue;
       const group = groups.get(r.userId) ?? { author, mine: r.userId === viewerId, items: [] };
-      group.items.push({ id: r.id, kind: r.video ? 'VIDEO' : 'IMAGE', ...captionOf(r), createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), canDelete: r.userId === viewerId || owner?.userId === viewerId, ...(r.overlays?.length ? { overlays: r.overlays } : {}), ...(r.userId !== viewerId ? { liked: liked.has(r.id) } : {}) });
+      group.items.push({ id: r.id, kind: r.video ? 'VIDEO' : 'IMAGE', ...captionOf(r), createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), canDelete: r.userId === viewerId || owner?.userId === viewerId, ...(r.overlays?.length ? { overlays: r.overlays } : {}), ...(r.userId !== viewerId ? { liked: liked.has(r.id) } : { views: views.get(r.id) ?? 0 }) });
       groups.set(r.userId, group);
     }
     const last = (g: EventStoryGroupView) => g.items[g.items.length - 1]!.createdAt;
@@ -524,6 +527,7 @@ export class EventPageService {
     const reported = await this.deps.eventRoom.reportedStoryIds(viewerId, all.map((r) => r.id));
     const rows = all.filter((r) => !reported.has(r.id));
     const liked = await this.deps.eventRoom.likedStoryIds(viewerId, rows.filter((r) => r.userId !== viewerId).map((r) => r.id));
+    const views = await this.deps.eventRoom.storyViewCounts(rows.filter((r) => r.userId === viewerId).map((r) => r.id));
     const profiles = await this.deps.users.findProfilesByIds([...new Set(rows.map((r) => r.userId))]);
     const byId = new Map(profiles.map((p) => [p.userId, toPublicProfile(p)]));
     // Um evento por vez era lento (cada um monta a página inteira); em paralelo, um por referência distinta.
@@ -535,7 +539,7 @@ export class EventPageService {
       if (!author) continue;
       const mine = r.userId === viewerId;
       const group = groups.get(r.userId) ?? { author, mine, items: [] };
-      group.items.push({ id: r.id, kind: r.video ? 'VIDEO' : 'IMAGE', ...captionOf(r), createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), canDelete: mine, event: events.get(r.ref.id) ?? null, ...(r.overlays?.length ? { overlays: r.overlays } : {}), ...(mine ? {} : { liked: liked.has(r.id) }) });
+      group.items.push({ id: r.id, kind: r.video ? 'VIDEO' : 'IMAGE', ...captionOf(r), createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), canDelete: mine, event: events.get(r.ref.id) ?? null, ...(r.overlays?.length ? { overlays: r.overlays } : {}), ...(mine ? { views: views.get(r.id) ?? 0 } : { liked: liked.has(r.id) }) });
       groups.set(r.userId, group);
     }
     const last = (g: ProfileStoryGroupView) => g.items[g.items.length - 1]!.createdAt;
@@ -577,7 +581,7 @@ export class EventPageService {
         ((await this.deps.follows.listFriendIds(viewerId)).includes(story.userId) &&
           !(await this.deps.blocks.existsEitherWay(viewerId, story.userId)) &&
           !storiesUnseenBy(viewerId, await this.deps.eventRoom.listStoryHidden(viewerId)).has(story.userId)));
-    if (!visible) throw notFound('Story não encontrado');
+    if (!visible) throw notFound('Flash não encontrado');
     return story;
   }
 
@@ -592,7 +596,7 @@ export class EventPageService {
    * Vale na página inicial e nos stories dos eventos. Só o que vier no pedido muda.
    */
   async setStoryVisibility(actorId: string, otherId: string, input: { hideTheirs?: unknown; hideMine?: unknown }): Promise<StoryVisibilityView> {
-    if (actorId === otherId) throw validationError('Você não pode ocultar seus stories de si mesmo');
+    if (actorId === otherId) throw validationError('Você não pode ocultar seus flashes de si mesmo');
     for (const key of ['hideTheirs', 'hideMine'] as const) {
       if (input[key] !== undefined && typeof input[key] !== 'boolean') throw validationError('Confira os dados', { [key]: 'Use verdadeiro ou falso' });
     }
@@ -610,7 +614,7 @@ export class EventPageService {
   /** Apaga, pela página inicial, um story seu (some do evento também). */
   async deleteProfileStory(viewerId: string, storyId: unknown): Promise<{ deleted: true }> {
     const story = await this.profileStoryFor(viewerId, storyId);
-    if (story.userId !== viewerId) throw forbidden('Só quem publicou apaga o story por aqui');
+    if (story.userId !== viewerId) throw forbidden('Só quem publicou apaga o flash por aqui');
     await this.deps.eventRoom.deleteStory(story.id);
     return { deleted: true };
   }
@@ -618,7 +622,7 @@ export class EventPageService {
   /** Denuncia, pela página inicial, o story de um amigo. */
   async reportProfileStory(viewerId: string, storyId: unknown, reason: unknown, details?: unknown): Promise<{ reported: true }> {
     const story = await this.profileStoryFor(viewerId, storyId);
-    if (story.userId === viewerId) throw forbidden('Este story é seu: apague-o se não quiser mais');
+    if (story.userId === viewerId) throw forbidden('Este flash é seu: apague-o se não quiser mais');
     if (typeof reason !== 'string' || !(POST_REPORT_REASONS as readonly string[]).includes(reason)) throw validationError('Motivo inválido', { reason: 'Escolha um motivo da lista' });
     const text = optionalText(details, EVENT_STORY_REPORT_DETAILS_MAX, 'details', 'Detalhes');
     await this.deps.eventRoom.reportStory({ id: this.deps.ids.next(), storyId: story.id, reporterId: viewerId, reason: reason as PostReportReason, details: text, createdAt: this.deps.clock.now() });
@@ -637,10 +641,10 @@ export class EventPageService {
       const { ref } = await this.resolve(viewerId, rawEventId);
       const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
       const found = typeof storyId === 'string' && storyId.length <= 64 ? (await this.visibleStories(viewerId, ref, hidden)).find((s) => s.id === storyId) : undefined;
-      if (!found) throw notFound('Story não encontrado');
+      if (!found) throw notFound('Flash não encontrado');
       story = found;
     }
-    if (story.userId === viewerId) throw forbidden('Este story é seu');
+    if (story.userId === viewerId) throw forbidden('Este flash é seu');
     return { authorId: story.userId, eventUrl: `/eventos/${story.ref.id}` };
   }
 
@@ -650,13 +654,13 @@ export class EventPageService {
     const overlays = parseStoryOverlays(rawOverlays);
     const { ref, owner } = await this.resolve(viewerId, rawId);
     const isOwner = owner?.userId === viewerId;
-    if (!isOwner && !(await this.deps.eventRoom.isGoing(ref, viewerId))) throw forbidden('Confirme presença para publicar um story neste evento');
+    if (!isOwner && !(await this.deps.eventRoom.isGoing(ref, viewerId))) throw forbidden('Confirme presença para publicar um flash neste evento');
     const { view } = await this.base(viewerId, ref, {});
     const now = this.deps.clock.now();
     const endsAt = Date.parse(view.endsAt);
     if (endsAt <= now.getTime()) throw forbidden('Esse evento já terminou');
     const mine = (await this.deps.eventRoom.listStories(ref, now)).filter((s) => s.userId === viewerId);
-    if (mine.length >= EVENT_STORY_MAX_PER_USER) throw validationError('Muitos stories', { media: `Você já tem ${EVENT_STORY_MAX_PER_USER} stories no ar neste evento` });
+    if (mine.length >= EVENT_STORY_MAX_PER_USER) throw validationError('Muitos flashes', { media: `Você já tem ${EVENT_STORY_MAX_PER_USER} flashes no ar neste evento` });
     const media = parseChatMedia(contentType, bytes, POST_VIDEO_MAX_BYTES);
     const caption = parseStoryCaption(text?.caption, text?.captionY);
     const expiresAt = new Date(Math.min(now.getTime() + EVENT_STORY_HOURS * 3_600_000, endsAt));
@@ -669,8 +673,8 @@ export class EventPageService {
   async deleteStory(viewerId: string, rawId: unknown, storyId: unknown): Promise<{ deleted: true }> {
     const { ref, owner } = await this.resolve(viewerId, rawId);
     const story = typeof storyId === 'string' && storyId.length <= 64 ? await this.deps.eventRoom.findStory(storyId) : undefined;
-    if (!story || story.ref.id !== ref.id) throw notFound('Story não encontrado');
-    if (story.userId !== viewerId && owner?.userId !== viewerId) throw forbidden('Só quem publicou ou o dono do evento apaga o story');
+    if (!story || story.ref.id !== ref.id) throw notFound('Flash não encontrado');
+    if (story.userId !== viewerId && owner?.userId !== viewerId) throw forbidden('Só quem publicou ou o dono do evento apaga o flash');
     await this.deps.eventRoom.deleteStory(story.id);
     return { deleted: true };
   }

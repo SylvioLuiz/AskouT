@@ -275,9 +275,9 @@ export class VenueStoryService {
   /** O responsável publica foto (até 2 MB) ou vídeo (até 60 MB). Dura 24 h. */
   async publish(userId: string, venueId: unknown, contentType: unknown, bytes: unknown): Promise<VenueStoryItemView> {
     const venue = await this.ownedOrThrow(userId, venueId);
-    if (await this.isSuspended(venue.id)) throw forbidden('A publicação de stories deste local está suspensa até a gestão analisar as denúncias');
+    if (await this.isSuspended(venue.id)) throw forbidden('A publicação de flashes deste local está suspensa até a gestão analisar as denúncias');
     const now = this.deps.clock.now();
-    if ((await this.deps.venueStories.listLive([venue.id], now)).length >= VENUE_STORY_MAX_LIVE) throw validationError('Muitos stories', { media: `O local já tem ${VENUE_STORY_MAX_LIVE} stories no ar` });
+    if ((await this.deps.venueStories.listLive([venue.id], now)).length >= VENUE_STORY_MAX_LIVE) throw validationError('Muitos flashes', { media: `O local já tem ${VENUE_STORY_MAX_LIVE} flashes no ar` });
     const media = parseChatMedia(contentType, bytes, POST_VIDEO_MAX_BYTES);
     const record = { id: this.deps.ids.next(), venueId: venue.id, authorId: userId, mime: media.mime, video: media.kind === 'VIDEO', data: media.data, createdAt: now, expiresAt: new Date(now.getTime() + VENUE_STORY_HOURS * HOUR) };
     await this.deps.venueStories.add(record);
@@ -287,7 +287,7 @@ export class VenueStoryService {
   async remove(userId: string, venueId: unknown, storyId: unknown): Promise<{ deleted: true }> {
     const venue = await this.ownedOrThrow(userId, venueId);
     const story = typeof storyId === 'string' && storyId.length <= 64 ? await this.deps.venueStories.find(storyId) : undefined;
-    if (!story || story.venueId !== venue.id) throw notFound('Story não encontrado');
+    if (!story || story.venueId !== venue.id) throw notFound('Flash não encontrado');
     await this.deps.venueStories.delete(story.id);
     return { deleted: true };
   }
@@ -295,8 +295,8 @@ export class VenueStoryService {
   /** Denuncia um story de local. Fica para a gestão e quem denunciou deixa de vê-lo. */
   async report(viewerId: string, storyId: unknown, reason: unknown, details?: unknown): Promise<{ reported: true }> {
     const story = typeof storyId === 'string' && storyId.length <= 64 ? await this.deps.venueStories.find(storyId) : undefined;
-    if (!story || story.expiresAt.getTime() <= this.deps.clock.now().getTime()) throw notFound('Story não encontrado');
-    if (story.authorId === viewerId) throw forbidden('Este story é do seu local: apague-o se não quiser mais');
+    if (!story || story.expiresAt.getTime() <= this.deps.clock.now().getTime()) throw notFound('Flash não encontrado');
+    if (story.authorId === viewerId) throw forbidden('Este flash é do seu local: apague-o se não quiser mais');
     if (typeof reason !== 'string' || !(POST_REPORT_REASONS as readonly string[]).includes(reason)) throw validationError('Motivo inválido', { reason: 'Escolha um motivo da lista' });
     const text = optionalText(details, VENUE_STORY_REPORT_DETAILS_MAX, 'details', 'Detalhes');
     await this.deps.venueStories.report({ id: this.deps.ids.next(), storyId: story.id, reporterId: viewerId, reason: reason as PostReportReason, details: text, createdAt: this.deps.clock.now(), resolvedAt: null, resolution: null, resolutionNote: null });
@@ -386,7 +386,7 @@ export class VenueStoryService {
     this.assertAdmin(actor);
     const text = optionalText(note, 500, 'note', 'Nota');
     if (text === null) throw validationError('Informe o motivo', { note: 'Informe o motivo' });
-    if (typeof storyId !== 'string' || storyId.length > 64 || !(await this.deps.venueStories.delete(storyId))) throw notFound('Story não encontrado');
+    if (typeof storyId !== 'string' || storyId.length > 64 || !(await this.deps.venueStories.delete(storyId))) throw notFound('Flash não encontrado');
     await this.deps.admin.addAudit({ id: this.deps.ids.next(), adminId: actor.userId, action: 'STORY_REMOVED', targetType: 'STORY', targetId: storyId, note: text, createdAt: this.deps.clock.now() });
     return { deleted: true };
   }

@@ -116,7 +116,7 @@ test('meus eventos confirmados: só os que ainda vão acontecer, do mais próxim
 const JPG_BYTES = (n = 20) => new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...new Array(n).fill(1)]);
 const MP4_BYTES = (n = 40) => new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, ...new Array(n).fill(2)]);
 
-test('story de evento: só quem confirmou presença publica; foto ou vídeo; página mostra quem tem story', async () => {
+test('flash de evento: só quem confirmou presença publica; foto ou vídeo; página mostra quem tem flash', async () => {
   const { w, ana, bia, caio } = await setup();
   await rejectsWith(w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES()), 'FORBIDDEN');
   assert.equal((await w.core.eventPages.get(bia, 'e1')).canStory, false);
@@ -125,7 +125,7 @@ test('story de evento: só quem confirmou presença publica; foto ou vídeo; pá
   assert.equal((await w.core.eventPages.get(bia, 'e1')).canStory, true);
   const photo = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES());
   assert.equal(photo.items[0]!.kind, 'IMAGE');
-  assert.equal(photo.items[0]!.caption, null, 'sem texto, o story é só a mídia');
+  assert.equal(photo.items[0]!.caption, null, 'sem texto, o flash é só a mídia');
   w.clock.tick(1000);
   await w.core.eventPages.createStory(bia, 'e1', 'video/mp4', MP4_BYTES());
   w.clock.tick(1000);
@@ -141,13 +141,13 @@ test('story de evento: só quem confirmou presença publica; foto ou vídeo; pá
   assert.equal(media?.mime, 'image/jpeg');
 });
 
-test('story de evento: 24 h ou o fim do evento, o que vier primeiro, e some com o evento', async () => {
+test('flash de evento: 24 h ou o fim do evento, o que vier primeiro, e some com o evento', async () => {
   const { w, ana, bia, ev } = await setup();
   await w.core.eventPages.go(bia, 'e1');
   await w.core.eventPages.go(bia, ev.id);
   const short = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES());
   const long = await w.core.eventPages.createStory(bia, ev.id, 'image/jpeg', JPG_BYTES());
-  assert.equal(Date.parse(short.items[0]!.expiresAt) - w.clock.now().getTime(), 4 * H, 'o evento acaba em 4 h: o story acaba junto');
+  assert.equal(Date.parse(short.items[0]!.expiresAt) - w.clock.now().getTime(), 4 * H, 'o evento acaba em 4 h: o flash acaba junto');
   assert.equal(Date.parse(long.items[0]!.expiresAt) - w.clock.now().getTime(), 24 * H, 'evento longe: vale 24 h');
   w.clock.tick(5 * H);
   assert.deepEqual(await w.core.eventPages.stories(ana, 'e1'), []);
@@ -155,11 +155,11 @@ test('story de evento: 24 h ou o fim do evento, o que vier primeiro, e some com 
   assert.equal((await w.core.eventPages.get(ana, 'e1')).storyUserIds.length, 0);
   assert.equal((await w.core.eventPages.stories(ana, ev.id)).length, 1);
   await w.core.posts.delete(ana, ev.id);
-  assert.equal(await w.core.eventPages.storyMedia(long.items[0]!.id), undefined, 'apagou o evento, o story vai junto');
+  assert.equal(await w.core.eventPages.storyMedia(long.items[0]!.id), undefined, 'apagou o evento, o flash vai junto');
   await rejectsWith(w.core.eventPages.stories(ana, ev.id), 'NOT_FOUND');
 });
 
-test('story de evento: depois do fim não publica; apagar é do autor ou do dono; bloqueio esconde; limite por pessoa', async () => {
+test('flash de evento: depois do fim não publica; apagar é do autor ou do dono; bloqueio esconde; limite por pessoa', async () => {
   const { w, ana, bia, caio, ev } = await setup();
   await w.core.eventPages.go(bia, ev.id);
   await w.core.eventPages.go(caio, ev.id);
@@ -179,7 +179,7 @@ test('story de evento: depois do fim não publica; apagar é do autor ou do dono
   await rejectsWith(w.core.eventPages.createStory(bia, ev.id, 'image/jpeg', JPG_BYTES()), 'FORBIDDEN');
 });
 
-test('denunciar story: uma vez por pessoa, não o próprio, e quem denunciou deixa de vê-lo', async () => {
+test('denunciar flash: uma vez por pessoa, não o próprio, e quem denunciou deixa de vê-lo', async () => {
   const { w, ana, bia, caio } = await setup();
   await w.core.eventPages.go(bia, 'e1');
   await w.core.eventPages.go(caio, 'e1');
@@ -196,10 +196,10 @@ test('denunciar story: uma vez por pessoa, não o próprio, e quem denunciou dei
   assert.deepEqual((await w.core.eventPages.get(caio, 'e1')).storyUserIds, []);
   assert.equal((await w.core.eventPages.stories(ana, 'e1')).length, 1, 'os outros continuam vendo');
   await w.core.eventPages.deleteStory(bia, 'e1', id);
-  assert.equal(w.eventRoom.storyReports.size, 0, 'apagou o story, a denúncia some junto (como o cascade do banco)');
+  assert.equal(w.eventRoom.storyReports.size, 0, 'apagou o flash, a denúncia some junto (como o cascade do banco)');
 });
 
-test('story também no perfil: aparece na página inicial dos amigos; sem a opção, fica só no evento', async () => {
+test('flash também no perfil: aparece na página inicial dos amigos; sem a opção, fica só no evento', async () => {
   const { w, ana, bia, caio, duda } = await setup();
   for (const who of [ana, bia, caio, duda]) await w.core.eventPages.go(who, 'e1');
   const shared = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), true);
@@ -210,7 +210,7 @@ test('story também no perfil: aparece na página inicial dos amigos; sem a opç
   assert.equal((await w.core.eventPages.stories(caio, 'e1')).flatMap((g) => g.items).length, 3, 'no evento, todos aparecem como antes');
 
   const forAna = await w.core.eventPages.profileStories(ana);
-  assert.deepEqual(forAna.map((g) => [g.author.username, g.mine, g.items.map((i) => i.id)]), [['bia', false, [shared.items[0]!.id]]], 'amiga: só o story publicado no perfil; duda não é amiga');
+  assert.deepEqual(forAna.map((g) => [g.author.username, g.mine, g.items.map((i) => i.id)]), [['bia', false, [shared.items[0]!.id]]], 'amiga: só o flash publicado no perfil; duda não é amiga');
   const where = forAna[0]!.items[0]!.event!;
   assert.deepEqual([where.id, where.title, where.place, where.kind, where.confirmedCount, where.going, where.cover], ['e1', 'Piquenique', 'Parque Ibirapuera', 'OUTDOOR', 4, true, { kind: 'URL', url: 'https://img.exemplo/capa.jpg' }], 'mostra onde a pessoa está');
   assert.equal(forAna[0]!.items[0]!.canDelete, false);
@@ -232,7 +232,7 @@ test('story também no perfil: aparece na página inicial dos amigos; sem a opç
   assert.deepEqual(await w.core.eventPages.profileStories(duda), [], 'depois de 24 h some');
 });
 
-test('ocultar stories entre amigos: não ver os dela e não deixar ela ver os meus, na página inicial e no evento', async () => {
+test('ocultar flashes entre amigos: não ver os dela e não deixar ela ver os meus, na página inicial e no evento', async () => {
   const { w, ana, bia, caio } = await setup();
   for (const who of [ana, bia, caio]) await w.core.eventPages.go(who, 'e1');
   const fromBia = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), true);
@@ -270,7 +270,7 @@ test('ocultar stories entre amigos: não ver os dela e não deixar ela ver os me
   await rejectsWith(w.core.eventPages.setStoryVisibility(ana, '00000000-0000-4000-8000-000000000000', { hideMine: true }), 'NOT_FOUND');
 });
 
-test('reagir a um story: amiga recebe na conversa; quem não é amigo manda um aviso; o próprio story e emoji inválido são recusados', async () => {
+test('reagir a um flash: amiga recebe na conversa; quem não é amigo manda um aviso; o próprio flash e emoji inválido são recusados', async () => {
   const { w, ana, bia, caio, duda } = await setup();
   for (const who of [ana, bia, caio, duda]) await w.core.eventPages.go(who, 'e1');
   const story = (await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), true)).items[0]!.id;
@@ -278,7 +278,7 @@ test('reagir a um story: amiga recebe na conversa; quem não é amigo manda um a
   const viaHome = await w.core.storyReactions.react(ana, story, '🔥');
   assert.ok(viaHome.conversationId, 'amigas: vira mensagem');
   const chat = await w.core.conversations.messages(bia, viaHome.conversationId!);
-  assert.equal(chat.messages.at(-1)?.body, 'Reagiu ao seu story: 🔥');
+  assert.equal(chat.messages.at(-1)?.body, 'Reagiu ao seu flash: 🔥');
 
   const viaEvent = await w.core.storyReactions.react(duda, story, '❤️', 'e1');
   assert.equal(viaEvent.conversationId, null, 'não são amigas: só o aviso');
@@ -287,14 +287,14 @@ test('reagir a um story: amiga recebe na conversa; quem não é amigo manda um a
   await rejectsWith(w.core.storyReactions.react(ana, story, 'oi'), 'VALIDATION');
 });
 
-test('responder e curtir um story: resposta de amiga vai para a conversa; curtida fica guardada e avisa uma vez', async () => {
+test('responder e curtir um flash: resposta de amiga vai para a conversa; curtida fica guardada e avisa uma vez', async () => {
   const { w, ana, bia, duda } = await setup();
   for (const who of [ana, bia, duda]) await w.core.eventPages.go(who, 'e1');
   const story = (await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), true)).items[0]!.id;
 
   const reply = await w.core.storyReactions.reply(ana, story, '  Que lugar lindo!  ');
   assert.ok(reply.conversationId, 'amigas: vira mensagem');
-  assert.equal((await w.core.conversations.messages(bia, reply.conversationId!)).messages.at(-1)?.body, 'Respondeu ao seu story: Que lugar lindo!');
+  assert.equal((await w.core.conversations.messages(bia, reply.conversationId!)).messages.at(-1)?.body, 'Respondeu ao seu flash: Que lugar lindo!');
   assert.equal((await w.core.storyReactions.reply(duda, story, 'Oi!', 'e1')).conversationId, null, 'não são amigas: só o aviso');
   await rejectsWith(w.core.storyReactions.reply(ana, story, '   '), 'VALIDATION');
   await rejectsWith(w.core.storyReactions.reply(ana, story, 'a'.repeat(501)), 'VALIDATION');
@@ -306,14 +306,14 @@ test('responder e curtir um story: resposta de amiga vai para a conversa; curtid
   assert.deepEqual(await w.core.storyReactions.like(ana, story, true), { liked: true }, 'curtir de novo não muda nada');
   assert.equal(await likedNow(ana), true);
   assert.equal(await likedNow(duda), false, 'cada pessoa vê a própria curtida');
-  assert.equal((await w.core.eventPages.stories(bia, 'e1')).find((g) => g.mine)?.items[0]?.liked, undefined, 'no próprio story não aparece');
+  assert.equal((await w.core.eventPages.stories(bia, 'e1')).find((g) => g.mine)?.items[0]?.liked, undefined, 'no próprio flash não aparece');
   await w.core.storyReactions.like(ana, story, false);
   assert.equal(await likedNow(ana), false);
   await rejectsWith(w.core.storyReactions.like(ana, story, 'sim'), 'VALIDATION');
   await rejectsWith(w.core.storyReactions.like(bia, story, true, 'e1'), 'FORBIDDEN');
 });
 
-test('story com texto por cima: guarda o texto e a altura, limpa espaços e confere o tamanho', async () => {
+test('flash com texto por cima: guarda o texto e a altura, limpa espaços e confere o tamanho', async () => {
   const { w, bia, ana } = await setup();
   await w.core.eventPages.go(bia, 'e1');
   const made = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), false, undefined, { caption: '  Chegamos!\r\n\n\n\nBora  ', captionY: '0.3' });

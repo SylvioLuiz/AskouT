@@ -776,6 +776,8 @@ export interface EventStoryItem {
   overlays?: StoryOverlay[];
   /** Você curtiu (coração). Só vem nos stories de outras pessoas. */
   liked?: boolean;
+  /** Quantas pessoas viram. Só vem nos seus próprios (só quem publicou vê a contagem). */
+  views?: number;
 }
 
 export type StoryOverlayStyle = 'CLASSIC' | 'BOX' | 'NEON' | 'SERIF';

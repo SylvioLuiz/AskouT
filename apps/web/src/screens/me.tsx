@@ -461,9 +461,9 @@ function VenueStoriesSetting() {
       <section className="setting">
         <div className="setting__text">
           <h2 className="setting__title" id="stories-locais-titulo">
-            {t('Não ver stories de locais')}
+            {t('Não ver flashes de locais')}
           </h2>
-          <p className="setting__help">{t('Esconde os stories de bares, casas e organizações na página inicial e no Rolando agora. Os stories dos seus amigos continuam.')}</p>
+          <p className="setting__help">{t('Esconde os flashes de bares, casas e organizações na página inicial e no Rolando agora. Os flashes dos seus amigos continuam.')}</p>
         </div>
         <button type="button" role="switch" aria-checked={data.hideVenueStories} aria-labelledby="stories-locais-titulo" className="switch" onClick={() => void change(!data.hideVenueStories)} disabled={busy}>
           <span className="switch__thumb" />

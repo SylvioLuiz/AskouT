@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { approximate, isAlcoholVenue } from './venue-story.ts';
 
-describe('regras dos stories de locais', () => {
+describe('regras dos flashes de locais', () => {
   it('reconhece categorias de bebida alcoólica', () => {
     for (const c of ['Bar', 'Pub irlandês', 'Casa noturna', 'night_club', 'Cervejaria artesanal', 'Bar e restaurante', 'Balada']) assert.equal(isAlcoholVenue(c), true, c);
     for (const c of ['Café', 'Restaurante', 'Livraria', 'Parque', 'Barbearia', 'Academia', null, undefined]) assert.equal(isAlcoholVenue(c), false, String(c));

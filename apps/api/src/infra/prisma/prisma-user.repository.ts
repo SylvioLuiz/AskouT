@@ -20,6 +20,7 @@ function toUser(row: {
   profilePending?: boolean;
   passwordless?: boolean;
   phone?: string | null;
+  phoneVerifiedAt?: Date | null;
 }): User {
   return {
     id: row.id,
@@ -36,6 +37,7 @@ function toUser(row: {
     profilePending: row.profilePending === true,
     passwordless: row.passwordless === true,
     phone: row.phone ?? null,
+    phoneVerifiedAt: row.phoneVerifiedAt ?? null,
   };
 }
 
@@ -136,12 +138,27 @@ export class PrismaUserRepository implements UserRepository {
     if (!isUuid(userId)) return;
     const phoneHash = phone ? createHash('sha256').update(phone, 'utf8').digest('hex') : null;
     try {
-      await this.prisma.user.updateMany({ where: { id: userId }, data: { phone, phoneHash } });
+      // Número diferente perde a confirmação por SMS; o mesmo número mantém.
+      await this.prisma.$transaction([
+        this.prisma.user.updateMany({ where: { id: userId, NOT: { phone } }, data: { phoneVerifiedAt: null } }),
+        this.prisma.user.updateMany({ where: { id: userId }, data: { phone, phoneHash } }),
+      ]);
     } catch (error) {
       const targets = uniqueViolationTargets(error);
       if (targets && targets.some((t) => t.includes('phone'))) throw conflict('Este celular já está em outra conta', { phone: 'Este celular já está em outra conta' });
       throw error;
     }
+  }
+
+  async findByPhone(phone: string): Promise<User | undefined> {
+    const row = await this.prisma.user.findUnique({ where: { phone } });
+    return row ? toUser(row) : undefined;
+  }
+
+  async markPhoneVerified(userId: string, phone: string, at: Date): Promise<boolean> {
+    if (!isUuid(userId)) return false;
+    const { count } = await this.prisma.user.updateMany({ where: { id: userId, phone }, data: { phoneVerifiedAt: at } });
+    return count > 0;
   }
 
   async findProfileById(userId: string): Promise<Profile | undefined> {

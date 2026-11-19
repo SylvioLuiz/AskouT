@@ -39,7 +39,7 @@ test('só o responsável publica, e só em local verificado; a mídia some em 24
   assert.deepEqual(await w.core.venueStories.home(ana), []);
 });
 
-test('o responsável tem limite de stories no ar e pode apagar os seus', async () => {
+test('o responsável tem limite de flashes no ar e pode apagar os seus', async () => {
   const { w, dono, ana } = await setup();
   let last = '';
   for (let i = 0; i < VENUE_STORY_MAX_LIVE; i++) last = (await w.core.venueStories.publish(dono, 'cafe', 'image/jpeg', JPEG)).id;
@@ -51,13 +51,13 @@ test('o responsável tem limite de stories no ar e pode apagar os seus', async (
   await rejectsWith(w.core.venueStories.ownerList(ana, 'cafe'), 'NOT_FOUND');
 });
 
-test('Home: quem segue o local vê os stories; quem não segue não vê', async () => {
+test('Home: quem segue o local vê os flashes; quem não segue não vê', async () => {
   const { w, dono, ana, caio } = await setup();
   await w.core.venueStories.publish(dono, 'cafe', 'image/jpeg', JPEG);
   w.clock.tick(1000);
   await w.core.venueStories.publish(dono, 'bar', 'image/jpeg', JPEG);
   const groups = await w.core.venueStories.home(ana);
-  assert.deepEqual(groups.map((g) => g.venue.id), ['bar', 'cafe'], 'o local com story mais novo primeiro');
+  assert.deepEqual(groups.map((g) => g.venue.id), ['bar', 'cafe'], 'o local com flash mais novo primeiro');
   assert.equal(groups[0]?.items.length, 1);
   assert.deepEqual(await w.core.venueStories.home(caio), []);
 });
@@ -139,7 +139,7 @@ test('muitas denúncias de pessoas diferentes suspendem a publicação até a ge
   await rejectsWith(w.core.venueStories.adminRemove(actor, item.id, 'de novo'), 'NOT_FOUND');
 });
 
-test('Rolando agora: junta stories e eventos em andamento, com amigos e interesses no topo, e respeita a privacidade', async () => {
+test('Rolando agora: junta flashes e eventos em andamento, com amigos e interesses no topo, e respeita a privacidade', async () => {
   const { w, dono, ana, bia, mia } = await setup();
   const now = w.clock.now().getTime();
   const live = (id: string, venueId: string, tags: string[]) => ({ id, venueId, title: `Evento ${id}`, description: null, kind: 'SHOW' as const, isFree: true, imageUrl: null, tags, startsAt: new Date(now - HOUR), endsAt: new Date(now + HOUR), isSample: true });
@@ -158,14 +158,14 @@ test('Rolando agora: junta stories e eventos em andamento, com amigos e interess
   const cafe = items.find((i) => i.venue.id === 'cafe')!;
   assert.deepEqual([cafe.stories.length, cafe.event?.id], [1, 'e-cafe']);
   const livre = items.find((i) => i.venue.id === 'livre')!;
-  assert.deepEqual([livre.stories.length, livre.event?.id], [0, 'e-livre'], 'local sem dono não tem story, mas o evento aparece');
+  assert.deepEqual([livre.stories.length, livre.event?.id], [0, 'e-livre'], 'local sem dono não tem flash, mas o evento aparece');
   assert.equal(items.every((i) => i.distanceM !== null && i.distanceM % 100 === 0), true, 'distância em passos de 100 m');
   assert.equal(await w.regions.find(ana), undefined, 'a posição não é gravada');
 
   await w.core.venueStories.setMuted(ana, 'bar', true);
   assert.equal((await w.core.venueStories.rollingNow(ana, near)).some((i) => i.venue.id === 'bar'), false);
   await w.core.venueStories.setSettings(ana, { hideVenueStories: true });
-  assert.equal((await w.core.venueStories.rollingNow(ana, near)).find((i) => i.venue.id === 'cafe')?.stories.length, 0, 'sem stories, o evento continua');
+  assert.equal((await w.core.venueStories.rollingNow(ana, near)).find((i) => i.venue.id === 'cafe')?.stories.length, 0, 'sem flashes, o evento continua');
 
   const mine = await w.core.venueStories.rollingNow(mia, near);
   assert.equal(mine.some((i) => i.venue.id === 'bar'), false, 'menor não vê bar');

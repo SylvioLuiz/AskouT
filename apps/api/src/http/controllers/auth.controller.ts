@@ -72,7 +72,46 @@ export class AuthController {
   @Public()
   @Get('providers')
   providers() {
-    return { items: this.core.auth.socialProviders() };
+    return { items: this.core.auth.socialProviders(), phone: this.core.auth.phoneLoginMethods() };
+  }
+
+  /** Entrar pelo celular sem senha, com o código do app autenticador (ou de recuperação). */
+  @Public()
+  @Post('phone/login')
+  @HttpCode(200)
+  phoneLogin(@Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.auth.loginWithPhoneAuthenticator({ phone: b.phone, code: b.code });
+  }
+
+  /** Entrar pelo celular com código por SMS, etapa 1. Só funciona com SMS_TRANSPORT configurado. */
+  @Public()
+  @Post('phone/sms')
+  @HttpCode(200)
+  phoneSms(@Body() body: unknown) {
+    return this.core.auth.startPhoneLogin(asBody(body).phone);
+  }
+
+  /** Etapa 2: confere o código do SMS. Com app autenticador ligado, ainda devolve o desafio do MFA. */
+  @Public()
+  @Post('phone/sms/confirm')
+  @HttpCode(200)
+  phoneSmsConfirm(@Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.auth.confirmPhoneLogin({ phone: b.phone, code: b.code });
+  }
+
+  /** Confirmar o celular do perfil por SMS (necessário para entrar pelo SMS). */
+  @Post('me/phone/verify')
+  @HttpCode(200)
+  phoneVerifyStart(@CurrentActor() actor: Actor) {
+    return this.core.auth.startPhoneVerification(actor.userId);
+  }
+
+  @Post('me/phone/verify/confirm')
+  @HttpCode(200)
+  phoneVerifyConfirm(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.auth.confirmPhoneVerification(actor.userId, asBody(body).code);
   }
 
   @Public()

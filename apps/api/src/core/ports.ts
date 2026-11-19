@@ -1,6 +1,6 @@
 import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from './album.ts';
 import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from './venue-story.ts';
-import type { GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
+import type { GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -18,6 +18,10 @@ export interface UserRepository {
   findIdsByPhoneHashes(hashes: string[]): Promise<string[]>;
   /** Guarda (ou, com `null`, apaga) o celular. Lança DomainError CONFLICT se outra conta já usa o número. */
   setPhone(userId: string, phone: string | null): Promise<void>;
+  /** Conta com esse celular (E.164), confirmado ou não. */
+  findByPhone(phone: string): Promise<User | undefined>;
+  /** Marca o celular como confirmado, só se a conta ainda usa esse mesmo número. Devolve false se o número mudou. */
+  markPhoneVerified(userId: string, phone: string, at: Date): Promise<boolean>;
   /** Registra a denúncia de um perfil ou comentário. Denunciar a mesma coisa de novo atualiza a denúncia anterior. */
   addReport(report: UserReportRecord): Promise<void>;
   /** Guarda a data de nascimento (AAAA-MM-DD) só se ainda não houver uma. Devolve false se já existia. */
@@ -123,6 +127,20 @@ export interface PasswordResetRepository {
   delete(userId: string): Promise<void>;
   /** Soma 1 às tentativas erradas de forma ATÔMICA e devolve o total (undefined se não existe mais). */
   incrementAttempts(userId: string): Promise<number | undefined>;
+}
+
+export interface PhoneCodeRepository {
+  find(userId: string): Promise<PhoneCode | undefined>;
+  /** Insere ou substitui o código da pessoa (um por vez, de qualquer finalidade). */
+  save(code: PhoneCode): Promise<void>;
+  delete(userId: string): Promise<void>;
+  /** Soma 1 às tentativas erradas de forma ATÔMICA e devolve o total (undefined se não existe mais). */
+  incrementAttempts(userId: string): Promise<number | undefined>;
+}
+
+/** Envio de SMS. Falha com erro comum se a mensagem não puder ser enviada. */
+export interface SmsSender {
+  sendCode(input: { to: string; code: string; purpose: 'LOGIN' | 'VERIFY'; expiresInMinutes: number }): Promise<void>;
 }
 
 export interface MfaRepository {
@@ -1017,6 +1035,10 @@ export interface EventRoomRepository {
   setStoryLike(storyId: string, userId: string, liked: boolean, at: Date): Promise<boolean>;
   /** Destes stories, quais `userId` curtiu. */
   likedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>>;
+  /** Registra que `userId` viu o story (uma vez por pessoa). Devolve true se foi a primeira vez. */
+  recordStoryView(storyId: string, userId: string, at: Date): Promise<boolean>;
+  /** Quantas pessoas viram cada story (só os que têm alguma). */
+  storyViewCounts(storyIds: string[]): Promise<Map<string, number>>;
   /** Grava a ocultação de stories de `ownerId` em relação a `otherId`; tudo desligado apaga a linha. */
   setStoryHidden(record: StoryHiddenRecord): Promise<void>;
   /** As ocultações de stories em que `userId` aparece (as que ele escolheu e as que escolheram sobre ele). */
@@ -1207,6 +1229,9 @@ export interface CoreDeps {
   gifs?: GifSource;
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
+  phoneCodes: PhoneCodeRepository;
+  /** SMS. Sem ele (provedor não configurado), o login por celular fica desligado e o app esconde a aba. */
+  sms?: SmsSender;
   mfa: MfaRepository;
   secretBox: SecretBox;
   mfaChallenges: MfaChallengeTokens;

@@ -126,7 +126,7 @@ export function AccountDeletionInfoScreen() {
         <section className="legal__section">
           <h2>{t('O que é apagado')}</h2>
           <ul>
-            <li>{t('Perfil, foto, posts, comentários, curtidas, stories, eventos criados e presença em eventos.')}</li>
+            <li>{t('Perfil, foto, posts, comentários, curtidas, flashes, eventos criados e presença em eventos.')}</li>
             <li>{t('Mensagens, encontros que você organizou, agenda, NOW, avisos, região e histórico de uso.')}</li>
             <li>{t('Quem você segue e quem segue você. O seu e-mail e o seu @usuário ficam livres de novo.')}</li>
           </ul>
@@ -186,7 +186,7 @@ export function CsaeStandardsScreen() {
         <section className="legal__section">
           <h2>{t('Como denunciar')}</h2>
           <ul>
-            <li>{t('No app: abra o menu de opções (três pontinhos) do perfil, post, comentário, story ou conversa, toque em Denunciar e escolha "Nudez ou conteúdo sexual". Nos detalhes, diga que envolve um menor.')}</li>
+            <li>{t('No app: abra o menu de opções (três pontinhos) do perfil, post, comentário, flash ou conversa, toque em Denunciar e escolha "Nudez ou conteúdo sexual". Nos detalhes, diga que envolve um menor.')}</li>
             <li>{t('Você também pode bloquear a pessoa na hora. O bloqueio avisa a nossa equipe.')}</li>
             <li>
               {t('Por e-mail, a qualquer hora:')} <a href={`mailto:${email}?subject=${encodeURIComponent(t('Denúncia de segurança infantil'))}`}>{email}</a>
