@@ -34,6 +34,8 @@ export interface LinkedPlace {
   address: string | null;
   /** Local do AskouT escolhido (ou criado a partir do Google): o nome no post leva à página dele. */
   venueId?: string | null;
+  /** Foto do Google do lugar, quando houver: a criação de evento oferece usá-la como capa. */
+  photo?: { photoPath: string; author: string | null } | null;
 }
 
 /** Adiciona sem passar de 5 e sem repetir foto de lugar (a nova foto de lugar troca a anterior). */
@@ -57,6 +59,8 @@ export function videoOf(images: readonly DraftImage[]): { index: number; file: F
 /** O lugar do post: o da foto do lugar (fixo) ou o que a pessoa vinculou quando só tem fotos próprias. */
 export function effectivePlace(images: readonly DraftImage[], linked: LinkedPlace | null): LinkedPlace | null {
   const fromPhoto = images.find((i): i is DraftPlacePhoto => i.kind === 'PLACE');
+  // A foto é do próprio lugar vinculado: fica o vínculo (com o local do AskouT), não só o nome da foto.
+  if (fromPhoto && linked && linked.name === fromPhoto.placeName) return linked;
   if (fromPhoto) return { name: fromPhoto.placeName, address: fromPhoto.placeAddress };
   return linked;
 }
