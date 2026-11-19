@@ -12,8 +12,6 @@ export interface PublicProfile {
 
 export interface Profile extends PublicProfile {
   bio: string | null;
-  /** A aba "Participou" aparece para visitantes. Ausente = privada (só a dona vê). */
-  attendedEventsPublic?: boolean;
 }
 
 export type RelationState = 'NONE' | 'PENDING' | 'ACCEPTED';
@@ -434,7 +432,7 @@ export interface PostedEvent extends EventCard {
   postedAt: string;
 }
 
-/** Evento que a pessoa já participou (aba "Participou" do perfil). */
+/** Evento em que a pessoa confirmou presença (abas Eventos e Participou do perfil). */
 export interface AttendedEvent extends EventCard {
   attendedAt: string;
   /** Evento privado criado por uma pessoa (só aparece para quem tem acesso a ele). */
@@ -812,6 +810,8 @@ export interface EventPage {
   storyUserIds: string[];
   /** Pode publicar story: confirmou presença (ou é dono) e o evento não acabou. */
   canStory: boolean;
+  /** Só quando confirmou: escolheu mostrar o evento na aba Eventos do perfil (senão fica na aba Participou, só sua). */
+  goingOnProfile?: boolean;
   owner: PublicProfile | null;
   isOwner: boolean;
 }

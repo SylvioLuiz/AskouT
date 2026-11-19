@@ -255,8 +255,7 @@ export function createApi(deps: ApiDeps) {
     setPhone: (phone: string | null) => request<{ phone: string | null }>('PUT', '/profiles/me/phone', { body: { phone } }),
     profileEvents: (username: string, page?: PageRequest) => request<PostedEventsPage>('GET', `/profiles/${id(username)}/events${pageQuery(page)}`),
     attendedEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/attended${pageQuery(page)}`),
-    setAttendedVisibility: (attendedEventsPublic: boolean) =>
-      request<{ attendedEventsPublic: boolean }>('PATCH', '/profiles/me/attended-visibility', { body: { attendedEventsPublic } }),
+    shownGoingEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/going${pageQuery(page)}`),
     postEvent: (eventId: string) => request<{ posted: true }>('POST', `/events/${id(eventId)}/post`),
     unpostEvent: (eventId: string) => request<{ posted: false }>('DELETE', `/events/${id(eventId)}/post`),
     sendGif: (conversationId: string, gif: CommentGif, replyToId?: string) =>
@@ -536,7 +535,8 @@ export function createApi(deps: ApiDeps) {
     reactProfileStory: (storyId: string, emoji: string) => request<{ sent: true; conversationId: string | null }>('POST', `/stories/${id(storyId)}/react`, { body: { emoji } }),
     reactEventStory: (eventId: string, storyId: string, emoji: string) => request<{ sent: true; conversationId: string | null }>('POST', `/events/${id(eventId)}/stories/${id(storyId)}/react`, { body: { emoji } }),
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
-    eventGo: (eventId: string) => request<EventPage>('POST', `/events/${id(eventId)}/going`),
+    eventGo: (eventId: string, onProfile?: boolean) => request<EventPage>('POST', `/events/${id(eventId)}/going`, onProfile === undefined ? {} : { body: { onProfile } }),
+    setGoingOnProfile: (eventId: string, onProfile: boolean) => request<EventPage>('PATCH', `/events/${id(eventId)}/going`, { body: { onProfile } }),
     eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),
 
     // Feed das páginas de evento (`events`) e de rolê (`venues`)

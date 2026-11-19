@@ -32,13 +32,6 @@ export class ProfilesController {
     return this.core.profiles.setPrivacy(actor.userId, asBody(body).isPrivate);
   }
 
-  /** `{attendedEventsPublic: true|false}`: mostra ou esconde dos visitantes a aba "Participou". */
-  @Patch('me/attended-visibility')
-  @HttpCode(200)
-  setAttendedVisibility(@CurrentActor() actor: Actor, @Body() body: unknown) {
-    return this.core.profiles.setAttendedVisibility(actor.userId, asBody(body).attendedEventsPublic);
-  }
-
   /** `{image: "data:image/jpeg;base64,..."}` (até 60 KB, já reduzida pelo app) ou `{image: null}` para remover. */
   @Put('me/photo')
   setPhoto(@CurrentActor() actor: Actor, @Body() body: unknown) {
@@ -65,7 +58,13 @@ export class ProfilesController {
     return this.core.profileEvents.list(actor.userId, username, { limit, offset });
   }
 
-  /** Eventos que a pessoa já participou (aba "Participou"): a dona sempre vê; visitante só se a aba for pública. */
+  /** Presenças que a pessoa escolheu mostrar na aba Eventos (evento privado só para quem tem acesso a ele). */
+  @Get(':username/going')
+  going(@CurrentActor() actor: Actor, @Param('username') username: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
+    return this.core.eventPages.listShownGoing(actor.userId, username, { limit, offset });
+  }
+
+  /** Aba "Participou": presenças que a pessoa não quis mostrar no perfil. Só ela mesma vê. */
   @Get(':username/attended')
   attended(@CurrentActor() actor: Actor, @Param('username') username: string, @Query('limit') limit?: string, @Query('offset') offset?: string) {
     return this.core.eventPages.listAttended(actor.userId, username, { limit, offset });

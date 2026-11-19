@@ -4,6 +4,7 @@ import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
 import { confirmedLabel, dateTile } from '../lib/poster.ts';
 import { Link } from '../router.tsx';
+import { GoingChoiceSheet } from './going-choice.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 /** Selo com o dia do evento ("SÁB 25 OUT"), em vidro sobre a foto. */
@@ -55,18 +56,26 @@ export function PosterEvent({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
 
-  async function toggle() {
+  const [choosing, setChoosing] = useState(false);
+
+  async function toggle(onProfile?: boolean) {
     if (busy) return;
+    // Confirmar pergunta antes se o evento aparece na aba Eventos do perfil.
+    if (!going && onProfile === undefined) {
+      setChoosing(true);
+      return;
+    }
     setBusy(true);
     setProblem(undefined);
     try {
-      const page = going ? await api.eventCancel(eventId) : await api.eventGo(eventId);
+      const page = going ? await api.eventCancel(eventId) : await api.eventGo(eventId, onProfile);
       setGoing(page.going);
       setConfirmed(page.confirmedCount);
     } catch (failure) {
       setProblem(toApiError(failure).message);
     } finally {
       setBusy(false);
+      setChoosing(false);
     }
   }
 
@@ -102,6 +111,7 @@ export function PosterEvent({
           )}
         </div>
       </div>
+      {choosing ? <GoingChoiceSheet busy={busy} onChoose={(onProfile) => void toggle(onProfile)} onClose={() => setChoosing(false)} /> : null}
     </article>
   );
 }

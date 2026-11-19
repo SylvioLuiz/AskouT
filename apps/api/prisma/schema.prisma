@@ -264,8 +264,6 @@ model Profile {
   bio         String?
   avatarUrl   String?
   isPrivate   Boolean @default(false)
-  /// A aba "Participou" (eventos que a pessoa já foi) aparece para visitantes. Desligada, só a dona vê.
-  attendedEventsPublic Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -1088,6 +1086,8 @@ model EventAttendance {
   placeEventId String?  @db.Uuid
   postId       String?  @db.Uuid
   createdAt    DateTime @default(now())
+  /// A pessoa escolheu, no "Eu vou", mostrar este evento na aba Eventos do perfil. Falso: fica só na aba Participou, que só ela vê.
+  onProfile    Boolean  @default(false)
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   placeEvent PlaceEvent? @relation(fields: [placeEventId], references: [id], onDelete: Cascade)
