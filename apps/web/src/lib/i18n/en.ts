@@ -2699,4 +2699,5 @@ export const EN: Readonly<Record<string, string>> = {
   "Organização": "Organization",
   "Remover minha marcação": "Remove my tag",
   "O post sai do seu perfil e você deixa de aparecer marcado.": "The post leaves your profile and you no longer appear tagged.",
+  "Carregando story": "Loading story",
 };
