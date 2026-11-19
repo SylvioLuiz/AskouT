@@ -74,6 +74,8 @@ class MainViewController: CAPBridgeViewController {
         super.viewDidLoad()
         hideAccessory()
         disableBounce()
+        // Empurrar a tela da borda esquerda para a direita volta à tela anterior (o app web usa o histórico do navegador).
+        self.webView?.allowsBackForwardNavigationGestures = true
     }
 
     /// Sem a mola do iOS, a página não passa do fim: no chat o campo de mensagem não se solta do rodapé nem mostra
