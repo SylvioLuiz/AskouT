@@ -2661,4 +2661,6 @@ export const EN: Readonly<Record<string, string>> = {
   "Próximos": "Upcoming",
   "Tipos de interação": "Interaction types",
   "Ver": "View",
+  "Remover minha marcação": "Remove my tag",
+  "O post sai do seu perfil e você deixa de aparecer marcado.": "The post leaves your profile and you no longer appear tagged.",
 };
