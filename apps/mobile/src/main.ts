@@ -23,6 +23,7 @@ import { createPushBridge, openInApp } from './push-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createVideoBridge } from './video-bridge.ts';
 import { createGalleryBridge, type GalleryPluginLike } from './gallery-bridge.ts';
+import { createAudioBridge, type AudioPluginLike } from './audio-bridge.ts';
 
 /** Carregado antes do app web (ver scripts/build-web.mjs): o app procura estas pontes na hora de usar. */
 const w = window as unknown as Record<string, unknown>;
@@ -88,6 +89,11 @@ if (Capacitor.isNativePlatform()) {
   w['AskouTContacts'] = createContactsBridge({ contacts: Contacts as never });
   // O botão do Google da web não abre dentro do app (o Google bloqueia login em WebView): entra a janela nativa.
   w['AskouTGoogle'] = createGoogleBridge({ login: SocialLogin as never, platform: () => Capacitor.getPlatform() });
+  // Mensagens de voz: no iPhone tocam pelo plugin do app (AudioPlugin.swift), fora do "Tocando agora".
+  // Build antigo, sem o plugin: a ponte não existe e o app web toca como antes.
+  if (Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('AskouTAudio')) {
+    w['AskouTAudio'] = createAudioBridge(registerPlugin<AudioPluginLike>('AskouTAudio'));
+  }
   // Criar story: grade da galeria dentro do app, como no Instagram. Só no iPhone (plugin do próprio app, GalleryPlugin.swift);
   // no Android segue o seletor do sistema (política do Google Play para fotos e vídeos).
   if (Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('AskouTGallery')) {

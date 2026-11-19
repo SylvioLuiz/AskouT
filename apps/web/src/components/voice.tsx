@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ChatMessage } from '../lib/types.ts';
+import { encodeWav, nativeAudio, nativeErrorCode, toBase64 } from '../lib/native-audio.ts';
+import type { NativeAudio, NativeAudioStopped } from '../lib/native-audio.ts';
 import { ArrowUpIcon, MicIcon, PauseIcon, PlayIcon, XIcon } from './icons.tsx';
 import {
   formatVoiceTime,
@@ -185,10 +187,34 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
 // (Now Playing). Um AudioBufferSourceNode não é registrado ali.
 // O Web Audio, porém, respeita a chave do silencioso do iPhone: por isso cada toque põe a sessão de
 // áudio em "playback" (ver setAudioSession) e a devolve para "auto" quando nada mais está tocando.
+// Só que com "playback" o iPhone também passa a mostrar o áudio no "Tocando agora". Por isso, no app do iPhone,
+// o áudio toca pelo plugin nativo (window.AskouTAudio, AudioPlugin.swift), que não aparece lá. O Web Audio fica
+// como reserva: navegador, build antigo do app ou qualquer falha do nativo.
 
 type Player = { pause(): void };
 let playing: Player | undefined;
 let sharedCtx: AudioContext | undefined;
+
+/** O player nativo falhou de um jeito que não é de formato: daqui em diante, só o Web Audio. */
+let nativeBroken = false;
+/** Áudio que o player nativo está tocando (ou começando a tocar) agora. */
+let nativeCurrent: string | undefined;
+const nativeHandlers = new Map<string, (e: NativeAudioStopped) => void>();
+let nativeListening = false;
+
+function nativePlayer(): NativeAudio | undefined {
+  if (nativeBroken) return undefined;
+  const native = nativeAudio();
+  if (native && !nativeListening) {
+    nativeListening = true;
+    native.onStopped((e) => {
+      if (nativeCurrent !== e.key) return;
+      nativeCurrent = undefined;
+      nativeHandlers.get(e.key)?.(e);
+    });
+  }
+  return native;
+}
 
 function audioContext(): AudioContext | undefined {
   if (sharedCtx) return sharedCtx;
@@ -254,6 +280,37 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
   const startedAt = useRef(0); // ctx.currentTime - offset no início do trecho atual
   const raf = useRef<number | undefined>(undefined);
   const player = useRef<Player>({ pause: () => pause() });
+  const key = `${conversationId}:${message.id}`;
+  /** Arquivo baixado (para mandar ao player nativo). */
+  const blob = useRef<Blob | undefined>(undefined);
+  /** O player nativo já tem este áudio guardado: tocar de novo não reenvia os bytes. */
+  const nativeHas = useRef(false);
+  /** Tocando pelo player nativo agora. */
+  const nativeOn = useRef(false);
+  /** performance.now() menos a posição, no início do trecho nativo atual (a barra anda sem perguntar ao nativo). */
+  const nativeStartedAt = useRef(0);
+  const onNativeStopped = useRef<(e: NativeAudioStopped) => void>(() => undefined);
+  onNativeStopped.current = (e) => {
+    nativeOn.current = false;
+    stopTicking();
+    if (playing === player.current) playing = undefined;
+    if (e.finished) {
+      offset.current = 0;
+      setPosition(0);
+      setState('idle');
+    } else {
+      offset.current = e.positionMs / 1000;
+      setPosition(e.positionMs);
+      setState('paused');
+    }
+  };
+  useEffect(() => {
+    const handler = (e: NativeAudioStopped) => onNativeStopped.current(e);
+    nativeHandlers.set(key, handler);
+    return () => {
+      if (nativeHandlers.get(key) === handler) nativeHandlers.delete(key);
+    };
+  }, [key]);
 
   function stopTicking() {
     if (raf.current !== undefined) cancelAnimationFrame(raf.current);
@@ -274,6 +331,27 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
   }
 
   function pause() {
+    if (nativeOn.current) {
+      nativeOn.current = false;
+      offset.current = Math.max(0, Math.min(total || Infinity, performance.now() - nativeStartedAt.current)) / 1000;
+      stopTicking();
+      if (playing === player.current) playing = undefined;
+      if (nativeCurrent === key) {
+        nativeCurrent = undefined;
+        // A posição exata vem do nativo; até lá vale a calculada aqui.
+        void nativeAudio()
+          ?.pause()
+          .then((r) => {
+            if (nativeOn.current || !(r.positionMs > 0)) return;
+            offset.current = r.positionMs / 1000;
+            setPosition(r.positionMs);
+          })
+          .catch(() => undefined);
+      }
+      setPosition(offset.current * 1000);
+      setState('paused');
+      return;
+    }
     const ctx = sharedCtx;
     if (!source.current || !ctx) return;
     offset.current = Math.max(0, ctx.currentTime - startedAt.current);
@@ -327,13 +405,105 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
     () => () => {
       stopSource();
       stopTicking();
+      if (nativeCurrent === key) {
+        nativeCurrent = undefined;
+        void nativeAudio()?.stop().catch(() => undefined);
+      }
       if (playing === player.current) {
         playing = undefined;
         idle();
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
+
+  async function download(): Promise<Blob> {
+    if (!blob.current) blob.current = await api.messageAudio(conversationId, message.id);
+    return blob.current;
+  }
+
+  /**
+   * Toca pelo player do iPhone. `true`: começou (ou outro áudio passou na frente enquanto preparava).
+   * `false`: o nativo não conseguiu, e quem chamou toca pelo Web Audio.
+   */
+  async function playNative(native: NativeAudio, ctx: AudioContext): Promise<boolean> {
+    nativeCurrent = key;
+    if (playing && playing !== player.current) playing.pause();
+    playing = player.current;
+    setState('loading');
+    const original = async () => {
+      const file = await download();
+      return { data: toBase64(new Uint8Array(await file.arrayBuffer())), mime: file.type };
+    };
+    // Formato que o iPhone não abre (WebM do Android): decodifica aqui e manda em WAV, que ele sempre toca.
+    const asWav = async () => {
+      if (!buffer.current) {
+        buffer.current = await decode(ctx, await (await download()).arrayBuffer());
+        setDecodedMs(buffer.current.duration * 1000);
+      }
+      return { data: toBase64(encodeWav(buffer.current)), mime: 'audio/wav' };
+    };
+    if (total > 0 && offset.current * 1000 >= total - 50) offset.current = 0;
+    // Outro áudio passou na frente enquanto este baixava: não chega a pedir ao nativo (senão tocaria por cima do outro).
+    const attempt = async (extra: { data?: string; mime?: string }) => {
+      if (nativeCurrent !== key) throw new Error('superseded');
+      return native.play({ key, offsetMs: offset.current * 1000, ...extra });
+    };
+    const leaveForOther = () => setState(offset.current > 0 ? 'paused' : 'idle');
+    try {
+      let started: { durationMs: number; positionMs: number } | undefined;
+      let code: string | undefined;
+      try {
+        started = await attempt(nativeHas.current ? {} : await original());
+      } catch (failure) {
+        code = nativeErrorCode(failure);
+        if (code === 'MISSING') {
+          try {
+            started = await attempt(await original());
+          } catch (again) {
+            code = nativeErrorCode(again);
+          }
+        }
+        if (!started && code !== 'UNSUPPORTED') throw failure;
+      }
+      if (!started) started = await attempt(await asWav());
+      nativeHas.current = true;
+      // Enquanto preparava, a pessoa tocou em outro áudio: este fica parado.
+      if (nativeCurrent !== key) {
+        leaveForOther();
+        return true;
+      }
+      nativeOn.current = true;
+      if (started.durationMs > 0) setDecodedMs(started.durationMs);
+      nativeStartedAt.current = performance.now() - started.positionMs;
+      setState('playing');
+      // O contexto do Web Audio só foi destravado como reserva: parado, não segura o som do aparelho.
+      if (ctx.state === 'running' && !source.current) void ctx.suspend().catch(() => undefined);
+      if (!message.mine && !heard) {
+        setHeardNow(true);
+        api.markAudioPlayed(conversationId, message.id).catch(() => undefined);
+      }
+      const duration = started.durationMs;
+      const tick = () => {
+        const at = performance.now() - nativeStartedAt.current;
+        setPosition(duration > 0 ? Math.min(duration, at) : at);
+        raf.current = requestAnimationFrame(tick);
+      };
+      tick();
+      return true;
+    } catch {
+      if (nativeCurrent !== key) {
+        leaveForOther();
+        return true;
+      }
+      // Falha que não é de formato (sessão de áudio, arquivo): desliga o nativo e segue pelo Web Audio.
+      nativeBroken = true;
+      if (nativeCurrent === key) nativeCurrent = undefined;
+      nativeHas.current = false;
+      return false;
+    }
+  }
 
   async function toggle() {
     if (state === 'loading') return;
@@ -347,6 +517,13 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
       setState('error');
       return;
     }
+    const native = nativePlayer();
+    if (native) {
+      // Destrava o Web Audio ainda dentro do toque (sem "playback", então sem player no iPhone): é a reserva caso o nativo falhe.
+      unlock(ctx);
+      if (ctx.state !== 'running') void ctx.resume().catch(() => undefined);
+      if (await playNative(native, ctx)) return;
+    }
     setAudioSession('playback');
     unlock(ctx);
     // "suspended" no primeiro toque; "interrupted" no iOS depois de uma ligação, do microfone ou de voltar do fundo.
@@ -354,8 +531,7 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
     try {
       if (!buffer.current) {
         setState('loading');
-        const blob = await api.messageAudio(conversationId, message.id);
-        buffer.current = await decode(ctx, await blob.arrayBuffer());
+        buffer.current = await decode(ctx, await (await download()).arrayBuffer());
         setDecodedMs(buffer.current.duration * 1000);
       }
       await resumed;
