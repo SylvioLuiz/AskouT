@@ -974,6 +974,17 @@ export interface VenueSummary {
 }
 
 /** Pedido para criar a página de uma organização da faculdade. */
+/** Local criado do zero em "Meus locais" (vira pedido para administrar). */
+export interface VenueRequestBody {
+  name: string;
+  category?: string;
+  address: string;
+  lat: number;
+  lng: number;
+  document: string;
+  note?: string;
+}
+
 export interface OrganizationRequestBody {
   name: string;
   type?: string;

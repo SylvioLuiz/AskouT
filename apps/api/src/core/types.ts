@@ -346,6 +346,8 @@ export interface VenueRecord {
   photoAuthor?: string | null;
   /** Organização (bateria, atlética...) em vez de estabelecimento. Sem dono, fica fora das buscas. */
   isOrganization?: boolean;
+  /** Criado do zero por alguém no app (pedido com documento). Sem dono, fica fora das buscas. */
+  isUserCreated?: boolean;
 }
 
 /** Abre e fecha em "HH:MM"; `close` menor ou igual a `open` significa que passa da meia-noite. */

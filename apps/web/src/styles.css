@@ -6059,3 +6059,9 @@ div.optrow__main { cursor: default; }
 .intertabs__tab { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .intertabs__tab .icon, .intertabs__tab svg { width: 16px; height: 16px; flex: none; }
 .intertabs::-webkit-scrollbar { display: none; }
+
+/* ---------- Meus locais: botão flutuante "Criar local" ---------- */
+.venueactions--fab { margin-bottom: 88px; }
+.createsource__item { flex-direction: row; align-items: center; gap: 12px; }
+.createsource__icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; color: var(--brand); background: var(--brand-soft); border-radius: 999px; }
+.createsource__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }

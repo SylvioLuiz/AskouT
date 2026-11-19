@@ -88,6 +88,20 @@ export interface VenueSummaryView {
 }
 
 /** Pedido para criar a página de uma organização da faculdade. */
+/** Local criado do zero em "Meus locais": ainda não existe no AskouT nem veio do Google. */
+export interface VenueRequestInput {
+  name?: unknown;
+  /** Bar, balada, restaurante... (opcional). */
+  category?: unknown;
+  address?: unknown;
+  /** Onde fica, para o local ter lugar no mapa. */
+  lat?: unknown;
+  lng?: unknown;
+  /** Data URL de um documento que mostre que o local é da pessoa (CNPJ, alvará ou comprovante; PDF ou imagem até 2 MB). */
+  document?: unknown;
+  note?: unknown;
+}
+
 export interface OrganizationRequestInput {
   name?: unknown;
   /** Tipo: bateria, atlética, centro acadêmico... (vira a categoria). */
@@ -673,6 +687,31 @@ export class VenueService {
     const doc = decodeClaimDocument(input.document);
     const now = this.deps.clock.now();
     const venue: VenueRecord = { id: this.deps.ids.next(), name, address: campus, category: type, lat, lng, isSample: false, ownerId: null, description, isOrganization: true };
+    await this.deps.places.createVenue(venue);
+    const claim: VenueClaimRecord = { id: this.deps.ids.next(), venueId: venue.id, userId, status: 'PENDING', note, documentMime: doc.mime, reviewNote: null, reviewedBy: null, reviewedAt: null, createdAt: now };
+    await this.deps.claims.create(claim, doc.bytes);
+    return { id: claim.id, venue: summary(venue), status: 'PENDING', reviewNote: null, createdAt: now.toISOString() };
+  }
+
+  /**
+   * Cria um local do zero (não está no AskouT nem no Google) e já pede para administrá-lo. O local nasce sem dono e
+   * fora das buscas; um admin confere o documento no painel de pedidos e, ao aprovar, a pessoa passa a administrá-lo.
+   */
+  async requestVenue(userId: string, input: VenueRequestInput): Promise<ClaimView> {
+    if (typeof input !== 'object' || input === null) throw validationError('Dados inválidos', { name: 'Preencha os dados do local' });
+    const name = text(input.name, VENUE_NAME_MAX, 'name', 'Nome do local', true) as string;
+    const category = text(input.category, VENUE_CATEGORY_MAX, 'category', 'Tipo');
+    const address = text(input.address, VENUE_ADDRESS_MAX, 'address', 'Endereço', true) as string;
+    const note = text(input.note, CLAIM_NOTE_MAX, 'note', 'Mensagem');
+    const { lat, lng } = input;
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      throw validationError('Dados inválidos', { location: 'Informe onde fica o local (use a localização do aparelho no local)' });
+    }
+    const pending = (await this.deps.claims.listByUser(userId)).filter((c) => c.status === 'PENDING').length;
+    if (pending >= CLAIMS_PENDING_MAX) throw conflict(`Você já tem ${CLAIMS_PENDING_MAX} pedidos em análise. Espere a resposta antes de pedir outro`);
+    const doc = decodeClaimDocument(input.document);
+    const now = this.deps.clock.now();
+    const venue: VenueRecord = { id: this.deps.ids.next(), name, address, category, lat, lng, isSample: false, ownerId: null, isUserCreated: true };
     await this.deps.places.createVenue(venue);
     const claim: VenueClaimRecord = { id: this.deps.ids.next(), venueId: venue.id, userId, status: 'PENDING', note, documentMime: doc.mime, reviewNote: null, reviewedBy: null, reviewedAt: null, createdAt: now };
     await this.deps.claims.create(claim, doc.bytes);

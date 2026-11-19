@@ -1607,7 +1607,7 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   async searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number) {
     const out: { venue: VenueRecord; distanceM: number | null }[] = [];
     for (const venue of this.venues.values()) {
-      if (venue.isOrganization && !venue.ownerId) continue; // organização ainda sem dono (pedido em análise ou recusado)
+      if ((venue.isOrganization || venue.isUserCreated) && !venue.ownerId) continue; // organização ou local novo ainda sem dono (pedido em análise ou recusado)
       const m = matchVenue(venue, text, center, radiusM);
       if (m) out.push(m);
     }
