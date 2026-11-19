@@ -3673,6 +3673,10 @@ a.actlog__row:hover { background: var(--surface); }
 .post__when { margin-right: auto; color: var(--muted); font-size: 0.8125rem; text-decoration: none; }
 .post__place { font-size: 0.9375rem; color: var(--ink-2); }
 .post__caption { white-space: pre-wrap; overflow-wrap: anywhere; }
+.post__textonly { margin: 0; padding: 20px 18px; border-radius: var(--radius-panel); background: color-mix(in srgb, var(--brand) 10%, var(--surface)); font-size: 1.25rem; line-height: 1.4; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.post__linkedevent { font-size: 0.9375rem; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+.post__linkedevent .icon { width: 16px; height: 16px; flex: none; }
+.compose__linkhint { margin: 8px 0 0; font-size: 0.875rem; }
 
 .pcarousel { position: relative; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
 .pcarousel__track { display: flex; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; touch-action: pan-x pan-y; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
@@ -3691,6 +3695,7 @@ a.actlog__row:hover { background: var(--surface); }
 .postgrid__item { position: relative; display: block; aspect-ratio: 1; background: var(--line); overflow: hidden; }
 .postgrid__item img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .postgrid__none { display: block; width: 100%; height: 100%; }
+.postgrid__text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 10px; box-sizing: border-box; background: color-mix(in srgb, var(--brand) 12%, var(--surface)); color: var(--ink); font-size: 0.8125rem; font-weight: 600; line-height: 1.3; text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .postgrid__multi { position: absolute; top: 6px; right: 6px; color: #fff; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6)); }
 .postgrid__multi .icon { width: 20px; height: 20px; }
 

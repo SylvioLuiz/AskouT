@@ -17,7 +17,7 @@ async function setup() {
 
 test('post com uma foto, sem legenda', async () => {
   const { w, ana } = await setup();
-  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   assert.equal(post.caption, null);
   assert.equal(post.images.length, 1);
   assert.equal(post.images[0]!.kind, 'UPLOAD');
@@ -28,12 +28,12 @@ test('post com uma foto, sem legenda', async () => {
 
 test('carrossel: mantém a ordem e aceita no máximo 5 fotos', async () => {
   const { w, ana } = await setup();
-  const post = await w.core.posts.create(ana, { caption: '  Noite boa  ', images: [JPEG(1), JPEG(2), JPEG(3)] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', caption: '  Noite boa  ', images: [JPEG(1), JPEG(2), JPEG(3)] });
   assert.equal(post.caption, 'Noite boa');
   const sizes = await Promise.all(post.images.map(async (i) => (await w.core.posts.image(i.id))!.data.length));
   assert.deepEqual(sizes, [5, 6, 7]);
-  await rejectsWith(w.core.posts.create(ana, { images: Array.from({ length: POST_IMAGES_MAX + 1 }, () => JPEG()) }), 'VALIDATION');
-  await rejectsWith(w.core.posts.create(ana, { images: [] }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: Array.from({ length: POST_IMAGES_MAX + 1 }, () => JPEG()) }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [] }), 'VALIDATION');
   await rejectsWith(w.core.posts.create(ana, {}), 'VALIDATION');
 });
 
@@ -50,23 +50,23 @@ test('foto do lugar (Google): vale como foto, com autor; só uma por post; pode 
   assert.equal(post.images[0]!.photoAuthor, 'Maria');
   assert.equal(post.placeName, 'Bar do Zé');
   assert.equal(await w.core.posts.image(post.images[0]!.id), undefined, 'foto do lugar não tem bytes guardados');
-  await rejectsWith(w.core.posts.create(ana, { images: [{ placePhotoRef: 'a' }, { placePhotoRef: 'b' }] }), 'VALIDATION');
-  await rejectsWith(w.core.posts.create(ana, { images: [{ placePhotoRef: '' }] }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [{ placePhotoRef: 'a' }, { placePhotoRef: 'b' }] }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [{ placePhotoRef: '' }] }), 'VALIDATION');
 });
 
 test('recusa arquivo que não é imagem, imagem grande demais e legenda longa', async () => {
   const { w, ana } = await setup();
-  await rejectsWith(w.core.posts.create(ana, { images: ['data:text/html;base64,PGI+'] }), 'VALIDATION');
-  await rejectsWith(w.core.posts.create(ana, { images: [`data:image/jpeg;base64,${Buffer.from([1, 2, 3, 4]).toString('base64')}`] }), 'VALIDATION');
-  await rejectsWith(w.core.posts.create(ana, { images: [JPEG(200_000)] }), 'VALIDATION');
-  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], caption: 'x'.repeat(501) }), 'VALIDATION');
-  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], caption: 5 }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: ['data:text/html;base64,PGI+'] }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [`data:image/jpeg;base64,${Buffer.from([1, 2, 3, 4]).toString('base64')}`] }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG(200_000)] }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()], caption: 'x'.repeat(501) }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()], caption: 5 }), 'VALIDATION');
 });
 
 test('perfil: lista os posts do mais recente, com paginação; privado só para quem segue', async () => {
   const { w, ana, bia, caio } = await setup();
   for (const c of ['um', 'dois', 'três']) {
-    await w.core.posts.create(ana, { caption: c, images: [JPEG()] });
+    await w.core.posts.create(ana, { placeName: 'Bar do Zé', caption: c, images: [JPEG()] });
     w.clock.tick(1000);
   }
   const page = await w.core.posts.listByUsername(bia, 'ana', { limit: 2 });
@@ -88,7 +88,7 @@ test('perfil: lista os posts do mais recente, com paginação; privado só para 
 
 test('bloqueio esconde os posts nos dois sentidos', async () => {
   const { w, ana, bia } = await setup();
-  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   await w.core.blocks.block(ana, bia);
   await rejectsWith(w.core.posts.listByUsername(bia, 'ana'), 'NOT_FOUND');
   await rejectsWith(w.core.posts.get(bia, post.id), 'NOT_FOUND');
@@ -98,11 +98,11 @@ test('bloqueio esconde os posts nos dois sentidos', async () => {
 test('feed: seus posts e os de quem você segue, amigo ou não', async () => {
   const { w, ana, bia, caio } = await setup();
   await w.core.follows.follow(ana, caio); // só segue: não é amigo, mas o post aparece
-  await w.core.posts.create(bia, { caption: 'da Bia', images: [JPEG()] });
+  await w.core.posts.create(bia, { placeName: 'Bar do Zé', caption: 'da Bia', images: [JPEG()] });
   w.clock.tick(1000);
-  await w.core.posts.create(caio, { caption: 'do Caio', images: [JPEG()] });
+  await w.core.posts.create(caio, { placeName: 'Bar do Zé', caption: 'do Caio', images: [JPEG()] });
   w.clock.tick(1000);
-  await w.core.posts.create(ana, { caption: 'da Ana', images: [JPEG()] });
+  await w.core.posts.create(ana, { placeName: 'Bar do Zé', caption: 'da Ana', images: [JPEG()] });
   const feed = await w.core.posts.feed(ana);
   assert.deepEqual(feed.items.map((p) => p.caption), ['da Ana', 'do Caio', 'da Bia']);
   assert.equal(feed.items[2]!.author.username, 'bia');
@@ -112,7 +112,7 @@ test('feed: seus posts e os de quem você segue, amigo ou não', async () => {
 
 test('apagar: só o autor; some do perfil e do feed e a foto deixa de existir', async () => {
   const { w, ana, bia } = await setup();
-  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   await rejectsWith(w.core.posts.delete(bia, post.id), 'NOT_FOUND');
   assert.deepEqual(await w.core.posts.delete(ana, post.id), { deleted: true });
   await rejectsWith(w.core.posts.delete(ana, post.id), 'NOT_FOUND');
@@ -123,9 +123,9 @@ test('apagar: só o autor; some do perfil e do feed e a foto deixa de existir', 
 
 test('marcar amigos: só amigos, fica pendente, avisa e só entra no feed e no perfil depois de aceitar', async () => {
   const { w, ana, bia, caio } = await setup();
-  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], tagUserIds: [caio] }), 'VALIDATION');
-  await rejectsWith(w.core.posts.create(ana, { images: [JPEG()], tagUserIds: 'bia' }), 'VALIDATION');
-  const post = await w.core.posts.create(ana, { caption: 'Com a Bia', images: [JPEG()], tagUserIds: [bia, bia, ana] });
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()], tagUserIds: [caio] }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()], tagUserIds: 'bia' }), 'VALIDATION');
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', caption: 'Com a Bia', images: [JPEG()], tagUserIds: [bia, bia, ana] });
   assert.deepEqual(post.tags.map((t) => [t.user.username, t.status]), [['bia', 'PENDING']], 'duplicado e a própria pessoa são ignorados');
   const news = await w.core.notifications.list(bia);
   assert.ok(news.items.some((n) => n.type === 'POST_TAG' && n.body.includes('Aceite')));
@@ -151,7 +151,7 @@ test('marcar amigos: só amigos, fica pendente, avisa e só entra no feed e no p
 
 test('post marcado de autor que o visitante não pode ver não aparece no perfil do marcado', async () => {
   const { w, ana, bia, caio } = await setup();
-  const post = await w.core.posts.create(ana, { images: [JPEG()], tagUserIds: [bia] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()], tagUserIds: [bia] });
   await w.core.posts.respondTag(bia, post.id, 'accept');
   await w.core.profiles.setPrivacy(ana, true);
   assert.equal((await w.core.posts.listByUsername(bia, 'bia')).items.length, 1, 'a própria Bia vê (segue a Ana)');
@@ -161,7 +161,7 @@ test('post marcado de autor que o visitante não pode ver não aparece no perfil
 test('evento: título, lugar e início no futuro; fim padrão 3 h depois; post comum vem com event nulo', async () => {
   const { w, ana } = await setup();
   const start = new Date(w.clock.now().getTime() + 24 * 3_600_000).toISOString();
-  const plain = await w.core.posts.create(ana, { images: [JPEG()] });
+  const plain = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   assert.equal(plain.event, null);
   const ev = await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Bar do Zé', event: { title: 'Pagode de sábado', startsAt: start } });
   assert.equal(ev.event?.title, 'Pagode de sábado');
@@ -177,7 +177,7 @@ test('evento: título, lugar e início no futuro; fim padrão 3 h depois; post c
 test('lista do perfil separa eventos de posts comuns (kind=event|post)', async () => {
   const { w, ana } = await setup();
   const start = new Date(w.clock.now().getTime() + 24 * 3_600_000).toISOString();
-  const plain = await w.core.posts.create(ana, { images: [JPEG()] });
+  const plain = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   w.clock.tick(1000);
   const ev = await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Bar', event: { title: 'Pagode', startsAt: start } });
   const all = await w.core.posts.listByUsername(ana, 'ana');
@@ -192,7 +192,7 @@ test('lista do perfil separa eventos de posts comuns (kind=event|post)', async (
 
 test('curtir: conta, desfaz, avisa o autor uma vez e não vale em post que não dá para ver', async () => {
   const { w, ana, bia, caio } = await setup();
-  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   assert.deepEqual([post.likeCount, post.likedByMe, post.commentCount], [0, false, 0]);
   assert.deepEqual(await w.core.posts.like(bia, post.id), { liked: true, likeCount: 1 });
   assert.deepEqual(await w.core.posts.like(bia, post.id), { liked: true, likeCount: 1 }, 'curtir de novo não duplica');
@@ -211,7 +211,7 @@ test('curtir: conta, desfaz, avisa o autor uma vez e não vale em post que não 
 
 test('comentários: escrever, listar do mais antigo, apagar (autor do comentário ou do post) e avisar', async () => {
   const { w, ana, bia, caio } = await setup();
-  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   const c1 = await w.core.posts.addComment(bia, post.id, '  Que legal!  ');
   assert.equal(c1.body, 'Que legal!');
   assert.deepEqual([c1.mine, c1.canDelete], [true, true]);
@@ -235,9 +235,9 @@ test('comentários: escrever, listar do mais antigo, apagar (autor do comentári
 
 test('denunciar e "não tenho interesse": somem do feed de quem pediu; o próprio post não', async () => {
   const { w, ana, bia } = await setup();
-  const p1 = await w.core.posts.create(ana, { images: [JPEG()] });
+  const p1 = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   w.clock.tick(1000);
-  const p2 = await w.core.posts.create(ana, { images: [JPEG()] });
+  const p2 = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   assert.equal((await w.core.posts.feed(bia)).items.length, 2);
   await w.core.posts.notInterested(bia, p1.id);
   assert.deepEqual((await w.core.posts.feed(bia)).items.map((p) => p.id), [p2.id]);
@@ -271,7 +271,7 @@ test('editar: legenda, lugar e evento; só o autor; evento mantém o início se 
 
 test('ajustar foto: troca os bytes de uma foto enviada, só do autor; foto de lugar não', async () => {
   const { w, ana, bia } = await setup();
-  const post = await w.core.posts.create(ana, { images: [JPEG(3), { placePhotoRef: 'places/x/photos/y' }] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG(3), { placePhotoRef: 'places/x/photos/y' }] });
   const [up, place] = post.images;
   const after = await w.core.posts.replaceImage(ana, post.id, up!.id, JPEG(9));
   assert.equal(after.images.length, 2);
@@ -286,7 +286,7 @@ test('ajustar foto: troca os bytes de uma foto enviada, só do autor; foto de lu
 
 test('arquivar: some do feed, do perfil e para os outros; volta ao desarquivar', async () => {
   const { w, ana, bia } = await setup();
-  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   await rejectsWith(w.core.posts.archive(bia, post.id), 'FORBIDDEN');
   assert.deepEqual(await w.core.posts.archive(ana, post.id), { archived: true });
   assert.equal((await w.core.posts.feed(ana)).items.length, 0);
@@ -320,7 +320,7 @@ test('vídeo no post: entra no item da capa, um por post, só do autor, com o ta
   const { ana, bia } = await w.signUpMany('ana', 'bia');
   await w.core.follows.follow(ana, bia);
   await w.core.follows.follow(bia, ana);
-  const post = await w.core.posts.create(ana, { images: [JPEG(), JPEG(2)] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG(), JPEG(2)] });
   assert.equal(post.images.some((i) => i.video), false);
   const [cover, other] = post.images;
 
@@ -330,7 +330,7 @@ test('vídeo no post: entra no item da capa, um por post, só do autor, com o ta
   await rejectsWith(w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9])), 'VALIDATION');
   await rejectsWith(w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', new Uint8Array(61 * 1024 * 1024)), 'VALIDATION');
 
-  // Acima dos 20 MB do chat ainda vale em post (o teto é 60 MB).
+  // Vídeo grande (30 MB) vale em post (o teto é 60 MB).
   const big = new Uint8Array(30 * 1024 * 1024);
   big.set(MP4(), 0);
   const withVideo = await w.core.posts.attachVideo(ana, post.id, cover!.id, 'video/mp4', big);
@@ -349,7 +349,7 @@ test('vídeo no post: entra no item da capa, um por post, só do autor, com o ta
 
 test('comentário: curtir e descurtir (sem duplicar), contagem, aviso ao autor e some junto com o comentário', async () => {
   const { w, ana, bia, caio } = await setup();
-  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   const c = await w.core.posts.addComment(bia, post.id, 'Boa!');
   assert.deepEqual([c.likeCount, c.likedByMe], [0, false]);
   assert.deepEqual(await w.core.posts.likeComment(ana, post.id, c.id), { liked: true, likeCount: 1 });
@@ -363,7 +363,7 @@ test('comentário: curtir e descurtir (sem duplicar), contagem, aviso ao autor e
   assert.equal((await w.core.notifications.list(bia)).items.filter((n) => n.type === 'POST_LIKE').length, 1, 'curtir o próprio comentário não avisa');
   assert.deepEqual(await w.core.posts.likeComment(ana, post.id, c.id, false), { liked: false, likeCount: 1 });
   await rejectsWith(w.core.posts.likeComment(ana, post.id, 'nao-existe'), 'NOT_FOUND');
-  const other = await w.core.posts.create(ana, { images: [JPEG()] });
+  const other = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   await rejectsWith(w.core.posts.likeComment(ana, other.id, c.id), 'NOT_FOUND');
   await w.core.profiles.setPrivacy(ana, true);
   await rejectsWith(w.core.posts.likeComment(caio, post.id, c.id), 'NOT_FOUND');
@@ -373,7 +373,7 @@ test('comentário: @usuario avisa quem foi marcado, ignora a si mesmo, bloqueio 
   const { w, ana, bia, caio } = await setup();
   await w.core.follows.follow(caio, ana);
   await w.core.follows.follow(ana, caio);
-  const post = await w.core.posts.create(ana, { images: [JPEG()] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()] });
   const count = async (id: string) => (await w.core.notifications.list(id)).items.filter((n) => n.type === 'POST_COMMENT').length;
   const c = await w.core.posts.addComment(bia, post.id, 'Vem @caio e @bia, falou @fantasma_x');
   assert.deepEqual(c.mentions, ['caio', 'bia'], 'só nomes que existem');
@@ -391,12 +391,12 @@ test('comentário: @usuario avisa quem foi marcado, ignora a si mesmo, bloqueio 
 test('Início: régua de datas pula para antes de uma data e informa o post mais antigo', async () => {
   const { w, ana, bia } = await setup();
   const first = w.clock.now();
-  await w.core.posts.create(bia, { caption: 'velho', images: [JPEG()] });
+  await w.core.posts.create(bia, { placeName: 'Bar do Zé', caption: 'velho', images: [JPEG()] });
   w.clock.tick(10 * 86_400_000);
   const middle = w.clock.now();
-  await w.core.posts.create(ana, { caption: 'meio', images: [JPEG()] });
+  await w.core.posts.create(ana, { placeName: 'Bar do Zé', caption: 'meio', images: [JPEG()] });
   w.clock.tick(10 * 86_400_000);
-  await w.core.posts.create(bia, { caption: 'novo', images: [JPEG()] });
+  await w.core.posts.create(bia, { placeName: 'Bar do Zé', caption: 'novo', images: [JPEG()] });
   const top = await w.core.posts.feed(ana);
   assert.equal(top.oldestAt, first.toISOString());
   const jumped = await w.core.posts.feed(ana, { before: new Date(middle.getTime() + 1).toISOString() });
@@ -405,4 +405,53 @@ test('Início: régua de datas pula para antes de uma data e informa o post mais
   const next = await w.core.posts.feed(ana, { before: new Date(middle.getTime() + 1).toISOString(), offset: '1', limit: '1' });
   assert.deepEqual(next.items.map((p) => ('caption' in p ? p.caption : '')), ['velho']);
   await rejectsWith(w.core.posts.feed(ana, { before: 'ontem' }), 'VALIDATION');
+});
+
+test('post comum precisa de um evento ou de um rolê; pode ser só texto', async () => {
+  const { w, ana, bia } = await setup();
+  await rejectsWith(w.core.posts.create(ana, { caption: 'Que noite', images: [JPEG()] }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé' }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { placeName: 'Bar do Zé', caption: '   ' }), 'VALIDATION');
+
+  const text = await w.core.posts.create(ana, { placeName: 'Bar do Zé', caption: 'Melhor samba da cidade' });
+  assert.equal(text.images.length, 0);
+  assert.equal(text.caption, 'Melhor samba da cidade');
+  assert.equal(text.linkedEvent, null);
+  assert.ok((await w.core.posts.feed(bia)).items.some((i) => i.id === text.id), 'post só de texto entra no feed');
+
+  // Evento continua com capa obrigatória.
+  const startsAt = new Date(w.clock.now().getTime() + 24 * 3_600_000).toISOString();
+  await rejectsWith(w.core.posts.create(ana, { caption: 'oi', event: { title: 'Festa', startsAt } }), 'VALIDATION');
+  const ev = await w.core.posts.create(ana, { images: [JPEG()], event: { title: 'Festa', startsAt } });
+  assert.ok(ev.event);
+});
+
+test('post vinculado a um evento: de local ou de pessoa; privado de outra pessoa não', async () => {
+  const { w, ana, bia, caio } = await setup();
+  const H = 3_600_000;
+  const now = w.clock.now().getTime();
+  await w.places.createVenue({ id: 'v1', name: 'Bar do Zé', address: null, category: 'bar', lat: -23.5, lng: -46.6, isSample: false });
+  await w.places.createEvent({ id: 'e1', venueId: 'v1', title: 'Samba', description: null, kind: 'SHOW', isFree: true, imageUrl: null, tags: [], startsAt: new Date(now + 24 * H), endsAt: new Date(now + 28 * H), isSample: false });
+
+  const onPlace = await w.core.posts.create(ana, { caption: 'Bora!', linkedEventId: 'e1' });
+  assert.equal(onPlace.placeName, null);
+  assert.deepEqual(onPlace.linkedEvent && { id: onPlace.linkedEvent.id, source: onPlace.linkedEvent.source, title: onPlace.linkedEvent.title }, { id: 'e1', source: 'PLACE', title: 'Samba' });
+
+  const startsAt = new Date(now + 48 * H).toISOString();
+  const party = await w.core.posts.create(bia, { images: [JPEG()], event: { title: 'Aniversário', startsAt } });
+  const onParty = await w.core.posts.create(ana, { images: [JPEG()], linkedEventId: party.id });
+  assert.equal(onParty.linkedEvent?.source, 'USER');
+  assert.equal(onParty.linkedEvent?.title, 'Aniversário');
+
+  const secret = await w.core.posts.create(bia, { images: [JPEG()], event: { title: 'Surpresa', startsAt, private: true } });
+  await rejectsWith(w.core.posts.create(ana, { caption: 'oi', linkedEventId: secret.id }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(ana, { caption: 'oi', linkedEventId: 'nao-existe' }), 'VALIDATION');
+  await rejectsWith(w.core.posts.create(caio, { caption: 'oi', linkedEventId: onParty.id }), 'VALIDATION'); // post comum não é evento
+
+  // Edição: troca o vínculo, mas não deixa ficar sem evento nem rolê.
+  await rejectsWith(w.core.posts.update(ana, onPlace.id, { linkedEventId: null }), 'VALIDATION');
+  const moved = await w.core.posts.update(ana, onPlace.id, { linkedEventId: null, placeName: 'Bar do Zé' });
+  assert.equal(moved.linkedEvent, null);
+  assert.equal(moved.placeName, 'Bar do Zé');
+  await rejectsWith(w.core.posts.update(ana, onPlace.id, { caption: null }), 'VALIDATION'); // sem foto, precisa de texto
 });

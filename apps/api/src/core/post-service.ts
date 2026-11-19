@@ -38,6 +38,8 @@ export interface PostInput {
   placeAddress?: unknown;
   /** Local do AskouT escolhido como rolê (o nome no post leva à página dele). */
   placeVenueId?: unknown;
+  /** Evento ao qual o post fica vinculado (de um local ou criado por alguém). Post comum precisa de um evento ou de um rolê. */
+  linkedEventId?: unknown;
   /** Amigos marcados (até 10). Cada um precisa aceitar para o post entrar no feed e no perfil dele. */
   tagUserIds?: unknown;
   /** Evento criado pela pessoa: `{title, startsAt, endsAt?}` (ISO). O lugar é opcional. */
@@ -54,6 +56,14 @@ export interface PostImageView {
   /** Só em foto do lugar: referência para montar o endereço assinado. */
   photoRef: string | null;
   photoAuthor: string | null;
+}
+
+/** Evento ao qual um post comum está vinculado: o nome leva à página do evento. */
+export interface PostLinkedEventView {
+  id: string;
+  source: 'PLACE' | 'USER';
+  title: string;
+  startsAt: string;
 }
 
 export interface PostEventView {
@@ -92,6 +102,8 @@ export interface PostView {
   placeAddress: string | null;
   /** Preenchido quando o post é um evento. */
   event: PostEventView | null;
+  /** Evento ao qual o post está vinculado (null se não há, se sumiu ou se quem vê não tem acesso). */
+  linkedEvent: PostLinkedEventView | null;
   createdAt: string;
   images: PostImageView[];
   mine: boolean;
@@ -161,6 +173,8 @@ export interface PostEditInput {
   placeAddress?: unknown;
   /** Local do AskouT do rolê; `null` desvincula. Mudar só o nome também desvincula. */
   placeVenueId?: unknown;
+  /** Evento vinculado; `null` desvincula (desde que fique um rolê). */
+  linkedEventId?: unknown;
   event?: unknown;
 }
 
@@ -227,10 +241,18 @@ export class PostService {
     const eventPrivate = event !== null && this.parsePrivate(input.event);
     const eventExtras = event !== null ? await this.parseExtras(input.event) : [];
     const poll = event !== null && input.datePollId !== undefined && input.datePollId !== null ? await this.pollToLink(actorId, input.datePollId) : undefined;
-    const raw = input.images;
-    if (!Array.isArray(raw) || raw.length < 1 || raw.length > POST_IMAGES_MAX) {
-      throw validationError('Fotos inválidas', { images: `Envie de 1 a ${POST_IMAGES_MAX} fotos` });
+    // Evento criado pela pessoa já é o próprio evento; post de local já tem o local. Os demais vinculam um evento ou um rolê.
+    const linkedEvent = event === null && !venue ? await this.linkableEvent(actorId, input.linkedEventId) : undefined;
+    if (event === null && !venue && !linkedEvent && !placeName) {
+      throw validationError('Escolha um evento ou um rolê', { place: 'Todo post precisa de um evento ou de um rolê vinculado' });
     }
+    const raw = input.images === undefined || input.images === null ? [] : input.images;
+    // Post comum pode ser só texto (sem foto); evento e post de local continuam com pelo menos uma foto (a capa).
+    const minImages = event === null && !venue ? 0 : 1;
+    if (!Array.isArray(raw) || raw.length < minImages || raw.length > POST_IMAGES_MAX) {
+      throw validationError('Fotos inválidas', { images: minImages === 0 ? `Envie até ${POST_IMAGES_MAX} fotos` : `Envie de 1 a ${POST_IMAGES_MAX} fotos` });
+    }
+    if (raw.length === 0 && !caption) throw validationError('Post vazio', { caption: 'Escreva algo ou escolha uma foto ou um vídeo' });
     const postId = ids.next();
     let placePhotos = 0;
     const images: PostImageRecord[] = raw.map((item: unknown, position) => {
@@ -249,7 +271,7 @@ export class PostService {
     });
     if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do rolê por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
-    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, eventExtras, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null }, images);
+    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, eventExtras, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null, linkedEventId: linkedEvent?.id ?? null }, images);
     if (tagIds.length > 0) {
       await posts.createTags(postId, tagIds, clock.now());
       const me = await this.deps.users.findProfileById(actorId);
@@ -468,7 +490,7 @@ export class PostService {
   }
 
   async update(actorId: string, postId: unknown, input: PostEditInput): Promise<PostView> {
-    const { post } = await this.seeable(actorId, postId);
+    const { post, images } = await this.seeable(actorId, postId);
     if (post.authorId !== actorId) throw forbidden('Só quem publicou edita o post');
     const caption = input.caption === undefined ? post.caption : optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
     const placeName = input.placeName === undefined ? post.placeName : optionalText(input.placeName, 120, 'placeName', 'Nome do rolê');
@@ -485,7 +507,16 @@ export class PostService {
     // `event.extras` ausente mantém as respostas; virar post comum apaga.
     const rawExtras = input.event !== undefined && input.event !== null ? (input.event as { extras?: unknown }).extras : undefined;
     const eventExtras = event === null ? [] : rawExtras === undefined ? (post.eventExtras ?? []) : await this.parseExtras(input.event);
-    const patch: PostPatch = { caption, placeName, placeAddress, placeVenueId, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventExtras, editedAt: this.deps.clock.now() };
+    // Evento vinculado: só em post comum. `null` desvincula; ausente mantém.
+    let linkedEventId: string | null = event === null ? (post.linkedEventId ?? null) : null;
+    if (event === null && input.linkedEventId !== undefined) linkedEventId = input.linkedEventId === null || input.linkedEventId === '' ? null : ((await this.linkableEvent(actorId, input.linkedEventId))?.id ?? null);
+    // Quem já tinha evento ou rolê não pode ficar sem nenhum (posts antigos, de antes da regra, seguem editáveis).
+    const hadLink = Boolean(post.placeName || post.linkedEventId);
+    if (event === null && !post.venueId && hadLink && !placeName && !linkedEventId) {
+      throw validationError('Escolha um evento ou um rolê', { place: 'Todo post precisa de um evento ou de um rolê vinculado' });
+    }
+    if (!caption && images.length === 0) throw validationError('Post vazio', { caption: 'Post sem foto precisa de um texto' });
+    const patch: PostPatch = { caption, placeName, placeAddress, placeVenueId, linkedEventId, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventExtras, editedAt: this.deps.clock.now() };
     if (!(await this.deps.posts.update(post.id, actorId, patch))) throw notFound('Post não encontrado');
     if (event) {
       await this.syncPollTitle(post.id, event.title);
@@ -687,6 +718,43 @@ export class PostService {
     return venue ? { id: venue.id, name: venue.name, address: venue.address } : undefined;
   }
 
+  /** Evento que a pessoa pode vincular ao post: de um local, ou criado por alguém cujo conteúdo ela vê (privado, só por cartão). */
+  private async linkableEvent(actorId: string, raw: unknown): Promise<{ id: string } | undefined> {
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    const invalid = () => validationError('Evento inválido', { linkedEventId: 'Evento não encontrado' });
+    if (typeof raw !== 'string' || raw.length > 64) throw invalid();
+    if (await this.deps.places.findEvent(raw)) return { id: raw };
+    const found = await this.deps.posts.findById(raw);
+    const post = found?.post;
+    if (!post || post.eventTitle === null || !post.eventStartsAt || !post.eventEndsAt) throw invalid();
+    if (post.authorId === actorId) return { id: post.id };
+    if (post.archivedAt !== null) throw invalid();
+    if (await this.deps.blocks.existsEitherWay(actorId, post.authorId)) throw invalid();
+    const visible = !post.eventPrivate && (await this.canSee(actorId, post.authorId));
+    if (!visible && !(await this.openedByCard(actorId, post))) throw invalid();
+    return { id: post.id };
+  }
+
+  /** Nome e data dos eventos vinculados, para quem vê. Evento privado só aparece para o dono e para quem recebeu o cartão. */
+  private async linkedEvents(viewerId: string, ids: string[]): Promise<Map<string, PostLinkedEventView>> {
+    const out = new Map<string, PostLinkedEventView>();
+    for (const id of ids) {
+      const place = await this.deps.places.findEvent(id);
+      if (place) {
+        out.set(id, { id, source: 'PLACE', title: place.event.title, startsAt: place.event.startsAt.toISOString() });
+        continue;
+      }
+      const post = (await this.deps.posts.findById(id))?.post;
+      if (!post || post.eventTitle === null || !post.eventStartsAt || !post.eventEndsAt) continue;
+      if (post.authorId !== viewerId) {
+        if (post.archivedAt !== null) continue;
+        if (post.eventPrivate && !(await this.openedByCard(viewerId, post))) continue;
+      }
+      out.set(id, { id, source: 'USER', title: post.eventTitle, startsAt: post.eventStartsAt.toISOString() });
+    }
+    return out;
+  }
+
   private parseEvent(raw: unknown, placeName: string | null, keepStart?: Date | null, keepKind?: EventKind): { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null {
     if (raw === undefined || raw === null) return null;
     if (typeof raw !== 'object' || Array.isArray(raw)) throw validationError('Evento inválido', { event: 'Dados do evento inválidos' });
@@ -814,6 +882,7 @@ export class PostService {
     const ids = rows.map((r) => r.post.id);
     const likes = new Map((await this.deps.posts.likeStats(ids, viewerId)).map((l) => [l.postId, l]));
     const comments = new Map((await this.deps.posts.commentCounts(ids)).map((c) => [c.postId, c.count]));
+    const linked = await this.linkedEvents(viewerId, [...new Set(rows.flatMap((r) => (r.post.linkedEventId && !r.post.eventTitle ? [r.post.linkedEventId] : [])))]);
     return rows.flatMap(({ post, images }) => {
       const author = byId.get(post.authorId);
       if (!author) return [];
@@ -827,6 +896,7 @@ export class PostService {
           placeVenueId: post.venueId ? post.venueId : post.placeVenueId ? post.placeVenueId : post.placeName ? (placeVenues.get(post.placeName.trim().toLowerCase()) ?? null) : null,
           placeAddress: post.placeAddress,
           event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString(), private: post.eventPrivate === true, extras: post.eventExtras ?? [] } : null,
+          linkedEvent: (post.linkedEventId && !post.eventTitle ? linked.get(post.linkedEventId) : undefined) ?? null,
           createdAt: post.createdAt.toISOString(),
           mine: post.authorId === viewerId,
           likeCount: likes.get(post.id)?.count ?? 0,

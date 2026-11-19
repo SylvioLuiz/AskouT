@@ -536,6 +536,8 @@ export interface PostRecord {
   venueId?: string | null;
   /** Local do AskouT vinculado como rolê do post (o nome leva à página dele). */
   placeVenueId?: string | null;
+  /** Evento vinculado ao post (id de um evento de local ou de um post que é evento). */
+  linkedEventId?: string | null;
 }
 
 export interface PostImageRecord {
@@ -728,6 +730,8 @@ export interface PostPatch {
   placeName: string | null;
   placeAddress: string | null;
   placeVenueId?: string | null;
+  /** Sem o campo, o evento vinculado não muda. */
+  linkedEventId?: string | null;
   eventTitle: string | null;
   eventStartsAt: Date | null;
   eventEndsAt: Date | null;

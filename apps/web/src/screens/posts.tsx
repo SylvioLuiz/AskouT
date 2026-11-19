@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
-import { CarouselIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, LocationIcon, PhotoIcon, SendIcon, UsersIcon, XIcon } from '../components/icons.tsx';
+import { CalendarIcon, CarouselIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, LocationIcon, PhotoIcon, SendIcon, UsersIcon, XIcon } from '../components/icons.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { CropEditor } from '../components/crop.tsx';
@@ -18,10 +18,12 @@ import { toApiError } from '../lib/errors.ts';
 import { cropPostPhoto, readPostSource, resizePostPhoto } from '../lib/image.ts';
 import type { CropRect } from '../lib/crop.ts';
 import { toggleId } from '../lib/meetup.ts';
-import { addImages, buildPostBody, effectivePlace, eventProblem, videoOf, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
+import { addImages, buildPostBody, effectivePlace, eventProblem, postProblem, videoOf, POST_CAPTION_MAX, POST_IMAGES_MAX } from '../lib/post-draft.ts';
+import { withMediaType } from '../lib/media-file.ts';
+import { formatWhen } from '../lib/chat.ts';
 import { isVideoFile, POST_VIDEO_MAX_BYTES, uploadProgressText, videoPoster, videoProblem, VIDEO_STILL_TOO_BIG } from '../lib/post-video.ts';
 import { canCompressVideo, prepareProgressText, prepareVideo } from '../lib/video-prepare.ts';
-import type { DraftImage, LinkedPlace } from '../lib/post-draft.ts';
+import type { DraftImage, LinkedEvent, LinkedPlace } from '../lib/post-draft.ts';
 import type { EventKind, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
@@ -105,6 +107,32 @@ function LinkPlaceSheet({ onPick, onClose }: { onPick: (place: LinkedPlace) => v
   );
 }
 
+/** Eventos para vincular ao post: os que você confirmou presença ou criou, inclusive os que acabaram nos últimos 7 dias. */
+function LinkEventSheet({ onPick, onClose }: { onPick: (event: LinkedEvent) => void; onClose: () => void }) {
+  const going = useAsync(() => api.myGoingEvents(7), []);
+  const items = going.data?.items ?? [];
+  return (
+    <Sheet title={t('Vincular um evento')} onClose={onClose}>
+      <p className="muted">{t('Eventos em que você confirmou presença ou que criou. Para outro evento, abra a página dele e toque em Publicar sobre o evento.')}</p>
+      {going.loading && !going.data ? <Loading /> : null}
+      {going.error ? <ErrorState message={going.error.message} onRetry={going.reload} /> : null}
+      {going.data && items.length === 0 ? <p className="muted">{t('Nenhum evento por aqui ainda. Confirme presença em um evento ou vincule um rolê.')}</p> : null}
+      <ul className="placepick">
+        {items.map((e) => (
+          <li key={e.id}>
+            <button type="button" className="placepick__item" onClick={() => onPick({ id: e.id, title: e.title })}>
+              <span>
+                <strong>{e.title}</strong>
+                <span className="muted"> {formatWhen(e.startsAt, e.endsAt, new Date())}{e.venueName ? ` · ${e.venueName}` : ''}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Sheet>
+  );
+}
+
 /** Etapa 1, aba "Foto de um lugar": grade com as fotos dos lugares perto de você. */
 function PlacePhotoGrid({ picked, onPick }: { picked: string | undefined; onPick: (place: ExplorePlace) => void }) {
   const [q, setQ] = useState('');
@@ -146,6 +174,12 @@ export function CreatePostScreen() {
   const [focusKey, setFocusKey] = useState<string | undefined>();
   const [caption, setCaption] = useState('');
   const [linked, setLinked] = useState<LinkedPlace | null>(null);
+  // Post comum precisa de um evento ou de um rolê. Vindo da página do evento (`?evento=id&eventoNome=...`), já vem marcado.
+  const [linkedEvent, setLinkedEvent] = useState<LinkedEvent | null>(() => {
+    const id = prefill.get('evento');
+    return id ? { id, title: (prefill.get('eventoNome') ?? t('Evento')).slice(0, 120) } : null;
+  });
+  const [pickingEvent, setPickingEvent] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [upload, setUpload] = useState<{ sent: number; total: number } | undefined>();
@@ -187,7 +221,8 @@ export function CreatePostScreen() {
   const tagged = (friends.data ?? []).filter((f) => tags.includes(f.userId));
 
   async function addFiles(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
+    // Tipo corrigido pela extensão (alguns aparelhos entregam o vídeo sem tipo).
+    const files = Array.from(event.target.files ?? []).map(withMediaType);
     event.target.value = '';
     if (files.length === 0) return;
     setMessage(undefined);
@@ -260,7 +295,7 @@ export function CreatePostScreen() {
     setBusy(true);
     setMessage(undefined);
     const eventDraft = kind === 'EVENT' ? { title: eventTitle, kind: eventKind, startsAt: eventStart, endsAt: eventEnd, private: eventPrivate, extras: extrasFromDraft(extras, extraOptions.data ?? []) } : null;
-    const problem = eventDraft ? eventProblem(eventDraft, effectivePlace(items, linked), new Date()) : null;
+    const problem = eventDraft && items.length === 0 ? t('Escolha uma capa para o evento.') : eventDraft ? eventProblem(eventDraft, effectivePlace(items, linked), new Date()) : postProblem({ items: items.length, caption, place: effectivePlace(items, linked), event: linkedEvent });
     if (problem) {
       setMessage({ tone: 'error', text: problem });
       setBusy(false);
@@ -277,7 +312,7 @@ export function CreatePostScreen() {
         if (prepared.file.size > POST_VIDEO_MAX_BYTES) throw new Error(VIDEO_STILL_TOO_BIG);
         videoFile = prepared.file;
       }
-      const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft, prefill.get('votacao')));
+      const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft, prefill.get('votacao'), linkedEvent));
       const video = draftVideo && videoFile ? { ...draftVideo, file: videoFile } : undefined;
       if (video) {
         // O vídeo segue logo depois do post, no item da capa. Se falhar, o post não fica pela metade (só com a capa).
@@ -436,6 +471,7 @@ export function CreatePostScreen() {
           </section>
         ) : null}
         <div className="compose__caption">
+          {items.length > 0 ? (
           <button type="button" className="compose__thumb" onClick={() => setStep('photos')} disabled={busy} aria-label={t('Editar fotos ({count})', { count: items.length })}>
             {cover ? <img src={cover.preview} alt="" referrerPolicy="no-referrer" /> : null}
             {items.length > 1 ? (
@@ -445,11 +481,12 @@ export function CreatePostScreen() {
             ) : null}
             {cover && cover.kind === 'UPLOAD' && cover.video ? <span className="compose__thumbplay" aria-hidden="true">▶</span> : null}
           </button>
+          ) : null}
           <textarea
             className="compose__text"
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            placeholder={kind === 'EVENT' ? t('Conte mais sobre o evento…') : t('Escreva uma legenda…')}
+            placeholder={kind === 'EVENT' ? t('Conte mais sobre o evento…') : items.length === 0 ? t('O que está rolando?') : t('Escreva uma legenda…')}
             aria-label={t('Legenda')}
             maxLength={POST_CAPTION_MAX + 20}
             rows={4}
@@ -461,7 +498,25 @@ export function CreatePostScreen() {
             {captionLength}/{POST_CAPTION_MAX}
           </p>
         ) : null}
+        {kind === 'POST' ? <p className="muted compose__linkhint">{place || linkedEvent ? t('Seu post fica vinculado a este evento ou rolê.') : t('Todo post precisa de um evento ou de um rolê. Escolha abaixo.')}</p> : null}
         <ul className="optrows">
+          {kind === 'POST' ? (
+            <li className="optrow">
+              <button type="button" className="optrow__main" onClick={() => setPickingEvent(true)}>
+                <span className="optrow__icon"><CalendarIcon /></span>
+                <span className="optrow__text">
+                  <span className="optrow__label">{linkedEvent ? linkedEvent.title : t('Vincular um evento')}</span>
+                  {linkedEvent ? <span className="optrow__sub">{t('Evento')}</span> : null}
+                </span>
+                {linkedEvent ? null : <span className="optrow__chev"><ChevronRightIcon /></span>}
+              </button>
+              {linkedEvent ? (
+                <button type="button" className="optrow__clear" onClick={() => setLinkedEvent(null)} aria-label={t('Remover o evento vinculado')}>
+                  <XIcon />
+                </button>
+              ) : null}
+            </li>
+          ) : null}
           <li className="optrow">
             {placeFromPhoto ? (
               <div className="optrow__main">
@@ -512,6 +567,16 @@ export function CreatePostScreen() {
           </Button>
         </div>
 
+        {pickingEvent ? (
+          <LinkEventSheet
+            onPick={(e) => {
+              setLinkedEvent(e);
+              setPickingEvent(false);
+              setMessage(undefined);
+            }}
+            onClose={() => setPickingEvent(false)}
+          />
+        ) : null}
         {linking ? (
           <LinkPlaceSheet
             onPick={(p) => {
@@ -541,7 +606,7 @@ export function CreatePostScreen() {
           <XIcon />
         </button>
         <h1 className="compose__title">{kind === 'EVENT' ? t('Novo evento') : t('Nova publicação')}</h1>
-        <button type="button" className="compose__next" disabled={items.length === 0 || reading || cropKey !== undefined} onClick={() => setStep('details')}>
+        <button type="button" className="compose__next" disabled={(kind === 'EVENT' && items.length === 0) || reading || cropKey !== undefined} onClick={() => setStep('details')}>
           {t('Avançar')}
         </button>
       </header>
@@ -575,7 +640,7 @@ export function CreatePostScreen() {
               <PhotoIcon />
             </span>
             <p className="compose__emptytitle">{reading ? t('Preparando as fotos…') : kind === 'EVENT' ? t('Capa do evento') : t('Fotos e vídeos do rolê')}</p>
-            <p className="compose__emptyhint">{kind === 'EVENT' ? t('Escolha a capa e avance para dar nome, data e horário ao evento.') : t('Até {max} itens, com no máximo 1 vídeo.', { max: POST_IMAGES_MAX })}</p>
+            <p className="compose__emptyhint">{kind === 'EVENT' ? t('Escolha a capa e avance para dar nome, data e horário ao evento.') : t('Até {max} itens, com no máximo 1 vídeo. Ou toque em Avançar para escrever só um texto.', { max: POST_IMAGES_MAX })}</p>
             <Button small loading={reading} onClick={() => fileRef.current?.click()}>
               {t('Escolher da galeria')}
             </Button>

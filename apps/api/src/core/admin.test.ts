@@ -136,7 +136,7 @@ test('busca de pessoas e suspensão: motivo obrigatório, trava o login e a sess
 test('posts e eventos: busca, remoção com motivo e registro', async () => {
   const { w, A, ana } = await setup();
   const start = new Date(w.clock.now().getTime() + 24 * H).toISOString();
-  const post = await w.core.posts.create(ana, { images: [JPEG()], caption: 'Foto do pôr do sol' });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()], caption: 'Foto do pôr do sol' });
   const ev = await w.core.posts.create(ana, { images: [JPEG()], caption: 'Vem!', placeName: 'Praça', event: { title: 'Corrida de rua', startsAt: start } });
   await w.places.createEvent({ id: 'e1', venueId: 'v1', title: 'Samba', description: null, kind: 'SHOW', isFree: true, imageUrl: null, tags: [], startsAt: new Date(w.clock.now().getTime() + 2 * H), endsAt: new Date(w.clock.now().getTime() + 5 * H), isSample: false });
   assert.equal((await w.core.admin.searchPosts(A, {})).items.length, 2);
@@ -158,7 +158,7 @@ test('posts e eventos: busca, remoção com motivo e registro', async () => {
 
 test('denúncias de posts: aparecem abertas, são decididas uma vez e saem da fila', async () => {
   const { w, A, ana, bia } = await setup();
-  const post = await w.core.posts.create(ana, { images: [JPEG()], caption: 'Post ofensivo' });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()], caption: 'Post ofensivo' });
   await w.core.posts.report(bia, post.id, 'OFFENSIVE', 'Ofende');
   assert.equal((await w.core.admin.stats(A)).openPostReports, 1);
   const open = await w.core.admin.postReports(A, {});
@@ -196,7 +196,7 @@ test('denúncias de conversa: trazem o trecho enviado e podem levar à suspensã
 
 test('painel: contagens e páginas', async () => {
   const { w, A, ana } = await setup();
-  await w.core.posts.create(ana, { images: [JPEG()], caption: 'um' });
+  await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()], caption: 'um' });
   const s = await w.core.admin.stats(A);
   assert.deepEqual([s.users, s.suspendedUsers, s.venues, s.venuesWithOwner, s.posts, s.pendingClaims], [4, 0, 1, 0, 1, 0]);
   const p1 = await w.core.admin.searchUsers(A, { limit: '3', offset: '0' });
@@ -278,7 +278,7 @@ test('denúncia de perfil e de comentário: vai para a fila da gestão, com o te
   await w.core.profiles.report(ana, 'bia', 'SPAM'); // denunciar de novo atualiza, não duplica
   await rejectsWith(w.core.profiles.report(ana, 'bia', 'OFFENSIVE', 'x'.repeat(301)), 'VALIDATION');
   // Comentário
-  const post = await w.core.posts.create(bia, { caption: 'oi', images: [JPEG()] });
+  const post = await w.core.posts.create(bia, { placeName: 'Bar do Zé', caption: 'oi', images: [JPEG()] });
   const c = await w.core.posts.addComment(ana, post.id, 'comentário ruim');
   await rejectsWith(w.core.posts.reportComment(ana, post.id, c.id, 'OFFENSIVE'), 'FORBIDDEN');
   await w.core.posts.reportComment(bia, post.id, c.id, 'OFFENSIVE', 'ofensa');
@@ -307,7 +307,7 @@ test('denúncia de perfil e de comentário: vai para a fila da gestão, com o te
 
 test('comentário denunciado: a gestão apaga com motivo e fica na auditoria', async () => {
   const { w, A, U, ana, bia } = await setup();
-  const post = await w.core.posts.create(bia, { caption: 'oi', images: [JPEG()] });
+  const post = await w.core.posts.create(bia, { placeName: 'Bar do Zé', caption: 'oi', images: [JPEG()] });
   const c = await w.core.posts.addComment(ana, post.id, 'comentário ruim');
   await w.core.posts.reportComment(bia, post.id, c.id, 'OFFENSIVE');
   const row = (await w.core.admin.userReports(A, {})).items.find((r) => r.kind === 'COMMENT')!;

@@ -188,10 +188,11 @@ export class ExploreController {
     return new StreamableFile(media.data.subarray(start, end + 1), { type: media.mime, length: end - start + 1 });
   }
 
-  /** Eventos em que você confirmou presença e que ainda não acabaram (alimenta a agenda). */
+  /** Eventos em que você confirmou presença e que ainda não acabaram (alimenta a agenda). `recentDays` (até 30) traz também os que acabaram há pouco. */
   @Get('me/events/going')
-  async myGoing(@CurrentActor() actor: Actor) {
-    return { items: await this.core.eventPages.listMyGoing(actor.userId) };
+  async myGoing(@CurrentActor() actor: Actor, @Query('recentDays') recentDays?: string) {
+    const days = recentDays && /^\d{1,2}$/.test(recentDays) ? Number(recentDays) : 0;
+    return { items: await this.core.eventPages.listMyGoing(actor.userId, { recentDays: days }) };
   }
 
   /** "Eu vou". */

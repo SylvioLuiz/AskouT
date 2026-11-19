@@ -67,7 +67,7 @@ test('comentário de post: só GIF vale, aparece na lista, na denúncia e some a
   const ana = u['ana']!, bia = u['bia']!;
   await w.core.follows.follow(ana, bia);
   await w.core.follows.follow(bia, ana);
-  const post = await w.core.posts.create(ana, { images: [JPEG] });
+  const post = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG] });
   await rejectsWith(w.core.posts.addComment(bia, post.id, '  '), 'VALIDATION');
   await rejectsWith(w.core.posts.addComment(bia, post.id, 'oi', { id: 'x', url: 'https://evil.com/a.gif' }), 'VALIDATION');
   const only = await w.core.posts.addComment(bia, post.id, undefined, GIF);

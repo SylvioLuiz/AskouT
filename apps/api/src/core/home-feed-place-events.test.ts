@@ -48,7 +48,7 @@ test('Início: o mesmo evento de bar postado por duas pessoas aparece uma vez, c
   w.clock.tick(H);
   await w.core.profileEvents.post(caio, 'e1');
   w.clock.tick(H);
-  await w.core.posts.create(ana, { images: [`data:image/jpeg;base64,${Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(10, 1)]).toString('base64')}`], caption: 'oi' });
+  await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [`data:image/jpeg;base64,${Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(10, 1)]).toString('base64')}`], caption: 'oi' });
 
   const page = await w.core.posts.feed(bia, {}, { placeEvents: true });
   assert.equal(page.items.length, 2);

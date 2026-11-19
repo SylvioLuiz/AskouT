@@ -92,6 +92,19 @@ export function isoToLocalInput(iso: string): string {
 /** Duração máxima de um evento (igual à da API). */
 export const POST_EVENT_MAX_DAYS = 30;
 
+/** Evento escolhido para vincular ao post. */
+export interface LinkedEvent {
+  id: string;
+  title: string;
+}
+
+/** O que falta para publicar um post comum (null = tudo certo): um evento ou um rolê, e foto, vídeo ou texto. */
+export function postProblem(input: { items: number; caption: string; place: LinkedPlace | null; event: LinkedEvent | null }): string | null {
+  if (!input.place && !input.event) return t('Escolha um evento ou um rolê para publicar.');
+  if (input.items === 0 && input.caption.trim() === '') return t('Escreva algo ou escolha uma foto ou um vídeo.');
+  return null;
+}
+
 /** O que falta para publicar como evento (null = tudo certo). */
 export function eventProblem(event: EventDraft, _place: LinkedPlace | null, now: Date): string | null {
   if (!event.title.trim()) return t('Dê um nome ao evento.');
@@ -107,9 +120,10 @@ export function eventProblem(event: EventDraft, _place: LinkedPlace | null, now:
 }
 
 /** Corpo do `POST /posts` a partir do rascunho. */
-export function buildPostBody(images: readonly DraftImage[], caption: string, linked: LinkedPlace | null, tagUserIds: readonly string[], event: EventDraft | null = null, datePollId: string | null = null) {
+export function buildPostBody(images: readonly DraftImage[], caption: string, linked: LinkedPlace | null, tagUserIds: readonly string[], event: EventDraft | null = null, datePollId: string | null = null, linkedEvent: LinkedEvent | null = null) {
   const place = effectivePlace(images, linked);
   return {
+    ...(linkedEvent && !event ? { linkedEventId: linkedEvent.id } : {}),
     images: images.map((i) => (i.kind === 'UPLOAD' ? i.dataUrl : { photoPath: i.photoPath, photoAuthor: i.author })),
     ...(caption.trim() ? { caption: caption.trim() } : {}),
     ...(place ? { placeName: place.name, ...(place.address ? { placeAddress: place.address } : {}), ...(place.venueId ? { placeVenueId: place.venueId } : {}) } : {}),

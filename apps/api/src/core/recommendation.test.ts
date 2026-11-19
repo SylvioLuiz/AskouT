@@ -37,7 +37,7 @@ describe('motor de recomendação', () => {
     await event(w, 'e-caio', 'v2', 30);
     await w.eventRoom.addGoing({ source: 'PLACE', id: 'e-bia' }, bia, w.clock.now());
     await w.eventRoom.addGoing({ source: 'PLACE', id: 'e-caio' }, caio, w.clock.now());
-    const post = await w.core.posts.create(bia, { caption: 'oi', images: [JPEG] });
+    const post = await w.core.posts.create(bia, { placeName: 'Bar do Zé', caption: 'oi', images: [JPEG] });
     await w.core.posts.like(ana, post.id);
     await w.core.posts.addComment(ana, post.id, 'show!');
     const r = await w.core.recommendations.recommend(ana);
@@ -64,7 +64,7 @@ describe('motor de recomendação', () => {
 
   it('post que amigo curtiu aparece, sem dizer quem curtiu', async () => {
     const { w, ana, bia, eva } = await setup();
-    const post = await w.core.posts.create(eva, { caption: 'noite boa #samba', images: [JPEG] });
+    const post = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'noite boa #samba', images: [JPEG] });
     await w.core.posts.like(bia, post.id);
     const r = await w.core.recommendations.recommend(ana);
     assert.deepEqual(ids(r), [post.id]);
@@ -76,11 +76,11 @@ describe('motor de recomendação', () => {
   it('não recomenda post que a pessoa não pode ver (perfil privado) nem o que ela já curtiu', async () => {
     const { w, ana, bia, eva } = await setup();
     await w.core.profiles.setPrivacy(eva, true);
-    const hidden = await w.core.posts.create(eva, { caption: 'privado', images: [JPEG] });
+    const hidden = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'privado', images: [JPEG] });
     await w.core.posts.like(bia, hidden.id);
     assert.deepEqual((await w.core.recommendations.recommend(ana)).items, []);
     await w.core.profiles.setPrivacy(eva, false);
-    const open = await w.core.posts.create(eva, { caption: 'aberto', images: [JPEG] });
+    const open = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'aberto', images: [JPEG] });
     await w.core.posts.like(bia, open.id);
     assert.ok(ids(await w.core.recommendations.recommend(ana)).includes(open.id));
     await w.core.posts.like(ana, open.id);
@@ -113,7 +113,7 @@ describe('motor de recomendação', () => {
     const { w, ana, eva } = await setup();
     await event(w, 'samba', 'v1', 40, 'OTHER', ['samba']);
     await event(w, 'rock', 'v2', 40, 'OTHER', ['rock']);
-    const liked = await w.core.posts.create(eva, { caption: 'roda #samba', images: [JPEG] });
+    const liked = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'roda #samba', images: [JPEG] });
     assert.deepEqual((await w.core.recommendations.recommend(ana)).items, []);
     await w.core.posts.like(ana, liked.id);
     const r = await w.core.recommendations.recommend(ana);
@@ -130,11 +130,11 @@ describe('motor de recomendação', () => {
     await w.core.dwell.record(ana, [{ targetType: 'EVENT', targetId: 'visto', ms: 0, source: 'OTHER', shared: true }]);
     assert.ok(ids(await w.core.recommendations.recommend(ana)).includes('samba2'));
     assert.ok(!ids(await w.core.recommendations.recommend(ana)).includes('visto'), 'o evento compartilhado não volta');
-    const rock = await w.core.posts.create(eva, { caption: 'noite #rock', images: [JPEG] });
+    const rock = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'noite #rock', images: [JPEG] });
     await w.core.posts.like(ana, rock.id);
     const both = (await w.core.recommendations.recommend(ana)).items.filter((i) => i.event);
     assert.equal(both[0]!.event!.id, 'samba2', 'o compartilhado vence a curtida');
-    const friendLiked = await w.core.posts.create(eva, { caption: 'outro', images: [JPEG] });
+    const friendLiked = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'outro', images: [JPEG] });
     await w.core.posts.like(bia, friendLiked.id);
     assert.ok(ids(await w.core.recommendations.recommend(ana)).includes(friendLiked.id));
     await w.core.dwell.record(ana, [{ targetType: 'POST', targetId: friendLiked.id, ms: 0, source: 'OTHER', shared: true }]);
@@ -159,11 +159,11 @@ describe('motor de recomendação', () => {
     await event(w, 'samba', 'v3', 40, 'OTHER', ['samba']);
     await event(w, 'rock', 'v3', 40, 'OTHER', ['rock']);
     // ana interage com a bia (fica próxima), nunca com o caio.
-    const biaPost = await w.core.posts.create(bia, { caption: 'oi', images: [JPEG] });
+    const biaPost = await w.core.posts.create(bia, { placeName: 'Bar do Zé', caption: 'oi', images: [JPEG] });
     await w.core.posts.like(ana, biaPost.id);
     await w.core.posts.addComment(ana, biaPost.id, 'top');
-    const s = await w.core.posts.create(eva, { caption: 'roda #samba', images: [JPEG] });
-    const r = await w.core.posts.create(eva, { caption: 'noite #rock', images: [JPEG] });
+    const s = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'roda #samba', images: [JPEG] });
+    const r = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'noite #rock', images: [JPEG] });
     await w.core.posts.like(bia, s.id);
     await w.core.posts.like(caio, r.id);
     const events = (await w.core.recommendations.recommend(ana)).items.filter((i) => i.event);
@@ -177,12 +177,12 @@ describe('motor de recomendação', () => {
     await w.places.createVenue({ id: 'v3', name: 'Neutro', address: null, category: null, lat: 0, lng: 0, isSample: false });
     await event(w, 'samba', 'v3', 40, 'OTHER', ['samba']);
     await event(w, 'rock', 'v3', 40, 'OTHER', ['rock']);
-    const biaPost = await w.core.posts.create(bia, { caption: 'oi', images: [JPEG] });
+    const biaPost = await w.core.posts.create(bia, { placeName: 'Bar do Zé', caption: 'oi', images: [JPEG] });
     await w.core.posts.like(ana, biaPost.id);
     await w.core.posts.addComment(ana, biaPost.id, 'top');
-    const bySamba = await w.core.posts.create(eva, { caption: 'roda #samba', images: [JPEG] });
+    const bySamba = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'roda #samba', images: [JPEG] });
     await w.core.posts.like(bia, bySamba.id);
-    const byRock = await w.core.posts.create(eva, { caption: 'noite #rock', images: [JPEG] });
+    const byRock = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'noite #rock', images: [JPEG] });
     await w.core.posts.like(ana, byRock.id);
     const events = (await w.core.recommendations.recommend(ana)).items.filter((i) => i.event);
     assert.deepEqual(events.map((i) => i.event!.id), ['rock', 'samba'], 'curtida própria > amigo no máximo de proximidade');
@@ -193,7 +193,7 @@ describe('motor de recomendação', () => {
     await w.places.createVenue({ id: 'v3', name: 'Neutro', address: null, category: null, lat: 0, lng: 0, isSample: false });
     await event(w, 'samba', 'v3', 40, 'OTHER', ['samba']);
     await w.core.profiles.setPrivacy(eva, true);
-    const hidden = await w.core.posts.create(eva, { caption: 'roda #samba', images: [JPEG] });
+    const hidden = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'roda #samba', images: [JPEG] });
     await w.core.posts.like(bia, hidden.id);
     assert.deepEqual((await w.core.recommendations.recommend(ana)).items, []);
   });
@@ -351,7 +351,7 @@ describe('contas do motor de recomendação', () => {
 
   it('diz quem fez o post ou o evento e se a pessoa já segue (pessoa, perfil privado e estabelecimento)', async () => {
     const { w, ana, bia, eva } = await setup();
-    const post = await w.core.posts.create(eva, { caption: 'noite boa', images: [JPEG] });
+    const post = await w.core.posts.create(eva, { placeName: 'Bar do Zé', caption: 'noite boa', images: [JPEG] });
     await w.core.posts.like(bia, post.id);
     await event(w, 'e-bia', 'v1', 30);
     await w.eventRoom.addGoing({ source: 'PLACE', id: 'e-bia' }, bia, w.clock.now());

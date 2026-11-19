@@ -947,6 +947,8 @@ model Post {
   venueId      String?  @db.Uuid
   /// Local do AskouT vinculado como rolê do post (escolhido na busca; pode ter sido criado a partir do Google).
   placeVenueId String?  @db.Uuid
+  /// Evento ao qual o post (foto, vídeo ou só texto) está vinculado: id de um PlaceEvent ou de um Post que é evento. Sem chave estrangeira; se o evento sumir, o vínculo só deixa de aparecer.
+  linkedEventId String? @db.Uuid
 
   author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   venue  Venue?      @relation(fields: [venueId], references: [id], onDelete: Cascade)
@@ -966,6 +968,7 @@ model Post {
 
   @@index([authorId, createdAt])
   @@index([venueId, createdAt])
+  @@index([linkedEventId, createdAt])
 }
 
 // Foto enviada: `mime` e `data`. Foto do lugar: só `placePhotoRef` (o servidor busca no Google na hora de mostrar).

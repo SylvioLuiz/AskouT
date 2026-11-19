@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
-import { addImages, buildPostBody, effectivePlace, eventProblem, isoToLocalInput, localToIso } from './post-draft.ts';
+import { describe, it, test } from 'node:test';
+import { addImages, buildPostBody, effectivePlace, eventProblem, isoToLocalInput, localToIso, postProblem } from './post-draft.ts';
 import type { DraftImage } from './post-draft.ts';
 
 const up = (n: number): DraftImage => ({ key: `u${n}`, kind: 'UPLOAD', preview: 'p', dataUrl: `data:image/jpeg;base64,${n}` });
@@ -78,4 +78,17 @@ describe('evento privado', () => {
     assert.equal('private' in (open.event ?? {}), false);
     assert.equal((secret.event as { private?: boolean }).private, true);
   });
+});
+
+test('postProblem: post comum precisa de evento ou rolê, e de foto, vídeo ou texto', () => {
+  assert.notEqual(postProblem({ items: 1, caption: '', place: null, event: null }), null);
+  assert.equal(postProblem({ items: 1, caption: '', place: { name: 'Bar', address: null }, event: null }), null);
+  assert.equal(postProblem({ items: 0, caption: 'Que noite!', place: null, event: { id: 'e1', title: 'Samba' } }), null);
+  assert.notEqual(postProblem({ items: 0, caption: '  ', place: { name: 'Bar', address: null }, event: null }), null);
+});
+
+test('buildPostBody: evento vinculado vai como linkedEventId (e não vale quando o post é o próprio evento)', () => {
+  assert.deepEqual(buildPostBody([], 'Só texto', null, [], null, null, { id: 'e1', title: 'Samba' }), { linkedEventId: 'e1', images: [], caption: 'Só texto' });
+  const ev = { title: 'Festa', startsAt: '2030-01-01T20:00', endsAt: '' };
+  assert.equal('linkedEventId' in buildPostBody([], '', null, [], ev, null, { id: 'e1', title: 'Samba' }), false);
 });

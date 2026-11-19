@@ -262,7 +262,7 @@ export function createApi(deps: ApiDeps) {
     sendGif: (conversationId: string, gif: CommentGif, replyToId?: string) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { gif, ...(replyToId ? { replyToId } : {}) } }),
     sendEvent: (conversationId: string, eventId: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { eventId } }),
-    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; private?: boolean; extras?: EventExtraAnswer[] }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
+    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; placeVenueId?: string; linkedEventId?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; private?: boolean; extras?: EventExtraAnswer[] }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
     /** Configurações de evento cadastradas pela gestão, para responder ao criar ou editar um evento. */
     eventExtras: () => request<{ items: EventExtraOption[] }>('GET', '/event-extras'),
     post: (postId: string) => request<PostView>('GET', `/posts/${id(postId)}`),
@@ -346,7 +346,8 @@ export function createApi(deps: ApiDeps) {
     homeFeed: (page?: PageRequest, before?: string) => request<HomeFeedPage>('GET', `/posts/feed${pageQuery(page)}${pageQuery(page) ? '&' : '?'}mixed=1${before ? `&before=${encodeURIComponent(before)}` : ''}`),
     userPosts: (username: string, page?: PageRequest, kind?: 'event' | 'post') => request<PostsPage>('GET', `/profiles/${id(username)}/posts${pageQuery(page)}${kind ? `${page ? '&' : '?'}kind=${kind}` : ''}`),
     myMeetups: () => request<{ items: MeetupView[] }>('GET', '/meetups'),
-    myGoingEvents: () => request<{ items: GoingEvent[] }>('GET', '/me/events/going'),
+    /** `recentDays`: inclui também os que acabaram há até tantos dias (escolher o evento de um post). */
+    myGoingEvents: (recentDays?: number) => request<{ items: GoingEvent[] }>('GET', `/me/events/going${recentDays ? `?recentDays=${recentDays}` : ''}`),
     updateProfile: (patch: ProfilePatch) => request<Profile>('PATCH', '/profiles/me', { body: patch }),
     setPrivacy: (isPrivate: boolean) =>
       request<{ isPrivate: boolean; acceptedPending: number }>('PATCH', '/profiles/me/privacy', {
