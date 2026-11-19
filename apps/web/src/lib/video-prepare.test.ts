@@ -90,7 +90,18 @@ describe('prepareVideo com o compressor nativo', () => {
   });
 
   it('sem nativo e sem WebCodecs: original, sem lançar erro', async () => {
-    const out = await prepareVideo(fakeFile(2 * MB), { native: undefined });
+    const out = await prepareVideo(fakeFile(20 * MB), { native: undefined });
     assert.deepEqual([out.compressed, out.reason], [false, 'unsupported']);
+  });
+
+  it('vídeo leve vai direto, sem passar pelo nativo (o caminho mais lento)', async () => {
+    let called = 0;
+    const native = { compress: async () => { called += 1; return fakeFile(1 * MB, 'x.mp4'); } };
+    assert.equal((await prepareVideo(fakeFile(2 * MB), { native })).reason, 'small-enough');
+    // 20 MB em 60 s ≈ 2,8 Mbps: abaixo do bitrate desejado, não compensa recodificar.
+    assert.equal((await prepareVideo(fakeFile(20 * MB), { native, seconds: 60 })).reason, 'small-enough');
+    assert.equal(called, 0);
+    // 20 MB em 10 s ≈ 16 Mbps: comprime.
+    assert.equal((await prepareVideo(fakeFile(20 * MB), { native, seconds: 10 })).compressed, true);
   });
 });

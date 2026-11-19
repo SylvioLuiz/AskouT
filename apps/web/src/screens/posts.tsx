@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CalendarIcon, CarouselIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, EventKindIcon, GlobeIcon, LocationIcon, LockIcon, PhotoIcon, PlusIcon, SendIcon, UsersIcon, XIcon } from '../components/icons.tsx';
@@ -17,7 +17,7 @@ import { PostCard, PostList } from '../components/post.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
-import { toApiError } from '../lib/errors.ts';
+import { ApiError, toApiError } from '../lib/errors.ts';
 import { cropPostPhoto, readPostSource, resizePostPhoto } from '../lib/image.ts';
 import type { CropRect } from '../lib/crop.ts';
 import { toggleId } from '../lib/meetup.ts';
@@ -187,7 +187,33 @@ export function CreatePostScreen() {
   const [tags, setTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [upload, setUpload] = useState<{ sent: number; total: number } | undefined>();
-  const [prep, setPrep] = useState<{ progress: number } | undefined>();
+  // Otimização do vídeo: começa assim que o vídeo é escolhido, em segundo plano, enquanto a pessoa escreve a legenda.
+  // Na hora de publicar, só espera o que faltar (antes começava do zero só depois de tocar em Compartilhar).
+  const [prep, setPrep] = useState<{ key: string; progress: number; done: boolean } | undefined>();
+  const videoJob = useRef<{ key: string; abort: AbortController; promise: Promise<File> } | undefined>(undefined);
+  useEffect(() => () => videoJob.current?.abort.abort(), []);
+
+  function startVideoJob(key: string, file: File, seconds: number) {
+    videoJob.current?.abort.abort();
+    const abort = new AbortController();
+    setPrep({ key, progress: 0, done: false });
+    const promise = prepareVideo(file, { seconds, signal: abort.signal, onProgress: (progress) => setPrep((p) => (p && p.key === key ? { ...p, progress } : p)) }).then((prepared) => {
+      if (prepared.file.size > POST_VIDEO_MAX_BYTES) throw new Error(VIDEO_STILL_TOO_BIG);
+      return prepared.file;
+    });
+    promise.then(
+      () => setPrep((p) => (p && p.key === key ? { ...p, progress: 1, done: true } : p)),
+      () => setPrep((p) => (p && p.key === key ? undefined : p)),
+    );
+    videoJob.current = { key, abort, promise };
+  }
+
+  function dropVideoJob(key: string) {
+    if (videoJob.current?.key !== key) return;
+    videoJob.current.abort.abort();
+    videoJob.current = undefined;
+    setPrep(undefined);
+  }
   const [reading, setReading] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const [linking, setLinking] = useState(false);
@@ -244,8 +270,10 @@ export function CreatePostScreen() {
           // Passou de 60 MB? Só serve se este aparelho conseguir reduzir antes de enviar.
           const problem = videoProblem(file, { canCompress: file.size > POST_VIDEO_MAX_BYTES ? await canCompressVideo() : false });
           if (problem) throw new Error(problem);
-          const { poster } = await videoPoster(file);
-          added.push({ key: nextKey(), kind: 'UPLOAD', preview: poster, dataUrl: poster, video: file });
+          const { poster, seconds } = await videoPoster(file);
+          const key = nextKey();
+          added.push({ key, kind: 'UPLOAD', preview: poster, dataUrl: poster, video: file });
+          startVideoJob(key, file, seconds);
           hasVideo = true;
           continue;
         }
@@ -299,6 +327,7 @@ export function CreatePostScreen() {
   }
 
   function remove(key: string) {
+    dropVideoJob(key);
     setItems((current) => current.filter((i) => i.key !== key));
     setMessage(undefined);
   }
@@ -318,11 +347,13 @@ export function CreatePostScreen() {
       const draftVideo = videoOf(items);
       let videoFile: File | undefined;
       if (draftVideo) {
-        setPrep({ progress: 0 });
-        const prepared = await prepareVideo(draftVideo.file, { onProgress: (progress) => setPrep({ progress }) });
-        setPrep(undefined);
-        if (prepared.file.size > POST_VIDEO_MAX_BYTES) throw new Error(VIDEO_STILL_TOO_BIG);
-        videoFile = prepared.file;
+        const key = items[draftVideo.index]?.key ?? '';
+        // Normalmente já terminou (ou está quase) enquanto a pessoa preenchia o resto.
+        if (videoJob.current?.key !== key) {
+          const { seconds } = await videoPoster(draftVideo.file);
+          startVideoJob(key, draftVideo.file, seconds);
+        }
+        videoFile = await videoJob.current!.promise;
       }
       const created = await api.createPost(buildPostBody(items, caption, linked, tags, eventDraft, prefill.get('votacao'), linkedEvent));
       const video = draftVideo && videoFile ? { ...draftVideo, file: videoFile } : undefined;
@@ -348,9 +379,9 @@ export function CreatePostScreen() {
       }
       navigate(`/posts/${encodeURIComponent(created.id)}`);
     } catch (failure) {
-      setMessage({ tone: 'error', text: toApiError(failure).message });
+      // Erro do aparelho (vídeo que não coube, por exemplo) tem texto próprio; o resto vem da API.
+      setMessage({ tone: 'error', text: failure instanceof Error && !(failure instanceof ApiError) && failure.message ? failure.message : toApiError(failure).message });
       setUpload(undefined);
-      setPrep(undefined);
       setBusy(false);
     }
   }
@@ -368,12 +399,17 @@ export function CreatePostScreen() {
 
   const progressBars = (
     <>
-      {busy && prep ? (
+      {busy && prep && !prep.done ? (
         <div className="uploadbar" role="status" aria-live="polite">
           <progress className="uploadbar__bar" max={1} value={prep.progress} aria-label={t('Otimização do vídeo')} />
           <p className="uploadbar__text">{prepareProgressText(prep.progress)}</p>
           <p className="uploadbar__hint">{t('Estamos reduzindo o vídeo para o envio ser mais rápido. Mantenha esta tela aberta.')}</p>
         </div>
+      ) : null}
+      {!busy && prep && !prep.done ? (
+        <p className="muted compose__prep" role="status" aria-live="polite">
+          {prepareProgressText(prep.progress)} {t('Pode continuar preenchendo enquanto isso.')}
+        </p>
       ) : null}
       {busy && upload ? (
         <div className="uploadbar" role="status" aria-live="polite">

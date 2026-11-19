@@ -40,8 +40,8 @@ export function withMediaType(file: File): File {
  * Prepara um vídeo para enviar (story, conversa): reduz como nos posts e confere o limite de envio.
  * Sem isso, vídeo de celular (dezenas de MB) era recusado pelo tamanho fora dos posts.
  */
-export async function prepareVideoUpload(file: File, onProgress?: (fraction: number) => void): Promise<File> {
-  const prepared = await prepareVideo(withMediaType(file), onProgress ? { onProgress } : {});
+export async function prepareVideoUpload(file: File, onProgress?: (fraction: number) => void, seconds?: number): Promise<File> {
+  const prepared = await prepareVideo(withMediaType(file), { ...(onProgress ? { onProgress } : {}), ...(seconds !== undefined ? { seconds } : {}) });
   const out = withMediaType(prepared.file);
   if (out.size > POST_VIDEO_MAX_BYTES) throw new Error(VIDEO_STILL_TOO_BIG);
   if (out.size === 0) throw new Error(t('O vídeo está vazio.'));

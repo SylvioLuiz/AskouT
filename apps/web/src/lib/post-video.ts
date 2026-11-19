@@ -42,11 +42,21 @@ export async function videoPoster(file: File): Promise<{ poster: string; seconds
     const video = document.createElement('video');
     video.muted = true;
     video.playsInline = true;
-    video.preload = 'auto';
+    // Só os metadados (duração e tamanho) antes de pular para o quadro da capa: não espera carregar o começo do vídeo,
+    // o que em vídeo grande de celular demorava, e no iPhone às vezes nem acontecia sem tocar o vídeo (a tela ficava presa).
+    video.preload = 'metadata';
     video.src = url;
     await new Promise<void>((resolve, reject) => {
-      video.onloadeddata = () => resolve();
-      video.onerror = () => reject(new Error(t('Não foi possível ler este vídeo. Tente outro arquivo.')));
+      const fail = () => reject(new Error(t('Não foi possível ler este vídeo. Tente outro arquivo.')));
+      const timer = window.setTimeout(fail, 15_000);
+      video.onloadedmetadata = () => {
+        window.clearTimeout(timer);
+        resolve();
+      };
+      video.onerror = () => {
+        window.clearTimeout(timer);
+        fail();
+      };
     });
     const seconds = video.duration;
     const tooLong = durationProblem(seconds);
@@ -54,7 +64,7 @@ export async function videoPoster(file: File): Promise<{ poster: string; seconds
     video.currentTime = Math.min(0.5, seconds / 2);
     await new Promise<void>((resolve) => {
       video.onseeked = () => resolve();
-      window.setTimeout(resolve, 1500);
+      window.setTimeout(resolve, 3000);
     });
     const width = video.videoWidth;
     const height = video.videoHeight;

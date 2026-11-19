@@ -6339,3 +6339,4 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .createpick__icon svg { width: 22px; height: 22px; }
 .createpick__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .createpick__chev { flex: none; display: flex; color: var(--line-strong); }
+.compose__prep { margin: 8px 0 0; font-size: 0.875rem; }
