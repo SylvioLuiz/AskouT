@@ -96,6 +96,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Aguardando informações": "Esperando información",
   "Aguardando pagamento": "Esperando el pago",
   "Aguarde quem organiza escolher a data.": "Espera a que quien organiza elija la fecha.",
+  "Ainda não ouvido": "Aún no escuchado",
   "Ainda faltam respostas para sugerir uma data. Peça para o pessoal votar.": "Faltan respuestas para sugerir una fecha. Pide a todos que voten.",
   "Ainda não chegou a hora de aprovar": "Aún no es hora de aprobar",
   "Ainda não dá para trocar o e-mail ou a senha por aqui. Isso entra numa próxima etapa.": "Todavía no se puede cambiar el correo ni la contraseña aquí. Llegará en una próxima etapa.",
@@ -1005,6 +1006,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Outro motivo": "Otro motivo",
   "Outros": "Otros",
   "Ouvir áudio": "Escuchar audio",
+  "Ouvido": "Escuchado",
   "Pagamento enviado. Assim que for confirmado, seu impulsionamento começa. O Pix pode levar alguns minutos.": "Pago enviado. En cuanto se confirme, tu impulso empieza. Pix puede tardar unos minutos.",
   "Pago": "Pagado",
   "Pague com Pix ou cartão. ": "Paga con Pix o tarjeta. ",
@@ -2546,4 +2548,5 @@ export const ES: Readonly<Record<string, string>> = {
   "Seu evento privado está pronto. Ele só chega a quem receber nas conversas.": "Tu evento privado está listo. Solo llega a quien lo reciba en las conversaciones.",
   "Seu evento está pronto e já aparece no seu perfil.": "Tu evento está listo y ya aparece en tu perfil.",
   "Depois de criar, você escolhe as conversas e grupos que vão receber o evento.": "Después de crearlo, eliges las conversaciones y grupos que recibirán el evento.",
+  "Ver": "Ver",
 };

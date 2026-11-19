@@ -24,6 +24,7 @@
   --warn: #c77700;
   --bad: #e0281d;
   --wait: #8e8e93;
+  --heard: rgb(29 127 224);
   --shadow-brand: rgb(250 114 201 / 0.4);
   --stripe: #ecc9df;
   /* Entrada, cadastro e abertura do app: sempre no visual noturno. */
@@ -3441,6 +3442,8 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 .newsrow { align-items: center; }
 .newsrow__dot { margin-top: 0; }
 .newshead--end { justify-content: flex-end; }
+.newsrow--withactions { border-bottom: 0; }
+.newsrow__actions { padding: 0 0 12px 56px; border-bottom: 1px solid var(--line); margin-top: -4px; }
 /* Seleção de avisos: barra fica presa no topo enquanto rola; cada linha ganha um círculo de marcar. */
 .newshead--select { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: 1fr auto; row-gap: 6px; padding: 8px 0; background: var(--bg); border-bottom: 1px solid var(--line); }
 .newshead--select > .btn { justify-self: end; }
@@ -3576,6 +3579,7 @@ a.actlog__row:hover { background: var(--surface); }
   --warn: #ff9f0a;
   --bad: #ff6961;
   --wait: #8e8e93;
+  --heard: rgb(74 168 255);
   --stripe: #3b3e50;
   --shadow-brand: rgb(181 110 252 / 0.4);
   --brand: #fa72c9;
@@ -3612,6 +3616,7 @@ a.actlog__row:hover { background: var(--surface); }
     --warn: #ff9f0a;
     --bad: #ff6961;
     --wait: #8e8e93;
+    --heard: rgb(74 168 255);
     --stripe: #3b3e50;
     --shadow-brand: rgb(181 110 252 / 0.4);
     --brand: #fa72c9;
@@ -3838,6 +3843,14 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .voice__track { flex: 1; height: 4px; border-radius: 2px; background: var(--line-strong); overflow: hidden; }
 .voice__bar { height: 100%; background: var(--brand); }
 .voice__time { flex: none; min-width: 3.2em; text-align: right; font-size: 0.8125rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+/* "Ouvido" (como no WhatsApp): microfone cinza; destacado na mensagem recebida ainda não ouvida; azul quando foi ouvida. */
+.voice__heard { display: grid; place-items: center; flex: none; margin-left: -4px; color: var(--muted); }
+.voice__heard .icon { width: 16px; height: 16px; }
+.voice--new .voice__heard { color: var(--brand-text); }
+.voice--new .voice__time { color: var(--brand-text); font-weight: 600; }
+.voice--heard .voice__heard { color: var(--heard); }
+.voice--new .voice__heard rect,
+.voice--heard .voice__heard rect { fill: currentColor; }
 
 /* Topo da conversa: preso abaixo da barra do app ao rolar */
 .chathead { position: sticky; top: var(--topbar-h, 0px); z-index: 15; display: flex; align-items: center; gap: 8px; margin: 0 -16px 8px; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }

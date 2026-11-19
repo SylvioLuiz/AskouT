@@ -391,6 +391,8 @@ export interface NotificationItem {
   createdAt: string;
   /** Quem causou o aviso (seguiu, curtiu, convidou...). Nulo em avisos do sistema e nos antigos. */
   actor?: { userId: string; username: string; avatarUrl: string | null } | null;
+  /** Post ou evento da marcação (só em POST_TAG): a tela mostra Aceitar/Recusar no próprio aviso. */
+  postId?: string | null;
 }
 
 export interface NotificationList {
@@ -532,7 +534,8 @@ export interface ChatMessage {
   body: string;
   suggestion: SuggestionCard | null;
   /** Mensagem de voz (kind AUDIO): só a duração; o áudio é baixado ao tocar. */
-  audio: { durationMs: number } | null;
+  /** `played`: na sua mensagem, alguém já ouviu; na dos outros, você já ouviu. */
+  audio: { durationMs: number; played?: boolean } | null;
   /** GIF (Giphy): mensagem de texto com este anexo. */
   gif?: CommentGif | null;
   /** Apagada por quem enviou: no lugar do conteúdo aparece "Mensagem apagada". */

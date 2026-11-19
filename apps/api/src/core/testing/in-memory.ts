@@ -1056,6 +1056,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
   readonly messages: MessageRecord[] = [];
   readonly prefs = new Map<string, ConversationPrefsRecord>();
   readonly reactions = new Map<string, MessageReactionRecord>();
+  readonly audioPlays = new Map<string, { messageId: string; userId: string; playedAt: Date }>();
   private medias = new Map<string, { mime: string; data: Uint8Array }>();
 
   async getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord> {
@@ -1171,6 +1172,16 @@ export class InMemoryConversationRepository implements ConversationRepository {
     this.medias.delete(messageId);
     for (const key of [...this.reactions.keys()]) if (key.startsWith(`${messageId}|`)) this.reactions.delete(key);
     return true;
+  }
+
+  async markAudioPlayed(messageId: string, userId: string, at: Date): Promise<void> {
+    const key = `${messageId}|${userId}`;
+    if (!this.audioPlays.has(key)) this.audioPlays.set(key, { messageId, userId, playedAt: at });
+  }
+
+  async listAudioPlays(messageIds: readonly string[]): Promise<{ messageId: string; userId: string }[]> {
+    const wanted = new Set(messageIds);
+    return [...this.audioPlays.values()].filter((p) => wanted.has(p.messageId)).map((p) => ({ messageId: p.messageId, userId: p.userId }));
   }
 
   async setReaction(messageId: string, userId: string, emoji: string | null, at: Date): Promise<void> {
@@ -1947,8 +1958,8 @@ export class InMemoryNotificationRepository implements NotificationRepository {
       .map((n) => ({ ...n }));
   }
 
-  async unreadCount(userId: string): Promise<number> {
-    return this.rows.filter((n) => n.userId === userId && n.readAt === null).length;
+  async unreadCount(userId: string, filter?: NotificationFilter): Promise<number> {
+    return this.rows.filter((n) => n.userId === userId && n.readAt === null && matchesNotificationFilter(n, filter)).length;
   }
 
   async hasUnread(userId: string, dedupeKey: string): Promise<boolean> {

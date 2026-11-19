@@ -43,14 +43,16 @@ describe('filtros da tela de notificações', () => {
     assert.ok(messages.every((t) => t === 'MESSAGE'));
   });
 
-  it('o filtro vai ao banco: acha avisos que não caberiam na página sem filtro', async () => {
+  it('"Todas" deixa de fora as mensagens de conversa (ficam só em "Mensagens"), e o filtro vai ao banco', async () => {
     const { w, ana } = await seed();
     const all = await w.core.notifications.list(ana);
-    assert.equal(all.items.length, NOTIFICATIONS_PAGE);
-    assert.ok(!all.items.some((i) => i.type === 'FEED_MENTION'));
-    assert.equal((await w.core.notifications.list(ana, 'mentions')).items.length, 3);
-    // O contador de não lidos é sempre o total.
-    assert.equal((await w.core.notifications.list(ana, 'mentions')).unread, all.unread);
+    assert.equal(all.items.length, 12, 'as 35 mensagens mais novas não empurram os outros avisos para fora da página');
+    assert.ok(!all.items.some((i) => i.type === 'MESSAGE'));
+    assert.ok(all.items.some((i) => i.type === 'FEED_MENTION'));
+    assert.equal(all.unread, 12, 'o contador de "Todas" também ignora mensagens');
+    assert.equal(await w.core.notifications.unreadCount(ana), 12, 'o sino idem');
+    assert.equal((await w.core.notifications.list(ana, 'messages')).unread, NOTIFICATIONS_PAGE + 5);
+    assert.equal((await w.core.notifications.list(ana, 'mentions')).unread, 3);
     assert.deepEqual((await w.core.notifications.list(ana, 'all')).items, all.items);
     assert.deepEqual((await w.core.notifications.list(ana, '')).items, all.items);
   });

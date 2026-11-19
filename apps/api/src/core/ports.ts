@@ -387,6 +387,10 @@ export interface ConversationRepository {
   mutedUserIds(conversationId: string): Promise<string[]>;
   /** Bytes da mensagem de voz (só de mensagens kind AUDIO). */
   findAudio(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+  /** Marca que `userId` ouviu a mensagem de voz (só a primeira vez conta). */
+  markAudioPlayed(messageId: string, userId: string, at: Date): Promise<void>;
+  /** Quem já ouviu cada uma destas mensagens de voz. */
+  listAudioPlays(messageIds: readonly string[]): Promise<{ messageId: string; userId: string }[]>;
   findMessage(id: string): Promise<MessageRecord | undefined>;
   /** Grava a resposta ao cartão só se ainda não houver uma. Devolve false se já tinha. */
   setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean>;
@@ -903,7 +907,8 @@ export interface NotificationRepository {
   create(record: NotificationRecord): Promise<void>;
   /** Mais recentes primeiro. Com `filter`, só os avisos que casam com alguma cláusula (chips da tela de notificações). */
   listForUser(userId: string, limit: number, filter?: import('./notification-categories.ts').NotificationFilter): Promise<NotificationRecord[]>;
-  unreadCount(userId: string): Promise<number>;
+  /** Não lidos; com `filter`, só os que casam com ele. */
+  unreadCount(userId: string, filter?: import('./notification-categories.ts').NotificationFilter): Promise<number>;
   /** Já existe aviso não lido com essa chave? */
   hasUnread(userId: string, dedupeKey: string): Promise<boolean>;
   /** Marca como lidos (todos se `ids` for omitido). Devolve quantos mudaram. */

@@ -105,6 +105,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Aguardando informações": "Waiting for information",
   "Aguardando pagamento": "Awaiting payment",
   "Aguarde quem organiza escolher a data.": "Wait for the organizer to pick the date.",
+  "Ainda não ouvido": "Not heard yet",
   "Ainda faltam respostas para sugerir uma data. Peça para o pessoal votar.": "More answers are needed to suggest a date. Ask everyone to vote.",
   "Ainda não chegou a hora de aprovar": "It's not yet time to approve",
   "Ainda não dá para trocar o e-mail ou a senha por aqui. Isso entra numa próxima etapa.": "You can't change your email or password here yet. That's coming in a later step.",
@@ -1072,6 +1073,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Outro motivo": "Another reason",
   "Outros": "Others",
   "Ouvir áudio": "Listen to audio",
+  "Ouvido": "Heard",
   "Pagamento enviado. Assim que for confirmado, seu impulsionamento começa. O Pix pode levar alguns minutos.": "Payment sent. Once confirmed, your boost starts. Pix can take a few minutes.",
   "Pagar {total}": "Pay {total}",
   "Pago": "Paid",
@@ -2653,4 +2655,5 @@ export const EN: Readonly<Record<string, string>> = {
   "Seu evento privado está pronto. Ele só chega a quem receber nas conversas.": "Your private event is ready. Only people who get it in a chat will see it.",
   "Seu evento está pronto e já aparece no seu perfil.": "Your event is ready and already shows on your profile.",
   "Depois de criar, você escolhe as conversas e grupos que vão receber o evento.": "After creating it, you'll pick the chats and groups that get the event.",
+  "Ver": "View",
 };

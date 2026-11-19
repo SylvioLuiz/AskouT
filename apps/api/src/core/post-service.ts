@@ -249,7 +249,8 @@ export class PostService {
       await posts.createTags(postId, tagIds, clock.now());
       const me = await this.deps.users.findProfileById(actorId);
       for (const userId of tagIds) {
-        await this.deps.notifier.notify({ userId, type: 'POST_TAG', title: `${me?.username ?? 'Alguém'} marcou você num post`, body: 'Aceite para ele aparecer no seu perfil', url: '/atividades', dedupeKey: `post-tag:${postId}`, actorId });
+        const who = me?.username ?? 'Alguém';
+        await this.deps.notifier.notify({ userId, type: 'POST_TAG', title: event ? `${who} marcou você no evento ${event.title}` : `${who} marcou você num post`, body: event ? 'Aceite para o evento aparecer no seu perfil' : 'Aceite para ele aparecer no seu perfil', url: `/posts/${postId}`, dedupeKey: `post-tag:${postId}`, actorId });
       }
     }
     if (poll && event) await this.linkPoll(poll, postId, event.title, actorId);
