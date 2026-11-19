@@ -102,6 +102,7 @@ import type {
   SocialProviderId,
 } from './types.ts';
 import type { CloakroomPanel, CloakroomPublic, CloakroomSettingBody, CloakroomStaffTicket, CloakroomTicket } from './cloakroom.ts';
+import type { EventExtraAnswer, EventExtraOption } from './types.ts';
 import { t } from '../lib/i18n/index.ts';
 
 /** O mínimo de `fetch` que o cliente usa (facilita testar sem navegador). */
@@ -259,7 +260,9 @@ export function createApi(deps: ApiDeps) {
     sendGif: (conversationId: string, gif: CommentGif, replyToId?: string) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { gif, ...(replyToId ? { replyToId } : {}) } }),
     sendEvent: (conversationId: string, eventId: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { eventId } }),
-    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
+    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; private?: boolean; extras?: EventExtraAnswer[] }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
+    /** Configurações de evento cadastradas pela gestão, para responder ao criar ou editar um evento. */
+    eventExtras: () => request<{ items: EventExtraOption[] }>('GET', '/event-extras'),
     post: (postId: string) => request<PostView>('GET', `/posts/${id(postId)}`),
     /** Anexa o vídeo ao item de foto que serve de capa: o arquivo vai cru no corpo, com o tipo no Content-Type. */
     attachPostVideo: async (postId: string, imageId: string, file: Blob, onProgress?: (sent: number, total: number) => void): Promise<PostView> => {

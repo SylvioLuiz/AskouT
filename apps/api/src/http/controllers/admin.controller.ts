@@ -64,6 +64,37 @@ export class AdminController {
     return this.core.admin.setPayments(actor, b.enabled, b.note);
   }
 
+  /** Configurações de evento cadastradas e os ícones disponíveis. */
+  @Get('event-extras')
+  eventExtras(@CurrentActor() actor: Actor) {
+    return this.core.admin.eventExtras(actor);
+  }
+
+  /** `{icon, label, type: 'YES_NO' | 'TEXT'}` */
+  @Post('event-extras')
+  createEventExtra(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.createEventExtra(actor, { icon: b.icon, label: b.label, type: b.type });
+  }
+
+  @Put('event-extras/:id')
+  updateEventExtra(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.updateEventExtra(actor, id, { icon: b.icon, label: b.label, type: b.type });
+  }
+
+  /** `{direction: 'up' | 'down'}`: muda a ordem em que aparecem no app. */
+  @Post('event-extras/:id/move')
+  @HttpCode(200)
+  moveEventExtra(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.admin.moveEventExtra(actor, id, asBody(body).direction);
+  }
+
+  @Delete('event-extras/:id')
+  deleteEventExtra(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.admin.deleteEventExtra(actor, id);
+  }
+
   @Get('retention')
   retention(@CurrentActor() actor: Actor, @Query() q: { days?: unknown }) {
     return this.core.admin.retention(actor, q);

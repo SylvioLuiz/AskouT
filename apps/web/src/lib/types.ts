@@ -801,6 +801,8 @@ export interface EventPage {
   postedByMe: boolean;
   /** Evento privado: só abre por cartão numa conversa e não pode ser repostado. */
   isPrivate?: boolean;
+  /** Configurações de evento respondidas por quem criou (ícone, nome e resposta). */
+  extras?: EventExtraView[];
   confirmedCount: number;
   going: boolean;
   attendees: PublicProfile[];
@@ -881,7 +883,7 @@ export interface PostView {
   placeVenueId?: string | null;
   placeAddress: string | null;
   /** Preenchido quando o post é um evento criado pela pessoa. */
-  event: { title: string; kind: EventKind; startsAt: string; endsAt: string } | null;
+  event: { title: string; kind: EventKind; startsAt: string; endsAt: string; private?: boolean; extras?: EventExtraAnswer[] } | null;
   createdAt: string;
   images: PostImage[];
   mine: boolean;
@@ -927,7 +929,7 @@ export interface PostEdit {
   caption?: string | null;
   placeName?: string | null;
   placeAddress?: string | null;
-  event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null } | null;
+  event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; extras?: EventExtraAnswer[] } | null;
 }
 
 /** Evento de bar repostado por alguém que você segue, como item do Início (só com `mixed=1`). */
@@ -1288,4 +1290,24 @@ export interface RecommendationSource {
 export interface Recommendations {
   personalized: boolean;
   items: RecommendationItem[];
+}
+
+/** Configuração de evento cadastrada pela gestão ("Pode fumar?" sim/não, "Estacionamento" texto). */
+export interface EventExtraOption {
+  id: string;
+  icon: string;
+  label: string;
+  type: 'YES_NO' | 'TEXT';
+}
+
+/** Resposta de quem criou o evento a uma configuração. */
+export interface EventExtraAnswer {
+  optionId: string;
+  value: boolean | string;
+}
+
+/** O que a página do evento mostra. */
+export interface EventExtraView extends EventExtraOption {
+  optionId: string;
+  value: boolean | string;
 }

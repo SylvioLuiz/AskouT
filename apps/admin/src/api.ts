@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, EventExtra, EventExtraInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -162,6 +162,12 @@ export const api = {
   resolveFeedReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/feed/${encodeURIComponent(id)}/resolve`, { resolution, note }),
 
   deleteComment: (id: string, note: string) => request<unknown>('DELETE', `/admin/comments/${encodeURIComponent(id)}`, { note }),
+
+  eventExtras: () => request<{ items: EventExtra[]; icons: string[] }>('GET', '/admin/event-extras'),
+  createEventExtra: (input: EventExtraInput) => request<{ items: EventExtra[] }>('POST', '/admin/event-extras', input),
+  updateEventExtra: (id: string, input: EventExtraInput) => request<{ items: EventExtra[] }>('PUT', `/admin/event-extras/${encodeURIComponent(id)}`, input),
+  moveEventExtra: (id: string, direction: 'up' | 'down') => request<{ items: EventExtra[] }>('POST', `/admin/event-extras/${encodeURIComponent(id)}/move`, { direction }),
+  deleteEventExtra: (id: string) => request<{ items: EventExtra[] }>('DELETE', `/admin/event-extras/${encodeURIComponent(id)}`),
 
   audit: (offset: number) => request<Page<AuditRow>>('GET', `/admin/audit${query({ offset })}`),
 };

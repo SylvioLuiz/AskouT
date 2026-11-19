@@ -13,6 +13,8 @@ import { parseReportInput } from './report-input.ts';
 import { buildEventCards } from './event-card.ts';
 import type { EventCardView } from './event-card.ts';
 import { EVENT_KINDS, POST_REPORT_REASONS, toPublicProfile } from './types.ts';
+import { loadEventExtras, parseEventExtraAnswers } from './event-extras.ts';
+import type { EventExtraAnswer } from './event-extras.ts';
 
 export const POST_IMAGES_MAX = 5;
 export const POST_CAPTION_MAX = 500;
@@ -61,6 +63,8 @@ export interface PostEventView {
   endsAt: string;
   /** Evento privado: só o dono e quem recebeu o cartão numa conversa. */
   private: boolean;
+  /** Respostas às configurações de evento (para preencher a edição). */
+  extras: EventExtraAnswer[];
 }
 
 export interface PostTagView {
@@ -221,6 +225,7 @@ export class PostService {
     const placeAddress = venue ? venue.address : (optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço') ?? placeVenue?.address?.slice(0, 200) ?? null);
     const event = this.parseEvent(input.event, placeName);
     const eventPrivate = event !== null && this.parsePrivate(input.event);
+    const eventExtras = event !== null ? await this.parseExtras(input.event) : [];
     const poll = event !== null && input.datePollId !== undefined && input.datePollId !== null ? await this.pollToLink(actorId, input.datePollId) : undefined;
     const raw = input.images;
     if (!Array.isArray(raw) || raw.length < 1 || raw.length > POST_IMAGES_MAX) {
@@ -244,7 +249,7 @@ export class PostService {
     });
     if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do rolê por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
-    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null }, images);
+    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, eventExtras, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null }, images);
     if (tagIds.length > 0) {
       await posts.createTags(postId, tagIds, clock.now());
       const me = await this.deps.users.findProfileById(actorId);
@@ -477,7 +482,10 @@ export class PostService {
     } else {
       event = this.parseEvent(input.event, placeName, post.eventStartsAt, post.eventKind);
     }
-    const patch: PostPatch = { caption, placeName, placeAddress, placeVenueId, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', editedAt: this.deps.clock.now() };
+    // `event.extras` ausente mantém as respostas; virar post comum apaga.
+    const rawExtras = input.event !== undefined && input.event !== null ? (input.event as { extras?: unknown }).extras : undefined;
+    const eventExtras = event === null ? [] : rawExtras === undefined ? (post.eventExtras ?? []) : await this.parseExtras(input.event);
+    const patch: PostPatch = { caption, placeName, placeAddress, placeVenueId, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventExtras, editedAt: this.deps.clock.now() };
     if (!(await this.deps.posts.update(post.id, actorId, patch))) throw notFound('Post não encontrado');
     if (event) {
       await this.syncPollTitle(post.id, event.title);
@@ -714,6 +722,13 @@ export class PostService {
     return value;
   }
 
+  /** `event.extras`: respostas às configurações de evento cadastradas pela gestão. */
+  private async parseExtras(raw: unknown): Promise<EventExtraAnswer[]> {
+    const value = (raw as { extras?: unknown }).extras;
+    if (value === undefined || value === null) return [];
+    return parseEventExtraAnswers(value, await loadEventExtras(this.deps));
+  }
+
   /** Quem recebeu o cartão do evento numa conversa abre o post, mesmo sem seguir o dono. */
   private async openedByCard(viewerId: string, post: { id: string; eventTitle?: string | null }): Promise<boolean> {
     return post.eventTitle ? this.deps.conversations.hasPostEventAccess(viewerId, post.id) : false;
@@ -811,7 +826,7 @@ export class PostService {
           placeName: post.placeName,
           placeVenueId: post.venueId ? post.venueId : post.placeVenueId ? post.placeVenueId : post.placeName ? (placeVenues.get(post.placeName.trim().toLowerCase()) ?? null) : null,
           placeAddress: post.placeAddress,
-          event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString(), private: post.eventPrivate === true } : null,
+          event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString(), private: post.eventPrivate === true, extras: post.eventExtras ?? [] } : null,
           createdAt: post.createdAt.toISOString(),
           mine: post.authorId === viewerId,
           likeCount: likes.get(post.id)?.count ?? 0,

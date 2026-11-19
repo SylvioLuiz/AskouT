@@ -2593,4 +2593,10 @@ export const ES: Readonly<Record<string, string>> = {
   "Remover minha marcação": "Quitar mi etiqueta",
   "O post sai do seu perfil e você deixa de aparecer marcado.": "La publicación sale de tu perfil y dejas de aparecer etiquetado.",
   "Carregando story": "Cargando historia",
+  "Mais informações do evento": "Más información del evento",
+  "1 preenchida": "1 completada",
+  "{count} preenchidas": "{count} completadas",
+  "Escreva aqui (opcional)": "Escribe aquí (opcional)",
+  "Sim": "Sí",
+  "Não": "No",
 };

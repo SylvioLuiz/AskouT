@@ -1,4 +1,5 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
+import { storedEventExtraAnswers } from '../../core/event-extras.ts';
 import type { PostRepository } from '../../core/ports.ts';
 import type { EngagementRow, Page, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
@@ -23,6 +24,7 @@ export class PrismaPostRepository implements PostRepository {
         eventEndsAt: post.eventEndsAt,
         eventKind: post.eventKind,
         eventPrivate: post.eventPrivate ?? false,
+        eventExtras: (post.eventExtras ?? []) as Prisma.InputJsonValue,
         archivedAt: post.archivedAt,
         editedAt: post.editedAt,
         createdAt: post.createdAt,
@@ -55,6 +57,7 @@ export class PrismaPostRepository implements PostRepository {
     eventEndsAt: Date | null;
     eventKind: PostRecord['eventKind'];
     eventPrivate: boolean;
+    eventExtras: Prisma.JsonValue;
     archivedAt: Date | null;
     editedAt: Date | null;
     createdAt: Date;
@@ -63,7 +66,7 @@ export class PrismaPostRepository implements PostRepository {
     images: { id: string; position: number; mime: string | null; placePhotoRef: string | null; placePhotoAuthor: string | null; videoMime: string | null }[];
   }): PostWithImages {
     return {
-      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, eventKind: row.eventKind, eventPrivate: row.eventPrivate, archivedAt: row.archivedAt, editedAt: row.editedAt, createdAt: row.createdAt, venueId: row.venueId ?? null, placeVenueId: row.placeVenueId ?? null },
+      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, eventKind: row.eventKind, eventPrivate: row.eventPrivate, eventExtras: storedEventExtraAnswers(row.eventExtras), archivedAt: row.archivedAt, editedAt: row.editedAt, createdAt: row.createdAt, venueId: row.venueId ?? null, placeVenueId: row.placeVenueId ?? null },
       images: row.images.map((i) => ({ id: i.id, position: i.position, isUpload: i.mime !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor, videoMime: i.videoMime })),
     };
   }
@@ -184,7 +187,9 @@ export class PrismaPostRepository implements PostRepository {
 
   async update(postId: string, authorId: string, patch: PostPatch): Promise<boolean> {
     if (!isUuid(postId) || !isUuid(authorId)) return false;
-    const result = await this.prisma.post.updateMany({ where: { id: postId, authorId }, data: patch });
+    const { eventExtras, ...rest } = patch;
+    const data = eventExtras === undefined ? rest : { ...rest, eventExtras: eventExtras as Prisma.InputJsonValue };
+    const result = await this.prisma.post.updateMany({ where: { id: postId, authorId }, data });
     return result.count > 0;
   }
 

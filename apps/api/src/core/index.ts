@@ -25,6 +25,7 @@ import { DwellService } from './dwell-service.ts';
 import { InterestService } from './interest-service.ts';
 import { MatchService } from './match-service.ts';
 import { PaymentsSwitch } from './payments-switch.ts';
+import { EventExtrasCatalog } from './event-extras.ts';
 import { ConsentService } from './consent-service.ts';
 import { CloakroomService } from './cloakroom-service.ts';
 import { RegionService } from './region-service.ts';
@@ -94,6 +95,7 @@ export function createCore(input: CoreInput) {
     scheduling: new SchedulingService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
     posts,
+    eventExtras: new EventExtrasCatalog(deps),
     dwell: new DwellService(deps),
     activity: new ActivityService(deps),
     recommendations: new RecommendationService(deps, posts, match),

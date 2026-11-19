@@ -6,6 +6,8 @@ import type { AuthResult, AuthService, LoginInput, MfaChallenge, SocialLoginInpu
 import type { CoreDeps } from './ports.ts';
 import type { VenueService } from './venue-service.ts';
 import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
+import { EVENT_EXTRA_ICONS, EventExtrasCatalog } from './event-extras.ts';
+import type { EventExtraInput, EventExtraOption } from './event-extras.ts';
 import type { Actor, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
 import { REPORT_RESOLUTIONS } from './types.ts';
 
@@ -228,6 +230,45 @@ export class AdminService {
     await this.paymentsSwitch.set(enabled, actor.userId);
     await this.log(actor.userId, enabled ? 'PAYMENTS_ENABLED' : 'PAYMENTS_DISABLED', 'SETTING', 'payments', reason);
     return this.paymentsSwitch.state();
+  }
+
+  // ---------- Configurações de evento ("Pode fumar?", "Estacionamento"...) ----------
+
+  private get eventExtrasCatalog(): EventExtrasCatalog {
+    return new EventExtrasCatalog(this.deps);
+  }
+
+  async eventExtras(actor: Actor): Promise<{ items: EventExtraOption[]; icons: readonly string[] }> {
+    this.assertAdmin(actor);
+    return { items: await this.eventExtrasCatalog.list(), icons: EVENT_EXTRA_ICONS };
+  }
+
+  async createEventExtra(actor: Actor, input: EventExtraInput): Promise<{ items: EventExtraOption[] }> {
+    this.assertAdmin(actor);
+    const { option, items } = await this.eventExtrasCatalog.create(input, actor.userId);
+    await this.log(actor.userId, 'EVENT_EXTRA_CREATED', 'SETTING', option.id, `${option.label} (${option.type === 'YES_NO' ? 'sim/não' : 'texto'})`);
+    return { items };
+  }
+
+  async updateEventExtra(actor: Actor, id: unknown, input: EventExtraInput): Promise<{ items: EventExtraOption[] }> {
+    this.assertAdmin(actor);
+    const { before, option, items } = await this.eventExtrasCatalog.update(id, input, actor.userId);
+    const note = before.label === option.label ? option.label : `${before.label} → ${option.label}`;
+    await this.log(actor.userId, 'EVENT_EXTRA_UPDATED', 'SETTING', option.id, note.slice(0, 300));
+    return { items };
+  }
+
+  async moveEventExtra(actor: Actor, id: unknown, direction: unknown): Promise<{ items: EventExtraOption[] }> {
+    this.assertAdmin(actor);
+    const { items } = await this.eventExtrasCatalog.move(id, direction, actor.userId);
+    return { items };
+  }
+
+  async deleteEventExtra(actor: Actor, id: unknown): Promise<{ items: EventExtraOption[] }> {
+    this.assertAdmin(actor);
+    const { option, items } = await this.eventExtrasCatalog.remove(id, actor.userId);
+    await this.log(actor.userId, 'EVENT_EXTRA_REMOVED', 'SETTING', option.id, option.label);
+    return { items };
   }
 
   // ---------- Locais, eventos e posts ----------

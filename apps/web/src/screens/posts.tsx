@@ -7,6 +7,9 @@ import { ShareEventSheet } from '../components/share-event.tsx';
 import { CropEditor } from '../components/crop.tsx';
 import { EventDates } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
+import { EventExtrasFields } from '../components/event-extras.tsx';
+import { extrasFromDraft } from '../lib/event-extras.ts';
+import type { EventExtrasDraft } from '../lib/event-extras.ts';
 import { PostCard, PostList } from '../components/post.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -163,6 +166,9 @@ export function CreatePostScreen() {
   const [eventStart, setEventStart] = useState(startAsEvent ? (prefill.get('inicio') ?? '') : '');
   const [eventEnd, setEventEnd] = useState(startAsEvent ? (prefill.get('fim') ?? '') : '');
   const [eventPrivate, setEventPrivate] = useState(false);
+  // Configurações de evento da gestão ("Pode fumar?", "Estacionamento"...), respondidas num acordeon recolhido.
+  const [extras, setExtras] = useState<EventExtrasDraft>({});
+  const extraOptions = useAsync(() => (kind === 'EVENT' ? api.eventExtras().then((r) => r.items) : Promise.resolve(null)), [kind === 'EVENT']);
   // A conversa da votação já vem marcada no passo de enviar, que aparece depois que o evento é criado.
   const pollConversation = fromPoll ? prefill.get('conversa') : null;
   // Evento criado: em vez de sair direto, mostra o passo "Enviar para conversas".
@@ -253,7 +259,7 @@ export function CreatePostScreen() {
   async function publish() {
     setBusy(true);
     setMessage(undefined);
-    const eventDraft = kind === 'EVENT' ? { title: eventTitle, kind: eventKind, startsAt: eventStart, endsAt: eventEnd, private: eventPrivate } : null;
+    const eventDraft = kind === 'EVENT' ? { title: eventTitle, kind: eventKind, startsAt: eventStart, endsAt: eventEnd, private: eventPrivate, extras: extrasFromDraft(extras, extraOptions.data ?? []) } : null;
     const problem = eventDraft ? eventProblem(eventDraft, effectivePlace(items, linked), new Date()) : null;
     if (problem) {
       setMessage({ tone: 'error', text: problem });
@@ -417,6 +423,7 @@ export function CreatePostScreen() {
             <Field label={t('Nome do evento')} value={eventTitle} onChange={setEventTitle} maxLength={120} />
             <EventKindPicker value={eventKind} onChange={setEventKind} />
             <EventDates starts={eventStart} ends={eventEnd} onStarts={setEventStart} onEnds={setEventEnd} />
+            <EventExtrasFields options={extraOptions.data ?? []} value={extras} onChange={setExtras} />
             <p className="muted">{t('O rolê é opcional: escolha abaixo se quiser.')}</p>
             <label className="check">
               <input type="checkbox" checked={eventPrivate} onChange={(e) => setEventPrivate(e.target.checked)} />
