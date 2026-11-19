@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
-import { useAsync, usePolling } from '../hooks.ts';
+import { PUSH_EVENT, useAsync, useLiveRefresh, usePolling } from '../hooks.ts';
 import { CHATS_CHANGED_EVENT } from '../lib/chat.ts';
 import { FLASH_CHANGED_EVENT } from '../lib/flash.ts';
 import { hasNewActivity, NOTIFICATIONS_CHANGED_EVENT, readActivitySeen } from '../lib/notifications.ts';
@@ -159,6 +159,8 @@ function MainShell({ children }: { children: ReactNode }) {
     const onMessage = (event: MessageEvent) => {
       const data = event.data as { type?: unknown; url?: unknown } | null;
       if (data?.type === 'askout:navigate' && typeof data.url === 'string' && data.url.startsWith('/')) navigate(data.url);
+      // Chegou um aviso com o app aberto: as telas que escutam (ex.: lista de conversas) atualizam na hora.
+      if (data?.type === 'askout:push') window.dispatchEvent(new CustomEvent(PUSH_EVENT, { detail: { url: typeof data.url === 'string' ? data.url : '/' } }));
     };
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);
@@ -184,7 +186,7 @@ function MainShell({ children }: { children: ReactNode }) {
   });
   // Conversas: bolinha quando há mensagem não lida.
   const convs = useAsync(() => api.conversations(), []);
-  usePolling(convs.reload, 15_000);
+  useLiveRefresh(convs.reload, 15_000);
   useEffect(() => {
     window.addEventListener(CHATS_CHANGED_EVENT, convs.reload);
     return () => window.removeEventListener(CHATS_CHANGED_EVENT, convs.reload);

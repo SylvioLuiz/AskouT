@@ -528,6 +528,9 @@ export function createApi(deps: ApiDeps) {
     deleteProfileStory: (storyId: string) => request<{ deleted: true }>('DELETE', `/stories/${id(storyId)}`),
     reportProfileStory: (storyId: string, reason: ReportReason, details?: string) =>
       request<{ reported: true }>('POST', `/stories/${id(storyId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+    /** Reage a um story: entre amigos vira mensagem na conversa; sem amizade (story de evento), um aviso para quem publicou. */
+    reactProfileStory: (storyId: string, emoji: string) => request<{ sent: true; conversationId: string | null }>('POST', `/stories/${id(storyId)}/react`, { body: { emoji } }),
+    reactEventStory: (eventId: string, storyId: string, emoji: string) => request<{ sent: true; conversationId: string | null }>('POST', `/events/${id(eventId)}/stories/${id(storyId)}/react`, { body: { emoji } }),
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
     eventGo: (eventId: string) => request<EventPage>('POST', `/events/${id(eventId)}/going`),
     eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),

@@ -18,6 +18,9 @@ import { kindLabel, safeImage } from '../lib/explore.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
+/** Reações rápidas no pé do story. */
+const STORY_REACTIONS = ['❤️', '😂', '😮', '😢', '🔥', '👏'] as const;
+
 // ---------- Publicar ----------
 
 export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: string; onClose: () => void; onCreated: () => void }) {
@@ -111,6 +114,11 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [reporting, setReporting] = useState(false);
+  /** Reação enviada no story atual (some sozinha depois de um instante). */
+  const [sentReaction, setSentReaction] = useState<{ storyId: string; emoji: string } | undefined>();
+  const [reacting, setReacting] = useState(false);
+  /** Id do story cuja mídia já carregou inteira: só então aparece e o tempo começa a contar. */
+  const [readyId, setReadyId] = useState<string | undefined>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const fillRef = useRef<HTMLSpanElement>(null);
   const spentRef = useRef(0);
@@ -131,10 +139,40 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
     setError(undefined);
   }, [item?.id]);
 
+  // Foto: baixa e decodifica fora da tela; só mostra quando está inteira (nada de meia imagem aparecendo).
+  // Já deixa a próxima foto baixando, para a troca ser instantânea.
+  const ready = !!item && readyId === item.id;
+  useEffect(() => {
+    if (!item || item.kind !== 'IMAGE') return;
+    let cancelled = false;
+    const id = item.id;
+    const img = new Image();
+    img.src = api.storyMediaUrl(id);
+    img
+      .decode()
+      .then(() => {
+        if (!cancelled) setReadyId(id);
+      })
+      .catch(() => {
+        if (!cancelled) setError(t('Não foi possível abrir esta foto.'));
+      });
+    const next = nextStory(groups, pos);
+    const upcoming = next ? groups[next.group]?.items[next.item] : undefined;
+    if (upcoming?.kind === 'IMAGE') new Image().src = api.storyMediaUrl(upcoming.id);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.id]);
+
   // Barra de progresso a cada quadro, direto no elemento (sem re-render): anda lisa, sem pulos.
   // Foto passa sozinha e pausa enquanto a denúncia está aberta; vídeo segue o tempo do próprio vídeo.
   useEffect(() => {
     if (!item || reporting) return;
+    if (!ready) {
+      if (fillRef.current) fillRef.current.style.transform = 'scaleX(0)';
+      return;
+    }
     let frame = 0;
     let last = performance.now();
     const paint = (ratio: number) => {
@@ -159,7 +197,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [item?.id, reporting]);
+  }, [item?.id, reporting, ready]);
 
   useEffect(() => {
     if (reporting) videoRef.current?.pause();
@@ -189,6 +227,23 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
     } catch (failure) {
       setError(toApiError(failure).message);
       setBusy(false);
+    }
+  }
+
+  async function react(emoji: string) {
+    if (!item || reacting) return;
+    const storyId = item.id;
+    setReacting(true);
+    setError(undefined);
+    try {
+      if (eventId) await api.reactEventStory(eventId, storyId, emoji);
+      else await api.reactProfileStory(storyId, emoji);
+      setSentReaction({ storyId, emoji });
+      window.setTimeout(() => setSentReaction((s) => (s?.storyId === storyId ? undefined : s)), 1800);
+    } catch (failure) {
+      setError(toApiError(failure).message);
+    } finally {
+      setReacting(false);
     }
   }
 
@@ -242,16 +297,34 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
             autoPlay
             playsInline
             muted={muted}
+            style={ready ? undefined : { opacity: 0 }}
+            onCanPlay={() => setReadyId(item.id)}
             onEnded={advance}
             onError={() => setError(t('Não foi possível abrir este vídeo.'))}
           />
         ) : (
-          <img key={item.id} className="storyview__media" src={src} alt="" onError={() => setError(t('Não foi possível abrir esta foto.'))} />
+          ready ? <img key={item.id} className="storyview__media" src={src} alt="" onError={() => setError(t('Não foi possível abrir esta foto.'))} /> : null
         )}
+        {!ready && !error ? <span className="storyview__loading" role="status" aria-label={t('Carregando story')} /> : null}
         <button type="button" className="storyview__tap storyview__tap--prev" onClick={() => setPos(prevStory(groups, pos))} aria-label={t('Story anterior')} />
         <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo story')} />
         {item.kind === 'VIDEO' ? <SoundToggle muted={muted} onToggle={() => setMuted((m) => !m)} /> : null}
       </div>
+      {!group.mine ? (
+        <div className="storyreact" role="group" aria-label={t('Reagir ao story')}>
+          {STORY_REACTIONS.map((emoji) => (
+            <button key={emoji} type="button" className="storyreact__btn" disabled={reacting} onClick={() => void react(emoji)} aria-label={t('Reagir com {emoji}', { emoji })}>
+              {emoji}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {sentReaction?.storyId === item.id ? (
+        <div className="storyreact__sent" role="status">
+          <span className="storyreact__burst" aria-hidden="true">{sentReaction.emoji}</span>
+          <span>{t('Reação enviada para {username}', { username: group.author.username })}</span>
+        </div>
+      ) : null}
       {!eventId && item.event ? <StoryPlace event={item.event} username={group.author.username} /> : null}
       {error ? <p className="storyview__error">{error}</p> : null}
       {reporting ? (

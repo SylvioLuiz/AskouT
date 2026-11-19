@@ -277,14 +277,6 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           </div>
         </div>
       ) : null}
-      {myTag === 'ACCEPTED' && !post.mine ? (
-        <p className="muted">
-          {t('Você está marcado neste post.')}{' '}
-          <button type="button" className="linkbtn" onClick={() => void answerTag('decline')} disabled={tagBusy}>
-            {t('Tirar minha marcação')}
-          </button>
-        </p>
-      ) : null}
       {post.event && eventCard ? <EventPostCard post={post} event={post.event} /> : null}
       {post.event && !eventCard ? (
         <p className="post__event">
@@ -417,7 +409,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
       {sheet === 'menu' ? (
         <PostMenuSheet
           post={post}
-          busy={busy}
+          busy={busy || tagBusy}
           onClose={() => setSheet(undefined)}
           onEdit={() => setSheet('edit')}
           onAdjust={() => setSheet('adjust')}
@@ -425,6 +417,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           onArchiveToggle={() => void toggleArchive()}
           onNotInterested={() => void run(() => api.notInterested(post.id), 'hidden')}
           onDelete={() => void run(() => api.deletePost(post.id), 'deleted')}
+          onRemoveTag={myTag === 'ACCEPTED' && !post.mine ? () => void answerTag('decline').then(() => setSheet(undefined)) : undefined}
         />
       ) : null}
       {sheet === 'edit' ? (
