@@ -423,6 +423,8 @@ export function createApi(deps: ApiDeps) {
     setStoryVisibility: (userId: string, body: Partial<StoryVisibility>) => request<StoryVisibility>('PUT', `/stories/visibility/${id(userId)}`, { body }),
     flashAvailable: (order?: AvailableOrder) => request<AvailableList>('GET', `/flash/available${order ? `?ordem=${order === 'near' ? 'perto' : 'interacao'}` : ''}`),
     flashInvites: () => request<FlashInvites>('GET', '/flash/invites'),
+    /** "Perguntar se está livre": cada amigo recebe um aviso que abre o NOW dele. */
+    flashAsk: (userIds: string[]) => request<{ asked: string[]; skipped: string[] }>('POST', '/flash/ask', { body: { userIds } }),
     flashInvite: (userId: string, approx = false) => request<FlashInvite>('POST', '/flash/invites', { body: { userId, approx } }),
     flashRespond: (inviteId: string, action: 'accept' | 'decline', approx = false) =>
       request<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: action === 'accept' ? { action, approx } : { action } }),

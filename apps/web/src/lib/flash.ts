@@ -127,6 +127,17 @@ export function formatCountdown(ms: number): string {
 }
 
 /** Quanto do tempo do Flash ainda resta, de 0 a 1. */
+/** Relógio do NOW: 2398 s -> "39:58"; 5400 s -> "1:30:00". */
+export function formatClock(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return '0:00';
+  const total = Math.ceil(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const two = (n: number) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`;
+}
+
 export function flashRemainingShare(startsAt: string | null, expiresAt: string, nowMs: number): number {
   const end = Date.parse(expiresAt);
   const start = startsAt ? Date.parse(startsAt) : Number.NaN;

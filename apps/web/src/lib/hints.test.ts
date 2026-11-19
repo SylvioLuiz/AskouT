@@ -26,7 +26,7 @@ describe('aviso de privacidade do NOW', () => {
     assert.equal(flashNoticeSeen(undefined), false);
   });
   it('tem os pontos combinados', () => {
-    assert.equal(FLASH_PRIVACY_POINTS.length, 4);
+    assert.equal(FLASH_PRIVACY_POINTS.length, 5);
     assert.ok(FLASH_PRIVACY_POINTS.every((p) => p.length > 20));
   });
 });

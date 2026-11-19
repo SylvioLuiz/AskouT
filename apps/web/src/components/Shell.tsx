@@ -12,6 +12,7 @@ import { venueAdminRoute, venueAdminTabs } from '../lib/venue-admin-mode.ts';
 import type { VenueAdminRoute, VenueAdminSection } from '../lib/venue-admin-mode.ts';
 import { Avatar } from './ui.tsx';
 import { CreateChooser } from './create-chooser.tsx';
+import { NowInviteToast } from './now-invite.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 interface NavItem {
@@ -182,7 +183,8 @@ function MainShell({ children }: { children: ReactNode }) {
     flash.reload();
     flashInvites.reload();
   };
-  usePolling(reloadFlash, 30_000);
+  // Convite do NOW vale só 15 minutos: confere com frequência para o aviso descer logo.
+  useLiveRefresh(reloadFlash, 15_000);
   useEffect(() => {
     window.addEventListener(FLASH_CHANGED_EVENT, reloadFlash);
     return () => window.removeEventListener(FLASH_CHANGED_EVENT, reloadFlash);
@@ -218,6 +220,8 @@ function MainShell({ children }: { children: ReactNode }) {
       <a className="skip" href="#conteudo">
         {t('Ir para o conteúdo')}
       </a>
+
+      <NowInviteToast received={flashInvites.data?.received ?? []} enabled={!pathname.startsWith('/now')} />
 
       <aside className="rail">
         <Link to="/" className="wordmark" aria-label={t('AskouT, ir para a Home')}>

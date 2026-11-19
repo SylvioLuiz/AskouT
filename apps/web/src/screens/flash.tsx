@@ -1,7 +1,10 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { lazyWithReload } from '../lib/chunk-reload.ts';
-import { Suspense, useEffect, useRef, useState } from 'react';
-import { BoltIcon, CalendarIcon, ChatIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, RefreshIcon, ShieldIcon, UserPlusIcon, UsersIcon, BulbIcon } from '../components/icons.tsx';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { BoltIcon, ChatIcon, CheckIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, MapIcon, PlusIcon, RefreshIcon, UserPlusIcon, UsersIcon, XIcon } from '../components/icons.tsx';
+import { InviteFocusCard, NowFace, useTick } from '../components/now-invite.tsx';
+import type { NowPin } from '../components/now-map.tsx';
+import { useUser } from '../auth.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { RingLoader } from '../components/ring-loader.tsx';
 import { MatchPlaceSearch } from '../components/match-place-search.tsx';
@@ -15,13 +18,14 @@ import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import {
   announceFlashChange,
   distanceMeters,
+  FLASH_CHANGED_EVENT,
+  formatClock,
   FLASH_DEFAULT_MINUTES,
   formatFlashDuration,
   FLASH_NOTE_MAX,
   flashNoteProblem,
   flashRemainingShare,
   formatAge,
-  formatCountdown,
   formatApprox,
   formatDistance,
   formatKm,
@@ -29,14 +33,13 @@ import {
   geolocationMessage,
   minutesLeft,
 } from '../lib/flash.ts';
-import { birthDateProblem, todayIso } from '../lib/age.ts';
-import { initials, tintIndex } from '../lib/avatar.ts';
+import { initials } from '../lib/avatar.ts';
 import { toApiError } from '../lib/errors.ts';
 import { FLASH_PRIVACY_POINTS, flashNoticeSeen, markFlashNoticeSeen, safeStorage } from '../lib/hints.ts';
-import type { OtherPin, PlacePin, RouteLine } from '../components/match-map.tsx';
+import type { PlacePin, RouteLine } from '../components/match-map.tsx';
 import { MatchDestination, MatchPlaces } from '../components/match-destination.tsx';
 import { MAX_PLACES_ON_MAP, placeName, sortByFairness } from '../lib/flash.ts';
-import type { AvailableFriend, AvailableOrder, FlashInvite, FlashMatch, PublicProfile, SuggestionItem } from '../lib/types.ts';
+import type { AvailableFriend, AvailableOrder, FlashMatch, PublicProfile, SuggestionItem } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
@@ -51,6 +54,7 @@ const DURATIONS: readonly { minutes: number; value: string; unit: string; label:
 
 // O mapa (MapLibre) é pesado: só é baixado quando alguém abre um encontro.
 const MatchMap = lazyWithReload(() => import('../components/match-map.tsx'));
+const NowMap = lazyWithReload(() => import('../components/now-map.tsx'));
 
 const ORDER_KEY = 'askout.now.order';
 
@@ -94,6 +98,7 @@ export function FlashScreen() {
 }
 
 function FlashContent() {
+  const user = useUser();
   const status = useAsync(() => api.flashStatus(), []);
   const active = status.data?.active === true;
   const [order, setOrder] = useState<AvailableOrder | undefined>(savedOrder);
@@ -118,7 +123,7 @@ function FlashContent() {
   }
   const invites = useAsync(() => api.flashInvites(), []);
 
-  // Mapa: onde estão os amigos que aceitaram sair com você (e só eles).
+  // Encontros aceitos: a posição exata de quem aceitou sair com você (só dessas pessoas).
   const matchIds = (invites.data?.matches ?? []).map((m) => m.id);
   const matchKey = matchIds.join(',');
   const matchViews = useAsync(
@@ -131,10 +136,9 @@ function FlashContent() {
       invites.reload();
       matchViews.reload();
     },
-    // Ligou o NOW, a localização já liga. Ela só vai para quem você aprovou (convite aceito).
+    // Ligou o NOW, a localização já liga. A posição exata só vai para quem você aprovou (convite aceito).
     active,
   );
-  const [mapFailed, setMapFailed] = useState(false);
 
   const [minutes, setMinutes] = useState(FLASH_DEFAULT_MINUTES);
   const [note, setNote] = useState('');
@@ -145,13 +149,17 @@ function FlashContent() {
   const [feedback, setFeedback] = useState<Feedback>();
   const [started, setStarted] = useState<string | undefined>();
   const [mapOpen, setMapOpen] = useState(false);
-  const [friendOpen, setFriendOpen] = useState<string | undefined>();
+  const [mapFriend, setMapFriend] = useState<string | undefined>();
   const [callAllOpen, setCallAllOpen] = useState(false);
   const [callingAll, setCallingAll] = useState(false);
   const [approxAll, setApproxAll] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
+  // Convites em foco: o resto da tela fica esmaecido até responder ou tocar fora.
+  const [unfocused, setUnfocused] = useState<string>('');
 
-  // O aviso de "Flash ativado" some sozinho depois de 3 segundos.
+  // O aviso de "NOW ativado" some sozinho depois de 3 segundos.
   useEffect(() => {
     if (!started) return undefined;
     const timer = window.setTimeout(() => setStarted(undefined), 3000);
@@ -159,14 +167,23 @@ function FlashContent() {
   }, [started]);
 
   // O tempo restante e as listas se atualizam sozinhos.
-  const [, setTick] = useState(0);
   usePolling(() => {
     status.reload();
     invites.reload();
     available.reload();
     matchViews.reload();
-    setTick((n) => n + 1);
   }, POLL_MS);
+
+  // Convite respondido pelo aviso do topo (ou em outra aba): a tela acompanha.
+  useEffect(() => {
+    const onChange = () => {
+      status.reload();
+      invites.reload();
+      available.reload();
+    };
+    window.addEventListener(FLASH_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(FLASH_CHANGED_EVENT, onChange);
+  });
 
   function reloadAll() {
     status.reload();
@@ -214,6 +231,7 @@ function FlashContent() {
     try {
       const next = await api.flashExtend(by);
       status.setData(next);
+      setPlusOpen(false);
       const until = next.expiresAt ? new Date(next.expiresAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit' }) : '';
       setFeedback({ tone: 'ok', text: t('NOW estendido até {time}.', { time: until }) });
       announceFlashChange();
@@ -244,28 +262,121 @@ function FlashContent() {
   if (status.loading && !status.data) return <Loading />;
   if (status.error && !status.data) return <ErrorState message={status.error.message} onRetry={status.reload} />;
 
-  const now = Date.now();
-  const left = status.data?.expiresAt ? minutesLeft(status.data.expiresAt, now) : 0;
+  const howSheet = infoOpen ? <HowItWorks onClose={() => setInfoOpen(false)} /> : null;
+  const askSheet = asking ? <AskSheet onClose={() => setAsking(false)} onFeedback={setFeedback} /> : null;
+  const feedbackLine = feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null;
+
+  if (!active) {
+    return (
+      <section className="nowoff" aria-label={t('Ligar o NOW')}>
+        {feedbackLine}
+        <OfferBanner />
+        <header className="nowhead">
+          <div>
+            <h1 className="nowhead__title">
+              NOW <BoltIcon filled />
+            </h1>
+            <p className="nowhead__sub">{t('Livre agora? Encontre alguém para sair.')}</p>
+          </div>
+          <button type="button" className="nowhead__how" onClick={() => setInfoOpen(true)}>
+            <HelpIcon />
+            {t('Como funciona?')}
+          </button>
+        </header>
+
+        <NowRadar me={user.profile} />
+
+        <label className="nownote nownote--input">
+          <span className="visually-hidden">{t('Recado (opcional)')}</span>
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder={t('No que você tá a fim?')}
+            maxLength={FLASH_NOTE_MAX + 20}
+            autoComplete="off"
+            aria-invalid={noteError ? true : undefined}
+            aria-describedby={noteError ? 'now-note-error' : undefined}
+          />
+        </label>
+        {noteError ? (
+          <p className="nowoff__error" id="now-note-error" role="alert">
+            {noteError}
+          </p>
+        ) : note !== '' ? (
+          <p className="nowoff__count">
+            {Array.from(note).length}/{FLASH_NOTE_MAX}
+          </p>
+        ) : null}
+
+        <div className="nowdur" role="radiogroup" aria-label={t('Duração do NOW')}>
+          {DURATIONS.map((d) => (
+            <button key={d.minutes} type="button" role="radio" aria-checked={minutes === d.minutes} aria-label={d.label} className="nowdur__opt" onClick={() => setMinutes(d.minutes)}>
+              {d.value} {d.unit}
+            </button>
+          ))}
+        </div>
+
+        <button type="button" className="nowgo" disabled={busy} aria-busy={busy || undefined} onClick={turnOn}>
+          <BoltIcon filled />
+          {t('Ativar NOW')}
+        </button>
+        <p className="nowoff__privacy">
+          <LockIcon />
+          {t('Só amigos veem. Localização exata só com quem você aprovar.')}
+        </p>
+
+        <button type="button" className="nowask" onClick={() => setAsking(true)}>
+          <span className="nowask__icon" aria-hidden="true">
+            <UsersIcon />
+          </span>
+          <span className="nowask__body">
+            <strong>{t('Perguntar se está livre')}</strong>
+            <span>{t('Mande um aviso para amigos. Quando ligarem o NOW, você fica sabendo.')}</span>
+          </span>
+          <ChevronRightIcon />
+        </button>
+
+        {explaining ? (
+          <Sheet title={t('Antes de ligar o NOW')} onClose={() => setExplaining(false)}>
+            <ul className="flashnotice">
+              {FLASH_PRIVACY_POINTS.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+            <Button
+              full
+              onClick={() => {
+                markFlashNoticeSeen(safeStorage());
+                setExplaining(false);
+                void doTurnOn();
+              }}
+            >
+              {t('Entendi, ligar o NOW')}
+            </Button>
+          </Sheet>
+        ) : null}
+        {howSheet}
+        {askSheet}
+      </section>
+    );
+  }
+
   const received = invites.data?.received ?? [];
   const matches = invites.data?.matches ?? [];
-  const mapOthers: OtherPin[] = (matchViews.data ?? []).flatMap((m) =>
-    m.them ? [{ id: m.inviteId, lat: m.them.lat, lng: m.them.lng, stale: m.them.stale, initials: initials(m.other.username) }] : [],
-  );
-
   const friends = available.data ?? [];
-  // Tela nova: Flash ligado e com ao menos um amigo livre. Os outros estados seguem como estavam.
-  const rich = active && friends.length > 0;
-  // Flash ligado e a lista já chegou vazia: mostra o estado "ninguém por enquanto" (e não o painel antigo).
-  const empty = active && available.data !== undefined && friends.length === 0;
+  const empty = available.data !== undefined && friends.length === 0;
   const eligible = friends.filter((f) => f.invite === null);
-  // Distância só de quem aceitou o convite e já enviou a posição. Parte da minha posição enviada ao encontro
-  // (ou da que o aparelho está lendo agora); sem as duas pontas, nada é mostrado.
-  const distanceById = new Map<string, string>();
+  const friendById = new Map(friends.map((f) => [f.profile.userId, f] as const));
+  const focusKey = received.map((i) => i.id).join(',');
+  const focusing = received.length > 0 && unfocused !== focusKey;
+
+  // Distância exata só de quem aceitou o convite e já enviou a posição.
+  const exactById = new Map<string, { lat: number; lng: number; km: string }>();
   for (const m of matchViews.data ?? []) {
     const origin = m.me ?? share.mine;
-    if (m.them && origin) distanceById.set(m.other.userId, formatKm(distanceMeters(origin, m.them)));
+    if (m.them) exactById.set(m.other.userId, { lat: m.them.lat, lng: m.them.lng, km: origin ? formatKm(distanceMeters(origin, m.them)) : '' });
   }
-  const friendInSheet = friends.find((f) => f.profile.userId === friendOpen);
+  const distanceOf = (f: AvailableFriend) => exactById.get(f.profile.userId)?.km || (f.approx ? formatApprox(f.approx, true) : '');
 
   async function callAll() {
     setCallingAll(true);
@@ -277,337 +388,18 @@ function FlashContent() {
     setCallAllOpen(false);
     setFeedback(
       failed === 0
-        ? { tone: 'ok', text: sent === 1 ? t('Convite enviado. Vale por 15 minutos.') : `${sent} convites enviados. Valem por 15 minutos.` }
+        ? { tone: 'ok', text: sent === 1 ? t('Convite enviado. Vale por 15 minutos.') : t('{sent} convites enviados. Valem por 15 minutos.', { sent }) }
         : { tone: 'error', text: t('{sent} de {length} convites enviados. Os outros não puderam ser enviados agora.', { sent, length: results.length }) },
     );
     reloadAll();
   }
 
-  const mapSection = (
-    <section className="section flashmap" aria-labelledby="mapa-titulo">
-      <h2 id="mapa-titulo" className="section__title flashmap__title">
-        {t('No mapa')}
-      </h2>
-      {!mapFailed && (share.mine || mapOthers.length > 0) ? (
-        <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label={t('Carregando o mapa')} /></div>}>
-          <MatchMap me={share.mine} others={mapOthers} onFail={() => setMapFailed(true)} />
-        </Suspense>
-      ) : null}
-      <p className="muted">
-        {matches.length === 0
-          ? t('Só aparecem aqui você e os amigos que aceitaram sair com você. Convide alguém da lista abaixo.')
-          : mapOthers.length === 0
-            ? t('Seus amigos aparecem no mapa quando compartilharem a localização.')
-            : t('Amigos que aceitaram sair com você, atualizados a cada poucos segundos.')}
-      </p>
-      {share.state.phase === 'sharing' ? (
-        <>
-          <p className="muted">{t('Sua localização está ligada. Só vê onde você está quem você aprovar, aceitando ou mandando um convite.')}</p>
-          <Button variant="secondary" full onClick={share.stop}>
-            {t('Parar de compartilhar')}
-          </Button>
-        </>
-      ) : (
-        <>
-          {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
-          <Button full loading={share.state.phase === 'asking'} onClick={share.start}>
-            {t('Compartilhar minha localização')}
-          </Button>
-          <p className="muted">{t('Sua localização só vai para quem aceitou sair com você, enquanto este NOW estiver ligado.')}</p>
-        </>
-      )}
-      <p className="muted">{t('Quando alguém aceita um convite, vocês dois passam a compartilhar a localização automaticamente. Dá para parar quando quiser.')}</p>
-    </section>
-  );
-
-  // Mostra no cartão do NOW se a localização está ligada (ela liga sozinha com o NOW).
-  const locationLine = (
-    <div className={`flashloc flashloc--${share.state.phase}`} role="status">
-      <LocationIcon />
-      {share.state.phase === 'sharing' ? (
-        <span>{t('Localização ligada. Só vê quem você aprovar.')}</span>
-      ) : share.state.phase === 'asking' ? (
-        <span>{t('Ligando sua localização…')}</span>
-      ) : (
-        <>
-          <span>{share.state.phase === 'error' ? share.state.message : t('Localização desligada.')}</span>
-          <button type="button" className="flashloc__btn" onClick={share.start}>
-            {share.state.phase === 'error' ? t('Tentar de novo') : t('Ligar')}
-          </button>
-        </>
-      )}
-    </div>
-  );
-
-  const receivedBlock =
-    received.length > 0 ? (
-      <section className="section" aria-labelledby="recebidos-titulo">
-        <h2 id="recebidos-titulo" className="section__title">
-          {t('Convites para você')}
-        </h2>
-        <ul className="list">
-          {received.map((invite) => (
-            <InviteRow key={invite.id} invite={invite} canAccept={active} onChanged={reloadAll} onFeedback={setFeedback} />
-          ))}
-        </ul>
-      </section>
-    ) : null;
-
-  const matchesBlock =
-    matches.length > 0 ? (
-      <section className="section" aria-labelledby="encontros-titulo">
-        <h2 id="encontros-titulo" className="section__title">
-          {t('Encontros em andamento')}
-        </h2>
-        <ul className="list">
-          {matches.map((invite) => (
-            <li key={invite.id} className="person">
-              <Link to={`/now/encontro/${invite.id}`} className="person__link">
-                <Avatar profile={invite.other} />
-                <span className="person__body">
-                  <span className="person__name">{invite.other.username}</span>
-                  <span className="person__handle">{t('Aceitou sair com você')}</span>
-                </span>
-              </Link>
-              <div className="person__aside row-actions">
-                <ChatButton userId={invite.other.userId} icon />
-                <Link to={`/now/encontro/${invite.id}`} className="btn btn--secondary btn--small">
-                  {t('Mapa')}
-                </Link>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
-    ) : null;
-
-  if (rich || empty) {
-    return (
-      <div className="flashlive">
-        {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
-        {started ? (
-          <div className="flashtoast" role="status">
-            <span className="flashtoast__bolt">
-              <BoltIcon filled />
-            </span>
-            <strong>{t('NOW ativado')}</strong>
-            <span>{started}</span>
-          </div>
-        ) : null}
-        <header className="flashlive__head">
-          <h1 className="flashlive__title">
-            NOW <BoltIcon filled />
-          </h1>
-          <p className="flashlive__sub">{t('Você está disponível agora.')}</p>
-        </header>
-
-        {/* Convites e encontros primeiro: é o que pede resposta. */}
-        {receivedBlock}
-        {matchesBlock}
-
-        <section className="flashcard" aria-label={t('Seu NOW')}>
-          <div className="flashcard__top">
-            <span className="flashcard__icon">
-              <BoltIcon filled />
-            </span>
-            <div className="flashcard__text">
-              <p className="flashcard__title">{t('NOW ativo')}</p>
-              <p className="flashcard__status">
-                {status.data?.expiresAt ? (
-                  <>
-                    Faltam <Countdown expiresAt={status.data.expiresAt} />
-                  </>
-                ) : null}
-              </p>
-            </div>
-          </div>
-          {status.data?.expiresAt ? <FlashBar startsAt={status.data.startsAt} expiresAt={status.data.expiresAt} /> : null}
-          {status.data?.note ? <p className="flashcard__note">“{status.data.note}”</p> : null}
-          {locationLine}
-          {confirmOff ? (
-            <Confirm question={t('Desligar o NOW? Convites abertos e encontros em andamento serão encerrados.')} confirmLabel={t('Desligar')} onConfirm={turnOff} onCancel={() => setConfirmOff(false)} busy={busy} danger />
-          ) : (
-            <>
-              <div className="flashcard__extend" role="group" aria-label={t('Estender o NOW')}>
-                <button type="button" className="flashcard__more" disabled={extending !== undefined || left >= 179} aria-busy={extending === 30 || undefined} onClick={() => void extend(30)}>
-                  <ClockIcon />
-                  {t('+30 min')}
-                </button>
-                <button type="button" className="flashcard__more" disabled={extending !== undefined || left >= 179} aria-busy={extending === 60 || undefined} onClick={() => void extend(60)}>
-                  <ClockIcon />
-                  {t('+1 hora')}
-                </button>
-              </div>
-              <div className="flashcard__foot">
-                <span className="flashcard__visible">
-                  <UsersIcon />
-                  {t('Visível para seus amigos')}
-                </span>
-                <button type="button" className="flashcard__off" onClick={() => setConfirmOff(true)}>
-                  <span className="flashcard__stop" aria-hidden="true" />
-                  {t('Desligar')}
-                </button>
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="flashlive__section" aria-labelledby="livres-titulo">
-          <div className="flashlive__row">
-            <h2 id="livres-titulo" className="flashlive__h2">
-              {empty ? t('Amigos livres agora') : t('Amigos livres agora ({length})', { length: friends.length })}
-            </h2>
-            <button type="button" className="flashlive__refresh" onClick={reloadAll}>
-              <RefreshIcon />
-              {t('Atualizar')}
-            </button>
-          </div>
-          {empty ? null : (
-            <div className="nowsort" role="group" aria-label={t('Ordenar amigos')}>
-              <button type="button" className="chip" aria-pressed={listMeta?.order === 'near'} disabled={listMeta !== undefined && !listMeta.nearAvailable} onClick={() => chooseOrder('near')}>
-                {t('Mais perto')}
-              </button>
-              <button type="button" className="chip" aria-pressed={listMeta?.order === 'interaction'} onClick={() => chooseOrder('interaction')}>
-                {t('Mais interação')}
-              </button>
-            </div>
-          )}
-          {!empty && listMeta && !listMeta.nearAvailable ? <p className="muted nowsort__hint">{t('Para ver quem está mais perto, libere a localização e ligue o NOW de novo.')}</p> : null}
-          {!empty && friends.some((f) => f.approx) ? <p className="muted nowsort__hint">{t('Distâncias aproximadas, para não revelar onde cada um está.')}</p> : null}
-          {empty ? (
-          <div className="flashempty">
-              <span className="flashempty__icon" aria-hidden="true">
-                <UsersIcon />
-              </span>
-              <h3 className="flashempty__title">{t('Ninguém disponível por enquanto')}</h3>
-              <p className="flashempty__text">{t('Que tal chamar seus amigos para ligar o NOW também?')}</p>
-              <button type="button" className="flashempty__cta" onClick={() => setInviting(true)}>
-                <UserPlusIcon />
-                {t('Convidar amigos')}
-              </button>
-          </div>
-          ) : (
-            <>
-              <ul className="flashfriends">
-                {friends.map((f) => {
-                  const dir = f.invite?.direction;
-                  const detail = distanceById.get(f.profile.userId) ?? (f.approx ? formatApprox(f.approx, true) : undefined) ?? (dir === 'MATCHED' ? 'Encontro' : dir === 'SENT' ? 'Convidado' : dir === 'RECEIVED' ? t('Convidou você') : '');
-                  return (
-                    <li key={f.profile.userId}>
-                      <button type="button" className="flashfriend" onClick={() => setFriendOpen(f.profile.userId)}>
-                        <span className="flashfriend__ring">
-                          {f.profile.avatarUrl ? (
-                            <img className="flashfriend__img" src={f.profile.avatarUrl.startsWith('/') ? api.assetUrl(f.profile.avatarUrl) : f.profile.avatarUrl} alt="" referrerPolicy="no-referrer" />
-                          ) : (
-                            <span className={`flashfriend__img avatar--tint-${tintIndex(f.profile.username)}`} aria-hidden="true">
-                              {initials(f.profile.username)}
-                            </span>
-                          )}
-                          <span className="flashfriend__on" aria-hidden="true" />
-                        </span>
-                        <span className="flashfriend__name">{f.profile.username}</span>
-                        <span className="flashfriend__detail">{detail || ' '}</span>
-                        <span className="visually-hidden">{t('Livre agora. Abrir opções.')}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              <button type="button" className="flashlive__map" onClick={() => setMapOpen(true)}>
-                <LocationIcon />
-                {t('Ver no mapa')}
-              </button>
-            </>
-          )}
-        </section>
-
-        {!empty ? (
-          <>
-            <section className="flashlive__section" aria-labelledby="acoes-titulo">
-              <h2 id="acoes-titulo" className="flashlive__h2">
-                {t('Ações rápidas')}
-              </h2>
-              <div className="flashquick">
-                <button type="button" className="flashquick__item" disabled={eligible.length === 0} onClick={() => setCallAllOpen(true)}>
-                  <UsersIcon />
-                  {t('Chamar todos')}
-                </button>
-                <Link to="/criar?tipo=evento" className="flashquick__item">
-                  <CalendarIcon />
-                  {t('Criar evento agora')}
-                </Link>
-                <Link to="/conversas" className="flashquick__item">
-                  <ChatIcon />
-                  {t('Ver conversas')}
-                </Link>
-              </div>
-            </section>
-
-            <button type="button" className="flashprivacy" onClick={() => setInfoOpen(true)}>
-              <ShieldIcon />
-              <span>{t('Sua localização é compartilhada apenas com amigos que você autorizar.')}</span>
-              <ChevronRightIcon />
-            </button>
-          </>
-        ) : (
-          <div className="flashtip">
-            <span className="flashtip__icon" aria-hidden="true">
-              <BulbIcon />
-            </span>
-            <div>
-              <p className="flashtip__title">{t('Dica')}</p>
-              <p className="flashtip__text">{t('Quanto mais amigos usarem o NOW, maiores as')} <strong>{t('chances')}</strong> {t('de encontrar alguém para sair.')}</p>
-            </div>
-          </div>
-        )}
-
-        {inviting ? <InviteSheet onClose={() => setInviting(false)} /> : null}
-        {infoOpen ? (
-          <Sheet title={t('Como o NOW funciona')} onClose={() => setInfoOpen(false)}>
-            <p>{t('Seus amigos que também estiverem com NOW ligado veem seu nome e sua foto.')}</p>
-            <p>{t('Sua localização só é compartilhada com quem aceitar sair com você.')}</p>
-          </Sheet>
-        ) : null}
-        {mapOpen ? (
-          <Sheet title={t('Ver no mapa')} onClose={() => setMapOpen(false)}>
-            {mapSection}
-          </Sheet>
-        ) : null}
-        {friendInSheet ? (
-          <Sheet title={friendInSheet.profile.username} onClose={() => setFriendOpen(undefined)}>
-            <ul className="list">
-              <AvailableRow friend={friendInSheet} onChanged={reloadAll} onFeedback={setFeedback} />
-            </ul>
-          </Sheet>
-        ) : null}
-        {callAllOpen ? (
-          <Sheet title={t('Chamar todos')} onClose={() => (callingAll ? undefined : setCallAllOpen(false))}>
-            <p>
-              {eligible.length === 1 ? t('Enviar convite para 1 amigo que está livre agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.') : t('Enviar convite para {count} amigos que estão livres agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.', { count: eligible.length })}
-            </p>
-            <ul className="flashcall">
-              {eligible.map((f) => (
-                <li key={f.profile.userId}>{f.profile.username}</li>
-              ))}
-            </ul>
-            <PrecisionPicker approx={approxAll} onChange={setApproxAll} text={t('Quem aceitar vai ver sua localização enquanto o encontro durar.')} />
-            <Button full loading={callingAll} onClick={() => callAll()}>
-              {t('Enviar convites')}
-            </Button>
-            <Button full variant="quiet" disabled={callingAll} onClick={() => setCallAllOpen(false)}>
-              {t('Cancelar')}
-            </Button>
-          </Sheet>
-        ) : null}
-      </div>
-    );
-  }
+  const expiresAt = status.data?.expiresAt ?? null;
+  const until = expiresAt ? new Date(expiresAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit' }) : '';
+  const left = expiresAt ? minutesLeft(expiresAt, Date.now()) : 0;
 
   return (
-    <>
-      {active ? <PageHead title={t('NOW')} subtitle={t('Estou livre agora. Para o futuro, use a Agenda.')} /> : null}
-      {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
-      <OfferBanner />
+    <div className={`nowon${focusing ? ' nowon--focus' : ''}`}>
       {started ? (
         <div className="flashtoast" role="status">
           <span className="flashtoast__bolt">
@@ -617,222 +409,496 @@ function FlashContent() {
           <span>{started}</span>
         </div>
       ) : null}
+      <header className="nowhead">
+        <div>
+          <h1 className="nowhead__title">
+            NOW <BoltIcon filled />
+          </h1>
+          <p className="nowhead__sub">{t('Você está disponível agora.')}</p>
+        </div>
+        <button type="button" className="nowhead__how" onClick={() => setInfoOpen(true)}>
+          <HelpIcon />
+          {t('Como funciona?')}
+        </button>
+      </header>
+      {feedbackLine}
 
-      {/* Convites e encontros primeiro: é o que pede resposta. */}
-      {receivedBlock}
-      {matchesBlock}
-
-      {active ? (
-        <section className="flashpanel flashpanel--on" aria-label={t('Seu NOW')}>
-          <div className="flashpanel__head">
-            <span className="flashpanel__bolt">
-              <BoltIcon filled />
-            </span>
-            <div>
-              <p className="flashpanel__title">{t('NOW ligado')}</p>
-              <p className="flashpanel__sub">Faltam {formatRemaining(left)}</p>
-            </div>
-          </div>
-          {status.data?.note ? <p className="flashpanel__note">“{status.data.note}”</p> : null}
-          <p className="muted">{t('Seus amigos com NOW ligado veem seu nome e sua foto. Ninguém vê onde você está até aceitar sair com você.')}</p>
-          {confirmOff ? (
-            <Confirm
-              question={t('Desligar o NOW? Convites abertos e encontros em andamento serão encerrados.')}
-              confirmLabel={t('Desligar')}
-              onConfirm={turnOff}
-              onCancel={() => setConfirmOff(false)}
-              busy={busy}
-              danger
-            />
-          ) : (
-            <Button variant="secondary" full onClick={() => setConfirmOff(true)}>
-              {t('Desligar NOW')}
-            </Button>
-          )}
-        </section>
-      ) : (
-        <section className="flashoff" aria-label={t('Ligar o NOW')}>
-          <header className="flashoff__head">
-            <h1 className="flashoff__title">
-              NOW <BoltIcon filled />
-            </h1>
-            <button type="button" className="flashoff__how" onClick={() => setInfoOpen(true)}>
-              <HelpIcon />
-              {t('Como funciona?')}
-            </button>
-          </header>
-          <p className="flashoff__sub">{t('Livre agora? Encontre alguém para sair.')}</p>
-
-          {/* Ilustração decorativa: os perfis são silhuetas e não indicam amigos disponíveis. */}
-          <div className="flashhero" aria-hidden="true">
-            {['5', '4', '3', '2', '1'].map((n) => (
-              <span key={n} className={`flashhero__ring flashhero__ring--${n}`} />
-            ))}
-            <span className="flashhero__glow" />
-            <svg className="flashhero__bolt" viewBox="0 0 100 100" focusable="false">
-              <path d="M63 3 21 56h25l-8 41 42-55H55z" />
-            </svg>
-            {['a', 'b', 'c', 'd'].map((k) => (
-              <span key={k} className={`flashhero__person flashhero__person--${k}`}>
-                <img src={`/flash/${k}.jpg`} alt="" width="60" height="60" loading="lazy" decoding="async" />
-              </span>
-            ))}
-            {['a', 'b', 'c', 'd', 'e'].map((k) => (
-              <span key={k} className={`flashhero__dot flashhero__dot--${k}`} />
+      {/* Convites primeiro: é o que pede resposta. */}
+      {received.length > 0 ? (
+        <>
+          {focusing ? <button type="button" className="nowon__veil" aria-label={t('Voltar para a tela')} onClick={() => setUnfocused(focusKey)} /> : null}
+          <div className="nowinv-stack">
+            {received.map((invite) => (
+              <InviteFocusCard key={invite.id} invite={invite} friend={friendById.get(invite.other.userId)} onDone={reloadAll} />
             ))}
           </div>
+        </>
+      ) : null}
 
-          <h2 className="flashoff__lead">
-            {t('Encontre amigos')}
-            <br />
-            {t('que também estão')} <em>{t('livres agora.')}</em>
-          </h2>
+      {matches.length > 0 ? (
+        <ul className="nowmatches" aria-label={t('Encontros em andamento')}>
+          {matches.map((invite) => (
+            <li key={invite.id}>
+              <Link to={`/now/encontro/${invite.id}`} className="nowmatch">
+                <NowFace profile={invite.other} size={36} />
+                <span>
+                  <strong>{t('{name} aceitou sair com você', { name: invite.other.username })}</strong>
+                  <span>{t('Ver encontro e mapa')}</span>
+                </span>
+                <ChevronRightIcon />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
-          <ul className="flashperks">
-            <li>
-              <span className="flashperks__icon">
-                <UsersIcon />
-              </span>
-              {t('Apenas seus amigos')}
-            </li>
-            <li>
-              <span className="flashperks__icon">
-                <ClockIcon />
-              </span>
-              {t('Tempo limitado')}
-            </li>
-            <li>
-              <span className="flashperks__icon">
-                <LockIcon />
-              </span>
-              {t('Você controla a sua localização')}
-            </li>
-          </ul>
-
-          <div className="flashdur" role="radiogroup" aria-label={t('Duração do NOW')}>
-            {DURATIONS.map((d) => (
-              <button key={d.minutes} type="button" role="radio" aria-checked={minutes === d.minutes} aria-label={d.label} className="flashdur__opt" onClick={() => setMinutes(d.minutes)}>
-                <span className="flashdur__value">{d.value}</span>
-                <span className="flashdur__unit">{d.unit}</span>
+      <section className="nowcard" aria-label={t('Seu NOW')}>
+        <button type="button" className="nowcard__plus" aria-haspopup="menu" aria-expanded={plusOpen} aria-label={t('Estender o NOW')} disabled={left >= 179} onClick={() => setPlusOpen((o) => !o)}>
+          <PlusIcon />
+        </button>
+        {plusOpen ? (
+          <div className="nowcard__menu" role="menu">
+            {([30, 60] as const).map((by) => (
+              <button key={by} type="button" role="menuitem" disabled={extending !== undefined} aria-busy={extending === by || undefined} onClick={() => void extend(by)}>
+                {by === 30 ? t('+30 min') : t('+1 hora')}
               </button>
             ))}
           </div>
-          <Field
-            label={t('Recado (opcional)')}
-            hideLabel
-            placeholder={t('Adicionar recado')}
-            value={note}
-            onChange={setNote}
-            error={noteError}
-            hint={note === '' ? undefined : `${Array.from(note).length}/${FLASH_NOTE_MAX}`}
-            maxLength={FLASH_NOTE_MAX + 20}
-            autoComplete="off"
-          />
-          <Button full loading={busy} onClick={turnOn}>
-            <BoltIcon filled />
-            {t('Ativar NOW')}
-          </Button>
-          {explaining ? (
-            <Sheet title={t('Antes de ligar o NOW')} onClose={() => setExplaining(false)}>
-              <ul className="flashnotice">
-                {FLASH_PRIVACY_POINTS.map((point) => (
-                  <li key={point}>{point}</li>
-                ))}
-              </ul>
-              <Button
-                full
-                onClick={() => {
-                  markFlashNoticeSeen(safeStorage());
-                  setExplaining(false);
-                  void doTurnOn();
-                }}
-              >
-                {t('Entendi, ligar o NOW')}
-              </Button>
-            </Sheet>
-          ) : null}
-          <p className="flashoff__privacy">
-            <LockIcon />
-            <span>{t('Sua localização só será compartilhada com amigos que você autorizar, enquanto o NOW estiver ativo. A região aproximada serve só para mostrar primeiro quem está mais perto: ninguém a vê.')}</span>
-          </p>
-
-          <Link to="/amigos/contatos" className="flashinvite">
-            <span className="flashinvite__art" aria-hidden="true">
-              <span className="flashinvite__p flashinvite__p--a" />
-              <span className="flashinvite__p flashinvite__p--b" />
-              <span className="flashinvite__plus">+</span>
-            </span>
-            <span className="flashinvite__body">
-              <strong>{t('Chame seus amigos para ativar o NOW também!')}</strong>
-              <span>{t('Quanto mais amigos ativos, maiores as chances de encontrar alguém para sair.')}</span>
-            </span>
-            <ChevronRightIcon />
-          </Link>
-
-          {infoOpen ? (
-            <Sheet title={t('Como o NOW funciona')} onClose={() => setInfoOpen(false)}>
-              <p>{t('Seus amigos que também estiverem com NOW ligado veem seu nome e sua foto.')}</p>
-              <p>{t('Sua localização só é compartilhada com quem aceitar sair com você.')}</p>
-            </Sheet>
-          ) : null}
-        </section>
-      )}
-
-      {active ? mapSection : null}
-
-      <section className="section" aria-labelledby="livres-titulo">
-        <h2 id="livres-titulo" className="section__title">
-          {t('Livres agora')}
-        </h2>
-
-        {!active ? (
-          <p className="muted">
-            Ligue seu NOW para ver quais amigos estão livres agora. Para outro dia, use a <Link to="/agenda">{t('Agenda')}</Link>.
-          </p>
         ) : null}
-        {active && available.loading && !available.data ? <Loading /> : null}
-        {active && available.error && !available.data ? <ErrorState message={available.error.message} onRetry={available.reload} /> : null}
-        {active && available.data && available.data.length === 0 ? (
-          <EmptyState title={t('Nenhum amigo com NOW ligado agora')}>{t('Quando alguém ligar o NOW, aparece aqui. Você também pode combinar um dia pela Agenda.')}</EmptyState>
+        <span className="nowcard__me">
+          {status.data?.note ? <span className="nownote nownote--small">{status.data.note}</span> : null}
+          <span className="nowcard__ring">
+            <NowFace profile={user.profile} size={56} />
+          </span>
+        </span>
+        <div className="nowcard__info">
+          <span className="nowcard__time">
+            <button type="button" className="nowcard__stop" aria-label={t('Parar o NOW')} onClick={() => setConfirmOff(true)}>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" />
+              </svg>
+            </button>
+            {expiresAt ? <NowClock expiresAt={expiresAt} /> : null}
+          </span>
+          <span className="nowcard__until">{t('NOW ativo · até {time}', { time: until })}</span>
+          {share.state.phase === 'sharing' ? (
+            <button type="button" className="nowloc nowloc--on" onClick={share.stop} title={t('Desligar a localização')}>
+              <i aria-hidden="true" />
+              {t('Localização ligada')}
+            </button>
+          ) : share.state.phase === 'asking' ? (
+            <span className="nowloc">{t('Ligando a localização…')}</span>
+          ) : (
+            <button type="button" className="nowloc nowloc--off" onClick={share.start} title={share.state.phase === 'error' ? share.state.message : undefined}>
+              <LocationIcon />
+              {share.state.phase === 'error' ? t('Tentar ligar a localização') : t('Ligar localização')}
+            </button>
+          )}
+        </div>
+        {expiresAt ? <NowBar startsAt={status.data?.startsAt ?? null} expiresAt={expiresAt} /> : null}
+      </section>
+      {share.state.phase === 'error' ? <p className="muted nowcard__hint">{share.state.message}</p> : null}
+      {confirmOff ? <Confirm question={t('Parar o NOW? Convites abertos e encontros em andamento serão encerrados.')} confirmLabel={t('Parar')} onConfirm={turnOff} onCancel={() => setConfirmOff(false)} busy={busy} danger /> : null}
+
+      <section className="nowfree" aria-labelledby="livres-titulo">
+        <div className="nowfree__row">
+          <h2 id="livres-titulo" className="nowfree__title">
+            {empty || available.data === undefined ? t('Amigos livres agora') : t('Amigos livres agora ({length})', { length: friends.length })}
+          </h2>
+          <button type="button" className="nowfree__refresh" onClick={reloadAll}>
+            <RefreshIcon />
+            {t('Atualizar')}
+          </button>
+        </div>
+        {available.loading && !available.data ? <Loading /> : null}
+        {available.error && !available.data ? <ErrorState message={available.error.message} onRetry={available.reload} /> : null}
+        {friends.length > 0 ? (
+          <>
+            <div className="nowsort" role="group" aria-label={t('Ordenar amigos')}>
+              <button type="button" className="chip" aria-pressed={listMeta?.order === 'near'} disabled={listMeta !== undefined && !listMeta.nearAvailable} onClick={() => chooseOrder('near')}>
+                {t('Mais perto')}
+              </button>
+              <button type="button" className="chip" aria-pressed={listMeta?.order === 'interaction'} onClick={() => chooseOrder('interaction')}>
+                {t('Mais interação')}
+              </button>
+            </div>
+            {listMeta && !listMeta.nearAvailable ? <p className="muted nowsort__hint">{t('Para ver quem está mais perto, libere a localização e ligue o NOW de novo.')}</p> : null}
+            <ul className="nowfriends">
+              {friends.map((f) => {
+                const dir = f.invite?.direction;
+                const state = dir === 'MATCHED' ? t('Encontro') : dir === 'SENT' ? t('Convidado') : dir === 'RECEIVED' ? t('Te chamou') : '';
+                return (
+                  <li key={f.profile.userId}>
+                    <button
+                      type="button"
+                      className="nowfriend"
+                      onClick={() => {
+                        setMapFriend(f.profile.userId);
+                        setMapOpen(true);
+                      }}
+                    >
+                      <span className={`nownote nownote--light${f.note ? '' : ' nownote--none'}`}>{f.note ?? '.'}</span>
+                      <NowFace profile={f.profile} size={52} />
+                      <span className="nowfriend__name">{f.profile.username}</span>
+                      <span className="nowfriend__detail">{[distanceOf(f), state].filter(Boolean).join(' · ') || ' '}</span>
+                      <span className="visually-hidden">{t('Livre agora. Abrir opções.')}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="nowfree__actions">
+              <button type="button" className="nowbtn nowbtn--ghost" onClick={() => setMapOpen(true)}>
+                <MapIcon />
+                {t('Ver no mapa')}
+              </button>
+              <button type="button" className="nowbtn nowbtn--ghost" disabled={eligible.length === 0} onClick={() => setCallAllOpen(true)}>
+                <UsersIcon />
+                {t('Chamar todos')}
+              </button>
+            </div>
+          </>
+        ) : empty ? (
+          <div className="nowempty">
+            <strong>{t('Ninguém livre por enquanto')}</strong>
+            <span>{t('Pergunte a alguns amigos se estão livres. Quando ligarem o NOW, você fica sabendo.')}</span>
+          </div>
         ) : null}
-        {active && available.data && available.data.length > 0 ? (
-          <ul className="list">
-            {available.data.map((friend) => (
-              <AvailableRow key={friend.profile.userId} friend={friend} onChanged={reloadAll} onFeedback={setFeedback} />
-            ))}
-          </ul>
+        <button type="button" className="nowask nowask--dashed" onClick={() => setAsking(true)}>
+          <UserPlusIcon />
+          {t('Perguntar se está livre')}
+        </button>
+        {empty ? (
+          <button type="button" className="nowfree__invite" onClick={() => setInviting(true)}>
+            {t('Chamar amigos para o AskouT')}
+          </button>
         ) : null}
       </section>
-    </>
+
+      {inviting ? <InviteSheet onClose={() => setInviting(false)} /> : null}
+      {howSheet}
+      {askSheet}
+      {mapOpen ? (
+        <FriendsMapSheet
+          friends={friends}
+          me={share.mine}
+          exactById={exactById}
+          selected={mapFriend}
+          onSelect={setMapFriend}
+          distanceOf={distanceOf}
+          onChanged={reloadAll}
+          onFeedback={setFeedback}
+          onClose={() => {
+            setMapOpen(false);
+            setMapFriend(undefined);
+          }}
+        />
+      ) : null}
+      {callAllOpen ? (
+        <Sheet title={t('Chamar todos')} onClose={() => (callingAll ? undefined : setCallAllOpen(false))}>
+          <p>
+            {eligible.length === 1 ? t('Enviar convite para 1 amigo que está livre agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.') : t('Enviar convite para {count} amigos que estão livres agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.', { count: eligible.length })}
+          </p>
+          <ul className="flashcall">
+            {eligible.map((f) => (
+              <li key={f.profile.userId}>{f.profile.username}</li>
+            ))}
+          </ul>
+          <PrecisionPicker approx={approxAll} onChange={setApproxAll} text={t('Quem aceitar vai ver sua localização enquanto o encontro durar.')} />
+          <Button full loading={callingAll} onClick={() => callAll()}>
+            {t('Enviar convites')}
+          </Button>
+          <Button full variant="quiet" disabled={callingAll} onClick={() => setCallAllOpen(false)}>
+            {t('Cancelar')}
+          </Button>
+        </Sheet>
+      ) : null}
+    </div>
+  );
+}
+
+// ---------- Peças da tela do NOW ----------
+
+/** Radar decorativo da tela desligada: você no meio, um ponteiro girando e fotos ilustrativas em volta. */
+function NowRadar({ me }: { me: PublicProfile }) {
+  return (
+    <div className="nowradar" aria-hidden="true">
+      <span className="nowradar__ring nowradar__ring--1" />
+      <span className="nowradar__ring nowradar__ring--2" />
+      <span className="nowradar__ring nowradar__ring--3" />
+      <span className="nowradar__cross" />
+      <span className="nowradar__sweep" />
+      {/* Fotos ilustrativas: não são amigos disponíveis. */}
+      {['a', 'b', 'c', 'd'].map((k) => (
+        <span key={k} className={`nowradar__p nowradar__p--${k}`}>
+          <img src={`/flash/${k}.jpg`} alt="" width="60" height="60" loading="lazy" decoding="async" />
+        </span>
+      ))}
+      <span className="nowradar__me">
+        <NowFace profile={me} size={84} />
+      </span>
+    </div>
+  );
+}
+
+function NowClock({ expiresAt }: { expiresAt: string }) {
+  const now = useTick(1000);
+  return <b className="nowcard__clock">{formatClock(Date.parse(expiresAt) - now)}</b>;
+}
+
+/** Barra fina na borda de baixo do cartão: o tempo que resta do NOW. */
+function NowBar({ startsAt, expiresAt }: { startsAt: string | null; expiresAt: string }) {
+  const now = useTick(1000);
+  const share = flashRemainingShare(startsAt, expiresAt, now);
+  return (
+    <span className="nowcard__bar" role="progressbar" aria-label={t('Tempo restante do NOW')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}>
+      <i style={{ width: `${Math.max(2, Math.round(share * 100))}%` }} />
+    </span>
+  );
+}
+
+/** "Como funciona?": as regras do NOW em poucas linhas. */
+function HowItWorks({ onClose }: { onClose: () => void }) {
+  const rules: { icon: ReactNode; title: string; text: string }[] = [
+    { icon: <UsersIcon />, title: t('Só amigos'), text: t('Só amigos (quem se segue de volta) veem que você está livre. Para ver quem está livre, você também liga o NOW.') },
+    { icon: <ClockIcon />, title: t('Você escolhe o tempo'), text: t('De 30 minutos a 3 horas. No + do cartão dá para estender, e o quadrado para o NOW na hora.') },
+    { icon: <ChatIcon />, title: t('Recado no balão'), text: t('O que você escrever aparece num balão na sua foto, só na tela do NOW e só para esses amigos.') },
+    { icon: <BoltIcon filled />, title: t('Convites de 15 minutos'), text: t('Um convite chega como aviso no topo de qualquer tela. Toque em Bora! para abrir o encontro, ou em Agora não.') },
+    { icon: <LocationIcon />, title: t('Localização sob controle'), text: t('No mapa, seus amigos veem só a região aproximada (uns 3 km) de onde você ligou. A posição exata vai só para quem aceitar sair com você, e você pode escolher mandar só a aproximada.') },
+    { icon: <UserPlusIcon />, title: t('Perguntar se está livre'), text: t('Mande um aviso para amigos que estão com o NOW desligado. Quando ligarem, você fica sabendo. Um pedido por amigo a cada 3 horas.') },
+  ];
+  return (
+    <Sheet title={t('Como o NOW funciona')} onClose={onClose}>
+      <ul className="nowhow">
+        {rules.map((r) => (
+          <li key={r.title}>
+            <span className="nowhow__icon" aria-hidden="true">
+              {r.icon}
+            </span>
+            <span>
+              <strong>{r.title}</strong>
+              <span>{r.text}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Sheet>
+  );
+}
+
+/** "Perguntar se está livre": escolhe amigos e manda um aviso que abre o NOW deles. */
+function AskSheet({ onClose, onFeedback }: { onClose: () => void; onFeedback: (f: Feedback) => void }) {
+  const friends = useAsync(() => api.friends(), []);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const list = (friends.data ?? []).filter((p) => p.username.toLowerCase().includes(query.trim().toLowerCase()) || p.displayName.toLowerCase().includes(query.trim().toLowerCase()));
+
+  function toggle(id: string) {
+    setPicked((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 20) next.add(id);
+      return next;
+    });
+  }
+
+  async function send() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const result = await api.flashAsk([...picked]);
+      onFeedback(
+        result.asked.length === 0
+          ? { tone: 'error', text: t('Ninguém recebeu agora: quem já está com o NOW ligado ou já recebeu um pedido seu nas últimas 3 horas fica de fora.') }
+          : { tone: 'ok', text: result.asked.length === 1 ? t('Pedido enviado. Quando ligar o NOW, você fica sabendo.') : t('Pedido enviado para {count} amigos. Quando ligarem o NOW, você fica sabendo.', { count: result.asked.length }) },
+      );
+      onClose();
+    } catch (failure) {
+      setError(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet title={t('Perguntar se está livre')} onClose={() => (busy ? undefined : onClose())}>
+      <p className="muted">{t('Cada amigo escolhido recebe um aviso perguntando se você está livre agora. Quando ligar o NOW, você é avisado.')}</p>
+      <Field label={t('Buscar amigo')} hideLabel placeholder={t('Buscar amigo')} value={query} onChange={setQuery} autoComplete="off" />
+      {friends.loading && !friends.data ? <Loading /> : null}
+      {friends.error && !friends.data ? <ErrorState message={friends.error.message} onRetry={friends.reload} /> : null}
+      {friends.data && friends.data.length === 0 ? <p className="muted">{t('Você ainda não tem amigos no AskouT.')}</p> : null}
+      <ul className="nowpick">
+        {list.map((p) => (
+          <li key={p.userId}>
+            <button type="button" className="nowpick__item" aria-pressed={picked.has(p.userId)} onClick={() => toggle(p.userId)}>
+              <NowFace profile={p} size={40} />
+              <span className="nowpick__name">
+                <strong>{p.username}</strong>
+                <span>{p.displayName}</span>
+              </span>
+              <span className="nowpick__check" aria-hidden="true">
+                {picked.has(p.userId) ? <CheckIcon /> : null}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {error ? <Notice tone="error">{error}</Notice> : null}
+      <Button full loading={busy} disabled={picked.size === 0} onClick={() => void send()}>
+        {picked.size <= 1 ? t('Perguntar') : t('Perguntar a {count} amigos', { count: picked.size })}
+      </Button>
+    </Sheet>
+  );
+}
+
+/** Mapa que sobe de baixo: fotos dos amigos livres (exatas para quem aceitou, aproximadas para os outros). */
+function FriendsMapSheet({
+  friends,
+  me,
+  exactById,
+  selected,
+  onSelect,
+  distanceOf,
+  onChanged,
+  onFeedback,
+  onClose,
+}: {
+  friends: readonly AvailableFriend[];
+  me: { lat: number; lng: number } | undefined;
+  exactById: Map<string, { lat: number; lng: number }>;
+  selected: string | undefined;
+  onSelect: (id: string | undefined) => void;
+  distanceOf: (f: AvailableFriend) => string;
+  onChanged: () => void;
+  onFeedback: (f: Feedback) => void;
+  onClose: () => void;
+}) {
+  const [mapFailed, setMapFailed] = useState(false);
+  const pins: NowPin[] = [];
+  for (const f of friends) {
+    const exact = exactById.get(f.profile.userId);
+    const at = exact ?? f.point ?? undefined;
+    if (!at) continue;
+    const photo = f.profile.avatarUrl ? (f.profile.avatarUrl.startsWith('/') ? api.assetUrl(f.profile.avatarUrl) : f.profile.avatarUrl) : null;
+    const distance = distanceOf(f);
+    pins.push({ id: f.profile.userId, lat: at.lat, lng: at.lng, name: f.profile.username, photo, initials: initials(f.profile.username), exact: exact !== undefined, label: exact ? f.profile.username : `${f.profile.username}${distance ? ` · ${distance}` : ''}` });
+  }
+  const chosen = friends.find((f) => f.profile.userId === selected);
+  const hidden = friends.length - pins.length;
+  return (
+    <Sheet title={t('Amigos livres no mapa')} onClose={onClose}>
+      <div className="nowmapwrap">
+        {!mapFailed && (pins.length > 0 || me) ? (
+          <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label={t('Carregando o mapa')} /></div>}>
+            <NowMap me={me} pins={pins} selected={selected} onSelect={onSelect} onFail={() => setMapFailed(true)} />
+          </Suspense>
+        ) : (
+          <p className="muted">{mapFailed ? t('Não foi possível carregar o mapa agora.') : t('Ninguém ligou o NOW com localização por enquanto.')}</p>
+        )}
+        {chosen ? <MapFriendCard key={chosen.profile.userId} friend={chosen} exact={exactById.has(chosen.profile.userId)} distance={distanceOf(chosen)} onChanged={onChanged} onFeedback={onFeedback} onClose={() => onSelect(undefined)} /> : null}
+      </div>
+      <p className="nowmap__legend">
+        <span>
+          <i className="nowmap__dot nowmap__dot--exact" aria-hidden="true" />
+          {t('Exata: aceitou sair com você')}
+        </span>
+        <span>
+          <i className="nowmap__dot nowmap__dot--approx" aria-hidden="true" />
+          {t('Aproximada: região de uns 3 km')}
+        </span>
+      </p>
+      {hidden > 0 ? <p className="muted">{hidden === 1 ? t('1 amigo ligou sem localização e não aparece no mapa.') : t('{count} amigos ligaram sem localização e não aparecem no mapa.', { count: hidden })}</p> : null}
+    </Sheet>
+  );
+}
+
+/** Cartão sobre o mapa ao tocar num amigo: recado, distância e o que dá para fazer. */
+function MapFriendCard({ friend, exact, distance, onChanged, onFeedback, onClose }: { friend: AvailableFriend; exact: boolean; distance: string; onChanged: () => void; onFeedback: (f: Feedback) => void; onClose: () => void }) {
+  const [approx, setApprox] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const { profile, invite } = friend;
+  const left = minutesLeft(friend.expiresAt, Date.now());
+
+  async function sendInvite() {
+    setBusy(true);
+    try {
+      await api.flashInvite(profile.userId, approx);
+      onFeedback({ tone: 'ok', text: t('Convite enviado para {username}. Vale por 15 minutos.', { username: profile.username }) });
+      onChanged();
+    } catch (failure) {
+      onFeedback({ tone: 'error', text: toApiError(failure).message });
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancel() {
+    if (!invite) return;
+    setBusy(true);
+    try {
+      await api.flashEnd(invite.id);
+      onChanged();
+    } catch (failure) {
+      onFeedback({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="nowfcard" role="group" aria-label={profile.username}>
+      <button type="button" className="nowfcard__close" aria-label={t('Fechar')} onClick={onClose}>
+        <XIcon />
+      </button>
+      <div className="nowfcard__top">
+        <NowFace profile={profile} size={52} />
+        <span className="nowfcard__who">
+          <strong>{profile.username}</strong>
+          <span>{[distance || (exact ? t('localização exata') : ''), t('livre por mais {left}', { left: formatRemaining(left) })].filter(Boolean).join(' · ')}</span>
+          {friend.note ? <span className="nowfcard__tag">{friend.note}</span> : null}
+        </span>
+      </div>
+      {invite === null ? (
+        <div className="nowfcard__prec" role="radiogroup" aria-label={t('Como mostrar sua localização')}>
+          <button type="button" role="radio" aria-checked={!approx} onClick={() => setApprox(false)}>
+            {t('Exata')}
+          </button>
+          <button type="button" role="radio" aria-checked={approx} onClick={() => setApprox(true)}>
+            {t('Aproximada')}
+          </button>
+        </div>
+      ) : null}
+      <div className="nowfcard__act">
+        {invite?.direction === 'MATCHED' ? (
+          <Link to={`/now/encontro/${invite.id}`} className="nowbtn nowbtn--yes">
+            {t('Ver encontro')}
+          </Link>
+        ) : invite?.direction === 'SENT' ? (
+          <button type="button" className="nowbtn nowbtn--no" disabled={busy} aria-busy={busy || undefined} onClick={() => void cancel()}>
+            {t('Cancelar convite')}
+          </button>
+        ) : invite?.direction === 'RECEIVED' ? (
+          <button type="button" className="nowbtn nowbtn--yes" onClick={onClose}>
+            {t('Responder convite')}
+          </button>
+        ) : (
+          <button type="button" className="nowbtn nowbtn--yes" disabled={busy} aria-busy={busy || undefined} onClick={() => void sendInvite()}>
+            {t('Convidar')}
+          </button>
+        )}
+        <ChatButton userId={profile.userId} small label={t('Conversar')} />
+        <Link to={`/u/${encodeURIComponent(profile.username)}`} className="btn btn--secondary btn--small">
+          {t('Ver perfil')}
+        </Link>
+      </div>
+    </div>
   );
 }
 
 // ---------- Cartão do Flash ligado ----------
-
-/** Relógio que anda de segundo em segundo sem refazer a tela toda. */
-function useNow(everyMs: number): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), everyMs);
-    return () => window.clearInterval(timer);
-  }, [everyMs]);
-  return now;
-}
-
-function Countdown({ expiresAt }: { expiresAt: string }) {
-  const now = useNow(1000);
-  return <span className="flashcard__time">{formatCountdown(Date.parse(expiresAt) - now)}</span>;
-}
-
-function FlashBar({ startsAt, expiresAt }: { startsAt: string | null; expiresAt: string }) {
-  const now = useNow(1000);
-  const share = flashRemainingShare(startsAt, expiresAt, now);
-  return (
-    <div className="flashbar" role="progressbar" aria-label={t('Tempo restante do NOW')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}>
-      <span className="flashbar__fill" style={{ width: `${Math.round(share * 100)}%` }} />
-    </div>
-  );
-}
 
 // ---------- Linhas ----------
 
@@ -872,133 +938,6 @@ function BlockAction({ profile, onDone, onFeedback }: { profile: PublicProfile; 
   );
 }
 
-function AvailableRow({ friend, onChanged, onFeedback }: { friend: AvailableFriend; onChanged: () => void; onFeedback: (f: Feedback) => void }) {
-  const [busy, setBusy] = useState(false);
-  const { profile, invite } = friend;
-  const left = minutesLeft(friend.expiresAt, Date.now());
-
-  const [choosing, setChoosing] = useState(false);
-  async function send(approx: boolean) {
-    setBusy(true);
-    try {
-      await api.flashInvite(profile.userId, approx);
-      setChoosing(false);
-      onFeedback({ tone: 'ok', text: t('Convite enviado para {username}. Vale por 15 minutos.', { username: profile.username }) });
-      onChanged();
-    } catch (failure) {
-      onFeedback({ tone: 'error', text: toApiError(failure).message });
-      onChanged();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function cancel() {
-    if (!invite) return;
-    setBusy(true);
-    try {
-      await api.flashEnd(invite.id);
-      onChanged();
-    } catch (failure) {
-      onFeedback({ tone: 'error', text: toApiError(failure).message });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  let action;
-  if (invite?.direction === 'MATCHED') {
-    action = (
-      <Link to={`/now/encontro/${invite.id}`} className="btn btn--primary btn--small">
-        {t('Ver encontro')}
-      </Link>
-    );
-  } else if (invite?.direction === 'SENT') {
-    action = (
-      <Button small variant="secondary" loading={busy} onClick={cancel}>
-        {t('Cancelar convite')}
-      </Button>
-    );
-  } else if (invite?.direction === 'RECEIVED') {
-    action = <span className="muted">{t('Convidou você')}</span>;
-  } else {
-    action = (
-      <Button small loading={busy && !choosing} disabled={choosing} onClick={() => setChoosing(true)}>
-        {t('Convidar')}
-      </Button>
-    );
-  }
-
-  return (
-    <li className="flashrow">
-      <div className="person person--flat">
-        <div className="person__link">
-          <Avatar profile={profile} />
-          <span className="person__body">
-            <span className="person__name">{profile.username}</span>
-            <span className="person__handle">{friend.note ? `“${friend.note}”` : friend.approx ? t('{distance} · livre por mais {left}', { distance: formatApprox(friend.approx), left: formatRemaining(left) }) : t('Livre por mais {left}', { left: formatRemaining(left) })}</span>
-            {friend.note && friend.approx ? <span className="person__handle">{formatApprox(friend.approx)}</span> : null}
-          </span>
-        </div>
-        <div className="person__aside">{action}</div>
-      </div>
-      {choosing ? <LocationChoice name={profile.username} busy={busy} confirmLabel={t('Convidar')} onChoose={(approx) => void send(approx)} onCancel={() => setChoosing(false)} /> : null}
-      <div className="flashrow__more">
-        <BlockAction profile={profile} onDone={onChanged} onFeedback={onFeedback} />
-      </div>
-    </li>
-  );
-}
-
-function InviteRow({ invite, canAccept, onChanged, onFeedback }: { invite: FlashInvite; canAccept: boolean; onChanged: () => void; onFeedback: (f: Feedback) => void }) {
-  const [busy, setBusy] = useState<'accept' | 'decline' | undefined>();
-
-  const [choosing, setChoosing] = useState(false);
-  async function answer(action: 'accept' | 'decline', approx = false) {
-    setBusy(action);
-    try {
-      const result = await api.flashRespond(invite.id, action, approx);
-      if (action === 'accept') {
-        announceFlashChange();
-        // Aceitou: abre o encontro, onde o envio da localização começa sozinho. A conversa fica a um toque dali.
-        navigate(`/now/encontro/${invite.id}`);
-        return;
-      }
-      onChanged();
-    } catch (failure) {
-      onFeedback({ tone: 'error', text: toApiError(failure).message });
-      onChanged();
-    } finally {
-      setBusy(undefined);
-    }
-  }
-
-  return (
-    <li className="flashrow">
-      <div className="person person--flat">
-        <div className="person__link">
-          <Avatar profile={invite.other} />
-          <span className="person__body">
-            <span className="person__name">{invite.other.username}</span>
-            <span className="person__handle">Quer sair agora · {formatRemaining(minutesLeft(invite.expiresAt, Date.now()))} para responder</span>
-          </span>
-        </div>
-      </div>
-      {canAccept ? null : <p className="muted">{t('Ligue seu NOW para aceitar.')}</p>}
-      {choosing ? <LocationChoice name={invite.other.username} busy={busy === 'accept'} confirmLabel={t('Aceitar')} onChoose={(approx) => void answer('accept', approx)} onCancel={() => setChoosing(false)} /> : null}
-      <div className="row-actions">
-        <Button small loading={busy === 'accept' && !choosing} disabled={!canAccept || busy === 'decline' || choosing} onClick={() => setChoosing(true)}>
-          {t('Aceitar')}
-        </Button>
-        <Button small variant="secondary" loading={busy === 'decline'} disabled={busy === 'accept'} onClick={() => answer('decline')}>
-          {t('Recusar')}
-        </Button>
-        <BlockAction profile={invite.other} onDone={onChanged} onFeedback={onFeedback} />
-      </div>
-    </li>
-  );
-}
-
 /** Escolha entre mostrar a localização exata ou só a aproximada (~3 km). */
 function PrecisionPicker({ approx, onChange, text, disabled }: { approx: boolean; onChange: (approx: boolean) => void; text: string; disabled?: boolean }) {
   return (
@@ -1016,24 +955,6 @@ function PrecisionPicker({ approx, onChange, text, disabled }: { approx: boolean
           <strong>{t('Aproximada')}</strong>
           <span>{t('Só a região, uns 3 km')}</span>
         </button>
-      </div>
-    </div>
-  );
-}
-
-/** Antes de convidar ou aceitar: deixa claro que o amigo vai ver a localização e deixa escolher a aproximada. */
-function LocationChoice({ name, busy, confirmLabel, onChoose, onCancel }: { name: string; busy: boolean; confirmLabel: string; onChoose: (approx: boolean) => void; onCancel: () => void }) {
-  const [approx, setApprox] = useState(false);
-  return (
-    <div className="flashchoice-wrap">
-      <PrecisionPicker approx={approx} onChange={setApprox} disabled={busy} text={t('{name} vai ver sua localização enquanto o encontro durar. Dá para mudar depois.', { name })} />
-      <div className="row-actions">
-        <Button small loading={busy} onClick={() => onChoose(approx)}>
-          {confirmLabel}
-        </Button>
-        <Button small variant="quiet" disabled={busy} onClick={onCancel}>
-          {t('Cancelar')}
-        </Button>
       </div>
     </div>
   );

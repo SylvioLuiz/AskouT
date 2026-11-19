@@ -28,8 +28,9 @@ const FLASH_KEY = 'askout.hint.flash';
 export const FLASH_PRIVACY_POINTS: readonly string[] = [
   t('Só amigos (quem se segue de volta) que também estão com o NOW ligado veem que você está livre.'),
   t('Você escolhe por quanto tempo. Passou o tempo, o NOW desliga sozinho, e você pode desligar quando quiser.'),
-  t('Se você escrever um recado, os mesmos amigos veem.'),
-  t('Sua localização só é compartilhada depois que você aceita um convite e abre o encontro, e só com a pessoa do encontro. Quando o NOW ou o encontro termina, ela deixa de ser enviada.'),
+  t('Se você escrever um recado, ele aparece num balão na sua foto, só para os mesmos amigos.'),
+  t('No mapa, esses amigos veem só a região aproximada (uns 3 km) de onde você ligou.'),
+  t('A localização exata só vai para quem aceitar sair com você, e você pode escolher mandar só a aproximada. Quando o NOW ou o encontro termina, ela deixa de ser enviada.'),
 ];
 
 export function flashNoticeSeen(storage: Pick<Storage, 'getItem'> | undefined): boolean {

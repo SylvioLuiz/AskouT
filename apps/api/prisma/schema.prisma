@@ -235,6 +235,8 @@ model User {
   flashPositions      FlashPosition[]
   flashHides          FlashHidden[]   @relation("FlashHiddenOwner")
   flashHiddenFrom     FlashHidden[]   @relation("FlashHiddenOther")
+  flashAsksSent       FlashAsk[]      @relation("FlashAskFrom")
+  flashAsksReceived   FlashAsk[]      @relation("FlashAskTo")
   storyHides          StoryHidden[]   @relation("StoryHiddenOwner")
   storyHiddenFrom     StoryHidden[]   @relation("StoryHiddenOther")
   notifications Notification[]
@@ -656,6 +658,20 @@ model FlashHidden {
 
   @@id([ownerId, otherId])
   @@index([otherId])
+}
+
+// "Perguntar se está livre": `askerId` perguntou a `targetId`. Uma linha por dupla (a mais recente); some quando a
+// pessoa liga o NOW (quem perguntou é avisado) ou depois de 24 h.
+model FlashAsk {
+  askerId   String   @db.Uuid
+  targetId  String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  asker  User @relation("FlashAskFrom", fields: [askerId], references: [id], onDelete: Cascade)
+  target User @relation("FlashAskTo", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([askerId, targetId])
+  @@index([targetId])
 }
 
 // Ocultação de stories entre duas pessoas, do ponto de vista de `ownerId`: não ver os stories dela e/ou não deixar ela ver os meus.

@@ -67,6 +67,13 @@ export class FlashController {
     return this.core.flash.listInvites(actor.userId);
   }
 
+  /** "Perguntar se está livre": `{userIds: [...]}`. Cada amigo recebe um aviso que abre o NOW. */
+  @Post('flash/ask')
+  @HttpCode(200)
+  ask(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.flash.ask(actor.userId, { userIds: asBody(body).userIds });
+  }
+
   @Post('flash/invites')
   invite(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = asBody(body);
