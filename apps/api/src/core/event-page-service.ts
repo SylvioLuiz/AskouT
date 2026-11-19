@@ -272,6 +272,8 @@ export class EventPageService {
     const { post, images } = found;
     const first = [...images].sort((a, b) => a.position - b.position)[0];
     const cover: EventCoverView | null = !first ? null : first.isUpload ? { kind: 'UPLOAD', imageId: first.id } : first.placePhotoRef ? { kind: 'PLACE', photoRef: first.placePhotoRef, author: first.placePhotoAuthor } : null;
+    // Rolê escolhido entre os locais do AskouT: a página do evento ganha o link e o ponto no mapa do local.
+    const linked = post.placeVenueId ? await this.deps.places.findVenue(post.placeVenueId) : undefined;
     return {
       view: {
         id: post.id,
@@ -284,7 +286,9 @@ export class EventPageService {
         isFree: false,
         sample: false,
         cover,
-        venue: { name: post.placeName ?? '', address: post.placeAddress, lat: null, lng: null },
+        venue: linked
+          ? { id: linked.id, name: post.placeName ?? linked.name, address: post.placeAddress ?? linked.address, lat: linked.lat, lng: linked.lng }
+          : { name: post.placeName ?? '', address: post.placeAddress, lat: null, lng: null },
         tags: [],
         ticketUrl: null,
         distanceM: null,

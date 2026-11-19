@@ -44,23 +44,51 @@ function LocationNotice({ status }: { status: string }) {
   return status === 'denied' || status === 'unavailable' ? <Notice tone="error">{t('Para achar rolês perto de você, permita a localização no navegador.')}</Notice> : null;
 }
 
-/** Escolher o lugar a vincular ao post (qualquer lugar, com ou sem foto). */
+/**
+ * Busca para vincular um rolê: locais do AskouT e qualquer lugar do Google pelo nome ou endereço, mesmo longe.
+ * A posição (se liberada) só põe o que está perto primeiro; sem ela a busca funciona do mesmo jeito.
+ */
+function useLinkPlaceSearch(q: string) {
+  const term = useDebounced(q.trim(), 350);
+  const where = useCurrentPosition();
+  const position = where.status === 'ok' ? where.position : undefined;
+  const result = useAsync(
+    () => (term.length >= 2 ? api.searchPlaces({ q: term, lat: position?.lat, lng: position?.lng }) : Promise.resolve(null)),
+    [term, position?.lat, position?.lng],
+  );
+  return { term, result, places: result.data?.places ?? [] };
+}
+
+/** Escolher o lugar a vincular ao post (qualquer lugar, com ou sem foto, do AskouT ou do Google). */
 function LinkPlaceSheet({ onPick, onClose }: { onPick: (place: LinkedPlace) => void; onClose: () => void }) {
   const [q, setQ] = useState('');
-  const { term, where, result, places } = usePlaceSearch(q, false);
+  const [picking, setPicking] = useState<string | undefined>();
+  const { term, result, places } = useLinkPlaceSearch(q);
+
+  async function pick(p: ExplorePlace) {
+    const base = { name: p.name, address: p.address };
+    if (p.venue) return onPick({ ...base, venueId: p.venue.id });
+    // Lugar que ainda não está no AskouT: cria o local a partir do Google e já vincula.
+    setPicking(p.key);
+    const venueId = await api
+      .openExternalVenue({ key: p.key, lat: p.lat, lng: p.lng })
+      .then((r) => r.venueId)
+      .catch(() => null);
+    setPicking(undefined);
+    onPick({ ...base, venueId });
+  }
+
   return (
     <Sheet title={t('Vincular um rolê')} onClose={onClose}>
-      <Field label={t('Buscar rolê')} type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint={t('Ex.: bar, balada, show')} />
-      <LocationNotice status={where.status} />
-      {term.length < 2 ? <p className="muted">{t('Digite o nome ou o tipo do rolê.')}</p> : null}
+      <Field label={t('Buscar rolê')} type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint={t('Nome ou endereço do lugar')} />
+      {term.length < 2 ? <p className="muted">{t('Digite o nome ou o endereço do rolê.')}</p> : null}
       {result.loading && !result.data ? <Loading /> : null}
       {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
-      {result.data && !result.data.placesAvailable ? <Notice>{t('A busca de rolês ainda não está ligada neste ambiente.')}</Notice> : null}
-      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">{t('Nenhum rolê encontrado.')}</p> : null}
+      {result.data && places.length === 0 ? <p className="muted">{result.data.placesAvailable ? t('Nenhum rolê encontrado.') : t('A busca de rolês ainda não está ligada neste ambiente.')}</p> : null}
       <ul className="placepick">
         {places.map((p) => (
           <li key={p.key}>
-            <button type="button" className="placepick__item" onClick={() => onPick({ name: p.name, address: p.address })}>
+            <button type="button" className="placepick__item" disabled={picking !== undefined} aria-busy={picking === p.key || undefined} onClick={() => void pick(p)}>
               <span>
                 <strong>{p.name}</strong>
                 {p.address ? <span className="muted"> {p.address}</span> : null}
@@ -69,6 +97,7 @@ function LinkPlaceSheet({ onPick, onClose }: { onPick: (place: LinkedPlace) => v
           </li>
         ))}
       </ul>
+      {places.some((p) => p.source === 'GOOGLE') ? <p className="muted">{t('Resultados do Google.')}</p> : null}
     </Sheet>
   );
 }

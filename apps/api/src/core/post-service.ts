@@ -34,6 +34,8 @@ export interface PostInput {
   images?: unknown;
   placeName?: unknown;
   placeAddress?: unknown;
+  /** Local do AskouT escolhido como rolê (o nome no post leva à página dele). */
+  placeVenueId?: unknown;
   /** Amigos marcados (até 10). Cada um precisa aceitar para o post entrar no feed e no perfil dele. */
   tagUserIds?: unknown;
   /** Evento criado pela pessoa: `{title, startsAt, endsAt?}` (ISO). O lugar é opcional. */
@@ -153,6 +155,8 @@ export interface PostEditInput {
   caption?: unknown;
   placeName?: unknown;
   placeAddress?: unknown;
+  /** Local do AskouT do rolê; `null` desvincula. Mudar só o nome também desvincula. */
+  placeVenueId?: unknown;
   event?: unknown;
 }
 
@@ -212,8 +216,9 @@ export class PostService {
   async create(actorId: string, input: PostInput, venue?: { id: string; name: string; address: string | null }): Promise<PostView> {
     const { posts, ids, clock } = this.deps;
     const caption = optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
-    const placeName = venue ? venue.name : optionalText(input.placeName, 120, 'placeName', 'Nome do rolê');
-    const placeAddress = venue ? venue.address : optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
+    const placeVenue = venue ? undefined : await this.placeVenue(input.placeVenueId);
+    const placeName = venue ? venue.name : (optionalText(input.placeName, 120, 'placeName', 'Nome do rolê') ?? placeVenue?.name.slice(0, 120) ?? null);
+    const placeAddress = venue ? venue.address : (optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço') ?? placeVenue?.address?.slice(0, 200) ?? null);
     const event = this.parseEvent(input.event, placeName);
     const eventPrivate = event !== null && this.parsePrivate(input.event);
     const poll = event !== null && input.datePollId !== undefined && input.datePollId !== null ? await this.pollToLink(actorId, input.datePollId) : undefined;
@@ -239,7 +244,7 @@ export class PostService {
     });
     if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do rolê por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
-    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null }, images);
+    await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null }, images);
     if (tagIds.length > 0) {
       await posts.createTags(postId, tagIds, clock.now());
       const me = await this.deps.users.findProfileById(actorId);
@@ -462,13 +467,16 @@ export class PostService {
     const caption = input.caption === undefined ? post.caption : optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
     const placeName = input.placeName === undefined ? post.placeName : optionalText(input.placeName, 120, 'placeName', 'Nome do rolê');
     const placeAddress = input.placeAddress === undefined ? post.placeAddress : optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
+    // Escolheu outro local do AskouT: vincula. Digitou outro nome sem escolher: o vínculo antigo não vale mais.
+    const placeVenueId =
+      input.placeVenueId !== undefined ? ((await this.placeVenue(input.placeVenueId))?.id ?? null) : placeName === post.placeName ? (post.placeVenueId ?? null) : null;
     let event: { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null;
     if (input.event === undefined) {
       event = post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, startsAt: post.eventStartsAt, endsAt: post.eventEndsAt, kind: post.eventKind } : null;
     } else {
       event = this.parseEvent(input.event, placeName, post.eventStartsAt, post.eventKind);
     }
-    const patch: PostPatch = { caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', editedAt: this.deps.clock.now() };
+    const patch: PostPatch = { caption, placeName, placeAddress, placeVenueId, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', editedAt: this.deps.clock.now() };
     if (!(await this.deps.posts.update(post.id, actorId, patch))) throw notFound('Post não encontrado');
     if (event) {
       await this.syncPollTitle(post.id, event.title);
@@ -662,6 +670,14 @@ export class PostService {
   }
 
   /** Evento: título, início no futuro (até 2 anos), fim opcional (padrão: 3 h depois; no máximo 30 dias). O lugar é opcional. */
+  /** Local do AskouT escolhido como rolê. Id que não existe (ou apagado) só não vincula: o nome digitado continua valendo. */
+  private async placeVenue(raw: unknown): Promise<{ id: string; name: string; address: string | null } | undefined> {
+    if (raw === undefined || raw === null || raw === '') return undefined;
+    if (typeof raw !== 'string' || raw.length > 64) throw validationError('Rolê inválido', { placeVenueId: 'Local inválido' });
+    const venue = await this.deps.places.findVenue(raw);
+    return venue ? { id: venue.id, name: venue.name, address: venue.address } : undefined;
+  }
+
   private parseEvent(raw: unknown, placeName: string | null, keepStart?: Date | null, keepKind?: EventKind): { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null {
     if (raw === undefined || raw === null) return null;
     if (typeof raw !== 'object' || Array.isArray(raw)) throw validationError('Evento inválido', { event: 'Dados do evento inválidos' });
@@ -772,7 +788,7 @@ export class PostService {
     const venueIds = [...new Set(rows.flatMap((r) => (r.post.venueId ? [r.post.venueId] : [])))];
     const venues = new Map((await Promise.all(venueIds.map((id) => this.deps.places.findVenue(id)))).flatMap((v) => (v ? [[v.id, { id: v.id, name: v.name, logoUrl: v.logoUrl ?? null }] as const] : [])));
     // Post de pessoa com "rolê" digitado: se o nome é de um único local do AskouT, o nome leva à página dele.
-    const typedNames = [...new Set(rows.flatMap((r) => (!r.post.venueId && r.post.placeName ? [r.post.placeName.trim().toLowerCase()] : [])))];
+    const typedNames = [...new Set(rows.flatMap((r) => (!r.post.venueId && !r.post.placeVenueId && r.post.placeName ? [r.post.placeName.trim().toLowerCase()] : [])))];
     const placeVenues = new Map<string, string>();
     for (const name of typedNames) {
       if (name === '') continue;
@@ -792,7 +808,7 @@ export class PostService {
           venue: (post.venueId ? venues.get(post.venueId) : undefined) ?? null,
           caption: post.caption,
           placeName: post.placeName,
-          placeVenueId: post.venueId ? post.venueId : post.placeName ? (placeVenues.get(post.placeName.trim().toLowerCase()) ?? null) : null,
+          placeVenueId: post.venueId ? post.venueId : post.placeVenueId ? post.placeVenueId : post.placeName ? (placeVenues.get(post.placeName.trim().toLowerCase()) ?? null) : null,
           placeAddress: post.placeAddress,
           event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString(), private: post.eventPrivate === true } : null,
           createdAt: post.createdAt.toISOString(),

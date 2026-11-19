@@ -31,6 +31,9 @@ describe('rascunho do post', () => {
     const ev = { title: 'Churras', kind: 'OTHER' as const, startsAt: '2026-10-24T19:00', endsAt: '', private: false };
     assert.equal((buildPostBody([up(1)], '', null, [], ev, 'poll-1') as { datePollId?: string }).datePollId, 'poll-1');
     assert.equal('datePollId' in buildPostBody([up(1)], '', null, [], ev), false);
+    // Rolê escolhido na busca (AskouT ou criado a partir do Google) leva o id do local.
+    assert.equal((buildPostBody([up(1)], '', { name: 'Arena', address: null, venueId: 'v1' }, []) as { placeVenueId?: string }).placeVenueId, 'v1');
+    assert.equal('placeVenueId' in buildPostBody([up(1)], '', { name: 'Arena', address: null }, []), false);
     assert.deepEqual(buildPostBody([up(1), place(1)], ' oi ', null, ['a']), {
       images: ['data:image/jpeg;base64,1', { photoPath: '/places/photo?ref=1', photoAuthor: 'Maria' }],
       caption: 'oi',

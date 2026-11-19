@@ -433,6 +433,8 @@ export interface ExternalPlace {
   photoAuthor?: string | null;
   /** Endereço da página do lugar na fonte. */
   mapsUri?: string | null;
+  /** Endereço do lugar (só na busca por texto e no detalhe do Google). */
+  address?: string | null;
 }
 
 // ---------- Encontros ----------
@@ -525,6 +527,8 @@ export interface PostRecord {
   createdAt: Date;
   /** Post publicado em nome de um estabelecimento (o autor é quem administra o local). */
   venueId?: string | null;
+  /** Local do AskouT vinculado como rolê do post (o nome leva à página dele). */
+  placeVenueId?: string | null;
 }
 
 export interface PostImageRecord {
@@ -716,6 +720,7 @@ export interface PostPatch {
   caption: string | null;
   placeName: string | null;
   placeAddress: string | null;
+  placeVenueId?: string | null;
   eventTitle: string | null;
   eventStartsAt: Date | null;
   eventEndsAt: Date | null;

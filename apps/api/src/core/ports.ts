@@ -814,6 +814,10 @@ export interface EventSearchQuery {
 /** Fonte externa de lugares (OpenStreetMap). Nunca lança: se não conseguir, devolve `available: false`. */
 export interface PlaceSource {
   nearby(center: { lat: number; lng: number }, radiusM: number, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }>;
+  /** Qualquer lugar pelo nome ou endereço (só fontes que suportam, como o Google). */
+  search?(text: string, center: { lat: number; lng: number } | undefined, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }>;
+  /** Um lugar pelo id na fonte, para confirmar que existe. */
+  lookup?(externalId: string): Promise<ExternalPlace | undefined>;
 }
 
 /** Rota entre dois pontos. Nunca lança: sem resposta, devolve `undefined` e o app desenha só uma linha reta. */

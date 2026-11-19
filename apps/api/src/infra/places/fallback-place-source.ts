@@ -17,4 +17,15 @@ export class FallbackPlaceSource implements PlaceSource {
     // Se a reserva também falhou, "indisponível" só vale quando as duas falharam.
     return { available: second.available || first.available, places: second.places };
   }
+
+  /** Busca por texto: a primeira fonte que souber buscar. */
+  async search(text: string, center: { lat: number; lng: number } | undefined, limit: number) {
+    if (this.primary.search) return this.primary.search(text, center, limit);
+    if (this.backup.search) return this.backup.search(text, center, limit);
+    return { available: false, places: [] };
+  }
+
+  async lookup(externalId: string) {
+    return (await this.primary.lookup?.(externalId)) ?? (await this.backup.lookup?.(externalId));
+  }
 }

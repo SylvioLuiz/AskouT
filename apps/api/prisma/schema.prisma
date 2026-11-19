@@ -925,6 +925,8 @@ model Post {
   createdAt    DateTime @default(now())
   /// Post feito em nome de um estabelecimento (o autor é quem administra o local).
   venueId      String?  @db.Uuid
+  /// Local do AskouT vinculado como rolê do post (escolhido na busca; pode ter sido criado a partir do Google).
+  placeVenueId String?  @db.Uuid
 
   author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   venue  Venue?      @relation(fields: [venueId], references: [id], onDelete: Cascade)

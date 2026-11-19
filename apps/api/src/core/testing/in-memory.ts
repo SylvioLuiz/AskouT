@@ -1835,6 +1835,22 @@ export class FakePlaceSource implements PlaceSource {
     this.calls += 1;
     return this.available ? { available: true, places: this.places.map((p) => ({ ...p })) } : { available: false, places: [] };
   }
+
+  /** Busca por texto: lugares de `searchable` cujo nome ou endereço contém o texto. */
+  searchable: ExternalPlace[] = [];
+  searchCalls = 0;
+
+  async search(text: string): Promise<{ available: boolean; places: ExternalPlace[] }> {
+    this.searchCalls += 1;
+    if (!this.available) return { available: false, places: [] };
+    const needle = text.toLowerCase();
+    return { available: true, places: this.searchable.filter((p) => `${p.name} ${p.address ?? ''}`.toLowerCase().includes(needle)).map((p) => ({ ...p })) };
+  }
+
+  async lookup(externalId: string): Promise<ExternalPlace | undefined> {
+    const found = [...this.searchable, ...this.places].find((p) => p.externalId === externalId);
+    return found ? { ...found } : undefined;
+  }
 }
 
 export class InMemoryProfileEventRepository implements ProfileEventRepository {

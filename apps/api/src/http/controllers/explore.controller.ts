@@ -50,6 +50,16 @@ export class ExploreController {
     };
   }
 
+  /** Vincular um rolê: locais do AskouT e lugares do Google pelo nome ou endereço, em qualquer lugar. */
+  @Get('explore/place-search')
+  async searchPlaces(@CurrentActor() actor: Actor, @Query() query: Record<string, unknown>) {
+    const view = await this.core.explore.searchPlaces(actor.userId, query);
+    return {
+      ...view,
+      places: view.places.map(({ photoRef, ...p }) => ({ ...p, photoPath: photoRef && this.photos.google ? this.photos.signer.path(photoRef) : null })),
+    };
+  }
+
   /** Posta o evento no seu perfil. */
   @Post('events/:id/post')
   @HttpCode(200)
