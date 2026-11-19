@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { api } from '../client.ts';
-import { useUser } from '../auth.tsx';
+import { useAuthContext, useUser } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { takeInvite } from '../lib/invite.ts';
 import { followProgressLabel, markOnboardingDone, ONBOARDING_FOLLOW_GOAL, ONBOARDING_SLIDES, onboardingDone, shouldShowOnboarding } from '../lib/onboarding.ts';
-import { filterByThemes, saveThemes, THEMES, themeOfCategory } from '../lib/themes.ts';
+import { filterByThemes, saveThemes, themeFilter, themesOfCategory } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 import type { ExplorePlace } from '../lib/types.ts';
 import { BoltIcon, HomeIcon, UserIcon } from './icons.tsx';
+import { TastePicker, toggleTaste } from './tastes.tsx';
 import { Button, Loading } from './ui.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -28,7 +29,7 @@ function FollowStep({ themes, onDone }: { themes: ReadonlySet<ThemeId>; onDone: 
   const [busy, setBusy] = useState<string | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const all = places.data?.places ?? [];
-  const byTheme = filterByThemes(all, themes, (p) => themeOfCategory(p.category));
+  const byTheme = filterByThemes(all, themes, (p) => themesOfCategory(p.category));
   // Se nada bate com o tema escolhido (fonte de fora fora do ar, locais sem tipo), mostra o que houver em vez de uma tela vazia.
   const list = (byTheme.length > 0 ? byTheme : all).slice(0, 12);
 
@@ -83,20 +84,8 @@ function ThemeStep({ chosen, onToggle, onNext }: { chosen: ReadonlySet<ThemeId>;
   return (
     <>
       <h2 id="onb-titulo" className="onb__title">{t('O que você curte?')}</h2>
-      <p className="onb__text">{t('Escolha um ou mais. Vamos sugerir rolês do seu jeito.')}</p>
-      <ul className="onb__themes">
-        {THEMES.map((theme) => {
-          const on = chosen.has(theme.id);
-          return (
-            <li key={theme.id}>
-              <button type="button" className={`onb__theme${on ? ' onb__theme--on' : ''}`} aria-pressed={on} onClick={() => onToggle(theme.id)}>
-                <strong>{theme.label}</strong>
-                <span>{theme.hint}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <p className="onb__text">{t('Escolha um ou mais. Vamos sugerir rolês do seu jeito. Dá para mudar depois, nas configurações.')}</p>
+      <TastePicker chosen={chosen} onToggle={onToggle} />
       <div className="onb__actions">
         <Button full onClick={onNext}>{chosen.size > 0 ? t('Continuar') : t('Gosto de tudo')}</Button>
       </div>
@@ -107,6 +96,7 @@ function ThemeStep({ chosen, onToggle, onNext }: { chosen: ReadonlySet<ThemeId>;
 /** Primeiro login: 3 telas curtas e o passo “siga 3 rolês”. Aparece uma vez por conta, em qualquer aparelho. */
 export function Onboarding() {
   const user = useUser();
+  const { setSessionUser } = useAuthContext();
   const [open, setOpen] = useState(() => shouldShowOnboarding(storage(), user));
   // Quem já viu o tutorial neste navegador antes de ele ser guardado na conta: registra na conta, sem mostrar de novo.
   useEffect(() => {
@@ -130,13 +120,7 @@ export function Onboarding() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   if (!open) return null;
-  const toggle = (id: ThemeId) =>
-    setChosen((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const toggle = (id: ThemeId) => setChosen((current) => toggleTaste(current, id));
   const finish = () => {
     markOnboardingDone(storage(), user.id);
     // Guarda na conta para não aparecer em outro aparelho; se falhar, o navegador já lembra.
@@ -168,12 +152,18 @@ export function Onboarding() {
             chosen={chosen}
             onToggle={toggle}
             onNext={() => {
-              saveThemes(storage(), user.id, [...chosen]);
+              const tastes = [...chosen];
+              saveThemes(storage(), user.id, tastes);
+              // Guarda na conta (vale em outro aparelho e aparece nas configurações); se falhar, o navegador já lembra.
+              api
+                .setTastes(tastes)
+                .then((saved) => setSessionUser({ ...user, tastes: saved.tastes }))
+                .catch(() => undefined);
               setStep(step + 1);
             }}
           />
         ) : (
-          <FollowStep themes={chosen.size === THEMES.length ? new Set() : chosen} onDone={finish} />
+          <FollowStep themes={themeFilter([...chosen])} onDone={finish} />
         )}
       </div>
     </div>

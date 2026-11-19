@@ -12,7 +12,7 @@ import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
 import { safeStorage } from '../lib/hints.ts';
 import { addRecent, buildSuggestions, readRecent, removeRecent, saveRecent } from '../lib/recent-searches.ts';
-import { filterByThemes, readThemes, THEMES, themeOfCategory, themeOfEvent } from '../lib/themes.ts';
+import { filterByThemes, THEMES, themeFilter, themesOfCategory, themesOfEvent, userThemes } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { formatRating, formatWhen, } from '../lib/chat.ts';
@@ -298,8 +298,7 @@ export function ExploreScreen() {
   }
   const [themes, setThemes] = useState<ReadonlySet<ThemeId>>(() => {
     // O que a pessoa escolheu no começo vira o filtro inicial, a não ser que ela tenha marcado todos (aí não filtra nada).
-    const saved = readThemes(safeStorage(), me.id);
-    return saved.length === THEMES.length ? new Set() : new Set(saved);
+    return themeFilter(userThemes(safeStorage(), me));
   });
   const [radiusKm, setRadiusKm] = useState(RADIUS_DEFAULT_KM);
   const [sheet, setSheet] = useState<'range' | 'kind' | 'radius' | null>(null);
@@ -328,14 +327,14 @@ export function ExploreScreen() {
   }, [q, range, kind, free, hot, radiusKm, position?.lat, position?.lng, waiting]);
 
   const raw = result.data;
-  // Tema é filtro de tela: a API devolve tudo e aqui fica só o que é de Bares e/ou Baladas.
+  // Tema é filtro de tela: a API devolve tudo e aqui fica só o que é dos gostos escolhidos.
   const data = useMemo(
     () =>
       raw
         ? {
             ...raw,
-            events: filterByThemes(raw.events, themes, themeOfEvent),
-            places: filterByThemes(raw.places, themes, (p) => themeOfCategory(p.category)),
+            events: filterByThemes(raw.events, themes, themesOfEvent),
+            places: filterByThemes(raw.places, themes, (p) => themesOfCategory(p.category)),
           }
         : raw,
     [raw, themes],
@@ -386,7 +385,7 @@ export function ExploreScreen() {
   useEffect(() => {
     if (autoTried.current || waiting || result.loading || !raw) return;
     autoTried.current = true;
-    if (!untouched || filterByThemes(raw.events, themes, themeOfEvent).length > 0) return;
+    if (!untouched || filterByThemes(raw.events, themes, themesOfEvent).length > 0) return;
     setWidening('searching');
     void (async () => {
       for (const step of widenSteps({ hasThemes: themes.size > 0, located: position !== undefined })) {
@@ -402,7 +401,7 @@ export function ExploreScreen() {
             hot: false,
           });
           if (!alive.current) return;
-          const events = step.clearThemes ? r.events : filterByThemes(r.events, themes, themeOfEvent);
+          const events = step.clearThemes ? r.events : filterByThemes(r.events, themes, themesOfEvent);
           if (events.length > 0) {
             staleRaw.current = raw;
             setWidening('found');
@@ -427,7 +426,7 @@ export function ExploreScreen() {
   }, [widening, result.loading, raw]);
   // Primeiro desenho com o vazio de hoje, antes de o efeito acima começar a procurar: já conta como buscando.
   const autoPending =
-    !autoTried.current && !waiting && !result.loading && !!raw && untouched && filterByThemes(raw.events, themes, themeOfEvent).length === 0;
+    !autoTried.current && !waiting && !result.loading && !!raw && untouched && filterByThemes(raw.events, themes, themesOfEvent).length === 0;
   const busy = waiting || result.loading || widening !== false || autoPending;
 
   const hasResults = data !== undefined && data !== null && data.events.length + data.places.length + data.people.length > 0;

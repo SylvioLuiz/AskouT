@@ -26,3 +26,19 @@ test('tutorial inicial: concluir de novo não muda a data registrada', async () 
   await w.core.auth.completeOnboarding(actor);
   assert.equal((await w.users.findById(signed.user.id))!.onboardedAt, first);
 });
+
+test('gostos de rolê: começam vazios, ficam na conta e só aceitam opções conhecidas', async () => {
+  const w = makeWorld();
+  const signed = await w.signUp('ana');
+  assert.deepEqual(signed.user.tastes, [], 'conta nova gosta de tudo');
+  const actor = { userId: signed.user.id, role: signed.user.role };
+
+  assert.deepEqual(await w.core.auth.setTastes(actor, ['SHOW', 'BAR', 'X', 'BAR', 'GAMES']), { tastes: ['BAR', 'SHOW', 'GAMES'] });
+  assert.deepEqual((await w.core.auth.me(actor)).tastes, ['BAR', 'SHOW', 'GAMES']);
+  const again = await asSession(w.core.auth.login({ identifier: 'ana', password: PASSWORD }));
+  assert.deepEqual(again.user.tastes, ['BAR', 'SHOW', 'GAMES'], 'vale em outro aparelho');
+
+  await w.core.auth.setTastes(actor, []);
+  assert.deepEqual((await w.core.auth.me(actor)).tastes, []);
+  await assert.rejects(w.core.auth.setTastes(actor, 'BAR'), /lista de gostos/);
+});

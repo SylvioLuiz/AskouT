@@ -232,6 +232,7 @@ export function createApi(deps: ApiDeps) {
       deps.onToken?.(token);
     },
     completeOnboarding: () => request<{ onboarded: true }>('POST', '/auth/me/onboarding'),
+    setTastes: (tastes: readonly string[]) => request<{ tastes: string[] }>('PUT', '/auth/me/tastes', { body: { tastes } }),
     /** "Complete seu cadastro" de quem entrou pela primeira vez com Google/Apple. */
     completeProfile: (input: { username: string; birthDate: string; acceptTerms: boolean; marketingEmail?: boolean }) =>
       request<SessionUser>('POST', '/auth/me/profile', { body: input }),

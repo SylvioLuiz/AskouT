@@ -47,6 +47,8 @@ export interface SessionUser {
    * Enquanto for true, o app só mostra a etapa "Complete seu cadastro" (mesmo depois de sair e entrar de novo).
    */
   profilePending?: boolean;
+  /** Gostos de rolê guardados na conta (ids de THEMES). Vazio = gosta de tudo. Ausente em versões antigas da API. */
+  tastes?: string[];
 }
 
 /** Conta do Google ou da Apple ligada ao perfil. */

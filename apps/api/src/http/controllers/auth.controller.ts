@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Put, Query } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { AllowPendingProfile, CurrentActor, Public } from '../decorators.ts';
@@ -139,6 +139,13 @@ export class AuthController {
   @HttpCode(200)
   completeOnboarding(@CurrentActor() actor: Actor) {
     return this.core.auth.completeOnboarding(actor);
+  }
+
+  /** Gostos de rolê da pessoa (`{tastes: ['BAR', 'SHOW']}`): escolhidos no cadastro e editáveis nas configurações. */
+  @Put('me/tastes')
+  @HttpCode(200)
+  setTastes(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.auth.setTastes(actor, asBody(body).tastes);
   }
 
   /** "Complete seu cadastro" de quem entrou pela primeira vez com Google/Apple: nome de usuário, data de nascimento e aceite. */

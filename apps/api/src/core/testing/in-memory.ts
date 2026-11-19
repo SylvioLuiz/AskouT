@@ -189,6 +189,11 @@ export class InMemoryUserRepository implements UserRepository {
     if (u && !u.onboardedAt) this.users.set(userId, { ...u, onboardedAt: at });
   }
 
+  async setTastes(userId: string, tastes: string[]): Promise<void> {
+    const u = this.users.get(userId);
+    if (u) this.users.set(userId, { ...u, tastes: [...tastes] });
+  }
+
   async completePendingProfile(userId: string, data: { username: string; displayName: string; birthDate: string; termsVersion: string; termsAcceptedAt: Date }): Promise<void> {
     for (const p of this.profiles.values()) {
       if (p.userId !== userId && p.username === data.username) throw conflict('Este nome de usuário já está em uso', { username: 'Este nome de usuário já está em uso' });

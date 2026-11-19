@@ -17,6 +17,8 @@ export interface User {
   termsVersion?: string | null;
   /** Quando a pessoa terminou (ou pulou) o tutorial inicial. Vazio = ainda não viu. */
   onboardedAt?: Date | null;
+  /** Gostos de rolê (ids de TASTE_IDS). Vazio = gosta de tudo. */
+  tastes?: string[];
   /** Conta criada pelo Google/Apple que ainda não escolheu o nome de usuário nem informou a data de nascimento. Até concluir, o app só mostra essa etapa. */
   profilePending?: boolean;
   /** Conta criada pelo Google/Apple que nunca definiu senha: só entra pela plataforma (ou criando uma senha pelo "Esqueci a senha"). */
