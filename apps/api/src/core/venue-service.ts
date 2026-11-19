@@ -23,7 +23,7 @@ export const ORGANIZATION_TYPE_MAX = 40;
 export const ORGANIZATION_CAMPUS_MAX = 120;
 export const ORGANIZATION_DESCRIPTION_MAX = 500;
 /** Categoria quando quem pede não diz o tipo (bateria, atlética...). */
-export const ORGANIZATION_DEFAULT_TYPE = 'Organização universitária';
+export const ORGANIZATION_DEFAULT_TYPE = 'Organização';
 /** Quantos avisos de evento novo saem ao mesmo tempo (o resto espera a vez). */
 const ANNOUNCE_BATCH = 25;
 
@@ -87,15 +87,15 @@ export interface VenueSummaryView {
   organization: boolean;
 }
 
-/** Pedido para criar a página de uma organização da faculdade. */
+/** Pedido para criar a página de uma organização (da facul ou não: atlética, coletivo, produtora, empresa...). */
 export interface OrganizationRequestInput {
   name?: unknown;
   /** Tipo: bateria, atlética, centro acadêmico... (vira a categoria). */
   type?: unknown;
-  /** Faculdade e campus (vira o endereço da página). */
+  /** Faculdade e campus, ou bairro/cidade/sede (vira o endereço da página). */
   campus?: unknown;
   description?: unknown;
-  /** Onde fica a sede (normalmente o campus), para a página ter lugar no mapa. */
+  /** Onde fica a sede (campus, sede ou point), para a página ter lugar no mapa. */
   lat?: unknown;
   lng?: unknown;
   /** Data URL de um comprovante de que a pessoa representa a organização (PDF ou imagem até 2 MB). */
@@ -654,19 +654,19 @@ export class VenueService {
   }
 
   /**
-   * Pede a página de uma organização da faculdade (bateria, atlética, centro acadêmico...). A página nasce sem dono e
+   * Pede a página de uma organização (atlética, bateria, coletivo, produtora, empresa...). A página nasce sem dono e
    * fora das buscas; um admin confere o comprovante no painel de pedidos e, ao aprovar, a pessoa passa a administrá-la.
    */
   async requestOrganization(userId: string, input: OrganizationRequestInput): Promise<ClaimView> {
     if (typeof input !== 'object' || input === null) throw validationError('Dados inválidos', { name: 'Preencha os dados da organização' });
     const name = text(input.name, ORGANIZATION_NAME_MAX, 'name', 'Nome da organização', true) as string;
     const type = text(input.type, ORGANIZATION_TYPE_MAX, 'type', 'Tipo') ?? ORGANIZATION_DEFAULT_TYPE;
-    const campus = text(input.campus, ORGANIZATION_CAMPUS_MAX, 'campus', 'Faculdade', true) as string;
+    const campus = text(input.campus, ORGANIZATION_CAMPUS_MAX, 'campus', 'Onde fica', true) as string;
     const description = text(input.description, ORGANIZATION_DESCRIPTION_MAX, 'description', 'Descrição');
     const note = text(input.note, CLAIM_NOTE_MAX, 'note', 'Mensagem');
     const { lat, lng } = input;
     if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-      throw validationError('Dados inválidos', { location: 'Informe onde fica a organização (use a localização do aparelho no campus)' });
+      throw validationError('Dados inválidos', { location: 'Informe onde fica a organização (use a localização do aparelho no campus, na sede ou no point)' });
     }
     const pending = (await this.deps.claims.listByUser(userId)).filter((c) => c.status === 'PENDING').length;
     if (pending >= CLAIMS_PENDING_MAX) throw conflict(`Você já tem ${CLAIMS_PENDING_MAX} pedidos em análise. Espere a resposta antes de pedir outro`);
