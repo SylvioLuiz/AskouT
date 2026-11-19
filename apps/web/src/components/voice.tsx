@@ -206,6 +206,24 @@ function decode(ctx: AudioContext, data: ArrayBuffer): Promise<AudioBuffer> {
   });
 }
 
+/**
+ * Nada tocando: suspende o contexto e limpa a sessão de mídia. Com a sessão em "playback" o iPhone trata o
+ * contexto como mídia e mostra o player na central de controle e na tela de bloqueio; suspenso, ele sai de lá.
+ */
+function idle(): void {
+  setAudioSession('auto');
+  try {
+    const media = (navigator as unknown as { mediaSession?: { metadata: unknown; playbackState: string } }).mediaSession;
+    if (media) {
+      media.metadata = null;
+      media.playbackState = 'none';
+    }
+  } catch {
+    /* sem suporte */
+  }
+  if (sharedCtx && sharedCtx.state === 'running') void sharedCtx.suspend().catch(() => undefined);
+}
+
 /** Toca um trecho mudo ainda dentro do toque: no iOS isso "destrava" o contexto para o som que vem depois do download. */
 function unlock(ctx: AudioContext) {
   try {
@@ -262,7 +280,7 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
     stopSource();
     stopTicking();
     if (playing === player.current) playing = undefined;
-    if (!playing) setAudioSession('auto');
+    if (!playing) idle();
     setPosition(offset.current * 1000);
     setState('paused');
   }
@@ -272,7 +290,7 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
     stopTicking();
     offset.current = 0;
     if (playing === player.current) playing = undefined;
-    if (!playing) setAudioSession('auto');
+    if (!playing) idle();
     setPosition(0);
     setState('idle');
   }
@@ -281,6 +299,9 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
     const buf = buffer.current;
     if (!buf) return;
     if (offset.current >= buf.duration) offset.current = 0;
+    // Pausa o outro áudio antes: ao parar, ele suspende o contexto (idle), que este aqui retoma logo abaixo.
+    if (playing && playing !== player.current) playing.pause();
+    if (ctx.state !== 'running') void ctx.resume().catch(() => undefined);
     const src = ctx.createBufferSource();
     src.buffer = buf;
     src.connect(ctx.destination);
@@ -288,7 +309,6 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
     startedAt.current = ctx.currentTime - offset.current;
     src.start(0, offset.current);
     source.current = src;
-    if (playing && playing !== player.current) playing.pause();
     playing = player.current;
     setAudioSession('playback');
     setState('playing');
@@ -309,7 +329,7 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
       stopTicking();
       if (playing === player.current) {
         playing = undefined;
-        setAudioSession('auto');
+        idle();
       }
     },
     [],
@@ -341,7 +361,7 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
       await resumed;
       start(ctx);
     } catch {
-      if (!playing) setAudioSession('auto');
+      if (!playing) idle();
       setState('error');
     }
   }
