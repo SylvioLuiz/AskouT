@@ -15,7 +15,7 @@ import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
-import { startOf } from '../lib/stories.ts';
+import { queueFrom, startOf } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
 import { eventLink } from '../lib/share.ts';
 import { attendeeStrip, eventDateLabel, eventLongDate, eventTimeLabel, venueLine } from '../lib/event-page.ts';
@@ -123,7 +123,12 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [editing, setEditing] = useState<PostView | undefined>();
   const [calMessage, setCalMessage] = useState<string | undefined>();
   const [creatingStory, setCreatingStory] = useState(false);
-  const [viewing, setViewing] = useState<StoryPos | undefined>();
+  /** Tocou em "Seu flash" sem ter marcado que vai: aviso de que só quem vai posta. */
+  const [storyNeedsGoing, setStoryNeedsGoing] = useState(false);
+  /** Marcou que vai a partir desse aviso: abre a criação do flash assim que confirmar. */
+  const storyAfterGoing = useRef(false);
+  /** Flash aberto: a fila (começando em quem foi tocado) e a posição nela. */
+  const [viewing, setViewing] = useState<{ groups: import('../lib/types.ts').EventStoryGroup[]; start: StoryPos } | undefined>();
   const [storyGroups, setStoryGroups] = useState<import('../lib/types.ts').EventStoryGroup[]>([]);
   const [storiesKey, setStoriesKey] = useState(0);
   const storyIds = (fresh ?? loaded.data ?? undefined)?.storyUserIds.join(',') ?? '';
@@ -172,11 +177,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
     setGoBusy(true);
     setProblem(undefined);
     try {
-      setFresh(await api.eventGo(e.id, onProfile));
+      const updated = await api.eventGo(e.id, onProfile);
+      setFresh(updated);
       setChoosing(false);
+      if (storyAfterGoing.current && updated.canStory) setCreatingStory(true);
+      storyAfterGoing.current = false;
     } catch (failure) {
       setProblem(toApiError(failure).message);
       setChoosing(false);
+      storyAfterGoing.current = false;
     } finally {
       setGoBusy(false);
     }
@@ -207,6 +216,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const strip = e ? attendeeStrip(e.attendees, e.confirmedCount, STRIP_MAX) : null;
   const ended = e ? Date.parse(e.endsAt) <= Date.now() : false;
   const canStory = e ? e.canStory : false;
+  // O botão de postar flash fica sempre à vista enquanto o evento não acabou; quem ainda não marcou que vai vê um aviso.
+  const showStoryButton = e ? canStory || !ended : false;
   const isPosted = posted ?? e?.postedByMe ?? false;
 
   return (
@@ -322,7 +333,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                     </button>
                   </p>
                 ) : null}
-                {choosing ? <GoingChoiceSheet busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => setChoosing(false)} /> : null}
+                {choosing ? <GoingChoiceSheet busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => { setChoosing(false); storyAfterGoing.current = false; }} /> : null}
               </>
             )}
             {problem ? <Notice tone="error">{problem}</Notice> : null}
@@ -365,15 +376,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
           </nav>
           {calMessage ? <Notice tone="error">{calMessage}</Notice> : null}
 
-          {strip.shown.length > 0 || canStory ? (
+          {strip.shown.length > 0 || showStoryButton ? (
             <section className="evwho" aria-label={t('Quem vai')}>
               <h2 className="evwho__title">
                 {t('Quem vai')} <span className="evwho__count">{e.confirmedCount}</span>
               </h2>
               <ul className="evgoing__faces">
-                {canStory ? (
+                {showStoryButton ? (
                   <li>
-                    <button type="button" className="evgoing__story" onClick={() => setCreatingStory(true)} aria-label={t('Criar flash neste evento')}>
+                    <button type="button" className="evgoing__story" onClick={() => (canStory ? setCreatingStory(true) : setStoryNeedsGoing(true))} aria-label={t('Criar flash neste evento')}>
                       <span className="evgoing__storyring">
                         <PlusIcon />
                       </span>
@@ -384,7 +395,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 {strip.shown.map((p) => (
                   <li key={p.userId} className="evwho__person">
                     {e.storyUserIds.includes(p.userId) && startOf(storyGroups, p.userId) ? (
-                      <button type="button" className="evgoing__face evgoing__face--story" onClick={() => setViewing(startOf(storyGroups, p.userId) ?? undefined)} aria-label={t('Ver o flash de {username}', { username: p.username })}>
+                      <button type="button" className="evgoing__face evgoing__face--story" onClick={() => setViewing({ groups: queueFrom(storyGroups, strip.shown.map((x) => x.userId), p.userId), start: { group: 0, item: 0 } })} aria-label={t('Ver o flash de {username}', { username: p.username })}>
                         <Avatar profile={p} size={40} />
                       </button>
                     ) : (
@@ -403,6 +414,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   </li>
                 ) : null}
               </ul>
+              {strip.shown.length === 0 && !ended ? <p className="evwho__empty">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p> : null}
             </section>
           ) : !ended ? (
             <p className="evwho__empty">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
@@ -541,6 +553,21 @@ export function EventScreen({ eventId }: { eventId: string }) {
           }}
         />
       ) : null}
+      {storyNeedsGoing && e ? (
+        <Sheet title={t('Só quem vai pode postar')} onClose={() => setStoryNeedsGoing(false)}>
+          <p>{t('Os flashes deste evento são de quem vai. Marque que você vai para postar o seu.')}</p>
+          <Button
+            full
+            onClick={() => {
+              setStoryNeedsGoing(false);
+              storyAfterGoing.current = true;
+              void toggleGoing();
+            }}
+          >
+            {t('Eu vou')}
+          </Button>
+        </Sheet>
+      ) : null}
       {creatingStory && e ? (
         <StoryCreator
           eventId={e.id}
@@ -555,8 +582,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
       {viewing && e ? (
         <StoryViewer
           eventId={e.id}
-          groups={storyGroups}
-          start={viewing}
+          groups={viewing.groups}
+          start={viewing.start}
           onClose={() => setViewing(undefined)}
           onChanged={() => {
             setViewing(undefined);
