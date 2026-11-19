@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { attendeeStrip, eventDateLabel, eventLink, eventTimeLabel, venueLine } from './event-page.ts';
+import { attendeeStrip, eventDateLabel, eventLink, eventLongDate, eventTimeLabel, venueLine } from './event-page.ts';
 
 test('data e hora do evento em colunas', () => {
   const start = new Date('2026-10-17T20:00').toISOString();
@@ -20,4 +20,11 @@ test('lugar, mapa, avatares e link', () => {
   assert.deepEqual(attendeeStrip([1, 2, 3, 4], 9, 3), { shown: [1, 2, 3], more: 6 });
   assert.deepEqual(attendeeStrip([1], 1, 3), { shown: [1], more: 0 });
   assert.equal(eventLink('https://x.app', 'a b'), 'https://x.app/eventos/a%20b');
+});
+
+test('data por extenso no bloco "Quando"', () => {
+  const start = new Date('2026-10-17T20:00').toISOString();
+  assert.equal(eventLongDate(start, new Date('2026-10-17T23:30').toISOString()), 'Sábado, 17 de outubro');
+  assert.equal(eventLongDate(start, new Date('2026-10-19T12:00').toISOString()), '17 out – 19 out');
+  assert.equal(eventLongDate('x', 'y'), '—');
 });

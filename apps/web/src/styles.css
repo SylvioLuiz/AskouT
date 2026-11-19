@@ -2284,6 +2284,13 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   flex-direction: column;
   gap: 8px;
 }
+/* Achar nos contatos: textos, botões e resultados com respiro entre si (antes ficava tudo colado). */
+.contacts { display: flex; flex-direction: column; gap: 16px; }
+.contacts > p { line-height: 1.55; }
+.contacts > .notice { margin-bottom: 0; }
+.contacts__actions { gap: 10px; }
+.contacts__list .person { padding: 14px 0; }
+
 /* Aviso antes de pedir permissão (contatos). */
 .disclosure__list { margin: 0; padding-left: 20px; list-style: disc; display: flex; flex-direction: column; gap: 6px; color: var(--ink-2); }
 
@@ -6117,3 +6124,60 @@ div.optrow__main { cursor: default; }
 .evextras-view--compact { gap: 6px; font-size: 0.9375rem; }
 .evextras-view--compact .icon { width: 18px; height: 18px; color: var(--muted); }
 .evextras-view--compact .evextras-view__value { margin-left: 0; text-align: left; }
+
+/* ---------- Página do evento: organizador, presença, quem vai e informações ---------- */
+.evhero__badge { width: 52px; height: 52px; margin-bottom: 2px; }
+.evhero__badge .icon { width: 26px; height: 26px; }
+.evhero__title { font-size: 1.5rem; line-height: 1.15; }
+.evhero__pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.evhero__pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; background: rgb(255 255 255 / 0.18); border: 1px solid rgb(255 255 255 / 0.35); backdrop-filter: blur(6px); color: #fff; font-size: 0.75rem; font-weight: 650; line-height: 1.4; }
+.evhero__pill .icon, .evhero__pill svg { width: 13px; height: 13px; }
+.evhost { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); color: var(--ink); text-decoration: none; -webkit-tap-highlight-color: transparent; }
+.evhost:visited { color: var(--ink); }
+.evhost:hover, .evhost:focus-visible { border-color: var(--brand); }
+.evhost > .icon, .evhost > svg { flex: none; width: 20px; height: 20px; margin-left: auto; color: var(--muted); }
+.evhost__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.evhost__label { color: var(--muted); font-size: 0.8125rem; }
+.evhost__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
+.evhost__user { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 0.8125rem; }
+.evprivate { display: flex; align-items: center; gap: 8px; margin: -6px 2px 0; color: var(--muted); font-size: 0.8125rem; line-height: 1.35; }
+.evprivate .icon, .evprivate svg { flex: none; width: 15px; height: 15px; }
+.evstats { padding: 4px 0 0; }
+.evgoing { gap: 8px; }
+.evgoing__ended { margin: 0; padding: 12px 14px; border-radius: var(--radius-panel); background: var(--brand-soft); color: var(--ink-2); text-align: center; font-weight: 600; }
+.evgo > .btn { min-height: 50px; font-size: 1rem; }
+.evgo > .btn .icon, .evgo > .btn svg { width: 18px; height: 18px; margin-right: 6px; vertical-align: -3px; }
+.evgo__hint { margin: 0; color: var(--muted); font-size: 0.8125rem; text-align: center; }
+.evwho { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); }
+.evwho__title { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-display); font-size: 0.9375rem; color: var(--ink-2); }
+.evwho__count { padding: 1px 8px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-text); font-size: 0.75rem; font-weight: 700; }
+.evwho .evgoing__faces { flex-wrap: nowrap; gap: 12px; margin: 0 -14px; padding: 0 14px 2px; overflow-x: auto; scrollbar-width: none; }
+.evwho .evgoing__faces::-webkit-scrollbar { display: none; }
+.evwho .evgoing__faces > li { flex: none; }
+.evwho__person { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 52px; }
+.evwho__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 0.6875rem; }
+.evwho__empty { margin: 0; color: var(--muted); text-align: center; font-size: 0.875rem; }
+.evinfo { gap: 12px; }
+.evinfo__block { padding: 14px 16px; }
+.evinfo__row { flex-direction: row; align-items: flex-start; gap: 12px; }
+.evinfo__icon { display: grid; flex: none; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--brand-soft); color: var(--brand-text); }
+.evinfo__icon .icon, .evinfo__icon svg { width: 20px; height: 20px; }
+.evinfo__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.evinfo__main .evinfo__title { margin-bottom: 2px; }
+.evinfo__strong { margin: 0; color: var(--ink); font-weight: 650; overflow-wrap: anywhere; }
+.evinfo__link, .evinfo__link:visited { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.evinfo__sub { margin: 0; color: var(--muted); font-size: 0.9375rem; overflow-wrap: anywhere; }
+.evinfo__about { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.evinfo__about--clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.evinfo__more, .evinfo__more:visited { align-self: flex-start; display: inline-flex; align-items: center; min-height: 36px; margin-top: 2px; padding: 0; border: 0; background: transparent; color: var(--brand-text); font: inherit; font-size: 0.875rem; font-weight: 650; text-decoration: none; cursor: pointer; }
+.evinfo__feedlink { align-items: flex-start; width: 100%; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.evinfo__feedlink:hover, .evinfo__feedlink:focus-visible { border-color: var(--brand); }
+.evinfo .tagchips { margin: 0; }
+.evinfo__title { font-weight: 700; }
+.evinfo .mapsbtn.evinfo__more { min-height: 36px; padding: 0; font-size: 0.875rem; font-weight: 650; color: var(--brand-text); background: transparent; border: 0; }
+.evpage .quickacts { display: flex; justify-content: center; gap: 8px; }
+.evpage .quickacts .quickacts__btn { flex: 1 1 0; max-width: 84px; min-width: 0; }
+
+/* Agenda ligada com sucesso (volta do Google/Outlook): check redondo no aviso da folha de agendas. */
+.calsync__check { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; vertical-align: -5px; border-radius: 50%; background: var(--ok, #1f9d55); color: #fff; }
+.calsync__check svg { width: 14px; height: 14px; }

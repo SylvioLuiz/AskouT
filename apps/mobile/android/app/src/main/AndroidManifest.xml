@@ -23,6 +23,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Volta do login da Google Agenda / Outlook no navegador: br.com.askout://agenda abre o app. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="br.com.askout" />
+            </intent-filter>
+
         </activity>
 
         <!-- Avisos (push) chegam no canal "notificacoes", de importância alta, para mostrar a prévia no topo da tela. O app cria o canal ao abrir. -->

@@ -8,7 +8,7 @@ import { StoryCreateSheet, StoryViewer } from '../components/event-story.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { EditPostSheet } from '../components/post-actions.tsx';
 import { EventExtrasList } from '../components/event-extras.tsx';
-import { CalendarIcon, CalendarPlusIcon, ChevronLeftIcon, EditIcon, EventKindIcon, LocationIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UserIcon } from '../components/icons.tsx';
+import { CalendarIcon, CalendarPlusIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
@@ -17,7 +17,7 @@ import { useAsync, useTitle } from '../hooks.ts';
 import { startOf } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
 import { eventLink } from '../lib/share.ts';
-import { attendeeStrip, eventDateLabel, eventTimeLabel, venueLine } from '../lib/event-page.ts';
+import { attendeeStrip, eventDateLabel, eventLongDate, eventTimeLabel, venueLine } from '../lib/event-page.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { ticketHost } from '../lib/venue.ts';
@@ -38,6 +38,8 @@ import { trackTicketClick } from '../components/sponsored-view.tsx';
 const EVENT_POST_CAPTION_MAX = 500;
 /** Avatares na fileira; o resto vira "+N". */
 const STRIP_MAX = 7;
+/** Descrição maior que isso começa recolhida, com "Ver mais". */
+const ABOUT_CLAMP_CHARS = 220;
 
 /** Capa: endereço https (evento do local) ou caminho da própria API (foto enviada / foto assinada do Google). */
 function coverSrc(path: string | null): string | null {
@@ -133,9 +135,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [posted, setPosted] = useState<boolean | undefined>();
   const [goBusy, setGoBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
-  const [tab, setTab] = useState<'feed' | 'info'>('feed');
-  const [feedSettings, setFeedSettings] = useState<FeedSettings | undefined>();
   const search = useSearch();
+  // Abre nas informações (o que quem recebeu o evento quer ver primeiro); link de publicação abre direto no feed.
+  const [tab, setTab] = useState<'feed' | 'info'>(() => (search.get('post') || search.get('pendentes') === '1' ? 'feed' : 'info'));
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const openPost = search.get('post');
+  useEffect(() => {
+    if (openPost) setTab('feed');
+  }, [openPost]);
+  const [feedSettings, setFeedSettings] = useState<FeedSettings | undefined>();
 
   async function toggleGoing() {
     if (!e) return;
@@ -148,6 +156,12 @@ export function EventScreen({ eventId }: { eventId: string }) {
     } finally {
       setGoBusy(false);
     }
+  }
+
+  function addToAgenda() {
+    if (!e) return;
+    setCalMessage(undefined);
+    addEventToCalendar(e).catch((failure: unknown) => setCalMessage(failure instanceof Error ? failure.message : t('Não foi possível adicionar à agenda.')));
   }
 
   const cover = e && !coverFailed ? coverSrc(e.coverPath) : null;
@@ -185,6 +199,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <EventKindIcon kind={e.kind} />
                 <span className="visually-hidden">{kindLabel(e.kind)}</span>
               </span>
+              <div className="evhero__pills">
+                <span className="evhero__pill">{kindLabel(e.kind)}</span>
+                {e.isFree ? <span className="evhero__pill">{t('Grátis')}</span> : null}
+                {e.isPrivate ? (
+                  <span className="evhero__pill evhero__pill--private">
+                    <LockIcon /> {t('Evento privado')}
+                  </span>
+                ) : null}
+              </div>
               <h1 className="evhero__title">{e.title}</h1>
               {e.venue.name || e.venue.address ? (
               <p className="evhero__place">
@@ -200,28 +223,27 @@ export function EventScreen({ eventId }: { eventId: string }) {
             </div>
           </section>
 
+          {e.owner ? (
+            <Link to={`/u/${encodeURIComponent(e.owner.username)}`} className="evhost">
+              <Avatar profile={e.owner} size={44} />
+              <span className="evhost__text">
+                <span className="evhost__label">{t('Organizado por')}</span>
+                <strong className="evhost__name">{e.owner.displayName || e.owner.username}</strong>
+                {e.owner.displayName && e.owner.displayName !== e.owner.username ? <span className="evhost__user">@{e.owner.username}</span> : null}
+              </span>
+              <ChevronRightIcon />
+            </Link>
+          ) : null}
+          {e.isPrivate && !e.isOwner ? <p className="evprivate"><LockIcon /> {t('Só quem recebeu o convite vê este evento.')}</p> : null}
+
           <dl className="evstats">
             <div className="evstats__cell">
               <dt>{t('Confirmados')}</dt>
               <dd className="evstats__main">{e.confirmedCount}</dd>
-              <dd className="evstats__sub">{e.confirmedCount === 1 ? 'pessoa' : 'pessoas'}</dd>
+              <dd className="evstats__sub">{e.confirmedCount === 1 ? t('pessoa') : t('pessoas')}</dd>
             </div>
-            <div className="evstats__cell evstats__cell--date">
-              <dt>
-                {t('Data')}
-                <button
-                  type="button"
-                  className="evstats__cal"
-                  aria-label={t('Adicionar à agenda')}
-                  title={t('Adicionar à agenda')}
-                  onClick={() => {
-                    setCalMessage(undefined);
-                    addEventToCalendar(e).catch((failure: unknown) => setCalMessage(failure instanceof Error ? failure.message : t('Não foi possível adicionar à agenda.')));
-                  }}
-                >
-                  <CalendarPlusIcon />
-                </button>
-              </dt>
+            <div className="evstats__cell">
+              <dt>{t('Data')}</dt>
               <dd className="evstats__main">{date.main}</dd>
               {date.sub ? <dd className="evstats__sub">{date.sub}</dd> : null}
             </div>
@@ -231,6 +253,44 @@ export function EventScreen({ eventId }: { eventId: string }) {
               {time.sub ? <dd className="evstats__sub">{time.sub}</dd> : null}
             </div>
           </dl>
+
+          <section className="evgoing" aria-label={t('Presença')}>
+            {e.isOwner ? null : ended ? (
+              <p className="evgoing__ended">{t('Esse evento já terminou.')}</p>
+            ) : (
+              <>
+                {/* "Eu vou" e "Criar encontro" lado a lado quando os dois existem. */}
+                <div className="evgo">
+                  <Button full variant={e.going ? 'secondary' : 'primary'} loading={goBusy} onClick={() => void toggleGoing()} aria-pressed={e.going}>
+                    {e.going ? (
+                      <>
+                        <CheckIcon /> {t('Você vai')}
+                      </>
+                    ) : (
+                      t('Eu vou')
+                    )}
+                  </Button>
+                  {e.source === 'PLACE' ? (
+                    <Button full variant="secondary" onClick={() => setPlanning(true)}>
+                      {MEETUP_ACTION_LABEL}
+                    </Button>
+                  ) : null}
+                </div>
+                {e.going ? <p className="evgo__hint">{t('Mudou de ideia? Toque em “Você vai” para cancelar.')}</p> : null}
+              </>
+            )}
+            {problem ? <Notice tone="error">{problem}</Notice> : null}
+            {e.ticketUrl && !ended ? (
+              <div className="evticket">
+                <a className="btn btn--secondary btn--full evticket__link" href={e.ticketUrl} target="_blank" rel="noopener noreferrer nofollow sponsored" onClick={() => trackTicketClick(e.id)}>
+                  <TicketIcon />
+                  {t('Comprar ingresso')}
+                </a>
+                <p className="evticket__note">{t('Abre {host}. A venda é feita lá: o AskouT não cobra nem entrega o ingresso.', { host: ticketHost(e.ticketUrl) || t('o site de venda') })}</p>
+              </div>
+            ) : null}
+          </section>
+
           <nav className="quickacts" aria-label={t('Ações rápidas do evento')}>
             {e.venue.lat !== null && e.venue.lng !== null ? (
               <OpenInMaps className="quickacts__btn" mode="route" lat={e.venue.lat} lng={e.venue.lng} label={e.venue.name}>
@@ -244,6 +304,10 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <span className="quickacts__label">{t('Mapa')}</span>
               </OpenInMaps>
             ) : null}
+            <button type="button" className="quickacts__btn" onClick={addToAgenda}>
+              <span className="quickacts__icon" aria-hidden="true"><CalendarPlusIcon /></span>
+              <span className="quickacts__label">{t('Agenda')}</span>
+            </button>
             <button type="button" className="quickacts__btn" onClick={() => setSharing(true)}>
               <span className="quickacts__icon" aria-hidden="true"><ShareIcon /></span>
               <span className="quickacts__label">{t('Compartilhar')}</span>
@@ -251,8 +315,11 @@ export function EventScreen({ eventId }: { eventId: string }) {
           </nav>
           {calMessage ? <Notice tone="error">{calMessage}</Notice> : null}
 
-          <section className="evgoing" aria-label={t('Quem confirmou')}>
-            {strip.shown.length > 0 || canStory ? (
+          {strip.shown.length > 0 || canStory ? (
+            <section className="evwho" aria-label={t('Quem vai')}>
+              <h2 className="evwho__title">
+                {t('Quem vai')} <span className="evwho__count">{e.confirmedCount}</span>
+              </h2>
               <ul className="evgoing__faces">
                 {canStory ? (
                   <li>
@@ -265,7 +332,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   </li>
                 ) : null}
                 {strip.shown.map((p) => (
-                  <li key={p.userId}>
+                  <li key={p.userId} className="evwho__person">
                     {e.storyUserIds.includes(p.userId) && startOf(storyGroups, p.userId) ? (
                       <button type="button" className="evgoing__face evgoing__face--story" onClick={() => setViewing(startOf(storyGroups, p.userId) ?? undefined)} aria-label={t('Ver o story de {username}', { username: p.username })}>
                         <Avatar profile={p} size={40} />
@@ -275,132 +342,80 @@ export function EventScreen({ eventId }: { eventId: string }) {
                         <Avatar profile={p} size={44} />
                       </Link>
                     )}
+                    <span className="evwho__name" aria-hidden="true">{p.username}</span>
                   </li>
                 ))}
                 {strip.more > 0 ? (
-                  <li>
+                  <li className="evwho__person">
                     <span className="evgoing__more" aria-label={t('mais {more} pessoas', { more: strip.more })}>
                       +{strip.more}
                     </span>
                   </li>
                 ) : null}
               </ul>
-            ) : (
-              <p className="muted">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
-            )}
-            {e.ticketUrl && !ended ? (
-              <div className="evticket">
-                <a className="btn btn--secondary btn--full evticket__link" href={e.ticketUrl} target="_blank" rel="noopener noreferrer nofollow sponsored" onClick={() => trackTicketClick(e.id)}>
-                  <TicketIcon />
-                  {t('Comprar ingresso')}
-                </a>
-                <p className="evticket__note">{t('Abre {host}. A venda é feita lá: o AskouT não cobra nem entrega o ingresso.', { host: ticketHost(e.ticketUrl) || t('o site de venda') })}</p>
-              </div>
-            ) : null}
-            {e.isOwner ? null : ended ? (
-              <p className="muted">{t('Esse evento já terminou.')}</p>
-            ) : (
-              // "Eu vou" e "Criar encontro" lado a lado quando os dois existem.
-              <div className="evgo">
-                <Button full variant={e.going ? 'secondary' : 'primary'} loading={goBusy} onClick={() => void toggleGoing()} aria-pressed={e.going}>
-                  {e.going ? t('Eu vou ✓ (toque para cancelar)') : t('Eu vou')}
-                </Button>
-                {e.source === 'PLACE' ? (
-                  <Button full variant="secondary" onClick={() => setPlanning(true)}>
-                    {MEETUP_ACTION_LABEL}
-                  </Button>
-                ) : null}
-              </div>
-            )}
-            {problem ? <Notice tone="error">{problem}</Notice> : null}
-          </section>
+            </section>
+          ) : !ended ? (
+            <p className="evwho__empty">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
+          ) : null}
 
           <div className="segtabs segtabs--fill evtabs" role="tablist" aria-label={t('Seções do evento')}>
-            <button type="button" role="tab" aria-selected={tab === 'feed'} className="segtabs__tab" onClick={() => setTab('feed')}>
-              {t('Publicações')}
-            </button>
             <button type="button" role="tab" aria-selected={tab === 'info'} className="segtabs__tab" onClick={() => setTab('info')}>
               {t('Informações')}
+            </button>
+            <button type="button" role="tab" aria-selected={tab === 'feed'} className="segtabs__tab" onClick={() => setTab('feed')}>
+              {t('Publicações')}
             </button>
           </div>
 
           {tab === 'feed' ? (
-            <Feed
-              where="events"
-              targetId={e.id}
-              openPostId={search.get('post')}
-              openPending={search.get('pendentes') === '1'}
-              onSettings={setFeedSettings}
-              intro={
-                <div className="feedintro">
-                  {e.description ? <p className="feedintro__text">{e.description}</p> : null}
-                  <ul className="feedintro__facts">
-                    <li>
-                      <CalendarIcon /> {date.main}
-                      {date.sub ? ` · ${date.sub}` : ''} · {time.main}
-                    </li>
-                    {e.venue.name || e.venue.address ? (
-                      <li>
-                        <LocationIcon /> {venueLine(e.venue)}
-                      </li>
-                    ) : null}
-                    {e.owner ? (
-                      <li>
-                        <UserIcon /> {t('Organizado por')}{' '}
-                        <Link to={`/u/${encodeURIComponent(e.owner.username)}`}>
-                          <strong>{e.owner.username}</strong>
-                        </Link>
-                      </li>
-                    ) : null}
-                  </ul>
-                  {e.extras && e.extras.length > 0 ? <EventExtrasList extras={e.extras} compact /> : null}
-                  <button type="button" className="linkbtn" onClick={() => setTab('info')}>
-                    {t('Ver todas as informações')}
-                  </button>
-                </div>
-              }
-            />
+            <Feed where="events" targetId={e.id} openPostId={search.get('post')} openPending={search.get('pendentes') === '1'} onSettings={setFeedSettings} />
           ) : (
             <section className="evinfo" aria-label={t('Informações do evento')}>
-              <div className="sugcard__tags">
-                <span className="tag tag--event">{kindLabel(e.kind)}</span>
-                {e.isFree ? <span className="tag tag--free">{t('Grátis')}</span> : null}
-                {e.sample ? <SampleBadge /> : null}
-                {e.distanceM !== null ? <span className="muted">{t('a {distance} de você', { distance: formatDistance(e.distanceM) })}</span> : null}
-              </div>
-              {e.owner ? (
-                <p className="muted">
-                  Organizado por{' '}
-                  <Link to={`/u/${encodeURIComponent(e.owner.username)}`}>
-                    <strong>{e.owner.username}</strong>
-                  </Link>
-                </p>
+              {e.description ? (
+                <div className="evinfo__block">
+                  <h2 className="evinfo__title">{t('Sobre')}</h2>
+                  <p className={`eventpage__text evinfo__about${aboutOpen ? '' : ' evinfo__about--clamp'}`}>{e.description}</p>
+                  {e.description.length > ABOUT_CLAMP_CHARS || e.description.split('\n').length > 4 ? (
+                    <button type="button" className="evinfo__more" onClick={() => setAboutOpen((v) => !v)} aria-expanded={aboutOpen}>
+                      {aboutOpen ? t('Ver menos') : t('Ver mais')}
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
-              {e.description ? <p className="eventpage__text">{e.description}</p> : null}
-              {e.tags.length > 0 ? (
-                <ul className="tagchips">
-                  {e.tags.map((t) => (
-                    <li key={t}>
-                      <button type="button" className="fchip" onClick={() => navigate(`/explorar?q=${encodeURIComponent(`#${t}`)}`)}>
-                        #{t}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              <div className="evinfo__block">
-                <h2 className="evinfo__title">{t('Quando')}</h2>
-                <p>
-                  {date.main}
-                  {date.sub ? ` · ${date.sub}` : ''} · {time.main}
-                  {time.sub ? ` ${time.sub}` : ''}
-                </p>
-
+              <div className="evinfo__block evinfo__row">
+                <span className="evinfo__icon" aria-hidden="true"><CalendarIcon /></span>
+                <div className="evinfo__main">
+                  <h2 className="evinfo__title">{t('Quando')}</h2>
+                  <p className="evinfo__strong">{eventLongDate(e.startsAt, e.endsAt)}</p>
+                  <p className="evinfo__sub">
+                    {time.main}
+                    {time.sub ? ` ${time.sub}` : ''}
+                  </p>
+                  <button type="button" className="evinfo__more" onClick={addToAgenda}>
+                    {t('Adicionar à agenda')}
+                  </button>
+                </div>
               </div>
               {e.venue.name || e.venue.address ? (
-                <div className="evinfo__block">
-                  <h2 className="evinfo__title">{t('Onde')}</h2>
-                  <p>{venueLine(e.venue)}</p>
+                <div className="evinfo__block evinfo__row">
+                  <span className="evinfo__icon" aria-hidden="true"><LocationIcon /></span>
+                  <div className="evinfo__main">
+                    <h2 className="evinfo__title">{t('Onde')}</h2>
+                    {e.venue.name ? (
+                      e.venue.id ? (
+                        <Link to={`/bares/${encodeURIComponent(e.venue.id)}`} className="evinfo__strong evinfo__link">
+                          {e.venue.name}
+                        </Link>
+                      ) : (
+                        <p className="evinfo__strong">{e.venue.name}</p>
+                      )
+                    ) : null}
+                    {e.venue.address ? <p className="evinfo__sub">{e.venue.address}</p> : null}
+                    {e.distanceM !== null ? <p className="evinfo__sub">{t('a {distance} de você', { distance: formatDistance(e.distanceM) })}</p> : null}
+                    <OpenInMaps className="evinfo__more" lat={e.venue.lat} lng={e.venue.lng} label={e.venue.name} address={e.venue.address}>
+                      {t('Abrir no mapa')}
+                    </OpenInMaps>
+                  </div>
                 </div>
               ) : null}
               {e.extras && e.extras.length > 0 ? (
@@ -408,6 +423,22 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   <h2 className="evinfo__title">{t('Detalhes')}</h2>
                   <EventExtrasList extras={e.extras} />
                 </div>
+              ) : null}
+              {e.tags.length > 0 || e.sample ? (
+                <ul className="tagchips">
+                  {e.sample ? (
+                    <li>
+                      <SampleBadge />
+                    </li>
+                  ) : null}
+                  {e.tags.map((tag) => (
+                    <li key={tag}>
+                      <button type="button" className="fchip" onClick={() => navigate(`/explorar?q=${encodeURIComponent(`#${tag}`)}`)}>
+                        #{tag}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               ) : null}
               {e.source === 'PLACE' && !ended && e.isOwner ? (
                 <div className="evactions">
@@ -417,12 +448,11 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 </div>
               ) : null}
               {e.source === 'PLACE' && !ended ? <CloakroomCard eventId={e.id} /> : null}
-              {feedSettings ? (
-                <div className="evinfo__block">
-                  <h2 className="evinfo__title">{t('Publicações')}</h2>
-                  <p className="muted">{policyNote(feedSettings)}</p>
-                </div>
-              ) : null}
+              <button type="button" className="evinfo__block evinfo__feedlink" onClick={() => setTab('feed')}>
+                <span className="evinfo__title">{t('Publicações')}</span>
+                <span className="muted">{feedSettings ? policyNote(feedSettings) : t('Avisos, fotos e comentários de quem vai.')}</span>
+                <span className="evinfo__more">{t('Ver publicações')}</span>
+              </button>
             </section>
           )}
         </article>

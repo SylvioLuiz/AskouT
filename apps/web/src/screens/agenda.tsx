@@ -230,10 +230,11 @@ export function AgendaScreen() {
   const [syncing, setSyncing] = useState(false);
   const [syncedN, setSyncedN] = useState(0);
   const search = useSearch();
-  /** Volta da Google Agenda (site): abre a folha com o aviso e limpa o endereço. */
+  /** Volta da Google Agenda / Outlook (site, ou o app aberto pelo link do navegador): abre a folha com o aviso e limpa o endereço. */
   const [syncNotice, setSyncNotice] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
+  const syncResult = search.get('agendas');
   useEffect(() => {
-    const result = search.get('agendas');
+    const result = syncResult;
     if (!result) return;
     setSyncNotice(
       result === 'google' || result === 'microsoft'
@@ -241,9 +242,10 @@ export function AgendaScreen() {
         : { tone: 'error', text: search.get('motivo') || t('Não foi possível ligar a agenda.') },
     );
     setSyncing(true);
+    calendars.reload();
     navigate('/agenda', { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [syncResult]);
   const busyBlocks = useAsync(() => api.calendarBusy(range.from, range.to).catch(() => [] as BusyBlock[]), [range.from, range.to]);
   const calendars = useAsync(() => api.calendarOverview().catch(() => undefined), []);
   useEffect(() => {
@@ -435,6 +437,7 @@ export function AgendaScreen() {
 
       {syncing ? (
         <CalendarSyncSheet
+          key={syncNotice?.text ?? 'sync'}
           notice={syncNotice}
           onClose={() => {
             setSyncing(false);

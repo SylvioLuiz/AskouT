@@ -29,6 +29,18 @@ export function eventTimeLabel(startsAt: string, endsAt: string): { main: string
   return { main: clock.format(start), sub: sameDayEnd ? t('até {time}', { time: clock.format(end) }) : null };
 }
 
+const longDay = new Intl.DateTimeFormat(intlLocale(), { weekday: 'long', day: 'numeric', month: 'long' });
+
+/** "sábado, 28 de novembro" e, quando termina em outro dia, "28 nov – 30 nov". */
+export function eventLongDate(startsAt: string, endsAt: string): string {
+  const start = new Date(startsAt);
+  if (Number.isNaN(start.getTime())) return '—';
+  const end = new Date(endsAt);
+  if (!Number.isNaN(end.getTime()) && !sameDay(start, end)) return `${dayMonth.format(start)} – ${dayMonth.format(end)}`;
+  const text = longDay.format(start);
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 /** Texto do endereço do evento: lugar e, se houver, o endereço. */
 export function venueLine(venue: EventPage['venue']): string {
   return venue.address ? `${venue.name} · ${venue.address}` : venue.name;
