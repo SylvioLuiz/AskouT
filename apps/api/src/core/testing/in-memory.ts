@@ -355,6 +355,23 @@ export class InMemoryFlashRepository implements FlashRepository {
   readonly invites = new Map<string, FlashInviteRecord>();
   readonly positions = new Map<string, FlashPositionRecord>();
   readonly hidden = new Map<string, FlashHiddenRecord>();
+  readonly asks = new Map<string, { askerId: string; targetId: string; at: Date }>();
+
+  async recordAsk(askerId: string, targetId: string, at: Date): Promise<void> {
+    this.asks.set(`${askerId}|${targetId}`, { askerId, targetId, at });
+  }
+
+  async lastAsk(askerId: string, targetId: string): Promise<Date | undefined> {
+    return this.asks.get(`${askerId}|${targetId}`)?.at;
+  }
+
+  async listAskersOf(targetId: string, since: Date): Promise<string[]> {
+    return [...this.asks.values()].filter((a) => a.targetId === targetId && a.at >= since).map((a) => a.askerId);
+  }
+
+  async clearAsksFor(targetId: string): Promise<void> {
+    for (const [k, a] of this.asks) if (a.targetId === targetId) this.asks.delete(k);
+  }
 
   private active(s: FlashSessionRecord, now: Date): boolean {
     return s.endedAt === null && s.expiresAt > now;
@@ -511,6 +528,12 @@ export class InMemoryFlashRepository implements FlashRepository {
           this.sessions.delete(id);
           removed += 1;
         }
+      }
+    }
+    for (const [k, a] of this.asks) {
+      if (a.at.getTime() < cutoff) {
+        this.asks.delete(k);
+        removed += 1;
       }
     }
     for (const [id, i] of this.invites) {

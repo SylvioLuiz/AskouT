@@ -433,8 +433,11 @@ test('livres agora: mais perto primeiro quando ligou com localização, sem reve
   assert.equal(r.order, 'near');
   assert.equal(r.nearAvailable, true);
   assert.deepEqual(r.items.map((i) => i.profile.userId), [perto, papo, longe]);
-  const json = JSON.stringify(r);
+  const json = JSON.stringify(r.items.map(({ point: _point, ...rest }) => rest));
   assert.doesNotMatch(json, /-19\.|-43\.|area|lat|lng/i, 'a posição nunca sai na resposta');
+  // Para o mapa, só um ponto numa grade de 1/40° (~3 km), nunca a região de ~1 km nem a posição real.
+  for (const i of r.items) for (const v of [i.point!.lat, i.point!.lng]) assert.equal(Math.round(v * 40), v * 40);
+  assert.deepEqual(r.items.map((i) => i.point), [{ lat: -19.95, lng: -43.925 }, { lat: -19.9, lng: -43.95 }, { lat: -19.8, lng: -43.95 }]);
   // Só a distância e o tempo aproximados (das regiões arredondadas: "perto" dá ~1,5 km).
   assert.deepEqual(r.items.map((i) => i.approx), [
     { km: 2, minutes: 20, mode: 'walk' },
@@ -538,4 +541,37 @@ test('localização aproximada: dá para escolher ao convidar e trocar durante o
   await w.core.flash.setPrecision(bia!, invite.id, true);
   assert.equal((await w.core.flash.getMatch(ana!, invite.id)).them?.lat, -23.525);
   await rejectsWith(w.core.flash.setPrecision(bia!, invite.id, 'sim'), 'VALIDATION');
+});
+
+test('perguntar se está livre: só amigos, uma vez a cada 3 h, e quem perguntou é avisado quando a pessoa liga', async () => {
+  const w = makeWorld();
+  const { ana, bia, caio, duda } = await w.signUpMany('ana', 'bia', 'caio', 'duda');
+  await befriend(w, ana!, bia!);
+  await befriend(w, ana!, duda!);
+  await w.core.flash.turnOn(duda!, { hours: 1 });
+
+  await rejectsWith(w.core.flash.ask(ana!, { userIds: [] }), 'VALIDATION');
+  await rejectsWith(w.core.flash.ask(ana!, { userIds: [caio!] }), 'FORBIDDEN');
+
+  const first = await w.core.flash.ask(ana!, { userIds: [bia!, caio!, duda!] });
+  assert.deepEqual(first.asked, [bia]);
+  assert.deepEqual(first.skipped.sort(), [caio, duda].sort(), 'não amigo e quem já está com NOW ligado são pulados');
+  assert.ok((await w.core.notifications.list(bia!)).items.some((n) => n.title === 'ana quer saber se você está livre agora' && n.url === '/now'));
+
+  assert.deepEqual((await w.core.flash.ask(ana!, { userIds: [bia!] })).asked, [], 'no máximo um pedido a cada 3 h');
+  w.clock.tick(30 * 60 * 1000);
+
+  await w.core.flash.turnOn(bia!, { hours: 1 });
+  assert.ok((await w.core.notifications.list(ana!)).items.some((n) => n.title === 'bia ligou o NOW'));
+  assert.deepEqual(await w.flash.listAskersOf(bia!, new Date(0)), [], 'os pedidos somem quando a pessoa liga');
+});
+
+test('listAvailable: ponto aproximado (grade de ~3 km) para o mapa só de quem ligou com localização', async () => {
+  const w = makeWorld();
+  const { ana, bia } = await w.signUpMany('ana', 'bia');
+  await befriend(w, ana!, bia!);
+  await w.core.flash.turnOn(ana!, { hours: 1 });
+  await w.core.flash.turnOn(bia!, { hours: 1, lat: -23.5617, lng: -46.6558 });
+  const [item] = await w.core.flash.listAvailable(ana!);
+  assert.deepEqual(item!.point, { lat: -23.55, lng: -46.65 });
 });

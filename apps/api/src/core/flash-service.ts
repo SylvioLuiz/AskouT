@@ -27,6 +27,9 @@ export const INVITE_TTL_MINUTES = 15;
 export const FLASH_EXTEND_MINUTES: readonly number[] = [30, 60];
 /** Depois disso a última posição conhecida é tratada como "sem sinal". */
 export const POSITION_STALE_SECONDS = 120;
+/** "Perguntar se está livre": no máximo um pedido por amigo a cada 3 h, até 20 amigos de uma vez. */
+export const ASK_COOLDOWN_HOURS = 3;
+export const ASK_MAX_USERS = 20;
 
 const HOUR_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
@@ -67,6 +70,8 @@ export interface AvailableFriendView {
   invite: { id: string; direction: InviteDirection } | null;
   /** Distância e tempo aproximados até a pessoa (das regiões de ~1 km de cada um). Nulo se algum dos dois ligou sem localização. */
   approx: ApproxTrip | null;
+  /** Ponto aproximado para o mapa: a região de quando ligou, arredondada numa grade de ~3 km. Nulo sem localização. */
+  point: { lat: number; lng: number } | null;
 }
 
 /** "~3 km · 15 min de carro": arredondado de propósito; nunca dá para achar a pessoa com isso. */
@@ -225,7 +230,60 @@ export class FlashService {
       area,
     };
     await flash.createSession(session, now);
+    await this.notifyAskers(actorId, now);
     return sessionView(session);
+  }
+
+  /** Avisa quem perguntou "está livre?" nas últimas horas que a pessoa ligou o NOW, e limpa os pedidos. */
+  private async notifyAskers(actorId: string, now: Date): Promise<void> {
+    const { flash, follows, users, notifier } = this.deps;
+    const askers = await flash.listAskersOf(actorId, new Date(now.getTime() - ASK_COOLDOWN_HOURS * HOUR_MS));
+    await flash.clearAsksFor(actorId);
+    if (askers.length === 0) return;
+    const friends = new Set(await follows.listFriendIds(actorId));
+    const unseen = new Set(unseenBy(actorId, await flash.listHidden(actorId)));
+    const who = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Seu amigo';
+    for (const askerId of askers) {
+      if (!friends.has(askerId) || unseen.has(askerId)) continue;
+      await notifier.notify({ userId: askerId, type: 'FLASH_INVITE', title: `${who} ligou o NOW`, body: 'Você perguntou se estava livre. Bora?', url: '/now', dedupeKey: `flash-ask-on:${actorId}`, actorId });
+    }
+  }
+
+  /**
+   * "Perguntar se está livre": manda para cada amigo escolhido um aviso que abre o NOW dele. Só amigos; quem já está
+   * com o NOW ligado, quem não se vê no NOW ou quem já recebeu um pedido seu nas últimas 3 h é pulado.
+   */
+  async ask(actorId: string, input: { userIds?: unknown }): Promise<{ asked: string[]; skipped: string[] }> {
+    const { flash, follows, users, clock, notifier } = this.deps;
+    const raw = input.userIds;
+    if (!Array.isArray(raw) || raw.length === 0 || raw.length > ASK_MAX_USERS || raw.some((id) => typeof id !== 'string')) {
+      throw validationError('Escolha os amigos', { userIds: `Escolha de 1 a ${ASK_MAX_USERS} amigos` });
+    }
+    const targets = [...new Set(raw as string[])].filter((id) => id !== actorId);
+    const now = clock.now();
+    const friends = new Set(await follows.listFriendIds(actorId));
+    const rows = await flash.listHidden(actorId);
+    const blocked = new Set([...unseenBy(actorId, rows), ...rows.filter((r) => r.ownerId === actorId && r.hideMine).map((r) => r.otherId), ...rows.filter((r) => r.otherId === actorId && r.hideTheirs).map((r) => r.ownerId)]);
+    const active = new Set((await flash.listActiveSessions(targets, now)).map((s) => s.userId));
+    const who = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Um amigo';
+    const asked: string[] = [];
+    const skipped: string[] = [];
+    for (const id of targets) {
+      if (!friends.has(id) || blocked.has(id) || active.has(id)) {
+        skipped.push(id);
+        continue;
+      }
+      const last = await flash.lastAsk(actorId, id);
+      if (last && now.getTime() - last.getTime() < ASK_COOLDOWN_HOURS * HOUR_MS) {
+        skipped.push(id);
+        continue;
+      }
+      await flash.recordAsk(actorId, id, now);
+      await notifier.notify({ userId: id, type: 'FLASH_INVITE', title: `${who} quer saber se você está livre agora`, body: 'Ligue o NOW se estiver a fim de sair', url: '/now', dedupeKey: `flash-ask:${actorId}`, actorId });
+      asked.push(id);
+    }
+    if (asked.length === 0 && targets.some((id) => !friends.has(id))) throw forbidden('Só dá para perguntar a amigos');
+    return { asked, skipped };
   }
 
   /**
@@ -292,6 +350,7 @@ export class FlashService {
         expiresAt: s.expiresAt.toISOString(),
         invite: invite ? { id: invite.id, direction: this.directionOf(invite, actorId) } : null,
         approx: myArea && s.area ? approxTrip(distanceMeters(myArea, s.area)) : null,
+        point: s.area ? { lat: Math.round(s.area.lat * APPROX_GRID) / APPROX_GRID, lng: Math.round(s.area.lng * APPROX_GRID) / APPROX_GRID } : null,
       });
     }
     const areas = new Map(sessions.map((s) => [s.userId, s.area ?? null] as const));

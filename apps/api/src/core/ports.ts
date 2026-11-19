@@ -362,9 +362,18 @@ export interface FlashRepository {
   upsertPosition(position: FlashPositionRecord): Promise<void>;
   listPositions(inviteId: string): Promise<FlashPositionRecord[]>;
 
+  /** "Perguntar se está livre": grava (ou renova) o pedido de `askerId` para `targetId`. */
+  recordAsk(askerId: string, targetId: string, at: Date): Promise<void>;
+  /** Quando `askerId` perguntou a `targetId` pela última vez, se perguntou. */
+  lastAsk(askerId: string, targetId: string): Promise<Date | undefined>;
+  /** Quem perguntou a `targetId` desde `since`. */
+  listAskersOf(targetId: string, since: Date): Promise<string[]>;
+  /** Apaga os pedidos recebidos por `targetId` (ele ligou o NOW). */
+  clearAsksFor(targetId: string): Promise<void>;
+
   /**
    * Faxina: convites vencidos viram EXPIRED/ENDED, posições de encontros que não estão mais abertos
-   * são apagadas e registros fechados há mais de 24 h saem do banco.
+   * são apagadas e registros fechados (e pedidos "está livre?") há mais de 24 h saem do banco.
    */
   purgeExpired(now: Date): Promise<{ invites: number; positions: number; removed: number }>;
 }

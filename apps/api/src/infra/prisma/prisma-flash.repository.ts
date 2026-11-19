@@ -296,6 +296,32 @@ export class PrismaFlashRepository implements FlashRepository {
     return (rows as PositionRow[]).map(toPosition);
   }
 
+  async recordAsk(askerId: string, targetId: string, at: Date): Promise<void> {
+    if (!isUuid(askerId) || !isUuid(targetId)) return;
+    await this.prisma.flashAsk.upsert({
+      where: { askerId_targetId: { askerId, targetId } },
+      create: { askerId, targetId, createdAt: at },
+      update: { createdAt: at },
+    });
+  }
+
+  async lastAsk(askerId: string, targetId: string): Promise<Date | undefined> {
+    if (!isUuid(askerId) || !isUuid(targetId)) return undefined;
+    const row = (await this.prisma.flashAsk.findUnique({ where: { askerId_targetId: { askerId, targetId } }, select: { createdAt: true } })) as { createdAt: Date } | null;
+    return row?.createdAt;
+  }
+
+  async listAskersOf(targetId: string, since: Date): Promise<string[]> {
+    if (!isUuid(targetId)) return [];
+    const rows = (await this.prisma.flashAsk.findMany({ where: { targetId, createdAt: { gte: since } }, select: { askerId: true } })) as { askerId: string }[];
+    return rows.map((r) => r.askerId);
+  }
+
+  async clearAsksFor(targetId: string): Promise<void> {
+    if (!isUuid(targetId)) return;
+    await this.prisma.flashAsk.deleteMany({ where: { targetId } });
+  }
+
   async purgeExpired(now: Date): Promise<{ invites: number; positions: number; removed: number }> {
     const cutoff = new Date(now.getTime() - DAY_MS);
     return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -316,7 +342,8 @@ export class PrismaFlashRepository implements FlashRepository {
         where: { OR: [{ endedAt: { lt: cutoff } }, { endedAt: null, expiresAt: { lt: cutoff } }] },
       });
       const oldInvites = await tx.flashInvite.deleteMany({ where: { status: { notIn: OPEN }, endedAt: { lt: cutoff } } });
-      return { invites: expired.length, positions: positions.count, removed: oldSessions.count + oldInvites.count };
+      const oldAsks = await tx.flashAsk.deleteMany({ where: { createdAt: { lt: cutoff } } });
+      return { invites: expired.length, positions: positions.count, removed: oldSessions.count + oldInvites.count + oldAsks.count };
     });
   }
 }
