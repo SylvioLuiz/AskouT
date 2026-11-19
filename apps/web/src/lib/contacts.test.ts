@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cleanEmails, emailsFromVcf, hashContactKeys, phonesFromVcf, sha256Hex } from './contacts.ts';
+import { cleanEmails, contactBatches, emailsFromVcf, hashContactKeys, mergeMatches, phonesFromVcf, sha256Hex } from './contacts.ts';
 
 test('limpa e-mails: minúsculas, sem repetir, só válidos', () => {
   assert.deepEqual(cleanEmails([' Ana@Exemplo.com ', 'ana@exemplo.com', 'sem-arroba', 'a@b']), ['ana@exemplo.com']);
@@ -25,4 +25,19 @@ test('códigos dos contatos: e-mails e celulares, dentro dos limites', async () 
   assert.equal(out.hashes[0], 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   assert.equal(out.phoneHashes.length, 1);
   assert.equal(out.truncated, false);
+});
+
+test('divide os códigos em pedidos menores: e-mails no primeiro, celulares em lotes', () => {
+  assert.deepEqual(contactBatches(['e1'], []), [{ hashes: ['e1'], phoneHashes: [] }]);
+  assert.deepEqual(contactBatches([], ['p1', 'p2', 'p3'], 2), [
+    { hashes: [], phoneHashes: ['p1', 'p2'] },
+    { hashes: [], phoneHashes: ['p3'] },
+  ]);
+  assert.deepEqual(contactBatches(['e1'], ['p1', 'p2'], 2), [{ hashes: ['e1'], phoneHashes: ['p1', 'p2'] }]);
+});
+
+test('junta as pessoas de vários pedidos sem repetir', () => {
+  const ana = { userId: '1', username: 'ana' };
+  const bia = { userId: '2', username: 'bia' };
+  assert.deepEqual(mergeMatches([[bia], [ana, bia]]), [ana, bia]);
 });
