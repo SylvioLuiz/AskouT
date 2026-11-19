@@ -44,6 +44,13 @@ describe('APNs (aviso no iPhone)', () => {
     assert.deepEqual(JSON.parse(r.body), { aps: { alert: { title: 'Ana', body: 'Nova mensagem' }, sound: 'default' }, url: '/conversas/1' });
   });
 
+  it('com "Responder", leva a categoria MESSAGE (campo de resposta no iPhone) e o token', async () => {
+    const requests: ApnsRequest[] = [];
+    const sender = new ApnsSender({ config, transport: async (r) => (requests.push(r), { status: 200, body: '' }) });
+    await sender.send(sub(`apns:${TOKEN}`), { ...msg, tag: 'msg:1', reply: 'rpl.x.y' });
+    assert.deepEqual(JSON.parse(requests[0]!.body), { aps: { alert: { title: 'Ana', body: 'Nova mensagem' }, sound: 'default', category: 'MESSAGE', 'thread-id': 'msg:1' }, url: '/conversas/1', reply: 'rpl.x.y' });
+  });
+
   it('modo sandbox usa o servidor de testes da Apple', async () => {
     const requests: ApnsRequest[] = [];
     const sender = new ApnsSender({ config: { ...config, production: false }, transport: async (r) => (requests.push(r), { status: 200, body: '' }) });

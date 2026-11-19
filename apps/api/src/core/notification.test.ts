@@ -308,4 +308,50 @@ describe('silenciar avisos', () => {
     await w.core.flushNotifications();
     assert.equal(pushes(), before + 2, 'desligou o silêncio: o push volta');
   });
+
+  it('responder pela notificação: o token vai só no push de mensagem do app que sabe, e manda a resposta na conversa', async () => {
+    const w = makeWorld();
+    w.push.nativeEnabled = true;
+    const { ana, bia } = await friends(w, 'ana', 'bia');
+    const iphone = `apns:${'a'.repeat(64)}`;
+    const antigo = `apns:${'b'.repeat(64)}`;
+    await w.core.notifications.subscribe(bia!, { endpoint: iphone, keys: undefined, reply: true });
+    await w.core.notifications.subscribe(bia!, { endpoint: antigo, keys: undefined });
+    const { id } = await w.core.conversations.open(ana!, bia!);
+    w.push.sent.length = 0;
+    await w.core.conversations.send(ana!, id, { body: 'bora?' });
+    await w.core.flushNotifications();
+    const toIphone = w.push.sent.find((s) => s.subscription.endpoint === iphone)!.message;
+    assert.match(toIphone.reply ?? '', /^rpl\./);
+    assert.equal(w.push.sent.find((s) => s.subscription.endpoint === antigo)!.message.reply, undefined, 'app antigo (sem "reply") recebe o aviso de sempre');
+
+    const sent = await w.core.replyFromPush(toIphone.reply, 'bora!');
+    const thread = await w.core.conversations.messages(ana!, id);
+    assert.equal(thread.messages.at(-1)!.id, sent.id);
+    assert.equal(thread.messages.at(-1)!.body, 'bora!');
+    assert.equal(thread.messages.at(-1)!.mine, false, 'chega para a ana como mensagem da bia');
+
+    await assert.rejects(w.core.replyFromPush('rpl.lixo.lixo', 'oi'), /responder por aqui/);
+    await assert.rejects(w.core.replyFromPush(undefined, 'oi'), /responder por aqui/);
+    // Desligou os avisos (ou saiu da conta) nesse aparelho: o token da notificação que ficou na tela para de valer.
+    await w.core.notifications.unsubscribe(bia!, iphone);
+    await assert.rejects(w.core.replyFromPush(toIphone.reply, 'oi de novo'), /responder por aqui/);
+  });
+
+  it('o token de resposta vence em 7 dias e não serve para outro tipo de aviso', async () => {
+    const w = makeWorld();
+    w.push.nativeEnabled = true;
+    const { ana, bia } = await friends(w, 'ana', 'bia');
+    const android = `fcm:${'f'.repeat(30)}:${'A'.repeat(60)}`;
+    await w.core.notifications.subscribe(bia!, { endpoint: android, keys: undefined, reply: true });
+    const { id } = await w.core.conversations.open(ana!, bia!);
+    w.push.sent.length = 0;
+    await w.core.conversations.send(ana!, id, { body: 'oi' });
+    await w.core.flushNotifications();
+    const reply = w.push.sent.find((s) => s.message.url === `/conversas/${id}`)!.message.reply;
+    assert.ok(reply);
+    assert.ok(w.push.sent.filter((s) => s.message.url !== `/conversas/${id}`).every((s) => s.message.reply === undefined));
+    w.clock.tick(7 * 24 * 3600_000 + 1000);
+    await assert.rejects(w.core.replyFromPush(reply, 'oi'), /responder por aqui/);
+  });
 });

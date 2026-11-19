@@ -1,6 +1,7 @@
 import UIKit
 import Capacitor
 import ObjectiveC
+import UserNotifications
 
 /// Tira a barra extra do teclado do iPhone (setas para cima/baixo e "OK") que o WebView mostra sobre o teclado.
 /// Faz o campo de texto do WebView não oferecer `inputAccessoryView`. Só afeta o app, não o teclado em si.
@@ -17,6 +18,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         hideKeyboardAccessoryBar()
+        // "Responder" nas notificações de mensagem: registra a categoria e assume as respostas desde já, porque o
+        // iPhone pode abrir o app em segundo plano só para entregar a resposta, sem tela e sem o Capacitor.
+        NotificationReply.shared.registerCategories()
+        NotificationReply.shared.install()
         return true
     }
 
@@ -68,6 +73,9 @@ class MainViewController: CAPBridgeViewController {
     /// Plugins nativos do próprio app (fora do npm): a galeria dentro do app para criar stories e o player das mensagens de voz.
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(GalleryPlugin())
+        // O Capacitor acabou de se colocar como quem recebe as notificações: volta para o "Responder", que repassa
+        // a ele tudo o que não é resposta (toque no aviso, aviso com o app aberto).
+        if let router = bridge?.notificationRouter { NotificationReply.shared.attach(router: router) }
         // Mensagens de voz tocadas pelo iPhone, fora do "Tocando agora" (ver AudioPlugin.swift).
         bridge?.registerPluginInstance(AudioPlugin())
     }
@@ -104,5 +112,114 @@ class MainViewController: CAPBridgeViewController {
         for view in web.scrollView.subviews where String(describing: type(of: view)).hasPrefix("WKContent") {
             class_replaceMethod(type(of: view), #selector(getter: UIResponder.inputAccessoryView), imp, "@@:")
         }
+    }
+}
+
+/// "Responder" direto na notificação de mensagem, sem abrir o app.
+///
+/// O servidor manda o push com `aps.category = "MESSAGE"` e um token `reply`, que só vale para aquela conversa
+/// neste aparelho (apps/api, NotificationService.replier). A resposta vai para `<API>/notifications/push/reply`;
+/// o endereço da API vem de `public/askout-native.json`, gerado no build (apps/mobile/scripts/build-web.mjs).
+///
+/// O iPhone só tem um "delegate" de notificações. O do Capacitor (NotificationRouter) cuida do toque no aviso e do
+/// aviso com o app aberto; este fica na frente, trata só a resposta e repassa o resto. Toques que chegam antes de o
+/// Capacitor carregar ficam guardados até ele chegar.
+final class NotificationReply: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationReply()
+    static let categoryId = "MESSAGE"
+    static let actionId = "REPLY"
+
+    private weak var router: NotificationRouter?
+    private var waiting: [(UNNotificationResponse, () -> Void)] = []
+
+    func registerCategories() {
+        let reply = UNTextInputNotificationAction(identifier: Self.actionId, title: "Responder", options: [], textInputButtonTitle: "Enviar", textInputPlaceholder: "Mensagem")
+        let category = UNNotificationCategory(identifier: Self.categoryId, actions: [reply], intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([category])
+    }
+
+    func install() {
+        UNUserNotificationCenter.current().delegate = self
+    }
+
+    func attach(router: NotificationRouter) {
+        self.router = router
+        install()
+        let queued = waiting
+        waiting = []
+        for (response, done) in queued {
+            router.userNotificationCenter(UNUserNotificationCenter.current(), didReceive: response, withCompletionHandler: done)
+        }
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        if let router = router {
+            router.userNotificationCenter(center, willPresent: notification, withCompletionHandler: completionHandler)
+        } else {
+            completionHandler([])
+        }
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        if response.actionIdentifier == Self.actionId, let text = (response as? UNTextInputNotificationResponse)?.userText {
+            send(text, from: response.notification, done: completionHandler)
+            return
+        }
+        if let router = router {
+            router.userNotificationCenter(center, didReceive: response, withCompletionHandler: completionHandler)
+        } else {
+            waiting.append((response, completionHandler))
+        }
+    }
+
+    private func apiURL() -> URL? {
+        guard let file = Bundle.main.url(forResource: "askout-native", withExtension: "json", subdirectory: "public"),
+              let data = try? Data(contentsOf: file),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let base = json["apiUrl"] as? String, base.hasPrefix("https://") else { return nil }
+        return URL(string: base + "/notifications/push/reply")
+    }
+
+    private func send(_ text: String, from notification: UNNotification, done: @escaping () -> Void) {
+        let info = notification.request.content.userInfo
+        let body = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty else { done(); return }
+        guard let token = info["reply"] as? String, let url = apiURL() else {
+            failed(info: info)
+            done()
+            return
+        }
+        var request = URLRequest(url: url, timeoutInterval: 20)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["token": token, "body": body])
+
+        // Com o app fechado, o iPhone dá alguns segundos em segundo plano: segura até a resposta sair.
+        var task: UIBackgroundTaskIdentifier = .invalid
+        task = UIApplication.shared.beginBackgroundTask {
+            UIApplication.shared.endBackgroundTask(task)
+            task = .invalid
+        }
+        URLSession.shared.dataTask(with: request) { _, response, error in
+            let ok = error == nil && ((response as? HTTPURLResponse)?.statusCode ?? 0) / 100 == 2
+            DispatchQueue.main.async {
+                if !ok { self.failed(info: info) }
+                done()
+                if task != .invalid {
+                    UIApplication.shared.endBackgroundTask(task)
+                    task = .invalid
+                }
+            }
+        }.resume()
+    }
+
+    /// Não foi: avisa, e tocar no aviso abre a conversa (o mesmo `url` do push original).
+    private func failed(info: [AnyHashable: Any]) {
+        let content = UNMutableNotificationContent()
+        content.title = "Sua resposta não foi enviada"
+        content.body = "Toque para abrir a conversa e tentar de novo."
+        content.sound = .default
+        if let path = info["url"] as? String { content.userInfo = ["url": path] }
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "reply-failed-" + UUID().uuidString, content: content, trigger: nil))
     }
 }

@@ -821,7 +821,7 @@ export function createApi(deps: ApiDeps) {
     /** Manda um aviso de teste para os aparelhos da própria pessoa. */
     pushTest: () => request<PushTestResult>('POST', '/notifications/push/test'),
     pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),
-    pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
+    pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string }; reply?: boolean }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
     pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),
 
     // Álbuns dos encontros

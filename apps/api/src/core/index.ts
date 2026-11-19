@@ -57,6 +57,7 @@ export type CoreInput = Omit<CoreDeps, 'notifier'> & {
 
 export function createCore(input: CoreInput) {
   const notifier = new StoredNotifier(input);
+  const notifications = new NotificationService(input);
   const deps: CoreDeps = { ...input, notifier };
   const flash = new FlashService(deps);
   const referrals = new ReferralService(deps);
@@ -119,7 +120,12 @@ export function createCore(input: CoreInput) {
     account: new AccountService(deps, auth),
     age: new AgeService(deps),
     gifs: new GifService(deps),
-    notifications: new NotificationService(input),
+    notifications,
+    /** "Responder" na notificação do app: confere o token e manda o texto como mensagem de quem recebeu o aviso. */
+    replyFromPush: async (token: unknown, body: unknown) => {
+      const { userId, conversationId } = await notifications.replier(token);
+      return conversations.send(userId, conversationId, { body });
+    },
     /** Espera os pushes em andamento (testes e desligamento). */
     flushNotifications: () => notifier.flush(),
   };

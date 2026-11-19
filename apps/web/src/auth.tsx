@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import { api, session, setUnauthorizedHandler } from './client.ts';
 import { toApiError } from './lib/errors.ts';
+import { forgetNativePush } from './lib/push.ts';
 import type { AuthResult, MfaChallenge, PublicProfile, SessionUser } from './lib/types.ts';
 import { MfaStep } from './components/mfa-step.tsx';
 import { navigate } from './router.tsx';
@@ -49,9 +50,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [challenge, setChallenge] = useState<MfaChallenge | undefined>();
 
   const signOut = useCallback(() => {
-    session.clear();
-    setState({ status: 'guest' });
-    navigate('/entrar', { replace: true });
+    // Antes de apagar a sessão (o pedido precisa dela): o aparelho para de receber os avisos dessa conta, e o
+    // "Responder" das notificações que ficaram na tela para de valer.
+    // Espera no máximo 3 s; sem rede, sai do mesmo jeito.
+    const leave = () => {
+      session.clear();
+      setState({ status: 'guest' });
+      navigate('/entrar', { replace: true });
+    };
+    void Promise.race([forgetNativePush(api).catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 3000))]).then(leave);
   }, []);
 
   // Sessão expirada ou inválida em qualquer chamada: volta para a entrada com um aviso.

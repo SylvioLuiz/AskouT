@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Inject, Post, Put, Query } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
-import { CurrentActor } from '../decorators.ts';
+import { CurrentActor, Public } from '../decorators.ts';
 import { validationError } from '../../core/errors.ts';
 import { asBody } from '../support/parse.ts';
 import { CORE } from '../tokens.ts';
@@ -75,12 +75,26 @@ export class NotificationsController {
   @HttpCode(200)
   subscribe(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.notifications.subscribe(actor.userId, { endpoint: b.endpoint, keys: b.keys });
+    return this.core.notifications.subscribe(actor.userId, { endpoint: b.endpoint, keys: b.keys, reply: b.reply });
   }
 
   @Post('push/remove')
   @HttpCode(200)
   unsubscribe(@CurrentActor() actor: Actor, @Body() body: unknown) {
     return this.core.notifications.unsubscribe(actor.userId, asBody(body).endpoint);
+  }
+
+  /**
+   * "Responder" direto na notificação do app (iPhone/Android), sem abrir o app: `{token, body}`. Sem login,
+   * porque quem chama é o código nativo do aviso; o `token` veio no próprio push e só vale para aquela conversa,
+   * naquele aparelho (ver NotificationService.replier).
+   */
+  @Public()
+  @Post('push/reply')
+  @HttpCode(200)
+  async reply(@Body() body: unknown) {
+    const b = asBody(body);
+    const message = await this.core.replyFromPush(b.token, b.body);
+    return { ok: true, id: message.id };
   }
 }

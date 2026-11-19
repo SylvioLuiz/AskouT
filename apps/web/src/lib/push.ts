@@ -103,6 +103,13 @@ export interface NativePushBridge {
   permission(): Promise<'granted' | 'denied' | 'prompt'>;
   /** Pede permissão se preciso e devolve o token do aparelho; `undefined` se a pessoa recusou. */
   register(): Promise<string | undefined>;
+  /** O app sabe mostrar "Responder" na notificação de mensagem (versões novas da casca nativa). */
+  replies?: boolean;
+}
+
+/** O que o app manda ao servidor para este aparelho receber avisos (com "Responder", se a casca souber). */
+export function nativeSubscription(bridge: Pick<NativePushBridge, 'replies'>, token: string): { endpoint: string; reply?: boolean } {
+  return bridge.replies === true ? { endpoint: nativeEndpoint(token), reply: true } : { endpoint: nativeEndpoint(token) };
 }
 
 export function nativePushBridge(host: unknown = typeof window === 'undefined' ? undefined : window): NativePushBridge | undefined {
@@ -151,9 +158,23 @@ export async function readNativeState(bridge: NativePushBridge, serverNative: bo
 export async function enableNativePush(api: Api, bridge: NativePushBridge): Promise<void> {
   const token = await bridge.register();
   if (!token) throw new Error(t('Os avisos não foram liberados. Você pode liberar em Ajustes do iPhone > AskouT > Notificações.'));
-  await api.pushSubscribe({ endpoint: nativeEndpoint(token) });
+  await api.pushSubscribe(nativeSubscription(bridge, token));
   storeNativeToken(token);
   setOptedOut(false);
+}
+
+/**
+ * Ao sair da conta: este aparelho para de receber os avisos (e o "Responder" da notificação para de valer) dessa
+ * pessoa. Não marca como "desligado por escolha": quem entrar depois ainda recebe o pedido normal de avisos.
+ */
+export async function forgetNativePush(api: Api): Promise<void> {
+  const token = storedNativeToken();
+  if (!token) return;
+  try {
+    await api.pushUnsubscribe(nativeEndpoint(token));
+  } finally {
+    storeNativeToken(null);
+  }
 }
 
 export async function disableNativePush(api: Api): Promise<void> {
@@ -188,7 +209,7 @@ export async function refreshNativeToken(api: Api, bridge: NativePushBridge): Pr
   if (!old || (await bridge.permission()) !== 'granted') return;
   const token = await bridge.register();
   if (!token) return;
-  await api.pushSubscribe({ endpoint: nativeEndpoint(token) });
+  await api.pushSubscribe(nativeSubscription(bridge, token));
   if (token !== old) await api.pushUnsubscribe(nativeEndpoint(old)).catch(() => undefined);
   storeNativeToken(token);
 }

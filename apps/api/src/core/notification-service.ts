@@ -1,6 +1,6 @@
-import { conflict, validationError } from './errors.ts';
+import { conflict, unauthorized, validationError } from './errors.ts';
 import { isNotificationCategory, notificationFilter, OVERVIEW_FILTER } from './notification-categories.ts';
-import type { Clock, ConversationRepository, IdGenerator, MeetupRepository, Notifier, NotificationRepository, PostRepository, PushSender, PushSubscriptionRepository, SchedulingRepository, UserRepository } from './ports.ts';
+import type { Clock, ConversationRepository, IdGenerator, MeetupRepository, Notifier, NotificationRepository, PostRepository, PushReplyTokens, PushSender, PushSubscriptionRepository, SchedulingRepository, UserRepository } from './ports.ts';
 import type { NotificationMuteSettings, NotificationRecord, NotificationType } from './types.ts';
 
 export const NOTIFICATIONS_PAGE = 30;
@@ -60,7 +60,17 @@ interface NotifierDeps {
   push: PushSender;
   clock: Clock;
   ids: IdGenerator;
+  /** Responder pela notificação (app no iPhone/Android). Opcional: sem ele, o push sai sem o campo de resposta. */
+  pushReplies?: PushReplyTokens;
 }
+
+/** Conversa de um aviso de mensagem (`/conversas/<id>`), para o token de resposta. */
+export function replyConversationOf(type: NotificationType, url: string): string | undefined {
+  if (type !== 'MESSAGE') return undefined;
+  return /^\/conversas\/([^/?#]+)$/.exec(url)?.[1];
+}
+
+const isNativeEndpoint = (endpoint: string): boolean => endpoint.startsWith(NATIVE_ENDPOINT_PREFIX) || endpoint.startsWith(FCM_ENDPOINT_PREFIX);
 
 /** Guarda o aviso e dispara o push em segundo plano. Falhas aqui nunca chegam a quem executou a ação. */
 export class StoredNotifier implements Notifier {
@@ -111,9 +121,13 @@ export class StoredNotifier implements Notifier {
     const { pushSubscriptions, push } = this.deps;
     if (push.publicKey === null && !push.nativeEnabled) return;
     const subs = await pushSubscriptions.listForUser(input.userId);
+    const conversationId = replyConversationOf(input.type, input.url);
+    const replies = this.deps.pushReplies;
     await Promise.all(
       subs.map(async (sub) => {
-        const result = await push.send(sub, { title: input.title, body: input.body, url: input.url, tag: input.dedupeKey ?? input.type });
+        // "Responder" só no app (iPhone/Android), e com um token preso a este aparelho.
+        const reply = replies && conversationId && sub.replyable === true && isNativeEndpoint(sub.endpoint) ? replies.issue(input.userId, conversationId, sub.endpoint) : undefined;
+        const result = await push.send(sub, { title: input.title, body: input.body, url: input.url, tag: input.dedupeKey ?? input.type, ...(reply ? { reply } : {}) });
         if (result === 'GONE') await pushSubscriptions.remove(sub.endpoint);
       }),
     );
@@ -123,11 +137,13 @@ export class StoredNotifier implements Notifier {
 export interface PushSubscribeInput {
   endpoint: unknown;
   keys: unknown;
+  /** O app do aparelho sabe mostrar "Responder" na notificação (só vale para `apns:`/`fcm:`). */
+  reply?: unknown;
 }
 
 /** O que a lista usa para descobrir quem causou cada aviso (inclusive nos antigos, gravados sem `actorId`). */
 interface ActorLookupDeps {
-  users: Pick<UserRepository, 'findProfilesByIds'>;
+  users: Pick<UserRepository, 'findProfilesByIds' | 'findById'>;
   conversations: Pick<ConversationRepository, 'findById' | 'participantIds' | 'listMessages'>;
   posts: Pick<PostRepository, 'findById' | 'findComment'>;
   meetups: Pick<MeetupRepository, 'find'>;
@@ -290,8 +306,25 @@ export class NotificationService {
     if (existing.length >= MAX_PUSH_SUBSCRIPTIONS && !existing.some((s) => s.endpoint === endpoint)) {
       throw conflict('Você já tem avisos ligados em muitos aparelhos. Desligue em algum para ligar aqui.');
     }
-    await pushSubscriptions.upsert({ userId, endpoint: endpoint as string, p256dh: p256dh as string, auth: auth as string, createdAt: clock.now() });
+    const replyable = input.reply === true && isNativeEndpoint(endpoint as string);
+    await pushSubscriptions.upsert({ userId, endpoint: endpoint as string, p256dh: p256dh as string, auth: auth as string, createdAt: clock.now(), replyable });
     return { ok: true };
+  }
+
+  /**
+   * Confere o token do "Responder" da notificação e devolve quem responde e em qual conversa. Recusa se o token é
+   * inválido ou venceu, se a conta foi suspensa ou não terminou o cadastro, ou se aquele aparelho não está mais
+   * inscrito para essa pessoa (desligou os avisos ou saiu da conta): o token só vale enquanto o aparelho recebe os avisos.
+   */
+  async replier(token: unknown): Promise<{ userId: string; conversationId: string }> {
+    const replies = this.deps.pushReplies;
+    const claims = replies?.verify(token);
+    if (!replies || !claims) throw unauthorized('Não deu para responder por aqui. Abra a conversa no app.');
+    const user = await this.deps.users.findById(claims.userId);
+    if (!user || user.status === 'SUSPENDED' || user.profilePending) throw unauthorized('Não deu para responder por aqui. Abra a conversa no app.');
+    const subs = await this.deps.pushSubscriptions.listForUser(claims.userId);
+    if (!subs.some((s) => replies.endpointHash(s.endpoint) === claims.endpointHash)) throw unauthorized('Não deu para responder por aqui. Abra a conversa no app.');
+    return { userId: claims.userId, conversationId: claims.conversationId };
   }
 
   async unsubscribe(userId: string, endpoint: unknown): Promise<{ ok: true }> {
