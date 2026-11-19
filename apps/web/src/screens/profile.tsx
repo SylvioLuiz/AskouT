@@ -63,8 +63,6 @@ export function ProfileScreen({ username }: { username: string }) {
   const search = useSearch();
   const initialTab = search.get('aba');
   const [tab, setTab] = useState<'events' | 'posts' | 'attended'>(initialTab === 'posts' ? 'posts' : initialTab === 'participou' ? 'attended' : 'events');
-  /** A dona mudou a visibilidade da aba "Participou" nesta tela (antes de recarregar o perfil). */
-  const [attendedPublic, setAttendedPublic] = useState<boolean | undefined>();
   const [eventTotal, setEventTotal] = useState<number | undefined>();
   const [storyOpen, setStoryOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -77,7 +75,6 @@ export function ProfileScreen({ username }: { username: string }) {
     setMenuOpen(false);
     setPhotoOpen(false);
     setTab('events');
-    setAttendedPublic(undefined);
     setEventTotal(undefined);
     setStoryOpen(false);
     setShareOpen(false);
@@ -122,9 +119,8 @@ export function ProfileScreen({ username }: { username: string }) {
 
   const { profile, counts, relationship, canViewContent } = data;
   const action = profileAction(relationship);
-  const attendedIsPublic = attendedPublic ?? profile.attendedEventsPublic === true;
-  // A aba "Participou" aparece sempre para a dona; para visitantes, só quando ela deixou pública.
-  const showAttended = relationship.isSelf || attendedIsPublic;
+  // A aba "Participou" é só da dona do perfil.
+  const showAttended = relationship.isSelf;
   const activeTab = tab === 'attended' && !showAttended ? 'events' : tab;
   const tabLabel = activeTab === 'events' ? 'aba-eventos' : activeTab === 'posts' ? 'aba-posts' : 'aba-participou';
   const note = relationNote(relationship);
@@ -330,13 +326,9 @@ export function ProfileScreen({ username }: { username: string }) {
             </button>
             {showAttended ? (
               <button type="button" role="tab" id="aba-participou" aria-selected={activeTab === 'attended'} aria-controls="painel-perfil" className={`tabs__tab${activeTab === 'attended' ? ' tabs__tab--on' : ''}`} onClick={() => setTab('attended')}>
-                {relationship.isSelf && !attendedIsPublic ? (
-                  <span className="tabs__label" title={t('Só você vê')}>
-                    <LockIcon /> {t('Participou')}
-                  </span>
-                ) : (
-                  t('Participou')
-                )}
+                <span className="tabs__label" title={t('Só você vê')}>
+                  <LockIcon /> {t('Participou')}
+                </span>
               </button>
             ) : null}
           </div>
@@ -346,7 +338,7 @@ export function ProfileScreen({ username }: { username: string }) {
             ) : activeTab === 'posts' ? (
               <PostGrid username={profile.username} kind="post" />
             ) : (
-              <AttendedEvents username={profile.username} mine={relationship.isSelf} isPublic={attendedIsPublic} onVisibilityChange={setAttendedPublic} />
+              <AttendedEvents username={profile.username} />
             )}
           </div>
         </>

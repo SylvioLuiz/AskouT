@@ -61,8 +61,6 @@ export interface Profile {
   bio: string | null;
   avatarUrl: string | null;
   isPrivate: boolean;
-  /** A aba "Participou" (eventos que a pessoa já foi) aparece para visitantes. Ausente = privada (só a dona vê). */
-  attendedEventsPublic?: boolean;
 }
 
 export interface Follow {
