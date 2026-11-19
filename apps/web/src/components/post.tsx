@@ -488,7 +488,7 @@ function feedAt(item: HomeFeedItem): string {
   return item.repostedAt ?? item.createdAt;
 }
 
-export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateRail }: { load: (offset: number, before?: string) => Promise<PostsPage | HomeFeedPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } | { after: number; node: ReactNode }[]; dateRail?: boolean }) {
+export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateRail, enter }: { load: (offset: number, before?: string) => Promise<PostsPage | HomeFeedPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } | { after: number; node: ReactNode }[]; dateRail?: boolean; enter?: boolean }) {
   const [page, setPage] = useState<{ hasMore: boolean } | undefined>();
   const [items, setItems] = useState<HomeFeedItem[]>([]);
   const [error, setError] = useState<ApiError | undefined>();
@@ -498,6 +498,9 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateR
   const [jump, setJump] = useState<RailMonth | undefined>();
   const sentinel = useRef<HTMLDivElement>(null);
   const top = useRef<HTMLDivElement>(null);
+  // Com `enter`, cada item entra com fade curto ao aparecer pela primeira vez. O escalonamento conta a partir
+  // do início do lote que acabou de chegar, então a próxima página não herda atraso e quem já está na tela não reanima.
+  const batchStart = useRef(0);
   const injected = jump || inject === undefined ? [] : Array.isArray(inject) ? inject : [inject];
   const before = jump ? railBefore(jump) : undefined;
   const months = useMemo(() => (dateRail ? railMonths(new Date(), oldest) : []), [dateRail, oldest]);
@@ -507,6 +510,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateR
     try {
       const next = await load(offset, from);
       setPage(next);
+      batchStart.current = offset;
       if (offset === 0 && !from && 'oldestAt' in next && next.oldestAt !== undefined) setOldest(next.oldestAt);
       setItems((current) => (offset === 0 ? (next.items as HomeFeedItem[]) : [...current, ...(next.items as HomeFeedItem[]).filter((p) => !current.some((c) => c.id === p.id && 'type' in c === 'type' in p))]));
     } catch (failure) {
@@ -568,7 +572,12 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateR
     <div className="postlist" ref={top}>
       {banner}
       {items.map((post, index) => (
-        <div className="postlist__item" data-feed-at={dateRail ? feedAt(post) : undefined} key={'type' in post ? `place:${post.id}` : post.id}>
+        <div
+          className={enter ? 'postlist__item enter' : 'postlist__item'}
+          style={enter ? ({ '--enter-i': Math.min(Math.max(index - batchStart.current, 0), 5) } as CSSProperties) : undefined}
+          data-feed-at={dateRail ? feedAt(post) : undefined}
+          key={'type' in post ? `place:${post.id}` : post.id}
+        >
           {'type' in post ? (
             <PlaceEventFeedCard item={post} />
           ) : (

@@ -6375,3 +6375,11 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .createpick__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .createpick__chev { flex: none; display: flex; color: var(--line-strong); }
 .compose__prep { margin: 8px 0 0; font-size: 0.875rem; }
+
+/* Entrada dos itens da Home: fade + leve subida, rápida e com freio no fim (sem "mola" nem lentidão).
+   O atraso escalonado vem de --enter-i (0 a 5, 40ms cada) e só vale para o lote que acabou de chegar.
+   `backwards` aplica o estado inicial só durante o atraso; ao terminar não sobra transform no elemento
+   (evita criar contexto de empilhamento que atrapalhe folhas e menus fixos dentro dos cards). */
+@keyframes enter-up { from { opacity: 0; transform: translateY(10px); } }
+.enter { animation: enter-up 280ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--enter-i, 0) * 40ms); }
+@media (prefers-reduced-motion: reduce) { .enter { animation: none; } }
