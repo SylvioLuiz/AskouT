@@ -287,6 +287,8 @@ export interface MessageRecord {
   /** GIF (Giphy) anexado: mensagem kind TEXT com `body` "GIF". */
   gifId?: string | null;
   gifUrl?: string | null;
+  /** Story respondido (ou reagido): a mensagem mostra o story anexado. */
+  storyId?: string | null;
   /** Mensagem que esta responde (na mesma conversa). */
   replyToId?: string | null;
   /** Apagada por quem enviou: some para todos, vira "Mensagem apagada". */

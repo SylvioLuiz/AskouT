@@ -60,6 +60,8 @@ export interface MessageView {
   audio: { durationMs: number; played: boolean } | null;
   /** GIF (Giphy): mensagem de texto com `body` "GIF" e este anexo. */
   gif: CommentGif | null;
+  /** Story respondido/reagido: a conversa mostra o story anexado. */
+  storyId: string | null;
   /** Apagada por quem enviou: o conteúdo some para todos. */
   deleted: boolean;
   /** Mensagem a que esta responde. */
@@ -223,6 +225,8 @@ export interface SendInput {
   gif?: unknown;
   /** Responde a esta mensagem (junto de qualquer conteúdo). */
   replyToId?: unknown;
+  /** Uso interno (resposta/reação de story): anexa o story à mensagem. Nunca vem do corpo da requisição. */
+  storyId?: string;
 }
 
 interface ViewExtras {
@@ -266,6 +270,7 @@ function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {
     event: gone ? null : (extras.event ?? null),
     audio: !gone && m.kind === 'AUDIO' && m.audioMs ? { durationMs: m.audioMs, played: audioPlayed(m, actorId, extras.playedBy ?? []) } : null,
     gif: gone ? null : gifOf(m),
+    storyId: gone ? null : (m.storyId ?? null),
     deleted: gone,
     replyTo: gone ? null : (extras.replyTo ?? null),
     reactions: gone ? [] : (extras.reactions ?? []),
@@ -600,7 +605,7 @@ export class ConversationService {
     if (recent >= MESSAGES_PER_MINUTE) throw rateLimited('Você está enviando mensagens rápido demais. Espere um instante.', 30);
 
     const replyToId = await this.parseReply(conversationId, input.replyToId);
-    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, ...(gif ? { gifId: gif.id, gifUrl: gif.url } : {}), createdAt: now };
+    const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, ...(input.storyId ? { storyId: input.storyId } : {}), ...(gif ? { gifId: gif.id, gifUrl: gif.url } : {}), createdAt: now };
     await conversations.addMessage(message, audio ?? (media ? { mime: media.mime, data: media.data } : undefined));
     this.typingUntil.delete(`${conversationId}|${actorId}`);
     await conversations.markRead(conversationId, actorId, now);

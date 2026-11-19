@@ -8,7 +8,7 @@ export function GoingChoiceSheet({ onChoose, onClose, busy }: { onChoose: (onPro
   // Fora do cartão (o cartaz isola a pilha de camadas e pinta o texto de branco).
   return createPortal(
     <Sheet title={t('Mostrar no seu perfil?')} onClose={onClose}>
-      <p className="muted">{t('Na aba Eventos, quem visita seu perfil vê que você vai. Se preferir, o evento fica só na aba Participou, que só você vê.')}</p>
+      <p className="muted going-choice__text">{t('Na aba Eventos, quem visita seu perfil vê que você vai. Se preferir, o evento fica só na aba Participou, que só você vê.')}</p>
       <div className="sheetactions">
         <Button full loading={busy} onClick={() => onChoose(true)}>
           {t('Mostrar na aba Eventos')}

@@ -550,6 +550,8 @@ export interface ChatMessage {
   audio: { durationMs: number; played?: boolean } | null;
   /** GIF (Giphy): mensagem de texto com este anexo. */
   gif?: CommentGif | null;
+  /** Story respondido ou reagido (anexado à mensagem). */
+  storyId?: string | null;
   /** Apagada por quem enviou: no lugar do conteúdo aparece "Mensagem apagada". */
   deleted: boolean;
   /** Mensagem a que esta responde. */

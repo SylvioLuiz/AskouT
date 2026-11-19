@@ -552,6 +552,8 @@ model Message {
   /// GIF da Giphy (mensagem de texto com `body` "GIF"): id e endereço (https, servidor da Giphy).
   gifId          String?
   gifUrl         String?
+  /// Story respondido ou reagido (a resposta leva o story anexado). Sem chave estrangeira: o story expira.
+  storyId        String?  @db.Uuid
   /// Mensagem respondida (na mesma conversa).
   replyToId      String?  @db.Uuid
   /// Apagada por quem enviou: some para todos.
