@@ -137,6 +137,20 @@ export class ExploreController {
     return this.core.eventPages.reportProfileStory(actor.userId, storyId, b.reason, b.details);
   }
 
+  /** Reage a um story da página inicial: vira mensagem na conversa com quem publicou. */
+  @Post('stories/:storyId/react')
+  @HttpCode(200)
+  reactProfileStory(@CurrentActor() actor: Actor, @Param('storyId') storyId: string, @Body() body: unknown) {
+    return this.core.storyReactions.react(actor.userId, storyId, asBody(body).emoji);
+  }
+
+  /** Reage a um story do evento: mensagem se forem amigos, senão um aviso para quem publicou. */
+  @Post('events/:id/stories/:storyId/react')
+  @HttpCode(200)
+  reactStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('storyId') storyId: string, @Body() body: unknown) {
+    return this.core.storyReactions.react(actor.userId, storyId, asBody(body).emoji, id);
+  }
+
   @Delete('events/:id/stories/:storyId')
   deleteStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('storyId') storyId: string) {
     return this.core.eventPages.deleteStory(actor.userId, id, storyId);

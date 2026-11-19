@@ -18,6 +18,9 @@ import { kindLabel, safeImage } from '../lib/explore.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
+/** Reações rápidas no pé do story. */
+const STORY_REACTIONS = ['❤️', '😂', '😮', '😢', '🔥', '👏'] as const;
+
 // ---------- Publicar ----------
 
 export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: string; onClose: () => void; onCreated: () => void }) {
@@ -111,6 +114,9 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [reporting, setReporting] = useState(false);
+  /** Reação enviada no story atual (some sozinha depois de um instante). */
+  const [sentReaction, setSentReaction] = useState<{ storyId: string; emoji: string } | undefined>();
+  const [reacting, setReacting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const fillRef = useRef<HTMLSpanElement>(null);
   const spentRef = useRef(0);
@@ -192,6 +198,23 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
     }
   }
 
+  async function react(emoji: string) {
+    if (!item || reacting) return;
+    const storyId = item.id;
+    setReacting(true);
+    setError(undefined);
+    try {
+      if (eventId) await api.reactEventStory(eventId, storyId, emoji);
+      else await api.reactProfileStory(storyId, emoji);
+      setSentReaction({ storyId, emoji });
+      window.setTimeout(() => setSentReaction((s) => (s?.storyId === storyId ? undefined : s)), 1800);
+    } catch (failure) {
+      setError(toApiError(failure).message);
+    } finally {
+      setReacting(false);
+    }
+  }
+
   const src = api.storyMediaUrl(item.id);
   return (
     <div className={`storyview${!eventId && item.event ? ' storyview--placed' : ''}`} role="dialog" aria-modal="true" aria-label={t('Story de {username}', { username: group.author.username })}>
@@ -252,6 +275,21 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
         <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo story')} />
         {item.kind === 'VIDEO' ? <SoundToggle muted={muted} onToggle={() => setMuted((m) => !m)} /> : null}
       </div>
+      {!group.mine ? (
+        <div className="storyreact" role="group" aria-label={t('Reagir ao story')}>
+          {STORY_REACTIONS.map((emoji) => (
+            <button key={emoji} type="button" className="storyreact__btn" disabled={reacting} onClick={() => void react(emoji)} aria-label={t('Reagir com {emoji}', { emoji })}>
+              {emoji}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {sentReaction?.storyId === item.id ? (
+        <div className="storyreact__sent" role="status">
+          <span className="storyreact__burst" aria-hidden="true">{sentReaction.emoji}</span>
+          <span>{t('Reação enviada para {username}', { username: group.author.username })}</span>
+        </div>
+      ) : null}
       {!eventId && item.event ? <StoryPlace event={item.event} username={group.author.username} /> : null}
       {error ? <p className="storyview__error">{error}</p> : null}
       {reporting ? (

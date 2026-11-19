@@ -2548,6 +2548,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Seu evento privado está pronto. Ele só chega a quem receber nas conversas.": "Tu evento privado está listo. Solo llega a quien lo reciba en las conversaciones.",
   "Seu evento está pronto e já aparece no seu perfil.": "Tu evento está listo y ya aparece en tu perfil.",
   "Depois de criar, você escolhe as conversas e grupos que vão receber o evento.": "Después de crearlo, eliges las conversaciones y grupos que recibirán el evento.",
+  "Reagir ao story": "Reaccionar a la historia",
+  "Reação enviada para {username}": "Reacción enviada a {username}",
   "Encontros": "Encuentros",
   "Próximos": "Próximos",
   "Tipos de interação": "Tipos de interacción",
@@ -2588,4 +2590,6 @@ export const ES: Readonly<Record<string, string>> = {
   "Escolher comprovante": "Elegir comprobante",
   "Trocar comprovante": "Cambiar comprobante",
   "Organização": "Organización",
+  "Remover minha marcação": "Quitar mi etiqueta",
+  "O post sai do seu perfil e você deixa de aparecer marcado.": "La publicación sale de tu perfil y dejas de aparecer etiquetado.",
 };
