@@ -2,7 +2,7 @@ import { decodeImageDataUrl } from './image.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import { normalizeTag } from './explore-match.ts';
 import type { CoreDeps } from './ports.ts';
-import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, PlaceEventRecord, Profile, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
+import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, ExternalPlace, PlaceEventRecord, Profile, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
 import { EVENT_KINDS, toPublicProfile } from './types.ts';
 import { canManageVenue, venueRoleOf, type VenueRole } from './venue-access.ts';
 
@@ -23,7 +23,7 @@ export const ORGANIZATION_TYPE_MAX = 40;
 export const ORGANIZATION_CAMPUS_MAX = 120;
 export const ORGANIZATION_DESCRIPTION_MAX = 500;
 /** Categoria quando quem pede não diz o tipo (bateria, atlética...). */
-export const ORGANIZATION_DEFAULT_TYPE = 'Organização universitária';
+export const ORGANIZATION_DEFAULT_TYPE = 'Organização';
 /** Quantos avisos de evento novo saem ao mesmo tempo (o resto espera a vez). */
 const ANNOUNCE_BATCH = 25;
 
@@ -87,15 +87,29 @@ export interface VenueSummaryView {
   organization: boolean;
 }
 
-/** Pedido para criar a página de uma organização da faculdade. */
+/** Local criado do zero em "Meus locais": ainda não existe no AskouT nem veio do Google. */
+export interface VenueRequestInput {
+  name?: unknown;
+  /** Bar, balada, restaurante... (opcional). */
+  category?: unknown;
+  address?: unknown;
+  /** Onde fica, para o local ter lugar no mapa. */
+  lat?: unknown;
+  lng?: unknown;
+  /** Data URL de um documento que mostre que o local é da pessoa (CNPJ, alvará ou comprovante; PDF ou imagem até 2 MB). */
+  document?: unknown;
+  note?: unknown;
+}
+
+/** Pedido para criar a página de uma organização (da facul ou não: atlética, coletivo, produtora, empresa...). */
 export interface OrganizationRequestInput {
   name?: unknown;
   /** Tipo: bateria, atlética, centro acadêmico... (vira a categoria). */
   type?: unknown;
-  /** Faculdade e campus (vira o endereço da página). */
+  /** Faculdade e campus, ou bairro/cidade/sede (vira o endereço da página). */
   campus?: unknown;
   description?: unknown;
-  /** Onde fica a sede (normalmente o campus), para a página ter lugar no mapa. */
+  /** Onde fica a sede (campus, sede ou point), para a página ter lugar no mapa. */
   lat?: unknown;
   lng?: unknown;
   /** Data URL de um comprovante de que a pessoa representa a organização (PDF ou imagem até 2 MB). */
@@ -654,25 +668,50 @@ export class VenueService {
   }
 
   /**
-   * Pede a página de uma organização da faculdade (bateria, atlética, centro acadêmico...). A página nasce sem dono e
+   * Pede a página de uma organização (atlética, bateria, coletivo, produtora, empresa...). A página nasce sem dono e
    * fora das buscas; um admin confere o comprovante no painel de pedidos e, ao aprovar, a pessoa passa a administrá-la.
    */
   async requestOrganization(userId: string, input: OrganizationRequestInput): Promise<ClaimView> {
     if (typeof input !== 'object' || input === null) throw validationError('Dados inválidos', { name: 'Preencha os dados da organização' });
     const name = text(input.name, ORGANIZATION_NAME_MAX, 'name', 'Nome da organização', true) as string;
     const type = text(input.type, ORGANIZATION_TYPE_MAX, 'type', 'Tipo') ?? ORGANIZATION_DEFAULT_TYPE;
-    const campus = text(input.campus, ORGANIZATION_CAMPUS_MAX, 'campus', 'Faculdade', true) as string;
+    const campus = text(input.campus, ORGANIZATION_CAMPUS_MAX, 'campus', 'Onde fica', true) as string;
     const description = text(input.description, ORGANIZATION_DESCRIPTION_MAX, 'description', 'Descrição');
     const note = text(input.note, CLAIM_NOTE_MAX, 'note', 'Mensagem');
     const { lat, lng } = input;
     if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-      throw validationError('Dados inválidos', { location: 'Informe onde fica a organização (use a localização do aparelho no campus)' });
+      throw validationError('Dados inválidos', { location: 'Informe onde fica a organização (use a localização do aparelho no campus, na sede ou no point)' });
     }
     const pending = (await this.deps.claims.listByUser(userId)).filter((c) => c.status === 'PENDING').length;
     if (pending >= CLAIMS_PENDING_MAX) throw conflict(`Você já tem ${CLAIMS_PENDING_MAX} pedidos em análise. Espere a resposta antes de pedir outro`);
     const doc = decodeClaimDocument(input.document);
     const now = this.deps.clock.now();
     const venue: VenueRecord = { id: this.deps.ids.next(), name, address: campus, category: type, lat, lng, isSample: false, ownerId: null, description, isOrganization: true };
+    await this.deps.places.createVenue(venue);
+    const claim: VenueClaimRecord = { id: this.deps.ids.next(), venueId: venue.id, userId, status: 'PENDING', note, documentMime: doc.mime, reviewNote: null, reviewedBy: null, reviewedAt: null, createdAt: now };
+    await this.deps.claims.create(claim, doc.bytes);
+    return { id: claim.id, venue: summary(venue), status: 'PENDING', reviewNote: null, createdAt: now.toISOString() };
+  }
+
+  /**
+   * Cria um local do zero (não está no AskouT nem no Google) e já pede para administrá-lo. O local nasce sem dono e
+   * fora das buscas; um admin confere o documento no painel de pedidos e, ao aprovar, a pessoa passa a administrá-lo.
+   */
+  async requestVenue(userId: string, input: VenueRequestInput): Promise<ClaimView> {
+    if (typeof input !== 'object' || input === null) throw validationError('Dados inválidos', { name: 'Preencha os dados do local' });
+    const name = text(input.name, VENUE_NAME_MAX, 'name', 'Nome do local', true) as string;
+    const category = text(input.category, VENUE_CATEGORY_MAX, 'category', 'Tipo');
+    const address = text(input.address, VENUE_ADDRESS_MAX, 'address', 'Endereço', true) as string;
+    const note = text(input.note, CLAIM_NOTE_MAX, 'note', 'Mensagem');
+    const { lat, lng } = input;
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      throw validationError('Dados inválidos', { location: 'Informe onde fica o local (use a localização do aparelho no local)' });
+    }
+    const pending = (await this.deps.claims.listByUser(userId)).filter((c) => c.status === 'PENDING').length;
+    if (pending >= CLAIMS_PENDING_MAX) throw conflict(`Você já tem ${CLAIMS_PENDING_MAX} pedidos em análise. Espere a resposta antes de pedir outro`);
+    const doc = decodeClaimDocument(input.document);
+    const now = this.deps.clock.now();
+    const venue: VenueRecord = { id: this.deps.ids.next(), name, address, category, lat, lng, isSample: false, ownerId: null, isUserCreated: true };
     await this.deps.places.createVenue(venue);
     const claim: VenueClaimRecord = { id: this.deps.ids.next(), venueId: venue.id, userId, status: 'PENDING', note, documentMime: doc.mime, reviewNote: null, reviewedBy: null, reviewedAt: null, createdAt: now };
     await this.deps.claims.create(claim, doc.bytes);
@@ -712,12 +751,14 @@ export class VenueService {
     const { lat, lng } = input;
     if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw validationError('Local inválido', { lat: 'Posição inválida' });
     const found = await this.deps.placeSource.nearby({ lat, lng }, EXTERNAL_CHECK_RADIUS_M, 40);
-    const place = found.places.find((p) => `${p.source.toLowerCase()}:${p.externalId}` === key);
+    // A busca de perto só traz bares e restaurantes; um lugar achado pelo nome ou endereço (casa de show, parque...)
+    // é conferido direto na fonte pelo id.
+    const place = found.places.find((p) => `${p.source.toLowerCase()}:${p.externalId}` === key) ?? (await this.lookupExternal(key));
     if (!place) throw notFound('Local não encontrado');
     const venue: VenueRecord = {
       id: this.deps.ids.next(),
       name: place.name.slice(0, VENUE_NAME_MAX),
-      address: null,
+      address: place.address ? place.address.slice(0, 200) : null,
       category: place.category ? place.category.slice(0, VENUE_CATEGORY_MAX) : null,
       lat: place.lat,
       lng: place.lng,
@@ -735,6 +776,14 @@ export class VenueService {
       throw error;
     }
     return { venueId: venue.id };
+  }
+
+  private async lookupExternal(key: string): Promise<ExternalPlace | undefined> {
+    const [source, ...rest] = key.split(':');
+    const externalId = rest.join(':');
+    if (!this.deps.placeSource.lookup || !externalId) return undefined;
+    const place = await this.deps.placeSource.lookup(externalId);
+    return place && place.source.toLowerCase() === source && place.externalId === externalId ? place : undefined;
   }
 
   /** Documento de um pedido, só para admin. */

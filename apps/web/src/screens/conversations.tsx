@@ -20,7 +20,8 @@ import { EventBubble } from '../components/share-event.tsx';
 import { peopleLabel } from '../lib/meetup.ts';
 import { SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
 import { api } from '../client.ts';
-import { useAsync, usePolling, useTitle } from '../hooks.ts';
+import { useAsync, useLiveRefresh, usePolling, useTitle } from '../hooks.ts';
+import { PullRefresh } from '../components/pull-refresh.tsx';
 import { allDeletable, announceChatsChanged, breakLabel, copyText, filterConversations, formatClock, groupAlbums, isDoubleTap, LONG_PRESS_MS, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
 import type { RunPosition } from '../lib/chat.ts';
 import { mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
@@ -45,7 +46,7 @@ export function ConversationsScreen() {
   useTitle(t('Conversas'));
   const [cameBack] = useState(() => Date.now() - chatLeftAt < BACK_WINDOW_MS);
   const list = useAsync(() => api.conversations(), []);
-  usePolling(list.reload, 10_000);
+  useLiveRefresh(list.reload, 5_000);
   useEffect(() => {
     if (list.data) announceChatsChanged();
   }, [list.data]);
@@ -61,6 +62,12 @@ export function ConversationsScreen() {
   const searching = query.trim() !== '';
 
   return (
+    <PullRefresh
+      onRefresh={async () => {
+        list.reload();
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }}
+    >
     <div className={`convscreen${cameBack ? ' convscreen--back' : ''}`}>
       <PageHead title={t('Conversas')} />
       <button type="button" className="fab" onClick={() => setCreating(true)}>
@@ -150,9 +157,11 @@ export function ConversationsScreen() {
           muted={prefsFor.muted}
           onClose={() => setPrefsFor(undefined)}
           onChanged={() => list.reload()}
+          remove={{ group: prefsFor.type === 'GROUP', onRemoved: () => list.reload() }}
         />
       ) : null}
     </div>
+    </PullRefresh>
   );
 }
 
@@ -172,7 +181,7 @@ interface StagedMedia {
 export function ChatScreen({ conversationId }: { conversationId: string }) {
   useEffect(() => () => void (chatLeftAt = Date.now()), []);
   const view = useAsync(() => api.messages(conversationId), [conversationId]);
-  usePolling(view.reload, POLL_MS);
+  useLiveRefresh(view.reload, POLL_MS);
   const flash = useAsync(() => api.flashInvites(), [conversationId]);
   usePolling(flash.reload, 10_000);
 

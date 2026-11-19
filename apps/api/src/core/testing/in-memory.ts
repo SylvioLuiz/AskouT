@@ -189,6 +189,11 @@ export class InMemoryUserRepository implements UserRepository {
     if (u && !u.onboardedAt) this.users.set(userId, { ...u, onboardedAt: at });
   }
 
+  async setTastes(userId: string, tastes: string[]): Promise<void> {
+    const u = this.users.get(userId);
+    if (u) this.users.set(userId, { ...u, tastes: [...tastes] });
+  }
+
   async completePendingProfile(userId: string, data: { username: string; displayName: string; birthDate: string; termsVersion: string; termsAcceptedAt: Date }): Promise<void> {
     for (const p of this.profiles.values()) {
       if (p.userId !== userId && p.username === data.username) throw conflict('Este nome de usuário já está em uso', { username: 'Este nome de usuário já está em uso' });
@@ -1056,6 +1061,7 @@ export class InMemoryConversationRepository implements ConversationRepository {
   readonly messages: MessageRecord[] = [];
   readonly prefs = new Map<string, ConversationPrefsRecord>();
   readonly reactions = new Map<string, MessageReactionRecord>();
+  readonly audioPlays = new Map<string, { messageId: string; userId: string; playedAt: Date }>();
   private medias = new Map<string, { mime: string; data: Uint8Array }>();
 
   async getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord> {
@@ -1171,6 +1177,16 @@ export class InMemoryConversationRepository implements ConversationRepository {
     this.medias.delete(messageId);
     for (const key of [...this.reactions.keys()]) if (key.startsWith(`${messageId}|`)) this.reactions.delete(key);
     return true;
+  }
+
+  async markAudioPlayed(messageId: string, userId: string, at: Date): Promise<void> {
+    const key = `${messageId}|${userId}`;
+    if (!this.audioPlays.has(key)) this.audioPlays.set(key, { messageId, userId, playedAt: at });
+  }
+
+  async listAudioPlays(messageIds: readonly string[]): Promise<{ messageId: string; userId: string }[]> {
+    const wanted = new Set(messageIds);
+    return [...this.audioPlays.values()].filter((p) => wanted.has(p.messageId)).map((p) => ({ messageId: p.messageId, userId: p.userId }));
   }
 
   async setReaction(messageId: string, userId: string, emoji: string | null, at: Date): Promise<void> {
@@ -1596,7 +1612,7 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   async searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number) {
     const out: { venue: VenueRecord; distanceM: number | null }[] = [];
     for (const venue of this.venues.values()) {
-      if (venue.isOrganization && !venue.ownerId) continue; // organização ainda sem dono (pedido em análise ou recusado)
+      if ((venue.isOrganization || venue.isUserCreated) && !venue.ownerId) continue; // organização ou local novo ainda sem dono (pedido em análise ou recusado)
       const m = matchVenue(venue, text, center, radiusM);
       if (m) out.push(m);
     }
@@ -1835,6 +1851,22 @@ export class FakePlaceSource implements PlaceSource {
     this.calls += 1;
     return this.available ? { available: true, places: this.places.map((p) => ({ ...p })) } : { available: false, places: [] };
   }
+
+  /** Busca por texto: lugares de `searchable` cujo nome ou endereço contém o texto. */
+  searchable: ExternalPlace[] = [];
+  searchCalls = 0;
+
+  async search(text: string): Promise<{ available: boolean; places: ExternalPlace[] }> {
+    this.searchCalls += 1;
+    if (!this.available) return { available: false, places: [] };
+    const needle = text.toLowerCase();
+    return { available: true, places: this.searchable.filter((p) => `${p.name} ${p.address ?? ''}`.toLowerCase().includes(needle)).map((p) => ({ ...p })) };
+  }
+
+  async lookup(externalId: string): Promise<ExternalPlace | undefined> {
+    const found = [...this.searchable, ...this.places].find((p) => p.externalId === externalId);
+    return found ? { ...found } : undefined;
+  }
 }
 
 export class InMemoryProfileEventRepository implements ProfileEventRepository {
@@ -1931,8 +1963,8 @@ export class InMemoryNotificationRepository implements NotificationRepository {
       .map((n) => ({ ...n }));
   }
 
-  async unreadCount(userId: string): Promise<number> {
-    return this.rows.filter((n) => n.userId === userId && n.readAt === null).length;
+  async unreadCount(userId: string, filter?: NotificationFilter): Promise<number> {
+    return this.rows.filter((n) => n.userId === userId && n.readAt === null && matchesNotificationFilter(n, filter)).length;
   }
 
   async hasUnread(userId: string, dedupeKey: string): Promise<boolean> {

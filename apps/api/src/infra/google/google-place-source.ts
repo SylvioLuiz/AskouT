@@ -3,6 +3,11 @@ import type { ExternalPlace } from '../../core/types.ts';
 
 const ENDPOINT = 'https://places.googleapis.com/v1';
 const FIELDS = 'places.id,places.displayName,places.location,places.rating,places.userRatingCount,places.primaryType,places.googleMapsUri,places.photos';
+/** Busca por texto e detalhe de um lugar também trazem o endereço, que vira o endereço do rolê vinculado. */
+const SEARCH_FIELDS = `${FIELDS},places.formattedAddress`;
+const DETAIL_FIELDS = 'id,displayName,location,rating,userRatingCount,primaryType,googleMapsUri,photos,formattedAddress';
+/** Id de lugar do Google: só letras, números, `_` e `-` (o servidor monta a URL com ele). */
+const PLACE_ID_RE = /^[A-Za-z0-9_-]{1,300}$/;
 /** Só aceita referências de foto no formato do Google (evita usar o servidor como proxy aberto). */
 export const PHOTO_REF_RE = /^places\/[A-Za-z0-9_-]{1,200}\/photos\/[A-Za-z0-9_-]{1,600}$/;
 
@@ -23,6 +28,7 @@ interface GooglePlace {
   userRatingCount?: number;
   primaryType?: string;
   googleMapsUri?: string;
+  formattedAddress?: string;
   photos?: { name?: string; authorAttributions?: { displayName?: string }[] }[];
 }
 
@@ -83,6 +89,48 @@ export class GooglePlaceSource implements PlaceSource {
     }
   }
 
+  /**
+   * Qualquer lugar pelo nome ou endereço (não só bares perto): é o que a pessoa digita ao vincular um rolê que ainda não
+   * está no AskouT. Com `center`, os resultados perto dele vêm primeiro.
+   */
+  async search(text: string, center: { lat: number; lng: number } | undefined, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }> {
+    if (!this.spend()) return { available: false, places: [] };
+    try {
+      const response = await this.fetchImpl(`${ENDPOINT}/places:searchText`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey, 'x-goog-fieldmask': SEARCH_FIELDS },
+        body: JSON.stringify({
+          textQuery: text,
+          pageSize: Math.max(1, Math.min(limit, 20)),
+          languageCode: 'pt-BR',
+          regionCode: 'BR',
+          ...(center ? { locationBias: { circle: { center: { latitude: center.lat, longitude: center.lng }, radius: 50_000 } } } : {}),
+        }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      if (!response.ok) return { available: false, places: [] };
+      const json = (await response.json()) as { places?: GooglePlace[] };
+      return { available: true, places: parse(json.places) };
+    } catch {
+      return { available: false, places: [] };
+    }
+  }
+
+  /** Um lugar pelo id do Google, para confirmar que existe antes de criar o local no AskouT. */
+  async lookup(externalId: string): Promise<ExternalPlace | undefined> {
+    if (!PLACE_ID_RE.test(externalId) || !this.spend()) return undefined;
+    try {
+      const response = await this.fetchImpl(`${ENDPOINT}/places/${externalId}?languageCode=pt-BR`, {
+        headers: { 'x-goog-api-key': this.apiKey, 'x-goog-fieldmask': DETAIL_FIELDS },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      if (!response.ok) return undefined;
+      return parse([(await response.json()) as GooglePlace])[0];
+    } catch {
+      return undefined;
+    }
+  }
+
   /** Baixa a foto no servidor. Devolve undefined se a referência for inválida ou o Google não entregar. */
   async photo(ref: string): Promise<{ type: string; bytes: Uint8Array } | undefined> {
     if (!PHOTO_REF_RE.test(ref)) return undefined;
@@ -121,6 +169,7 @@ function parse(places: GooglePlace[] | undefined): ExternalPlace[] {
       photoRef: photo?.name ?? null,
       photoAuthor: photo?.authorAttributions?.[0]?.displayName?.slice(0, 80) ?? null,
       mapsUri: typeof p.googleMapsUri === 'string' && p.googleMapsUri.startsWith('https://') ? p.googleMapsUri : null,
+      address: typeof p.formattedAddress === 'string' && p.formattedAddress.trim() !== '' ? p.formattedAddress.trim().slice(0, 200) : null,
     });
   }
   return out;

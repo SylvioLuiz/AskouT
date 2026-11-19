@@ -28,6 +28,7 @@ import type {
   VenueProfile,
   VenueBell,
   OrganizationRequestBody,
+  VenueRequestBody,
   VenueRating,
   VenueProfileBody,
   VenuePanel,
@@ -232,6 +233,7 @@ export function createApi(deps: ApiDeps) {
       deps.onToken?.(token);
     },
     completeOnboarding: () => request<{ onboarded: true }>('POST', '/auth/me/onboarding'),
+    setTastes: (tastes: readonly string[]) => request<{ tastes: string[] }>('PUT', '/auth/me/tastes', { body: { tastes } }),
     /** "Complete seu cadastro" de quem entrou pela primeira vez com Google/Apple. */
     completeProfile: (input: { username: string; birthDate: string; acceptTerms: boolean; marketingEmail?: boolean }) =>
       request<SessionUser>('POST', '/auth/me/profile', { body: input }),
@@ -436,6 +438,15 @@ export function createApi(deps: ApiDeps) {
       if (params.radiusKm !== undefined) query.set('radiusKm', String(params.radiusKm));
       return request<{ places: ExplorePlace[]; placesAvailable: boolean }>('GET', `/explore/places?${query.toString()}`);
     },
+    /** Vincular um rolê: locais do AskouT e lugares do Google pelo nome ou endereço, em qualquer lugar. */
+    searchPlaces: (params: { q: string; lat?: number | undefined; lng?: number | undefined }) => {
+      const query = new URLSearchParams({ q: params.q });
+      if (params.lat !== undefined && params.lng !== undefined) {
+        query.set('lat', String(params.lat));
+        query.set('lng', String(params.lng));
+      }
+      return request<{ places: ExplorePlace[]; placesAvailable: boolean }>('GET', `/explore/place-search?${query.toString()}`);
+    },
     recommendations: (personalize: boolean) => request<Recommendations>('GET', `/me/recommendations?personalize=${personalize ? 'true' : 'false'}`),
     recordDwell: (items: DwellEntry[]) => request<{ saved: number }>('POST', '/me/dwell', { body: { items } }),
     eraseDwell: () => request<{ removed: number }>('DELETE', '/me/dwell'),
@@ -518,6 +529,9 @@ export function createApi(deps: ApiDeps) {
     deleteProfileStory: (storyId: string) => request<{ deleted: true }>('DELETE', `/stories/${id(storyId)}`),
     reportProfileStory: (storyId: string, reason: ReportReason, details?: string) =>
       request<{ reported: true }>('POST', `/stories/${id(storyId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+    /** Reage a um story: entre amigos vira mensagem na conversa; sem amizade (story de evento), um aviso para quem publicou. */
+    reactProfileStory: (storyId: string, emoji: string) => request<{ sent: true; conversationId: string | null }>('POST', `/stories/${id(storyId)}/react`, { body: { emoji } }),
+    reactEventStory: (eventId: string, storyId: string, emoji: string) => request<{ sent: true; conversationId: string | null }>('POST', `/events/${id(eventId)}/stories/${id(storyId)}/react`, { body: { emoji } }),
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
     eventGo: (eventId: string) => request<EventPage>('POST', `/events/${id(eventId)}/going`),
     eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),
@@ -569,6 +583,7 @@ export function createApi(deps: ApiDeps) {
     unfollowVenue: (venueId: string) => request<{ following: false; followerCount: number }>('DELETE', `/venues/${id(venueId)}/follow`),
     /** Sininho: liga (e já segue) ou desliga o aviso de cada evento novo. */
     setVenueNotify: (venueId: string, notify: boolean) => request<VenueBell>('PUT', `/venues/${id(venueId)}/notify`, { body: { notify } }),
+    requestVenue: (body: VenueRequestBody) => request<VenueClaim>('POST', '/venues/requests', { body }),
     requestOrganization: (body: OrganizationRequestBody) => request<VenueClaim>('POST', '/organizations/requests', { body }),
     venuePosts: (venueId: string, page?: PageRequest) => request<PostsPage>('GET', `/venues/${id(venueId)}/posts${pageQuery(page)}`),
     createVenuePost: (venueId: string, input: { images: string[]; caption?: string }) => request<PostView>('POST', `/me/venues/${id(venueId)}/posts`, { body: input }),
@@ -654,6 +669,8 @@ export function createApi(deps: ApiDeps) {
       if (!response.ok) throw errorFromResponse(response.status, undefined, response.headers.get('Retry-After'));
       return response.blob();
     },
+    /** Avisa que você ouviu a mensagem de voz (quem enviou vê o "ouvido"). */
+    markAudioPlayed: (conversationId: string, messageId: string) => request<{ played: true }>('POST', `/conversations/${id(conversationId)}/messages/${id(messageId)}/audio/played`),
     sendSuggestion: (conversationId: string, suggestion: SuggestionCard) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { suggestion } }),
     respondSuggestion: (conversationId: string, messageId: string, action: 'accept' | 'decline') =>

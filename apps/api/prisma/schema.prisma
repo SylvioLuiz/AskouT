@@ -122,6 +122,18 @@ model MessageReaction {
   @@id([messageId, userId])
 }
 
+/// Quem já ouviu a mensagem de voz (o "ouvido" do balão, como no WhatsApp). Uma linha por pessoa.
+model MessageAudioPlay {
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  playedAt  DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+}
+
 model MessageAudio {
   messageId String @id @db.Uuid
   mime      String
@@ -156,6 +168,8 @@ model User {
   termsVersion    String?
   /// Quando a pessoa terminou (ou pulou) o tutorial inicial; o app só o mostra enquanto estiver vazio.
   onboardedAt     DateTime?
+  /// Gostos de rolê escolhidos no cadastro e editáveis nas configurações (ids como BAR, NIGHT, SHOW). Vazio = gosta de tudo.
+  tastes          String[]  @default([])
   /// Conta criada pelo Google/Apple que ainda não escolheu o nome de usuário nem informou a data de nascimento: o app só mostra essa etapa até concluir.
   profilePending  Boolean   @default(false)
   /// Criada pelo Google/Apple e sem senha definida: não dá para desligar a última conta vinculada até criar uma senha.
@@ -204,6 +218,7 @@ model User {
   conversationParticipations ConversationParticipant[]
   messages                   Message[]
   messageReactions           MessageReaction[]
+  messageAudioPlays          MessageAudioPlay[]
 
   flashSessions       FlashSession[]
   flashInvitesSent    FlashInvite[]   @relation("FlashInviteFrom")
@@ -535,6 +550,7 @@ model Message {
   audio        MessageAudio?
   media        MessageMedia?
   reactions    MessageReaction[]
+  audioPlays   MessageAudioPlay[]
   replyTo      Message?     @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
   replies      Message[]    @relation("MessageReply")
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -791,6 +807,8 @@ model Venue {
   /// Organização (bateria, atlética, centro acadêmico...) em vez de estabelecimento. Pedida por quem a representa e
   /// aprovada por um admin; enquanto não tem dono, fica fora das buscas.
   isOrganization Boolean @default(false)
+  /// Local criado do zero por alguém no app (pedido com documento). Enquanto não tem dono, fica fora das buscas.
+  isUserCreated Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -925,6 +943,8 @@ model Post {
   createdAt    DateTime @default(now())
   /// Post feito em nome de um estabelecimento (o autor é quem administra o local).
   venueId      String?  @db.Uuid
+  /// Local do AskouT vinculado como rolê do post (escolhido na busca; pode ter sido criado a partir do Google).
+  placeVenueId String?  @db.Uuid
 
   author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   venue  Venue?      @relation(fields: [venueId], references: [id], onDelete: Cascade)

@@ -26,6 +26,8 @@ export interface UserRepository {
   acceptTerms(userId: string, version: string, at: Date): Promise<void>;
   /** Registra que a pessoa já passou pelo tutorial inicial. Não sobrescreve a data se já houver uma. */
   markOnboarded(userId: string, at: Date): Promise<void>;
+  /** Troca os gostos de rolê da pessoa (já validados). */
+  setTastes(userId: string, tastes: string[]): Promise<void>;
   /**
    * Conclui o cadastro de uma conta criada pelo Google/Apple: troca o nome de usuário, guarda a data de nascimento e o aceite
    * dos Termos e tira a marca de pendente, tudo junto. Lança DomainError CONFLICT se o nome de usuário já for de outra pessoa.
@@ -387,6 +389,10 @@ export interface ConversationRepository {
   mutedUserIds(conversationId: string): Promise<string[]>;
   /** Bytes da mensagem de voz (só de mensagens kind AUDIO). */
   findAudio(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+  /** Marca que `userId` ouviu a mensagem de voz (só a primeira vez conta). */
+  markAudioPlayed(messageId: string, userId: string, at: Date): Promise<void>;
+  /** Quem já ouviu cada uma destas mensagens de voz. */
+  listAudioPlays(messageIds: readonly string[]): Promise<{ messageId: string; userId: string }[]>;
   findMessage(id: string): Promise<MessageRecord | undefined>;
   /** Grava a resposta ao cartão só se ainda não houver uma. Devolve false se já tinha. */
   setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean>;
@@ -814,6 +820,10 @@ export interface EventSearchQuery {
 /** Fonte externa de lugares (OpenStreetMap). Nunca lança: se não conseguir, devolve `available: false`. */
 export interface PlaceSource {
   nearby(center: { lat: number; lng: number }, radiusM: number, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }>;
+  /** Qualquer lugar pelo nome ou endereço (só fontes que suportam, como o Google). */
+  search?(text: string, center: { lat: number; lng: number } | undefined, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }>;
+  /** Um lugar pelo id na fonte, para confirmar que existe. */
+  lookup?(externalId: string): Promise<ExternalPlace | undefined>;
 }
 
 /** Rota entre dois pontos. Nunca lança: sem resposta, devolve `undefined` e o app desenha só uma linha reta. */
@@ -899,7 +909,8 @@ export interface NotificationRepository {
   create(record: NotificationRecord): Promise<void>;
   /** Mais recentes primeiro. Com `filter`, só os avisos que casam com alguma cláusula (chips da tela de notificações). */
   listForUser(userId: string, limit: number, filter?: import('./notification-categories.ts').NotificationFilter): Promise<NotificationRecord[]>;
-  unreadCount(userId: string): Promise<number>;
+  /** Não lidos; com `filter`, só os que casam com ele. */
+  unreadCount(userId: string, filter?: import('./notification-categories.ts').NotificationFilter): Promise<number>;
   /** Já existe aviso não lido com essa chave? */
   hasUnread(userId: string, dedupeKey: string): Promise<boolean>;
   /** Marca como lidos (todos se `ids` for omitido). Devolve quantos mudaram. */

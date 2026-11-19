@@ -55,7 +55,7 @@ export class PostsController {
           return i;
         })
       : b.images;
-    return this.present(await this.core.posts.create(actor.userId, { caption: b.caption, images, placeName: b.placeName, placeAddress: b.placeAddress, tagUserIds: b.tagUserIds, event: b.event, datePollId: b.datePollId }));
+    return this.present(await this.core.posts.create(actor.userId, { caption: b.caption, images, placeName: b.placeName, placeAddress: b.placeAddress, placeVenueId: b.placeVenueId, tagUserIds: b.tagUserIds, event: b.event, datePollId: b.datePollId }));
   }
 
   /** Seus posts arquivados (só você vê). Vem antes de `posts/:id`. */
@@ -140,7 +140,7 @@ export class PostsController {
   @Patch('posts/:id')
   async edit(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
     const b = asBody(body);
-    return this.present(await this.core.posts.update(actor.userId, id, { caption: b.caption, placeName: b.placeName, placeAddress: b.placeAddress, event: b.event }));
+    return this.present(await this.core.posts.update(actor.userId, id, { caption: b.caption, placeName: b.placeName, placeAddress: b.placeAddress, placeVenueId: b.placeVenueId, event: b.event }));
   }
 
   /** Ajuste de uma foto enviada: `{image: dataUrl}` já recortada pelo app (só o autor). */

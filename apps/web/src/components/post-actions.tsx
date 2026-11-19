@@ -29,7 +29,7 @@ export type PostGone = 'deleted' | 'hidden' | 'archived';
 // ---------- Menu ⋯ ----------
 
 /** Opções do post: de outra pessoa (denunciar, não tenho interesse) ou suas (editar, ajustar, arquivar, excluir). */
-export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArchiveToggle, onNotInterested, onDelete, busy }: {
+export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArchiveToggle, onNotInterested, onDelete, onRemoveTag, busy }: {
   post: PostView;
   onClose: () => void;
   onEdit: () => void;
@@ -38,6 +38,8 @@ export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArc
   onArchiveToggle: () => void;
   onNotInterested: () => void;
   onDelete: () => void;
+  /** Só quando você está marcado (marcação aceita) no post de outra pessoa. */
+  onRemoveTag?: (() => void) | undefined;
   busy: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -72,6 +74,7 @@ export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArc
         </ul>
       ) : (
         <ul className="sharelist">
+          {onRemoveTag ? item(t('Remover minha marcação'), t('O post sai do seu perfil e você deixa de aparecer marcado.'), onRemoveTag) : null}
           {item('Denunciar', t('Conteúdo que não deveria estar aqui.'), onReport, { danger: true })}
           {item(t('Não tenho interesse'), t('Deixa de mostrar este post no seu feed.'), onNotInterested)}
         </ul>
@@ -368,7 +371,8 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
 
 // ---------- Editar ----------
 
-export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onClose: () => void; onSaved: (post: PostView) => void }) {
+/** `eventOnly`: aberto da página do evento; continua sendo evento (sem a troca para post comum). */
+export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { post: PostView; onClose: () => void; onSaved: (post: PostView) => void; eventOnly?: boolean }) {
   const [caption, setCaption] = useState(post.caption ?? '');
   const [placeName, setPlaceName] = useState(post.placeName ?? '');
   const [placeAddress, setPlaceAddress] = useState(post.placeAddress ?? '');
@@ -408,8 +412,9 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
   }
 
   return (
-    <Sheet title={t('Editar post')} onClose={onClose}>
+    <Sheet title={eventOnly ? t('Editar evento') : t('Editar post')} onClose={onClose}>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      {eventOnly ? null : (
       <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
         <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
           {t('Post')}
@@ -418,6 +423,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
           {t('Evento')}
         </button>
       </div>
+      )}
       {kind === 'EVENT' ? (
         <>
           <Field label={t('Nome do evento')} value={title} onChange={setTitle} maxLength={120} />

@@ -356,7 +356,7 @@ export class ExploreService {
           source: p.source,
           name: p.name,
           category: p.category,
-          address: null,
+          address: p.address ?? null,
           lat: p.lat,
           lng: p.lng,
           sample: false,
@@ -386,6 +386,57 @@ export class ExploreService {
     const venues = await this.deps.places.searchVenues('', center, radiusM, MAP_PLACE_LIMIT);
     const { placeItems, placesAvailable } = await this.collectPlaces(actorId, venues, { center, radiusM, now: this.deps.clock.now(), all: true, limit: MAP_PLACE_LIMIT });
     return { places: placeItems, placesAvailable };
+  }
+
+  /**
+   * Vincular um rolê: busca pelo nome ou endereço os locais do AskouT (em qualquer lugar) e, na fonte externa (Google),
+   * qualquer lugar que combine, mesmo longe ou fora dos tipos de bar. Com posição, o que está perto vem primeiro.
+   */
+  async searchPlaces(actorId: string, input: { q?: unknown; lat?: unknown; lng?: unknown }): Promise<{ places: ExplorePlaceItem[]; placesAvailable: boolean }> {
+    const text = typeof input.q === 'string' ? input.q.trim() : '';
+    // eslint-disable-next-line no-control-regex
+    if (text.length < 2 || text.length > EXPLORE_QUERY_MAX || /[\u0000-\u001f\u007f]/.test(text)) throw validationError('Busca inválida', { q: `De 2 a ${EXPLORE_QUERY_MAX} caracteres` });
+    const lat = parseNumber(input.lat, 'lat');
+    const lng = parseNumber(input.lng, 'lng');
+    if ((lat === undefined) !== (lng === undefined)) throw validationError('Posição incompleta', { lat: 'Envie lat e lng juntos' });
+    if (lat !== undefined && lng !== undefined && (Math.abs(lat) > 90 || Math.abs(lng) > 180)) throw validationError('Posição inválida', { lat: 'Coordenadas fora do intervalo' });
+    const center = lat !== undefined && lng !== undefined ? { lat, lng } : undefined;
+
+    const found = await this.deps.places.searchVenues(text, undefined, 0, VENUE_LIMIT);
+    const venues = center
+      ? found.map((v) => ({ ...v, distanceM: distanceMeters(center, v.venue) })).sort((a, b) => a.distanceM - b.distanceM)
+      : found;
+    const { placeItems } = await this.collectPlaces(actorId, venues, { center: undefined, radiusM: 0, now: this.deps.clock.now(), limit: VENUE_LIMIT });
+
+    const source = this.deps.placeSource;
+    if (!source.search) return { places: placeItems, placesAvailable: false };
+    const ext = await source.search(text, center, 10);
+    const seen = new Set(placeItems.map((p) => fold(p.name)));
+    const known = new Set(venues.flatMap(({ venue }) => (venue.externalKey ? [venue.externalKey] : [])));
+    for (const p of ext.places) {
+      const key = `${p.source.toLowerCase()}:${p.externalId}`;
+      const name = fold(p.name);
+      if (known.has(key) || seen.has(name)) continue;
+      seen.add(name);
+      placeItems.push({
+        key,
+        source: p.source,
+        name: p.name,
+        category: p.category,
+        address: p.address ?? null,
+        lat: p.lat,
+        lng: p.lng,
+        sample: false,
+        distanceM: center ? Math.round(distanceMeters(center, { lat: p.lat, lng: p.lng })) : null,
+        rating: p.rating ?? null,
+        ratingCount: p.ratingCount ?? null,
+        photoRef: p.photoRef ?? null,
+        photoAuthor: p.photoAuthor ?? null,
+        mapsUri: p.mapsUri ?? null,
+        venue: null,
+      });
+    }
+    return { places: placeItems, placesAvailable: ext.available };
   }
 
   /** Um evento pelo id. Com posição, inclui a distância (usada só nesta resposta). */

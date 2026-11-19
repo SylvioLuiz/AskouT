@@ -168,7 +168,7 @@ test('foto e vídeo: enviar, baixar, listar na aba Mídia e validar tipo, bytes 
 test('foto: aviso para o outro e sem aviso quando a conversa está silenciada', async () => {
   const { w, ana, bia, id } = await setup();
   await w.core.conversations.send(ana, id, { media: { mime: 'image/jpeg', data: JPEG } });
-  const bodies = async (u: string) => (await w.core.notifications.list(u)).items.filter((n) => n.type === 'MESSAGE').map((n) => n.body);
+  const bodies = async (u: string) => (await w.core.notifications.list(u, 'messages')).items.filter((n) => n.type === 'MESSAGE').map((n) => n.body);
   assert.deepEqual(await bodies(bia), ['Enviou uma foto']);
 });
 
@@ -230,7 +230,7 @@ test('silenciar: sem aviso para quem silenciou, mas a mensagem e o contador cont
   const { w, ana, bia, id } = await setup();
   assert.deepEqual(await w.core.conversations.setPreferences(bia, id, { muted: true }), { pinned: false, muted: true, color: null });
   await w.core.conversations.send(ana, id, { body: 'oi' });
-  const messageNotices = async (u: string) => (await w.core.notifications.list(u)).items.filter((n) => n.type === 'MESSAGE');
+  const messageNotices = async (u: string) => (await w.core.notifications.list(u, 'messages')).items.filter((n) => n.type === 'MESSAGE');
   assert.equal((await messageNotices(bia)).length, 0);
   const item = (await w.core.conversations.list(bia))[0]!;
   assert.equal(item.muted, true);
@@ -274,7 +274,7 @@ test('digitando: em grupo lista quem digita e some para quem tem bloqueio', asyn
 test('texto: o aviso mostra um pedaço da mensagem (1 a 1)', async () => {
   const { w, ana, bia, id } = await setup();
   await w.core.conversations.send(ana, id, { body: '  Bora   sair\nhoje?  ' });
-  const notices = (await w.core.notifications.list(bia)).items.filter((n) => n.type === 'MESSAGE');
+  const notices = (await w.core.notifications.list(bia, 'messages')).items.filter((n) => n.type === 'MESSAGE');
   assert.deepEqual(notices.map((n) => [n.title, n.body]), [['ana', 'Bora sair hoje?']]);
   assert.equal(messagePreview('a'.repeat(150))?.length, 100);
   assert.ok(messagePreview('a'.repeat(150))?.endsWith('…'));

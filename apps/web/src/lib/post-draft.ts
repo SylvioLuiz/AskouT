@@ -32,6 +32,8 @@ export type DraftImage = DraftUpload | DraftPlacePhoto;
 export interface LinkedPlace {
   name: string;
   address: string | null;
+  /** Local do AskouT escolhido (ou criado a partir do Google): o nome no post leva à página dele. */
+  venueId?: string | null;
 }
 
 /** Adiciona sem passar de 5 e sem repetir foto de lugar (a nova foto de lugar troca a anterior). */
@@ -108,7 +110,7 @@ export function buildPostBody(images: readonly DraftImage[], caption: string, li
   return {
     images: images.map((i) => (i.kind === 'UPLOAD' ? i.dataUrl : { photoPath: i.photoPath, photoAuthor: i.author })),
     ...(caption.trim() ? { caption: caption.trim() } : {}),
-    ...(place ? { placeName: place.name, ...(place.address ? { placeAddress: place.address } : {}) } : {}),
+    ...(place ? { placeName: place.name, ...(place.address ? { placeAddress: place.address } : {}), ...(place.venueId ? { placeVenueId: place.venueId } : {}) } : {}),
     ...(tagUserIds.length > 0 ? { tagUserIds: [...tagUserIds] } : {}),
     ...(event && datePollId ? { datePollId } : {}),
     ...(event ? { event: { title: event.title.trim(), kind: event.kind ?? 'OTHER', startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}), ...(event.private ? { private: true } : {}) } } : {}),

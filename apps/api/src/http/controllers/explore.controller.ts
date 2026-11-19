@@ -50,6 +50,16 @@ export class ExploreController {
     };
   }
 
+  /** Vincular um rolê: locais do AskouT e lugares do Google pelo nome ou endereço, em qualquer lugar. */
+  @Get('explore/place-search')
+  async searchPlaces(@CurrentActor() actor: Actor, @Query() query: Record<string, unknown>) {
+    const view = await this.core.explore.searchPlaces(actor.userId, query);
+    return {
+      ...view,
+      places: view.places.map(({ photoRef, ...p }) => ({ ...p, photoPath: photoRef && this.photos.google ? this.photos.signer.path(photoRef) : null })),
+    };
+  }
+
   /** Posta o evento no seu perfil. */
   @Post('events/:id/post')
   @HttpCode(200)
@@ -125,6 +135,20 @@ export class ExploreController {
   reportProfileStory(@CurrentActor() actor: Actor, @Param('storyId') storyId: string, @Body() body: unknown) {
     const b = asBody(body);
     return this.core.eventPages.reportProfileStory(actor.userId, storyId, b.reason, b.details);
+  }
+
+  /** Reage a um story da página inicial: vira mensagem na conversa com quem publicou. */
+  @Post('stories/:storyId/react')
+  @HttpCode(200)
+  reactProfileStory(@CurrentActor() actor: Actor, @Param('storyId') storyId: string, @Body() body: unknown) {
+    return this.core.storyReactions.react(actor.userId, storyId, asBody(body).emoji);
+  }
+
+  /** Reage a um story do evento: mensagem se forem amigos, senão um aviso para quem publicou. */
+  @Post('events/:id/stories/:storyId/react')
+  @HttpCode(200)
+  reactStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('storyId') storyId: string, @Body() body: unknown) {
+    return this.core.storyReactions.react(actor.userId, storyId, asBody(body).emoji, id);
   }
 
   @Delete('events/:id/stories/:storyId')

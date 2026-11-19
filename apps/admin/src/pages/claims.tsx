@@ -42,11 +42,12 @@ function ClaimDetail({ claim, onClose, onChanged }: { claim: Claim; onClose: () 
       <div className="split">
         <div>
           <dl className="facts">
-            <dt>{claim.venue.isOrganization ? 'Organização nova' : 'Local'}</dt>
+            <dt>{claim.venue.isOrganization ? 'Organização nova' : claim.venue.isUserCreated ? 'Local novo (criado do zero)' : 'Local'}</dt>
             <dd>
               {claim.venue.name}
               {claim.venue.isSample ? ' [TESTE]' : ''}
-              {claim.venue.isOrganization ? <div className="muted small">{claim.venue.category ?? 'Organização universitária'}</div> : null}
+              {claim.venue.isOrganization ? <div className="muted small">{claim.venue.category ?? 'Organização'}</div> : null}
+              {claim.venue.isUserCreated && claim.venue.category ? <div className="muted small">{claim.venue.category}</div> : null}
               <div className="muted small">{claim.venue.address ?? 'Sem endereço'}</div>
               {claim.venue.isOrganization && claim.venue.description ? <div className="muted small">{claim.venue.description}</div> : null}
             </dd>
@@ -161,6 +162,7 @@ export function ClaimsPage() {
                   <td>
                     <strong>{c.venue.name}</strong>
                     {c.venue.isOrganization ? <div className="muted small">Organização · {c.venue.category ?? 'universitária'}</div> : null}
+                    {c.venue.isUserCreated ? <div className="muted small">Local novo{c.venue.category ? ` · ${c.venue.category}` : ''}</div> : null}
                     <div className="muted small">{c.venue.address ?? 'Sem endereço'}</div>
                   </td>
                   <td>

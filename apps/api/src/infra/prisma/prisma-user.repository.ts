@@ -16,6 +16,7 @@ function toUser(row: {
   termsAcceptedAt: Date | null;
   termsVersion: string | null;
   onboardedAt: Date | null;
+  tastes?: string[];
   profilePending?: boolean;
   passwordless?: boolean;
   phone?: string | null;
@@ -31,6 +32,7 @@ function toUser(row: {
     termsAcceptedAt: row.termsAcceptedAt,
     termsVersion: row.termsVersion,
     onboardedAt: row.onboardedAt,
+    tastes: row.tastes ?? [],
     profilePending: row.profilePending === true,
     passwordless: row.passwordless === true,
     phone: row.phone ?? null,
@@ -218,6 +220,11 @@ export class PrismaUserRepository implements UserRepository {
   async markOnboarded(userId: string, at: Date): Promise<void> {
     if (!isUuid(userId)) return;
     await this.prisma.user.updateMany({ where: { id: userId, onboardedAt: null }, data: { onboardedAt: at } });
+  }
+
+  async setTastes(userId: string, tastes: string[]): Promise<void> {
+    if (!isUuid(userId)) return;
+    await this.prisma.user.updateMany({ where: { id: userId }, data: { tastes } });
   }
 
   async completePendingProfile(userId: string, data: { username: string; displayName: string; birthDate: string; termsVersion: string; termsAcceptedAt: Date }): Promise<void> {

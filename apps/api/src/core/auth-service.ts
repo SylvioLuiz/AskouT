@@ -36,6 +36,17 @@ export interface SessionUser {
    * Enquanto for true, o app só mostra a etapa "Complete seu cadastro" (em qualquer login, até concluir).
    */
   profilePending: boolean;
+  /** Gostos de rolê escolhidos no cadastro ou nas configurações. Vazio = gosta de tudo. */
+  tastes: string[];
+}
+
+/** Gostos de rolê que a pessoa pode escolher. O app mostra os nomes; aqui só valida. Para abrir outro, inclua aqui e no app. */
+export const TASTE_IDS = ['BAR', 'NIGHT', 'SHOW', 'FOOD', 'CAFE', 'CULTURE', 'GAMES', 'OUTDOOR', 'SPORT'] as const;
+
+/** Mantém só gostos conhecidos, sem repetir, na ordem da lista. Lança erro de validação se não vier uma lista. */
+export function parseTastes(value: unknown): string[] {
+  if (!Array.isArray(value)) throw validationError('Envie a lista de gostos', { tastes: 'Envie a lista de gostos' });
+  return TASTE_IDS.filter((id) => value.includes(id));
 }
 
 /** Conta do Google ou da Apple ligada ao perfil (o e-mail fica só para a própria pessoa). */
@@ -151,7 +162,7 @@ export function passwordStamp(passwordHash: string): string {
 }
 
 function sessionUser(user: User, profile: Profile): SessionUser {
-  return { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile), onboarded: Boolean(user.onboardedAt), profilePending: user.profilePending === true };
+  return { id: user.id, email: user.email, role: user.role, profile: toPublicProfile(profile), onboarded: Boolean(user.onboardedAt), profilePending: user.profilePending === true, tastes: user.tastes ?? [] };
 }
 
 /**
@@ -740,6 +751,13 @@ export class AuthService {
   async completeOnboarding(actor: Actor): Promise<{ onboarded: true }> {
     await this.deps.users.markOnboarded(actor.userId, this.deps.clock.now());
     return { onboarded: true };
+  }
+
+  /** Troca os gostos de rolê (cadastro e configurações do perfil). Devolve a lista guardada. */
+  async setTastes(actor: Actor, tastes: unknown): Promise<{ tastes: string[] }> {
+    const clean = parseTastes(tastes);
+    await this.deps.users.setTastes(actor.userId, clean);
+    return { tastes: clean };
   }
 
   /** Começa com @ -> usuário; tem @ no meio -> e-mail; senão -> usuário. */

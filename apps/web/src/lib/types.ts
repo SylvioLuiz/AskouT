@@ -47,6 +47,8 @@ export interface SessionUser {
    * Enquanto for true, o app só mostra a etapa "Complete seu cadastro" (mesmo depois de sair e entrar de novo).
    */
   profilePending?: boolean;
+  /** Gostos de rolê guardados na conta (ids de THEMES). Vazio = gosta de tudo. Ausente em versões antigas da API. */
+  tastes?: string[];
 }
 
 /** Conta do Google ou da Apple ligada ao perfil. */
@@ -391,6 +393,8 @@ export interface NotificationItem {
   createdAt: string;
   /** Quem causou o aviso (seguiu, curtiu, convidou...). Nulo em avisos do sistema e nos antigos. */
   actor?: { userId: string; username: string; avatarUrl: string | null } | null;
+  /** Post ou evento da marcação (só em POST_TAG): a tela mostra Aceitar/Recusar no próprio aviso. */
+  postId?: string | null;
 }
 
 export interface NotificationList {
@@ -532,7 +536,8 @@ export interface ChatMessage {
   body: string;
   suggestion: SuggestionCard | null;
   /** Mensagem de voz (kind AUDIO): só a duração; o áudio é baixado ao tocar. */
-  audio: { durationMs: number } | null;
+  /** `played`: na sua mensagem, alguém já ouviu; na dos outros, você já ouviu. */
+  audio: { durationMs: number; played?: boolean } | null;
   /** GIF (Giphy): mensagem de texto com este anexo. */
   gif?: CommentGif | null;
   /** Apagada por quem enviou: no lugar do conteúdo aparece "Mensagem apagada". */
@@ -966,11 +971,22 @@ export interface VenueSummary {
   address: string | null;
   category: string | null;
   sample: boolean;
-  /** Organização da faculdade (bateria, atlética...) em vez de estabelecimento. */
+  /** Organização (atlética, coletivo, produtora, empresa...) em vez de estabelecimento. */
   organization?: boolean;
 }
 
-/** Pedido para criar a página de uma organização da faculdade. */
+/** Local criado do zero em "Meus locais" (vira pedido para administrar). */
+export interface VenueRequestBody {
+  name: string;
+  category?: string;
+  address: string;
+  lat: number;
+  lng: number;
+  document: string;
+  note?: string;
+}
+
+/** Pedido para criar a página de uma organização (da facul ou não). */
 export interface OrganizationRequestBody {
   name: string;
   type?: string;
@@ -1124,7 +1140,7 @@ export interface VenueProfile {
   following: boolean;
   /** Sininho ligado: recebe aviso de cada evento novo. */
   notify?: boolean;
-  /** Organização da faculdade (bateria, atlética...). */
+  /** Organização (atlética, coletivo, produtora, empresa...). */
   organization?: boolean;
   followerCount: number;
   rating: VenueRating;

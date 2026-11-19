@@ -272,6 +272,8 @@ export class EventPageService {
     const { post, images } = found;
     const first = [...images].sort((a, b) => a.position - b.position)[0];
     const cover: EventCoverView | null = !first ? null : first.isUpload ? { kind: 'UPLOAD', imageId: first.id } : first.placePhotoRef ? { kind: 'PLACE', photoRef: first.placePhotoRef, author: first.placePhotoAuthor } : null;
+    // Rolê escolhido entre os locais do AskouT: a página do evento ganha o link e o ponto no mapa do local.
+    const linked = post.placeVenueId ? await this.deps.places.findVenue(post.placeVenueId) : undefined;
     return {
       view: {
         id: post.id,
@@ -284,7 +286,9 @@ export class EventPageService {
         isFree: false,
         sample: false,
         cover,
-        venue: { name: post.placeName ?? '', address: post.placeAddress, lat: null, lng: null },
+        venue: linked
+          ? { id: linked.id, name: post.placeName ?? linked.name, address: post.placeAddress ?? linked.address, lat: linked.lat, lng: linked.lng }
+          : { name: post.placeName ?? '', address: post.placeAddress, lat: null, lng: null },
         tags: [],
         ticketUrl: null,
         distanceM: null,
@@ -559,6 +563,25 @@ export class EventPageService {
     const text = optionalText(details, EVENT_STORY_REPORT_DETAILS_MAX, 'details', 'Detalhes');
     await this.deps.eventRoom.reportStory({ id: this.deps.ids.next(), storyId: story.id, reporterId: viewerId, reason: reason as PostReportReason, details: text, createdAt: this.deps.clock.now() });
     return { reported: true };
+  }
+
+  /**
+   * O story que `viewerId` pode reagir: no ar, visível para ele e de outra pessoa.
+   * Com `rawEventId`, vem da página do evento; sem, da página inicial (stories do perfil).
+   */
+  async reactableStory(viewerId: string, storyId: unknown, rawEventId?: unknown): Promise<{ authorId: string; eventUrl: string }> {
+    let story: EventStoryMeta;
+    if (rawEventId === undefined) {
+      story = await this.profileStoryFor(viewerId, storyId);
+    } else {
+      const { ref } = await this.resolve(viewerId, rawEventId);
+      const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
+      const found = typeof storyId === 'string' && storyId.length <= 64 ? (await this.visibleStories(viewerId, ref, hidden)).find((s) => s.id === storyId) : undefined;
+      if (!found) throw notFound('Story não encontrado');
+      story = found;
+    }
+    if (story.userId === viewerId) throw forbidden('Este story é seu');
+    return { authorId: story.userId, eventUrl: `/eventos/${story.ref.id}` };
   }
 
   /** Publica um story. Só quem confirmou presença (ou o dono), enquanto o evento não acabou. Foto até 2 MB ou vídeo até 60 MB. */
