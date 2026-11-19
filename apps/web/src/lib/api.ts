@@ -537,7 +537,10 @@ export function createApi(deps: ApiDeps) {
       if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
       let response;
       try {
-        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/stories${onProfile ? '?profile=1' : ''}`, { method: 'POST', headers, body: file });
+        const query = new URLSearchParams();
+        if (onProfile) query.set('profile', '1');
+        const qs = query.toString();
+        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/stories${qs ? `?${qs}` : ''}`, { method: 'POST', headers, body: file });
       } catch {
         throw networkError();
       }

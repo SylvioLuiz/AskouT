@@ -4,6 +4,9 @@ import { createPortal } from 'react-dom';
 import { CameraIcon, PhotoIcon, RefreshIcon, TrashIcon, XIcon } from './icons.tsx';
 import { SoundToggle } from './sound-toggle.tsx';
 import { StoryOverlayItem, useKeyboardInset, useMediaBox } from './story-overlays.tsx';
+import { GalleryGrid } from './story-gallery.tsx';
+import { nativeGallery } from '../lib/gallery.ts';
+import type { GalleryItem } from '../lib/gallery.ts';
 import { api } from '../client.ts';
 import { ApiError, toApiError } from '../lib/errors.ts';
 import { mediaKind, prepareImage } from '../lib/chat-media.ts';
@@ -81,6 +84,30 @@ async function mediaFrom(chosen: File): Promise<StoryMedia> {
 }
 
 /**
+ * Esc e o botão voltar do Android (a casca dispara `askout:back` antes de voltar a página; cancelar o evento
+ * faz só um passo aqui dentro). Cada tela chama `step` quando está por cima e devolve true se tratou.
+ */
+function useBackStep(step: () => boolean, active = true) {
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') stepRef.current();
+    };
+    const onBack = (event: Event) => {
+      if (stepRef.current()) event.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('askout:back', onBack);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('askout:back', onBack);
+    };
+  }, [active]);
+}
+
+/**
  * Criar story em tela cheia, como no Instagram: primeiro a câmera (ou a galeria), depois o editor
  * com textos e figurinhas, e por fim publicar só no evento ou também no perfil.
  */
@@ -109,6 +136,10 @@ function StoryCapture({ onPicked, onClose }: { onPicked: (media: StoryMedia) => 
   const [camera, setCamera] = useState<'starting' | 'on' | 'off'>('starting');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  /** Galeria dentro do app (iPhone): grade das fotos recentes por cima da câmera. */
+  const gallery = nativeGallery();
+  const [grid, setGrid] = useState(false);
+  const [loadingId, setLoadingId] = useState<string | undefined>();
 
   useEffect(() => {
     let stream: MediaStream | undefined;
@@ -142,13 +173,30 @@ function StoryCapture({ onPicked, onClose }: { onPicked: (media: StoryMedia) => 
     };
   }, [facing]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  // Voltar: fecha a grade da galeria; depois sai.
+  useBackStep(() => {
+    if (busy) return true;
+    if (grid) setGrid(false);
+    else onClose();
+    return true;
+  });
+
+  function openGallery() {
+    if (gallery) setGrid(true);
+    else galleryRef.current?.click();
+  }
+
+  async function pickFromGrid(item: GalleryItem) {
+    if (!gallery) return;
+    setLoadingId(item.id);
+    try {
+      await use(await gallery.file(item.id));
+    } catch (failure) {
+      setProblem(friendlyProblem(failure));
+    } finally {
+      setLoadingId(undefined);
+    }
+  }
 
   async function use(file: File) {
     setBusy(true);
@@ -223,7 +271,7 @@ function StoryCapture({ onPicked, onClose }: { onPicked: (media: StoryMedia) => 
         </p>
       ) : null}
       <div className="storycam__bar">
-        <button type="button" className="storycam__side" disabled={busy} onClick={() => galleryRef.current?.click()} aria-label={t('Escolher da galeria')}>
+        <button type="button" className="storycam__side" disabled={busy} onClick={openGallery} aria-label={t('Escolher da galeria')}>
           <PhotoIcon />
           <span>{t('Galeria')}</span>
         </button>
@@ -241,6 +289,23 @@ function StoryCapture({ onPicked, onClose }: { onPicked: (media: StoryMedia) => 
           <span className="storycam__spacer" aria-hidden="true" />
         )}
       </div>
+      {grid && gallery ? (
+        <div className="storycam__grid" role="dialog" aria-label={t('Galeria')}>
+          <div className="storycam__gridtop">
+            <button type="button" className="storyedit__btn" onClick={() => setGrid(false)} aria-label={t('Voltar para a câmera')}>
+              <XIcon />
+            </button>
+          </div>
+          <GalleryGrid
+            gallery={gallery}
+            loadingId={loadingId}
+            busy={busy}
+            onPick={(item) => void pickFromGrid(item)}
+            onCamera={() => (camera === 'on' ? setGrid(false) : nativeCameraRef.current?.click())}
+            onOther={() => galleryRef.current?.click()}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -284,13 +349,14 @@ function StoryEditor({ media, eventId, onBack, onCreated }: { media: StoryMedia;
   const gesture = useRef<Gesture | undefined>(undefined);
   const tap = useRef<{ id: number; start: Point } | undefined>(undefined);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !editing && !stickers && !busy) onBack();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [editing, stickers, busy, onBack]);
+  // Voltar: o texto aberto cuida de si; depois fecha as figurinhas; depois volta para a câmera.
+  useBackStep(() => {
+    if (editing) return false;
+    if (busy) return true;
+    if (stickers) setStickers(false);
+    else onBack();
+    return true;
+  });
 
   const full = items.length >= STORY_OVERLAYS_MAX;
 
@@ -551,13 +617,10 @@ function StoryTextEditor({ initial, width, onDone }: { initial: StoryOverlay; wi
     el.style.height = `${el.scrollHeight}px`;
   }, [text, style, width]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') doneRef.current();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  useBackStep(() => {
+    doneRef.current();
+    return true;
+  });
 
   const look = overlayLook({ kind: 'TEXT', color, style, scale: 1 }, width);
   return (

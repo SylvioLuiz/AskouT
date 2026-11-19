@@ -706,6 +706,9 @@ export interface EventStoryRecord {
   onProfile?: boolean;
   /** Textos e figurinhas por cima da mídia (desenhados por quem assiste). Sem o campo, nenhum. */
   overlays?: StoryOverlay[];
+  /** Texto por cima da mídia e a altura dele na tela (0 = topo, 1 = pé). */
+  caption?: string | null;
+  captionY?: number | null;
   data: Uint8Array;
   createdAt: Date;
   expiresAt: Date;
@@ -889,7 +892,7 @@ export interface AdminStoryReportRow {
   details: string | null;
   createdAt: Date;
   reporter: { id: string; username: string };
-  story: { id: string; kind: 'IMAGE' | 'VIDEO'; author: { id: string; username: string }; eventId: string; eventTitle: string | null; createdAt: Date; expiresAt: Date; reportsCount: number };
+  story: { id: string; kind: 'IMAGE' | 'VIDEO'; caption: string | null; author: { id: string; username: string }; eventId: string; eventTitle: string | null; createdAt: Date; expiresAt: Date; reportsCount: number };
   resolvedAt: Date | null;
   resolution: ReportResolution | null;
   resolutionNote: string | null;

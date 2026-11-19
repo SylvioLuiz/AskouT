@@ -209,6 +209,7 @@ function StoryReportCard({ r, onAction }: { r: StoryReportRow; onAction: (a: Act
             Story de <span className="handle">@{r.story.author.username}</span> · {r.story.reportsCount} denúncia(s) no total
           </div>
           {r.story.eventTitle ? <strong>Evento: {r.story.eventTitle}</strong> : null}
+          {r.story.caption ? <p className="pre">Texto no story: “{r.story.caption}”</p> : null}
           <div className="muted small">Publicado em {formatDateTime(r.story.createdAt)} · no ar até {formatDateTime(r.story.expiresAt)}</div>
         </div>
         <Outcome r={r} />

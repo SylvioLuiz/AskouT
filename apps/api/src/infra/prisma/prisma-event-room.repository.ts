@@ -94,15 +94,15 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
 
   async addStory(story: EventStoryRecord): Promise<void> {
     await this.prisma.eventStory.create({
-      data: { id: story.id, userId: story.userId, mime: story.mime, isVideo: story.video, onProfile: story.onProfile === true, ...(story.overlays?.length ? { overlays: story.overlays as unknown as Prisma.InputJsonValue } : {}), data: Buffer.from(story.data), createdAt: story.createdAt, expiresAt: story.expiresAt, ...PrismaEventRoomRepository.where(story.ref) },
+      data: { id: story.id, userId: story.userId, mime: story.mime, isVideo: story.video, onProfile: story.onProfile === true, caption: story.caption ?? null, captionY: story.captionY ?? null, ...(story.overlays?.length ? { overlays: story.overlays as unknown as Prisma.InputJsonValue } : {}), data: Buffer.from(story.data), createdAt: story.createdAt, expiresAt: story.expiresAt, ...PrismaEventRoomRepository.where(story.ref) },
     });
   }
 
-  private static readonly storySelect = { id: true, userId: true, placeEventId: true, postId: true, mime: true, isVideo: true, onProfile: true, overlays: true, createdAt: true, expiresAt: true } as const;
+  private static readonly storySelect = { id: true, userId: true, placeEventId: true, postId: true, mime: true, isVideo: true, onProfile: true, caption: true, captionY: true, overlays: true, createdAt: true, expiresAt: true } as const;
 
-  private static storyMeta(r: { id: string; userId: string; placeEventId: string | null; postId: string | null; mime: string; isVideo: boolean; onProfile: boolean; overlays: Prisma.JsonValue | null; createdAt: Date; expiresAt: Date }): EventStoryMeta | undefined {
+  private static storyMeta(r: { id: string; userId: string; placeEventId: string | null; postId: string | null; mime: string; isVideo: boolean; onProfile: boolean; caption: string | null; captionY: number | null; overlays: Prisma.JsonValue | null; createdAt: Date; expiresAt: Date }): EventStoryMeta | undefined {
     const ref: EventRef | undefined = r.placeEventId ? { source: 'PLACE', id: r.placeEventId } : r.postId ? { source: 'USER', id: r.postId } : undefined;
-    return ref ? { id: r.id, ref, userId: r.userId, mime: r.mime, video: r.isVideo, onProfile: r.onProfile, ...storedOverlays(r.overlays), createdAt: r.createdAt, expiresAt: r.expiresAt } : undefined;
+    return ref ? { id: r.id, ref, userId: r.userId, mime: r.mime, video: r.isVideo, onProfile: r.onProfile, caption: r.caption, captionY: r.captionY, ...storedOverlays(r.overlays), createdAt: r.createdAt, expiresAt: r.expiresAt } : undefined;
   }
 
   async listStories(ref: EventRef, now: Date): Promise<EventStoryMeta[]> {

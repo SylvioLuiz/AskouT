@@ -2995,7 +2995,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       const reportsCount = [...this.eventRoom.storyReports.values()].filter((x) => x.storyId === s.id).length;
       rows.push({
         id: r.id, reason: r.reason, details: r.details, createdAt: r.createdAt, reporter: { id: r.reporterId, username: this.username(r.reporterId) },
-        story: { id: s.id, kind: s.video ? 'VIDEO' : 'IMAGE', author: { id: s.userId, username: this.username(s.userId) }, eventId: s.ref.id, eventTitle: title, createdAt: s.createdAt, expiresAt: s.expiresAt, reportsCount },
+        story: { id: s.id, kind: s.video ? 'VIDEO' : 'IMAGE', caption: s.caption ?? null, author: { id: s.userId, username: this.username(s.userId) }, eventId: s.ref.id, eventTitle: title, createdAt: s.createdAt, expiresAt: s.expiresAt, reportsCount },
         resolvedAt: r.resolvedAt ?? null, resolution: r.resolution ?? null, resolutionNote: r.resolutionNote ?? null,
       });
     }

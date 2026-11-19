@@ -762,6 +762,9 @@ export interface NotificationMute {
 export interface EventStoryItem {
   id: string;
   kind: 'IMAGE' | 'VIDEO';
+  /** Texto por cima da mídia (null/ausente se não tem) e a altura dele na tela, de 0 (topo) a 1 (pé). */
+  caption?: string | null;
+  captionY?: number | null;
   createdAt: string;
   expiresAt: string;
   canDelete: boolean;

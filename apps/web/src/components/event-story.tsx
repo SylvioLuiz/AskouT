@@ -6,6 +6,7 @@ import { ChevronRightIcon, EventKindIcon, HeartIcon, LocationIcon, MoreIcon, Sen
 import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Confirm } from './ui.tsx';
 import { Sheet } from './agenda.tsx';
+import { StoryCaption } from './story-gallery.tsx';
 import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
 import { timeAgo } from '../lib/format.ts';
@@ -360,6 +361,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
           ready ? <img key={item.id} className="storyview__media" src={src} alt="" onError={() => setError(t('Não foi possível abrir esta foto.'))} /> : null
         )}
         {ready && item.overlays?.length ? <StoryOverlayLayer overlays={item.overlays} box={mediaBox} /> : null}
+        {ready && item.caption ? <StoryCaption text={item.caption} y={item.captionY} /> : null}
         {!ready && !error ? <span className="storyview__loading" role="status" aria-label={t('Carregando story')} /> : null}
         <button type="button" className="storyview__tap storyview__tap--prev" onClick={() => setPos(prevStory(groups, pos))} aria-label={t('Story anterior')} />
         <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo story')} />

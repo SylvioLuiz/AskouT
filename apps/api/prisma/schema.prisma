@@ -1133,6 +1133,10 @@ model EventStory {
   onProfile    Boolean  @default(false)
   /// Textos e figurinhas por cima da mídia (lista conferida por `parseStoryOverlays`). Quem assiste desenha.
   overlays     Json?
+  /// Texto que a pessoa escreveu sobre a mídia (como no Instagram). Null se publicou só a foto/vídeo.
+  caption      String?
+  /// Altura do texto na tela do story: 0 (topo) a 1 (pé).
+  captionY     Float?
   data         Bytes
   createdAt    DateTime @default(now())
   expiresAt    DateTime

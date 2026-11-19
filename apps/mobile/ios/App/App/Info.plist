@@ -24,6 +24,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>O AskouT usa suas fotos e vídeos para você publicar em posts, stories e conversas.</string>
+	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
+	<true/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>O AskouT lê só os horários ocupados das agendas que você escolher, para mostrar na sua agenda e achar horários livres com seus amigos. Títulos e detalhes não saem do celular.</string>
 	<key>NSCalendarsUsageDescription</key>

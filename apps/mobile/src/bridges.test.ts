@@ -469,3 +469,33 @@ it('link br.com.askout:// abre só rotas conhecidas do app', async () => {
   assert.equal(deepLinkPath('br.com.askout://configuracoes'), undefined);
   assert.equal(deepLinkPath('https://evil.example/agenda'), undefined);
 });
+
+describe('galeria (iPhone)', () => {
+  it('lê o arquivo exportado, devolve como File e apaga o temporário', async () => {
+    const { createGalleryBridge } = await import('./gallery-bridge.ts');
+    const discarded: string[] = [];
+    const bridge = createGalleryBridge({
+      plugin: {
+        access: async () => ({ access: 'limited' }),
+        request: async () => ({ access: 'weird' }),
+        recent: async (o) => ({ items: [{ id: 'a', kind: 'IMAGE', thumb: 'data:x' }, { id: 'b', kind: 'VIDEO', thumb: '' }], more: o.offset === 0 }),
+        file: async () => ({ path: 'file:///tmp/x.jpg', mime: 'image/jpeg', name: 'foto.jpg' }),
+        discard: async (o) => void discarded.push(o.path),
+        manage: async () => undefined,
+        openSettings: async () => undefined,
+      },
+      convertFileSrc: (p) => `capacitor://localhost/_capacitor_file_${p}`,
+      fetchFile: async () => new Blob([new Uint8Array([1, 2, 3])]),
+      pixelRatio: () => 3,
+    });
+    assert.equal(await bridge.access(), 'limited');
+    assert.equal(await bridge.request(), 'denied', 'resposta desconhecida conta como negado');
+    const page = await bridge.recent({ offset: 0, limit: 60 });
+    assert.deepEqual(page.items.map((i) => i.id), ['a'], 'sem miniatura não entra na grade');
+    assert.equal(page.more, true);
+    const file = await bridge.file('a');
+    assert.equal(file.type, 'image/jpeg');
+    assert.equal(file.size, 3);
+    assert.deepEqual(discarded, ['file:///tmp/x.jpg']);
+  });
+});

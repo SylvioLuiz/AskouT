@@ -92,6 +92,7 @@ export class ExploreController {
    * Publica um story: o corpo é o arquivo cru (`Content-Type: image/jpeg`, `video/mp4`...).
    * `?profile=1` publica também no perfil, para os amigos verem na página inicial.
    * `X-Story-Overlays`: textos e figurinhas por cima (JSON em base64), já que o corpo é a mídia.
+   * `?caption=...&captionY=0.4`: o texto único da versão anterior (ainda aceito para apps já instalados).
    */
   @Post('events/:id/stories')
   @HttpCode(200)
@@ -102,9 +103,11 @@ export class ExploreController {
     @Headers('x-story-overlays') overlays: string | undefined,
     @Body() body: unknown,
     @Query('profile') profile: string | undefined,
+    @Query('caption') caption: unknown,
+    @Query('captionY') captionY: unknown,
   ) {
     const data = Buffer.isBuffer(body) ? new Uint8Array(body.buffer, body.byteOffset, body.byteLength) : undefined;
-    return this.core.eventPages.createStory(actor.userId, id, contentType, data, profile === '1' || profile === 'true', parseStoryOverlaysHeader(overlays));
+    return this.core.eventPages.createStory(actor.userId, id, contentType, data, profile === '1' || profile === 'true', parseStoryOverlaysHeader(overlays), { caption, captionY });
   }
 
   /** Página inicial: os stories que você e seus amigos publicaram também no perfil. */
