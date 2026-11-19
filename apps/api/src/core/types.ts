@@ -1013,7 +1013,10 @@ export type AuditAction =
   | 'PAYMENTS_DISABLED'
   | 'EVENT_EXTRA_CREATED'
   | 'EVENT_EXTRA_UPDATED'
-  | 'EVENT_EXTRA_REMOVED';
+  | 'EVENT_EXTRA_REMOVED'
+  | 'RECO_EXPERIMENT_ENABLED'
+  | 'RECO_EXPERIMENT_CHANGED'
+  | 'RECO_EXPERIMENT_DISABLED';
 
 export interface AuditRecord {
   id: string;

@@ -29,6 +29,7 @@ import { PaymentsSwitch } from './payments-switch.ts';
 import { EventExtrasCatalog } from './event-extras.ts';
 import { ConsentService } from './consent-service.ts';
 import { CloakroomService } from './cloakroom-service.ts';
+import { RecoExperiment } from './reco-experiment.ts';
 import { RegionService } from './region-service.ts';
 import { AccountService } from './account-service.ts';
 import { AgeService } from './age-service.ts';
@@ -65,6 +66,7 @@ export function createCore(input: CoreInput) {
   const interests = new InterestService(deps);
   const match = new MatchService(deps, interests);
   const paymentsSwitch = new PaymentsSwitch(deps, input.boostsEnabled ?? true);
+  const recoExperiment = new RecoExperiment(deps);
   const boosts = new BoostService(
     deps,
     {
@@ -95,7 +97,7 @@ export function createCore(input: CoreInput) {
     venues,
     calendarImport: new CalendarImportService(deps, venues),
     calendarSync: new CalendarSyncService(deps),
-    admin: new AdminService(deps, venues, auth, paymentsSwitch),
+    admin: new AdminService(deps, venues, auth, paymentsSwitch, recoExperiment),
     meetups: new MeetupService(deps),
     scheduling: new SchedulingService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
@@ -103,7 +105,7 @@ export function createCore(input: CoreInput) {
     eventExtras: new EventExtrasCatalog(deps),
     dwell: new DwellService(deps),
     activity: new ActivityService(deps),
-    recommendations: new RecommendationService(deps, posts, match),
+    recommendations: new RecommendationService(deps, posts, match, recoExperiment),
     regions: new RegionService(deps),
     consents: new ConsentService(deps),
     cloakroom: new CloakroomService(deps),

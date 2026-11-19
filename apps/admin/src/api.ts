@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, EventExtra, EventExtraInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, EventExtra, EventExtraInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -115,6 +115,8 @@ export const api = {
   payments: () => request<PaymentsState>('GET', '/admin/payments'),
   setPayments: (enabled: boolean, note: string) => request<PaymentsState>('PUT', '/admin/payments', { enabled, note }),
   topInviters: (limit = 20) => request<TopInviter[]>('GET', `/admin/referrals/top${query({ limit })}`),
+  recoExperiment: () => request<RecoExperimentState>('GET', '/admin/reco-experiment'),
+  setRecoExperiment: (enabled: boolean, controlPercent: number, note: string) => request<RecoExperimentState>('PUT', '/admin/reco-experiment', { enabled, controlPercent, note }),
   retention: (days: number) => request<RetentionReport>('GET', `/admin/retention${query({ days })}`),
 
   claims: (status: ClaimStatus) => request<Claim[]>('GET', `/admin/claims${query({ status })}`),

@@ -266,7 +266,44 @@ export interface ReturnGroup {
   withoutReco: ReturnRate;
 }
 
+export interface RecoExperimentState {
+  enabled: boolean;
+  controlPercent: number;
+  maxPercent: number;
+  startedAt: string | null;
+  endedAt: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface ProportionDiff {
+  diff: number;
+  low: number;
+  high: number;
+  significant: boolean;
+}
+
+export interface GroupReturn {
+  users: number;
+  d1: ReturnRate;
+  d7: ReturnRate;
+}
+
+export interface ExperimentReport {
+  enabled: boolean;
+  controlPercent: number;
+  from: string;
+  to: string;
+  control: GroupReturn;
+  treatment: GroupReturn;
+  d1Diff: ProportionDiff | null;
+  d7Diff: ProportionDiff | null;
+  lowData: boolean;
+  minSample: number;
+}
+
 export interface RetentionReport {
+  experiment: ExperimentReport | null;
   days: number;
   from: string;
   to: string;

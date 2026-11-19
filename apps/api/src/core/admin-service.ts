@@ -8,6 +8,8 @@ import type { VenueService } from './venue-service.ts';
 import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
 import { EVENT_EXTRA_ICONS, EventExtrasCatalog } from './event-extras.ts';
 import type { EventExtraInput, EventExtraOption } from './event-extras.ts';
+import { buildExperimentReport } from './reco-experiment.ts';
+import type { ExperimentReport, RecoExperiment, RecoExperimentState } from './reco-experiment.ts';
 import type { Actor, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
 import { REPORT_RESOLUTIONS } from './types.ts';
 
@@ -60,8 +62,10 @@ export class AdminService {
   private readonly venues: VenueService;
   private readonly auth: AuthService;
   private readonly paymentsSwitch: PaymentsSwitch;
+  private readonly recoExperiment: RecoExperiment;
 
-  constructor(deps: CoreDeps, venues: VenueService, auth: AuthService, paymentsSwitch: PaymentsSwitch) {
+  constructor(deps: CoreDeps, venues: VenueService, auth: AuthService, paymentsSwitch: PaymentsSwitch, recoExperiment: RecoExperiment) {
+    this.recoExperiment = recoExperiment;
     this.deps = deps;
     this.venues = venues;
     this.auth = auth;
@@ -122,7 +126,7 @@ export class AdminService {
   }
 
   /** Painel de retenção: bloco "Para você" contra o feed, e quem volta depois de um dia com atividade. */
-  async retention(actor: Actor, query: { days?: unknown }): Promise<RetentionReport> {
+  async retention(actor: Actor, query: { days?: unknown }): Promise<RetentionReport & { experiment: ExperimentReport | null }> {
     this.assertAdmin(actor);
     const days = query.days === undefined ? 14 : Number(query.days);
     if (!Number.isInteger(days) || days < 1 || days > 60) throw validationError('Período inválido', { days: 'Entre 1 e 60 dias' });
@@ -130,7 +134,9 @@ export class AdminService {
     // Margem de um dia por causa do fuso; o corte exato é feito na montagem.
     const rows = await this.deps.dwell.listAllSince(new Date(now.getTime() - (days + 1) * 86_400_000), RETENTION_MAX_ROWS + 1);
     const truncated = rows.length > RETENTION_MAX_ROWS;
-    return buildRetentionReport(truncated ? rows.slice(0, RETENTION_MAX_ROWS) : rows, now, days, truncated);
+    const used = truncated ? rows.slice(0, RETENTION_MAX_ROWS) : rows;
+    const config = await this.recoExperiment.config();
+    return { ...buildRetentionReport(used, now, days, truncated), experiment: config ? buildExperimentReport(used, now, config) : null };
   }
 
   // ---------- Pedidos de donos ----------
@@ -269,6 +275,33 @@ export class AdminService {
     const { option, items } = await this.eventExtrasCatalog.remove(id, actor.userId);
     await this.log(actor.userId, 'EVENT_EXTRA_REMOVED', 'SETTING', option.id, option.label);
     return { items };
+  }
+
+  // ---------- Teste A/B do bloco "Para você" ----------
+
+  async recoExperimentState(actor: Actor): Promise<RecoExperimentState> {
+    this.assertAdmin(actor);
+    return this.recoExperiment.state();
+  }
+
+  /**
+   * Liga, desliga ou muda o tamanho do grupo de controle (0 a 50%), na hora. Cada mudança vai para a Auditoria.
+   * Mexer no tamanho com o teste no ar recomeça a medição, porque algumas pessoas trocam de grupo.
+   */
+  async setRecoExperiment(actor: Actor, enabled: unknown, controlPercent: unknown, note: unknown): Promise<RecoExperimentState> {
+    this.assertAdmin(actor);
+    if (typeof enabled !== 'boolean') throw validationError('Dados inválidos', { enabled: 'Use true ou false' });
+    const before = await this.recoExperiment.state();
+    const percent = controlPercent === undefined ? before.controlPercent : controlPercent;
+    if (typeof percent !== 'number' || !Number.isInteger(percent) || percent < 0 || percent > before.maxPercent) {
+      throw validationError('Dados inválidos', { controlPercent: `Número inteiro de 0 a ${before.maxPercent}` });
+    }
+    const reason = noteText(note, false);
+    if (before.enabled === enabled && before.controlPercent === percent) throw conflict(enabled ? 'O teste já está ligado com esse tamanho' : 'O teste já está desligado');
+    await this.recoExperiment.set(enabled, percent, actor.userId);
+    const action = !enabled ? 'RECO_EXPERIMENT_DISABLED' : before.enabled ? 'RECO_EXPERIMENT_CHANGED' : 'RECO_EXPERIMENT_ENABLED';
+    await this.log(actor.userId, action, 'SETTING', 'reco-experiment', `${enabled ? `controle ${percent}%` : 'desligado'}${reason ? `: ${reason}` : ''}`.slice(0, 400));
+    return this.recoExperiment.state();
   }
 
   // ---------- Locais, eventos e posts ----------
