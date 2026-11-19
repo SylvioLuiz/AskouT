@@ -3595,7 +3595,13 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 .ptile__title { font-weight: 700; font-size: 0.875rem; overflow-wrap: anywhere; }
 .ptile__when { font-size: 0.75rem; opacity: 0.9; }
 .ptile__remove { width: 100%; padding: 8px; border: 0; border-top: 1px solid var(--line); background: var(--surface); color: var(--danger); font-size: 0.8125rem; cursor: pointer; }
-.ptile__remove--show { color: var(--brand-text); }
+.attinfo { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin: -4px 0 12px; }
+.attinfo__btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.attinfo__btn[aria-expanded='true'] { color: var(--brand-text); background: var(--surface); }
+.attinfo__btn svg { width: 20px; height: 20px; }
+.attinfo__text { align-self: stretch; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--surface); color: var(--ink-2); font-size: 0.875rem; }
+.ptile--press .ptile__link { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.ptile--press .ptile__link img { -webkit-user-drag: none; pointer-events: none; }
 .ptile__remove:disabled { opacity: 0.6; }
 
 /* ---------- Menu do perfil (folha inferior, estilo lista do iOS) ---------- */

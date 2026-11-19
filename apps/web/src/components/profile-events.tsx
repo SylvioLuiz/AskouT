@@ -7,6 +7,7 @@ import type { ApiError } from '../lib/errors.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import type { AttendedEvent, PostedEvent, PostedEventsPage, PostView } from '../lib/types.ts';
 import { GoingTile } from './profile-attended.tsx';
+import { TileMenu, useTileMenu } from './tile-press.tsx';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -17,9 +18,11 @@ const GOING_MAX = 60;
 function Tile({ event, mine, onRemove, busy }: { event: PostedEvent; mine: boolean; onRemove: () => void; busy: boolean }) {
   const [failed, setFailed] = useState(false);
   const image = failed ? null : safeImage(event.imageUrl);
+  // A dona tira o evento do perfil segurando o cartão.
+  const menu = useTileMenu(mine);
   return (
-    <li className="ptile">
-      <Link to={`/eventos/${encodeURIComponent(event.id)}`} className={`ptile__link evcover--${event.kind.toLowerCase()}${image ? '' : ' ptile__link--plain'}`}>
+    <li className={`ptile${mine ? ' ptile--press' : ''}`}>
+      <Link {...menu.press} to={`/eventos/${encodeURIComponent(event.id)}`} className={`ptile__link evcover--${event.kind.toLowerCase()}${image ? '' : ' ptile__link--plain'}`}>
         {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="ptile__kind" aria-hidden="true">{kindLabel(event.kind)}</span>}
         <span className="ptile__info">
           <span className="ptile__title">{event.title}</span>
@@ -28,10 +31,11 @@ function Tile({ event, mine, onRemove, busy }: { event: PostedEvent; mine: boole
         </span>
       </Link>
       {mine ? (
-        <button type="button" className="ptile__remove" onClick={onRemove} disabled={busy} aria-label={t('Tirar {title} do perfil', { title: event.title })}>
-          {t('Tirar do perfil')}
+        <button type="button" className="visually-hidden" onClick={() => menu.setOpen(true)}>
+          {t('Opções de {title}', { title: event.title })}
         </button>
       ) : null}
+      {mine && menu.open ? <TileMenu title={event.title} actions={[{ label: t('Tirar do perfil'), busy, run: onRemove }]} onClose={() => menu.setOpen(false)} /> : null}
     </li>
   );
 }
