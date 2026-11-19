@@ -2712,4 +2712,5 @@ export const ES: Readonly<Record<string, string>> = {
   "Só você vê esta aba. Aqui ficam os eventos em que você disse Eu vou sem mostrar no perfil.": "Solo tú ves esta pestaña. Aquí quedan los eventos en los que dijiste Voy sin mostrarlos en tu perfil.",
   "Nenhum evento aqui": "No hay eventos aquí",
   "Ao tocar em Eu vou, escolha Só para mim para o evento ficar nesta aba.": "Al tocar Voy, elige Solo para mí para que el evento quede en esta pestaña.",
+  "Pode continuar preenchendo enquanto isso.": "Puedes seguir completando mientras tanto.",
 };

@@ -92,6 +92,18 @@ export interface PrepareOptions {
   native?: NativeVideoCompressor | undefined;
   /** Só para teste: o navegador de teste não tem H.264, então a verificação usa VP9/WebM. */
   codec?: 'avc' | 'vp9';
+  /** Duração já conhecida (lida ao escolher o vídeo): decide sem abrir o arquivo se vale comprimir. */
+  seconds?: number;
+}
+
+/**
+ * Vale mandar para o compressor? Sem a duração, só pelo tamanho. Evita o caminho mais lento (gravar o arquivo no
+ * aparelho, recodificar e ler de volta) para um vídeo que já é leve: ele segue direto para o envio.
+ */
+export function needsCompression(sizeBytes: number, seconds?: number): boolean {
+  if (sizeBytes <= SMALL_ENOUGH_BYTES) return false;
+  if (seconds === undefined) return true;
+  return worthCompressing({ sizeBytes, seconds });
 }
 
 function outputName(file: File, extension: string): string {
@@ -104,6 +116,8 @@ export async function prepareVideo(file: File, options: PrepareOptions = {}): Pr
   const original = (reason: SkipReason): PreparedVideo => ({ file, compressed: false, reason, originalBytes: file.size });
   const done = (out: File): PreparedVideo => ({ file: out, compressed: true, originalBytes: file.size });
   const useful = (out: File | undefined): out is File => out !== undefined && out.size > 0 && (out.size < file.size || file.size > POST_VIDEO_MAX_BYTES);
+
+  if (!needsCompression(file.size, options.seconds)) return original('small-enough');
 
   const native = 'native' in options ? options.native : nativeCompressor();
   if (native) {

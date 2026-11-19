@@ -27,7 +27,7 @@ const STORY_REACTIONS = ['❤️', '😂', '😮', '😢', '🔥', '👏'] as co
 
 export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: string; onClose: () => void; onCreated: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<{ blob: Blob; kind: 'IMAGE' | 'VIDEO'; url: string } | undefined>();
+  const [file, setFile] = useState<{ blob: Blob; kind: 'IMAGE' | 'VIDEO'; url: string; seconds?: number } | undefined>();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [prep, setPrep] = useState<number | undefined>();
@@ -47,8 +47,8 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
         // Como nos posts: vídeo grande serve se este aparelho conseguir reduzir antes de enviar.
         const bad = videoProblem(picked, { canCompress: picked.size > POST_VIDEO_MAX_BYTES ? await canCompressVideo() : false });
         if (bad) throw new Error(bad);
-        await videoPoster(picked); // confere a duração (até 3 minutos)
-        setFile({ blob: picked, kind: 'VIDEO', url: URL.createObjectURL(picked) });
+        const { seconds } = await videoPoster(picked); // confere a duração (até 3 minutos)
+        setFile({ blob: picked, kind: 'VIDEO', url: URL.createObjectURL(picked), seconds });
       } else if (kind === 'IMAGE') {
         const blob = await prepareImage(picked);
         setFile({ blob, kind: 'IMAGE', url: URL.createObjectURL(blob) });
@@ -70,7 +70,7 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
       let blob = file.blob;
       if (file.kind === 'VIDEO' && blob instanceof File) {
         setPrep(0);
-        blob = await prepareVideoUpload(blob, (fraction) => setPrep(fraction));
+        blob = await prepareVideoUpload(blob, (fraction) => setPrep(fraction), file.seconds);
         setPrep(undefined);
       }
       await api.createEventStory(eventId, blob, onProfile);
