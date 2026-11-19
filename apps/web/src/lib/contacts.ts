@@ -107,3 +107,21 @@ export async function hashContactKeys(keys: ContactKeys): Promise<{ hashes: stri
   const [hashes, phoneHashes] = await Promise.all([Promise.all(emails.map(sha256Hex)), Promise.all(phones.map(sha256Hex))]);
   return { hashes, phoneHashes, truncated: emails.length < keys.emails.length || phones.length < keys.phones.length };
 }
+
+/** Celulares por pedido ao servidor: pedidos menores chegam mais rápido e não caem em rede fraca do celular. */
+export const CONTACT_BATCH_PHONES = 500;
+
+/** Divide os códigos em pedidos menores: os e-mails vão no primeiro, os celulares em lotes de CONTACT_BATCH_PHONES. */
+export function contactBatches(hashes: string[], phoneHashes: string[], size = CONTACT_BATCH_PHONES): { hashes: string[]; phoneHashes: string[] }[] {
+  if (phoneHashes.length === 0) return [{ hashes, phoneHashes: [] }];
+  const out: { hashes: string[]; phoneHashes: string[] }[] = [];
+  for (let i = 0; i < phoneHashes.length; i += size) out.push({ hashes: i === 0 ? hashes : [], phoneHashes: phoneHashes.slice(i, i + size) });
+  return out;
+}
+
+/** Junta as pessoas achadas em vários pedidos, sem repetir, na ordem do servidor (pelo nome de usuário). */
+export function mergeMatches<T extends { userId: string; username: string }>(groups: T[][]): T[] {
+  const byId = new Map<string, T>();
+  for (const group of groups) for (const p of group) byId.set(p.userId, p);
+  return [...byId.values()].sort((a, b) => a.username.localeCompare(b.username, 'pt-BR') || a.userId.localeCompare(b.userId));
+}
