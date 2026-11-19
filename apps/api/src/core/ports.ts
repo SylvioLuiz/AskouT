@@ -818,6 +818,10 @@ export interface EventSearchQuery {
 /** Fonte externa de lugares (OpenStreetMap). Nunca lança: se não conseguir, devolve `available: false`. */
 export interface PlaceSource {
   nearby(center: { lat: number; lng: number }, radiusM: number, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }>;
+  /** Qualquer lugar pelo nome ou endereço (só fontes que suportam, como o Google). */
+  search?(text: string, center: { lat: number; lng: number } | undefined, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }>;
+  /** Um lugar pelo id na fonte, para confirmar que existe. */
+  lookup?(externalId: string): Promise<ExternalPlace | undefined>;
 }
 
 /** Rota entre dois pontos. Nunca lança: sem resposta, devolve `undefined` e o app desenha só uma linha reta. */
@@ -903,7 +907,8 @@ export interface NotificationRepository {
   create(record: NotificationRecord): Promise<void>;
   /** Mais recentes primeiro. Com `filter`, só os avisos que casam com alguma cláusula (chips da tela de notificações). */
   listForUser(userId: string, limit: number, filter?: import('./notification-categories.ts').NotificationFilter): Promise<NotificationRecord[]>;
-  unreadCount(userId: string): Promise<number>;
+  /** Não lidos; com `filter`, só os que casam com ele. */
+  unreadCount(userId: string, filter?: import('./notification-categories.ts').NotificationFilter): Promise<number>;
   /** Já existe aviso não lido com essa chave? */
   hasUnread(userId: string, dedupeKey: string): Promise<boolean>;
   /** Marca como lidos (todos se `ids` for omitido). Devolve quantos mudaram. */

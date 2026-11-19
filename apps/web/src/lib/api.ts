@@ -436,6 +436,15 @@ export function createApi(deps: ApiDeps) {
       if (params.radiusKm !== undefined) query.set('radiusKm', String(params.radiusKm));
       return request<{ places: ExplorePlace[]; placesAvailable: boolean }>('GET', `/explore/places?${query.toString()}`);
     },
+    /** Vincular um rolê: locais do AskouT e lugares do Google pelo nome ou endereço, em qualquer lugar. */
+    searchPlaces: (params: { q: string; lat?: number | undefined; lng?: number | undefined }) => {
+      const query = new URLSearchParams({ q: params.q });
+      if (params.lat !== undefined && params.lng !== undefined) {
+        query.set('lat', String(params.lat));
+        query.set('lng', String(params.lng));
+      }
+      return request<{ places: ExplorePlace[]; placesAvailable: boolean }>('GET', `/explore/place-search?${query.toString()}`);
+    },
     recommendations: (personalize: boolean) => request<Recommendations>('GET', `/me/recommendations?personalize=${personalize ? 'true' : 'false'}`),
     recordDwell: (items: DwellEntry[]) => request<{ saved: number }>('POST', '/me/dwell', { body: { items } }),
     eraseDwell: () => request<{ removed: number }>('DELETE', '/me/dwell'),

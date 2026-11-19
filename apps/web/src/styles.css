@@ -3442,6 +3442,8 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 .newsrow { align-items: center; }
 .newsrow__dot { margin-top: 0; }
 .newshead--end { justify-content: flex-end; }
+.newsrow--withactions { border-bottom: 0; }
+.newsrow__actions { padding: 0 0 12px 56px; border-bottom: 1px solid var(--line); margin-top: -4px; }
 /* Seleção de avisos: barra fica presa no topo enquanto rola; cada linha ganha um círculo de marcar. */
 .newshead--select { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: 1fr auto; row-gap: 6px; padding: 8px 0; background: var(--bg); border-bottom: 1px solid var(--line); }
 .newshead--select > .btn { justify-self: end; }
