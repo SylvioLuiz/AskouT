@@ -164,6 +164,19 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
     return (await this.prisma.eventStoryLike.createMany({ data: [{ storyId, userId, createdAt: at }], skipDuplicates: true })).count > 0;
   }
 
+  async recordStoryView(storyId: string, userId: string, at: Date): Promise<boolean> {
+    if (!isUuid(storyId) || !isUuid(userId)) return false;
+    if (!(await this.prisma.eventStory.findUnique({ where: { id: storyId }, select: { id: true } }))) return false;
+    return (await this.prisma.eventStoryView.createMany({ data: [{ storyId, userId, createdAt: at }], skipDuplicates: true })).count > 0;
+  }
+
+  async storyViewCounts(storyIds: string[]): Promise<Map<string, number>> {
+    const ids = storyIds.filter(isUuid);
+    if (ids.length === 0) return new Map();
+    const rows = await this.prisma.eventStoryView.groupBy({ by: ['storyId'], where: { storyId: { in: ids } }, _count: { _all: true } });
+    return new Map(rows.map((r) => [r.storyId, r._count._all] as const));
+  }
+
   async likedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>> {
     const ids = storyIds.filter(isUuid);
     if (!isUuid(userId) || ids.length === 0) return new Set();

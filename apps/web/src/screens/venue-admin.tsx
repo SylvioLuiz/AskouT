@@ -129,7 +129,7 @@ export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
           {t('Novo post')}
         </Button>
         <Button full variant="secondary" onClick={() => setSheet('story')}>
-          {t('Novo story')}
+          {t('Novo flash')}
         </Button>
         <Button full variant="secondary" onClick={() => setSheet('edit')}>
           {t('Editar perfil')}

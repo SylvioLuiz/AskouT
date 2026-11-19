@@ -1017,6 +1017,10 @@ export interface EventRoomRepository {
   setStoryLike(storyId: string, userId: string, liked: boolean, at: Date): Promise<boolean>;
   /** Destes stories, quais `userId` curtiu. */
   likedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>>;
+  /** Registra que `userId` viu o story (uma vez por pessoa). Devolve true se foi a primeira vez. */
+  recordStoryView(storyId: string, userId: string, at: Date): Promise<boolean>;
+  /** Quantas pessoas viram cada story (só os que têm alguma). */
+  storyViewCounts(storyIds: string[]): Promise<Map<string, number>>;
   /** Grava a ocultação de stories de `ownerId` em relação a `otherId`; tudo desligado apaga a linha. */
   setStoryHidden(record: StoryHiddenRecord): Promise<void>;
   /** As ocultações de stories em que `userId` aparece (as que ele escolheu e as que escolheram sobre ele). */

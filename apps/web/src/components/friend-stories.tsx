@@ -20,7 +20,7 @@ export function FriendStories({ groups, onChanged }: { groups: EventStoryGroup[]
   const [viewing, setViewing] = useState<StoryPos | undefined>();
   if (groups.length === 0) return null;
   return (
-    <section className="homestories enter" aria-label={t('Stories dos amigos')}>
+    <section className="homestories enter" aria-label={t('Flashes dos amigos')}>
       <ul className="homestories__list">
         {groups.map((group, index) => (
           <li key={group.author.userId}>
@@ -30,16 +30,16 @@ export function FriendStories({ groups, onChanged }: { groups: EventStoryGroup[]
               onClick={() => setViewing({ group: index, item: 0 })}
               aria-label={
                 group.mine
-                  ? t('Ver o seu story')
+                  ? t('Ver o seu flash')
                   : where(group)
-                    ? t('Ver o story de {username}, que está em {title}', { username: group.author.username, title: where(group) ?? '' })
-                    : t('Ver o story de {username}', { username: group.author.username })
+                    ? t('Ver o flash de {username}, que está em {title}', { username: group.author.username, title: where(group) ?? '' })
+                    : t('Ver o flash de {username}', { username: group.author.username })
               }
             >
               <span className="homestories__ring">
                 <Avatar profile={group.author} size={60} />
               </span>
-              <span className="homestories__name">{group.mine ? t('Seu story') : group.author.username}</span>
+              <span className="homestories__name">{group.mine ? t('Seu flash') : group.author.username}</span>
               {where(group) ? (
                 <span className="homestories__where">
                   <LocationIcon />

@@ -35,9 +35,9 @@ const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(mi
 /** Confere e normaliza a lista vinda do aplicativo. Nada (ou lista vazia) vira `undefined`. */
 export function parseStoryOverlays(raw: unknown): StoryOverlay[] | undefined {
   if (raw === undefined || raw === null) return undefined;
-  const fail = () => validationError('Textos do story inválidos', { overlays: 'Confira os textos do story' });
+  const fail = () => validationError('Textos do flash inválidos', { overlays: 'Confira os textos do flash' });
   if (!Array.isArray(raw)) throw fail();
-  if (raw.length > STORY_OVERLAYS_MAX) throw validationError('Textos demais no story', { overlays: `Use até ${STORY_OVERLAYS_MAX} textos ou figurinhas` });
+  if (raw.length > STORY_OVERLAYS_MAX) throw validationError('Textos demais no flash', { overlays: `Use até ${STORY_OVERLAYS_MAX} textos ou figurinhas` });
   const out: StoryOverlay[] = [];
   for (const item of raw) {
     if (typeof item !== 'object' || item === null) throw fail();
@@ -47,7 +47,7 @@ export function parseStoryOverlays(raw: unknown): StoryOverlay[] | undefined {
     // Sem caracteres de controle (quebra de linha pode).
     const text = o.text.replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '').replace(/\r\n?/g, '\n').trim();
     if (text === '') continue;
-    if ([...text].length > STORY_OVERLAY_TEXT_MAX) throw validationError('Texto do story muito longo', { overlays: `Cada texto tem até ${STORY_OVERLAY_TEXT_MAX} caracteres` });
+    if ([...text].length > STORY_OVERLAY_TEXT_MAX) throw validationError('Texto do flash muito longo', { overlays: `Cada texto tem até ${STORY_OVERLAY_TEXT_MAX} caracteres` });
     const nums = [o.x, o.y, o.scale, o.rotation];
     if (!nums.every((n) => typeof n === 'number' && Number.isFinite(n))) throw fail();
     const color = typeof o.color === 'string' && /^#[0-9a-f]{6}$/i.test(o.color) ? o.color.toLowerCase() : '#ffffff';
@@ -72,8 +72,8 @@ export function parseStoryOverlays(raw: unknown): StoryOverlay[] | undefined {
 /** O cabeçalho `X-Story-Overlays`: JSON em base64 (UTF-8). Vazio ou ausente: sem textos. */
 export function parseStoryOverlaysHeader(header: unknown): StoryOverlay[] | undefined {
   if (typeof header !== 'string' || header.trim() === '') return undefined;
-  const fail = () => validationError('Textos do story inválidos', { overlays: 'Confira os textos do story' });
-  if (header.length > STORY_OVERLAYS_HEADER_MAX) throw validationError('Textos demais no story', { overlays: 'Os textos do story passam do limite' });
+  const fail = () => validationError('Textos do flash inválidos', { overlays: 'Confira os textos do flash' });
+  if (header.length > STORY_OVERLAYS_HEADER_MAX) throw validationError('Textos demais no flash', { overlays: 'Os textos do flash passam do limite' });
   let parsed: unknown;
   try {
     parsed = JSON.parse(Buffer.from(header.trim(), 'base64').toString('utf8'));

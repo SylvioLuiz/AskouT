@@ -176,6 +176,19 @@ export class ExploreController {
     return this.core.storyReactions.like(actor.userId, storyId, asBody(body).liked, id);
   }
 
+  /** Marca o story de outra pessoa como visto (uma vez por pessoa). Quem publicou vê só a contagem. */
+  @Post('stories/:storyId/view')
+  @HttpCode(200)
+  viewProfileStory(@CurrentActor() actor: Actor, @Param('storyId') storyId: string) {
+    return this.core.storyReactions.view(actor.userId, storyId);
+  }
+
+  @Post('events/:id/stories/:storyId/view')
+  @HttpCode(200)
+  viewStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('storyId') storyId: string) {
+    return this.core.storyReactions.view(actor.userId, storyId, id);
+  }
+
   /** Responde a um story com texto: `{text}`. Entre amigos vai direto para a conversa; senão, chega como aviso. */
   @Post('stories/:storyId/reply')
   @HttpCode(200)

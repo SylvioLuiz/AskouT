@@ -27,8 +27,8 @@ export class StoryReactionService {
   async react(actorId: string, storyId: unknown, emoji: unknown, rawEventId?: unknown): Promise<{ sent: true; conversationId: string | null }> {
     if (!isEmoji(emoji)) throw validationError('Reação inválida', { emoji: 'Use um emoji' });
     return this.deliver(actorId, storyId, rawEventId, {
-      message: `Reagiu ao seu story: ${emoji}`,
-      title: (name) => `${name} reagiu ${emoji} ao seu story`,
+      message: `Reagiu ao seu flash: ${emoji}`,
+      title: (name) => `${name} reagiu ${emoji} ao seu flash`,
       body: 'Toque para ver o evento.',
       dedupe: 'story-reaction',
     });
@@ -40,8 +40,8 @@ export class StoryReactionService {
     if (text === '' || /[\u0000-\u0009\u000b-\u001f\u007f]/.test(text)) throw validationError('Escreva uma mensagem', { text: 'Escreva uma mensagem' });
     if ([...text].length > STORY_REPLY_MAX) throw validationError('Mensagem muito longa', { text: `Use até ${STORY_REPLY_MAX} caracteres` });
     return this.deliver(actorId, storyId, rawEventId, {
-      message: `Respondeu ao seu story: ${text}`,
-      title: (name) => `${name} respondeu ao seu story`,
+      message: `Respondeu ao seu flash: ${text}`,
+      title: (name) => `${name} respondeu ao seu flash`,
       body: text.length > 140 ? `${text.slice(0, 139)}…` : text,
       // Cada resposta é um aviso próprio.
       dedupe: `story-reply:${this.deps.ids.next()}`,
@@ -59,7 +59,7 @@ export class StoryReactionService {
       await this.deps.notifier.notify({
         userId: authorId,
         type: 'FEED_REACTION',
-        title: `${me?.username ?? 'Alguém'} curtiu seu story`,
+        title: `${me?.username ?? 'Alguém'} curtiu seu flash`,
         body: 'Toque para ver o evento.',
         url: eventUrl,
         dedupeKey: `story-like:${id}:${actorId}`,
@@ -67,6 +67,13 @@ export class StoryReactionService {
       });
     }
     return { liked };
+  }
+
+  /** Registra que você viu o story de outra pessoa (uma vez). Quem publicou vê só a contagem. */
+  async view(actorId: string, storyId: unknown, rawEventId?: unknown): Promise<{ viewed: true }> {
+    await this.eventPages.reactableStory(actorId, storyId, rawEventId);
+    await this.deps.eventRoom.recordStoryView(String(storyId), actorId, this.deps.clock.now());
+    return { viewed: true };
   }
 
   private async deliver(

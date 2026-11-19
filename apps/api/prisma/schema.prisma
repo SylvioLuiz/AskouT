@@ -209,6 +209,7 @@ model User {
   eventStories        EventStory[]         @relation("EventStoryAuthor")
   storyReports        EventStoryReport[]   @relation("EventStoryReports")
   storyLikes          EventStoryLike[]     @relation("EventStoryLikes")
+  storyViews          EventStoryView[]     @relation("EventStoryViews")
   notificationSetting NotificationSetting? @relation("NotificationSettingUser")
 
   organizedMeetings     Meeting[]            @relation("MeetingOrganizer")
@@ -1147,6 +1148,7 @@ model EventStory {
 
   reports    EventStoryReport[]
   likes      EventStoryLike[]
+  views      EventStoryView[]
 
   @@index([placeEventId, expiresAt])
   @@index([postId, expiresAt])
@@ -1162,6 +1164,19 @@ model EventStoryLike {
 
   story EventStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
   user  User       @relation("EventStoryLikes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([storyId, userId])
+  @@index([userId])
+}
+
+/// Visualização de um story: uma por pessoa (a primeira vez que abriu). Só quem publicou vê a contagem. Some junto com o story.
+model EventStoryView {
+  storyId   String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  story EventStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user  User       @relation("EventStoryViews", fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([storyId, userId])
   @@index([userId])

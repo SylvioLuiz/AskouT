@@ -127,7 +127,7 @@ export function ProfileScreen({ username }: { username: string }) {
   const base = `/u/${encodeURIComponent(profile.username)}`;
   const storyGroup = stories.data?.groups.find((g) => g.author.userId === profile.userId);
   const hasStory = Boolean(storyGroup && storyGroup.items.length > 0 && !relationship.blockedByViewer);
-  const storyLabel = relationship.isSelf ? t('Ver o seu story') : t('Ver o story de {username}', { username: profile.username });
+  const storyLabel = relationship.isSelf ? t('Ver o seu flash') : t('Ver o flash de {username}', { username: profile.username });
 
   return (
     <>

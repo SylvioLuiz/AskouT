@@ -573,6 +573,9 @@ export function createApi(deps: ApiDeps) {
     /** Coração do story (fica guardado; quem publicou recebe um aviso). */
     likeStory: (storyId: string, liked: boolean, eventId?: string) =>
       request<{ liked: boolean }>('POST', eventId ? `/events/${id(eventId)}/stories/${id(storyId)}/like` : `/stories/${id(storyId)}/like`, { body: { liked } }),
+    /** Marca o story de outra pessoa como visto (uma vez por pessoa; quem publicou vê só a contagem). */
+    viewStory: (storyId: string, eventId?: string) =>
+      request<{ viewed: true }>('POST', eventId ? `/events/${id(eventId)}/stories/${id(storyId)}/view` : `/stories/${id(storyId)}/view`, { body: {} }),
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
     eventGo: (eventId: string, onProfile?: boolean) => request<EventPage>('POST', `/events/${id(eventId)}/going`, onProfile === undefined ? {} : { body: { onProfile } }),
     setGoingOnProfile: (eventId: string, onProfile: boolean) => request<EventPage>('PATCH', `/events/${id(eventId)}/going`, { body: { onProfile } }),

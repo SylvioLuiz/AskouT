@@ -77,6 +77,14 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
     setReply('');
   }, [item?.id]);
 
+  // Conta a visualização (uma por pessoa) quando você abre o flash de outra pessoa. Os seus não contam.
+  const viewedRef = useRef(new Set<string>());
+  useEffect(() => {
+    if (!item || group?.mine || viewedRef.current.has(item.id)) return;
+    viewedRef.current.add(item.id);
+    void api.viewStory(item.id, eventId).catch(() => undefined);
+  }, [item?.id, group?.mine, eventId]);
+
   // Foto: baixa e decodifica fora da tela; só mostra quando está inteira (nada de meia imagem aparecendo).
   // Já deixa a próxima foto baixando, para a troca ser instantânea.
   const ready = !!item && readyId === item.id;
@@ -303,7 +311,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
           event.preventDefault();
         }
       }}
-      className={`storyview${!eventId && item.event ? ' storyview--placed' : ''}${group.mine ? '' : ' storyview--replies'}`} role="dialog" aria-modal="true" aria-label={t('Story de {username}', { username: group.author.username })}>
+      className={`storyview${!eventId && item.event ? ' storyview--placed' : ''}${group.mine ? '' : ' storyview--replies'}`} role="dialog" aria-modal="true" aria-label={t('Flash de {username}', { username: group.author.username })}>
       <div className="storyview__bars" aria-hidden="true">
         {group.items.map((it, index) => (
           <span key={it.id} className="storyview__bar">
@@ -328,12 +336,12 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
           </span>
         </Link>
         {!group.mine ? (
-          <button type="button" className="storyview__btn storyview__btn--quiet" onClick={() => setReporting(true)} aria-label={t('Mais opções do story')} aria-haspopup="dialog">
+          <button type="button" className="storyview__btn storyview__btn--quiet" onClick={() => setReporting(true)} aria-label={t('Mais opções do flash')} aria-haspopup="dialog">
             <MoreIcon />
           </button>
         ) : null}
         {item.canDelete ? (
-          <button type="button" className="storyview__btn" onClick={() => setAskDelete(true)} disabled={busy} aria-label={t('Apagar este story')}>
+          <button type="button" className="storyview__btn" onClick={() => setAskDelete(true)} disabled={busy} aria-label={t('Apagar este flash')}>
             <TrashIcon />
           </button>
         ) : null}
@@ -362,16 +370,16 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
         )}
         {ready && item.overlays?.length ? <StoryOverlayLayer overlays={item.overlays} box={mediaBox} /> : null}
         {ready && item.caption ? <StoryCaption text={item.caption} y={item.captionY} /> : null}
-        {!ready && !error ? <span className="storyview__loading" role="status" aria-label={t('Carregando story')} /> : null}
-        <button type="button" className="storyview__tap storyview__tap--prev" onClick={() => setPos(prevStory(groups, pos))} aria-label={t('Story anterior')} />
-        <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo story')} />
+        {!ready && !error ? <span className="storyview__loading" role="status" aria-label={t('Carregando flash')} /> : null}
+        <button type="button" className="storyview__tap storyview__tap--prev" onClick={() => setPos(prevStory(groups, pos))} aria-label={t('Flash anterior')} />
+        <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo flash')} />
         {item.kind === 'VIDEO' ? <SoundToggle muted={muted} onToggle={() => setMuted((m) => !m)} /> : null}
       </div>
-      {composing ? <button type="button" className="storyreply__shade" onPointerDown={(event) => event.preventDefault()} onClick={() => replyRef.current?.blur()} aria-label={t('Voltar ao story')} tabIndex={-1} /> : null}
+      {composing ? <button type="button" className="storyreply__shade" onPointerDown={(event) => event.preventDefault()} onClick={() => replyRef.current?.blur()} aria-label={t('Voltar ao flash')} tabIndex={-1} /> : null}
       {!group.mine ? (
         <div className={`storyreply${composing ? ' is-composing' : ''}${item.kind === 'VIDEO' ? ' storyreply--video' : ''}`} style={keyboard > 0 ? { bottom: `${keyboard + 8}px` } : undefined}>
           {composing ? (
-            <div className="storyreply__quick" role="group" aria-label={t('Reagir ao story')}>
+            <div className="storyreply__quick" role="group" aria-label={t('Reagir ao flash')}>
               {STORY_REACTIONS.map((emoji) => (
                 <button
                   key={emoji}
@@ -407,7 +415,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
                 <SendIcon />
               </button>
             ) : (
-              <button type="button" className={`storyreply__heart${liked ? ' is-on' : ''}${likePop === item.id ? ' is-pop' : ''}`} onClick={() => void toggleLike()} aria-pressed={liked} aria-label={liked ? t('Descurtir o story') : t('Curtir o story')}>
+              <button type="button" className={`storyreply__heart${liked ? ' is-on' : ''}${likePop === item.id ? ' is-pop' : ''}`} onClick={() => void toggleLike()} aria-pressed={liked} aria-label={liked ? t('Descurtir o flash') : t('Curtir o flash')}>
                 <HeartIcon filled={liked} />
               </button>
             )}
@@ -420,17 +428,26 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
           <span>{sentReaction.emoji ? t('Reação enviada para {username}', { username: group.author.username }) : t('Mensagem enviada para {username}', { username: group.author.username })}</span>
         </div>
       ) : null}
+      {group.mine && item.views !== undefined ? (
+        <p className="storyview__views" role="status">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <span>{item.views === 1 ? t('1 visualização') : t('{count} visualizações', { count: item.views })}</span>
+        </p>
+      ) : null}
       {!eventId && item.event ? <StoryPlace event={item.event} username={group.author.username} /> : null}
       {error ? <p className="storyview__error">{error}</p> : null}
       {askDelete ? (
-        <Sheet title={t('Apagar story')} onClose={() => setAskDelete(false)}>
-          <Confirm danger question={t('Apagar este story? Ele sai do ar na hora e não dá para desfazer.')} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => void remove()} onCancel={() => setAskDelete(false)} />
+        <Sheet title={t('Apagar flash')} onClose={() => setAskDelete(false)}>
+          <Confirm danger question={t('Apagar este flash? Ele sai do ar na hora e não dá para desfazer.')} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => void remove()} onCancel={() => setAskDelete(false)} />
         </Sheet>
       ) : null}
       {reporting ? (
         <ReasonSheet
-          title={t('Denunciar story')}
-          doneText={t('Denúncia enviada. Você não verá mais este story.')}
+          title={t('Denunciar flash')}
+          doneText={t('Denúncia enviada. Você não verá mais este flash.')}
           submit={(reason, details) => (eventId ? api.reportEventStory(eventId, item.id, reason, details) : api.reportProfileStory(item.id, reason, details))}
           onClose={() => setReporting(false)}
           onDone={() => {

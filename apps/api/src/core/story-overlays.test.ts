@@ -4,7 +4,7 @@ import { STORY_OVERLAYS_MAX, parseStoryOverlays, parseStoryOverlaysHeader } from
 
 const base = { kind: 'TEXT', text: 'Partiu!', x: 0.5, y: 0.4, scale: 1, rotation: 0, color: '#FFFFFF', style: 'BOX' };
 
-describe('textos do story', () => {
+describe('textos do flash', () => {
   it('sem nada ou lista vazia: sem textos', () => {
     assert.equal(parseStoryOverlays(undefined), undefined);
     assert.equal(parseStoryOverlays([]), undefined);

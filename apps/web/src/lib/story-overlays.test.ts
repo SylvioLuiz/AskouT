@@ -5,7 +5,7 @@ import type { StoryOverlay } from './types.ts';
 
 const text: StoryOverlay = { kind: 'TEXT', text: 'Partiu!', x: 0.5, y: 0.5, scale: 1, rotation: 0, color: '#ffffff', style: 'CLASSIC' };
 
-describe('textos do story: geometria', () => {
+describe('textos do flash: geometria', () => {
   it('encaixa a mídia inteira no palco (como object-fit: contain)', () => {
     assert.deepEqual(containRect({ width: 390, height: 844 }, { width: 1080, height: 1920 }), { left: 0, top: 75.33333333333331, width: 390, height: 693.3333333333334 });
     const wide = containRect({ width: 400, height: 800 }, { width: 1600, height: 900 });
@@ -34,7 +34,7 @@ describe('textos do story: geometria', () => {
   });
 });
 
-describe('textos do story: envio', () => {
+describe('textos do flash: envio', () => {
   it('tira itens vazios, corta excesso e limita a posição', () => {
     const out = cleanOverlays([{ ...text, text: '  ' }, { ...text, x: 2, y: -1, rotation: 400, text: ' oi\r\n ' }]);
     assert.deepEqual(out, [{ ...text, text: 'oi', x: 1, y: 0, rotation: 40 }]);
@@ -48,7 +48,7 @@ describe('textos do story: envio', () => {
   });
 });
 
-describe('textos do story: aparência', () => {
+describe('textos do flash: aparência', () => {
   it('estilos se alternam em ciclo', () => {
     assert.equal(nextStyle('CLASSIC'), 'BOX');
     assert.equal(nextStyle('SERIF'), 'CLASSIC');

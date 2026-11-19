@@ -129,7 +129,7 @@ export function StoryCreator({ eventId, onClose, onCreated }: { eventId: string;
   const [media, setMedia] = useState<StoryMedia | undefined>();
   useEffect(() => () => media && URL.revokeObjectURL(media.url), [media]);
   return createPortal(
-    <div className="storycreate" role="dialog" aria-modal="true" aria-label={t('Criar story')}>
+    <div className="storycreate" role="dialog" aria-modal="true" aria-label={t('Criar flash')}>
       {media ? (
         <StoryEditor media={media} eventId={eventId} onBack={() => setMedia(undefined)} onCreated={onCreated} />
       ) : (
@@ -552,7 +552,7 @@ function StoryEditor({ media, eventId, onBack, onCreated }: { media: StoryMedia;
         {media.kind === 'VIDEO' ? (
           <video className="storyedit__media" src={media.url} autoPlay loop playsInline muted={muted} />
         ) : (
-          <img className="storyedit__media" src={media.url} alt={t('Prévia do story')} draggable={false} />
+          <img className="storyedit__media" src={media.url} alt={t('Prévia do flash')} draggable={false} />
         )}
         {box ? (
           <div className="storyovs storyovs--edit" style={{ left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` }}>
@@ -647,7 +647,7 @@ function StoryTextEditor({ initial, width, onDone }: { initial: StoryOverlay; wi
 
   const look = overlayLook({ kind: 'TEXT', color, style, scale: 1 }, width);
   return (
-    <div className="storytext" style={{ ['--kb' as string]: `${keyboard}px` }} role="dialog" aria-label={t('Escrever no story')}>
+    <div className="storytext" style={{ ['--kb' as string]: `${keyboard}px` }} role="dialog" aria-label={t('Escrever no flash')}>
       <button type="button" className="storytext__backdrop" onClick={done} aria-label={t('Concluir')} tabIndex={-1} />
       <div className="storytext__bar">
         <button type="button" className="storytext__style" onClick={() => setStyle((s) => nextStyle(s))} aria-label={t('Estilo do texto: {style}. Toque para trocar', { style: STYLE_LABEL[style]() })}>
@@ -666,7 +666,7 @@ function StoryTextEditor({ initial, width, onDone }: { initial: StoryOverlay; wi
           maxLength={STORY_OVERLAY_TEXT_MAX}
           rows={1}
           onChange={(event) => setText(event.target.value)}
-          aria-label={t('Texto do story')}
+          aria-label={t('Texto do flash')}
           placeholder={t('Escreva algo')}
           enterKeyHint="enter"
           autoCapitalize="sentences"

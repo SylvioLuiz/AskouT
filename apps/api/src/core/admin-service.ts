@@ -393,7 +393,7 @@ export class AdminService {
   async deleteStory(actor: Actor, storyId: unknown, note: unknown): Promise<{ deleted: true }> {
     this.assertAdmin(actor);
     const text = noteText(note, true);
-    if (typeof storyId !== 'string' || storyId.length > 64 || !(await this.deps.admin.deleteStory(storyId))) throw notFound('Story não encontrado');
+    if (typeof storyId !== 'string' || storyId.length > 64 || !(await this.deps.admin.deleteStory(storyId))) throw notFound('Flash não encontrado');
     await this.log(actor.userId, 'STORY_REMOVED', 'STORY', storyId, text);
     return { deleted: true };
   }

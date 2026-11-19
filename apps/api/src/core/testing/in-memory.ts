@@ -2533,6 +2533,24 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     return new Set(storyIds.filter((id) => this.storyLikes.has(`${id}|${userId}`)));
   }
 
+  readonly storyViews = new Set<string>();
+
+  async recordStoryView(storyId: string, userId: string): Promise<boolean> {
+    const key = `${storyId}|${userId}`;
+    if (!this.stories.has(storyId) || this.storyViews.has(key)) return false;
+    this.storyViews.add(key);
+    return true;
+  }
+
+  async storyViewCounts(storyIds: string[]): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    for (const key of this.storyViews) {
+      const id = key.split('|')[0]!;
+      if (storyIds.includes(id)) counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+    return counts;
+  }
+
   readonly storyHidden = new Map<string, StoryHiddenRecord>();
 
   async setStoryHidden(record: StoryHiddenRecord): Promise<void> {

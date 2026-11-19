@@ -205,7 +205,7 @@ test('painel: contagens e páginas', async () => {
   await rejectsWith(w.core.admin.searchUsers(A, { q: 'x'.repeat(81) }), 'VALIDATION');
 });
 
-test('denúncias de story: fila da gestão, mídia mesmo vencida, decisão uma vez e remoção do story', async () => {
+test('denúncias de flash: fila da gestão, mídia mesmo vencida, decisão uma vez e remoção do flash', async () => {
   const { w, A, U, ana, bia, caio } = await setup();
   const now = w.clock.now().getTime();
   await w.places.createEvent({ id: 'e9', venueId: 'v1', title: 'Noite do Samba', description: null, kind: 'SHOW', isFree: false, imageUrl: null, tags: [], startsAt: new Date(now + H), endsAt: new Date(now + 5 * H), isSample: false });
@@ -238,7 +238,7 @@ test('denúncias de story: fila da gestão, mídia mesmo vencida, decisão uma v
   await rejectsWith(w.core.admin.deleteStory(A, s2, ''), 'VALIDATION');
   await w.core.admin.deleteStory(A, s2, 'Fora das regras');
   await rejectsWith(w.core.admin.deleteStory(A, s2, 'de novo'), 'NOT_FOUND');
-  assert.equal((await w.core.admin.stats(A)).openStoryReports, 1, 'a denúncia do story apagado sai junto');
+  assert.equal((await w.core.admin.stats(A)).openStoryReports, 1, 'a denúncia do flash apagado sai junto');
   const actions = (await w.core.admin.audit(A, {})).items.map((r) => r.action);
   assert.deepEqual(actions, ['STORY_REMOVED', 'REPORT_DISMISSED']);
 });

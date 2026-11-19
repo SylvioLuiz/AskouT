@@ -151,7 +151,7 @@ export function buildTerms(email: string): LegalDoc {
       {
         title: '5. Denúncias, bloqueio e moderação',
         items: [
-          'Você pode denunciar perfis, posts, comentários, stories e conversas pelo próprio app (menu de opções de cada item) e bloquear qualquer pessoa a qualquer momento.',
+          'Você pode denunciar perfis, posts, comentários, flashes e conversas pelo próprio app (menu de opções de cada item) e bloquear qualquer pessoa a qualquer momento.',
           'A nossa equipe analisa as denúncias em até 24 horas, remove o conteúdo que descumprir estes termos e exclui da plataforma quem o publicou. Bloquear alguém também avisa a nossa equipe e faz o conteúdo dessa pessoa sumir do seu feed na hora.',
           `Para denúncias que não caibam no app ou casos urgentes, escreva para ${email}.`,
         ],
