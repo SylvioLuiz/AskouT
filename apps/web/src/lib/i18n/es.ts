@@ -2550,5 +2550,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Depois de criar, você escolhe as conversas e grupos que vão receber o evento.": "Después de crearlo, eliges las conversaciones y grupos que recibirán el evento.",
   "Reagir ao story": "Reaccionar a la historia",
   "Reação enviada para {username}": "Reacción enviada a {username}",
+  "Encontros": "Encuentros",
+  "Próximos": "Próximos",
+  "Tipos de interação": "Tipos de interacción",
   "Ver": "Ver",
 };

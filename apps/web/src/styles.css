@@ -6064,3 +6064,9 @@ div.optrow__main { cursor: default; }
 .vpreview { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .vpreview__page { display: flex; flex-direction: column; gap: 12px; padding-bottom: 8px; overflow: hidden; border: 1px dashed var(--line-strong); border-radius: var(--radius-control); pointer-events: none; user-select: none; }
 .vpreview__page > :not(.vhero) { margin-inline: 16px; }
+
+/* Abas de Suas interações (como em "Sua atividade > Interações" do Instagram): ícone + nome, rolam na horizontal. */
+.intertabs { margin-top: 4px; }
+.intertabs__tab { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.intertabs__tab .icon, .intertabs__tab svg { width: 16px; height: 16px; flex: none; }
+.intertabs::-webkit-scrollbar { display: none; }
