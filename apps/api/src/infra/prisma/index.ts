@@ -19,6 +19,7 @@ export { PrismaPasswordResetRepository } from './prisma-password-reset.repositor
 export { PrismaMfaRepository } from './prisma-mfa.repository.ts';
 export { PrismaBoostRepository } from './prisma-boost.repository.ts';
 export { PrismaBoostStatsRepository } from './prisma-boost-stats.repository.ts';
+export { PrismaOfferRepository } from './prisma-offer.repository.ts';
 export { PrismaAppSettingsRepository } from './prisma-app-settings.repository.ts';
 export { PrismaDwellRepository } from './prisma-dwell.repository.ts';
 export { PrismaAccountRepository } from './prisma-account.repository.ts';

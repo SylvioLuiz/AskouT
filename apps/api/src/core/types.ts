@@ -1335,3 +1335,19 @@ export interface CloakroomTicketRecord {
   storedAt: Date | null;
   returnedAt: Date | null;
 }
+
+// ---------- Oferta relâmpago do bar ----------
+
+/** Oferta curta publicada por quem administra o local ("chopp em dobro até 22h"). Aparece como "Patrocinado" para quem está perto. */
+export interface VenueOfferRecord {
+  id: string;
+  venueId: string;
+  /** Quem publicou (o responsável pelo local). */
+  ownerId: string;
+  text: string;
+  createdAt: Date;
+  startsAt: Date;
+  endsAt: Date;
+  /** Preenchido quando o responsável encerra antes do fim. */
+  endedAt: Date | null;
+}

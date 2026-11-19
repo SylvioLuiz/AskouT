@@ -39,6 +39,7 @@ const DatePollCreateScreen = lazyWithReload(() => import('./components/date-poll
 const ChatInfoScreen = lazyWithReload(() => import('./screens/chat-info.tsx').then((m) => ({ default: m.ChatInfoScreen })));
 const GroupScreen = lazyWithReload(() => import('./screens/group.tsx').then((m) => ({ default: m.GroupScreen })));
 const VenueCalendarScreen = lazyWithReload(() => import('./screens/venue-calendar.tsx').then((m) => ({ default: m.VenueCalendarScreen })));
+const VenueOffersScreen = lazyWithReload(() => import('./screens/venue-offers.tsx').then((m) => ({ default: m.VenueOffersScreen })));
 const CloakroomPanelScreen = lazyWithReload(() => import('./screens/cloakroom-panel.tsx').then((m) => ({ default: m.CloakroomPanelScreen })));
 const VenueAdminHomeScreen = lazyWithReload(() => import('./screens/venue-admin.tsx').then((m) => ({ default: m.VenueAdminHomeScreen })));
 const VenueAdminEventsScreen = lazyWithReload(() => import('./screens/venue-admin.tsx').then((m) => ({ default: m.VenueAdminEventsScreen })));
@@ -174,6 +175,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/bares/:id/equipe', render: (p) => <VenueTeamScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id/agenda', render: (p) => <VenueCalendarScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/locais/:id/agenda', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}/agenda`} /> },
+  { path: '/bares/:id/oferta', render: (p) => <VenueOffersScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id/impulsionar', render: (p) => <BoostScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id', render: (p) => <VenuePageScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/locais/:id', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}`} /> },

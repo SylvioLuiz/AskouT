@@ -129,6 +129,9 @@ export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
         <Button full variant="secondary" onClick={() => setSheet('edit')}>
           {t('Editar perfil')}
         </Button>
+        <Button full variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/oferta`)}>
+          {t('Oferta relâmpago')}
+        </Button>
       </div>
       <section className="section" aria-labelledby="vadmin-next">
         <h2 id="vadmin-next" className="section__title">

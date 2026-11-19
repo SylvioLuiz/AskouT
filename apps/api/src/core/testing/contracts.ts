@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+import type { AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, OfferRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
   CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
-import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
+import type { VenueOfferRecord, DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -21,6 +21,7 @@ export interface RepoHarness {
   passwordResets: PasswordResetRepository;
   boosts: BoostRepository;
   boostStats: BoostStatsRepository;
+  offers: OfferRepository;
   settings: AppSettingsRepository;
   dwell: DwellRepository;
   regions: RegionRepository;
@@ -596,6 +597,32 @@ export function defineRepositoryContract(
         assert.equal((await h.boosts.findByChargeId(receipt))?.id, a.id, 'a compra fica registrada como cobrança');
         assert.equal(await h.boosts.markPaid(b.id, { ...window, chargeId: receipt }), false, 'o mesmo recibo não paga outro pedido');
         assert.equal((await h.boosts.find(b.id))?.status, 'PENDING_PAYMENT', 'o outro pedido continua aguardando');
+      });
+
+      it('oferta relâmpago: uma no ar por local, contagem por dia, encerrar e janela', async () => {
+        const owner = await newUser('oferta_dono');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar Oferta', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: owner };
+        await h.places.createVenue(v);
+        const t0 = new Date(Date.UTC(2030, 0, 10, 20));
+        const H = 3_600_000;
+        const mk = (n: number, over: Partial<VenueOfferRecord> = {}): VenueOfferRecord => ({ id: randomUUID(), venueId: v.id, ownerId: owner, text: `Chopp em dobro ${n}`, createdAt: new Date(t0.getTime() + n), startsAt: t0, endsAt: new Date(t0.getTime() + 2 * H), endedAt: null, ...over });
+        const a = mk(1);
+        await h.offers.create(a, t0);
+        assert.equal((await h.offers.find(a.id))?.text, a.text);
+        assert.equal((await h.offers.findActiveByVenue(v.id, t0))?.id, a.id);
+        await assert.rejects(h.offers.create(mk(2), t0), (e: unknown) => e instanceof DomainError && e.code === 'CONFLICT', 'só uma no ar por local');
+        assert.deepEqual((await h.offers.listActive(t0)).filter((o) => o.venueId === v.id).map((o) => o.id), [a.id]);
+        assert.equal((await h.offers.listActive(new Date(t0.getTime() + 3 * H))).filter((o) => o.venueId === v.id).length, 0, 'depois do fim some');
+        assert.equal(await h.offers.end(a.id, new Date(t0.getTime() + H)), true);
+        assert.equal(await h.offers.end(a.id, new Date(t0.getTime() + H)), false, 'já encerrada');
+        assert.equal(await h.offers.findActiveByVenue(v.id, new Date(t0.getTime() + H)), undefined);
+        assert.ok((await h.offers.find(a.id))?.endedAt);
+        const b = mk(3, { endsAt: new Date(t0.getTime() + 3 * H) });
+        await h.offers.create(b, new Date(t0.getTime() + H));
+        assert.deepEqual((await h.offers.listByVenue(v.id, 10)).map((o) => o.id), [b.id, a.id], 'mais nova primeiro');
+        assert.equal((await h.offers.listByVenue(v.id, 1)).length, 1);
+        assert.equal(await h.offers.countSince(v.id, t0), 2, 'as encerradas também contam');
+        assert.equal(await h.offers.countSince(v.id, new Date(t0.getTime() + 2)), 1);
       });
 
       it('região: guarda uma por pessoa, troca, apaga e filtra pela caixa', async () => {

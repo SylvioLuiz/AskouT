@@ -1327,3 +1327,43 @@ export interface EventExtraView extends EventExtraOption {
   optionId: string;
   value: boolean | string;
 }
+
+// ---------- Oferta relâmpago do bar ----------
+
+/** Oferta que vale para a pessoa agora (Home e NOW). Sempre com a etiqueta “Patrocinado”; nada sobre quem mais recebeu. */
+export interface NearbyOffer {
+  id: string;
+  venueId: string;
+  venueName: string;
+  text: string;
+  endsAt: string;
+  label: 'Patrocinado';
+}
+
+/** Como o responsável enxerga a oferta. `reach` é só uma faixa de alcance, nunca quem. */
+export interface OfferView {
+  id: string;
+  venueId: string;
+  venueName: string;
+  text: string;
+  startsAt: string;
+  endsAt: string;
+  phase: 'ACTIVE' | 'ENDED';
+  reach: MatchReach | null;
+}
+
+export interface OfferLimits {
+  textMax: number;
+  textMin: number;
+  minMinutes: number;
+  maxMinutes: number;
+  maxPerDay: number;
+  radiusKm: number;
+  free: boolean;
+}
+
+export interface VenueOffers {
+  items: OfferView[];
+  limits: OfferLimits;
+  remainingToday: number;
+}

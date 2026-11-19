@@ -33,6 +33,7 @@ import type {
   PasswordResetRepository,
   BoostRepository,
   BoostStatsRepository,
+  OfferRepository,
   RegionRepository,
   ConsentRepository,
   CloakroomRepository,
@@ -57,6 +58,7 @@ import { matchesNotificationFilter, type NotificationFilter } from '../notificat
 import type {
   DirectActivityRow,
   DwellRecord,
+  VenueOfferRecord,
   ConsentEventRecord,
   CloakroomSettingRecord,
   CloakroomTicketRecord,
@@ -825,6 +827,52 @@ export class InMemoryRegionRepository implements RegionRepository {
       .sort((a, b) => (a.userId < b.userId ? -1 : 1))
       .slice(0, limit)
       .map((r) => ({ ...r }));
+  }
+}
+
+export class InMemoryOfferRepository implements OfferRepository {
+  readonly rows = new Map<string, VenueOfferRecord>();
+
+  private static isActive(o: VenueOfferRecord, now: Date): boolean {
+    return o.endedAt === null && o.startsAt.getTime() <= now.getTime() && o.endsAt.getTime() > now.getTime();
+  }
+
+  async create(offer: VenueOfferRecord, now: Date): Promise<void> {
+    if ([...this.rows.values()].some((o) => o.venueId === offer.venueId && InMemoryOfferRepository.isActive(o, now))) throw conflict('Este local já tem uma oferta no ar.');
+    this.rows.set(offer.id, { ...offer });
+  }
+
+  async find(id: string): Promise<VenueOfferRecord | undefined> {
+    const r = this.rows.get(id);
+    return r ? { ...r } : undefined;
+  }
+
+  async listByVenue(venueId: string, limit: number): Promise<VenueOfferRecord[]> {
+    return [...this.rows.values()]
+      .filter((o) => o.venueId === venueId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+      .slice(0, limit)
+      .map((o) => ({ ...o }));
+  }
+
+  async findActiveByVenue(venueId: string, now: Date): Promise<VenueOfferRecord | undefined> {
+    const r = [...this.rows.values()].find((o) => o.venueId === venueId && InMemoryOfferRepository.isActive(o, now));
+    return r ? { ...r } : undefined;
+  }
+
+  async countSince(venueId: string, since: Date): Promise<number> {
+    return [...this.rows.values()].filter((o) => o.venueId === venueId && o.createdAt.getTime() >= since.getTime()).length;
+  }
+
+  async end(id: string, now: Date): Promise<boolean> {
+    const r = this.rows.get(id);
+    if (!r || !InMemoryOfferRepository.isActive(r, now)) return false;
+    r.endedAt = now;
+    return true;
+  }
+
+  async listActive(now: Date): Promise<VenueOfferRecord[]> {
+    return [...this.rows.values()].filter((o) => InMemoryOfferRepository.isActive(o, now)).map((o) => ({ ...o }));
   }
 }
 

@@ -180,6 +180,21 @@ O dono escolhe um evento, o raio (2, 5, 10 ou 25 km em volta do local) e de 1 a 
 - Não há ainda relatório para o dono (quantas vezes o anúncio foi exibido e aberto) nem cobrança diferente por resultado. A exibição já é medida como as demais do "Para você" (fonte RECO).
 - O Match só existe no "Para você" da Home; não aparece no Explorar nem fora do app.
 
+## Oferta relâmpago do bar
+
+Quem administra o local publica uma oferta curta (5 a 80 caracteres, ex.: "chopp em dobro até 22h") com duração de 15 min a 4 h, em "Oferta relâmpago" na página do local. Aparece com a etiqueta "Patrocinado", na Home e na tela do NOW, para quem **está com o NOW ligado (com área) ou tem região salva a até 5 km do local** (mesma conta de distância do Match). No máximo 1 oferta por vez para a pessoa (a mais próxima); some ao vencer ou ao ser encerrada. Respeita bloqueios nos dois sentidos, e o dono não vê a própria oferta.
+
+**Limites:** 1 oferta no ar por local (também garantido por índice único parcial no Postgres) e 3 ofertas por local nas últimas 24 h (as encerradas contam). Texto passa pelo filtro de termos (`content-filter.ts`).
+
+**Privacidade:** ninguém vê quem recebeu. O dono vê só uma faixa ("menos de 10 pessoas" / "cerca de 20 pessoas") que conta quem tem **região salva** no raio; quem está só com o NOW ligado não entra nessa faixa (a estimativa fica abaixo do alcance real).
+
+**Pendências / decisões do produto:**
+- **Preço:** por enquanto a oferta é **grátis** (`OFFER_FREE` em `offer-service.ts`). Se o produto decidir cobrar, o pedido deve passar pela chave de pagamentos (`payments-switch.ts`), como o impulsionamento, com produto nas lojas.
+- Valores ajustáveis em `offer-service.ts`: raio (`OFFER_RADIUS_M`), texto, duração máxima e `OFFER_MAX_PER_DAY`.
+- Sem push: a oferta só aparece quando a pessoa abre a Home ou o NOW.
+- Traduções em inglês e espanhol ainda não feitas (cai no português).
+- Migração `20261215120000_venue_offers`: rodar `prisma migrate deploy` e `prisma generate`.
+
 ## Link de ingresso nos eventos dos locais
 
 - Rodar a migração `20261201120000_event_ticket_url` (coluna `PlaceEvent.ticketUrl`). O `npm run update` do ambiente de teste já faz isso.
