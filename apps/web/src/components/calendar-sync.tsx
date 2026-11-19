@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, Loading, Notice } from './ui.tsx';
 import { Sheet } from './agenda.tsx';
 import { CalendarLogo } from './calendar-logos.tsx';
+import { CheckIcon } from './icons.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -153,7 +154,12 @@ export function CalendarSyncSheet({ onClose, onChange, notice }: { onClose: () =
   return (
     <Sheet title={t('Sincronizar agendas')} onClose={onClose}>
       <p className="muted">{t('Conecte suas agendas: os compromissos aparecem como "ocupado" no AskouT e na hora de achar horário com amigos. Títulos e detalhes não saem da sua agenda.')}</p>
-      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      {message ? (
+        <Notice tone={message.tone}>
+          {message.tone === 'ok' ? <span className="calsync__check" aria-hidden="true"><CheckIcon /></span> : null}
+          {message.text}
+        </Notice>
+      ) : null}
       {overview.loading && !data ? <Loading /> : null}
       {overview.error ? <Notice tone="error">{overview.error.message}</Notice> : null}
 

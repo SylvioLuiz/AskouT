@@ -13,6 +13,7 @@ import { SocialLogin } from '@capgo/capacitor-social-login';
 import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';
 import { createAppleBridge } from './apple-bridge.ts';
 import { installBackButton } from './back-button.ts';
+import { deepLinkPath } from './deep-link.ts';
 import { createLocationBridge, guardGeolocation } from './location-bridge.ts';
 import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
@@ -43,6 +44,11 @@ if (Capacitor.isNativePlatform()) {
       dispatch: () => window.dispatchEvent(new Event('askout:back', { cancelable: true })),
     });
   }
+  // Volta do login da agenda no navegador (br.com.askout://agenda?agendas=google): abre a Agenda com o aviso.
+  void App.addListener('appUrlOpen', ({ url }) => {
+    const path = deepLinkPath(url);
+    if (path) openInApp(path, window);
+  });
   const location = createLocationBridge({
     checkPermissions: () => Geolocation.checkPermissions(),
     requestPermissions: () => Geolocation.requestPermissions(),

@@ -5,23 +5,13 @@ import { CurrentActor, Public } from '../decorators.ts';
 import type { AppConfig } from '../support/config.ts';
 import { asBody } from '../support/parse.ts';
 import { CONFIG, CORE } from '../tokens.ts';
+import { appReturnUrl, backToAppPage } from './calendar-return-page.ts';
 
 interface RedirectResponse {
   redirect(status: number, url: string): void;
   status(code: number): RedirectResponse;
   setHeader(name: string, value: string): unknown;
   send(body: string): void;
-}
-
-const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-
-/** Página curta para quem ligou uma agenda pelo app: o login abriu no navegador do celular, então é só voltar ao app. */
-function backToAppPage(ok: boolean, name: string, message: string | undefined): string {
-  const title = ok ? `${name} ligada` : 'Não deu certo';
-  const text = ok ? 'Pronto! Pode voltar ao AskouT: seus horários ocupados já aparecem na agenda.' : message ?? 'Tente de novo pelo app.';
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title>
-<style>body{font-family:system-ui,-apple-system,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;box-sizing:border-box;background:#fff;color:#1d1d1f;text-align:center}@media(prefers-color-scheme:dark){body{background:#111;color:#f5f5f7}}h1{font-size:1.4rem}p{max-width:22rem;line-height:1.5}</style>
-</head><body><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(text)}</p></main></body></html>`;
 }
 
 /**
@@ -89,7 +79,7 @@ export class CalendarsController {
     if (r.from === 'app') {
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store');
-      res.status(r.ok ? 200 : 400).send(backToAppPage(r.ok, name, r.message));
+      res.status(r.ok ? 200 : 400).send(backToAppPage(r.ok, name, r.message, appReturnUrl(provider, r.ok, r.message)));
       return;
     }
     const q = new URLSearchParams(r.ok ? { agendas: provider.toLowerCase() } : { agendas: 'erro', motivo: r.message ?? '' });
