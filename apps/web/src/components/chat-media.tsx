@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { DOUBLE_TAP_MS } from '../lib/chat.ts';
+import { DOUBLE_TAP_MS, LONG_PRESS_MS } from '../lib/chat.ts';
 import { api } from '../client.ts';
 import { PlayIcon, XIcon } from './icons.tsx';
 import type { ChatMessage } from '../lib/types.ts';
@@ -210,6 +210,8 @@ export function MediaBubble({ message, conversationId, onTap }: { message: Pick<
   const [wanted, setWanted] = useState(false);
   const [open, setOpen] = useState(false);
   const openTimer = useRef<number | undefined>(undefined);
+  // Quando o dedo desceu: segurar (long press) abre só as reações, então o clique que vem ao soltar é ignorado.
+  const pressedAt = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(openTimer.current), []);
   const media = useMessageMedia(conversationId, message.id, !isVideo || wanted);
   const label = `${isVideo ? t('Vídeo enviado') : t('Foto enviada')} por ${message.mine ? 'você' : (message.senderName ?? 'alguém')}`;
@@ -226,7 +228,21 @@ export function MediaBubble({ message, conversationId, onTap }: { message: Pick<
         className={`mediabubble${isVideo ? ' mediabubble--video' : ''}`}
         aria-label={isVideo ? t('Assistir vídeo. {label}', { label }) : t('Abrir foto. {label}', { label })}
         aria-busy={(!media.url && (!isVideo || wanted)) || undefined}
+        onPointerDown={(e) => {
+          pressedAt.current = e.pointerType === 'mouse' ? undefined : Date.now();
+        }}
+        onContextMenu={() => {
+          // Segurar no celular: cancela qualquer abertura pendente; o balão abre o menu de reações.
+          window.clearTimeout(openTimer.current);
+          pressedAt.current = 0;
+        }}
         onClick={(e) => {
+          const downAt = pressedAt.current;
+          pressedAt.current = undefined;
+          if (downAt !== undefined && (downAt === 0 || Date.now() - downAt >= LONG_PRESS_MS)) {
+            window.clearTimeout(openTimer.current);
+            return;
+          }
           const show = () => {
             if (isVideo) {
               setWanted(true);

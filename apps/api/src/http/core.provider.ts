@@ -133,7 +133,7 @@ export const coreProvider = {
         : {}),
       identities: new PrismaIdentityRepository(prisma),
       verifier: new OidcIdentityVerifier({ googleClientId: config.googleClientId, googleIosClientId: config.googleIosClientId, appleClientId: config.appleClientId, appleAppId: config.appleAppId }),
-      mailer: config.resend ? new ResendEmailSender(config.resend) : new ConsoleEmailSender(),
+      mailer: config.resend ? new ResendEmailSender({ ...config.resend, siteUrl: config.webBaseUrl }) : new ConsoleEmailSender(),
       codes: new HmacOneTimeCodes({ secret: config.codeSecret }),
       hasher: new ScryptPasswordHasher(),
       tokens: new Hs256TokenService({ secret: config.jwtSecret, ttlSeconds: config.tokenTtlSeconds }),

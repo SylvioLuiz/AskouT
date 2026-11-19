@@ -261,6 +261,8 @@ export function seenLabel(messages: readonly ChatMessage[], members: readonly Ch
 
 /** Toque duplo: dois toques no mesmo lugar em até 300 ms. */
 export const DOUBLE_TAP_MS = 300;
+/** Segurar o balão por esse tempo abre as reações/opções (e não abre a foto em tela cheia). */
+export const LONG_PRESS_MS = 450;
 export function isDoubleTap(previous: { at: number; x: number; y: number } | undefined, current: { at: number; x: number; y: number }): boolean {
   return previous !== undefined && current.at - previous.at <= DOUBLE_TAP_MS && Math.hypot(current.x - previous.x, current.y - previous.y) <= 24;
 }
