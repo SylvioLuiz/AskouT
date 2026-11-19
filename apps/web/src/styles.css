@@ -4002,6 +4002,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .avatarflash { position: relative; flex: none; display: inline-block; }
 .avatarflash__bolt { position: absolute; left: -2px; bottom: -2px; display: grid; place-items: center; border-radius: 50%; background: var(--brand); color: var(--brand-ink); border: 2px solid var(--bg); box-sizing: content-box; }
 .avatarflash__bolt svg { width: 62%; height: 62%; }
+/* Nos flashes (stories), o selo fica "negativo": só o raio escuro, sem o círculo rosa em volta. */
+.homestories .avatarflash__bolt, .storyring .avatarflash__bolt { background: none; border: 0; color: var(--brand-ink); filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.7)); }
+.homestories .avatarflash__bolt svg, .storyring .avatarflash__bolt svg { width: 100%; height: 100%; }
 
 /* ---------- Página do evento ---------- */
 .evpage { display: flex; flex-direction: column; gap: 16px; }
@@ -6938,4 +6941,42 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   .nowradar__sweep, .nowradar__p, .nowtoast, .nowtoast__line { animation: none; }
+}
+
+/* Código em caixinhas (verificação em duas etapas). */
+.codeboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.codeboxes__row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.codeboxes__box {
+  min-width: 0;
+  height: 54px;
+  padding: 0;
+  text-align: center;
+  font: inherit;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--control-border);
+  border-radius: var(--radius-control);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.codeboxes__box:focus {
+  outline: none;
+  border-color: var(--brand-text);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.codeboxes--error .codeboxes__box {
+  border-color: var(--danger);
 }
