@@ -2259,7 +2259,7 @@ export class InMemoryPostRepository implements PostRepository {
 
 export class InMemoryEventRoomRepository implements EventRoomRepository {
   private readonly postsRepo: InMemoryPostRepository;
-  readonly going = new Map<string, { ref: EventRef; userId: string; createdAt: Date }>();
+  readonly going = new Map<string, { ref: EventRef; userId: string; createdAt: Date; onProfile: boolean }>();
   readonly reminded = new Set<string>();
 
   constructor(postsRepo: InMemoryPostRepository) {
@@ -2270,11 +2270,23 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     return `${ref.source}:${ref.id}`;
   }
 
-  async addGoing(ref: EventRef, userId: string, at: Date): Promise<boolean> {
+  async addGoing(ref: EventRef, userId: string, at: Date, onProfile = false): Promise<boolean> {
     const key = `${InMemoryEventRoomRepository.key(ref)}|${userId}`;
     if (this.going.has(key)) return false;
-    this.going.set(key, { ref: { ...ref }, userId, createdAt: at });
+    this.going.set(key, { ref: { ...ref }, userId, createdAt: at, onProfile });
     return true;
+  }
+
+  async setGoingOnProfile(ref: EventRef, userId: string, onProfile: boolean): Promise<boolean> {
+    const row = this.going.get(`${InMemoryEventRoomRepository.key(ref)}|${userId}`);
+    if (!row || !this.alive(ref)) return false;
+    row.onProfile = onProfile;
+    return true;
+  }
+
+  async goingOnProfile(ref: EventRef, userId: string): Promise<boolean | undefined> {
+    const row = this.going.get(`${InMemoryEventRoomRepository.key(ref)}|${userId}`);
+    return row && this.alive(ref) ? row.onProfile : undefined;
   }
 
   async markReminded(ref: EventRef, userId: string): Promise<boolean> {
@@ -2322,12 +2334,12 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     return [...out].map(([userId, count]) => ({ userId, count }));
   }
 
-  async listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date }[]> {
+  async listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date; onProfile: boolean }[]> {
     return [...this.going.values()]
       .filter((r) => r.userId === userId && this.alive(r.ref))
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit)
-      .map((r) => ({ ref: { ...r.ref }, createdAt: r.createdAt }));
+      .map((r) => ({ ref: { ...r.ref }, createdAt: r.createdAt, onProfile: r.onProfile }));
   }
 
   readonly stories = new Map<string, EventStoryRecord>();

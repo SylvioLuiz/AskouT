@@ -955,7 +955,11 @@ export interface Notifier {
 /** Presença ("Eu vou") e posts dentro de eventos criados por pessoas. */
 export interface EventRoomRepository {
   /** Confirma presença. Devolve false se já estava confirmada. */
-  addGoing(ref: EventRef, userId: string, at: Date): Promise<boolean>;
+  addGoing(ref: EventRef, userId: string, at: Date, onProfile?: boolean): Promise<boolean>;
+  /** Muda se a presença aparece na aba Eventos do perfil (true) ou só na aba Participou, que só a pessoa vê (false). Devolve false se ela não confirmou. */
+  setGoingOnProfile(ref: EventRef, userId: string, onProfile: boolean): Promise<boolean>;
+  /** A presença da pessoa aparece na aba Eventos do perfil? `undefined` se ela não confirmou. */
+  goingOnProfile(ref: EventRef, userId: string): Promise<boolean | undefined>;
   removeGoing(ref: EventRef, userId: string): Promise<boolean>;
   isGoing(ref: EventRef, userId: string): Promise<boolean>;
   /** Quem confirmou, na ordem da confirmação (mais antigo primeiro). */
@@ -965,7 +969,7 @@ export interface EventRoomRepository {
   /** Quantos desses eventos cada pessoa confirmou presença (só quem tem ao menos 1). */
   countGoingByUser(refs: EventRef[]): Promise<{ userId: string; count: number }[]>;
   /** Eventos em que a pessoa confirmou presença, do confirmado mais recentemente para o mais antigo. */
-  listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date }[]>;
+  listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date; onProfile: boolean }[]>;
   /** Marca que o lembrete de começo deste evento já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
   markReminded(ref: EventRef, userId: string, at: Date): Promise<boolean>;
   addStory(story: EventStoryRecord): Promise<void>;

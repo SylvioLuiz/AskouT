@@ -33,6 +33,7 @@ import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
 import { t } from '../lib/i18n/index.ts';
 import { trackTicketClick } from '../components/sponsored-view.tsx';
+import { GoingChoiceSheet } from '../components/going-choice.tsx';
 
 /** O mesmo texto máximo que a API aceita num post de evento. */
 const EVENT_POST_CAPTION_MAX = 500;
@@ -134,6 +135,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   }, [eventId, storyIds, storiesKey]);
   const [posted, setPosted] = useState<boolean | undefined>();
   const [goBusy, setGoBusy] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const search = useSearch();
   // Abre nas informações (o que quem recebeu o evento quer ver primeiro); link de publicação abre direto no feed.
@@ -147,10 +149,43 @@ export function EventScreen({ eventId }: { eventId: string }) {
 
   async function toggleGoing() {
     if (!e) return;
+    // Confirmar pergunta antes se o evento aparece na aba Eventos do perfil.
+    if (!e.going) {
+      setChoosing(true);
+      return;
+    }
     setGoBusy(true);
     setProblem(undefined);
     try {
-      setFresh(e.going ? await api.eventCancel(e.id) : await api.eventGo(e.id));
+      setFresh(await api.eventCancel(e.id));
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setGoBusy(false);
+    }
+  }
+
+  async function confirmGoing(onProfile: boolean) {
+    if (!e) return;
+    setGoBusy(true);
+    setProblem(undefined);
+    try {
+      setFresh(await api.eventGo(e.id, onProfile));
+      setChoosing(false);
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      setChoosing(false);
+    } finally {
+      setGoBusy(false);
+    }
+  }
+
+  async function switchProfile() {
+    if (!e) return;
+    setGoBusy(true);
+    setProblem(undefined);
+    try {
+      setFresh(await api.setGoingOnProfile(e.id, !e.goingOnProfile));
     } catch (failure) {
       setProblem(toApiError(failure).message);
     } finally {
@@ -277,6 +312,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   ) : null}
                 </div>
                 {e.going ? <p className="evgo__hint">{t('Mudou de ideia? Toque em “Você vai” para cancelar.')}</p> : null}
+                {e.going ? (
+                  <p className="evgo__hint">
+                    {e.goingOnProfile ? t('Aparece na aba Eventos do seu perfil.') : t('Fica na aba Participou do seu perfil, que só você vê.')}{' '}
+                    <button type="button" className="linkbtn" onClick={() => void switchProfile()} disabled={goBusy}>
+                      {e.goingOnProfile ? t('Tirar do perfil') : t('Mostrar no perfil')}
+                    </button>
+                  </p>
+                ) : null}
+                {choosing ? <GoingChoiceSheet busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => setChoosing(false)} /> : null}
               </>
             )}
             {problem ? <Notice tone="error">{problem}</Notice> : null}

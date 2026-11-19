@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Header, Headers, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Header, Headers, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
 import type { PlacePhotos } from './places.controller.ts';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
@@ -195,11 +195,18 @@ export class ExploreController {
     return { items: await this.core.eventPages.listMyGoing(actor.userId, { recentDays: days }) };
   }
 
-  /** "Eu vou". */
+  /** "Eu vou". `{onProfile?: boolean}`: mostrar na aba Eventos do perfil (padrão: não, fica só na aba Participou). */
   @Post('events/:id/going')
   @HttpCode(200)
-  async go(@CurrentActor() actor: Actor, @Param('id') id: string) {
-    return this.presentPage(await this.core.eventPages.go(actor.userId, id));
+  async go(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.presentPage(await this.core.eventPages.go(actor.userId, id, asBody(body).onProfile));
+  }
+
+  /** `{onProfile: boolean}`: leva a presença para a aba Eventos do perfil ou de volta para a aba Participou. */
+  @Patch('events/:id/going')
+  @HttpCode(200)
+  async setGoingOnProfile(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.presentPage(await this.core.eventPages.setGoingOnProfile(actor.userId, id, asBody(body).onProfile));
   }
 
   @Delete('events/:id/going')

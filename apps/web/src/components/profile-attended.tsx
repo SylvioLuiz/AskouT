@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, EmptyState, ErrorState, Loading, Notice } from './ui.tsx';
+import { Button, EmptyState, ErrorState, Loading } from './ui.tsx';
 import { api } from '../client.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -11,7 +11,8 @@ import { t } from '../lib/i18n/index.ts';
 
 const PAGE = 12;
 
-function Tile({ event }: { event: AttendedEvent }) {
+/** Cartão de um evento em que a pessoa confirmou presença. `action` é o botão da dona (tirar ou mostrar no perfil). */
+export function GoingTile({ event, action }: { event: AttendedEvent; action?: { label: string; aria: string; busy: boolean; run: () => void; positive?: boolean } }) {
   const [failed, setFailed] = useState(false);
   const image = failed ? null : safeImage(event.imageUrl);
   return (
@@ -24,55 +25,21 @@ function Tile({ event }: { event: AttendedEvent }) {
           {event.private ? <span className="tag">{t('Privado')}</span> : null}
         </span>
       </Link>
+      {action ? (
+        <button type="button" className={`ptile__remove${action.positive ? ' ptile__remove--show' : ''}`} onClick={action.run} disabled={action.busy} aria-label={action.aria}>
+          {action.label}
+        </button>
+      ) : null}
     </li>
   );
 }
 
-/** Chave da aba "Participou": pública (visitantes veem) ou privada (só a dona). */
-export function AttendedVisibilitySetting({ value, onChange }: { value: boolean; onChange: (next: boolean) => void }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-
-  async function toggle() {
-    setBusy(true);
-    setError(undefined);
-    try {
-      const result = await api.setAttendedVisibility(!value);
-      onChange(result.attendedEventsPublic);
-    } catch (failure) {
-      setError(toApiError(failure).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <>
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      <section className="setting">
-        <div className="setting__text">
-          <h2 className="setting__title" id="participou-titulo">
-            {t('Mostrar eventos que participei')}
-          </h2>
-          <p className="setting__help">
-            {value
-              ? t('Visitantes veem a aba Participou. Eventos privados só aparecem para quem tem acesso a eles.')
-              : t('Só você vê a aba Participou. Ligue para mostrar aos visitantes do seu perfil.')}
-          </p>
-        </div>
-        <button type="button" role="switch" aria-checked={value} aria-labelledby="participou-titulo" className="switch" onClick={() => void toggle()} disabled={busy}>
-          <span className="switch__thumb" />
-        </button>
-      </section>
-    </>
-  );
-}
-
-/** Aba "Participou": eventos que já acabaram em que a pessoa confirmou presença ou que ela criou. */
-export function AttendedEvents({ username, mine, isPublic, onVisibilityChange }: { username: string; mine: boolean; isPublic: boolean; onVisibilityChange?: (next: boolean) => void }) {
+/** Aba "Participou" (só a dona do perfil vê): eventos em que ela disse "Eu vou" e escolheu não mostrar na aba Eventos. */
+export function AttendedEvents({ username }: { username: string }) {
   const [page, setPage] = useState<AttendedEventsPage | undefined>();
   const [error, setError] = useState<ApiError | undefined>();
   const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | undefined>();
 
   async function load(offset: number) {
     setLoading(true);
@@ -93,32 +60,38 @@ export function AttendedEvents({ username, mine, isPublic, onVisibilityChange }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username]);
 
-  const setting = mine && onVisibilityChange ? <AttendedVisibilitySetting value={isPublic} onChange={onVisibilityChange} /> : null;
-
-  if (error && !page) {
-    if (error.code === 'FORBIDDEN') return <EmptyState title={t('Eventos privados')}>{t('Esta pessoa escolheu não mostrar os eventos que participou.')}</EmptyState>;
-    return <ErrorState message={error.message} onRetry={() => void load(0)} />;
+  async function show(event: AttendedEvent) {
+    setBusyId(event.id);
+    try {
+      await api.setGoingOnProfile(event.id, true);
+      setPage((current) => (current ? { ...current, total: current.total - 1, items: current.items.filter((x) => x.id !== event.id) } : current));
+    } catch (failure) {
+      setError(toApiError(failure));
+    } finally {
+      setBusyId(undefined);
+    }
   }
+
+  if (error && !page) return <ErrorState message={error.message} onRetry={() => void load(0)} />;
   if (!page) return <Loading />;
+  const intro = <p className="muted">{t('Só você vê esta aba. Aqui ficam os eventos em que você disse Eu vou sem mostrar no perfil.')}</p>;
   if (page.items.length === 0) {
     return (
       <>
-        {setting}
-        {mine ? (
-          <EmptyState title={t('Nenhum evento ainda')}>{t('Quando você confirmar presença com Eu vou e o evento acabar, ele aparece aqui.')}</EmptyState>
-        ) : (
-          <EmptyState title={t('Nenhum evento para mostrar')}>{t('Os eventos que essa pessoa participou aparecem aqui.')}</EmptyState>
-        )}
+        {intro}
+        <EmptyState title={t('Nenhum evento aqui')}>{t('Ao tocar em Eu vou, escolha Só para mim para o evento ficar nesta aba.')}</EmptyState>
       </>
     );
   }
 
-  const tiles = page.items.map((event) => <Tile key={event.id} event={event} />);
+  const tiles = page.items.map((event) => (
+    <GoingTile key={event.id} event={event} action={{ label: t('Mostrar no perfil'), aria: t('Mostrar {title} no perfil', { title: event.title }), busy: busyId === event.id, run: () => void show(event), positive: true }} />
+  ));
   const left = tiles.filter((_, i) => i % 2 === 0);
   const right = tiles.filter((_, i) => i % 2 === 1);
   return (
     <>
-      {setting}
+      {intro}
       {error ? <ErrorState message={error.message} onRetry={() => void load(page.items.length)} /> : null}
       <div className="pgrid" aria-label={t('Eventos que participou')}>
         {[left, right].map((column, index) => (

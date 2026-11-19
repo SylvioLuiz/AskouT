@@ -125,6 +125,8 @@ export interface EventPageView {
   storyUserIds: string[];
   /** O visitante pode publicar story: confirmou presença (ou é o dono) e o evento não acabou. */
   canStory: boolean;
+  /** Só quando o visitante confirmou: escolheu mostrar o evento na aba Eventos do perfil (senão fica na aba Participou, só dele). */
+  goingOnProfile: boolean;
 }
 
 /** Evento em que a pessoa confirmou presença, no formato curto que a agenda usa. */
@@ -137,9 +139,9 @@ export interface GoingEventView {
   venueName: string | null;
 }
 
-/** Evento que a pessoa já foi (confirmou presença ou criou, e já acabou). */
+/** Evento em que a pessoa confirmou presença ("Eu vou"), para as abas Eventos e Participou do perfil. */
 export interface AttendedEventView extends EventCardView {
-  /** Quando ela confirmou presença (ou criou o evento). */
+  /** Quando ela confirmou presença. */
   attendedAt: string;
 }
 
@@ -150,7 +152,7 @@ export interface AttendedEventsPage {
   offset: number;
 }
 
-/** Quantas presenças e eventos criados a aba "Participou" percorre, no máximo. */
+/** Quantas presenças as abas Eventos e Participou percorrem, no máximo. */
 export const ATTENDED_SCAN_LIMIT = 500;
 
 /** Quantos eventos confirmados a agenda recebe, no máximo. */
@@ -238,10 +240,11 @@ export class EventPageService {
       isOwner,
       storyUserIds: [...new Set((await this.visibleStories(viewerId, ref, hidden)).map((s) => s.userId))],
       canStory: (isOwner || iGo) && Date.parse(base.view.endsAt) > this.deps.clock.now().getTime(),
+      goingOnProfile: !isOwner && iGo ? (await this.deps.eventRoom.goingOnProfile(ref, viewerId)) === true : false,
     };
   }
 
-  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory'> }> {
+  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'goingOnProfile'> }> {
     if (ref.source === 'PLACE') {
       const found = await this.deps.places.findEvent(ref.id);
       if (!found) throw notFound('Evento não encontrado');
@@ -352,53 +355,65 @@ export class EventPageService {
   }
 
   /**
-   * Aba "Participou" do perfil: eventos que já acabaram em que a pessoa confirmou presença ou que ela criou, do mais recente
-   * ao mais antigo. A dona sempre vê a aba. O visitante só vê quando a dona deixou a aba pública e ele pode ver o conteúdo
-   * do perfil; mesmo assim, cada evento passa pela regra do próprio evento (evento privado só aparece para quem tem acesso a ele).
+   * Aba "Participou" do perfil: eventos em que a pessoa confirmou presença e escolheu não mostrar na aba Eventos.
+   * Só a própria pessoa vê esta aba. Eventos que ela mesma criou não entram (já aparecem na aba Eventos).
    */
   async listAttended(viewerId: string, username: unknown, query: { limit?: unknown; offset?: unknown } = {}): Promise<AttendedEventsPage> {
     const view = await this.profiles.getByUsername(viewerId, username);
+    if (!view.relationship.isSelf) throw forbidden('Só a própria pessoa vê os eventos da aba Participou');
+    return this.goingPage(viewerId, viewerId, false, query);
+  }
+
+  /**
+   * Presenças que a pessoa escolheu mostrar na aba Eventos do perfil. O visitante precisa poder ver o conteúdo do perfil e,
+   * evento por evento, poder abrir o evento (evento privado só aparece para quem tem acesso a ele).
+   */
+  async listShownGoing(viewerId: string, username: unknown, query: { limit?: unknown; offset?: unknown } = {}): Promise<AttendedEventsPage> {
+    const view = await this.profiles.getByUsername(viewerId, username);
     if (view.relationship.blockedByViewer) throw notFound('Usuário não encontrado');
-    const isSelf = view.relationship.isSelf;
-    if (!isSelf && view.profile.attendedEventsPublic !== true) throw forbidden('Os eventos que esta pessoa participou são privados');
     if (!view.canViewContent) throw forbidden('Esta conta é privada');
+    return this.goingPage(viewerId, view.profile.userId, true, query);
+  }
+
+  private async goingPage(viewerId: string, ownerId: string, onProfile: boolean, query: { limit?: unknown; offset?: unknown }): Promise<AttendedEventsPage> {
     const page = parsePage(query);
-    const ownerId = view.profile.userId;
-    const now = this.deps.clock.now().getTime();
-
-    const attended = new Map<string, Date>();
-    for (const row of await this.deps.eventRoom.listGoingByUser(ownerId, ATTENDED_SCAN_LIMIT)) attended.set(row.ref.id, row.createdAt);
-    const created = await this.deps.posts.listFor([ownerId], [], { limit: ATTENDED_SCAN_LIMIT, offset: 0 }, 'EVENT');
-    for (const { post } of created) {
-      if (post.authorId !== ownerId || post.eventTitle === null || attended.has(post.id)) continue;
-      attended.set(post.id, post.createdAt);
-    }
-
-    const cards = await buildEventCards(this.deps, [...attended.keys()]);
+    const isSelf = viewerId === ownerId;
+    const rows = (await this.deps.eventRoom.listGoingByUser(ownerId, ATTENDED_SCAN_LIMIT)).filter((r) => r.onProfile === onProfile);
+    const cards = await buildEventCards(this.deps, rows.map((r) => r.ref.id));
     const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
     const checked = await Promise.all(
-      [...attended].map(async ([id, at]): Promise<AttendedEventView | undefined> => {
-        const card = cards.get(id);
-        if (!card || Date.parse(card.endsAt) > now) return undefined;
+      rows.map(async (row): Promise<AttendedEventView | undefined> => {
+        const card = cards.get(row.ref.id);
+        if (!card || card.ownerId === ownerId) return undefined;
         if (card.ownerId && card.ownerId !== viewerId && hidden.has(card.ownerId)) return undefined;
         // O visitante só vê o evento se ele mesmo poderia abri-lo (evento privado: só com acesso a ele).
         if (!isSelf) {
           try {
-            await this.resolve(viewerId, id);
+            await this.resolve(viewerId, row.ref.id);
           } catch (failure) {
             if (!(failure instanceof DomainError)) throw failure;
             return undefined;
           }
         }
-        return { ...card, attendedAt: at.toISOString() };
+        return { ...card, attendedAt: row.createdAt.toISOString() };
       }),
     );
     const all = checked.filter((v): v is AttendedEventView => v !== undefined).sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
     return { items: all.slice(page.offset, page.offset + page.limit), total: all.length, ...page };
   }
 
+  /** Muda se a presença aparece na aba Eventos (true) ou só na aba Participou (false). Precisa ter confirmado presença. */
+  async setGoingOnProfile(viewerId: string, rawId: unknown, onProfile: unknown): Promise<EventPageView> {
+    if (typeof onProfile !== 'boolean') throw validationError('Valor inválido', { onProfile: 'Use true ou false' });
+    const { ref } = await this.resolve(viewerId, rawId);
+    if (!(await this.deps.eventRoom.setGoingOnProfile(ref, viewerId, onProfile))) throw conflict('Confirme presença com Eu vou antes');
+    return this.get(viewerId, ref.id);
+  }
+
   /** "Eu vou". O dono já conta como confirmado: confirmar de novo não muda nada. */
-  async go(viewerId: string, rawId: unknown): Promise<EventPageView> {
+  /** `onProfile`: mostrar o evento na aba Eventos do perfil (true) ou só na aba Participou, que só a pessoa vê (false, o padrão). */
+  async go(viewerId: string, rawId: unknown, onProfile?: unknown): Promise<EventPageView> {
+    if (onProfile !== undefined && typeof onProfile !== 'boolean') throw validationError('Valor inválido', { onProfile: 'Use true ou false' });
     const { ref, owner } = await this.resolve(viewerId, rawId);
     if (owner?.userId !== viewerId) {
       const found = ref.source === 'PLACE' ? await this.deps.places.findEvent(ref.id) : await this.deps.posts.findById(ref.id);
@@ -406,7 +421,9 @@ export class EventPageService {
       // Depois que o evento termina não se confirma mais presença (a tela também esconde o botão).
       const endsAt = 'event' in found ? found.event.endsAt : found.post.eventEndsAt;
       if (endsAt && endsAt.getTime() <= this.deps.clock.now().getTime()) throw conflict('Esse evento já terminou');
-      await this.deps.eventRoom.addGoing(ref, viewerId, this.deps.clock.now());
+      const added = await this.deps.eventRoom.addGoing(ref, viewerId, this.deps.clock.now(), onProfile === true);
+      // Já tinha confirmado: só muda a escolha do perfil, se veio uma.
+      if (!added && typeof onProfile === 'boolean') await this.deps.eventRoom.setGoingOnProfile(ref, viewerId, onProfile);
     }
     return this.get(viewerId, ref.id);
   }

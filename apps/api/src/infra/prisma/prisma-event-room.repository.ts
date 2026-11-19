@@ -14,10 +14,22 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
     return ref.source === 'PLACE' ? { placeEventId: ref.id } : { postId: ref.id };
   }
 
-  async addGoing(ref: EventRef, userId: string, at: Date): Promise<boolean> {
+  async addGoing(ref: EventRef, userId: string, at: Date, onProfile = false): Promise<boolean> {
     if (!isUuid(ref.id) || !isUuid(userId)) return false;
-    const result = await this.prisma.eventAttendance.createMany({ data: [{ userId, createdAt: at, ...PrismaEventRoomRepository.where(ref) }], skipDuplicates: true });
+    const result = await this.prisma.eventAttendance.createMany({ data: [{ userId, createdAt: at, onProfile, ...PrismaEventRoomRepository.where(ref) }], skipDuplicates: true });
     return result.count > 0;
+  }
+
+  async setGoingOnProfile(ref: EventRef, userId: string, onProfile: boolean): Promise<boolean> {
+    if (!isUuid(ref.id) || !isUuid(userId)) return false;
+    const result = await this.prisma.eventAttendance.updateMany({ where: { userId, ...PrismaEventRoomRepository.where(ref) }, data: { onProfile } });
+    return result.count > 0;
+  }
+
+  async goingOnProfile(ref: EventRef, userId: string): Promise<boolean | undefined> {
+    if (!isUuid(ref.id) || !isUuid(userId)) return undefined;
+    const row = await this.prisma.eventAttendance.findFirst({ where: { userId, ...PrismaEventRoomRepository.where(ref) }, select: { onProfile: true } });
+    return row ? row.onProfile : undefined;
   }
 
   async markReminded(ref: EventRef, userId: string, at: Date): Promise<boolean> {
@@ -68,12 +80,12 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
     return rows.map((r) => ({ userId: r.userId, count: r._count._all }));
   }
 
-  async listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date }[]> {
+  async listGoingByUser(userId: string, limit: number): Promise<{ ref: EventRef; createdAt: Date; onProfile: boolean }[]> {
     if (!isUuid(userId)) return [];
     const rows = await this.prisma.eventAttendance.findMany({ where: { userId }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit });
-    return rows.flatMap((r): { ref: EventRef; createdAt: Date }[] => {
-      if (r.placeEventId) return [{ ref: { source: 'PLACE' as const, id: r.placeEventId }, createdAt: r.createdAt }];
-      if (r.postId) return [{ ref: { source: 'USER' as const, id: r.postId }, createdAt: r.createdAt }];
+    return rows.flatMap((r): { ref: EventRef; createdAt: Date; onProfile: boolean }[] => {
+      if (r.placeEventId) return [{ ref: { source: 'PLACE' as const, id: r.placeEventId }, createdAt: r.createdAt, onProfile: r.onProfile }];
+      if (r.postId) return [{ ref: { source: 'USER' as const, id: r.postId }, createdAt: r.createdAt, onProfile: r.onProfile }];
       return [];
     });
   }

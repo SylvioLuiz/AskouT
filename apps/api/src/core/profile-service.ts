@@ -212,15 +212,6 @@ export class ProfileService {
     return { isPrivate, acceptedPending };
   }
 
-  /** Liga ou desliga a aba "Participou" para visitantes. Desligada, só a própria pessoa vê os eventos que já foi. */
-  async setAttendedVisibility(userId: string, isPublic: unknown): Promise<{ attendedEventsPublic: boolean }> {
-    if (typeof isPublic !== 'boolean') throw validationError('Valor inválido', { attendedEventsPublic: 'Use true ou false' });
-    const current = await this.deps.users.findProfileById(userId);
-    if (!current) throw notFound('Perfil não encontrado');
-    if ((current.attendedEventsPublic === true) !== isPublic) await this.deps.users.updateProfile({ ...current, attendedEventsPublic: isPublic });
-    return { attendedEventsPublic: isPublic };
-  }
-
   /** Busca por username (prefixo) ou nome. Não retorna o próprio usuário nem bloqueios em qualquer sentido. */
   async search(viewerId: string, rawQuery: unknown, limit = 20): Promise<PublicProfile[]> {
     const query = normalizeUsername(asString(rawQuery));
