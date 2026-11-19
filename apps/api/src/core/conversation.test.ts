@@ -215,14 +215,22 @@ test('áudio: envia mensagem de voz, só quem está na conversa ouve, e valida o
   const { w, ana, bia, caio, id } = await friends();
   const sent = await w.core.conversations.send(ana, id, { audio: voice(WEBM), audioMs: 4200 });
   assert.equal(sent.kind, 'AUDIO');
-  assert.deepEqual(sent.audio, { durationMs: 4200 });
+  assert.deepEqual(sent.audio, { durationMs: 4200, played: false });
   assert.equal(sent.body, 'Mensagem de voz');
   const got = await w.core.conversations.audio(bia, id, sent.id);
   assert.equal(got.mime, 'audio/webm');
   assert.equal(got.data.length, 44);
   const list = await w.core.conversations.messages(bia, id);
-  assert.deepEqual(list.messages.at(-1)!.audio, { durationMs: 4200 });
+  assert.deepEqual(list.messages.at(-1)!.audio, { durationMs: 4200, played: false });
   assert.equal(list.messages.at(-1)!.mine, false);
+  // "ouvido": ouvir o próprio áudio não conta; quando a Bia ouve, os dois veem como ouvido
+  await w.core.conversations.audioPlayed(ana, id, sent.id);
+  assert.equal((await w.core.conversations.messages(ana, id)).messages.at(-1)!.audio!.played, false);
+  await w.core.conversations.audioPlayed(bia, id, sent.id);
+  await w.core.conversations.audioPlayed(bia, id, sent.id);
+  assert.equal((await w.core.conversations.messages(ana, id)).messages.at(-1)!.audio!.played, true);
+  assert.equal((await w.core.conversations.messages(bia, id)).messages.at(-1)!.audio!.played, true);
+  await rejectsWith(w.core.conversations.audioPlayed(caio, id, sent.id), 'NOT_FOUND');
   await rejectsWith(w.core.conversations.audio(caio, id, sent.id), 'NOT_FOUND');
   await rejectsWith(w.core.conversations.audio(bia, id, 'nao-existe'), 'NOT_FOUND');
   const text = await w.core.conversations.send(ana, id, { body: 'oi' });

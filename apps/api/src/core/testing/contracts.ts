@@ -997,6 +997,11 @@ export function defineRepositoryContract(
         assert.equal(audio!.mime, 'audio/webm');
         assert.deepEqual(Array.from(audio!.data), Array.from(bytes));
         assert.equal(await h.conversations.findAudio(randomUUID()), undefined);
+        assert.deepEqual(await h.conversations.listAudioPlays([id]), []);
+        await h.conversations.markAudioPlayed(id, bia, at(3));
+        await h.conversations.markAudioPlayed(id, bia, at(4));
+        assert.deepEqual(await h.conversations.listAudioPlays([id]), [{ messageId: id, userId: bia }], 'ouvir de novo não duplica');
+        assert.deepEqual(await h.conversations.listAudioPlays([]), []);
         await h.conversations.addMessage(msg(c.id, bia, 'oi', 2));
         const text = (await h.conversations.listMessages(c.id, 10)).at(-1)!;
         assert.equal(await h.conversations.findAudio(text.id), undefined, 'texto não tem áudio');

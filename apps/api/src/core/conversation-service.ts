@@ -53,7 +53,11 @@ export interface MessageView {
   /** Evento compartilhado (kind EVENT). */
   event: EventCardView | null;
   /** Mensagem de voz (kind AUDIO): só a duração; o áudio vem de `GET .../messages/:id/audio`. */
-  audio: { durationMs: number } | null;
+  /**
+   * `played`: em mensagem sua, alguém da conversa já ouviu; em mensagem de outra pessoa, você já ouviu
+   * (o "ouvido" do WhatsApp/Instagram).
+   */
+  audio: { durationMs: number; played: boolean } | null;
   /** GIF (Giphy): mensagem de texto com `body` "GIF" e este anexo. */
   gif: CommentGif | null;
   /** Apagada por quem enviou: o conteúdo some para todos. */
@@ -228,6 +232,8 @@ interface ViewExtras {
   event?: EventCardView | null;
   replyTo?: ReplyView | null;
   reactions?: ReactionView[];
+  /** Quem já ouviu esta mensagem de voz. */
+  playedBy?: readonly string[];
 }
 
 function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {}): MessageView {
@@ -243,7 +249,7 @@ function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {
     suggestion: gone ? null : m.suggestion,
     meetup: gone ? null : (extras.meetup ?? null),
     event: gone ? null : (extras.event ?? null),
-    audio: !gone && m.kind === 'AUDIO' && m.audioMs ? { durationMs: m.audioMs } : null,
+    audio: !gone && m.kind === 'AUDIO' && m.audioMs ? { durationMs: m.audioMs, played: audioPlayed(m, actorId, extras.playedBy ?? []) } : null,
     gif: gone ? null : gifOf(m),
     deleted: gone,
     replyTo: gone ? null : (extras.replyTo ?? null),
@@ -253,6 +259,10 @@ function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {
     distances: m.suggestion && !gone ? distances : null,
     createdAt: m.createdAt.toISOString(),
   };
+}
+
+function audioPlayed(m: MessageRecord, actorId: string, playedBy: readonly string[]): boolean {
+  return m.senderId === actorId ? playedBy.some((id) => id !== actorId) : playedBy.includes(actorId);
 }
 
 const PREVIEW_BY_KIND: Partial<Record<MessageKind, string>> = { AUDIO: 'Mensagem de voz', IMAGE: 'Foto', VIDEO: 'Vídeo' };
@@ -498,6 +508,7 @@ export class ConversationService {
           event: m.eventId || m.postEventId ? (eventCards.get((m.eventId ?? m.postEventId) as string) ?? null) : null,
           replyTo: decor.replies.get(m.id) ?? null,
           reactions: decor.reactions.get(m.id) ?? [],
+          playedBy: decor.plays.get(m.id) ?? [],
         }),
       ),
       hasMore,
@@ -685,8 +696,13 @@ export class ConversationService {
   }
 
   /** Respostas (trecho da original) e reações de um grupo de mensagens. */
-  private async decorate(actorId: string, items: MessageRecord[]): Promise<{ replies: Map<string, ReplyView>; reactions: Map<string, ReactionView[]> }> {
+  private async decorate(actorId: string, items: MessageRecord[]): Promise<{ replies: Map<string, ReplyView>; reactions: Map<string, ReactionView[]>; plays: Map<string, string[]> }> {
     const { conversations, users } = this.deps;
+    const plays = new Map<string, string[]>();
+    const voiceIds = items.filter((m) => m.kind === 'AUDIO' && !m.deletedAt).map((m) => m.id);
+    if (voiceIds.length > 0) {
+      for (const p of await conversations.listAudioPlays(voiceIds)) plays.set(p.messageId, [...(plays.get(p.messageId) ?? []), p.userId]);
+    }
     const reactionRows = await conversations.listReactions(items.map((m) => m.id));
     const reactions = groupReactions(reactionRows, actorId, await this.namesOf(reactionRows.map((r) => r.userId)));
     const replies = new Map<string, ReplyView>();
@@ -704,7 +720,7 @@ export class ConversationService {
         replies.set(m.id, { id: o.id, senderName: names.get(o.senderId) ?? 'Alguém', mine: o.senderId === actorId, kind: o.kind, preview: previewOf(o), deleted: o.deletedAt != null });
       }
     }
-    return { replies, reactions };
+    return { replies, reactions, plays };
   }
 
   /** Bytes de uma mensagem de voz, só para quem está na conversa. */
@@ -715,6 +731,15 @@ export class ConversationService {
     const found = await this.deps.conversations.findAudio(messageId);
     if (!found) throw notFound('Áudio não encontrado');
     return found;
+  }
+
+  /** Marca que você ouviu a mensagem de voz de outra pessoa (quem enviou passa a ver "ouvido"). Ouvir o próprio áudio não conta. */
+  async audioPlayed(actorId: string, conversationId: string, messageId: string): Promise<{ played: true }> {
+    await this.access(actorId, conversationId);
+    const message = await this.visibleMessage(actorId, conversationId, messageId);
+    if (message.kind !== 'AUDIO' || message.deletedAt) throw notFound('Áudio não encontrado');
+    if (message.senderId !== actorId) await this.deps.conversations.markAudioPlayed(messageId, actorId, this.deps.clock.now());
+    return { played: true };
   }
 
   /** Avisa os outros membros (menos quem bloqueou ou foi bloqueado por quem escreveu). O texto da mensagem não vai no aviso. */
