@@ -4,7 +4,7 @@ import { toApiError } from '../lib/errors.ts';
 import type { ChatMessage } from '../lib/types.ts';
 import { encodeWav, nativeAudio, nativeErrorCode, toBase64 } from '../lib/native-audio.ts';
 import type { NativeAudio, NativeAudioStopped } from '../lib/native-audio.ts';
-import { ArrowUpIcon, MicIcon, PauseIcon, PlayIcon, XIcon } from './icons.tsx';
+import { ArrowUpIcon, CheckIcon, MicIcon, PauseIcon, PlayIcon, XIcon } from './icons.tsx';
 import {
   formatVoiceTime,
   pickVoiceMime,
@@ -548,16 +548,20 @@ export function VoiceBubble({ message, conversationId, receipt = true }: { messa
   const receiptClass = heard ? ' voice--heard' : message.mine ? '' : ' voice--new';
   return (
     <div className={`voice${receipt ? receiptClass : ''}`}>
-      <button type="button" className="voice__btn" onClick={() => void toggle()} aria-label={state === 'playing' ? t('Pausar áudio') : t('Ouvir áudio')} aria-busy={state === 'loading' || undefined}>
-        {state === 'playing' ? <PauseIcon /> : <PlayIcon />}
-      </button>
-      <div className="voice__track" aria-hidden="true">
-        <div className="voice__bar" style={{ width: `${progress}%` }} />
+      <div className="voice__row">
+        <button type="button" className="voice__btn" onClick={() => void toggle()} aria-label={state === 'playing' ? t('Pausar áudio') : t('Ouvir áudio')} aria-busy={state === 'loading' || undefined}>
+          {state === 'playing' ? <PauseIcon /> : <PlayIcon />}
+        </button>
+        <div className="voice__track" aria-hidden="true">
+          <div className="voice__bar" style={{ width: `${progress}%` }} />
+        </div>
+        <span className="voice__time">{state === 'error' ? t('Erro ao tocar') : formatVoiceTime(shown)}</span>
       </div>
-      <span className="voice__time">{state === 'error' ? t('Erro ao tocar') : formatVoiceTime(shown)}</span>
       {receipt ? (
-        <span className="voice__heard" role="img" aria-label={receiptLabel} title={receiptLabel}>
-          <MicIcon />
+        // Escrito por extenso: só a cor do microfone não deixava claro que era "já ouvido".
+        <span className="voice__heard">
+          {heard ? <CheckIcon /> : message.mine ? <MicIcon /> : <span className="voice__dot" aria-hidden="true" />}
+          {receiptLabel}
         </span>
       ) : null}
     </div>

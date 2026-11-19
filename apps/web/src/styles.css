@@ -3965,19 +3965,20 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 @keyframes recpulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .recbar__dot { animation: none; } }
 .bubble--voice { width: min(82%, 280px); }
-.voice { display: flex; align-items: center; gap: 10px; min-width: 200px; }
+.voice { display: flex; flex-direction: column; gap: 4px; min-width: 200px; }
+.voice__row { display: flex; align-items: center; gap: 10px; }
 .voice__btn { display: grid; place-items: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: var(--brand); color: var(--brand-ink); cursor: pointer; }
 .voice__track { flex: 1; height: 4px; border-radius: 2px; background: var(--line-strong); overflow: hidden; }
 .voice__bar { height: 100%; background: var(--brand); }
 .voice__time { flex: none; min-width: 3.2em; text-align: right; font-size: 0.8125rem; font-variant-numeric: tabular-nums; color: var(--muted); }
-/* "Ouvido" (como no WhatsApp): microfone cinza; destacado na mensagem recebida ainda não ouvida; azul quando foi ouvida. */
-.voice__heard { display: grid; place-items: center; flex: none; margin-left: -4px; color: var(--muted); }
-.voice__heard .icon { width: 16px; height: 16px; }
-.voice--new .voice__heard { color: var(--brand-text); }
+/* "Ouvido" escrito por extenso embaixo do áudio: cinza enquanto ninguém ouviu (sua mensagem), destacado na recebida
+   ainda não ouvida e azul com ✓ depois de ouvida. */
+.voice__heard { display: inline-flex; align-items: center; gap: 4px; margin-left: 46px; font-size: 0.75rem; line-height: 1.2; color: var(--muted); }
+.voice__heard .icon { width: 14px; height: 14px; flex: none; }
+.voice__dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.voice--new .voice__heard { color: var(--brand-text); font-weight: 600; }
 .voice--new .voice__time { color: var(--brand-text); font-weight: 600; }
-.voice--heard .voice__heard { color: var(--heard); }
-.voice--new .voice__heard rect,
-.voice--heard .voice__heard rect { fill: currentColor; }
+.voice--heard .voice__heard { color: var(--heard); font-weight: 600; }
 
 /* Topo da conversa: preso abaixo da barra do app ao rolar */
 .chathead { position: sticky; top: var(--topbar-h, 0px); z-index: 15; display: flex; align-items: center; gap: 8px; margin: 0 -16px 8px; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
