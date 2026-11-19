@@ -285,6 +285,8 @@ export interface AvailableFriend {
   invite: { id: string; direction: InviteDirection } | null;
   /** Distância e tempo aproximados (regiões de ~1 km). Nulo se algum dos dois ligou o NOW sem localização. */
   approx?: ApproxTrip | null;
+  /** Ponto aproximado para o mapa (grade de ~3 km). Nulo se a pessoa ligou o NOW sem localização. */
+  point?: { lat: number; lng: number } | null;
 }
 
 /** "~3 km · 15 min de carro": arredondado de propósito pelo servidor. */

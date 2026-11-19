@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { distanceMeters, flashNoteProblem, flashRemainingShare, formatCountdown, formatAge, formatApprox, formatDistance, formatKm, formatRemaining, formatTravel, placeName, sortByFairness, geolocationMessage, minutesLeft } from './flash.ts';
+import { distanceMeters, flashNoteProblem, flashRemainingShare, formatClock, formatCountdown, formatAge, formatApprox, formatDistance, formatKm, formatRemaining, formatTravel, placeName, sortByFairness, geolocationMessage, minutesLeft } from './flash.ts';
 
 describe('distanceMeters', () => {
   it('é zero para o mesmo ponto', () => {
@@ -124,5 +124,14 @@ describe('formatApprox', () => {
   it('versão curta para caber embaixo da foto', () => {
     assert.equal(formatApprox({ km: 0, minutes: 5, mode: 'walk' }, true), '<1 km');
     assert.equal(formatApprox({ km: 3, minutes: 10, mode: 'car' }, true), '~3 km');
+  });
+});
+
+describe('formatClock', () => {
+  it('mostra minutos e segundos, e horas quando passa de 1 h', () => {
+    assert.equal(formatClock(2398_000), '39:58');
+    assert.equal(formatClock(5400_000), '1:30:00');
+    assert.equal(formatClock(59_500), '1:00');
+    assert.equal(formatClock(0), '0:00');
   });
 });
