@@ -368,7 +368,8 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
 
 // ---------- Editar ----------
 
-export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onClose: () => void; onSaved: (post: PostView) => void }) {
+/** `eventOnly`: aberto da página do evento; continua sendo evento (sem a troca para post comum). */
+export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { post: PostView; onClose: () => void; onSaved: (post: PostView) => void; eventOnly?: boolean }) {
   const [caption, setCaption] = useState(post.caption ?? '');
   const [placeName, setPlaceName] = useState(post.placeName ?? '');
   const [placeAddress, setPlaceAddress] = useState(post.placeAddress ?? '');
@@ -408,8 +409,9 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
   }
 
   return (
-    <Sheet title={t('Editar post')} onClose={onClose}>
+    <Sheet title={eventOnly ? t('Editar evento') : t('Editar post')} onClose={onClose}>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      {eventOnly ? null : (
       <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
         <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
           {t('Post')}
@@ -418,6 +420,7 @@ export function EditPostSheet({ post, onClose, onSaved }: { post: PostView; onCl
           {t('Evento')}
         </button>
       </div>
+      )}
       {kind === 'EVENT' ? (
         <>
           <Field label={t('Nome do evento')} value={title} onChange={setTitle} maxLength={120} />
