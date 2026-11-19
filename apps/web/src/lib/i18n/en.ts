@@ -3024,4 +3024,10 @@ export const EN: Readonly<Record<string, string>> = {
   "Apagar sua região? Você deixa de receber anúncios Match de lugares perto de você.": "Delete your area? You’ll stop getting Match ads from places near you.",
   "Desconectar {name}? Os horários importados dela saem da sua Agenda.": "Disconnect {name}? The times imported from it leave your Agenda.",
   "Tirar seu nome da lista VIP? Se as vagas acabarem, pode não dar para voltar.": "Take your name off the VIP list? If spots run out, you may not be able to get back on.",
+  "Entrar com": "Sign in with",
+  "Telefone": "Phone",
+  "Informe seu celular": "Enter your phone number",
+  "Informe o código do app autenticador": "Enter the code from your authenticator app",
+  "Código do app autenticador": "Authenticator app code",
+  "Sem senha: use o código de 6 números do Google Authenticator (ou outro app). Ative em Configurações > Verificação em duas etapas, com o celular salvo no seu perfil.": "No password: use the 6-digit code from Google Authenticator (or another app). Turn it on in Settings > Two-step verification, with your phone number saved in your profile.",
 };

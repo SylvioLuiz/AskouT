@@ -27,6 +27,23 @@ export interface User {
   passwordless?: boolean;
   /** Celular (E.164). Privado: nunca vai para o perfil público. */
   phone?: string | null;
+  /** Quando o celular atual foi confirmado por SMS. Só celular confirmado serve para entrar sem senha. Trocar o número apaga. */
+  phoneVerifiedAt?: Date | null;
+}
+
+/** Para que serve o código mandado por SMS: entrar na conta ou confirmar o celular cadastrado. */
+export type PhoneCodePurpose = 'LOGIN' | 'VERIFY';
+
+/** Código por SMS em andamento: um por pessoa. Guarda só o HMAC do código e o número para onde foi. */
+export interface PhoneCode {
+  userId: string;
+  purpose: PhoneCodePurpose;
+  phone: string;
+  codeHash: string;
+  expiresAt: Date;
+  attempts: number;
+  sendCount: number;
+  lastSentAt: Date;
 }
 
 /** Pedido de nova senha em andamento: um por pessoa. `channel` deixa pronto o envio por celular (SMS) no futuro. */

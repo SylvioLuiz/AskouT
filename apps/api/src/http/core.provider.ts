@@ -28,6 +28,7 @@ import {
   PrismaFlashRepository,
   PrismaFollowRepository,
   PrismaPasswordResetRepository,
+  PrismaPhoneCodeRepository,
   PrismaMfaRepository,
   PrismaBoostRepository,
   PrismaBoostStatsRepository,
@@ -51,6 +52,8 @@ import { GiphyGifSource } from '../infra/giphy/giphy-gif-source.ts';
 import { SandboxPaymentGateway, UnconfiguredPaymentGateway } from '../infra/payments/sandbox-payment-gateway.ts';
 import { StripePaymentGateway } from '../infra/payments/stripe-payment-gateway.ts';
 import { ConsoleEmailSender } from './console-email-sender.ts';
+import { ConsoleSmsSender } from '../infra/sms/console-sms-sender.ts';
+import { TwilioSmsSender } from '../infra/sms/twilio-sms-sender.ts';
 import { ResendEmailSender } from '../infra/email/resend-email-sender.ts';
 import { HttpCalendarFetcher } from '../infra/calendar/http-calendar-fetcher.ts';
 import { HttpGoogleCalendarClient } from '../infra/google/google-calendar-client.ts';
@@ -113,6 +116,9 @@ export const coreProvider = {
       routes: new OsrmRouteSource({ baseUrl: process.env['OSRM_URL']?.trim() || undefined }),
       pending: new PrismaPendingSignupRepository(prisma),
       passwordResets: new PrismaPasswordResetRepository(prisma),
+      phoneCodes: new PrismaPhoneCodeRepository(prisma),
+      // SMS desligado por padrão (SMS_TRANSPORT=off): o login pelo celular usa o código do app autenticador.
+      ...(config.smsTransport === 'twilio' && config.twilio ? { sms: new TwilioSmsSender(config.twilio) } : config.smsTransport === 'console' ? { sms: new ConsoleSmsSender() } : {}),
       // Verificação em duas etapas (TOTP): grátis, sem serviço externo. As chaves saem do CODE_SECRET.
       mfa: new PrismaMfaRepository(prisma),
       secretBox: new AesGcmSecretBox({ secret: config.codeSecret }),

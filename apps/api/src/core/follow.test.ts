@@ -324,16 +324,16 @@ test('amigos nos contatos: acha pelo celular cadastrado no perfil', async () => 
 test('celular no perfil: privado, normalizado, um por conta e apagável', async () => {
   const w = makeWorld();
   const u = await w.signUpMany('leo', 'ana');
-  assert.deepEqual(await w.core.profiles.getPhone(u['leo']!), { phone: null });
-  assert.deepEqual(await w.core.profiles.setPhone(u['leo']!, '(11) 98765-4321'), { phone: '+5511987654321' });
-  assert.deepEqual(await w.core.profiles.getPhone(u['leo']!), { phone: '+5511987654321' });
+  assert.deepEqual(await w.core.profiles.getPhone(u['leo']!), { phone: null, verified: false });
+  assert.deepEqual(await w.core.profiles.setPhone(u['leo']!, '(11) 98765-4321'), { phone: '+5511987654321', verified: false });
+  assert.deepEqual(await w.core.profiles.getPhone(u['leo']!), { phone: '+5511987654321', verified: false });
   // Nunca aparece no perfil que os outros veem.
   assert.equal(JSON.stringify(await w.core.profiles.getByUsername(u['ana']!, 'leo')).includes('98765'), false);
   await rejectsWith(w.core.profiles.setPhone(u['ana']!, '+55 11 98765-4321'), 'CONFLICT');
   await rejectsWith(w.core.profiles.setPhone(u['ana']!, '123'), 'VALIDATION');
   await rejectsWith(w.core.profiles.setPhone(u['ana']!, 42), 'VALIDATION');
-  assert.deepEqual(await w.core.profiles.setPhone(u['leo']!, ''), { phone: null });
-  assert.deepEqual(await w.core.profiles.setPhone(u['ana']!, '+55 11 98765-4321'), { phone: '+5511987654321' });
+  assert.deepEqual(await w.core.profiles.setPhone(u['leo']!, ''), { phone: null, verified: false });
+  assert.deepEqual(await w.core.profiles.setPhone(u['ana']!, '+55 11 98765-4321'), { phone: '+5511987654321', verified: false });
 });
 
 test('seguir perfil público avisa a pessoa; perfil privado avisa como pedido', async () => {
