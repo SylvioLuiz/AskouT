@@ -23,7 +23,6 @@ import { InviteSheet } from '../components/invite.tsx';
 import { ConnectContactsCard } from '../components/connect-contacts.tsx';
 import { ActivityKindIcon, ActivityLog } from '../components/activity-log.tsx';
 import { INTERACTIONS_TABS, interactionsPath, tabFromSlug, type InteractionsTab } from '../lib/activity-log.ts';
-import { AttendedVisibilitySetting } from '../components/profile-attended.tsx';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
 import { AvatarCropper } from '../components/avatar-cropper.tsx';
 import { AvatarViewer } from '../components/photo-viewer.tsx';
@@ -501,7 +500,6 @@ export function PrivacyScreen() {
           <span className="switch__thumb" />
         </button>
       </section>
-      <AttendedSetting username={user.profile.username} />
       <PersonalizeSetting userId={user.profile.userId} onChange={() => setPersonalizeRev((n) => n + 1)} />
       <RegionSetting key={personalizeRev} userId={user.profile.userId} />
       <nav className="linklist" aria-label={t('Privacidade')}>
@@ -516,14 +514,6 @@ export function PrivacyScreen() {
       </nav>
     </>
   );
-}
-
-/** A aba "Participou" do perfil: pública ou só para a dona. Lê o valor atual do próprio perfil. */
-function AttendedSetting({ username }: { username: string }) {
-  const own = useAsync(() => api.getProfile(username), [username]);
-  const [value, setValue] = useState<boolean | undefined>();
-  if (!own.data) return null;
-  return <AttendedVisibilitySetting value={value ?? own.data.profile.attendedEventsPublic === true} onChange={setValue} />;
 }
 
 /** Seus dados: baixar uma cópia ou apagar a conta (LGPD). */

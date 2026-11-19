@@ -3505,6 +3505,7 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 .ptile__title { font-weight: 700; font-size: 0.875rem; overflow-wrap: anywhere; }
 .ptile__when { font-size: 0.75rem; opacity: 0.9; }
 .ptile__remove { width: 100%; padding: 8px; border: 0; border-top: 1px solid var(--line); background: var(--surface); color: var(--danger); font-size: 0.8125rem; cursor: pointer; }
+.ptile__remove--show { color: var(--brand-text); }
 .ptile__remove:disabled { opacity: 0.6; }
 
 /* ---------- Menu do perfil (folha inferior, estilo lista do iOS) ---------- */

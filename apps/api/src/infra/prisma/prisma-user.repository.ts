@@ -46,7 +46,6 @@ function toProfile(row: {
   bio: string | null;
   avatarUrl: string | null;
   isPrivate: boolean;
-  attendedEventsPublic?: boolean;
 }): Profile {
   return {
     userId: row.userId,
@@ -55,7 +54,6 @@ function toProfile(row: {
     bio: row.bio,
     avatarUrl: row.avatarUrl,
     isPrivate: row.isPrivate,
-    ...(row.attendedEventsPublic === true ? { attendedEventsPublic: true } : {}),
   };
 }
 
@@ -257,7 +255,6 @@ export class PrismaUserRepository implements UserRepository {
         bio: profile.bio,
         avatarUrl: profile.avatarUrl,
         isPrivate: profile.isPrivate,
-        ...(profile.attendedEventsPublic === undefined ? {} : { attendedEventsPublic: profile.attendedEventsPublic }),
       },
     });
   }

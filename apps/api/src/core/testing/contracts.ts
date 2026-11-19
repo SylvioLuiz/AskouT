@@ -2168,6 +2168,14 @@ export function defineRepositoryContract(
         const mine = await h.eventRoom.listGoingByUser(bia, 10);
         assert.deepEqual(mine.map((r) => [r.ref.source, r.ref.id]), [['PLACE', e.id], ['USER', postId]], 'do confirmado mais recente ao mais antigo');
         assert.equal((await h.eventRoom.listGoingByUser(bia, 1)).length, 1, 'respeita o limite');
+        // escolha do perfil no "Eu vou": padrão fora do perfil, dá para mudar depois
+        assert.deepEqual(mine.map((r) => r.onProfile), [false, false]);
+        assert.equal(await h.eventRoom.goingOnProfile({ source: 'PLACE', id: e.id }, bia), false);
+        assert.equal(await h.eventRoom.setGoingOnProfile({ source: 'PLACE', id: e.id }, bia, true), true);
+        assert.equal(await h.eventRoom.goingOnProfile({ source: 'PLACE', id: e.id }, bia), true);
+        assert.equal((await h.eventRoom.listGoingByUser(bia, 10))[0]?.onProfile, true);
+        assert.equal(await h.eventRoom.setGoingOnProfile({ source: 'PLACE', id: e.id }, caio, true), false, 'sem presença não muda nada');
+        assert.equal(await h.eventRoom.goingOnProfile({ source: 'PLACE', id: e.id }, caio), undefined);
         assert.deepEqual(await h.eventRoom.listGoingByUser(caio, 10), []);
         assert.equal(await h.eventRoom.removeGoing(user, bia), true);
         assert.equal(await h.eventRoom.removeGoing(user, bia), false);
