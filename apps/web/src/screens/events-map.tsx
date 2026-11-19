@@ -285,6 +285,11 @@ export function EventsMapScreen() {
   }, [waiting, position?.lat, position?.lng, area]);
 
   const events = useMemo(() => eventsResult.data?.events ?? [], [eventsResult.data]);
+  // Sem nada acontecendo agora, a aba some; se ela estava aberta, volta para Locais.
+  const noLiveEvents = eventsResult.data != null && events.length === 0;
+  useEffect(() => {
+    if (noLiveEvents) setMode('places');
+  }, [noLiveEvents]);
   const places = useMemo(() => placesResult.data?.places ?? [], [placesResult.data]);
 
   const pins = useMemo(
@@ -423,9 +428,11 @@ export function EventsMapScreen() {
           <button type="button" aria-pressed={mode === 'places'} className={mode === 'places' ? 'is-on' : ''} onClick={() => setMode('places')}>
             Locais{placesResult.data ? ` ${places.length}` : ''}
           </button>
-          <button type="button" aria-pressed={mode === 'events'} className={mode === 'events' ? 'is-on' : ''} onClick={() => setMode('events')}>
-            Acontecendo agora{eventsResult.data ? ` ${events.length}` : ''}
-          </button>
+          {noLiveEvents ? null : (
+            <button type="button" aria-pressed={mode === 'events'} className={mode === 'events' ? 'is-on' : ''} onClick={() => setMode('events')}>
+              Acontecendo agora{eventsResult.data ? ` ${events.length}` : ''}
+            </button>
+          )}
         </div>
         {meHint && !moved && !searching ? (
           <p key={meHint} className="evmap__hint" role="status">
