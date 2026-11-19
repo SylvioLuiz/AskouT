@@ -390,7 +390,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY';
 
 export interface NotificationItem {
   id: string;
@@ -789,6 +789,49 @@ export interface EventStoryGroup {
   author: PublicProfile;
   mine: boolean;
   items: EventStoryItem[];
+}
+
+/** Story público de um local verificado (foto ou vídeo, 24 h). */
+export interface VenueStoryItem {
+  id: string;
+  kind: 'IMAGE' | 'VIDEO';
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface VenueStoryVenue {
+  id: string;
+  name: string;
+  category: string | null;
+  logoUrl: string | null;
+}
+
+/** Os stories de um local que a pessoa segue (faixa da Home). */
+export interface VenueStoryGroup {
+  venue: VenueStoryVenue;
+  items: VenueStoryItem[];
+}
+
+/** Um item da faixa "Rolando agora" do Explorar: local com story no ar e/ou evento em andamento. */
+export interface RollingNowItem {
+  venue: VenueStoryVenue;
+  stories: VenueStoryItem[];
+  event: { id: string; title: string; kind: EventKind; startsAt: string; endsAt: string; isFree: boolean; goingCount: number } | null;
+  /** Em metros, em passos de 100 m; null sem posição. */
+  distanceM: number | null;
+  interest: boolean;
+  friendsGoingCount: number;
+  friendsGoing: PublicProfile[];
+}
+
+export interface VenueStorySettings {
+  hideVenueStories: boolean;
+  mutedVenues: { id: string; name: string }[];
+}
+
+export interface VenueStoryOwnerView {
+  suspended: boolean;
+  items: VenueStoryItem[];
 }
 
 export interface EventPage {
@@ -1394,4 +1437,29 @@ export interface VenueOffers {
   items: OfferView[];
   limits: OfferLimits;
   remainingToday: number;
+}
+
+/** Álbum do encontro (NOW ou evento): fotos só de quem foi. */
+export interface AlbumSummary {
+  id: string;
+  kind: 'FLASH' | 'EVENT';
+  title: string | null;
+  placeName: string | null;
+  startedAt: string;
+  /** Quem foi, sem contar você nem quem tem bloqueio com você. */
+  friendCount: number;
+  photoCount: number;
+  coverPhotoId: string | null;
+}
+
+export interface AlbumPhoto {
+  id: string;
+  author: PublicProfile;
+  createdAt: string;
+  mine: boolean;
+}
+
+export interface AlbumDetail extends AlbumSummary {
+  members: PublicProfile[];
+  photos: AlbumPhoto[];
 }

@@ -67,6 +67,11 @@ import type {
   NotificationMute,
   EventStoryGroup,
   CommentGif,
+  RollingNowItem,
+  VenueStoryGroup,
+  VenueStoryItem,
+  VenueStoryOwnerView,
+  VenueStorySettings,
   FeedComment,
   GifResults,
   FeedPage,
@@ -77,6 +82,9 @@ import type {
   GroupDetails,
   GoingEvent,
   MeetupView,
+  AlbumDetail,
+  AlbumPhoto,
+  AlbumSummary,
   NotificationCategory,
   NotificationList,
   PushTestResult,
@@ -551,6 +559,40 @@ export function createApi(deps: ApiDeps) {
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
     eventGo: (eventId: string, onProfile?: boolean) => request<EventPage>('POST', `/events/${id(eventId)}/going`, onProfile === undefined ? {} : { body: { onProfile } }),
     setGoingOnProfile: (eventId: string, onProfile: boolean) => request<EventPage>('PATCH', `/events/${id(eventId)}/going`, { body: { onProfile } }),
+
+    // Stories públicos de locais verificados
+    venueStoriesHome: () => request<{ groups: VenueStoryGroup[] }>('GET', '/venue-stories/home'),
+    /** A posição vale só nesta consulta (o servidor arredonda e não guarda). */
+    rollingNow: (position?: { lat: number; lng: number }) => request<{ items: RollingNowItem[] }>('GET', `/venue-stories/rolling-now${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
+    venueStoryMediaUrl: (storyId: string) => `${deps.baseUrl}/venue-stories/${id(storyId)}/media`,
+    reportVenueStory: (storyId: string, reason: ReportReason, details?: string) =>
+      request<{ reported: true }>('POST', `/venue-stories/${id(storyId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+    muteVenueStories: (venueId: string, muted: boolean) => request<{ muted: boolean }>('PUT', `/venue-stories/venues/${id(venueId)}/mute`, { body: { muted } }),
+    venueStorySettings: () => request<VenueStorySettings>('GET', '/venue-stories/settings'),
+    setVenueStorySettings: (hideVenueStories: boolean) => request<VenueStorySettings>('PUT', '/venue-stories/settings', { body: { hideVenueStories } }),
+    ownerVenueStories: (venueId: string) => request<VenueStoryOwnerView>('GET', `/me/venues/${id(venueId)}/stories`),
+    publishVenueStory: async (venueId: string, file: Blob): Promise<VenueStoryItem> => {
+      const token = deps.getToken();
+      const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
+      if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/me/venues/${id(venueId)}/stories`, { method: 'POST', headers, body: file });
+      } catch {
+        throw networkError();
+      }
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+      if (response.ok) return payload as VenueStoryItem;
+      const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+      if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+      throw error;
+    },
+    deleteVenueStory: (venueId: string, storyId: string) => request<{ deleted: true }>('DELETE', `/me/venues/${id(venueId)}/stories/${id(storyId)}`),
     eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),
 
     // Feed das páginas de evento (`events`) e de rolê (`venues`)
@@ -748,6 +790,25 @@ export function createApi(deps: ApiDeps) {
     pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),
     pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
     pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),
+
+    // Álbuns dos encontros
+    albums: () => request<{ items: AlbumSummary[] }>('GET', '/albums'),
+    album: (albumId: string) => request<AlbumDetail>('GET', `/albums/${id(albumId)}`),
+    addAlbumPhoto: (albumId: string, image: string) => request<AlbumPhoto>('POST', `/albums/${id(albumId)}/photos`, { body: { image } }),
+    deleteAlbumPhoto: (albumId: string, photoId: string) => request<{ ok: true }>('DELETE', `/albums/${id(albumId)}/photos/${id(photoId)}`),
+    postAlbumPhoto: (albumId: string, photoId: string, caption?: string) => request<{ id: string }>('POST', `/albums/${id(albumId)}/photos/${id(photoId)}/post`, { body: caption === undefined || caption.trim() === '' ? {} : { caption } }),
+    /** Baixa a foto do álbum (a rota exige o token, então não dá para usar <img src>). */
+    albumPhoto: async (albumId: string, photoId: string): Promise<Blob> => {
+      const token = deps.getToken();
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/albums/${id(albumId)}/photos/${id(photoId)}`, { method: 'GET', headers: token !== undefined ? { Authorization: t('Bearer {token}', { token }) } : {} });
+      } catch {
+        throw networkError();
+      }
+      if (!response.ok) throw errorFromResponse(response.status, undefined, response.headers.get('Retry-After'));
+      return response.blob();
+    },
 
     // Bloqueios
     block: (userId: string) => request<{ ok: true }>('POST', `/users/${id(userId)}/block`),

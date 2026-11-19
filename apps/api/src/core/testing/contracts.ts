@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { ReferralRepository, AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, OfferRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+import type { ReferralRepository, AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, VenueStoryRepository, OfferRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
   CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { VenueOfferRecord, DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -38,6 +38,8 @@ export interface RepoHarness {
   profileEvents: ProfileEventRepository;
   posts: PostRepository;
   eventRoom: EventRoomRepository;
+  albums: AlbumRepository;
+  venueStories: VenueStoryRepository;
   feed: FeedRepository;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
@@ -2440,6 +2442,131 @@ export function defineRepositoryContract(
         assert.equal(done.status, 'FINALIZED');
         assert.equal(done.finalProposalId, proposal.id);
         assert.deepEqual(await h.scheduling.listOpenForUser(bia, 10), []);
+      });
+    });
+    // ---------- Álbuns dos encontros ----------
+
+    describe('álbuns', () => {
+      it('cria uma vez por encontro, guarda quem foi, as fotos e o aviso do dia seguinte', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const album = { id: randomUUID(), kind: 'EVENT' as const, refId: `PLACE:${randomUUID()}`, title: 'Samba', placeName: 'Bar do Zé', startedAt: at(100), createdAt: at(100) };
+        const created = await h.albums.ensure(album);
+        assert.deepEqual(created, album);
+        const again = await h.albums.ensure({ ...album, id: randomUUID(), title: 'outro' });
+        assert.equal(again.id, album.id, 'mesmo encontro, mesmo álbum');
+        assert.equal(again.title, 'Samba');
+        assert.deepEqual(await h.albums.find(album.id), album);
+        assert.equal(await h.albums.find(randomUUID()), undefined);
+        assert.equal(await h.albums.find('nao-e-uuid'), undefined);
+
+        await h.albums.addMembers(album.id, [bia, ana], at(101));
+        await h.albums.addMembers(album.id, [ana, caio], at(102));
+        assert.deepEqual(await h.albums.listMembers(album.id), [ana, bia, caio].sort((a, b) => (a < b ? -1 : 1)).filter((id) => id !== caio).concat(caio), 'ordem de entrada; quem já estava não muda');
+        assert.equal(await h.albums.isMember(album.id, caio), true);
+        assert.equal(await h.albums.isMember(album.id, randomUUID()), false);
+
+        const other = await h.albums.ensure({ id: randomUUID(), kind: 'FLASH', refId: randomUUID(), title: null, placeName: null, startedAt: at(500), createdAt: at(500) });
+        await h.albums.addMembers(other.id, [ana], at(500));
+        assert.deepEqual((await h.albums.listForUser(ana, at(0), 10)).map((a) => a.id), [other.id, album.id], 'o mais recente primeiro');
+        assert.deepEqual((await h.albums.listForUser(ana, at(200), 10)).map((a) => a.id), [other.id]);
+        assert.deepEqual(await h.albums.listForUser(bia, at(200), 10), []);
+        assert.deepEqual((await h.albums.listStartedBetween(at(100), at(500), 10)).map((a) => a.id), [other.id], 'exclui o início, inclui o fim');
+
+        const photo = { id: randomUUID(), albumId: album.id, authorId: bia, mime: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff, 1, 2]), createdAt: at(110) };
+        await h.albums.addPhoto(photo);
+        await h.albums.addPhoto({ ...photo, id: randomUUID(), authorId: ana, createdAt: at(111) });
+        assert.deepEqual((await h.albums.listPhotos(album.id)).map((p) => [p.id, p.authorId]), [[photo.id, bia], [(await h.albums.listPhotos(album.id))[1]!.id, ana]]);
+        assert.equal(await h.albums.countPhotos(album.id), 2);
+        assert.equal(await h.albums.countPhotos(album.id, bia), 1);
+        const found = (await h.albums.findPhoto(album.id, photo.id))!;
+        assert.deepEqual([found.mime, [...found.data], found.authorId], ['image/jpeg', [0xff, 0xd8, 0xff, 1, 2], bia]);
+        assert.equal(await h.albums.findPhoto(other.id, photo.id), undefined, 'a foto é daquele álbum');
+        assert.equal(await h.albums.deletePhoto(album.id, photo.id, ana), false, 'só o autor apaga');
+        assert.equal(await h.albums.deletePhoto(album.id, photo.id, bia), true);
+        assert.equal(await h.albums.countPhotos(album.id), 1);
+
+        assert.equal(await h.albums.markSummarized(album.id, bia, at(900)), true);
+        assert.equal(await h.albums.markSummarized(album.id, bia, at(901)), false, 'nunca avisa duas vezes');
+        assert.equal(await h.albums.markSummarized(album.id, ana, at(901)), true);
+      });
+    });
+
+    // ---------- Stories de locais ----------
+
+    describe('stories de locais', () => {
+      it('guarda, lista os que estão no ar, denuncia uma vez por pessoa e apaga junto das denúncias', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const mk = async (name: string) => {
+          const v: VenueRecord = { id: randomUUID(), name, address: null, category: 'bar', lat: -23.55, lng: -46.63, isSample: false };
+          await h.places.createVenue(v);
+          return v.id;
+        };
+        const venueId = await mk('Bar A');
+        const other = await mk('Bar B');
+        const story = { id: randomUUID(), venueId, authorId: ana, mime: 'image/jpeg', video: false, data: new Uint8Array([0xff, 0xd8, 1]), createdAt: at(10), expiresAt: at(1000) };
+        await h.venueStories.add(story);
+        await h.venueStories.add({ ...story, id: randomUUID(), createdAt: at(20), expiresAt: at(50), video: true, mime: 'video/mp4' });
+        await h.venueStories.add({ ...story, id: randomUUID(), venueId: other, createdAt: at(30) });
+        assert.deepEqual((await h.venueStories.listLive([venueId], at(40))).map((s) => s.createdAt.getTime() - at(0).getTime()), [10000, 20000]);
+        assert.deepEqual((await h.venueStories.listLive([venueId], at(60))).map((s) => s.id), [story.id], 'o vencido sai');
+        assert.equal((await h.venueStories.listLive([venueId, other], at(60))).length, 2);
+        assert.deepEqual(await h.venueStories.listLive([], at(60)), []);
+        const meta = (await h.venueStories.find(story.id))!;
+        assert.deepEqual([meta.venueId, meta.authorId, meta.video, 'data' in meta], [venueId, ana, false, false]);
+        const media = (await h.venueStories.findMedia(story.id))!;
+        assert.deepEqual([media.mime, [...media.data]], ['image/jpeg', [0xff, 0xd8, 1]]);
+        assert.equal(await h.venueStories.find('nao-e-uuid'), undefined);
+
+        const report = (id: string, storyId: string, reporterId: string, createdAt: Date) => ({ id, storyId, reporterId, reason: 'SPAM' as const, details: null, createdAt, resolvedAt: null, resolution: null, resolutionNote: null });
+        const r1 = randomUUID();
+        assert.equal(await h.venueStories.report(report(r1, story.id, bia, at(100))), true);
+        assert.equal(await h.venueStories.report(report(randomUUID(), story.id, bia, at(101))), false, 'uma denúncia por pessoa');
+        assert.equal(await h.venueStories.report(report(randomUUID(), randomUUID(), bia, at(101))), false, 'story que não existe');
+        assert.equal(await h.venueStories.report(report(randomUUID(), story.id, caio, at(102))), true);
+        assert.deepEqual([...(await h.venueStories.reportedIds(bia, [story.id, meta.id]))], [story.id]);
+        assert.equal(await h.venueStories.countOpenReporters(venueId, at(0)), 2);
+        assert.equal(await h.venueStories.countOpenReporters(venueId, at(101)), 1, 'só desde a data');
+        assert.equal(await h.venueStories.countOpenReporters(other, at(0)), 0);
+        assert.deepEqual((await h.venueStories.listReports(true, { limit: 10, offset: 0 })).map((r) => r.reporterId), [bia, caio], 'as mais antigas primeiro');
+        assert.equal((await h.venueStories.findReport(r1))?.storyId, story.id);
+        assert.equal(await h.venueStories.resolveReport(r1, ana, 'DISMISSED', 'ok', at(200)), true);
+        assert.equal(await h.venueStories.resolveReport(r1, ana, 'ACTIONED', null, at(201)), false, 'decide uma vez só');
+        assert.equal(await h.venueStories.countOpenReporters(venueId, at(0)), 1, 'denúncia decidida não conta');
+        assert.equal((await h.venueStories.listReports(false, { limit: 10, offset: 0 })).length, 1);
+        assert.equal((await h.venueStories.listReports(true, { limit: 10, offset: 1 })).length, 0);
+
+        assert.equal(await h.venueStories.delete(story.id), true);
+        assert.equal(await h.venueStories.delete(story.id), false);
+        assert.equal(await h.venueStories.findReport(r1), undefined, 'as denúncias vão junto');
+      });
+
+      it('silencia locais e guarda a preferência de não ver stories de locais', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const mk = async (name: string) => {
+          const v: VenueRecord = { id: randomUUID(), name, address: null, category: 'bar', lat: -23.55, lng: -46.63, isSample: false };
+          await h.places.createVenue(v);
+          return v.id;
+        };
+        const v1 = await mk('Bar A');
+        const v2 = await mk('Bar B');
+        assert.deepEqual(await h.venueStories.getPrefs(ana), { hideAll: false });
+        await h.venueStories.setMuted(ana, v1, true);
+        await h.venueStories.setMuted(ana, v1, true);
+        await h.venueStories.setMuted(ana, v2, true);
+        await h.venueStories.setMuted(bia, v1, true);
+        assert.deepEqual(await h.venueStories.listMuted(ana), [v1, v2].sort());
+        await h.venueStories.setMuted(ana, v1, false);
+        assert.deepEqual(await h.venueStories.listMuted(ana), [v2]);
+        await h.venueStories.setPrefs(ana, { hideAll: true });
+        assert.deepEqual(await h.venueStories.getPrefs(ana), { hideAll: true });
+        assert.deepEqual(await h.venueStories.getPrefs(bia), { hideAll: false });
+        await h.venueStories.setPrefs(ana, { hideAll: false });
+        assert.deepEqual(await h.venueStories.getPrefs(ana), { hideAll: false });
       });
     });
   });

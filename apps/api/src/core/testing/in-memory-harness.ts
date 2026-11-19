@@ -13,6 +13,8 @@ import {
   InMemoryProfileEventRepository,
   InMemoryPostRepository,
   InMemoryEventRoomRepository,
+  InMemoryAlbumRepository,
+  InMemoryVenueStoryRepository,
   InMemoryFeedRepository,
   InMemoryPushSubscriptionRepository,
   InMemoryFlashRepository,
@@ -54,6 +56,8 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let profileEvents = new InMemoryProfileEventRepository();
   let posts = new InMemoryPostRepository();
   let eventRoom = new InMemoryEventRoomRepository(posts);
+  let albums = new InMemoryAlbumRepository();
+  let venueStories = new InMemoryVenueStoryRepository();
   let feed = new InMemoryFeedRepository(posts, places);
   let admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom });
   let notifications = new InMemoryNotificationRepository();
@@ -130,6 +134,12 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
     get posts() {
       return posts;
     },
+    get albums() {
+      return albums;
+    },
+    get venueStories() {
+      return venueStories;
+    },
     get eventRoom() {
       return eventRoom;
     },
@@ -170,6 +180,8 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
       profileEvents = new InMemoryProfileEventRepository();
       posts = new InMemoryPostRepository();
       eventRoom = new InMemoryEventRoomRepository(posts);
+      albums = new InMemoryAlbumRepository();
+      venueStories = new InMemoryVenueStoryRepository();
       feed = new InMemoryFeedRepository(posts, places);
       admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom });
       notifications = new InMemoryNotificationRepository();

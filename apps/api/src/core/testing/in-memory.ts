@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
+import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from '../album.ts';
+import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from '../venue-story.ts';
 import { conflict } from '../errors.ts';
 import { CalendarFetchError } from '../ports.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
   ReferralRecord,
   ReferralRepository,
+  AlbumRepository,
+  VenueStoryRepository,
   PostRepository,
   EventRoomRepository,
   FeedRepository,
@@ -3274,5 +3278,186 @@ export class InMemoryActivityRepository implements ActivityRepository {
       .filter((r) => !b || r.at.getTime() < b.at.getTime() || (r.at.getTime() === b.at.getTime() && r.id < b.id))
       .sort((x, y) => y.at.getTime() - x.at.getTime() || (x.id < y.id ? 1 : x.id > y.id ? -1 : 0))
       .slice(0, query.limit);
+  }
+}
+
+export class InMemoryAlbumRepository implements AlbumRepository {
+  readonly albums = new Map<string, AlbumRecord>();
+  readonly members = new Map<string, Map<string, Date>>();
+  readonly photos = new Map<string, AlbumPhotoRecord>();
+  readonly summarized = new Set<string>();
+
+  async ensure(album: AlbumRecord): Promise<AlbumRecord> {
+    const existing = [...this.albums.values()].find((a) => a.kind === album.kind && a.refId === album.refId);
+    if (existing) return { ...existing };
+    this.albums.set(album.id, { ...album });
+    return { ...album };
+  }
+
+  async find(id: string): Promise<AlbumRecord | undefined> {
+    const a = this.albums.get(id);
+    return a ? { ...a } : undefined;
+  }
+
+  async addMembers(albumId: string, userIds: string[], at: Date): Promise<void> {
+    if (!this.albums.has(albumId)) return;
+    const map = this.members.get(albumId) ?? new Map<string, Date>();
+    for (const id of userIds) if (!map.has(id)) map.set(id, at);
+    this.members.set(albumId, map);
+  }
+
+  async listMembers(albumId: string): Promise<string[]> {
+    return [...(this.members.get(albumId) ?? new Map<string, Date>()).entries()].sort((a, b) => a[1].getTime() - b[1].getTime() || (a[0] < b[0] ? -1 : 1)).map(([id]) => id);
+  }
+
+  async isMember(albumId: string, userId: string): Promise<boolean> {
+    return this.members.get(albumId)?.has(userId) ?? false;
+  }
+
+  async listForUser(userId: string, since: Date, limit: number): Promise<AlbumRecord[]> {
+    return [...this.albums.values()]
+      .filter((a) => a.startedAt > since && this.members.get(a.id)?.has(userId))
+      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+      .slice(0, limit)
+      .map((a) => ({ ...a }));
+  }
+
+  async listStartedBetween(from: Date, to: Date, limit: number): Promise<AlbumRecord[]> {
+    return [...this.albums.values()]
+      .filter((a) => a.startedAt > from && a.startedAt <= to)
+      .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
+      .slice(0, limit)
+      .map((a) => ({ ...a }));
+  }
+
+  async addPhoto(photo: AlbumPhotoRecord): Promise<void> {
+    if (this.albums.has(photo.albumId)) this.photos.set(photo.id, { ...photo });
+  }
+
+  async listPhotos(albumId: string): Promise<AlbumPhotoMeta[]> {
+    return [...this.photos.values()]
+      .filter((p) => p.albumId === albumId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map((p) => ({ id: p.id, albumId: p.albumId, authorId: p.authorId, createdAt: p.createdAt }));
+  }
+
+  async countPhotos(albumId: string, authorId?: string): Promise<number> {
+    return [...this.photos.values()].filter((p) => p.albumId === albumId && (authorId === undefined || p.authorId === authorId)).length;
+  }
+
+  async findPhoto(albumId: string, photoId: string): Promise<AlbumPhotoRecord | undefined> {
+    const p = this.photos.get(photoId);
+    return p && p.albumId === albumId ? { ...p } : undefined;
+  }
+
+  async deletePhoto(albumId: string, photoId: string, authorId: string): Promise<boolean> {
+    const p = this.photos.get(photoId);
+    if (!p || p.albumId !== albumId || p.authorId !== authorId) return false;
+    this.photos.delete(photoId);
+    return true;
+  }
+
+  async markSummarized(albumId: string, userId: string): Promise<boolean> {
+    const key = `${albumId}|${userId}`;
+    if (this.summarized.has(key)) return false;
+    this.summarized.add(key);
+    return true;
+  }
+}
+
+export class InMemoryVenueStoryRepository implements VenueStoryRepository {
+  readonly stories = new Map<string, VenueStoryRecord>();
+  readonly reports = new Map<string, VenueStoryReportRecord>();
+  readonly muted = new Set<string>();
+  readonly prefs = new Map<string, VenueStoryPrefs>();
+
+  async add(story: VenueStoryRecord): Promise<void> {
+    this.stories.set(story.id, { ...story, data: new Uint8Array(story.data) });
+  }
+
+  private static meta(s: VenueStoryRecord): VenueStoryMeta {
+    const { data: _data, ...meta } = s;
+    return { ...meta };
+  }
+
+  async find(id: string): Promise<VenueStoryMeta | undefined> {
+    const s = this.stories.get(id);
+    return s ? InMemoryVenueStoryRepository.meta(s) : undefined;
+  }
+
+  async findMedia(id: string): Promise<{ mime: string; data: Uint8Array; expiresAt: Date } | undefined> {
+    const s = this.stories.get(id);
+    return s ? { mime: s.mime, data: new Uint8Array(s.data), expiresAt: s.expiresAt } : undefined;
+  }
+
+  async listLive(venueIds: string[], now: Date): Promise<VenueStoryMeta[]> {
+    const wanted = new Set(venueIds);
+    return [...this.stories.values()]
+      .filter((s) => wanted.has(s.venueId) && s.expiresAt.getTime() > now.getTime())
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map(InMemoryVenueStoryRepository.meta);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    for (const [key, r] of this.reports) if (r.storyId === id) this.reports.delete(key);
+    return this.stories.delete(id);
+  }
+
+  async report(report: VenueStoryReportRecord): Promise<boolean> {
+    const key = `${report.storyId}|${report.reporterId}`;
+    if (this.reports.has(key) || !this.stories.has(report.storyId)) return false;
+    this.reports.set(key, { ...report });
+    return true;
+  }
+
+  async reportedIds(userId: string, storyIds: string[]): Promise<Set<string>> {
+    return new Set(storyIds.filter((id) => this.reports.has(`${id}|${userId}`)));
+  }
+
+  async listReports(open: boolean, page: Page): Promise<VenueStoryReportRecord[]> {
+    const rows = [...this.reports.values()].filter((r) => (r.resolvedAt === null) === open);
+    rows.sort((a, b) => (open ? a.createdAt.getTime() - b.createdAt.getTime() : b.createdAt.getTime() - a.createdAt.getTime()) || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit).map((r) => ({ ...r }));
+  }
+
+  async findReport(id: string): Promise<VenueStoryReportRecord | undefined> {
+    const r = [...this.reports.values()].find((x) => x.id === id);
+    return r ? { ...r } : undefined;
+  }
+
+  async resolveReport(id: string, _adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean> {
+    for (const [key, r] of this.reports) {
+      if (r.id === id && r.resolvedAt === null) {
+        this.reports.set(key, { ...r, resolvedAt: at, resolution, resolutionNote: note });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async countOpenReporters(venueId: string, since: Date): Promise<number> {
+    const reporters = new Set<string>();
+    for (const r of this.reports.values()) {
+      if (r.resolvedAt === null && r.createdAt.getTime() >= since.getTime() && this.stories.get(r.storyId)?.venueId === venueId) reporters.add(r.reporterId);
+    }
+    return reporters.size;
+  }
+
+  async setMuted(userId: string, venueId: string, muted: boolean): Promise<void> {
+    if (muted) this.muted.add(`${userId}|${venueId}`);
+    else this.muted.delete(`${userId}|${venueId}`);
+  }
+
+  async listMuted(userId: string): Promise<string[]> {
+    return [...this.muted].filter((k) => k.startsWith(`${userId}|`)).map((k) => k.slice(userId.length + 1)).sort();
+  }
+
+  async getPrefs(userId: string): Promise<VenueStoryPrefs> {
+    return { ...(this.prefs.get(userId) ?? { hideAll: false }) };
+  }
+
+  async setPrefs(userId: string, prefs: VenueStoryPrefs): Promise<void> {
+    if (prefs.hideAll) this.prefs.set(userId, { ...prefs });
+    else this.prefs.delete(userId);
   }
 }

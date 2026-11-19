@@ -162,6 +162,20 @@ export interface FeedReportRow {
   resolutionNote: string | null;
 }
 
+export interface VenueStoryReportRow {
+  id: string;
+  reason: ReportReason;
+  details: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolution: Resolution | null;
+  resolutionNote: string | null;
+  reporter: { id: string; username: string };
+  story: { id: string; kind: 'IMAGE' | 'VIDEO'; venueId: string; venueName: string | null; author: { id: string; username: string } | null; createdAt: string; expiresAt: string };
+  /** Pessoas diferentes com denúncia aberta contra o local; a partir de 3 a publicação do local fica suspensa. */
+  venueOpenReporters: number;
+}
+
 export interface StoryReportRow {
   id: string;
   reason: ReportReason;

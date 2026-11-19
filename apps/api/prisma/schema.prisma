@@ -239,6 +239,12 @@ model User {
   photo             ProfilePhoto?
   posts             Post[]
   eventAttendances  EventAttendance[]
+  albumMembers      AlbumMember[]
+  albumPhotos       AlbumPhoto[]
+  venueStories      VenueStory[]       @relation("VenueStoryAuthor")
+  venueStoryReports VenueStoryReport[] @relation("VenueStoryReports")
+  venueStoryMutes   VenueStoryMute[]
+  venueStoryPref    VenueStoryPref?
   feedPosts         FeedPost[]        @relation("FeedPostAuthor")
   feedComments      FeedComment[]     @relation("FeedCommentAuthor")
   feedReactions     FeedReaction[]    @relation("FeedReactionUser")
@@ -824,6 +830,8 @@ model Venue {
   calendar       VenueCalendar?
   calendarDrafts VenueCalendarDraft[]
   followers VenueFollow[]
+  stories   VenueStory[]
+  storyMutes VenueStoryMute[]
   ratings   VenueRating[]
   checkinCode VenueCheckinCode?
   checkins  VenueCheckin[]
@@ -1787,4 +1795,112 @@ model Referral {
   inviter User @relation("ReferralInviter", fields: [inviterId], references: [id], onDelete: Cascade)
 
   @@index([inviterId, createdAt])
+}
+
+/// Álbum do encontro: fotos só de quem foi. No NOW `refId` é o id do convite (sem chave estrangeira: o convite some em 24 h);
+/// no evento é `PLACE:<id>` ou `USER:<id>`. Quem foi fica gravado em AlbumMember.
+model Album {
+  id        String   @id @default(uuid()) @db.Uuid
+  kind      String
+  refId     String
+  title     String?
+  placeName String?
+  startedAt DateTime
+  createdAt DateTime @default(now())
+
+  members AlbumMember[]
+  photos  AlbumPhoto[]
+
+  @@unique([kind, refId])
+  @@index([startedAt])
+}
+
+model AlbumMember {
+  albumId      String    @db.Uuid
+  userId       String    @db.Uuid
+  joinedAt     DateTime  @default(now())
+  /// Quando o aviso "Ontem em..." saiu para esta pessoa (nunca sai duas vezes).
+  summarizedAt DateTime?
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([albumId, userId])
+  @@index([userId])
+}
+
+model AlbumPhoto {
+  id        String   @id @default(uuid()) @db.Uuid
+  albumId   String   @db.Uuid
+  authorId  String   @db.Uuid
+  mime      String
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  album  Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([albumId, createdAt])
+  @@index([authorId])
+}
+
+/// Story público de um local verificado (com responsável): foto ou vídeo, 24 h. Quem segue vê na Home; o Explorar mostra na faixa "Rolando agora".
+model VenueStory {
+  id        String   @id @default(uuid()) @db.Uuid
+  venueId   String   @db.Uuid
+  authorId  String   @db.Uuid
+  mime      String
+  isVideo   Boolean  @default(false)
+  data      Bytes
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  venue   Venue              @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  author  User               @relation("VenueStoryAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  reports VenueStoryReport[]
+
+  @@index([venueId, expiresAt])
+  @@index([expiresAt])
+}
+
+/// Denúncia de story de local: uma por pessoa. Denúncias abertas de várias pessoas suspendem a publicação do local até a gestão decidir.
+model VenueStoryReport {
+  id         String   @id @default(uuid()) @db.Uuid
+  storyId    String   @db.Uuid
+  reporterId String   @db.Uuid
+  reason     String
+  details    String?
+  createdAt  DateTime @default(now())
+  /// Decisão da gestão: DISMISSED (sem problema) ou ACTIONED (providência tomada).
+  resolvedAt     DateTime?
+  resolvedBy     String?   @db.Uuid
+  resolution     String?
+  resolutionNote String?
+
+  story    VenueStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  reporter User       @relation("VenueStoryReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, reporterId])
+  @@index([reporterId])
+  @@index([resolvedAt, createdAt])
+}
+
+/// "Não tenho interesse": a pessoa não vê mais o local na Home nem no "Rolando agora".
+model VenueStoryMute {
+  userId    String   @db.Uuid
+  venueId   String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([userId, venueId])
+}
+
+/// Preferência de quem vê: não ver stories de locais. Sem linha = vê.
+model VenueStoryPref {
+  userId  String  @id @db.Uuid
+  hideAll Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -16,6 +16,8 @@ import {
   PrismaProfileEventRepository,
   PrismaPostRepository,
   PrismaEventRoomRepository,
+  PrismaAlbumRepository,
+  PrismaVenueStoryRepository,
   PrismaFeedRepository,
   PrismaSchedulingRepository,
   PrismaPushSubscriptionRepository,
@@ -83,6 +85,8 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     profileEvents: new PrismaProfileEventRepository(prisma),
     posts: new PrismaPostRepository(prisma),
     eventRoom: new PrismaEventRoomRepository(prisma),
+    albums: new PrismaAlbumRepository(prisma),
+    venueStories: new PrismaVenueStoryRepository(prisma),
     feed: new PrismaFeedRepository(prisma),
     notifications: new PrismaNotificationRepository(prisma),
     pushSubscriptions: new PrismaPushSubscriptionRepository(prisma),
@@ -95,7 +99,7 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     },
     async reset() {
       // CASCADE leva junto todas as tabelas que referenciam "User"; PendingSignup e Venue não têm chave estrangeira para User.
-      await prisma.$executeRawUnsafe('TRUNCATE TABLE "User", "PendingSignup", "Venue" CASCADE');
+      await prisma.$executeRawUnsafe('TRUNCATE TABLE "User", "PendingSignup", "Venue", "Album" CASCADE');
     },
     async close() {
       await prisma.$disconnect();

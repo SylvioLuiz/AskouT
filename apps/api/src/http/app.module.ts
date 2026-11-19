@@ -34,6 +34,9 @@ import { PlacesController } from './controllers/places.controller.ts';
 import { coreProvider, googleProvider, placePhotosProvider } from './core.provider.ts';
 import { FlashPurge } from './flash-purge.ts';
 import { EventReminders } from './event-reminders.ts';
+import { AlbumJobs } from './album-jobs.ts';
+import { AlbumsController } from './controllers/albums.controller.ts';
+import { VenueStoriesController } from './controllers/venue-stories.controller.ts';
 import { CalendarImportJob } from './calendar-import-job.ts';
 import { CalendarSyncJob } from './calendar-sync-job.ts';
 import { CalendarsController } from './controllers/calendars.controller.ts';
@@ -43,7 +46,7 @@ import { loadConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
 
 @Module({
-  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, GifsController, FeedController, VenuesController, BoostsController, OffersController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AdminController, ReferralsController],
+  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, GifsController, FeedController, VenuesController, BoostsController, OffersController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AlbumsController, VenueStoriesController, AdminController, ReferralsController],
   providers: [
     { provide: CONFIG, useFactory: () => loadConfig(process.env) },
     prismaProvider,
@@ -54,6 +57,7 @@ import { CONFIG } from './tokens.ts';
     FlashPurge,
     PollDeadlines,
     EventReminders,
+    AlbumJobs,
     CalendarImportJob,
     CalendarSyncJob,
     {

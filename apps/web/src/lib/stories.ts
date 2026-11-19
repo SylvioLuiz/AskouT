@@ -9,7 +9,7 @@ export interface StoryPos {
 }
 
 /** Próximo story (do mesmo grupo e depois do próximo grupo). `null` no último: é hora de fechar. */
-export function nextStory(groups: readonly Pick<EventStoryGroup, 'items'>[], pos: StoryPos): StoryPos | null {
+export function nextStory(groups: readonly { items: readonly unknown[] }[], pos: StoryPos): StoryPos | null {
   const group = groups[pos.group];
   if (!group) return null;
   if (pos.item + 1 < group.items.length) return { group: pos.group, item: pos.item + 1 };
@@ -18,7 +18,7 @@ export function nextStory(groups: readonly Pick<EventStoryGroup, 'items'>[], pos
 }
 
 /** Story anterior; no primeiro, volta para o começo dele. */
-export function prevStory(groups: readonly Pick<EventStoryGroup, 'items'>[], pos: StoryPos): StoryPos {
+export function prevStory(groups: readonly { items: readonly unknown[] }[], pos: StoryPos): StoryPos {
   if (pos.item > 0) return { group: pos.group, item: pos.item - 1 };
   const before = groups[pos.group - 1];
   if (before) return { group: pos.group - 1, item: before.items.length - 1 };

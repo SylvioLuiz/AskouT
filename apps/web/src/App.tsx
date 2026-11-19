@@ -43,6 +43,8 @@ const GroupScreen = lazyWithReload(() => import('./screens/group.tsx').then((m) 
 const VenueCalendarScreen = lazyWithReload(() => import('./screens/venue-calendar.tsx').then((m) => ({ default: m.VenueCalendarScreen })));
 const VenueOffersScreen = lazyWithReload(() => import('./screens/venue-offers.tsx').then((m) => ({ default: m.VenueOffersScreen })));
 const CheckinScreen = lazyWithReload(() => import('./screens/checkin.tsx').then((m) => ({ default: m.CheckinScreen })));
+const AlbumsScreen = lazyWithReload(() => import('./screens/albums.tsx').then((m) => ({ default: m.AlbumsScreen })));
+const AlbumScreen = lazyWithReload(() => import('./screens/albums.tsx').then((m) => ({ default: m.AlbumScreen })));
 const CloakroomPanelScreen = lazyWithReload(() => import('./screens/cloakroom-panel.tsx').then((m) => ({ default: m.CloakroomPanelScreen })));
 const VenueAdminHomeScreen = lazyWithReload(() => import('./screens/venue-admin.tsx').then((m) => ({ default: m.VenueAdminHomeScreen })));
 const VenueAdminEventsScreen = lazyWithReload(() => import('./screens/venue-admin.tsx').then((m) => ({ default: m.VenueAdminEventsScreen })));
@@ -167,6 +169,8 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/privacidade', render: () => <PrivacyScreen /> },
   { path: '/configuracao/privacidade-e-dados', render: () => <PrivacyDataScreen /> },
   { path: '/privacidade/apagar-conta', render: () => <DeleteAccountScreen /> },
+  { path: '/albuns', render: () => <AlbumsScreen /> },
+  { path: '/albuns/:id', render: (p) => <AlbumScreen key={p['id']} albumId={p['id'] ?? ''} /> },
   { path: '/arquivados', render: () => <ArchivedScreen /> },
   { path: '/interacoes', render: () => <InteractionsScreen /> },
   { path: '/ajuda', render: () => <HelpScreen /> },

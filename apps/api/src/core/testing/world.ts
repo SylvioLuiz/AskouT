@@ -11,6 +11,8 @@ import {
   InMemoryProfileEventRepository,
   InMemoryPostRepository,
   InMemoryEventRoomRepository,
+  InMemoryAlbumRepository,
+  InMemoryVenueStoryRepository,
   InMemoryFeedRepository,
   InMemorySchedulingRepository,
   InMemoryPushSubscriptionRepository,
@@ -60,6 +62,8 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const profileEvents = new InMemoryProfileEventRepository();
   const posts = new InMemoryPostRepository();
   const eventRoom = new InMemoryEventRoomRepository(posts);
+  const albums = new InMemoryAlbumRepository();
+  const venueStories = new InMemoryVenueStoryRepository();
   const notifications = new InMemoryNotificationRepository();
   const pushSubscriptions = new InMemoryPushSubscriptionRepository();
   const push = new FakePushSender();
@@ -104,7 +108,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, personalCalendars, ...(googleCalendar ? { googleCalendar } : {}), ...(microsoftCalendar ? { microsoftCalendar } : {}), oauthStates, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), ...(options.gifs ? { gifs: options.gifs } : {}), pending, passwordResets, mfa, secretBox, mfaChallenges, boosts, offers, boostStats, dwell, activity, regions, consents, cloakroom, account, payments, settings, referrals, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, personalCalendars, ...(googleCalendar ? { googleCalendar } : {}), ...(microsoftCalendar ? { microsoftCalendar } : {}), oauthStates, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), ...(options.gifs ? { gifs: options.gifs } : {}), pending, passwordResets, mfa, secretBox, mfaChallenges, boosts, offers, boostStats, dwell, activity, regions, consents, cloakroom, account, payments, settings, referrals, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string; minor?: boolean } = {}): Promise<AuthResult> {
@@ -124,7 +128,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
     return out;
   }
 
-  return { personalCalendars, googleCalendar, microsoftCalendar, oauthStates, mfa, secretBox, mfaChallenges, core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, boosts, offers, boostStats, dwell, regions, consents, cloakroom, account, payments, settings, referrals, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+  return { personalCalendars, googleCalendar, microsoftCalendar, oauthStates, mfa, secretBox, mfaChallenges, core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, boosts, offers, boostStats, dwell, regions, consents, cloakroom, account, payments, settings, referrals, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
 }
 
 /** Nos testes sem verificação em duas etapas, o login sempre devolve a sessão. */
