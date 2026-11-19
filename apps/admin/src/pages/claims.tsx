@@ -46,7 +46,7 @@ function ClaimDetail({ claim, onClose, onChanged }: { claim: Claim; onClose: () 
             <dd>
               {claim.venue.name}
               {claim.venue.isSample ? ' [TESTE]' : ''}
-              {claim.venue.isOrganization ? <div className="muted small">{claim.venue.category ?? 'Organização universitária'}</div> : null}
+              {claim.venue.isOrganization ? <div className="muted small">{claim.venue.category ?? 'Organização'}</div> : null}
               <div className="muted small">{claim.venue.address ?? 'Sem endereço'}</div>
               {claim.venue.isOrganization && claim.venue.description ? <div className="muted small">{claim.venue.description}</div> : null}
             </dd>

@@ -127,21 +127,47 @@ export function ClaimSheet({ onClose, onSent, fixed }: { onClose: () => void; on
   );
 }
 
-// ---------- Criar uma organização da faculdade ----------
+// ---------- Criar uma página de organização ----------
 
-const ORG_TYPES = ['Bateria', 'Atlética', 'Centro acadêmico', 'Empresa júnior', 'Coletivo', 'Outro'] as const;
+/** Tipos de organização, em dois blocos: os da facul vêm primeiro (público principal), depois o resto. */
+const ORG_TYPE_GROUPS = [
+  {
+    title: 'Da facul',
+    types: [
+      { label: 'Atlética', emoji: '🏆' },
+      { label: 'Bateria', emoji: '🥁' },
+      { label: 'Centro acadêmico', emoji: '📣' },
+      { label: 'Empresa júnior', emoji: '💼' },
+      { label: 'Liga acadêmica', emoji: '🧪' },
+    ],
+  },
+  {
+    title: 'De qualquer lugar',
+    types: [
+      { label: 'Coletivo', emoji: '✊' },
+      { label: 'Produtora de festa', emoji: '🪩' },
+      { label: 'Grupo ou galera', emoji: '🫶' },
+      { label: 'Empresa ou marca', emoji: '🏢' },
+      { label: 'Time ou esporte', emoji: '⚽' },
+      { label: 'Projeto social', emoji: '🌱' },
+      { label: 'Outro', emoji: '✨' },
+    ],
+  },
+] as const;
+const CAMPUS_TYPES: readonly string[] = ORG_TYPE_GROUPS[0].types.map((x) => x.label);
 export const ORGANIZATION_NAME_MAX = 80;
 export const ORGANIZATION_CAMPUS_MAX = 120;
 export const ORGANIZATION_DESCRIPTION_MAX = 500;
 
 /**
- * Pede a página de uma organização (bateria, atlética, centro acadêmico...). Quem segue a página e toca no sininho
- * recebe aviso de cada evento novo. Um administrador confere o comprovante antes de a página aparecer.
+ * Pede a página de uma organização: da facul (atlética, bateria, centro acadêmico...) ou de fora dela (coletivo,
+ * produtora, empresa, galera...). Quem segue a página e toca no sininho recebe aviso de cada evento novo.
+ * Um administrador confere o comprovante antes de a página aparecer.
  */
 export function OrganizationSheet({ onClose, onSent }: { onClose: () => void; onSent: () => void }) {
   const where = useCurrentPosition();
   const [name, setName] = useState('');
-  const [type, setType] = useState<string>(ORG_TYPES[0]);
+  const [type, setType] = useState<string>(ORG_TYPE_GROUPS[0].types[0].label);
   const [campus, setCampus] = useState('');
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | undefined>();
@@ -149,6 +175,7 @@ export function OrganizationSheet({ onClose, onSent }: { onClose: () => void; on
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | undefined>();
   const input = useRef<HTMLInputElement>(null);
+  const fromCampus = CAMPUS_TYPES.includes(type);
 
   function choose(event: ChangeEvent<HTMLInputElement>) {
     const chosen = event.target.files?.[0];
@@ -186,28 +213,46 @@ export function OrganizationSheet({ onClose, onSent }: { onClose: () => void; on
   return (
     <Sheet title={t('Criar página de organização')} onClose={onClose}>
       <div className="claim">
-        <p className="muted">{t('Para bateria, atlética, centro acadêmico e outras organizações da faculdade. Quem seguir a página e tocar no sininho recebe um aviso a cada evento novo.')}</p>
-        <Field label={t('Nome da organização')} value={name} onChange={setName} placeholder={t('Ex.: Bateria Furiosa')} maxLength={ORGANIZATION_NAME_MAX} autoFocus />
-        <div className="field">
-          <span className="field__label">{t('Tipo')}</span>
-          <div className="chips" role="group" aria-label={t('Tipo')}>
-            {ORG_TYPES.map((option) => (
-              <button key={option} type="button" aria-pressed={type === option} className="chip" onClick={() => setType(option)}>
-                {t(option)}
-              </button>
-            ))}
-          </div>
+        <div className="orghero">
+          <span className="orghero__emojis" aria-hidden="true">
+            🥁🏆🪩✊
+          </span>
+          <p className="orghero__title">{t('Sua galera merece uma página')}</p>
+          <p className="orghero__text">{t('Atlética, bateria, coletivo, produtora, empresa ou aquele grupo que vive marcando rolê. Quem seguir e ligar o sininho fica sabendo de cada evento novo.')}</p>
         </div>
-        <Field label={t('Faculdade e campus')} value={campus} onChange={setCampus} placeholder={t('Ex.: UFMG, Campus Pampulha')} maxLength={ORGANIZATION_CAMPUS_MAX} />
+        <Field label={t('Nome da organização')} value={name} onChange={setName} placeholder={fromCampus ? t('Ex.: Bateria Furiosa') : t('Ex.: Coletivo Noite Preta')} maxLength={ORGANIZATION_NAME_MAX} autoFocus />
+        <div className="field">
+          <span className="field__label">{t('O que vocês são?')}</span>
+          {ORG_TYPE_GROUPS.map((group) => (
+            <div key={group.title} className="orgtypes">
+              <span className="orgtypes__title">{t(group.title)}</span>
+              <div className="chips" role="group" aria-label={t(group.title)}>
+                {group.types.map((option) => (
+                  <button key={option.label} type="button" aria-pressed={type === option.label} className="chip orgchip" onClick={() => setType(option.label)}>
+                    <span aria-hidden="true">{option.emoji}</span> {t(option.label)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <Field
+          label={fromCampus ? t('Faculdade e campus') : t('Onde vocês ficam')}
+          value={campus}
+          onChange={setCampus}
+          placeholder={fromCampus ? t('Ex.: UFMG, Campus Pampulha') : t('Ex.: Savassi, Belo Horizonte')}
+          hint={fromCampus ? undefined : t('Bairro, cidade, faculdade ou o point de vocês.')}
+          maxLength={ORGANIZATION_CAMPUS_MAX}
+        />
         <Field label={t('Descrição (opcional)')} value={description} onChange={setDescription} multiline maxLength={ORGANIZATION_DESCRIPTION_MAX} />
         {where.status === 'ok' ? (
-          <p className="muted">{t('A página fica no mapa onde você está agora. Faça o pedido de dentro do campus.')}</p>
+          <p className="muted">{fromCampus ? t('A página fica no mapa onde você está agora. Faça o pedido de dentro do campus.') : t('A página fica no mapa onde você está agora. Faça o pedido da sede ou do point de vocês.')}</p>
         ) : where.status === 'asking' ? (
           <p className="muted">{t('Pegando a sua localização...')}</p>
         ) : (
           <Notice tone="error">{t('Precisamos da sua localização para colocar a organização no mapa. Libere a localização do aparelho e abra de novo.')}</Notice>
         )}
-        <p className="muted">{t('Envie um comprovante de que você representa a organização (ata, carteirinha, declaração da faculdade ou print do perfil oficial). Só um administrador do AskouT vê o arquivo.')}</p>
+        <p className="muted">{fromCampus ? t('Envie um comprovante de que você representa a organização (ata, carteirinha, declaração da faculdade ou print do perfil oficial). Só um administrador do AskouT vê o arquivo.') : t('Envie um comprovante de que você representa a organização (print do perfil oficial, CNPJ, crachá ou qualquer coisa que mostre o vínculo). Só um administrador do AskouT vê o arquivo.')}</p>
         <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="visually-hidden" aria-label={t('Escolher comprovante')} onChange={choose} />
         <Button variant="secondary" onClick={() => input.current?.click()}>
           {file ? t('Trocar comprovante') : t('Escolher comprovante')}
@@ -356,7 +401,7 @@ export function VenuesScreen() {
               {t('Reivindicar um local')}
             </Button>
             <Button full variant="secondary" onClick={() => setCreatingOrg(true)}>
-              {t('Criar página de organização (bateria, atlética...)')}
+              {t('Criar página de organização (atlética, coletivo, produtora...)')}
             </Button>
           </div>
         </>

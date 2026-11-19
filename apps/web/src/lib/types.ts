@@ -969,11 +969,11 @@ export interface VenueSummary {
   address: string | null;
   category: string | null;
   sample: boolean;
-  /** Organização da faculdade (bateria, atlética...) em vez de estabelecimento. */
+  /** Organização (atlética, coletivo, produtora, empresa...) em vez de estabelecimento. */
   organization?: boolean;
 }
 
-/** Pedido para criar a página de uma organização da faculdade. */
+/** Pedido para criar a página de uma organização (da facul ou não). */
 export interface OrganizationRequestBody {
   name: string;
   type?: string;
@@ -1127,7 +1127,7 @@ export interface VenueProfile {
   following: boolean;
   /** Sininho ligado: recebe aviso de cada evento novo. */
   notify?: boolean;
-  /** Organização da faculdade (bateria, atlética...). */
+  /** Organização (atlética, coletivo, produtora, empresa...). */
   organization?: boolean;
   followerCount: number;
   rating: VenueRating;

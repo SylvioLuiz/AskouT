@@ -121,7 +121,7 @@ export class VenuesController {
     return this.core.venues.setNotify(actor.userId, id, body?.notify);
   }
 
-  /** Pede a página de uma organização da faculdade (bateria, atlética...). Um admin aprova no painel de pedidos. */
+  /** Pede a página de uma organização (atlética, coletivo, produtora, empresa...). Um admin aprova no painel de pedidos. */
   @Post('organizations/requests')
   @HttpCode(200)
   requestOrganization(@CurrentActor() actor: Actor, @Body() body: unknown) {
