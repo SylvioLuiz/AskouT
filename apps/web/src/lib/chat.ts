@@ -6,6 +6,7 @@ import { intlLocale, t } from '../lib/i18n/index.ts';
 
 const clock = new Intl.DateTimeFormat(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
 const dayMonth = new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'short' });
+const dayMonthYear = new Intl.DateTimeFormat(intlLocale(), { day: 'numeric', month: 'short', year: 'numeric' });
 const weekday = new Intl.DateTimeFormat(intlLocale(), { weekday: 'long' });
 
 const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -50,7 +51,7 @@ export function formatWhen(startsAt: string | null, endsAt: string | null, now: 
     return d === 0 ? t('hoje') : d === 1 ? t('amanhã') : dayMonth.format(e);
   };
   // Já terminou (ou, sem horário de fim, começou há mais de 24 h): não é mais "acontecendo agora".
-  if ((hasEnd && end.getTime() <= now.getTime()) || (!hasEnd && now.getTime() - start.getTime() > 86_400_000)) return t('Aconteceu em {day}', { day: dayMonth.format(start) });
+  if ((hasEnd && end.getTime() <= now.getTime()) || (!hasEnd && now.getTime() - start.getTime() > 86_400_000)) return t('Aconteceu em {day}', { day: (start.getFullYear() === now.getFullYear() ? dayMonth : dayMonthYear).format(start) });
   const reference = start.getTime() <= now.getTime() ? now : start;
   const until = hasEnd ? (sameDay(end, reference) ? t(' até {time}', { time: clock.format(end) }) : t(' até {day} às {time}', { day: endDay(end), time: clock.format(end) })) : '';
   if (start.getTime() <= now.getTime()) return t('Acontecendo agora{until}', { until });

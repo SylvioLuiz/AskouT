@@ -159,6 +159,8 @@ export const VENUE_ADDRESS_MAX = 200;
 export const VENUE_CATEGORY_MAX = 40;
 export const VENUE_DESCRIPTION_MAX = 600;
 export const VENUE_UPCOMING_LIMIT = 30;
+/** Quantos eventos que já terminaram a página do local mostra em "Já rolou aqui". */
+export const VENUE_PAST_LIMIT = 20;
 /** Capa do estabelecimento enviada do aparelho (a tela reduz a foto antes). */
 export const VENUE_COVER_MAX_BYTES = 256 * 1024;
 const HOUR_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -226,6 +228,8 @@ export interface VenueProfileView {
   rating: VenueRatingView;
   /** Eventos que ainda vão acontecer ou estão acontecendo, do mais cedo ao mais tarde. */
   upcomingEvents: VenueEventView[];
+  /** Eventos que já terminaram, do mais recente ao mais antigo (até VENUE_PAST_LIMIT), com quantas pessoas confirmaram presença. */
+  pastEvents: (VenueEventView & { goingCount: number })[];
   /** Ranking de quem mais frequenta (só perfis que o visitante pode ver). */
   regulars: VenueRegularView[];
   /** Amigos (quem você segue e te segue de volta) que já confirmaram presença aqui: quantos são e até 3 para mostrar. */
@@ -605,6 +609,11 @@ export class VenueService {
       .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || (a.id < b.id ? -1 : 1))
       .slice(0, VENUE_UPCOMING_LIMIT)
       .map((e) => this.eventView(e));
+    const past = events
+      .filter((e) => e.endsAt.getTime() <= now)
+      .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime() || (a.id < b.id ? -1 : 1))
+      .slice(0, VENUE_PAST_LIMIT);
+    const pastGoing = past.length === 0 ? new Map<string, number>() : await this.deps.eventRoom.countGoing(past.map((e) => ({ source: 'PLACE' as const, id: e.id })));
     return {
       id: venue.id,
       name: venue.name,
@@ -629,6 +638,7 @@ export class VenueService {
       followerCount,
       rating: ratingView(rating),
       upcomingEvents: upcoming,
+      pastEvents: past.map((e) => ({ ...this.eventView(e), goingCount: pastGoing.get(e.id) ?? 0 })),
       ...(await this.visitors(viewerId, venue.id, events, now)),
     };
   }

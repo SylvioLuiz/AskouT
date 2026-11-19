@@ -222,4 +222,5 @@ test('primeiro emoji digitado no "+"', () => {
 test('formatWhen: evento que já terminou não aparece como acontecendo agora', () => {
   assert.match(formatWhen(iso(at(10, 20, 0)), iso(at(11, 2, 0)), NOW), /^Aconteceu em 10 de out\.$/);
   assert.match(formatWhen(iso(at(11, 20, 0)), null, NOW), /^Aconteceu em 11 de out\.$/);
+  assert.match(formatWhen("2024-11-26T23:00:00.000Z", "2024-11-27T03:00:00.000Z", NOW), /^Aconteceu em 26 de nov. de 2024$/);
 });
