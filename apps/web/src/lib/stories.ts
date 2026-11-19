@@ -30,3 +30,20 @@ export function startOf(groups: readonly Pick<EventStoryGroup, 'author'>[], user
   const group = groups.findIndex((g) => g.author.userId === userId);
   return group < 0 ? null : { group, item: 0 };
 }
+
+/**
+ * Fila para assistir a partir de uma pessoa, na ordem da faixa "Quem vai": começa nela, segue com quem vem depois,
+ * dá a volta em quem vinha antes e termina com quem tem flash mas não aparece na faixa. Assim, ao acabar o flash
+ * de uma pessoa, entram os das outras em seguida (em vez de fechar só porque ela era a última na ordem do servidor).
+ */
+export function queueFrom<G extends { author: { userId: string } }>(groups: readonly G[], order: readonly string[], userId: string): G[] {
+  const byUser = new Map(groups.map((g) => [g.author.userId, g]));
+  const shown = order.filter((id, i) => byUser.has(id) && order.indexOf(id) === i);
+  const at = shown.indexOf(userId);
+  const rotated = at < 0 ? shown : [...shown.slice(at), ...shown.slice(0, at)];
+  const first = byUser.get(userId);
+  const queue: G[] = first && at < 0 ? [first] : [];
+  for (const id of rotated) queue.push(byUser.get(id)!);
+  for (const g of groups) if (!queue.includes(g)) queue.push(g);
+  return queue;
+}

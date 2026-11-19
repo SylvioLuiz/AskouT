@@ -2942,4 +2942,6 @@ export const ES: Readonly<Record<string, string>> = {
   "Usar código de recuperação": "Usar un código de recuperación",
   "Código de {length} números": "Código de {length} números",
   "Número {n}": "Número {n}",
+  "Só quem vai pode postar": "Solo quienes van pueden publicar",
+  "Os flashes deste evento são de quem vai. Marque que você vai para postar o seu.": "Los flashes de este evento son de quienes van. Marca que vas para publicar el tuyo.",
 };

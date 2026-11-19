@@ -335,6 +335,34 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     return () => observer.disconnect();
   }, [hasThread]);
 
+  // No celular o topo (nome do amigo) e a caixa de mensagem ficam presos na tela (position: fixed, ver .chat--pinned
+  // no CSS). A conversa precisa de um espaço do tamanho deles em cima e embaixo, senão as mensagens passam por baixo:
+  // mede os dois sempre que mudam de altura (resposta, fotos na fila, modo seleção) e guarda em --chat-top/--chat-bottom.
+  const chatRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const root = chatRef.current;
+    if (!root || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      const top = root.querySelector<HTMLElement>(':scope > .chathead, :scope > .selectbar');
+      const bottom = root.querySelector<HTMLElement>(':scope > .chat__dock, :scope > .selectactions');
+      root.style.setProperty('--chat-top', `${top?.offsetHeight ?? 0}px`);
+      root.style.setProperty('--chat-bottom', `${bottom?.offsetHeight ?? 0}px`);
+    };
+    const sizes = new ResizeObserver(measure);
+    const watch = () => {
+      sizes.disconnect();
+      root.querySelectorAll<HTMLElement>(':scope > .chathead, :scope > .selectbar, :scope > .chat__dock, :scope > .selectactions').forEach((el) => sizes.observe(el));
+      measure();
+    };
+    const children = new MutationObserver(watch);
+    children.observe(root, { childList: true });
+    watch();
+    return () => {
+      sizes.disconnect();
+      children.disconnect();
+    };
+  }, [hasThread]);
+
   if (view.loading && !view.data && !view.error) return <Loading />;
   if (view.error && !view.data) {
     if (view.error.code === 'NOT_FOUND') {
@@ -671,7 +699,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   );
 
   return (
-    <div className={`chat chat--enter${background ? ' chat--bg' : ''}${colorStyle ? ' chat--colored' : ''}`} style={background || colorStyle ? ({ ...colorStyle, ...(background ? { '--chat-bg': `url(${background})` } : {}) } as CSSProperties) : undefined}>
+    <div ref={chatRef} className={`chat chat--enter chat--pinned${background ? ' chat--bg' : ''}${colorStyle ? ' chat--colored' : ''}`} style={background || colorStyle ? ({ ...colorStyle, ...(background ? { '--chat-bg': `url(${background})` } : {}) } as CSSProperties) : undefined}>
       {selected ? (
         <header className="selectbar">
           <p className="selectbar__count" role="status">
