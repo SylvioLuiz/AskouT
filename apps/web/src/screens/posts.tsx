@@ -197,7 +197,7 @@ export function CreatePostScreen() {
   // Vindo de uma votação de data fechada: já abre como evento, com nome, horário e a conversa marcada.
   const fromPoll = prefill.get('votacao') !== null;
   // `?tipo=evento` (ou vindo de uma votação) já abre como evento.
-  const [kind, setKind] = useState<'POST' | 'EVENT'>(startAsEvent ? 'EVENT' : 'POST');
+  const kind: 'POST' | 'EVENT' = startAsEvent ? 'EVENT' : 'POST';
   const [eventTitle, setEventTitle] = useState(fromPoll ? (prefill.get('titulo') ?? '').slice(0, 120) : '');
   const [eventKind, setEventKind] = useState<EventKind>('OTHER');
   // Data e horário também vêm de um compromisso da agenda (`/criar?tipo=evento&inicio=...&fim=...`).
@@ -355,16 +355,6 @@ export function CreatePostScreen() {
     }
   }
 
-  const kindToggle = (
-    <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
-      <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => { setKind('POST'); if (items.length === 0) setStep('photos'); }} disabled={busy}>
-        {t('Post')}
-      </button>
-      <button type="button" className={`segmented__tab${kind === 'EVENT' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'EVENT'} onClick={() => { setKind('EVENT'); setStep('details'); }} disabled={busy}>
-        {t('Evento')}
-      </button>
-    </div>
-  );
 
   const fileInput = <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="visually-hidden" aria-label={t('Escolher fotos ou vídeo')} id="fotos-post" onChange={addFiles} />;
 
@@ -689,7 +679,6 @@ export function CreatePostScreen() {
         </header>
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
         {progressBars}
-        {kindToggle}
         {kind === 'EVENT' ? (
           <section className="compose__row" aria-label={t('Dados do evento')}>
             <Field label={t('Nome do evento')} value={eventTitle} onChange={setEventTitle} maxLength={120} />
@@ -862,7 +851,6 @@ export function CreatePostScreen() {
       )}
       {fileInput}
 
-      {kind === 'EVENT' ? null : kindToggle}
 
       <div className="segmented" role="tablist" aria-label={t('De onde vem a foto')}>
         <button type="button" role="tab" aria-selected={source === 'photos'} className={`segmented__tab${source === 'photos' ? ' segmented__tab--on' : ''}`} onClick={() => setSource('photos')}>
