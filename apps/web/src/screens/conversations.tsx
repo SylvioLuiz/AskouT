@@ -180,6 +180,17 @@ interface StagedMedia {
   url: string;
 }
 
+/** Story respondido: aparece anexado em cima da resposta (some a imagem se o story já expirou ou for vídeo). */
+function StoryAttachment({ storyId, mine }: { storyId: string; mine: boolean }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="bubble__story" role="group" aria-label={mine ? t('Story que você respondeu') : t('Story respondido')}>
+      {failed ? null : <img src={api.storyMediaUrl(storyId)} alt="" draggable={false} onError={() => setFailed(true)} />}
+      <span>{failed ? t('Story indisponível') : mine ? t('Você respondeu ao story') : t('Respondeu ao seu story')}</span>
+    </div>
+  );
+}
+
 export function ChatScreen({ conversationId }: { conversationId: string }) {
   useEffect(() => () => void (chatLeftAt = Date.now()), []);
   const view = useAsync(() => api.messages(conversationId), [conversationId]);
@@ -614,6 +625,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       {!cell && !selected && m.mine && hasActions(m) ? moreButton(m) : null}
       <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.reactions.length > 0 ? ' bubble--reacted' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} title={formatClock(m.createdAt)} onClick={(e) => tapBubble(m, e)} {...pressHandlers(m)}>
         {isGroup && !m.mine && m.senderName && (pos === 'first' || pos === 'single') ? <span className="bubble__sender">{m.senderName}</span> : null}
+        {m.storyId && !m.deleted ? <StoryAttachment storyId={m.storyId} mine={m.mine} /> : null}
         {m.replyTo && !m.deleted ? (
           <button type="button" className="bubble__quote" aria-label={t('Ir para a mensagem respondida de {name}', { name: m.replyTo.mine ? t('você') : (m.replyTo.senderName ?? '') })} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
             <span className="bubble__quotetext">
@@ -773,19 +785,6 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           {prep !== undefined ? prepareProgressText(prep) : t('Enviando…')}
         </p>
       ) : null}
-      {replyTo && data.canSend ? (
-        <div className="replybar">
-          <div className="replybar__text">
-            <strong>{t('Respondendo a {name}', { name: replyTo.mine ? t('você') : (replyTo.senderName ?? data.other?.displayName ?? t('mensagem')) })}</strong>
-            <span>{replyPreview(replyTo)}</span>
-          </div>
-          {!replyTo.deleted && (replyTo.kind === 'IMAGE' || replyTo.kind === 'VIDEO') ? <ReplyThumb conversationId={conversationId} messageId={replyTo.id} kind={replyTo.kind} /> : null}
-          <button type="button" className="iconbtn" aria-label={t('Cancelar resposta')} onClick={() => setReplyTo(undefined)}>
-            <XIcon />
-          </button>
-        </div>
-      ) : null}
-
       {selected ? (
         <div className="selectactions" role="toolbar" aria-label={t('Ações para as mensagens selecionadas')}>
           <button type="button" className="selectactions__btn" disabled={selected.length !== 1 || !data.canSend} onClick={() => { const only = chosen[0]; if (only) { setReplyTo(only); setSelected(undefined); } }}>
@@ -803,97 +802,111 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         </div>
       ) : data.canSend ? (
         <>
-          {pendingGif ? (
-            <div className="gifstage" role="group" aria-label={t('GIF para enviar')}>
-              <span className="gifstage__item">
-                <GifImage url={pendingGif.url} />
-                <button type="button" className="stagebar__remove" aria-label={t('Tirar o GIF')} disabled={sending} onClick={() => setPendingGif(undefined)}>
-                  <XIcon />
-                </button>
-              </span>
-            </div>
-          ) : null}
-          {staged.length > 0 ? (
-            <div className="stagebar" role="group" aria-label={staged.length === 1 ? t('1 item para enviar') : t('{count} itens para enviar', { count: staged.length })}>
-              <ul className="stagebar__list">
-                {staged.map((item, i) => (
-                  <li key={item.id} className="stagebar__item">
-                    {item.kind === 'IMAGE' ? (
-                      <img src={item.url} alt={t('Foto {n}', { n: i + 1 })} draggable={false} />
-                    ) : (
-                      <span className="stagebar__video">
-                        <PlayIcon />
-                        <span className="visually-hidden">{t('Vídeo {n}', { n: i + 1 })}</span>
-                      </span>
-                    )}
-                    <button type="button" className="stagebar__remove" aria-label={item.kind === 'IMAGE' ? t('Tirar foto {n}', { n: i + 1 }) : t('Tirar vídeo {n}', { n: i + 1 })} disabled={sending} onClick={() => unstage(item.id)}>
-                      <XIcon />
-                    </button>
-                  </li>
-                ))}
-                {staged.length < STAGED_MAX ? (
-                  <li>
-                    <button type="button" className="stagebar__add" aria-label={t('Adicionar mais fotos ou vídeos')} disabled={sending} onClick={() => galleryRef.current?.click()}>
-                      <PlusIcon />
-                    </button>
-                  </li>
-                ) : null}
-              </ul>
-            </div>
-          ) : null}
-          <form className="composer" onSubmit={send}>
-            <label className="visually-hidden" htmlFor="msg">
-              Mensagem para {chatName}
-            </label>
-            <input ref={galleryRef} type="file" multiple accept="image/*,video/*" className="visually-hidden" aria-label={t('Escolher fotos ou vídeos')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
-            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="visually-hidden" aria-label={t('Tirar foto')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
-            {recording ? (
-              <VoiceRecorderBar onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
-            ) : (
-              <div className="composer__pill">
-                <button type="button" className="composer__camera" aria-label={t('Tirar foto')} disabled={sending} onClick={() => cameraRef.current?.click()}>
-                  <CameraIcon />
-                </button>
-                <textarea
-                  id="msg"
-                  className="composer__input composer__input--pill"
-                  rows={1}
-                  value={draft}
-                  maxLength={MESSAGE_MAX}
-                  placeholder={staged.length > 0 ? t('Adicione uma legenda…') : t('Mensagem…')}
-                  onChange={(e) => {
-                    setDraft(e.target.value);
-                    noteTyping(e.target.value);
-                  }}
-                  onKeyDown={(e) => {
-                    // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
-                    if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
-                  }}
-                />
-                {draft.trim() !== '' || staged.length > 0 || pendingGif ? (
-                  <>
-                    {/* Emoji e GIF só aparecem enquanto você escreve; com a caixa vazia o canto fica para o microfone, como nos outros apps. */}
-                    <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
-                    <button type="submit" className="composer__sendtext" disabled={sending} aria-busy={sending || undefined} aria-label={t('Enviar')}>
-                      <ArrowUpIcon />
-                    </button>
-                  </>
-                ) : (
-                  <span className="composer__tools">
-                    <button type="button" className="composer__tool" aria-label={t('Enviar fotos ou vídeos da galeria')} onClick={() => galleryRef.current?.click()}>
-                      <PhotoIcon />
-                    </button>
-                    <button type="button" className="composer__tool" aria-label={t('Gravar áudio')} onClick={() => {
-                        setProblem(undefined);
-                        setRecording(true);
-                      }}>
-                      <MicIcon />
-                    </button>
-                  </span>
-                )}
+          <div className="chat__dock">
+          {replyTo ? (
+            <div className="replybar">
+              <div className="replybar__text">
+                <strong>{t('Respondendo a {name}', { name: replyTo.mine ? t('você') : (replyTo.senderName ?? data.other?.displayName ?? t('mensagem')) })}</strong>
+                <span>{replyPreview(replyTo)}</span>
               </div>
-            )}
-          </form>
+              {!replyTo.deleted && (replyTo.kind === 'IMAGE' || replyTo.kind === 'VIDEO') ? <ReplyThumb conversationId={conversationId} messageId={replyTo.id} kind={replyTo.kind} /> : null}
+              <button type="button" className="iconbtn" aria-label={t('Cancelar resposta')} onClick={() => setReplyTo(undefined)}>
+                <XIcon />
+              </button>
+            </div>
+          ) : null}
+            {pendingGif ? (
+              <div className="gifstage" role="group" aria-label={t('GIF para enviar')}>
+                <span className="gifstage__item">
+                  <GifImage url={pendingGif.url} />
+                  <button type="button" className="stagebar__remove" aria-label={t('Tirar o GIF')} disabled={sending} onClick={() => setPendingGif(undefined)}>
+                    <XIcon />
+                  </button>
+                </span>
+              </div>
+            ) : null}
+            {staged.length > 0 ? (
+              <div className="stagebar" role="group" aria-label={staged.length === 1 ? t('1 item para enviar') : t('{count} itens para enviar', { count: staged.length })}>
+                <ul className="stagebar__list">
+                  {staged.map((item, i) => (
+                    <li key={item.id} className="stagebar__item">
+                      {item.kind === 'IMAGE' ? (
+                        <img src={item.url} alt={t('Foto {n}', { n: i + 1 })} draggable={false} />
+                      ) : (
+                        <span className="stagebar__video">
+                          <PlayIcon />
+                          <span className="visually-hidden">{t('Vídeo {n}', { n: i + 1 })}</span>
+                        </span>
+                      )}
+                      <button type="button" className="stagebar__remove" aria-label={item.kind === 'IMAGE' ? t('Tirar foto {n}', { n: i + 1 }) : t('Tirar vídeo {n}', { n: i + 1 })} disabled={sending} onClick={() => unstage(item.id)}>
+                        <XIcon />
+                      </button>
+                    </li>
+                  ))}
+                  {staged.length < STAGED_MAX ? (
+                    <li>
+                      <button type="button" className="stagebar__add" aria-label={t('Adicionar mais fotos ou vídeos')} disabled={sending} onClick={() => galleryRef.current?.click()}>
+                        <PlusIcon />
+                      </button>
+                    </li>
+                  ) : null}
+                </ul>
+              </div>
+            ) : null}
+            <form className="composer" onSubmit={send}>
+              <label className="visually-hidden" htmlFor="msg">
+                Mensagem para {chatName}
+              </label>
+              <input ref={galleryRef} type="file" multiple accept="image/*,video/*" className="visually-hidden" aria-label={t('Escolher fotos ou vídeos')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="visually-hidden" aria-label={t('Tirar foto')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
+              {recording ? (
+                <VoiceRecorderBar onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
+              ) : (
+                <div className="composer__pill">
+                  <button type="button" className="composer__camera" aria-label={t('Tirar foto')} disabled={sending} onClick={() => cameraRef.current?.click()}>
+                    <CameraIcon />
+                  </button>
+                  <textarea
+                    id="msg"
+                    className="composer__input composer__input--pill"
+                    rows={1}
+                    value={draft}
+                    maxLength={MESSAGE_MAX}
+                    placeholder={staged.length > 0 ? t('Adicione uma legenda…') : t('Mensagem…')}
+                    onChange={(e) => {
+                      setDraft(e.target.value);
+                      noteTyping(e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      // Enter envia no computador; Shift+Enter quebra a linha. No celular o botão envia.
+                      if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
+                    }}
+                  />
+                  {draft.trim() !== '' || staged.length > 0 || pendingGif ? (
+                    <>
+                      {/* Emoji e GIF só aparecem enquanto você escreve; com a caixa vazia o canto fica para o microfone, como nos outros apps. */}
+                      <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
+                      <button type="submit" className="composer__sendtext" disabled={sending} aria-busy={sending || undefined} aria-label={t('Enviar')}>
+                        <ArrowUpIcon />
+                      </button>
+                    </>
+                  ) : (
+                    <span className="composer__tools">
+                      <button type="button" className="composer__tool" aria-label={t('Enviar fotos ou vídeos da galeria')} onClick={() => galleryRef.current?.click()}>
+                        <PhotoIcon />
+                      </button>
+                      <button type="button" className="composer__tool" aria-label={t('Gravar áudio')} onClick={() => {
+                          setProblem(undefined);
+                          setRecording(true);
+                        }}>
+                        <MicIcon />
+                      </button>
+                    </span>
+                  )}
+                </div>
+              )}
+            </form>
+          </div>
         </>
       ) : (
         <Notice>{t('Vocês não são mais amigos. O histórico continua aqui, mas não dá para enviar novas mensagens.')}</Notice>

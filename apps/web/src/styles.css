@@ -6686,3 +6686,14 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 /* Galeria dentro do app (iPhone): a grade das fotos recentes por cima da câmera. */
 .storycam__grid { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; padding-top: calc(max(10px, env(safe-area-inset-top)) + 54px); background: #000; color: #fff; animation: storyreply-in 160ms ease-out; }
 .storycam__gridtop { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 10px; }
+
+/* Chat: a barra "Respondendo a", as prévias de anexo e a caixa de mensagem ficam juntas e fixas no rodapé. */
+.chat__dock { position: sticky; bottom: 0; z-index: 5; margin: 0 -16px; background: var(--bg); }
+.chat__dock .replybar { margin: 0; }
+.chat__dock .composer { position: static; margin: 0; }
+
+.bubble__story { display: flex; flex-direction: column; gap: 4px; width: 120px; margin: 0 0 6px; }
+.bubble__story img { display: block; width: 120px; aspect-ratio: 9 / 16; max-height: 200px; object-fit: cover; border-radius: 10px; background: rgba(0, 0, 0, 0.08); }
+.bubble__story span { font-size: 0.75rem; opacity: 0.8; }
+
+.going-choice__text { margin: 0 0 20px; }

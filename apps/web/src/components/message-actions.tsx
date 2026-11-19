@@ -27,6 +27,8 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
   const [copied, setCopied] = useState(false);
   const [pos, setPos] = useState<{ barTop: number; menuTop: number } | undefined>();
   const menuRef = useRef<HTMLDivElement>(null);
+  // Ao soltar o dedo de um toque longo, o toque "vaza" para o fundo; ignora fechar nos primeiros instantes.
+  const openedAt = useRef(Date.now());
   const mine = message.reactions.find((r) => r.mine)?.emoji;
   const canDelete = allDeletable([message]);
 
@@ -113,7 +115,7 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
   const style = (top: number | undefined) => (top === undefined ? { visibility: 'hidden' as const } : { top });
   return (
     <div className={`msgpop ${side}`} role="dialog" aria-modal="true" aria-label={t('Opções da mensagem')}>
-      <div className="msgpop__scrim" onClick={onClose} />
+      <div className="msgpop__scrim" onClick={() => { if (Date.now() - openedAt.current > 600) onClose(); }} />
       {canSend && step === 'menu' ? (
         <div className="msgpop__bar" style={style(pos?.barTop)} role="group" aria-label={t('Reagir')}>
           {REACTIONS.map((emoji) => (

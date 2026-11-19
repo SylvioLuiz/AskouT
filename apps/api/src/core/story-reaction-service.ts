@@ -86,7 +86,7 @@ export class StoryReactionService {
     const friends = await this.deps.follows.listFriendIds(actorId);
     if (friends.includes(authorId)) {
       const { id } = await this.conversations.open(actorId, authorId);
-      await this.conversations.send(actorId, id, { body: content.message });
+      await this.conversations.send(actorId, id, { body: content.message, storyId: String(storyId) });
       return { sent: true, conversationId: id };
     }
     const me = (await this.deps.users.findProfilesByIds([actorId]))[0];
