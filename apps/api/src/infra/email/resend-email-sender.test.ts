@@ -68,4 +68,24 @@ describe('ResendEmailSender', () => {
       });
     }
   });
+
+  it('todos os e-mails usam o layout da marca: logo do site, rosa do AskouT e assinatura', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const sender = new ResendEmailSender({ apiKey: 're_teste', from: 'AskouT <x@exemplo.com.br>', siteUrl: 'https://askout.exemplo/', fetch: async (_u, init) => { bodies.push(JSON.parse(init.body) as Record<string, unknown>); return { ok: true, status: 200 }; } });
+    await sender.sendSignupCode({ to: 'a@b.co', code: '048213', expiresInMinutes: 10 });
+    await sender.sendPasswordResetCode({ to: 'a@b.co', code: '123456', expiresInMinutes: 10 });
+    await sender.sendWelcome({ to: 'a@b.co', username: 'ana' });
+    await sender.sendAccountDeleted({ to: 'a@b.co', username: 'ana' });
+    await sender.sendModerationAlert({ to: 'a@b.co', what: 'um perfil', reason: undefined });
+    assert.equal(bodies.length, 5);
+    for (const body of bodies) {
+      const html = String(body['html']);
+      assert.match(html, /<img src="https:\/\/askout\.exemplo\/email\/logo\.png"/);
+      assert.match(html, /#fa72c9/);
+      assert.match(html, /Menos tempo combinando\. Mais tempo juntos\./);
+      assert.match(String(body['text']), /AskouT\nhttps:\/\/askout\.exemplo$/);
+    }
+    assert.match(String(bodies[0]!['html']), /048213/);
+    assert.match(String(bodies[2]!['html']), /href="https:\/\/askout\.exemplo"[^>]*>Abrir o AskouT/);
+  });
 });

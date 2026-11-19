@@ -1,5 +1,6 @@
 import { conflict } from '../../core/errors.ts';
 import type { EmailSender } from '../../core/ports.ts';
+import { block, renderEmail, renderText, type LayoutBrand } from './email-layout.ts';
 
 const API = 'https://api.resend.com/emails';
 
@@ -16,10 +17,12 @@ export interface ResendOptions {
   replyTo?: string;
   /** Endereço de contato que aparece nos avisos (padrão: o de resposta, se houver). */
   contactEmail?: string;
+  /** Endereço do site (PUBLIC_WEB_URL), usado no logo, nos links e na assinatura. Padrão: https://askout.com.br. */
+  siteUrl?: string;
+  /** Logo do topo dos e-mails (padrão: `${siteUrl}/email/logo.png`, servido pelo site). */
+  logoUrl?: string;
   fetch?: MailFetch;
 }
-
-const escapeHtml = (text: string): string => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 interface Message {
   subject: string;
@@ -27,29 +30,34 @@ interface Message {
   html: string;
 }
 
-function codeMessage(input: { title: string; intro: string; code: string; expiresInMinutes: number; footer: string }): Message {
+function codeMessage(brand: LayoutBrand, input: { title: string; intro: string; code: string; expiresInMinutes: number; footer: string }): Message {
   const minutes = `${input.expiresInMinutes} ${input.expiresInMinutes === 1 ? 'minuto' : 'minutos'}`;
-  const text = `${input.intro}\n\n${input.code}\n\nO código vale por ${minutes}.\n\n${input.footer}\n\nAskouT`;
-  const html = `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:24px;background:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1c1c1e">
-<div style="max-width:420px;margin:0 auto;padding:28px;background:#ffffff;border-radius:16px">
-<p style="margin:0 0 16px;font-size:20px;font-weight:700">${escapeHtml(input.title)}</p>
-<p style="margin:0 0 20px;font-size:16px;line-height:1.5">${escapeHtml(input.intro)}</p>
-<p style="margin:0 0 20px;font-size:34px;font-weight:700;letter-spacing:6px;text-align:center">${escapeHtml(input.code)}</p>
-<p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:#5c5c60">O código vale por ${minutes}.</p>
-<p style="margin:0;font-size:13px;line-height:1.5;color:#5c5c60">${escapeHtml(input.footer)}</p>
-</div></body></html>`;
-  return { subject: `${input.code} é o seu código do AskouT`, text, html };
+  const subject = `${input.code} é o seu código do AskouT`;
+  const validity = `O código vale por ${minutes}.`;
+  return {
+    subject,
+    text: renderText(brand, [input.intro, input.code, validity], input.footer),
+    html: renderEmail(brand, {
+      subject,
+      preheader: `${input.intro} ${validity}`,
+      body: [block.title(input.title), block.paragraph(input.intro), block.code(input.code), block.note(validity)].join('\n'),
+      footer: input.footer,
+    }),
+  };
 }
 
-function noticeMessage(input: { subject: string; title: string; paragraphs: string[]; footer: string }): Message {
-  const text = `${input.title}\n\n${input.paragraphs.join('\n\n')}\n\n${input.footer}\n\nAskouT`;
-  const html = `<!doctype html><html lang="pt-BR"><body style="margin:0;padding:24px;background:#f2f2f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1c1c1e">
-<div style="max-width:420px;margin:0 auto;padding:28px;background:#ffffff;border-radius:16px">
-<p style="margin:0 0 16px;font-size:20px;font-weight:700">${escapeHtml(input.title)}</p>
-${input.paragraphs.map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:1.5">${escapeHtml(p)}</p>`).join('\n')}
-<p style="margin:8px 0 0;font-size:13px;line-height:1.5;color:#5c5c60">${escapeHtml(input.footer)}</p>
-</div></body></html>`;
-  return { subject: input.subject, text, html };
+function noticeMessage(brand: LayoutBrand, input: { subject: string; title: string; paragraphs: string[]; action?: { label: string; href: string }; footer: string }): Message {
+  const actionText = input.action ? [`${input.action.label}: ${input.action.href}`] : [];
+  return {
+    subject: input.subject,
+    text: renderText(brand, [input.title, ...input.paragraphs, ...actionText], input.footer),
+    html: renderEmail(brand, {
+      subject: input.subject,
+      preheader: input.paragraphs[0] ?? input.title,
+      body: [block.title(input.title), ...input.paragraphs.map(block.paragraph), ...(input.action ? [block.button(input.action.label, input.action.href)] : [])].join('\n'),
+      footer: input.footer,
+    }),
+  };
 }
 
 /**
@@ -62,6 +70,7 @@ export class ResendEmailSender implements EmailSender {
   private readonly replyTo: string | undefined;
   private readonly contact: string;
   private readonly fetchImpl: MailFetch;
+  private readonly brand: LayoutBrand;
 
   constructor(options: ResendOptions) {
     this.apiKey = options.apiKey;
@@ -69,12 +78,13 @@ export class ResendEmailSender implements EmailSender {
     this.replyTo = options.replyTo;
     this.contact = options.contactEmail ?? options.replyTo ?? 'privacidade@askout.com.br';
     this.fetchImpl = options.fetch ?? ((url, init) => fetch(url, init));
+    this.brand = { siteUrl: (options.siteUrl ?? 'https://askout.com.br').replace(/\/+$/, ''), ...(options.logoUrl ? { logoUrl: options.logoUrl } : {}) };
   }
 
   sendSignupCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void> {
     return this.deliver(
       input.to,
-      codeMessage({
+      codeMessage(this.brand, {
         title: 'Confirme seu e-mail',
         intro: 'Use este código para terminar de criar sua conta no AskouT.',
         code: input.code,
@@ -87,7 +97,7 @@ export class ResendEmailSender implements EmailSender {
   sendPasswordResetCode(input: { to: string; code: string; expiresInMinutes: number }): Promise<void> {
     return this.deliver(
       input.to,
-      codeMessage({
+      codeMessage(this.brand, {
         title: 'Criar uma nova senha',
         intro: 'Use este código para criar uma nova senha no AskouT.',
         code: input.code,
@@ -100,13 +110,14 @@ export class ResendEmailSender implements EmailSender {
   sendWelcome(input: { to: string; username: string }): Promise<void> {
     return this.deliver(
       input.to,
-      noticeMessage({
+      noticeMessage(this.brand, {
         subject: 'Bem-vindo ao AskouT',
         title: `Bem-vindo ao AskouT, @${input.username}!`,
         paragraphs: [
           'Sua conta está pronta. Siga seus amigos, marque nos dias em que você pode sair e combine encontros de verdade.',
           'Você controla quem vê o quê em Privacidade, dentro do app, e pode baixar seus dados ou apagar a conta quando quiser.',
         ],
+        action: { label: 'Abrir o AskouT', href: this.brand.siteUrl },
         footer: `Se você não criou esta conta, escreva para ${this.contact}.`,
       }),
     );
@@ -115,7 +126,7 @@ export class ResendEmailSender implements EmailSender {
   sendAccountDeleted(input: { to: string; username: string }): Promise<void> {
     return this.deliver(
       input.to,
-      noticeMessage({
+      noticeMessage(this.brand, {
         subject: 'Sua conta do AskouT foi apagada',
         title: 'Sua conta foi apagada',
         paragraphs: [
@@ -131,7 +142,7 @@ export class ResendEmailSender implements EmailSender {
   sendModerationAlert(input: { to: string; what: string; reason: string | undefined }): Promise<void> {
     return this.deliver(
       input.to,
-      noticeMessage({
+      noticeMessage(this.brand, {
         subject: `Nova denúncia no AskouT: ${input.what}`,
         title: 'Nova denúncia para revisar',
         paragraphs: [

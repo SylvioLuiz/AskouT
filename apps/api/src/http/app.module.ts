@@ -57,7 +57,7 @@ import { CONFIG } from './tokens.ts';
     {
       provide: MODERATION_ALERT,
       inject: [CONFIG],
-      useFactory: (config: AppConfig) => ({ alerter: config.resend ? new ResendEmailSender(config.resend) : undefined, to: config.moderationEmail }),
+      useFactory: (config: AppConfig) => ({ alerter: config.resend ? new ResendEmailSender({ ...config.resend, siteUrl: config.webBaseUrl }) : undefined, to: config.moderationEmail }),
     },
     { provide: APP_INTERCEPTOR, useClass: ReportAlertInterceptor },
     { provide: APP_GUARD, useClass: RateLimitGuard },
