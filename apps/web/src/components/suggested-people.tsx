@@ -22,7 +22,7 @@ export function SuggestedPeople() {
   }
   if (!show) return null;
   return (
-    <section className="section suggest" aria-labelledby="talvez-titulo">
+    <section className="section suggest enter" aria-labelledby="talvez-titulo">
       <div className="section__head">
         <h2 id="talvez-titulo" className="section__title">
           {t('Pessoas que você talvez conheça')}

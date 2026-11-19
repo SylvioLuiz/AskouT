@@ -2847,4 +2847,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Você liberou só algumas fotos para o AskouT.": "You've allowed AskouT to see only some photos.",
   "Voltar para a galeria": "Back to gallery",
   "Vídeo de {duration}": "{duration} video",
+  "Sobre esta aba": "About this tab",
+  "Opções de {title}": "Options for {title}",
+  "Segure um evento para tirar ou mostrar no perfil.": "Press and hold an event to remove it from or show it on your profile.",
 };
