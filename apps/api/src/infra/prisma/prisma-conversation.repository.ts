@@ -276,6 +276,17 @@ export class PrismaConversationRepository implements ConversationRepository {
     });
   }
 
+  async markAudioPlayed(messageId: string, userId: string, at: Date): Promise<void> {
+    if (!isUuid(messageId) || !isUuid(userId)) return;
+    await this.prisma.messageAudioPlay.createMany({ data: [{ messageId, userId, playedAt: at }], skipDuplicates: true });
+  }
+
+  async listAudioPlays(messageIds: readonly string[]): Promise<{ messageId: string; userId: string }[]> {
+    const valid = messageIds.filter(isUuid);
+    if (valid.length === 0) return [];
+    return this.prisma.messageAudioPlay.findMany({ where: { messageId: { in: valid } }, select: { messageId: true, userId: true } });
+  }
+
   async setReaction(messageId: string, userId: string, emoji: string | null, at: Date): Promise<void> {
     if (!isUuid(messageId) || !isUuid(userId)) return;
     if (emoji === null) {

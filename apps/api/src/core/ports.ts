@@ -387,6 +387,10 @@ export interface ConversationRepository {
   mutedUserIds(conversationId: string): Promise<string[]>;
   /** Bytes da mensagem de voz (só de mensagens kind AUDIO). */
   findAudio(messageId: string): Promise<{ mime: string; data: Uint8Array } | undefined>;
+  /** Marca que `userId` ouviu a mensagem de voz (só a primeira vez conta). */
+  markAudioPlayed(messageId: string, userId: string, at: Date): Promise<void>;
+  /** Quem já ouviu cada uma destas mensagens de voz. */
+  listAudioPlays(messageIds: readonly string[]): Promise<{ messageId: string; userId: string }[]>;
   findMessage(id: string): Promise<MessageRecord | undefined>;
   /** Grava a resposta ao cartão só se ainda não houver uma. Devolve false se já tinha. */
   setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean>;

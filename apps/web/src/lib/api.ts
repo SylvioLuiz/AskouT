@@ -654,6 +654,8 @@ export function createApi(deps: ApiDeps) {
       if (!response.ok) throw errorFromResponse(response.status, undefined, response.headers.get('Retry-After'));
       return response.blob();
     },
+    /** Avisa que você ouviu a mensagem de voz (quem enviou vê o "ouvido"). */
+    markAudioPlayed: (conversationId: string, messageId: string) => request<{ played: true }>('POST', `/conversations/${id(conversationId)}/messages/${id(messageId)}/audio/played`),
     sendSuggestion: (conversationId: string, suggestion: SuggestionCard) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { suggestion } }),
     respondSuggestion: (conversationId: string, messageId: string, action: 'accept' | 'decline') =>
