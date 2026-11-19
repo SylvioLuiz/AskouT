@@ -6072,11 +6072,11 @@ div.optrow__main { cursor: default; }
 .intertabs::-webkit-scrollbar { display: none; }
 
 /* Página de organização: chamada colorida e tipos agrupados (facul primeiro, depois o resto). */
-.orghero { display: flex; flex-direction: column; gap: 4px; padding: 18px 18px 16px; border-radius: var(--radius-panel); background: var(--brand-grad); color: #15162a; box-shadow: 0 8px 24px rgba(181, 110, 252, 0.28); }
+.orghero { display: flex; flex-direction: column; gap: 4px; padding: 18px 18px 16px; border-radius: var(--radius-panel); background: var(--brand-grad); color: var(--brand-ink); }
 .orghero__emojis { font-size: 1.75rem; letter-spacing: 4px; line-height: 1; margin-bottom: 4px; }
 .orghero__title { margin: 0; font-size: 1.25rem; font-weight: 800; line-height: 1.2; }
 .orghero__text { margin: 0; font-size: 0.9375rem; font-weight: 500; line-height: 1.35; }
 .orgtypes { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .orgtypes__title { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .orgchip { display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; }
-.orgchip[aria-pressed='true'] { background: var(--brand-grad); border-color: transparent; color: #15162a; }
+.orgchip[aria-pressed='true'] { background: var(--brand-grad); border-color: transparent; color: var(--brand-ink); }
