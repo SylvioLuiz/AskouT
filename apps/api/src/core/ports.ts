@@ -26,6 +26,8 @@ export interface UserRepository {
   acceptTerms(userId: string, version: string, at: Date): Promise<void>;
   /** Registra que a pessoa já passou pelo tutorial inicial. Não sobrescreve a data se já houver uma. */
   markOnboarded(userId: string, at: Date): Promise<void>;
+  /** Troca os gostos de rolê da pessoa (já validados). */
+  setTastes(userId: string, tastes: string[]): Promise<void>;
   /**
    * Conclui o cadastro de uma conta criada pelo Google/Apple: troca o nome de usuário, guarda a data de nascimento e o aceite
    * dos Termos e tira a marca de pendente, tudo junto. Lança DomainError CONFLICT se o nome de usuário já for de outra pessoa.

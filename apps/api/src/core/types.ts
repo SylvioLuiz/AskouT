@@ -18,6 +18,8 @@ export interface User {
   termsVersion?: string | null;
   /** Quando a pessoa terminou (ou pulou) o tutorial inicial. Vazio = ainda não viu. */
   onboardedAt?: Date | null;
+  /** Gostos de rolê (ids de TASTE_IDS). Vazio = gosta de tudo. */
+  tastes?: string[];
   /** Conta criada pelo Google/Apple que ainda não escolheu o nome de usuário nem informou a data de nascimento. Até concluir, o app só mostra essa etapa. */
   profilePending?: boolean;
   /** Conta criada pelo Google/Apple que nunca definiu senha: só entra pela plataforma (ou criando uma senha pelo "Esqueci a senha"). */
@@ -347,6 +349,8 @@ export interface VenueRecord {
   photoAuthor?: string | null;
   /** Organização (bateria, atlética...) em vez de estabelecimento. Sem dono, fica fora das buscas. */
   isOrganization?: boolean;
+  /** Criado do zero por alguém no app (pedido com documento). Sem dono, fica fora das buscas. */
+  isUserCreated?: boolean;
 }
 
 /** Abre e fecha em "HH:MM"; `close` menor ou igual a `open` significa que passa da meia-noite. */

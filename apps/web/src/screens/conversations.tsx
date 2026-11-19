@@ -157,6 +157,7 @@ export function ConversationsScreen() {
           muted={prefsFor.muted}
           onClose={() => setPrefsFor(undefined)}
           onChanged={() => list.reload()}
+          remove={{ group: prefsFor.type === 'GROUP', onRemoved: () => list.reload() }}
         />
       ) : null}
     </div>

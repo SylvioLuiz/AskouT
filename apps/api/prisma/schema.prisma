@@ -168,6 +168,8 @@ model User {
   termsVersion    String?
   /// Quando a pessoa terminou (ou pulou) o tutorial inicial; o app só o mostra enquanto estiver vazio.
   onboardedAt     DateTime?
+  /// Gostos de rolê escolhidos no cadastro e editáveis nas configurações (ids como BAR, NIGHT, SHOW). Vazio = gosta de tudo.
+  tastes          String[]  @default([])
   /// Conta criada pelo Google/Apple que ainda não escolheu o nome de usuário nem informou a data de nascimento: o app só mostra essa etapa até concluir.
   profilePending  Boolean   @default(false)
   /// Criada pelo Google/Apple e sem senha definida: não dá para desligar a última conta vinculada até criar uma senha.
@@ -805,6 +807,8 @@ model Venue {
   /// Organização (bateria, atlética, centro acadêmico...) em vez de estabelecimento. Pedida por quem a representa e
   /// aprovada por um admin; enquanto não tem dono, fica fora das buscas.
   isOrganization Boolean @default(false)
+  /// Local criado do zero por alguém no app (pedido com documento). Enquanto não tem dono, fica fora das buscas.
+  isUserCreated Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

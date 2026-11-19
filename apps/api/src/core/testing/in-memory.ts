@@ -189,6 +189,11 @@ export class InMemoryUserRepository implements UserRepository {
     if (u && !u.onboardedAt) this.users.set(userId, { ...u, onboardedAt: at });
   }
 
+  async setTastes(userId: string, tastes: string[]): Promise<void> {
+    const u = this.users.get(userId);
+    if (u) this.users.set(userId, { ...u, tastes: [...tastes] });
+  }
+
   async completePendingProfile(userId: string, data: { username: string; displayName: string; birthDate: string; termsVersion: string; termsAcceptedAt: Date }): Promise<void> {
     for (const p of this.profiles.values()) {
       if (p.userId !== userId && p.username === data.username) throw conflict('Este nome de usuário já está em uso', { username: 'Este nome de usuário já está em uso' });
@@ -1607,7 +1612,7 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   async searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number) {
     const out: { venue: VenueRecord; distanceM: number | null }[] = [];
     for (const venue of this.venues.values()) {
-      if (venue.isOrganization && !venue.ownerId) continue; // organização ainda sem dono (pedido em análise ou recusado)
+      if ((venue.isOrganization || venue.isUserCreated) && !venue.ownerId) continue; // organização ou local novo ainda sem dono (pedido em análise ou recusado)
       const m = matchVenue(venue, text, center, radiusM);
       if (m) out.push(m);
     }

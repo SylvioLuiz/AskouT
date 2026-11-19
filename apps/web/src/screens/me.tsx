@@ -14,6 +14,9 @@ import { pluralize } from '../lib/format.ts';
 import { statusLabel } from '../lib/meetup.ts';
 import type { RegionView } from '../lib/types.ts';
 import { applyTheme, readTheme, saveTheme, THEME_LABELS } from '../lib/theme.ts';
+import { saveThemes, themeLabel, THEMES, userThemes } from '../lib/themes.ts';
+import type { ThemeId } from '../lib/themes.ts';
+import { TastePicker, toggleTaste } from '../components/tastes.tsx';
 import type { ThemeChoice } from '../lib/theme.ts';
 import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validation.ts';
 import { InviteSheet } from '../components/invite.tsx';
@@ -24,7 +27,7 @@ import { AttendedVisibilitySetting } from '../components/profile-attended.tsx';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
 import { AvatarCropper } from '../components/avatar-cropper.tsx';
 import { AvatarViewer } from '../components/photo-viewer.tsx';
-import { BellIcon, BlockIcon, BoltIcon, ChevronLeftIcon, ChevronRightIcon, DocIcon, GlobeIcon, HelpIcon, LinkIcon, ListIcon, LockIcon, LogoutIcon, MoonIcon, ShieldIcon, SunIcon, UserIcon, UsersIcon } from '../components/icons.tsx';
+import { BellIcon, BlockIcon, BoltIcon, HeartIcon, ChevronLeftIcon, ChevronRightIcon, DocIcon, GlobeIcon, HelpIcon, LinkIcon, ListIcon, LockIcon, LogoutIcon, MoonIcon, ShieldIcon, SunIcon, UserIcon, UsersIcon } from '../components/icons.tsx';
 import { formatPhone, normalizePhone } from '../lib/phone.ts';
 import { supportMailto } from '../lib/help-mailto.ts';
 import { downloadJson } from '../lib/account.ts';
@@ -247,6 +250,7 @@ export function SettingsScreen() {
   const theme = readTheme(window.localStorage);
   const language = LOCALES.find((item) => item.code === getLocale())?.label;
   const radius = nowRadiusKm();
+  const tastes = userThemes(safeLocalStorage(), user);
   return (
     <>
       <PageHead title={t('Configurações e privacidade')} back="/perfil" />
@@ -272,6 +276,7 @@ export function SettingsScreen() {
       <h2 className="settingshub__group">{t('Como você usa o AskouT')}</h2>
       <ul className="menulist">
         <SettingsRow to="/configuracao/notificacoes" icon={<BellIcon />} label={t('Notificações')} />
+        <SettingsRow to="/configuracao/gostos" icon={<HeartIcon />} label={t('Seus gostos')} value={tastesSummary(tastes)} />
         <SettingsRow to="/configuracao/now" icon={<BoltIcon />} label={t('NOW')} value={radius === null ? t('Automático') : `${radius} km`} />
       </ul>
 
@@ -350,6 +355,61 @@ export function NotificationSettingsScreen() {
       <PushTestCard />
       <h2 className="profile__section">{t('Silenciar push')}</h2>
       <MuteCard />
+    </>
+  );
+}
+
+function safeLocalStorage(): Storage | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Valor curto da linha "Seus gostos": "Tudo", um nome, ou o primeiro e quantos mais. */
+function tastesSummary(tastes: readonly ThemeId[]): string {
+  const [first] = tastes;
+  if (first === undefined || tastes.length === THEMES.length) return t('Tudo');
+  return tastes.length === 1 ? themeLabel(first) : t('{first} e mais {count}', { first: themeLabel(first), count: tastes.length - 1 });
+}
+
+/**
+ * Seus gostos: os mesmos do cadastro, editáveis depois. Cada toque já salva na conta (vale em qualquer aparelho) e vira o
+ * filtro inicial do Explorar.
+ */
+export function TastesSettingsScreen() {
+  useTitle(t('Seus gostos'));
+  const user = useUser();
+  const { setSessionUser } = useAuthContext();
+  const [chosen, setChosen] = useState<ReadonlySet<ThemeId>>(() => new Set(userThemes(safeLocalStorage(), user)));
+  const [message, setMessage] = useState<Message>();
+  const [saving, setSaving] = useState(false);
+  async function toggle(id: ThemeId) {
+    const before = chosen;
+    const next = toggleTaste(chosen, id);
+    const tastes = THEMES.map((theme) => theme.id).filter((x) => next.has(x));
+    setChosen(next);
+    setSaving(true);
+    setMessage(undefined);
+    try {
+      const saved = await api.setTastes(tastes);
+      saveThemes(safeLocalStorage(), user.id, saved.tastes as ThemeId[]);
+      setSessionUser({ ...user, tastes: saved.tastes });
+      setMessage({ tone: 'ok', text: t('Gostos salvos.') });
+    } catch (failure) {
+      setChosen(before);
+      setMessage({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <>
+      <PageHead title={t('Seus gostos')} back="/configuracao" />
+      <p className="setting__help">{t('Escolha os rolês que você curte. O Explorar já abre filtrado por eles. Sem nenhum marcado, mostramos tudo.')}</p>
+      <TastePicker chosen={chosen} onToggle={toggle} disabled={saving} />
+      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
     </>
   );
 }

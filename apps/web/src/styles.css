@@ -3781,7 +3781,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .post__action { display: inline-flex; align-items: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--ink); font-weight: 700; font-size: 0.9375rem; cursor: pointer; }
 .post__action .icon { width: 26px; height: 26px; }
 .post__action--on { color: #e0245e; }
-.sharelist__item--danger strong { color: var(--danger); }
+.sharelist__item--danger strong, .sharelist__item--danger > svg { color: var(--danger); }
 .sharelist__item--on { border-color: var(--brand); }
 .sharelist__item--on strong::after { content: 'Ativo'; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 0.75rem; font-weight: 600; vertical-align: 1px; }
 .inlineicon { display: inline-flex; vertical-align: middle; }
@@ -5235,8 +5235,8 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .onb__placeinfo strong, .onb__placeinfo .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .onb__progress { margin: 0; font-weight: 700; color: var(--brand-text); }
 
-.onb__themes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.onb__theme { display: flex; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box; min-height: 64px; padding: 12px 14px; border: 2px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.onb__themes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.onb__theme { display: flex; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box; height: 100%; min-height: 64px; padding: 12px 14px; border: 2px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .onb__theme span { font-size: 0.875rem; color: var(--muted); }
 .onb__theme--on { border-color: var(--brand); background: var(--brand-soft); }
 :root[data-theme='dark'] .onb__theme--on { background: var(--brand-soft); border-color: var(--brand); }
@@ -6072,6 +6072,13 @@ div.optrow__main { cursor: default; }
 .intertabs__tab { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .intertabs__tab .icon, .intertabs__tab svg { width: 16px; height: 16px; flex: none; }
 .intertabs::-webkit-scrollbar { display: none; }
+
+
+/* ---------- Meus locais: botão flutuante "Criar local" ---------- */
+.venueactions--fab { margin-bottom: 88px; }
+.createsource__item { flex-direction: row; align-items: center; gap: 12px; }
+.createsource__icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; color: var(--brand); background: var(--brand-soft); border-radius: 999px; }
+.createsource__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 
 /* Página de organização: chamada colorida e tipos agrupados (facul primeiro, depois o resto). */
 .orghero { display: flex; flex-direction: column; gap: 4px; padding: 18px 18px 16px; border-radius: var(--radius-panel); background: var(--brand-grad); color: var(--brand-ink); }

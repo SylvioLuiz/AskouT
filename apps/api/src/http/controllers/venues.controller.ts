@@ -129,6 +129,14 @@ export class VenuesController {
     return this.core.venues.requestOrganization(actor.userId, { name: b.name, type: b.type, campus: b.campus, description: b.description, lat: b.lat, lng: b.lng, document: b.document, note: b.note });
   }
 
+  /** Cria um local do zero e pede para administrá-lo: `{name, category?, address, lat, lng, document, note?}`. */
+  @Post('venues/requests')
+  @HttpCode(200)
+  requestVenue(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.venues.requestVenue(actor.userId, { name: b.name, category: b.category, address: b.address, lat: b.lat, lng: b.lng, document: b.document, note: b.note });
+  }
+
   @Put('venues/:id/rating')
   rate(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: { stars?: unknown }) {
     return this.core.venues.rate(actor.userId, id, body?.stars);
