@@ -193,14 +193,13 @@ export class AuthService {
   }
 
   /**
-   * Entrar pelo celular, sem senha: o celular identifica a conta e o código do app autenticador (ou um código de recuperação)
-   * prova que é a pessoa. Só para quem ligou a verificação em duas etapas. A mesma mensagem vale para "não tem conta" e
+   * Entrar pelo celular, sem senha, etapa 1: o celular identifica a conta e devolve o desafio da verificação em duas etapas.
+   * A etapa 2 é a mesma do login por e-mail (`verifyMfaLogin`, código do app autenticador ou de recuperação), então o
+   * comprovante sozinho não dá sessão. Só para quem ligou o autenticador. A mesma mensagem vale para "não tem conta" e
    * "não ligou o autenticador", para o celular não revelar mais do que precisa.
    */
-  async loginWithPhoneAuthenticator(input: { phone: unknown; code: unknown }, options: LoginOptions = {}): Promise<AuthResult> {
-    const phone = parsePhone(input.phone);
-    const code = asString(input.code).trim();
-    if (code === '' || code.length > 20) throw validationError('Informe o código do app autenticador', { code: 'Informe o código do app autenticador' });
+  async startPhoneAuthenticatorLogin(rawPhone: unknown, options: LoginOptions = {}): Promise<MfaChallenge> {
+    const phone = parsePhone(rawPhone);
     const user = await this.deps.users.findByPhone(phone);
     if (!user || !(await this.mfa.isEnabled(user.id))) {
       const msg = 'Não encontramos uma conta com esse celular e com o app autenticador ativado. Entre com seu e-mail e ative em Configurações > Verificação em duas etapas.';
@@ -208,10 +207,8 @@ export class AuthService {
     }
     if (user.status === 'SUSPENDED') throw forbidden('Conta suspensa');
     if (options.requireRole && user.role !== options.requireRole) throw unauthorized();
-    const profile = await this.deps.users.findProfileById(user.id);
-    if (!profile) throw unauthorized();
-    await this.mfa.verifyLogin(user.id, code);
-    return this.session(user, profile);
+    const { mfaChallenges } = this.deps;
+    return { mfaRequired: true, mfaToken: mfaChallenges.issue(user.id), expiresInSeconds: mfaChallenges.ttlSeconds };
   }
 
   /**

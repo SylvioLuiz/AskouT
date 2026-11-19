@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { AuthLayout } from '../components/AuthLayout.tsx';
 import { ConsentFields } from '../components/consent-fields.tsx';
 import { SocialLogin } from '../components/social-login.tsx';
+import { MfaStep } from '../components/mfa-step.tsx';
 import { consentProblems } from '../lib/age.ts';
 import { Button, Field, Notice, PasswordField } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -10,7 +11,7 @@ import { useAuthContext } from '../auth.tsx';
 import { useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { formatCountdown, secondsUntil } from '../lib/format.ts';
-import type { PasswordResetStarted, SignupStarted } from '../lib/types.ts';
+import type { MfaChallenge, PasswordResetStarted, SignupStarted } from '../lib/types.ts';
 import {
   codeProblem,
   compact,
@@ -22,7 +23,7 @@ import {
   usernameProblem,
 } from '../lib/validation.ts';
 import { parseInvite, rememberInvite } from '../lib/invite.ts';
-import { normalizePhone } from '../lib/phone.ts';
+import { formatPhone, normalizePhone } from '../lib/phone.ts';
 import { safeStorage } from '../lib/hints.ts';
 import { ChevronLeftIcon } from '../components/icons.tsx';
 import { Link, navigate, useSearch } from '../router.tsx';
@@ -56,7 +57,8 @@ export function LoginScreen() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
+  // Celular: etapa 1 só com o número; a etapa 2 (código) fica aqui mesmo, para "voltar" manter o número digitado.
+  const [phoneChallenge, setPhoneChallenge] = useState<MfaChallenge | undefined>();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
@@ -91,7 +93,6 @@ export function LoginScreen() {
           })
         : compact({
             phone: phone.trim() === '' ? t('Informe seu celular') : normalizePhone(phone) ? undefined : t('Informe o celular com DDD, ex.: (11) 98765-4321'),
-            code: code.trim() === '' ? t('Informe o código do app autenticador') : undefined,
           });
     setErrors(found);
     setFormError(undefined);
@@ -99,10 +100,28 @@ export function LoginScreen() {
 
     setBusy(true);
     try {
-      signIn(tab === 'email' ? await api.login(identifier.trim(), password) : await api.phoneLogin(phone.trim(), code.trim()));
+      if (tab === 'email') {
+        signIn(await api.login(identifier.trim(), password));
+      } else {
+        setPhoneChallenge(await api.phoneLogin(phone.trim()));
+        setBusy(false);
+      }
     } catch (failure) {
       fail(failure);
     }
+  }
+
+  if (phoneChallenge) {
+    const e164 = normalizePhone(phone);
+    return (
+      <MfaStep
+        challenge={phoneChallenge}
+        subtitle={t('Entrando com o celular {phone}.', { phone: e164 ? formatPhone(e164) : phone.trim() })}
+        backLabel={t('Trocar número')}
+        onDone={signIn}
+        onCancel={() => setPhoneChallenge(undefined)}
+      />
+    );
   }
 
   return (
@@ -126,21 +145,23 @@ export function LoginScreen() {
           </>
         ) : (
           <>
-            <Field label={t('Celular')} type="tel" inputMode="tel" value={phone} onChange={setPhone} error={errors['phone']} autoComplete="tel" maxLength={25} placeholder="(11) 98765-4321" autoFocus />
             <Field
-              label={t('Código do app autenticador')}
-              value={code}
-              onChange={(v) => setCode(v.slice(0, 20))}
-              error={errors['code']}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={20}
-              hint={t('Sem senha: use o código de 6 números do Google Authenticator (ou outro app). Ative em Configurações > Verificação em duas etapas, com o celular salvo no seu perfil.')}
+              label={t('Celular')}
+              type="tel"
+              inputMode="tel"
+              value={phone}
+              onChange={setPhone}
+              error={errors['phone']}
+              autoComplete="tel"
+              maxLength={25}
+              placeholder="(11) 98765-4321"
+              autoFocus
+              hint={t('Sem senha: depois você confirma com o código do app autenticador. Ative em Configurações > Verificação em duas etapas, com o celular salvo no seu perfil.')}
             />
           </>
         )}
         <Button type="submit" full loading={busy}>
-          {t('Entrar')}
+          {tab === 'email' ? t('Entrar') : t('Continuar')}
         </Button>
         <p className="form__switch form__switch--row">
           <Link to="/esqueci-senha">{t('Esqueci minha senha')}</Link>

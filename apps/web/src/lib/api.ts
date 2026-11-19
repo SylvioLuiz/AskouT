@@ -235,8 +235,8 @@ export function createApi(deps: ApiDeps) {
     login: (identifier: string, password: string) =>
       request<AuthResult | MfaChallenge>('POST', '/auth/login', { body: { identifier, password }, auth: false }),
     socialProviders: () => request<{ items: SocialProvider[]; phone?: { authenticator: boolean; sms: boolean } }>('GET', '/auth/providers', { auth: false }),
-    /** Entrar pelo celular, sem senha, com o código do app autenticador (ou um código de recuperação). */
-    phoneLogin: (phone: string, code: string) => request<AuthResult>('POST', '/auth/phone/login', { body: { phone, code }, auth: false }),
+    /** Entrar pelo celular, sem senha, etapa 1: devolve o desafio; a etapa 2 é `mfaVerify` com o código do app autenticador. */
+    phoneLogin: (phone: string) => request<MfaChallenge>('POST', '/auth/phone/login', { body: { phone }, auth: false }),
     socialLogin: (input: { provider: SocialProviderId; idToken: string; username?: string; displayName?: string; birthDate?: string; acceptTerms?: boolean; marketingEmail?: boolean }) =>
       request<AuthResult | MfaChallenge | SocialNeedsProfile>('POST', '/auth/social', { body: input, auth: false }),
     mfaVerify: (mfaToken: string, code: string) =>

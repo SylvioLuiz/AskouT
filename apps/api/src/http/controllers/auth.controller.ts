@@ -75,13 +75,12 @@ export class AuthController {
     return { items: this.core.auth.socialProviders(), phone: this.core.auth.phoneLoginMethods() };
   }
 
-  /** Entrar pelo celular sem senha, com o código do app autenticador (ou de recuperação). */
+  /** Entrar pelo celular sem senha, etapa 1: devolve o desafio do MFA. A etapa 2 é `mfa/verify`, igual ao login por e-mail. */
   @Public()
   @Post('phone/login')
   @HttpCode(200)
   phoneLogin(@Body() body: unknown) {
-    const b = asBody(body);
-    return this.core.auth.loginWithPhoneAuthenticator({ phone: b.phone, code: b.code });
+    return this.core.auth.startPhoneAuthenticatorLogin(asBody(body).phone);
   }
 
   /** Entrar pelo celular com código por SMS, etapa 1. Só funciona com SMS_TRANSPORT configurado. */

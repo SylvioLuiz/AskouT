@@ -23,51 +23,48 @@ async function setup(options: { noSms?: boolean } = {}) {
   return { w, ana, nextCode, enableMfa };
 }
 
-// ---------- Celular + código do app autenticador ----------
+// ---------- Celular, depois o código do app autenticador ----------
 
-test('celular + autenticador: entra sem senha com o código do app, em qualquer formato de número', async () => {
+async function phoneChallenge(w: Awaited<ReturnType<typeof setup>>['w'], phone: string) {
+  const challenge = await w.core.auth.startPhoneAuthenticatorLogin(phone);
+  assert.equal(challenge.mfaRequired, true);
+  return challenge.mfaToken;
+}
+
+test('celular: etapa 1 só devolve o desafio (não é sessão); etapa 2 com o código do app entra', async () => {
   const { w, ana, nextCode, enableMfa } = await setup();
   await w.core.profiles.setPhone(ana, '(11) 98765-4321');
   const { secret } = await enableMfa();
-  const session = await w.core.auth.loginWithPhoneAuthenticator({ phone: '11 98765 4321', code: nextCode(secret) });
+  const token = await phoneChallenge(w, '11 98765 4321');
+  await rejectsWith(w.core.auth.authenticate(token), 'UNAUTHORIZED');
+  await rejectsWith(w.core.auth.verifyMfaLogin({ mfaToken: token, code: '000000' }), 'VALIDATION');
+  const session = await w.core.auth.verifyMfaLogin({ mfaToken: token, code: nextCode(secret) });
   assert.equal(session.user.id, ana);
-  assert.ok(session.token);
 });
 
-test('celular + autenticador: código errado não entra, e o mesmo código não vale duas vezes', async () => {
-  const { w, ana, nextCode, enableMfa } = await setup();
-  await w.core.profiles.setPhone(ana, PHONE);
-  const { secret } = await enableMfa();
-  await rejectsWith(w.core.auth.loginWithPhoneAuthenticator({ phone: PHONE, code: '000000' }), 'VALIDATION');
-  const code = nextCode(secret);
-  await w.core.auth.loginWithPhoneAuthenticator({ phone: PHONE, code });
-  await rejectsWith(w.core.auth.loginWithPhoneAuthenticator({ phone: PHONE, code }), 'VALIDATION');
-});
-
-test('celular + autenticador: aceita código de recuperação (uma vez)', async () => {
+test('celular: aceita código de recuperação na etapa 2 (uma vez)', async () => {
   const { w, ana, enableMfa } = await setup();
   await w.core.profiles.setPhone(ana, PHONE);
   const { recoveryCodes } = await enableMfa();
-  await w.core.auth.loginWithPhoneAuthenticator({ phone: PHONE, code: recoveryCodes[0]! });
-  await rejectsWith(w.core.auth.loginWithPhoneAuthenticator({ phone: PHONE, code: recoveryCodes[0]! }), 'VALIDATION');
+  await w.core.auth.verifyMfaLogin({ mfaToken: await phoneChallenge(w, PHONE), code: recoveryCodes[0]! });
+  await rejectsWith(w.core.auth.verifyMfaLogin({ mfaToken: await phoneChallenge(w, PHONE), code: recoveryCodes[0]! }), 'VALIDATION');
 });
 
-test('celular + autenticador: sem conta ou sem autenticador ligado, a mesma mensagem', async () => {
+test('celular: sem conta ou sem autenticador ligado, a mesma mensagem', async () => {
   const { w, ana } = await setup();
   await w.core.profiles.setPhone(ana, PHONE);
-  const noMfa = await rejectsWith(w.core.auth.loginWithPhoneAuthenticator({ phone: PHONE, code: '123456' }), 'VALIDATION');
-  const noAccount = await rejectsWith(w.core.auth.loginWithPhoneAuthenticator({ phone: '+5521999998888', code: '123456' }), 'VALIDATION');
+  const noMfa = await rejectsWith(w.core.auth.startPhoneAuthenticatorLogin(PHONE), 'VALIDATION');
+  const noAccount = await rejectsWith(w.core.auth.startPhoneAuthenticatorLogin('+5521999998888'), 'VALIDATION');
   assert.equal(noMfa.message, noAccount.message);
-  await rejectsWith(w.core.auth.loginWithPhoneAuthenticator({ phone: 'abc', code: '123456' }), 'VALIDATION');
-  await rejectsWith(w.core.auth.loginWithPhoneAuthenticator({ phone: PHONE, code: '' }), 'VALIDATION');
+  await rejectsWith(w.core.auth.startPhoneAuthenticatorLogin('abc'), 'VALIDATION');
 });
 
-test('celular + autenticador: conta suspensa não entra', async () => {
-  const { w, ana, nextCode, enableMfa } = await setup();
+test('celular: conta suspensa não passa da etapa 1', async () => {
+  const { w, ana, enableMfa } = await setup();
   await w.core.profiles.setPhone(ana, PHONE);
-  const { secret } = await enableMfa();
+  await enableMfa();
   w.users.users.set(ana, { ...w.users.users.get(ana)!, status: 'SUSPENDED' });
-  await rejectsWith(w.core.auth.loginWithPhoneAuthenticator({ phone: PHONE, code: nextCode(secret) }), 'FORBIDDEN');
+  await rejectsWith(w.core.auth.startPhoneAuthenticatorLogin(PHONE), 'FORBIDDEN');
 });
 
 test('providers: diz se o SMS está ligado', async () => {
