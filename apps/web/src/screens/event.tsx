@@ -352,6 +352,10 @@ export function EventScreen({ eventId }: { eventId: string }) {
               <span className="quickacts__icon" aria-hidden="true"><CalendarPlusIcon /></span>
               <span className="quickacts__label">{t('Agenda')}</span>
             </button>
+            <Link to={`/criar?tipo=post&evento=${encodeURIComponent(e.id)}&eventoNome=${encodeURIComponent(e.title)}`} className="quickacts__btn" aria-label={t('Publicar sobre o evento')}>
+              <span className="quickacts__icon" aria-hidden="true"><PlusIcon /></span>
+              <span className="quickacts__label">{t('Publicar')}</span>
+            </Link>
             <button type="button" className="quickacts__btn" onClick={() => setSharing(true)}>
               <span className="quickacts__icon" aria-hidden="true"><ShareIcon /></span>
               <span className="quickacts__label">{t('Compartilhar')}</span>

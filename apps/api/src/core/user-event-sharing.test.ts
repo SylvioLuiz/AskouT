@@ -147,12 +147,12 @@ test('repost no Início: arquivado ou de quem bloqueou não aparece; paginação
   // caio cria vários posts para paginar junto com o repost.
   for (let i = 0; i < 4; i += 1) {
     w.clock.tick(H);
-    await w.core.posts.create(caio, { images: [JPEG], caption: `p${i}` });
+    await w.core.posts.create(caio, { placeName: 'Bar do Zé', images: [JPEG], caption: `p${i}` });
   }
   w.clock.tick(H);
   await w.core.profileEvents.post(bia, post.id);
   w.clock.tick(H);
-  await w.core.posts.create(caio, { images: [JPEG], caption: 'último' });
+  await w.core.posts.create(caio, { placeName: 'Bar do Zé', images: [JPEG], caption: 'último' });
 
   const seen: string[] = [];
   let offset = 0;

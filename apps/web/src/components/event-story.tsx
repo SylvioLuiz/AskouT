@@ -6,10 +6,12 @@ import { ChevronRightIcon, EventKindIcon, LocationIcon, MoreIcon, TrashIcon, XIc
 import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Button, Notice } from './ui.tsx';
 import { api } from '../client.ts';
-import { toApiError } from '../lib/errors.ts';
+import { ApiError, toApiError } from '../lib/errors.ts';
 import { timeAgo } from '../lib/format.ts';
 import { mediaKind, prepareImage } from '../lib/chat-media.ts';
-import { isVideoFile, videoPoster, videoProblem } from '../lib/post-video.ts';
+import { isVideoFile, POST_VIDEO_MAX_BYTES, videoPoster, videoProblem } from '../lib/post-video.ts';
+import { prepareVideoUpload, withMediaType } from '../lib/media-file.ts';
+import { canCompressVideo, prepareProgressText } from '../lib/video-prepare.ts';
 import { STORY_PHOTO_MS, nextStory, prevStory } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
 import type { EventStoryGroup, StoryEvent } from '../lib/types.ts';
@@ -28,19 +30,22 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
   const [file, setFile] = useState<{ blob: Blob; kind: 'IMAGE' | 'VIDEO'; url: string } | undefined>();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  const [prep, setPrep] = useState<number | undefined>();
 
   useEffect(() => () => file && URL.revokeObjectURL(file.url), [file]);
 
   async function pick(event: ChangeEvent<HTMLInputElement>) {
-    const picked = event.target.files?.[0];
+    const chosen = event.target.files?.[0];
     event.target.value = '';
-    if (!picked) return;
+    if (!chosen) return;
+    const picked = withMediaType(chosen);
     setProblem(undefined);
     setBusy(true);
     try {
       const kind = mediaKind(picked);
       if (kind === 'VIDEO' || isVideoFile(picked)) {
-        const bad = videoProblem(picked);
+        // Como nos posts: vídeo grande serve se este aparelho conseguir reduzir antes de enviar.
+        const bad = videoProblem(picked, { canCompress: picked.size > POST_VIDEO_MAX_BYTES ? await canCompressVideo() : false });
         if (bad) throw new Error(bad);
         await videoPoster(picked); // confere a duração (até 3 minutos)
         setFile({ blob: picked, kind: 'VIDEO', url: URL.createObjectURL(picked) });
@@ -62,10 +67,17 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
     setBusy(true);
     setProblem(undefined);
     try {
-      await api.createEventStory(eventId, file.blob, onProfile);
+      let blob = file.blob;
+      if (file.kind === 'VIDEO' && blob instanceof File) {
+        setPrep(0);
+        blob = await prepareVideoUpload(blob, (fraction) => setPrep(fraction));
+        setPrep(undefined);
+      }
+      await api.createEventStory(eventId, blob, onProfile);
       onCreated();
     } catch (failure) {
-      setProblem(toApiError(failure).message);
+      setPrep(undefined);
+      setProblem(failure instanceof Error && !(failure instanceof ApiError) ? failure.message : toApiError(failure).message);
       setBusy(false);
     }
   }
@@ -73,11 +85,17 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
   return (
     <Sheet title={t('Seu story')} onClose={onClose}>
       <p className="muted">{t('Foto ou vídeo. Qualquer pessoa vê, fica no ar por 24 h e some quando o evento acabar.')}</p>
-      <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" onChange={(event) => void pick(event)} aria-label={t('Escolher foto ou vídeo')} />
+      <input ref={fileRef} type="file" accept="image/*,video/*" className="visually-hidden" onChange={(event) => void pick(event)} aria-label={t('Escolher foto ou vídeo')} />
       {file ? (
         <div className="storysheet__preview">{file.kind === 'VIDEO' ? <video src={file.url} controls playsInline muted /> : <img src={file.url} alt={t('Prévia do story')} />}</div>
       ) : null}
       {problem ? <Notice tone="error">{problem}</Notice> : null}
+      {prep !== undefined ? (
+        <div className="uploadbar" role="status" aria-live="polite">
+          <progress className="uploadbar__bar" max={1} value={prep} aria-label={t('Otimização do vídeo')} />
+          <p className="uploadbar__text">{prepareProgressText(prep)}</p>
+        </div>
+      ) : null}
       {file ? (
         <div className="storysheet__ask" role="group" aria-labelledby="storysheet-ask">
           <p id="storysheet-ask" className="storysheet__question">

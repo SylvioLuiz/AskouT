@@ -106,7 +106,9 @@ test('fitWithin reduz sem ampliar e mantém a proporção', () => {
 test('mediaProblem e mediaKind', () => {
   assert.equal(mediaProblem({ type: 'image/jpeg', size: 9_000_000 }), null);
   assert.equal(mediaProblem({ type: 'image/gif', size: 10 }) !== null, true);
-  assert.equal(mediaProblem({ type: 'video/mp4', size: 21 * 1024 * 1024 }) !== null, true);
+  assert.equal(mediaProblem({ type: 'video/mp4', size: 21 * 1024 * 1024 }), null, 'vídeo de celular de 21 MB passa (antes o teto era 20 MB)');
+  assert.equal(mediaProblem({ type: 'video/mp4', size: 61 * 1024 * 1024 }) !== null, true);
+  assert.equal(mediaProblem({ type: 'video/mp4', size: 200 * 1024 * 1024 }, { canCompress: true }), null, 'com compressão, o vídeo grande é reduzido antes');
   assert.equal(mediaProblem({ type: 'video/mp4', size: 1024 }), null);
   assert.equal(mediaProblem({ type: 'application/pdf', size: 10 }) !== null, true);
   assert.equal(mediaProblem({ type: 'image/png', size: 0 }) !== null, true);

@@ -20,24 +20,13 @@ export function EventExtraIcon({ icon }: { icon: string }) {
  * Configurações de evento da gestão, para responder ao criar ou editar um evento. Fica recolhido (acordeon) para não
  * ocupar espaço; aberto, cada linha tem Sim/Não ou um campo de texto. Tudo é opcional.
  */
-export function EventExtrasFields({ options, value, onChange }: { options: readonly EventExtraOption[]; value: EventExtrasDraft; onChange: (next: EventExtrasDraft) => void }) {
+export function EventExtrasFields({ options, value, onChange, embedded = false }: { options: readonly EventExtraOption[]; value: EventExtrasDraft; onChange: (next: EventExtrasDraft) => void; /** Já dentro de outro acordeon (criar evento): só a lista, sempre aberta. */ embedded?: boolean }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
   if (options.length === 0) return null;
   const answered = extrasFromDraft(value, options).length;
   const preview = options.slice(0, 3).map((o) => o.label).join(', ') + (options.length > 3 ? '…' : '');
-  return (
-    <div className={`evextras${open ? ' evextras--open' : ''}`}>
-      <button type="button" className="evextras__head" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((o) => !o)}>
-        <span className="evextras__text">
-          <span className="evextras__title">{t('Mais informações do evento')}</span>
-          <span className="evextras__sub">{answered > 0 ? (answered === 1 ? t('1 preenchida') : t('{count} preenchidas', { count: answered })) : preview}</span>
-        </span>
-        <span className="evextras__chev">
-          <ChevronDownIcon />
-        </span>
-      </button>
-      {open ? (
+  const list = (
         <ul className="evextras__list" id={panelId}>
           {options.map((o) => {
             const current = value[o.id];
@@ -72,7 +61,20 @@ export function EventExtrasFields({ options, value, onChange }: { options: reado
             );
           })}
         </ul>
-      ) : null}
+  );
+  if (embedded) return list;
+  return (
+    <div className={`evextras${open ? ' evextras--open' : ''}`}>
+      <button type="button" className="evextras__head" aria-expanded={open} aria-controls={panelId} onClick={() => setOpen((o) => !o)}>
+        <span className="evextras__text">
+          <span className="evextras__title">{t('Mais informações do evento')}</span>
+          <span className="evextras__sub">{answered > 0 ? (answered === 1 ? t('1 preenchida') : t('{count} preenchidas', { count: answered })) : preview}</span>
+        </span>
+        <span className="evextras__chev">
+          <ChevronDownIcon />
+        </span>
+      </button>
+      {open ? list : null}
     </div>
   );
 }

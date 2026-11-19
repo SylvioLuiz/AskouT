@@ -206,7 +206,7 @@ test('dono comenta no post do próprio bar como o bar; nos outros posts, como pe
   assert.equal(list.items[0]!.canDelete, false);
   assert.equal((await w.core.posts.comments(dono, post.id)).items[0]!.canDelete, true);
   // post pessoal do dono: comentário de pessoa
-  const own = await w.core.posts.create(dono, { images: [JPEG()] });
+  const own = await w.core.posts.create(dono, { placeName: 'Bar do Zé', images: [JPEG()] });
   const c = await w.core.posts.addComment(dono, own.id, 'Meu post');
   assert.equal(c.venue, null);
   // post de outro bar (v2 não é dele, mas o post é de um bar de outra pessoa): comenta como pessoa

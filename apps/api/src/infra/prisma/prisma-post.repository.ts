@@ -30,6 +30,7 @@ export class PrismaPostRepository implements PostRepository {
         createdAt: post.createdAt,
         venueId: post.venueId ?? null,
         placeVenueId: post.placeVenueId ?? null,
+        linkedEventId: post.linkedEventId ?? null,
         images: {
           create: images.map((i) => ({
             id: i.id,
@@ -63,10 +64,11 @@ export class PrismaPostRepository implements PostRepository {
     createdAt: Date;
     venueId?: string | null;
     placeVenueId?: string | null;
+    linkedEventId?: string | null;
     images: { id: string; position: number; mime: string | null; placePhotoRef: string | null; placePhotoAuthor: string | null; videoMime: string | null }[];
   }): PostWithImages {
     return {
-      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, eventKind: row.eventKind, eventPrivate: row.eventPrivate, eventExtras: storedEventExtraAnswers(row.eventExtras), archivedAt: row.archivedAt, editedAt: row.editedAt, createdAt: row.createdAt, venueId: row.venueId ?? null, placeVenueId: row.placeVenueId ?? null },
+      post: { id: row.id, authorId: row.authorId, caption: row.caption, placeName: row.placeName, placeAddress: row.placeAddress, eventTitle: row.eventTitle, eventStartsAt: row.eventStartsAt, eventEndsAt: row.eventEndsAt, eventKind: row.eventKind, eventPrivate: row.eventPrivate, eventExtras: storedEventExtraAnswers(row.eventExtras), archivedAt: row.archivedAt, editedAt: row.editedAt, createdAt: row.createdAt, venueId: row.venueId ?? null, placeVenueId: row.placeVenueId ?? null, linkedEventId: row.linkedEventId ?? null },
       images: row.images.map((i) => ({ id: i.id, position: i.position, isUpload: i.mime !== null, placePhotoRef: i.placePhotoRef, placePhotoAuthor: i.placePhotoAuthor, videoMime: i.videoMime })),
     };
   }

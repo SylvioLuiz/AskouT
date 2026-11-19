@@ -323,8 +323,10 @@ export class EventPageService {
   }
 
   /** Eventos que ainda não acabaram e em que a pessoa vai: os que confirmou ("Eu vou") e os que ela criou, do mais próximo ao mais distante. Os que sumiram, foram arquivados ou ficaram inacessíveis (bloqueio) não entram. */
-  async listMyGoing(viewerId: string): Promise<GoingEventView[]> {
-    const now = this.deps.clock.now().getTime();
+  /** `recentDays`: inclui também os que acabaram há até tantos dias (para vincular um post ao evento em que a pessoa foi). */
+  async listMyGoing(viewerId: string, options: { recentDays?: number } = {}): Promise<GoingEventView[]> {
+    const recent = Math.min(30, Math.max(0, Math.floor(options.recentDays ?? 0)));
+    const now = this.deps.clock.now().getTime() - recent * 24 * 3_600_000;
     const rows = await this.deps.eventRoom.listGoingByUser(viewerId, MY_GOING_LIMIT);
     // Cada evento monta a página inteira; em paralelo (a ordem final é refeita pelo sort no fim).
     const resolved = await Promise.all(

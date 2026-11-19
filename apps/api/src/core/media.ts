@@ -2,8 +2,8 @@ import { validationError } from './errors.ts';
 
 /** Foto na conversa: o app reduz antes de enviar (lado maior 1600 px); aqui o teto é de 2 MB. */
 export const CHAT_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
-/** Vídeo na conversa: curto, até 20 MB. */
-export const CHAT_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
+/** Vídeo na conversa: até 60 MB, como nos posts e stories (o app reduz antes de enviar). */
+export const CHAT_VIDEO_MAX_BYTES = 60 * 1024 * 1024;
 /** Vídeo em post: até 60 MB (a duração, até 3 minutos, o app confere antes de enviar). */
 export const POST_VIDEO_MAX_BYTES = 60 * 1024 * 1024;
 

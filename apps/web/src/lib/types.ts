@@ -886,7 +886,10 @@ export interface PostView {
   placeAddress: string | null;
   /** Preenchido quando o post é um evento criado pela pessoa. */
   event: { title: string; kind: EventKind; startsAt: string; endsAt: string; private?: boolean; extras?: EventExtraAnswer[] } | null;
+  /** Evento ao qual o post (foto, vídeo ou só texto) está vinculado; o nome leva à página do evento. */
+  linkedEvent?: { id: string; source: 'PLACE' | 'USER'; title: string; startsAt: string } | null;
   createdAt: string;
+  /** Pode vir vazio: post só de texto. */
   images: PostImage[];
   mine: boolean;
   tags: { user: PublicProfile; status: 'PENDING' | 'ACCEPTED' }[];

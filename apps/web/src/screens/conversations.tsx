@@ -24,8 +24,10 @@ import { useAsync, useLiveRefresh, usePolling, useTitle } from '../hooks.ts';
 import { PullRefresh } from '../components/pull-refresh.tsx';
 import { allDeletable, announceChatsChanged, breakLabel, copyText, filterConversations, formatClock, groupAlbums, isDoubleTap, LONG_PRESS_MS, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
 import type { RunPosition } from '../lib/chat.ts';
-import { mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
-import { toApiError } from '../lib/errors.ts';
+import { CHAT_VIDEO_MAX_BYTES, mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
+import { prepareVideoUpload, withMediaType } from '../lib/media-file.ts';
+import { canCompressVideo, prepareProgressText } from '../lib/video-prepare.ts';
+import { ApiError, toApiError } from '../lib/errors.ts';
 import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
 import { CommentGifView, CommentTools, GifImage } from '../components/comment-tools.tsx';
 import type { ChatMessage, CommentGif, ConversationItem } from '../lib/types.ts';
@@ -203,6 +205,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const threadRef = useRef<HTMLDivElement>(null);
   const reveal = useTimeReveal(threadRef);
   const [uploading, setUploading] = useState(false);
+  /** Otimizando um vídeo antes de enviar (0 a 1). */
+  const [prep, setPrep] = useState<number | undefined>();
   const [selected, setSelected] = useState<string[] | undefined>();
   const [deleting, setDeleting] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -375,15 +379,18 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   }
 
   /** Fotos e vídeos escolhidos (galeria, várias de uma vez, ou câmera) ficam numa prévia até a pessoa enviar. */
-  function pickMedia(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
+  async function pickMedia(event: ChangeEvent<HTMLInputElement>) {
+    // Tipo corrigido pela extensão: alguns aparelhos entregam o vídeo sem tipo e o servidor recusava.
+    const files = Array.from(event.target.files ?? []).map(withMediaType);
     event.target.value = '';
     if (files.length === 0) return;
     setProblem(undefined);
     const room = STAGED_MAX - staged.length;
     const ok: StagedMedia[] = [];
+    // Vídeo grande serve se o aparelho conseguir reduzir antes de enviar (como nos posts).
+    const canCompress = files.some((f) => mediaKind(f) === 'VIDEO' && f.size > CHAT_VIDEO_MAX_BYTES) ? await canCompressVideo() : false;
     for (const file of files) {
-      const trouble = mediaProblem(file);
+      const trouble = mediaProblem(file, { canCompress });
       if (trouble) {
         setProblem(trouble);
         continue;
@@ -450,7 +457,13 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     try {
       // Primeiro as fotos (na ordem escolhida), depois o GIF, depois o texto, logo abaixo.
       for (const item of media) {
-        const blob = item.kind === 'IMAGE' ? await prepareImage(item.file) : item.file;
+        let blob: Blob;
+        if (item.kind === 'IMAGE') blob = await prepareImage(item.file);
+        else {
+          setPrep(0);
+          blob = await prepareVideoUpload(item.file, (fraction) => setPrep(fraction));
+          setPrep(undefined);
+        }
         const message = await api.sendMedia(conversationId, blob, reply);
         reply = undefined;
         stickToEnd.current = true;
@@ -475,10 +488,11 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       setReplyTo(undefined);
     } catch (failure) {
       if (reply === undefined) setReplyTo(undefined);
-      setProblem(failure instanceof Error && failure.message === 'grande' ? t('Não consegui reduzir a foto para o tamanho permitido.') : toApiError(failure).message);
+      setProblem(failure instanceof Error && failure.message === 'grande' ? t('Não consegui reduzir a foto para o tamanho permitido.') : failure instanceof Error && !(failure instanceof ApiError) && failure.message ? failure.message : toApiError(failure).message);
     } finally {
       setSending(false);
       setUploading(false);
+      setPrep(undefined);
     }
   }
 
@@ -750,7 +764,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       {problem ? <Notice tone="error">{problem}</Notice> : null}
       {uploading ? (
         <p className="muted chat__sending" role="status">
-          {t('Enviando…')}
+          {prep !== undefined ? prepareProgressText(prep) : t('Enviando…')}
         </p>
       ) : null}
       {replyTo && data.canSend ? (
@@ -825,8 +839,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             <label className="visually-hidden" htmlFor="msg">
               Mensagem para {chatName}
             </label>
-            <input ref={galleryRef} type="file" multiple accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" aria-label={t('Escolher fotos ou vídeos')} tabIndex={-1} onChange={pickMedia} />
-            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="visually-hidden" aria-label={t('Tirar foto')} tabIndex={-1} onChange={pickMedia} />
+            <input ref={galleryRef} type="file" multiple accept="image/*,video/*" className="visually-hidden" aria-label={t('Escolher fotos ou vídeos')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="visually-hidden" aria-label={t('Tirar foto')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
             {recording ? (
               <VoiceRecorderBar onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
             ) : (

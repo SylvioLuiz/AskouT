@@ -3,7 +3,10 @@ import { t } from '../lib/i18n/index.ts';
 
 export const CHAT_IMAGE_SIDE = 1600;
 export const CHAT_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
-export const CHAT_VIDEO_MAX_BYTES = 20 * 1024 * 1024;
+/** Igual ao dos posts e stories: o vídeo é reduzido antes de enviar, e o que sai precisa caber aqui. */
+export const CHAT_VIDEO_MAX_BYTES = 60 * 1024 * 1024;
+/** Com compressão no aparelho, dá para escolher um vídeo bem maior (ele é reduzido antes de enviar). */
+export const CHAT_VIDEO_SOURCE_MAX_BYTES = 500 * 1024 * 1024;
 export const REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍'] as const;
 
 /** Emojis do "+" das reações (qualquer outro dá para digitar no campo do teclado). */
@@ -39,13 +42,14 @@ export function fitWithin(width: number, height: number, max: number): { width: 
 }
 
 /** Texto de erro se o arquivo não serve (tipo ou tamanho); `null` se pode seguir. Foto grande é reduzida, então só o vídeo tem teto aqui. */
-export function mediaProblem(file: { type: string; size: number }): string | null {
+export function mediaProblem(file: { type: string; size: number }, options: { canCompress?: boolean } = {}): string | null {
   const type = file.type.split(';')[0]?.trim().toLowerCase() ?? '';
   if (file.size <= 0) return t('O arquivo está vazio.');
   if (type.startsWith('image/')) return IMAGE_TYPES.includes(type) || type === 'image/heic' || type === 'image/heif' ? null : t('Use uma foto JPEG, PNG ou WebP.');
   if (type.startsWith('video/')) {
     if (!VIDEO_TYPES.includes(type)) return t('Use um vídeo MP4, WebM ou MOV.');
-    return file.size > CHAT_VIDEO_MAX_BYTES ? t('O vídeo passa de 20 MB. Escolha um mais curto.') : null;
+    if (options.canCompress) return file.size > CHAT_VIDEO_SOURCE_MAX_BYTES ? t('O vídeo passa de 500 MB. Escolha um mais curto.') : null;
+    return file.size > CHAT_VIDEO_MAX_BYTES ? t('O vídeo passa de 60 MB. Escolha um mais curto.') : null;
   }
   return t('Escolha uma foto ou um vídeo.');
 }

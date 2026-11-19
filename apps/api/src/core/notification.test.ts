@@ -51,7 +51,7 @@ describe('avisos', () => {
     await w.core.conversations.send(ana!, id, { body: 'oi' });
     await w.core.flushNotifications();
     assert.equal(await w.core.notifications.latestUnreadAt(bia!), null, 'mensagem de conversa não acende o sino (fica no ícone das conversas)');
-    const post = await w.core.posts.create(bia!, { images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64')}`] });
+    const post = await w.core.posts.create(bia!, { placeName: 'Bar do Zé', images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64')}`] });
     await w.core.posts.like(ana!, post.id);
     await w.core.flushNotifications();
     const list = await w.core.notifications.list(bia!);
@@ -291,13 +291,13 @@ describe('silenciar avisos', () => {
     await w.core.flushNotifications();
     assert.equal(await count('MESSAGE'), 1, 'a mensagem continua no sino');
     assert.equal(pushes(), before, 'mas o push foi silenciado');
-    const post = await w.core.posts.create(bia!, { images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64')}`] });
+    const post = await w.core.posts.create(bia!, { placeName: 'Bar do Zé', images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64')}`] });
     await w.core.posts.like(ana!, post.id);
     await w.core.flushNotifications();
     assert.equal(await count('POST_LIKE'), 1);
     assert.equal(pushes(), before + 1, 'só conversas silenciadas: o push da curtida sai');
     await w.core.notifications.setMuteSettings(bia!, { all: true });
-    const other = await w.core.posts.create(bia!, { images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 4, 5, 6]).toString('base64')}`] });
+    const other = await w.core.posts.create(bia!, { placeName: 'Bar do Zé', images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 4, 5, 6]).toString('base64')}`] });
     await w.core.posts.like(ana!, other.id);
     await w.core.flushNotifications();
     assert.equal(await count('POST_LIKE'), 2, 'todas silenciadas: chega no sino');

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { CarouselIcon, CommentIcon, HeartIcon, MoreIcon, RepostIcon, SendIcon } from './icons.tsx';
+import { CarouselIcon, CalendarIcon, CommentIcon, HeartIcon, MoreIcon, RepostIcon, SendIcon } from './icons.tsx';
 import { SoundToggle } from './sound-toggle.tsx';
 import { hasSound } from '../lib/sound.ts';
 import { AdjustSheet, CommentsSheet, EditPostSheet, PostMenuSheet, ReportSheet, SharePostSheet } from './post-actions.tsx';
@@ -218,7 +218,9 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
   }
 
   const eventCard = post.event && asEvent;
-  const cartaz = poster === true && !eventCard;
+  // Post só de texto não tem foto para o cartaz: mostra no formato comum, com o texto em destaque.
+  const textOnly = post.images.length === 0 && !post.event;
+  const cartaz = poster === true && !eventCard && !textOnly;
   const [viewing, setViewing] = useState<number | undefined>();
   // Tocar na foto: post de evento abre o evento; post de um local abre a página do local; os outros abrem a foto em tela cheia.
   function openMedia(index: number) {
@@ -308,9 +310,9 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
                 ) : (
                   <Link to={`/u/${encodeURIComponent(post.author.username)}`} className="poster__name">{post.author.username}</Link>
                 )}
-                {post.placeName && !post.venue ? (
+                {(post.placeName || post.linkedEvent) && !post.venue ? (
                   <span className="poster__sub">
-                    <VenueLink venueId={post.placeVenueId} name={post.placeName} />
+                    {post.linkedEvent ? <Link to={`/eventos/${encodeURIComponent(post.linkedEvent.id)}`}>{post.linkedEvent.title}</Link> : <VenueLink venueId={post.placeVenueId} name={post.placeName ?? ''} />}
                     {' · '}
                     <Link to={`/posts/${encodeURIComponent(post.id)}`}>{timeAgo(post.createdAt, new Date())}{post.edited ? ' · editado' : ''}</Link>
                   </span>
@@ -369,7 +371,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           </div>
         </div>
       ) : null}
-      {eventCard || cartaz ? null : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} onOpen={openMedia} />}
+      {eventCard || cartaz ? null : textOnly ? (post.caption ? <p className="post__textonly">{post.caption}</p> : null) : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} onOpen={openMedia} />}
       {viewing !== undefined ? <PhotoViewer images={post.images} start={viewing} onClose={() => setViewing(undefined)} /> : null}
       {cartaz ? null : (
       <div className="post__actions" role="group" aria-label={t('Ações do post')}>
@@ -386,6 +388,13 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
         </button>
       </div>
       )}
+      {post.linkedEvent && !cartaz ? (
+        <p className="post__linkedevent">
+          <CalendarIcon />
+          <strong><Link to={`/eventos/${encodeURIComponent(post.linkedEvent.id)}`}>{post.linkedEvent.title}</Link></strong>
+          <span className="muted">· {eventWhen(post.linkedEvent.startsAt)}</span>
+        </p>
+      ) : null}
       {post.placeName && !eventCard && !cartaz ? (
         <p className="post__place">
           <strong><VenueLink venueId={post.placeVenueId} name={post.placeName} /></strong>
@@ -404,7 +413,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           ))}
         </p>
       ) : null}
-      {post.caption && !cartaz ? <p className="post__caption">{post.caption}</p> : null}
+      {post.caption && !cartaz && !textOnly ? <p className="post__caption">{post.caption}</p> : null}
 
       {sheet === 'menu' ? (
         <PostMenuSheet
@@ -615,7 +624,7 @@ export function PostGrid({ username, kind, quiet, onCount }: { username: string;
   }, [username, kind]);
   if (error && items.length === 0) return <ErrorState message={error.message} onRetry={() => void more(0)} />;
   if (!page) return <Loading />;
-  if (items.length === 0) return quiet ? null : <EmptyState title={t('Nenhum post ainda')}>{t('Posts com fotos aparecem aqui.')}</EmptyState>;
+  if (items.length === 0) return quiet ? null : <EmptyState title={t('Nenhum post ainda')}>{t('Posts com fotos, vídeos e textos aparecem aqui.')}</EmptyState>;
   return (
     <>
       <ul className="postgrid" aria-label={t('Posts')}>
@@ -624,7 +633,7 @@ export function PostGrid({ username, kind, quiet, onCount }: { username: string;
           return (
             <li key={post.id}>
               <Link to={`/posts/${encodeURIComponent(post.id)}`} className="postgrid__item" aria-label={post.caption ? t('Post: {caption}', { caption: post.caption }) : t('Abrir post')}>
-                {first?.path ? <img src={api.assetUrl(first.path)} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span className="postgrid__none" />}
+                {first?.path ? <img src={api.assetUrl(first.path)} alt="" loading="lazy" referrerPolicy="no-referrer" /> : !first && post.caption ? <span className="postgrid__text">{post.caption}</span> : <span className="postgrid__none" />}
                 {post.event ? <span className="postgrid__event">{t('Evento')}</span> : null}
                 {post.images.length > 1 ? (
                   <span className="postgrid__multi" aria-label={`${post.images.length} fotos`}>

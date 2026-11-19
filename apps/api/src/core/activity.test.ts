@@ -18,13 +18,13 @@ async function setup() {
   await w.core.follows.follow(ana, bia);
   step();
   await w.core.follows.follow(bia, ana);
-  const biaPost = await w.core.posts.create(bia, { images: [JPEG()], caption: 'Noite boa no centro' });
+  const biaPost = await w.core.posts.create(bia, { placeName: 'Bar do Zé', images: [JPEG()], caption: 'Noite boa no centro' });
   step();
   await w.core.posts.like(ana, biaPost.id);
   step();
   await w.core.posts.addComment(ana, biaPost.id, 'Que demais!');
   step();
-  const mine = await w.core.posts.create(ana, { images: [JPEG()], caption: 'Meu post' });
+  const mine = await w.core.posts.create(ana, { placeName: 'Bar do Zé', images: [JPEG()], caption: 'Meu post' });
   step();
   const start = new Date(w.clock.now().getTime() + 24 * H).toISOString();
   const ev = await w.core.posts.create(ana, { images: [JPEG()], placeName: 'Praça', event: { title: 'Corrida', startsAt: start } });
