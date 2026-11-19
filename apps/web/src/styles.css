@@ -2649,6 +2649,12 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   scroll-padding: 0 16px;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
+  /* Sem barra de rolagem própria: a da página já aparece, e duas juntas ficam feias. */
+  scrollbar-width: none;
+}
+
+.carousel::-webkit-scrollbar {
+  display: none;
 }
 
 .carousel__slide {
@@ -6647,6 +6653,7 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 
 /* Pé do story de outra pessoa, como no Instagram: "Enviar mensagem" e o coração no canto.
    Tocar no campo pausa o story, escurece a tela e mostra as reações rápidas (que vão direto para a conversa). */
+.storyview__views { position: absolute; left: 14px; bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px)); z-index: 5; display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 14px; border-radius: 999px; background: rgb(0 0 0 / 0.5); color: #fff; font-size: 0.875rem; font-weight: 600; }
 .storyreply { position: absolute; left: 12px; right: 12px; bottom: max(14px, env(safe-area-inset-bottom)); z-index: 6; display: flex; flex-direction: column; gap: 14px; }
 .storyreply--video:not(.is-composing) { right: 64px; }
 .storyview--placed .storyreply:not(.is-composing) { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 96px); }
