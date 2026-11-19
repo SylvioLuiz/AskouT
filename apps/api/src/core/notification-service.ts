@@ -1,5 +1,5 @@
 import { conflict, validationError } from './errors.ts';
-import { isNotificationCategory, notificationFilter } from './notification-categories.ts';
+import { isNotificationCategory, notificationFilter, OVERVIEW_FILTER } from './notification-categories.ts';
 import type { Clock, ConversationRepository, IdGenerator, MeetupRepository, Notifier, NotificationRepository, PostRepository, PushSender, PushSubscriptionRepository, SchedulingRepository, UserRepository } from './ports.ts';
 import type { NotificationMuteSettings, NotificationRecord, NotificationType } from './types.ts';
 
@@ -39,6 +39,8 @@ export interface NotificationView {
   createdAt: string;
   /** Quem causou o aviso, para a tela mostrar a foto. Nulo em avisos do sistema, antigos ou de conta que sumiu. */
   actor: NotificationActor | null;
+  /** Post (ou evento) da marcação, para a tela mostrar Aceitar/Recusar no próprio aviso. Só em POST_TAG. */
+  postId: string | null;
 }
 
 export interface NotificationActor {
@@ -48,7 +50,8 @@ export interface NotificationActor {
 }
 
 export function toNotificationView(n: NotificationRecord, actor: NotificationActor | null = null): NotificationView {
-  return { id: n.id, type: n.type, title: n.title, body: n.body, url: n.url, read: n.readAt !== null, createdAt: n.createdAt.toISOString(), actor };
+  const postId = n.type === 'POST_TAG' && n.dedupeKey?.startsWith('post-tag:') ? n.dedupeKey.slice('post-tag:'.length) || null : null;
+  return { id: n.id, type: n.type, title: n.title, body: n.body, url: n.url, read: n.readAt !== null, createdAt: n.createdAt.toISOString(), actor, postId };
 }
 
 interface NotifierDeps {
@@ -143,13 +146,14 @@ export class NotificationService {
   /**
    * Os avisos mais recentes. `category` (chips da tela: menções, comentários, curtidas...) filtra no banco, para a
    * página trazer os 30 mais recentes daquela categoria e não só os que sobraram entre os 30 mais recentes de todos.
-   * `unread` é sempre o total, sem filtro.
+   * `unread`: não lidos do chip escolhido ("Todas" deixa de fora as mensagens de conversa, que ficam só em "Mensagens").
    */
   async list(userId: string, category: unknown = 'all'): Promise<{ items: NotificationView[]; unread: number }> {
     const { notifications } = this.deps;
     const chosen = category === undefined || category === '' ? 'all' : category;
     if (!isNotificationCategory(chosen)) throw validationError('Dados inválidos', { category: 'Categoria inválida' });
-    const [items, unread] = await Promise.all([notifications.listForUser(userId, NOTIFICATIONS_PAGE, notificationFilter(chosen)), notifications.unreadCount(userId)]);
+    const filter = notificationFilter(chosen);
+    const [items, unread] = await Promise.all([notifications.listForUser(userId, NOTIFICATIONS_PAGE, filter), notifications.unreadCount(userId, filter)]);
     const resolved = await Promise.all(items.map((n) => this.actorOf(n).catch(() => null)));
     const actorIds = [...new Set(resolved.filter((id): id is string => typeof id === 'string'))];
     const profiles = actorIds.length > 0 ? await this.deps.users.findProfilesByIds(actorIds) : [];
@@ -192,13 +196,13 @@ export class NotificationService {
 
   /** Quando chegou o aviso não lido mais recente (ISO), ou nulo. Serve para a bolinha do sino saber o que é novo desde a última visita. */
   async latestUnreadAt(userId: string): Promise<string | null> {
-    const items = await this.deps.notifications.listForUser(userId, NOTIFICATIONS_PAGE);
+    const items = await this.deps.notifications.listForUser(userId, NOTIFICATIONS_PAGE, OVERVIEW_FILTER);
     const unread = items.filter((n) => n.readAt === null);
     return unread.length === 0 ? null : new Date(Math.max(...unread.map((n) => n.createdAt.getTime()))).toISOString();
   }
 
   unreadCount(userId: string): Promise<number> {
-    return this.deps.notifications.unreadCount(userId);
+    return this.deps.notifications.unreadCount(userId, OVERVIEW_FILTER);
   }
 
   muteSettings(userId: string): Promise<NotificationMuteSettings> {
@@ -221,12 +225,12 @@ export class NotificationService {
     const { notifications, clock } = this.deps;
     let ids: string[] | undefined;
     if (Array.isArray(id)) {
-      if (id.length === 0) return { unread: await notifications.unreadCount(userId) };
+      if (id.length === 0) return { unread: await notifications.unreadCount(userId, OVERVIEW_FILTER) };
       if (id.length > MARK_READ_MAX || id.some((x) => typeof x !== 'string' || x === '' || x.length > 100)) throw validationError('Dados inválidos', { ids: `Envie de 1 a ${MARK_READ_MAX} avisos` });
       ids = [...new Set(id)];
     } else if (id !== undefined) ids = [id];
     await notifications.markRead(userId, clock.now(), ids);
-    return { unread: await notifications.unreadCount(userId) };
+    return { unread: await notifications.unreadCount(userId, OVERVIEW_FILTER) };
   }
 
   /**

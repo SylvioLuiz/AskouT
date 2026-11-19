@@ -31,9 +31,21 @@ export function isNotificationCategory(value: unknown): value is NotificationCat
   return typeof value === 'string' && (NOTIFICATION_CATEGORIES as readonly string[]).includes(value);
 }
 
-/** Filtro do repositório para a categoria; `undefined` em `all`. */
-export function notificationFilter(category: NotificationCategory): NotificationFilter | undefined {
-  return category === 'all' ? undefined : FILTERS[category];
+/** Todos os tipos de aviso (conferido pelo TypeScript: tipo novo sem entrar aqui não compila). */
+const ALL_TYPES = ['MESSAGE', 'MEETUP_INVITE', 'MEETUP_ACCEPTED', 'MEETUP_CANCELLED', 'GROUP_REMOVED', 'FOLLOW_REQUEST', 'FOLLOW_ACCEPTED', 'FOLLOW_NEW', 'FLASH_INVITE', 'POST_TAG', 'POST_LIKE', 'POST_COMMENT', 'VENUE_CLAIM', 'EVENT_REMINDER', 'VENUE_CALENDAR', 'VENUE_EVENT', 'FEED_PENDING', 'FEED_APPROVED', 'FEED_REJECTED', 'FEED_COMMENT', 'FEED_MENTION', 'FEED_REACTION', 'FEED_NOTICE', 'VENUE_TEAM'] as const satisfies readonly NotificationType[];
+type MissingType = Exclude<NotificationType, (typeof ALL_TYPES)[number]>;
+const _allTypesCovered: MissingType extends never ? true : MissingType = true;
+void _allTypesCovered;
+
+/**
+ * "Todas" mostra tudo menos mensagens de conversa: elas continuam gerando aviso (e push), mas só aparecem no chip "Mensagens".
+ * A contagem de não lidos do sino segue a mesma regra (mensagem nova já acende o ícone das conversas).
+ */
+export const OVERVIEW_FILTER: NotificationFilter = [{ types: ALL_TYPES.filter((t) => t !== 'MESSAGE') }];
+
+/** Filtro do repositório para a categoria. */
+export function notificationFilter(category: NotificationCategory): NotificationFilter {
+  return category === 'all' ? OVERVIEW_FILTER : FILTERS[category];
 }
 
 /** O aviso casa com o filtro? (usado pelo repositório em memória e para conferir o Prisma nos testes). */

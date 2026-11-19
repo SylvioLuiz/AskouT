@@ -150,7 +150,7 @@ test('chat: GIF vira mensagem, aparece na lista, não mistura com texto e entra 
   assert.deepEqual([sent.kind, sent.body, sent.gif], ['TEXT', 'GIF', GIF]);
   const list = await w.core.conversations.messages(bia, chat.id);
   assert.deepEqual(list.messages.map((m) => m.gif), [GIF]);
-  assert.ok((await w.core.notifications.list(bia)).items.some((n) => n.body.includes('GIF')));
+  assert.ok((await w.core.notifications.list(bia, 'messages')).items.some((n) => n.body.includes('GIF')));
   await w.core.conversations.deleteMessage(ana, chat.id, sent.id);
   assert.equal((await w.core.conversations.messages(bia, chat.id)).messages[0]!.gif, null, 'apagada some com o GIF');
 });

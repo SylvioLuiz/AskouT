@@ -1931,8 +1931,8 @@ export class InMemoryNotificationRepository implements NotificationRepository {
       .map((n) => ({ ...n }));
   }
 
-  async unreadCount(userId: string): Promise<number> {
-    return this.rows.filter((n) => n.userId === userId && n.readAt === null).length;
+  async unreadCount(userId: string, filter?: NotificationFilter): Promise<number> {
+    return this.rows.filter((n) => n.userId === userId && n.readAt === null && matchesNotificationFilter(n, filter)).length;
   }
 
   async hasUnread(userId: string, dedupeKey: string): Promise<boolean> {

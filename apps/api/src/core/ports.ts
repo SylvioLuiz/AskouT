@@ -899,7 +899,8 @@ export interface NotificationRepository {
   create(record: NotificationRecord): Promise<void>;
   /** Mais recentes primeiro. Com `filter`, só os avisos que casam com alguma cláusula (chips da tela de notificações). */
   listForUser(userId: string, limit: number, filter?: import('./notification-categories.ts').NotificationFilter): Promise<NotificationRecord[]>;
-  unreadCount(userId: string): Promise<number>;
+  /** Não lidos; com `filter`, só os que casam com ele. */
+  unreadCount(userId: string, filter?: import('./notification-categories.ts').NotificationFilter): Promise<number>;
   /** Já existe aviso não lido com essa chave? */
   hasUnread(userId: string, dedupeKey: string): Promise<boolean>;
   /** Marca como lidos (todos se `ids` for omitido). Devolve quantos mudaram. */
