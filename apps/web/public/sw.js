@@ -13,13 +13,19 @@ self.addEventListener('push', (event) => {
   const title = typeof data.title === 'string' && data.title !== '' ? data.title : 'AskouT';
   const url = typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/';
   event.waitUntil(
-    self.registration.showNotification(title, {
+    Promise.all([
+      // Com o app aberto, avisa as abas para atualizarem na hora (lista de conversas, sino...).
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+        for (const w of windows) w.postMessage({ type: 'askout:push', url });
+      }),
+      self.registration.showNotification(title, {
       body: typeof data.body === 'string' ? data.body : '',
       tag: typeof data.tag === 'string' ? data.tag : undefined,
       icon: '/favicon.svg',
       badge: '/favicon.svg',
       data: { url },
-    }),
+      }),
+    ]),
   );
 });
 

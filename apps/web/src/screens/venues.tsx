@@ -1,18 +1,19 @@
 import { useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CoverPicker } from '../components/cover-picker.tsx';
 import { EventDates } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { ChevronRightIcon, EditIcon, GlobeIcon, PlusIcon, SearchIcon } from '../components/icons.tsx';
 import { api } from '../client.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { kindLabel } from '../lib/explore.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
-import type { ClaimableVenue, TeamInvite, VenueClaim, VenueEvent, VenueEventBody, VenueSummary } from '../lib/types.ts';
+import type { ClaimableVenue, ExplorePlace, TeamInvite, VenueClaim, VenueEvent, VenueEventBody, VenueSummary } from '../lib/types.ts';
 import { CLAIM_NOTE_MAX, EMPTY_VENUE_EVENT, VENUE_EVENT_DESCRIPTION_MAX, VENUE_EVENT_TITLE_MAX, claimStateLabel, claimStatusLabel, documentProblem, draftFromEvent, phaseLabel, venueEventBody, venueEventProblem } from '../lib/venue.ts';
 import type { VenueEventDraft } from '../lib/venue.ts';
 import { Link } from '../router.tsx';
@@ -123,6 +124,184 @@ export function ClaimSheet({ onClose, onSent, fixed }: { onClose: () => void; on
           </div>
         </div>
       )}
+    </Sheet>
+  );
+}
+
+// ---------- Criar um local (botão flutuante de Meus locais) ----------
+
+type CreateSource = 'google' | 'askout' | 'scratch';
+
+/** Primeiro passo do botão "Criar local": de onde vem o local. */
+function CreateVenueChooser({ onPick, onClose }: { onPick: (source: CreateSource) => void; onClose: () => void }) {
+  const options: { source: CreateSource; icon: ReactNode; title: string; sub: string }[] = [
+    { source: 'google', icon: <GlobeIcon />, title: t('A partir de um lugar do Google'), sub: t('Busque o seu rolê no Google e use o nome e o endereço de lá.') },
+    { source: 'askout', icon: <SearchIcon />, title: t('Um local que já está no AskouT'), sub: t('O seu rolê já aparece no app? Peça para administrá-lo.') },
+    { source: 'scratch', icon: <EditIcon />, title: t('Criar do zero'), sub: t('Não achou em lugar nenhum? Preencha nome, tipo e endereço.') },
+  ];
+  return (
+    <Sheet title={t('Criar local')} onClose={onClose}>
+      <ul className="venuelist createsource">
+        {options.map((o) => (
+          <li key={o.source}>
+            <button type="button" className="venuerow createsource__item" onClick={() => onPick(o.source)}>
+              <span className="createsource__icon" aria-hidden="true">
+                {o.icon}
+              </span>
+              <span className="createsource__text">
+                <span className="venuerow__name">{o.title}</span>
+                <span className="venuerow__sub">{o.sub}</span>
+              </span>
+              <ChevronRightIcon />
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="muted">{t('Em todos os casos você envia um documento e um administrador do AskouT confirma que o local é seu.')}</p>
+    </Sheet>
+  );
+}
+
+/**
+ * Busca um lugar do Google pelo nome ou endereço (a mesma busca de vincular rolê) e cria o local no AskouT a partir
+ * dele. Lugares que já estão no AskouT ficam de fora: para eles existe a opção de reivindicar.
+ */
+function GoogleVenueSheet({ onPicked, onClose }: { onPicked: (venue: { id: string; name: string; address: string | null }) => void; onClose: () => void }) {
+  const [q, setQ] = useState('');
+  const term = useDebounced(q.trim(), 350);
+  const where = useCurrentPosition();
+  const position = where.status === 'ok' ? where.position : undefined;
+  const result = useAsync(() => (term.length >= 2 ? api.searchPlaces({ q: term, lat: position?.lat, lng: position?.lng }) : Promise.resolve(null)), [term, position?.lat, position?.lng]);
+  const places = (result.data?.places ?? []).filter((p) => p.venue === null);
+  const [picking, setPicking] = useState<string | undefined>();
+  const [message, setMessage] = useState<string | undefined>();
+
+  async function pick(p: ExplorePlace) {
+    setPicking(p.key);
+    setMessage(undefined);
+    try {
+      const { venueId } = await api.openExternalVenue({ key: p.key, lat: p.lat, lng: p.lng });
+      onPicked({ id: venueId, name: p.name, address: p.address });
+    } catch (failure) {
+      setMessage(toApiError(failure).message);
+      setPicking(undefined);
+    }
+  }
+
+  return (
+    <Sheet title={t('Criar a partir do Google')} onClose={onClose}>
+      <div className="claim">
+        <Field label={t('Buscar no Google')} type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint={t('Nome ou endereço do lugar')} />
+        {term.length < 2 ? <p className="muted">{t('Digite o nome ou o endereço do seu rolê.')}</p> : null}
+        {result.loading && !result.data ? <Loading /> : null}
+        {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
+        {result.data && places.length === 0 ? <p className="muted">{result.data.placesAvailable ? t('Nenhum lugar do Google com esse nome. Tente o endereço ou crie do zero.') : t('A busca do Google ainda não está ligada neste ambiente.')}</p> : null}
+        {places.length > 0 ? (
+          <ul className="placepick">
+            {places.map((p) => (
+              <li key={p.key}>
+                <button type="button" className="placepick__item" disabled={picking !== undefined} aria-busy={picking === p.key || undefined} onClick={() => void pick(p)}>
+                  {p.photoPath ? <img src={api.assetUrl(p.photoPath)} alt="" referrerPolicy="no-referrer" /> : null}
+                  <span>
+                    <strong>{p.name}</strong>
+                    {p.address ? <span className="muted"> {p.address}</span> : null}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {message ? <Notice tone="error">{message}</Notice> : null}
+        {places.some((p) => p.source === 'GOOGLE') ? <p className="muted">{t('Resultados do Google.')}</p> : null}
+      </div>
+    </Sheet>
+  );
+}
+
+const VENUE_TYPES = ['Bar', 'Balada', 'Restaurante', 'Casa de show', 'Café', 'Outro'] as const;
+export const NEW_VENUE_NAME_MAX = 80;
+export const NEW_VENUE_ADDRESS_MAX = 200;
+
+/** Cria um local do zero (não está no AskouT nem no Google). Vira um pedido: um admin confere o documento. */
+export function NewVenueSheet({ onClose, onSent }: { onClose: () => void; onSent: () => void }) {
+  const where = useCurrentPosition();
+  const [name, setName] = useState('');
+  const [type, setType] = useState<string>(VENUE_TYPES[0]);
+  const [address, setAddress] = useState('');
+  const [file, setFile] = useState<File | undefined>();
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | undefined>();
+  const input = useRef<HTMLInputElement>(null);
+
+  function choose(event: ChangeEvent<HTMLInputElement>) {
+    const chosen = event.target.files?.[0];
+    event.target.value = '';
+    if (!chosen) return;
+    const problem = documentProblem(chosen);
+    setMessage(problem ?? undefined);
+    setFile(problem ? undefined : chosen);
+  }
+
+  const ready = name.trim() !== '' && address.trim() !== '' && file !== undefined && where.status === 'ok';
+
+  async function send() {
+    if (!file || where.status !== 'ok') return;
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await api.requestVenue({
+        name: name.trim(),
+        ...(type === 'Outro' ? {} : { category: type }),
+        address: address.trim(),
+        lat: where.position.lat,
+        lng: where.position.lng,
+        document: await readAsDataUrl(file),
+        ...(note.trim() ? { note: note.trim() } : {}),
+      });
+      onSent();
+    } catch (failure) {
+      setMessage(toApiError(failure).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Sheet title={t('Criar local do zero')} onClose={onClose}>
+      <div className="claim">
+        <Field label={t('Nome do local')} value={name} onChange={setName} placeholder={t('Ex.: Bar do Zé ou Balada Nova')} maxLength={NEW_VENUE_NAME_MAX} autoFocus />
+        <div className="field">
+          <span className="field__label">{t('Tipo')}</span>
+          <div className="chips" role="group" aria-label={t('Tipo')}>
+            {VENUE_TYPES.map((option) => (
+              <button key={option} type="button" aria-pressed={type === option} className="chip" onClick={() => setType(option)}>
+                {t(option)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field label={t('Endereço')} value={address} onChange={setAddress} placeholder={t('Ex.: Rua das Flores, 120 - Centro')} maxLength={NEW_VENUE_ADDRESS_MAX} autoComplete="street-address" />
+        {where.status === 'ok' ? (
+          <p className="muted">{t('O local fica no mapa onde você está agora. Faça o pedido de dentro do local.')}</p>
+        ) : where.status === 'asking' ? (
+          <p className="muted">{t('Pegando a sua localização...')}</p>
+        ) : (
+          <Notice tone="error">{t('Precisamos da sua localização para colocar o local no mapa. Libere a localização do aparelho e abra de novo.')}</Notice>
+        )}
+        <p className="muted">{t('Para confirmar que o local é seu, envie um documento (CNPJ, alvará ou comprovante). Só um administrador do AskouT vê o arquivo.')}</p>
+        <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="visually-hidden" aria-label={t('Escolher documento')} onChange={choose} />
+        <Button variant="secondary" onClick={() => input.current?.click()}>
+          {file ? t('Trocar documento') : t('Escolher documento')}
+        </Button>
+        {file ? <p className="claim__file">{file.name}</p> : null}
+        <Field label={t('Mensagem (opcional)')} value={note} onChange={setNote} multiline maxLength={CLAIM_NOTE_MAX} hint={t('Até {CLAIM_NOTE_MAX} caracteres', { CLAIM_NOTE_MAX })} />
+        {message ? <Notice tone="error">{message}</Notice> : null}
+        <div className="claim__actions">
+          <Button full loading={busy} disabled={!ready} onClick={send}>
+            {t('Enviar pedido')}
+          </Button>
+        </div>
+      </div>
     </Sheet>
   );
 }
@@ -349,6 +528,16 @@ export function VenuesScreen() {
   const [claiming, setClaiming] = useState(false);
   const [creatingOrg, setCreatingOrg] = useState(false);
   const [sent, setSent] = useState(false);
+  /** Botão flutuante "Criar local": escolher a origem, buscar no Google, criar do zero ou pedir o local do Google. */
+  const [creating, setCreating] = useState<'choose' | 'google' | 'scratch' | undefined>();
+  const [fromGoogle, setFromGoogle] = useState<{ id: string; name: string; address: string | null } | undefined>();
+  const done = () => {
+    setClaiming(false);
+    setCreating(undefined);
+    setFromGoogle(undefined);
+    setSent(true);
+    mine.reload();
+  };
 
   return (
     <>
@@ -383,7 +572,7 @@ export function VenuesScreen() {
             </section>
           ) : null}
           {mine.data.venues.length === 0 && mine.data.managed.length === 0 && mine.data.invites.length === 0 && mine.data.claims.length === 0 ? (
-            <EmptyState title={t('Você ainda não administra nenhum local')}>{t('Reivindique o seu rolê (bar, balada ou casa) para criar os eventos dele. O pedido é analisado por um administrador.')}</EmptyState>
+            <EmptyState title={t('Você ainda não administra nenhum local')}>{t('Toque em Criar local para trazer o seu rolê (bar, balada ou casa) do Google, do AskouT ou do zero. O pedido é analisado por um administrador.')}</EmptyState>
           ) : mine.data.venues.length + mine.data.managed.length === 0 ? null : (
             <ul className="venuelist" aria-label={t('Locais que você administra')}>
               {[...mine.data.venues, ...mine.data.managed].map((v) => (
@@ -396,16 +585,41 @@ export function VenuesScreen() {
               ))}
             </ul>
           )}
-          <div className="venueactions">
-            <Button full onClick={() => setClaiming(true)}>
-              {t('Reivindicar um local')}
-            </Button>
+          <div className="venueactions venueactions--fab">
             <Button full variant="secondary" onClick={() => setCreatingOrg(true)}>
               {t('Criar página de organização (atlética, coletivo, produtora...)')}
             </Button>
           </div>
         </>
       ) : null}
+      {mine.data ? (
+        <button type="button" className="fab" onClick={() => setCreating('choose')}>
+          <PlusIcon />
+          {t('Criar local')}
+        </button>
+      ) : null}
+      {creating === 'choose' ? (
+        <CreateVenueChooser
+          onClose={() => setCreating(undefined)}
+          onPick={(source) => {
+            if (source === 'askout') {
+              setCreating(undefined);
+              setClaiming(true);
+            } else setCreating(source);
+          }}
+        />
+      ) : null}
+      {creating === 'google' ? (
+        <GoogleVenueSheet
+          onClose={() => setCreating(undefined)}
+          onPicked={(venue) => {
+            setCreating(undefined);
+            setFromGoogle(venue);
+          }}
+        />
+      ) : null}
+      {fromGoogle ? <ClaimSheet fixed={fromGoogle} onClose={() => setFromGoogle(undefined)} onSent={done} /> : null}
+      {creating === 'scratch' ? <NewVenueSheet onClose={() => setCreating(undefined)} onSent={done} /> : null}
       {creatingOrg ? (
         <OrganizationSheet
           onClose={() => setCreatingOrg(false)}
@@ -417,14 +631,7 @@ export function VenuesScreen() {
         />
       ) : null}
       {claiming ? (
-        <ClaimSheet
-          onClose={() => setClaiming(false)}
-          onSent={() => {
-            setClaiming(false);
-            setSent(true);
-            mine.reload();
-          }}
-        />
+        <ClaimSheet onClose={() => setClaiming(false)} onSent={done} />
       ) : null}
     </>
   );

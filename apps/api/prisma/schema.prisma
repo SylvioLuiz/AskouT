@@ -807,6 +807,8 @@ model Venue {
   /// Organização (bateria, atlética, centro acadêmico...) em vez de estabelecimento. Pedida por quem a representa e
   /// aprovada por um admin; enquanto não tem dono, fica fora das buscas.
   isOrganization Boolean @default(false)
+  /// Local criado do zero por alguém no app (pedido com documento). Enquanto não tem dono, fica fora das buscas.
+  isUserCreated Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

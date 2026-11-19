@@ -28,6 +28,7 @@ import type {
   VenueProfile,
   VenueBell,
   OrganizationRequestBody,
+  VenueRequestBody,
   VenueRating,
   VenueProfileBody,
   VenuePanel,
@@ -582,6 +583,7 @@ export function createApi(deps: ApiDeps) {
     unfollowVenue: (venueId: string) => request<{ following: false; followerCount: number }>('DELETE', `/venues/${id(venueId)}/follow`),
     /** Sininho: liga (e já segue) ou desliga o aviso de cada evento novo. */
     setVenueNotify: (venueId: string, notify: boolean) => request<VenueBell>('PUT', `/venues/${id(venueId)}/notify`, { body: { notify } }),
+    requestVenue: (body: VenueRequestBody) => request<VenueClaim>('POST', '/venues/requests', { body }),
     requestOrganization: (body: OrganizationRequestBody) => request<VenueClaim>('POST', '/organizations/requests', { body }),
     venuePosts: (venueId: string, page?: PageRequest) => request<PostsPage>('GET', `/venues/${id(venueId)}/posts${pageQuery(page)}`),
     createVenuePost: (venueId: string, input: { images: string[]; caption?: string }) => request<PostView>('POST', `/me/venues/${id(venueId)}/posts`, { body: input }),
