@@ -3,6 +3,8 @@ import { conflict } from '../errors.ts';
 import { CalendarFetchError } from '../ports.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
+  ReferralRecord,
+  ReferralRepository,
   PostRepository,
   EventRoomRepository,
   FeedRepository,
@@ -225,6 +227,51 @@ export class InMemoryUserRepository implements UserRepository {
       .sort((a, b) => a.username.localeCompare(b.username))
       .slice(0, limit)
       .map((p) => ({ ...p }));
+  }
+}
+
+export class InMemoryReferralRepository implements ReferralRepository {
+  readonly rows = new Map<string, ReferralRecord>();
+  private readonly users: InMemoryUserRepository;
+
+  constructor(users: InMemoryUserRepository) {
+    this.users = users;
+  }
+
+  async create(record: ReferralRecord): Promise<boolean> {
+    if (this.rows.has(record.inviteeId)) return false;
+    this.rows.set(record.inviteeId, { ...record });
+    return true;
+  }
+
+  async qualify(inviteeId: string, at: Date): Promise<boolean> {
+    const row = this.rows.get(inviteeId);
+    if (!row || row.qualifiedAt) return false;
+    row.qualifiedAt = at;
+    return true;
+  }
+
+  async listByInviter(inviterId: string, limit: number): Promise<ReferralRecord[]> {
+    return [...this.rows.values()]
+      .filter((r) => r.inviterId === inviterId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.inviteeId < b.inviteeId ? -1 : 1))
+      .slice(0, limit)
+      .map((r) => ({ ...r }));
+  }
+
+  async top(limit: number): Promise<{ inviterId: string; total: number; confirmed: number }[]> {
+    const byInviter = new Map<string, { total: number; confirmed: number }>();
+    for (const r of this.rows.values()) {
+      if (this.users.users.get(r.inviteeId)?.status !== 'ACTIVE') continue;
+      const acc = byInviter.get(r.inviterId) ?? { total: 0, confirmed: 0 };
+      acc.total += 1;
+      if (r.qualifiedAt) acc.confirmed += 1;
+      byInviter.set(r.inviterId, acc);
+    }
+    return [...byInviter.entries()]
+      .map(([inviterId, v]) => ({ inviterId, ...v }))
+      .sort((a, b) => b.confirmed - a.confirmed || b.total - a.total || (a.inviterId < b.inviterId ? -1 : 1))
+      .slice(0, limit);
   }
 }
 

@@ -6407,3 +6407,14 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
   body.is-printing-qr .qrcard { position: fixed; inset: 0; margin: auto; width: 15cm; height: fit-content; max-width: none; }
   body.is-printing-qr .qrcard__img { max-width: none; }
 }
+
+/* Convite com contagem */
+.referrals { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line, rgba(127,127,127,.25)); }
+.referrals__title { margin: 0 0 4px; font-size: 1.05rem; }
+.referrals__list { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; max-height: 220px; overflow-y: auto; }
+.referrals__item { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.referrals__link { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; font-weight: 600; min-width: 0; }
+.referrals__ok { font-size: 0.75rem; color: var(--muted, #666); }
+.referrals__toggle { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 0.9rem; }
+.profile__badge { display: inline-flex; align-items: center; gap: 6px; margin: 6px 0 0; padding: 2px 10px; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 0.75rem; font-weight: 700; }
+.profile__badge .icon { width: 14px; height: 14px; }

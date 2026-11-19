@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { shareOrigin } from '../lib/public-origin.ts';
-import { CameraIcon, ChevronDownIcon, EditIcon, LockIcon, MoreIcon, ShareIcon } from '../components/icons.tsx';
+import { CameraIcon, ChevronDownIcon, EditIcon, LockIcon, MoreIcon, ShareIcon, UsersIcon } from '../components/icons.tsx';
 import { StoryViewer } from '../components/event-story.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { profileLink, profileShareText } from '../lib/share.ts';
@@ -198,6 +198,12 @@ export function ProfileScreen({ username }: { username: string }) {
             ) : null}
           </h1>
           <p className="profile__handle">@{profile.username}</p>
+          {data.referralBadge ? (
+            <p className="profile__badge" title={t('Trouxe {n} amigos para o AskouT', { n: data.referralBadge })}>
+              <UsersIcon />
+              <span>{t('Trouxe a galera')}</span>
+            </p>
+          ) : null}
           {note ? <p className="profile__note">{note}</p> : null}
         </div>
         {relationship.isSelf ? (

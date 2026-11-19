@@ -1,6 +1,7 @@
 export { PrismaActivityRepository } from './prisma-activity.repository.ts';
 export { PrismaAvailabilityRepository } from './prisma-availability.repository.ts';
 export { PrismaBlockRepository } from './prisma-block.repository.ts';
+export { PrismaReferralRepository } from './prisma-referral.repository.ts';
 export { PrismaFlashRepository } from './prisma-flash.repository.ts';
 export { PrismaFollowRepository } from './prisma-follow.repository.ts';
 export { PrismaPendingSignupRepository } from './prisma-pending-signup.repository.ts';

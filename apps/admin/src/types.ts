@@ -291,3 +291,10 @@ export interface EventExtraInput {
   label: string;
   type: EventExtra['type'];
 }
+
+/** Quem mais trouxe gente pelo convite (entraram = todos; confirmados = voltaram ao app em outro dia). */
+export interface TopInviter {
+  profile: { userId: string; username: string; displayName: string; avatarUrl: string | null };
+  brought: number;
+  confirmed: number;
+}

@@ -27,10 +27,12 @@ import {
   InMemoryRegionRepository,
   InMemoryPendingSignupRepository,
   InMemoryUserRepository,
+  InMemoryReferralRepository,
 } from './in-memory.ts';
 
 export async function makeInMemoryHarness(): Promise<RepoHarness> {
   let users = new InMemoryUserRepository();
+  let referrals = new InMemoryReferralRepository(users);
   let blocks = new InMemoryBlockRepository();
   let follows = new InMemoryFollowRepository(blocks);
   let pending = new InMemoryPendingSignupRepository();
@@ -61,6 +63,9 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
   return {
     get users() {
       return users;
+    },
+    get referrals() {
+      return referrals;
     },
     get follows() {
       return follows;
@@ -143,6 +148,7 @@ export async function makeInMemoryHarness(): Promise<RepoHarness> {
     },
     async reset() {
       users = new InMemoryUserRepository();
+      referrals = new InMemoryReferralRepository(users);
       blocks = new InMemoryBlockRepository();
       follows = new InMemoryFollowRepository(blocks);
       pending = new InMemoryPendingSignupRepository();

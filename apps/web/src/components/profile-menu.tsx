@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { api } from '../client.ts';
+import { useAsync } from '../hooks.ts';
+import { broughtText } from '../lib/referrals.ts';
 import { ChevronRightIcon, UsersIcon } from './icons.tsx';
 import { InviteSheet } from './invite.tsx';
 import { Sheet } from './agenda.tsx';
@@ -18,6 +21,8 @@ export const PROFILE_MENU: { to: string; label: string }[] = [
 export function ProfileMenu({ onClose }: { onClose: () => void }) {
   const { signOut } = useAuthContext();
   const [inviting, setInviting] = useState(false);
+  const referrals = useAsync(() => api.referrals(), []);
+  const brought = referrals.data?.brought ?? 0;
   // O convite troca a folha do menu pela do convite (uma folha por vez); fechar o convite fecha tudo.
   if (inviting) return <InviteSheet onClose={onClose} />;
   return (
@@ -28,7 +33,7 @@ export function ProfileMenu({ onClose }: { onClose: () => void }) {
         </span>
         <span className="invitecta__text">
           <span className="invitecta__title">{t('Chame a galera')}</span>
-          <span className="invitecta__sub">{t('O AskouT é melhor com os amigos. Compartilhe o link.')}</span>
+          <span className="invitecta__sub">{brought > 0 ? broughtText(brought) : t('O AskouT é melhor com os amigos. Compartilhe o link.')}</span>
         </span>
       </button>
       <ul className="menulist">

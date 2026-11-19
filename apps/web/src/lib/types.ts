@@ -31,6 +31,18 @@ export interface ProfileView {
   counts: { followers: number; following: number; events: number };
   relationship: Relationship;
   canViewContent: boolean;
+  /** Selo de quem trouxe amigos: quantos, ou null sem selo (não alcançou ou escondeu). Ausente em versões antigas da API. */
+  referralBadge?: number | null;
+}
+
+/** Convite com contagem: quem entrou pelo seu link e o progresso do selo. */
+export interface ReferralOverview {
+  brought: number;
+  confirmed: number;
+  badgeThreshold: number;
+  badgeEarned: boolean;
+  badgeHidden: boolean;
+  people: { profile: PublicProfile; joinedAt: string; confirmed: boolean }[];
 }
 
 export interface SessionUser {

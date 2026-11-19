@@ -13,6 +13,7 @@ import { FeedPage } from './pages/feed.tsx';
 import { PaymentsPage } from './pages/payments.tsx';
 import { EventExtrasPage } from './pages/event-extras.tsx';
 import { RetentionPage } from './pages/retention.tsx';
+import { ReferralsPage } from './pages/referrals.tsx';
 import { ReportsPage } from './pages/reports.tsx';
 import { UsersPage } from './pages/users.tsx';
 import { VenuesPage } from './pages/venues.tsx';
@@ -271,6 +272,8 @@ function Page({ route }: { route: RoutePath }) {
       return <FeedPage />;
     case '/retencao':
       return <RetentionPage />;
+    case '/convites':
+      return <ReferralsPage />;
     case '/pagamentos':
       return <PaymentsPage />;
     case '/auditoria':
