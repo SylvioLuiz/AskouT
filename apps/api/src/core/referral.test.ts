@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { REFERRAL_BADGE_THRESHOLD } from './referral-service.ts';
-import { makeWorld } from './testing/world.ts';
+import { asSession, makeWorld } from './testing/world.ts';
 import type { UserRole } from './types.ts';
 
 const DAY = 24 * 3_600_000;
@@ -29,11 +29,11 @@ test('convite: registra quem convidou, uma vez só e sem trocar depois', async (
   assert.deepEqual(await w.core.referrals.claim(actorOf(bia), '@Ana'), { counted: true });
   assert.deepEqual(await w.core.referrals.claim(actorOf(bia), 'caio'), { counted: false }, 'o primeiro convite vale');
   assert.deepEqual(await w.core.referrals.claim(actorOf(bia), 'ana'), { counted: false });
-  const ana = await w.core.auth.login({ identifier: 'ana', password: 'uma-senha-forte-123' });
+  const ana = await asSession(w.core.auth.login({ identifier: 'ana', password: 'uma-senha-forte-123' }));
   const overview = await w.core.referrals.overview(actorOf(ana));
   assert.equal(overview.brought, 1);
   assert.deepEqual(overview.people.map((p) => p.profile.username), ['bia']);
-  assert.equal((await w.core.referrals.overview(actorOf(await w.core.auth.login({ identifier: 'caio', password: 'uma-senha-forte-123' })))).brought, 0);
+  assert.equal((await w.core.referrals.overview(actorOf(await asSession(w.core.auth.login({ identifier: 'caio', password: 'uma-senha-forte-123' }))))).brought, 0);
 });
 
 test('convite: ignora o próprio usuário, conta inexistente, texto inválido, suspensa, bloqueada e conta antiga', async () => {

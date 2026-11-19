@@ -32,7 +32,7 @@ export function isNotificationCategory(value: unknown): value is NotificationCat
 }
 
 /** Todos os tipos de aviso (conferido pelo TypeScript: tipo novo sem entrar aqui não compila). */
-const ALL_TYPES = ['MESSAGE', 'MEETUP_INVITE', 'MEETUP_ACCEPTED', 'MEETUP_CANCELLED', 'GROUP_REMOVED', 'FOLLOW_REQUEST', 'FOLLOW_ACCEPTED', 'FOLLOW_NEW', 'FLASH_INVITE', 'POST_TAG', 'POST_LIKE', 'POST_COMMENT', 'VENUE_CLAIM', 'EVENT_REMINDER', 'VENUE_CALENDAR', 'VENUE_EVENT', 'FEED_PENDING', 'FEED_APPROVED', 'FEED_REJECTED', 'FEED_COMMENT', 'FEED_MENTION', 'FEED_REACTION', 'FEED_NOTICE', 'VENUE_TEAM'] as const satisfies readonly NotificationType[];
+const ALL_TYPES = ['MESSAGE', 'MEETUP_INVITE', 'MEETUP_ACCEPTED', 'MEETUP_CANCELLED', 'GROUP_REMOVED', 'FOLLOW_REQUEST', 'FOLLOW_ACCEPTED', 'FOLLOW_NEW', 'FLASH_INVITE', 'POST_TAG', 'POST_LIKE', 'POST_COMMENT', 'VENUE_CLAIM', 'EVENT_REMINDER', 'VENUE_CALENDAR', 'VENUE_EVENT', 'FEED_PENDING', 'FEED_APPROVED', 'FEED_REJECTED', 'FEED_COMMENT', 'FEED_MENTION', 'FEED_REACTION', 'FEED_NOTICE', 'VENUE_TEAM', 'ALBUM_SUMMARY', 'GUEST_LIST'] as const satisfies readonly NotificationType[];
 type MissingType = Exclude<NotificationType, (typeof ALL_TYPES)[number]>;
 const _allTypesCovered: MissingType extends never ? true : MissingType = true;
 void _allTypesCovered;
