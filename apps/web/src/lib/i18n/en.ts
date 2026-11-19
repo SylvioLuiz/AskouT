@@ -2817,4 +2817,5 @@ export const EN: Readonly<Record<string, string>> = {
   "Só você vê esta aba. Aqui ficam os eventos em que você disse Eu vou sem mostrar no perfil.": "Only you can see this tab. Events you said I'm going to without showing them on your profile stay here.",
   "Nenhum evento aqui": "No events here",
   "Ao tocar em Eu vou, escolha Só para mim para o evento ficar nesta aba.": "When you tap I'm going, choose Just for me to keep the event in this tab.",
+  "Pode continuar preenchendo enquanto isso.": "You can keep filling in meanwhile.",
 };
