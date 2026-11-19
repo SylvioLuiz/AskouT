@@ -191,7 +191,7 @@ export function PostedEvents({ username, mine, onCount, quietEmpty }: { username
       </div>
       {page.items.length < page.total ? (
         <div className="more">
-          <Button variant="secondary" loading={loading} onClick={() => void load(page.items.length)}>
+          <Button variant="secondary" loading={loading} onClick={() => load(page.items.length)}>
             {t('Carregar mais')}
           </Button>
         </div>

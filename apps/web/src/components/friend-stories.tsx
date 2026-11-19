@@ -20,7 +20,7 @@ export function FriendStories({ groups, onChanged }: { groups: EventStoryGroup[]
   const [viewing, setViewing] = useState<StoryPos | undefined>();
   if (groups.length === 0) return null;
   return (
-    <section className="homestories" aria-label={t('Stories dos amigos')}>
+    <section className="homestories enter" aria-label={t('Stories dos amigos')}>
       <ul className="homestories__list">
         {groups.map((group, index) => (
           <li key={group.author.userId}>

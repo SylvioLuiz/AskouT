@@ -540,7 +540,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
           </div>
         ) : (
           <div className="vhead__actions">
-            <Button variant={v.following ? 'secondary' : 'primary'} loading={followBusy} aria-pressed={v.following} onClick={() => void toggleFollow()}>
+            <Button variant={v.following ? 'secondary' : 'primary'} loading={followBusy} aria-pressed={v.following} onClick={() => toggleFollow()}>
               {v.following ? t('Seguindo') : t('Seguir')}
             </Button>
             <button

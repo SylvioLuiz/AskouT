@@ -341,7 +341,7 @@ export function ActivityScreen() {
               <Button small variant="quiet" onClick={() => setSelected(chosen.length === visibleIds.length ? new Set() : new Set(visibleIds))}>
                 {chosen.length === visibleIds.length ? t('Desmarcar todos') : t('Selecionar todos')}
               </Button>
-              <Button small loading={markingSelected} disabled={chosen.length === 0} onClick={() => void readSelected()}>
+              <Button small loading={markingSelected} disabled={chosen.length === 0} onClick={() => readSelected()}>
                 {t('Marcar como vistas')}
               </Button>
             </div>
@@ -351,7 +351,7 @@ export function ActivityScreen() {
                 {t('Selecionar')}
               </Button>
               {news.data.unread > 0 ? (
-                <Button small variant="quiet" onClick={() => void readAll()}>
+                <Button small variant="quiet" onClick={() => readAll()}>
                   {t('Marcar tudo como lido')}
                 </Button>
               ) : null}
@@ -388,13 +388,13 @@ export function ActivityScreen() {
                   </button>
                   {tagActions && n.postId ? (
                     <div className="row-actions newsrow__actions">
-                      <Button small onClick={() => void answerTag(n.postId as string, 'accept')} loading={tagBusy === n.postId}>
+                      <Button small onClick={() => answerTag(n.postId as string, 'accept')} loading={tagBusy === n.postId}>
                         {t('Aceitar')}
                       </Button>
-                      <Button small variant="secondary" onClick={() => void answerTag(n.postId as string, 'decline')} disabled={tagBusy === n.postId}>
+                      <Button small variant="secondary" onClick={() => answerTag(n.postId as string, 'decline')} disabled={tagBusy === n.postId}>
                         {t('Recusar')}
                       </Button>
-                      <Button small variant="quiet" onClick={() => void open(n)}>
+                      <Button small variant="quiet" onClick={() => open(n)}>
                         {t('Ver')}
                       </Button>
                     </div>
@@ -423,10 +423,10 @@ export function ActivityScreen() {
                   </span>
                 </Link>
                 <div className="row-actions">
-                  <Button small onClick={() => void answerTag(post.id, 'accept')} loading={tagBusy === post.id}>
+                  <Button small onClick={() => answerTag(post.id, 'accept')} loading={tagBusy === post.id}>
                     {t('Aceitar')}
                   </Button>
-                  <Button small variant="secondary" onClick={() => void answerTag(post.id, 'decline')} disabled={tagBusy === post.id}>
+                  <Button small variant="secondary" onClick={() => answerTag(post.id, 'decline')} disabled={tagBusy === post.id}>
                     {t('Recusar')}
                   </Button>
                 </div>

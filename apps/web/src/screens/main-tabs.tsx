@@ -50,7 +50,7 @@ export function HomeScreen() {
       <FriendStories groups={stories.data?.groups ?? []} onChanged={stories.reload} />
 
       {plan ? (
-        <Link to="/agenda" className="nextplan" aria-label={t('Seu próximo plano: {now}, {title}. Abrir a agenda', { now: planWhenLabel(plan, now), title: plan.title })}>
+        <Link to="/agenda" className="nextplan enter" aria-label={t('Seu próximo plano: {now}, {title}. Abrir a agenda', { now: planWhenLabel(plan, now), title: plan.title })}>
           <span className="nextplan__icon" aria-hidden="true">
             <CalendarIcon />
           </span>
@@ -61,7 +61,7 @@ export function HomeScreen() {
       ) : null}
 
       {showFlashCard(me.data?.counts.following) ? (
-        <Link to="/now" className={`flashcta${flashOn ? ' flashcta--on' : ''}`}>
+        <Link to="/now" className={`flashcta enter${flashOn ? ' flashcta--on' : ''}`}>
           <span className="flashcta__icon">
             <BoltIcon filled />
           </span>
@@ -77,7 +77,7 @@ export function HomeScreen() {
       ) : null}
 
       {followedEvents.length > 0 ? (
-        <section className="section" aria-labelledby="seguindo-titulo">
+        <section className="section enter" aria-labelledby="seguindo-titulo">
           <div className="section__head">
             <h2 id="seguindo-titulo" className="section__title">
               {t('Eventos dos rolês que você segue')}
@@ -92,7 +92,7 @@ export function HomeScreen() {
       ) : null}
 
       {sponsoredEvents.length > 0 ? (
-        <section className="section" aria-labelledby="patrocinado-titulo">
+        <section className="section enter" aria-labelledby="patrocinado-titulo">
           <div className="section__head">
             <h2 id="patrocinado-titulo" className="section__title">
               {t('Rolês em destaque')}
@@ -113,7 +113,7 @@ export function HomeScreen() {
             {t('Posts de quem você segue')}
           </h2>
         </div>
-        <PostList dateRail load={(offset, before) => api.homeFeed({ limit: 6, offset }, before)} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os de quem você segue aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
+        <PostList dateRail enter load={(offset, before) => api.homeFeed({ limit: 6, offset }, before)} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os de quem você segue aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
       </section>
     </PullRefresh>
   );

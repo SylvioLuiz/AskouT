@@ -57,7 +57,7 @@ function FollowSource({ source }: { source: RecommendationSource | null }) {
       {state === 'PENDING' ? (
         <span className="foryou__followed">Pedido enviado para {label}</span>
       ) : (
-        <Button small variant="secondary" loading={busy} onClick={() => void follow()} aria-label={t('Seguir {label}', { label })}>
+        <Button small variant="secondary" loading={busy} onClick={() => follow()} aria-label={t('Seguir {label}', { label })}>
           Seguir {label}
         </Button>
       )}
@@ -114,7 +114,7 @@ export function ForYou({ reloadKey }: { reloadKey?: string }) {
   }, [me, reloadKey]);
   if (items.length === 0) return null;
   return (
-    <section className="foryou" aria-labelledby="foryou-titulo">
+    <section className="foryou enter" aria-labelledby="foryou-titulo">
       <h2 id="foryou-titulo" className="section__title">{t('Para você')}</h2>
       <ul className="foryou__list">
         {items.map((item) => (item.type === 'EVENT' && item.event ? <EventReco key={`e${item.event.id}`} item={item} /> : item.post ? <PostReco key={`p${item.post.id}`} item={item} /> : null))}

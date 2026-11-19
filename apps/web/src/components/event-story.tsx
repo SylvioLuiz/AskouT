@@ -107,10 +107,10 @@ export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: str
       <div className="storysheet__actions">
         {file ? (
           <>
-            <Button loading={busy} onClick={() => void publish(true)}>
+            <Button loading={busy} onClick={() => publish(true)}>
               {t('Sim, no evento e no perfil')}
             </Button>
-            <Button variant="secondary" disabled={busy} onClick={() => void publish(false)}>
+            <Button variant="secondary" disabled={busy} onClick={() => publish(false)}>
               {t('Não, só no evento')}
             </Button>
           </>

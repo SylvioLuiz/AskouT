@@ -631,7 +631,7 @@ export function CreatePostScreen() {
         </div>
 
         <div className="compose__footer">
-          <Button full loading={busy} disabled={missing.length > 0 || captionLength > POST_CAPTION_MAX} onClick={() => void publish()}>
+          <Button full loading={busy} disabled={missing.length > 0 || captionLength > POST_CAPTION_MAX} onClick={() => publish()}>
             {t('Criar evento')}
           </Button>
           {missingText ? <p className="evmissing">{missingText}</p> : null}
@@ -824,7 +824,7 @@ export function CreatePostScreen() {
         </ul>
 
         <div className="compose__footer">
-          <Button full loading={busy} disabled={captionLength > POST_CAPTION_MAX} onClick={() => void publish()}>
+          <Button full loading={busy} disabled={captionLength > POST_CAPTION_MAX} onClick={() => publish()}>
             {kind === 'EVENT' ? t('Criar evento') : t('Compartilhar')}
           </Button>
         </div>

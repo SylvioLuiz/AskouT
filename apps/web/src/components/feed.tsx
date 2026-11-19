@@ -360,7 +360,7 @@ function ComposeSheet({ where, targetId, settings, onClose, onCreated }: { where
       ) : null}
       <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => void pick(e)} aria-label={t('Escolher fotos do aparelho')} />
       {message ? <Notice tone="error">{message}</Notice> : null}
-      <Button full loading={busy} disabled={empty || length > FEED_BODY_MAX} onClick={() => void publish()}>
+      <Button full loading={busy} disabled={empty || length > FEED_BODY_MAX} onClick={() => publish()}>
         {settings.needsApproval ? t('Enviar para aprovação') : t('Publicar')}
       </Button>
     </Sheet>
@@ -708,7 +708,7 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
         ))}
       </ul>
       {cursor ? (
-        <Button variant="quiet" small onClick={() => void load(cursor)}>
+        <Button variant="quiet" small onClick={() => load(cursor)}>
           {t('Ver mais comentários')}
         </Button>
       ) : null}
@@ -874,7 +874,7 @@ export function Feed({ where, targetId, intro, openPostId, openPending, onSettin
       {error && items.length > 0 ? <ErrorState message={error.message} onRetry={() => void load(cursor)} /> : null}
       {cursor ? (
         <div ref={sentinel} className="feed__more">
-          {loading ? <Loading /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => void load(cursor)}>{t('Carregar mais')}</Button> : null}
+          {loading ? <Loading /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => load(cursor)}>{t('Carregar mais')}</Button> : null}
         </div>
       ) : null}
 

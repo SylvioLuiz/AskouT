@@ -85,7 +85,7 @@ export function PushCard({ hideInstallHint = false }: { hideInstallHint?: boolea
         {t('Mensagens, convites e encontros chegam como notificação, mesmo com o AskouT fechado.')}
       </p>
       <div className="row-actions">
-        <Button small loading={busy} onClick={() => void toggle(true)}>
+        <Button small loading={busy} onClick={() => toggle(true)}>
           {t('Ativar avisos')}
         </Button>
       </div>
@@ -186,7 +186,7 @@ export function PushTestCard() {
         <h3 className="setting__title">{t('Testar avisos')}</h3>
         <p className="setting__help">{t('Manda um aviso para os seus aparelhos 5 segundos depois de tocar. Minimize o app nesse meio tempo para ver a notificação chegar com a prévia.')}</p>
         <div className="row-actions">
-          <Button small variant="secondary" loading={busy} onClick={() => void send()}>
+          <Button small variant="secondary" loading={busy} onClick={() => send()}>
             {t('Enviar teste')}
           </Button>
         </div>

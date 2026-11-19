@@ -181,10 +181,10 @@ export function VenueCalendarScreen({ venueId }: { venueId: string }) {
                 </p>
                 <p className={calendar.lastError ? 'calsec__hint calsec__hint--bad' : 'calsec__hint'}>{syncLabel(calendar, now)}</p>
                 <div className="calsec__row">
-                  <Button small variant="secondary" loading={busy === 'sync'} onClick={() => void run('sync', () => api.syncCalendar(venueId), t('Agenda atualizada.'))}>
+                  <Button small variant="secondary" loading={busy === 'sync'} onClick={() => run('sync', () => api.syncCalendar(venueId), t('Agenda atualizada.'))}>
                     {t('Atualizar agora')}
                   </Button>
-                  <Button small variant="secondary" loading={busy === 'toggle'} onClick={() => void run('toggle', () => api.saveCalendar(venueId, { enabled: !calendar.enabled }))}>
+                  <Button small variant="secondary" loading={busy === 'toggle'} onClick={() => run('toggle', () => api.saveCalendar(venueId, { enabled: !calendar.enabled }))}>
                     {calendar.enabled ? t('Pausar') : t('Ligar')}
                   </Button>
                   <Button small variant="secondary" onClick={() => setChanging(true)}>
@@ -240,7 +240,7 @@ export function VenueCalendarScreen({ venueId }: { venueId: string }) {
               <Wheel label={t('Dias de antecedência')} values={CALENDAR_LEAD_VALUES} value={shownLead} onChange={setLead} format={leadLabel} />
             </div>
             {calendar && lead !== undefined && lead !== calendar.leadDays ? (
-              <Button small loading={busy === 'lead'} onClick={() => void run('lead', async () => { const res = await api.saveCalendar(venueId, { leadDays: lead }); setLead(undefined); return res; }, t('Pronto: os eventos sobem {lead} antes.', { lead: leadLabel(lead) }))}>
+              <Button small loading={busy === 'lead'} onClick={() => run('lead', async () => { const res = await api.saveCalendar(venueId, { leadDays: lead }); setLead(undefined); return res; }, t('Pronto: os eventos sobem {lead} antes.', { lead: leadLabel(lead) }))}>
                 {t('Salvar')}
               </Button>
             ) : null}

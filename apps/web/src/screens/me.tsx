@@ -542,7 +542,7 @@ function MyDataSection() {
         <p className="setting__help">{t('Baixe uma cópia do que o AskouT guarda sobre você, ou apague a sua conta.')}</p>
       </div>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      <Button variant="secondary" loading={busy} onClick={() => void download()}>
+      <Button variant="secondary" loading={busy} onClick={() => download()}>
         {t('Baixar meus dados')}
       </Button>
       <Link className="btn btn--quiet btn--danger-text" to="/privacidade/apagar-conta">
@@ -607,7 +607,7 @@ function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: ()
         </button>
       </section>
       <div className="setting__actions">
-        <Button variant="quiet" small loading={busy} onClick={() => void erase()}>
+        <Button variant="quiet" small loading={busy} onClick={() => erase()}>
           {t('Apagar meu histórico de tempo na tela')}
         </Button>
       </div>
@@ -680,7 +680,7 @@ function RegionSetting({ userId }: { userId: string }) {
         <Button variant="secondary" small loading={busy} disabled={!personalizing} onClick={useHere}>
           {current ? t('Atualizar com minha localização atual') : t('Usar minha localização atual')}
         </Button>
-        {current ? <Button variant="quiet" small disabled={busy} onClick={() => void remove()}>{t('Apagar minha região')}</Button> : null}
+        {current ? <Button variant="quiet" small disabled={busy} onClick={() => remove()}>{t('Apagar minha região')}</Button> : null}
       </div>
     </>
   );

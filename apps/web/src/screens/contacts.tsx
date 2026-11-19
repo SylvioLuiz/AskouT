@@ -125,7 +125,7 @@ export function ContactsScreen() {
             </Button>
           ) : null}
           {!native && picker ? (
-            <Button loading={busy} onClick={() => void run(pickContacts)}>
+            <Button loading={busy} onClick={() => run(pickContacts)}>
               {t('Escolher contatos')}
             </Button>
           ) : null}
@@ -171,7 +171,7 @@ export function ContactsScreen() {
           <>
             {notFollowed.length > 1 ? (
               <div>
-                <Button variant="secondary" small loading={followingAll} onClick={() => void followAll(notFollowed)}>
+                <Button variant="secondary" small loading={followingAll} onClick={() => followAll(notFollowed)}>
                   {t('Seguir todos ({n})', { n: notFollowed.length })}
                 </Button>
               </div>
@@ -186,7 +186,7 @@ export function ContactsScreen() {
                     followed[p.userId] ? (
                       <span className="muted">{followed[p.userId] === 'PENDING' ? t('Pedido enviado') : t('Seguindo')}</span>
                     ) : (
-                      <Button small loading={followingBusy === p.userId} disabled={followingAll} onClick={() => void follow(p)}>
+                      <Button small loading={followingBusy === p.userId} disabled={followingAll} onClick={() => follow(p)}>
                         {t('Seguir')}
                       </Button>
                     )

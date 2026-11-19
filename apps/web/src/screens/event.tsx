@@ -81,7 +81,7 @@ function EventMenuSheet({ page, onShare, onEdit, onClose }: { page: EventPage; o
       {message ? <Notice tone="error">{message}</Notice> : null}
       <div className="sheetactions">
       {canEdit ? (
-        <Button full variant="secondary" loading={opening} onClick={() => void edit()}>
+        <Button full variant="secondary" loading={opening} onClick={() => edit()}>
           <EditIcon /> {t('Editar evento')}
         </Button>
       ) : null}
@@ -296,7 +296,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
               <>
                 {/* "Eu vou" e "Criar encontro" lado a lado quando os dois existem. */}
                 <div className="evgo">
-                  <Button full variant={e.going ? 'secondary' : 'primary'} loading={goBusy} onClick={() => void toggleGoing()} aria-pressed={e.going}>
+                  <Button full variant={e.going ? 'secondary' : 'primary'} loading={goBusy} onClick={() => toggleGoing()} aria-pressed={e.going}>
                     {e.going ? (
                       <>
                         <CheckIcon /> {t('Você vai')}
