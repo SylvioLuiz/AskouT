@@ -18,7 +18,7 @@ const config = app.get<AppConfig>(CONFIG);
 // Posts levam até 5 fotos já reduzidas (≤100 KB cada, em base64) e o pedido de reivindicação leva um documento de até 2 MB (~2,7 MB em base64):
 // o limite padrão (100 KB) não basta.
 app.useBodyParser('json', { limit: '3mb' });
-// Fotos e vídeos da conversa chegam como arquivo cru (sem base64): até 20 MB, só desses tipos.
+// Fotos e vídeos (conversa, story, post) chegam como arquivo cru (sem base64): até 60 MB, só desses tipos.
 app.useBodyParser('raw', { type: ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'], limit: '61mb' });
 // Atrás do proxy da hospedagem, o IP do cliente vem do cabeçalho X-Forwarded-For; sem isso o limite contaria o IP do proxy.
 if (config.trustProxyHops > 0) app.set('trust proxy', config.trustProxyHops);
