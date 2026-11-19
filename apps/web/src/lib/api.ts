@@ -74,6 +74,8 @@ import type {
   VenueStorySettings,
   FeedComment,
   GifResults,
+  GuestListOwnerView,
+  GuestListView,
   FeedPage,
   FeedPolicy,
   FeedPost,
@@ -612,6 +614,15 @@ export function createApi(deps: ApiDeps) {
     reactFeedComment: (commentId: string, emoji: string | null) => request<FeedReactions>('PUT', `/feed/comments/${id(commentId)}/reaction`, { body: { emoji } }),
     reportFeedPost: (postId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/feed/posts/${id(postId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
     reportFeedComment: (commentId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/feed/comments/${id(commentId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+
+    // Lista VIP (nome na lista) dos eventos de locais
+    guestList: (eventId: string) => request<GuestListView>('GET', `/events/${id(eventId)}/guest-list`),
+    joinGuestList: (eventId: string, companions: number) => request<GuestListView>('POST', `/events/${id(eventId)}/guest-list/join`, { body: { companions } }),
+    leaveGuestList: (eventId: string) => request<GuestListView>('DELETE', `/events/${id(eventId)}/guest-list/join`),
+    configureGuestList: (eventId: string, input: { enabled: boolean; limit?: number | null; closesAt?: string | null; maxCompanions?: number }) => request<GuestListView>('PUT', `/events/${id(eventId)}/guest-list`, { body: input }),
+    guestListEntries: (eventId: string) => request<GuestListOwnerView>('GET', `/events/${id(eventId)}/guest-list/entries`),
+    checkInGuest: (eventId: string, userId: string, checkedIn: boolean) => request<GuestListOwnerView>('PUT', `/events/${id(eventId)}/guest-list/entries/${id(userId)}/check-in`, { body: { checkedIn } }),
+    exportGuestList: (eventId: string) => request<{ filename: string; csv: string }>('GET', `/events/${id(eventId)}/guest-list/export`),
 
     // Locais (painel do local)
     myVenues: () => request<MyVenues>('GET', '/me/venues'),

@@ -469,7 +469,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST';
 
 /** O que a pessoa silenciou no push (o aviso continua no sino). `all` vale para tudo; `chats` e `events` só para o seu grupo de avisos. */
 export interface NotificationMuteSettings {
@@ -1353,4 +1353,25 @@ export interface VenueOfferRecord {
   endsAt: Date;
   /** Preenchido quando o responsável encerra antes do fim. */
   endedAt: Date | null;
+}
+
+/** Lista VIP de um evento de local: ligada por quem administra o local, sem pagamento. */
+export interface GuestListRecord {
+  eventId: string;
+  /** Quantos nomes cabem (sem contar acompanhantes). Nulo: sem limite. */
+  limit: number | null;
+  /** Depois deste horário ninguém entra nem muda o nome. Nulo: até o fim do evento. */
+  closesAt: Date | null;
+  /** Quantos acompanhantes cada pessoa pode levar (0 a 5). */
+  maxCompanions: number;
+  createdAt: Date;
+}
+
+export interface GuestListEntryRecord {
+  eventId: string;
+  userId: string;
+  companions: number;
+  /** Quando o dono marcou que a pessoa entrou. */
+  checkedInAt: Date | null;
+  createdAt: Date;
 }

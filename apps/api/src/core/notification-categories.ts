@@ -23,7 +23,7 @@ const FILTERS: Record<Exclude<NotificationCategory, 'all'>, NotificationFilter> 
   likes: [{ types: ['POST_LIKE', 'FEED_REACTION'] }],
   follows: [{ types: ['FOLLOW_REQUEST', 'FOLLOW_ACCEPTED', 'FOLLOW_NEW'] }],
   invites: [{ types: ['MEETUP_INVITE', 'MEETUP_ACCEPTED', 'MEETUP_CANCELLED', 'FLASH_INVITE'] }],
-  events: [{ types: ['EVENT_REMINDER', 'ALBUM_SUMMARY', 'VENUE_CALENDAR', 'VENUE_EVENT', 'FEED_NOTICE'] }],
+  events: [{ types: ['EVENT_REMINDER', 'ALBUM_SUMMARY', 'VENUE_CALENDAR', 'VENUE_EVENT', 'FEED_NOTICE', 'GUEST_LIST'] }],
   messages: [{ types: ['MESSAGE', 'GROUP_REMOVED'] }],
 };
 

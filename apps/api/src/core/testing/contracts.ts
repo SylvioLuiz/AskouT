@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { ReferralRepository, AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, VenueStoryRepository, OfferRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+import type { ReferralRepository, AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, VenueStoryRepository, OfferRepository, EventRoomRepository, FeedRepository, GuestListRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
   CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
 import type { VenueOfferRecord, DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -41,6 +41,7 @@ export interface RepoHarness {
   albums: AlbumRepository;
   venueStories: VenueStoryRepository;
   feed: FeedRepository;
+  guestLists: GuestListRepository;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
@@ -2361,6 +2362,42 @@ export function defineRepositoryContract(
         assert.equal(await h.posts.delete(userEventId, ana), true);
         assert.equal(await h.feed.countPosts(userT, 'PUBLISHED'), 0);
         assert.equal(await h.feed.findPost('nao-e-uuid'), undefined);
+      });
+
+      it('lista VIP: liga e ajusta, nomes com acompanhantes, limite, sair, marcar entrada e cascata', async () => {
+        const { ana, bia, caio, e } = await setup();
+        assert.equal(await h.guestLists.get(e.id), undefined);
+        assert.equal(await h.guestLists.upsert({ eventId: randomUUID(), limit: null, closesAt: null, maxCompanions: 0, createdAt: at(1) }), false, 'evento inexistente');
+        assert.equal(await h.guestLists.upsert({ eventId: e.id, limit: 2, closesAt: at(3), maxCompanions: 2, createdAt: at(1) }), true);
+        assert.deepEqual(await h.guestLists.get(e.id), { eventId: e.id, limit: 2, closesAt: at(3), maxCompanions: 2, createdAt: at(1) });
+        assert.equal(await h.guestLists.upsert({ eventId: e.id, limit: null, closesAt: null, maxCompanions: 1, createdAt: at(9) }), true);
+        const adjusted = (await h.guestLists.get(e.id))!;
+        assert.deepEqual([adjusted.limit, adjusted.closesAt, adjusted.maxCompanions, adjusted.createdAt.getTime()], [null, null, 1, at(1).getTime()], 'ajustar mantém a data em que a lista nasceu');
+        await h.guestLists.upsert({ eventId: e.id, limit: 2, closesAt: null, maxCompanions: 3, createdAt: at(1) });
+        assert.equal(await h.guestLists.join({ eventId: e.id, userId: ana, companions: 1, at: at(10) }, 2), 'created');
+        assert.equal(await h.guestLists.join({ eventId: e.id, userId: bia, companions: 0, at: at(11) }, 2), 'created');
+        assert.equal(await h.guestLists.join({ eventId: e.id, userId: caio, companions: 0, at: at(12) }, 2), 'full');
+        assert.equal(await h.guestLists.join({ eventId: e.id, userId: ana, companions: 3, at: at(13) }, 2), 'updated', 'quem já está muda os acompanhantes mesmo com a lista cheia');
+        assert.equal(await h.guestLists.count(e.id), 2);
+        assert.deepEqual((await h.guestLists.list(e.id)).map((r) => [r.userId, r.companions, r.checkedInAt]), [[ana, 3, null], [bia, 0, null]], 'ordem de chegada');
+        assert.equal((await h.guestLists.find(e.id, ana))?.createdAt.getTime(), at(10).getTime(), 'mudar não troca a data de entrada');
+        assert.equal(await h.guestLists.find(e.id, caio), undefined);
+        assert.equal(await h.guestLists.setCheckedIn(e.id, bia, at(20)), true);
+        assert.equal((await h.guestLists.find(e.id, bia))?.checkedInAt?.getTime(), at(20).getTime());
+        assert.equal(await h.guestLists.setCheckedIn(e.id, bia, null), true);
+        assert.equal((await h.guestLists.find(e.id, bia))?.checkedInAt, null);
+        assert.equal(await h.guestLists.setCheckedIn(e.id, caio, at(20)), false, 'quem não está na lista');
+        assert.equal(await h.guestLists.leave(e.id, bia), true);
+        assert.equal(await h.guestLists.leave(e.id, bia), false);
+        assert.equal(await h.guestLists.join({ eventId: e.id, userId: caio, companions: 0, at: at(14) }, 2), 'created', 'a vaga voltou');
+        assert.equal(await h.guestLists.remove(e.id), true, 'desligar apaga a lista e os nomes');
+        assert.deepEqual([await h.guestLists.get(e.id), await h.guestLists.count(e.id), await h.guestLists.find(e.id, ana)], [undefined, 0, undefined]);
+        assert.equal(await h.guestLists.remove(e.id), false);
+        // apagar o evento leva a lista junto, como no banco
+        await h.guestLists.upsert({ eventId: e.id, limit: null, closesAt: null, maxCompanions: 0, createdAt: at(1) });
+        await h.guestLists.join({ eventId: e.id, userId: ana, companions: 0, at: at(10) }, null);
+        await h.places.deleteEvent(e.venueId, e.id);
+        assert.equal(await h.guestLists.get(e.id), undefined);
       });
 
       it('mensagem de evento guarda o evento; encontros do usuário listados do mais recente', async () => {
