@@ -268,3 +268,20 @@ test('ocultar stories entre amigos: não ver os dela e não deixar ela ver os me
   await rejectsWith(w.core.eventPages.setStoryVisibility(ana, bia, { hideMine: 'sim' }), 'VALIDATION');
   await rejectsWith(w.core.eventPages.setStoryVisibility(ana, '00000000-0000-4000-8000-000000000000', { hideMine: true }), 'NOT_FOUND');
 });
+
+test('reagir a um story: amiga recebe na conversa; quem não é amigo manda um aviso; o próprio story e emoji inválido são recusados', async () => {
+  const { w, ana, bia, caio, duda } = await setup();
+  for (const who of [ana, bia, caio, duda]) await w.core.eventPages.go(who, 'e1');
+  const story = (await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), true)).items[0]!.id;
+
+  const viaHome = await w.core.storyReactions.react(ana, story, '🔥');
+  assert.ok(viaHome.conversationId, 'amigas: vira mensagem');
+  const chat = await w.core.conversations.messages(bia, viaHome.conversationId!);
+  assert.equal(chat.messages.at(-1)?.body, 'Reagiu ao seu story: 🔥');
+
+  const viaEvent = await w.core.storyReactions.react(duda, story, '❤️', 'e1');
+  assert.equal(viaEvent.conversationId, null, 'não são amigas: só o aviso');
+  await rejectsWith(w.core.storyReactions.react(duda, story, '❤️'), 'NOT_FOUND');
+  await rejectsWith(w.core.storyReactions.react(bia, story, '❤️', 'e1'), 'FORBIDDEN');
+  await rejectsWith(w.core.storyReactions.react(ana, story, 'oi'), 'VALIDATION');
+});

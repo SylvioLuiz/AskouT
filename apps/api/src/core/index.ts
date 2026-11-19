@@ -4,6 +4,7 @@ import { AuthService } from './auth-service.ts';
 import { BlockService } from './block-service.ts';
 import { FlashService } from './flash-service.ts';
 import { ConversationService } from './conversation-service.ts';
+import { StoryReactionService } from './story-reaction-service.ts';
 import { FollowService } from './follow-service.ts';
 import { MeetupService } from './meetup-service.ts';
 import { SchedulingService } from './scheduling-service.ts';
@@ -56,6 +57,7 @@ export function createCore(input: CoreInput) {
   const auth = new AuthService(deps);
   const posts = new PostService(deps, profiles);
   const eventPages = new EventPageService(deps, profiles);
+  const conversations = new ConversationService(deps);
   const interests = new InterestService(deps);
   const match = new MatchService(deps, interests);
   const paymentsSwitch = new PaymentsSwitch(deps, input.boostsEnabled ?? true);
@@ -77,7 +79,8 @@ export function createCore(input: CoreInput) {
     blocks: new BlockService(deps),
     availability: new AvailabilityService(deps),
     flash,
-    conversations: new ConversationService(deps),
+    conversations,
+    storyReactions: new StoryReactionService(deps, eventPages, conversations),
     suggestions: new SuggestionService(deps, flash),
     explore: new ExploreService(deps, profiles, boosts),
     eventPages,

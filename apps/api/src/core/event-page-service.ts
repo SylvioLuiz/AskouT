@@ -561,6 +561,25 @@ export class EventPageService {
     return { reported: true };
   }
 
+  /**
+   * O story que `viewerId` pode reagir: no ar, visível para ele e de outra pessoa.
+   * Com `rawEventId`, vem da página do evento; sem, da página inicial (stories do perfil).
+   */
+  async reactableStory(viewerId: string, storyId: unknown, rawEventId?: unknown): Promise<{ authorId: string; eventUrl: string }> {
+    let story: EventStoryMeta;
+    if (rawEventId === undefined) {
+      story = await this.profileStoryFor(viewerId, storyId);
+    } else {
+      const { ref } = await this.resolve(viewerId, rawEventId);
+      const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
+      const found = typeof storyId === 'string' && storyId.length <= 64 ? (await this.visibleStories(viewerId, ref, hidden)).find((s) => s.id === storyId) : undefined;
+      if (!found) throw notFound('Story não encontrado');
+      story = found;
+    }
+    if (story.userId === viewerId) throw forbidden('Este story é seu');
+    return { authorId: story.userId, eventUrl: `/eventos/${story.ref.id}` };
+  }
+
   /** Publica um story. Só quem confirmou presença (ou o dono), enquanto o evento não acabou. Foto até 2 MB ou vídeo até 60 MB. */
   async createStory(viewerId: string, rawId: unknown, contentType: unknown, bytes: unknown, onProfile?: unknown): Promise<EventStoryGroupView> {
     const { ref, owner } = await this.resolve(viewerId, rawId);

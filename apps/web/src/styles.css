@@ -1781,6 +1781,7 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 
 .sheet__panel {
   width: 100%;
+  color: var(--ink);
   max-width: 520px;
   max-height: calc(92dvh - env(safe-area-inset-top));
   overflow-y: auto;
@@ -5068,7 +5069,17 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .storyview--placed::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 220px; z-index: 2; background: linear-gradient(to top, rgb(0 0 0 / 0.55), transparent); pointer-events: none; }
 .storyview--placed .storyview__tap { bottom: 132px; }
 .storyview--placed .soundtoggle { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 112px); }
-.storyview--placed .storyview__error { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 120px); }
+/* Reações rápidas no pé do story (à esquerda do botão de som). */
+.storyreact { position: absolute; left: 12px; right: 64px; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 4; display: flex; justify-content: space-between; gap: 4px; max-width: 360px; }
+.storyreact__btn { flex: 1; min-width: 40px; height: 44px; padding: 0; border: 0; border-radius: 999px; background: rgb(0 0 0 / 0.35); font-size: 1.5rem; line-height: 1; cursor: pointer; transition: transform 120ms ease; -webkit-tap-highlight-color: transparent; }
+.storyreact__btn:active { transform: scale(1.25); }
+.storyreact__btn:disabled { opacity: 0.6; cursor: default; }
+.storyreact__btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.storyreact__sent { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; font-weight: 600; text-shadow: 0 1px 6px rgb(0 0 0 / 0.6); pointer-events: none; }
+.storyreact__burst { font-size: 5rem; line-height: 1; animation: heart-burst 900ms ease-out forwards; }
+.storyview--placed .storyreact { bottom: calc(max(14px, env(safe-area-inset-bottom)) + 96px); }
+.storyview .storyview__error { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 56px); }
+.storyview--placed .storyview__error { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 150px); }
 .storyplace { position: absolute; left: 12px; right: 12px; bottom: max(14px, env(safe-area-inset-bottom)); z-index: 3; display: flex; align-items: center; gap: 12px; min-height: 84px; padding: 10px 10px 10px 10px; border: 1px solid rgb(255 255 255 / 0.14); border-radius: 20px; background: rgb(18 18 22 / 0.5); color: #fff; text-decoration: none; -webkit-backdrop-filter: blur(18px) saturate(140%); backdrop-filter: blur(18px) saturate(140%); box-shadow: 0 8px 28px rgb(0 0 0 / 0.28); transition: transform 160ms ease, background-color 160ms ease; -webkit-tap-highlight-color: transparent; }
 .storyplace:active { transform: scale(0.985); background: rgb(18 18 22 / 0.62); }
 .storyplace:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }

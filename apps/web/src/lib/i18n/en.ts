@@ -2651,4 +2651,6 @@ export const EN: Readonly<Record<string, string>> = {
   "Seu evento privado está pronto. Ele só chega a quem receber nas conversas.": "Your private event is ready. Only people who get it in a chat will see it.",
   "Seu evento está pronto e já aparece no seu perfil.": "Your event is ready and already shows on your profile.",
   "Depois de criar, você escolhe as conversas e grupos que vão receber o evento.": "After creating it, you'll pick the chats and groups that get the event.",
+  "Reagir ao story": "React to story",
+  "Reação enviada para {username}": "Reaction sent to {username}",
 };
