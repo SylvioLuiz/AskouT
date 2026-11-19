@@ -270,10 +270,10 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
             <strong>{post.author.username}</strong> {t('marcou você neste post. Se aceitar, ele aparece no seu perfil e no seu feed.')}
           </p>
           <div className="row-actions">
-            <Button small loading={tagBusy} onClick={() => void answerTag('accept')}>
+            <Button small loading={tagBusy} onClick={() => answerTag('accept')}>
               {t('Aceitar')}
             </Button>
-            <Button small variant="secondary" disabled={tagBusy} onClick={() => void answerTag('decline')}>
+            <Button small variant="secondary" disabled={tagBusy} onClick={() => answerTag('decline')}>
               {t('Recusar')}
             </Button>
           </div>
@@ -580,7 +580,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateR
       {error ? <ErrorState message={error.message} onRetry={() => void more(items.length)} /> : null}
       {page.hasMore ? (
         <div className="more" ref={sentinel}>
-          {loading ? <Loading /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => void more(items.length)}>{t('Carregar mais')}</Button> : null}
+          {loading ? <Loading /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => more(items.length)}>{t('Carregar mais')}</Button> : null}
         </div>
       ) : null}
       {rail}
@@ -647,7 +647,7 @@ export function PostGrid({ username, kind, quiet, onCount }: { username: string;
       </ul>
       {page.hasMore ? (
         <div className="more">
-          <Button variant="secondary" loading={loading} onClick={() => void more(items.length)}>
+          <Button variant="secondary" loading={loading} onClick={() => more(items.length)}>
             {t('Carregar mais')}
           </Button>
         </div>

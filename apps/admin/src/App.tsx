@@ -149,7 +149,7 @@ function LoginScreen({ onLogin, expired }: { onLogin: (u: Admin) => void; expire
             {error}
           </p>
         ) : null}
-        <button type="submit" className="btn btn--primary btn--block login__submit" disabled={busy || (mfaToken ? code.trim() === '' : identifier.trim() === '' || password === '')}>
+        <button type="submit" className="btn btn--primary btn--block login__submit" aria-busy={busy || undefined} disabled={busy || (mfaToken ? code.trim() === '' : identifier.trim() === '' || password === '')}>
           {busy ? 'Entrando…' : mfaToken ? 'Confirmar' : 'Entrar'}
         </button>
         {mfaToken ? (
@@ -242,7 +242,7 @@ function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
           <button type="button" className="btn" onClick={onClose} disabled={busy}>
             Cancelar
           </button>
-          <button type="submit" className="btn btn--primary" disabled={busy || current === '' || next === '' || next !== repeat}>
+          <button type="submit" className="btn btn--primary" aria-busy={busy || undefined} disabled={busy || current === '' || next === '' || next !== repeat}>
             {busy ? 'Aguarde…' : 'Trocar senha'}
           </button>
         </div>

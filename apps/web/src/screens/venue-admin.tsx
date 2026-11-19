@@ -313,7 +313,7 @@ export function VenueTeamScreen({ venueId }: { venueId: string }) {
             {t('Convidar pessoa')}
           </h2>
           <Field label={t('@usuário')} value={username} onChange={setUsername} autoComplete="off" maxLength={40} hint={t('A pessoa recebe um aviso e só entra na equipe se aceitar.')} />
-          <Button full loading={busy} disabled={username.trim() === ''} onClick={() => void invite()}>
+          <Button full loading={busy} disabled={username.trim() === ''} onClick={() => invite()}>
             {t('Enviar convite')}
           </Button>
         </section>

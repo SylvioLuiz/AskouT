@@ -41,7 +41,7 @@ export function InviteSheet({ onClose }: { onClose: () => void }) {
         <a className="btn btn--primary btn--full" href={whatsappUrl(text, url)} target="_blank" rel="noopener noreferrer">
           {t('Enviar pelo WhatsApp')}
         </a>
-        <Button full variant="secondary" onClick={() => void shareOrCopy()}>
+        <Button full variant="secondary" onClick={() => shareOrCopy()}>
           {typeof navigator.share === 'function' ? t('Compartilhar link') : t('Copiar link')}
         </Button>
       </div>

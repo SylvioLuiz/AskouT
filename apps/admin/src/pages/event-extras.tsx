@@ -96,7 +96,7 @@ function ExtraForm({ icons, initial, onClose, onSaved }: { icons: string[]; init
         <button type="button" className="btn" onClick={onClose} disabled={busy}>
           Cancelar
         </button>
-        <button type="button" className="btn btn--primary" onClick={() => void save()} disabled={!ready}>
+        <button type="button" className="btn btn--primary" onClick={() => void save()} disabled={!ready || busy} aria-busy={busy || undefined}>
           {busy ? 'Aguarde…' : initial ? 'Salvar' : 'Cadastrar'}
         </button>
       </div>

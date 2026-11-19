@@ -105,7 +105,7 @@ export function ActivityLog({ filter }: { filter: ActivityFilter }) {
       ))}
       {moreError ? <p className="muted" role="alert">{moreError}</p> : null}
       {firstPage && cursor ? (
-        <Button full variant="secondary" loading={loadingMore} onClick={() => void loadMore()}>
+        <Button full variant="secondary" loading={loadingMore} onClick={() => loadMore()}>
           {t('Carregar mais')}
         </Button>
       ) : null}

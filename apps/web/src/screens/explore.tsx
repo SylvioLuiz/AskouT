@@ -221,7 +221,7 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
             </span>
           </span>
         </button>
-        <Button small variant={following ? 'quiet' : 'primary'} loading={busy} onClick={() => void toggleFollow()}>
+        <Button small variant={following ? 'quiet' : 'primary'} loading={busy} onClick={() => toggleFollow()}>
           {following ? t('Seguindo') : t('Seguir')}
         </Button>
         <div className="placerow__actions">
@@ -253,7 +253,7 @@ function PlaceRow({ place }: { place: ExplorePlace }) {
       </p>
       {problem ? <p className="field__error">{problem}</p> : null}
       <div className="sugcard__actions">
-        <Button small loading={opening} onClick={() => void openPage()}>
+        <Button small loading={opening} onClick={() => openPage()}>
           {t('Ver página')}
         </Button>
         <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={place.lat} lng={place.lng} label={place.name}>

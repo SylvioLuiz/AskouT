@@ -110,7 +110,7 @@ export function LinkedAccountsScreen() {
                             : t('Você não vai mais conseguir entrar com essa conta {provider}.', { provider: providerLabel(provider) })}
                         </p>
                         <div className="linked__actions">
-                          <Button small variant="danger" loading={busy} onClick={() => void unlink(provider)}>
+                          <Button small variant="danger" loading={busy} onClick={() => unlink(provider)}>
                             {t('Desvincular {provider}', { provider: providerLabel(provider) })}
                           </Button>
                           <Button small variant="quiet" onClick={() => setConfirming(undefined)} disabled={busy}>

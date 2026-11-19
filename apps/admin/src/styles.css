@@ -83,6 +83,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 14px; cursor: pointer; min-height: 34px; }
 .btn:hover:not(:disabled) { border-color: var(--muted); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Ação em andamento: o texto some e um spinner gira no lugar, sem mudar o tamanho do botão. */
+.btn[aria-busy='true'] { position: relative; cursor: progress; opacity: 0.85; -webkit-text-fill-color: transparent; }
+.btn[aria-busy='true'] > * { visibility: hidden; }
+.btn[aria-busy='true']::before { content: ''; position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; box-sizing: border-box; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: btn-spin 0.7s linear infinite; pointer-events: none; }
+@keyframes btn-spin { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
 .btn--primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); font-weight: 600; }
 .btn--danger { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
 .btn--danger-quiet { color: var(--danger); }

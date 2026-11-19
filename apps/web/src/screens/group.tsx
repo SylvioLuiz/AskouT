@@ -186,7 +186,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
                   <input ref={fileRef} type="file" accept="image/*" aria-label={data.imageUrl ? t('Trocar foto do grupo') : t('Adicionar foto do grupo')} onChange={(e) => void pickPhoto(e.target.files?.[0])} />
                 </span>
                 {data.imageUrl ? (
-                  <Button small variant="quiet" onClick={() => void act(() => api.setGroupPhoto(conversationId, null))}>
+                  <Button small variant="quiet" onClick={() => act(() => api.setGroupPhoto(conversationId, null))}>
                     {t('Remover foto')}
                   </Button>
                 ) : null}
@@ -194,7 +194,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
             </div>
             <div className="groupedit__form">
               <Field label={t('Nome do grupo')} value={name} onChange={setName} maxLength={60} />
-              <Button full loading={busy} disabled={name.trim() === '' || name.trim() === data.name} onClick={() => void act(() => api.renameGroup(conversationId, name.trim()))}>
+              <Button full loading={busy} disabled={name.trim() === '' || name.trim() === data.name} onClick={() => act(() => api.renameGroup(conversationId, name.trim()))}>
                 {t('Salvar nome')}
               </Button>
             </div>
@@ -261,7 +261,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
             {memberOf(sheet.block)?.profile.displayName ?? t('Essa pessoa')} deixa de ver você e você deixa de ver essa pessoa, inclusive neste grupo. Vocês deixam de se seguir. Dá para desbloquear depois nas configurações.
           </p>
           {problem ? <p className="sugcard__problem" role="alert">{problem}</p> : null}
-          <Button full variant="danger" loading={busy} onClick={() => void act(() => api.block(sheet.block))}>
+          <Button full variant="danger" loading={busy} onClick={() => act(() => api.block(sheet.block))}>
             {t('Bloquear')}
           </Button>
         </Sheet>
@@ -271,7 +271,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         <Sheet title={t('Adicionar ao grupo')} onClose={() => setSheet(undefined)}>
           <FriendPicker picked={picked} onToggle={(userId) => setPicked((cur) => toggleId(cur, userId))} exclude={data.members.map((m) => m.profile.userId)} />
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
-          <Button full loading={busy} disabled={picked.length === 0} onClick={() => void act(() => api.addGroupMembers(conversationId, picked))}>
+          <Button full loading={busy} disabled={picked.length === 0} onClick={() => act(() => api.addGroupMembers(conversationId, picked))}>
             {picked.length > 1 ? t('Adicionar {length} pessoas', { length: picked.length }) : t('Adicionar')}
           </Button>
         </Sheet>
@@ -283,7 +283,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
             {t('Você deixa de ver as mensagens do grupo e sai dos encontros dele.')}{isOwner && data.members.length > 1 ? t(' Outra pessoa passa a administrar o grupo.') : ''} {t('Para voltar, só com um novo convite.')}
           </p>
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
-          <Button full variant="danger" loading={busy} onClick={() => void act(() => api.leaveGroup(conversationId), () => navigate('/conversas'))}>
+          <Button full variant="danger" loading={busy} onClick={() => act(() => api.leaveGroup(conversationId), () => navigate('/conversas'))}>
             {t('Sair do grupo')}
           </Button>
         </Sheet>
@@ -293,7 +293,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         <Sheet title={t('Apagar grupo')} onClose={() => setSheet(undefined)}>
           <p className="muted">{t('O grupo e todas as mensagens dele são apagados para todo mundo, e não dá para desfazer. Os outros participantes recebem um aviso. Os encontros já marcados continuam na agenda de cada um.')}</p>
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
-          <Button full variant="danger" loading={busy} onClick={() => void act(() => api.deleteGroup(conversationId), () => navigate('/conversas'))}>
+          <Button full variant="danger" loading={busy} onClick={() => act(() => api.deleteGroup(conversationId), () => navigate('/conversas'))}>
             {t('Apagar grupo para todos')}
           </Button>
         </Sheet>
@@ -303,7 +303,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         <Sheet title={t('Remover do grupo')} onClose={() => setSheet(undefined)}>
           <p className="muted">{data.members.find((m) => m.profile.userId === sheet.remove)?.profile.displayName ?? t('Essa pessoa')} sai do grupo e dos encontros dele.</p>
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
-          <Button full variant="danger" loading={busy} onClick={() => void act(() => api.removeMember(conversationId, sheet.remove))}>
+          <Button full variant="danger" loading={busy} onClick={() => act(() => api.removeMember(conversationId, sheet.remove))}>
             {t('Remover')}
           </Button>
         </Sheet>

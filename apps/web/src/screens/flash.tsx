@@ -590,7 +590,7 @@ function FlashContent() {
               ))}
             </ul>
             <PrecisionPicker approx={approxAll} onChange={setApproxAll} text={t('Quem aceitar vai ver sua localização enquanto o encontro durar.')} />
-            <Button full loading={callingAll} onClick={() => void callAll()}>
+            <Button full loading={callingAll} onClick={() => callAll()}>
               {t('Enviar convites')}
             </Button>
             <Button full variant="quiet" disabled={callingAll} onClick={() => setCallAllOpen(false)}>

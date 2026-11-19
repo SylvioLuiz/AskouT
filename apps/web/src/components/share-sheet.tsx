@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
 import { CheckIcon, CopyIcon, MailIcon, MoreIcon, SearchIcon, SendIcon, WhatsAppIcon } from './icons.tsx';
-import { Avatar, Button, ErrorState, GroupAvatar, Loading, Notice } from './ui.tsx';
+import { Avatar, Button, ErrorState, GroupAvatar, Loading, Notice, useOnce } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -152,7 +152,8 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
     }
   }
 
-  async function more() {
+  // O menu do aparelho não abre duas vezes: o segundo toque enquanto ele está aberto é ignorado.
+  const [more, sharingNative] = useOnce(async () => {
     if (!link) return;
     setFeedback(undefined);
     try {
@@ -160,7 +161,7 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
     } catch {
       setFeedback({ tone: 'error', text: t('Não foi possível abrir o menu do aparelho. Use "Copiar link".') });
     }
-  }
+  });
 
   /** WhatsApp, Telegram, e-mail: no app nativo a navegação sai para o app certo; no navegador abre outra aba. */
   function external(href: string, newTab = true) {
@@ -282,7 +283,7 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
                   </li>
                   {nativeShareAvailable() ? (
                     <li>
-                      <button type="button" className="sharesheet__action" onClick={() => void more()}>
+                      <button type="button" className="sharesheet__action" disabled={sharingNative} onClick={() => more()}>
                         <span className="sharesheet__bubble">
                           <MoreIcon />
                         </span>

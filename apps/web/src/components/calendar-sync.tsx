@@ -345,7 +345,7 @@ function DevicePicker({ current, onBack, onSaved }: { current: CalendarConnectio
             </fieldset>
           ))
         : null}
-      <Button full loading={saving} disabled={!calendars || chosen.size === 0} onClick={() => void save()}>
+      <Button full loading={saving} disabled={!calendars || chosen.size === 0} onClick={() => save()}>
         {chosen.size > 0 ? t('Sincronizar ({length})', { length: chosen.size }) : t('Sincronizar')}
       </Button>
       <Button variant="quiet" full onClick={onBack}>

@@ -510,10 +510,10 @@ function InviteRow({ invite, onChanged }: { invite: TeamInvite; onChanged: () =>
         <span className="venuerow__sub">{invite.invitedBy ? t('Convite de @{username}', { username: invite.invitedBy.username }) : t('Convite para a equipe')}</span>
       </div>
       <div className="claimrow__actions">
-        <Button small loading={busy === 'yes'} disabled={busy !== undefined} onClick={() => void answer(true)}>
+        <Button small loading={busy === 'yes'} disabled={busy !== undefined} onClick={() => answer(true)}>
           {t('Aceitar')}
         </Button>
-        <Button small variant="quiet" loading={busy === 'no'} disabled={busy !== undefined} onClick={() => void answer(false)}>
+        <Button small variant="quiet" loading={busy === 'no'} disabled={busy !== undefined} onClick={() => answer(false)}>
           {t('Recusar')}
         </Button>
       </div>

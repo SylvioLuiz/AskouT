@@ -151,16 +151,16 @@ export function BoostScreen({ venueId }: { venueId: string }) {
                 <>
                   <label className="boost__code-label" htmlFor={`pix-${b.id}`}>{t('Pix copia e cola')}</label>
                   <textarea id={`pix-${b.id}`} className="boost__code" readOnly rows={3} value={b.payment.pixCode} onFocus={(e) => e.currentTarget.select()} />
-                  <Button small variant="secondary" onClick={() => void copy(b)}>{copied === b.id ? 'Copiado' : t('Copiar código')}</Button>
+                  <Button small variant="secondary" onClick={() => copy(b)}>{copied === b.id ? 'Copiado' : t('Copiar código')}</Button>
                 </>
               ) : null}
               {safePaymentUrl(b.payment.checkoutUrl) ? <a className="btn btn--secondary btn--small" href={safePaymentUrl(b.payment.checkoutUrl)} target="_blank" rel="noopener noreferrer">{t('Abrir pagamento')}</a> : null}
-              {price.sandbox && b.channel === 'WEB' ? <Button small loading={busy} onClick={() => void run(() => api.simulateBoostPayment(b.id))}>{t('Simular pagamento')}</Button> : null}
+              {price.sandbox && b.channel === 'WEB' ? <Button small loading={busy} onClick={() => run(() => api.simulateBoostPayment(b.id))}>{t('Simular pagamento')}</Button> : null}
             </div>
           ) : null}
-          {b.phase === 'PENDING_PAYMENT' && b.storeProductId && storeReady ? <Button small loading={busy} onClick={() => void run(() => finishStorePurchase(b))}>{t('Concluir compra')}</Button> : null}
+          {b.phase === 'PENDING_PAYMENT' && b.storeProductId && storeReady ? <Button small loading={busy} onClick={() => run(() => finishStorePurchase(b))}>{t('Concluir compra')}</Button> : null}
           {hasResults(b.phase) ? <BoostResults boostId={b.id} /> : null}
-          {canCancelBoost(b) ? <Button small variant="quiet" disabled={busy} onClick={() => void run(() => api.cancelBoost(b.id))}>{t('Cancelar pedido')}</Button> : null}
+          {canCancelBoost(b) ? <Button small variant="quiet" disabled={busy} onClick={() => run(() => api.cancelBoost(b.id))}>{t('Cancelar pedido')}</Button> : null}
         </li>
       ))}
     </ul>
@@ -273,7 +273,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
           <span>{t('{price} por dia × {days}', { price: formatBrl(perDay), days: daysLabel(days) })}{discountPct > 0 ? t(' ({pct}% de desconto)', { pct: discountPct }) : ''}</span>
           <strong>{formatBrl(total)}</strong>
         </div>
-        <Button full loading={busy} disabled={!storeReady || (matching && (tags.length === 0 || eventTarget?.tags.length === 0))} onClick={() => void create()}>{onStore ? t('Comprar por {total}', { total: formatBrl(total) }) : t('Pagar {total}', { total: formatBrl(total) })}</Button>
+        <Button full loading={busy} disabled={!storeReady || (matching && (tags.length === 0 || eventTarget?.tags.length === 0))} onClick={() => create()}>{onStore ? t('Comprar por {total}', { total: formatBrl(total) }) : t('Pagar {total}', { total: formatBrl(total) })}</Button>
         <p className="boost__hint">
           {onStore ? t('A compra é cobrada pela {storeName}. ', { storeName }) : t('Pague com Pix ou cartão. ')}O anúncio começa assim que o pagamento for confirmado. Depois de pago, não há cancelamento.
         </p>

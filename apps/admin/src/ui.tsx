@@ -176,7 +176,7 @@ export function ActionDialog({ spec, onClose, onDone }: { spec: ActionSpec; onCl
         <button type="button" className="btn" onClick={onClose} disabled={busy}>
           Cancelar
         </button>
-        <button type="button" className={spec.danger ? 'btn btn--danger' : 'btn btn--primary'} onClick={confirm} disabled={missing || busy}>
+        <button type="button" className={spec.danger ? 'btn btn--danger' : 'btn btn--primary'} onClick={confirm} disabled={missing || busy} aria-busy={busy || undefined}>
           {busy ? 'Aguarde…' : spec.confirmLabel}
         </button>
       </div>

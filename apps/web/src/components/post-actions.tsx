@@ -154,7 +154,7 @@ export function ReasonSheet({ title, doneText, extra, submit, onClose, onDone }:
         ))}
       </div>
       <Field label={t('Detalhes (opcional)')} value={details} onChange={setDetails} multiline maxLength={300} />
-      <Button full disabled={!reason} loading={busy} onClick={() => void send()}>
+      <Button full disabled={!reason} loading={busy} onClick={() => send()}>
         {t('Enviar denúncia')}
       </Button>
     </Sheet>
@@ -328,7 +328,7 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
         ))}
       </ul>
       {hasMore ? (
-        <Button variant="quiet" small onClick={() => void load(items.length)}>
+        <Button variant="quiet" small onClick={() => load(items.length)}>
           {t('Ver mais comentários')}
         </Button>
       ) : null}
@@ -450,7 +450,7 @@ export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { p
       <Field label={t('Descrição')} value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />
       <Field label={kind === 'EVENT' ? t('Rolê (obrigatório no evento)') : t('Rolê (opcional)')} value={placeName} onChange={setPlaceName} maxLength={120} />
       {placeName.trim() ? <Field label={t('Endereço (opcional)')} value={placeAddress} onChange={setPlaceAddress} maxLength={200} /> : null}
-      <Button full loading={busy} disabled={Array.from(caption).length > POST_CAPTION_MAX} onClick={() => void save()}>
+      <Button full loading={busy} disabled={Array.from(caption).length > POST_CAPTION_MAX} onClick={() => save()}>
         {t('Salvar')}
       </Button>
     </Sheet>

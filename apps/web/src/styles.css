@@ -395,6 +395,74 @@ button {
   cursor: progress;
 }
 
+/*
+ * Ação em andamento: qualquer botão com aria-busy troca o conteúdo por um spinner,
+ * mantendo o tamanho (nada pula na tela). Usa ::before porque o ::after de vários
+ * botões já é a área de toque de 44 px.
+ */
+/* :where() zera a especificidade: botões que já têm position própria (absolute etc.) continuam como estão. */
+:where(button[aria-busy='true']:not(.switch)) {
+  position: relative;
+}
+button[aria-busy='true']:not(.switch) {
+  -webkit-text-fill-color: transparent;
+}
+button[aria-busy='true']:not(.switch) > * {
+  visibility: hidden;
+}
+button[aria-busy='true']:not(.switch)::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.1em;
+  height: 1.1em;
+  max-width: 20px;
+  max-height: 20px;
+  min-width: 14px;
+  min-height: 14px;
+  margin: 0;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: btn-spin 0.7s linear infinite;
+  pointer-events: none;
+}
+/* Linhas de menu: o texto continua, o spinner fica no canto. */
+button.menulist__item[aria-busy='true'] {
+  -webkit-text-fill-color: currentColor;
+}
+button.menulist__item[aria-busy='true'] > * {
+  visibility: visible;
+}
+button.menulist__item[aria-busy='true']::before {
+  left: auto;
+  right: 16px;
+  transform: translateY(-50%);
+}
+/* Enquanto gira, o botão não fica apagado como um botão desabilitado. */
+button[aria-busy='true']:disabled {
+  opacity: 0.85;
+}
+@keyframes btn-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes btn-spin-end {
+  from { transform: translateY(-50%) rotate(0deg); }
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+button.menulist__item[aria-busy='true']::before {
+  animation-name: btn-spin-end;
+}
+@media (prefers-reduced-motion: reduce) {
+  button[aria-busy='true']:not(.switch)::before {
+    animation-duration: 1.6s;
+  }
+}
+
 .btn--small {
   min-height: 44px;
   padding: 0 14px;

@@ -1,7 +1,7 @@
 import { api } from '../client.ts';
 import { safeGroupImage } from '../lib/image.ts';
-import { useId, useState } from 'react';
-import type { ButtonHTMLAttributes, HTMLInputTypeAttribute, ReactNode } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
+import type { ButtonHTMLAttributes, HTMLInputTypeAttribute, MouseEvent, ReactNode } from 'react';
 import { initials, tintIndex } from '../lib/avatar.ts';
 import type { PublicProfile } from '../lib/types.ts';
 import { BoltIcon, ChevronLeftIcon } from './icons.tsx';
@@ -13,20 +13,73 @@ import { t } from '../lib/i18n/index.ts';
 
 type Variant = 'primary' | 'secondary' | 'quiet' | 'danger';
 
-interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> {
+interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'onClick'> {
   variant?: Variant;
   loading?: boolean;
   full?: boolean;
   small?: boolean;
+  /** Se devolver uma promessa, o botão fica travado e girando até ela terminar. */
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => unknown;
 }
 
-export function Button({ variant = 'primary', loading = false, full = false, small = false, disabled, children, type = 'button', ...rest }: ButtonProps) {
+/**
+ * Botão padrão. Nunca dispara a ação duas vezes: se o onClick devolver uma promessa,
+ * o botão trava e mostra um spinner até ela acabar; cliques no meio do caminho são ignorados.
+ */
+export function Button({ variant = 'primary', loading = false, full = false, small = false, disabled, children, type = 'button', onClick, ...rest }: ButtonProps) {
+  const [pending, setPending] = useState(false);
+  const running = useRef(false);
+  const busy = loading || pending;
   const classes = ['btn', `btn--${variant}`, full ? 'btn--full' : '', small ? 'btn--small' : ''].filter(Boolean).join(' ');
+  function handleClick(event: MouseEvent<HTMLButtonElement>) {
+    if (running.current || busy) {
+      event.preventDefault();
+      return;
+    }
+    const result = onClick?.(event);
+    if (isThenable(result)) {
+      running.current = true;
+      setPending(true);
+      const done = () => {
+        running.current = false;
+        setPending(false);
+      };
+      result.then(done, done);
+    }
+  }
   return (
-    <button {...rest} type={type} className={classes} disabled={disabled || loading} aria-busy={loading || undefined}>
+    <button {...rest} type={type} className={classes} disabled={disabled || busy} aria-busy={busy || undefined} onClick={onClick ? handleClick : undefined}>
       {children}
     </button>
   );
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return typeof value === 'object' && value !== null && typeof (value as PromiseLike<unknown>).then === 'function';
+}
+
+/**
+ * Para botões soltos (sem o <Button>): embrulha uma ação assíncrona para ela nunca rodar
+ * duas vezes ao mesmo tempo. Devolve a ação protegida e se ela está rodando.
+ */
+export function useOnce<A extends unknown[]>(action: (...args: A) => Promise<unknown> | unknown): [(...args: A) => void, boolean] {
+  const [busy, setBusy] = useState(false);
+  const running = useRef(false);
+  const latest = useRef(action);
+  latest.current = action;
+  const run = useCallback((...args: A) => {
+    if (running.current) return;
+    const result = latest.current(...args);
+    if (!isThenable(result)) return;
+    running.current = true;
+    setBusy(true);
+    const done = () => {
+      running.current = false;
+      setBusy(false);
+    };
+    result.then(done, done);
+  }, []);
+  return [run, busy];
 }
 
 // ---------- Campos de formulário ----------

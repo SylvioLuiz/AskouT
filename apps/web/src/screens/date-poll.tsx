@@ -149,7 +149,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           <p className="callout__text">
             <strong>{t('Todos já votaram.')}</strong> Você pode encerrar a votação agora e escolher a data.
           </p>
-          <Button small loading={busy} onClick={() => void act(() => api.closePoll(poll.id))}>
+          <Button small loading={busy} onClick={() => act(() => api.closePoll(poll.id))}>
             {t('Encerrar votação')}
           </Button>
         </div>
@@ -255,12 +255,12 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           {poll.iFinished ? (
             <>
               <p className="dpoll__done">✓ {t('Você concluiu sua votação. Pode mudar os votos até o encerramento.')}</p>
-              <Button small variant="secondary" loading={busy} onClick={() => void act(() => api.finishPoll(poll.id, false))}>
+              <Button small variant="secondary" loading={busy} onClick={() => act(() => api.finishPoll(poll.id, false))}>
                 {t('Reabrir minha votação')}
               </Button>
             </>
           ) : (
-            <Button full loading={busy} onClick={() => void act(() => api.finishPoll(poll.id, true))}>
+            <Button full loading={busy} onClick={() => act(() => api.finishPoll(poll.id, true))}>
               {t('Concluí minha votação')}
             </Button>
           )}
@@ -522,11 +522,11 @@ function ProposalCard({ poll, busy, act }: { poll: PollView; busy: boolean; act:
       {poll.isOrganizer ? (
         <div className="row-actions">
           {poll.confirmationPolicy === 'MANUAL' ? (
-            <Button small disabled={busy} onClick={() => void act(() => api.finalizePoll(poll.id))}>
+            <Button small disabled={busy} onClick={() => act(() => api.finalizePoll(poll.id))}>
               {t('Fechar a data')}
             </Button>
           ) : null}
-          <Button small variant="quiet" disabled={busy} onClick={() => void act(() => api.withdrawPoll(poll.id))}>
+          <Button small variant="quiet" disabled={busy} onClick={() => act(() => api.withdrawPoll(poll.id))}>
             {t('Escolher outra data')}
           </Button>
         </div>

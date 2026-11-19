@@ -77,7 +77,7 @@ export function MfaSettingsScreen() {
               </li>
             ))}
           </ul>
-          <Button full onClick={() => void navigator.clipboard?.writeText(codes.join('\n'))}>
+          <Button full onClick={() => navigator.clipboard?.writeText(codes.join('\n'))}>
             {t('Copiar códigos')}
           </Button>
           <Button variant="quiet" full onClick={() => setCodes(undefined)}>
@@ -89,7 +89,7 @@ export function MfaSettingsScreen() {
       {!codes && status.data && !status.data.enabled && !setup ? (
         <div className="form">
           <p className="muted">{t('Além da senha, o login passa a pedir um código de 6 dígitos de um app autenticador no seu celular. É grátis e protege a conta mesmo se a senha vazar.')}</p>
-          <Button full loading={busy} onClick={() => void start()}>
+          <Button full loading={busy} onClick={() => start()}>
             {t('Ativar')}
           </Button>
         </div>
@@ -119,7 +119,7 @@ export function MfaSettingsScreen() {
           <Button type="submit" variant="danger" full loading={busy}>
             {t('Desligar')}
           </Button>
-          <Button variant="secondary" full onClick={() => void regenerate()} disabled={busy}>
+          <Button variant="secondary" full onClick={() => regenerate()} disabled={busy}>
             {t('Gerar novos códigos de recuperação')}
           </Button>
         </form>

@@ -57,7 +57,7 @@ function FollowSource({ source }: { source: RecommendationSource | null }) {
       {state === 'PENDING' ? (
         <span className="foryou__followed">Pedido enviado para {label}</span>
       ) : (
-        <Button small variant="secondary" loading={busy} onClick={() => void follow()} aria-label={t('Seguir {label}', { label })}>
+        <Button small variant="secondary" loading={busy} onClick={() => follow()} aria-label={t('Seguir {label}', { label })}>
           Seguir {label}
         </Button>
       )}
