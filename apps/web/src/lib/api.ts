@@ -234,7 +234,9 @@ export function createApi(deps: ApiDeps) {
       request<AuthResult | MfaChallenge>('POST', '/auth/password-reset/confirm', { body: { identifier, code, password }, auth: false }),
     login: (identifier: string, password: string) =>
       request<AuthResult | MfaChallenge>('POST', '/auth/login', { body: { identifier, password }, auth: false }),
-    socialProviders: () => request<{ items: SocialProvider[] }>('GET', '/auth/providers', { auth: false }),
+    socialProviders: () => request<{ items: SocialProvider[]; phone?: { authenticator: boolean; sms: boolean } }>('GET', '/auth/providers', { auth: false }),
+    /** Entrar pelo celular, sem senha, com o código do app autenticador (ou um código de recuperação). */
+    phoneLogin: (phone: string, code: string) => request<AuthResult>('POST', '/auth/phone/login', { body: { phone, code }, auth: false }),
     socialLogin: (input: { provider: SocialProviderId; idToken: string; username?: string; displayName?: string; birthDate?: string; acceptTerms?: boolean; marketingEmail?: boolean }) =>
       request<AuthResult | MfaChallenge | SocialNeedsProfile>('POST', '/auth/social', { body: input, auth: false }),
     mfaVerify: (mfaToken: string, code: string) =>
@@ -271,8 +273,8 @@ export function createApi(deps: ApiDeps) {
     setReferralBadgeHidden: (hidden: boolean) => request<{ badgeHidden: boolean }>('PUT', '/me/referral-badge', { body: { hidden } }),
     getProfile: (username: string) => request<ProfileView>('GET', `/profiles/${id(username)}`),
     setProfilePhoto: (image: string | null) => request<Profile>('PUT', '/profiles/me/photo', { body: { image } }),
-    getPhone: () => request<{ phone: string | null }>('GET', '/profiles/me/phone'),
-    setPhone: (phone: string | null) => request<{ phone: string | null }>('PUT', '/profiles/me/phone', { body: { phone } }),
+    getPhone: () => request<{ phone: string | null; verified?: boolean }>('GET', '/profiles/me/phone'),
+    setPhone: (phone: string | null) => request<{ phone: string | null; verified?: boolean }>('PUT', '/profiles/me/phone', { body: { phone } }),
     profileEvents: (username: string, page?: PageRequest) => request<PostedEventsPage>('GET', `/profiles/${id(username)}/events${pageQuery(page)}`),
     attendedEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/attended${pageQuery(page)}`),
     shownGoingEvents: (username: string, page?: PageRequest) => request<AttendedEventsPage>('GET', `/profiles/${id(username)}/going${pageQuery(page)}`),

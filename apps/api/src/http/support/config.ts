@@ -26,6 +26,10 @@ export interface AppConfig {
   googlePlacesKey: string | undefined;
   /** Chave da Giphy (GIPHY_API_KEY) para GIFs nos comentários. Sem ela o recurso fica desligado e o app esconde o botão. */
   giphyApiKey: string | undefined;
+  /** SMS (login pelo celular com código). "off" (padrão) desliga; "console" imprime no log (fora de produção); "twilio" envia de verdade. */
+  smsTransport: 'off' | 'console' | 'twilio';
+  /** Dados do Twilio, só quando `smsTransport` é "twilio". Remetente: número (TWILIO_FROM) ou Messaging Service (TWILIO_MESSAGING_SERVICE_SID). */
+  twilio: { accountSid: string; authToken: string; from: string | undefined; messagingServiceSid: string | undefined } | undefined;
   /** Teto de buscas ao Google por dia, para não estourar o crédito gratuito sem perceber. */
   googleDailyLimit: number;
   /** ID do aplicativo Google (client ID web) para "Entrar com Google". Sem ele, o botão não aparece. */
@@ -123,6 +127,31 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     problems.push('EMAIL_TRANSPORT deve ser "console" ou "resend"');
   } else if (nodeEnv === 'production') {
     problems.push('Em produção o envio "console" é recusado: ele imprime os códigos de cadastro no log. Use EMAIL_TRANSPORT=resend');
+  }
+
+  const smsRaw = env.SMS_TRANSPORT?.trim() || 'off';
+  let smsTransport: AppConfig['smsTransport'] = 'off';
+  let twilio: AppConfig['twilio'];
+  if (smsRaw === 'twilio') {
+    const accountSid = env.TWILIO_ACCOUNT_SID?.trim() ?? '';
+    const authToken = env.TWILIO_AUTH_TOKEN?.trim() ?? '';
+    const from = env.TWILIO_FROM?.trim() || undefined;
+    const messagingServiceSid = env.TWILIO_MESSAGING_SERVICE_SID?.trim() || undefined;
+    const before = problems.length;
+    if (!/^AC[0-9a-fA-F]{32}$/.test(accountSid)) problems.push('TWILIO_ACCOUNT_SID deve ser o Account SID do Twilio (AC…)');
+    if (!/^[0-9a-fA-F]{32}$/.test(authToken)) problems.push('TWILIO_AUTH_TOKEN deve ser o Auth Token do Twilio');
+    if (!from && !messagingServiceSid) problems.push('Informe TWILIO_FROM (número no formato +5511…) ou TWILIO_MESSAGING_SERVICE_SID (MG…)');
+    if (from !== undefined && !/^\+[1-9]\d{7,14}$/.test(from)) problems.push('TWILIO_FROM deve ser um número no formato internacional, ex.: +15551234567');
+    if (messagingServiceSid !== undefined && !/^MG[0-9a-fA-F]{32}$/.test(messagingServiceSid)) problems.push('TWILIO_MESSAGING_SERVICE_SID deve começar com MG');
+    if (problems.length === before) {
+      smsTransport = 'twilio';
+      twilio = { accountSid, authToken, from, messagingServiceSid };
+    }
+  } else if (smsRaw === 'console') {
+    if (nodeEnv === 'production') problems.push('Em produção SMS_TRANSPORT=console é recusado: ele imprime os códigos no log. Use "twilio" ou "off"');
+    else smsTransport = 'console';
+  } else if (smsRaw !== 'off') {
+    problems.push('SMS_TRANSPORT deve ser "off", "console" ou "twilio"');
   }
 
   const rateLimitEnabled = !(env.RATE_LIMIT === 'off' && nodeEnv !== 'production');
@@ -250,5 +279,5 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     throw new Error(`Configuração inválida:\n - ${problems.join('\n - ')}`);
   }
 
-  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, moderationEmail: env.MODERATION_EMAIL?.trim() || 'suporte@askout.com.br', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, giphyApiKey: env.GIPHY_API_KEY?.trim() || undefined, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, googleIosClientId: env.GOOGLE_IOS_CLIENT_ID?.trim() || undefined, googleCalendar, microsoftCalendar, webBaseUrl: (env.PUBLIC_WEB_URL?.trim() || 'https://askout.com.br').replace(/\/+$/, ''), appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, fcmProjectId, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
+  return { nodeEnv, port, databaseUrl, jwtSecret, codeSecret, tokenTtlSeconds, corsOrigins, rateLimitEnabled, trustProxyHops, emailTransport, resend, moderationEmail: env.MODERATION_EMAIL?.trim() || 'suporte@askout.com.br', osmContact: env.OSM_CONTACT?.trim() || undefined, googlePlacesKey: env.GOOGLE_PLACES_API_KEY?.trim() || undefined, giphyApiKey: env.GIPHY_API_KEY?.trim() || undefined, smsTransport, twilio, googleDailyLimit, googleClientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, googleIosClientId: env.GOOGLE_IOS_CLIENT_ID?.trim() || undefined, googleCalendar, microsoftCalendar, webBaseUrl: (env.PUBLIC_WEB_URL?.trim() || 'https://askout.com.br').replace(/\/+$/, ''), appleClientId: env.APPLE_CLIENT_ID?.trim() || undefined, appleAppId: env.APPLE_APP_ID?.trim() || undefined, vapid, apns, googleServiceAccount, fcmProjectId, googlePlayPackage, paymentProvider, stripe, paymentsEnabled, ...(boostPricePerDayCents === undefined ? {} : { boostPricePerDayCents }), ...(boostStorePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents }) };
 }

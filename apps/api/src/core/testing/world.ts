@@ -25,6 +25,8 @@ import {
   InMemoryBlockRepository,
   InMemoryFollowRepository,
   InMemoryPasswordResetRepository,
+  InMemoryPhoneCodeRepository,
+  FakeSmsSender,
   InMemoryMfaRepository,
   InMemoryBoostRepository,
   InMemoryOfferRepository,
@@ -52,7 +54,7 @@ export const TEST_SECRET = 'segredo-de-teste-com-mais-de-32-caracteres';
 export const PASSWORD = 'uma-senha-forte-123';
 
 /** Monta o núcleo com repositórios em memória e hash rápido (custo baixo, só para testes). */
-export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnabled?: boolean; store?: FakeStoreVerifier; storePricePerDayCents?: number; pricePerDayCents?: number; routes?: RouteSource; gifs?: GifSource; noGoogleCalendar?: boolean } = {}) {
+export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnabled?: boolean; store?: FakeStoreVerifier; storePricePerDayCents?: number; pricePerDayCents?: number; routes?: RouteSource; gifs?: GifSource; noGoogleCalendar?: boolean; noSms?: boolean } = {}) {
   const blocks = new InMemoryBlockRepository();
   const follows = new InMemoryFollowRepository(blocks);
   const availability = new InMemoryAvailabilityRepository();
@@ -81,6 +83,8 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom, identities: identitiesRepo });
   const pending = new InMemoryPendingSignupRepository();
   const passwordResets = new InMemoryPasswordResetRepository();
+  const phoneCodes = new InMemoryPhoneCodeRepository();
+  const sms = new FakeSmsSender();
   const mfa = new InMemoryMfaRepository();
   const boosts = new InMemoryBoostRepository();
   const boostStats = new InMemoryBoostStatsRepository();
@@ -110,7 +114,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, personalCalendars, ...(googleCalendar ? { googleCalendar } : {}), ...(microsoftCalendar ? { microsoftCalendar } : {}), oauthStates, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), ...(options.gifs ? { gifs: options.gifs } : {}), pending, passwordResets, mfa, secretBox, mfaChallenges, boosts, offers, boostStats, dwell, activity, regions, consents, cloakroom, account, payments, settings, referrals, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, personalCalendars, ...(googleCalendar ? { googleCalendar } : {}), ...(microsoftCalendar ? { microsoftCalendar } : {}), oauthStates, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), ...(options.gifs ? { gifs: options.gifs } : {}), pending, passwordResets, phoneCodes, ...(options.noSms ? {} : { sms }), mfa, secretBox, mfaChallenges, boosts, offers, boostStats, dwell, activity, regions, consents, cloakroom, account, payments, settings, referrals, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string; minor?: boolean } = {}): Promise<AuthResult> {
@@ -130,7 +134,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
     return out;
   }
 
-  return { personalCalendars, googleCalendar, microsoftCalendar, oauthStates, mfa, secretBox, mfaChallenges, core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, boosts, offers, boostStats, dwell, regions, consents, cloakroom, account, payments, settings, referrals, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+  return { personalCalendars, googleCalendar, microsoftCalendar, oauthStates, mfa, secretBox, mfaChallenges, core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, phoneCodes, sms, boosts, offers, boostStats, dwell, regions, consents, cloakroom, account, payments, settings, referrals, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
 }
 
 /** Nos testes sem verificação em duas etapas, o login sempre devolve a sessão. */

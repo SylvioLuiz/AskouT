@@ -3,6 +3,9 @@ import { DomainError, conflict, forbidden, notFound, rateLimited, unauthorized, 
 import type { CoreDeps, SocialProviderInfo } from './ports.ts';
 import { checkSignupConsent } from './age-service.ts';
 import { MfaService } from './mfa-service.ts';
+import { PhoneCodeFlow } from './phone-code.ts';
+import type { PhoneCodeStarted } from './phone-code.ts';
+import { normalizePhone } from './phone.ts';
 import { confirmReferralReturn } from './referral-service.ts';
 import type { Actor, ExternalProvider, PendingSignup, Profile, PublicProfile, User, UserRole } from './types.ts';
 import { toPublicProfile } from './types.ts';
@@ -176,10 +179,85 @@ export class AuthService {
   private readonly deps: CoreDeps;
   private dummyHash: Promise<string> | undefined;
   readonly mfa: MfaService;
+  private readonly phoneCodes: PhoneCodeFlow;
 
   constructor(deps: CoreDeps) {
     this.deps = deps;
     this.mfa = new MfaService(deps);
+    this.phoneCodes = new PhoneCodeFlow(deps);
+  }
+
+  /** Formas de entrar pelo celular: com o código do app autenticador (sempre) e por SMS (só com provedor configurado). */
+  phoneLoginMethods(): { authenticator: true; sms: boolean } {
+    return { authenticator: true, sms: this.phoneCodes.available };
+  }
+
+  /**
+   * Entrar pelo celular, sem senha: o celular identifica a conta e o código do app autenticador (ou um código de recuperação)
+   * prova que é a pessoa. Só para quem ligou a verificação em duas etapas. A mesma mensagem vale para "não tem conta" e
+   * "não ligou o autenticador", para o celular não revelar mais do que precisa.
+   */
+  async loginWithPhoneAuthenticator(input: { phone: unknown; code: unknown }, options: LoginOptions = {}): Promise<AuthResult> {
+    const phone = parsePhone(input.phone);
+    const code = asString(input.code).trim();
+    if (code === '' || code.length > 20) throw validationError('Informe o código do app autenticador', { code: 'Informe o código do app autenticador' });
+    const user = await this.deps.users.findByPhone(phone);
+    if (!user || !(await this.mfa.isEnabled(user.id))) {
+      const msg = 'Não encontramos uma conta com esse celular e com o app autenticador ativado. Entre com seu e-mail e ative em Configurações > Verificação em duas etapas.';
+      throw validationError(msg, { phone: msg });
+    }
+    if (user.status === 'SUSPENDED') throw forbidden('Conta suspensa');
+    if (options.requireRole && user.role !== options.requireRole) throw unauthorized();
+    const profile = await this.deps.users.findProfileById(user.id);
+    if (!profile) throw unauthorized();
+    await this.mfa.verifyLogin(user.id, code);
+    return this.session(user, profile);
+  }
+
+  /**
+   * Login pelo celular, etapa 1: manda o código por SMS. Só vale para celular já confirmado na conta: um número digitado
+   * errado no perfil (e nunca confirmado) não pode virar a porta de entrada de outra pessoa.
+   */
+  async startPhoneLogin(rawPhone: unknown): Promise<PhoneCodeStarted> {
+    const phone = parsePhone(rawPhone);
+    const user = await this.deps.users.findByPhone(phone);
+    if (!user || !user.phoneVerifiedAt) {
+      const msg = 'Não encontramos uma conta com esse celular confirmado. Entre com seu e-mail e confirme o celular em Editar perfil.';
+      throw validationError(msg, { phone: msg });
+    }
+    if (user.status === 'SUSPENDED') throw forbidden('Conta suspensa');
+    return this.phoneCodes.send(user.id, phone, 'LOGIN');
+  }
+
+  /** Login pelo celular, etapa 2: confere o código e entra (passando pelo app autenticador, se a conta usa). */
+  async confirmPhoneLogin(input: { phone: unknown; code: unknown }, options: LoginOptions = {}): Promise<AuthResult | MfaChallenge> {
+    const phone = parsePhone(input.phone);
+    const user = await this.deps.users.findByPhone(phone);
+    const valid = user && user.phoneVerifiedAt && user.status !== 'SUSPENDED' ? user : undefined;
+    await this.phoneCodes.consume(valid?.id, phone, 'LOGIN', asString(input.code));
+    const profile = await this.deps.users.findProfileById(valid!.id);
+    if (!profile) throw unauthorized();
+    if (options.requireRole && valid!.role !== options.requireRole) throw unauthorized();
+    return this.sessionOrChallenge(valid!, profile);
+  }
+
+  /** Confirmar o celular salvo no perfil: manda o código para ele. */
+  async startPhoneVerification(userId: string): Promise<PhoneCodeStarted> {
+    const user = await this.deps.users.findById(userId);
+    if (!user) throw unauthorized('Sessão inválida');
+    if (!user.phone) throw validationError('Salve um celular antes de confirmar', { phone: 'Salve um celular antes de confirmar' });
+    if (user.phoneVerifiedAt) throw validationError('Este celular já está confirmado', { phone: 'Este celular já está confirmado' });
+    return this.phoneCodes.send(user.id, user.phone, 'VERIFY');
+  }
+
+  async confirmPhoneVerification(userId: string, rawCode: unknown): Promise<{ phone: string; verified: true }> {
+    const user = await this.deps.users.findById(userId);
+    if (!user) throw unauthorized('Sessão inválida');
+    if (!user.phone) throw validationError('Salve um celular antes de confirmar', { phone: 'Salve um celular antes de confirmar' });
+    await this.phoneCodes.consume(user.id, user.phone, 'VERIFY', asString(rawCode));
+    // Se o número mudou entre o envio e a confirmação, o código (amarrado ao número antigo) já teria falhado acima.
+    await this.deps.users.markPhoneVerified(user.id, user.phone, this.deps.clock.now());
+    return { phone: user.phone, verified: true };
   }
 
   /** Etapa 1: valida, guarda o cadastro pendente e envia o código. Nenhuma conta é criada ainda. */
@@ -822,6 +900,12 @@ export class AuthService {
     this.dummyHash ??= this.deps.hasher.hash('askout-dummy-password');
     return this.dummyHash;
   }
+}
+
+function parsePhone(raw: unknown): string {
+  const phone = typeof raw === 'string' && raw.length <= 30 ? normalizePhone(raw) : undefined;
+  if (!phone) throw validationError('Celular inválido', { phone: 'Informe o celular com DDD, ex.: (11) 98765-4321' });
+  return phone;
 }
 
 function addMs(date: Date, ms: number): Date {

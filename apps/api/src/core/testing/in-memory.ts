@@ -38,6 +38,8 @@ import type {
   FollowRepository,
   IdGenerator,
   PasswordResetRepository,
+  PhoneCodeRepository,
+  SmsSender,
   BoostRepository,
   BoostStatsRepository,
   OfferRepository,
@@ -69,7 +71,7 @@ import type {
   ConsentEventRecord,
   CloakroomSettingRecord,
   CloakroomTicketRecord,
-  GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+  GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 import type { ActivityRepository, MfaRepository } from '../ports.ts';
@@ -154,7 +156,19 @@ export class InMemoryUserRepository implements UserRepository {
       }
     }
     const u = this.users.get(userId);
-    if (u) this.users.set(userId, { ...u, phone });
+    if (u) this.users.set(userId, { ...u, phone, phoneVerifiedAt: phone !== null && phone === u.phone ? (u.phoneVerifiedAt ?? null) : null });
+  }
+
+  async findByPhone(phone: string): Promise<User | undefined> {
+    for (const u of this.users.values()) if (u.phone === phone) return { ...u };
+    return undefined;
+  }
+
+  async markPhoneVerified(userId: string, phone: string, at: Date): Promise<boolean> {
+    const u = this.users.get(userId);
+    if (!u || u.phone !== phone) return false;
+    this.users.set(userId, { ...u, phoneVerifiedAt: at });
+    return true;
   }
 
   async findProfileById(userId: string): Promise<Profile | undefined> {
@@ -774,6 +788,49 @@ export class InMemoryPasswordResetRepository implements PasswordResetRepository 
     if (!r) return undefined;
     r.attempts += 1;
     return r.attempts;
+  }
+}
+
+export class InMemoryPhoneCodeRepository implements PhoneCodeRepository {
+  readonly rows = new Map<string, PhoneCode>();
+
+  async find(userId: string): Promise<PhoneCode | undefined> {
+    const r = this.rows.get(userId);
+    return r ? { ...r } : undefined;
+  }
+
+  async save(code: PhoneCode): Promise<void> {
+    this.rows.set(code.userId, { ...code });
+  }
+
+  async delete(userId: string): Promise<void> {
+    this.rows.delete(userId);
+  }
+
+  async incrementAttempts(userId: string): Promise<number | undefined> {
+    const r = this.rows.get(userId);
+    if (!r) return undefined;
+    r.attempts += 1;
+    return r.attempts;
+  }
+}
+
+/** SMS de mentira: guarda o que seria enviado. `failNext` simula falha do provedor. */
+export class FakeSmsSender implements SmsSender {
+  readonly sent: { to: string; code: string; purpose: 'LOGIN' | 'VERIFY'; expiresInMinutes: number }[] = [];
+  failNext = false;
+
+  async sendCode(input: { to: string; code: string; purpose: 'LOGIN' | 'VERIFY'; expiresInMinutes: number }): Promise<void> {
+    if (this.failNext) {
+      this.failNext = false;
+      throw new Error('falha simulada no envio de SMS');
+    }
+    this.sent.push({ ...input });
+  }
+
+  lastCodeFor(phone: string): string {
+    for (let i = this.sent.length - 1; i >= 0; i -= 1) if (this.sent[i]!.to === phone) return this.sent[i]!.code;
+    return '';
   }
 }
 

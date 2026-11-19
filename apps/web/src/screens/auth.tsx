@@ -22,6 +22,7 @@ import {
   usernameProblem,
 } from '../lib/validation.ts';
 import { parseInvite, rememberInvite } from '../lib/invite.ts';
+import { normalizePhone } from '../lib/phone.ts';
 import { safeStorage } from '../lib/hints.ts';
 import { ChevronLeftIcon } from '../components/icons.tsx';
 import { Link, navigate, useSearch } from '../router.tsx';
@@ -45,40 +46,62 @@ function BackButton({ onClick, disabled }: { onClick: () => void; disabled?: boo
   );
 }
 
+type LoginTab = 'email' | 'phone';
+
 export function LoginScreen() {
   useTitle(t('Entrar'));
   const { signIn } = useAuthContext();
   const expired = useSearch().get('expirou') === '1';
+  const [tab, setTab] = useState<LoginTab>('email');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [code, setCode] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
 
+  function switchTab(next: LoginTab) {
+    if (next === tab || busy) return;
+    setTab(next);
+    setErrors({});
+    setFormError(undefined);
+  }
+
+  function fail(failure: unknown) {
+    const error = toApiError(failure);
+    if (error.fields['socialProvider']) {
+      // Conta criada pelo Google/Apple, sem senha: avisa por onde ela entra.
+      setErrors({});
+      setFormError(error.message);
+    } else {
+      setErrors(error.fields);
+      setFormError(Object.keys(error.fields).length === 0 ? error.message : undefined);
+    }
+    setBusy(false);
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const found = compact({
-      identifier: loginIdentifierProblem(identifier),
-      password: password === '' ? t('Informe sua senha') : undefined,
-    });
+    const found =
+      tab === 'email'
+        ? compact({
+            identifier: loginIdentifierProblem(identifier),
+            password: password === '' ? t('Informe sua senha') : undefined,
+          })
+        : compact({
+            phone: phone.trim() === '' ? t('Informe seu celular') : normalizePhone(phone) ? undefined : t('Informe o celular com DDD, ex.: (11) 98765-4321'),
+            code: code.trim() === '' ? t('Informe o código do app autenticador') : undefined,
+          });
     setErrors(found);
     setFormError(undefined);
     if (Object.keys(found).length > 0) return;
 
     setBusy(true);
     try {
-      signIn(await api.login(identifier.trim(), password));
+      signIn(tab === 'email' ? await api.login(identifier.trim(), password) : await api.phoneLogin(phone.trim(), code.trim()));
     } catch (failure) {
-      const error = toApiError(failure);
-      if (error.fields['socialProvider']) {
-        // Conta criada pelo Google/Apple, sem senha: avisa por onde ela entra.
-        setErrors({});
-        setFormError(error.message);
-      } else {
-        setErrors(error.fields);
-        setFormError(Object.keys(error.fields).length === 0 ? error.message : undefined);
-      }
-      setBusy(false);
+      fail(failure);
     }
   }
 
@@ -86,10 +109,36 @@ export function LoginScreen() {
     <AuthLayout fit>
       <form className="form" onSubmit={submit} noValidate>
         <h2 className="form__title">{t('Entrar')}</h2>
+        <div className="segtabs segtabs--fill" role="tablist" aria-label={t('Entrar com')}>
+          <button type="button" role="tab" aria-selected={tab === 'email'} className="segtabs__tab" onClick={() => switchTab('email')}>
+            {t('E-mail')}
+          </button>
+          <button type="button" role="tab" aria-selected={tab === 'phone'} className="segtabs__tab" onClick={() => switchTab('phone')}>
+            {t('Telefone')}
+          </button>
+        </div>
         {expired ? <Notice tone="info">{t('Sua sessão expirou. Entre de novo para continuar.')}</Notice> : null}
         {formError ? <Notice tone="error">{formError}</Notice> : null}
-        <Field label={t('E-mail ou @usuário')} value={identifier} onChange={setIdentifier} error={errors['identifier']} autoComplete="username" autoFocus />
-        <PasswordField label={t('Senha')} value={password} onChange={setPassword} error={errors['password']} autoComplete="current-password" />
+        {tab === 'email' ? (
+          <>
+            <Field label={t('E-mail ou @usuário')} value={identifier} onChange={setIdentifier} error={errors['identifier']} autoComplete="username" autoFocus />
+            <PasswordField label={t('Senha')} value={password} onChange={setPassword} error={errors['password']} autoComplete="current-password" />
+          </>
+        ) : (
+          <>
+            <Field label={t('Celular')} type="tel" inputMode="tel" value={phone} onChange={setPhone} error={errors['phone']} autoComplete="tel" maxLength={25} placeholder="(11) 98765-4321" autoFocus />
+            <Field
+              label={t('Código do app autenticador')}
+              value={code}
+              onChange={(v) => setCode(v.slice(0, 20))}
+              error={errors['code']}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={20}
+              hint={t('Sem senha: use o código de 6 números do Google Authenticator (ou outro app). Ative em Configurações > Verificação em duas etapas, com o celular salvo no seu perfil.')}
+            />
+          </>
+        )}
         <Button type="submit" full loading={busy}>
           {t('Entrar')}
         </Button>

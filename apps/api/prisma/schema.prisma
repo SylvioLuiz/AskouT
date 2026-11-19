@@ -178,10 +178,13 @@ model User {
   phone           String?   @unique
   /// SHA-256 (hex) do celular, comparado com os códigos que o app manda da agenda de quem procura amigos.
   phoneHash       String?   @unique
+  /// Quando o celular atual foi confirmado por SMS. Só celular confirmado entra sem senha (código por SMS). Trocar o número apaga.
+  phoneVerifiedAt DateTime?
 
   profile  Profile?
   settings UserSettings?
   passwordReset PasswordReset?
+  phoneCode     PhoneCode?
   mfa           UserMfa?
   boosts        Boost[]
   venueOffers   VenueOffer[]
@@ -765,6 +768,21 @@ model PushSubscription {
 model PasswordReset {
   userId     String   @id @db.Uuid
   channel    String   @default("EMAIL")
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int      @default(0)
+  sendCount  Int      @default(1)
+  lastSentAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Código por SMS em andamento (entrar pelo celular ou confirmar o número): um por pessoa, guarda só o HMAC do código.
+model PhoneCode {
+  userId     String   @id @db.Uuid
+  /// LOGIN ou VERIFY
+  purpose    String
+  phone      String
   codeHash   String
   expiresAt  DateTime
   attempts   Int      @default(0)

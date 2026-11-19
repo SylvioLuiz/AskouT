@@ -175,25 +175,26 @@ export class ProfileService {
   }
 
   /** O próprio celular (privado: só a dona da conta vê). */
-  async getPhone(userId: string): Promise<{ phone: string | null }> {
+  async getPhone(userId: string): Promise<{ phone: string | null; verified: boolean }> {
     const user = await this.deps.users.findById(userId);
     if (!user) throw notFound('Perfil não encontrado');
-    return { phone: user.phone ?? null };
+    return { phone: user.phone ?? null, verified: Boolean(user.phone && user.phoneVerifiedAt) };
   }
 
   /** Guarda o celular (qualquer formato; sem código do país, entende Brasil) ou, com `null` ou vazio, apaga. */
-  async setPhone(userId: string, raw: unknown): Promise<{ phone: string | null }> {
+  async setPhone(userId: string, raw: unknown): Promise<{ phone: string | null; verified?: boolean }> {
     if (raw !== null && typeof raw !== 'string') throw validationError('Celular inválido', { phone: 'Informe o celular com DDD' });
     const user = await this.deps.users.findById(userId);
     if (!user) throw notFound('Perfil não encontrado');
     if (raw === null || raw.trim() === '') {
       await this.deps.users.setPhone(userId, null);
-      return { phone: null };
+      return { phone: null, verified: false };
     }
     const phone = normalizePhone(raw);
     if (!phone) throw validationError('Celular inválido', { phone: 'Informe o celular com DDD, ex.: (11) 98765-4321' });
+    // Número novo começa sem confirmação (o repositório apaga a data junto).
     if (phone !== user.phone) await this.deps.users.setPhone(userId, phone);
-    return { phone };
+    return { phone, verified: phone === user.phone && Boolean(user.phoneVerifiedAt) };
   }
 
   /** Bytes da foto de perfil (rota pública, usada em <img>). */
