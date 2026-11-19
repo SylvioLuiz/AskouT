@@ -1,5 +1,5 @@
 import { App } from '@capacitor/app';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { Contacts } from '@capacitor-community/contacts';
 import { PushNotifications } from '@capacitor/push-notifications';
@@ -22,6 +22,7 @@ import { createContactsBridge } from './contacts-bridge.ts';
 import { createPushBridge, openInApp } from './push-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createVideoBridge } from './video-bridge.ts';
+import { createGalleryBridge, type GalleryPluginLike } from './gallery-bridge.ts';
 
 /** Carregado antes do app web (ver scripts/build-web.mjs): o app procura estas pontes na hora de usar. */
 const w = window as unknown as Record<string, unknown>;
@@ -87,6 +88,16 @@ if (Capacitor.isNativePlatform()) {
   w['AskouTContacts'] = createContactsBridge({ contacts: Contacts as never });
   // O botão do Google da web não abre dentro do app (o Google bloqueia login em WebView): entra a janela nativa.
   w['AskouTGoogle'] = createGoogleBridge({ login: SocialLogin as never, platform: () => Capacitor.getPlatform() });
+  // Criar story: grade da galeria dentro do app, como no Instagram. Só no iPhone (plugin do próprio app, GalleryPlugin.swift);
+  // no Android segue o seletor do sistema (política do Google Play para fotos e vídeos).
+  if (Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('AskouTGallery')) {
+    w['AskouTGallery'] = createGalleryBridge({
+      plugin: registerPlugin<GalleryPluginLike>('AskouTGallery'),
+      convertFileSrc: (p) => Capacitor.convertFileSrc(p),
+      fetchFile: async (url) => (await fetch(url)).blob(),
+      pixelRatio: () => window.devicePixelRatio || 2,
+    });
+  }
   if (Capacitor.getPlatform() === 'ios') {
     // O botão da Apple da web não abre dentro do app; no iPhone entra a janela nativa.
     w['AskouTApple'] = createAppleBridge({ login: SocialLogin as never });

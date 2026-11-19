@@ -6371,7 +6371,7 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .storygrid__scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom); }
 .storygrid__list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin: 0; padding: 0; list-style: none; }
 @media (min-width: 600px) { .storygrid__list { grid-template-columns: repeat(4, 1fr); } }
-.storygrid__cell { position: relative; display: block; width: 100%; aspect-ratio: 9 / 16; padding: 0; border: 0; overflow: hidden; background: rgb(28 28 30); color: #fff; cursor: pointer; }
+.storygrid__cell { position: relative; display: block; width: 100%; aspect-ratio: 3 / 4; padding: 0; border: 0; overflow: hidden; background: rgb(28 28 30); color: #fff; cursor: pointer; }
 .storygrid__cell img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .storygrid__cell:disabled { cursor: default; }
 .storygrid__cell--loading img { opacity: 0.5; }
@@ -6400,8 +6400,8 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .storycomp__note { margin: 0; color: rgb(255 255 255 / 0.65); font-size: 0.75rem; text-align: center; }
 
 /* Texto do story: o mesmo desenho ao editar e ao assistir */
-.storycaption { position: absolute; left: 16px; right: 16px; z-index: 2; display: flex; justify-content: center; margin: 0; padding: 0; border: 0; background: transparent; transform: translateY(-50%); pointer-events: none; text-align: center; font: inherit; color: #fff; }
-.storycaption__text { display: inline; max-width: 100%; padding: 4px 10px; border-radius: 8px; background: rgb(0 0 0 / 0.55); color: #fff; font: 700 1.375rem/1.35 var(--font-display); letter-spacing: -0.01em; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-box-decoration-break: clone; box-decoration-break: clone; text-shadow: 0 1px 2px rgb(0 0 0 / 0.25); }
+.storycaption { position: absolute; left: 16px; right: 16px; z-index: 2; display: block; margin: 0; padding: 0; border: 0; background: transparent; transform: translateY(-50%); pointer-events: none; text-align: center; font: inherit; color: #fff; }
+.storycaption__text { display: inline; max-width: 100%; padding: 3px 10px; border-radius: 8px; background: rgb(0 0 0 / 0.55); color: #fff; font: 700 1.375rem/1.5 var(--font-display); letter-spacing: -0.01em; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-box-decoration-break: clone; box-decoration-break: clone; text-shadow: 0 1px 2px rgb(0 0 0 / 0.25); }
 .storycaption--edit { pointer-events: auto; cursor: grab; touch-action: none; }
 .storycaption--edit:active { cursor: grabbing; }
 .storyview .storycaption { z-index: 1; }
