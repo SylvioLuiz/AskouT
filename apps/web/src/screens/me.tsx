@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NOW_RADIUS_CHOICES_KM, nowRadiusKm, setNowRadiusKm } from '../lib/now-radius.ts';
 import type { FormEvent, ReactNode } from 'react';
-import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
+import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { MuteCard, PushCard, PushTestCard } from '../components/notifications.tsx';
 import { api } from '../client.ts';
 import { useAuthContext, useUser } from '../auth.tsx';
@@ -621,6 +621,7 @@ function MyDataSection() {
 function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: () => void }) {
   const [on, setOn] = useState(() => readPersonalize(userId));
   const [busy, setBusy] = useState(false);
+  const [askErase, setAskErase] = useState(false);
   const [message, setMessage] = useState<Message>();
 
   async function change() {
@@ -646,6 +647,7 @@ function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: ()
   }
 
   async function erase() {
+    setAskErase(false);
     setBusy(true);
     try {
       const r = await api.eraseDwell();
@@ -672,10 +674,11 @@ function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: ()
         </button>
       </section>
       <div className="setting__actions">
-        <Button variant="quiet" small loading={busy} onClick={() => erase()}>
+        <Button variant="quiet" small loading={busy} disabled={askErase} onClick={() => setAskErase(true)}>
           {t('Apagar meu histórico de tempo na tela')}
         </Button>
       </div>
+      {askErase ? <Confirm danger question={t('Apagar seu histórico de tempo na tela? As recomendações recomeçam do zero e não dá para desfazer.')} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => void erase()} onCancel={() => setAskErase(false)} /> : null}
     </>
   );
 }
@@ -689,6 +692,7 @@ function RegionSetting({ userId }: { userId: string }) {
   const saved = useAsync(() => api.region(), []);
   const [region, setRegion] = useState<RegionView | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const [askRemove, setAskRemove] = useState(false);
   const [message, setMessage] = useState<Message>();
   const current = region === undefined ? (saved.data?.region ?? null) : region;
 
@@ -715,6 +719,7 @@ function RegionSetting({ userId }: { userId: string }) {
   }
 
   async function remove() {
+    setAskRemove(false);
     setBusy(true);
     setMessage(undefined);
     try {
@@ -745,8 +750,9 @@ function RegionSetting({ userId }: { userId: string }) {
         <Button variant="secondary" small loading={busy} disabled={!personalizing} onClick={useHere}>
           {current ? t('Atualizar com minha localização atual') : t('Usar minha localização atual')}
         </Button>
-        {current ? <Button variant="quiet" small disabled={busy} onClick={() => remove()}>{t('Apagar minha região')}</Button> : null}
+        {current ? <Button variant="quiet" small disabled={busy || askRemove} onClick={() => setAskRemove(true)}>{t('Apagar minha região')}</Button> : null}
       </div>
+      {askRemove ? <Confirm danger question={t('Apagar sua região? Você deixa de receber anúncios Match de lugares perto de você.')} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => void remove()} onCancel={() => setAskRemove(false)} /> : null}
     </>
   );
 }

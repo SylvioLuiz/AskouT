@@ -114,13 +114,10 @@ export function HomeScreen() {
         </section>
       ) : null}
 
-      <section className="section" aria-labelledby="posts-titulo">
-        <div className="section__head">
-          <h2 id="posts-titulo" className="section__title">
-            {t('Posts de quem você segue')}
-          </h2>
-        </div>
-        <PostList dateRail enter load={(offset, before) => api.homeFeed({ limit: 6, offset }, before)} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os de quem você segue aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
+      {/* Sem título: o normal da página inicial são os posts de quem você segue. Só as recomendações ("Para você") têm título. */}
+      <section className="section" aria-label={t('Posts de quem você segue')}>
+        {/* Na página inicial, os posts seguem o desenho dos eventos: nome de quem postou em cima, ações embaixo. */}
+        <PostList dateRail enter poster={false} load={(offset, before) => api.homeFeed({ limit: 6, offset }, before)} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os de quem você segue aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
       </section>
     </PullRefresh>
   );

@@ -1,3 +1,4 @@
+import type { StoryOverlay } from './story-overlays.ts';
 import type { EventExtraAnswer } from './event-extras.ts';
 export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETION_REQUESTED';
 export type UserRole = 'USER' | 'VENUE_OWNER' | 'ADMIN';
@@ -703,6 +704,8 @@ export interface EventStoryRecord {
   video: boolean;
   /** Também no perfil: os amigos veem na página inicial. Sem o campo, fica só no evento. */
   onProfile?: boolean;
+  /** Textos e figurinhas por cima da mídia (desenhados por quem assiste). Sem o campo, nenhum. */
+  overlays?: StoryOverlay[];
   data: Uint8Array;
   createdAt: Date;
   expiresAt: Date;

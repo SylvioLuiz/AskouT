@@ -4,7 +4,8 @@ import { Sheet } from './agenda.tsx';
 import { Confirm, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { allDeletable, selectable } from '../lib/chat.ts';
-import { MORE_EMOJIS, REACTIONS, firstEmoji } from '../lib/chat-media.ts';
+import { REACTIONS } from '../lib/chat-media.ts';
+import { EmojiSheet } from './emoji-sheet.tsx';
 import { toApiError } from '../lib/errors.ts';
 import type { ChatMessage, ChatReaction } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
@@ -21,7 +22,6 @@ const EDGE = 12;
  */
 export function MessagePopup({ message, conversationId, canSend, onClose, onReply, onSelect, onReacted, onDeleted }: { message: ChatMessage; conversationId: string; canSend: boolean; onClose: () => void; onReply: () => void; onSelect: () => void; onReacted: (reactions: ChatReaction[]) => void; onDeleted: (message: ChatMessage) => void }) {
   const [step, setStep] = useState<'menu' | 'delete' | 'emoji'>('menu');
-  const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [copied, setCopied] = useState(false);
@@ -49,6 +49,7 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
 
   // Destaca a própria mensagem acima do fundo escurecido e mede onde ficam a barra e o menu.
   useLayoutEffect(() => {
+    if (step === 'emoji') return; // a folha de emojis cobre a conversa; a mensagem não fica por cima dela
     const el = document.getElementById(`msg-${message.id}`);
     el?.classList.add('msg--lifted');
     const place = () => {
@@ -105,6 +106,9 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
     }
   }
 
+  // O "+" troca o menu pela folha com todos os emojis (busca, recentes e categorias), como no Instagram.
+  if (step === 'emoji') return <EmojiSheet selected={mine} busy={busy} problem={problem} onPick={(emoji) => void react(emoji)} onClose={onClose} />;
+
   const side = message.mine ? 'msgpop--mine' : 'msgpop--theirs';
   const style = (top: number | undefined) => (top === undefined ? { visibility: 'hidden' as const } : { top });
   return (
@@ -130,43 +134,7 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
       ) : null}
       <div ref={menuRef} className="msgpop__menu" style={style(pos?.menuTop)}>
         {problem ? <Notice tone="error">{problem}</Notice> : null}
-        {step === 'emoji' ? (
-          <div className="emojipick">
-            <form
-              className="emojipick__type"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const emoji = firstEmoji(typed);
-                if (emoji) void react(emoji);
-                else setProblem(t('Digite um emoji.'));
-              }}
-            >
-              <label className="visually-hidden" htmlFor="emoji-typed">
-                {t('Digite qualquer emoji')}
-              </label>
-              <input
-                id="emoji-typed"
-                className="emojipick__input"
-                value={typed}
-                placeholder={t('Ou digite qualquer emoji')}
-                autoComplete="off"
-                enterKeyHint="send"
-                onChange={(e) => {
-                  setTyped(e.target.value);
-                  const emoji = firstEmoji(e.target.value);
-                  if (emoji) void react(emoji);
-                }}
-              />
-            </form>
-            <div className="emojipick__grid" role="group" aria-label={t('Escolha um emoji')}>
-              {MORE_EMOJIS.map((emoji) => (
-                <button key={emoji} type="button" className={`emojipick__btn${mine === emoji ? ' is-on' : ''}`} aria-label={t('Reagir com {emoji}', { emoji })} disabled={busy} onClick={() => void react(emoji)}>
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : step === 'delete' ? (
+        {step === 'delete' ? (
           <Confirm danger question={t('Apagar esta mensagem para todos? Ela some da conversa de todo mundo e não dá para desfazer.')} confirmLabel={t('Apagar para todos')} busy={busy} onCancel={() => setStep('menu')} onConfirm={() => void remove()} />
         ) : (
           <ul>

@@ -119,7 +119,8 @@ import type {
   SocialProviderId,
 } from './types.ts';
 import type { CloakroomPanel, CloakroomPublic, CloakroomSettingBody, CloakroomStaffTicket, CloakroomTicket } from './cloakroom.ts';
-import type { EventExtraAnswer, EventExtraOption } from './types.ts';
+import type { EventExtraAnswer, EventExtraOption, StoryOverlay } from './types.ts';
+import { overlaysHeader } from './story-overlays.ts';
 import { t } from '../lib/i18n/index.ts';
 
 /** O mínimo de `fetch` que o cliente usa (facilita testar sem navegador). */
@@ -524,10 +525,15 @@ export function createApi(deps: ApiDeps) {
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
       request<EventPage>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
     eventStories: (eventId: string) => request<{ groups: EventStoryGroup[] }>('GET', `/events/${id(eventId)}/stories`),
-    /** `onProfile`: publica também no perfil, para os amigos verem na página inicial. */
-    createEventStory: async (eventId: string, file: Blob, onProfile = false): Promise<EventStoryGroup> => {
+    /**
+     * `onProfile`: publica também no perfil, para os amigos verem na página inicial.
+     * `overlays`: textos e figurinhas por cima, num cabeçalho (o corpo é a mídia crua).
+     */
+    createEventStory: async (eventId: string, file: Blob, onProfile = false, overlays: readonly StoryOverlay[] = []): Promise<EventStoryGroup> => {
       const token = deps.getToken();
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
+      const overlayHeader = overlaysHeader(overlays);
+      if (overlayHeader) headers['X-Story-Overlays'] = overlayHeader;
       if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
       let response;
       try {
@@ -558,6 +564,12 @@ export function createApi(deps: ApiDeps) {
     /** Reage a um story: entre amigos vira mensagem na conversa; sem amizade (story de evento), um aviso para quem publicou. */
     reactProfileStory: (storyId: string, emoji: string) => request<{ sent: true; conversationId: string | null }>('POST', `/stories/${id(storyId)}/react`, { body: { emoji } }),
     reactEventStory: (eventId: string, storyId: string, emoji: string) => request<{ sent: true; conversationId: string | null }>('POST', `/events/${id(eventId)}/stories/${id(storyId)}/react`, { body: { emoji } }),
+    /** Responde ao story com texto: entre amigos vai direto para a conversa; senão, chega como aviso. Sem `eventId`, pela página inicial. */
+    replyStory: (storyId: string, text: string, eventId?: string) =>
+      request<{ sent: true; conversationId: string | null }>('POST', eventId ? `/events/${id(eventId)}/stories/${id(storyId)}/reply` : `/stories/${id(storyId)}/reply`, { body: { text } }),
+    /** Coração do story (fica guardado; quem publicou recebe um aviso). */
+    likeStory: (storyId: string, liked: boolean, eventId?: string) =>
+      request<{ liked: boolean }>('POST', eventId ? `/events/${id(eventId)}/stories/${id(storyId)}/like` : `/stories/${id(storyId)}/like`, { body: { liked } }),
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
     eventGo: (eventId: string, onProfile?: boolean) => request<EventPage>('POST', `/events/${id(eventId)}/going`, onProfile === undefined ? {} : { body: { onProfile } }),
     setGoingOnProfile: (eventId: string, onProfile: boolean) => request<EventPage>('PATCH', `/events/${id(eventId)}/going`, { body: { onProfile } }),

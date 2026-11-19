@@ -2250,6 +2250,14 @@ export function defineRepositoryContract(
         assert.equal(await h.eventRoom.reportStory({ ...rep, id: randomUUID() }), false, 'uma denúncia por pessoa');
         assert.deepEqual([...(await h.eventRoom.reportedStoryIds(ana, [storyA.id, storyP.id]))], [storyA.id]);
         assert.deepEqual([...(await h.eventRoom.reportedStoryIds(bia, [storyA.id]))], []);
+        // curtidas: uma por pessoa; curtir de novo ou descurtir o que não curtiu não muda nada
+        assert.equal(await h.eventRoom.setStoryLike(storyA.id, bia, true, at(4)), true);
+        assert.equal(await h.eventRoom.setStoryLike(storyA.id, bia, true, at(5)), false);
+        assert.deepEqual([...(await h.eventRoom.likedStoryIds(bia, [storyA.id, storyP.id]))], [storyA.id]);
+        assert.deepEqual([...(await h.eventRoom.likedStoryIds(ana, [storyA.id]))], []);
+        assert.equal(await h.eventRoom.setStoryLike(storyA.id, bia, false, at(6)), true);
+        assert.equal(await h.eventRoom.setStoryLike(storyA.id, bia, false, at(6)), false);
+        assert.equal(await h.eventRoom.setStoryLike(randomUUID(), bia, true, at(6)), false, 'story que não existe');
         // ocultação de stories: uma linha por dono; tudo desligado apaga
         assert.deepEqual(await h.eventRoom.listStoryHidden(ana), []);
         await h.eventRoom.setStoryHidden({ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: false });

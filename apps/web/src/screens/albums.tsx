@@ -4,7 +4,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { useAlbumPhoto } from '../components/album-photo.tsx';
 import { PhotoIcon } from '../components/icons.tsx';
 import { AvatarViewer } from '../components/photo-viewer.tsx';
-import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { albumName, albumPhotosText, albumWith } from '../lib/album.ts';
@@ -103,14 +103,19 @@ function PostSheet({ albumId, photo, onClose }: { albumId: string; photo: AlbumP
 /** Menu da própria foto: postar no perfil ou apagar do álbum. */
 function MyPhotoSheet({ album, photo, onClose, onView, onDeleted }: { album: AlbumDetail; photo: AlbumPhoto; onClose: () => void; onView: () => void; onDeleted: () => void }) {
   const [posting, setPosting] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
   if (posting) return <PostSheet albumId={album.id} photo={photo} onClose={onClose} />;
   async function remove() {
+    setBusy(true);
     try {
       await api.deleteAlbumPhoto(album.id, photo.id);
       onDeleted();
     } catch (failure) {
       setError(toApiError(failure).message);
+      setBusy(false);
+      setAsking(false);
     }
   }
   return (
@@ -127,11 +132,12 @@ function MyPhotoSheet({ album, photo, onClose, onView, onDeleted }: { album: Alb
           </button>
         </li>
         <li>
-          <button type="button" className="menulist__item menulist__item--danger" onClick={() => void remove()}>
+          <button type="button" className="menulist__item menulist__item--danger" onClick={() => setAsking(true)}>
             <span>{t('Apagar do álbum')}</span>
           </button>
         </li>
       </ul>
+      {asking ? <Confirm danger question={t('Apagar esta foto do álbum? Ela some para todos que veem o álbum e não dá para desfazer.')} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => void remove()} onCancel={() => setAsking(false)} /> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
     </Sheet>
   );

@@ -767,6 +767,25 @@ export interface EventStoryItem {
   canDelete: boolean;
   /** Só nos stories da página inicial: de qual evento veio (null se você não tem acesso a ele). */
   event?: StoryEvent | null;
+  /** Textos e figurinhas por cima da mídia (ver `lib/story-overlays.ts`). */
+  overlays?: StoryOverlay[];
+  /** Você curtiu (coração). Só vem nos stories de outras pessoas. */
+  liked?: boolean;
+}
+
+export type StoryOverlayStyle = 'CLASSIC' | 'BOX' | 'NEON' | 'SERIF';
+
+/** Texto ou figurinha por cima do story: centro em `x`/`y` (0 a 1 na área da mídia), escala e giro em graus. */
+export interface StoryOverlay {
+  kind: 'TEXT' | 'STICKER';
+  text: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  /** `#rrggbb`: cor da letra (ou do fundo, no estilo BOX; do brilho, no NEON). */
+  color: string;
+  style: StoryOverlayStyle;
 }
 
 /** Onde a pessoa do story está: o evento e o local, para mostrar num relance. */

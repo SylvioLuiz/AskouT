@@ -4,7 +4,7 @@ import { Sheet } from './agenda.tsx';
 import { SoundToggle } from './sound-toggle.tsx';
 import { ChevronRightIcon, EventKindIcon, TrashIcon, XIcon, MoreIcon } from './icons.tsx';
 import { ReasonSheet } from './post-actions.tsx';
-import { Button, ErrorState, Loading, Notice } from './ui.tsx';
+import { Button, Confirm, ErrorState, Loading, Notice } from './ui.tsx';
 import { VenueLogo } from './venue-logo.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
@@ -341,7 +341,11 @@ export function VenueStorySheet({ venueId, onClose }: { venueId: string; onClose
     }
   }
 
+  /** Story esperando a confirmação para ser apagado. */
+  const [askDelete, setAskDelete] = useState<string | undefined>();
+
   async function remove(storyId: string) {
+    setAskDelete(undefined);
     setBusy(true);
     setProblem(undefined);
     try {
@@ -363,12 +367,13 @@ export function VenueStorySheet({ venueId, onClose }: { venueId: string; onClose
       {list.error && !data ? <ErrorState message={list.error.message} onRetry={list.reload} /> : null}
       {data?.suspended ? <Notice tone="error">{t('A publicação de stories deste local está suspensa até a equipe do AskouT analisar as denúncias.')}</Notice> : null}
       {problem ? <Notice tone="error">{problem}</Notice> : null}
+      {askDelete ? <Confirm danger question={t('Apagar este story? Ele sai do ar na hora e não dá para desfazer.')} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => void remove(askDelete)} onCancel={() => setAskDelete(undefined)} /> : null}
       {data && data.items.length > 0 ? (
         <ul className="vstories" aria-label={t('Stories no ar')}>
           {data.items.map((s) => (
             <li key={s.id} className="vstories__item">
               {s.kind === 'VIDEO' ? <video src={api.venueStoryMediaUrl(s.id)} muted playsInline preload="metadata" /> : <img src={api.venueStoryMediaUrl(s.id)} alt="" />}
-              <button type="button" className="vstories__del" onClick={() => void remove(s.id)} disabled={busy} aria-label={t('Apagar este story')}>
+              <button type="button" className="vstories__del" onClick={() => setAskDelete(s.id)} disabled={busy} aria-label={t('Apagar este story')}>
                 <TrashIcon />
               </button>
             </li>

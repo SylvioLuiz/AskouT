@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { shareOrigin } from '../lib/public-origin.ts';
-import { CameraIcon, ChevronDownIcon, EditIcon, LockIcon, MoreIcon, ShareIcon, UsersIcon } from '../components/icons.tsx';
+import { CameraIcon, ChevronDownIcon, LockIcon, MoreIcon, ShareIcon, UsersIcon } from '../components/icons.tsx';
 import { StoryViewer } from '../components/event-story.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { profileLink, profileShareText } from '../lib/share.ts';
@@ -211,9 +211,6 @@ export function ProfileScreen({ username }: { username: string }) {
             <button type="button" className="iconbtn" onClick={() => setMenuOpen(true)} aria-label={t('Abrir menu')} aria-haspopup="dialog">
               <MoreIcon />
             </button>
-            <Link to="/perfil/editar" className="iconbtn" aria-label={t('Editar perfil')}>
-              <EditIcon />
-            </Link>
           </div>
         ) : !relationship.isSelf ? (
           <ProfileActions

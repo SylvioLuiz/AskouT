@@ -4,7 +4,8 @@ import { Sheet } from './agenda.tsx';
 import { CommentGifView, CommentTools } from './comment-tools.tsx';
 import { Carousel } from './post.tsx';
 import { PhotoViewer } from './photo-viewer.tsx';
-import { ArrowUpIcon, CommentIcon, MoreIcon, PhotoIcon, TrashIcon, XIcon } from './icons.tsx';
+import { ArrowUpIcon, CommentIcon, HeartIcon, MoreIcon, PhotoIcon, PlusIcon, TrashIcon, XIcon } from './icons.tsx';
+import { EmojiSheet } from './emoji-sheet.tsx';
 import { ReasonSheet } from './post-actions.tsx';
 import { VenueLogo } from './venue-logo.tsx';
 import { Avatar, Button, Confirm, ErrorState, Field, Loading, Notice } from './ui.tsx';
@@ -79,24 +80,94 @@ function MentionList({ people, onPick }: { people: PublicProfile[]; onPick: (use
   );
 }
 
-/** Botão de reagir: abre a fileira de emojis; tocar no emoji que já é o seu tira a reação. */
+/**
+ * Coração do feed, como no Instagram: um toque curte (❤️) ou tira a sua reação; segurar abre a fileira de emojis,
+ * com o "+" para todos os outros. Com teclado, a seta para cima (ou a tecla de menu) abre a fileira.
+ */
 function ReactButton({ reactions, onReact, small }: { reactions: FeedReactions; onReact: (emoji: string | null) => void; small?: boolean }) {
   const [open, setOpen] = useState(false);
+  const [all, setAll] = useState(false);
+  const [pop, setPop] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+  const timer = useRef<number | undefined>(undefined);
+  const held = useRef(false);
   useEffect(() => {
     if (!open) return;
     const close = (event: PointerEvent) => {
       if (!wrap.current?.contains(event.target as Node)) setOpen(false);
     };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('pointerdown', close);
-    return () => document.removeEventListener('pointerdown', close);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [open]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
   const mine = reactions.mine;
+
+  function stopTimer() {
+    window.clearTimeout(timer.current);
+    timer.current = undefined;
+  }
+  function choose(emoji: string | null) {
+    setOpen(false);
+    setAll(false);
+    if (emoji) {
+      setPop(true);
+      window.setTimeout(() => setPop(false), 400);
+    }
+    onReact(emoji);
+  }
+
   return (
     <div className={`react${small ? ' react--small' : ''}`} ref={wrap}>
-      <button type="button" className={`react__btn${mine ? ' react__btn--on' : ''}`} aria-expanded={open} aria-haspopup="true" onClick={() => setOpen((o) => !o)} aria-label={mine ? t('Sua reação: {emoji}. Trocar ou tirar', { emoji: mine }) : t('Reagir')}>
-        <span aria-hidden="true">{mine ?? '🤍'}</span>
-        {small ? null : <span>{mine ? t('Reagiu') : t('Reagir')}</span>}
+      <button
+        type="button"
+        className={`react__btn${mine ? ' react__btn--on' : ''}${pop ? ' react__btn--pop' : ''}`}
+        aria-expanded={open}
+        aria-haspopup="true"
+        aria-label={mine ? t('Sua reação: {emoji}. Toque para tirar; segure para trocar', { emoji: mine }) : t('Curtir. Segure para escolher outra reação')}
+        onPointerDown={(event) => {
+          event.stopPropagation(); // segurar o coração não abre as opções do comentário
+          if (event.pointerType === 'mouse' && event.button !== 0) return;
+          held.current = false;
+          stopTimer();
+          timer.current = window.setTimeout(() => {
+            held.current = true;
+            setOpen(true);
+            navigator.vibrate?.(10);
+          }, LONG_PRESS_MS);
+        }}
+        onPointerUp={stopTimer}
+        onPointerLeave={stopTimer}
+        onPointerCancel={stopTimer}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          stopTimer();
+          held.current = true;
+          setOpen(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowUp' || event.key === 'ContextMenu') {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+        onClick={() => {
+          // O toque que abriu a fileira não curte.
+          if (held.current) {
+            held.current = false;
+            return;
+          }
+          choose(mine ? null : '❤️');
+        }}
+      >
+        {mine === null ? <HeartIcon /> : mine === '❤️' ? <span className="react__heart"><HeartIcon filled /></span> : <span className="react__mine" aria-hidden="true">{mine}</span>}
       </button>
       {open ? (
         <div className="react__pick" role="group" aria-label={t('Escolha uma reação')}>
@@ -107,16 +178,17 @@ function ReactButton({ reactions, onReact, small }: { reactions: FeedReactions; 
               className={`react__emoji${mine === emoji ? ' react__emoji--on' : ''}`}
               aria-pressed={mine === emoji}
               aria-label={mine === emoji ? t('Tirar a reação {emoji}', { emoji }) : t('Reagir com {emoji}', { emoji })}
-              onClick={() => {
-                setOpen(false);
-                onReact(mine === emoji ? null : emoji);
-              }}
+              onClick={() => choose(mine === emoji ? null : emoji)}
             >
               {emoji}
             </button>
           ))}
+          <button type="button" className="react__emoji react__emoji--more" aria-label={t('Mais emojis')} onClick={() => { setOpen(false); setAll(true); }}>
+            <PlusIcon />
+          </button>
         </div>
       ) : null}
+      {all ? <EmojiSheet selected={mine ?? undefined} onPick={(emoji) => choose(mine === emoji ? null : emoji)} onClose={() => setAll(false)} /> : null}
     </div>
   );
 }
@@ -217,9 +289,8 @@ function FeedPostCard({ post, onChange, onGone, onComments, onApprove, onReject 
           ) : null}
           <div className="feedpost__actions" role="group" aria-label={t('Ações da publicação')}>
             <ReactButton reactions={post.reactions} onReact={(emoji) => void react(emoji)} />
-            <button type="button" className="react__btn" onClick={onComments}>
+            <button type="button" className="react__btn" onClick={onComments} aria-label={t('Comentar')}>
               <CommentIcon />
-              <span>{t('Comentar')}</span>
             </button>
           </div>
         </>

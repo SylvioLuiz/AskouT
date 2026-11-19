@@ -4,7 +4,8 @@ import { shareOrigin } from '../lib/public-origin.ts';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
-import { StoryCreateSheet, StoryViewer } from '../components/event-story.tsx';
+import { StoryViewer } from '../components/event-story.tsx';
+import { StoryCreator } from '../components/story-creator.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { EditPostSheet } from '../components/post-actions.tsx';
 import { EventExtrasList } from '../components/event-extras.tsx';
@@ -541,7 +542,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
         />
       ) : null}
       {creatingStory && e ? (
-        <StoryCreateSheet
+        <StoryCreator
           eventId={e.id}
           onClose={() => setCreatingStory(false)}
           onCreated={() => {

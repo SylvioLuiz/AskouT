@@ -1013,6 +1013,10 @@ export interface EventRoomRepository {
   reportStory(report: EventStoryReportRecord): Promise<boolean>;
   /** Destes stories, quais `userId` já denunciou (ele não os vê mais). */
   reportedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>>;
+  /** Curte (ou descurte) um story. Devolve true se mudou algo (curtir de novo não conta). */
+  setStoryLike(storyId: string, userId: string, liked: boolean, at: Date): Promise<boolean>;
+  /** Destes stories, quais `userId` curtiu. */
+  likedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>>;
   /** Grava a ocultação de stories de `ownerId` em relação a `otherId`; tudo desligado apaga a linha. */
   setStoryHidden(record: StoryHiddenRecord): Promise<void>;
   /** As ocultações de stories em que `userId` aparece (as que ele escolheu e as que escolheram sobre ele). */

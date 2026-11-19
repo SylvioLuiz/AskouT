@@ -208,6 +208,7 @@ model User {
   commentLikes        PostCommentLike[]    @relation("PostCommentLikes")
   eventStories        EventStory[]         @relation("EventStoryAuthor")
   storyReports        EventStoryReport[]   @relation("EventStoryReports")
+  storyLikes          EventStoryLike[]     @relation("EventStoryLikes")
   notificationSetting NotificationSetting? @relation("NotificationSettingUser")
 
   organizedMeetings     Meeting[]            @relation("MeetingOrganizer")
@@ -1130,6 +1131,8 @@ model EventStory {
   isVideo      Boolean  @default(false)
   /// A pessoa escolheu publicar também no perfil: aparece na página inicial dos amigos (além do evento).
   onProfile    Boolean  @default(false)
+  /// Textos e figurinhas por cima da mídia (lista conferida por `parseStoryOverlays`). Quem assiste desenha.
+  overlays     Json?
   data         Bytes
   createdAt    DateTime @default(now())
   expiresAt    DateTime
@@ -1139,11 +1142,25 @@ model EventStory {
   post       Post?       @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   reports    EventStoryReport[]
+  likes      EventStoryLike[]
 
   @@index([placeEventId, expiresAt])
   @@index([postId, expiresAt])
   @@index([userId])
   @@index([userId, onProfile, expiresAt])
+}
+
+/// Curtida (coração) num story, como no Instagram: uma por pessoa. Some junto com o story.
+model EventStoryLike {
+  storyId   String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  story EventStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user  User       @relation("EventStoryLikes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([storyId, userId])
+  @@index([userId])
 }
 
 /// Denúncia de story: uma por pessoa. Fica guardada para a gestão; quem denunciou deixa de ver aquele story.

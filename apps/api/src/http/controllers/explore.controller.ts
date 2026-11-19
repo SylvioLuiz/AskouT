@@ -4,6 +4,7 @@ import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import type { EventCoverView, EventPageView } from '../../core/event-page-service.ts';
 import { asBody } from '../support/parse.ts';
+import { parseStoryOverlaysHeader } from '../../core/story-overlays.ts';
 import { CurrentActor, Public } from '../decorators.ts';
 import { CORE, PLACE_PHOTOS } from '../tokens.ts';
 
@@ -90,12 +91,20 @@ export class ExploreController {
   /**
    * Publica um story: o corpo é o arquivo cru (`Content-Type: image/jpeg`, `video/mp4`...).
    * `?profile=1` publica também no perfil, para os amigos verem na página inicial.
+   * `X-Story-Overlays`: textos e figurinhas por cima (JSON em base64), já que o corpo é a mídia.
    */
   @Post('events/:id/stories')
   @HttpCode(200)
-  async createStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Headers('content-type') contentType: string | undefined, @Body() body: unknown, @Query('profile') profile: string | undefined) {
+  async createStory(
+    @CurrentActor() actor: Actor,
+    @Param('id') id: string,
+    @Headers('content-type') contentType: string | undefined,
+    @Headers('x-story-overlays') overlays: string | undefined,
+    @Body() body: unknown,
+    @Query('profile') profile: string | undefined,
+  ) {
     const data = Buffer.isBuffer(body) ? new Uint8Array(body.buffer, body.byteOffset, body.byteLength) : undefined;
-    return this.core.eventPages.createStory(actor.userId, id, contentType, data, profile === '1' || profile === 'true');
+    return this.core.eventPages.createStory(actor.userId, id, contentType, data, profile === '1' || profile === 'true', parseStoryOverlaysHeader(overlays));
   }
 
   /** Página inicial: os stories que você e seus amigos publicaram também no perfil. */
@@ -149,6 +158,32 @@ export class ExploreController {
   @HttpCode(200)
   reactStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('storyId') storyId: string, @Body() body: unknown) {
     return this.core.storyReactions.react(actor.userId, storyId, asBody(body).emoji, id);
+  }
+
+  /** Coração do story (como no Instagram): `{liked: boolean}`. Quem publicou recebe um aviso; não vira mensagem. */
+  @Post('stories/:storyId/like')
+  @HttpCode(200)
+  likeProfileStory(@CurrentActor() actor: Actor, @Param('storyId') storyId: string, @Body() body: unknown) {
+    return this.core.storyReactions.like(actor.userId, storyId, asBody(body).liked);
+  }
+
+  @Post('events/:id/stories/:storyId/like')
+  @HttpCode(200)
+  likeStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('storyId') storyId: string, @Body() body: unknown) {
+    return this.core.storyReactions.like(actor.userId, storyId, asBody(body).liked, id);
+  }
+
+  /** Responde a um story com texto: `{text}`. Entre amigos vai direto para a conversa; senão, chega como aviso. */
+  @Post('stories/:storyId/reply')
+  @HttpCode(200)
+  replyProfileStory(@CurrentActor() actor: Actor, @Param('storyId') storyId: string, @Body() body: unknown) {
+    return this.core.storyReactions.reply(actor.userId, storyId, asBody(body).text);
+  }
+
+  @Post('events/:id/stories/:storyId/reply')
+  @HttpCode(200)
+  replyStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('storyId') storyId: string, @Body() body: unknown) {
+    return this.core.storyReactions.reply(actor.userId, storyId, asBody(body).text, id);
   }
 
   @Delete('events/:id/stories/:storyId')

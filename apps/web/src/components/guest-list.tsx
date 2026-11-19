@@ -7,7 +7,7 @@ import { t } from '../lib/i18n/index.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
 import type { GuestListOwnerView, GuestListView } from '../lib/types.ts';
 import { Sheet } from './agenda.tsx';
-import { Avatar, Button, Field, Notice } from './ui.tsx';
+import { Avatar, Button, Confirm, Field, Notice } from './ui.tsx';
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -24,6 +24,7 @@ export function GuestListCard({ eventId, ended }: { eventId: string; ended: bool
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [managing, setManaging] = useState(false);
+  const [askLeave, setAskLeave] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -92,7 +93,11 @@ export function GuestListCard({ eventId, ended }: { eventId: string; ended: bool
         </Button>
       ) : null}
       {view.mine && !view.mine.checkedIn && !ended ? (
-        <Button full variant="quiet" loading={busy} onClick={() => void run(() => api.leaveGuestList(eventId))}>{t('Tirar meu nome')}</Button>
+        askLeave ? (
+          <Confirm danger question={t('Tirar seu nome da lista VIP? Se as vagas acabarem, pode não dar para voltar.')} confirmLabel={t('Tirar meu nome')} busy={busy} onConfirm={() => { setAskLeave(false); void run(() => api.leaveGuestList(eventId)); }} onCancel={() => setAskLeave(false)} />
+        ) : (
+          <Button full variant="quiet" loading={busy} onClick={() => setAskLeave(true)}>{t('Tirar meu nome')}</Button>
+        )
       ) : null}
       {!view.mine ? <p className="muted evguest__privacy">{t('Quem administra o local vê o seu nome e o seu @usuário na lista.')}</p> : null}
       {problem ? <Notice tone="error">{problem}</Notice> : null}
@@ -112,6 +117,7 @@ function GuestListManager({ eventId, view, onChanged, onClose }: { eventId: stri
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [askOff, setAskOff] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
 
   useEffect(() => {
@@ -149,7 +155,7 @@ function GuestListManager({ eventId, view, onChanged, onClose }: { eventId: stri
   }
 
   async function turnOff() {
-    if (!window.confirm(t('Desligar a lista apaga todos os nomes. Continuar?'))) return;
+    setAskOff(false);
     await guarded(async () => {
       onChanged(await api.configureGuestList(eventId, { enabled: false }));
       onClose();
@@ -196,7 +202,11 @@ function GuestListManager({ eventId, view, onChanged, onClose }: { eventId: stri
               saveCsv(file.filename, file.csv);
             })}>{t('Exportar CSV')}</Button>
             <p className="muted evguest__privacy">{t('Estes nomes são de quem se inscreveu e só você vê. Use a lista só para a portaria deste evento.')}</p>
-            <Button full variant="danger" disabled={busy} onClick={() => void turnOff()}>{t('Desligar a lista')}</Button>
+            {askOff ? (
+              <Confirm danger question={t('Desligar a lista apaga todos os nomes. Continuar?')} confirmLabel={t('Desligar a lista')} busy={busy} onConfirm={() => void turnOff()} onCancel={() => setAskOff(false)} />
+            ) : (
+              <Button full variant="danger" disabled={busy} onClick={() => setAskOff(true)}>{t('Desligar a lista')}</Button>
+            )}
           </>
         ) : null}
       </div>
