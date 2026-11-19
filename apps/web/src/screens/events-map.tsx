@@ -407,7 +407,7 @@ export function EventsMapScreen() {
         <ExploreViews current="map" floating />
         <div className="evmap__seg" role="group" aria-label={t('O que mostrar no carrossel')}>
           <button type="button" aria-pressed={mode === 'places'} className={mode === 'places' ? 'is-on' : ''} onClick={() => setMode('places')}>
-            Locais{placesResult.data ? ` ${places.length}` : ''}
+            Locais
           </button>
           {noLiveEvents ? null : (
             <button type="button" aria-pressed={mode === 'events'} className={mode === 'events' ? 'is-on' : ''} onClick={() => setMode('events')}>
