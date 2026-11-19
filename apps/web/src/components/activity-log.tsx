@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
-import { ACTIVITY_FILTERS, activityDetail, activityPath, activitySentence, appendPage, groupByDay, type ActivityFilter, type ActivityItem } from '../lib/activity-log.ts';
+import { activityDetail, activityPath, activitySentence, appendPage, groupByDay, type ActivityFilter, type ActivityItem } from '../lib/activity-log.ts';
 import { toApiError } from '../lib/errors.ts';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 import { Link } from '../router.tsx';
@@ -53,9 +53,13 @@ function ActivityRow({ item }: { item: ActivityItem }) {
   return <li>{path ? <Link to={path} className="actlog__row">{body}</Link> : <div className="actlog__row actlog__row--off">{body}</div>}</li>;
 }
 
-/** Registro de atividades, no estilo do "Registro de atividades" do Facebook: o que você fez, por dia, com filtros. */
-export function ActivityLog() {
-  const [filter, setFilter] = useState<ActivityFilter>('ALL');
+/** Ícone de cada aba de "Suas interações". */
+export function ActivityKindIcon({ kind }: { kind: ActivityItem['kind'] }) {
+  return <KindIcon kind={kind} />;
+}
+
+/** Registro de atividades de um tipo (ou todos): o que você fez, por dia. A aba fica na tela, que passa o filtro. */
+export function ActivityLog({ filter }: { filter: ActivityFilter }) {
   const first = useAsync(async () => ({ filter, page: await api.myActivity(filter) }), [filter]);
   // Páginas extras de "Carregar mais", sempre do filtro atual.
   const [more, setMore] = useState<{ filter: ActivityFilter; items: ActivityItem[]; cursor: string | null } | undefined>();
@@ -66,12 +70,6 @@ export function ActivityLog() {
   const extra = more?.filter === filter ? more : undefined;
   const items = firstPage ? appendPage(firstPage.items, extra?.items ?? []) : [];
   const cursor = extra ? extra.cursor : (firstPage?.nextCursor ?? null);
-
-  function pick(next: ActivityFilter) {
-    setFilter(next);
-    setMore(undefined);
-    setMoreError(undefined);
-  }
 
   async function loadMore() {
     if (!cursor) return;
@@ -90,15 +88,6 @@ export function ActivityLog() {
   const groups = groupByDay(items, new Date());
   return (
     <section className="actlog" aria-label={t('Registro de atividades')}>
-      <h2 className="profile__section">{t('Registro de atividades')}</h2>
-      <p className="muted">{t('O que você fez no AskouT. Só você vê.')}</p>
-      <div className="newsfilters" role="group" aria-label={t('Filtrar atividades')}>
-        {ACTIVITY_FILTERS.map((f) => (
-          <button key={f.id} type="button" className="chip newsfilters__chip" aria-pressed={filter === f.id} onClick={() => pick(f.id)}>
-            {f.label()}
-          </button>
-        ))}
-      </div>
       {!firstPage && !first.error ? <Loading /> : null}
       {first.error ? <ErrorState message={first.error.message} onRetry={first.reload} /> : null}
       {firstPage && items.length === 0 ? (

@@ -18,17 +18,18 @@ import type { ThemeChoice } from '../lib/theme.ts';
 import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validation.ts';
 import { InviteSheet } from '../components/invite.tsx';
 import { ConnectContactsCard } from '../components/connect-contacts.tsx';
-import { ActivityLog } from '../components/activity-log.tsx';
+import { ActivityKindIcon, ActivityLog } from '../components/activity-log.tsx';
+import { INTERACTIONS_TABS, interactionsPath, tabFromSlug, type InteractionsTab } from '../lib/activity-log.ts';
 import { AttendedVisibilitySetting } from '../components/profile-attended.tsx';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
 import { AvatarCropper } from '../components/avatar-cropper.tsx';
 import { AvatarViewer } from '../components/photo-viewer.tsx';
-import { BellIcon, BlockIcon, BoltIcon, ChevronLeftIcon, ChevronRightIcon, DocIcon, GlobeIcon, HelpIcon, LinkIcon, LockIcon, LogoutIcon, MoonIcon, ShieldIcon, SunIcon, UserIcon, UsersIcon } from '../components/icons.tsx';
+import { BellIcon, BlockIcon, BoltIcon, ChevronLeftIcon, ChevronRightIcon, DocIcon, GlobeIcon, HelpIcon, LinkIcon, ListIcon, LockIcon, LogoutIcon, MoonIcon, ShieldIcon, SunIcon, UserIcon, UsersIcon } from '../components/icons.tsx';
 import { formatPhone, normalizePhone } from '../lib/phone.ts';
 import { supportMailto } from '../lib/help-mailto.ts';
 import { downloadJson } from '../lib/account.ts';
 import { birthDateProblem, MIN_ACCOUNT_AGE, ageOnDate, todayIso } from '../lib/age.ts';
-import { Link } from '../router.tsx';
+import { Link, navigate, useSearch } from '../router.tsx';
 import { LOCALES, chooseLocale, getLocale, intlLocale, t } from '../lib/i18n/index.ts';
 
 /** Versão mostrada no rodapé das configurações. */
@@ -637,8 +638,63 @@ function RegionSetting({ userId }: { userId: string }) {
 
 export function InteractionsScreen() {
   useTitle(t('Suas interações'));
-  const meetups = useAsync(() => api.myMeetups(), []);
+  // Abas por tipo, como em "Sua atividade > Interações" do Instagram. A aba fica no ?aba= para o voltar e o link levarem a ela.
+  const tab = tabFromSlug(useSearch().get('aba'));
   const requests = useAsync(() => api.followRequests({ limit: 1 }), []);
+
+  function pick(next: InteractionsTab) {
+    if (next === tab) return;
+    const y = window.scrollY;
+    navigate(interactionsPath(next), { replace: true });
+    window.scrollTo(0, y);
+  }
+
+  return (
+    <>
+      <PageHead title={t('Suas interações')} back="/perfil" />
+      {(requests.data?.total ?? 0) > 0 ? (
+        <Link to="/atividades?aba=pedidos" className="callout callout--link">
+          <span className="callout__text">
+            <strong>{pluralize(requests.data?.total ?? 0, 'pedido para seguir', 'pedidos para seguir')}</strong>
+            <br />
+            {t('Aprove ou recuse em Notificações.')}
+          </span>
+        </Link>
+      ) : null}
+      <div className="segtabs intertabs" role="tablist" aria-label={t('Tipos de interação')}>
+        {INTERACTIONS_TABS.map((item) => (
+          <button key={item.id} type="button" role="tab" id={`intertab-${item.slug}`} aria-selected={tab === item.id} aria-controls="interpanel" className="segtabs__tab intertabs__tab" onClick={() => pick(item.id)}>
+            {item.id === 'MEETUPS' ? <UsersIcon /> : item.id === 'ALL' ? <ListIcon /> : <ActivityKindIcon kind={item.id} />}
+            {item.label()}
+          </button>
+        ))}
+      </div>
+      <div id="interpanel" role="tabpanel" aria-labelledby={`intertab-${INTERACTIONS_TABS.find((item) => item.id === tab)?.slug}`}>
+        {tab === 'MEETUPS' ? (
+          <MeetupsTab />
+        ) : (
+          <>
+            {tab === 'ALL' ? <p className="muted">{t('O que você fez no AskouT. Só você vê.')}</p> : null}
+            {tab === 'EVENT' ? (
+              <Link to="/perfil" className="callout callout--link">
+                <span className="callout__text">
+                  <strong>{t('Eventos postados no perfil')}</strong>
+                  <br />
+                  {t('Veja e tire eventos do seu perfil. Para postar, abra um evento e use Compartilhar.')}
+                </span>
+              </Link>
+            ) : null}
+            <ActivityLog key={tab} filter={tab} />
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** Aba "Encontros" de Suas interações: os próximos e os anteriores. */
+function MeetupsTab() {
+  const meetups = useAsync(() => api.myMeetups(), []);
   const items = meetups.data?.items ?? [];
   const now = Date.now();
   const upcoming = items.filter((m) => m.status === 'ACTIVE' && Date.parse(m.endsAt) > now);
@@ -648,7 +704,7 @@ export function InteractionsScreen() {
     <li key={m.id}>
       <Link to={`/conversas/${encodeURIComponent(m.conversationId)}`} className="inter__row">
         <span className="inter__title">{m.title}</span>
-        <span className="inter__sub">{m.status === 'CANCELLED' ? 'Cancelado' : formatWhen(m.startsAt, m.endsAt, new Date())}</span>
+        <span className="inter__sub">{m.status === 'CANCELLED' ? t('Cancelado') : formatWhen(m.startsAt, m.endsAt, new Date())}</span>
         {statusLabel(m.myStatus) ? <span className="inter__sub">{statusLabel(m.myStatus)}</span> : null}
       </Link>
     </li>
@@ -656,17 +712,6 @@ export function InteractionsScreen() {
 
   return (
     <>
-      <PageHead title={t('Suas interações')} back="/perfil" />
-      {(requests.data?.total ?? 0) > 0 ? (
-        <Link to="/atividades" className="callout callout--link">
-          <span className="callout__text">
-            <strong>{pluralize(requests.data?.total ?? 0, 'pedido para seguir', 'pedidos para seguir')}</strong>
-            <br />
-            {t('Aprove ou recuse em Notificações.')}
-          </span>
-        </Link>
-      ) : null}
-      <h2 className="profile__section">{t('Seus encontros')}</h2>
       {meetups.loading && !meetups.data ? <Loading /> : null}
       {meetups.error ? <ErrorState message={meetups.error.message} onRetry={meetups.reload} /> : null}
       {meetups.data && items.length === 0 ? (
@@ -681,22 +726,18 @@ export function InteractionsScreen() {
           {t('Os encontros que você criar ou for convidado aparecem aqui.')}
         </EmptyState>
       ) : null}
-      {upcoming.length > 0 ? <ul className="inter">{upcoming.map(row)}</ul> : null}
+      {upcoming.length > 0 ? (
+        <>
+          <h2 className="profile__section">{t('Próximos')}</h2>
+          <ul className="inter">{upcoming.map(row)}</ul>
+        </>
+      ) : null}
       {past.length > 0 ? (
         <>
           <h2 className="profile__section">{t('Anteriores')}</h2>
           <ul className="inter">{past.map(row)}</ul>
         </>
       ) : null}
-      <h2 className="profile__section">{t('Seus eventos')}</h2>
-      <Link to="/perfil" className="callout callout--link">
-        <span className="callout__text">
-          <strong>{t('Eventos postados no perfil')}</strong>
-          <br />
-          {t('Veja e tire eventos do seu perfil. Para postar, abra um evento e use Compartilhar.')}
-        </span>
-      </Link>
-      <ActivityLog />
     </>
   );
 }

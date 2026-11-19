@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { activityDayLabel, activityDetail, activityPath, activitySentence, appendPage, groupByDay, type ActivityItem } from './activity-log.ts';
+import { activityDayLabel, activityDetail, activityPath, activitySentence, appendPage, groupByDay, interactionsPath, tabFromSlug, type ActivityItem } from './activity-log.ts';
 
 const bia = { userId: 'u-bia', username: 'bia', displayName: 'Bia', avatarUrl: null, isPrivate: false };
 const item = (over: Partial<ActivityItem>): ActivityItem => ({ id: 'x', kind: 'LIKE', action: 'POST_LIKE', at: '2026-11-06T15:00:00.000Z', available: true, target: { type: 'POST', id: 'p1' }, person: bia, title: 'Noite boa', text: null, pending: false, ...over });
@@ -45,4 +45,16 @@ test('groupByDay: agrupa por dia com Hoje, Ontem e a data', () => {
 
 test('appendPage: carregar mais não repete itens', () => {
   assert.deepEqual(appendPage([item({ id: 'a' })], [item({ id: 'a' }), item({ id: 'b' })]).map((i) => i.id), ['a', 'b']);
+});
+
+test('abas de Suas interações: ?aba= da URL ida e volta', () => {
+  assert.equal(tabFromSlug(null), 'ALL');
+  assert.equal(tabFromSlug('xyz'), 'ALL');
+  assert.equal(tabFromSlug('curtidas'), 'LIKE');
+  assert.equal(tabFromSlug('encontros'), 'MEETUPS');
+  assert.equal(interactionsPath('ALL'), '/interacoes');
+  assert.equal(interactionsPath('COMMENT'), '/interacoes?aba=comentarios');
+  for (const tab of ['LIKE', 'COMMENT', 'POST', 'FOLLOW', 'EVENT', 'MEETUPS'] as const) {
+    assert.equal(tabFromSlug(new URLSearchParams(interactionsPath(tab).split('?')[1]).get('aba')), tab);
+  }
 });

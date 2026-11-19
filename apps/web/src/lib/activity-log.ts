@@ -25,15 +25,29 @@ export interface ActivityPage {
   nextCursor: string | null;
 }
 
-/** Chips do topo, na ordem em que aparecem. */
-export const ACTIVITY_FILTERS: { id: ActivityFilter; label: () => string }[] = [
-  { id: 'ALL', label: () => t('Todas') },
-  { id: 'LIKE', label: () => t('Curtidas') },
-  { id: 'COMMENT', label: () => t('Comentários') },
-  { id: 'POST', label: () => t('Posts') },
-  { id: 'FOLLOW', label: () => t('Seguindo') },
-  { id: 'EVENT', label: () => t('Eventos') },
+/** Abas da tela "Suas interações", na ordem em que aparecem (como no Instagram). MEETUPS é a lista de encontros. */
+export type InteractionsTab = ActivityFilter | 'MEETUPS';
+
+export const INTERACTIONS_TABS: { id: InteractionsTab; slug: string; label: () => string }[] = [
+  { id: 'ALL', slug: 'todas', label: () => t('Todas') },
+  { id: 'LIKE', slug: 'curtidas', label: () => t('Curtidas') },
+  { id: 'COMMENT', slug: 'comentarios', label: () => t('Comentários') },
+  { id: 'POST', slug: 'posts', label: () => t('Posts') },
+  { id: 'FOLLOW', slug: 'seguindo', label: () => t('Seguindo') },
+  { id: 'EVENT', slug: 'eventos', label: () => t('Eventos') },
+  { id: 'MEETUPS', slug: 'encontros', label: () => t('Encontros') },
 ];
+
+/** Aba aberta a partir do ?aba= da URL; sem valor ou desconhecido abre "Todas". */
+export function tabFromSlug(slug: string | null): InteractionsTab {
+  return INTERACTIONS_TABS.find((tab) => tab.slug === slug)?.id ?? 'ALL';
+}
+
+/** Endereço da tela com a aba; "Todas" fica sem parâmetro. */
+export function interactionsPath(tab: InteractionsTab): string {
+  const slug = INTERACTIONS_TABS.find((item) => item.id === tab)?.slug;
+  return !slug || tab === 'ALL' ? '/interacoes' : `/interacoes?aba=${slug}`;
+}
 
 /** Para onde o item leva no app; undefined se não leva a lugar nenhum. */
 export function activityPath(item: ActivityItem): string | undefined {

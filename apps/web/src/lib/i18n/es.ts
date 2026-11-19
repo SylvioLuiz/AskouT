@@ -2546,4 +2546,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Seu evento privado está pronto. Ele só chega a quem receber nas conversas.": "Tu evento privado está listo. Solo llega a quien lo reciba en las conversaciones.",
   "Seu evento está pronto e já aparece no seu perfil.": "Tu evento está listo y ya aparece en tu perfil.",
   "Depois de criar, você escolhe as conversas e grupos que vão receber o evento.": "Después de crearlo, eliges las conversaciones y grupos que recibirán el evento.",
+  "Encontros": "Encuentros",
+  "Próximos": "Próximos",
+  "Tipos de interação": "Tipos de interacción",
 };
