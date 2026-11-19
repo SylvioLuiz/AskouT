@@ -6,7 +6,8 @@ import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { StoryCreateSheet, StoryViewer } from '../components/event-story.tsx';
 import { Sheet } from '../components/agenda.tsx';
-import { CalendarIcon, CalendarPlusIcon, ChevronLeftIcon, EventKindIcon, LocationIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UserIcon } from '../components/icons.tsx';
+import { EditPostSheet } from '../components/post-actions.tsx';
+import { CalendarIcon, CalendarPlusIcon, ChevronLeftIcon, EditIcon, EventKindIcon, LocationIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UserIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
@@ -24,7 +25,7 @@ import { addToCalendar } from '../lib/ics.ts';
 import { resizePostPhoto } from '../lib/image.ts';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
 import { timeAgo } from '../lib/format.ts';
-import type { EventPage, FeedSettings } from '../lib/types.ts';
+import type { EventPage, FeedSettings, PostView } from '../lib/types.ts';
 import { Feed } from '../components/feed.tsx';
 import { policyNote } from '../lib/feed.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
@@ -53,14 +54,33 @@ function goBack() {
   else navigate('/explorar');
 }
 
-/** Menu ⋯ do evento: compartilhar e adicionar à agenda. */
-function EventMenuSheet({ page, onShare, onClose }: { page: EventPage; onShare: () => void; onClose: () => void }) {
+/** Menu ⋯ do evento: editar (quem criou o evento), compartilhar e adicionar à agenda. */
+function EventMenuSheet({ page, onShare, onEdit, onClose }: { page: EventPage; onShare: () => void; onEdit: (post: PostView) => void; onClose: () => void }) {
   const [message, setMessage] = useState<string | undefined>();
+  const [opening, setOpening] = useState(false);
+  // O evento criado por uma pessoa é um post: edita pelo mesmo formulário de "Editar" do post.
+  const canEdit = page.isOwner && page.source === 'USER';
+
+  async function edit() {
+    setMessage(undefined);
+    setOpening(true);
+    try {
+      onEdit(await api.post(page.id));
+    } catch (failure) {
+      setMessage(toApiError(failure).message);
+      setOpening(false);
+    }
+  }
 
   return (
     <Sheet title={t('Opções do evento')} onClose={onClose}>
       {message ? <Notice tone="error">{message}</Notice> : null}
       <div className="sheetactions">
+      {canEdit ? (
+        <Button full variant="secondary" loading={opening} onClick={() => void edit()}>
+          <EditIcon /> {t('Editar evento')}
+        </Button>
+      ) : null}
       <Button full variant="secondary" onClick={onShare}>
         <ShareIcon /> {t('Compartilhar')}
       </Button>
@@ -94,6 +114,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [planning, setPlanning] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [editing, setEditing] = useState<PostView | undefined>();
   const [calMessage, setCalMessage] = useState<string | undefined>();
   const [creatingStory, setCreatingStory] = useState(false);
   const [viewing, setViewing] = useState<StoryPos | undefined>();
@@ -410,7 +431,26 @@ export function EventScreen({ eventId }: { eventId: string }) {
           onClose={() => setSharing(false)}
         />
       ) : null}
-      {menu && e ? <EventMenuSheet page={e} onShare={() => { setMenu(false); setSharing(true); }} onClose={() => setMenu(false)} /> : null}
+      {menu && e ? (
+        <EventMenuSheet
+          page={e}
+          onShare={() => { setMenu(false); setSharing(true); }}
+          onEdit={(post) => { setMenu(false); setEditing(post); }}
+          onClose={() => setMenu(false)}
+        />
+      ) : null}
+      {editing ? (
+        <EditPostSheet
+          post={editing}
+          eventOnly
+          onClose={() => setEditing(undefined)}
+          onSaved={() => {
+            setEditing(undefined);
+            setCoverFailed(false);
+            loaded.reload();
+          }}
+        />
+      ) : null}
       {creatingStory && e ? (
         <StoryCreateSheet
           eventId={e.id}
