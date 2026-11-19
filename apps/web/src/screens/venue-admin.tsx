@@ -6,6 +6,7 @@ import { useAsync, useTitle } from '../hooks.ts';
 import { formatRating, formatWhen } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { TeamMember, VenueEvent } from '../lib/types.ts';
+import { CheckinQrSheet } from './checkin.tsx';
 import { navigate } from '../router.tsx';
 import { AgendaRow, HoursInfo, InfoRow, OwnerEvents, ProfileEditSheet, VenueHero, VenuePostSheet } from './venue-page.tsx';
 import { LocationIcon } from '../components/icons.tsx';
@@ -73,7 +74,7 @@ export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
   const page = useAsync(() => api.venueProfile(venueId), [venueId]);
   const v = page.data;
   useTitle(v ? t('Painel · {name}', { name: v.name }) : t('Painel'));
-  const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | undefined>();
+  const [sheet, setSheet] = useState<'edit' | 'event' | 'post' | 'qr' | undefined>();
   const [done, setDone] = useState<string | undefined>();
   const [view, setView] = useState<'manage' | 'public'>('manage');
   const now = new Date();
@@ -129,6 +130,9 @@ export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
         <Button full variant="secondary" onClick={() => setSheet('edit')}>
           {t('Editar perfil')}
         </Button>
+        <Button full variant="secondary" onClick={() => setSheet('qr')}>
+          {t('QR code')}
+        </Button>
         <Button full variant="secondary" onClick={() => navigate(`/bares/${encodeURIComponent(v.id)}/oferta`)}>
           {t('Oferta relâmpago')}
         </Button>
@@ -148,6 +152,7 @@ export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
       </section>
         </>
       ) : null}
+      {sheet === 'qr' ? <CheckinQrSheet venueId={v.id} venueName={v.name} onClose={() => setSheet(undefined)} /> : null}
       {sheet === 'edit' ? (
         <ProfileEditSheet
           venue={v}

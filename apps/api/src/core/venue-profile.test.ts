@@ -340,3 +340,70 @@ test('post de pessoa: o nome do rolê leva à página do local quando bate com u
   await w.places.createVenue({ id: 'v3', name: 'Bar do Zé', address: null, category: 'bar', lat: -23.6, lng: -46.7, isSample: false });
   assert.equal((await w.core.posts.get(bia, igual.id)).placeVenueId, null);
 });
+
+test('check-in por QR: só o dono vê e troca o código; trocar invalida o anterior', async () => {
+  const { w, dono, ana } = await setup();
+  await rejectsWith(w.core.venues.checkinCode(ana, 'v1'), 'NOT_FOUND');
+  await rejectsWith(w.core.venues.rotateCheckinCode(ana, 'v1'), 'NOT_FOUND');
+  const first = await w.core.venues.checkinCode(dono, 'v1');
+  assert.ok(first.code.length >= 20, 'código longo demais para adivinhar');
+  assert.equal((await w.core.venues.checkinCode(dono, 'v1')).code, first.code, 'o mesmo código até trocar');
+  const done = await w.core.venues.checkIn(ana, 'v1', first.code);
+  assert.equal(done.venueName, 'Bar do Zé');
+  const second = await w.core.venues.rotateCheckinCode(dono, 'v1');
+  assert.notEqual(second.code, first.code);
+  w.clock.tick(7 * H);
+  await rejectsWith(w.core.venues.checkIn(ana, 'v1', first.code), 'VALIDATION');
+  await w.core.venues.checkIn(ana, 'v1', second.code);
+});
+
+test('check-in por QR: código errado, local sem QR e local inexistente falham', async () => {
+  const { w, dono, ana } = await setup();
+  await rejectsWith(w.core.venues.checkIn(ana, 'v1', 'qualquer'), 'VALIDATION');
+  await w.core.venues.checkinCode(dono, 'v1');
+  await rejectsWith(w.core.venues.checkIn(ana, 'v1', 'qualquer'), 'VALIDATION');
+  await rejectsWith(w.core.venues.checkIn(ana, 'v1', undefined), 'VALIDATION');
+  await rejectsWith(w.core.venues.checkIn(ana, 'v1', 42), 'VALIDATION');
+  await rejectsWith(w.core.venues.checkIn(ana, 'v2', 'qualquer'), 'VALIDATION');
+  await rejectsWith(w.core.venues.checkIn(ana, 'nao-existe', 'x'), 'NOT_FOUND');
+});
+
+test('check-in por QR: um por pessoa e local a cada 6 horas', async () => {
+  const { w, dono, ana, bia } = await setup();
+  const { code } = await w.core.venues.checkinCode(dono, 'v1');
+  await w.core.venues.checkIn(ana, 'v1', code);
+  await rejectsWith(w.core.venues.checkIn(ana, 'v1', code), 'RATE_LIMITED');
+  await w.core.venues.checkIn(bia, 'v1', code); // outra pessoa pode
+  w.clock.tick(5 * H);
+  await rejectsWith(w.core.venues.checkIn(ana, 'v1', code), 'RATE_LIMITED');
+  w.clock.tick(1 * H);
+  await w.core.venues.checkIn(ana, 'v1', code);
+  assert.equal((await w.places.countVenueCheckinsByUser('v1')).find((c) => c.userId === ana)?.count, 2);
+});
+
+test('check-in vale mais que presença confirmada no ranking e entra em "amigos que já foram"', async () => {
+  const { w, dono, ana, bia } = await setup();
+  const u = await w.signUpMany('caio', 'dedo');
+  const caio = u['caio']!, dedo = u['dedo']!;
+  const now = w.clock.now().getTime();
+  await w.places.createEvent({ id: 'e1', venueId: 'v1', title: 'e1', description: null, startsAt: new Date(now - 48 * H), endsAt: new Date(now - 45 * H), kind: 'OTHER' as const, isFree: false, imageUrl: null, tags: [], isSample: false });
+  await w.eventRoom.addGoing({ source: 'PLACE', id: 'e1' }, ana, new Date(now));
+  await w.eventRoom.addGoing({ source: 'PLACE', id: 'e1' }, bia, new Date(now));
+  const { code } = await w.core.venues.checkinCode(dono, 'v1');
+  await w.core.venues.checkIn(caio, 'v1', code);
+  await w.core.venues.checkIn(dedo, 'v1', code);
+  w.clock.tick(7 * H);
+  await w.core.venues.checkIn(dedo, 'v1', code);
+  const rank = async (viewer: string) => (await w.core.venues.profile(viewer, 'v1')).regulars.map((r) => [r.user.username, r.visits, r.checkins]);
+  assert.deepEqual(await rank(ana), [['dedo', 2, 2], ['caio', 1, 1], ['ana', 1, 0], ['bia', 1, 0]], 'check-in pesa 2; empate de pontos pelo nome');
+  // amigos: caio só tem check-in (nenhum evento) e ainda assim conta
+  await w.core.follows.follow(ana, caio);
+  await w.core.follows.follow(caio, ana);
+  assert.deepEqual((await w.core.venues.profile(ana, 'v1')).friendsWent.sample.map((p) => p.username), ['caio']);
+  // bloqueio e perfil privado valem para check-ins também
+  await w.core.blocks.block(ana, dedo);
+  assert.deepEqual((await rank(ana)).map((r) => r[0]), ['caio', 'ana', 'bia']);
+  await w.core.profiles.setPrivacy(caio, true);
+  await w.core.follows.unfollow(ana, caio);
+  assert.deepEqual((await rank(bia)).map((r) => r[0]), ['dedo', 'ana', 'bia']);
+});

@@ -640,6 +640,16 @@ export interface PlaceRepository {
   rateVenue(userId: string, venueId: string, stars: number, at: Date): Promise<void>;
   clearVenueRating(userId: string, venueId: string): Promise<void>;
   venueRating(venueId: string, userId: string): Promise<{ count: number; sum: number; mine: number | null }>;
+  /** Código secreto do QR do local (some quando o dono troca). Undefined enquanto nunca foi gerado. */
+  venueCheckinCode(venueId: string): Promise<string | undefined>;
+  /** Grava o código do QR; o anterior deixa de valer. */
+  setVenueCheckinCode(venueId: string, code: string, at: Date): Promise<void>;
+  /** Registra um check-in ("estive aqui"). */
+  addVenueCheckin(checkin: { id: string; venueId: string; userId: string; createdAt: Date }): Promise<void>;
+  /** Quando foi o último check-in da pessoa no local. */
+  lastVenueCheckin(venueId: string, userId: string): Promise<Date | undefined>;
+  /** Quantos check-ins cada pessoa tem no local (só quem tem ao menos 1). */
+  countVenueCheckinsByUser(venueId: string): Promise<{ userId: string; count: number }[]>;
 }
 
 export interface CalendarRepository {

@@ -30,6 +30,8 @@ import type {
   VenueEventBody,
   VenueProfile,
   VenueBell,
+  VenueCheckinCode,
+  VenueCheckinResult,
   OrganizationRequestBody,
   VenueRequestBody,
   VenueRating,
@@ -589,6 +591,11 @@ export function createApi(deps: ApiDeps) {
     venueProfile: (venueId: string) => request<VenueProfile>('GET', `/venues/${id(venueId)}/profile`).then((v) => ({ ...v, canManage: v.canManage ?? v.isOwner, role: v.role ?? (v.isOwner ? ('OWNER' as const) : null) })),
     updateVenueProfile: (venueId: string, body: VenueProfileBody) => request<VenueProfile>('PUT', `/me/venues/${id(venueId)}/profile`, { body }),
     followVenue: (venueId: string) => request<{ following: true; followerCount: number }>('POST', `/venues/${id(venueId)}/follow`),
+    /** QR do local: o código atual (gerado na primeira vez) e a troca, que invalida o QR impresso. */
+    venueCheckinCode: (venueId: string) => request<VenueCheckinCode>('GET', `/me/venues/${id(venueId)}/checkin`),
+    rotateVenueCheckinCode: (venueId: string) => request<VenueCheckinCode>('POST', `/me/venues/${id(venueId)}/checkin/rotate`),
+    /** "Estive aqui": o código vem do link do QR. */
+    venueCheckin: (venueId: string, code: string) => request<VenueCheckinResult>('POST', `/venues/${id(venueId)}/checkin`, { body: { code } }),
     rateVenue: (venueId: string, stars: number) => request<VenueRating>('PUT', `/venues/${id(venueId)}/rating`, { body: { stars } }),
     clearVenueRating: (venueId: string) => request<VenueRating>('DELETE', `/venues/${id(venueId)}/rating`),
     unfollowVenue: (venueId: string) => request<{ following: false; followerCount: number }>('DELETE', `/venues/${id(venueId)}/follow`),

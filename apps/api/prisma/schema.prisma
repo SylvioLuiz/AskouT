@@ -255,6 +255,7 @@ model User {
   venueFollows      VenueFollow[]
   region            UserRegion?
   venueRatings      VenueRating[]
+  venueCheckins     VenueCheckin[]
   reviewedClaims    VenueClaim[]  @relation("ClaimReviewer")
 }
 
@@ -821,6 +822,8 @@ model Venue {
   calendarDrafts VenueCalendarDraft[]
   followers VenueFollow[]
   ratings   VenueRating[]
+  checkinCode VenueCheckinCode?
+  checkins  VenueCheckin[]
   posts  Post[]
   comments PostComment[]
   /// Quem pode publicar no feed da página do rolê.
@@ -1222,6 +1225,28 @@ model VenueRating {
 
   @@id([userId, venueId])
   @@index([venueId])
+}
+
+/// Código secreto do QR de check-in do local. Trocar o código invalida o QR antigo.
+model VenueCheckinCode {
+  venueId   String   @id @db.Uuid
+  code      String
+  updatedAt DateTime @default(now())
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+}
+
+/// "Estive aqui": check-in feito lendo o QR do local. Vale mais que a presença confirmada no ranking.
+model VenueCheckin {
+  id        String   @id @default(uuid()) @db.Uuid
+  venueId   String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, userId, createdAt])
 }
 
 /// Logo do estabelecimento enviada do aparelho (JPEG/PNG/WebP até 128 KB), servida em `/venues/:id/logo`.

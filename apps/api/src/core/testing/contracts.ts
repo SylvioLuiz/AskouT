@@ -1704,6 +1704,27 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.places.venueRating('nao-e-uuid', ana), { count: 0, sum: 0, mine: null });
       });
 
+      it('check-in por QR: código do local (trocável) e contagem de check-ins por pessoa', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: -23.5, lng: -46.6, isSample: false };
+        await h.places.createVenue(v);
+        assert.equal(await h.places.venueCheckinCode(v.id), undefined);
+        await h.places.setVenueCheckinCode(v.id, 'codigo-um', at(1));
+        assert.equal(await h.places.venueCheckinCode(v.id), 'codigo-um');
+        await h.places.setVenueCheckinCode(v.id, 'codigo-dois', at(2));
+        assert.equal(await h.places.venueCheckinCode(v.id), 'codigo-dois');
+        assert.equal(await h.places.lastVenueCheckin(v.id, ana), undefined);
+        await h.places.addVenueCheckin({ id: randomUUID(), venueId: v.id, userId: ana, createdAt: at(3) });
+        await h.places.addVenueCheckin({ id: randomUUID(), venueId: v.id, userId: ana, createdAt: at(5) });
+        await h.places.addVenueCheckin({ id: randomUUID(), venueId: v.id, userId: bia, createdAt: at(4) });
+        await h.places.addVenueCheckin({ id: randomUUID(), venueId: randomUUID(), userId: bia, createdAt: at(4) });
+        assert.equal((await h.places.lastVenueCheckin(v.id, ana))?.getTime(), at(5).getTime());
+        const counts = (await h.places.countVenueCheckinsByUser(v.id)).sort((a, b) => b.count - a.count);
+        assert.deepEqual(counts, [{ userId: ana, count: 2 }, { userId: bia, count: 1 }]);
+        assert.deepEqual(await h.places.countVenueCheckinsByUser('nao-e-uuid'), []);
+      });
+
       it('posts em nome do local só entram pelo local, nunca pelo perfil de quem postou', async () => {
         const ana = await newUser('ana');
         const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: -23.5, lng: -46.6, isSample: false, ownerId: ana };

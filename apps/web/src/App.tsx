@@ -12,6 +12,8 @@ import { useTitle } from './hooks.ts';
 import { Link, navigate, resolveRoute, usePathname } from './router.tsx';
 import type { RouteDef } from './router.tsx';
 import { HomeScreen } from './screens/main-tabs.tsx';
+import { rememberCheckinReturn, takeCheckinReturn } from './lib/checkin.ts';
+import { safeStorage } from './lib/hints.ts';
 import { t } from './lib/i18n/index.ts';
 import { lazyWithReload } from './lib/chunk-reload.ts';
 
@@ -40,6 +42,7 @@ const ChatInfoScreen = lazyWithReload(() => import('./screens/chat-info.tsx').th
 const GroupScreen = lazyWithReload(() => import('./screens/group.tsx').then((m) => ({ default: m.GroupScreen })));
 const VenueCalendarScreen = lazyWithReload(() => import('./screens/venue-calendar.tsx').then((m) => ({ default: m.VenueCalendarScreen })));
 const VenueOffersScreen = lazyWithReload(() => import('./screens/venue-offers.tsx').then((m) => ({ default: m.VenueOffersScreen })));
+const CheckinScreen = lazyWithReload(() => import('./screens/checkin.tsx').then((m) => ({ default: m.CheckinScreen })));
 const CloakroomPanelScreen = lazyWithReload(() => import('./screens/cloakroom-panel.tsx').then((m) => ({ default: m.CloakroomPanelScreen })));
 const VenueAdminHomeScreen = lazyWithReload(() => import('./screens/venue-admin.tsx').then((m) => ({ default: m.VenueAdminHomeScreen })));
 const VenueAdminEventsScreen = lazyWithReload(() => import('./screens/venue-admin.tsx').then((m) => ({ default: m.VenueAdminEventsScreen })));
@@ -173,6 +176,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/bares/:id/painel', render: (p) => <VenueAdminHomeScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id/eventos', render: (p) => <VenueAdminEventsScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id/equipe', render: (p) => <VenueTeamScreen key={p['id']} venueId={p['id'] ?? ''} /> },
+  { path: '/checkin/:id', render: (p) => <CheckinScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id/agenda', render: (p) => <VenueCalendarScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/locais/:id/agenda', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}/agenda`} /> },
   { path: '/bares/:id/oferta', render: (p) => <VenueOffersScreen key={p['id']} venueId={p['id'] ?? ''} /> },
@@ -238,8 +242,12 @@ function AppRoutes() {
 
   useEffect(() => {
     if (legal) return;
-    if (state.status === 'user' && guest) navigate('/', { replace: true });
-    if (state.status === 'guest' && !guest) navigate('/entrar', { replace: true });
+    if (state.status === 'user' && guest) navigate(takeCheckinReturn(safeStorage()) ?? '/', { replace: true });
+    if (state.status === 'guest' && !guest) {
+      // Quem abriu o QR do local sem ter entrado volta ao check-in depois do login.
+      rememberCheckinReturn(safeStorage(), window.location.pathname + window.location.search);
+      navigate('/entrar', { replace: true });
+    }
   }, [state.status, guest, legal, pathname]);
 
   if (legal) return <Suspense fallback={<Splash />}>{legal.route.render(legal.params)}</Suspense>;

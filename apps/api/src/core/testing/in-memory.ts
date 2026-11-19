@@ -1439,6 +1439,8 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   readonly venueRatings = new Map<string, number>();
   /** Equipe dos locais (`venueId|userId`). */
   readonly venueManagers = new Map<string, VenueManagerRecord>();
+  readonly venueCheckinCodes = new Map<string, string>();
+  readonly venueCheckins: { id: string; venueId: string; userId: string; createdAt: Date }[] = [];
 
   async updateVenueProfile(venueId: string, patch: VenueProfilePatch) {
     const v = this.venues.get(venueId);
@@ -1518,6 +1520,29 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   async rateVenue(userId: string, venueId: string, stars: number) {
     if (!this.venues.has(venueId)) return;
     this.venueRatings.set(`${userId}|${venueId}`, stars);
+  }
+
+  async venueCheckinCode(venueId: string) {
+    return this.venueCheckinCodes.get(venueId);
+  }
+
+  async setVenueCheckinCode(venueId: string, code: string) {
+    if (this.venues.has(venueId)) this.venueCheckinCodes.set(venueId, code);
+  }
+
+  async addVenueCheckin(checkin: { id: string; venueId: string; userId: string; createdAt: Date }) {
+    if (this.venues.has(checkin.venueId)) this.venueCheckins.push({ ...checkin });
+  }
+
+  async lastVenueCheckin(venueId: string, userId: string) {
+    const times = this.venueCheckins.filter((c) => c.venueId === venueId && c.userId === userId).map((c) => c.createdAt.getTime());
+    return times.length === 0 ? undefined : new Date(Math.max(...times));
+  }
+
+  async countVenueCheckinsByUser(venueId: string) {
+    const out = new Map<string, number>();
+    for (const c of this.venueCheckins) if (c.venueId === venueId) out.set(c.userId, (out.get(c.userId) ?? 0) + 1);
+    return [...out].map(([userId, count]) => ({ userId, count }));
   }
 
   async clearVenueRating(userId: string, venueId: string) {

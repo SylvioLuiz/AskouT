@@ -193,7 +193,7 @@ Quem administra o local publica uma oferta curta (5 a 80 caracteres, ex.: "chopp
 - Valores ajustáveis em `offer-service.ts`: raio (`OFFER_RADIUS_M`), texto, duração máxima e `OFFER_MAX_PER_DAY`.
 - Sem push: a oferta só aparece quando a pessoa abre a Home ou o NOW.
 - Traduções em inglês e espanhol ainda não feitas (cai no português).
-- Migração `20261215120000_venue_offers`: rodar `prisma migrate deploy` e `prisma generate`.
+- Migração `20270102120000_venue_offers`: rodar `prisma migrate deploy` e `prisma generate`.
 
 ## Link de ingresso nos eventos dos locais
 
@@ -487,3 +487,18 @@ Auditoria feita no código em 22/10/2026. As regras das lojas mudam; confira o t
 - **Administrador adicional** (tabela `VenueManager`, convite do responsável + aceite): edita perfil, eventos, agenda importada, posts e chapelaria. **Não** convida nem remove pessoas e **não** impulsiona; a API responde "não encontrado" nesses casos. Pode sair da equipe sozinho. Limite de 10 por local.
 - Migração `20261226120000_venue_managers` escrita à mão e **nunca rodada em Postgres**: rodar `prisma migrate deploy` + `prisma generate` e a suíte de contrato Prisma (`equipe do local`). A tela não foi conferida num navegador.
 - Os avisos da agenda importada (aprovar rascunhos) ainda vão só para o responsável.
+
+## Check-in no local por QR code
+- Quem administra o local abre o painel dele, toca em **QR code** e baixa a imagem (PNG) ou imprime. O QR leva a `/checkin/<local>?codigo=<segredo>`; com a conta logada, um toque em **Estive aqui** registra o check-in. Quem abre sem ter entrado volta ao check-in depois do login ou cadastro.
+- O código é aleatório (24 caracteres, guardado no servidor) e só o dono o vê. **Trocar o código** invalida o QR impresso antes. Código errado, antigo ou local sem QR dão a mesma resposta (nada a descobrir por tentativa).
+- Limite: 1 check-in por pessoa e local a cada 6 horas (`CHECKIN_COOLDOWN_HOURS` em `venue-service.ts`); antes disso a API devolve 429 com `Retry-After`.
+- Ranking: check-in pesa 2 e presença confirmada pesa 1 (`CHECKIN_WEIGHT`). "Amigos que já foram" conta quem fez check-in mesmo sem ter confirmado evento. Bloqueios em qualquer sentido, conta suspensa e perfil privado (para quem não segue) ficam de fora, como antes.
+- Migração `20270102120100_venue_checkin` (tabelas `VenueCheckinCode` e `VenueCheckin`, roda sozinha no deploy da API).
+- O QR é gerado no app, sem biblioteca (`apps/web/src/lib/qr.ts`).
+- **Falta:**
+  - Ler um QR impresso com a câmera de aparelhos reais (iPhone e Android) e conferir que o link abre o app/site certo: o gerador foi testado só com vetores da especificação, não com um leitor de verdade.
+  - Universal Links / App Links para `/checkin/*` abrirem o app instalado (hoje abre no navegador, que pede login).
+  - Testar a impressão (CSS `@media print`) e o download do PNG no app Capacitor (iOS pode bloquear `download`; aí vale usar o compartilhar do aparelho).
+  - Não há validação de proximidade (GPS): o segredo no QR impede check-in de casa, mas quem fotografar o QR pode repassá-lo. Se virar problema, trocar o código ou exigir localização.
+  - O check-in ainda não entra na exportação de dados da conta (LGPD); é apagado junto com a conta.
+  - Rodar o contrato Prisma contra Postgres (`prisma.contract.test.ts`, caso novo "check-in por QR"): não rodei sem banco.

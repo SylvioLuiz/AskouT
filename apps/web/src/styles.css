@@ -6395,3 +6395,15 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .offerbanner__text { font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
 .offerbanner__meta { font-size: 0.8125rem; color: var(--ink-2); }
 .offerbanner--owner { margin-bottom: 8px; }
+
+/* Check-in por QR: cartão do QR do local (tela, download e impressão). */
+.qrcard { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 16px auto; padding: 16px; max-width: 320px; border-radius: 16px; background: #fff; color: #000; text-align: center; }
+.qrcard__img { width: 100%; max-width: 280px; height: auto; image-rendering: pixelated; }
+.qrcard__name { font-size: 1.125rem; }
+.qrcard__hint { font-size: 0.8125rem; color: #444; }
+@media print {
+  body.is-printing-qr * { visibility: hidden; }
+  body.is-printing-qr .qrcard, body.is-printing-qr .qrcard * { visibility: visible; }
+  body.is-printing-qr .qrcard { position: fixed; inset: 0; margin: auto; width: 15cm; height: fit-content; max-width: none; }
+  body.is-printing-qr .qrcard__img { max-width: none; }
+}
