@@ -2,7 +2,7 @@ import { decodeImageDataUrl } from './image.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import { normalizeTag } from './explore-match.ts';
 import type { CoreDeps } from './ports.ts';
-import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, PlaceEventRecord, Profile, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
+import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, ExternalPlace, PlaceEventRecord, Profile, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
 import { EVENT_KINDS, toPublicProfile } from './types.ts';
 import { canManageVenue, venueRoleOf, type VenueRole } from './venue-access.ts';
 
@@ -712,12 +712,14 @@ export class VenueService {
     const { lat, lng } = input;
     if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw validationError('Local inválido', { lat: 'Posição inválida' });
     const found = await this.deps.placeSource.nearby({ lat, lng }, EXTERNAL_CHECK_RADIUS_M, 40);
-    const place = found.places.find((p) => `${p.source.toLowerCase()}:${p.externalId}` === key);
+    // A busca de perto só traz bares e restaurantes; um lugar achado pelo nome ou endereço (casa de show, parque...)
+    // é conferido direto na fonte pelo id.
+    const place = found.places.find((p) => `${p.source.toLowerCase()}:${p.externalId}` === key) ?? (await this.lookupExternal(key));
     if (!place) throw notFound('Local não encontrado');
     const venue: VenueRecord = {
       id: this.deps.ids.next(),
       name: place.name.slice(0, VENUE_NAME_MAX),
-      address: null,
+      address: place.address ? place.address.slice(0, 200) : null,
       category: place.category ? place.category.slice(0, VENUE_CATEGORY_MAX) : null,
       lat: place.lat,
       lng: place.lng,
@@ -735,6 +737,14 @@ export class VenueService {
       throw error;
     }
     return { venueId: venue.id };
+  }
+
+  private async lookupExternal(key: string): Promise<ExternalPlace | undefined> {
+    const [source, ...rest] = key.split(':');
+    const externalId = rest.join(':');
+    if (!this.deps.placeSource.lookup || !externalId) return undefined;
+    const place = await this.deps.placeSource.lookup(externalId);
+    return place && place.source.toLowerCase() === source && place.externalId === externalId ? place : undefined;
   }
 
   /** Documento de um pedido, só para admin. */

@@ -122,6 +122,18 @@ model MessageReaction {
   @@id([messageId, userId])
 }
 
+/// Quem já ouviu a mensagem de voz (o "ouvido" do balão, como no WhatsApp). Uma linha por pessoa.
+model MessageAudioPlay {
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  playedAt  DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+}
+
 model MessageAudio {
   messageId String @id @db.Uuid
   mime      String
@@ -204,6 +216,7 @@ model User {
   conversationParticipations ConversationParticipant[]
   messages                   Message[]
   messageReactions           MessageReaction[]
+  messageAudioPlays          MessageAudioPlay[]
 
   flashSessions       FlashSession[]
   flashInvitesSent    FlashInvite[]   @relation("FlashInviteFrom")
@@ -535,6 +548,7 @@ model Message {
   audio        MessageAudio?
   media        MessageMedia?
   reactions    MessageReaction[]
+  audioPlays   MessageAudioPlay[]
   replyTo      Message?     @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
   replies      Message[]    @relation("MessageReply")
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -925,6 +939,8 @@ model Post {
   createdAt    DateTime @default(now())
   /// Post feito em nome de um estabelecimento (o autor é quem administra o local).
   venueId      String?  @db.Uuid
+  /// Local do AskouT vinculado como rolê do post (escolhido na busca; pode ter sido criado a partir do Google).
+  placeVenueId String?  @db.Uuid
 
   author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
   venue  Venue?      @relation(fields: [venueId], references: [id], onDelete: Cascade)

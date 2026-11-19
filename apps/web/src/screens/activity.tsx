@@ -124,6 +124,10 @@ export function ActivityScreen() {
   const totalUnread = newsState.data?.list.unread ?? 0;
   const tagReqs = useAsync(() => api.pendingTags({ limit: 20 }), []);
   const [tagBusy, setTagBusy] = useState<string | undefined>();
+  const pendingTagIds = new Set(tagReqs.data?.items.map((p) => p.id) ?? []);
+  // Marcações que já aparecem como aviso na lista ganham os botões lá; a seção de baixo fica só com as outras.
+  const tagsInList = new Set((news.data?.items ?? []).flatMap((n) => (n.type === 'POST_TAG' && n.postId ? [n.postId] : [])));
+  const otherTags = tagReqs.data?.items.filter((p) => !tagsInList.has(p.id)) ?? [];
   async function answerTag(postId: string, action: 'accept' | 'decline') {
     setTagBusy(postId);
     setMessage(undefined);
@@ -194,7 +198,7 @@ export function ActivityScreen() {
     }
   }
 
-  async function open(item: { id: string; url: string; read: boolean; type: NotificationType }) {
+  async function open(item: { id: string; url: string; read: boolean; type: NotificationType; postId?: string | null }) {
     if (!item.read) {
       try {
         await api.markNotificationsRead(item.id);
@@ -202,6 +206,11 @@ export function ActivityScreen() {
       } catch {
         // abrir o aviso é mais importante que marcar como lido
       }
+    }
+    // Marcação: abre o post/evento para ver antes de aceitar (avisos antigos apontavam só para /atividades).
+    if (item.type === 'POST_TAG' && item.postId) {
+      navigate(`/posts/${encodeURIComponent(item.postId)}`);
+      return;
     }
     // Pedido para seguir abre a aba de pedidos aqui mesmo (avisos antigos apontam só para /atividades).
     if (item.type === 'FOLLOW_REQUEST' && item.url.startsWith('/atividades')) {
@@ -351,11 +360,12 @@ export function ActivityScreen() {
           <ul className="newslist">
             {news.data.items.map((n) => {
               const isChosen = selecting && selected.has(n.id);
+              const tagActions = !selecting && n.type === 'POST_TAG' && !!n.postId && pendingTagIds.has(n.postId);
               return (
                 <li key={n.id}>
                   <button
                     type="button"
-                    className={`newsrow${n.read ? '' : ' newsrow--unread'}${selecting ? ' newsrow--selecting' : ''}${isChosen ? ' newsrow--chosen' : ''}`}
+                    className={`newsrow${n.read ? '' : ' newsrow--unread'}${selecting ? ' newsrow--selecting' : ''}${isChosen ? ' newsrow--chosen' : ''}${tagActions ? ' newsrow--withactions' : ''}`}
                     aria-pressed={selecting ? isChosen : undefined}
                     onClick={() => rowClick(n)}
                     onPointerDown={() => startPress(n.id)}
@@ -376,6 +386,19 @@ export function ActivityScreen() {
                     <span className="newsrow__dot" aria-hidden="true" />
                     {n.read ? null : <span className="visually-hidden">{t('não lido')}</span>}
                   </button>
+                  {tagActions && n.postId ? (
+                    <div className="row-actions newsrow__actions">
+                      <Button small onClick={() => void answerTag(n.postId as string, 'accept')} loading={tagBusy === n.postId}>
+                        {t('Aceitar')}
+                      </Button>
+                      <Button small variant="secondary" onClick={() => void answerTag(n.postId as string, 'decline')} disabled={tagBusy === n.postId}>
+                        {t('Recusar')}
+                      </Button>
+                      <Button small variant="quiet" onClick={() => void open(n)}>
+                        {t('Ver')}
+                      </Button>
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
@@ -386,11 +409,11 @@ export function ActivityScreen() {
         <p className="muted">{filter === 'all' ? t('Nenhuma novidade ainda. Mensagens, convites e encontros aparecem aqui.') : t('Nada por aqui neste filtro.')}</p>
       ) : null}
       {news.error && !news.data ? <ErrorState message={news.error.message} onRetry={news.reload} /> : null}
-      {(filter === 'all' || filter === 'mentions') && tagReqs.data && tagReqs.data.items.length > 0 ? (
+      {(filter === 'all' || filter === 'mentions') && otherTags.length > 0 ? (
         <>
           <h2 className="results__h">{t('Marcações')}</h2>
           <ul className="list">
-            {tagReqs.data.items.map((post) => (
+            {otherTags.map((post) => (
               <li key={post.id} className="tagreq">
                 <Link to={`/posts/${encodeURIComponent(post.id)}`} className="tagreq__link">
                   {post.images[0]?.path ? <img src={api.assetUrl(post.images[0].path)} alt="" referrerPolicy="no-referrer" /> : <span className="tagreq__none" />}

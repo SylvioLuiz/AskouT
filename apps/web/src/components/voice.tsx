@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ChatMessage } from '../lib/types.ts';
-import { ArrowUpIcon, PauseIcon, PlayIcon, XIcon } from './icons.tsx';
+import { ArrowUpIcon, MicIcon, PauseIcon, PlayIcon, XIcon } from './icons.tsx';
 import {
   formatVoiceTime,
   pickVoiceMime,
@@ -14,6 +14,20 @@ import {
   voiceProblemMessage,
 } from '../lib/voice.ts';
 import { t } from '../lib/i18n/index.ts';
+
+/**
+ * Categoria de áudio da página no iPhone (Safari 17+ / iOS 17+; nos outros não existe e não faz nada).
+ * Sem isso o Web Audio fica na categoria "ambiente": some no modo silencioso e, depois de usar o microfone,
+ * sai baixinho pelo alto-falante de ligação. "playback" toca como mídia (alto-falante, ignora a chave do silencioso).
+ */
+function setAudioSession(type: 'auto' | 'playback' | 'play-and-record'): void {
+  try {
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    if (session && session.type !== type) session.type = type;
+  } catch {
+    /* navegador sem suporte */
+  }
+}
 
 export function voiceSupported(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined';
@@ -55,6 +69,7 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
   function release() {
     stream.current?.getTracks().forEach((t) => t.stop());
     stream.current = undefined;
+    setAudioSession('auto');
   }
 
   useEffect(() => {
@@ -73,6 +88,7 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
         return;
       }
       try {
+        setAudioSession('play-and-record');
         const media = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
         if (!alive) {
           media.getTracks().forEach((t) => t.stop());
@@ -89,6 +105,7 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
         rec.start(500);
         startedAt.current = Date.now();
       } catch (failure) {
+        setAudioSession('auto');
         callbacks.current.onProblem(voiceProblemMessage(voiceProblemFrom(failure)));
         callbacks.current.onCancel();
       }
@@ -166,6 +183,8 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
 // O áudio toca pela Web Audio API, não por <audio>/new Audio(): no iPhone, um HTMLMediaElement
 // vira "mídia do sistema" e aparece no player da central de controle e da tela de bloqueio
 // (Now Playing). Um AudioBufferSourceNode não é registrado ali.
+// O Web Audio, porém, respeita a chave do silencioso do iPhone: por isso cada toque põe a sessão de
+// áudio em "playback" (ver setAudioSession) e a devolve para "auto" quando nada mais está tocando.
 
 type Player = { pause(): void };
 let playing: Player | undefined;
@@ -187,8 +206,26 @@ function decode(ctx: AudioContext, data: ArrayBuffer): Promise<AudioBuffer> {
   });
 }
 
-/** Balão de mensagem de voz: baixa o áudio (com o token) na primeira vez que toca. */
-export function VoiceBubble({ message, conversationId }: { message: ChatMessage; conversationId: string }) {
+/** Toca um trecho mudo ainda dentro do toque: no iOS isso "destrava" o contexto para o som que vem depois do download. */
+function unlock(ctx: AudioContext) {
+  try {
+    const src = ctx.createBufferSource();
+    src.buffer = ctx.createBuffer(1, 1, 22050);
+    src.connect(ctx.destination);
+    src.start(0);
+  } catch {
+    /* sem problema: o resume() costuma bastar */
+  }
+}
+
+/**
+ * Balão de mensagem de voz: baixa o áudio (com o token) na primeira vez que toca.
+ * `receipt`: mostra o "ouvido" (microfone azul), como no WhatsApp: na sua mensagem, quando alguém ouviu;
+ * na dos outros, destacado até você ouvir.
+ */
+export function VoiceBubble({ message, conversationId, receipt = true }: { message: ChatMessage; conversationId: string; receipt?: boolean }) {
+  const [heardNow, setHeardNow] = useState(false);
+  const heard = !!message.audio?.played || heardNow;
   const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'paused' | 'error'>('idle');
   const [position, setPosition] = useState(0);
   const [decodedMs, setDecodedMs] = useState<number | undefined>(undefined);
@@ -225,6 +262,7 @@ export function VoiceBubble({ message, conversationId }: { message: ChatMessage;
     stopSource();
     stopTicking();
     if (playing === player.current) playing = undefined;
+    if (!playing) setAudioSession('auto');
     setPosition(offset.current * 1000);
     setState('paused');
   }
@@ -234,6 +272,7 @@ export function VoiceBubble({ message, conversationId }: { message: ChatMessage;
     stopTicking();
     offset.current = 0;
     if (playing === player.current) playing = undefined;
+    if (!playing) setAudioSession('auto');
     setPosition(0);
     setState('idle');
   }
@@ -251,7 +290,12 @@ export function VoiceBubble({ message, conversationId }: { message: ChatMessage;
     source.current = src;
     if (playing && playing !== player.current) playing.pause();
     playing = player.current;
+    setAudioSession('playback');
     setState('playing');
+    if (!message.mine && !heard) {
+      setHeardNow(true);
+      api.markAudioPlayed(conversationId, message.id).catch(() => undefined);
+    }
     const tick = () => {
       setPosition(Math.min(buf.duration, ctx.currentTime - startedAt.current) * 1000);
       raf.current = requestAnimationFrame(tick);
@@ -263,7 +307,10 @@ export function VoiceBubble({ message, conversationId }: { message: ChatMessage;
     () => () => {
       stopSource();
       stopTicking();
-      if (playing === player.current) playing = undefined;
+      if (playing === player.current) {
+        playing = undefined;
+        setAudioSession('auto');
+      }
     },
     [],
   );
@@ -280,7 +327,10 @@ export function VoiceBubble({ message, conversationId }: { message: ChatMessage;
       setState('error');
       return;
     }
-    const resumed = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve();
+    setAudioSession('playback');
+    unlock(ctx);
+    // "suspended" no primeiro toque; "interrupted" no iOS depois de uma ligação, do microfone ou de voltar do fundo.
+    const resumed = ctx.state !== 'running' ? ctx.resume() : Promise.resolve();
     try {
       if (!buffer.current) {
         setState('loading');
@@ -291,14 +341,17 @@ export function VoiceBubble({ message, conversationId }: { message: ChatMessage;
       await resumed;
       start(ctx);
     } catch {
+      if (!playing) setAudioSession('auto');
       setState('error');
     }
   }
 
   const shown = state === 'playing' || state === 'paused' ? position : total;
   const progress = total > 0 ? Math.min(100, (position / total) * 100) : 0;
+  const receiptLabel = heard ? t('Ouvido') : t('Ainda não ouvido');
+  const receiptClass = heard ? ' voice--heard' : message.mine ? '' : ' voice--new';
   return (
-    <div className="voice">
+    <div className={`voice${receipt ? receiptClass : ''}`}>
       <button type="button" className="voice__btn" onClick={() => void toggle()} aria-label={state === 'playing' ? t('Pausar áudio') : t('Ouvir áudio')} aria-busy={state === 'loading' || undefined}>
         {state === 'playing' ? <PauseIcon /> : <PlayIcon />}
       </button>
@@ -306,6 +359,11 @@ export function VoiceBubble({ message, conversationId }: { message: ChatMessage;
         <div className="voice__bar" style={{ width: `${progress}%` }} />
       </div>
       <span className="voice__time">{state === 'error' ? t('Erro ao tocar') : formatVoiceTime(shown)}</span>
+      {receipt ? (
+        <span className="voice__heard" role="img" aria-label={receiptLabel} title={receiptLabel}>
+          <MicIcon />
+        </span>
+      ) : null}
     </div>
   );
 }

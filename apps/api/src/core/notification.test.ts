@@ -18,11 +18,11 @@ describe('avisos', () => {
     const { id } = await w.core.conversations.open(ana!, bia!);
     await w.core.conversations.send(ana!, id, { body: 'oi' });
     await w.core.flushNotifications();
-    const item = (await w.core.notifications.list(bia!)).items[0]!;
+    const item = (await w.core.notifications.list(bia!, 'messages')).items[0]!;
     await w.core.profiles.updateOwn(ana!, { displayName: 'Ana Maria Souza' });
     await w.core.conversations.send(ana!, id, { body: 'oi de novo' });
     await w.core.flushNotifications();
-    const titles = (await w.core.notifications.list(bia!)).items.filter((n) => n.type === 'MESSAGE').map((n) => n.title);
+    const titles = (await w.core.notifications.list(bia!, 'messages')).items.filter((n) => n.type === 'MESSAGE').map((n) => n.title);
     assert.ok(titles.length > 0 && titles.every((t) => t === 'ana'), titles.join(','));
     assert.equal(item.title, 'ana');
   });
@@ -33,15 +33,14 @@ describe('avisos', () => {
     const { id } = await w.core.conversations.open(ana!, bia!);
     await w.core.conversations.send(ana!, id, { body: 'oi' });
     await w.core.flushNotifications();
-    const msg = (await w.core.notifications.list(bia!)).items.find((n) => n.type === 'MESSAGE')!;
+    const msg = (await w.core.notifications.list(bia!, 'messages')).items.find((n) => n.type === 'MESSAGE')!;
     assert.equal(msg.actor?.username, 'ana');
     const follow = (await w.core.notifications.list(bia!)).items.find((n) => n.type === 'FOLLOW_NEW')!;
     assert.equal(follow.actor?.username, 'ana');
     // Aviso antigo (gravado antes do actorId): descobre pela chave.
     for (const row of w.notifications.rows) delete row.actorId;
-    const old = (await w.core.notifications.list(bia!)).items;
-    assert.equal(old.find((n) => n.type === 'MESSAGE')!.actor?.username, 'ana');
-    assert.equal(old.find((n) => n.type === 'FOLLOW_NEW')!.actor?.username, 'ana');
+    assert.equal((await w.core.notifications.list(bia!, 'messages')).items.find((n) => n.type === 'MESSAGE')!.actor?.username, 'ana');
+    assert.equal((await w.core.notifications.list(bia!)).items.find((n) => n.type === 'FOLLOW_NEW')!.actor?.username, 'ana');
   });
 
   it('latestUnreadAt: o aviso não lido mais recente; nulo sem não lidos', async () => {
@@ -50,6 +49,10 @@ describe('avisos', () => {
     assert.equal(await w.core.notifications.latestUnreadAt(bia!), null);
     const { id } = await w.core.conversations.open(ana!, bia!);
     await w.core.conversations.send(ana!, id, { body: 'oi' });
+    await w.core.flushNotifications();
+    assert.equal(await w.core.notifications.latestUnreadAt(bia!), null, 'mensagem de conversa não acende o sino (fica no ícone das conversas)');
+    const post = await w.core.posts.create(bia!, { images: [`data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]).toString('base64')}`] });
+    await w.core.posts.like(ana!, post.id);
     await w.core.flushNotifications();
     const list = await w.core.notifications.list(bia!);
     assert.equal(await w.core.notifications.latestUnreadAt(bia!), list.items[0]!.createdAt);
@@ -64,15 +67,15 @@ describe('avisos', () => {
     await w.core.conversations.send(ana!, id, { body: 'segredo 123' });
     await w.core.conversations.send(ana!, id, { body: 'outra' });
     await w.core.flushNotifications();
-    const list = await w.core.notifications.list(bia!);
+    const list = await w.core.notifications.list(bia!, 'messages');
     assert.equal(list.unread, 1, 'um aviso só por conversa enquanto não lido');
     assert.equal(list.items[0]!.type, 'MESSAGE');
     assert.equal(list.items[0]!.body, 'segredo 123', 'o aviso do sino mostra um pedaço da primeira mensagem não lida');
     assert.equal(list.items[0]!.url, `/conversas/${id}`);
-    assert.equal((await w.core.notifications.list(ana!)).unread, 0, 'quem escreveu não é avisado');
+    assert.equal((await w.core.notifications.list(ana!, 'messages')).unread, 0, 'quem escreveu não é avisado');
     await w.core.notifications.markRead(bia!, list.items[0]!.id);
     await w.core.conversations.send(ana!, id, { body: 'de novo' });
-    assert.equal((await w.core.notifications.list(bia!)).unread, 1, 'depois de lido, volta a avisar');
+    assert.equal((await w.core.notifications.list(bia!, 'messages')).unread, 1, 'depois de lido, volta a avisar');
   });
 
   it('marca como lidos só os avisos selecionados', async () => {
@@ -83,14 +86,15 @@ describe('avisos', () => {
       await w.core.conversations.send(who, id, { body: 'oi' });
     }
     await w.core.flushNotifications();
-    const list = await w.core.notifications.list(bia!);
+    const list = await w.core.notifications.list(bia!, 'messages');
     assert.equal(list.unread, 3);
     const [first, second, third] = list.items.filter((n) => !n.read);
-    const res = await w.core.notifications.markRead(bia!, [first!.id, second!.id, first!.id]);
-    assert.equal(res.unread, 1);
-    const after = await w.core.notifications.list(bia!);
+    await w.core.notifications.markRead(bia!, [first!.id, second!.id, first!.id]);
+    assert.equal((await w.core.notifications.list(bia!, 'messages')).unread, 1);
+    const after = await w.core.notifications.list(bia!, 'messages');
     assert.deepEqual(after.items.filter((n) => !n.read).map((n) => n.id), [third!.id]);
-    assert.equal((await w.core.notifications.markRead(bia!, [])).unread, 1, 'lista vazia não marca nada');
+    await w.core.notifications.markRead(bia!, []);
+    assert.equal((await w.core.notifications.list(bia!, 'messages')).unread, 1, 'lista vazia não marca nada');
     await assert.rejects(w.core.notifications.markRead(bia!, Array.from({ length: 101 }, (_, i) => `x${i}`)), /Dados inválidos/);
     await assert.rejects(w.core.notifications.markRead(bia!, [42 as unknown as string]), /Dados inválidos/);
   });
@@ -104,7 +108,7 @@ describe('avisos', () => {
     await w.core.flushNotifications();
     assert.equal(w.push.sent.filter((s) => s.message.url === `/conversas/${id}`).length, 3, 'um push por mensagem');
     assert.deepEqual(w.push.sent.filter((s) => s.message.url === `/conversas/${id}`).map((s) => s.message.body), ['oi', 'tá aí?', 'bora?'], 'cada push mostra o texto da mensagem');
-    assert.equal((await w.core.notifications.list(bia!)).unread, 1, 'o sino continua com um aviso só por conversa');
+    assert.equal((await w.core.notifications.list(bia!, 'messages')).unread, 1, 'o sino continua com um aviso só por conversa');
   });
 
   it('push: envia para os aparelhos inscritos e apaga inscrição vencida', async () => {
@@ -130,7 +134,7 @@ describe('avisos', () => {
     const { id } = await w.core.conversations.open(ana!, bia!);
     await w.core.conversations.send(ana!, id, { body: 'oi' });
     await w.core.flushNotifications();
-    assert.equal((await w.core.notifications.list(bia!)).unread, 1);
+    assert.equal((await w.core.notifications.list(bia!, 'messages')).unread, 1);
     assert.equal(w.push.sent.length, 0);
     assert.deepEqual(w.core.notifications.pushKey(), { publicKey: null, native: false });
   });
@@ -248,8 +252,8 @@ describe('avisos', () => {
     await w.core.blocks.block(bia!, caio!);
     await w.core.notifications.markRead(bia!);
     await w.core.conversations.send(caio!, m.conversationId, { body: 'oi' });
-    assert.equal((await w.core.notifications.list(bia!)).unread, 0);
-    assert.equal((await w.core.notifications.list(ana!)).items.some((n) => n.type === 'MESSAGE'), true);
+    assert.equal((await w.core.notifications.list(bia!, 'messages')).unread, 0);
+    assert.equal((await w.core.notifications.list(ana!, 'messages')).items.some((n) => n.type === 'MESSAGE'), true);
   });
 });
 
@@ -279,7 +283,7 @@ describe('silenciar avisos', () => {
     const { ana, bia } = await friends(w, 'ana', 'bia');
     await w.core.notifications.subscribe(bia!, { endpoint: 'https://push.example/bia', keys: { p256dh: 'abc', auth: 'def' } });
     const { id } = await w.core.conversations.open(ana!, bia!);
-    const count = async (type: string) => (await w.core.notifications.list(bia!)).items.filter((n) => n.type === type).length;
+    const count = async (type: string) => (await w.core.notifications.list(bia!, type === 'MESSAGE' ? 'messages' : 'all')).items.filter((n) => n.type === type).length;
     const pushes = () => w.push.sent.length;
     await w.core.notifications.setMuteSettings(bia!, { chats: true });
     const before = pushes();

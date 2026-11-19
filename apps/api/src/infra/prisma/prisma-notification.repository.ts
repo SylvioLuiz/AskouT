@@ -12,6 +12,12 @@ interface Payload {
   actorId?: string | null;
 }
 
+/** Cláusulas do filtro da tela (tipo e, às vezes, começo da chave do aviso) no formato do Prisma. */
+function filterWhere(filter: NotificationFilter | undefined): Prisma.NotificationWhereInput {
+  if (!filter) return {};
+  return { OR: filter.map((c) => (c.dedupePrefix === undefined ? { type: { in: c.types } } : { type: { in: c.types }, payload: { path: ['dedupeKey'], string_starts_with: c.dedupePrefix } })) };
+}
+
 export class PrismaNotificationRepository implements NotificationRepository {
   private readonly prisma: PrismaClient;
 
@@ -26,10 +32,7 @@ export class PrismaNotificationRepository implements NotificationRepository {
 
   async listForUser(userId: string, limit: number, filter?: NotificationFilter): Promise<NotificationRecord[]> {
     if (!isUuid(userId)) return [];
-    const where: Prisma.NotificationWhereInput = { userId };
-    if (filter) {
-      where.OR = filter.map((c) => (c.dedupePrefix === undefined ? { type: { in: c.types } } : { type: { in: c.types }, payload: { path: ['dedupeKey'], string_starts_with: c.dedupePrefix } }));
-    }
+    const where: Prisma.NotificationWhereInput = { userId, ...filterWhere(filter) };
     const rows = await this.prisma.notification.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit });
     return rows.map((r) => {
       const p = r.payload as unknown as Payload;
@@ -37,9 +40,9 @@ export class PrismaNotificationRepository implements NotificationRepository {
     });
   }
 
-  async unreadCount(userId: string): Promise<number> {
+  async unreadCount(userId: string, filter?: NotificationFilter): Promise<number> {
     if (!isUuid(userId)) return 0;
-    return this.prisma.notification.count({ where: { userId, readAt: null } });
+    return this.prisma.notification.count({ where: { userId, readAt: null, ...filterWhere(filter) } });
   }
 
   async hasUnread(userId: string, dedupeKey: string): Promise<boolean> {

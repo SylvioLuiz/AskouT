@@ -103,6 +103,13 @@ export class ConversationsController {
     return new StreamableFile(found.data, { type: found.mime });
   }
 
+  /** Marca a mensagem de voz como ouvida por você (quem enviou vê o "ouvido"). */
+  @Post(':id/messages/:messageId/audio/played')
+  @HttpCode(200)
+  audioPlayed(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Param('messageId', new ParseUUIDPipe()) messageId: string) {
+    return this.core.conversations.audioPlayed(actor.userId, id, messageId);
+  }
+
   /** Quem recebeu o cartão aceita ou recusa o lugar (`{action: 'accept' | 'decline'}`). */
   @Post(':id/messages/:messageId/respond')
   @HttpCode(200)

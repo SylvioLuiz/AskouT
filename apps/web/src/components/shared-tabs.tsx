@@ -93,7 +93,7 @@ export function SharedMedia({ voice, media, conversationId }: { voice: SharedVoi
                 {v.mine ? t('Você') : v.senderName} · {dateFmt.format(new Date(v.createdAt))} {timeFmt.format(new Date(v.createdAt))}
               </p>
               <div className={`bubble bubble--voice${v.mine ? ' bubble--mine' : ''}`}>
-                <VoiceBubble message={{ id: v.messageId, audio: { durationMs: v.durationMs } } as unknown as ChatMessage} conversationId={conversationId} />
+                <VoiceBubble message={{ id: v.messageId, audio: { durationMs: v.durationMs } } as unknown as ChatMessage} conversationId={conversationId} receipt={false} />
               </div>
             </li>
           ))}
