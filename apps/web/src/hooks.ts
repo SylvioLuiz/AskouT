@@ -78,3 +78,27 @@ export function usePolling(tick: () => void, everyMs: number, enabled = true): v
     };
   }, [everyMs, enabled]);
 }
+
+/** Evento disparado na janela quando chega um aviso (Web Push) com o app aberto. */
+export const PUSH_EVENT = 'askout:push';
+
+/**
+ * Mantém uma tela atualizada sozinha: de tempos em tempos (só com a aba visível), ao voltar para o app,
+ * ao reconectar à internet e na hora em que chega um aviso.
+ */
+export function useLiveRefresh(tick: () => void, everyMs: number): void {
+  usePolling(tick, everyMs);
+  const ref = useRef(tick);
+  ref.current = tick;
+  useEffect(() => {
+    const run = () => ref.current();
+    window.addEventListener('focus', run);
+    window.addEventListener('online', run);
+    window.addEventListener(PUSH_EVENT, run);
+    return () => {
+      window.removeEventListener('focus', run);
+      window.removeEventListener('online', run);
+      window.removeEventListener(PUSH_EVENT, run);
+    };
+  }, []);
+}
