@@ -36,10 +36,17 @@ export const EVENT_STORY_HOURS = 24;
 /** Quantos stories no ar uma pessoa pode ter no mesmo evento. */
 export const EVENT_STORY_MAX_PER_USER = 10;
 export const EVENT_STORY_REPORT_DETAILS_MAX = 300;
+/** Texto por cima do story: curto, como no Instagram. */
+export const EVENT_STORY_CAPTION_MAX = 200;
+/** Linhas do texto do story (o resto vira espaço). */
+export const EVENT_STORY_CAPTION_LINES = 6;
 
 export interface EventStoryItemView {
   id: string;
   kind: 'IMAGE' | 'VIDEO';
+  /** Texto por cima da mídia (null se não tem) e a altura dele na tela, de 0 (topo) a 1 (pé). */
+  caption: string | null;
+  captionY: number | null;
   createdAt: string;
   expiresAt: string;
   canDelete: boolean;
@@ -165,6 +172,26 @@ function optionalText(value: unknown, max: number, field: string, label: string)
   if (text === '') return null;
   if (Array.from(text).length > max) throw validationError('Dados inválidos', { [field]: `${label} pode ter até ${max} caracteres` });
   return text;
+}
+
+/** Texto e altura do story para a tela. */
+function captionOf(r: { caption?: string | null; captionY?: number | null }): { caption: string | null; captionY: number | null } {
+  const caption = r.caption ?? null;
+  return { caption, captionY: caption === null ? null : (r.captionY ?? 0.5) };
+}
+
+/** Confere o texto do story: até {@link EVENT_STORY_CAPTION_MAX} caracteres e {@link EVENT_STORY_CAPTION_LINES} linhas; altura entre 0 e 1. */
+export function parseStoryCaption(text: unknown, y: unknown): { caption: string | null; captionY: number | null } {
+  const raw = optionalText(text, EVENT_STORY_CAPTION_MAX, 'caption', 'Texto');
+  if (raw === null) return { caption: null, captionY: null };
+  const lines = raw.split('\n').map((line) => line.trimEnd());
+  const caption = [...lines.slice(0, EVENT_STORY_CAPTION_LINES), ...(lines.length > EVENT_STORY_CAPTION_LINES ? [lines.slice(EVENT_STORY_CAPTION_LINES).join(' ')] : [])]
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  const n = typeof y === 'number' ? y : typeof y === 'string' && y.trim() !== '' ? Number(y) : NaN;
+  const captionY = Number.isFinite(n) ? Math.round(Math.min(0.9, Math.max(0.1, n)) * 1000) / 1000 : 0.5;
+  return { caption, captionY };
 }
 
 function parseId(id: unknown): string {
@@ -470,7 +497,7 @@ export class EventPageService {
       const author = byId.get(r.userId);
       if (!author) continue;
       const group = groups.get(r.userId) ?? { author, mine: r.userId === viewerId, items: [] };
-      group.items.push({ id: r.id, kind: r.video ? 'VIDEO' : 'IMAGE', createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), canDelete: r.userId === viewerId || owner?.userId === viewerId });
+      group.items.push({ id: r.id, kind: r.video ? 'VIDEO' : 'IMAGE', ...captionOf(r), createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), canDelete: r.userId === viewerId || owner?.userId === viewerId });
       groups.set(r.userId, group);
     }
     const last = (g: EventStoryGroupView) => g.items[g.items.length - 1]!.createdAt;
@@ -500,7 +527,7 @@ export class EventPageService {
       if (!author) continue;
       const mine = r.userId === viewerId;
       const group = groups.get(r.userId) ?? { author, mine, items: [] };
-      group.items.push({ id: r.id, kind: r.video ? 'VIDEO' : 'IMAGE', createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), canDelete: mine, event: events.get(r.ref.id) ?? null });
+      group.items.push({ id: r.id, kind: r.video ? 'VIDEO' : 'IMAGE', ...captionOf(r), createdAt: r.createdAt.toISOString(), expiresAt: r.expiresAt.toISOString(), canDelete: mine, event: events.get(r.ref.id) ?? null });
       groups.set(r.userId, group);
     }
     const last = (g: ProfileStoryGroupView) => g.items[g.items.length - 1]!.createdAt;
@@ -610,7 +637,7 @@ export class EventPageService {
   }
 
   /** Publica um story. Só quem confirmou presença (ou o dono), enquanto o evento não acabou. Foto até 2 MB ou vídeo até 60 MB. */
-  async createStory(viewerId: string, rawId: unknown, contentType: unknown, bytes: unknown, onProfile?: unknown): Promise<EventStoryGroupView> {
+  async createStory(viewerId: string, rawId: unknown, contentType: unknown, bytes: unknown, onProfile?: unknown, text?: { caption?: unknown; captionY?: unknown }): Promise<EventStoryGroupView> {
     const { ref, owner } = await this.resolve(viewerId, rawId);
     const isOwner = owner?.userId === viewerId;
     if (!isOwner && !(await this.deps.eventRoom.isGoing(ref, viewerId))) throw forbidden('Confirme presença para publicar um story neste evento');
@@ -621,11 +648,12 @@ export class EventPageService {
     const mine = (await this.deps.eventRoom.listStories(ref, now)).filter((s) => s.userId === viewerId);
     if (mine.length >= EVENT_STORY_MAX_PER_USER) throw validationError('Muitos stories', { media: `Você já tem ${EVENT_STORY_MAX_PER_USER} stories no ar neste evento` });
     const media = parseChatMedia(contentType, bytes, POST_VIDEO_MAX_BYTES);
+    const caption = parseStoryCaption(text?.caption, text?.captionY);
     const expiresAt = new Date(Math.min(now.getTime() + EVENT_STORY_HOURS * 3_600_000, endsAt));
-    const record = { id: this.deps.ids.next(), ref, userId: viewerId, mime: media.mime, video: media.kind === 'VIDEO', onProfile: onProfile === true, data: media.data, createdAt: now, expiresAt };
+    const record = { id: this.deps.ids.next(), ref, userId: viewerId, mime: media.mime, video: media.kind === 'VIDEO', onProfile: onProfile === true, ...caption, data: media.data, createdAt: now, expiresAt };
     await this.deps.eventRoom.addStory(record);
     const me = await this.deps.users.findProfileById(viewerId);
-    return { author: toPublicProfile(me!), mine: true, items: [{ id: record.id, kind: media.kind, createdAt: now.toISOString(), expiresAt: expiresAt.toISOString(), canDelete: true }] };
+    return { author: toPublicProfile(me!), mine: true, items: [{ id: record.id, kind: media.kind, ...caption, createdAt: now.toISOString(), expiresAt: expiresAt.toISOString(), canDelete: true }] };
   }
 
   async deleteStory(viewerId: string, rawId: unknown, storyId: unknown): Promise<{ deleted: true }> {

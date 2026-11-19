@@ -90,12 +90,13 @@ export class ExploreController {
   /**
    * Publica um story: o corpo é o arquivo cru (`Content-Type: image/jpeg`, `video/mp4`...).
    * `?profile=1` publica também no perfil, para os amigos verem na página inicial.
+   * `?caption=...&captionY=0.4` põe um texto por cima da mídia, na altura dada (0 = topo, 1 = pé).
    */
   @Post('events/:id/stories')
   @HttpCode(200)
-  async createStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Headers('content-type') contentType: string | undefined, @Body() body: unknown, @Query('profile') profile: string | undefined) {
+  async createStory(@CurrentActor() actor: Actor, @Param('id') id: string, @Headers('content-type') contentType: string | undefined, @Body() body: unknown, @Query('profile') profile: string | undefined, @Query('caption') caption: unknown, @Query('captionY') captionY: unknown) {
     const data = Buffer.isBuffer(body) ? new Uint8Array(body.buffer, body.byteOffset, body.byteLength) : undefined;
-    return this.core.eventPages.createStory(actor.userId, id, contentType, data, profile === '1' || profile === 'true');
+    return this.core.eventPages.createStory(actor.userId, id, contentType, data, profile === '1' || profile === 'true', { caption, captionY });
   }
 
   /** Página inicial: os stories que você e seus amigos publicaram também no perfil. */

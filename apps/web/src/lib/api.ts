@@ -501,14 +501,25 @@ export function createApi(deps: ApiDeps) {
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
       request<EventPage>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
     eventStories: (eventId: string) => request<{ groups: EventStoryGroup[] }>('GET', `/events/${id(eventId)}/stories`),
-    /** `onProfile`: publica também no perfil, para os amigos verem na página inicial. */
-    createEventStory: async (eventId: string, file: Blob, onProfile = false): Promise<EventStoryGroup> => {
+    /**
+     * `onProfile`: publica também no perfil, para os amigos verem na página inicial.
+     * `text`: texto por cima da mídia e a altura dele na tela (0 = topo, 1 = pé).
+     */
+    createEventStory: async (eventId: string, file: Blob, onProfile = false, text?: { caption: string; captionY: number }): Promise<EventStoryGroup> => {
       const token = deps.getToken();
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
       if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
       let response;
       try {
-        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/stories${onProfile ? '?profile=1' : ''}`, { method: 'POST', headers, body: file });
+        const query = new URLSearchParams();
+        if (onProfile) query.set('profile', '1');
+        const caption = text?.caption.trim();
+        if (text && caption) {
+          query.set('caption', caption);
+          query.set('captionY', String(Math.round(text.captionY * 1000) / 1000));
+        }
+        const qs = query.toString();
+        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/stories${qs ? `?${qs}` : ''}`, { method: 'POST', headers, body: file });
       } catch {
         throw networkError();
       }

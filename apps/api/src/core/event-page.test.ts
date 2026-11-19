@@ -125,6 +125,7 @@ test('story de evento: só quem confirmou presença publica; foto ou vídeo; pá
   assert.equal((await w.core.eventPages.get(bia, 'e1')).canStory, true);
   const photo = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES());
   assert.equal(photo.items[0]!.kind, 'IMAGE');
+  assert.equal(photo.items[0]!.caption, null, 'sem texto, o story é só a mídia');
   w.clock.tick(1000);
   await w.core.eventPages.createStory(bia, 'e1', 'video/mp4', MP4_BYTES());
   w.clock.tick(1000);
@@ -284,4 +285,23 @@ test('reagir a um story: amiga recebe na conversa; quem não é amigo manda um a
   await rejectsWith(w.core.storyReactions.react(duda, story, '❤️'), 'NOT_FOUND');
   await rejectsWith(w.core.storyReactions.react(bia, story, '❤️', 'e1'), 'FORBIDDEN');
   await rejectsWith(w.core.storyReactions.react(ana, story, 'oi'), 'VALIDATION');
+});
+
+test('story com texto por cima: guarda o texto e a altura, limpa espaços e confere o tamanho', async () => {
+  const { w, bia, ana } = await setup();
+  await w.core.eventPages.go(bia, 'e1');
+  const made = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), false, { caption: '  Chegamos!\r\n\n\n\nBora  ', captionY: '0.3' });
+  assert.equal(made.items[0]!.caption, 'Chegamos!\n\nBora');
+  assert.equal(made.items[0]!.captionY, 0.3);
+  const seen = (await w.core.eventPages.stories(ana, 'e1'))[0]!.items[0]!;
+  assert.equal(seen.caption, 'Chegamos!\n\nBora', 'quem vê recebe o texto');
+  assert.equal(seen.captionY, 0.3);
+  w.clock.tick(1000);
+  const edge = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), false, { caption: 'oi', captionY: 'abc' });
+  assert.equal(edge.items[0]!.captionY, 0.5, 'altura inválida vai para o meio');
+  w.clock.tick(1000);
+  const blank = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), false, { caption: '   ', captionY: 0.2 });
+  assert.equal(blank.items[0]!.caption, null);
+  assert.equal(blank.items[0]!.captionY, null);
+  await rejectsWith(w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), false, { caption: 'x'.repeat(201) }), 'VALIDATION');
 });

@@ -1,17 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
-import { Sheet } from './agenda.tsx';
 import { SoundToggle } from './sound-toggle.tsx';
 import { ChevronRightIcon, EventKindIcon, LocationIcon, MoreIcon, TrashIcon, XIcon } from './icons.tsx';
 import { ReasonSheet } from './post-actions.tsx';
-import { Avatar, Button, Notice } from './ui.tsx';
+import { Avatar } from './ui.tsx';
+import { StoryCaption } from './story-composer.tsx';
 import { api } from '../client.ts';
-import { ApiError, toApiError } from '../lib/errors.ts';
+import { toApiError } from '../lib/errors.ts';
 import { timeAgo } from '../lib/format.ts';
-import { mediaKind, prepareImage } from '../lib/chat-media.ts';
-import { isVideoFile, POST_VIDEO_MAX_BYTES, videoPoster, videoProblem } from '../lib/post-video.ts';
-import { prepareVideoUpload, withMediaType } from '../lib/media-file.ts';
-import { canCompressVideo, prepareProgressText } from '../lib/video-prepare.ts';
 import { STORY_PHOTO_MS, nextStory, prevStory } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
 import type { EventStoryGroup, StoryEvent } from '../lib/types.ts';
@@ -25,103 +20,8 @@ const STORY_REACTIONS = ['❤️', '😂', '😮', '😢', '🔥', '👏'] as co
 
 // ---------- Publicar ----------
 
-export function StoryCreateSheet({ eventId, onClose, onCreated }: { eventId: string; onClose: () => void; onCreated: () => void }) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<{ blob: Blob; kind: 'IMAGE' | 'VIDEO'; url: string; seconds?: number } | undefined>();
-  const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<string | undefined>();
-  const [prep, setPrep] = useState<number | undefined>();
-
-  useEffect(() => () => file && URL.revokeObjectURL(file.url), [file]);
-
-  async function pick(event: ChangeEvent<HTMLInputElement>) {
-    const chosen = event.target.files?.[0];
-    event.target.value = '';
-    if (!chosen) return;
-    const picked = withMediaType(chosen);
-    setProblem(undefined);
-    setBusy(true);
-    try {
-      const kind = mediaKind(picked);
-      if (kind === 'VIDEO' || isVideoFile(picked)) {
-        // Como nos posts: vídeo grande serve se este aparelho conseguir reduzir antes de enviar.
-        const bad = videoProblem(picked, { canCompress: picked.size > POST_VIDEO_MAX_BYTES ? await canCompressVideo() : false });
-        if (bad) throw new Error(bad);
-        const { seconds } = await videoPoster(picked); // confere a duração (até 3 minutos)
-        setFile({ blob: picked, kind: 'VIDEO', url: URL.createObjectURL(picked), seconds });
-      } else if (kind === 'IMAGE') {
-        const blob = await prepareImage(picked);
-        setFile({ blob, kind: 'IMAGE', url: URL.createObjectURL(blob) });
-      } else {
-        throw new Error(t('Escolha uma foto ou um vídeo.'));
-      }
-    } catch (failure) {
-      setProblem(failure instanceof Error && failure.message !== 'grande' && failure.message !== 'canvas' ? failure.message : t('Não foi possível usar este arquivo. Tente outro.'));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function publish(onProfile: boolean) {
-    if (!file) return;
-    setBusy(true);
-    setProblem(undefined);
-    try {
-      let blob = file.blob;
-      if (file.kind === 'VIDEO' && blob instanceof File) {
-        setPrep(0);
-        blob = await prepareVideoUpload(blob, (fraction) => setPrep(fraction), file.seconds);
-        setPrep(undefined);
-      }
-      await api.createEventStory(eventId, blob, onProfile);
-      onCreated();
-    } catch (failure) {
-      setPrep(undefined);
-      setProblem(failure instanceof Error && !(failure instanceof ApiError) ? failure.message : toApiError(failure).message);
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Sheet title={t('Seu story')} onClose={onClose}>
-      <p className="muted">{t('Foto ou vídeo. Qualquer pessoa vê, fica no ar por 24 h e some quando o evento acabar.')}</p>
-      <input ref={fileRef} type="file" accept="image/*,video/*" className="visually-hidden" onChange={(event) => void pick(event)} aria-label={t('Escolher foto ou vídeo')} />
-      {file ? (
-        <div className="storysheet__preview">{file.kind === 'VIDEO' ? <video src={file.url} controls playsInline muted /> : <img src={file.url} alt={t('Prévia do story')} />}</div>
-      ) : null}
-      {problem ? <Notice tone="error">{problem}</Notice> : null}
-      {prep !== undefined ? (
-        <div className="uploadbar" role="status" aria-live="polite">
-          <progress className="uploadbar__bar" max={1} value={prep} aria-label={t('Otimização do vídeo')} />
-          <p className="uploadbar__text">{prepareProgressText(prep)}</p>
-        </div>
-      ) : null}
-      {file ? (
-        <div className="storysheet__ask" role="group" aria-labelledby="storysheet-ask">
-          <p id="storysheet-ask" className="storysheet__question">
-            <strong>{t('Publicar também no seu perfil?')}</strong>
-            <span className="muted">{t('Seus amigos veem na página inicial, junto com o evento onde você está. Se não, ele fica só neste evento.')}</span>
-          </p>
-        </div>
-      ) : null}
-      <div className="storysheet__actions">
-        {file ? (
-          <>
-            <Button loading={busy} onClick={() => publish(true)}>
-              {t('Sim, no evento e no perfil')}
-            </Button>
-            <Button variant="secondary" disabled={busy} onClick={() => publish(false)}>
-              {t('Não, só no evento')}
-            </Button>
-          </>
-        ) : null}
-        <Button variant={file ? 'quiet' : 'secondary'} disabled={busy} onClick={() => fileRef.current?.click()}>
-          {file ? t('Trocar foto ou vídeo') : t('Escolher foto ou vídeo')}
-        </Button>
-      </div>
-    </Sheet>
-  );
-}
+/** Criar story: tela cheia no estilo do Instagram (ver story-composer.tsx). */
+export { StoryComposer as StoryCreateSheet } from './story-composer.tsx';
 
 // ---------- Assistir ----------
 
@@ -323,6 +223,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
         ) : (
           ready ? <img key={item.id} className="storyview__media" src={src} alt="" onError={() => setError(t('Não foi possível abrir esta foto.'))} /> : null
         )}
+        {ready && item.caption ? <StoryCaption text={item.caption} y={item.captionY} /> : null}
         {!ready && !error ? <span className="storyview__loading" role="status" aria-label={t('Carregando story')} /> : null}
         <button type="button" className="storyview__tap storyview__tap--prev" onClick={() => setPos(prevStory(groups, pos))} aria-label={t('Story anterior')} />
         <button type="button" className="storyview__tap storyview__tap--next" onClick={advance} aria-label={t('Próximo story')} />

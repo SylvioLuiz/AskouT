@@ -1112,6 +1112,10 @@ model EventStory {
   isVideo      Boolean  @default(false)
   /// A pessoa escolheu publicar também no perfil: aparece na página inicial dos amigos (além do evento).
   onProfile    Boolean  @default(false)
+  /// Texto que a pessoa escreveu sobre a mídia (como no Instagram). Null se publicou só a foto/vídeo.
+  caption      String?
+  /// Altura do texto na tela do story: 0 (topo) a 1 (pé).
+  captionY     Float?
   data         Bytes
   createdAt    DateTime @default(now())
   expiresAt    DateTime
