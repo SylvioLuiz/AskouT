@@ -35,8 +35,22 @@ function friendlyProblem(failure: unknown): string {
 async function imageSize(url: string): Promise<{ width: number; height: number }> {
   const img = new Image();
   img.src = url;
-  await img.decode();
-  return { width: img.naturalWidth, height: img.naturalHeight };
+  try {
+    await img.decode();
+    return { width: img.naturalWidth, height: img.naturalHeight };
+  } catch {
+    // O WebView do Android às vezes recusa `decode()` num arquivo que abre normalmente: tenta ler o tamanho de outro jeito.
+    const blob = await (await fetch(url)).blob();
+    let bitmap: ImageBitmap;
+    try {
+      bitmap = await createImageBitmap(blob);
+    } catch {
+      throw new Error(t('Não foi possível ler essa imagem. Tente uma foto JPEG ou PNG.'));
+    }
+    const size = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return size;
+  }
 }
 
 function videoSize(url: string): Promise<{ width: number; height: number }> {
@@ -219,6 +233,10 @@ function StoryCapture({ onPicked, onClose }: { onPicked: (media: StoryMedia) => 
   async function shoot() {
     const video = videoRef.current;
     if (!video || !video.videoWidth || busy) return;
+    // Mostra já que está tirando (no Android o recorte e a leitura da foto demoram um pouco).
+    setBusy(true);
+    setProblem(undefined);
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     const cw = video.clientWidth || vw;
@@ -230,7 +248,10 @@ function StoryCapture({ onPicked, onClose }: { onPicked: (media: StoryMedia) => 
     canvas.width = Math.round(sw);
     canvas.height = Math.round(sh);
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      setBusy(false);
+      return;
+    }
     if (facing === 'user') {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
@@ -239,6 +260,7 @@ function StoryCapture({ onPicked, onClose }: { onPicked: (media: StoryMedia) => 
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
     if (!blob) {
       setProblem(t('Não foi possível tirar a foto. Tente de novo.'));
+      setBusy(false);
       return;
     }
     await use(new File([blob], 'story.jpg', { type: 'image/jpeg' }));
@@ -255,6 +277,7 @@ function StoryCapture({ onPicked, onClose }: { onPicked: (media: StoryMedia) => 
         </button>
       </div>
       {camera === 'starting' ? <span className="storyview__loading" role="status" aria-label={t('Abrindo a câmera')} /> : null}
+      {busy ? <span className="storyview__loading" role="status" aria-label={t('Preparando a foto')} /> : null}
       {camera === 'off' ? (
         <div className="storycam__off">
           <CameraIcon />

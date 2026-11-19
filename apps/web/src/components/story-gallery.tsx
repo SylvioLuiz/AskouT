@@ -9,8 +9,9 @@ import { t } from '../lib/i18n/index.ts';
  * nativa oferece `window.AskouTGallery` (hoje, no iPhone). Também mostra o texto único dos stories da versão anterior.
  */
 
-/** Miniaturas por página da grade. */
-const PAGE = 60;
+/** Miniaturas por página da grade: a primeira é curta para a grade aparecer logo. */
+const FIRST_PAGE = 21;
+const PAGE = 45;
 
 // ---------- Galeria ----------
 
@@ -30,7 +31,7 @@ export function GalleryGrid({ gallery, loadingId, busy, onPick, onCamera, onOthe
     setLoading(true);
     try {
       const offset = reset ? 0 : s.offset;
-      const page = await gallery.recent({ offset, limit: PAGE });
+      const page = await gallery.recent({ offset, limit: offset === 0 ? FIRST_PAGE : PAGE });
       s.offset = offset + page.items.length;
       s.more = page.more && page.items.length > 0;
       setMore(s.more);
