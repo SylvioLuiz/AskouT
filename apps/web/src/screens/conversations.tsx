@@ -225,6 +225,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const deleteTimer = useRef<number | undefined>(undefined);
   const deleteIds = useRef<string[] | undefined>(undefined);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [staged, setStaged] = useState<StagedMedia[]>([]);
   /** GIF escolhido, ainda não enviado: aparece acima do campo até tocar em enviar. */
@@ -297,14 +298,56 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   }, [view.data]);
 
   // A página inteira rola; só acompanha as mensagens novas se a pessoa já estiver perto do fim.
+  // Chegar ao fim rolando (ou tentar passar dele) acende uma luzinha em cima da caixa de mensagem, como nos outros apps.
+  const [glow, setGlow] = useState(0);
   useEffect(() => {
+    const gapToEnd = () => document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+    let atEnd = gapToEnd() < 2;
+    let userAt = 0;
+    let glowAt = 0;
+    let touchY: number | undefined;
+    const light = () => {
+      const now = performance.now();
+      if (now - glowAt < 900) return;
+      glowAt = now;
+      setGlow((n) => n + 1);
+    };
     const onScroll = () => {
-      const doc = document.documentElement;
-      stickToEnd.current = doc.scrollHeight - window.scrollY - window.innerHeight < 120;
+      const gap = gapToEnd();
+      stickToEnd.current = gap < 120;
       if (stickToEnd.current) setUnseen(0);
+      const nowAtEnd = gap < 2;
+      // Só quando foi a pessoa que rolou (não a rolagem automática de mensagem nova ou ao abrir a conversa).
+      if (nowAtEnd && !atEnd && performance.now() - userAt < 1200) light();
+      atEnd = nowAtEnd;
+    };
+    const onTouchStart = (e: TouchEvent) => {
+      userAt = performance.now();
+      touchY = e.touches[0]?.clientY;
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      userAt = performance.now();
+      const y = e.touches[0]?.clientY;
+      // Já no fim e o dedo ainda subindo (querendo ver mais embaixo): acende de novo.
+      if (y !== undefined && touchY !== undefined && touchY - y > 24 && gapToEnd() < 2) {
+        light();
+        touchY = y;
+      }
+    };
+    const onWheel = (e: WheelEvent) => {
+      userAt = performance.now();
+      if (e.deltaY > 0 && gapToEnd() < 2) light();
     };
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('wheel', onWheel, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('wheel', onWheel);
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -489,6 +532,9 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     const media = staged;
     const gif = pendingGif;
     if ((text === '' && media.length === 0 && !gif) || sending) return;
+    // Como no Instagram: o campo esvazia na hora e o teclado continua aberto para a próxima mensagem.
+    // Se o envio falhar, o texto volta para o campo.
+    if (text !== '') setDraft('');
     setSending(true);
     setUploading(media.length > 0);
     setProblem(undefined);
@@ -521,11 +567,11 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         const message = await api.sendText(conversationId, text, reply);
         stickToEnd.current = true;
         setMessages((current) => mergeMessages(current, [message]));
-        setDraft('');
         typingSentAt.current = 0;
       }
       setReplyTo(undefined);
     } catch (failure) {
+      if (text !== '') setDraft((current) => (current === '' ? text : current));
       if (reply === undefined) setReplyTo(undefined);
       setProblem(failure instanceof Error && failure.message === 'grande' ? t('Não consegui reduzir a foto para o tamanho permitido.') : failure instanceof Error && !(failure instanceof ApiError) && failure.message ? failure.message : toApiError(failure).message);
     } finally {
@@ -831,6 +877,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       ) : data.canSend ? (
         <>
           <div className="chat__dock">
+          {glow > 0 ? <span key={glow} className="chat__glow" aria-hidden="true" /> : null}
           {replyTo ? (
             <div className="replybar">
               <div className="replybar__text">
@@ -895,6 +942,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     <CameraIcon />
                   </button>
                   <textarea
+                    ref={inputRef}
                     id="msg"
                     className="composer__input composer__input--pill"
                     rows={1}
@@ -914,7 +962,17 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     <>
                       {/* Emoji e GIF só aparecem enquanto você escreve; com a caixa vazia o canto fica para o microfone, como nos outros apps. */}
                       <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
-                      <button type="submit" className="composer__sendtext" disabled={sending} aria-busy={sending || undefined} aria-label={t('Enviar')}>
+                      <button
+                        type="submit"
+                        className="composer__sendtext"
+                        disabled={sending}
+                        aria-busy={sending || undefined}
+                        aria-label={t('Enviar')}
+                        // Tocar em enviar não tira o foco do campo: o teclado não fecha (o botão some logo depois, e o foco iria junto).
+                        onPointerDown={(e) => {
+                          if (document.activeElement === inputRef.current) e.preventDefault();
+                        }}
+                      >
                         <ArrowUpIcon />
                       </button>
                     </>
