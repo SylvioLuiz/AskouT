@@ -69,15 +69,16 @@ public class GalleryPlugin: CAPPlugin, CAPBridgedPlugin {
             if offset < end {
                 let options = PHImageRequestOptions()
                 options.isSynchronous = true
-                options.deliveryMode = .highQualityFormat
+                // Miniatura rápida: a primeira que o iOS já tiver pronta, sem baixar do iCloud (o arquivo inteiro é pedido só ao escolher).
+                options.deliveryMode = .fastFormat
                 options.resizeMode = .fast
-                options.isNetworkAccessAllowed = true
+                options.isNetworkAccessAllowed = false
                 let target = CGSize(width: edge, height: edge * 4 / 3)
                 for index in offset..<end {
                     let asset = assets.object(at: index)
                     var thumb = ""
                     self.imageManager.requestImage(for: asset, targetSize: target, contentMode: .aspectFill, options: options) { image, _ in
-                        if let data = image?.jpegData(compressionQuality: 0.7) {
+                        if let data = image?.jpegData(compressionQuality: 0.6) {
                             thumb = "data:image/jpeg;base64," + data.base64EncodedString()
                         }
                     }
