@@ -2635,4 +2635,5 @@ export const ES: Readonly<Record<string, string>> = {
   "Gostos salvos.": "Gustos guardados.",
   "Escolha os rolês que você curte. O Explorar já abre filtrado por eles. Sem nenhum marcado, mostramos tudo.": "Elige los planes que te gustan. Explorar se abre filtrado por ellos. Sin ninguno marcado, mostramos todo.",
   "Carregando story": "Cargando historia",
+  "Sair do grupo? Ele some da sua lista e você para de receber as mensagens. Para voltar, alguém do grupo precisa te adicionar.": "¿Salir del grupo? Desaparece de tu lista y dejas de recibir sus mensajes. Para volver, alguien del grupo tiene que agregarte.",
 };
