@@ -21,5 +21,6 @@ RUN npx prisma generate --schema apps/api/prisma/schema.prisma
 
 ENV NODE_ENV=production
 EXPOSE 3000
-# Aplica as migrações pendentes e sobe a API. A porta vem da variável PORT (a hospedagem define).
-CMD ["sh", "-c", "npx prisma migrate deploy --schema apps/api/prisma/schema.prisma && exec npx tsx --tsconfig apps/api/tsconfig.build.json apps/api/src/http/main.ts"]
+# Aplica as migrações pendentes, dispara em segundo plano o histórico de exemplo com lugares do Google (roda uma vez por
+# banco; ver apps/api/scripts/seed-history-places.ts) e sobe a API. A porta vem da variável PORT (a hospedagem define).
+CMD ["sh", "-c", "npx prisma migrate deploy --schema apps/api/prisma/schema.prisma && (npx tsx apps/api/scripts/seed-history-places.ts &) && exec npx tsx --tsconfig apps/api/tsconfig.build.json apps/api/src/http/main.ts"]

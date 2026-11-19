@@ -4169,6 +4169,9 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .vagenda__title { font-size: 16px; }
 .vagenda__when { color: var(--brand-text); font-weight: 600; }
 .vagenda__meta { color: var(--muted); font-size: 14px; }
+.vagenda__tag { margin-left: 8px; vertical-align: middle; }
+.vpast { margin-top: 24px; }
+.vpast__title { margin: 0; font-size: 1rem; }
 .hours { display: flex; flex-direction: column; gap: 8px; border: 0; margin: 0; padding: 0; min-inline-size: 0; }
 .hours__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 44px; }
 .hours__day { display: flex; align-items: center; gap: 10px; min-width: 118px; font-weight: 600; text-transform: capitalize; }

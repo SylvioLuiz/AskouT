@@ -1233,6 +1233,8 @@ export interface VenueProfile {
   followerCount: number;
   rating: VenueRating;
   upcomingEvents: VenueEvent[];
+  /** Eventos que já terminaram, do mais recente ao mais antigo, com quantas pessoas confirmaram presença. */
+  pastEvents?: (VenueEvent & { goingCount: number })[];
   /** Quem mais frequenta, por check-ins e presenças confirmadas em eventos do local. */
   regulars: VenueRegular[];
   /** Amigos que já confirmaram presença aqui. */

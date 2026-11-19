@@ -107,6 +107,20 @@ test('agenda da página: só o que ainda vai acontecer, do mais cedo ao mais tar
   assert.deepEqual((await w.core.venues.profile(ana, 'v1')).upcomingEvents.map((e) => e.title), ['Depois']);
 });
 
+test('já rolou aqui: eventos que terminaram, do mais recente ao mais antigo, com quantos foram', async () => {
+  const { w, dono, ana } = await setup();
+  const now = w.clock.now().getTime();
+  const velho = await w.core.venues.createEvent(dono, 'v1', { title: 'Velho', startsAt: new Date(now + 2 * H).toISOString() });
+  await w.core.venues.createEvent(dono, 'v1', { title: 'Novo', startsAt: new Date(now + 26 * H).toISOString() });
+  await w.core.venues.createEvent(dono, 'v1', { title: 'Futuro', startsAt: new Date(now + 200 * H).toISOString() });
+  assert.deepEqual((await w.core.venues.profile(ana, 'v1')).pastEvents, []);
+  await w.eventRoom.addGoing({ source: 'PLACE', id: velho.id }, ana, w.clock.now());
+  w.clock.tick(40 * H);
+  const page = await w.core.venues.profile(ana, 'v1');
+  assert.deepEqual(page.pastEvents.map((e) => [e.title, e.phase, e.goingCount]), [['Novo', 'PAST', 0], ['Velho', 'PAST', 1]]);
+  assert.deepEqual(page.upcomingEvents.map((e) => e.title), ['Futuro']);
+});
+
 test('posts do bar: só o dono publica, aparecem na página e no feed de quem segue', async () => {
   const { w, dono, ana, bia } = await setup();
   await rejectsWith(w.core.posts.createForVenue(ana, 'v1', { images: [JPEG()] }), 'NOT_FOUND');

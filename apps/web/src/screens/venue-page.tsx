@@ -243,15 +243,19 @@ export function VenueHero({ venue, now, onShare, preview = false }: { venue: Ven
   );
 }
 
-export function AgendaRow({ event, now, preview = false }: { event: VenueEvent; now: Date; preview?: boolean }) {
+export function AgendaRow({ event, now, preview = false, goingCount }: { event: VenueEvent; now: Date; preview?: boolean; goingCount?: number }) {
   const body = (
     <>
-      <strong className="vagenda__title">{event.title}</strong>
+      <strong className="vagenda__title">
+        {event.title}
+        {event.sample ? <span className="tag tag--sample vagenda__tag">{t('Exemplo de teste')}</span> : null}
+      </strong>
       <span className="vagenda__when">{formatWhen(event.startsAt, event.endsAt, now)}</span>
       <span className="vagenda__meta">
         {kindLabel(event.kind)}
         {event.isFree ? t(' · Grátis') : ''}
         {event.phase === 'LIVE' ? ' · Acontecendo agora' : ''}
+        {goingCount === undefined || goingCount === 0 ? '' : goingCount === 1 ? t(' · 1 pessoa foi') : t(' · {n} pessoas foram', { n: goingCount })}
       </span>
     </>
   );
@@ -651,15 +655,27 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
       ) : null}
 
       {tab === 'events' ? (
-        v.upcomingEvents.length === 0 ? (
-          <EmptyState title={t('Nenhum evento marcado')}>{t('Quando o rolê divulgar eventos, eles aparecem aqui.')}</EmptyState>
-        ) : (
-          <ul className="vagenda" aria-label={t('Próximos eventos')}>
-            {v.upcomingEvents.map((e) => (
-              <AgendaRow key={e.id} event={e} now={now} />
-            ))}
-          </ul>
-        )
+        <>
+          {v.upcomingEvents.length === 0 ? (
+            <EmptyState title={t('Nenhum evento marcado')}>{t('Quando o rolê divulgar eventos, eles aparecem aqui.')}</EmptyState>
+          ) : (
+            <ul className="vagenda" aria-label={t('Próximos eventos')}>
+              {v.upcomingEvents.map((e) => (
+                <AgendaRow key={e.id} event={e} now={now} />
+              ))}
+            </ul>
+          )}
+          {v.pastEvents && v.pastEvents.length > 0 ? (
+            <section className="vpast">
+              <h2 className="vpast__title">{t('Já rolou aqui')}</h2>
+              <ul className="vagenda" aria-label={t('Já rolou aqui')}>
+                {v.pastEvents.map((e) => (
+                  <AgendaRow key={e.id} event={e} now={now} goingCount={e.goingCount} />
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </>
       ) : null}
 
       {tab === 'regulars' ? (
