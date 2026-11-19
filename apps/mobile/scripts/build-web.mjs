@@ -25,6 +25,9 @@ function run(command, args, cwd, env = {}) {
 }
 
 run('npx', ['vite', 'build', '--outDir', www, '--emptyOutDir'], web, { VITE_API_URL: apiUrl.replace(/\/+$/, '') });
+// Endereço da API para o código nativo (iPhone e Android): o "Responder" da notificação manda a resposta direto,
+// sem abrir o app web. Fica em public/askout-native.json dentro do app (Capacitor copia www/ para lá).
+writeFileSync(join(www, 'askout-native.json'), JSON.stringify({ apiUrl: apiUrl.replace(/\/+$/, '') }) + '\n');
 // Imagens da ficha das lojas (public/loja) servem só ao site: não entram no app.
 rmSync(join(www, 'loja'), { recursive: true, force: true });
 run('npx', ['esbuild', 'src/main.ts', '--bundle', '--format=esm', '--minify', '--target=es2022', `--outfile=${join(www, 'native-bridge.js')}`], mobile);

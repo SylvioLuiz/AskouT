@@ -138,6 +138,9 @@ const TOKEN_LIFETIME_SECONDS = 50 * 60;
 /** Motivos da Apple em que o token do aparelho não vale mais (apagar a inscrição). */
 const GONE_REASONS = new Set(['BadDeviceToken', 'Unregistered', 'DeviceTokenNotForTopic']);
 
+/** Categoria de notificação com o campo "Responder" (mesmo nome no AppDelegate do app). */
+export const APNS_REPLY_CATEGORY = 'MESSAGE';
+
 export class ApnsSender implements PushSender {
   /** O app do iPhone não usa chave pública do navegador. */
   readonly publicKey = null;
@@ -166,7 +169,13 @@ export class ApnsSender implements PushSender {
   async send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
     if (!subscription.endpoint.startsWith(NATIVE_PREFIX)) return 'FAILED';
     const deviceToken = subscription.endpoint.slice(NATIVE_PREFIX.length);
-    const body = JSON.stringify({ aps: { alert: { title: message.title, body: message.body }, sound: 'default' }, url: message.url });
+    // Com `reply`, a categoria MESSAGE faz o iPhone mostrar o campo "Responder" (registrado no AppDelegate do app).
+    // Em versões do app sem a categoria, o iPhone só ignora e mostra o aviso normal.
+    const body = JSON.stringify(
+      message.reply
+        ? { aps: { alert: { title: message.title, body: message.body }, sound: 'default', category: APNS_REPLY_CATEGORY, 'thread-id': message.tag.slice(0, 64) }, url: message.url, reply: message.reply }
+        : { aps: { alert: { title: message.title, body: message.body }, sound: 'default' }, url: message.url },
+    );
     const host = this.config.production ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
     const attempt = async (forceNew: boolean): Promise<ApnsResponse> =>
       this.transport({

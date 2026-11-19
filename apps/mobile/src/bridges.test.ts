@@ -193,6 +193,10 @@ describe('ponte de avisos (push)', () => {
     assert.deepEqual(f.removed.sort(), ['registration', 'registrationError'], 'solta os ouvintes depois');
   });
 
+  it('avisa o app web que esta casca sabe mostrar "Responder" na notificação', () => {
+    assert.equal(createPushBridge({ push: fakePush({ token: 'ab12' }).push, open: () => undefined }).replies, true);
+  });
+
   it('não pede de novo quando já está liberado, e devolve undefined quando a pessoa recusa', async () => {
     const ok = fakePush({ receive: 'granted', token: 'cd34' });
     assert.equal(await createPushBridge({ push: ok.push, open: () => undefined }).register(), 'cd34');

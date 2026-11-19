@@ -756,6 +756,8 @@ model PushSubscription {
   p256dh    String
   auth      String
   createdAt DateTime @default(now())
+  /// O app do aparelho mostra o campo "Responder" na notificação (no Android, o push vai só com dados).
+  replyable Boolean  @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

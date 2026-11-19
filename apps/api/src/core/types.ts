@@ -520,6 +520,11 @@ export interface PushSubscriptionRecord {
   p256dh: string;
   auth: string;
   createdAt: Date;
+  /**
+   * O app desse aparelho sabe mostrar o campo "Responder" na notificação. No Android isso muda o formato do push
+   * (só dados, o app monta o aviso); versões antigas do app não mostrariam nada, então só vale quando o app avisa.
+   */
+  replyable?: boolean;
 }
 
 /** Foto de perfil guardada no banco (já reduzida pelo app). */

@@ -1,5 +1,5 @@
-import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
-import type { MfaChallengeTokens, OAuthStateTokens, OneTimeCodes, PasswordHasher, SecretBox, TokenClaims, TokenService } from '../ports.ts';
+import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
+import type { MfaChallengeTokens, PushReplyTokens, OAuthStateTokens, OneTimeCodes, PasswordHasher, SecretBox, TokenClaims, TokenService } from '../ports.ts';
 import type { UserRole } from '../types.ts';
 
 /**
@@ -297,5 +297,53 @@ export class HmacOAuthStateTokens implements OAuthStateTokens {
     } catch {
       return undefined;
     }
+  }
+}
+
+/**
+ * Token de "Responder" que vai no push de mensagem (ver PushReplyTokens): quem, qual conversa e o hash do aparelho,
+ * assinado e com validade de 7 dias (a notificação pode ficar esperando na tela por um tempo).
+ */
+export class HmacPushReplyTokens implements PushReplyTokens {
+  readonly ttlSeconds: number;
+  private readonly key: Buffer;
+  private readonly nowMs: () => number;
+
+  constructor(options: { secret: string; ttlSeconds?: number; nowMs?: () => number }) {
+    this.key = deriveSubkey(options.secret, 'push-reply');
+    this.ttlSeconds = options.ttlSeconds ?? 7 * 24 * 3600;
+    this.nowMs = options.nowMs ?? Date.now;
+  }
+
+  endpointHash(endpoint: string): string {
+    return createHash('sha256').update(endpoint).digest('base64url').slice(0, 22);
+  }
+
+  issue(userId: string, conversationId: string, endpoint: string): string {
+    const exp = Math.floor(this.nowMs() / 1000) + this.ttlSeconds;
+    const payload = Buffer.from(JSON.stringify({ sub: userId, cid: conversationId, ep: this.endpointHash(endpoint), exp })).toString('base64url');
+    return `rpl.${payload}.${this.sign(payload)}`;
+  }
+
+  verify(token: unknown): { userId: string; conversationId: string; endpointHash: string } | undefined {
+    if (typeof token !== 'string' || token.length > 1000) return undefined;
+    const [prefix, payload, signature] = token.split('.');
+    if (prefix !== 'rpl' || !payload || !signature) return undefined;
+    const expected = Buffer.from(this.sign(payload));
+    const received = Buffer.from(signature);
+    if (expected.length !== received.length || !timingSafeEqual(expected, received)) return undefined;
+    try {
+      const { sub, cid, ep, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>;
+      if (typeof sub !== 'string' || sub === '' || typeof cid !== 'string' || cid === '' || typeof ep !== 'string' || ep === '' || typeof exp !== 'number') return undefined;
+      if (Math.floor(this.nowMs() / 1000) >= exp) return undefined;
+      return { userId: sub, conversationId: cid, endpointHash: ep };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private sign(payload: string): string {
+    return createHmac('sha256', this.key).update(`push-reply
+${payload}`).digest('base64url');
   }
 }

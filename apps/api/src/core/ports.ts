@@ -990,6 +990,24 @@ export interface PushMessage {
   url: string;
   /** Avisos com a mesma `tag` se substituem na tela do aparelho. */
   tag: string;
+  /**
+   * Mensagem de conversa no app (iPhone/Android): token para responder pela própria notificação, sem abrir o app.
+   * Vale só para aquela conversa e aquele aparelho (ver PushReplyTokens).
+   */
+  reply?: string;
+}
+
+/**
+ * Token que vai junto do push de mensagem para a pessoa responder pela notificação. Assinado (HMAC), com validade,
+ * preso à conversa e ao aparelho (hash do endereço da inscrição): desligar os avisos ou sair da conta nesse aparelho
+ * apaga a inscrição, e o token para de valer.
+ */
+export interface PushReplyTokens {
+  issue(userId: string, conversationId: string, endpoint: string): string;
+  /** Quem, qual conversa e o hash do aparelho; undefined se inválido ou vencido. */
+  verify(token: unknown): { userId: string; conversationId: string; endpointHash: string } | undefined;
+  /** O mesmo hash usado no token, para conferir a inscrição. */
+  endpointHash(endpoint: string): string;
 }
 
 /** SENT: entregue ao serviço de push; GONE: a inscrição não vale mais (apagar); FAILED: erro passageiro. */
@@ -1244,6 +1262,8 @@ export interface CoreDeps {
   mfa: MfaRepository;
   secretBox: SecretBox;
   mfaChallenges: MfaChallengeTokens;
+  /** Responder mensagem pela notificação do app. Sem ele, os avisos saem sem o campo de resposta. */
+  pushReplies?: PushReplyTokens;
   boosts: BoostRepository;
   boostStats: BoostStatsRepository;
   offers: OfferRepository;

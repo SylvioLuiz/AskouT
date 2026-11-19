@@ -51,7 +51,17 @@ export class FcmSender implements PushSender {
   async send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
     if (!subscription.endpoint.startsWith(FCM_PREFIX)) return 'FAILED';
     const deviceToken = subscription.endpoint.slice(FCM_PREFIX.length);
-    const body = JSON.stringify({
+    // Com `reply` (só aparelhos que avisaram que sabem), vai só com dados: o próprio app monta o aviso com o campo
+    // "Responder" (ReplyMessagingService no Android). Com `notification`, o Android mostraria sozinho, sem o campo.
+    const body = message.reply
+      ? JSON.stringify({
+          message: {
+            token: deviceToken,
+            data: { url: message.url, title: message.title, body: message.body, tag: message.tag.slice(0, 64), reply: message.reply },
+            android: { priority: 'HIGH' },
+          },
+        })
+      : JSON.stringify({
       message: {
         token: deviceToken,
         notification: { title: message.title, body: message.body },

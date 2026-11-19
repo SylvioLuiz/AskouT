@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { nativeEndpoint, nativePushAction, nativePushBridge, nativePushState, pushState, shouldAutoAskPush, subscriptionBody, urlBase64ToBytes } from './push.ts';
+import { nativeEndpoint, nativePushAction, nativePushBridge, nativePushState, nativeSubscription, pushState, shouldAutoAskPush, subscriptionBody, urlBase64ToBytes } from './push.ts';
 import type { PushEnvironment } from './push.ts';
 
 const base: PushEnvironment = { hasServiceWorker: true, hasPushManager: true, hasNotification: true, secureContext: true, permission: 'default', isApple: false, standalone: false, serverKey: 'k', subscribed: false };
@@ -63,5 +63,13 @@ describe('push no app do iPhone', () => {
     assert.equal(nativePushAction({ ...base, permission: 'granted', optedOut: true }), 'none');
     assert.equal(nativePushAction({ ...base, permission: 'denied' }), 'none');
     assert.equal(nativePushAction({ ...base, permission: 'granted', serverNative: false }), 'none');
+  });
+});
+
+describe('"Responder" na notificação', () => {
+  it('só pede o campo de resposta quando a casca nativa sabe mostrar', () => {
+    const iphone = 'a'.repeat(64);
+    assert.deepEqual(nativeSubscription({ replies: true }, iphone), { endpoint: `apns:${iphone}`, reply: true });
+    assert.deepEqual(nativeSubscription({}, iphone), { endpoint: `apns:${iphone}` }, 'app antigo: aviso de sempre (no Android, o novo formato não apareceria)');
   });
 });

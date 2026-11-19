@@ -51,6 +51,8 @@ export function createPushBridge(deps: { push: PushPluginLike; open: (path: stri
   };
   listen();
   return {
+    /** Esta casca mostra "Responder" na notificação de mensagem (AppDelegate no iPhone, ReplyMessagingService no Android). */
+    replies: true as const,
     async permission(): Promise<PushPermission> {
       return toPermission((await deps.push.checkPermissions()).receive);
     },

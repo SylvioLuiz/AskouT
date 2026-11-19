@@ -38,6 +38,24 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="notificacoes" />
 
+        <!--
+          Push: troca o serviço do plugin do Capacitor pelo do app, que faz o mesmo e, nas mensagens de conversa
+          (push só com dados), monta a notificação com o campo "Responder". A resposta sai pelo ReplyReceiver.
+        -->
+        <service
+            android:name="com.capacitorjs.plugins.pushnotifications.MessagingService"
+            tools:node="remove" />
+        <service
+            android:name=".ReplyMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <receiver
+            android:name=".ReplyReceiver"
+            android:exported="false" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

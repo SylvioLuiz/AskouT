@@ -85,8 +85,8 @@ export class PrismaPushSubscriptionRepository implements PushSubscriptionReposit
   async upsert(record: PushSubscriptionRecord): Promise<void> {
     await this.prisma.pushSubscription.upsert({
       where: { endpoint: record.endpoint },
-      create: { endpoint: record.endpoint, userId: record.userId, p256dh: record.p256dh, auth: record.auth, createdAt: record.createdAt },
-      update: { userId: record.userId, p256dh: record.p256dh, auth: record.auth },
+      create: { endpoint: record.endpoint, userId: record.userId, p256dh: record.p256dh, auth: record.auth, createdAt: record.createdAt, replyable: record.replyable === true },
+      update: { userId: record.userId, p256dh: record.p256dh, auth: record.auth, replyable: record.replyable === true },
     });
   }
 
@@ -97,6 +97,6 @@ export class PrismaPushSubscriptionRepository implements PushSubscriptionReposit
   async listForUser(userId: string): Promise<PushSubscriptionRecord[]> {
     if (!isUuid(userId)) return [];
     const rows = await this.prisma.pushSubscription.findMany({ where: { userId }, orderBy: { createdAt: 'asc' } });
-    return rows.map((r) => ({ userId: r.userId, endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth, createdAt: r.createdAt }));
+    return rows.map((r) => ({ userId: r.userId, endpoint: r.endpoint, p256dh: r.p256dh, auth: r.auth, createdAt: r.createdAt, replyable: r.replyable }));
   }
 }

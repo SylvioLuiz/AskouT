@@ -89,6 +89,16 @@ describe('FCM (aviso no Android)', () => {
     assert.equal(android.notification['visibility'], 'PRIVATE');
   });
 
+  it('com "Responder", vai só com dados (o app monta o aviso com o campo de resposta)', async () => {
+    const g = fakeGoogle(() => ok({ name: 'projects/askout-1/messages/1' }));
+    const sender = new FcmSender({ tokens: g.tokens, fetch: g.fetcher });
+    assert.equal(await sender.send(sub(`fcm:${FCM_TOKEN}`), { ...msg, tag: 'msg:1', reply: 'rpl.x.y' }), 'SENT');
+    const body = JSON.parse(g.calls.find((c) => c.url.includes('fcm.googleapis.com'))!.body!) as { message: Record<string, unknown> };
+    assert.equal(body.message['notification'], undefined, 'sem notification: senão o Android mostraria sozinho, sem o campo');
+    assert.deepEqual(body.message['data'], { url: '/conversas/1', title: 'Ana', body: 'Nova mensagem', tag: 'msg:1', reply: 'rpl.x.y' });
+    assert.deepEqual(body.message['android'], { priority: 'HIGH' });
+  });
+
   it('registra no log por que o FCM recusou, com a dica de como resolver', async () => {
     const lines: string[] = [];
     const g = fakeGoogle(() => ok({ error: { status: 'PERMISSION_DENIED' } }, 403));
