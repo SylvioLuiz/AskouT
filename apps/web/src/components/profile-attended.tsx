@@ -7,17 +7,20 @@ import type { ApiError } from '../lib/errors.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import type { AttendedEvent, AttendedEventsPage } from '../lib/types.ts';
 import { Link } from '../router.tsx';
+import { InfoIcon } from './icons.tsx';
+import { TileMenu, useTileMenu } from './tile-press.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 const PAGE = 12;
 
-/** Cartão de um evento em que a pessoa confirmou presença. `action` é o botão da dona (tirar ou mostrar no perfil). */
-export function GoingTile({ event, action }: { event: AttendedEvent; action?: { label: string; aria: string; busy: boolean; run: () => void; positive?: boolean } }) {
+/** Cartão de um evento em que a pessoa confirmou presença. `action` é a opção da dona (tirar ou mostrar no perfil), que aparece ao segurar o cartão. */
+export function GoingTile({ event, action }: { event: AttendedEvent; action?: { label: string; aria: string; busy: boolean; run: () => void } }) {
   const [failed, setFailed] = useState(false);
   const image = failed ? null : safeImage(event.imageUrl);
+  const menu = useTileMenu(action !== undefined);
   return (
-    <li className="ptile">
-      <Link to={`/eventos/${encodeURIComponent(event.id)}`} className={`ptile__link evcover--${event.kind.toLowerCase()}${image ? '' : ' ptile__link--plain'}`}>
+    <li className={`ptile${action ? ' ptile--press' : ''}`}>
+      <Link {...menu.press} to={`/eventos/${encodeURIComponent(event.id)}`} className={`ptile__link evcover--${event.kind.toLowerCase()}${image ? '' : ' ptile__link--plain'}`}>
         {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="ptile__kind" aria-hidden="true">{kindLabel(event.kind)}</span>}
         <span className="ptile__info">
           <span className="ptile__title">{event.title}</span>
@@ -26,10 +29,12 @@ export function GoingTile({ event, action }: { event: AttendedEvent; action?: { 
         </span>
       </Link>
       {action ? (
-        <button type="button" className={`ptile__remove${action.positive ? ' ptile__remove--show' : ''}`} onClick={action.run} disabled={action.busy} aria-label={action.aria}>
-          {action.label}
+        // Teclado e leitor de tela: o mesmo menu de segurar o cartão.
+        <button type="button" className="visually-hidden" onClick={() => menu.setOpen(true)}>
+          {t('Opções de {title}', { title: event.title })}
         </button>
       ) : null}
+      {action && menu.open ? <TileMenu title={event.title} actions={[{ label: action.label, busy: action.busy, run: action.run }]} onClose={() => menu.setOpen(false)} /> : null}
     </li>
   );
 }
@@ -40,6 +45,7 @@ export function AttendedEvents({ username }: { username: string }) {
   const [error, setError] = useState<ApiError | undefined>();
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | undefined>();
+  const [infoOpen, setInfoOpen] = useState(false);
 
   async function load(offset: number) {
     setLoading(true);
@@ -74,7 +80,20 @@ export function AttendedEvents({ username }: { username: string }) {
 
   if (error && !page) return <ErrorState message={error.message} onRetry={() => void load(0)} />;
   if (!page) return <Loading />;
-  const intro = <p className="muted">{t('Só você vê esta aba. Aqui ficam os eventos em que você disse Eu vou sem mostrar no perfil.')}</p>;
+  // A explicação fica atrás de um ícone de informação, aberta só quando a pessoa toca nele.
+  const intro = (
+    <div className="attinfo">
+      <button type="button" className="attinfo__btn" onClick={() => setInfoOpen((v) => !v)} aria-expanded={infoOpen} aria-controls="attinfo-texto" aria-label={t('Sobre esta aba')}>
+        <InfoIcon />
+      </button>
+      {infoOpen ? (
+        <p className="attinfo__text" id="attinfo-texto" role="note">
+          {t('Só você vê esta aba. Aqui ficam os eventos em que você disse Eu vou sem mostrar no perfil.')}{' '}
+          {t('Segure um evento para tirar ou mostrar no perfil.')}
+        </p>
+      ) : null}
+    </div>
+  );
   if (page.items.length === 0) {
     return (
       <>
@@ -85,7 +104,7 @@ export function AttendedEvents({ username }: { username: string }) {
   }
 
   const tiles = page.items.map((event) => (
-    <GoingTile key={event.id} event={event} action={{ label: t('Mostrar no perfil'), aria: t('Mostrar {title} no perfil', { title: event.title }), busy: busyId === event.id, run: () => void show(event), positive: true }} />
+    <GoingTile key={event.id} event={event} action={{ label: t('Mostrar no perfil'), aria: t('Mostrar {title} no perfil', { title: event.title }), busy: busyId === event.id, run: () => void show(event) }} />
   ));
   const left = tiles.filter((_, i) => i % 2 === 0);
   const right = tiles.filter((_, i) => i % 2 === 1);

@@ -12,7 +12,7 @@ const PATHS: Record<View, string> = { list: '/explorar', map: '/explorar/mapa' }
  * Troca de visão com um crossfade curto (View Transitions, onde o navegador tiver);
  * nos outros, as telas entram com fade pelo CSS.
  */
-function switchView(path: string) {
+export function switchView(path: string) {
   const go = () => navigate(path, { replace: true });
   const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };

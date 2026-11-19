@@ -1,7 +1,8 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { lazyWithReload } from '../lib/chunk-reload.ts';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
-import { ExploreViews } from '../components/explore-views.tsx';
+import { ExploreViews, switchView } from '../components/explore-views.tsx';
+import { ExploreSearch } from '../components/explore-search.tsx';
 import { VenueLink } from '../components/venue-link.tsx';
 import { VenueLogo } from '../components/venue-logo.tsx';
 import { Button, EmptyState } from '../components/ui.tsx';
@@ -200,39 +201,19 @@ function PlaceCard({ place, selected, index, onSelect }: { place: ExplorePlace; 
   );
 }
 
-/** Busca no topo do mapa, igual à da lista: ao enviar, abre os resultados na lista do Explorar. */
+/** Busca no topo do mapa, a mesma da lista: ao enviar, abre os resultados na lista do Explorar com a transição suave. */
 function MapSearch() {
   const [query, setQuery] = useState('');
   return (
-    <form
-      className="evmap__search"
-      role="search"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const q = query.trim();
-        if (q) navigate(`/explorar?q=${encodeURIComponent(q)}`, { replace: true });
+    <ExploreSearch
+      id="busca-mapa"
+      value={query}
+      onChange={setQuery}
+      onSubmit={(value) => {
+        const q = value.trim();
+        if (q) switchView(`/explorar?q=${encodeURIComponent(q)}`);
       }}
-    >
-      <span className="search__icon" aria-hidden="true">
-        <SearchIcon />
-      </span>
-      <label className="visually-hidden" htmlFor="busca-mapa">
-        {t('Buscar eventos, rolês, pessoas ou #')}
-      </label>
-      <input
-        id="busca-mapa"
-        className="evmap__searchinput"
-        type="search"
-        enterKeyHint="search"
-        placeholder={t('Eventos, rolês, pessoas ou #')}
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        autoComplete="off"
-        autoCapitalize="none"
-        spellCheck={false}
-        maxLength={80}
-      />
-    </form>
+    />
   );
 }
 
