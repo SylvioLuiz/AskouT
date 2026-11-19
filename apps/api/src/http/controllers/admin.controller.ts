@@ -95,6 +95,24 @@ export class AdminController {
     return this.core.admin.deleteEventExtra(actor, id);
   }
 
+  /** Quem mais trouxe gente pelo convite (`?limit=`, até 50). */
+  @Get('referrals/top')
+  topInviters(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown }) {
+    const n = Number(q.limit);
+    return this.core.referrals.adminTop(actor, Number.isFinite(n) && q.limit !== undefined ? n : undefined);
+  }
+
+  @Get('reco-experiment')
+  recoExperiment(@CurrentActor() actor: Actor) {
+    return this.core.admin.recoExperimentState(actor);
+  }
+
+  @Put('reco-experiment')
+  setRecoExperiment(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.setRecoExperiment(actor, b.enabled, b.controlPercent, b.note);
+  }
+
   @Get('retention')
   retention(@CurrentActor() actor: Actor, @Query() q: { days?: unknown }) {
     return this.core.admin.retention(actor, q);

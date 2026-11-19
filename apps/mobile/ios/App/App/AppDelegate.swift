@@ -65,6 +65,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 /// Tela principal: reforça a retirada da barra do teclado (setas e OK) direto no WebView que está na tela
 /// e tira o "efeito mola" da página (ver `disableBounce`).
 class MainViewController: CAPBridgeViewController {
+    /// Plugins nativos do próprio app (fora do npm): a galeria dentro do app para criar stories.
+    override func capacitorDidLoad() {
+        bridge?.registerPluginInstance(GalleryPlugin())
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         hideAccessory()

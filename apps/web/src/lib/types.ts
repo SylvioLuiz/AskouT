@@ -31,6 +31,18 @@ export interface ProfileView {
   counts: { followers: number; following: number; events: number };
   relationship: Relationship;
   canViewContent: boolean;
+  /** Selo de quem trouxe amigos: quantos, ou null sem selo (não alcançou ou escondeu). Ausente em versões antigas da API. */
+  referralBadge?: number | null;
+}
+
+/** Convite com contagem: quem entrou pelo seu link e o progresso do selo. */
+export interface ReferralOverview {
+  brought: number;
+  confirmed: number;
+  badgeThreshold: number;
+  badgeEarned: boolean;
+  badgeHidden: boolean;
+  people: { profile: PublicProfile; joinedAt: string; confirmed: boolean }[];
 }
 
 export interface SessionUser {
@@ -378,7 +390,7 @@ export interface MeetupView {
   canManage: boolean;
 }
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST';
 
 export interface NotificationItem {
   id: string;
@@ -750,11 +762,33 @@ export interface NotificationMute {
 export interface EventStoryItem {
   id: string;
   kind: 'IMAGE' | 'VIDEO';
+  /** Texto por cima da mídia (null/ausente se não tem) e a altura dele na tela, de 0 (topo) a 1 (pé). */
+  caption?: string | null;
+  captionY?: number | null;
   createdAt: string;
   expiresAt: string;
   canDelete: boolean;
   /** Só nos stories da página inicial: de qual evento veio (null se você não tem acesso a ele). */
   event?: StoryEvent | null;
+  /** Textos e figurinhas por cima da mídia (ver `lib/story-overlays.ts`). */
+  overlays?: StoryOverlay[];
+  /** Você curtiu (coração). Só vem nos stories de outras pessoas. */
+  liked?: boolean;
+}
+
+export type StoryOverlayStyle = 'CLASSIC' | 'BOX' | 'NEON' | 'SERIF';
+
+/** Texto ou figurinha por cima do story: centro em `x`/`y` (0 a 1 na área da mídia), escala e giro em graus. */
+export interface StoryOverlay {
+  kind: 'TEXT' | 'STICKER';
+  text: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  /** `#rrggbb`: cor da letra (ou do fundo, no estilo BOX; do brilho, no NEON). */
+  color: string;
+  style: StoryOverlayStyle;
 }
 
 /** Onde a pessoa do story está: o evento e o local, para mostrar num relance. */
@@ -777,6 +811,49 @@ export interface EventStoryGroup {
   author: PublicProfile;
   mine: boolean;
   items: EventStoryItem[];
+}
+
+/** Story público de um local verificado (foto ou vídeo, 24 h). */
+export interface VenueStoryItem {
+  id: string;
+  kind: 'IMAGE' | 'VIDEO';
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface VenueStoryVenue {
+  id: string;
+  name: string;
+  category: string | null;
+  logoUrl: string | null;
+}
+
+/** Os stories de um local que a pessoa segue (faixa da Home). */
+export interface VenueStoryGroup {
+  venue: VenueStoryVenue;
+  items: VenueStoryItem[];
+}
+
+/** Um item da faixa "Rolando agora" do Explorar: local com story no ar e/ou evento em andamento. */
+export interface RollingNowItem {
+  venue: VenueStoryVenue;
+  stories: VenueStoryItem[];
+  event: { id: string; title: string; kind: EventKind; startsAt: string; endsAt: string; isFree: boolean; goingCount: number } | null;
+  /** Em metros, em passos de 100 m; null sem posição. */
+  distanceM: number | null;
+  interest: boolean;
+  friendsGoingCount: number;
+  friendsGoing: PublicProfile[];
+}
+
+export interface VenueStorySettings {
+  hideVenueStories: boolean;
+  mutedVenues: { id: string; name: string }[];
+}
+
+export interface VenueStoryOwnerView {
+  suspended: boolean;
+  items: VenueStoryItem[];
 }
 
 export interface EventPage {
@@ -1150,7 +1227,7 @@ export interface VenueProfile {
   followerCount: number;
   rating: VenueRating;
   upcomingEvents: VenueEvent[];
-  /** Quem mais frequenta, por presenças confirmadas em eventos do local. */
+  /** Quem mais frequenta, por check-ins e presenças confirmadas em eventos do local. */
   regulars: VenueRegular[];
   /** Amigos que já confirmaram presença aqui. */
   friendsWent: { count: number; sample: PublicProfile[] };
@@ -1159,7 +1236,21 @@ export interface VenueProfile {
 export interface VenueRegular {
   rank: number;
   user: PublicProfile;
+  /** Idas ao local: check-ins por QR mais presenças confirmadas. */
   visits: number;
+  /** Quantas foram check-ins por QR (valem mais no ranking). */
+  checkins: number;
+}
+
+/** Código secreto do QR do local (só quem administra vê). */
+export interface VenueCheckinCode {
+  code: string;
+}
+
+export interface VenueCheckinResult {
+  venueId: string;
+  venueName: string;
+  at: string;
 }
 
 export interface VenueProfileBody {
@@ -1305,6 +1396,8 @@ export interface RecommendationSource {
 
 export interface Recommendations {
   personalized: boolean;
+  /** Teste A/B do bloco: no controle só vêm os anúncios Match e o título "Para você" não aparece. null = teste desligado. */
+  group?: 'control' | 'treatment' | null;
   items: RecommendationItem[];
 }
 
@@ -1326,4 +1419,102 @@ export interface EventExtraAnswer {
 export interface EventExtraView extends EventExtraOption {
   optionId: string;
   value: boolean | string;
+}
+
+// ---------- Oferta relâmpago do bar ----------
+
+/** Oferta que vale para a pessoa agora (Home e NOW). Sempre com a etiqueta “Patrocinado”; nada sobre quem mais recebeu. */
+export interface NearbyOffer {
+  id: string;
+  venueId: string;
+  venueName: string;
+  text: string;
+  endsAt: string;
+  label: 'Patrocinado';
+}
+
+/** Como o responsável enxerga a oferta. `reach` é só uma faixa de alcance, nunca quem. */
+export interface OfferView {
+  id: string;
+  venueId: string;
+  venueName: string;
+  text: string;
+  startsAt: string;
+  endsAt: string;
+  phase: 'ACTIVE' | 'ENDED';
+  reach: MatchReach | null;
+}
+
+export interface OfferLimits {
+  textMax: number;
+  textMin: number;
+  minMinutes: number;
+  maxMinutes: number;
+  maxPerDay: number;
+  radiusKm: number;
+  free: boolean;
+}
+
+export interface VenueOffers {
+  items: OfferView[];
+  limits: OfferLimits;
+  remainingToday: number;
+}
+
+/** Álbum do encontro (NOW ou evento): fotos só de quem foi. */
+export interface AlbumSummary {
+  id: string;
+  kind: 'FLASH' | 'EVENT';
+  title: string | null;
+  placeName: string | null;
+  startedAt: string;
+  /** Quem foi, sem contar você nem quem tem bloqueio com você. */
+  friendCount: number;
+  photoCount: number;
+  coverPhotoId: string | null;
+}
+
+export interface AlbumPhoto {
+  id: string;
+  author: PublicProfile;
+  createdAt: string;
+  mine: boolean;
+}
+
+export interface AlbumDetail extends AlbumSummary {
+  members: PublicProfile[];
+  photos: AlbumPhoto[];
+}
+
+// ---------- Lista VIP (nome na lista) ----------
+
+export interface GuestListConfig {
+  limit: number | null;
+  closesAt: string | null;
+  maxCompanions: number;
+}
+
+export interface GuestListView {
+  enabled: boolean;
+  isOwner: boolean;
+  config: GuestListConfig | null;
+  count: number;
+  spotsLeft: number | null;
+  open: boolean;
+  mine: { companions: number; checkedIn: boolean } | null;
+}
+
+export interface GuestListEntry {
+  user: PublicProfile;
+  companions: number;
+  checkedIn: boolean;
+  createdAt: string;
+}
+
+export interface GuestListOwnerView {
+  config: GuestListConfig;
+  count: number;
+  people: number;
+  checkedInPeople: number;
+  entries: GuestListEntry[];
 }

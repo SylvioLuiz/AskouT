@@ -10,8 +10,11 @@ import { MeetupService } from './meetup-service.ts';
 import { SchedulingService } from './scheduling-service.ts';
 import { ProfileEventService } from './profile-event-service.ts';
 import { PostService } from './post-service.ts';
+import { AlbumService } from './album-service.ts';
+import { VenueStoryService } from './venue-story-service.ts';
 import { EventPageService } from './event-page-service.ts';
 import { FeedService } from './feed-service.ts';
+import { GuestListService } from './guest-list-service.ts';
 import { EventReminderService } from './event-reminder-service.ts';
 import { ExploreService } from './explore-service.ts';
 import { VenueService } from './venue-service.ts';
@@ -24,10 +27,12 @@ import { SuggestionService } from './suggestion-service.ts';
 import { DwellService } from './dwell-service.ts';
 import { InterestService } from './interest-service.ts';
 import { MatchService } from './match-service.ts';
+import { OfferService } from './offer-service.ts';
 import { PaymentsSwitch } from './payments-switch.ts';
 import { EventExtrasCatalog } from './event-extras.ts';
 import { ConsentService } from './consent-service.ts';
 import { CloakroomService } from './cloakroom-service.ts';
+import { RecoExperiment } from './reco-experiment.ts';
 import { RegionService } from './region-service.ts';
 import { AccountService } from './account-service.ts';
 import { AgeService } from './age-service.ts';
@@ -36,6 +41,7 @@ import { RecommendationService } from './recommendation-service.ts';
 import type { CoreDeps, NotificationRepository, PushSender, PushSubscriptionRepository } from './ports.ts';
 import { NotificationService, StoredNotifier } from './notification-service.ts';
 import { ProfileService } from './profile-service.ts';
+import { ReferralService } from './referral-service.ts';
 
 export type CoreInput = Omit<CoreDeps, 'notifier'> & {
   /** Valor do impulsionamento por dia, em centavos. */
@@ -53,7 +59,8 @@ export function createCore(input: CoreInput) {
   const notifier = new StoredNotifier(input);
   const deps: CoreDeps = { ...input, notifier };
   const flash = new FlashService(deps);
-  const profiles = new ProfileService(deps);
+  const referrals = new ReferralService(deps);
+  const profiles = new ProfileService(deps, referrals);
   const venues = new VenueService(deps);
   const auth = new AuthService(deps);
   const posts = new PostService(deps, profiles);
@@ -61,7 +68,9 @@ export function createCore(input: CoreInput) {
   const conversations = new ConversationService(deps);
   const interests = new InterestService(deps);
   const match = new MatchService(deps, interests);
+  const venueStories = new VenueStoryService(deps, interests);
   const paymentsSwitch = new PaymentsSwitch(deps, input.boostsEnabled ?? true);
+  const recoExperiment = new RecoExperiment(deps);
   const boosts = new BoostService(
     deps,
     {
@@ -74,7 +83,9 @@ export function createCore(input: CoreInput) {
   return {
     boosts,
     boostStats: new BoostStatsService(deps),
+    offers: new OfferService(deps),
     auth,
+    referrals,
     profiles,
     follows: new FollowService(deps),
     blocks: new BlockService(deps),
@@ -86,19 +97,22 @@ export function createCore(input: CoreInput) {
     explore: new ExploreService(deps, profiles, boosts),
     eventPages,
     feed: new FeedService(deps, eventPages),
+    guestList: new GuestListService(deps, eventPages),
     eventReminders: new EventReminderService(deps),
     venues,
     calendarImport: new CalendarImportService(deps, venues),
     calendarSync: new CalendarSyncService(deps),
-    admin: new AdminService(deps, venues, auth, paymentsSwitch),
+    admin: new AdminService(deps, venues, auth, paymentsSwitch, recoExperiment),
     meetups: new MeetupService(deps),
     scheduling: new SchedulingService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
     posts,
     eventExtras: new EventExtrasCatalog(deps),
+    albums: new AlbumService(deps, posts),
+    venueStories,
     dwell: new DwellService(deps),
     activity: new ActivityService(deps),
-    recommendations: new RecommendationService(deps, posts, match),
+    recommendations: new RecommendationService(deps, posts, match, recoExperiment),
     regions: new RegionService(deps),
     consents: new ConsentService(deps),
     cloakroom: new CloakroomService(deps),
@@ -176,10 +190,14 @@ export { ActivityService, ACTIVITY_ACTIONS, ACTIVITY_PAGE_DEFAULT, ACTIVITY_PAGE
 export type { ActivityItemView, ActivityPage } from './activity-service.ts';
 export { SuggestionService, SUGGESTION_RADIUS_M, SUGGESTION_MAX_RADIUS_M, suggestionRadiusM } from './suggestion-service.ts';
 export type { SuggestionItem, SuggestionsView } from './suggestion-service.ts';
+export { GuestListService, GUEST_LIST_COMPANIONS_MAX, GUEST_LIST_LIMIT_MAX } from './guest-list-service.ts';
+export type { GuestListView, GuestListOwnerView, GuestListEntryView, GuestListConfigView } from './guest-list-service.ts';
 export { EventPageService } from './event-page-service.ts';
 export { EventReminderService } from './event-reminder-service.ts';
 export type { EventPageView, EventCoverView } from './event-page-service.ts';
 export type { FeedCommentView, FeedCommentsPage, FeedPageView, FeedPostView, FeedReactionsView, FeedSettingsView } from './feed-service.ts';
+export { OfferService, OFFER_TEXT_MAX, OFFER_MAX_PER_DAY, OFFER_MAX_MINUTES, OFFER_RADIUS_M } from './offer-service.ts';
+export type { OfferView, NearbyOfferView, OfferLimits } from './offer-service.ts';
 export { BoostService, BOOST_DAY_OPTIONS, BOOST_DEFAULT_PRICE_PER_DAY_CENTS, BOOST_DEFAULT_PACKAGE_PRICES_CENTS, boostPhase, boostProductId } from './boost-service.ts';
 export type { BoostPricing, BoostView, BoostPhase } from './boost-service.ts';
 export { BoostStatsService, BOOST_TRACK_BATCH_MAX, BOOST_STATS_MATCH_FLOOR, statDay } from './boost-stats-service.ts';
@@ -192,12 +210,17 @@ export { distanceMeters, midpoint, boundingBox } from './geo.ts';
 export { NotificationService, StoredNotifier } from './notification-service.ts';
 export type { NotificationView } from './notification-service.ts';
 export { ProfileEventService } from './profile-event-service.ts';
+export { VenueStoryService } from './venue-story-service.ts';
+export { AlbumService, ALBUM_LIST_DAYS, ALBUM_PHOTOS_PER_USER, ALBUM_SUMMARY_HOUR } from './album-service.ts';
+export type { AlbumSummaryView, AlbumView, AlbumPhotoView } from './album-service.ts';
 export { PostService, POST_IMAGES_MAX, POST_CAPTION_MAX } from './post-service.ts';
 export type { PostedEventsPage, PostedEventView } from './profile-event-service.ts';
 export type { EventCardView } from './event-card.ts';
 export { BlockService } from './block-service.ts';
 export { FollowService } from './follow-service.ts';
 export type { ConnectionsPage, FollowResult } from './follow-service.ts';
+export { ReferralService, REFERRAL_BADGE_THRESHOLD } from './referral-service.ts';
+export type { ReferralOverview, ReferralPersonView, TopInviterView } from './referral-service.ts';
 export { ProfileService } from './profile-service.ts';
 export type { ProfilePatch, ProfileView, RelationState } from './profile-service.ts';
 export { DomainError } from './errors.ts';
@@ -220,6 +243,8 @@ export type {
   PasswordHasher,
   PasswordResetRepository,
   PendingSignupRepository,
+  ReferralRecord,
+  ReferralRepository,
   TokenClaims,
   TokenService,
   UserRepository,

@@ -1,11 +1,18 @@
 import { createHash } from 'node:crypto';
+import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from '../album.ts';
+import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from '../venue-story.ts';
 import { conflict } from '../errors.ts';
 import { CalendarFetchError } from '../ports.ts';
 import { evaluateFriendship } from '../friendship.ts';
 import type {
+  ReferralRecord,
+  ReferralRepository,
+  AlbumRepository,
+  VenueStoryRepository,
   PostRepository,
   EventRoomRepository,
   FeedRepository,
+  GuestListRepository,
   ConversationRepository,
   MeetupRepository,
   SchedulingRepository,
@@ -33,6 +40,7 @@ import type {
   PasswordResetRepository,
   BoostRepository,
   BoostStatsRepository,
+  OfferRepository,
   RegionRepository,
   ConsentRepository,
   CloakroomRepository,
@@ -57,10 +65,11 @@ import { matchesNotificationFilter, type NotificationFilter } from '../notificat
 import type {
   DirectActivityRow,
   DwellRecord,
+  VenueOfferRecord,
   ConsentEventRecord,
   CloakroomSettingRecord,
   CloakroomTicketRecord,
-  EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
+  GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 import type { ActivityRepository, MfaRepository } from '../ports.ts';
@@ -223,6 +232,51 @@ export class InMemoryUserRepository implements UserRepository {
       .sort((a, b) => a.username.localeCompare(b.username))
       .slice(0, limit)
       .map((p) => ({ ...p }));
+  }
+}
+
+export class InMemoryReferralRepository implements ReferralRepository {
+  readonly rows = new Map<string, ReferralRecord>();
+  private readonly users: InMemoryUserRepository;
+
+  constructor(users: InMemoryUserRepository) {
+    this.users = users;
+  }
+
+  async create(record: ReferralRecord): Promise<boolean> {
+    if (this.rows.has(record.inviteeId)) return false;
+    this.rows.set(record.inviteeId, { ...record });
+    return true;
+  }
+
+  async qualify(inviteeId: string, at: Date): Promise<boolean> {
+    const row = this.rows.get(inviteeId);
+    if (!row || row.qualifiedAt) return false;
+    row.qualifiedAt = at;
+    return true;
+  }
+
+  async listByInviter(inviterId: string, limit: number): Promise<ReferralRecord[]> {
+    return [...this.rows.values()]
+      .filter((r) => r.inviterId === inviterId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.inviteeId < b.inviteeId ? -1 : 1))
+      .slice(0, limit)
+      .map((r) => ({ ...r }));
+  }
+
+  async top(limit: number): Promise<{ inviterId: string; total: number; confirmed: number }[]> {
+    const byInviter = new Map<string, { total: number; confirmed: number }>();
+    for (const r of this.rows.values()) {
+      if (this.users.users.get(r.inviteeId)?.status !== 'ACTIVE') continue;
+      const acc = byInviter.get(r.inviterId) ?? { total: 0, confirmed: 0 };
+      acc.total += 1;
+      if (r.qualifiedAt) acc.confirmed += 1;
+      byInviter.set(r.inviterId, acc);
+    }
+    return [...byInviter.entries()]
+      .map(([inviterId, v]) => ({ inviterId, ...v }))
+      .sort((a, b) => b.confirmed - a.confirmed || b.total - a.total || (a.inviterId < b.inviterId ? -1 : 1))
+      .slice(0, limit);
   }
 }
 
@@ -828,6 +882,52 @@ export class InMemoryRegionRepository implements RegionRepository {
   }
 }
 
+export class InMemoryOfferRepository implements OfferRepository {
+  readonly rows = new Map<string, VenueOfferRecord>();
+
+  private static isActive(o: VenueOfferRecord, now: Date): boolean {
+    return o.endedAt === null && o.startsAt.getTime() <= now.getTime() && o.endsAt.getTime() > now.getTime();
+  }
+
+  async create(offer: VenueOfferRecord, now: Date): Promise<void> {
+    if ([...this.rows.values()].some((o) => o.venueId === offer.venueId && InMemoryOfferRepository.isActive(o, now))) throw conflict('Este local já tem uma oferta no ar.');
+    this.rows.set(offer.id, { ...offer });
+  }
+
+  async find(id: string): Promise<VenueOfferRecord | undefined> {
+    const r = this.rows.get(id);
+    return r ? { ...r } : undefined;
+  }
+
+  async listByVenue(venueId: string, limit: number): Promise<VenueOfferRecord[]> {
+    return [...this.rows.values()]
+      .filter((o) => o.venueId === venueId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : -1))
+      .slice(0, limit)
+      .map((o) => ({ ...o }));
+  }
+
+  async findActiveByVenue(venueId: string, now: Date): Promise<VenueOfferRecord | undefined> {
+    const r = [...this.rows.values()].find((o) => o.venueId === venueId && InMemoryOfferRepository.isActive(o, now));
+    return r ? { ...r } : undefined;
+  }
+
+  async countSince(venueId: string, since: Date): Promise<number> {
+    return [...this.rows.values()].filter((o) => o.venueId === venueId && o.createdAt.getTime() >= since.getTime()).length;
+  }
+
+  async end(id: string, now: Date): Promise<boolean> {
+    const r = this.rows.get(id);
+    if (!r || !InMemoryOfferRepository.isActive(r, now)) return false;
+    r.endedAt = now;
+    return true;
+  }
+
+  async listActive(now: Date): Promise<VenueOfferRecord[]> {
+    return [...this.rows.values()].filter((o) => InMemoryOfferRepository.isActive(o, now)).map((o) => ({ ...o }));
+  }
+}
+
 export class InMemoryBoostRepository implements BoostRepository {
   readonly rows = new Map<string, BoostRecord>();
 
@@ -1391,6 +1491,8 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   readonly venueRatings = new Map<string, number>();
   /** Equipe dos locais (`venueId|userId`). */
   readonly venueManagers = new Map<string, VenueManagerRecord>();
+  readonly venueCheckinCodes = new Map<string, string>();
+  readonly venueCheckins: { id: string; venueId: string; userId: string; createdAt: Date }[] = [];
 
   async updateVenueProfile(venueId: string, patch: VenueProfilePatch) {
     const v = this.venues.get(venueId);
@@ -1470,6 +1572,29 @@ export class InMemoryPlaceRepository implements PlaceRepository {
   async rateVenue(userId: string, venueId: string, stars: number) {
     if (!this.venues.has(venueId)) return;
     this.venueRatings.set(`${userId}|${venueId}`, stars);
+  }
+
+  async venueCheckinCode(venueId: string) {
+    return this.venueCheckinCodes.get(venueId);
+  }
+
+  async setVenueCheckinCode(venueId: string, code: string) {
+    if (this.venues.has(venueId)) this.venueCheckinCodes.set(venueId, code);
+  }
+
+  async addVenueCheckin(checkin: { id: string; venueId: string; userId: string; createdAt: Date }) {
+    if (this.venues.has(checkin.venueId)) this.venueCheckins.push({ ...checkin });
+  }
+
+  async lastVenueCheckin(venueId: string, userId: string) {
+    const times = this.venueCheckins.filter((c) => c.venueId === venueId && c.userId === userId).map((c) => c.createdAt.getTime());
+    return times.length === 0 ? undefined : new Date(Math.max(...times));
+  }
+
+  async countVenueCheckinsByUser(venueId: string) {
+    const out = new Map<string, number>();
+    for (const c of this.venueCheckins) if (c.venueId === venueId) out.set(c.userId, (out.get(c.userId) ?? 0) + 1);
+    return [...out].map(([userId, count]) => ({ userId, count }));
   }
 
   async clearVenueRating(userId: string, venueId: string) {
@@ -2394,6 +2519,20 @@ export class InMemoryEventRoomRepository implements EventRoomRepository {
     return new Set(storyIds.filter((id) => this.storyReports.has(`${id}|${userId}`)));
   }
 
+  readonly storyLikes = new Set<string>();
+
+  async setStoryLike(storyId: string, userId: string, liked: boolean): Promise<boolean> {
+    const key = `${storyId}|${userId}`;
+    if (liked === this.storyLikes.has(key) || (liked && !this.stories.has(storyId))) return false;
+    if (liked) this.storyLikes.add(key);
+    else this.storyLikes.delete(key);
+    return true;
+  }
+
+  async likedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>> {
+    return new Set(storyIds.filter((id) => this.storyLikes.has(`${id}|${userId}`)));
+  }
+
   readonly storyHidden = new Map<string, StoryHiddenRecord>();
 
   async setStoryHidden(record: StoryHiddenRecord): Promise<void> {
@@ -2856,7 +2995,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       const reportsCount = [...this.eventRoom.storyReports.values()].filter((x) => x.storyId === s.id).length;
       rows.push({
         id: r.id, reason: r.reason, details: r.details, createdAt: r.createdAt, reporter: { id: r.reporterId, username: this.username(r.reporterId) },
-        story: { id: s.id, kind: s.video ? 'VIDEO' : 'IMAGE', author: { id: s.userId, username: this.username(s.userId) }, eventId: s.ref.id, eventTitle: title, createdAt: s.createdAt, expiresAt: s.expiresAt, reportsCount },
+        story: { id: s.id, kind: s.video ? 'VIDEO' : 'IMAGE', caption: s.caption ?? null, author: { id: s.userId, username: this.username(s.userId) }, eventId: s.ref.id, eventTitle: title, createdAt: s.createdAt, expiresAt: s.expiresAt, reportsCount },
         resolvedAt: r.resolvedAt ?? null, resolution: r.resolution ?? null, resolutionNote: r.resolutionNote ?? null,
       });
     }
@@ -3154,5 +3293,253 @@ export class InMemoryActivityRepository implements ActivityRepository {
       .filter((r) => !b || r.at.getTime() < b.at.getTime() || (r.at.getTime() === b.at.getTime() && r.id < b.id))
       .sort((x, y) => y.at.getTime() - x.at.getTime() || (x.id < y.id ? 1 : x.id > y.id ? -1 : 0))
       .slice(0, query.limit);
+  }
+}
+
+export class InMemoryAlbumRepository implements AlbumRepository {
+  readonly albums = new Map<string, AlbumRecord>();
+  readonly members = new Map<string, Map<string, Date>>();
+  readonly photos = new Map<string, AlbumPhotoRecord>();
+  readonly summarized = new Set<string>();
+
+  async ensure(album: AlbumRecord): Promise<AlbumRecord> {
+    const existing = [...this.albums.values()].find((a) => a.kind === album.kind && a.refId === album.refId);
+    if (existing) return { ...existing };
+    this.albums.set(album.id, { ...album });
+    return { ...album };
+  }
+
+  async find(id: string): Promise<AlbumRecord | undefined> {
+    const a = this.albums.get(id);
+    return a ? { ...a } : undefined;
+  }
+
+  async addMembers(albumId: string, userIds: string[], at: Date): Promise<void> {
+    if (!this.albums.has(albumId)) return;
+    const map = this.members.get(albumId) ?? new Map<string, Date>();
+    for (const id of userIds) if (!map.has(id)) map.set(id, at);
+    this.members.set(albumId, map);
+  }
+
+  async listMembers(albumId: string): Promise<string[]> {
+    return [...(this.members.get(albumId) ?? new Map<string, Date>()).entries()].sort((a, b) => a[1].getTime() - b[1].getTime() || (a[0] < b[0] ? -1 : 1)).map(([id]) => id);
+  }
+
+  async isMember(albumId: string, userId: string): Promise<boolean> {
+    return this.members.get(albumId)?.has(userId) ?? false;
+  }
+
+  async listForUser(userId: string, since: Date, limit: number): Promise<AlbumRecord[]> {
+    return [...this.albums.values()]
+      .filter((a) => a.startedAt > since && this.members.get(a.id)?.has(userId))
+      .sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime())
+      .slice(0, limit)
+      .map((a) => ({ ...a }));
+  }
+
+  async listStartedBetween(from: Date, to: Date, limit: number): Promise<AlbumRecord[]> {
+    return [...this.albums.values()]
+      .filter((a) => a.startedAt > from && a.startedAt <= to)
+      .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime())
+      .slice(0, limit)
+      .map((a) => ({ ...a }));
+  }
+
+  async addPhoto(photo: AlbumPhotoRecord): Promise<void> {
+    if (this.albums.has(photo.albumId)) this.photos.set(photo.id, { ...photo });
+  }
+
+  async listPhotos(albumId: string): Promise<AlbumPhotoMeta[]> {
+    return [...this.photos.values()]
+      .filter((p) => p.albumId === albumId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map((p) => ({ id: p.id, albumId: p.albumId, authorId: p.authorId, createdAt: p.createdAt }));
+  }
+
+  async countPhotos(albumId: string, authorId?: string): Promise<number> {
+    return [...this.photos.values()].filter((p) => p.albumId === albumId && (authorId === undefined || p.authorId === authorId)).length;
+  }
+
+  async findPhoto(albumId: string, photoId: string): Promise<AlbumPhotoRecord | undefined> {
+    const p = this.photos.get(photoId);
+    return p && p.albumId === albumId ? { ...p } : undefined;
+  }
+
+  async deletePhoto(albumId: string, photoId: string, authorId: string): Promise<boolean> {
+    const p = this.photos.get(photoId);
+    if (!p || p.albumId !== albumId || p.authorId !== authorId) return false;
+    this.photos.delete(photoId);
+    return true;
+  }
+
+  async markSummarized(albumId: string, userId: string): Promise<boolean> {
+    const key = `${albumId}|${userId}`;
+    if (this.summarized.has(key)) return false;
+    this.summarized.add(key);
+    return true;
+  }
+}
+
+export class InMemoryVenueStoryRepository implements VenueStoryRepository {
+  readonly stories = new Map<string, VenueStoryRecord>();
+  readonly reports = new Map<string, VenueStoryReportRecord>();
+  readonly muted = new Set<string>();
+  readonly prefs = new Map<string, VenueStoryPrefs>();
+
+  async add(story: VenueStoryRecord): Promise<void> {
+    this.stories.set(story.id, { ...story, data: new Uint8Array(story.data) });
+  }
+
+  private static meta(s: VenueStoryRecord): VenueStoryMeta {
+    const { data: _data, ...meta } = s;
+    return { ...meta };
+  }
+
+  async find(id: string): Promise<VenueStoryMeta | undefined> {
+    const s = this.stories.get(id);
+    return s ? InMemoryVenueStoryRepository.meta(s) : undefined;
+  }
+
+  async findMedia(id: string): Promise<{ mime: string; data: Uint8Array; expiresAt: Date } | undefined> {
+    const s = this.stories.get(id);
+    return s ? { mime: s.mime, data: new Uint8Array(s.data), expiresAt: s.expiresAt } : undefined;
+  }
+
+  async listLive(venueIds: string[], now: Date): Promise<VenueStoryMeta[]> {
+    const wanted = new Set(venueIds);
+    return [...this.stories.values()]
+      .filter((s) => wanted.has(s.venueId) && s.expiresAt.getTime() > now.getTime())
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1))
+      .map(InMemoryVenueStoryRepository.meta);
+  }
+
+  async delete(id: string): Promise<boolean> {
+    for (const [key, r] of this.reports) if (r.storyId === id) this.reports.delete(key);
+    return this.stories.delete(id);
+  }
+
+  async report(report: VenueStoryReportRecord): Promise<boolean> {
+    const key = `${report.storyId}|${report.reporterId}`;
+    if (this.reports.has(key) || !this.stories.has(report.storyId)) return false;
+    this.reports.set(key, { ...report });
+    return true;
+  }
+
+  async reportedIds(userId: string, storyIds: string[]): Promise<Set<string>> {
+    return new Set(storyIds.filter((id) => this.reports.has(`${id}|${userId}`)));
+  }
+
+  async listReports(open: boolean, page: Page): Promise<VenueStoryReportRecord[]> {
+    const rows = [...this.reports.values()].filter((r) => (r.resolvedAt === null) === open);
+    rows.sort((a, b) => (open ? a.createdAt.getTime() - b.createdAt.getTime() : b.createdAt.getTime() - a.createdAt.getTime()) || (a.id < b.id ? -1 : 1));
+    return rows.slice(page.offset, page.offset + page.limit).map((r) => ({ ...r }));
+  }
+
+  async findReport(id: string): Promise<VenueStoryReportRecord | undefined> {
+    const r = [...this.reports.values()].find((x) => x.id === id);
+    return r ? { ...r } : undefined;
+  }
+
+  async resolveReport(id: string, _adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean> {
+    for (const [key, r] of this.reports) {
+      if (r.id === id && r.resolvedAt === null) {
+        this.reports.set(key, { ...r, resolvedAt: at, resolution, resolutionNote: note });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async countOpenReporters(venueId: string, since: Date): Promise<number> {
+    const reporters = new Set<string>();
+    for (const r of this.reports.values()) {
+      if (r.resolvedAt === null && r.createdAt.getTime() >= since.getTime() && this.stories.get(r.storyId)?.venueId === venueId) reporters.add(r.reporterId);
+    }
+    return reporters.size;
+  }
+
+  async setMuted(userId: string, venueId: string, muted: boolean): Promise<void> {
+    if (muted) this.muted.add(`${userId}|${venueId}`);
+    else this.muted.delete(`${userId}|${venueId}`);
+  }
+
+  async listMuted(userId: string): Promise<string[]> {
+    return [...this.muted].filter((k) => k.startsWith(`${userId}|`)).map((k) => k.slice(userId.length + 1)).sort();
+  }
+
+  async getPrefs(userId: string): Promise<VenueStoryPrefs> {
+    return { ...(this.prefs.get(userId) ?? { hideAll: false }) };
+  }
+
+  async setPrefs(userId: string, prefs: VenueStoryPrefs): Promise<void> {
+    if (prefs.hideAll) this.prefs.set(userId, { ...prefs });
+    else this.prefs.delete(userId);
+  }
+}
+
+/** Lista VIP em memória. Quem confere se o evento existe é o repositório de locais. */
+export class InMemoryGuestListRepository implements GuestListRepository {
+  private readonly places: InMemoryPlaceRepository;
+  readonly lists = new Map<string, GuestListRecord>();
+  readonly entries = new Map<string, GuestListEntryRecord>();
+
+  constructor(places: InMemoryPlaceRepository) {
+    this.places = places;
+  }
+
+  private static key(eventId: string, userId: string): string {
+    return `${eventId}|${userId}`;
+  }
+
+  async get(eventId: string): Promise<GuestListRecord | undefined> {
+    return this.places.events.has(eventId) ? this.lists.get(eventId) : undefined;
+  }
+
+  async upsert(list: GuestListRecord): Promise<boolean> {
+    if (!this.places.events.has(list.eventId)) return false;
+    const before = this.lists.get(list.eventId);
+    this.lists.set(list.eventId, { ...list, createdAt: before?.createdAt ?? list.createdAt });
+    return true;
+  }
+
+  async remove(eventId: string): Promise<boolean> {
+    for (const [key, e] of this.entries) if (e.eventId === eventId) this.entries.delete(key);
+    return this.lists.delete(eventId);
+  }
+
+  async join(entry: { eventId: string; userId: string; companions: number; at: Date }, limit: number | null): Promise<'created' | 'updated' | 'full'> {
+    const key = InMemoryGuestListRepository.key(entry.eventId, entry.userId);
+    const before = this.entries.get(key);
+    if (before) {
+      this.entries.set(key, { ...before, companions: entry.companions });
+      return 'updated';
+    }
+    if (limit !== null && (await this.count(entry.eventId)) >= limit) return 'full';
+    this.entries.set(key, { eventId: entry.eventId, userId: entry.userId, companions: entry.companions, checkedInAt: null, createdAt: entry.at });
+    return 'created';
+  }
+
+  async leave(eventId: string, userId: string): Promise<boolean> {
+    return this.entries.delete(InMemoryGuestListRepository.key(eventId, userId));
+  }
+
+  async find(eventId: string, userId: string): Promise<GuestListEntryRecord | undefined> {
+    return this.entries.get(InMemoryGuestListRepository.key(eventId, userId));
+  }
+
+  async list(eventId: string): Promise<GuestListEntryRecord[]> {
+    return [...this.entries.values()].filter((e) => e.eventId === eventId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.userId.localeCompare(b.userId));
+  }
+
+  async count(eventId: string): Promise<number> {
+    return (await this.list(eventId)).length;
+  }
+
+  async setCheckedIn(eventId: string, userId: string, at: Date | null): Promise<boolean> {
+    const key = InMemoryGuestListRepository.key(eventId, userId);
+    const e = this.entries.get(key);
+    if (!e) return false;
+    this.entries.set(key, { ...e, checkedInAt: at });
+    return true;
   }
 }

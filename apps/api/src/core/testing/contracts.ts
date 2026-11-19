@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import { DomainError } from '../errors.ts';
-import type { AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, EventRoomRepository, FeedRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
+import type { ReferralRepository, AppSettingsRepository, BoostStatsRepository, DwellRepository, RegionRepository, BoostRepository, AlbumRepository, VenueStoryRepository, OfferRepository, EventRoomRepository, FeedRepository, GuestListRepository, ConversationRepository, MeetupRepository, NotificationRepository, ProfileEventRepository, SchedulingRepository, PostRepository, PushSubscriptionRepository, PlaceRepository, VenueClaimRepository,
   CalendarRepository, AdminRepository, AvailabilityRepository, FlashRepository, BlockRepository, FollowRepository, PendingSignupRepository, PasswordResetRepository, UserRepository } from '../ports.ts';
-import type { DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
+import type { VenueOfferRecord, DwellRecord, PostRecord, BoostRecord, MeetupRecord, MessageRecord, PlaceEventRecord, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, SuggestionCard, VenueRecord, PendingSignup, Profile, User, UserStatus } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
 
 /**
@@ -17,10 +17,12 @@ export interface RepoHarness {
   users: UserRepository;
   follows: FollowRepository;
   blocks: BlockRepository;
+  referrals: ReferralRepository;
   pending: PendingSignupRepository;
   passwordResets: PasswordResetRepository;
   boosts: BoostRepository;
   boostStats: BoostStatsRepository;
+  offers: OfferRepository;
   settings: AppSettingsRepository;
   dwell: DwellRepository;
   regions: RegionRepository;
@@ -36,7 +38,10 @@ export interface RepoHarness {
   profileEvents: ProfileEventRepository;
   posts: PostRepository;
   eventRoom: EventRoomRepository;
+  albums: AlbumRepository;
+  venueStories: VenueStoryRepository;
   feed: FeedRepository;
+  guestLists: GuestListRepository;
   notifications: NotificationRepository;
   pushSubscriptions: PushSubscriptionRepository;
   setUserStatus(userId: string, status: UserStatus): Promise<void>;
@@ -231,6 +236,51 @@ export function defineRepositoryContract(
     });
 
     // ---------- Seguimentos ----------
+
+    describe('convites (quem trouxe quem)', () => {
+      it('guarda um convite por pessoa, lista do mais novo ao mais antigo e confirma uma vez só', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const dani = await newUser('dani');
+        assert.equal(await h.referrals.create({ inviteeId: bia, inviterId: ana, createdAt: at(10), qualifiedAt: null }), true);
+        assert.equal(await h.referrals.create({ inviteeId: caio, inviterId: ana, createdAt: at(20), qualifiedAt: null }), true);
+        // o primeiro convite vale: a mesma pessoa não troca de quem a trouxe
+        assert.equal(await h.referrals.create({ inviteeId: bia, inviterId: dani, createdAt: at(30), qualifiedAt: null }), false);
+        assert.deepEqual((await h.referrals.listByInviter(ana, 10)).map((r) => r.inviteeId), [caio, bia]);
+        assert.deepEqual(await h.referrals.listByInviter(dani, 10), []);
+        assert.equal((await h.referrals.listByInviter(ana, 1)).length, 1);
+
+        assert.equal(await h.referrals.qualify(bia, at(100)), true);
+        assert.equal(await h.referrals.qualify(bia, at(200)), false);
+        assert.equal(await h.referrals.qualify(dani, at(200)), false);
+        const rows = await h.referrals.listByInviter(ana, 10);
+        assert.deepEqual(rows.find((r) => r.inviteeId === bia)!.qualifiedAt, at(100));
+        assert.equal(rows.find((r) => r.inviteeId === caio)!.qualifiedAt, null);
+      });
+
+      it('ranking: confirmados primeiro, depois o total, e ignora convidados suspensos', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const dani = await newUser('dani');
+        const edu = await newUser('edu');
+        const fabi = await newUser('fabi');
+        await h.referrals.create({ inviteeId: caio, inviterId: ana, createdAt: at(1), qualifiedAt: null });
+        await h.referrals.create({ inviteeId: dani, inviterId: ana, createdAt: at(2), qualifiedAt: null });
+        await h.referrals.create({ inviteeId: edu, inviterId: bia, createdAt: at(3), qualifiedAt: null });
+        await h.referrals.create({ inviteeId: fabi, inviterId: bia, createdAt: at(4), qualifiedAt: null });
+        await h.referrals.qualify(edu, at(50));
+        assert.deepEqual(await h.referrals.top(10), [
+          { inviterId: bia, total: 2, confirmed: 1 },
+          { inviterId: ana, total: 2, confirmed: 0 },
+        ]);
+        await h.setUserStatus(fabi, 'SUSPENDED');
+        await h.setUserStatus(edu, 'SUSPENDED');
+        assert.deepEqual(await h.referrals.top(10), [{ inviterId: ana, total: 2, confirmed: 0 }]);
+        assert.equal((await h.referrals.top(1)).length, 1);
+      });
+    });
 
     describe('seguimentos', () => {
       it('salva, lê e atualiza o status preservando a data de criação', async () => {
@@ -596,6 +646,32 @@ export function defineRepositoryContract(
         assert.equal((await h.boosts.findByChargeId(receipt))?.id, a.id, 'a compra fica registrada como cobrança');
         assert.equal(await h.boosts.markPaid(b.id, { ...window, chargeId: receipt }), false, 'o mesmo recibo não paga outro pedido');
         assert.equal((await h.boosts.find(b.id))?.status, 'PENDING_PAYMENT', 'o outro pedido continua aguardando');
+      });
+
+      it('oferta relâmpago: uma no ar por local, contagem por dia, encerrar e janela', async () => {
+        const owner = await newUser('oferta_dono');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar Oferta', address: null, category: 'bar', lat: 0, lng: 0, isSample: false, ownerId: owner };
+        await h.places.createVenue(v);
+        const t0 = new Date(Date.UTC(2030, 0, 10, 20));
+        const H = 3_600_000;
+        const mk = (n: number, over: Partial<VenueOfferRecord> = {}): VenueOfferRecord => ({ id: randomUUID(), venueId: v.id, ownerId: owner, text: `Chopp em dobro ${n}`, createdAt: new Date(t0.getTime() + n), startsAt: t0, endsAt: new Date(t0.getTime() + 2 * H), endedAt: null, ...over });
+        const a = mk(1);
+        await h.offers.create(a, t0);
+        assert.equal((await h.offers.find(a.id))?.text, a.text);
+        assert.equal((await h.offers.findActiveByVenue(v.id, t0))?.id, a.id);
+        await assert.rejects(h.offers.create(mk(2), t0), (e: unknown) => e instanceof DomainError && e.code === 'CONFLICT', 'só uma no ar por local');
+        assert.deepEqual((await h.offers.listActive(t0)).filter((o) => o.venueId === v.id).map((o) => o.id), [a.id]);
+        assert.equal((await h.offers.listActive(new Date(t0.getTime() + 3 * H))).filter((o) => o.venueId === v.id).length, 0, 'depois do fim some');
+        assert.equal(await h.offers.end(a.id, new Date(t0.getTime() + H)), true);
+        assert.equal(await h.offers.end(a.id, new Date(t0.getTime() + H)), false, 'já encerrada');
+        assert.equal(await h.offers.findActiveByVenue(v.id, new Date(t0.getTime() + H)), undefined);
+        assert.ok((await h.offers.find(a.id))?.endedAt);
+        const b = mk(3, { endsAt: new Date(t0.getTime() + 3 * H) });
+        await h.offers.create(b, new Date(t0.getTime() + H));
+        assert.deepEqual((await h.offers.listByVenue(v.id, 10)).map((o) => o.id), [b.id, a.id], 'mais nova primeiro');
+        assert.equal((await h.offers.listByVenue(v.id, 1)).length, 1);
+        assert.equal(await h.offers.countSince(v.id, t0), 2, 'as encerradas também contam');
+        assert.equal(await h.offers.countSince(v.id, new Date(t0.getTime() + 2)), 1);
       });
 
       it('região: guarda uma por pessoa, troca, apaga e filtra pela caixa', async () => {
@@ -1677,6 +1753,27 @@ export function defineRepositoryContract(
         assert.deepEqual(await h.places.venueRating('nao-e-uuid', ana), { count: 0, sum: 0, mine: null });
       });
 
+      it('check-in por QR: código do local (trocável) e contagem de check-ins por pessoa', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: -23.5, lng: -46.6, isSample: false };
+        await h.places.createVenue(v);
+        assert.equal(await h.places.venueCheckinCode(v.id), undefined);
+        await h.places.setVenueCheckinCode(v.id, 'codigo-um', at(1));
+        assert.equal(await h.places.venueCheckinCode(v.id), 'codigo-um');
+        await h.places.setVenueCheckinCode(v.id, 'codigo-dois', at(2));
+        assert.equal(await h.places.venueCheckinCode(v.id), 'codigo-dois');
+        assert.equal(await h.places.lastVenueCheckin(v.id, ana), undefined);
+        await h.places.addVenueCheckin({ id: randomUUID(), venueId: v.id, userId: ana, createdAt: at(3) });
+        await h.places.addVenueCheckin({ id: randomUUID(), venueId: v.id, userId: ana, createdAt: at(5) });
+        await h.places.addVenueCheckin({ id: randomUUID(), venueId: v.id, userId: bia, createdAt: at(4) });
+        await h.places.addVenueCheckin({ id: randomUUID(), venueId: randomUUID(), userId: bia, createdAt: at(4) });
+        assert.equal((await h.places.lastVenueCheckin(v.id, ana))?.getTime(), at(5).getTime());
+        const counts = (await h.places.countVenueCheckinsByUser(v.id)).sort((a, b) => b.count - a.count);
+        assert.deepEqual(counts, [{ userId: ana, count: 2 }, { userId: bia, count: 1 }]);
+        assert.deepEqual(await h.places.countVenueCheckinsByUser('nao-e-uuid'), []);
+      });
+
       it('posts em nome do local só entram pelo local, nunca pelo perfil de quem postou', async () => {
         const ana = await newUser('ana');
         const v: VenueRecord = { id: randomUUID(), name: 'Bar', address: null, category: null, lat: -23.5, lng: -46.6, isSample: false, ownerId: ana };
@@ -2153,6 +2250,14 @@ export function defineRepositoryContract(
         assert.equal(await h.eventRoom.reportStory({ ...rep, id: randomUUID() }), false, 'uma denúncia por pessoa');
         assert.deepEqual([...(await h.eventRoom.reportedStoryIds(ana, [storyA.id, storyP.id]))], [storyA.id]);
         assert.deepEqual([...(await h.eventRoom.reportedStoryIds(bia, [storyA.id]))], []);
+        // curtidas: uma por pessoa; curtir de novo ou descurtir o que não curtiu não muda nada
+        assert.equal(await h.eventRoom.setStoryLike(storyA.id, bia, true, at(4)), true);
+        assert.equal(await h.eventRoom.setStoryLike(storyA.id, bia, true, at(5)), false);
+        assert.deepEqual([...(await h.eventRoom.likedStoryIds(bia, [storyA.id, storyP.id]))], [storyA.id]);
+        assert.deepEqual([...(await h.eventRoom.likedStoryIds(ana, [storyA.id]))], []);
+        assert.equal(await h.eventRoom.setStoryLike(storyA.id, bia, false, at(6)), true);
+        assert.equal(await h.eventRoom.setStoryLike(storyA.id, bia, false, at(6)), false);
+        assert.equal(await h.eventRoom.setStoryLike(randomUUID(), bia, true, at(6)), false, 'story que não existe');
         // ocultação de stories: uma linha por dono; tudo desligado apaga
         assert.deepEqual(await h.eventRoom.listStoryHidden(ana), []);
         await h.eventRoom.setStoryHidden({ ownerId: ana, otherId: bia, hideTheirs: true, hideMine: false });
@@ -2267,6 +2372,42 @@ export function defineRepositoryContract(
         assert.equal(await h.feed.findPost('nao-e-uuid'), undefined);
       });
 
+      it('lista VIP: liga e ajusta, nomes com acompanhantes, limite, sair, marcar entrada e cascata', async () => {
+        const { ana, bia, caio, e } = await setup();
+        assert.equal(await h.guestLists.get(e.id), undefined);
+        assert.equal(await h.guestLists.upsert({ eventId: randomUUID(), limit: null, closesAt: null, maxCompanions: 0, createdAt: at(1) }), false, 'evento inexistente');
+        assert.equal(await h.guestLists.upsert({ eventId: e.id, limit: 2, closesAt: at(3), maxCompanions: 2, createdAt: at(1) }), true);
+        assert.deepEqual(await h.guestLists.get(e.id), { eventId: e.id, limit: 2, closesAt: at(3), maxCompanions: 2, createdAt: at(1) });
+        assert.equal(await h.guestLists.upsert({ eventId: e.id, limit: null, closesAt: null, maxCompanions: 1, createdAt: at(9) }), true);
+        const adjusted = (await h.guestLists.get(e.id))!;
+        assert.deepEqual([adjusted.limit, adjusted.closesAt, adjusted.maxCompanions, adjusted.createdAt.getTime()], [null, null, 1, at(1).getTime()], 'ajustar mantém a data em que a lista nasceu');
+        await h.guestLists.upsert({ eventId: e.id, limit: 2, closesAt: null, maxCompanions: 3, createdAt: at(1) });
+        assert.equal(await h.guestLists.join({ eventId: e.id, userId: ana, companions: 1, at: at(10) }, 2), 'created');
+        assert.equal(await h.guestLists.join({ eventId: e.id, userId: bia, companions: 0, at: at(11) }, 2), 'created');
+        assert.equal(await h.guestLists.join({ eventId: e.id, userId: caio, companions: 0, at: at(12) }, 2), 'full');
+        assert.equal(await h.guestLists.join({ eventId: e.id, userId: ana, companions: 3, at: at(13) }, 2), 'updated', 'quem já está muda os acompanhantes mesmo com a lista cheia');
+        assert.equal(await h.guestLists.count(e.id), 2);
+        assert.deepEqual((await h.guestLists.list(e.id)).map((r) => [r.userId, r.companions, r.checkedInAt]), [[ana, 3, null], [bia, 0, null]], 'ordem de chegada');
+        assert.equal((await h.guestLists.find(e.id, ana))?.createdAt.getTime(), at(10).getTime(), 'mudar não troca a data de entrada');
+        assert.equal(await h.guestLists.find(e.id, caio), undefined);
+        assert.equal(await h.guestLists.setCheckedIn(e.id, bia, at(20)), true);
+        assert.equal((await h.guestLists.find(e.id, bia))?.checkedInAt?.getTime(), at(20).getTime());
+        assert.equal(await h.guestLists.setCheckedIn(e.id, bia, null), true);
+        assert.equal((await h.guestLists.find(e.id, bia))?.checkedInAt, null);
+        assert.equal(await h.guestLists.setCheckedIn(e.id, caio, at(20)), false, 'quem não está na lista');
+        assert.equal(await h.guestLists.leave(e.id, bia), true);
+        assert.equal(await h.guestLists.leave(e.id, bia), false);
+        assert.equal(await h.guestLists.join({ eventId: e.id, userId: caio, companions: 0, at: at(14) }, 2), 'created', 'a vaga voltou');
+        assert.equal(await h.guestLists.remove(e.id), true, 'desligar apaga a lista e os nomes');
+        assert.deepEqual([await h.guestLists.get(e.id), await h.guestLists.count(e.id), await h.guestLists.find(e.id, ana)], [undefined, 0, undefined]);
+        assert.equal(await h.guestLists.remove(e.id), false);
+        // apagar o evento leva a lista junto, como no banco
+        await h.guestLists.upsert({ eventId: e.id, limit: null, closesAt: null, maxCompanions: 0, createdAt: at(1) });
+        await h.guestLists.join({ eventId: e.id, userId: ana, companions: 0, at: at(10) }, null);
+        await h.places.deleteEvent(e.venueId, e.id);
+        assert.equal(await h.guestLists.get(e.id), undefined);
+      });
+
       it('mensagem de evento guarda o evento; encontros do usuário listados do mais recente', async () => {
         const { ana, bia, caio, e } = await setup();
         const conv = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(1));
@@ -2346,6 +2487,131 @@ export function defineRepositoryContract(
         assert.equal(done.status, 'FINALIZED');
         assert.equal(done.finalProposalId, proposal.id);
         assert.deepEqual(await h.scheduling.listOpenForUser(bia, 10), []);
+      });
+    });
+    // ---------- Álbuns dos encontros ----------
+
+    describe('álbuns', () => {
+      it('cria uma vez por encontro, guarda quem foi, as fotos e o aviso do dia seguinte', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const album = { id: randomUUID(), kind: 'EVENT' as const, refId: `PLACE:${randomUUID()}`, title: 'Samba', placeName: 'Bar do Zé', startedAt: at(100), createdAt: at(100) };
+        const created = await h.albums.ensure(album);
+        assert.deepEqual(created, album);
+        const again = await h.albums.ensure({ ...album, id: randomUUID(), title: 'outro' });
+        assert.equal(again.id, album.id, 'mesmo encontro, mesmo álbum');
+        assert.equal(again.title, 'Samba');
+        assert.deepEqual(await h.albums.find(album.id), album);
+        assert.equal(await h.albums.find(randomUUID()), undefined);
+        assert.equal(await h.albums.find('nao-e-uuid'), undefined);
+
+        await h.albums.addMembers(album.id, [bia, ana], at(101));
+        await h.albums.addMembers(album.id, [ana, caio], at(102));
+        assert.deepEqual(await h.albums.listMembers(album.id), [ana, bia, caio].sort((a, b) => (a < b ? -1 : 1)).filter((id) => id !== caio).concat(caio), 'ordem de entrada; quem já estava não muda');
+        assert.equal(await h.albums.isMember(album.id, caio), true);
+        assert.equal(await h.albums.isMember(album.id, randomUUID()), false);
+
+        const other = await h.albums.ensure({ id: randomUUID(), kind: 'FLASH', refId: randomUUID(), title: null, placeName: null, startedAt: at(500), createdAt: at(500) });
+        await h.albums.addMembers(other.id, [ana], at(500));
+        assert.deepEqual((await h.albums.listForUser(ana, at(0), 10)).map((a) => a.id), [other.id, album.id], 'o mais recente primeiro');
+        assert.deepEqual((await h.albums.listForUser(ana, at(200), 10)).map((a) => a.id), [other.id]);
+        assert.deepEqual(await h.albums.listForUser(bia, at(200), 10), []);
+        assert.deepEqual((await h.albums.listStartedBetween(at(100), at(500), 10)).map((a) => a.id), [other.id], 'exclui o início, inclui o fim');
+
+        const photo = { id: randomUUID(), albumId: album.id, authorId: bia, mime: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff, 1, 2]), createdAt: at(110) };
+        await h.albums.addPhoto(photo);
+        await h.albums.addPhoto({ ...photo, id: randomUUID(), authorId: ana, createdAt: at(111) });
+        assert.deepEqual((await h.albums.listPhotos(album.id)).map((p) => [p.id, p.authorId]), [[photo.id, bia], [(await h.albums.listPhotos(album.id))[1]!.id, ana]]);
+        assert.equal(await h.albums.countPhotos(album.id), 2);
+        assert.equal(await h.albums.countPhotos(album.id, bia), 1);
+        const found = (await h.albums.findPhoto(album.id, photo.id))!;
+        assert.deepEqual([found.mime, [...found.data], found.authorId], ['image/jpeg', [0xff, 0xd8, 0xff, 1, 2], bia]);
+        assert.equal(await h.albums.findPhoto(other.id, photo.id), undefined, 'a foto é daquele álbum');
+        assert.equal(await h.albums.deletePhoto(album.id, photo.id, ana), false, 'só o autor apaga');
+        assert.equal(await h.albums.deletePhoto(album.id, photo.id, bia), true);
+        assert.equal(await h.albums.countPhotos(album.id), 1);
+
+        assert.equal(await h.albums.markSummarized(album.id, bia, at(900)), true);
+        assert.equal(await h.albums.markSummarized(album.id, bia, at(901)), false, 'nunca avisa duas vezes');
+        assert.equal(await h.albums.markSummarized(album.id, ana, at(901)), true);
+      });
+    });
+
+    // ---------- Stories de locais ----------
+
+    describe('stories de locais', () => {
+      it('guarda, lista os que estão no ar, denuncia uma vez por pessoa e apaga junto das denúncias', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const caio = await newUser('caio');
+        const mk = async (name: string) => {
+          const v: VenueRecord = { id: randomUUID(), name, address: null, category: 'bar', lat: -23.55, lng: -46.63, isSample: false };
+          await h.places.createVenue(v);
+          return v.id;
+        };
+        const venueId = await mk('Bar A');
+        const other = await mk('Bar B');
+        const story = { id: randomUUID(), venueId, authorId: ana, mime: 'image/jpeg', video: false, data: new Uint8Array([0xff, 0xd8, 1]), createdAt: at(10), expiresAt: at(1000) };
+        await h.venueStories.add(story);
+        await h.venueStories.add({ ...story, id: randomUUID(), createdAt: at(20), expiresAt: at(50), video: true, mime: 'video/mp4' });
+        await h.venueStories.add({ ...story, id: randomUUID(), venueId: other, createdAt: at(30) });
+        assert.deepEqual((await h.venueStories.listLive([venueId], at(40))).map((s) => s.createdAt.getTime() - at(0).getTime()), [10000, 20000]);
+        assert.deepEqual((await h.venueStories.listLive([venueId], at(60))).map((s) => s.id), [story.id], 'o vencido sai');
+        assert.equal((await h.venueStories.listLive([venueId, other], at(60))).length, 2);
+        assert.deepEqual(await h.venueStories.listLive([], at(60)), []);
+        const meta = (await h.venueStories.find(story.id))!;
+        assert.deepEqual([meta.venueId, meta.authorId, meta.video, 'data' in meta], [venueId, ana, false, false]);
+        const media = (await h.venueStories.findMedia(story.id))!;
+        assert.deepEqual([media.mime, [...media.data]], ['image/jpeg', [0xff, 0xd8, 1]]);
+        assert.equal(await h.venueStories.find('nao-e-uuid'), undefined);
+
+        const report = (id: string, storyId: string, reporterId: string, createdAt: Date) => ({ id, storyId, reporterId, reason: 'SPAM' as const, details: null, createdAt, resolvedAt: null, resolution: null, resolutionNote: null });
+        const r1 = randomUUID();
+        assert.equal(await h.venueStories.report(report(r1, story.id, bia, at(100))), true);
+        assert.equal(await h.venueStories.report(report(randomUUID(), story.id, bia, at(101))), false, 'uma denúncia por pessoa');
+        assert.equal(await h.venueStories.report(report(randomUUID(), randomUUID(), bia, at(101))), false, 'story que não existe');
+        assert.equal(await h.venueStories.report(report(randomUUID(), story.id, caio, at(102))), true);
+        assert.deepEqual([...(await h.venueStories.reportedIds(bia, [story.id, meta.id]))], [story.id]);
+        assert.equal(await h.venueStories.countOpenReporters(venueId, at(0)), 2);
+        assert.equal(await h.venueStories.countOpenReporters(venueId, at(101)), 1, 'só desde a data');
+        assert.equal(await h.venueStories.countOpenReporters(other, at(0)), 0);
+        assert.deepEqual((await h.venueStories.listReports(true, { limit: 10, offset: 0 })).map((r) => r.reporterId), [bia, caio], 'as mais antigas primeiro');
+        assert.equal((await h.venueStories.findReport(r1))?.storyId, story.id);
+        assert.equal(await h.venueStories.resolveReport(r1, ana, 'DISMISSED', 'ok', at(200)), true);
+        assert.equal(await h.venueStories.resolveReport(r1, ana, 'ACTIONED', null, at(201)), false, 'decide uma vez só');
+        assert.equal(await h.venueStories.countOpenReporters(venueId, at(0)), 1, 'denúncia decidida não conta');
+        assert.equal((await h.venueStories.listReports(false, { limit: 10, offset: 0 })).length, 1);
+        assert.equal((await h.venueStories.listReports(true, { limit: 10, offset: 1 })).length, 0);
+
+        assert.equal(await h.venueStories.delete(story.id), true);
+        assert.equal(await h.venueStories.delete(story.id), false);
+        assert.equal(await h.venueStories.findReport(r1), undefined, 'as denúncias vão junto');
+      });
+
+      it('silencia locais e guarda a preferência de não ver stories de locais', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const mk = async (name: string) => {
+          const v: VenueRecord = { id: randomUUID(), name, address: null, category: 'bar', lat: -23.55, lng: -46.63, isSample: false };
+          await h.places.createVenue(v);
+          return v.id;
+        };
+        const v1 = await mk('Bar A');
+        const v2 = await mk('Bar B');
+        assert.deepEqual(await h.venueStories.getPrefs(ana), { hideAll: false });
+        await h.venueStories.setMuted(ana, v1, true);
+        await h.venueStories.setMuted(ana, v1, true);
+        await h.venueStories.setMuted(ana, v2, true);
+        await h.venueStories.setMuted(bia, v1, true);
+        assert.deepEqual(await h.venueStories.listMuted(ana), [v1, v2].sort());
+        await h.venueStories.setMuted(ana, v1, false);
+        assert.deepEqual(await h.venueStories.listMuted(ana), [v2]);
+        await h.venueStories.setPrefs(ana, { hideAll: true });
+        assert.deepEqual(await h.venueStories.getPrefs(ana), { hideAll: true });
+        assert.deepEqual(await h.venueStories.getPrefs(bia), { hideAll: false });
+        await h.venueStories.setPrefs(ana, { hideAll: false });
+        assert.deepEqual(await h.venueStories.getPrefs(ana), { hideAll: false });
       });
     });
   });

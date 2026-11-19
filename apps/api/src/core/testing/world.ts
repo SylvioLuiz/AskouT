@@ -11,7 +11,10 @@ import {
   InMemoryProfileEventRepository,
   InMemoryPostRepository,
   InMemoryEventRoomRepository,
+  InMemoryAlbumRepository,
+  InMemoryVenueStoryRepository,
   InMemoryFeedRepository,
+  InMemoryGuestListRepository,
   InMemorySchedulingRepository,
   InMemoryPushSubscriptionRepository,
   FakePushSender,
@@ -24,6 +27,7 @@ import {
   InMemoryPasswordResetRepository,
   InMemoryMfaRepository,
   InMemoryBoostRepository,
+  InMemoryOfferRepository,
   InMemoryActivityRepository,
   InMemoryDwellRepository,
   InMemoryBoostStatsRepository,
@@ -40,6 +44,7 @@ import {
   FakeCalendarFetcher,
   InMemoryAdminRepository,
   InMemoryUserRepository,
+  InMemoryReferralRepository,
   SequentialIds,
 } from './in-memory.ts';
 
@@ -58,16 +63,20 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const profileEvents = new InMemoryProfileEventRepository();
   const posts = new InMemoryPostRepository();
   const eventRoom = new InMemoryEventRoomRepository(posts);
+  const albums = new InMemoryAlbumRepository();
+  const venueStories = new InMemoryVenueStoryRepository();
   const notifications = new InMemoryNotificationRepository();
   const pushSubscriptions = new InMemoryPushSubscriptionRepository();
   const push = new FakePushSender();
   const places = new InMemoryPlaceRepository();
   const claims = new InMemoryVenueClaimRepository();
   const feed = new InMemoryFeedRepository(posts, places);
+  const guestLists = new InMemoryGuestListRepository(places);
   const calendars = new InMemoryCalendarRepository();
   const calendarFetcher = new FakeCalendarFetcher();
   const placeSource = new FakePlaceSource();
   const users = new InMemoryUserRepository();
+  const referrals = new InMemoryReferralRepository(users);
   const identitiesRepo = new InMemoryIdentityRepository();
   const admin = new InMemoryAdminRepository({ users, posts, conversations, places, claims, eventRoom, identities: identitiesRepo });
   const pending = new InMemoryPendingSignupRepository();
@@ -75,6 +84,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const mfa = new InMemoryMfaRepository();
   const boosts = new InMemoryBoostRepository();
   const boostStats = new InMemoryBoostStatsRepository();
+  const offers = new InMemoryOfferRepository();
   const dwell = new InMemoryDwellRepository();
   const activity = new InMemoryActivityRepository({ posts, feed, eventRoom, follows, places });
   const regions = new InMemoryRegionRepository();
@@ -100,7 +110,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, personalCalendars, ...(googleCalendar ? { googleCalendar } : {}), ...(microsoftCalendar ? { microsoftCalendar } : {}), oauthStates, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), ...(options.gifs ? { gifs: options.gifs } : {}), pending, passwordResets, mfa, secretBox, mfaChallenges, boosts, boostStats, dwell, activity, regions, consents, cloakroom, account, payments, settings, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, personalCalendars, ...(googleCalendar ? { googleCalendar } : {}), ...(microsoftCalendar ? { microsoftCalendar } : {}), oauthStates, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), ...(options.gifs ? { gifs: options.gifs } : {}), pending, passwordResets, mfa, secretBox, mfaChallenges, boosts, offers, boostStats, dwell, activity, regions, consents, cloakroom, account, payments, settings, referrals, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string; minor?: boolean } = {}): Promise<AuthResult> {
@@ -120,7 +130,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
     return out;
   }
 
-  return { personalCalendars, googleCalendar, microsoftCalendar, oauthStates, mfa, secretBox, mfaChallenges, core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, feed, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, boosts, boostStats, dwell, regions, consents, cloakroom, account, payments, settings, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+  return { personalCalendars, googleCalendar, microsoftCalendar, oauthStates, mfa, secretBox, mfaChallenges, core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, boosts, offers, boostStats, dwell, regions, consents, cloakroom, account, payments, settings, referrals, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
 }
 
 /** Nos testes sem verificação em duas etapas, o login sempre devolve a sessão. */

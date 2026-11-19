@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NOW_RADIUS_CHOICES_KM, nowRadiusKm, setNowRadiusKm } from '../lib/now-radius.ts';
 import type { FormEvent, ReactNode } from 'react';
-import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
+import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
 import { MuteCard, PushCard, PushTestCard } from '../components/notifications.tsx';
 import { api } from '../client.ts';
 import { useAuthContext, useUser } from '../auth.tsx';
@@ -424,6 +424,70 @@ export function NowSettingsScreen() {
   );
 }
 
+/** Stories de locais: desligar de vez, ou desfazer o "não tenho interesse" de um local. */
+function VenueStoriesSetting() {
+  const settings = useAsync(() => api.venueStorySettings(), []);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | undefined>();
+  const data = settings.data;
+  async function change(hide: boolean) {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await api.setVenueStorySettings(hide);
+      settings.reload();
+    } catch (failure) {
+      setMessage(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function unmute(venueId: string) {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await api.muteVenueStories(venueId, false);
+      settings.reload();
+    } catch (failure) {
+      setMessage(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!data) return settings.error ? <Notice tone="error">{settings.error.message}</Notice> : null;
+  return (
+    <>
+      {message ? <Notice tone="error">{message}</Notice> : null}
+      <section className="setting">
+        <div className="setting__text">
+          <h2 className="setting__title" id="stories-locais-titulo">
+            {t('Não ver stories de locais')}
+          </h2>
+          <p className="setting__help">{t('Esconde os stories de bares, casas e organizações na página inicial e no Rolando agora. Os stories dos seus amigos continuam.')}</p>
+        </div>
+        <button type="button" role="switch" aria-checked={data.hideVenueStories} aria-labelledby="stories-locais-titulo" className="switch" onClick={() => void change(!data.hideVenueStories)} disabled={busy}>
+          <span className="switch__thumb" />
+        </button>
+      </section>
+      {data.mutedVenues.length > 0 ? (
+        <section className="setting setting--stack">
+          <h2 className="setting__title">{t('Locais sem interesse')}</h2>
+          <ul className="linklist" aria-label={t('Locais sem interesse')}>
+            {data.mutedVenues.map((v) => (
+              <li key={v.id}>
+                <span>{v.name}</span>{' '}
+                <Button variant="quiet" small disabled={busy} onClick={() => void unmute(v.id)}>
+                  {t('Voltar a mostrar')}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </>
+  );
+}
+
 /** Até onde buscar rolês entre você e o amigo num encontro do NOW. Fica salvo neste aparelho. */
 function NowRadiusSetting() {
   const [km, setKm] = useState<number | null>(() => nowRadiusKm());
@@ -512,6 +576,7 @@ export function PrivacyScreen() {
       <nav className="linklist" aria-label={t('Seus dados')}>
         <Link to="/configuracao/privacidade-e-dados">{t('Privacidade e dados: consentimentos, baixar dados ou apagar a conta')}</Link>
       </nav>
+      <VenueStoriesSetting />
     </>
   );
 }
@@ -556,6 +621,7 @@ function MyDataSection() {
 function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: () => void }) {
   const [on, setOn] = useState(() => readPersonalize(userId));
   const [busy, setBusy] = useState(false);
+  const [askErase, setAskErase] = useState(false);
   const [message, setMessage] = useState<Message>();
 
   async function change() {
@@ -581,6 +647,7 @@ function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: ()
   }
 
   async function erase() {
+    setAskErase(false);
     setBusy(true);
     try {
       const r = await api.eraseDwell();
@@ -607,10 +674,11 @@ function PersonalizeSetting({ userId, onChange }: { userId: string; onChange: ()
         </button>
       </section>
       <div className="setting__actions">
-        <Button variant="quiet" small loading={busy} onClick={() => erase()}>
+        <Button variant="quiet" small loading={busy} disabled={askErase} onClick={() => setAskErase(true)}>
           {t('Apagar meu histórico de tempo na tela')}
         </Button>
       </div>
+      {askErase ? <Confirm danger question={t('Apagar seu histórico de tempo na tela? As recomendações recomeçam do zero e não dá para desfazer.')} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => void erase()} onCancel={() => setAskErase(false)} /> : null}
     </>
   );
 }
@@ -624,6 +692,7 @@ function RegionSetting({ userId }: { userId: string }) {
   const saved = useAsync(() => api.region(), []);
   const [region, setRegion] = useState<RegionView | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const [askRemove, setAskRemove] = useState(false);
   const [message, setMessage] = useState<Message>();
   const current = region === undefined ? (saved.data?.region ?? null) : region;
 
@@ -650,6 +719,7 @@ function RegionSetting({ userId }: { userId: string }) {
   }
 
   async function remove() {
+    setAskRemove(false);
     setBusy(true);
     setMessage(undefined);
     try {
@@ -680,8 +750,9 @@ function RegionSetting({ userId }: { userId: string }) {
         <Button variant="secondary" small loading={busy} disabled={!personalizing} onClick={useHere}>
           {current ? t('Atualizar com minha localização atual') : t('Usar minha localização atual')}
         </Button>
-        {current ? <Button variant="quiet" small disabled={busy} onClick={() => remove()}>{t('Apagar minha região')}</Button> : null}
+        {current ? <Button variant="quiet" small disabled={busy || askRemove} onClick={() => setAskRemove(true)}>{t('Apagar minha região')}</Button> : null}
       </div>
+      {askRemove ? <Confirm danger question={t('Apagar sua região? Você deixa de receber anúncios Match de lugares perto de você.')} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => void remove()} onCancel={() => setAskRemove(false)} /> : null}
     </>
   );
 }

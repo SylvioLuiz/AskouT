@@ -488,7 +488,8 @@ function feedAt(item: HomeFeedItem): string {
   return item.repostedAt ?? item.createdAt;
 }
 
-export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateRail, enter }: { load: (offset: number, before?: string) => Promise<PostsPage | HomeFeedPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } | { after: number; node: ReactNode }[]; dateRail?: boolean; enter?: boolean }) {
+/** `poster`: posts com foto em formato de cartaz (nome e ações por cima da foto). Desligado, ficam como os eventos: nome em cima e ações embaixo. */
+export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateRail, enter, poster = true }: { load: (offset: number, before?: string) => Promise<PostsPage | HomeFeedPage>; emptyTitle: string; emptyHint?: string; reloadKey?: string; inject?: { after: number; node: ReactNode } | { after: number; node: ReactNode }[]; dateRail?: boolean; enter?: boolean; poster?: boolean }) {
   const [page, setPage] = useState<{ hasMore: boolean } | undefined>();
   const [items, setItems] = useState<HomeFeedItem[]>([]);
   const [error, setError] = useState<ApiError | undefined>();
@@ -581,7 +582,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateR
           {'type' in post ? (
             <PlaceEventFeedCard item={post} />
           ) : (
-            <PostCard post={post} asEvent poster track="FEED" onGone={(id) => setItems((current) => current.filter((p) => 'type' in p || p.id !== id))} />
+            <PostCard post={post} asEvent poster={poster} track="FEED" onGone={(id) => setItems((current) => current.filter((p) => 'type' in p || p.id !== id))} />
           )}
           {injected.filter((i) => index === Math.min(i.after, items.length) - 1).map((i) => (<Fragment key={i.after}>{i.node}</Fragment>))}
         </div>

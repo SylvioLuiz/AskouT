@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, EventExtra, EventExtraInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RetentionReport, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, EventExtra, EventExtraInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -114,6 +114,9 @@ export const api = {
   stats: () => request<Stats>('GET', '/admin/stats'),
   payments: () => request<PaymentsState>('GET', '/admin/payments'),
   setPayments: (enabled: boolean, note: string) => request<PaymentsState>('PUT', '/admin/payments', { enabled, note }),
+  topInviters: (limit = 20) => request<TopInviter[]>('GET', `/admin/referrals/top${query({ limit })}`),
+  recoExperiment: () => request<RecoExperimentState>('GET', '/admin/reco-experiment'),
+  setRecoExperiment: (enabled: boolean, controlPercent: number, note: string) => request<RecoExperimentState>('PUT', '/admin/reco-experiment', { enabled, controlPercent, note }),
   retention: (days: number) => request<RetentionReport>('GET', `/admin/retention${query({ days })}`),
 
   claims: (status: ClaimStatus) => request<Claim[]>('GET', `/admin/claims${query({ status })}`),
@@ -146,6 +149,14 @@ export const api = {
   /** Baixa a mídia do story com o token e devolve um endereço temporário para exibir. */
   async storyMedia(id: string): Promise<{ url: string; mime: string }> {
     const response = await send('GET', `/admin/stories/${encodeURIComponent(id)}/media`);
+    const blob = await response.blob();
+    return { url: URL.createObjectURL(blob), mime: blob.type };
+  },
+  venueStoryReports: (p: { resolved: boolean; offset: number }) => request<Page<VenueStoryReportRow>>('GET', `/admin/reports/venue-stories${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
+  resolveVenueStoryReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/venue-stories/${encodeURIComponent(id)}/resolve`, { resolution, note }),
+  deleteVenueStory: (id: string, note: string) => request<unknown>('DELETE', `/admin/venue-stories/${encodeURIComponent(id)}`, { note }),
+  async venueStoryMedia(id: string): Promise<{ url: string; mime: string }> {
+    const response = await send('GET', `/admin/venue-stories/${encodeURIComponent(id)}/media`);
     const blob = await response.blob();
     return { url: URL.createObjectURL(blob), mime: blob.type };
   },

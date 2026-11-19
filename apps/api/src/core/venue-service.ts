@@ -1,5 +1,6 @@
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { decodeImageDataUrl } from './image.ts';
-import { conflict, forbidden, notFound, validationError } from './errors.ts';
+import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import { normalizeTag } from './explore-match.ts';
 import type { CoreDeps } from './ports.ts';
 import type { ClaimDocumentMime, ClaimStatus, EventKind, EventRef, ExternalPlace, PlaceEventRecord, Profile, PublicProfile, VenueClaimRecord, VenueHours, VenueRecord } from './types.ts';
@@ -26,6 +27,10 @@ export const ORGANIZATION_DESCRIPTION_MAX = 500;
 export const ORGANIZATION_DEFAULT_TYPE = 'Organização';
 /** Quantos avisos de evento novo saem ao mesmo tempo (o resto espera a vez). */
 const ANNOUNCE_BATCH = 25;
+/** Intervalo mínimo entre dois check-ins da mesma pessoa no mesmo local. */
+export const CHECKIN_COOLDOWN_HOURS = 6;
+/** Quanto um check-in pesa no ranking em relação a uma presença confirmada (que vale 1). */
+export const CHECKIN_WEIGHT = 2;
 
 const ANNOUNCE_WHEN = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -227,11 +232,25 @@ export interface VenueProfileView {
   friendsWent: { count: number; sample: PublicProfile[] };
 }
 
-/** Quem mais frequenta o local: presenças confirmadas em eventos que já começaram. */
+/** Quem mais frequenta o local: check-ins por QR (peso maior) e presenças confirmadas em eventos que já começaram. */
 export interface VenueRegularView {
   rank: number;
   user: PublicProfile;
+  /** Idas ao local: check-ins mais presenças confirmadas. */
   visits: number;
+  /** Quantas dessas foram check-ins por QR. */
+  checkins: number;
+}
+
+/** QR do local para o dono: o código secreto que vai dentro do link impresso. */
+export interface VenueCheckinCodeView {
+  code: string;
+}
+
+export interface VenueCheckinResult {
+  venueId: string;
+  venueName: string;
+  at: string;
 }
 
 export const VENUE_REGULARS_LIMIT = 10;
@@ -539,6 +558,42 @@ export class VenueService {
     return this.deps.places.findEventCover(eventId);
   }
 
+  /** Código do QR do local (gera na primeira vez). Só quem administra. */
+  async checkinCode(userId: string, venueId: unknown): Promise<VenueCheckinCodeView> {
+    const venue = await this.ownedOrThrow(userId, venueId);
+    const current = await this.deps.places.venueCheckinCode(venue.id);
+    if (current) return { code: current };
+    return this.renewCheckinCode(venue.id);
+  }
+
+  /** Troca o código: o QR impresso antes deixa de valer. */
+  async rotateCheckinCode(userId: string, venueId: unknown): Promise<VenueCheckinCodeView> {
+    const venue = await this.ownedOrThrow(userId, venueId);
+    return this.renewCheckinCode(venue.id);
+  }
+
+  private async renewCheckinCode(venueId: string): Promise<VenueCheckinCodeView> {
+    const code = randomBytes(18).toString('base64url');
+    await this.deps.places.setVenueCheckinCode(venueId, code, this.deps.clock.now());
+    return { code };
+  }
+
+  /** "Estive aqui": vale com o código atual do QR e no máximo uma vez a cada CHECKIN_COOLDOWN_HOURS por pessoa e local. */
+  async checkIn(userId: string, venueId: unknown, code: unknown): Promise<VenueCheckinResult> {
+    const venue = await this.venueOrThrow(venueId);
+    const expected = await this.deps.places.venueCheckinCode(venue.id);
+    const given = typeof code === 'string' ? Buffer.from(code.slice(0, 128)) : Buffer.alloc(0);
+    const want = Buffer.from(expected ?? '');
+    // Mesma resposta para código errado, antigo ou local sem QR: nada a descobrir por tentativa.
+    if (!expected || given.length !== want.length || !timingSafeEqual(given, want)) throw validationError('QR code inválido ou desatualizado');
+    const now = this.deps.clock.now();
+    const last = await this.deps.places.lastVenueCheckin(venue.id, userId);
+    const waitMs = last ? last.getTime() + CHECKIN_COOLDOWN_HOURS * 3_600_000 - now.getTime() : 0;
+    if (waitMs > 0) throw rateLimited(`Você já fez check-in aqui há pouco. Tente de novo em ${CHECKIN_COOLDOWN_HOURS} horas.`, waitMs / 1000);
+    await this.deps.places.addVenueCheckin({ id: this.deps.ids.next(), venueId: venue.id, userId, createdAt: now });
+    return { venueId: venue.id, venueName: venue.name, at: now.toISOString() };
+  }
+
   /** Página pública do local. Qualquer pessoa logada vê; quem administra também recebe `isOwner`. */
   async profile(viewerId: string, venueId: unknown): Promise<VenueProfileView> {
     const venue = await this.venueOrThrow(venueId);
@@ -579,7 +634,8 @@ export class VenueService {
   }
 
   /**
-   * Ranking de quem mais confirmou presença em eventos do local que já começaram (eventos do Explorar e posts de evento feitos em nome do local).
+   * Ranking de quem mais frequenta o local: check-ins por QR (peso CHECKIN_WEIGHT) e presenças confirmadas em eventos do local que já começaram
+   * (eventos do Explorar e posts de evento feitos em nome do local).
    * Perfil privado só aparece para quem já o segue; bloqueio em qualquer sentido e conta suspensa ficam de fora. Empate: ordem alfabética do nome de usuário.
    */
   private async visitors(viewerId: string, venueId: string, events: PlaceEventRecord[], now: number): Promise<{ regulars: VenueRegularView[]; friendsWent: { count: number; sample: PublicProfile[] } }> {
@@ -588,26 +644,29 @@ export class VenueService {
       ...events.filter((e) => e.startsAt.getTime() <= now).map((e) => ({ source: 'PLACE' as const, id: e.id })),
       ...posts.filter((p) => p.post.venueId === venueId && p.post.eventStartsAt && p.post.eventStartsAt.getTime() <= now && p.post.archivedAt === null).map((p) => ({ source: 'USER' as const, id: p.post.id })),
     ];
-    if (refs.length === 0) return { regulars: [], friendsWent: { count: 0, sample: [] } };
-    const counts = await this.deps.eventRoom.countGoingByUser(refs);
-    const profiles = new Map((await this.deps.users.findProfilesByIds(counts.map((c) => c.userId))).map((p) => [p.userId, p] as const));
-    const rows: { user: PublicProfile; visits: number; friend: boolean }[] = [];
-    for (const c of counts) {
-      const profile = profiles.get(c.userId);
+    const [going, checkins] = await Promise.all([refs.length === 0 ? Promise.resolve([]) : this.deps.eventRoom.countGoingByUser(refs), this.deps.places.countVenueCheckinsByUser(venueId)]);
+    const tally = new Map<string, { going: number; checkins: number }>();
+    for (const c of going) tally.set(c.userId, { going: c.count, checkins: 0 });
+    for (const c of checkins) tally.set(c.userId, { going: tally.get(c.userId)?.going ?? 0, checkins: c.count });
+    if (tally.size === 0) return { regulars: [], friendsWent: { count: 0, sample: [] } };
+    const profiles = new Map((await this.deps.users.findProfilesByIds([...tally.keys()])).map((p) => [p.userId, p] as const));
+    const rows: { user: PublicProfile; visits: number; checkins: number; score: number; friend: boolean }[] = [];
+    for (const [userId, t] of tally) {
+      const profile = profiles.get(userId);
       if (!profile) continue;
-      if (c.userId !== viewerId) {
-        const account = await this.deps.users.findById(c.userId);
+      if (userId !== viewerId) {
+        const account = await this.deps.users.findById(userId);
         if (!account || account.status !== 'ACTIVE') continue;
-        if (await this.deps.blocks.existsEitherWay(viewerId, c.userId)) continue;
-        if (profile.isPrivate && (await this.deps.follows.get(viewerId, c.userId))?.status !== 'ACCEPTED') continue;
+        if (await this.deps.blocks.existsEitherWay(viewerId, userId)) continue;
+        if (profile.isPrivate && (await this.deps.follows.get(viewerId, userId))?.status !== 'ACCEPTED') continue;
       }
-      const friend = c.userId !== viewerId && (await this.deps.follows.get(viewerId, c.userId))?.status === 'ACCEPTED' && (await this.deps.follows.get(c.userId, viewerId))?.status === 'ACCEPTED';
-      rows.push({ user: toPublicProfile(profile), visits: c.count, friend });
+      const friend = userId !== viewerId && (await this.deps.follows.get(viewerId, userId))?.status === 'ACCEPTED' && (await this.deps.follows.get(userId, viewerId))?.status === 'ACCEPTED';
+      rows.push({ user: toPublicProfile(profile), visits: t.going + t.checkins, checkins: t.checkins, score: t.going + t.checkins * CHECKIN_WEIGHT, friend });
     }
-    rows.sort((a, b) => b.visits - a.visits || (a.user.username < b.user.username ? -1 : 1));
+    rows.sort((a, b) => b.score - a.score || (a.user.username < b.user.username ? -1 : 1));
     const friends = rows.filter((r) => r.friend);
     return {
-      regulars: rows.slice(0, VENUE_REGULARS_LIMIT).map((r, i) => ({ rank: i + 1, user: r.user, visits: r.visits })),
+      regulars: rows.slice(0, VENUE_REGULARS_LIMIT).map((r, i) => ({ rank: i + 1, user: r.user, visits: r.visits, checkins: r.checkins })),
       friendsWent: { count: friends.length, sample: friends.slice(0, 3).map((r) => r.user) },
     };
   }

@@ -1,4 +1,6 @@
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
+import { parseStoryOverlays } from '../../core/story-overlays.ts';
+import type { StoryOverlay } from '../../core/story-overlays.ts';
 import type { EventRoomRepository } from '../../core/ports.ts';
 import type { EventAttendanceRecord, EventRef, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, Page, StoryHiddenRecord } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
@@ -92,15 +94,15 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
 
   async addStory(story: EventStoryRecord): Promise<void> {
     await this.prisma.eventStory.create({
-      data: { id: story.id, userId: story.userId, mime: story.mime, isVideo: story.video, onProfile: story.onProfile === true, data: Buffer.from(story.data), createdAt: story.createdAt, expiresAt: story.expiresAt, ...PrismaEventRoomRepository.where(story.ref) },
+      data: { id: story.id, userId: story.userId, mime: story.mime, isVideo: story.video, onProfile: story.onProfile === true, caption: story.caption ?? null, captionY: story.captionY ?? null, ...(story.overlays?.length ? { overlays: story.overlays as unknown as Prisma.InputJsonValue } : {}), data: Buffer.from(story.data), createdAt: story.createdAt, expiresAt: story.expiresAt, ...PrismaEventRoomRepository.where(story.ref) },
     });
   }
 
-  private static readonly storySelect = { id: true, userId: true, placeEventId: true, postId: true, mime: true, isVideo: true, onProfile: true, createdAt: true, expiresAt: true } as const;
+  private static readonly storySelect = { id: true, userId: true, placeEventId: true, postId: true, mime: true, isVideo: true, onProfile: true, caption: true, captionY: true, overlays: true, createdAt: true, expiresAt: true } as const;
 
-  private static storyMeta(r: { id: string; userId: string; placeEventId: string | null; postId: string | null; mime: string; isVideo: boolean; onProfile: boolean; createdAt: Date; expiresAt: Date }): EventStoryMeta | undefined {
+  private static storyMeta(r: { id: string; userId: string; placeEventId: string | null; postId: string | null; mime: string; isVideo: boolean; onProfile: boolean; caption: string | null; captionY: number | null; overlays: Prisma.JsonValue | null; createdAt: Date; expiresAt: Date }): EventStoryMeta | undefined {
     const ref: EventRef | undefined = r.placeEventId ? { source: 'PLACE', id: r.placeEventId } : r.postId ? { source: 'USER', id: r.postId } : undefined;
-    return ref ? { id: r.id, ref, userId: r.userId, mime: r.mime, video: r.isVideo, onProfile: r.onProfile, createdAt: r.createdAt, expiresAt: r.expiresAt } : undefined;
+    return ref ? { id: r.id, ref, userId: r.userId, mime: r.mime, video: r.isVideo, onProfile: r.onProfile, caption: r.caption, captionY: r.captionY, ...storedOverlays(r.overlays), createdAt: r.createdAt, expiresAt: r.expiresAt } : undefined;
   }
 
   async listStories(ref: EventRef, now: Date): Promise<EventStoryMeta[]> {
@@ -155,6 +157,20 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
     return result.count > 0;
   }
 
+  async setStoryLike(storyId: string, userId: string, liked: boolean, at: Date): Promise<boolean> {
+    if (!isUuid(storyId) || !isUuid(userId)) return false;
+    if (!liked) return (await this.prisma.eventStoryLike.deleteMany({ where: { storyId, userId } })).count > 0;
+    if (!(await this.prisma.eventStory.findUnique({ where: { id: storyId }, select: { id: true } }))) return false;
+    return (await this.prisma.eventStoryLike.createMany({ data: [{ storyId, userId, createdAt: at }], skipDuplicates: true })).count > 0;
+  }
+
+  async likedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>> {
+    const ids = storyIds.filter(isUuid);
+    if (!isUuid(userId) || ids.length === 0) return new Set();
+    const rows = await this.prisma.eventStoryLike.findMany({ where: { userId, storyId: { in: ids } }, select: { storyId: true } });
+    return new Set(rows.map((r) => r.storyId));
+  }
+
   async reportedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>> {
     const ids = storyIds.filter(isUuid);
     if (!isUuid(userId) || ids.length === 0) return new Set();
@@ -183,5 +199,16 @@ export class PrismaEventRoomRepository implements EventRoomRepository {
       select: { ownerId: true, otherId: true, hideTheirs: true, hideMine: true },
     });
     return rows.map((r) => ({ ownerId: r.ownerId, otherId: r.otherId, hideTheirs: r.hideTheirs, hideMine: r.hideMine }));
+  }
+}
+
+/** Os textos guardados com o story. Gravados já conferidos; algo estranho no banco é ignorado em vez de derrubar a lista. */
+function storedOverlays(raw: Prisma.JsonValue | null): { overlays?: StoryOverlay[] } {
+  if (!Array.isArray(raw) || raw.length === 0) return {};
+  try {
+    const overlays = parseStoryOverlays(raw);
+    return overlays ? { overlays } : {};
+  } catch {
+    return {};
   }
 }

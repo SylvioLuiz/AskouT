@@ -14,6 +14,9 @@ import type {
   Recommendations,
   BoostView,
   BoostReport,
+  NearbyOffer,
+  OfferView,
+  VenueOffers,
   MatchReach,
   RegionView,
   ClaimableVenue,
@@ -27,6 +30,8 @@ import type {
   VenueEventBody,
   VenueProfile,
   VenueBell,
+  VenueCheckinCode,
+  VenueCheckinResult,
   OrganizationRequestBody,
   VenueRequestBody,
   VenueRating,
@@ -62,8 +67,15 @@ import type {
   NotificationMute,
   EventStoryGroup,
   CommentGif,
+  RollingNowItem,
+  VenueStoryGroup,
+  VenueStoryItem,
+  VenueStoryOwnerView,
+  VenueStorySettings,
   FeedComment,
   GifResults,
+  GuestListOwnerView,
+  GuestListView,
   FeedPage,
   FeedPolicy,
   FeedPost,
@@ -72,6 +84,9 @@ import type {
   GroupDetails,
   GoingEvent,
   MeetupView,
+  AlbumDetail,
+  AlbumPhoto,
+  AlbumSummary,
   NotificationCategory,
   NotificationList,
   PushTestResult,
@@ -92,6 +107,7 @@ import type {
   Profile,
   ProfilePatch,
   ProfileView,
+  ReferralOverview,
   PublicProfile,
   SessionUser,
   SignupInput,
@@ -103,7 +119,8 @@ import type {
   SocialProviderId,
 } from './types.ts';
 import type { CloakroomPanel, CloakroomPublic, CloakroomSettingBody, CloakroomStaffTicket, CloakroomTicket } from './cloakroom.ts';
-import type { EventExtraAnswer, EventExtraOption } from './types.ts';
+import type { EventExtraAnswer, EventExtraOption, StoryOverlay } from './types.ts';
+import { overlaysHeader } from './story-overlays.ts';
 import { t } from '../lib/i18n/index.ts';
 
 /** O mínimo de `fetch` que o cliente usa (facilita testar sem navegador). */
@@ -249,6 +266,9 @@ export function createApi(deps: ApiDeps) {
         'GET',
         `/profiles/search?q=${id(query)}${limit !== undefined ? `&limit=${limit}` : ''}`,
       ),
+    claimReferral: (inviter: string) => request<{ counted: boolean }>('POST', '/me/referral', { body: { inviter } }),
+    referrals: () => request<ReferralOverview>('GET', '/me/referrals'),
+    setReferralBadgeHidden: (hidden: boolean) => request<{ badgeHidden: boolean }>('PUT', '/me/referral-badge', { body: { hidden } }),
     getProfile: (username: string) => request<ProfileView>('GET', `/profiles/${id(username)}`),
     setProfilePhoto: (image: string | null) => request<Profile>('PUT', '/profiles/me/photo', { body: { image } }),
     getPhone: () => request<{ phone: string | null }>('GET', '/profiles/me/phone'),
@@ -493,6 +513,10 @@ export function createApi(deps: ApiDeps) {
     boostReport: (boostId: string) => request<BoostReport>('GET', `/me/boosts/${id(boostId)}/report`),
     /** O que apareceu como "Patrocinado" (o servidor decide a qual anúncio pertence). */
     trackBoostStats: (items: BoostStatEntry[]) => request<{ counted: number }>('POST', '/me/boost-stats', { body: { items } }),
+    nearbyOffers: () => request<{ items: NearbyOffer[] }>('GET', '/offers/nearby'),
+    venueOffers: (venueId: string) => request<VenueOffers>('GET', `/me/venues/${id(venueId)}/offers`),
+    createOffer: (venueId: string, body: { text: string; minutes: number }) => request<OfferView>('POST', `/me/venues/${id(venueId)}/offers`, { body }),
+    endOffer: (offerId: string) => request<OfferView>('POST', `/me/offers/${id(offerId)}/end`),
     cancelBoost: (boostId: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/cancel`),
     simulateBoostPayment: (boostId: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/simulate-payment`),
     confirmStorePurchase: (boostId: string, receipt: string) => request<BoostView>('POST', `/me/boosts/${id(boostId)}/store-purchase`, { body: { receipt } }),
@@ -501,14 +525,22 @@ export function createApi(deps: ApiDeps) {
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
       request<EventPage>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
     eventStories: (eventId: string) => request<{ groups: EventStoryGroup[] }>('GET', `/events/${id(eventId)}/stories`),
-    /** `onProfile`: publica também no perfil, para os amigos verem na página inicial. */
-    createEventStory: async (eventId: string, file: Blob, onProfile = false): Promise<EventStoryGroup> => {
+    /**
+     * `onProfile`: publica também no perfil, para os amigos verem na página inicial.
+     * `overlays`: textos e figurinhas por cima, num cabeçalho (o corpo é a mídia crua).
+     */
+    createEventStory: async (eventId: string, file: Blob, onProfile = false, overlays: readonly StoryOverlay[] = []): Promise<EventStoryGroup> => {
       const token = deps.getToken();
       const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
+      const overlayHeader = overlaysHeader(overlays);
+      if (overlayHeader) headers['X-Story-Overlays'] = overlayHeader;
       if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
       let response;
       try {
-        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/stories${onProfile ? '?profile=1' : ''}`, { method: 'POST', headers, body: file });
+        const query = new URLSearchParams();
+        if (onProfile) query.set('profile', '1');
+        const qs = query.toString();
+        response = await deps.fetch(`${deps.baseUrl}/events/${id(eventId)}/stories${qs ? `?${qs}` : ''}`, { method: 'POST', headers, body: file });
       } catch {
         throw networkError();
       }
@@ -535,9 +567,49 @@ export function createApi(deps: ApiDeps) {
     /** Reage a um story: entre amigos vira mensagem na conversa; sem amizade (story de evento), um aviso para quem publicou. */
     reactProfileStory: (storyId: string, emoji: string) => request<{ sent: true; conversationId: string | null }>('POST', `/stories/${id(storyId)}/react`, { body: { emoji } }),
     reactEventStory: (eventId: string, storyId: string, emoji: string) => request<{ sent: true; conversationId: string | null }>('POST', `/events/${id(eventId)}/stories/${id(storyId)}/react`, { body: { emoji } }),
+    /** Responde ao story com texto: entre amigos vai direto para a conversa; senão, chega como aviso. Sem `eventId`, pela página inicial. */
+    replyStory: (storyId: string, text: string, eventId?: string) =>
+      request<{ sent: true; conversationId: string | null }>('POST', eventId ? `/events/${id(eventId)}/stories/${id(storyId)}/reply` : `/stories/${id(storyId)}/reply`, { body: { text } }),
+    /** Coração do story (fica guardado; quem publicou recebe um aviso). */
+    likeStory: (storyId: string, liked: boolean, eventId?: string) =>
+      request<{ liked: boolean }>('POST', eventId ? `/events/${id(eventId)}/stories/${id(storyId)}/like` : `/stories/${id(storyId)}/like`, { body: { liked } }),
     storyMediaUrl: (storyId: string) => `${deps.baseUrl}/stories/media/${id(storyId)}`,
     eventGo: (eventId: string, onProfile?: boolean) => request<EventPage>('POST', `/events/${id(eventId)}/going`, onProfile === undefined ? {} : { body: { onProfile } }),
     setGoingOnProfile: (eventId: string, onProfile: boolean) => request<EventPage>('PATCH', `/events/${id(eventId)}/going`, { body: { onProfile } }),
+
+    // Stories públicos de locais verificados
+    venueStoriesHome: () => request<{ groups: VenueStoryGroup[] }>('GET', '/venue-stories/home'),
+    /** A posição vale só nesta consulta (o servidor arredonda e não guarda). */
+    rollingNow: (position?: { lat: number; lng: number }) => request<{ items: RollingNowItem[] }>('GET', `/venue-stories/rolling-now${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
+    venueStoryMediaUrl: (storyId: string) => `${deps.baseUrl}/venue-stories/${id(storyId)}/media`,
+    reportVenueStory: (storyId: string, reason: ReportReason, details?: string) =>
+      request<{ reported: true }>('POST', `/venue-stories/${id(storyId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+    muteVenueStories: (venueId: string, muted: boolean) => request<{ muted: boolean }>('PUT', `/venue-stories/venues/${id(venueId)}/mute`, { body: { muted } }),
+    venueStorySettings: () => request<VenueStorySettings>('GET', '/venue-stories/settings'),
+    setVenueStorySettings: (hideVenueStories: boolean) => request<VenueStorySettings>('PUT', '/venue-stories/settings', { body: { hideVenueStories } }),
+    ownerVenueStories: (venueId: string) => request<VenueStoryOwnerView>('GET', `/me/venues/${id(venueId)}/stories`),
+    publishVenueStory: async (venueId: string, file: Blob): Promise<VenueStoryItem> => {
+      const token = deps.getToken();
+      const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': file.type };
+      if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/me/venues/${id(venueId)}/stories`, { method: 'POST', headers, body: file });
+      } catch {
+        throw networkError();
+      }
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+      if (response.ok) return payload as VenueStoryItem;
+      const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+      if (error.code === 'UNAUTHORIZED' && token !== undefined) deps.onUnauthorized();
+      throw error;
+    },
+    deleteVenueStory: (venueId: string, storyId: string) => request<{ deleted: true }>('DELETE', `/me/venues/${id(venueId)}/stories/${id(storyId)}`),
     eventCancel: (eventId: string) => request<EventPage>('DELETE', `/events/${id(eventId)}/going`),
 
     // Feed das páginas de evento (`events`) e de rolê (`venues`)
@@ -557,6 +629,15 @@ export function createApi(deps: ApiDeps) {
     reactFeedComment: (commentId: string, emoji: string | null) => request<FeedReactions>('PUT', `/feed/comments/${id(commentId)}/reaction`, { body: { emoji } }),
     reportFeedPost: (postId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/feed/posts/${id(postId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
     reportFeedComment: (commentId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/feed/comments/${id(commentId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),
+
+    // Lista VIP (nome na lista) dos eventos de locais
+    guestList: (eventId: string) => request<GuestListView>('GET', `/events/${id(eventId)}/guest-list`),
+    joinGuestList: (eventId: string, companions: number) => request<GuestListView>('POST', `/events/${id(eventId)}/guest-list/join`, { body: { companions } }),
+    leaveGuestList: (eventId: string) => request<GuestListView>('DELETE', `/events/${id(eventId)}/guest-list/join`),
+    configureGuestList: (eventId: string, input: { enabled: boolean; limit?: number | null; closesAt?: string | null; maxCompanions?: number }) => request<GuestListView>('PUT', `/events/${id(eventId)}/guest-list`, { body: input }),
+    guestListEntries: (eventId: string) => request<GuestListOwnerView>('GET', `/events/${id(eventId)}/guest-list/entries`),
+    checkInGuest: (eventId: string, userId: string, checkedIn: boolean) => request<GuestListOwnerView>('PUT', `/events/${id(eventId)}/guest-list/entries/${id(userId)}/check-in`, { body: { checkedIn } }),
+    exportGuestList: (eventId: string) => request<{ filename: string; csv: string }>('GET', `/events/${id(eventId)}/guest-list/export`),
 
     // Locais (painel do local)
     myVenues: () => request<MyVenues>('GET', '/me/venues'),
@@ -582,6 +663,11 @@ export function createApi(deps: ApiDeps) {
     venueProfile: (venueId: string) => request<VenueProfile>('GET', `/venues/${id(venueId)}/profile`).then((v) => ({ ...v, canManage: v.canManage ?? v.isOwner, role: v.role ?? (v.isOwner ? ('OWNER' as const) : null) })),
     updateVenueProfile: (venueId: string, body: VenueProfileBody) => request<VenueProfile>('PUT', `/me/venues/${id(venueId)}/profile`, { body }),
     followVenue: (venueId: string) => request<{ following: true; followerCount: number }>('POST', `/venues/${id(venueId)}/follow`),
+    /** QR do local: o código atual (gerado na primeira vez) e a troca, que invalida o QR impresso. */
+    venueCheckinCode: (venueId: string) => request<VenueCheckinCode>('GET', `/me/venues/${id(venueId)}/checkin`),
+    rotateVenueCheckinCode: (venueId: string) => request<VenueCheckinCode>('POST', `/me/venues/${id(venueId)}/checkin/rotate`),
+    /** "Estive aqui": o código vem do link do QR. */
+    venueCheckin: (venueId: string, code: string) => request<VenueCheckinResult>('POST', `/venues/${id(venueId)}/checkin`, { body: { code } }),
     rateVenue: (venueId: string, stars: number) => request<VenueRating>('PUT', `/venues/${id(venueId)}/rating`, { body: { stars } }),
     clearVenueRating: (venueId: string) => request<VenueRating>('DELETE', `/venues/${id(venueId)}/rating`),
     unfollowVenue: (venueId: string) => request<{ following: false; followerCount: number }>('DELETE', `/venues/${id(venueId)}/follow`),
@@ -730,6 +816,25 @@ export function createApi(deps: ApiDeps) {
     pushKey: () => request<{ publicKey: string | null; native?: boolean }>('GET', '/notifications/push-key'),
     pushSubscribe: (input: { endpoint: string; keys?: { p256dh: string; auth: string } }) => request<{ ok: true }>('POST', '/notifications/push', { body: input }),
     pushUnsubscribe: (endpoint: string) => request<{ ok: true }>('POST', '/notifications/push/remove', { body: { endpoint } }),
+
+    // Álbuns dos encontros
+    albums: () => request<{ items: AlbumSummary[] }>('GET', '/albums'),
+    album: (albumId: string) => request<AlbumDetail>('GET', `/albums/${id(albumId)}`),
+    addAlbumPhoto: (albumId: string, image: string) => request<AlbumPhoto>('POST', `/albums/${id(albumId)}/photos`, { body: { image } }),
+    deleteAlbumPhoto: (albumId: string, photoId: string) => request<{ ok: true }>('DELETE', `/albums/${id(albumId)}/photos/${id(photoId)}`),
+    postAlbumPhoto: (albumId: string, photoId: string, caption?: string) => request<{ id: string }>('POST', `/albums/${id(albumId)}/photos/${id(photoId)}/post`, { body: caption === undefined || caption.trim() === '' ? {} : { caption } }),
+    /** Baixa a foto do álbum (a rota exige o token, então não dá para usar <img src>). */
+    albumPhoto: async (albumId: string, photoId: string): Promise<Blob> => {
+      const token = deps.getToken();
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/albums/${id(albumId)}/photos/${id(photoId)}`, { method: 'GET', headers: token !== undefined ? { Authorization: t('Bearer {token}', { token }) } : {} });
+      } catch {
+        throw networkError();
+      }
+      if (!response.ok) throw errorFromResponse(response.status, undefined, response.headers.get('Retry-After'));
+      return response.blob();
+    },
 
     // Bloqueios
     block: (userId: string) => request<{ ok: true }>('POST', `/users/${id(userId)}/block`),

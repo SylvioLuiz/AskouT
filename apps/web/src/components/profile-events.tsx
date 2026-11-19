@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, EmptyState, ErrorState, Loading } from './ui.tsx';
+import { Button, Confirm, EmptyState, ErrorState, Loading } from './ui.tsx';
 import { api } from '../client.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -43,6 +43,7 @@ function Tile({ event, mine, onRemove, busy }: { event: PostedEvent; mine: boole
 /** Evento que a pessoa publicou como post: mesmo desenho do evento postado, com a foto do post de capa. */
 function PostTile({ post, mine, onRemove, busy }: { post: PostView; mine: boolean; onRemove: () => void; busy: boolean }) {
   const [failed, setFailed] = useState(false);
+  const [asking, setAsking] = useState(false);
   const first = post.images[0];
   const image = first?.path && !failed ? api.assetUrl(first.path) : null;
   const event = post.event;
@@ -56,8 +57,10 @@ function PostTile({ post, mine, onRemove, busy }: { post: PostView; mine: boolea
           <span className="ptile__when">{formatWhen(event.startsAt, event.endsAt, new Date())}</span>
         </span>
       </Link>
-      {mine ? (
-        <button type="button" className="ptile__remove" onClick={onRemove} disabled={busy} aria-label={t('Apagar o evento {title}', { title: event.title })}>
+      {mine && asking ? (
+        <Confirm danger question={t('Apagar o evento {title}? Quem confirmou presença deixa de vê-lo e não dá para desfazer.', { title: event.title })} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => { setAsking(false); onRemove(); }} onCancel={() => setAsking(false)} />
+      ) : mine ? (
+        <button type="button" className="ptile__remove" onClick={() => setAsking(true)} disabled={busy} aria-label={t('Apagar o evento {title}', { title: event.title })}>
           {t('Apagar evento')}
         </button>
       ) : null}

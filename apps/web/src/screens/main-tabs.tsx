@@ -3,6 +3,7 @@ import { EmptyState, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
 import { ForYou } from '../components/for-you.tsx';
+import { OfferBanner } from '../components/offer-banner.tsx';
 import { useMemo, useState } from 'react';
 import { agendaEvents, nextPlan, planWhenLabel } from '../lib/agenda.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -13,6 +14,7 @@ import { PostList } from '../components/post.tsx';
 import { Link } from '../router.tsx';
 import { SuggestedPeople } from '../components/suggested-people.tsx';
 import { FriendStories } from '../components/friend-stories.tsx';
+import { VenueStoriesStrip } from '../components/venue-story.tsx';
 import { EventCard } from './explore.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -31,6 +33,7 @@ export function HomeScreen() {
   const meetups = useAsync(() => api.myMeetups(), []);
   const going = useAsync(() => api.myGoingEvents(), []);
   const stories = useAsync(() => api.profileStories(), []);
+  const venueStories = useAsync(() => api.venueStoriesHome(), []);
   const plan = useMemo(() => nextPlan(agendaEvents(meetups.data?.items ?? [], going.data?.items ?? []), new Date()), [meetups.data, going.data]);
 
   return (
@@ -44,10 +47,14 @@ export function HomeScreen() {
         meetups.reload();
         going.reload();
         stories.reload();
+        venueStories.reload();
         await new Promise((resolve) => setTimeout(resolve, 700));
       }}
     >
       <FriendStories groups={stories.data?.groups ?? []} onChanged={stories.reload} />
+      <VenueStoriesStrip groups={venueStories.data?.groups ?? []} onChanged={venueStories.reload} />
+
+      <OfferBanner reloadKey={feedKey} />
 
       {plan ? (
         <Link to="/agenda" className="nextplan enter" aria-label={t('Seu próximo plano: {now}, {title}. Abrir a agenda', { now: planWhenLabel(plan, now), title: plan.title })}>
@@ -107,13 +114,10 @@ export function HomeScreen() {
         </section>
       ) : null}
 
-      <section className="section" aria-labelledby="posts-titulo">
-        <div className="section__head">
-          <h2 id="posts-titulo" className="section__title">
-            {t('Posts de quem você segue')}
-          </h2>
-        </div>
-        <PostList dateRail enter load={(offset, before) => api.homeFeed({ limit: 6, offset }, before)} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os de quem você segue aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
+      {/* Sem título: o normal da página inicial são os posts de quem você segue. Só as recomendações ("Para você") têm título. */}
+      <section className="section" aria-label={t('Posts de quem você segue')}>
+        {/* Na página inicial, os posts seguem o desenho dos eventos: nome de quem postou em cima, ações embaixo. */}
+        <PostList dateRail enter poster={false} load={(offset, before) => api.homeFeed({ limit: 6, offset }, before)} emptyTitle={t('Ainda não há posts')} emptyHint={t('Seus posts e os de quem você segue aparecem aqui.')} inject={[{ after: 2, node: <ForYou reloadKey={String(feedKey)} /> }, { after: 5, node: <SuggestedPeople /> }]} reloadKey={String(feedKey)} />
       </section>
     </PullRefresh>
   );

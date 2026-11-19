@@ -17,6 +17,7 @@ import { PostsController } from './controllers/posts.controller.ts';
 import { ExploreController } from './controllers/explore.controller.ts';
 import { GifsController } from './controllers/gifs.controller.ts';
 import { FeedController } from './controllers/feed.controller.ts';
+import { GuestListController } from './controllers/guest-list.controller.ts';
 import { AdminController } from './controllers/admin.controller.ts';
 import { VenuesController } from './controllers/venues.controller.ts';
 import { RecommendationsController } from './controllers/recommendations.controller.ts';
@@ -24,14 +25,19 @@ import { AccountController } from './controllers/account.controller.ts';
 import { RegionController } from './controllers/region.controller.ts';
 import { CloakroomController } from './controllers/cloakroom.controller.ts';
 import { BoostsController } from './controllers/boosts.controller.ts';
+import { OffersController } from './controllers/offers.controller.ts';
 import { HealthController } from './controllers/health.controller.ts';
 import { FlashController } from './controllers/flash.controller.ts';
+import { ReferralsController } from './controllers/referrals.controller.ts';
 import { FollowsController } from './controllers/follows.controller.ts';
 import { ProfilesController, AvatarController } from './controllers/profiles.controller.ts';
 import { PlacesController } from './controllers/places.controller.ts';
 import { coreProvider, googleProvider, placePhotosProvider } from './core.provider.ts';
 import { FlashPurge } from './flash-purge.ts';
 import { EventReminders } from './event-reminders.ts';
+import { AlbumJobs } from './album-jobs.ts';
+import { AlbumsController } from './controllers/albums.controller.ts';
+import { VenueStoriesController } from './controllers/venue-stories.controller.ts';
 import { CalendarImportJob } from './calendar-import-job.ts';
 import { CalendarSyncJob } from './calendar-sync-job.ts';
 import { CalendarsController } from './controllers/calendars.controller.ts';
@@ -41,7 +47,7 @@ import { loadConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
 
 @Module({
-  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, GifsController, FeedController, VenuesController, BoostsController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AdminController],
+  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, GifsController, FeedController, GuestListController, VenuesController, BoostsController, OffersController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AlbumsController, VenueStoriesController, AdminController, ReferralsController],
   providers: [
     { provide: CONFIG, useFactory: () => loadConfig(process.env) },
     prismaProvider,
@@ -52,6 +58,7 @@ import { CONFIG } from './tokens.ts';
     FlashPurge,
     PollDeadlines,
     EventReminders,
+    AlbumJobs,
     CalendarImportJob,
     CalendarSyncJob,
     {

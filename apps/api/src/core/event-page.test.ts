@@ -125,6 +125,7 @@ test('story de evento: só quem confirmou presença publica; foto ou vídeo; pá
   assert.equal((await w.core.eventPages.get(bia, 'e1')).canStory, true);
   const photo = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES());
   assert.equal(photo.items[0]!.kind, 'IMAGE');
+  assert.equal(photo.items[0]!.caption, null, 'sem texto, o story é só a mídia');
   w.clock.tick(1000);
   await w.core.eventPages.createStory(bia, 'e1', 'video/mp4', MP4_BYTES());
   w.clock.tick(1000);
@@ -284,4 +285,49 @@ test('reagir a um story: amiga recebe na conversa; quem não é amigo manda um a
   await rejectsWith(w.core.storyReactions.react(duda, story, '❤️'), 'NOT_FOUND');
   await rejectsWith(w.core.storyReactions.react(bia, story, '❤️', 'e1'), 'FORBIDDEN');
   await rejectsWith(w.core.storyReactions.react(ana, story, 'oi'), 'VALIDATION');
+});
+
+test('responder e curtir um story: resposta de amiga vai para a conversa; curtida fica guardada e avisa uma vez', async () => {
+  const { w, ana, bia, duda } = await setup();
+  for (const who of [ana, bia, duda]) await w.core.eventPages.go(who, 'e1');
+  const story = (await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), true)).items[0]!.id;
+
+  const reply = await w.core.storyReactions.reply(ana, story, '  Que lugar lindo!  ');
+  assert.ok(reply.conversationId, 'amigas: vira mensagem');
+  assert.equal((await w.core.conversations.messages(bia, reply.conversationId!)).messages.at(-1)?.body, 'Respondeu ao seu story: Que lugar lindo!');
+  assert.equal((await w.core.storyReactions.reply(duda, story, 'Oi!', 'e1')).conversationId, null, 'não são amigas: só o aviso');
+  await rejectsWith(w.core.storyReactions.reply(ana, story, '   '), 'VALIDATION');
+  await rejectsWith(w.core.storyReactions.reply(ana, story, 'a'.repeat(501)), 'VALIDATION');
+  await rejectsWith(w.core.storyReactions.reply(bia, story, 'eu mesma', 'e1'), 'FORBIDDEN');
+
+  const likedNow = async (who: string) => (await w.core.eventPages.stories(who, 'e1')).find((g) => !g.mine)?.items[0]?.liked;
+  assert.equal(await likedNow(ana), false);
+  assert.deepEqual(await w.core.storyReactions.like(ana, story, true), { liked: true });
+  assert.deepEqual(await w.core.storyReactions.like(ana, story, true), { liked: true }, 'curtir de novo não muda nada');
+  assert.equal(await likedNow(ana), true);
+  assert.equal(await likedNow(duda), false, 'cada pessoa vê a própria curtida');
+  assert.equal((await w.core.eventPages.stories(bia, 'e1')).find((g) => g.mine)?.items[0]?.liked, undefined, 'no próprio story não aparece');
+  await w.core.storyReactions.like(ana, story, false);
+  assert.equal(await likedNow(ana), false);
+  await rejectsWith(w.core.storyReactions.like(ana, story, 'sim'), 'VALIDATION');
+  await rejectsWith(w.core.storyReactions.like(bia, story, true, 'e1'), 'FORBIDDEN');
+});
+
+test('story com texto por cima: guarda o texto e a altura, limpa espaços e confere o tamanho', async () => {
+  const { w, bia, ana } = await setup();
+  await w.core.eventPages.go(bia, 'e1');
+  const made = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), false, undefined, { caption: '  Chegamos!\r\n\n\n\nBora  ', captionY: '0.3' });
+  assert.equal(made.items[0]!.caption, 'Chegamos!\n\nBora');
+  assert.equal(made.items[0]!.captionY, 0.3);
+  const seen = (await w.core.eventPages.stories(ana, 'e1'))[0]!.items[0]!;
+  assert.equal(seen.caption, 'Chegamos!\n\nBora', 'quem vê recebe o texto');
+  assert.equal(seen.captionY, 0.3);
+  w.clock.tick(1000);
+  const edge = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), false, undefined, { caption: 'oi', captionY: 'abc' });
+  assert.equal(edge.items[0]!.captionY, 0.5, 'altura inválida vai para o meio');
+  w.clock.tick(1000);
+  const blank = await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), false, undefined, { caption: '   ', captionY: 0.2 });
+  assert.equal(blank.items[0]!.caption, null);
+  assert.equal(blank.items[0]!.captionY, null);
+  await rejectsWith(w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), false, undefined, { caption: 'x'.repeat(201) }), 'VALIDATION');
 });

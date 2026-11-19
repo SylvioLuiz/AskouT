@@ -37,6 +37,7 @@ function categoryOf(type: NotificationType): Category {
     case 'MEETUP_ACCEPTED':
     case 'MEETUP_CANCELLED':
     case 'EVENT_REMINDER':
+    case 'ALBUM_SUMMARY':
     case 'VENUE_CALENDAR':
     case 'VENUE_EVENT':
       return 'event';
@@ -74,6 +75,7 @@ function CategoryIcon({ type }: { type: NotificationType }) {
     case 'FOLLOW_NEW':
       return <UserPlusIcon />;
     case 'POST_TAG':
+    case 'ALBUM_SUMMARY':
       return <PhotoIcon />;
     case 'FLASH_INVITE':
       return <BoltIcon filled />;

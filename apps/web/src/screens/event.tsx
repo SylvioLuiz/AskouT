@@ -4,7 +4,8 @@ import { shareOrigin } from '../lib/public-origin.ts';
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
-import { StoryCreateSheet, StoryViewer } from '../components/event-story.tsx';
+import { StoryViewer } from '../components/event-story.tsx';
+import { StoryCreator } from '../components/story-creator.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { EditPostSheet } from '../components/post-actions.tsx';
 import { EventExtrasList } from '../components/event-extras.tsx';
@@ -28,6 +29,7 @@ import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
 import { timeAgo } from '../lib/format.ts';
 import type { EventPage, FeedSettings, PostView } from '../lib/types.ts';
 import { Feed } from '../components/feed.tsx';
+import { GuestListCard } from '../components/guest-list.tsx';
 import { policyNote } from '../lib/feed.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
@@ -406,6 +408,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
             <p className="evwho__empty">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
           ) : null}
 
+          {e.source === 'PLACE' ? <GuestListCard eventId={e.id} ended={ended} /> : null}
+
           <div className="segtabs segtabs--fill evtabs" role="tablist" aria-label={t('Seções do evento')}>
             <button type="button" role="tab" aria-selected={tab === 'info'} className="segtabs__tab" onClick={() => setTab('info')}>
               {t('Informações')}
@@ -538,7 +542,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
         />
       ) : null}
       {creatingStory && e ? (
-        <StoryCreateSheet
+        <StoryCreator
           eventId={e.id}
           onClose={() => setCreatingStory(false)}
           onCreated={() => {

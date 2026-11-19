@@ -294,7 +294,11 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
     }
   }
 
+  /** Comentário esperando a confirmação para ser apagado. */
+  const [askDelete, setAskDelete] = useState<PostComment | undefined>();
+
   async function remove(comment: PostComment) {
+    setAskDelete(undefined);
     setDeleting(comment.id);
     setError(undefined);
     try {
@@ -320,11 +324,14 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
         />
       ) : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
+      {askDelete ? (
+        <Confirm danger question={t('Apagar este comentário? Não dá para desfazer.')} confirmLabel={t('Apagar')} busy={deleting === askDelete.id} onConfirm={() => void remove(askDelete)} onCancel={() => setAskDelete(undefined)} />
+      ) : null}
       {!loaded ? <Loading /> : null}
-      {loaded && items.length === 0 && !error ? <p className="comments__empty">{t('Ainda não há nenhum comentário.')}</p> : null}
+      {loaded && items.length === 0 && !error ? <p className="comments__empty">{t('Seja o primeiro a comentar')}</p> : null}
       <ul className="comments">
         {items.map((c) => (
-          <CommentRow key={c.id} comment={c} busy={deleting === c.id} onDelete={() => void remove(c)} onLike={() => void toggleLike(c)} onReport={() => setReporting(c)} />
+          <CommentRow key={c.id} comment={c} busy={deleting === c.id} onDelete={() => setAskDelete(c)} onLike={() => void toggleLike(c)} onReport={() => setReporting(c)} />
         ))}
       </ul>
       {hasMore ? (

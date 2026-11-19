@@ -236,6 +236,21 @@ interface ViewExtras {
   playedBy?: readonly string[];
 }
 
+/** Link de evento do AskouT dentro de um texto (`…/eventos/<id>`). */
+const EVENT_LINK_RE = /\/eventos\/([A-Za-z0-9_-]{1,64})(?![A-Za-z0-9_-])/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * O evento de um link colado numa mensagem de texto (o primeiro), para a conversa mostrar o cartão
+ * com foto, título e link, como num evento compartilhado pelo botão.
+ */
+export function linkedEventId(m: Pick<MessageRecord, 'kind' | 'body' | 'eventId' | 'postEventId'>): string | undefined {
+  if (m.kind !== 'TEXT' || m.eventId || m.postEventId || !m.body) return undefined;
+  const id = EVENT_LINK_RE.exec(m.body)?.[1];
+  // Id de evento que não existe só fica sem cartão; UUID vale em maiúsculas ou minúsculas.
+  return id && UUID_RE.test(id) ? id.toLowerCase() : id;
+}
+
 function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {}): MessageView {
   const distances = extras.distances ?? null;
   const gone = m.deletedAt != null;
@@ -470,7 +485,7 @@ export class ConversationService {
     const meetupIds = [...new Set(items.flatMap((m) => (m.meetupId ? [m.meetupId] : [])))];
     const records = (await Promise.all(meetupIds.map((id) => this.deps.meetups.find(id)))).filter((m) => m !== undefined);
     const meetupViews = new Map((await buildMeetupViews(this.deps, actorId, records)).map((v) => [v.id, v] as const));
-    const eventCards = await buildEventCards(this.deps, items.flatMap((m) => (m.eventId ? [m.eventId] : m.postEventId ? [m.postEventId] : [])));
+    const eventCards = await buildEventCards(this.deps, [...new Set(items.flatMap((m) => (m.eventId ? [m.eventId] : m.postEventId ? [m.postEventId] : [linkedEventId(m)].filter((id): id is string => !!id))))]);
     // O cartão já chega marcado para quem confirmou presença antes de receber o evento na conversa.
     for (const [id, card] of eventCards) {
       card.going = card.ownerId === actorId || (await this.deps.eventRoom.isGoing({ source: card.userEvent ? 'USER' : 'PLACE', id }, actorId));
@@ -505,7 +520,7 @@ export class ConversationService {
           distances: m.suggestion && otherId ? this.distancesOf(m.suggestion, positions) : null,
           senderName: names ? (names.get(m.senderId) ?? null) : null,
           meetup: m.meetupId ? (meetupViews.get(m.meetupId) ?? null) : null,
-          event: m.eventId || m.postEventId ? (eventCards.get((m.eventId ?? m.postEventId) as string) ?? null) : null,
+          event: eventCards.get((m.eventId ?? m.postEventId ?? linkedEventId(m)) as string) ?? null,
           replyTo: decor.replies.get(m.id) ?? null,
           reactions: decor.reactions.get(m.id) ?? [],
           playedBy: decor.plays.get(m.id) ?? [],
@@ -598,7 +613,10 @@ export class ConversationService {
     const preview = kind === 'TEXT' && !gif ? messagePreview(body) : undefined;
     await this.notifyMembers(actorId, actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um rolê' : 'enviou uma mensagem', preview);
     const decor = await this.decorate(actorId, [message]);
-    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard, replyTo: decor.replies.get(message.id) ?? null });
+    // Texto com link de evento: já volta com o cartão (como na lista de mensagens).
+    const linked = linkedEventId(message);
+    const linkCard = linked ? ((await buildEventCards(this.deps, [linked])).get(linked) ?? null) : null;
+    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard ?? linkCard, replyTo: decor.replies.get(message.id) ?? null });
   }
 
   /** Bytes de uma foto ou vídeo, só para quem está na conversa. */

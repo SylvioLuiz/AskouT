@@ -1,4 +1,6 @@
-import type { ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
+import type { AlbumPhotoMeta, AlbumPhotoRecord, AlbumRecord } from './album.ts';
+import type { VenueStoryMeta, VenueStoryPrefs, VenueStoryRecord, VenueStoryReportRecord } from './venue-story.ts';
+import type { GuestListRecord, GuestListEntryRecord, ActivityAction, CloakroomSettingRecord, CloakroomTicketRecord, ConsentEventRecord, ActivityRecord, PasswordReset, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, AvailabilitySlotRecord, ConversationRecord, ConversationPrefsRecord, BoostPlacement, BoostRecord, VenueOfferRecord, BoostStatKind, BoostStatRow, BoostStatus, DirectActivityRow, DwellRecord, EngagementRow, ConversationReportRecord, ConversationSummaryRecord, RegionRecord, Direction, EventAttendanceRecord, EventKind, EventStoryMeta, EventStoryRecord, EventStoryReportRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReactionStats, FeedReportRecord, FeedTarget, ExternalPlace, ExternalProvider, IdentityClaims, MeetupRecord, MessageReactionRecord, MessageRecord, NotificationMuteSettings, NotificationRecord, NotificationType, PostCommentRecord, PostKindFilter, PostPatch, PostReportRecord, PostScope, PushSubscriptionRecord, PlaceEventRecord, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AdminUserReportRow, UserReportRecord, AuditRecord, AuditRow, ReportResolution, UserStatus, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, Profile, ProfilePhotoRecord, SuggestionResponse, User, UserMfa, UserRole } from './types.ts';
 
 /**
  * Portas (interfaces) que a lógica de negócio precisa. As implementações reais
@@ -237,6 +239,23 @@ export interface BoostStatsRepository {
   listByBoost(boostId: string): Promise<BoostStatRow[]>;
   /** Apaga as marcações de dias anteriores a `day` (os contadores ficam). Devolve quantas apagou. */
   purgeSeenBefore(day: string): Promise<number>;
+}
+
+/** Ofertas relâmpago dos locais. */
+export interface OfferRepository {
+  /** Insere a oferta. CONFLICT se o local já tem uma ativa (uma por vez, mesmo com publicações ao mesmo tempo). */
+  create(offer: VenueOfferRecord, now: Date): Promise<void>;
+  find(id: string): Promise<VenueOfferRecord | undefined>;
+  /** Do mais novo para o mais antigo. */
+  listByVenue(venueId: string, limit: number): Promise<VenueOfferRecord[]>;
+  /** Oferta do local no ar em `now` (não encerrada e dentro da janela). */
+  findActiveByVenue(venueId: string, now: Date): Promise<VenueOfferRecord | undefined>;
+  /** Quantas ofertas o local publicou desde `since` (inclui as encerradas). */
+  countSince(venueId: string, since: Date): Promise<number>;
+  /** Encerra antes do fim. Devolve se havia uma no ar. */
+  end(id: string, now: Date): Promise<boolean>;
+  /** Todas as ofertas no ar em `now`. */
+  listActive(now: Date): Promise<VenueOfferRecord[]>;
 }
 
 /** Cobrança criada no provedor de pagamento. */
@@ -623,6 +642,16 @@ export interface PlaceRepository {
   rateVenue(userId: string, venueId: string, stars: number, at: Date): Promise<void>;
   clearVenueRating(userId: string, venueId: string): Promise<void>;
   venueRating(venueId: string, userId: string): Promise<{ count: number; sum: number; mine: number | null }>;
+  /** Código secreto do QR do local (some quando o dono troca). Undefined enquanto nunca foi gerado. */
+  venueCheckinCode(venueId: string): Promise<string | undefined>;
+  /** Grava o código do QR; o anterior deixa de valer. */
+  setVenueCheckinCode(venueId: string, code: string, at: Date): Promise<void>;
+  /** Registra um check-in ("estive aqui"). */
+  addVenueCheckin(checkin: { id: string; venueId: string; userId: string; createdAt: Date }): Promise<void>;
+  /** Quando foi o último check-in da pessoa no local. */
+  lastVenueCheckin(venueId: string, userId: string): Promise<Date | undefined>;
+  /** Quantos check-ins cada pessoa tem no local (só quem tem ao menos 1). */
+  countVenueCheckinsByUser(venueId: string): Promise<{ userId: string; count: number }[]>;
 }
 
 export interface CalendarRepository {
@@ -984,6 +1013,10 @@ export interface EventRoomRepository {
   reportStory(report: EventStoryReportRecord): Promise<boolean>;
   /** Destes stories, quais `userId` já denunciou (ele não os vê mais). */
   reportedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>>;
+  /** Curte (ou descurte) um story. Devolve true se mudou algo (curtir de novo não conta). */
+  setStoryLike(storyId: string, userId: string, liked: boolean, at: Date): Promise<boolean>;
+  /** Destes stories, quais `userId` curtiu. */
+  likedStoryIds(userId: string, storyIds: string[]): Promise<Set<string>>;
   /** Grava a ocultação de stories de `ownerId` em relação a `otherId`; tudo desligado apaga a linha. */
   setStoryHidden(record: StoryHiddenRecord): Promise<void>;
   /** As ocultações de stories em que `userId` aparece (as que ele escolheu e as que escolheram sobre ele). */
@@ -1046,7 +1079,102 @@ export interface ActivityRepository {
   listByUser(userId: string, query: { actions: readonly ActivityAction[]; before?: { at: Date; id: string }; limit: number }): Promise<ActivityRecord[]>;
 }
 
+/** Quem trouxe quem: uma linha por pessoa convidada (a chave é a convidada, então só dá para ter um convite). */
+export interface ReferralRecord {
+  inviteeId: string;
+  inviterId: string;
+  createdAt: Date;
+  /** Preenchido quando a pessoa voltou ao app em outro dia: só então o convite conta para o selo. */
+  qualifiedAt: Date | null;
+}
+
+export interface ReferralRepository {
+  /** Guarda o convite. Devolve false se a pessoa já tinha um (o primeiro vale; nunca troca). */
+  create(record: ReferralRecord): Promise<boolean>;
+  /** Marca o convite da pessoa como confirmado, se houver e ainda não estiver. Devolve true se mudou. */
+  qualify(inviteeId: string, at: Date): Promise<boolean>;
+  /** Convites de quem convidou, do mais novo ao mais antigo (no máximo `limit`). */
+  listByInviter(inviterId: string, limit: number): Promise<ReferralRecord[]>;
+  /** Maiores convidantes pelo número de convites confirmados (contas ativas), depois pelo total. */
+  top(limit: number): Promise<{ inviterId: string; total: number; confirmed: number }[]>;
+}
+
+/** Álbuns dos encontros: criação a partir do NOW e dos eventos, fotos e aviso do dia seguinte. */
+export interface AlbumRepository {
+  /** Cria o álbum ou devolve o que já existe para o mesmo `kind` + `refId` (idempotente). */
+  ensure(album: AlbumRecord): Promise<AlbumRecord>;
+  find(id: string): Promise<AlbumRecord | undefined>;
+  /** Idempotente: quem já estava continua. */
+  addMembers(albumId: string, userIds: string[], at: Date): Promise<void>;
+  /** Quem foi, na ordem em que entrou. */
+  listMembers(albumId: string): Promise<string[]>;
+  isMember(albumId: string, userId: string): Promise<boolean>;
+  /** Álbuns de que a pessoa faz parte, começados depois de `since`, o mais recente primeiro. */
+  listForUser(userId: string, since: Date, limit: number): Promise<AlbumRecord[]>;
+  /** Álbuns começados entre `from` (exclusive) e `to` (inclusive), do mais antigo ao mais novo. */
+  listStartedBetween(from: Date, to: Date, limit: number): Promise<AlbumRecord[]>;
+  addPhoto(photo: AlbumPhotoRecord): Promise<void>;
+  /** Sem os bytes, da mais antiga à mais nova. */
+  listPhotos(albumId: string): Promise<AlbumPhotoMeta[]>;
+  countPhotos(albumId: string, authorId?: string): Promise<number>;
+  findPhoto(albumId: string, photoId: string): Promise<AlbumPhotoRecord | undefined>;
+  /** Só apaga se `authorId` é o autor. */
+  deletePhoto(albumId: string, photoId: string, authorId: string): Promise<boolean>;
+  /** Marca que o aviso do dia seguinte já foi mandado a esta pessoa. Devolve false se já tinha sido (nunca avisa duas vezes). */
+  markSummarized(albumId: string, userId: string, at: Date): Promise<boolean>;
+}
+
+/** Stories públicos de locais verificados, denúncias, silenciar local e preferência de quem vê. */
+export interface VenueStoryRepository {
+  add(story: VenueStoryRecord): Promise<void>;
+  find(id: string): Promise<VenueStoryMeta | undefined>;
+  /** Os bytes, mesmo vencido (a gestão confere denúncias). */
+  findMedia(id: string): Promise<{ mime: string; data: Uint8Array; expiresAt: Date } | undefined>;
+  /** No ar agora nestes locais, do mais antigo ao mais novo. */
+  listLive(venueIds: string[], now: Date): Promise<VenueStoryMeta[]>;
+  /** Apaga o story e as denúncias dele. */
+  delete(id: string): Promise<boolean>;
+  /** Uma denúncia por pessoa e story. Devolve false se já existia. */
+  report(report: VenueStoryReportRecord): Promise<boolean>;
+  reportedIds(userId: string, storyIds: string[]): Promise<Set<string>>;
+  /** Denúncias abertas (ou já decididas), as mais antigas primeiro nas abertas. */
+  listReports(open: boolean, page: Page): Promise<VenueStoryReportRecord[]>;
+  findReport(id: string): Promise<VenueStoryReportRecord | undefined>;
+  resolveReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean>;
+  /** Quantas pessoas diferentes têm denúncia ainda aberta contra stories deste local, desde `since`. */
+  countOpenReporters(venueId: string, since: Date): Promise<number>;
+  /** "Não tenho interesse": o local deixa de aparecer para a pessoa. */
+  setMuted(userId: string, venueId: string, muted: boolean): Promise<void>;
+  listMuted(userId: string): Promise<string[]>;
+  getPrefs(userId: string): Promise<VenueStoryPrefs>;
+  setPrefs(userId: string, prefs: VenueStoryPrefs): Promise<void>;
+}
+
+/** Lista VIP (nome na lista) dos eventos de locais. */
+export interface GuestListRepository {
+  get(eventId: string): Promise<GuestListRecord | undefined>;
+  /** Liga ou ajusta a lista. false se o evento não existe. */
+  upsert(list: GuestListRecord): Promise<boolean>;
+  /** Desliga a lista e apaga os nomes. */
+  remove(eventId: string): Promise<boolean>;
+  /**
+   * Põe o nome (ou troca os acompanhantes). Com `limit`, recusa um nome novo quando a lista já está cheia.
+   * 'full' é lista cheia; 'created' e 'updated' dizem se a pessoa já estava.
+   */
+  join(entry: { eventId: string; userId: string; companions: number; at: Date }, limit: number | null): Promise<'created' | 'updated' | 'full'>;
+  leave(eventId: string, userId: string): Promise<boolean>;
+  find(eventId: string, userId: string): Promise<GuestListEntryRecord | undefined>;
+  /** Na ordem em que entraram (mais antigo primeiro). */
+  list(eventId: string): Promise<GuestListEntryRecord[]>;
+  count(eventId: string): Promise<number>;
+  /** Marca (ou desmarca) que a pessoa entrou. false se ela não está na lista. */
+  setCheckedIn(eventId: string, userId: string, at: Date | null): Promise<boolean>;
+}
+
 export interface CoreDeps {
+  venueStories: VenueStoryRepository;
+  albums: AlbumRepository;
+  guestLists: GuestListRepository;
   activity: ActivityRepository;
   notifier: Notifier;
   users: UserRepository;
@@ -1084,6 +1212,7 @@ export interface CoreDeps {
   mfaChallenges: MfaChallengeTokens;
   boosts: BoostRepository;
   boostStats: BoostStatsRepository;
+  offers: OfferRepository;
   dwell: DwellRepository;
   regions: RegionRepository;
   consents: ConsentRepository;
@@ -1093,6 +1222,7 @@ export interface CoreDeps {
   settings: AppSettingsRepository;
   /** Conferência das compras dentro do app. Sem ela, só a compra pela web funciona. */
   storeVerifier?: StorePurchaseVerifier;
+  referrals: ReferralRepository;
   identities: IdentityRepository;
   verifier: IdentityVerifier;
   mailer: EmailSender;

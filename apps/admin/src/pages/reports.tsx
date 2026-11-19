@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import { REASON_LABEL, RESOLUTION_LABEL, formatDateTime } from '../labels.ts';
-import type { ConversationReportRow, FeedReportRow, PostReportRow, StoryReportRow, UserReportRow } from '../types.ts';
+import type { ConversationReportRow, FeedReportRow, PostReportRow, StoryReportRow, UserReportRow, VenueStoryReportRow } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead, Pager, Tabs } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
 import { PostThumb, deletePostAction } from './posts.tsx';
 import { FeedPostSummary, FeedThumb, deleteFeedCommentAction, deleteFeedPostAction } from './feed.tsx';
 
-type Kind = 'posts' | 'feed' | 'stories' | 'conversations' | 'users';
+type Kind = 'posts' | 'feed' | 'stories' | 'venue-stories' | 'conversations' | 'users';
 
 function Outcome({ r }: { r: { resolution: PostReportRow['resolution']; resolutionNote: string | null; resolvedAt: string | null } }) {
   if (!r.resolution) return null;
@@ -148,6 +148,52 @@ function StoryPreview({ r }: { r: StoryReportRow }) {
   );
 }
 
+function VenueStoryReportCard({ r, onAction }: { r: VenueStoryReportRow; onAction: (a: ActionSpec) => void }) {
+  const open = r.resolution === null;
+  const [media, setMedia] = useState<{ url: string; mime: string } | undefined>();
+  const [problem, setProblem] = useState<string | undefined>();
+  useEffect(() => () => { if (media) URL.revokeObjectURL(media.url); }, [media]);
+  return (
+    <article className="report">
+      {media ? (
+        media.mime.startsWith('video/') ? <video className="thumb thumb--story" src={media.url} controls playsInline /> : <img className="thumb thumb--story" src={media.url} alt="Story denunciado" />
+      ) : (
+        <div className="thumb thumb--empty thumb--story">
+          <button type="button" className="btn btn--small" onClick={() => { setProblem(undefined); api.venueStoryMedia(r.story.id).then(setMedia).catch(() => setProblem('Não foi possível abrir.')); }}>
+            Ver {r.story.kind === 'VIDEO' ? 'vídeo' : 'foto'}
+          </button>
+          {problem ? <div className="small">{problem}</div> : null}
+        </div>
+      )}
+      <div className="report__main">
+        <div>
+          <Badge tone="warn">{REASON_LABEL[r.reason]}</Badge> <span className="muted small">denunciado por @{r.reporter.username} em {formatDateTime(r.createdAt)}</span>
+        </div>
+        {r.details ? <p className="pre">“{r.details}”</p> : null}
+        <div className="postbox">
+          <strong>Local: {r.story.venueName ?? '—'}</strong>
+          <div className="muted small">{r.venueOpenReporters} pessoa(s) com denúncia aberta contra o local{r.venueOpenReporters >= 3 ? ' · publicação suspensa' : ''}</div>
+          <div className="muted small">Publicado em {formatDateTime(r.story.createdAt)} · no ar até {formatDateTime(r.story.expiresAt)}</div>
+        </div>
+        <Outcome r={r} />
+      </div>
+      {open ? (
+        <div className="report__actions">
+          <button type="button" className="btn btn--small" onClick={() => onAction({ title: 'Denúncia sem problema', description: <p>O story continua no ar, a denúncia sai da fila e deixa de contar para a suspensão do local.</p>, confirmLabel: 'Marcar sem problema', noteLabel: 'Nota', run: (n) => api.resolveVenueStoryReport(r.id, 'DISMISSED', n) })}>
+            Sem problema
+          </button>
+          <button type="button" className="btn btn--small" onClick={() => onAction({ title: 'Providência tomada', description: <p>Use quando você já agiu por outro caminho. A publicação do local é liberada.</p>, confirmLabel: 'Registrar providência', noteLabel: 'O que foi feito', noteRequired: true, run: (n) => api.resolveVenueStoryReport(r.id, 'ACTIONED', n) })}>
+            Providência tomada
+          </button>
+          <button type="button" className="btn btn--small btn--danger-quiet" onClick={() => onAction({ title: 'Apagar story', description: <p>O story do local sai do ar e as denúncias dele saem da fila. Isso não pode ser desfeito.</p>, confirmLabel: 'Apagar story', danger: true, noteLabel: 'Motivo', noteRequired: true, run: (n) => api.deleteVenueStory(r.story.id, n) })}>
+            Apagar story
+          </button>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 function StoryReportCard({ r, onAction }: { r: StoryReportRow; onAction: (a: ActionSpec) => void }) {
   const open = r.resolution === null;
   return (
@@ -163,6 +209,7 @@ function StoryReportCard({ r, onAction }: { r: StoryReportRow; onAction: (a: Act
             Story de <span className="handle">@{r.story.author.username}</span> · {r.story.reportsCount} denúncia(s) no total
           </div>
           {r.story.eventTitle ? <strong>Evento: {r.story.eventTitle}</strong> : null}
+          {r.story.caption ? <p className="pre">Texto no story: “{r.story.caption}”</p> : null}
           <div className="muted small">Publicado em {formatDateTime(r.story.createdAt)} · no ar até {formatDateTime(r.story.expiresAt)}</div>
         </div>
         <Outcome r={r} />
@@ -348,6 +395,7 @@ export function ReportsPage() {
   const posts = useAsync(() => (kind === 'posts' ? api.postReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
   const feed = useAsync(() => (kind === 'feed' ? api.feedReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
   const stories = useAsync(() => (kind === 'stories' ? api.storyReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
+  const venueStories = useAsync(() => (kind === 'venue-stories' ? api.venueStoryReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
   const users = useAsync(() => (kind === 'users' ? api.userReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
   const convs = useAsync(() => (kind === 'conversations' ? api.conversationReports({ resolved, offset }) : Promise.resolve(undefined)), [kind, resolved, offset]);
 
@@ -355,6 +403,7 @@ export function ReportsPage() {
     posts.reload();
     feed.reload();
     stories.reload();
+    venueStories.reload();
     convs.reload();
     users.reload();
     stats.reload();
@@ -371,6 +420,7 @@ export function ReportsPage() {
             { value: 'posts', label: 'Posts', count: stats.data?.openPostReports },
             { value: 'feed', label: 'Feed', count: stats.data?.openFeedReports },
             { value: 'stories', label: 'Stories', count: stats.data?.openStoryReports },
+            { value: 'venue-stories', label: 'Stories de locais' },
             { value: 'conversations', label: 'Conversas', count: stats.data?.openConversationReports },
             { value: 'users', label: 'Perfis e comentários', count: stats.data?.openUserReports },
           ]}
@@ -405,6 +455,17 @@ export function ReportsPage() {
             page ? (
               <>
                 <div className="reports">{page.items.map((r) => <StoryReportCard key={r.id} r={r} onAction={setAction} />)}</div>
+                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+              </>
+            ) : null
+          }
+        </Loadable>
+      ) : kind === 'venue-stories' ? (
+        <Loadable state={venueStories} empty={resolved ? 'Nenhuma denúncia decidida ainda.' : 'Nenhuma denúncia aberta. 🎉'} isEmpty={(d) => d === undefined || d.items.length === 0}>
+          {(page) =>
+            page ? (
+              <>
+                <div className="reports">{page.items.map((r) => <VenueStoryReportCard key={r.id} r={r} onAction={setAction} />)}</div>
                 <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
               </>
             ) : null

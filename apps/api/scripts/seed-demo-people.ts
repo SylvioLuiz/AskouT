@@ -4,6 +4,8 @@
 //   npm run seed:demo                       (cria/atualiza as pessoas e posts de exemplo)
 //   npm run seed:demo -- --follow sylvio    (e faz @sylvio e as pessoas de exemplo se seguirem: viram amigos,
 //                                            com conversas 1 a 1 e dois grupos de exemplo)
+//                                            Com --follow, a pessoa também confirma presença ("Eu vou") nos eventos de exemplo,
+//                                            para poder publicar stories neles.
 //   npm run seed:demo -- --clear            (apaga tudo que veio daqui)
 //
 // Pode rodar quantas vezes quiser: não duplica. Não roda em produção.
@@ -120,6 +122,16 @@ const GROUPS: { name: string; slugs: string[]; text: string }[] = [
   { name: '[TESTE] Pedal de domingo', slugs: ['felipe', 'lucas', 'karina'], text: '[TESTE] Saída às 7h do parque.' },
 ];
 
+/** Eventos de exemplo (aparecem no meio dos posts): horários contados a partir de agora, em horas. */
+const EVENTS: { slug: string; title: string; kind: 'SHOW' | 'NIGHT' | 'GASTRONOMY' | 'OUTDOOR' | 'SPORT' | 'CINEMA'; place: string; address: string; startH: number; hours: number; color: [number, number, number] }[] = [
+  { slug: 'ana', title: '[TESTE] Happy hour no terraço', kind: 'NIGHT', place: 'Bar do Terraço (exemplo)', address: 'Rua de Teste, 100', startH: -1, hours: 5, color: [181, 110, 252] },
+  { slug: 'bruno', title: '[TESTE] Show de rock na garagem', kind: 'SHOW', place: 'Garagem Sonora (exemplo)', address: 'Av. Exemplo, 200', startH: 3, hours: 4, color: [250, 114, 201] },
+  { slug: 'gabi', title: '[TESTE] Karaokê da galera', kind: 'NIGHT', place: 'Karaokê Central (exemplo)', address: 'Rua das Vozes, 42', startH: 26, hours: 4, color: [255, 55, 95] },
+  { slug: 'olivia', title: '[TESTE] Feirinha gastronômica', kind: 'GASTRONOMY', place: 'Praça de Teste (exemplo)', address: 'Praça Central, s/n', startH: 50, hours: 6, color: [255, 159, 10] },
+  { slug: 'felipe', title: '[TESTE] Pedal de domingo cedo', kind: 'OUTDOOR', place: 'Parque de Exemplo', address: 'Portão 1', startH: 70, hours: 3, color: [94, 92, 230] },
+  { slug: 'heitor', title: '[TESTE] Jogo do time no telão', kind: 'SPORT', place: 'Bar da Esquina (exemplo)', address: 'Rua do Jogo, 10', startH: 120, hours: 3, color: [48, 176, 199] },
+];
+
 const directKeyOf = (a: string, b: string) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
 const prisma = new PrismaClient({ datasourceUrl: databaseUrl() });
@@ -169,6 +181,34 @@ try {
     }
     console.log(`Pessoas de exemplo: ${createdUsers} criada(s), ${PEOPLE.length - createdUsers} já existiam. Posts criados: ${createdPosts}.`);
 
+    // Eventos: recriados a cada rodada para os horários continuarem "agora", "hoje à noite", "amanhã"...
+    const eventIds: string[] = [];
+    const startOfHour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+    for (const [i, e] of EVENTS.entries()) {
+      const authorId = demoIds[PEOPLE.findIndex((p) => p.slug === e.slug)]!;
+      await prisma.post.deleteMany({ where: { authorId, eventTitle: e.title } });
+      const startsAt = new Date(startOfHour + e.startH * 3_600_000);
+      const post = await prisma.post.create({
+        data: {
+          id: randomUUID(),
+          authorId,
+          caption: `${e.title}. Evento de exemplo para testar o AskouT.`,
+          eventTitle: e.title,
+          eventKind: e.kind,
+          eventStartsAt: startsAt,
+          eventEndsAt: new Date(startsAt.getTime() + e.hours * 3_600_000),
+          placeName: e.place,
+          placeAddress: e.address,
+          feedPolicy: 'OPEN',
+          // Um pouco antes dos posts comuns, para os eventos aparecerem no meio deles no feed.
+          createdAt: new Date(Date.now() - (i * 2 + 1) * 45 * 60_000),
+          images: { create: [{ id: randomUUID(), position: 0, mime: 'image/png', data: solidPng(800, 450, e.color) }] },
+        },
+      });
+      eventIds.push(post.id);
+    }
+    console.log(`Eventos de exemplo: ${eventIds.length} (re)criado(s).`);
+
     const target = arg('follow')?.trim().replace(/^@/, '').toLowerCase();
     if (target) {
       const profile = await prisma.profile.findUnique({ where: { username: target } });
@@ -178,6 +218,12 @@ try {
         await prisma.follow.upsert({ where: { followerId_followeeId: { followerId: id, followeeId: profile.userId } }, create: { followerId: id, followeeId: profile.userId, status: 'ACCEPTED' }, update: {} });
       }
       console.log(`@${target} e as pessoas de exemplo agora se seguem (amigos).`);
+      for (const postId of eventIds) {
+        if (!(await prisma.eventAttendance.findFirst({ where: { userId: profile.userId, postId } }))) {
+          await prisma.eventAttendance.create({ data: { id: randomUUID(), userId: profile.userId, postId } });
+        }
+      }
+      console.log(`@${target} confirmou presença nos ${eventIds.length} eventos de exemplo (pode publicar stories neles).`);
 
       const idOf = (slug: string) => demoIds[PEOPLE.findIndex((p) => p.slug === slug)]!;
       const me = profile.userId;

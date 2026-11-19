@@ -227,14 +227,14 @@ export class PrismaAdminRepository implements AdminRepository {
       select: {
         id: true, reason: true, details: true, createdAt: true, resolvedAt: true, resolution: true, resolutionNote: true,
         reporter: { select: { id: true, profile: { select: { username: true } } } },
-        story: { select: { id: true, isVideo: true, userId: true, placeEventId: true, postId: true, createdAt: true, expiresAt: true, user: { select: { profile: { select: { username: true } } } }, placeEvent: { select: { title: true } }, post: { select: { eventTitle: true } }, _count: { select: { reports: true } } } },
+        story: { select: { id: true, isVideo: true, caption: true, overlays: true, userId: true, placeEventId: true, postId: true, createdAt: true, expiresAt: true, user: { select: { profile: { select: { username: true } } } }, placeEvent: { select: { title: true } }, post: { select: { eventTitle: true } }, _count: { select: { reports: true } } } },
       },
     });
     return rows.map((r) => ({
       id: r.id, reason: r.reason as PostReportReason, details: r.details, createdAt: r.createdAt,
       reporter: { id: r.reporter.id, username: r.reporter.profile?.username ?? MISSING },
       story: {
-        id: r.story.id, kind: r.story.isVideo ? 'VIDEO' as const : 'IMAGE' as const, author: { id: r.story.userId, username: r.story.user.profile?.username ?? MISSING },
+        id: r.story.id, kind: r.story.isVideo ? 'VIDEO' as const : 'IMAGE' as const, caption: storyText(r.story.caption, r.story.overlays), author: { id: r.story.userId, username: r.story.user.profile?.username ?? MISSING },
         eventId: r.story.placeEventId ?? r.story.postId ?? '', eventTitle: r.story.placeEvent?.title ?? r.story.post?.eventTitle ?? null,
         createdAt: r.story.createdAt, expiresAt: r.story.expiresAt, reportsCount: r.story._count.reports,
       },
@@ -306,4 +306,11 @@ export class PrismaAdminRepository implements AdminRepository {
       note: r.note, createdAt: r.createdAt, adminUsername: names.get(r.adminId) ?? MISSING,
     }));
   }
+}
+
+/** Texto do story para a gestão: o texto único da versão anterior e os textos e figurinhas por cima, juntos. */
+function storyText(caption: string | null, overlays: unknown): string | null {
+  const parts = [caption, ...(Array.isArray(overlays) ? overlays.map((o) => (o && typeof o === 'object' && typeof (o as { text?: unknown }).text === 'string' ? (o as { text: string }).text : null)) : [])];
+  const texts = parts.filter((t): t is string => !!t && t.trim() !== '');
+  return texts.length > 0 ? texts.join(' · ') : null;
 }

@@ -162,13 +162,27 @@ export interface FeedReportRow {
   resolutionNote: string | null;
 }
 
+export interface VenueStoryReportRow {
+  id: string;
+  reason: ReportReason;
+  details: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolution: Resolution | null;
+  resolutionNote: string | null;
+  reporter: { id: string; username: string };
+  story: { id: string; kind: 'IMAGE' | 'VIDEO'; venueId: string; venueName: string | null; author: { id: string; username: string } | null; createdAt: string; expiresAt: string };
+  /** Pessoas diferentes com denúncia aberta contra o local; a partir de 3 a publicação do local fica suspensa. */
+  venueOpenReporters: number;
+}
+
 export interface StoryReportRow {
   id: string;
   reason: ReportReason;
   details: string | null;
   createdAt: string;
   reporter: { id: string; username: string };
-  story: { id: string; kind: 'IMAGE' | 'VIDEO'; author: { id: string; username: string }; eventId: string; eventTitle: string | null; createdAt: string; expiresAt: string; reportsCount: number };
+  story: { id: string; kind: 'IMAGE' | 'VIDEO'; caption?: string | null; author: { id: string; username: string }; eventId: string; eventTitle: string | null; createdAt: string; expiresAt: string; reportsCount: number };
   resolvedAt: string | null;
   resolution: Resolution | null;
   resolutionNote: string | null;
@@ -266,7 +280,44 @@ export interface ReturnGroup {
   withoutReco: ReturnRate;
 }
 
+export interface RecoExperimentState {
+  enabled: boolean;
+  controlPercent: number;
+  maxPercent: number;
+  startedAt: string | null;
+  endedAt: string | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface ProportionDiff {
+  diff: number;
+  low: number;
+  high: number;
+  significant: boolean;
+}
+
+export interface GroupReturn {
+  users: number;
+  d1: ReturnRate;
+  d7: ReturnRate;
+}
+
+export interface ExperimentReport {
+  enabled: boolean;
+  controlPercent: number;
+  from: string;
+  to: string;
+  control: GroupReturn;
+  treatment: GroupReturn;
+  d1Diff: ProportionDiff | null;
+  d7Diff: ProportionDiff | null;
+  lowData: boolean;
+  minSample: number;
+}
+
 export interface RetentionReport {
+  experiment: ExperimentReport | null;
   days: number;
   from: string;
   to: string;
@@ -290,4 +341,11 @@ export interface EventExtraInput {
   icon: string;
   label: string;
   type: EventExtra['type'];
+}
+
+/** Quem mais trouxe gente pelo convite (entraram = todos; confirmados = voltaram ao app em outro dia). */
+export interface TopInviter {
+  profile: { userId: string; username: string; displayName: string; avatarUrl: string | null };
+  brought: number;
+  confirmed: number;
 }

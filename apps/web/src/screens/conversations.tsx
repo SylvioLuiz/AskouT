@@ -637,6 +637,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           <EventBubble event={m.event} />
         ) : m.gif ? (
           <CommentGifView gif={m.gif} />
+        ) : m.kind === 'TEXT' && m.event ? (
+          // Texto com link de evento: o texto e, embaixo, o cartão do evento (foto, título e link).
+          <>
+            <p className="bubble__text">{m.body}</p>
+            <EventBubble event={m.event} />
+          </>
         ) : (
           <p className="bubble__text">{m.body}</p>
         )}

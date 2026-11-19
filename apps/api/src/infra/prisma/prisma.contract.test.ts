@@ -6,15 +6,20 @@ import {
   PrismaRegionRepository,
   PrismaBlockRepository,
   PrismaAppSettingsRepository,
+  PrismaReferralRepository,
   PrismaBoostRepository,
   PrismaBoostStatsRepository,
+  PrismaOfferRepository,
   PrismaConversationRepository,
   PrismaMeetupRepository,
   PrismaNotificationRepository,
   PrismaProfileEventRepository,
   PrismaPostRepository,
   PrismaEventRoomRepository,
+  PrismaAlbumRepository,
+  PrismaVenueStoryRepository,
   PrismaFeedRepository,
+  PrismaGuestListRepository,
   PrismaSchedulingRepository,
   PrismaPushSubscriptionRepository,
   PrismaPlaceRepository,
@@ -68,7 +73,9 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     passwordResets: new PrismaPasswordResetRepository(prisma),
     boosts: new PrismaBoostRepository(prisma),
     boostStats: new PrismaBoostStatsRepository(prisma),
+    offers: new PrismaOfferRepository(prisma),
     settings: new PrismaAppSettingsRepository(prisma),
+    referrals: new PrismaReferralRepository(prisma),
     dwell: new PrismaDwellRepository(prisma),
     regions: new PrismaRegionRepository(prisma),
     availability: new PrismaAvailabilityRepository(prisma),
@@ -79,7 +86,10 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     profileEvents: new PrismaProfileEventRepository(prisma),
     posts: new PrismaPostRepository(prisma),
     eventRoom: new PrismaEventRoomRepository(prisma),
+    albums: new PrismaAlbumRepository(prisma),
+    venueStories: new PrismaVenueStoryRepository(prisma),
     feed: new PrismaFeedRepository(prisma),
+    guestLists: new PrismaGuestListRepository(prisma),
     notifications: new PrismaNotificationRepository(prisma),
     pushSubscriptions: new PrismaPushSubscriptionRepository(prisma),
     places: new PrismaPlaceRepository(prisma),
@@ -91,7 +101,7 @@ async function makePrismaHarness(): Promise<RepoHarness> {
     },
     async reset() {
       // CASCADE leva junto todas as tabelas que referenciam "User"; PendingSignup e Venue não têm chave estrangeira para User.
-      await prisma.$executeRawUnsafe('TRUNCATE TABLE "User", "PendingSignup", "Venue" CASCADE');
+      await prisma.$executeRawUnsafe('TRUNCATE TABLE "User", "PendingSignup", "Venue", "Album" CASCADE');
     },
     async close() {
       await prisma.$disconnect();

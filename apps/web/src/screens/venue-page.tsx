@@ -664,7 +664,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
 
       {tab === 'regulars' ? (
         v.regulars.length === 0 ? (
-          <EmptyState title={t('O ranking ainda está vazio')}>Quem confirmar presença nos eventos de {v.name} e for aparece aqui.</EmptyState>
+          <EmptyState title={t('O ranking ainda está vazio')}>Quem fizer check-in no QR de {v.name} ou confirmar presença nos eventos e for aparece aqui.</EmptyState>
         ) : (
           <>
             <ol className="vrank" aria-label={t('Quem mais frequenta')}>
@@ -681,12 +681,13 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
                     </span>
                   </Link>
                   <span className="vrank__n">
-                    {r.visits === 1 ? t('1 presença') : t('{count} presenças', { count: r.visits })}
+                    {r.visits === 1 ? t('1 ida') : t('{count} idas', { count: r.visits })}
+                    {r.checkins > 0 ? <span className="muted"> · {r.checkins === 1 ? t('1 check-in') : t('{count} check-ins', { count: r.checkins })}</span> : null}
                   </span>
                 </li>
               ))}
             </ol>
-            <p className="muted vrank__note">{t('Conta as presenças confirmadas em eventos do local que já aconteceram. Perfis privados só aparecem para quem os segue.')}</p>
+            <p className="muted vrank__note">{t('Conta os check-ins pelo QR do local (valem mais) e as presenças confirmadas em eventos que já aconteceram. Perfis privados só aparecem para quem os segue.')}</p>
           </>
         )
       ) : null}

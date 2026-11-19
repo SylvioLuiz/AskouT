@@ -184,9 +184,13 @@ model User {
   passwordReset PasswordReset?
   mfa           UserMfa?
   boosts        Boost[]
+  venueOffers   VenueOffer[]
   dwells        ContentDwell[]
   consentEvents ConsentEvent[]
   cloakroomTickets CloakroomTicket[]
+
+  referralsMade   Referral[] @relation("ReferralInviter")
+  referralReceived Referral? @relation("ReferralInvitee")
 
   following Follow[] @relation("Follower")
   followers Follow[] @relation("Followee")
@@ -204,6 +208,7 @@ model User {
   commentLikes        PostCommentLike[]    @relation("PostCommentLikes")
   eventStories        EventStory[]         @relation("EventStoryAuthor")
   storyReports        EventStoryReport[]   @relation("EventStoryReports")
+  storyLikes          EventStoryLike[]     @relation("EventStoryLikes")
   notificationSetting NotificationSetting? @relation("NotificationSettingUser")
 
   organizedMeetings     Meeting[]            @relation("MeetingOrganizer")
@@ -235,6 +240,12 @@ model User {
   photo             ProfilePhoto?
   posts             Post[]
   eventAttendances  EventAttendance[]
+  albumMembers      AlbumMember[]
+  albumPhotos       AlbumPhoto[]
+  venueStories      VenueStory[]       @relation("VenueStoryAuthor")
+  venueStoryReports VenueStoryReport[] @relation("VenueStoryReports")
+  venueStoryMutes   VenueStoryMute[]
+  venueStoryPref    VenueStoryPref?
   feedPosts         FeedPost[]        @relation("FeedPostAuthor")
   feedComments      FeedComment[]     @relation("FeedCommentAuthor")
   feedReactions     FeedReaction[]    @relation("FeedReactionUser")
@@ -254,7 +265,9 @@ model User {
   venueFollows      VenueFollow[]
   region            UserRegion?
   venueRatings      VenueRating[]
+  venueCheckins     VenueCheckin[]
   reviewedClaims    VenueClaim[]  @relation("ClaimReviewer")
+  guestListEntries GuestListEntry[]
 }
 
 model Profile {
@@ -819,7 +832,11 @@ model Venue {
   calendar       VenueCalendar?
   calendarDrafts VenueCalendarDraft[]
   followers VenueFollow[]
+  stories   VenueStory[]
+  storyMutes VenueStoryMute[]
   ratings   VenueRating[]
+  checkinCode VenueCheckinCode?
+  checkins  VenueCheckin[]
   posts  Post[]
   comments PostComment[]
   /// Quem pode publicar no feed da página do rolê.
@@ -829,6 +846,7 @@ model Venue {
   @@index([lat, lng])
   @@index([ownerId])
   boosts Boost[]
+  offers VenueOffer[]
 }
 
 enum VenueManagerStatus {
@@ -914,6 +932,7 @@ model PlaceEvent {
   feedPosts FeedPost[]
   cloakroom CloakroomSetting?
   cloakroomTickets CloakroomTicket[]
+  guestList GuestList?
 
   @@index([startsAt])
   @@index([venueId])
@@ -1112,6 +1131,12 @@ model EventStory {
   isVideo      Boolean  @default(false)
   /// A pessoa escolheu publicar também no perfil: aparece na página inicial dos amigos (além do evento).
   onProfile    Boolean  @default(false)
+  /// Textos e figurinhas por cima da mídia (lista conferida por `parseStoryOverlays`). Quem assiste desenha.
+  overlays     Json?
+  /// Texto que a pessoa escreveu sobre a mídia (como no Instagram). Null se publicou só a foto/vídeo.
+  caption      String?
+  /// Altura do texto na tela do story: 0 (topo) a 1 (pé).
+  captionY     Float?
   data         Bytes
   createdAt    DateTime @default(now())
   expiresAt    DateTime
@@ -1121,11 +1146,25 @@ model EventStory {
   post       Post?       @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   reports    EventStoryReport[]
+  likes      EventStoryLike[]
 
   @@index([placeEventId, expiresAt])
   @@index([postId, expiresAt])
   @@index([userId])
   @@index([userId, onProfile, expiresAt])
+}
+
+/// Curtida (coração) num story, como no Instagram: uma por pessoa. Some junto com o story.
+model EventStoryLike {
+  storyId   String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  story EventStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user  User       @relation("EventStoryLikes", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([storyId, userId])
+  @@index([userId])
 }
 
 /// Denúncia de story: uma por pessoa. Fica guardada para a gestão; quem denunciou deixa de ver aquele story.
@@ -1220,6 +1259,28 @@ model VenueRating {
 
   @@id([userId, venueId])
   @@index([venueId])
+}
+
+/// Código secreto do QR de check-in do local. Trocar o código invalida o QR antigo.
+model VenueCheckinCode {
+  venueId   String   @id @db.Uuid
+  code      String
+  updatedAt DateTime @default(now())
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+}
+
+/// "Estive aqui": check-in feito lendo o QR do local. Vale mais que a presença confirmada no ranking.
+model VenueCheckin {
+  id        String   @id @default(uuid()) @db.Uuid
+  venueId   String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, userId, createdAt])
 }
 
 /// Logo do estabelecimento enviada do aparelho (JPEG/PNG/WebP até 128 KB), servida em `/venues/:id/logo`.
@@ -1433,6 +1494,26 @@ model BoostSeen {
 
   @@id([boostId, day, kind, viewerKey])
   @@index([day])
+}
+
+/// Oferta relâmpago do bar: texto curto com hora de fim, mostrada como "Patrocinado" a quem está perto.
+/// Grátis por enquanto (ver GOLIVE.md). Uma no ar por local; o limite por dia é conferido pelo núcleo.
+model VenueOffer {
+  id        String    @id @default(uuid()) @db.Uuid
+  venueId   String    @db.Uuid
+  ownerId   String    @db.Uuid
+  text      String
+  createdAt DateTime
+  startsAt  DateTime
+  endsAt    DateTime
+  /// Preenchido quando o responsável encerra antes do fim.
+  endedAt   DateTime?
+
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  owner User  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([venueId, createdAt])
+  @@index([endsAt])
 }
 
 /// Quanto tempo um conteúdo ficou visível na tela da pessoa. Alimenta as recomendações da Home.
@@ -1723,4 +1804,155 @@ model CloakroomTicket {
   @@unique([placeEventId, code])
   @@unique([placeEventId, number])
   @@index([userId, createdAt])
+}
+
+/// Quem trouxe quem pelo link de convite. A chave é a pessoa convidada: só um convite por conta, que nunca troca.
+/// `qualifiedAt` marca o retorno ao app em outro dia; só convites confirmados contam para o selo (ver GOLIVE.md).
+model Referral {
+  inviteeId   String    @id @db.Uuid
+  inviterId   String    @db.Uuid
+  createdAt   DateTime  @default(now())
+  qualifiedAt DateTime?
+
+  invitee User @relation("ReferralInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+  inviter User @relation("ReferralInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+
+  @@index([inviterId, createdAt])
+}
+
+/// Álbum do encontro: fotos só de quem foi. No NOW `refId` é o id do convite (sem chave estrangeira: o convite some em 24 h);
+/// no evento é `PLACE:<id>` ou `USER:<id>`. Quem foi fica gravado em AlbumMember.
+model Album {
+  id        String   @id @default(uuid()) @db.Uuid
+  kind      String
+  refId     String
+  title     String?
+  placeName String?
+  startedAt DateTime
+  createdAt DateTime @default(now())
+
+  members AlbumMember[]
+  photos  AlbumPhoto[]
+
+  @@unique([kind, refId])
+  @@index([startedAt])
+}
+
+model AlbumMember {
+  albumId      String    @db.Uuid
+  userId       String    @db.Uuid
+  joinedAt     DateTime  @default(now())
+  /// Quando o aviso "Ontem em..." saiu para esta pessoa (nunca sai duas vezes).
+  summarizedAt DateTime?
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([albumId, userId])
+  @@index([userId])
+}
+
+model AlbumPhoto {
+  id        String   @id @default(uuid()) @db.Uuid
+  albumId   String   @db.Uuid
+  authorId  String   @db.Uuid
+  mime      String
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  album  Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([albumId, createdAt])
+  @@index([authorId])
+}
+
+/// Story público de um local verificado (com responsável): foto ou vídeo, 24 h. Quem segue vê na Home; o Explorar mostra na faixa "Rolando agora".
+model VenueStory {
+  id        String   @id @default(uuid()) @db.Uuid
+  venueId   String   @db.Uuid
+  authorId  String   @db.Uuid
+  mime      String
+  isVideo   Boolean  @default(false)
+  data      Bytes
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  venue   Venue              @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  author  User               @relation("VenueStoryAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  reports VenueStoryReport[]
+
+  @@index([venueId, expiresAt])
+  @@index([expiresAt])
+}
+
+/// Denúncia de story de local: uma por pessoa. Denúncias abertas de várias pessoas suspendem a publicação do local até a gestão decidir.
+model VenueStoryReport {
+  id         String   @id @default(uuid()) @db.Uuid
+  storyId    String   @db.Uuid
+  reporterId String   @db.Uuid
+  reason     String
+  details    String?
+  createdAt  DateTime @default(now())
+  /// Decisão da gestão: DISMISSED (sem problema) ou ACTIONED (providência tomada).
+  resolvedAt     DateTime?
+  resolvedBy     String?   @db.Uuid
+  resolution     String?
+  resolutionNote String?
+
+  story    VenueStory @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  reporter User       @relation("VenueStoryReports", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, reporterId])
+  @@index([reporterId])
+  @@index([resolvedAt, createdAt])
+}
+
+/// "Não tenho interesse": a pessoa não vê mais o local na Home nem no "Rolando agora".
+model VenueStoryMute {
+  userId    String   @db.Uuid
+  venueId   String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue Venue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+
+  @@id([userId, venueId])
+}
+
+/// Preferência de quem vê: não ver stories de locais. Sem linha = vê.
+model VenueStoryPref {
+  userId  String  @id @db.Uuid
+  hideAll Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Lista VIP de um evento de local (sem pagamento): ligada por quem administra o local.
+model GuestList {
+  eventId       String   @id @db.Uuid
+  /// Quantos nomes cabem (sem contar acompanhantes). Nulo: sem limite.
+  limit         Int?
+  /// Depois deste horário ninguém entra. Nulo: até o fim do evento.
+  closesAt      DateTime?
+  maxCompanions Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  event   PlaceEvent        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  entries GuestListEntry[]
+}
+
+/// Um nome na lista VIP. O dono do local vê o nome e o @usuário (ponto de privacidade no GOLIVE.md).
+model GuestListEntry {
+  eventId     String    @db.Uuid
+  userId      String    @db.Uuid
+  companions  Int       @default(0)
+  checkedInAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  list GuestList @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, userId])
+  @@index([userId])
 }

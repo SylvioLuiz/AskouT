@@ -131,6 +131,40 @@ export class PrismaPlaceRepository implements PlaceRepository {
     }
   }
 
+  async venueCheckinCode(venueId: string): Promise<string | undefined> {
+    if (!isUuid(venueId)) return undefined;
+    return (await this.prisma.venueCheckinCode.findUnique({ where: { venueId }, select: { code: true } }))?.code;
+  }
+
+  async setVenueCheckinCode(venueId: string, code: string, at: Date): Promise<void> {
+    if (!isUuid(venueId)) return;
+    try {
+      await this.prisma.venueCheckinCode.upsert({ where: { venueId }, create: { venueId, code, updatedAt: at }, update: { code, updatedAt: at } });
+    } catch (failure) {
+      if (!isForeignKeyViolation(failure)) throw failure;
+    }
+  }
+
+  async addVenueCheckin(checkin: { id: string; venueId: string; userId: string; createdAt: Date }): Promise<void> {
+    if (!isUuid(checkin.venueId) || !isUuid(checkin.userId)) return;
+    try {
+      await this.prisma.venueCheckin.create({ data: { id: checkin.id, venueId: checkin.venueId, userId: checkin.userId, createdAt: checkin.createdAt } });
+    } catch (failure) {
+      if (!isForeignKeyViolation(failure)) throw failure;
+    }
+  }
+
+  async lastVenueCheckin(venueId: string, userId: string): Promise<Date | undefined> {
+    if (!isUuid(venueId) || !isUuid(userId)) return undefined;
+    return (await this.prisma.venueCheckin.findFirst({ where: { venueId, userId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true } }))?.createdAt;
+  }
+
+  async countVenueCheckinsByUser(venueId: string): Promise<{ userId: string; count: number }[]> {
+    if (!isUuid(venueId)) return [];
+    const rows = await this.prisma.venueCheckin.groupBy({ by: ['userId'], where: { venueId }, _count: { _all: true } });
+    return rows.map((r) => ({ userId: r.userId, count: r._count._all }));
+  }
+
   async clearVenueRating(userId: string, venueId: string): Promise<void> {
     if (!isUuid(userId) || !isUuid(venueId)) return;
     await this.prisma.venueRating.deleteMany({ where: { userId, venueId } });

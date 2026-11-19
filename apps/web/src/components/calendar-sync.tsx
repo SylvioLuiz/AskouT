@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Loading, Notice } from './ui.tsx';
+import { Button, Confirm, Loading, Notice } from './ui.tsx';
 import { Sheet } from './agenda.tsx';
 import { CalendarLogo } from './calendar-logos.tsx';
 import { CheckIcon } from './icons.tsx';
@@ -220,6 +220,7 @@ function OptionList({ options, busyId, onConnect }: { options: CalendarOption[];
 
 function ConnectionItem({ connection: c, busy, onSync, onReconnect, onToggle, onRemove }: { connection: CalendarConnection; busy: boolean; onSync: () => void; onReconnect: (() => void) | undefined; onToggle: (ids: string[]) => void; onRemove: () => void }) {
   const [open, setOpen] = useState(false);
+  const [asking, setAsking] = useState(false);
   const revoked = c.status !== 'ACTIVE';
   const selected = c.calendars.filter((x) => x.selected);
   const canChoose = (c.provider === 'GOOGLE' || c.provider === 'MICROSOFT') && c.calendars.length > 0 && !revoked;
@@ -267,10 +268,20 @@ function ConnectionItem({ connection: c, busy, onSync, onReconnect, onToggle, on
             {open ? t('Fechar agendas') : t('Escolher agendas')}
           </Button>
         ) : null}
-        <Button small variant="quiet" disabled={busy} onClick={onRemove} aria-label={t('Desconectar {name}', { name: c.label })}>
+        <Button small variant="quiet" disabled={busy || asking} onClick={() => setAsking(true)} aria-label={t('Desconectar {name}', { name: c.label })}>
           {t('Desconectar')}
         </Button>
       </div>
+      {asking ? (
+        <Confirm
+          danger
+          question={t('Desconectar {name}? Os horários importados dela saem da sua Agenda.', { name: c.label })}
+          confirmLabel={t('Desconectar')}
+          busy={busy}
+          onConfirm={() => { setAsking(false); onRemove(); }}
+          onCancel={() => setAsking(false)}
+        />
+      ) : null}
     </li>
   );
 }

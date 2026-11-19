@@ -1,3 +1,4 @@
+import type { StoryOverlay } from './story-overlays.ts';
 import type { EventExtraAnswer } from './event-extras.ts';
 export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETION_REQUESTED';
 export type UserRole = 'USER' | 'VENUE_OWNER' | 'ADMIN';
@@ -469,7 +470,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST';
 
 /** O que a pessoa silenciou no push (o aviso continua no sino). `all` vale para tudo; `chats` e `events` só para o seu grupo de avisos. */
 export interface NotificationMuteSettings {
@@ -703,6 +704,11 @@ export interface EventStoryRecord {
   video: boolean;
   /** Também no perfil: os amigos veem na página inicial. Sem o campo, fica só no evento. */
   onProfile?: boolean;
+  /** Textos e figurinhas por cima da mídia (desenhados por quem assiste). Sem o campo, nenhum. */
+  overlays?: StoryOverlay[];
+  /** Texto por cima da mídia e a altura dele na tela (0 = topo, 1 = pé). */
+  caption?: string | null;
+  captionY?: number | null;
   data: Uint8Array;
   createdAt: Date;
   expiresAt: Date;
@@ -886,7 +892,7 @@ export interface AdminStoryReportRow {
   details: string | null;
   createdAt: Date;
   reporter: { id: string; username: string };
-  story: { id: string; kind: 'IMAGE' | 'VIDEO'; author: { id: string; username: string }; eventId: string; eventTitle: string | null; createdAt: Date; expiresAt: Date; reportsCount: number };
+  story: { id: string; kind: 'IMAGE' | 'VIDEO'; caption: string | null; author: { id: string; username: string }; eventId: string; eventTitle: string | null; createdAt: Date; expiresAt: Date; reportsCount: number };
   resolvedAt: Date | null;
   resolution: ReportResolution | null;
   resolutionNote: string | null;
@@ -1013,7 +1019,10 @@ export type AuditAction =
   | 'PAYMENTS_DISABLED'
   | 'EVENT_EXTRA_CREATED'
   | 'EVENT_EXTRA_UPDATED'
-  | 'EVENT_EXTRA_REMOVED';
+  | 'EVENT_EXTRA_REMOVED'
+  | 'RECO_EXPERIMENT_ENABLED'
+  | 'RECO_EXPERIMENT_CHANGED'
+  | 'RECO_EXPERIMENT_DISABLED';
 
 export interface AuditRecord {
   id: string;
@@ -1334,4 +1343,41 @@ export interface CloakroomTicketRecord {
   createdAt: Date;
   storedAt: Date | null;
   returnedAt: Date | null;
+}
+
+// ---------- Oferta relâmpago do bar ----------
+
+/** Oferta curta publicada por quem administra o local ("chopp em dobro até 22h"). Aparece como "Patrocinado" para quem está perto. */
+export interface VenueOfferRecord {
+  id: string;
+  venueId: string;
+  /** Quem publicou (o responsável pelo local). */
+  ownerId: string;
+  text: string;
+  createdAt: Date;
+  startsAt: Date;
+  endsAt: Date;
+  /** Preenchido quando o responsável encerra antes do fim. */
+  endedAt: Date | null;
+}
+
+/** Lista VIP de um evento de local: ligada por quem administra o local, sem pagamento. */
+export interface GuestListRecord {
+  eventId: string;
+  /** Quantos nomes cabem (sem contar acompanhantes). Nulo: sem limite. */
+  limit: number | null;
+  /** Depois deste horário ninguém entra nem muda o nome. Nulo: até o fim do evento. */
+  closesAt: Date | null;
+  /** Quantos acompanhantes cada pessoa pode levar (0 a 5). */
+  maxCompanions: number;
+  createdAt: Date;
+}
+
+export interface GuestListEntryRecord {
+  eventId: string;
+  userId: string;
+  companions: number;
+  /** Quando o dono marcou que a pessoa entrou. */
+  checkedInAt: Date | null;
+  createdAt: Date;
 }
