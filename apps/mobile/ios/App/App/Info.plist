@@ -88,6 +88,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.427546548243-lub8u08v7iqrr3odqoq58edvvb9r5mn1</string>
+				<string>br.com.askout</string>
 			</array>
 		</dict>
 	</array>

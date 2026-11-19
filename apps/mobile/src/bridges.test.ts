@@ -461,3 +461,11 @@ it('localização: as telas pedem a permissão antes de ler a posição, e o can
   assert.deepEqual(log, ['get', 'watch', 'clear 7']);
   assert.equal(code, 1);
 });
+
+it('link br.com.askout:// abre só rotas conhecidas do app', async () => {
+  const { deepLinkPath } = await import('./deep-link.ts');
+  assert.equal(deepLinkPath('br.com.askout://agenda?agendas=google'), '/agenda?agendas=google');
+  assert.equal(deepLinkPath('br.com.askout:///agenda/'), '/agenda');
+  assert.equal(deepLinkPath('br.com.askout://configuracoes'), undefined);
+  assert.equal(deepLinkPath('https://evil.example/agenda'), undefined);
+});

@@ -6124,3 +6124,7 @@ div.optrow__main { cursor: default; }
 .evextras-view--compact { gap: 6px; font-size: 0.9375rem; }
 .evextras-view--compact .icon { width: 18px; height: 18px; color: var(--muted); }
 .evextras-view--compact .evextras-view__value { margin-left: 0; text-align: left; }
+
+/* Agenda ligada com sucesso (volta do Google/Outlook): check redondo no aviso da folha de agendas. */
+.calsync__check { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; vertical-align: -5px; border-radius: 50%; background: var(--ok, #1f9d55); color: #fff; }
+.calsync__check svg { width: 14px; height: 14px; }
