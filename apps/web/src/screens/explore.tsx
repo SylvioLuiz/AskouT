@@ -1,11 +1,12 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { ExploreViews } from '../components/explore-views.tsx';
+import { ExploreSearch } from '../components/explore-search.tsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
-import { ClockIcon, EventKindIcon, SearchIcon } from '../components/icons.tsx';
+import { ClockIcon, EventKindIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
 import { Button, EmptyState, ErrorState, Loading, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -306,7 +307,10 @@ export function ExploreScreen() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const where = useCurrentPosition();
-  const q = effectiveQuery(useDebounced(query, 300));
+  const debounced = useDebounced(query, 300);
+  const q = effectiveQuery(debounced);
+  // Ainda digitando: a busca de verdade sai quando a pessoa para por um instante.
+  const typing = effectiveQuery(query) !== '' && effectiveQuery(query) !== q;
   const position = where.position;
   const waiting = where.status === 'asking';
 
@@ -463,32 +467,16 @@ export function ExploreScreen() {
 
       {/* Busca sempre no topo: fica presa logo abaixo da barra do app enquanto a lista rola. */}
       <div className="explore__sticky">
-        <div className="search search--explore" role="search">
-          <span className="search__icon" aria-hidden="true">
-            <SearchIcon />
-          </span>
-          <label className="visually-hidden" htmlFor="busca">
-            {t('Buscar eventos, rolês, pessoas ou #')}
-          </label>
-          <input
-            id="busca"
-            ref={inputRef}
-            className="search__input search__input--icon"
-            type="search"
-            placeholder={t('Eventos, rolês, pessoas ou #')}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') commitSearch(query);
-            }}
-            autoComplete="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            maxLength={80}
-          />
-        </div>
+        <ExploreSearch
+          id="busca"
+          inputRef={inputRef}
+          value={query}
+          onChange={setQuery}
+          onSubmit={commitSearch}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          busy={typing || (searching && result.loading)}
+        />
 
         {showPanel ? (
           // onPointerDown evita que o campo perca o foco (e o painel suma) antes do toque valer.

@@ -4324,11 +4324,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmap__hint { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 7px 14px; border-radius: 18px; background: rgba(18,18,20,.82); color: #fff; font-size: 13px; font-weight: 600; box-shadow: 0 2px 10px rgba(0,0,0,.25); pointer-events: none; animation: evmap-hint 2.6s ease both; }
 .evmap__hint svg { width: 16px; height: 16px; }
 @keyframes evmap-hint { 0% { opacity: 0; transform: translateY(-8px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
-.evmap__search { position: relative; width: min(100%, 420px); }
-.evmap__searchinput { box-sizing: border-box; width: 100%; min-height: 44px; padding: 0 16px 0 44px; border: 0; border-radius: 22px; background: var(--evmap-float); color: var(--evmap-float-ink); font: inherit; font-size: 15px; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
-.evmap__searchinput::placeholder { color: var(--evmap-float-muted); opacity: .85; }
-.evmap__searchinput:focus-visible { outline: 3px solid var(--brand-soft, rgba(58,54,245,.35)); outline-offset: 1px; }
-.evmap__search .search__icon { color: var(--evmap-float-muted); }
+.evmap__top > .xsearch { width: min(100%, 420px); }
 .evmap__spin { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: evmap-spin .7s linear infinite; }
 @keyframes evmap-fade { from { opacity: 0; } }
 @keyframes evmap-card-in { from { opacity: 0; transform: translateY(18px); } }
@@ -5881,13 +5877,30 @@ button.reactlist__row { cursor: pointer; }
 .feed__list--pending .feedpost__badge--wait { display: none; }
 /* Explorar (lista): a busca fica presa no topo, logo abaixo da barra do app. */
 .explore__sticky { position: sticky; top: var(--topbar-h, 0px); z-index: 12; margin: 0 -16px 4px; padding: 6px 16px 2px; background: var(--bg); }
-.explore__sticky .search { margin-bottom: 8px; }
+.explore__sticky .xsearch { margin-bottom: 8px; }
+/* Busca do Explorar: o mesmo campo na Lista e no Mapa. Fonte de 16px para o iOS não dar zoom ao focar. */
+.xsearch { position: relative; display: flex; align-items: center; width: 100%; min-height: 48px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); box-shadow: 0 2px 10px rgb(0 0 0 / .12); transition: border-color .18s ease, box-shadow .18s ease; view-transition-name: explore-search; }
+.xsearch:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft), 0 2px 10px rgb(0 0 0 / .12); }
+.xsearch__icon { position: absolute; left: 16px; top: 50%; display: flex; color: var(--muted); transform: translateY(-50%); pointer-events: none; transition: color .18s ease; }
+.xsearch:focus-within .xsearch__icon { color: var(--brand); }
+.xsearch__input { flex: 1; min-width: 0; min-height: 46px; padding: 0 44px 0 46px; border: 0; border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 16px; outline: none; -webkit-appearance: none; appearance: none; }
+.xsearch__input::placeholder { color: var(--muted); opacity: 1; }
+.xsearch__input::-webkit-search-cancel-button, .xsearch__input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+.xsearch__clear, .xsearch__spin { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); animation: xsearch-in .16s ease-out both; }
+.xsearch__clear { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font: inherit; font-size: 22px; line-height: 1; cursor: pointer; }
+.xsearch__clear:focus-visible { outline: 3px solid var(--brand-soft); }
+.xsearch__spin { right: 16px; width: 18px; height: 18px; border: 2px solid var(--brand); border-right-color: transparent; border-radius: 50%; animation: xsearch-spin .7s linear infinite; }
+@keyframes xsearch-spin { from { transform: translateY(-50%) rotate(0); } to { transform: translateY(-50%) rotate(360deg); } }
+@keyframes xsearch-in { from { opacity: 0; transform: translateY(-50%) scale(.7); } }
+/* Na troca Lista ⇄ Mapa, a busca e as abas deslizam até o novo lugar em vez de piscar. */
+.viewtabs { view-transition-name: explore-views; }
+:root.vt-explore::view-transition-group(explore-search), :root.vt-explore::view-transition-group(explore-views) { animation-duration: .28s; animation-timing-function: cubic-bezier(.2,.8,.2,1); }
 /* Troca Lista ⇄ Mapa: crossfade curto; o mapa aparece aos poucos quando fica pronto. */
 .evmap .evmap__canvas { opacity: 0; transition: opacity .35s ease; }
 .evmap .evmap__canvas--ready, .evmap .evmap__canvas--off { opacity: 1; }
 .explore__sticky ~ * { animation: explore-fade .22s ease-out both; }
 :root.vt-explore::view-transition-old(root), :root.vt-explore::view-transition-new(root) { animation-duration: .22s; animation-timing-function: ease; }
-@media (prefers-reduced-motion: reduce) { .evmap, .explore__sticky ~ * { animation: none; } .evmap .evmap__canvas { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .evmap, .explore__sticky ~ * { animation: none; } .evmap .evmap__canvas { transition: none; } .xsearch, .xsearch__icon { transition: none; } .xsearch__clear { animation: none; } }
 
 /* ---------- Central de configurações (lista agrupada, padrão iOS/Instagram) ---------- */
 
