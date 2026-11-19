@@ -531,7 +531,7 @@ function FlashContent() {
                   <UsersIcon />
                   {t('Chamar todos')}
                 </button>
-                <Link to="/criar" className="flashquick__item">
+                <Link to="/criar?tipo=evento" className="flashquick__item">
                   <CalendarIcon />
                   {t('Criar evento agora')}
                 </Link>

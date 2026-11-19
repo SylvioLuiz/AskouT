@@ -11,6 +11,7 @@ import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, ChevronLeftIcon, HomeIcon, 
 import { venueAdminRoute, venueAdminTabs } from '../lib/venue-admin-mode.ts';
 import type { VenueAdminRoute, VenueAdminSection } from '../lib/venue-admin-mode.ts';
 import { Avatar } from './ui.tsx';
+import { CreateChooser } from './create-chooser.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 interface NavItem {
@@ -145,6 +146,8 @@ function MainShell({ children }: { children: ReactNode }) {
   usePolling(unreadNews.reload, 20_000);
   // O sino só mostra bolinha para o que chegou depois da última vez que Atividades foi aberta.
   const [, setSeenTick] = useState(0);
+  // O + pergunta antes: postagem ou evento.
+  const [choosing, setChoosing] = useState(false);
   useEffect(() => {
     const onChange = () => {
       unreadNews.reload();
@@ -201,7 +204,6 @@ function MainShell({ children }: { children: ReactNode }) {
   const flashInvited = (flashInvites.data?.received.length ?? 0) > 0;
 
   const flashItem: NavItem = { to: '/now', label: t('NOW'), icon: <BoltIcon filled={flashOn} />, also: ['/now/encontro'] };
-  const createItem: NavItem = { to: '/criar', label: t('Criar post'), icon: <PlusBigIcon /> };
   const activities: NavItem = { to: '/atividades', label: t('Notificações'), icon: <BellIcon /> };
   const profile: NavItem = {
     to: '/perfil',
@@ -224,7 +226,12 @@ function MainShell({ children }: { children: ReactNode }) {
         <nav className="rail__nav" aria-label={t('Principal')}>
           <NavLink item={HOME} pathname={pathname} />
           <NavLink item={EXPLORE} pathname={pathname} />
-          <NavLink item={createItem} pathname={pathname} />
+          <button type="button" className={`navlink navlink--button${inCompose ? ' navlink--active' : ''}`} onClick={() => setChoosing(true)} aria-haspopup="dialog">
+            <span className="navlink__icon">
+              <PlusBigIcon />
+            </span>
+            <span className="navlink__label">{t('Criar')}</span>
+          </button>
           <NavLink item={flashItem} pathname={pathname} badge={flashInvited} />
           <NavLink item={AGENDA} pathname={pathname} />
           <NavLink item={CHATS} pathname={pathname} badge={hasUnread} />
@@ -266,12 +273,13 @@ function MainShell({ children }: { children: ReactNode }) {
       <nav className="tabbar" aria-label={t('Principal')}>
         <NavLink item={HOME} pathname={pathname} />
         <NavLink item={EXPLORE} pathname={pathname} />
-        <Link to="/criar" className={`tabbar__create${pathname === '/criar' ? ' tabbar__create--active' : ''}`} aria-label={t('Criar post')} aria-current={pathname === '/criar' ? 'page' : undefined}>
+        <button type="button" className={`tabbar__create${inCompose ? ' tabbar__create--active' : ''}`} aria-label={t('Criar postagem ou evento')} aria-haspopup="dialog" onClick={() => setChoosing(true)}>
           <PlusBigIcon />
-        </Link>
+        </button>
         <NavLink item={flashItem} pathname={pathname} badge={flashInvited} />
         <NavLink item={AGENDA} pathname={pathname} />
       </nav>
+      {choosing ? <CreateChooser onClose={() => setChoosing(false)} /> : null}
     </div>
   );
 }

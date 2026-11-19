@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
-import { CarouselIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, LocationIcon, PhotoIcon, SendIcon, UsersIcon, XIcon } from '../components/icons.tsx';
+import { CalendarIcon, CarouselIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, EventKindIcon, GlobeIcon, LocationIcon, LockIcon, PhotoIcon, PlusIcon, SendIcon, UsersIcon, XIcon } from '../components/icons.tsx';
+import { EventAudienceSheet, EventKindSheet, EventRow, EventWhenSheet } from '../components/event-compose.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { CropEditor } from '../components/crop.tsx';
@@ -9,6 +10,8 @@ import { EventDates } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
 import { EventExtrasFields } from '../components/event-extras.tsx';
 import { extrasFromDraft } from '../lib/event-extras.ts';
+import { whenLabel } from '../lib/event-when.ts';
+import { KINDS } from '../lib/explore.ts';
 import type { EventExtrasDraft } from '../lib/event-extras.ts';
 import { PostCard, PostList } from '../components/post.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
@@ -69,7 +72,7 @@ function LinkPlaceSheet({ onPick, onClose }: { onPick: (place: LinkedPlace) => v
   const { term, result, places } = useLinkPlaceSearch(q);
 
   async function pick(p: ExplorePlace) {
-    const base = { name: p.name, address: p.address };
+    const base = { name: p.name, address: p.address, photo: p.photoPath ? { photoPath: p.photoPath, author: p.photoAuthor } : null };
     if (p.venue) return onPick({ ...base, venueId: p.venue.id });
     // Lugar que ainda não está no AskouT: cria o local a partir do Google e já vincula.
     setPicking(p.key);
@@ -140,7 +143,8 @@ export function CreatePostScreen() {
   const prefill = useSearch();
   const startAsEvent = prefill.get('votacao') !== null || prefill.get('tipo') === 'evento';
   const fileRef = useRef<HTMLInputElement>(null);
-  const [step, setStep] = useState<Step>('photos');
+  // Evento abre direto na tela única (capa, nome e as linhas Quando/Onde/Tipo/Quem vê); post começa pelas fotos.
+  const [step, setStep] = useState<Step>(startAsEvent ? 'details' : 'photos');
   const [source, setSource] = useState<Source>('photos');
   const [items, setItems] = useState<DraftImage[]>([]);
   const [focusKey, setFocusKey] = useState<string | undefined>();
@@ -177,6 +181,9 @@ export function CreatePostScreen() {
   const [sharedOnce, setSharedOnce] = useState(false);
   useTitle(created ? t('Evento criado') : kind === 'EVENT' ? t('Novo evento') : t('Nova publicação'));
   const [discarding, setDiscarding] = useState(false);
+  // Folhas da tela de evento.
+  const [sheet, setSheet] = useState<'when' | 'kind' | 'audience' | 'placePhoto' | undefined>();
+  const [moreOpen, setMoreOpen] = useState(false);
   const friends = useAsync(() => api.friends(), []);
 
   const room = POST_IMAGES_MAX - items.length;
@@ -224,15 +231,20 @@ export function CreatePostScreen() {
 
   function pickPlacePhoto(p: ExplorePlace) {
     if (!p.photoPath) return;
-    const image: DraftImage = { key: nextKey(), kind: 'PLACE', preview: api.assetUrl(p.photoPath), photoPath: p.photoPath, author: p.photoAuthor, placeName: p.name, placeAddress: p.address };
+    addPlaceImage({ key: nextKey(), kind: 'PLACE', preview: api.assetUrl(p.photoPath), photoPath: p.photoPath, author: p.photoAuthor, placeName: p.name, placeAddress: p.address });
+  }
+
+  /** No evento, a foto do lugar vira a capa (primeiro item); no post, entra no fim como antes. */
+  function addPlaceImage(image: Extract<DraftImage, { kind: 'PLACE' }>): boolean {
     const next = addImages(items, [image]);
     if (!next.includes(image)) {
       setMessage({ tone: 'error', text: t('Já são {POST_IMAGES_MAX} fotos. Remova uma para usar a foto do rolê.', { POST_IMAGES_MAX }) });
-      return;
+      return false;
     }
-    setItems(next);
+    setItems(kind === 'EVENT' ? [image, ...next.filter((i) => i !== image)] : next);
     setFocusKey(image.key);
     setMessage(undefined);
+    return true;
   }
 
   async function applyCrop(key: string, rect: CropRect) {
@@ -310,10 +322,10 @@ export function CreatePostScreen() {
 
   const kindToggle = (
     <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
-      <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')} disabled={busy}>
+      <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => { setKind('POST'); if (items.length === 0) setStep('photos'); }} disabled={busy}>
         {t('Post')}
       </button>
-      <button type="button" className={`segmented__tab${kind === 'EVENT' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'EVENT'} onClick={() => setKind('EVENT')} disabled={busy}>
+      <button type="button" className={`segmented__tab${kind === 'EVENT' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'EVENT'} onClick={() => { setKind('EVENT'); setStep('details'); }} disabled={busy}>
         {t('Evento')}
       </button>
     </div>
@@ -325,9 +337,28 @@ export function CreatePostScreen() {
   const cover = items[0];
 
   function leave() {
-    if (items.length === 0 && caption.trim() === '') navigate('/');
+    if (items.length === 0 && caption.trim() === '' && eventTitle.trim() === '') navigate('/');
     else setDiscarding(true);
   }
+
+  const progressBars = (
+    <>
+      {busy && prep ? (
+        <div className="uploadbar" role="status" aria-live="polite">
+          <progress className="uploadbar__bar" max={1} value={prep.progress} aria-label={t('Otimização do vídeo')} />
+          <p className="uploadbar__text">{prepareProgressText(prep.progress)}</p>
+          <p className="uploadbar__hint">{t('Estamos reduzindo o vídeo para o envio ser mais rápido. Mantenha esta tela aberta.')}</p>
+        </div>
+      ) : null}
+      {busy && upload ? (
+        <div className="uploadbar" role="status" aria-live="polite">
+          <progress className="uploadbar__bar" max={upload.total} value={upload.sent} aria-label={t('Envio do vídeo')} />
+          <p className="uploadbar__text">{uploadProgressText(upload.sent, upload.total)}</p>
+          <p className="uploadbar__hint">{t('Mantenha esta tela aberta até terminar.')}</p>
+        </div>
+      ) : null}
+    </>
+  );
 
   const discardSheet = discarding ? (
     <Sheet title={t('Descartar publicação?')} onClose={() => setDiscarding(false)}>
@@ -392,6 +423,225 @@ export function CreatePostScreen() {
     );
   }
 
+  if (step === 'details' && kind === 'EVENT') {
+    // Tela única do evento: capa no topo, nome grande e as linhas Quando / Onde / Tipo / Quem vê, cada uma com sua folha.
+    const missing = [eventTitle.trim() ? null : t('nome'), eventStart ? null : t('data'), cover ? null : t('capa')].filter((m): m is string => m !== null);
+    const missingText = missing.length > 0 ? t('Falta: {what}', { what: missing.length > 1 ? `${missing.slice(0, -1).join(', ')} ${t('e')} ${missing[missing.length - 1]}` : missing[0]! }) : null;
+    const when = whenLabel(eventStart, eventEnd, new Date());
+    const kindLabel = KINDS.find((k) => k.id === eventKind)?.label ?? t('Outros');
+    const linkedPhoto = linked?.photo && !(placePhoto && placePhoto.placeName === linked.name) ? linked.photo : null;
+    const extrasAnswered = extrasFromDraft(extras, extraOptions.data ?? []).length;
+    const moreParts = [tagged.length > 0 ? tagged.map((f) => `@${f.username}`).join(', ') : null, extrasAnswered > 0 ? (extrasAnswered === 1 ? t('1 informação') : t('{count} informações', { count: extrasAnswered })) : null].filter(Boolean);
+    const moreHint = (extraOptions.data ?? []).slice(0, 2).map((o) => o.label.toLowerCase());
+    const moreSub = moreParts.length > 0 ? moreParts.join(' · ') : [t('Marcar pessoas'), ...moreHint].join(', ') + ((extraOptions.data ?? []).length > 2 ? '…' : '');
+    return (
+      <div className="compose compose--event">
+        <header className="compose__bar">
+          <button type="button" className="iconbtn" onClick={leave} aria-label={t('Cancelar')} disabled={busy}>
+            <XIcon />
+          </button>
+          <h1 className="compose__title">{t('Novo evento')}</h1>
+          <button type="button" className="compose__next" disabled={busy || missing.length > 0 || captionLength > POST_CAPTION_MAX} onClick={() => void publish()}>
+            {t('Criar')}
+          </button>
+        </header>
+        {fileInput}
+        {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+        {progressBars}
+
+        {cover ? (
+          <div className="evcover">
+            <img src={cover.preview} alt={t('Capa do evento')} referrerPolicy="no-referrer" />
+            <button type="button" className="evcover__change" onClick={() => setStep('photos')} disabled={busy}>
+              <PhotoIcon /> {items.length > 1 ? t('Capa e fotos ({count})', { count: items.length }) : t('Trocar capa')}
+            </button>
+            {cover.kind === 'UPLOAD' && cover.video ? <span className="evcover__video" aria-hidden="true">▶</span> : null}
+            <span className="evcover__kind" aria-hidden="true">
+              <EventKindIcon kind={eventKind} />
+            </span>
+            {when ? <span className="evcover__when">{when}</span> : null}
+          </div>
+        ) : (
+          <div className="evcover evcover--empty">
+            <p>{reading ? t('Preparando as fotos…') : t('Adicione uma capa')}</p>
+            <div className="evcover__actions">
+              <Button small variant="secondary" loading={reading} onClick={() => fileRef.current?.click()}>
+                <PhotoIcon /> {t('Galeria')}
+              </Button>
+              <Button small variant="secondary" onClick={() => setSheet('placePhoto')}>
+                <LocationIcon /> {t('Foto de um rolê')}
+              </Button>
+            </div>
+          </div>
+        )}
+        {linkedPhoto && linked ? (
+          <div className="evphotohint">
+            <img src={api.assetUrl(linkedPhoto.photoPath)} alt="" referrerPolicy="no-referrer" />
+            <span>{cover ? t('Trocar a capa pela foto do {place}?', { place: linked.name }) : t('Usar a foto do {place} como capa?', { place: linked.name })}</span>
+            <Button
+              small
+              variant="quiet"
+              onClick={() => {
+                const image: Extract<DraftImage, { kind: 'PLACE' }> = { key: nextKey(), kind: 'PLACE', preview: api.assetUrl(linkedPhoto.photoPath), photoPath: linkedPhoto.photoPath, author: linkedPhoto.author, placeName: linked.name, placeAddress: linked.address };
+                addPlaceImage(image);
+              }}
+            >
+              {t('Usar')}
+            </Button>
+          </div>
+        ) : null}
+
+        <input className="evtitle" value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} maxLength={120} placeholder={t('Nome do evento')} aria-label={t('Nome do evento')} disabled={busy} />
+        <textarea
+          className="evdesc"
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          placeholder={t('Conte mais sobre o evento…')}
+          aria-label={t('Descrição do evento')}
+          maxLength={POST_CAPTION_MAX + 20}
+          rows={2}
+          aria-invalid={captionLength > POST_CAPTION_MAX || undefined}
+          disabled={busy}
+        />
+        {captionLength > POST_CAPTION_MAX * 0.8 ? (
+          <p className={`compose__count${captionLength > POST_CAPTION_MAX ? ' compose__count--over' : ''}`} aria-live="polite">
+            {captionLength}/{POST_CAPTION_MAX}
+          </p>
+        ) : null}
+
+        <ul className="evrows">
+          <EventRow icon={<CalendarIcon />} label={t('Quando')} value={when} placeholder={t('Escolher')} onClick={() => setSheet('when')} disabled={busy} />
+          <EventRow
+            icon={<LocationIcon />}
+            label={t('Onde')}
+            value={place?.name}
+            placeholder={t('Opcional')}
+            onClick={placeFromPhoto && !linked ? undefined : () => setLinking(true)}
+            disabled={busy}
+            trailing={
+              linked ? (
+                <button type="button" className="evrow__clear" onClick={() => setLinked(null)} aria-label={t('Remover o rolê vinculado')}>
+                  <XIcon />
+                </button>
+              ) : null
+            }
+          />
+          <EventRow icon={<EventKindIcon kind={eventKind} />} label={t('Tipo')} value={kindLabel} onClick={() => setSheet('kind')} disabled={busy} />
+          <EventRow icon={eventPrivate ? <LockIcon /> : <GlobeIcon />} label={t('Quem vê')} value={eventPrivate ? t('Só convidados') : t('Público')} onClick={() => setSheet('audience')} disabled={busy} />
+        </ul>
+
+        <div className={`evmore${moreOpen ? ' evmore--open' : ''}`}>
+          <button type="button" className="evmore__head" aria-expanded={moreOpen} aria-controls="evmore-panel" onClick={() => setMoreOpen((o) => !o)}>
+            <span className="evrow__icon" aria-hidden="true">
+              <PlusIcon />
+            </span>
+            <span className="evmore__text">
+              <span className="evmore__title">{t('Mais detalhes')}</span>
+              <span className="evmore__sub">{moreSub}</span>
+            </span>
+            <span className="evmore__chev" aria-hidden="true">
+              <ChevronDownIcon />
+            </span>
+          </button>
+          {moreOpen ? (
+            <div className="evmore__panel" id="evmore-panel">
+              <button type="button" className="evmore__row" onClick={() => setTagging(true)}>
+                <span className="evextras__icon" aria-hidden="true">
+                  <UsersIcon />
+                </span>
+                <span className="evmore__rowtext">
+                  <span className="evextras__label">{t('Marcar pessoas')}</span>
+                  {tagged.length > 0 ? <span className="evmore__sub">{tagged.map((f) => `@${f.username}`).join(', ')}</span> : null}
+                </span>
+                {tagged.length > 0 ? (
+                  <span className="optrow__avatars" aria-hidden="true">
+                    {tagged.slice(0, 3).map((f) => (
+                      <Avatar key={f.userId} profile={f} size={24} />
+                    ))}
+                  </span>
+                ) : null}
+                <span className="evrow__chev" aria-hidden="true">
+                  <ChevronRightIcon />
+                </span>
+              </button>
+              <EventExtrasFields embedded options={extraOptions.data ?? []} value={extras} onChange={setExtras} />
+            </div>
+          ) : null}
+        </div>
+
+        <div className="compose__footer">
+          <Button full loading={busy} disabled={missing.length > 0 || captionLength > POST_CAPTION_MAX} onClick={() => void publish()}>
+            {t('Criar evento')}
+          </Button>
+          {missingText ? <p className="evmissing">{missingText}</p> : null}
+        </div>
+
+        {sheet === 'when' ? (
+          <EventWhenSheet
+            starts={eventStart}
+            ends={eventEnd}
+            onDone={(s, e) => {
+              setEventStart(s);
+              setEventEnd(e);
+              setSheet(undefined);
+            }}
+            onClose={() => setSheet(undefined)}
+          />
+        ) : null}
+        {sheet === 'kind' ? (
+          <EventKindSheet
+            value={eventKind}
+            onPick={(k) => {
+              setEventKind(k);
+              setSheet(undefined);
+            }}
+            onClose={() => setSheet(undefined)}
+          />
+        ) : null}
+        {sheet === 'audience' ? (
+          <EventAudienceSheet
+            isPrivate={eventPrivate}
+            onPick={(v) => {
+              setEventPrivate(v);
+              setSheet(undefined);
+            }}
+            onClose={() => setSheet(undefined)}
+          />
+        ) : null}
+        {sheet === 'placePhoto' ? (
+          <Sheet title={t('Foto de um rolê')} onClose={() => setSheet(undefined)}>
+            <PlacePhotoGrid
+              picked={placePhoto?.placeName}
+              onPick={(p) => {
+                pickPlacePhoto(p);
+                setSheet(undefined);
+              }}
+            />
+          </Sheet>
+        ) : null}
+        {linking ? (
+          <LinkPlaceSheet
+            onPick={(p) => {
+              setLinked(p);
+              setLinking(false);
+            }}
+            onClose={() => setLinking(false)}
+          />
+        ) : null}
+        {tagging ? (
+          <Sheet title={t('Marcar pessoas')} onClose={() => setTagging(false)}>
+            <p className="muted">{t('Só amigos. Cada pessoa precisa aceitar a marcação para o post aparecer no perfil e no feed dela.')}</p>
+            <FriendPicker picked={tags} onToggle={(id) => setTags((c) => toggleId(c, id))} />
+            <Button full onClick={() => setTagging(false)}>
+              {t('Concluir')}
+            </Button>
+          </Sheet>
+        ) : null}
+        {discardSheet}
+      </div>
+    );
+  }
+
   if (step === 'details') {
     return (
       <div className="compose compose--details">
@@ -403,20 +653,7 @@ export function CreatePostScreen() {
           <span aria-hidden="true" />
         </header>
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-        {busy && prep ? (
-          <div className="uploadbar" role="status" aria-live="polite">
-            <progress className="uploadbar__bar" max={1} value={prep.progress} aria-label={t('Otimização do vídeo')} />
-            <p className="uploadbar__text">{prepareProgressText(prep.progress)}</p>
-            <p className="uploadbar__hint">{t('Estamos reduzindo o vídeo para o envio ser mais rápido. Mantenha esta tela aberta.')}</p>
-          </div>
-        ) : null}
-        {busy && upload ? (
-          <div className="uploadbar" role="status" aria-live="polite">
-            <progress className="uploadbar__bar" max={upload.total} value={upload.sent} aria-label={t('Envio do vídeo')} />
-            <p className="uploadbar__text">{uploadProgressText(upload.sent, upload.total)}</p>
-            <p className="uploadbar__hint">{t('Mantenha esta tela aberta até terminar.')}</p>
-          </div>
-        ) : null}
+        {progressBars}
         {kindToggle}
         {kind === 'EVENT' ? (
           <section className="compose__row" aria-label={t('Dados do evento')}>
@@ -536,18 +773,31 @@ export function CreatePostScreen() {
 
   return (
     <div className="compose">
-      <header className="compose__bar">
-        <button type="button" className="iconbtn" onClick={leave} aria-label={t('Cancelar')}>
-          <XIcon />
-        </button>
-        <h1 className="compose__title">{kind === 'EVENT' ? t('Novo evento') : t('Nova publicação')}</h1>
-        <button type="button" className="compose__next" disabled={items.length === 0 || reading || cropKey !== undefined} onClick={() => setStep('details')}>
-          {t('Avançar')}
-        </button>
-      </header>
+      {kind === 'EVENT' ? (
+        // Evento: esta é só a tela de editar a capa (várias fotos, recorte, foto de um rolê); volta para a tela do evento.
+        <header className="compose__bar">
+          <button type="button" className="iconbtn" onClick={() => setStep('details')} aria-label={t('Voltar para o evento')} disabled={reading || cropKey !== undefined}>
+            <ChevronLeftIcon />
+          </button>
+          <h1 className="compose__title">{t('Capa do evento')}</h1>
+          <button type="button" className="compose__next" disabled={reading || cropKey !== undefined} onClick={() => setStep('details')}>
+            {t('Concluir')}
+          </button>
+        </header>
+      ) : (
+        <header className="compose__bar">
+          <button type="button" className="iconbtn" onClick={leave} aria-label={t('Cancelar')}>
+            <XIcon />
+          </button>
+          <h1 className="compose__title">{t('Nova publicação')}</h1>
+          <button type="button" className="compose__next" disabled={items.length === 0 || reading || cropKey !== undefined} onClick={() => setStep('details')}>
+            {t('Avançar')}
+          </button>
+        </header>
+      )}
       {fileInput}
 
-      {kindToggle}
+      {kind === 'EVENT' ? null : kindToggle}
 
       <div className="segmented" role="tablist" aria-label={t('De onde vem a foto')}>
         <button type="button" role="tab" aria-selected={source === 'photos'} className={`segmented__tab${source === 'photos' ? ' segmented__tab--on' : ''}`} onClick={() => setSource('photos')}>
@@ -575,7 +825,7 @@ export function CreatePostScreen() {
               <PhotoIcon />
             </span>
             <p className="compose__emptytitle">{reading ? t('Preparando as fotos…') : kind === 'EVENT' ? t('Capa do evento') : t('Fotos e vídeos do rolê')}</p>
-            <p className="compose__emptyhint">{kind === 'EVENT' ? t('Escolha a capa e avance para dar nome, data e horário ao evento.') : t('Até {max} itens, com no máximo 1 vídeo.', { max: POST_IMAGES_MAX })}</p>
+            <p className="compose__emptyhint">{kind === 'EVENT' ? t('A primeira foto é a capa. Até {max} itens, com no máximo 1 vídeo.', { max: POST_IMAGES_MAX }) : t('Até {max} itens, com no máximo 1 vídeo.', { max: POST_IMAGES_MAX })}</p>
             <Button small loading={reading} onClick={() => fileRef.current?.click()}>
               {t('Escolher da galeria')}
             </Button>

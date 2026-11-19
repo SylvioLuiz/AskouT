@@ -25,6 +25,9 @@ describe('rascunho do post', () => {
     assert.deepEqual(effectivePlace([place(1)], { name: 'Outro', address: null }), { name: 'Lugar 1', address: 'Rua A' });
     assert.deepEqual(effectivePlace([up(1)], { name: 'Outro', address: null }), { name: 'Outro', address: null });
     assert.equal(effectivePlace([up(1)], null), null);
+    // Capa com a foto do próprio lugar vinculado: o vínculo com o local do AskouT continua.
+    const linked = { name: 'Lugar 1', address: 'Rua A, 10', venueId: 'v1' };
+    assert.deepEqual(effectivePlace([place(1)], linked), linked);
   });
   it('monta o corpo, sem campos vazios', () => {
     assert.deepEqual(buildPostBody([up(1)], '  ', null, []), { images: ['data:image/jpeg;base64,1'] });
