@@ -21,7 +21,7 @@ import { peopleLabel } from '../lib/meetup.ts';
 import { SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
-import { allDeletable, announceChatsChanged, breakLabel, copyText, filterConversations, formatClock, groupAlbums, isDoubleTap, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
+import { allDeletable, announceChatsChanged, breakLabel, copyText, filterConversations, formatClock, groupAlbums, isDoubleTap, LONG_PRESS_MS, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
 import type { RunPosition } from '../lib/chat.ts';
 import { mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -421,7 +421,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       },
       onTouchStart: () => {
         window.clearTimeout(pressTimer.current);
-        pressTimer.current = window.setTimeout(() => setActionsFor(m), 450);
+        pressTimer.current = window.setTimeout(() => setActionsFor(m), LONG_PRESS_MS);
       },
       onTouchEnd: () => window.clearTimeout(pressTimer.current),
       onTouchMove: () => window.clearTimeout(pressTimer.current),
