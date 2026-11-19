@@ -2742,5 +2742,11 @@ export const EN: Readonly<Record<string, string>> = {
   "Gostos salvos.": "Interests saved.",
   "Escolha os rolês que você curte. O Explorar já abre filtrado por eles. Sem nenhum marcado, mostramos tudo.": "Choose the outings you enjoy. Explore opens filtered by them. With none selected, we show everything.",
   "Carregando story": "Loading story",
+  "Mais informações do evento": "More event info",
+  "1 preenchida": "1 filled in",
+  "{count} preenchidas": "{count} filled in",
+  "Escreva aqui (opcional)": "Write here (optional)",
+  "Sim": "Yes",
+  "Não": "No",
   "Sair do grupo? Ele some da sua lista e você para de receber as mensagens. Para voltar, alguém do grupo precisa te adicionar.": "Leave the group? It disappears from your list and you stop getting its messages. To come back, someone in the group has to add you.",
 };

@@ -126,6 +126,12 @@ export class PostsController {
     return new StreamableFile(video.data.subarray(start, end + 1), { type: video.mime, length: end - start + 1 });
   }
 
+  /** Configurações de evento que quem cria um evento pode responder (cadastradas pela gestão). */
+  @Get('event-extras')
+  async eventExtras() {
+    return { items: await this.core.eventExtras.list() };
+  }
+
   @Get('posts/:id')
   async get(@CurrentActor() actor: Actor, @Param('id') id: string) {
     return this.present(await this.core.posts.get(actor.userId, id));

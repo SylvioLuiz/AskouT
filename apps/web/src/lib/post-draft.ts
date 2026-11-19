@@ -1,5 +1,5 @@
 import type { CropRect } from './crop.ts';
-import type { EventKind } from './types.ts';
+import type { EventExtraAnswer, EventKind } from './types.ts';
 import { t } from '../lib/i18n/index.ts';
 
 export const POST_IMAGES_MAX = 5;
@@ -70,6 +70,8 @@ export interface EventDraft {
   endsAt: string;
   /** Evento privado: só vai para as conversas escolhidas e ninguém posta no perfil. */
   private?: boolean;
+  /** Respostas às configurações de evento da gestão. */
+  extras?: EventExtraAnswer[];
 }
 
 /** Converte o valor do campo de data/hora (hora local do aparelho) para ISO; vazio ou inválido vira null. */
@@ -113,6 +115,6 @@ export function buildPostBody(images: readonly DraftImage[], caption: string, li
     ...(place ? { placeName: place.name, ...(place.address ? { placeAddress: place.address } : {}), ...(place.venueId ? { placeVenueId: place.venueId } : {}) } : {}),
     ...(tagUserIds.length > 0 ? { tagUserIds: [...tagUserIds] } : {}),
     ...(event && datePollId ? { datePollId } : {}),
-    ...(event ? { event: { title: event.title.trim(), kind: event.kind ?? 'OTHER', startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}), ...(event.private ? { private: true } : {}) } } : {}),
+    ...(event ? { event: { title: event.title.trim(), kind: event.kind ?? 'OTHER', startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}), ...(event.private ? { private: true } : {}), ...(event.extras && event.extras.length > 0 ? { extras: event.extras } : {}) } } : {}),
   };
 }

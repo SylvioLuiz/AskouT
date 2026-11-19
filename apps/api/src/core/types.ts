@@ -1,3 +1,4 @@
+import type { EventExtraAnswer } from './event-extras.ts';
 export type UserStatus = 'ACTIVE' | 'SUSPENDED' | 'DELETION_REQUESTED';
 export type UserRole = 'USER' | 'VENUE_OWNER' | 'ADMIN';
 export type FollowStatus = 'PENDING' | 'ACCEPTED';
@@ -525,6 +526,8 @@ export interface PostRecord {
   eventKind: EventKind;
   /** Evento privado: só o dono vê nas listas; os demais chegam por cartão numa conversa. */
   eventPrivate?: boolean;
+  /** Respostas às configurações de evento da gestão ("Pode fumar?": sim). Só vale quando o post é um evento. */
+  eventExtras?: EventExtraAnswer[];
   /** Arquivado: some do feed e do perfil, só a própria pessoa vê. */
   archivedAt: Date | null;
   editedAt: Date | null;
@@ -729,6 +732,8 @@ export interface PostPatch {
   eventStartsAt: Date | null;
   eventEndsAt: Date | null;
   eventKind: EventKind;
+  /** Sem o campo, as respostas não mudam. */
+  eventExtras?: EventExtraAnswer[];
   editedAt: Date;
 }
 
@@ -1003,7 +1008,10 @@ export type AuditAction =
   | 'REPORT_DISMISSED'
   | 'REPORT_ACTIONED'
   | 'PAYMENTS_ENABLED'
-  | 'PAYMENTS_DISABLED';
+  | 'PAYMENTS_DISABLED'
+  | 'EVENT_EXTRA_CREATED'
+  | 'EVENT_EXTRA_UPDATED'
+  | 'EVENT_EXTRA_REMOVED';
 
 export interface AuditRecord {
   id: string;

@@ -7,6 +7,7 @@ import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { StoryCreateSheet, StoryViewer } from '../components/event-story.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { EditPostSheet } from '../components/post-actions.tsx';
+import { EventExtrasList } from '../components/event-extras.tsx';
 import { CalendarIcon, CalendarPlusIcon, ChevronLeftIcon, EditIcon, EventKindIcon, LocationIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UserIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
@@ -352,6 +353,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                       </li>
                     ) : null}
                   </ul>
+                  {e.extras && e.extras.length > 0 ? <EventExtrasList extras={e.extras} compact /> : null}
                   <button type="button" className="linkbtn" onClick={() => setTab('info')}>
                     {t('Ver todas as informações')}
                   </button>
@@ -399,6 +401,12 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <div className="evinfo__block">
                   <h2 className="evinfo__title">{t('Onde')}</h2>
                   <p>{venueLine(e.venue)}</p>
+                </div>
+              ) : null}
+              {e.extras && e.extras.length > 0 ? (
+                <div className="evinfo__block">
+                  <h2 className="evinfo__title">{t('Detalhes')}</h2>
+                  <EventExtrasList extras={e.extras} />
                 </div>
               ) : null}
               {e.source === 'PLACE' && !ended && e.isOwner ? (

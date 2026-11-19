@@ -277,3 +277,17 @@ export interface RetentionReport {
   d7: ReturnGroup;
   minSample: number;
 }
+
+/** Configuração de evento ("Pode fumar?" sim/não, "Estacionamento" texto) que quem cria evento pode responder. */
+export interface EventExtra {
+  id: string;
+  icon: string;
+  label: string;
+  type: 'YES_NO' | 'TEXT';
+}
+
+export interface EventExtraInput {
+  icon: string;
+  label: string;
+  type: EventExtra['type'];
+}

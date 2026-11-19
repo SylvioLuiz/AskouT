@@ -11,6 +11,7 @@ import { EventsPage } from './pages/events.tsx';
 import { PostsPage } from './pages/posts.tsx';
 import { FeedPage } from './pages/feed.tsx';
 import { PaymentsPage } from './pages/payments.tsx';
+import { EventExtrasPage } from './pages/event-extras.tsx';
 import { RetentionPage } from './pages/retention.tsx';
 import { ReportsPage } from './pages/reports.tsx';
 import { UsersPage } from './pages/users.tsx';
@@ -262,6 +263,8 @@ function Page({ route }: { route: RoutePath }) {
       return <VenuesPage />;
     case '/eventos':
       return <EventsPage />;
+    case '/config-eventos':
+      return <EventExtrasPage />;
     case '/posts':
       return <PostsPage />;
     case '/feed':

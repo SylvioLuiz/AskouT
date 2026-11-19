@@ -5,12 +5,15 @@ import { CropEditor } from './crop.tsx';
 import { EventDates } from './event-dates.tsx';
 import { CommentGifView, CommentTools } from './comment-tools.tsx';
 import { EventKindPicker } from './event-kind-picker.tsx';
+import { EventExtrasFields } from './event-extras.tsx';
+import { extrasDraftFrom, extrasFromDraft } from '../lib/event-extras.ts';
+import type { EventExtrasDraft } from '../lib/event-extras.ts';
 import { ArrowUpIcon, CropIcon, HeartIcon, TrashIcon } from './icons.tsx';
 import { VenueLogo } from './venue-logo.tsx';
 import { Avatar, Button, Confirm, Field, Loading, Notice } from './ui.tsx';
 import { ShareSheet } from './share-sheet.tsx';
 import { api } from '../client.ts';
-import { useDebounced } from '../hooks.ts';
+import { useAsync, useDebounced } from '../hooks.ts';
 import { cropPostPhoto } from '../lib/image.ts';
 import type { CropRect } from '../lib/crop.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -381,6 +384,8 @@ export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { p
   const [eventKind, setEventKind] = useState<EventKind>(post.event?.kind ?? 'OTHER');
   const [starts, setStarts] = useState(post.event ? isoToLocalInput(post.event.startsAt) : '');
   const [ends, setEnds] = useState(post.event ? isoToLocalInput(post.event.endsAt) : '');
+  const [extras, setExtras] = useState<EventExtrasDraft>(() => extrasDraftFrom(post.event?.extras));
+  const extraOptions = useAsync(() => (kind === 'EVENT' ? api.eventExtras().then((r) => r.items) : Promise.resolve(null)), [kind === 'EVENT']);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
 
@@ -402,7 +407,17 @@ export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { p
         caption: caption.trim() || null,
         placeName: place?.name ?? null,
         placeAddress: place?.address ?? null,
-        event: kind === 'EVENT' ? { title: title.trim(), kind: eventKind, startsAt: localToIso(starts), endsAt: ends ? localToIso(ends) : null } : null,
+        event:
+          kind === 'EVENT'
+            ? {
+                title: title.trim(),
+                kind: eventKind,
+                startsAt: localToIso(starts),
+                endsAt: ends ? localToIso(ends) : null,
+                // Sem a lista carregada, não manda `extras` e as respostas ficam como estavam.
+                ...(extraOptions.data ? { extras: extrasFromDraft(extras, extraOptions.data) } : {}),
+              }
+            : null,
       });
       onSaved(updated);
     } catch (failure) {
@@ -429,6 +444,7 @@ export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { p
           <Field label={t('Nome do evento')} value={title} onChange={setTitle} maxLength={120} />
           <EventKindPicker value={eventKind} onChange={setEventKind} />
           <EventDates starts={starts} ends={ends} onStarts={setStarts} onEnds={setEnds} />
+          <EventExtrasFields options={extraOptions.data ?? []} value={extras} onChange={setExtras} />
         </>
       ) : null}
       <Field label={t('Descrição')} value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />

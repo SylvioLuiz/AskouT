@@ -2,6 +2,8 @@ import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
 import { distanceMeters } from './geo.ts';
 import { DomainError, conflict, forbidden, notFound, validationError } from './errors.ts';
 import { buildEventCards } from './event-card.ts';
+import { loadEventExtras, resolveEventExtras } from './event-extras.ts';
+import type { EventExtraView } from './event-extras.ts';
 import type { EventCardView } from './event-card.ts';
 import { parsePage } from './profile-event-service.ts';
 import type { CoreDeps } from './ports.ts';
@@ -109,6 +111,8 @@ export interface EventPageView {
   postedByMe: boolean;
   /** Evento privado: só chega por cartão numa conversa e não pode ser repostado. */
   isPrivate: boolean;
+  /** Configurações de evento respondidas por quem criou (ícone, nome e resposta), na ordem da gestão. */
+  extras: EventExtraView[];
   /** Confirmados, contando o dono (que está confirmado por ser dono). */
   confirmedCount: number;
   /** O visitante confirmou (o dono sempre está). */
@@ -261,6 +265,7 @@ export class EventPageService {
           distanceM: distance,
           postedByMe: await this.deps.profileEvents.has(viewerId, event.id),
           isPrivate: false,
+          extras: [],
         },
       };
     }
@@ -294,6 +299,7 @@ export class EventPageService {
         distanceM: null,
         postedByMe: await this.deps.profileEvents.hasPost(viewerId, post.id),
         isPrivate: post.eventPrivate === true,
+        extras: post.eventExtras && post.eventExtras.length > 0 ? resolveEventExtras(post.eventExtras, await loadEventExtras(this.deps)) : [],
       },
     };
   }
