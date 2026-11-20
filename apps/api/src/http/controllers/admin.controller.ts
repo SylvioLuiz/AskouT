@@ -196,6 +196,12 @@ export class AdminController {
     return this.core.admin.searchVenues(actor, q);
   }
 
+  /** Detalhe do local: cadastro, origem, responsável, seguidores e eventos. */
+  @Get('venues/:id')
+  venue(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.admin.venueDetail(actor, id);
+  }
+
   @Delete('venues/:id/owner')
   removeOwner(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
     return this.core.admin.removeVenueOwner(actor, id, asBody(body).note);

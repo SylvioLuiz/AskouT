@@ -342,3 +342,35 @@ test('as listas da gestão trazem o total de registros, que acompanha a busca e 
   assert.equal((await w.core.admin.feedPosts(A, {})).total, 0);
   assert.equal((await w.core.admin.feedReports(A, { status: 'resolved' })).total, 0);
 });
+
+test('detalhe do local na gestão: cadastro, origem, responsável, seguidores e eventos; só admin', async () => {
+  const { w, A, U, ana, bia } = await setup();
+  await rejectsWith(w.core.admin.venueDetail(U(ana), 'v1'), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.venueDetail(A, 'nao-existe'), 'NOT_FOUND');
+  await rejectsWith(w.core.admin.venueDetail(A, 42), 'NOT_FOUND');
+
+  await w.places.createVenue({ id: 'v2', name: 'Kill Beer Lab', address: 'Rua X, 10', category: 'bar', lat: -23.52, lng: -46.18, isSample: false, ownerId: ana, externalKey: 'google:abc', description: 'Gastrobar de Mogi' });
+  const at = w.clock.now().getTime();
+  const mk = (id: string, startsAt: number, endsAt: number) => w.places.createEvent({ id, venueId: 'v2', title: id, description: null, startsAt: new Date(startsAt), endsAt: new Date(endsAt), kind: 'NIGHT', isFree: false, imageUrl: null, tags: [], isSample: id === 'teste' });
+  await mk('passado', at - 48 * H, at - 44 * H);
+  await mk('teste', at + 2 * H, at + 6 * H);
+  await mk('depois', at + 30 * H, at + 34 * H);
+  await w.core.venues.follow(bia, 'v2');
+
+  const d = await w.core.admin.venueDetail(A, 'v2');
+  assert.equal(d.name, 'Kill Beer Lab');
+  assert.equal(d.source, 'GOOGLE');
+  assert.equal(d.owner?.id, ana);
+  assert.equal(d.owner?.username, 'ana');
+  assert.equal(d.followers, 1);
+  assert.equal(d.eventsTotal, 3);
+  assert.equal(d.upcomingCount, 2);
+  assert.deepEqual(d.events.map((e) => [e.id, e.upcoming]), [['teste', true], ['depois', true], ['passado', false]], 'próximos por data e depois o que já passou');
+  assert.equal(d.events[0]!.isSample, true);
+  assert.equal(d.description, 'Gastrobar de Mogi');
+
+  const bare = await w.core.admin.venueDetail(A, 'v1');
+  assert.equal(bare.owner, null);
+  assert.equal(bare.source, null);
+  assert.deepEqual(bare.events, []);
+});
