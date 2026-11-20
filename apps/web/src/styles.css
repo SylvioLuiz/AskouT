@@ -3093,6 +3093,7 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
 }
 
 .evcard__venue,
+.evcard__author { margin: 0; color: var(--muted); font-size: 0.8125rem; }
 .evcard__when,
 .evcard__hot { margin: 2px 0 0; color: var(--brand-text); font-weight: 700; font-size: 0.8125rem; }
 .evcard__dist {
@@ -4513,6 +4514,8 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .pollline__more { font-size: 0.75rem; color: var(--muted); }
 
 .suggest .section__head { flex-wrap: nowrap; align-items: baseline; gap: 8px; }
+.suggest__hide { flex: none; margin-left: auto; color: var(--muted); font-size: 0.75rem; white-space: nowrap; }
+.suggest__contacts + .suggest__hide { margin-left: 4px; }
 .suggest .section__title { white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .suggest__contacts { margin-left: auto; flex: 0 0 auto; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
 /* Card "Conecte seus contatos" (é um link, então não herda a cor de link). */
@@ -6833,6 +6836,10 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .nowfree__title { margin: 0; font-family: var(--now-display); font-size: 1.0625rem; font-weight: 700; }
 .nowfree__refresh { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 4px; border: 0; background: transparent; color: var(--brand-text); font: inherit; font-size: 0.9375rem; font-weight: 600; cursor: pointer; }
 .nowfree__refresh svg { width: 16px; height: 16px; }
+.nowfree__refresh:disabled { cursor: default; opacity: 0.75; }
+.nowfree__refresh--busy svg { animation: nowspin 0.8s linear infinite; }
+@keyframes nowspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .nowfree__refresh--busy svg { animation: none; } }
 .nowfriends { display: flex; gap: 14px; margin: 0 -16px; padding: 4px 16px 2px; list-style: none; overflow-x: auto; scrollbar-width: none; }
 .nowfriends::-webkit-scrollbar { display: none; }
 .nowfriend { display: grid; justify-items: center; gap: 4px; width: 78px; padding: 0; border: 0; background: none; color: var(--ink); font: inherit; cursor: pointer; }

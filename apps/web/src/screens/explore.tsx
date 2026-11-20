@@ -121,9 +121,12 @@ function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
         <EventCover event={event} shape={coverShape(event.id)} badge />
         <div className="evcard__body">
           <h3 className="evcard__title">{event.title}</h3>
-          <p className="evcard__venue">
-            <VenueLink venueId={event.venue.id} name={event.venue.name} nested />
-          </p>
+          {event.venue.name ? (
+            <p className="evcard__venue">
+              <VenueLink venueId={event.venue.id} name={event.venue.name} nested />
+            </p>
+          ) : null}
+          {event.author ? <p className="evcard__author">{t('Criado por @{username}', { username: event.author.username })}</p> : null}
           <p className="evcard__when">{formatWhen(event.startsAt, event.endsAt, now)}</p>
           {event.goingCount !== undefined ? <p className="evcard__hot">{event.goingCount} confirmados agora</p> : null}
           {event.distanceM !== null ? <p className="evcard__dist">a {formatDistance(event.distanceM)}</p> : null}

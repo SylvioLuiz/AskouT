@@ -158,3 +158,30 @@ test('bombando: só eventos acontecendo agora com muita gente confirmada, do mai
   const plain = await w.core.explore.search(ana, {});
   assert.equal(plain.events.some((e) => e.goingCount !== undefined), false, 'sem o filtro, não mostra contagem');
 });
+
+test('eventos públicos criados por pessoas entram na lista, misturados pela hora; privados, de perfil fechado e sem local perto ficam de fora', async () => {
+  const w = makeWorld();
+  const { ana, bia, caio } = await w.signUpMany('ana', 'bia', 'caio');
+  await seed(w);
+  const JPEG = `data:image/jpeg;base64,${Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(10, 1)]).toString('base64')}`;
+  const at = (h: number) => new Date(w.clock.now().getTime() + h * H).toISOString();
+  const pub = await w.core.posts.create(bia!, { images: [JPEG], placeVenueId: 'v-near', event: { title: 'Aniversário no bar', startsAt: at(5), kind: 'NIGHT' } });
+  await w.core.posts.create(bia!, { images: [JPEG], placeVenueId: 'v-near', event: { title: 'Surpresa', startsAt: at(6), private: true } });
+  await w.core.posts.create(bia!, { images: [JPEG], placeName: 'Casa da Bia', event: { title: 'Sem local', startsAt: at(7) } });
+  await w.core.posts.create(caio!, { images: [JPEG], placeVenueId: 'v-near', event: { title: 'Do Caio', startsAt: at(8) } });
+  await w.core.profiles.setPrivacy(caio!, true);
+
+  const v = await w.core.explore.search(ana!, { lat: HERE.lat, lng: HERE.lng });
+  const pubId = (pub as { id: string }).id;
+  assert.deepEqual(v.events.map((e) => e.id), ['e1', pubId, 'e2']);
+  const item = v.events[1]!;
+  assert.equal(item.author?.username, 'bia');
+  assert.equal(item.venue.id, 'v-near');
+  assert.ok((item.distanceM ?? 0) > 400);
+  // Sem posição, o evento sem local também entra.
+  assert.ok((await w.core.explore.search(ana!, {})).events.some((e) => e.title === 'Sem local'));
+  // Filtros: tipo vale; "grátis" tira os das pessoas; busca por texto acha pelo título.
+  assert.deepEqual((await w.core.explore.search(ana!, { lat: HERE.lat, lng: HERE.lng, kind: 'NIGHT' })).events.map((e) => e.id), [pubId]);
+  assert.ok(!(await w.core.explore.search(ana!, { lat: HERE.lat, lng: HERE.lng, free: true })).events.some((e) => e.author));
+  assert.ok((await w.core.explore.search(ana!, { q: 'aniversario', lat: HERE.lat, lng: HERE.lng })).events.some((e) => e.id === pubId));
+});

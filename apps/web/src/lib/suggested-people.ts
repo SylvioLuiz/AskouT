@@ -4,18 +4,17 @@ export interface SuggestedPerson extends PublicProfile {
   mutualCount: number;
 }
 
-export const SUGGESTION_EVERY_MS = 3 * 24 * 3_600_000;
-export const SUGGESTION_MIN_FOLLOWING = 5;
-const KEY = 'askout.suggestedPeople.shownAt';
+/** Quanto tempo o bloco fica escondido depois que a pessoa toca em "Ocultar". */
+export const SUGGESTION_HIDE_MS = 3 * 24 * 3_600_000;
+const KEY = 'askout.suggestedPeople.hiddenAt';
 
-/** Quem segue menos de 5 pessoas vê o bloco sempre; depois, só de 3 em 3 dias. */
-export function shouldShowSuggestions(followingCount: number, lastShownAt: number | null, now: number): boolean {
-  if (followingCount < SUGGESTION_MIN_FOLLOWING) return true;
-  if (lastShownAt === null || !Number.isFinite(lastShownAt)) return true;
-  return now - lastShownAt >= SUGGESTION_EVERY_MS;
+/** O bloco aparece sempre que há sugestões; só some por 3 dias quando a pessoa o oculta. */
+export function shouldShowSuggestions(hiddenAt: number | null, now: number): boolean {
+  if (hiddenAt === null || !Number.isFinite(hiddenAt)) return true;
+  return now - hiddenAt >= SUGGESTION_HIDE_MS;
 }
 
-export function readLastShown(): number | null {
+export function readHiddenAt(): number | null {
   try {
     const raw = localStorage.getItem(KEY);
     return raw === null ? null : Number(raw);
@@ -24,10 +23,10 @@ export function readLastShown(): number | null {
   }
 }
 
-export function markShown(now: number): void {
+export function markHidden(now: number): void {
   try {
     localStorage.setItem(KEY, String(now));
   } catch {
-    // sem armazenamento: o bloco só aparece com a regra de quem segue pouca gente
+    // sem armazenamento: o bloco some só nesta visita
   }
 }

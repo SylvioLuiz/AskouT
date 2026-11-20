@@ -1,24 +1,22 @@
 import { useState } from 'react';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
-import { markShown, readLastShown, shouldShowSuggestions } from '../lib/suggested-people.ts';
+import { markHidden, readHiddenAt, shouldShowSuggestions } from '../lib/suggested-people.ts';
 import { Link } from '../router.tsx';
 import { Avatar } from './ui.tsx';
 import { ConnectContactsCard, useContactsConnected } from './connect-contacts.tsx';
 import { t } from '../lib/i18n/index.ts';
 
-/** "Pessoas que você talvez conheça": amigos de amigos, em carrossel. Aparece de 3 em 3 dias (sempre, se você segue menos de 5 pessoas). */
+/** "Pessoas que você talvez conheça": amigos de amigos, em carrossel. Aparece sempre que há sugestões; "Ocultar" esconde por 3 dias. */
 export function SuggestedPeople() {
   const data = useAsync(() => api.suggestedPeople(), []);
-  // A decisão vale para a visita inteira: o carimbo é gravado uma vez e o bloco não some no meio da leitura.
-  const [decision] = useState(() => ({ lastShownAt: readLastShown(), now: Date.now() }));
-  const [stamped, setStamped] = useState(false);
+  const [hidden, setHidden] = useState(() => !shouldShowSuggestions(readHiddenAt(), Date.now()));
   const connected = useContactsConnected();
   const items = data.data?.items ?? [];
-  const show = data.data !== undefined && items.length > 0 && shouldShowSuggestions(data.data.followingCount, decision.lastShownAt, decision.now);
-  if (show && !stamped) {
-    markShown(decision.now);
-    setStamped(true);
+  const show = !hidden && items.length > 0;
+  function hide() {
+    markHidden(Date.now());
+    setHidden(true);
   }
   if (!show) return null;
   return (
@@ -28,6 +26,9 @@ export function SuggestedPeople() {
           {t('Pessoas que você talvez conheça')}
         </h2>
         {connected ? <Link to="/amigos/contatos" className="suggest__contacts">{t('Achar nos contatos')}</Link> : null}
+        <button type="button" className="linkbtn suggest__hide" onClick={hide}>
+          {t('Ocultar')}
+        </button>
       </div>
       <ConnectContactsCard />
       <ul className="suggest__track">

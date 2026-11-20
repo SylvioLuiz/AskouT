@@ -185,10 +185,24 @@ function FlashContent() {
     return () => window.removeEventListener(FLASH_CHANGED_EVENT, onChange);
   });
 
+  // Toque em "Atualizar": o ícone gira enquanto as listas voltam (no mínimo um instante, para dar para ver que atualizou).
+  const [refreshing, setRefreshing] = useState(false);
+  const loadingAny = status.loading || invites.loading || available.loading || matchViews.loading;
+  useEffect(() => {
+    if (!refreshing || loadingAny) return;
+    const timer = setTimeout(() => setRefreshing(false), 600);
+    return () => clearTimeout(timer);
+  }, [refreshing, loadingAny]);
   function reloadAll() {
     status.reload();
     invites.reload();
     available.reload();
+    matchViews.reload();
+  }
+  function refreshNow() {
+    if (refreshing) return;
+    setRefreshing(true);
+    reloadAll();
   }
 
   const [explaining, setExplaining] = useState(false);
@@ -505,9 +519,9 @@ function FlashContent() {
           <h2 id="livres-titulo" className="nowfree__title">
             {empty || available.data === undefined ? t('Amigos livres agora') : t('Amigos livres agora ({length})', { length: friends.length })}
           </h2>
-          <button type="button" className="nowfree__refresh" onClick={reloadAll}>
+          <button type="button" className={`nowfree__refresh${refreshing ? ' nowfree__refresh--busy' : ''}`} onClick={refreshNow} disabled={refreshing} aria-busy={refreshing || undefined}>
             <RefreshIcon />
-            {t('Atualizar')}
+            {refreshing ? t('Atualizando…') : t('Atualizar')}
           </button>
         </div>
         {available.loading && !available.data ? <Loading /> : null}

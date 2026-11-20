@@ -9,6 +9,8 @@
 //   3. Cria eventos PASSADOS de exemplo nesses locais, espalhados pelos últimos 2 anos (isSample: selo "Exemplo de teste"),
 //      com "quem vai" entre as pessoas de exemplo da migration 20270120120000_sample_event_history.
 //   4. Grava a marca `seed.historyPlaces` em AppSetting: com ela, os próximos deploys não fazem nada.
+//   5. Depois, cria alguns eventos FUTUROS de exemplo (próximos 30 dias) nesses lugares, para o Explorar ter o que mostrar
+//      (marca própria `seed.upcomingPlaces`).
 //
 // Sem chave do Google ou sem resposta dele, não grava a marca e tenta de novo no próximo deploy. Nunca derruba a API:
 // o Dockerfile roda isto em segundo plano.
@@ -17,7 +19,7 @@
 //   npx tsx apps/api/scripts/seed-history-places.ts --force    (roda de novo mesmo com a marca; não duplica)
 //
 // Para apagar os eventos de exemplo (daqui e da migration; as presenças caem junto):
-//   DELETE FROM "PlaceEvent" WHERE "isSample" AND description = 'Evento de exemplo do histórico do AskouT.';
+//   DELETE FROM "PlaceEvent" WHERE "isSample" AND description IN ('Evento de exemplo do histórico do AskouT.', 'Evento de exemplo do AskouT.');
 // Os locais criados ficam, como qualquer lugar aberto do Google pelo app.
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -30,6 +32,8 @@ import type { ExternalPlace } from '../src/core/types.ts';
 const here = dirname(fileURLToPath(import.meta.url));
 const MARK = 'seed.historyPlaces';
 const DESCRIPTION = 'Evento de exemplo do histórico do AskouT.';
+const UPCOMING_MARK = 'seed.upcomingPlaces';
+const UPCOMING_DESCRIPTION = 'Evento de exemplo do AskouT.';
 const DEMO_EMAIL = /^hist-[a-z]+@teste\.askout\.invalid$/;
 const DAY = 86_400_000;
 
@@ -108,9 +112,23 @@ async function main(): Promise<void> {
   if (!url) return console.log('[historico] sem DATABASE_URL: nada a fazer.');
   const prisma = new PrismaClient({ datasources: { db: { url } } });
   try {
+    await runHistory(prisma, force, apiKey);
+    await runUpcoming(prisma, force);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+async function demoPeople(prisma: PrismaClient): Promise<{ id: string; email: string; createdAt: Date }[]> {
+  const rows = await prisma.user.findMany({ where: { email: { endsWith: '@teste.askout.invalid', startsWith: 'hist-' } }, select: { id: true, email: true, createdAt: true }, orderBy: { email: 'asc' } });
+  return rows.filter((u) => DEMO_EMAIL.test(u.email));
+}
+
+async function runHistory(prisma: PrismaClient, force: boolean, apiKey: string | undefined): Promise<void> {
+  {
     if (!force && (await prisma.appSetting.findUnique({ where: { key: MARK } }))) return console.log('[historico] já rodou neste banco: nada a fazer.');
     if (!apiKey) return console.log('[historico] sem GOOGLE_PLACES_API_KEY: tento de novo no próximo deploy.');
-    const people = (await prisma.user.findMany({ where: { email: { endsWith: '@teste.askout.invalid', startsWith: 'hist-' } }, select: { id: true, email: true, createdAt: true }, orderBy: { email: 'asc' } })).filter((u) => DEMO_EMAIL.test(u.email));
+    const people = await demoPeople(prisma);
     if (people.length === 0) return console.log('[historico] pessoas de exemplo não encontradas (migration 20270120120000): nada a fazer.');
 
     const google = new GooglePlaceSource({ apiKey, dailyLimit: 60 });
@@ -209,9 +227,63 @@ async function main(): Promise<void> {
     });
     const byArea = AREAS.map((a) => `${a.name}: ${venues.filter((v) => v.area === a.name).length}`).join(', ');
     console.log(`[historico] locais (${byArea}); ${createdEvents} evento(s) e ${createdGoing} presença(s) criados.`);
-  } finally {
-    await prisma.$disconnect();
   }
+}
+
+/**
+ * Próximos eventos de EXEMPLO (selo "Exemplo de teste") nos lugares que receberam o histórico, para o Explorar não ficar vazio:
+ * de 1 a 3 por lugar, nos próximos 30 dias, com algumas pessoas de exemplo confirmadas. Só depois do histórico (para os lugares
+ * do Google já existirem) e uma vez por banco (marca `seed.upcomingPlaces`).
+ */
+async function runUpcoming(prisma: PrismaClient, force: boolean): Promise<void> {
+  if (!force && (await prisma.appSetting.findUnique({ where: { key: UPCOMING_MARK } }))) return console.log('[proximos] já rodou neste banco: nada a fazer.');
+  if (!(await prisma.appSetting.findUnique({ where: { key: MARK } }))) return console.log('[proximos] espera o histórico rodar primeiro.');
+  const people = await demoPeople(prisma);
+  const venues = await prisma.venue.findMany({
+    where: { ownerId: null, isOrganization: false, isUserCreated: false, events: { some: { isSample: true, description: DESCRIPTION } } },
+    select: { id: true, category: true },
+    orderBy: { id: 'asc' },
+  });
+  const now = Date.now();
+  const today = todaySaoPaulo(now);
+  const events: { id: string; venueId: string; title: string; description: string; startsAt: Date; endsAt: Date; kind: EventKind; isFree: boolean; tags: string[]; isSample: true; createdAt: Date; updatedAt: Date }[] = [];
+  for (const v of venues) {
+    const count = 1 + (hashOf(`askout-proximos:n:${v.id}`) % 3);
+    for (let n = 0; n < count; n++) {
+      const h = hashOf(`askout-proximos:${v.id}:${n}`);
+      const daysAhead = 1 + ((h + n * 9) % 29);
+      const kind = kindFor(v.category ?? '', h);
+      const startsAt = new Date(today + daysAhead * DAY + pick(START_HOUR[kind], h >>> 4) * 3_600_000);
+      events.push({
+        id: uuidOf(`askout-proximos:${v.id}:${n}`),
+        venueId: v.id,
+        title: pick(TITLES[kind], h >>> 3),
+        description: UPCOMING_DESCRIPTION,
+        startsAt,
+        endsAt: new Date(startsAt.getTime() + HOURS[kind] * 3_600_000),
+        kind,
+        isFree: (h >>> 12) % 3 === 0,
+        tags: TAGS[kind],
+        isSample: true,
+        createdAt: new Date(now),
+        updatedAt: new Date(now),
+      });
+    }
+  }
+  const createdEvents = (await prisma.placeEvent.createMany({ data: events, skipDuplicates: true })).count;
+  const attendance: { id: string; userId: string; placeEventId: string; createdAt: Date; onProfile: boolean }[] = [];
+  for (const e of events) {
+    const k = 2 + (hashOf(`askout-proximos:k:${e.id}`) % 7);
+    const ranked = people.map((p) => ({ p, h: hashOf(`askout-proximos:a:${e.id}${p.id}`) })).sort((a, b) => a.h - b.h).slice(0, k);
+    for (const { p, h } of ranked) attendance.push({ id: uuidOf(`askout-proximos:att:${e.id}${p.id}`), userId: p.id, placeEventId: e.id, createdAt: new Date(now), onProfile: h % 3 !== 0 });
+  }
+  const createdGoing = (await prisma.eventAttendance.createMany({ data: attendance, skipDuplicates: true })).count;
+  await prisma.appSetting.upsert({
+    where: { key: UPCOMING_MARK },
+    create: { key: UPCOMING_MARK, value: new Date(now).toISOString(), updatedAt: new Date(now) },
+    update: { value: new Date(now).toISOString(), updatedAt: new Date(now) },
+  });
+  console.log(`[proximos] ${venues.length} lugar(es); ${createdEvents} evento(s) e ${createdGoing} presença(s) criados.`);
 }
 
 main().catch((error: unknown) => {

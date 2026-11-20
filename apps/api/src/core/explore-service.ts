@@ -22,6 +22,8 @@ const VENUE_LIMIT = 15;
 const MAP_PLACE_LIMIT = 40;
 const TAG_LIMIT = 10;
 const PEOPLE_LIMIT = 10;
+/** Quantos eventos públicos criados por pessoas entram na lista do Explorar. */
+const PEOPLE_EVENT_LIMIT = 15;
 const DAY_MS = 86_400_000;
 
 export interface ExploreInput {
@@ -57,6 +59,8 @@ export interface ExploreEventItem {
   goingCount?: number;
   /** Impulsionado (anúncio pago) pelo responsável do local. A tela mostra “Patrocinado”. */
   sponsored?: boolean;
+  /** Evento criado por uma pessoa (público): quem criou. Sem isto, o evento é de um local. */
+  author?: { userId: string; username: string; displayName: string; avatarUrl: string | null };
 }
 
 export interface ExplorePlaceItem {
@@ -267,8 +271,8 @@ export class ExploreService {
     };
 
     if (rawQ === '') {
-      const found = await places.searchEvents(base);
-      return { ...empty, events: await toItems(found) };
+      const [found, people] = await Promise.all([places.searchEvents(base), hot ? Promise.resolve([]) : this.peopleEvents(actorId, { center, radiusM, from, to, kind, freeOnly })]);
+      return { ...empty, events: mixByStart(await toItems(found), people) };
     }
 
     if (isTag) {
@@ -296,7 +300,60 @@ export class ExploreService {
       limit: VENUE_LIMIT,
     });
 
-    return { ...empty, events: await toItems(found), places: placeItems, people, tags, placesAvailable };
+    const fromPeople = hot ? [] : await this.peopleEvents(actorId, { center, radiusM, from, to, kind, freeOnly, needle: fold(text) });
+    return { ...empty, events: mixByStart(await toItems(found), fromPeople), places: placeItems, people, tags, placesAvailable };
+  }
+
+  /**
+   * Eventos públicos criados por pessoas, para entrar na lista do Explorar junto com os dos locais.
+   * Fora: evento privado ou arquivado, conta suspensa, bloqueio em qualquer sentido e perfil privado que quem consulta não segue.
+   * Com posição, só os que têm local (rolê vinculado do AskouT) dentro do raio. "Grátis" não se aplica: eles não informam preço.
+   */
+  private async peopleEvents(
+    actorId: string,
+    opts: { center: { lat: number; lng: number } | undefined; radiusM: number; from: Date; to: Date; kind: EventKind | undefined; freeOnly: boolean; needle?: string },
+  ): Promise<ExploreEventItem[]> {
+    if (opts.freeOnly) return [];
+    const { posts, places, users, blocks, follows } = this.deps;
+    // Começou até 1 dia antes do período e ainda não acabou também vale (evento em andamento).
+    const rows = await posts.listEventsStartingBetween(new Date(opts.from.getTime() - DAY_MS), opts.to, 200);
+    const out: ExploreEventItem[] = [];
+    for (const { post } of rows) {
+      if (out.length >= PEOPLE_EVENT_LIMIT) break;
+      if (post.eventTitle === null || !post.eventStartsAt || !post.eventEndsAt || post.eventPrivate || post.archivedAt !== null) continue;
+      if (post.eventEndsAt.getTime() <= opts.from.getTime() || post.eventStartsAt.getTime() >= opts.to.getTime()) continue;
+      if (opts.kind && post.eventKind !== opts.kind) continue;
+      if (opts.needle && !fold(`${post.eventTitle} ${post.placeName ?? ''} ${post.caption ?? ''}`).includes(opts.needle)) continue;
+      const venue = post.placeVenueId ? await places.findVenue(post.placeVenueId) : undefined;
+      const distanceM = opts.center && venue ? distanceMeters(opts.center, { lat: venue.lat, lng: venue.lng }) : null;
+      if (opts.center && (distanceM === null || distanceM > opts.radiusM)) continue;
+      if (post.authorId !== actorId) {
+        const account = await users.findById(post.authorId);
+        if (!account || account.status !== 'ACTIVE') continue;
+        if (await blocks.existsEitherWay(actorId, post.authorId)) continue;
+      }
+      const author = await users.findProfileById(post.authorId);
+      if (!author) continue;
+      if (author.isPrivate && post.authorId !== actorId && (await follows.get(actorId, post.authorId))?.status !== 'ACCEPTED') continue;
+      out.push({
+        id: post.id,
+        title: post.eventTitle,
+        description: post.caption,
+        startsAt: post.eventStartsAt.toISOString(),
+        endsAt: post.eventEndsAt.toISOString(),
+        kind: post.eventKind,
+        isFree: false,
+        imageUrl: null,
+        tags: [],
+        sample: venue?.isSample ?? false,
+        venue: venue
+          ? { id: venue.id, name: venue.name, address: venue.address, category: venue.category, lat: venue.lat, lng: venue.lng, logoUrl: venue.logoUrl ?? null }
+          : { id: '', name: post.placeName ?? '', address: post.placeAddress, category: null, lat: 0, lng: 0, logoUrl: null },
+        distanceM: distanceM === null ? null : Math.round(distanceM),
+        author: { userId: author.userId, username: author.username, displayName: author.displayName, avatarUrl: author.avatarUrl ?? null },
+      });
+    }
+    return out;
   }
 
   /** Locais do AskouT já achados + de fora (Google/OSM) na mesma região, sem repetir, com os impulsionados primeiro. */
@@ -450,4 +507,12 @@ export class ExploreService {
     const distance = lat !== undefined && lng !== undefined ? distanceMeters({ lat, lng }, found.venue) : null;
     return { ...toEventItem(found.event, found.venue, distance), postedByMe: await this.deps.profileEvents.has(actorId, id) };
   }
+}
+
+/** Junta os eventos dos locais (patrocinados primeiro, como vieram) com os das pessoas, pela hora de começo. */
+function mixByStart(placeItems: ExploreEventItem[], peopleItems: ExploreEventItem[]): ExploreEventItem[] {
+  if (peopleItems.length === 0) return placeItems;
+  const sponsored = placeItems.filter((i) => i.sponsored);
+  const rest = [...placeItems.filter((i) => !i.sponsored), ...peopleItems].sort((a, b) => (a.startsAt < b.startsAt ? -1 : a.startsAt > b.startsAt ? 1 : a.id < b.id ? -1 : 1));
+  return [...sponsored, ...rest];
 }
