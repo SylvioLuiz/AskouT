@@ -7150,3 +7150,8 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
   :root:not([data-theme='light']) .evcover.evtone,
   :root:not([data-theme='light']) .evhero.evtone { background: linear-gradient(150deg, var(--tone-a), var(--tone-b)); }
 }
+
+/* Título do card: no máximo 3 linhas, com "..." se passar. */
+.evcard__title { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+/* Página do evento: o que vem antes dos ":" do título fica em fonte menor, acima do restante. */
+.evhero__lead { display: block; margin-bottom: 4px; font-size: 0.75em; font-weight: 600; line-height: 1.2; opacity: 0.9; }

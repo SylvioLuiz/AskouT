@@ -35,6 +35,7 @@ import { Link, navigate, useSearch, goBack as routerGoBack } from '../router.tsx
 import { useCurrentPosition } from './explore.tsx';
 import { t } from '../lib/i18n/index.ts';
 import { trackTicketClick } from '../components/sponsored-view.tsx';
+import { splitEventTitle } from '../lib/event-title.ts';
 import { LiveTag } from '../components/live-tag.tsx';
 import { GoingChoiceSheet } from '../components/going-choice.tsx';
 
@@ -223,6 +224,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const ended = e ? Date.parse(e.endsAt) <= Date.now() : false;
   const canStory = e ? e.canStory : false;
   // O botão de postar flash fica sempre à vista enquanto o evento não acabou; quem ainda não marcou que vai vê um aviso.
+  const titleParts = splitEventTitle(e?.title ?? '');
   const showStoryButton = e ? canStory || !ended : false;
   const isPosted = posted ?? e?.postedByMe ?? false;
 
@@ -263,7 +265,10 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   </span>
                 ) : null}
               </div>
-              <h1 className="evhero__title">{e.title}</h1>
+              <h1 className="evhero__title">
+                {titleParts.lead ? <span className="evhero__lead">{titleParts.lead}</span> : null}
+                {titleParts.rest}
+              </h1>
               {e.venue.name || e.venue.address ? (
               <p className="evhero__place">
                 {e.venue.id ? (
