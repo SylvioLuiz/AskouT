@@ -86,6 +86,7 @@ final class MessageNotifications {
         PendingIntent openIntent = PendingIntent.getActivity(context, ("open:" + tag).hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         return new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(icon(context))
+            .setColor(androidx.core.content.ContextCompat.getColor(context, R.color.notification_accent))
             .setContentIntent(openIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -115,9 +116,9 @@ final class MessageNotifications {
         manager.createNotificationChannel(channel);
     }
 
-    /** O mesmo ícone que o Firebase usa nos outros avisos (o do app). */
+    /** Ícone pequeno do aviso: silhueta branca do AskouT (o Android pinta só o contorno; o ícone colorido do app viraria um quadrado). */
     private static int icon(Context context) {
-        return context.getApplicationInfo().icon;
+        return R.drawable.ic_stat_askout;
     }
 
     private static String value(String v, String fallback) {
