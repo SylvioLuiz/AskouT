@@ -6423,6 +6423,8 @@ div.optrow__main { cursor: default; }
 .evcover__video { position: absolute; z-index: 1; top: 14px; left: 14px; color: #fff; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6)); }
 .evcover__kind { position: absolute; z-index: 1; left: 12px; bottom: 12px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #fff; color: var(--brand-text); }
 .evcover__kind svg { width: 22px; height: 22px; }
+/* Tipo escrito por extenso (Show, Noite, Gastronomia...): vira uma pílula que cresce com o texto, em vez de um círculo fixo onde a palavra não cabe. */
+.evcover__kind:not(.evcover__kind--icon) { width: auto; max-width: calc(100% - 24px); height: auto; padding: 3px 10px; border-radius: 999px; font-family: inherit; font-size: 0.6875rem; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .evcover__when { position: absolute; z-index: 1; left: 62px; right: 12px; bottom: 21px; color: #fff; font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .evcover--empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; background: var(--surface); border: 1.5px dashed var(--line-strong); }
 .evcover--empty p { margin: 0; color: var(--muted); }
