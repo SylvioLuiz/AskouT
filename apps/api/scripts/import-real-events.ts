@@ -1,7 +1,9 @@
 // Importa EVENTOS REAIS de fontes autorizadas para o AskouT, só os que fazem sentido para o app (encontro de pessoas).
 //
-// Fontes: Juicy Santos, agenda da Prefeitura de Mogi das Cruzes, Centro Cultural São Paulo e programação do Sesc SP
-// (uso autorizado pelo responsável do AskouT). Cinema fica de fora.
+// Fontes: Juicy Santos, agenda da Prefeitura de Mogi das Cruzes, Centro Cultural São Paulo, programação do Sesc SP, agenda do Clube Outs e links de
+// eventos do Sympla colados em scripts/event-urls.txt (baladas e casas de show de SP, como as da Rua Augusta). Uso autorizado
+// pelo responsável do AskouT, e a agenda curada à mão em scripts/manual-events.json (bares que só publicam no Instagram,
+// com noites fixas semanais). Cinema fica de fora.
 // Cada evento guarda o link da página de origem na descrição, como crédito.
 //
 //   npm run import:events                  SIMULAÇÃO (padrão): busca, filtra e mostra o que entraria e o que ficou de fora. Não grava.
@@ -22,6 +24,9 @@ import { fetchJuicyEvents } from '../src/infra/event-import/juicy-santos.ts';
 import { fetchMogiEvents } from '../src/infra/event-import/mogi-prefeitura.ts';
 import { fetchCcspEvents } from '../src/infra/event-import/ccsp.ts';
 import { fetchSescEvents } from '../src/infra/event-import/sesc.ts';
+import { fetchSymplaEvents, parseUrlList } from '../src/infra/event-import/sympla-event.ts';
+import { fetchClubeOutsEvents } from '../src/infra/event-import/clube-outs.ts';
+import { manualEvents, validateManual } from '../src/infra/event-import/manual-events.ts';
 import { classifyEvent, IMPORT_TAGS } from '../src/infra/event-import/niche.ts';
 import type { ImportedEvent } from '../src/infra/event-import/niche.ts';
 import type { ExternalPlace } from '../src/core/types.ts';
@@ -75,11 +80,16 @@ async function main(): Promise<void> {
   };
   const ccsp = await optional('CCSP', () => fetchCcspEvents(now));
   const sesc = await optional('Sesc', () => fetchSescEvents(now));
-  const fetched = [...(await fetchJuicyEvents(now)), ...mogi, ...ccsp, ...sesc];
+  const outs = await optional('Clube Outs', () => fetchClubeOutsEvents(now));
+  const urlFile = join(here, 'event-urls.txt');
+  const sympla = await optional('Sympla (links)', () => fetchSymplaEvents(existsSync(urlFile) ? parseUrlList(readFileSync(urlFile, 'utf8')) : [], now));
+  const manualFile = join(here, 'manual-events.json');
+  const manual = await optional('Agenda curada', async () => (existsSync(manualFile) ? manualEvents(validateManual(JSON.parse(readFileSync(manualFile, 'utf8'))), now) : []));
+  const fetched = [...(await fetchJuicyEvents(now)), ...mogi, ...ccsp, ...sesc, ...sympla, ...outs, ...manual];
   const kept: { event: ImportedEvent; kind: Extract<ReturnType<typeof classifyEvent>, { keep: true }>['kind'] }[] = [];
   const dropped: { event: ImportedEvent; reason: string }[] = [];
   for (const event of fetched) {
-    const verdict = classifyEvent(event);
+    const verdict = event.kind ? ({ keep: true, kind: event.kind } as const) : classifyEvent(event);
     if (verdict.keep) kept.push({ event, kind: verdict.kind });
     else dropped.push({ event, reason: verdict.reason });
   }
@@ -102,10 +112,11 @@ async function main(): Promise<void> {
     for (const { event, kind } of kept) {
       const nameKey = `${event.area.name}|${event.venueName.toLowerCase()}`;
       if (!venueByName.has(nameKey)) {
-        const found = await google.search(`${event.venueName} ${event.address ?? event.area.name}`, event.area, 5);
+        const found = await google.search(`${event.venueName} ${event.address ?? ''} ${event.area.name}`.replace(/\s+/g, ' ').trim(), event.area, 5);
         const place = found.available ? bestPlace(event.venueName, event.area, found.places) : undefined;
         let venueId: string | undefined;
         if (place) {
+          console.log(`  local: ${event.venueName} (${event.area.name}) → Google: ${place.name} — ${place.address ?? 'sem endereço'}`);
           const externalKey = `google:${place.externalId}`;
           let venue = await prisma.venue.findUnique({ where: { externalKey } });
           if (!venue) {
@@ -127,6 +138,15 @@ async function main(): Promise<void> {
               venue = await prisma.venue.findUnique({ where: { externalKey } });
             }
           }
+          venueId = venue?.id;
+        }
+        if (!venueId && event.coords) {
+          // O Google não achou, mas a fonte deu a posição exata: cria o local com ela (chave estável, não duplica).
+          const slug = event.venueName.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          const externalKey = `import:${slug}:${event.coords.lat.toFixed(4)}:${event.coords.lng.toFixed(4)}`;
+          const venue = (await prisma.venue.findUnique({ where: { externalKey } })) ?? (await prisma.venue.create({
+            data: { id: uuidOf(`askout-import:venue:${externalKey}`), name: event.venueName.slice(0, 80), address: event.address ? event.address.slice(0, 200) : null, category: null, lat: event.coords.lat, lng: event.coords.lng, externalKey },
+          }).catch(() => prisma.venue.findUnique({ where: { externalKey } })));
           venueId = venue?.id;
         }
         venueByName.set(nameKey, venueId);

@@ -152,3 +152,83 @@ test('Sesc: palestra, oficina e curso ficam como "Outro"; nas outras fontes cont
   assert.equal(classifyEvent({ ...talk, source: 'juicy-santos' }).keep, false);
   assert.equal(classifyEvent({ title: 'Palestra online do Sesc', description: 'transmissão online', venueName: 'Sesc', source: 'sesc-sp' }).keep, false, 'online continua fora');
 });
+
+test('Sympla: lê um evento da página (título, hora de São Paulo, local com coordenadas, preço, imagem)', async () => {
+  const { parseSymplaEvent, isSymplaEventUrl, parseUrlList } = await import('./sympla-event.ts');
+  const page = (over: Record<string, unknown> = {}) => `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+    props: { pageProps: { hydrationData: { eventHydration: { event: {
+      id: 3651782, name: 'SEM FREIO &amp; 14 ANOS', startDate: '2026-11-28 20:00:00', endDate: '2026-11-29 06:00:00', strippedDetail: '&nbsp;É funk, é pancadão.&nbsp;',
+      newUrl: 'https://www.sympla.com.br/evento/sem-freio/3651782', logoUrl: 'https://images.sympla.com.br/a.jpg', paymentEventType: 'paid', published: true, cancelled: false, privateEvent: false, onlineInfo: null,
+      eventsAddress: { name: 'Blitz Haus', address: 'Rua Augusta', addressNum: '657', neighborhood: 'Consolação', city: 'São Paulo', state: 'SP', geolocation: { latitude: -23.5521, longitude: -46.6521 } },
+      ...over,
+    } } } } },
+  })}</script></html>`;
+  const e = parseSymplaEvent(page(), 'https://www.sympla.com.br/evento/sem-freio/3651782')!;
+  assert.equal(e.title, 'SEM FREIO & 14 ANOS');
+  assert.equal(e.startsAt.toISOString(), '2026-11-28T23:00:00.000Z');
+  assert.equal(e.endsAt.toISOString(), '2026-11-29T09:00:00.000Z');
+  assert.equal(e.venueName, 'Blitz Haus');
+  assert.equal(e.address, 'Rua Augusta, 657 - Consolação - São Paulo - SP');
+  assert.deepEqual(e.coords, { lat: -23.5521, lng: -46.6521 });
+  assert.equal(e.isFree, false);
+  assert.equal(e.description, 'É funk, é pancadão.');
+  assert.equal(e.sourceId, '3651782');
+  assert.equal(parseSymplaEvent(page({ paymentEventType: 'free' }), 'x')!.isFree, true);
+  for (const bad of [{ cancelled: true }, { privateEvent: true }, { published: false }, { onlineInfo: { url: 'x' } }, { startDate: 'em breve' }]) {
+    assert.equal(parseSymplaEvent(page(bad), 'x'), undefined, JSON.stringify(bad));
+  }
+  assert.equal(parseSymplaEvent('<html>sem dados</html>', 'x'), undefined);
+  assert.equal(isSymplaEventUrl('https://www.sympla.com.br/evento/a/1'), true);
+  assert.equal(isSymplaEventUrl('http://www.sympla.com.br/evento/a/1'), false);
+  assert.equal(isSymplaEventUrl('https://sympla.evil.com/evento/a/1'), false);
+  assert.equal(isSymplaEventUrl('https://www.sympla.com.br/produtor/x'), false);
+  assert.deepEqual(parseUrlList('# comentário\nhttps://www.sympla.com.br/evento/a/1  # fim\n\nhttps://outro.com/x\nhttps://www.sympla.com.br/evento/a/1\n'), ['https://www.sympla.com.br/evento/a/1']);
+});
+
+test('Clube Outs: lê as festas da agenda (data, nome e imagem); hora de balada e só o que vem', async () => {
+  const { parseClubeOuts } = await import('./clube-outs.ts');
+  const card = (d: string, name: string) => `<Div onclick=Verificar('Clube_Outs/${d.replace(/\//g, '')}') style='x'><Table><TR><TD><img src=https://www.comprasnanet.com.br/Clube_Outs/${d.replace(/\//g, '')}/imagens/a.jpg style='width:300px'></TD></TR><TR><TD><B> Data: ${d} <font color=#000090>(Sexta) <BR>  <font color=#000000>${name}</B><BR> </TD></TR></Table></DIV>`;
+  const html = card('10/11/2026', 'FESTA PASSADA') + card('20/11/2026', 'THE GRUNGE PARTY - OPEN BAR') + card('21/11/2026', 'FESTA DOS PERDIDOS &amp; AREA 51') + card('21/11/2026', 'FESTA DOS PERDIDOS &amp; AREA 51');
+  const events = parseClubeOuts(html, new Date('2026-11-20T12:00:00Z'));
+  assert.deepEqual(events.map((e) => e.title), ['THE GRUNGE PARTY - OPEN BAR', 'FESTA DOS PERDIDOS & AREA 51']);
+  assert.equal(events[0]!.startsAt.toISOString(), '2026-11-21T02:00:00.000Z');
+  assert.equal(events[0]!.venueName, 'Clube Outs');
+  assert.equal(events[0]!.imageUrl, 'https://www.comprasnanet.com.br/Clube_Outs/20112026/imagens/a.jpg');
+  assert.match(events[0]!.description, /Horário a confirmar/);
+});
+
+test('agenda curada: avulso, noite fixa semanal com datas puladas e validação', async () => {
+  const { manualEvents, validateManual } = await import('./manual-events.ts');
+  const base = { venue: 'Grow', area: 'mogi', kind: 'NIGHT', start: '20:00', credit: 'Instagram do Grow', link: 'https://www.instagram.com/instagrow.exe/' } as const;
+  const entries = validateManual([
+    { ...base, title: 'Quintow', weekday: 4 },
+    { ...base, title: 'Sextou', weekday: 5, skip: ['2026-11-20'] },
+    { ...base, title: 'Show avulso', date: '2026-11-28', kind: 'SHOW', start: '22:00', end: '01:00' },
+    { ...base, title: 'Show que já passou', date: '2026-11-10' },
+  ]);
+  const now = new Date('2026-11-20T12:00:00Z'); // sexta 20/11, 09h em São Paulo
+  const events = manualEvents(entries, now, 14);
+  const dates = (title: string) => events.filter((e) => e.title === title).map((e) => e.startsAt.toISOString());
+  assert.deepEqual(dates('Quintow'), ['2026-11-26T23:00:00.000Z', '2026-12-03T23:00:00.000Z']);
+  assert.deepEqual(dates('Sextou'), ['2026-11-27T23:00:00.000Z', '2026-12-04T23:00:00.000Z'], 'a sexta 20/11 foi pulada');
+  assert.deepEqual(dates('Show avulso'), ['2026-11-29T01:00:00.000Z']);
+  assert.equal(events.find((e) => e.title === 'Show avulso')!.endsAt.toISOString(), '2026-11-29T04:00:00.000Z', 'termina de madrugada');
+  assert.deepEqual(dates('Show que já passou'), []);
+  const one = events.find((e) => e.title === 'Quintow')!;
+  assert.equal(one.sourceId, 'grow-quintow-2026-11-26');
+  assert.equal(one.kind, 'NIGHT');
+  assert.equal(one.area.name, 'Mogi das Cruzes');
+  assert.match(one.description, /Horário a confirmar/);
+  assert.throws(() => validateManual([{ ...base, title: 'Sem dia' }]), /date.*weekday/);
+  assert.throws(() => validateManual([{ ...base, title: 'Dois', date: '2026-11-28', weekday: 1 }]), /um só/);
+  assert.throws(() => validateManual([{ ...base, title: 'Hora', date: '2026-11-28', start: '25:00' }]), /horário/);
+  assert.throws(() => validateManual([{ ...base, title: 'Link', date: '2026-11-28', link: 'http://x' }]), /https/);
+  assert.throws(() => validateManual([{ ...base, title: 'Região', date: '2026-11-28', area: 'rio' }]), /região/);
+});
+
+test('agenda curada: evento avulso anunciado para daqui a semanas entra mesmo fora do horizonte das noites fixas', async () => {
+  const { manualEvents, validateManual } = await import('./manual-events.ts');
+  const entries = validateManual([{ title: 'Festival', venue: 'Sweet Mogi', area: 'mogi', kind: 'SHOW', date: '2026-12-13', start: '20:00', credit: 'Instagram', link: 'https://www.instagram.com/x/' }]);
+  assert.equal(manualEvents(entries, new Date('2026-11-20T12:00:00Z'), 14).length, 1);
+  assert.equal(manualEvents(entries, new Date('2026-06-01T12:00:00Z'), 14).length, 0, 'mais de 180 dias: ainda não');
+});
