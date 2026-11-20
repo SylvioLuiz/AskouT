@@ -789,6 +789,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Já rolou aqui": "Ya pasó aquí",
   " · 1 pessoa foi": " · 1 persona fue",
   " · {n} pessoas foram": " · {n} personas fueron",
+  "Atualizando…": "Actualizando…",
+  "Criado por @{username}": "Creado por @{username}",
   "Nenhum evento marcado": "Ningún evento programado",
   "Nenhum evento no grupo": "Ningún evento en el grupo",
   "Nenhum evento ou rolê encontrado por perto agora.": "No se encontraron eventos ni planes cerca ahora.",

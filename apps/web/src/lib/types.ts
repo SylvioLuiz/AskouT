@@ -675,6 +675,8 @@ export interface ExploreEvent {
   goingCount?: number;
   /** Anúncio pago pelo responsável do local. Sempre mostrar “Patrocinado”. */
   sponsored?: boolean;
+  /** Evento público criado por uma pessoa: quem criou. Sem isto, o evento é de um local. */
+  author?: { userId: string; username: string; displayName: string; avatarUrl: string | null };
 }
 
 /** Quem publica no feed: todos que veem a página, todos com aprovação do dono, ou só o dono. */
