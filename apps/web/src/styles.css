@@ -7239,3 +7239,28 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .evcard__more p { margin: 0; }
 .evcard__desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
 .evcard--expanded .evcard__title { -webkit-line-clamp: unset; line-clamp: unset; }
+
+/* Endereço da capa: sempre uma linha só. */
+.evhero__placetext { display: block; -webkit-line-clamp: unset; line-clamp: unset; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100vw - 72px); }
+.evhero__placelink { align-items: center; max-width: 100%; }
+.evhero__placelink .icon, .evhero__placelink svg { margin-top: 0; }
+
+/* Prévia ao segurar um card do Explorar: aparece enquanto o dedo está na tela. */
+.evcard__link { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.evpreview { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px 20px; background: rgb(10 12 40 / 0.55); backdrop-filter: blur(6px); pointer-events: none; animation: evpreview-in 160ms ease-out; }
+.evpreview__card { width: min(100%, 360px); max-height: 100%; overflow: hidden; border-radius: 24px; background: var(--surface); color: var(--ink); box-shadow: 0 24px 60px rgb(0 0 0 / 0.45); }
+.evpreview__cover { position: relative; display: flex; align-items: flex-end; min-height: 200px; color: #fff; background: linear-gradient(150deg, var(--tone-a), var(--tone-b)); }
+.evpreview__cover > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.evpreview__shade { position: absolute; inset: 0; background: linear-gradient(to bottom, rgb(10 12 40 / 0.1), rgb(10 12 40 / 0.78)); }
+.evpreview__head { position: relative; display: flex; flex-wrap: wrap; gap: 6px; width: 100%; padding: 16px; }
+.evpreview__title { flex-basis: 100%; margin: 4px 0 0; font-family: var(--font-display); font-size: 1.2rem; line-height: 1.15; overflow-wrap: anywhere; }
+.evpreview__place { display: flex; align-items: center; gap: 4px; flex-basis: 100%; margin: 0; font-size: 0.875rem; }
+.evpreview__place span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.evpreview__place svg { flex: none; width: 16px; height: 16px; }
+.evpreview__body { display: grid; gap: 6px; padding: 14px 16px 18px; font-size: 0.875rem; }
+.evpreview__body p { margin: 0; }
+.evpreview__when { font-weight: 650; }
+.evpreview__desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; color: var(--muted); }
+.evpreview__tags { opacity: 0.7; }
+@keyframes evpreview-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .evpreview { animation: none; } }
