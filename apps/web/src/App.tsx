@@ -66,6 +66,7 @@ const HelpScreen = lazyWithReload(() => import('./screens/me.tsx').then((m) => (
 const InteractionsScreen = lazyWithReload(() => import('./screens/me.tsx').then((m) => ({ default: m.InteractionsScreen })));
 const NotificationSettingsScreen = lazyWithReload(() => import('./screens/me.tsx').then((m) => ({ default: m.NotificationSettingsScreen })));
 const NowSettingsScreen = lazyWithReload(() => import('./screens/me.tsx').then((m) => ({ default: m.NowSettingsScreen })));
+const AgendaSettingsScreen = lazyWithReload(() => import('./screens/me.tsx').then((m) => ({ default: m.AgendaSettingsScreen })));
 const TastesSettingsScreen = lazyWithReload(() => import('./screens/me.tsx').then((m) => ({ default: m.TastesSettingsScreen })));
 const PrivacyScreen = lazyWithReload(() => import('./screens/me.tsx').then((m) => ({ default: m.PrivacyScreen })));
 const SettingsScreen = lazyWithReload(() => import('./screens/me.tsx').then((m) => ({ default: m.SettingsScreen })));
@@ -167,6 +168,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/configuracao/notificacoes', render: () => <NotificationSettingsScreen /> },
   { path: '/configuracao/now', render: () => <NowSettingsScreen /> },
   { path: '/configuracao/gostos', render: () => <TastesSettingsScreen /> },
+  { path: '/configuracao/agenda', render: () => <AgendaSettingsScreen /> },
   { path: '/privacidade', render: () => <PrivacyScreen /> },
   { path: '/configuracao/privacidade-e-dados', render: () => <PrivacyDataScreen /> },
   { path: '/privacidade/apagar-conta', render: () => <DeleteAccountScreen /> },

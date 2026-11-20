@@ -251,6 +251,7 @@ export function SettingsScreen() {
   const language = LOCALES.find((item) => item.code === getLocale())?.label;
   const radius = nowRadiusKm();
   useThemes();
+  const agendaSharing = useAsync(() => api.availabilitySharing(), []);
   const tastes = userThemes(safeLocalStorage(), user);
   return (
     <>
@@ -279,6 +280,7 @@ export function SettingsScreen() {
         <SettingsRow to="/configuracao/notificacoes" icon={<BellIcon />} label={t('Notificações')} />
         <SettingsRow to="/configuracao/gostos" icon={<HeartIcon />} label={t('Seus gostos')} value={tastesSummary(tastes)} />
         <SettingsRow to="/configuracao/now" icon={<BoltIcon />} label={t('NOW')} value={radius === null ? t('Automático') : `${radius} km`} />
+        <SettingsRow to="/configuracao/agenda" icon={<UsersIcon />} label={t('Agenda com amigos')} value={agendaSharing.data === undefined ? undefined : agendaSharing.data.sharing ? t('Ligada') : t('Desligada')} />
       </ul>
 
       <h2 className="settingshub__group">{t('Quem pode ver seu conteúdo')}</h2>
@@ -412,6 +414,50 @@ export function TastesSettingsScreen() {
       <p className="setting__help">{t('Escolha os rolês que você curte. O Explorar já abre filtrado por eles. Sem nenhum marcado, mostramos tudo.')}</p>
       <TastePicker chosen={chosen} onToggle={toggle} disabled={saving} />
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+    </>
+  );
+}
+
+/**
+ * Agenda com amigos: se os amigos veem os horários que a pessoa marca na agenda. Começa desligada. É aqui que se muda; a tela
+ * da Agenda só mostra como está.
+ */
+export function AgendaSettingsScreen() {
+  useTitle(t('Agenda com amigos'));
+  const sharing = useAsync(() => api.availabilitySharing(), []);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<Message>();
+  const shared = sharing.data?.sharing === true;
+  async function toggle() {
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      sharing.setData(await api.setAvailabilitySharing(!shared));
+      setMessage({ tone: 'ok', text: shared ? t('Agora só você vê a sua agenda.') : t('Seus amigos agora veem seus horários.') });
+    } catch (failure) {
+      setMessage({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <PageHead title={t('Agenda com amigos')} back="/configuracao" />
+      <section className="agshare" aria-labelledby="agshare-titulo">
+        <div className="agshare__text">
+          <h2 className="agshare__title" id="agshare-titulo">
+            {t('Mostrar meus horários para amigos')}
+          </h2>
+          <p className="agshare__help">{t('Seus amigos veem quando você está disponível, parcial ou indisponível, e podem achar horários em comum com você. Compromissos das agendas ligadas contam só como ocupado. Dá para desligar quando quiser.')}</p>
+        </div>
+        <button type="button" role="switch" aria-checked={shared} aria-labelledby="agshare-titulo" className="switch" onClick={() => void toggle()} disabled={busy || sharing.data === undefined}>
+          <span className="switch__thumb" />
+        </button>
+      </section>
+      {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
+      <p className="setting__help">
+        {t('Veja e marque seus horários na')} <Link to="/agenda">{t('Agenda')}</Link>.
+      </p>
     </>
   );
 }
