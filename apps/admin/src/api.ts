@@ -1,7 +1,7 @@
 import { getPageSize } from './page-size.ts';
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, VenueDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -138,6 +138,7 @@ export const api = {
   removeOwner: (venueId: string, note: string) => request<unknown>('DELETE', `/admin/venues/${encodeURIComponent(venueId)}/owner`, { note }),
 
   placeEvents: (p: { q: string; offset: number }) => request<Page<PlaceEventRow>>('GET', `/admin/place-events${query({ ...p, limit: getPageSize() })}`),
+  placeEvent: (id: string) => request<EventDetail>('GET', `/admin/place-events/${encodeURIComponent(id)}`),
   deletePlaceEvent: (id: string, note: string) => request<unknown>('DELETE', `/admin/place-events/${encodeURIComponent(id)}`, { note }),
 
   posts: (p: { q: string; events: boolean; offset: number }) => request<Page<PostRow>>('GET', `/admin/posts${query({ ...p, limit: getPageSize() })}`),
