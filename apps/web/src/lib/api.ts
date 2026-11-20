@@ -122,6 +122,7 @@ import type {
 } from './types.ts';
 import type { CloakroomPanel, CloakroomPublic, CloakroomSettingBody, CloakroomStaffTicket, CloakroomTicket } from './cloakroom.ts';
 import type { EventExtraAnswer, EventExtraOption, StoryOverlay } from './types.ts';
+import type { TasteDefinition } from './themes.ts';
 import { overlaysHeader } from './story-overlays.ts';
 import { t } from '../lib/i18n/index.ts';
 
@@ -288,6 +289,8 @@ export function createApi(deps: ApiDeps) {
     createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; placeVenueId?: string; linkedEventId?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; private?: boolean; extras?: EventExtraAnswer[] }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
     /** Configurações de evento cadastradas pela gestão, para responder ao criar ou editar um evento. */
     eventExtras: () => request<{ items: EventExtraOption[] }>('GET', '/event-extras'),
+    /** Gostos de rolê cadastrados pela gestão (cadastro, configurações e filtro do Explorar). */
+    tastes: () => request<{ items: TasteDefinition[] }>('GET', '/tastes', { auth: false }),
     post: (postId: string) => request<PostView>('GET', `/posts/${id(postId)}`),
     /** Anexa o vídeo ao item de foto que serve de capa: o arquivo vai cru no corpo, com o tipo no Content-Type. */
     attachPostVideo: async (postId: string, imageId: string, file: Blob, onProgress?: (sent: number, total: number) => void): Promise<PostView> => {

@@ -343,6 +343,22 @@ export interface EventExtraInput {
   type: EventExtra['type'];
 }
 
+/** Gosto de rolê (Bares, Baladas...) que a pessoa escolhe no app. */
+export interface Taste {
+  id: string;
+  label: string;
+  hint: string;
+  keywords: string[];
+  kinds: string[];
+}
+
+export interface TasteInput {
+  label: string;
+  hint: string;
+  keywords: string;
+  kinds: string[];
+}
+
 /** Quem mais trouxe gente pelo convite (entraram = todos; confirmados = voltaram ao app em outro dia). */
 export interface TopInviter {
   profile: { userId: string; username: string; displayName: string; avatarUrl: string | null };

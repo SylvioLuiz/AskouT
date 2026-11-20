@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { filterByThemes, readThemes, saveThemes, THEMES, themeFilter, themeOfCategory, themeOfEvent, themesOfCategory, themesOfEvent, userThemes } from './themes.ts';
+import { filterByThemes, keywordsRegExp, normalizeCategory, readThemes, setThemes, saveThemes, THEMES, themeFilter, themeOfCategory, themeOfEvent, themesOfCategory, themesOfEvent, userThemes } from './themes.ts';
 
 describe('temas de rolê', () => {
   it('reconhece o tema pelo tipo do local', () => {
@@ -61,5 +61,32 @@ describe('temas de rolê', () => {
     data.set('askout.themes.u', '["X","BAR"]');
     assert.deepEqual(readThemes(s, 'u'), ['BAR']);
     assert.deepEqual(readThemes(undefined, 'u'), []);
+  });
+});
+
+describe('gostos cadastrados pela gestão', () => {
+  it('palavra inteira x prefixo, sem acento nem maiúscula', () => {
+    const re = keywordsRegExp(['bar', 'restaura*', 'casa noturna']);
+    const hit = (text: string) => re.test(normalizeCategory(text));
+    assert.ok(hit('Bar'));
+    assert.ok(hit('sports_bar'));
+    assert.ok(!hit('Barbearia'));
+    assert.ok(hit('Restaurante Japonês'));
+    assert.ok(hit('Casa Noturna'));
+    assert.ok(!hit('parking'));
+  });
+  it('a lista da API troca a de origem; lista vazia é ignorada; ids que sumiram saem da escolha', () => {
+    const before = THEMES.map((t) => t.id);
+    setThemes([]);
+    assert.deepEqual(THEMES.map((t) => t.id), before);
+    setThemes([{ id: 'PET', label: 'Pets', hint: 'Com pet', keywords: ['pet*', 'cachorro'], kinds: ['OUTDOOR'] }, { id: 'BAR', label: 'Bares', hint: 'x', keywords: ['bar'], kinds: [] }]);
+    try {
+      assert.deepEqual(themesOfCategory('Café Pet Friendly'), ['PET']);
+      assert.deepEqual(themesOfEvent({ kind: 'OUTDOOR', venue: { category: 'Bar' } }), ['PET', 'BAR']);
+      assert.deepEqual(userThemes(undefined, { id: 'u', tastes: ['SHOW', 'PET'] }), ['PET']);
+      assert.deepEqual(themesOfEvent({ kind: 'OTHER', venue: { category: null } }), ['BAR']);
+    } finally {
+      setThemes([{ id: 'X', label: 'x', hint: 'x', keywords: ['x'], kinds: [] }]);
+    }
   });
 });

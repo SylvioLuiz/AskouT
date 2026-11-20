@@ -14,8 +14,9 @@ import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
 import { safeStorage } from '../lib/hints.ts';
 import { addRecent, buildSuggestions, readRecent, removeRecent, saveRecent } from '../lib/recent-searches.ts';
-import { filterByThemes, THEMES, themeFilter, themesOfCategory, themesOfEvent, userThemes } from '../lib/themes.ts';
+import { filterByThemes, themeFilter, themesOfCategory, themesOfEvent, userThemes } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
+import { useThemes } from '../lib/use-themes.ts';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { formatRating, formatWhen, } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -301,6 +302,7 @@ export function ExploreScreen() {
       return next;
     });
   }
+  const allThemes = useThemes();
   const [themes, setThemes] = useState<ReadonlySet<ThemeId>>(() => {
     // O que a pessoa escolheu no começo vira o filtro inicial, a não ser que ela tenha marcado todos (aí não filtra nada).
     return themeFilter(userThemes(safeStorage(), me));
@@ -529,7 +531,7 @@ export function ExploreScreen() {
       {!q ? <RollingNowStrip position={position} waiting={waiting} /> : null}
 
       <div className="filters" role="group" aria-label={t('Filtros')}>
-        {THEMES.map((theme) => (
+        {allThemes.map((theme) => (
           <button key={theme.id} type="button" className={`fchip fchip--theme${themes.has(theme.id) ? ' fchip--on' : ''}`} aria-pressed={themes.has(theme.id)} onClick={() => toggleTheme(theme.id)}>
             {theme.label}
           </button>

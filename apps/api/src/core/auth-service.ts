@@ -6,6 +6,7 @@ import { MfaService } from './mfa-service.ts';
 import { PhoneCodeFlow } from './phone-code.ts';
 import type { PhoneCodeStarted } from './phone-code.ts';
 import { normalizePhone } from './phone.ts';
+import { loadTastes, parseTastes } from './tastes.ts';
 import { confirmReferralReturn } from './referral-service.ts';
 import type { Actor, ExternalProvider, PendingSignup, Profile, PublicProfile, User, UserRole } from './types.ts';
 import { toPublicProfile } from './types.ts';
@@ -42,15 +43,6 @@ export interface SessionUser {
   profilePending: boolean;
   /** Gostos de rolê escolhidos no cadastro ou nas configurações. Vazio = gosta de tudo. */
   tastes: string[];
-}
-
-/** Gostos de rolê que a pessoa pode escolher. O app mostra os nomes; aqui só valida. Para abrir outro, inclua aqui e no app. */
-export const TASTE_IDS = ['BAR', 'NIGHT', 'SHOW', 'FOOD', 'CAFE', 'CULTURE', 'GAMES', 'OUTDOOR', 'SPORT'] as const;
-
-/** Mantém só gostos conhecidos, sem repetir, na ordem da lista. Lança erro de validação se não vier uma lista. */
-export function parseTastes(value: unknown): string[] {
-  if (!Array.isArray(value)) throw validationError('Envie a lista de gostos', { tastes: 'Envie a lista de gostos' });
-  return TASTE_IDS.filter((id) => value.includes(id));
 }
 
 /** Conta do Google ou da Apple ligada ao perfil (o e-mail fica só para a própria pessoa). */
@@ -833,7 +825,7 @@ export class AuthService {
 
   /** Troca os gostos de rolê (cadastro e configurações do perfil). Devolve a lista guardada. */
   async setTastes(actor: Actor, tastes: unknown): Promise<{ tastes: string[] }> {
-    const clean = parseTastes(tastes);
+    const clean = parseTastes(tastes, await loadTastes(this.deps));
     await this.deps.users.setTastes(actor.userId, clean);
     return { tastes: clean };
   }

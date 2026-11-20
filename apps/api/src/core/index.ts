@@ -30,6 +30,7 @@ import { MatchService } from './match-service.ts';
 import { OfferService } from './offer-service.ts';
 import { PaymentsSwitch } from './payments-switch.ts';
 import { EventExtrasCatalog } from './event-extras.ts';
+import { TastesCatalog } from './tastes.ts';
 import { ConsentService } from './consent-service.ts';
 import { CloakroomService } from './cloakroom-service.ts';
 import { RecoExperiment } from './reco-experiment.ts';
@@ -109,6 +110,7 @@ export function createCore(input: CoreInput) {
     profileEvents: new ProfileEventService(deps, profiles),
     posts,
     eventExtras: new EventExtrasCatalog(deps),
+    tastes: new TastesCatalog(deps),
     albums: new AlbumService(deps, posts),
     venueStories,
     dwell: new DwellService(deps),

@@ -6,6 +6,7 @@ export const ROUTES = [
   { path: '/locais', label: 'Locais' },
   { path: '/eventos', label: 'Eventos' },
   { path: '/config-eventos', label: 'Config. de eventos' },
+  { path: '/gostos', label: 'Gostos' },
   { path: '/posts', label: 'Posts' },
   { path: '/feed', label: 'Feed' },
   { path: '/retencao', label: 'Retenção' },

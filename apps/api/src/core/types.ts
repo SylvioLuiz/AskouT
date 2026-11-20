@@ -19,7 +19,7 @@ export interface User {
   termsVersion?: string | null;
   /** Quando a pessoa terminou (ou pulou) o tutorial inicial. Vazio = ainda não viu. */
   onboardedAt?: Date | null;
-  /** Gostos de rolê (ids de TASTE_IDS). Vazio = gosta de tudo. */
+  /** Gostos de rolê (ids do catálogo de gostos, ver tastes.ts). Vazio = gosta de tudo. */
   tastes?: string[];
   /** Conta criada pelo Google/Apple que ainda não escolheu o nome de usuário nem informou a data de nascimento. Até concluir, o app só mostra essa etapa. */
   profilePending?: boolean;
@@ -1044,6 +1044,9 @@ export type AuditAction =
   | 'EVENT_EXTRA_CREATED'
   | 'EVENT_EXTRA_UPDATED'
   | 'EVENT_EXTRA_REMOVED'
+  | 'TASTE_CREATED'
+  | 'TASTE_UPDATED'
+  | 'TASTE_REMOVED'
   | 'RECO_EXPERIMENT_ENABLED'
   | 'RECO_EXPERIMENT_CHANGED'
   | 'RECO_EXPERIMENT_DISABLED';

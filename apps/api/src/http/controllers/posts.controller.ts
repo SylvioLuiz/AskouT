@@ -132,6 +132,13 @@ export class PostsController {
     return { items: await this.core.eventExtras.list() };
   }
 
+  /** Gostos de rolê cadastrados pela gestão, na ordem das telas (a lista não é sigilosa: o app a carrega ao abrir). */
+  @Public()
+  @Get('tastes')
+  async tastes() {
+    return { items: await this.core.tastes.list() };
+  }
+
   @Get('posts/:id')
   async get(@CurrentActor() actor: Actor, @Param('id') id: string) {
     return this.present(await this.core.posts.get(actor.userId, id));

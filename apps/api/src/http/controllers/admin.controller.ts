@@ -95,6 +95,37 @@ export class AdminController {
     return this.core.admin.deleteEventExtra(actor, id);
   }
 
+  /** Gostos de rolê cadastrados (a ordem é a das telas do app). */
+  @Get('tastes')
+  tastes(@CurrentActor() actor: Actor) {
+    return this.core.admin.tastes(actor);
+  }
+
+  /** `{label, hint, keywords: string[] | string, kinds: EventKind[]}` */
+  @Post('tastes')
+  createTaste(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.createTaste(actor, { label: b.label, hint: b.hint, keywords: b.keywords, kinds: b.kinds });
+  }
+
+  @Put('tastes/:id')
+  updateTaste(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.updateTaste(actor, id, { label: b.label, hint: b.hint, keywords: b.keywords, kinds: b.kinds });
+  }
+
+  /** `{direction: 'up' | 'down'}` */
+  @Post('tastes/:id/move')
+  @HttpCode(200)
+  moveTaste(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.admin.moveTaste(actor, id, asBody(body).direction);
+  }
+
+  @Delete('tastes/:id')
+  deleteTaste(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.admin.deleteTaste(actor, id);
+  }
+
   /** Quem mais trouxe gente pelo convite (`?limit=`, até 50). */
   @Get('referrals/top')
   topInviters(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown }) {
