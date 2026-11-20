@@ -7094,3 +7094,11 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 }
 @media (prefers-reduced-motion: reduce) { .chat__glow { animation-duration: 400ms; } @keyframes chat-glow { 0%, 100% { opacity: 0; } 40% { opacity: 0.8; } } }
 
+
+/* Esqueleto da lista de conversas: as linhas usam as classes reais (.convrow etc.), só o conteúdo é falso. */
+.convskel { display: block; background: linear-gradient(90deg, var(--line) 25%, color-mix(in srgb, var(--line) 55%, var(--surface)) 50%, var(--line) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s ease-in-out infinite; }
+.convskel--search { height: 48px; border-radius: var(--radius-control); }
+.convskel--avatar { flex: none; width: 48px; height: 48px; border-radius: 50%; }
+.convskel--text { display: inline-block; max-width: 100%; height: 0.8em; border-radius: 6px; vertical-align: middle; }
+.convskel--time { width: 34px; }
+@media (prefers-reduced-motion: reduce) { .convskel { animation: none; } }

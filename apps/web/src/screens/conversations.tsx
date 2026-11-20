@@ -59,13 +59,34 @@ export function ConversationsScreen() {
   const [prefsFor, setPrefsFor] = useState<ConversationItem | undefined>();
   const now = new Date();
 
-  if (list.loading && !list.data) return <Loading />;
+  // O botão + fica fora do PullRefresh e da lista: os dois ganham `transform` (o puxar e a animação de volta),
+  // e um `position: fixed` dentro de um elemento com transform passa a andar junto com ele.
+  const fab = (
+    <>
+      <button type="button" className="fab" onClick={() => setCreating(true)}>
+        <PlusIcon />
+        {t('Nova conversa')}
+      </button>
+      {creating ? <NewConversationSheet onClose={() => setCreating(false)} /> : null}
+    </>
+  );
+
+  if (list.loading && !list.data) {
+    return (
+      <>
+        <ConversationsSkeleton />
+        {fab}
+      </>
+    );
+  }
   if (list.error && !list.data) return <ErrorState message={list.error.message} onRetry={list.reload} />;
   const items = list.data?.items ?? [];
   const shown = filterConversations(items, query);
   const searching = query.trim() !== '';
 
   return (
+    <>
+    {fab}
     <PullRefresh
       onRefresh={async () => {
         list.reload();
@@ -74,11 +95,6 @@ export function ConversationsScreen() {
     >
     <div className={`convscreen${cameBack ? ' convscreen--back' : ''}`}>
       <PageHead title={t('Conversas')} />
-      <button type="button" className="fab" onClick={() => setCreating(true)}>
-        <PlusIcon />
-        {t('Nova conversa')}
-      </button>
-      {creating ? <NewConversationSheet onClose={() => setCreating(false)} /> : null}
       {items.length === 0 ? (
         <EmptyState
           title={t('Nenhuma conversa ainda')}
@@ -166,6 +182,58 @@ export function ConversationsScreen() {
       ) : null}
     </div>
     </PullRefresh>
+    </>
+  );
+}
+
+/** Larguras do nome e da prévia de cada linha falsa, para não parecer uma grade igual. */
+const SKELETON_ROWS: Array<[name: number, preview: number]> = [
+  [46, 78],
+  [34, 62],
+  [52, 70],
+  [40, 56],
+  [30, 74],
+  [44, 64],
+];
+
+/**
+ * Enquanto a lista carrega: o mesmo cabeçalho, a mesma busca e as mesmas linhas (avatar, nome, hora, prévia e o
+ * botão de opções), usando as classes reais, para nada pular de lugar quando as conversas chegam.
+ */
+function ConversationsSkeleton() {
+  return (
+    <div className="convscreen" role="status" aria-live="polite">
+      <PageHead title={t('Conversas')} />
+      <span className="visually-hidden">{t('Carregando conversas…')}</span>
+      <div aria-hidden="true">
+        <div className="search search--convs">
+          <span className="convskel convskel--search" />
+        </div>
+        <ul className="list convlist">
+          {SKELETON_ROWS.map(([name, preview], i) => (
+            <li key={i} className="convitem">
+              <span className="convrow">
+                <span className="convskel convskel--avatar" />
+                <span className="convrow__body">
+                  <span className="convrow__top">
+                    <span className="convrow__name">
+                      <span className="convskel convskel--text" style={{ width: `${name * 2.4}px` }} />
+                    </span>
+                    <span className="convrow__time">
+                      <span className="convskel convskel--text convskel--time" />
+                    </span>
+                  </span>
+                  <span className="convrow__preview">
+                    <span className="convskel convskel--text" style={{ width: `${preview}%` }} />
+                  </span>
+                </span>
+              </span>
+              <span className="iconbtn convitem__more" />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 
