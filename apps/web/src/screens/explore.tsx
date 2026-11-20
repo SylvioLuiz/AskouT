@@ -10,7 +10,7 @@ import { ClockIcon, EventKindIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
 import { Button, EmptyState, ErrorState, Loading, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
-import { useIsVisitor, useUser } from '../auth.tsx';
+import { useIsVisitor, useOptionalUser, useUser } from '../auth.tsx';
 import { useVisitorCity } from '../components/visitor.tsx';
 import { safeStorage } from '../lib/hints.ts';
 import { addRecent, buildSuggestions, readRecent, removeRecent, saveRecent } from '../lib/recent-searches.ts';
@@ -155,7 +155,8 @@ function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
 
 /** Evento em formato de cartaz (Home): foto inteira, data em destaque e "Eu vou". */
 function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
-  const me = useUser();
+  // Também aparece na Home de quem não entrou (sem usuário): aí o "Eu vou" sempre aparece e pede login.
+  const me = useOptionalUser();
   const dwellRef = useDwell<HTMLLIElement>('EVENT', event.id, 'FEED');
   // O cartaz patrocinado aparece na Home ("Rolês em destaque").
   useSponsoredView<HTMLLIElement>(event.sponsored === true, 'HOME', { eventId: event.id }, dwellRef);
@@ -176,7 +177,7 @@ function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
           </span>
         }
         count={event.goingCount}
-        hideGoing={event.author?.userId === me.id}
+        hideGoing={me !== undefined && event.author?.userId === me.id}
         tags={
           <>
             {isLiveNow(event, now) ? <LiveTag /> : null}
