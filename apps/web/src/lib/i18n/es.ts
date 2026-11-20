@@ -1500,6 +1500,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Story indisponível": "Story no disponible",
   "Você respondeu ao story": "Respondiste al story",
   "Respondeu ao seu story": "Respondió a tu story",
+  "Até {time}": "Hasta las {time}",
+  "Até {day} às {time}": "Hasta el {day} a las {time}",
   "Respondendo a {name}": "Respondiendo a {name}",
   "Rolê": "Plan",
   "Rolê (obrigatório no evento)": "Plan (obligatorio en el evento)",
