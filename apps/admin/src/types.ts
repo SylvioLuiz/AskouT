@@ -110,6 +110,25 @@ export interface VenueDetail {
   events: { id: string; title: string; startsAt: string; endsAt: string; kind: string; isFree: boolean; isSample: boolean; upcoming: boolean }[];
 }
 
+/** Detalhe de um evento de local (a gestão abre ao clicar no evento da lista). */
+export interface EventDetail {
+  id: string;
+  title: string;
+  description: string | null;
+  startsAt: string;
+  endsAt: string;
+  kind: string;
+  isFree: boolean;
+  isSample: boolean;
+  imageUrl: string | null;
+  tags: string[];
+  ticketUrl: string | null;
+  status: 'UPCOMING' | 'LIVE' | 'PAST';
+  venue: { id: string; name: string; address: string | null; owner: { id: string; username: string } | null };
+  goingCount: number;
+  going: { id: string; username: string; displayName: string; at: string }[];
+}
+
 export interface PlaceEventRow {
   id: string;
   title: string;

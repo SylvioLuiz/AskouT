@@ -374,3 +374,25 @@ test('detalhe do local na gestão: cadastro, origem, responsável, seguidores e 
   assert.equal(bare.source, null);
   assert.deepEqual(bare.events, []);
 });
+
+test('detalhe do evento na gestão: cadastro, local, responsável e quem confirmou; só admin', async () => {
+  const { w, A, U, ana, bia } = await setup();
+  await w.places.createVenue({ id: 'v3', name: 'Sweet Mogi', address: 'Av. Y, 20', category: 'bar', lat: -23.52, lng: -46.18, isSample: false, ownerId: ana });
+  const at = w.clock.now().getTime();
+  await w.places.createEvent({ id: 'terca', venueId: 'v3', title: 'Terçaneja', description: 'Sertanejo toda terça', startsAt: new Date(at + 2 * H), endsAt: new Date(at + 6 * H), kind: 'NIGHT', isFree: true, imageUrl: null, tags: ['sertanejo'], isSample: false });
+  await rejectsWith(w.core.admin.eventDetail(U(ana), 'terca'), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.eventDetail(A, 'nao-existe'), 'NOT_FOUND');
+  await rejectsWith(w.core.admin.eventDetail(A, 42), 'NOT_FOUND');
+
+  await w.core.eventPages.go(bia, 'terca');
+  const d = await w.core.admin.eventDetail(A, 'terca');
+  assert.equal(d.title, 'Terçaneja');
+  assert.equal(d.description, 'Sertanejo toda terça');
+  assert.equal(d.status, 'UPCOMING');
+  assert.equal(d.isFree, true);
+  assert.deepEqual(d.tags, ['sertanejo']);
+  assert.equal(d.venue.name, 'Sweet Mogi');
+  assert.equal(d.venue.owner?.username, 'ana');
+  assert.equal(d.goingCount, 1);
+  assert.deepEqual(d.going.map((g) => g.username), ['bia']);
+});

@@ -245,4 +245,5 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .venuedetail__facts dd { margin: 2px 0 0; font-weight: 600; }
 .venuedetail__h { margin: 16px 0 6px; font-size: 14px; }
 .venuedetail__events { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow: auto; }
-
+.eventdetail__cover { display: block; width: 100%; max-height: 220px; margin: 8px 0; object-fit: cover; border-radius: 10px; }
+.eventdetail__desc { white-space: pre-wrap; }

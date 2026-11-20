@@ -44,6 +44,27 @@ export interface AdminVenueDetail {
   events: { id: string; title: string; startsAt: string; endsAt: string; kind: string; isFree: boolean; isSample: boolean; upcoming: boolean }[];
 }
 
+/** Detalhe de um evento de local na gestão: o cadastro, o local, quem responde por ele e quem confirmou presença. */
+export interface AdminEventDetail {
+  id: string;
+  title: string;
+  description: string | null;
+  startsAt: string;
+  endsAt: string;
+  kind: string;
+  isFree: boolean;
+  isSample: boolean;
+  imageUrl: string | null;
+  tags: string[];
+  ticketUrl: string | null;
+  /** Já começou e ainda não acabou / já acabou. */
+  status: 'UPCOMING' | 'LIVE' | 'PAST';
+  venue: { id: string; name: string; address: string | null; owner: { id: string; username: string } | null };
+  goingCount: number;
+  /** Primeiras pessoas que confirmaram (até 20), na ordem da confirmação. */
+  going: { id: string; username: string; displayName: string; at: string }[];
+}
+
 export interface AdminPage<T> {
   items: T[];
   limit: number;
@@ -434,6 +455,39 @@ export class AdminService {
     this.assertAdmin(actor);
     const text = queryText(query.q);
     return this.paged(query, (page) => this.deps.admin.searchPlaceEvents(text, page), () => this.deps.admin.countList('PLACE_EVENTS', { text }));
+  }
+
+  /** Abre um evento de local: cadastro, local, responsável e quem confirmou presença. */
+  async eventDetail(actor: Actor, id: unknown): Promise<AdminEventDetail> {
+    this.assertAdmin(actor);
+    if (typeof id !== 'string' || id.length === 0 || id.length > 64) throw notFound('Evento não encontrado');
+    const { places, users, eventRoom, clock } = this.deps;
+    const found = await places.findEvent(id);
+    if (!found) throw notFound('Evento não encontrado');
+    const { event, venue } = found;
+    const attendance = await eventRoom.listGoing({ source: 'PLACE', id: event.id });
+    const first = attendance.slice(0, 20);
+    const ids = [...new Set([...first.map((a) => a.userId), ...(venue.ownerId ? [venue.ownerId] : [])])];
+    const profiles = new Map((ids.length > 0 ? await users.findProfilesByIds(ids) : []).map((p) => [p.userId, p]));
+    const now = clock.now().getTime();
+    const status = event.endsAt.getTime() < now ? 'PAST' : event.startsAt.getTime() <= now ? 'LIVE' : 'UPCOMING';
+    return {
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      startsAt: event.startsAt.toISOString(),
+      endsAt: event.endsAt.toISOString(),
+      kind: event.kind,
+      isFree: event.isFree,
+      isSample: event.isSample,
+      imageUrl: event.imageUrl,
+      tags: event.tags,
+      ticketUrl: event.ticketUrl ?? null,
+      status,
+      venue: { id: venue.id, name: venue.name, address: venue.address, owner: venue.ownerId ? { id: venue.ownerId, username: profiles.get(venue.ownerId)?.username ?? '(removido)' } : null },
+      goingCount: attendance.length,
+      going: first.map((a) => ({ id: a.userId, username: profiles.get(a.userId)?.username ?? '(removido)', displayName: profiles.get(a.userId)?.displayName ?? '', at: a.createdAt.toISOString() })),
+    };
   }
 
   async deletePlaceEvent(actor: Actor, eventId: unknown, note: unknown): Promise<{ deleted: true }> {

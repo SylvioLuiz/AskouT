@@ -196,6 +196,12 @@ export class AdminController {
     return this.core.admin.searchVenues(actor, q);
   }
 
+  /** Detalhe do evento de local: cadastro, local, responsável e quem confirmou presença. */
+  @Get('place-events/:id')
+  placeEvent(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.admin.eventDetail(actor, id);
+  }
+
   /** Detalhe do local: cadastro, origem, responsável, seguidores e eventos. */
   @Get('venues/:id')
   venue(@CurrentActor() actor: Actor, @Param('id') id: string) {
