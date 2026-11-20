@@ -1,0 +1,8 @@
+# Links de eventos FUTUROS do Sympla para o importador (um por linha; linhas com # são ignoradas).
+# Só links de evento: https://www.sympla.com.br/evento/<nome>/<número>. Cancelado, privado e online são ignorados.
+# Rodar de novo não duplica. Para tirar um evento da lista, apague a linha (o que já entrou continua no app).
+#
+# Baladas da Rua Augusta (a agenda de cada casa fica no Instagram; os ingressos, no Sympla):
+#   Blitz Haus (Augusta, 657), Selva Club (Augusta, 501), 1007 Augusta (Augusta, 430), Beco 203 (Augusta, 609)
+https://www.sympla.com.br/evento/sem-freio-14-anos-de-blitz-haus/3651782
+https://www.sympla.com.br/evento/reveillon-open-bar-o-maior-ano-novo-da-rua-augusta-e-na-blitz-haus/3652094

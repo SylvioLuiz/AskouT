@@ -25,6 +25,10 @@ export interface ImportedEvent {
   sourceName: string;
   /** Região onde procurar o local no Google. */
   area: { name: string; lat: number; lng: number };
+  /** Posição exata do local, quando a fonte informa (usada se o Google não achar o lugar). */
+  coords?: { lat: number; lng: number };
+  /** Tipo já decidido por quem curou a fonte (pula o filtro de nicho). */
+  kind?: EventKind;
 }
 
 export type NicheVerdict = { keep: true; kind: EventKind } | { keep: false; reason: string };
