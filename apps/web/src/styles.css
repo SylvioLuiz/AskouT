@@ -5397,6 +5397,7 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .onb__themes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .onb__theme { display: flex; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box; height: 100%; min-height: 64px; padding: 12px 14px; border: 2px solid var(--line); border-radius: 16px; background: var(--bg); color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .onb__theme span { font-size: 0.875rem; color: var(--muted); }
+.onb__themeicon { color: var(--brand); margin-bottom: 4px; flex: none; }
 .onb__theme--on { border-color: var(--brand); background: var(--brand-soft); }
 :root[data-theme='dark'] .onb__theme--on { background: var(--brand-soft); border-color: var(--brand); }
 

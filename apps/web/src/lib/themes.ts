@@ -10,6 +10,8 @@ export type ThemeId = string;
 
 export interface Theme {
   id: ThemeId;
+  /** Chave do desenho em taste-icons.ts. */
+  icon: string;
   label: string;
   hint: string;
   /** Casa com o tipo do local já passado por `normalizeCategory` (texto livre do dono ou tipo do Google/OpenStreetMap). */
@@ -21,6 +23,7 @@ export interface Theme {
 /** Gosto como a API entrega: palavras no lugar de expressão regular. */
 export interface TasteDefinition {
   id: string;
+  icon?: string;
   label: string;
   hint: string;
   keywords: readonly string[];
@@ -48,20 +51,21 @@ export function keywordsRegExp(keywords: readonly string[]): RegExp {
 }
 
 function build(def: TasteDefinition): Theme {
-  return { id: def.id, label: t(def.label), hint: t(def.hint), category: keywordsRegExp(def.keywords), kinds: def.kinds as readonly EventKind[] };
+  return { id: def.id, icon: def.icon ?? 'star', label: t(def.label), hint: t(def.hint), category: keywordsRegExp(def.keywords), kinds: def.kinds as readonly EventKind[] };
 }
 
-/** Os nove gostos de origem (os mesmos de DEFAULT_TASTES na API). Os textos passam pelo t() para a tradução achar. */
+/** Os gostos de origem (os mesmos de DEFAULT_TASTES na API). Os textos passam pelo t() para a tradução achar. */
 const DEFAULT_DEFINITIONS: readonly TasteDefinition[] = [
-  { id: 'BAR', label: 'Bares', hint: 'Boteco, pub, música ao vivo, happy hour', keywords: ['bar', 'pub', 'boteco', 'botequim', 'choperia', 'cervejaria', 'biergarten', 'casa de show', 'casa de shows', 'samba'], kinds: [] },
-  { id: 'NIGHT', label: 'Baladas', hint: 'Balada, festa, pista, noite', keywords: ['night*', 'balada*', 'boate*', 'danceteria', 'club', 'festa*', 'casa noturna'], kinds: ['NIGHT'] },
-  { id: 'SHOW', label: 'Shows', hint: 'Música ao vivo, samba, pagode, sertanejo, rock', keywords: ['casa de show', 'casa de shows', 'show', 'shows', 'concert*', 'live music', 'music venue', 'musica ao vivo', 'samba', 'pagode', 'forro', 'sertanej*', 'rock', 'jazz'], kinds: ['SHOW'] },
-  { id: 'FOOD', label: 'Restaurantes', hint: 'Jantar, pizza, hambúrguer, japonês, rodízio', keywords: ['restaura*', 'pizza*', 'hamburg*', 'burger*', 'churrasc*', 'steak*', 'sushi*', 'japon*', 'lanchonete*', 'bistro*', 'cantina*', 'rodizio*', 'gastrono*', 'comida*', 'food'], kinds: ['GASTRONOMY'] },
-  { id: 'CAFE', label: 'Cafés e docerias', hint: 'Café, padaria, brunch, sorvete', keywords: ['cafe', 'cafes', 'cafeteria*', 'coffee*', 'padaria*', 'bakery*', 'confeitaria*', 'doceria*', 'sorvet*', 'ice cream', 'brunch*', 'tea house'], kinds: [] },
-  { id: 'CULTURE', label: 'Cinema e cultura', hint: 'Cinema, teatro, museu, exposição, stand-up', keywords: ['cinema*', 'movie*', 'teatro*', 'theater', 'theatre', 'museu*', 'museum*', 'galeria*', 'gallery', 'arts centre', 'centro cultural', 'exposi*', 'stand up', 'standup', 'comedia*', 'performing arts'], kinds: ['CINEMA', 'THEATER', 'EXHIBITION'] },
-  { id: 'GAMES', label: 'Karaokê e jogos', hint: 'Karaokê, sinuca, boliche, fliperama, escape room', keywords: ['karaok*', 'sinuca*', 'bilhar*', 'snooker*', 'boliche*', 'bowling*', 'fliperama*', 'arcade*', 'escape*', 'jogos', 'game', 'games', 'amusement center'], kinds: [] },
-  { id: 'OUTDOOR', label: 'Ao ar livre', hint: 'Parque, praia, trilha, feira, piquenique', keywords: ['park', 'parque*', 'praia*', 'beach*', 'praca*', 'jardim*', 'garden*', 'trilha*', 'hiking', 'mirante*', 'viewpoint', 'camping*', 'feira*'], kinds: ['OUTDOOR'] },
-  { id: 'SPORT', label: 'Esportes', hint: 'Jogo no estádio, futebol, beach tennis, corrida', keywords: ['stadium*', 'estadio*', 'arena*', 'ginasio*', 'esporte*', 'sport', 'sports', 'futebol*', 'soccer*', 'quadra*', 'beach tennis', 'tenis*', 'padel*', 'golf*', 'surf*', 'skate*', 'corrida*'], kinds: ['SPORT'] },
+  { id: 'BAR', icon: 'beer', label: 'Bares', hint: 'Boteco, pub, música ao vivo, happy hour', keywords: ['bar', 'pub', 'boteco', 'botequim', 'choperia', 'cervejaria', 'biergarten', 'casa de show', 'casa de shows', 'samba'], kinds: [] },
+  { id: 'NIGHT', icon: 'moon', label: 'Baladas', hint: 'Balada, festa, pista, noite', keywords: ['night*', 'balada*', 'boate*', 'danceteria', 'club', 'festa*', 'casa noturna'], kinds: ['NIGHT'] },
+  { id: 'SHOW', icon: 'mic', label: 'Shows', hint: 'Música ao vivo, samba, pagode, sertanejo, rock', keywords: ['casa de show', 'casa de shows', 'show', 'shows', 'concert*', 'live music', 'music venue', 'musica ao vivo', 'samba', 'pagode', 'forro', 'sertanej*', 'rock', 'jazz'], kinds: ['SHOW'] },
+  { id: 'FOOD', icon: 'food', label: 'Restaurantes', hint: 'Jantar, pizza, hambúrguer, japonês, rodízio', keywords: ['restaura*', 'pizza*', 'hamburg*', 'burger*', 'churrasc*', 'steak*', 'sushi*', 'japon*', 'lanchonete*', 'bistro*', 'cantina*', 'rodizio*', 'gastrono*', 'comida*', 'food'], kinds: ['GASTRONOMY'] },
+  { id: 'CAFE', icon: 'coffee', label: 'Cafés e docerias', hint: 'Café, padaria, brunch, sorvete', keywords: ['cafe', 'cafes', 'cafeteria*', 'coffee*', 'padaria*', 'bakery*', 'confeitaria*', 'doceria*', 'sorvet*', 'ice cream', 'brunch*', 'tea house'], kinds: [] },
+  { id: 'CULTURE', icon: 'film', label: 'Cinema e cultura', hint: 'Cinema, teatro, museu, exposição, stand-up', keywords: ['cinema*', 'movie*', 'teatro*', 'theater', 'theatre', 'museu*', 'museum*', 'galeria*', 'gallery', 'arts centre', 'centro cultural', 'exposi*', 'stand up', 'standup', 'comedia*', 'performing arts'], kinds: ['CINEMA', 'THEATER', 'EXHIBITION'] },
+  { id: 'GAMES', icon: 'gamepad', label: 'Karaokê e jogos', hint: 'Karaokê, sinuca, boliche, fliperama, escape room', keywords: ['karaok*', 'sinuca*', 'bilhar*', 'snooker*', 'boliche*', 'bowling*', 'fliperama*', 'arcade*', 'escape*', 'jogos', 'game', 'games', 'amusement center'], kinds: [] },
+  { id: 'RPG', icon: 'dice', label: 'RPG e jogos de mesa', hint: 'Campanha de RPG, board games, card games, mesa de D&D', keywords: ['rpg*', 'dungeons*', 'tabuleiro*', 'board game*', 'boardgame*', 'jogos de mesa', 'card game*', 'taverna*', 'ludica*', 'geek', 'nerd'], kinds: [] },
+  { id: 'OUTDOOR', icon: 'tree', label: 'Ao ar livre', hint: 'Parque, praia, trilha, feira, piquenique', keywords: ['park', 'parque*', 'praia*', 'beach*', 'praca*', 'jardim*', 'garden*', 'trilha*', 'hiking', 'mirante*', 'viewpoint', 'camping*', 'feira*'], kinds: ['OUTDOOR'] },
+  { id: 'SPORT', icon: 'ball', label: 'Esportes', hint: 'Jogo no estádio, futebol, beach tennis, corrida', keywords: ['stadium*', 'estadio*', 'arena*', 'ginasio*', 'esporte*', 'sport', 'sports', 'futebol*', 'soccer*', 'quadra*', 'beach tennis', 'tenis*', 'padel*', 'golf*', 'surf*', 'skate*', 'corrida*'], kinds: ['SPORT'] },
 ];
 
 /** A lista viva. Quem só lê pode importar; quem desenha a lista usa `useThemes()` para redesenhar quando ela chegar. */

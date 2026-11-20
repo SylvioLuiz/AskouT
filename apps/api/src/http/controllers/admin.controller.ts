@@ -105,13 +105,13 @@ export class AdminController {
   @Post('tastes')
   createTaste(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.admin.createTaste(actor, { label: b.label, hint: b.hint, keywords: b.keywords, kinds: b.kinds });
+    return this.core.admin.createTaste(actor, { icon: b.icon, label: b.label, hint: b.hint, keywords: b.keywords, kinds: b.kinds });
   }
 
   @Put('tastes/:id')
   updateTaste(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.admin.updateTaste(actor, id, { label: b.label, hint: b.hint, keywords: b.keywords, kinds: b.kinds });
+    return this.core.admin.updateTaste(actor, id, { icon: b.icon, label: b.label, hint: b.hint, keywords: b.keywords, kinds: b.kinds });
   }
 
   /** `{direction: 'up' | 'down'}` */

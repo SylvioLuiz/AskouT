@@ -90,3 +90,14 @@ describe('gostos cadastrados pela gestão', () => {
     }
   });
 });
+
+describe('RPG e jogos de mesa', () => {
+  it('existe, tem ícone e reconhece locais de mesa', () => {
+    const rpg = THEMES.find((x) => x.id === 'RPG');
+    assert.equal(rpg?.icon, 'dice');
+    assert.deepEqual(themesOfCategory('Taverna de RPG'), ['RPG']);
+    assert.deepEqual(themesOfCategory('Loja de Board Games'), ['RPG']);
+    assert.deepEqual(themesOfCategory('Karaokê'), ['GAMES']);
+    assert.ok(THEMES.every((x) => x.icon !== ''));
+  });
+});
