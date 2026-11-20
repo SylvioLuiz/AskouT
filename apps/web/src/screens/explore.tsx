@@ -1,7 +1,6 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { ExploreViews } from '../components/explore-views.tsx';
 import { ExploreSearch } from '../components/explore-search.tsx';
-import { RollingNowStrip } from '../components/venue-story.tsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
@@ -17,6 +16,8 @@ import { addRecent, buildSuggestions, readRecent, removeRecent, saveRecent } fro
 import { filterByThemes, themeFilter, themesOfCategory, themesOfEvent, userThemes } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 import { useThemes } from '../lib/use-themes.ts';
+import { isLiveNow, liveFirst } from '../lib/live-events.ts';
+import { LiveTag } from '../components/live-tag.tsx';
 import { useAsync, useDebounced, useTitle } from '../hooks.ts';
 import { formatRating, formatWhen, } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -80,7 +81,7 @@ export function useCurrentPosition(): LocationState {
 
 // ---------- Peças de tela ----------
 
-function EventCover({ event, shape, badge = false }: { event: ExploreEvent; shape: string; badge?: boolean }) {
+function EventCover({ event, shape, badge = false, live = false }: { event: ExploreEvent; shape: string; badge?: boolean; live?: boolean }) {
   const [failed, setFailed] = useState(false);
   const image = failed ? null : safeImage(event.imageUrl);
   return (
@@ -88,10 +89,12 @@ function EventCover({ event, shape, badge = false }: { event: ExploreEvent; shap
       {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="evcover__fallback" aria-hidden="true"><EventKindIcon kind={event.kind} /><span className="evcover__kind">{kindLabel(event.kind)}</span></span>}
       {badge ? <DateBadge startsAt={event.startsAt} mini /> : null}
       <span className="evcover__tags">
+        {live ? <LiveTag /> : null}
         {event.sponsored ? <span className="tag-sponsored">{t('Patrocinado')}</span> : null}
-        {event.isFree ? <span className="tag tag--free">{t('Grátis')}</span> : null}
+        {event.isFree && !badge ? <span className="tag tag--free">{t('Grátis')}</span> : null}
         {event.sample ? <SampleBadge /> : null}
       </span>
+      {event.isFree && badge ? <span className="tag tag--free evcover__free">{t('Grátis')}</span> : null}
     </div>
   );
 }
@@ -105,9 +108,9 @@ export function EventCard({ event, now, poster }: { event: ExploreEvent; now: Da
 function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
   const adRef = useSponsoredView<HTMLLIElement>(event.sponsored === true, 'EXPLORE', { eventId: event.id });
   return (
-    <li className="evcard" ref={adRef}>
+    <li className={`evcard${isLiveNow(event, now) ? ' evcard--live' : ''}`} ref={adRef}>
       <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link" onClick={() => { if (event.sponsored) trackSponsoredOpen('EXPLORE', { eventId: event.id }); }}>
-        <EventCover event={event} shape={coverShape(event.id)} badge />
+        <EventCover event={event} shape={coverShape(event.id)} badge live={isLiveNow(event, now)} />
         <div className="evcard__body">
           <h3 className="evcard__title">{event.title}</h3>
           {event.venue.name ? (
@@ -149,6 +152,7 @@ function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
         count={event.goingCount}
         tags={
           <>
+            {isLiveNow(event, now) ? <LiveTag /> : null}
             {event.sponsored ? <span className="tag-sponsored">{t('Patrocinado')}</span> : null}
             {event.isFree ? <span className="tag tag--free">{t('Grátis')}</span> : null}
             {event.sample ? <SampleBadge /> : null}
@@ -331,7 +335,7 @@ export function ExploreScreen() {
       raw
         ? {
             ...raw,
-            events: filterByThemes(raw.events, themes, themesOfEvent),
+            events: liveFirst(filterByThemes(raw.events, themes, themesOfEvent), new Date()),
             places: filterByThemes(raw.places, themes, (p) => themesOfCategory(p.category)),
           }
         : raw,
@@ -516,7 +520,6 @@ export function ExploreScreen() {
         ) : null}
       </div>
       <ExploreViews current="list" />
-      {!q ? <RollingNowStrip position={position} waiting={waiting} /> : null}
 
       <div className="filters" role="group" aria-label={t('Filtros')}>
         {allThemes.map((theme) => (

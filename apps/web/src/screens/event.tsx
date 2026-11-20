@@ -35,6 +35,7 @@ import { Link, navigate, useSearch, goBack as routerGoBack } from '../router.tsx
 import { useCurrentPosition } from './explore.tsx';
 import { t } from '../lib/i18n/index.ts';
 import { trackTicketClick } from '../components/sponsored-view.tsx';
+import { LiveTag } from '../components/live-tag.tsx';
 import { GoingChoiceSheet } from '../components/going-choice.tsx';
 
 /** O mesmo texto máximo que a API aceita num post de evento. */
@@ -253,6 +254,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <span className="visually-hidden">{kindLabel(e.kind)}</span>
               </span>
               <div className="evhero__pills">
+                {Date.parse(e.startsAt) <= Date.now() && Date.now() < Date.parse(e.endsAt) ? <LiveTag /> : null}
                 <span className="evhero__pill">{kindLabel(e.kind)}</span>
                 {e.isFree ? <span className="evhero__pill">{t('Grátis')}</span> : null}
                 {e.isPrivate ? (

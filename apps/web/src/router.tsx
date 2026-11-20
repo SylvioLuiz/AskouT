@@ -75,8 +75,16 @@ export function canGoBack(): boolean {
 
 /** Botão "voltar" das telas: volta uma tela; se esta é a primeira (aberta por link ou aviso), vai para `fallback`. */
 export function goBack(fallback: string): void {
-  if (canGoBack()) window.history.back();
-  else navigate(fallback, { replace: true });
+  if (!canGoBack()) {
+    navigate(fallback, { replace: true });
+    return;
+  }
+  const from = here();
+  window.history.back();
+  // Garantia: se o histórico não andou (entrada perdida, camada por cima, WebView do celular), o botão ainda leva para algum lugar.
+  window.setTimeout(() => {
+    if (here() === from) navigate(fallback, { replace: true });
+  }, 450);
 }
 
 export function navigate(to: string, options: { replace?: boolean } = {}): void {
