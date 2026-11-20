@@ -1,3 +1,4 @@
+import { PAGE_SIZES, setPageSize, usePageSize } from './page-size.ts';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ApiError } from './api.ts';
@@ -41,20 +42,55 @@ export function Tabs<T extends string>({ value, onChange, options }: { value: T;
   );
 }
 
-export function Pager({ offset, limit, hasMore, onChange }: { offset: number; limit: number; hasMore: boolean; onChange: (offset: number) => void }) {
-  if (offset === 0 && !hasMore) return null;
+/**
+ * Rodapé das tabelas paginadas: "Mostrando X–Y de N registros", escolha de quantos registros por página (vale para todas as
+ * tabelas) e os botões de página. O tamanho fica guardado no navegador (ver page-size.ts).
+ */
+export function Pager({ offset, limit, hasMore, total, onChange }: { offset: number; limit: number; hasMore: boolean; total?: number; onChange: (offset: number) => void }) {
+  const size = usePageSize();
+  const first = offset + 1;
+  const last = total === undefined ? offset + limit : Math.min(offset + limit, total);
   return (
     <div className="pager">
-      <button type="button" className="btn" disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - limit))}>
-        Anteriores
-      </button>
-      <span className="muted">
-        {offset + 1}–{offset + limit}
+      <span className="muted pager__count" aria-live="polite">
+        {total === undefined ? `${first}–${last}` : total === 0 ? 'Nenhum registro' : `Mostrando ${first}–${last} de ${total} ${total === 1 ? 'registro' : 'registros'}`}
       </span>
-      <button type="button" className="btn" disabled={!hasMore} onClick={() => onChange(offset + limit)}>
-        Próximos
-      </button>
+      <label className="pager__size">
+        <span className="muted">Registros por página</span>
+        <select
+          value={size}
+          onChange={(e) => {
+            setPageSize(Number(e.target.value));
+            onChange(0);
+          }}
+        >
+          {PAGE_SIZES.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      </label>
+      {offset === 0 && !hasMore ? null : (
+        <span className="pager__nav">
+          <button type="button" className="btn" disabled={offset === 0} onClick={() => onChange(Math.max(0, offset - limit))}>
+            Anteriores
+          </button>
+          <button type="button" className="btn" disabled={!hasMore} onClick={() => onChange(offset + limit)}>
+            Próximos
+          </button>
+        </span>
+      )}
     </div>
+  );
+}
+
+/** Rodapé das tabelas que mostram tudo de uma vez (sem páginas): só o total. */
+export function RecordCount({ count }: { count: number }) {
+  return (
+    <p className="muted pager__count recordcount" aria-live="polite">
+      {count === 0 ? 'Nenhum registro' : `Total: ${count} ${count === 1 ? 'registro' : 'registros'}`}
+    </p>
   );
 }
 

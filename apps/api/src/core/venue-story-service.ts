@@ -342,7 +342,7 @@ export class VenueStoryService {
     if (actor.role !== 'ADMIN') throw forbidden('Acesso restrito a administradores');
   }
 
-  async adminReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<{ items: AdminVenueStoryReportRow[]; limit: number; offset: number; hasMore: boolean }> {
+  async adminReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<{ items: AdminVenueStoryReportRow[]; limit: number; offset: number; hasMore: boolean; total: number }> {
     this.assertAdmin(actor);
     const page = parsePage(query);
     const rows = await this.deps.venueStories.listReports(query.status !== 'resolved', { limit: page.limit + 1, offset: page.offset });
@@ -367,7 +367,7 @@ export class VenueStoryService {
         venueOpenReporters: await this.deps.venueStories.countOpenReporters(story.venueId, since),
       });
     }
-    return { items, limit: page.limit, offset: page.offset, hasMore: rows.length > page.limit };
+    return { items, limit: page.limit, offset: page.offset, hasMore: rows.length > page.limit, total: await this.deps.venueStories.countReports(query.status !== 'resolved') };
   }
 
   /** Decide a denúncia. Decidida, ela deixa de contar para a suspensão do local. */

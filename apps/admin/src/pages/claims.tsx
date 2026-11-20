@@ -3,7 +3,7 @@ import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import { CLAIM_LABEL, formatDateTime } from '../labels.ts';
 import type { Claim, ClaimStatus } from '../types.ts';
-import { ActionDialog, Badge, Loadable, Modal, PageHead, Tabs } from '../ui.tsx';
+import { ActionDialog, Badge, Loadable, Modal, PageHead, RecordCount, Tabs } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
 
 function DocumentViewer({ claim }: { claim: Claim }) {
@@ -184,6 +184,7 @@ export function ClaimsPage() {
           </table>
         )}
       </Loadable>
+      {list.data ? <RecordCount count={list.data.length} /> : null}
       {open ? <ClaimDetail claim={open} onClose={() => setOpen(undefined)} onChanged={() => { list.reload(); counts.reload(); }} /> : null}
     </>
   );

@@ -138,7 +138,7 @@ export function FeedPage() {
         {(page) => (
           <>
             <div className="reports">{page.items.map((p) => <FeedPostCard key={p.id} post={p} onAction={setAction} />)}</div>
-            <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+            <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} total={page.total} onChange={setOffset} />
           </>
         )}
       </Loadable>

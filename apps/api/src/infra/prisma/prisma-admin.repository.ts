@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { isUuid } from './helpers.ts';
-import type { AdminRepository } from '../../core/ports.ts';
+import type { AdminCountKind, AdminRepository } from '../../core/ports.ts';
 import type {
   AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
   AuditAction, AuditRecord, AuditRow, ExternalProvider, Page, PostReportReason, ReportResolution, UserStatus,
@@ -60,11 +60,7 @@ export class PrismaAdminRepository implements AdminRepository {
 
   async searchUsers(text: string, status: UserStatus | undefined, page: Page): Promise<AdminUserRow[]> {
     const q = text.trim();
-    const where: Prisma.UserWhereInput = {
-      profile: { isNot: null },
-      ...(status ? { status } : {}),
-      ...(q ? { OR: [{ email: contains(q) }, { profile: { username: contains(q) } }, { profile: { displayName: contains(q) } }] } : {}),
-    };
+    const where = userWhere(q, status);
     const users = await this.prisma.user.findMany({
       where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: page.offset, take: page.limit,
       select: { id: true, email: true, status: true, role: true, createdAt: true, birthDate: true, profile: { select: { username: true, displayName: true } } },
@@ -104,7 +100,7 @@ export class PrismaAdminRepository implements AdminRepository {
   async searchVenues(text: string, page: Page): Promise<AdminVenueRow[]> {
     const q = text.trim();
     const rows = await this.prisma.venue.findMany({
-      where: q ? { OR: [{ name: contains(q) }, { address: contains(q) }] } : {},
+      where: venueWhere(q),
       orderBy: [{ name: 'asc' }, { id: 'asc' }], skip: page.offset, take: page.limit,
       select: { id: true, name: true, address: true, category: true, isSample: true, owner: { select: { id: true, profile: { select: { username: true } } } }, _count: { select: { events: true } } },
     });
@@ -117,7 +113,7 @@ export class PrismaAdminRepository implements AdminRepository {
   async searchPlaceEvents(text: string, page: Page): Promise<AdminPlaceEventRow[]> {
     const q = text.trim();
     const rows = await this.prisma.placeEvent.findMany({
-      where: q ? { OR: [{ title: contains(q) }, { venue: { name: contains(q) } }] } : {},
+      where: eventWhere(q),
       orderBy: [{ startsAt: 'desc' }, { id: 'asc' }], skip: page.offset, take: page.limit,
       select: { id: true, title: true, startsAt: true, endsAt: true, kind: true, isSample: true, venue: { select: { id: true, name: true } } },
     });
@@ -132,10 +128,7 @@ export class PrismaAdminRepository implements AdminRepository {
 
   async searchPosts(text: string, onlyEvents: boolean, page: Page): Promise<AdminPostRow[]> {
     const q = text.trim();
-    const where: Prisma.PostWhereInput = {
-      ...(onlyEvents ? { eventTitle: { not: null } } : {}),
-      ...(q ? { OR: [{ caption: contains(q) }, { eventTitle: contains(q) }, { placeName: contains(q) }, { author: { profile: { username: contains(q) } } }] } : {}),
-    };
+    const where = postWhere(q, onlyEvents);
     const rows = await this.prisma.post.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: page.offset, take: page.limit, select: POST_SELECT });
     return rows.map(toPostRow);
   }
@@ -296,6 +289,22 @@ export class PrismaAdminRepository implements AdminRepository {
     });
   }
 
+  async countList(kind: AdminCountKind, filter: { text?: string; status?: UserStatus; onlyEvents?: boolean; open?: boolean } = {}): Promise<number> {
+    const q = (filter.text ?? '').trim();
+    const resolved = { resolvedAt: filter.open === false ? { not: null } : null };
+    switch (kind) {
+      case 'USERS': return this.prisma.user.count({ where: userWhere(q, filter.status) });
+      case 'VENUES': return this.prisma.venue.count({ where: venueWhere(q) });
+      case 'PLACE_EVENTS': return this.prisma.placeEvent.count({ where: eventWhere(q) });
+      case 'POSTS': return this.prisma.post.count({ where: postWhere(q, filter.onlyEvents === true) });
+      case 'POST_REPORTS': return this.prisma.postReport.count({ where: resolved });
+      case 'CONVERSATION_REPORTS': return this.prisma.conversationReport.count({ where: resolved });
+      case 'STORY_REPORTS': return this.prisma.eventStoryReport.count({ where: resolved });
+      case 'USER_REPORTS': return this.prisma.userReport.count({ where: resolved });
+      case 'AUDIT': return this.prisma.adminAudit.count();
+    }
+  }
+
   async listAudit(page: Page): Promise<AuditRow[]> {
     const rows = await this.prisma.adminAudit.findMany({ orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: page.offset, take: page.limit });
     const ids = [...new Set(rows.map((r) => r.adminId))];
@@ -313,4 +322,25 @@ function storyText(caption: string | null, overlays: unknown): string | null {
   const parts = [caption, ...(Array.isArray(overlays) ? overlays.map((o) => (o && typeof o === 'object' && typeof (o as { text?: unknown }).text === 'string' ? (o as { text: string }).text : null)) : [])];
   const texts = parts.filter((t): t is string => !!t && t.trim() !== '');
   return texts.length > 0 ? texts.join(' · ') : null;
+}
+
+// Os filtros das listas da gestão: a busca e a contagem do total usam os mesmos, para o número bater com a tabela.
+function userWhere(q: string, status: UserStatus | undefined): Prisma.UserWhereInput {
+  return {
+    profile: { isNot: null },
+    ...(status ? { status } : {}),
+    ...(q ? { OR: [{ email: contains(q) }, { profile: { username: contains(q) } }, { profile: { displayName: contains(q) } }] } : {}),
+  };
+}
+function venueWhere(q: string): Prisma.VenueWhereInput {
+  return q ? { OR: [{ name: contains(q) }, { address: contains(q) }] } : {};
+}
+function eventWhere(q: string): Prisma.PlaceEventWhereInput {
+  return q ? { OR: [{ title: contains(q) }, { venue: { name: contains(q) } }] } : {};
+}
+function postWhere(q: string, onlyEvents: boolean): Prisma.PostWhereInput {
+  return {
+    ...(onlyEvents ? { eventTitle: { not: null } } : {}),
+    ...(q ? { OR: [{ caption: contains(q) }, { eventTitle: contains(q) }, { placeName: contains(q) }, { author: { profile: { username: contains(q) } } }] } : {}),
+  };
 }

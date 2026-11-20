@@ -74,7 +74,7 @@ import type {
   GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User } from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
-import type { ActivityRepository, MfaRepository } from '../ports.ts';
+import type { ActivityRepository, AdminCountKind, MfaRepository } from '../ports.ts';
 import type { UserMfa } from '../types.ts';
 import type { ActivityAction, ActivityRecord, ActivityTarget } from '../types.ts';
 
@@ -2884,6 +2884,14 @@ export class InMemoryFeedRepository implements FeedRepository {
     return { posts, comments };
   }
 
+  async countAdminPosts(query: { status?: FeedPostStatus; text: string }): Promise<number> {
+    return (await this.adminListPosts({ ...query, page: { limit: Number.MAX_SAFE_INTEGER, offset: 0 } })).length;
+  }
+
+  async countReports(open: boolean): Promise<number> {
+    return (await this.listReports(open, { limit: Number.MAX_SAFE_INTEGER, offset: 0 })).length;
+  }
+
   async adminListPosts(query: { status?: FeedPostStatus; text: string; page: Page }): Promise<FeedPostWithImages[]> {
     const q = query.text.trim().toLowerCase();
     return [...this.posts.values()]
@@ -3173,6 +3181,23 @@ export class InMemoryAdminRepository implements AdminRepository {
 
   async addAudit(record: AuditRecord) {
     this.audit.set(record.id, { ...record });
+  }
+
+  async countList(kind: AdminCountKind, filter: { text?: string; status?: UserStatus; onlyEvents?: boolean; open?: boolean } = {}): Promise<number> {
+    const all = { limit: Number.MAX_SAFE_INTEGER, offset: 0 };
+    const text = filter.text ?? '';
+    const open = filter.open !== false;
+    switch (kind) {
+      case 'USERS': return (await this.searchUsers(text, filter.status, all)).length;
+      case 'VENUES': return (await this.searchVenues(text, all)).length;
+      case 'PLACE_EVENTS': return (await this.searchPlaceEvents(text, all)).length;
+      case 'POSTS': return (await this.searchPosts(text, filter.onlyEvents === true, all)).length;
+      case 'POST_REPORTS': return (await this.listPostReports(open, all)).length;
+      case 'CONVERSATION_REPORTS': return (await this.listConversationReports(open, all)).length;
+      case 'STORY_REPORTS': return (await this.listStoryReports(open, all)).length;
+      case 'USER_REPORTS': return (await this.listUserReports(open, all)).length;
+      case 'AUDIT': return (await this.listAudit(all)).length;
+    }
   }
 
   async listAudit(page: Page) {
@@ -3539,6 +3564,10 @@ export class InMemoryVenueStoryRepository implements VenueStoryRepository {
 
   async reportedIds(userId: string, storyIds: string[]): Promise<Set<string>> {
     return new Set(storyIds.filter((id) => this.reports.has(`${id}|${userId}`)));
+  }
+
+  async countReports(open: boolean): Promise<number> {
+    return [...this.reports.values()].filter((r) => (r.resolvedAt === null) === open).length;
   }
 
   async listReports(open: boolean, page: Page): Promise<VenueStoryReportRecord[]> {

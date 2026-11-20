@@ -9,6 +9,8 @@ export interface Page<T> {
   limit: number;
   offset: number;
   hasMore: boolean;
+  /** Quantos registros a lista tem com o mesmo filtro. */
+  total: number;
 }
 
 export interface SessionUser {

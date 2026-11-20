@@ -25,6 +25,8 @@ export interface AdminPage<T> {
   limit: number;
   offset: number;
   hasMore: boolean;
+  /** Quantos registros a lista tem com o mesmo filtro (a gestão mostra embaixo da tabela). */
+  total: number;
 }
 
 function parsePage(query: { limit?: unknown; offset?: unknown }): Page {
@@ -115,10 +117,10 @@ export class AdminService {
     await this.deps.admin.addAudit({ id: this.deps.ids.next(), adminId, action, targetType, targetId, note, createdAt: this.deps.clock.now() });
   }
 
-  private async paged<T>(query: { limit?: unknown; offset?: unknown }, fetch: (page: Page) => Promise<T[]>): Promise<AdminPage<T>> {
+  private async paged<T>(query: { limit?: unknown; offset?: unknown }, fetch: (page: Page) => Promise<T[]>, count: () => Promise<number>): Promise<AdminPage<T>> {
     const page = parsePage(query);
-    const rows = await fetch({ limit: page.limit + 1, offset: page.offset });
-    return { items: rows.slice(0, page.limit), limit: page.limit, offset: page.offset, hasMore: rows.length > page.limit };
+    const [rows, total] = await Promise.all([fetch({ limit: page.limit + 1, offset: page.offset }), count()]);
+    return { items: rows.slice(0, page.limit), limit: page.limit, offset: page.offset, hasMore: rows.length > page.limit, total };
   }
 
   async stats(actor: Actor): Promise<AdminStats> {
@@ -180,7 +182,7 @@ export class AdminService {
     this.assertAdmin(actor);
     const status: UserStatus | undefined = query.status === 'ACTIVE' || query.status === 'SUSPENDED' || query.status === 'DELETION_REQUESTED' ? query.status : undefined;
     const text = queryText(query.q);
-    return this.paged(query, (page) => this.deps.admin.searchUsers(text, status, page));
+    return this.paged(query, (page) => this.deps.admin.searchUsers(text, status, page), () => this.deps.admin.countList('USERS', { text, ...(status ? { status } : {}) }));
   }
 
   /** Suspende (banir) ou reativa. Admins e a própria conta não podem ser suspensos. */
@@ -350,7 +352,7 @@ export class AdminService {
   async searchVenues(actor: Actor, query: { q?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminVenueRow>> {
     this.assertAdmin(actor);
     const text = queryText(query.q);
-    return this.paged(query, (page) => this.deps.admin.searchVenues(text, page));
+    return this.paged(query, (page) => this.deps.admin.searchVenues(text, page), () => this.deps.admin.countList('VENUES', { text }));
   }
 
   /** Tira o responsável de um local (ele volta a poder ser reivindicado). */
@@ -368,7 +370,7 @@ export class AdminService {
   async searchPlaceEvents(actor: Actor, query: { q?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminPlaceEventRow>> {
     this.assertAdmin(actor);
     const text = queryText(query.q);
-    return this.paged(query, (page) => this.deps.admin.searchPlaceEvents(text, page));
+    return this.paged(query, (page) => this.deps.admin.searchPlaceEvents(text, page), () => this.deps.admin.countList('PLACE_EVENTS', { text }));
   }
 
   async deletePlaceEvent(actor: Actor, eventId: unknown, note: unknown): Promise<{ deleted: true }> {
@@ -383,7 +385,7 @@ export class AdminService {
     this.assertAdmin(actor);
     const text = queryText(query.q);
     const onlyEvents = query.events === 'true' || query.events === true;
-    return this.paged(query, (page) => this.deps.admin.searchPosts(text, onlyEvents, page));
+    return this.paged(query, (page) => this.deps.admin.searchPosts(text, onlyEvents, page), () => this.deps.admin.countList('POSTS', { text, onlyEvents }));
   }
 
   async deletePost(actor: Actor, postId: unknown, note: unknown): Promise<{ deleted: true }> {
@@ -410,13 +412,13 @@ export class AdminService {
   async postReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminPostReportRow>> {
     this.assertAdmin(actor);
     const open = query.status !== 'resolved';
-    return this.paged(query, (page) => this.deps.admin.listPostReports(open, page));
+    return this.paged(query, (page) => this.deps.admin.listPostReports(open, page), () => this.deps.admin.countList('POST_REPORTS', { open }));
   }
 
   async storyReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminStoryReportRow>> {
     this.assertAdmin(actor);
     const open = query.status !== 'resolved';
-    return this.paged(query, (page) => this.deps.admin.listStoryReports(open, page));
+    return this.paged(query, (page) => this.deps.admin.listStoryReports(open, page), () => this.deps.admin.countList('STORY_REPORTS', { open }));
   }
 
   async resolveStoryReport(actor: Actor, reportId: unknown, resolution: unknown, note: unknown): Promise<{ resolved: true }> {
@@ -448,13 +450,13 @@ export class AdminService {
   async conversationReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminConversationReportRow>> {
     this.assertAdmin(actor);
     const open = query.status !== 'resolved';
-    return this.paged(query, (page) => this.deps.admin.listConversationReports(open, page));
+    return this.paged(query, (page) => this.deps.admin.listConversationReports(open, page), () => this.deps.admin.countList('CONVERSATION_REPORTS', { open }));
   }
 
   async userReports(actor: Actor, query: { status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminUserReportRow>> {
     this.assertAdmin(actor);
     const open = query.status !== 'resolved';
-    return this.paged(query, (page) => this.deps.admin.listUserReports(open, page));
+    return this.paged(query, (page) => this.deps.admin.listUserReports(open, page), () => this.deps.admin.countList('USER_REPORTS', { open }));
   }
 
   async resolveUserReport(actor: Actor, reportId: unknown, resolution: unknown, note: unknown): Promise<{ resolved: true }> {
@@ -541,7 +543,7 @@ export class AdminService {
     this.assertAdmin(actor);
     const text = queryText(query.q);
     const status: FeedPostStatus | undefined = query.status === 'pending' ? 'PENDING' : query.status === 'published' ? 'PUBLISHED' : undefined;
-    return this.paged(query, async (page) => this.feedPostRows(await this.deps.feed.adminListPosts({ text, page, ...(status ? { status } : {}) })));
+    return this.paged(query, async (page) => this.feedPostRows(await this.deps.feed.adminListPosts({ text, page, ...(status ? { status } : {}) })), () => this.deps.feed.countAdminPosts({ text, ...(status ? { status } : {}) }));
   }
 
   /** Comentários de uma publicação (do mais antigo ao mais novo), para conferir e apagar. */
@@ -599,7 +601,7 @@ export class AdminService {
         commentAlive: r.commentId !== null && alive.has(r.commentId),
         resolvedAt: r.resolvedAt ?? null, resolution: r.resolution ?? null, resolutionNote: r.resolutionNote ?? null,
       }));
-    });
+    }, () => this.deps.feed.countReports(open));
   }
 
   async resolveFeedReport(actor: Actor, reportId: unknown, resolution: unknown, note: unknown): Promise<{ resolved: true }> {
@@ -617,6 +619,6 @@ export class AdminService {
 
   async audit(actor: Actor, query: { limit?: unknown; offset?: unknown }): Promise<AdminPage<AuditRow>> {
     this.assertAdmin(actor);
-    return this.paged(query, (page) => this.deps.admin.listAudit(page));
+    return this.paged(query, (page) => this.deps.admin.listAudit(page), () => this.deps.admin.countList('AUDIT'));
   }
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from './api.ts';
+import { usePageSize } from './page-size.ts';
 
 export interface Async<T> {
   data: T | undefined;
@@ -13,6 +14,8 @@ export function useAsync<T>(load: () => Promise<T>, deps: readonly unknown[]): A
   const [state, setState] = useState<{ data: T | undefined; error: string | undefined; loading: boolean }>({ data: undefined, error: undefined, loading: true });
   const [tick, setTick] = useState(0);
   const latest = useRef(0);
+  // Trocar "registros por página" recarrega a tela aberta.
+  const pageSize = usePageSize();
   const loadRef = useRef(load);
   loadRef.current = load;
 
@@ -28,7 +31,7 @@ export function useAsync<T>(load: () => Promise<T>, deps: readonly unknown[]): A
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, tick]);
+  }, [...deps, tick, pageSize]);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
   return { ...state, reload };

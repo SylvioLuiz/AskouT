@@ -1,6 +1,6 @@
 import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
-import { Loadable, PageHead, UserLink } from '../ui.tsx';
+import { Loadable, PageHead, RecordCount, UserLink } from '../ui.tsx';
 
 export function ReferralsPage() {
   const list = useAsync(() => api.topInviters(30), []);
@@ -37,6 +37,7 @@ export function ReferralsPage() {
           </table>
         )}
       </Loadable>
+      {list.data ? <RecordCount count={list.data.length} /> : null}
     </>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api, ApiError } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import type { Taste, TasteInput } from '../types.ts';
-import { ActionDialog, Loadable, Modal, PageHead } from '../ui.tsx';
+import { ActionDialog, Loadable, Modal, PageHead, RecordCount } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
 // Os desenhos são os mesmos do app (um arquivo só, para os dois mostrarem igual).
 import { TASTE_ICON_LABELS, TASTE_ICON_PATHS, tasteIconPaths } from '../../../web/src/lib/taste-icons.ts';
@@ -225,6 +225,7 @@ export function TastesPage() {
           </table>
         )}
       </Loadable>
+      {state.data ? <RecordCount count={state.data.items.length} /> : null}
       <p className="muted small">Mudanças valem na hora no app. Cada alteração fica na Auditoria.</p>
       {editing !== undefined && state.data ? <TasteForm initial={editing} onClose={() => setEditing(undefined)} onSaved={state.reload} /> : null}
       {action ? <ActionDialog spec={action} onClose={() => setAction(undefined)} onDone={state.reload} /> : null}
