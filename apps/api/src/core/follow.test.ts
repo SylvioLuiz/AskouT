@@ -359,3 +359,37 @@ test('aceitar pedido avisa com o caminho do perfil de quem aceitou', async () =>
   const accepted = (await w.core.notifications.list(leo!)).items.find((n) => n.type === 'FOLLOW_ACCEPTED');
   assert.equal(accepted?.url, '/u/maria');
 });
+
+test('pessoas que você talvez conheça: placar com seguidores, eventos em comum e gostos, com o motivo', async () => {
+  const w = makeWorld();
+  const u = await w.signUpMany('leo', 'ana', 'bia', 'caio', 'duda', 'edu', 'fabi');
+  const [eu, ana, caio, duda, edu, fe] = [u['leo']!, u['ana']!, u['caio']!, u['duda']!, u['edu']!, u['fabi']!];
+  const friends = async (a: string, b: string) => {
+    await w.core.follows.follow(a, b);
+    await w.core.follows.follow(b, a);
+  };
+  await friends(eu, ana);
+  await friends(ana, caio); // caio: 1 amigo em comum
+  await w.core.follows.follow(duda, eu); // duda já segue você
+  await w.eventRoom.addGoing({ source: 'PLACE', id: 'show1' }, eu, new Date(w.clock.now()));
+  await w.eventRoom.addGoing({ source: 'PLACE', id: 'show1' }, edu, new Date(w.clock.now()));
+  await w.eventRoom.addGoing({ source: 'PLACE', id: 'show2' }, eu, new Date(w.clock.now()));
+  await w.eventRoom.addGoing({ source: 'PLACE', id: 'show2' }, edu, new Date(w.clock.now()));
+  await w.eventRoom.addGoing({ source: 'USER', id: 'festa-privada' }, eu, new Date(w.clock.now()));
+  await w.eventRoom.addGoing({ source: 'USER', id: 'festa-privada' }, fe, new Date(w.clock.now()));
+  await w.core.auth.setTastes({ userId: eu, role: 'USER' }, ['BAR', 'SHOW']);
+  await w.core.auth.setTastes({ userId: caio, role: 'USER' }, ['BAR', 'SHOW', 'FOOD']);
+  await w.core.auth.setTastes({ userId: fe, role: 'USER' }, ['BAR', 'SHOW']);
+
+  const r = await w.core.follows.suggestedPeople(eu);
+  // duda: segue você (5); caio: 1 amigo em comum (3) + 2 gostos (2) = 5, mas amigo em comum vence o empate; edu: 2 eventos (4)
+  assert.deepEqual(r.items.map((p) => [p.username, p.reason]), [['caio', 'MUTUAL'], ['duda', 'FOLLOWS_YOU'], ['edu', 'EVENTS']]);
+  const caioItem = r.items.find((p) => p.username === 'caio')!;
+  assert.deepEqual([caioItem.mutualCount, caioItem.sharedTastes], [1, 2]);
+  assert.equal(r.items.find((p) => p.username === 'edu')!.sharedEvents, 2);
+  assert.equal(r.items.some((p) => p.username === 'fabi'), false, 'evento de pessoa e gosto sozinho não trazem ninguém');
+  await w.core.blocks.block(eu, edu);
+  assert.deepEqual((await w.core.follows.suggestedPeople(eu)).items.map((p) => p.username), ['caio', 'duda']);
+  await w.core.follows.follow(eu, duda);
+  assert.deepEqual((await w.core.follows.suggestedPeople(eu)).items.map((p) => p.username), ['caio']);
+});

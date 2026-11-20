@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
-import { markHidden, readHiddenAt, shouldShowSuggestions } from '../lib/suggested-people.ts';
+import { markHidden, readHiddenAt, shouldShowSuggestions, suggestionReasonText } from '../lib/suggested-people.ts';
 import { Link } from '../router.tsx';
 import { Avatar } from './ui.tsx';
 import { ConnectContactsCard, useContactsConnected } from './connect-contacts.tsx';
 import { t } from '../lib/i18n/index.ts';
 
-/** "Pessoas que você talvez conheça": amigos de amigos, em carrossel. Aparece sempre que há sugestões; "Ocultar" esconde por 3 dias. */
+/** "Pessoas que você talvez conheça": amigos em comum, rolês, quem já segue você e gostos parecidos, em carrossel. Aparece sempre que há sugestões; "Ocultar" esconde por 3 dias. */
 export function SuggestedPeople() {
   const data = useAsync(() => api.suggestedPeople(), []);
   const [hidden, setHidden] = useState(() => !shouldShowSuggestions(readHiddenAt(), Date.now()));
@@ -37,7 +37,7 @@ export function SuggestedPeople() {
             <Link to={`/u/${encodeURIComponent(p.username)}`} className="suggest__link">
               <Avatar profile={p} size={72} />
               <span className="suggest__name">{p.username}</span>
-              <span className="suggest__mutual">{p.mutualCount === 1 ? t('1 amigo em comum') : t('{n} amigos em comum', { n: p.mutualCount })}</span>
+              <span className="suggest__mutual">{suggestionReasonText(p)}</span>
             </Link>
           </li>
         ))}

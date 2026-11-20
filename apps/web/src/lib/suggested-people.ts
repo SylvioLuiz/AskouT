@@ -1,7 +1,28 @@
+import { t } from './i18n/index.ts';
 import type { PublicProfile } from './types.ts';
+
+/** Por que a pessoa foi sugerida (o motivo que mais pesou no servidor). */
+export type SuggestionReason = 'MUTUAL' | 'FOLLOWS_YOU' | 'EVENTS' | 'TASTES';
 
 export interface SuggestedPerson extends PublicProfile {
   mutualCount: number;
+  /** Ausentes em versões antigas da API. */
+  sharedEvents?: number;
+  followsYou?: boolean;
+  sharedTastes?: number;
+  reason?: SuggestionReason;
+}
+
+/** Frase curta do cartão: o motivo principal, com o número quando houver. Versão antiga da API cai em amigos em comum. */
+export function suggestionReasonText(p: SuggestedPerson): string {
+  const reason = p.reason ?? 'MUTUAL';
+  if (reason === 'FOLLOWS_YOU') return t('Segue você');
+  if (reason === 'EVENTS') {
+    const n = p.sharedEvents ?? 0;
+    return n === 1 ? t('1 rolê em comum') : t('{n} rolês em comum', { n });
+  }
+  if (reason === 'TASTES') return t('Curte rolês parecidos');
+  return p.mutualCount === 1 ? t('1 amigo em comum') : t('{n} amigos em comum', { n: p.mutualCount });
 }
 
 /** Quanto tempo o bloco fica escondido depois que a pessoa toca em "Ocultar". */
