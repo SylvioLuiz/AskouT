@@ -429,7 +429,7 @@ function ComposeSheet({ where, targetId, settings, onClose, onCreated }: { where
           <PhotoIcon /> {photos.length === 0 ? t('Adicionar fotos') : t('Adicionar mais fotos')}
         </Button>
       ) : null}
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => void pick(e)} aria-label={t('Escolher fotos do aparelho')} />
+      <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => void pick(e)} aria-label={t('Escolher fotos do aparelho')} />
       {message ? <Notice tone="error">{message}</Notice> : null}
       <Button full loading={busy} disabled={empty || length > FEED_BODY_MAX} onClick={() => publish()}>
         {settings.needsApproval ? t('Enviar para aprovação') : t('Publicar')}

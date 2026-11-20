@@ -34,22 +34,58 @@ export interface ResizeOptions {
   maxBytes: number;
 }
 
+const IMAGE_EXTENSION = /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif)$/i;
+
+/** Android às vezes entrega `type` vazio ou genérico; nesse caso vale a extensão. */
+export function looksLikeImage(file: { type: string; name: string }): boolean {
+  if (file.type.startsWith('image/')) return true;
+  return (file.type === '' || file.type === 'application/octet-stream') && IMAGE_EXTENSION.test(file.name);
+}
+
+interface Decoded {
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  close: () => void;
+}
+
+/** Decodifica a foto; se createImageBitmap recusar (comum em fotos de celular), tenta pelo <img>. */
+async function decodeImage(file: File): Promise<Decoded> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    return { source: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close() };
+  } catch {
+    /* tenta o <img> abaixo */
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      return { source: img, width: img.naturalWidth, height: img.naturalHeight, close: () => URL.revokeObjectURL(url) };
+    }
+  } catch {
+    /* cai no erro abaixo */
+  }
+  URL.revokeObjectURL(url);
+  const heic = /\.(heic|heif)$/i.test(file.name) || /hei[cf]/i.test(file.type);
+  throw new Error(heic
+    ? t('Esse formato de foto (HEIC) não é aceito aqui. Escolha outra foto ou mude a câmera para "Mais compatível".')
+    : t('Não foi possível ler essa imagem. Tente uma foto JPEG ou PNG.'));
+}
+
 /** Reduz a foto escolhida para caber no limite da API. Lança Error com texto claro se não der. */
 export async function resizePhoto(file: File, options: ResizeOptions): Promise<string> {
-  if (!file.type.startsWith('image/')) throw new Error(t('Escolha um arquivo de imagem'));
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch {
-    throw new Error(t('Não foi possível ler essa imagem. Tente uma foto JPEG ou PNG.'));
-  }
+  if (!looksLikeImage(file)) throw new Error(t('Escolha um arquivo de imagem'));
+  const bitmap = await decodeImage(file);
   const { width, height } = fitWithin(bitmap.width, bitmap.height, options.side);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error(t('Seu navegador não conseguiu preparar a imagem'));
-  ctx.drawImage(bitmap, 0, 0, width, height);
+  ctx.drawImage(bitmap.source, 0, 0, width, height);
   bitmap.close();
   for (const quality of [0.85, 0.7, 0.55, 0.4, 0.3]) {
     const url = canvas.toDataURL('image/jpeg', quality);
@@ -94,15 +130,10 @@ function jpegWithin(canvas: HTMLCanvasElement, maxBytes: number): string {
 }
 
 export async function readPostSource(file: File): Promise<string> {
-  if (!file.type.startsWith('image/')) throw new Error(t('Escolha um arquivo de imagem'));
-  let bitmap: ImageBitmap;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch {
-    throw new Error(t('Não foi possível ler essa imagem. Tente uma foto JPEG ou PNG.'));
-  }
+  if (!looksLikeImage(file)) throw new Error(t('Escolha um arquivo de imagem'));
+  const bitmap = await decodeImage(file);
   const size = fitWithin(bitmap.width, bitmap.height, POST_SOURCE_SIDE);
-  const canvas = paint(bitmap, { sx: 0, sy: 0, sw: bitmap.width, sh: bitmap.height }, size);
+  const canvas = paint(bitmap.source,{ sx: 0, sy: 0, sw: bitmap.width, sh: bitmap.height }, size);
   bitmap.close();
   return canvas.toDataURL('image/jpeg', 0.92);
 }
