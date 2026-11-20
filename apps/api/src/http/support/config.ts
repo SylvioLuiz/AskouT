@@ -265,8 +265,11 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     problems.push('BOOST_PRICE_PER_DAY_CENTS deve ser um inteiro de 100 a 1000000 (centavos)');
   }
 
-  if (paymentsEnabled && paymentProvider === undefined) {
-    problems.push('PAYMENTS_ENABLED=true exige um provedor de pagamento: defina PAYMENT_PROVIDER (e, para a Stripe, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET e PUBLIC_WEB_URL)');
+  // Sem provedor na web ainda dá para vender pelas lojas (App Store com APPLE_APP_ID, Google Play com a conta de serviço):
+  // a compra pela web só responde "ainda não disponível". Sem loja e sem provedor, ligar seria prometer uma cobrança impossível.
+  const storeConfigured = Boolean(env.APPLE_APP_ID?.trim()) || googleServiceAccount !== undefined;
+  if (paymentsEnabled && paymentProvider === undefined && !storeConfigured) {
+    problems.push('PAYMENTS_ENABLED=true exige um jeito de cobrar: defina PAYMENT_PROVIDER (e, para a Stripe, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET e PUBLIC_WEB_URL) ou configure a compra pelas lojas (APPLE_APP_ID ou GOOGLE_SERVICE_ACCOUNT_JSON)');
   }
 
   const storePriceRaw = env.BOOST_STORE_PRICE_PER_DAY_CENTS?.trim() ?? '';
