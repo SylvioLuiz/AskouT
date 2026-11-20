@@ -149,8 +149,13 @@ function ViewOnly({ albumId, photoId, onClose }: { albumId: string; photoId: str
 }
 
 export function AlbumScreen({ albumId }: { albumId: string }) {
+  return <AlbumContent albumId={albumId} />;
+}
+
+/** Fotos do álbum, com o botão de adicionar. `embedded`: dentro da página do evento (sem cabeçalho nem título da aba). */
+export function AlbumContent({ albumId, embedded = false }: { albumId: string; embedded?: boolean }) {
   const album = useAsync(() => api.album(albumId), [albumId]);
-  useTitle(album.data ? albumName(album.data) : t('Álbum'));
+  useTitle(embedded ? undefined : album.data ? albumName(album.data) : t('Álbum'));
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -194,7 +199,7 @@ export function AlbumScreen({ albumId }: { albumId: string }) {
 
   return (
     <>
-      <PageHead title={albumName(data)} subtitle={`${dayText(data.startedAt)} · ${albumWith(data.friendCount)}`} back="/albuns" />
+      {embedded ? <p className="muted">{t('Fotos de quem foi. Só quem confirmou presença vê.')} {albumWith(data.friendCount)} · {albumPhotosText(data.photos.length)}</p> : <PageHead title={albumName(data)} subtitle={`${dayText(data.startedAt)} · ${albumWith(data.friendCount)}`} back="/albuns" />}
       <div className="albumpeople">
         {data.members.map((m) => (
           <Link key={m.userId} to={`/u/${encodeURIComponent(m.username)}`} aria-label={m.username}>

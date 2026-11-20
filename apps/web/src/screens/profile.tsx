@@ -156,6 +156,9 @@ export function ProfileScreen({ username }: { username: string }) {
         />
       ) : null}
       {viewOpen && profile.avatarUrl ? <AvatarViewer url={profile.avatarUrl} onClose={() => setViewOpen(false)} /> : null}
+      {/* No celular os blocos são transparentes (display: contents); no computador, o cartão do perfil fica à esquerda e o conteúdo à direita. */}
+      <div className="profilepage">
+      <div className="profilepage__side">
       <header className="profile">
         {relationship.isSelf ? (
           <div className="avatarbtn__wrap">
@@ -311,7 +314,9 @@ export function ProfileScreen({ username }: { username: string }) {
           onConfirm={() => run(() => api.unfollow(profile.userId), t('Você deixou de seguir @{username}.', { username: profile.username }))}
         />
       ) : null}
+      </div>
 
+      <div className="profilepage__main">
       {relationship.blockedByViewer ? (
         <EmptyState title={t('Você bloqueou @{username}', { username: profile.username })}>{t('Desbloqueie para ver o perfil de novo ou seguir.')}</EmptyState>
       ) : !canViewContent ? (
@@ -346,6 +351,8 @@ export function ProfileScreen({ username }: { username: string }) {
           </div>
         </>
       )}
+      </div>
+      </div>
     </>
   );
 }

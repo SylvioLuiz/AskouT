@@ -173,3 +173,19 @@ test('NOW: o álbum nasce quando o encontro é aceito e é só dos dois', async 
   const note = (await w.core.notifications.list(ana!)).items.find((n) => n.type === 'ALBUM_SUMMARY');
   assert.equal(note?.title, 'Ontem: um encontro do NOW com 1 amigo');
 });
+
+test('aba Álbum do evento: antes de começar avisa; depois abre só para quem vai, entrando na hora e reaproveitando o mesmo álbum', async () => {
+  const { w, bia, caio, dani } = await setup();
+  assert.equal((await w.core.albums.forEvent(bia, 'e1')).state, 'SOON');
+  w.clock.tick(3 * HOUR);
+  assert.deepEqual(await w.core.albums.forEvent(dani, 'e1'), { state: 'LOCKED' }, 'quem não confirmou não vê');
+  const mine = await w.core.albums.forEvent(bia, 'e1');
+  assert.equal(mine.state, 'OPEN');
+  if (mine.state !== 'OPEN') return;
+  assert.equal(mine.album.title, 'Noite de samba');
+  await w.core.albums.addPhoto(bia, mine.album.id, JPEG);
+  assert.equal(await w.core.albums.syncEvents(), 1, 'o job usa o mesmo álbum');
+  const other = await w.core.albums.forEvent(caio, 'e1');
+  assert.ok(other.state === 'OPEN' && other.album.id === mine.album.id && other.album.photoCount === 1);
+  await rejectsWith(w.core.albums.forEvent(bia, 'nao-existe'), 'NOT_FOUND');
+});

@@ -6,7 +6,7 @@ import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { ArrowUpIcon, BellOffIcon, CameraIcon, CheckIcon, ChevronDownIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
 import { MessagePopup, ReactionSummary, ReactionsSheet, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';
@@ -23,6 +23,7 @@ import { SuggestionBubble, SuggestionsSheet } from '../components/suggestions.ts
 import { api } from '../client.ts';
 import { useAsync, useLiveRefresh, usePolling, useTitle } from '../hooks.ts';
 import { PullRefresh } from '../components/pull-refresh.tsx';
+import { useWideDesktop } from '../lib/use-desktop.ts';
 import { allDeletable, announceChatsChanged, breakLabel, copyText, filterConversations, formatClock, groupAlbums, isDoubleTap, LONG_PRESS_MS, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
 import type { RunPosition } from '../lib/chat.ts';
 import { CHAT_VIDEO_MAX_BYTES, mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
@@ -46,8 +47,9 @@ const UNDO_MS = 6000;
 let chatLeftAt = 0;
 const BACK_WINDOW_MS = 1500;
 
-export function ConversationsScreen() {
-  useTitle(t('Conversas'));
+export function ConversationsScreen({ activeId, split = false }: { activeId?: string; split?: boolean } = {}) {
+  // Lado a lado com o chat (computador): quem dá o título da aba é a conversa aberta.
+  useTitle(split && activeId ? undefined : t('Conversas'));
   const [cameBack] = useState(() => Date.now() - chatLeftAt < BACK_WINDOW_MS);
   const list = useAsync(() => api.conversations(), []);
   useLiveRefresh(list.reload, 5_000);
@@ -63,7 +65,7 @@ export function ConversationsScreen() {
   // e um `position: fixed` dentro de um elemento com transform passa a andar junto com ele.
   const fab = (
     <>
-      <button type="button" className="fab" onClick={() => setCreating(true)}>
+      <button type="button" className={`fab${split ? ' fab--split' : ''}`} onClick={() => setCreating(true)}>
         <PlusIcon />
         {t('Nova conversa')}
       </button>
@@ -133,7 +135,7 @@ export function ConversationsScreen() {
             <ul className="list convlist">
               {shown.map((c) => (
                 <li key={c.id} className="convitem">
-                  <Link to={`/conversas/${c.id}`} className={`convrow${c.unread > 0 ? ' convrow--unread' : ''}`}>
+                  <Link to={`/conversas/${c.id}`} className={`convrow${c.unread > 0 ? ' convrow--unread' : ''}${c.id === activeId ? ' convrow--active' : ''}`} aria-current={c.id === activeId ? 'page' : undefined}>
                     {c.other ? <Avatar profile={c.other} size={48} /> : <GroupAvatar name={c.name ?? t('Grupo')} size={48} imageUrl={c.imageUrl} />}
                     <span className="convrow__body">
                       <span className="convrow__top">
@@ -183,6 +185,35 @@ export function ConversationsScreen() {
     </div>
     </PullRefresh>
     </>
+  );
+}
+
+/**
+ * Rota das conversas. No celular é uma tela por vez (lista ou chat); no computador largo, a lista fica à esquerda
+ * e a conversa aberta à direita, como nos apps de mensagem de desktop.
+ */
+export function ConversationsRoute({ conversationId }: { conversationId?: string }) {
+  const wide = useWideDesktop();
+  if (!wide) return conversationId ? <ChatScreen key={conversationId} conversationId={conversationId} /> : <ConversationsScreen />;
+  return (
+    <div className="convsplit">
+      <div className="convsplit__list">
+        <ConversationsScreen split activeId={conversationId} />
+      </div>
+      <section className="convsplit__chat" aria-label={t('Conversa')}>
+        {conversationId ? (
+          <ChatScreen key={conversationId} conversationId={conversationId} />
+        ) : (
+          <div className="convsplit__empty">
+            <span className="convsplit__icon" aria-hidden="true">
+              <ChatIcon />
+            </span>
+            <h2 className="convsplit__title">{t('Suas conversas')}</h2>
+            <p className="muted">{t('Escolha uma conversa na lista para abrir aqui, ou comece uma nova.')}</p>
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 

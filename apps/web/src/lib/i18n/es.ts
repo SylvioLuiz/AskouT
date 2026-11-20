@@ -3324,4 +3324,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Seus amigos veem quando você está disponível, parcial ou indisponível, e podem achar horários em comum com você. Compromissos das agendas ligadas contam só como ocupado. Dá para desligar quando quiser.": "Tus amigos ven cuándo estás disponible, parcialmente disponible o no disponible, y pueden encontrar horarios en común contigo. Los eventos de calendarios vinculados solo cuentan como ocupado. Puedes desactivarlo cuando quieras.",
   "Carregando mais…": "Cargando más…",
   "Ver mais eventos": "Ver más eventos",
+  "Suas conversas": "Tus conversaciones",
+  "Escolha uma conversa na lista para abrir aqui, ou comece uma nova.": "Elige una conversación de la lista para abrirla aquí, o empieza una nueva.",
+  "Seus planos e sugestões": "Tus planes y sugerencias",
+  "Entre para dizer \"Eu vou\" e receber um lembrete antes de começar.": "Inicia sesión para decir \"Voy\" y recibir un recordatorio antes de que empiece.",
 };

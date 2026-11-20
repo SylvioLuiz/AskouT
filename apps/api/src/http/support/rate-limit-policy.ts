@@ -14,6 +14,8 @@ const HOUR = 3_600_000;
 
 /** Limite geral por endereço: folgado, porque muita gente no celular divide o mesmo IP da operadora. */
 export const GENERAL = { limit: 600, windowMs: MIN };
+/** Leituras do modo visitante (sem login), por endereço: mais apertado que o geral, para ninguém raspar o catálogo. */
+export const PUBLIC_PER_IP = { limit: 120, windowMs: MIN };
 /** Rotas de entrada e códigos, por endereço. */
 export const AUTH_PER_IP = { limit: 30, windowMs: 10 * MIN };
 /** Tentativas de adivinhar senha ou código, por conta. */
@@ -54,6 +56,7 @@ export class RateLimitPolicy {
     };
 
     apply(`ip:${ip}`, GENERAL, 'Muitas requisições. Espere um instante e tente de novo.');
+    if (route.startsWith('GET /public/')) apply(`public-ip:${ip}`, PUBLIC_PER_IP, 'Muitas consultas sem login. Entre na sua conta ou espere um instante.');
     if (!AUTH_ROUTES.has(route)) return;
     apply(`auth-ip:${ip}`, AUTH_PER_IP, 'Muitas tentativas de entrada. Espere alguns minutos e tente de novo.');
     const guess = GUESS_ROUTES[route];

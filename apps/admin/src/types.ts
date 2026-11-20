@@ -88,6 +88,28 @@ export interface VenueRow {
   eventsCount: number;
 }
 
+/** Detalhe de um local (a gestão abre ao clicar no local da lista). */
+export interface VenueDetail {
+  id: string;
+  name: string;
+  address: string | null;
+  category: string | null;
+  lat: number;
+  lng: number;
+  isSample: boolean;
+  isOrganization: boolean;
+  isUserCreated: boolean;
+  source: 'GOOGLE' | 'OSM' | 'IMPORT' | null;
+  description: string | null;
+  coverUrl: string | null;
+  logoUrl: string | null;
+  owner: { id: string; username: string; displayName: string } | null;
+  followers: number;
+  eventsTotal: number;
+  upcomingCount: number;
+  events: { id: string; title: string; startsAt: string; endsAt: string; kind: string; isFree: boolean; isSample: boolean; upcoming: boolean }[];
+}
+
 export interface PlaceEventRow {
   id: string;
   title: string;

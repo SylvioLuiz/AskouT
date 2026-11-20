@@ -599,7 +599,7 @@ export class VenueService {
   }
 
   /** Página pública do local. Qualquer pessoa logada vê; quem administra também recebe `isOwner`. */
-  async profile(viewerId: string, venueId: unknown): Promise<VenueProfileView> {
+  async profile(viewerId: string, venueId: unknown, opts: { withVisitors?: boolean } = {}): Promise<VenueProfileView> {
     const venue = await this.venueOrThrow(venueId);
     const now = this.deps.clock.now().getTime();
     const role = await venueRoleOf(this.deps.places, viewerId, venue);
@@ -639,7 +639,7 @@ export class VenueService {
       rating: ratingView(rating),
       upcomingEvents: upcoming,
       pastEvents: past.map((e) => ({ ...this.eventView(e), goingCount: pastGoing.get(e.id) ?? 0 })),
-      ...(await this.visitors(viewerId, venue.id, events, now)),
+      ...(opts.withVisitors === false ? { regulars: [], friendsWent: { count: 0, sample: [] } } : await this.visitors(viewerId, venue.id, events, now)),
     };
   }
 

@@ -82,6 +82,12 @@ export class ExploreController {
     return this.presentPage(await this.core.eventPages.get(actor.userId, id, lat !== undefined && lng !== undefined ? { lat, lng } : {}));
   }
 
+  /** Aba "Álbum" do evento: abre quando começa, só para quem confirmou presença (ou criou). */
+  @Get('events/:id/album')
+  eventAlbum(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.albums.forEvent(actor.userId, id);
+  }
+
   /** Stories no ar do evento, agrupados por pessoa. */
   @Get('events/:id/stories')
   stories(@CurrentActor() actor: Actor, @Param('id') id: string) {

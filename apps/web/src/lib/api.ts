@@ -224,6 +224,9 @@ export function createApi(deps: ApiDeps) {
     throw error;
   }
 
+  /** Sem login (modo visitante): Explorar, mapa, evento e local vêm das leituras públicas, sem dados de pessoas. */
+  const visitor = () => deps.getToken() === undefined;
+
   return {
     // Cadastro e sessão
     startSignup: (input: SignupInput) => request<SignupStarted>('POST', '/auth/signup', { body: input, auth: false }),
@@ -470,13 +473,13 @@ export function createApi(deps: ApiDeps) {
       if (params.hot) query.set('hot', 'true');
       if (params.offset) query.set('offset', String(params.offset));
       const text = query.toString();
-      return request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
+      return visitor() ? request<ExploreResult>('GET', `/public/explore${text ? `?${text}` : ''}`, { auth: false }) : request<ExploreResult>('GET', `/explore${text ? `?${text}` : ''}`);
     },
     /** Locais perto (AskouT + Google/OSM) para os pins do mapa do Explorar. */
     explorePlaces: (params: { lat: number; lng: number; radiusKm?: number }) => {
       const query = new URLSearchParams({ lat: String(params.lat), lng: String(params.lng) });
       if (params.radiusKm !== undefined) query.set('radiusKm', String(params.radiusKm));
-      return request<{ places: ExplorePlace[]; placesAvailable: boolean }>('GET', `/explore/places?${query.toString()}`);
+      return request<{ places: ExplorePlace[]; placesAvailable: boolean }>('GET', `${visitor() ? '/public' : ''}/explore/places?${query.toString()}`, visitor() ? { auth: false } : {});
     },
     /** Vincular um rolê: locais do AskouT e lugares do Google pelo nome ou endereço, em qualquer lugar. */
     searchPlaces: (params: { q: string; lat?: number | undefined; lng?: number | undefined }) => {
@@ -542,7 +545,9 @@ export function createApi(deps: ApiDeps) {
     sponsoredEvents: () => request<{ events: ExploreEvent[] }>('GET', '/explore/sponsored'),
     followedEvents: () => request<{ events: ExploreEvent[] }>('GET', '/explore/followed-events'),
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
-      request<EventPage>('GET', `/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`),
+      request<EventPage>('GET', `${visitor() ? '/public' : ''}/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`, visitor() ? { auth: false } : {}),
+    /** Aba Álbum do evento: SOON antes de começar, LOCKED para quem não confirmou, OPEN com o álbum. */
+    eventAlbum: (eventId: string) => request<{ state: 'SOON'; startsAt: string } | { state: 'LOCKED' } | { state: 'OPEN'; album: AlbumDetail }>('GET', `/events/${id(eventId)}/album`),
     eventStories: (eventId: string) => request<{ groups: EventStoryGroup[] }>('GET', `/events/${id(eventId)}/stories`),
     /**
      * `onProfile`: publica também no perfil, para os amigos verem na página inicial.
@@ -682,7 +687,7 @@ export function createApi(deps: ApiDeps) {
     respondVenueInvite: (venueId: string, accept: boolean) => request<{ accepted: boolean }>('POST', `/me/venues/${id(venueId)}/team/invite`, { body: { accept } }),
     leaveVenueTeam: (venueId: string) => request<{ left: true }>('DELETE', `/me/venues/${id(venueId)}/team`),
     // A API ainda sem equipe não manda canManage/role: o responsável continua administrando.
-    venueProfile: (venueId: string) => request<VenueProfile>('GET', `/venues/${id(venueId)}/profile`).then((v) => ({ ...v, canManage: v.canManage ?? v.isOwner, role: v.role ?? (v.isOwner ? ('OWNER' as const) : null) })),
+    venueProfile: (venueId: string) => request<VenueProfile>('GET', visitor() ? `/public/venues/${id(venueId)}` : `/venues/${id(venueId)}/profile`, visitor() ? { auth: false } : {}).then((v) => ({ ...v, canManage: v.canManage ?? v.isOwner, role: v.role ?? (v.isOwner ? ('OWNER' as const) : null) })),
     updateVenueProfile: (venueId: string, body: VenueProfileBody) => request<VenueProfile>('PUT', `/me/venues/${id(venueId)}/profile`, { body }),
     followVenue: (venueId: string) => request<{ following: true; followerCount: number }>('POST', `/venues/${id(venueId)}/follow`),
     /** QR do local: o código atual (gerado na primeira vez) e a troca, que invalida o QR impresso. */

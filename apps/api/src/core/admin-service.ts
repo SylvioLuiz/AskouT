@@ -20,6 +20,30 @@ export const ADMIN_PAGE_MAX = 100;
 export const ADMIN_NOTE_MAX = 300;
 export const ADMIN_QUERY_MAX = 80;
 
+/** Detalhe de um local na gestão: o cadastro, de onde veio, quem responde por ele e os eventos. */
+export interface AdminVenueDetail {
+  id: string;
+  name: string;
+  address: string | null;
+  category: string | null;
+  lat: number;
+  lng: number;
+  isSample: boolean;
+  isOrganization: boolean;
+  isUserCreated: boolean;
+  /** De onde o local entrou: Google, OpenStreetMap, importação de agenda ou cadastro no app (`null`). */
+  source: 'GOOGLE' | 'OSM' | 'IMPORT' | null;
+  description: string | null;
+  coverUrl: string | null;
+  logoUrl: string | null;
+  owner: { id: string; username: string; displayName: string } | null;
+  followers: number;
+  eventsTotal: number;
+  upcomingCount: number;
+  /** Próximos eventos (até 15) e os últimos que já passaram (até 5), do mais novo para o mais antigo dentro de cada grupo. */
+  events: { id: string; title: string; startsAt: string; endsAt: string; kind: string; isFree: boolean; isSample: boolean; upcoming: boolean }[];
+}
+
 export interface AdminPage<T> {
   items: T[];
   limit: number;
@@ -353,6 +377,45 @@ export class AdminService {
     this.assertAdmin(actor);
     const text = queryText(query.q);
     return this.paged(query, (page) => this.deps.admin.searchVenues(text, page), () => this.deps.admin.countList('VENUES', { text }));
+  }
+
+  /** Abre um local: cadastro, origem, responsável, seguidores e eventos. */
+  async venueDetail(actor: Actor, id: unknown): Promise<AdminVenueDetail> {
+    this.assertAdmin(actor);
+    if (typeof id !== 'string' || id.length === 0 || id.length > 64) throw notFound('Local não encontrado');
+    const { places, users, clock } = this.deps;
+    const venue = await places.findVenue(id);
+    if (!venue) throw notFound('Local não encontrado');
+    const now = clock.now();
+    const [events, followers, ownerProfile] = await Promise.all([
+      places.listVenueEvents(venue.id),
+      places.countVenueFollowers(venue.id),
+      venue.ownerId ? users.findProfileById(venue.ownerId) : Promise.resolve(undefined),
+    ]);
+    const key = venue.externalKey ?? '';
+    const view = (e: (typeof events)[number], upcoming: boolean) => ({ id: e.id, title: e.title, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), kind: e.kind, isFree: e.isFree, isSample: e.isSample, upcoming });
+    const ahead = events.filter((e) => e.endsAt.getTime() >= now.getTime()).sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+    const behind = events.filter((e) => e.endsAt.getTime() < now.getTime()).sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+    return {
+      id: venue.id,
+      name: venue.name,
+      address: venue.address,
+      category: venue.category,
+      lat: venue.lat,
+      lng: venue.lng,
+      isSample: venue.isSample,
+      isOrganization: venue.isOrganization === true,
+      isUserCreated: venue.isUserCreated === true,
+      source: key.startsWith('google:') ? 'GOOGLE' : key.startsWith('osm:') ? 'OSM' : key.startsWith('import:') ? 'IMPORT' : null,
+      description: venue.description ?? null,
+      coverUrl: venue.coverUrl ?? null,
+      logoUrl: venue.logoUrl ?? null,
+      owner: venue.ownerId ? { id: venue.ownerId, username: ownerProfile?.username ?? '(removido)', displayName: ownerProfile?.displayName ?? '' } : null,
+      followers,
+      eventsTotal: events.length,
+      upcomingCount: ahead.length,
+      events: [...ahead.slice(0, 15).map((e) => view(e, true)), ...behind.slice(0, 5).map((e) => view(e, false))],
+    };
   }
 
   /** Tira o responsável de um local (ele volta a poder ser reivindicado). */

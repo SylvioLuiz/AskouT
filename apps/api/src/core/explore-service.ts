@@ -213,7 +213,8 @@ export class ExploreService {
    * Explorar: sem texto devolve os eventos perto; com texto busca eventos, lugares, pessoas e hashtags (`#texto` só hashtags e eventos).
    * A posição vale só para esta consulta; nada é guardado.
    */
-  async search(actorId: string, input: ExploreInput): Promise<ExploreView> {
+  async search(actorId: string, input: ExploreInput, opts: { withPeople?: boolean } = {}): Promise<ExploreView> {
+    const withPeople = opts.withPeople !== false;
     const { places, clock } = this.deps;
 
     const rawQ = typeof input.q === 'string' ? input.q.trim() : '';
@@ -291,7 +292,7 @@ export class ExploreService {
     const first = offset === 0;
 
     if (rawQ === '') {
-      const [found, people] = await Promise.all([places.searchEvents(base), hot || !first ? Promise.resolve([]) : this.peopleEvents(actorId, { center, radiusM, from, to, kind, freeOnly })]);
+      const [found, people] = await Promise.all([places.searchEvents(base), hot || !first || !withPeople ? Promise.resolve([]) : this.peopleEvents(actorId, { center, radiusM, from, to, kind, freeOnly })]);
       const { rows, hasMore } = slicePage(found);
       return { ...empty, events: hot ? await toItems(rows) : mixByStart(await toItems(rows), people), hasMore: !hot && hasMore };
     }
@@ -311,7 +312,7 @@ export class ExploreService {
       places.searchEvents({ ...base, text }),
       first && foldedTag ? places.listTags(foldedTag, from, to, TAG_LIMIT) : Promise.resolve([]),
       first ? places.searchVenues(text, center, searchRadiusM, VENUE_LIMIT) : Promise.resolve([]),
-      first && text.length >= 2 ? this.profiles.search(actorId, text, PEOPLE_LIMIT).catch(() => []) : Promise.resolve([]),
+      first && withPeople && text.length >= 2 ? this.profiles.search(actorId, text, PEOPLE_LIMIT).catch(() => []) : Promise.resolve([]),
     ]);
     const page = slicePage(found);
     if (!first) return { ...empty, events: await toItems(page.rows), hasMore: page.hasMore };
@@ -324,7 +325,7 @@ export class ExploreService {
       limit: VENUE_LIMIT,
     });
 
-    const fromPeople = hot ? [] : await this.peopleEvents(actorId, { center, radiusM: searchRadiusM, from, to, kind, freeOnly, needle: fold(text) });
+    const fromPeople = hot || !withPeople ? [] : await this.peopleEvents(actorId, { center, radiusM: searchRadiusM, from, to, kind, freeOnly, needle: fold(text) });
     return { ...empty, events: hot ? await toItems(page.rows) : mixByStart(await toItems(page.rows), fromPeople), hasMore: !hot && page.hasMore, places: placeItems, people, tags, placesAvailable };
   }
 

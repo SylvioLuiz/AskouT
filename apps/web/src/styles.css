@@ -7097,6 +7097,11 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
   100% { opacity: 0; transform: scaleX(1.08) scaleY(0.9); }
 }
 @media (prefers-reduced-motion: reduce) { .chat__glow { animation-duration: 400ms; } @keyframes chat-glow { 0%, 100% { opacity: 0; } 40% { opacity: 0.8; } } }
+/* Mesma luz no fim de páginas longas (ex.: Home de quem não entrou): acende colada em cima da barra de baixo. */
+.endglow { position: fixed; left: 50%; bottom: calc(62px + var(--sa-bottom)); z-index: 19; width: min(78%, 420px); height: 26px; pointer-events: none; background: radial-gradient(50% 100% at 50% 100%, color-mix(in srgb, var(--brand) 38%, transparent), transparent 100%); transform-origin: 50% 100%; translate: -50% 0; opacity: 0; animation: chat-glow 720ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@media (min-width: 900px) { .endglow { bottom: 0; left: calc(50% + var(--rail) / 2); } }
+@media (min-width: 900px) and (max-width: 1179px) { .endglow { left: calc(50% + 42px); } }
+@media (prefers-reduced-motion: reduce) { .endglow { animation-duration: 400ms; } }
 
 
 /* Esqueleto da lista de conversas: as linhas usam as classes reais (.convrow etc.), só o conteúdo é falso. */
@@ -7150,6 +7155,71 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
   :root:not([data-theme='light']) .evcover.evtone,
   :root:not([data-theme='light']) .evhero.evtone { background: linear-gradient(150deg, var(--tone-a), var(--tone-b)); }
 }
+
+/* ---------- Modo visitante (sem login) ---------- */
+.tabbar--visitor { grid-template-columns: repeat(4, 1fr); }
+.topbar__actions:has(.visitorcity) { align-items: center; gap: 8px; }
+/* No cabeçalho do celular o seletor de cidade fica sem borda, só o texto e o ícone. */
+.topbar .visitorcity { border: 0; background: transparent; padding: 0 6px; }
+.visitorcity {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 44vw;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0.5px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.visitorcity svg { width: 18px; height: 18px; flex: none; }
+.visitorcity__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail .visitorcity { margin-top: auto; align-self: flex-start; }
+.citylist { list-style: none; margin: 12px 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.citylist__item {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0.5px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.citylist__item--on { border-color: var(--brand-text); color: var(--brand-text); font-weight: 600; }
+.visitorgate { padding: 32px 0; }
+.visitorgate__actions { display: grid; gap: 8px; width: 100%; max-width: 320px; margin: 0 auto; }
+.visitorcta { margin: 24px 0 8px; padding: 16px; border-radius: 16px; background: var(--surface); border: 0.5px solid var(--line-strong); display: grid; gap: 12px; text-align: center; }
+.visitorcta p { margin: 0; }
+
+/* Entrada e cadastro: voltar para a Home do visitante. */
+.auth__home {
+  position: absolute;
+  top: calc(var(--sa-top) + 12px);
+  left: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 40px;
+  padding: 0 12px 0 6px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.35);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+.auth__home svg { width: 20px; height: 20px; }
 
 /* Título do card: no máximo 3 linhas, com "..." se passar. */
 .evcard__title { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }

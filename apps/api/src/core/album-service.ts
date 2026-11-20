@@ -6,6 +6,7 @@ import { decodeImageDataUrl } from './image.ts';
 import type { CoreDeps } from './ports.ts';
 import { POST_IMAGE_MAX_BYTES } from './post-service.ts';
 import type { PostService, PostView } from './post-service.ts';
+import type { EventPageService } from './event-page-service.ts';
 import type { EventRef, FlashInviteRecord, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
 
@@ -41,6 +42,12 @@ export interface AlbumPhotoView {
   mine: boolean;
 }
 
+/** O álbum visto de dentro da página do evento. */
+export type EventAlbumView =
+  | { state: 'SOON'; startsAt: string }
+  | { state: 'LOCKED' }
+  | { state: 'OPEN'; album: AlbumView };
+
 export interface AlbumView extends AlbumSummaryView {
   /** Quem foi (você incluído), sem quem tem bloqueio com você. */
   members: PublicProfile[];
@@ -65,10 +72,29 @@ export async function openFlashAlbum(deps: CoreDeps, invite: FlashInviteRecord, 
 export class AlbumService {
   private readonly deps: CoreDeps;
   private readonly posts: PostService;
+  private readonly eventPages: EventPageService | undefined;
 
-  constructor(deps: CoreDeps, posts: PostService) {
+  constructor(deps: CoreDeps, posts: PostService, eventPages?: EventPageService) {
     this.deps = deps;
     this.posts = posts;
+    this.eventPages = eventPages;
+  }
+
+  /**
+   * Aba "Álbum" da página do evento. Abre quando o evento começa; só quem confirmou presença (ou criou o evento) entra.
+   * Quem pode entrar e ainda não está no álbum entra na hora (sem esperar o job de syncEvents).
+   * Quem não pode ver o evento recebe o mesmo "não encontrado" da página.
+   */
+  async forEvent(viewerId: string, eventId: unknown): Promise<EventAlbumView> {
+    if (!this.eventPages) throw notFound('Álbum não encontrado');
+    const page = await this.eventPages.get(viewerId, eventId);
+    const startedAt = new Date(page.startsAt);
+    if (startedAt > this.deps.clock.now()) return { state: 'SOON', startsAt: page.startsAt };
+    if (!page.going && !page.isOwner) return { state: 'LOCKED' };
+    const { albums, ids, clock } = this.deps;
+    const album = await albums.ensure({ id: ids.next(), kind: 'EVENT', refId: eventRefId({ source: page.source, id: page.id }), title: page.title, placeName: page.venue.name || null, startedAt, createdAt: clock.now() });
+    await albums.addMembers(album.id, [viewerId], clock.now());
+    return { state: 'OPEN', album: await this.get(viewerId, album.id) };
   }
 
   /** Álbuns do visitante: os dos últimos 30 dias, o mais recente primeiro. */

@@ -236,3 +236,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .pager__size select { min-height: 36px; padding: 4px 8px; }
 .pager__nav { display: inline-flex; gap: 8px; }
 .recordcount { margin-top: 12px; }
+
+/* Local clicável na lista e detalhe do local. */
+.linkbtn { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-underline-offset: 3px; }
+.linkbtn:hover, .linkbtn:focus-visible { color: var(--info); text-decoration-color: currentColor; }
+.venuedetail__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; margin: 12px 0; }
+.venuedetail__facts dt { color: var(--muted); font-size: 12px; }
+.venuedetail__facts dd { margin: 2px 0 0; font-weight: 600; }
+.venuedetail__h { margin: 16px 0 6px; font-size: 14px; }
+.venuedetail__events { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow: auto; }
+
