@@ -19,8 +19,13 @@ export const TASTE_HINT_MAX = 90;
 export const TASTE_KEYWORDS_MAX = 40;
 export const TASTE_KEYWORD_MAX = 40;
 
+/** Ícones que a gestão pode escolher. Os desenhos ficam nos apps (`apps/web/src/lib/taste-icons.ts`). */
+export const TASTE_ICONS = ['beer', 'drink', 'moon', 'mic', 'music', 'food', 'coffee', 'film', 'dice', 'gamepad', 'tree', 'ball', 'heart', 'star', 'book', 'palette', 'camera', 'users', 'paw'] as const;
+export type TasteIcon = (typeof TASTE_ICONS)[number];
+
 export type TasteOption = {
   id: string;
+  icon: TasteIcon;
   label: string;
   hint: string;
   /** Palavras que casam com o tipo do local (texto livre do dono ou tipo do Google/OpenStreetMap). */
@@ -30,23 +35,25 @@ export type TasteOption = {
 };
 
 export interface TasteInput {
+  icon?: unknown;
   label?: unknown;
   hint?: unknown;
   keywords?: unknown;
   kinds?: unknown;
 }
 
-/** Os nove gostos que o app já tinha. Os ids ficam: as contas existentes guardam estes ids. */
+/** Os gostos de origem (os nove que o app já tinha e RPG e jogos de mesa). Os ids ficam: as contas existentes guardam estes ids. */
 export const DEFAULT_TASTES: readonly TasteOption[] = [
-  { id: 'BAR', label: 'Bares', hint: 'Boteco, pub, música ao vivo, happy hour', keywords: ['bar', 'pub', 'boteco', 'botequim', 'choperia', 'cervejaria', 'biergarten', 'casa de show', 'casa de shows', 'samba'], kinds: [] },
-  { id: 'NIGHT', label: 'Baladas', hint: 'Balada, festa, pista, noite', keywords: ['night*', 'balada*', 'boate*', 'danceteria', 'club', 'festa*', 'casa noturna'], kinds: ['NIGHT'] },
-  { id: 'SHOW', label: 'Shows', hint: 'Música ao vivo, samba, pagode, sertanejo, rock', keywords: ['casa de show', 'casa de shows', 'show', 'shows', 'concert*', 'live music', 'music venue', 'musica ao vivo', 'samba', 'pagode', 'forro', 'sertanej*', 'rock', 'jazz'], kinds: ['SHOW'] },
-  { id: 'FOOD', label: 'Restaurantes', hint: 'Jantar, pizza, hambúrguer, japonês, rodízio', keywords: ['restaura*', 'pizza*', 'hamburg*', 'burger*', 'churrasc*', 'steak*', 'sushi*', 'japon*', 'lanchonete*', 'bistro*', 'cantina*', 'rodizio*', 'gastrono*', 'comida*', 'food'], kinds: ['GASTRONOMY'] },
-  { id: 'CAFE', label: 'Cafés e docerias', hint: 'Café, padaria, brunch, sorvete', keywords: ['cafe', 'cafes', 'cafeteria*', 'coffee*', 'padaria*', 'bakery*', 'confeitaria*', 'doceria*', 'sorvet*', 'ice cream', 'brunch*', 'tea house'], kinds: [] },
-  { id: 'CULTURE', label: 'Cinema e cultura', hint: 'Cinema, teatro, museu, exposição, stand-up', keywords: ['cinema*', 'movie*', 'teatro*', 'theater', 'theatre', 'museu*', 'museum*', 'galeria*', 'gallery', 'arts centre', 'centro cultural', 'exposi*', 'stand up', 'standup', 'comedia*', 'performing arts'], kinds: ['CINEMA', 'THEATER', 'EXHIBITION'] },
-  { id: 'GAMES', label: 'Karaokê e jogos', hint: 'Karaokê, sinuca, boliche, fliperama, escape room', keywords: ['karaok*', 'sinuca*', 'bilhar*', 'snooker*', 'boliche*', 'bowling*', 'fliperama*', 'arcade*', 'escape*', 'jogos', 'game', 'games', 'amusement center'], kinds: [] },
-  { id: 'OUTDOOR', label: 'Ao ar livre', hint: 'Parque, praia, trilha, feira, piquenique', keywords: ['park', 'parque*', 'praia*', 'beach*', 'praca*', 'jardim*', 'garden*', 'trilha*', 'hiking', 'mirante*', 'viewpoint', 'camping*', 'feira*'], kinds: ['OUTDOOR'] },
-  { id: 'SPORT', label: 'Esportes', hint: 'Jogo no estádio, futebol, beach tennis, corrida', keywords: ['stadium*', 'estadio*', 'arena*', 'ginasio*', 'esporte*', 'sport', 'sports', 'futebol*', 'soccer*', 'quadra*', 'beach tennis', 'tenis*', 'padel*', 'golf*', 'surf*', 'skate*', 'corrida*'], kinds: ['SPORT'] },
+  { id: 'BAR', icon: 'beer', label: 'Bares', hint: 'Boteco, pub, música ao vivo, happy hour', keywords: ['bar', 'pub', 'boteco', 'botequim', 'choperia', 'cervejaria', 'biergarten', 'casa de show', 'casa de shows', 'samba'], kinds: [] },
+  { id: 'NIGHT', icon: 'moon', label: 'Baladas', hint: 'Balada, festa, pista, noite', keywords: ['night*', 'balada*', 'boate*', 'danceteria', 'club', 'festa*', 'casa noturna'], kinds: ['NIGHT'] },
+  { id: 'SHOW', icon: 'mic', label: 'Shows', hint: 'Música ao vivo, samba, pagode, sertanejo, rock', keywords: ['casa de show', 'casa de shows', 'show', 'shows', 'concert*', 'live music', 'music venue', 'musica ao vivo', 'samba', 'pagode', 'forro', 'sertanej*', 'rock', 'jazz'], kinds: ['SHOW'] },
+  { id: 'FOOD', icon: 'food', label: 'Restaurantes', hint: 'Jantar, pizza, hambúrguer, japonês, rodízio', keywords: ['restaura*', 'pizza*', 'hamburg*', 'burger*', 'churrasc*', 'steak*', 'sushi*', 'japon*', 'lanchonete*', 'bistro*', 'cantina*', 'rodizio*', 'gastrono*', 'comida*', 'food'], kinds: ['GASTRONOMY'] },
+  { id: 'CAFE', icon: 'coffee', label: 'Cafés e docerias', hint: 'Café, padaria, brunch, sorvete', keywords: ['cafe', 'cafes', 'cafeteria*', 'coffee*', 'padaria*', 'bakery*', 'confeitaria*', 'doceria*', 'sorvet*', 'ice cream', 'brunch*', 'tea house'], kinds: [] },
+  { id: 'CULTURE', icon: 'film', label: 'Cinema e cultura', hint: 'Cinema, teatro, museu, exposição, stand-up', keywords: ['cinema*', 'movie*', 'teatro*', 'theater', 'theatre', 'museu*', 'museum*', 'galeria*', 'gallery', 'arts centre', 'centro cultural', 'exposi*', 'stand up', 'standup', 'comedia*', 'performing arts'], kinds: ['CINEMA', 'THEATER', 'EXHIBITION'] },
+  { id: 'GAMES', icon: 'gamepad', label: 'Karaokê e jogos', hint: 'Karaokê, sinuca, boliche, fliperama, escape room', keywords: ['karaok*', 'sinuca*', 'bilhar*', 'snooker*', 'boliche*', 'bowling*', 'fliperama*', 'arcade*', 'escape*', 'jogos', 'game', 'games', 'amusement center'], kinds: [] },
+  { id: 'RPG', icon: 'dice', label: 'RPG e jogos de mesa', hint: 'Campanha de RPG, board games, card games, mesa de D&D', keywords: ['rpg*', 'dungeons*', 'tabuleiro*', 'board game*', 'boardgame*', 'jogos de mesa', 'card game*', 'taverna*', 'ludica*', 'geek', 'nerd'], kinds: [] },
+  { id: 'OUTDOOR', icon: 'tree', label: 'Ao ar livre', hint: 'Parque, praia, trilha, feira, piquenique', keywords: ['park', 'parque*', 'praia*', 'beach*', 'praca*', 'jardim*', 'garden*', 'trilha*', 'hiking', 'mirante*', 'viewpoint', 'camping*', 'feira*'], kinds: ['OUTDOOR'] },
+  { id: 'SPORT', icon: 'ball', label: 'Esportes', hint: 'Jogo no estádio, futebol, beach tennis, corrida', keywords: ['stadium*', 'estadio*', 'arena*', 'ginasio*', 'esporte*', 'sport', 'sports', 'futebol*', 'soccer*', 'quadra*', 'beach tennis', 'tenis*', 'padel*', 'golf*', 'surf*', 'skate*', 'corrida*'], kinds: ['SPORT'] },
 ];
 
 function isTaste(v: unknown): v is TasteOption {
@@ -55,7 +62,7 @@ function isTaste(v: unknown): v is TasteOption {
   return typeof o['id'] === 'string' && typeof o['label'] === 'string' && typeof o['hint'] === 'string' && Array.isArray(o['keywords']) && Array.isArray(o['kinds']);
 }
 
-const clone = (t: TasteOption): TasteOption => ({ id: t.id, label: t.label, hint: t.hint, keywords: [...t.keywords], kinds: [...t.kinds] });
+const clone = (t: TasteOption): TasteOption => ({ id: t.id, icon: t.icon, label: t.label, hint: t.hint, keywords: [...t.keywords], kinds: [...t.kinds] });
 
 /** Lê o catálogo. Nada gravado ou linha estragada vira os gostos de origem (nunca deixa o cadastro sem gostos). */
 export async function loadTastes(deps: Pick<CoreDeps, 'settings'>): Promise<TasteOption[]> {
@@ -66,6 +73,7 @@ export async function loadTastes(deps: Pick<CoreDeps, 'settings'>): Promise<Tast
       if (Array.isArray(parsed)) {
         const items = parsed.filter(isTaste).map((o) => ({
           id: o.id,
+          icon: (TASTE_ICONS as readonly unknown[]).includes(o.icon) ? (o.icon as TasteIcon) : 'star',
           label: o.label,
           hint: o.hint,
           keywords: o.keywords.filter((k): k is string => typeof k === 'string'),
@@ -117,6 +125,8 @@ function parseKeywords(raw: unknown, fields: Record<string, string>): string[] {
 
 function parseInput(input: TasteInput): Omit<TasteOption, 'id'> {
   const fields: Record<string, string> = {};
+  const icon = typeof input.icon === 'string' && (TASTE_ICONS as readonly string[]).includes(input.icon) ? (input.icon as TasteIcon) : undefined;
+  if (!icon) fields['icon'] = 'Escolha um ícone da lista';
   const label = typeof input.label === 'string' ? input.label.trim().replace(/\s+/g, ' ') : '';
   if (label === '') fields['label'] = 'Dê um nome (ex.: Bares)';
   else if (Array.from(label).length > TASTE_LABEL_MAX) fields['label'] = `Use até ${TASTE_LABEL_MAX} caracteres`;
@@ -129,8 +139,8 @@ function parseInput(input: TasteInput): Omit<TasteOption, 'id'> {
     if (!Array.isArray(input.kinds) || input.kinds.some((k) => !(EVENT_KINDS as readonly unknown[]).includes(k))) fields['kinds'] = 'Tipo de evento inválido';
     else kinds = EVENT_KINDS.filter((k) => (input.kinds as unknown[]).includes(k));
   }
-  if (Object.keys(fields).length > 0) throw validationError('Dados inválidos', fields);
-  return { label, hint, keywords, kinds };
+  if (!icon || Object.keys(fields).length > 0) throw validationError('Dados inválidos', fields);
+  return { icon, label, hint, keywords, kinds };
 }
 
 /** Catálogo editado pela gestão. A conferência de papel ADMIN e a auditoria ficam no AdminService. */

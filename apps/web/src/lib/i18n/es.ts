@@ -2973,6 +2973,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Café, padaria, brunch, sorvete": "Café, panadería, brunch, helado",
   "Cinema e cultura": "Cine y cultura",
   "Cinema, teatro, museu, exposição, stand-up": "Cine, teatro, museo, exposición, stand-up",
+  "RPG e jogos de mesa": "RPG y juegos de mesa",
+  "Campanha de RPG, board games, card games, mesa de D&D": "Campañas de rol, juegos de mesa, juegos de cartas, mesas de D&D",
   "Karaokê e jogos": "Karaoke y juegos",
   "Karaokê, sinuca, boliche, fliperama, escape room": "Karaoke, billar, bolos, arcade, escape room",
   "Ao ar livre": "Al aire libre",

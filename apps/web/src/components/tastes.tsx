@@ -1,3 +1,4 @@
+import { tasteIconPaths } from '../lib/taste-icons.ts';
 import { useThemes } from '../lib/use-themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 
@@ -11,6 +12,11 @@ export function TastePicker({ chosen, onToggle, disabled }: { chosen: ReadonlySe
         return (
           <li key={theme.id}>
             <button type="button" className={`onb__theme${on ? ' onb__theme--on' : ''}`} aria-pressed={on} disabled={disabled} onClick={() => onToggle(theme.id)}>
+              <svg className="onb__themeicon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                {tasteIconPaths(theme.icon).map((d) => (
+                  <path key={d} d={d} />
+                ))}
+              </svg>
               <strong>{theme.label}</strong>
               <span>{theme.hint}</span>
             </button>

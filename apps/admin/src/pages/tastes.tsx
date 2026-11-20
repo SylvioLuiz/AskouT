@@ -4,6 +4,8 @@ import { useAsync } from '../hooks.ts';
 import type { Taste, TasteInput } from '../types.ts';
 import { ActionDialog, Loadable, Modal, PageHead } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
+// Os desenhos são os mesmos do app (um arquivo só, para os dois mostrarem igual).
+import { TASTE_ICON_LABELS, TASTE_ICON_PATHS, tasteIconPaths } from '../../../web/src/lib/taste-icons.ts';
 
 const LABEL_MAX = 40;
 const HINT_MAX = 90;
@@ -20,8 +22,20 @@ const KIND_LABELS: Record<string, string> = {
   OTHER: 'Outro',
 };
 const KINDS = Object.keys(KIND_LABELS);
+const ICONS = Object.keys(TASTE_ICON_PATHS);
+
+function TasteIcon({ icon, size = 22 }: { icon: string; size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      {tasteIconPaths(icon).map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
 
 function TasteForm({ initial, onClose, onSaved }: { initial: Taste | null; onClose: () => void; onSaved: () => void }) {
+  const [icon, setIcon] = useState(initial?.icon ?? ICONS[0] ?? 'star');
   const [label, setLabel] = useState(initial?.label ?? '');
   const [hint, setHint] = useState(initial?.hint ?? '');
   const [keywords, setKeywords] = useState((initial?.keywords ?? []).join('\n'));
@@ -43,7 +57,7 @@ function TasteForm({ initial, onClose, onSaved }: { initial: Taste | null; onClo
     if (!ready) return;
     setBusy(true);
     setError(undefined);
-    const input: TasteInput = { label: label.trim(), hint: hint.trim(), keywords, kinds: KINDS.filter((k) => kinds.has(k)) };
+    const input: TasteInput = { icon, label: label.trim(), hint: hint.trim(), keywords, kinds: KINDS.filter((k) => kinds.has(k)) };
     try {
       if (initial) await api.updateTaste(initial.id, input);
       else await api.createTaste(input);
@@ -74,6 +88,25 @@ function TasteForm({ initial, onClose, onSaved }: { initial: Taste | null; onClo
           Uma por linha (ou separadas por vírgula). Sem acento e sem diferença de maiúscula. “bar” casa só a palavra inteira; com asterisco, “restaura*”, casa tudo que começa assim (restaurante, restaurant). Vale para o tipo do local, escrito pelo dono ou vindo do Google.
         </span>
       </div>
+      <fieldset className="field extras__fieldset">
+        <legend>Ícone</legend>
+        <div className="extras__icons" role="radiogroup" aria-label="Ícone">
+          {ICONS.map((key) => (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={icon === key}
+              className={`extras__iconbtn${icon === key ? ' extras__iconbtn--on' : ''}`}
+              onClick={() => setIcon(key)}
+              title={TASTE_ICON_LABELS[key] ?? key}
+              aria-label={TASTE_ICON_LABELS[key] ?? key}
+            >
+              <TasteIcon icon={key} />
+            </button>
+          ))}
+        </div>
+      </fieldset>
       <fieldset className="field extras__fieldset">
         <legend>Tipos de evento deste gosto (opcional)</legend>
         {KINDS.map((kind) => (
@@ -147,6 +180,7 @@ export function TastesPage() {
             <thead>
               <tr>
                 <th scope="col">Ordem</th>
+                <th scope="col">Ícone</th>
                 <th scope="col">Nome</th>
                 <th scope="col">Palavras do tipo do local</th>
                 <th scope="col">Tipos de evento</th>
@@ -165,6 +199,11 @@ export function TastesPage() {
                     <button type="button" className="btn btn--small" aria-label={`Descer ${x.label}`} disabled={i === d.items.length - 1 || moving !== undefined} onClick={() => void move(x.id, 'down')}>
                       ↓
                     </button>
+                  </td>
+                  <td>
+                    <span className="extras__cellicon" title={TASTE_ICON_LABELS[x.icon] ?? x.icon}>
+                      <TasteIcon icon={x.icon} />
+                    </span>
                   </td>
                   <td>
                     <strong>{x.label}</strong>

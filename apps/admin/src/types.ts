@@ -346,6 +346,7 @@ export interface EventExtraInput {
 /** Gosto de rolê (Bares, Baladas...) que a pessoa escolhe no app. */
 export interface Taste {
   id: string;
+  icon: string;
   label: string;
   hint: string;
   keywords: string[];
@@ -353,6 +354,7 @@ export interface Taste {
 }
 
 export interface TasteInput {
+  icon: string;
   label: string;
   hint: string;
   keywords: string;
