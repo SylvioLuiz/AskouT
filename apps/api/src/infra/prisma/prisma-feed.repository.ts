@@ -310,6 +310,20 @@ export class PrismaFeedRepository implements FeedRepository {
     return { posts, comments };
   }
 
+  async countAdminPosts(query: { status?: FeedPostStatus; text: string }): Promise<number> {
+    const q = query.text.trim();
+    return this.prisma.feedPost.count({
+      where: {
+        ...(query.status ? { status: query.status } : {}),
+        ...(q ? { OR: [{ body: { contains: q, mode: 'insensitive' } }, { author: { profile: { username: { contains: q.replace(/^@/, ''), mode: 'insensitive' } } } }] } : {}),
+      },
+    });
+  }
+
+  async countReports(open: boolean): Promise<number> {
+    return this.prisma.feedReport.count({ where: { resolvedAt: open ? null : { not: null } } });
+  }
+
   async adminListPosts(query: { status?: FeedPostStatus; text: string; page: Page }): Promise<FeedPostWithImages[]> {
     const q = query.text.trim();
     const rows = await this.prisma.feedPost.findMany({

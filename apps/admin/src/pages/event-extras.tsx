@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api, ApiError } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import type { EventExtra, EventExtraInput } from '../types.ts';
-import { ActionDialog, Badge, Loadable, Modal, PageHead } from '../ui.tsx';
+import { ActionDialog, Badge, Loadable, Modal, PageHead, RecordCount } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
 // Os desenhos são os mesmos do app (um arquivo só, para os dois mostrarem igual).
 import { EVENT_EXTRA_ICON_LABELS, eventExtraIconPaths } from '../../../web/src/lib/event-extra-icons.ts';
@@ -196,6 +196,7 @@ export function EventExtrasPage() {
           </table>
         )}
       </Loadable>
+      {state.data ? <RecordCount count={state.data.items.length} /> : null}
       <p className="muted small">Renomear ou trocar o ícone vale também para os eventos já criados. Cada mudança fica na Auditoria.</p>
       {editing !== undefined && state.data ? <ExtraForm icons={state.data.icons} initial={editing} onClose={() => setEditing(undefined)} onSaved={state.reload} /> : null}
       {action ? <ActionDialog spec={action} onClose={() => setAction(undefined)} onDone={state.reload} /> : null}

@@ -1,3 +1,4 @@
+import { getPageSize } from './page-size.ts';
 import { query } from './labels.ts';
 import type {
   AuditRow, AuthResult, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
@@ -128,22 +129,22 @@ export const api = {
   },
   reviewClaim: (id: string, decision: 'APPROVED' | 'REJECTED', note: string) => request<unknown>('POST', `/admin/claims/${encodeURIComponent(id)}/review`, { decision, note }),
 
-  users: (p: { q: string; status?: UserStatus; offset: number }) => request<Page<UserRow>>('GET', `/admin/users${query({ q: p.q, status: p.status, offset: p.offset })}`),
+  users: (p: { q: string; status?: UserStatus; offset: number }) => request<Page<UserRow>>('GET', `/admin/users${query({ q: p.q, status: p.status, offset: p.offset, limit: getPageSize() })}`),
   setUserBirthDate: (id: string, birthDate: string, note: string) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/birth-date`, { birthDate, note }),
   setUserStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED', note: string) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/status`, { status, note }),
 
-  venues: (p: { q: string; offset: number }) => request<Page<VenueRow>>('GET', `/admin/venues${query(p)}`),
+  venues: (p: { q: string; offset: number }) => request<Page<VenueRow>>('GET', `/admin/venues${query({ ...p, limit: getPageSize() })}`),
   removeOwner: (venueId: string, note: string) => request<unknown>('DELETE', `/admin/venues/${encodeURIComponent(venueId)}/owner`, { note }),
 
-  placeEvents: (p: { q: string; offset: number }) => request<Page<PlaceEventRow>>('GET', `/admin/place-events${query(p)}`),
+  placeEvents: (p: { q: string; offset: number }) => request<Page<PlaceEventRow>>('GET', `/admin/place-events${query({ ...p, limit: getPageSize() })}`),
   deletePlaceEvent: (id: string, note: string) => request<unknown>('DELETE', `/admin/place-events/${encodeURIComponent(id)}`, { note }),
 
-  posts: (p: { q: string; events: boolean; offset: number }) => request<Page<PostRow>>('GET', `/admin/posts${query(p)}`),
+  posts: (p: { q: string; events: boolean; offset: number }) => request<Page<PostRow>>('GET', `/admin/posts${query({ ...p, limit: getPageSize() })}`),
   deletePost: (id: string, note: string) => request<unknown>('DELETE', `/admin/posts/${encodeURIComponent(id)}`, { note }),
 
-  postReports: (p: { resolved: boolean; offset: number }) => request<Page<PostReportRow>>('GET', `/admin/reports/posts${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
-  conversationReports: (p: { resolved: boolean; offset: number }) => request<Page<ConversationReportRow>>('GET', `/admin/reports/conversations${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
-  storyReports: (p: { resolved: boolean; offset: number }) => request<Page<StoryReportRow>>('GET', `/admin/reports/stories${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
+  postReports: (p: { resolved: boolean; offset: number }) => request<Page<PostReportRow>>('GET', `/admin/reports/posts${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset, limit: getPageSize() })}`),
+  conversationReports: (p: { resolved: boolean; offset: number }) => request<Page<ConversationReportRow>>('GET', `/admin/reports/conversations${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset, limit: getPageSize() })}`),
+  storyReports: (p: { resolved: boolean; offset: number }) => request<Page<StoryReportRow>>('GET', `/admin/reports/stories${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset, limit: getPageSize() })}`),
   resolveStoryReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/stories/${encodeURIComponent(id)}/resolve`, { resolution, note }),
   deleteStory: (id: string, note: string) => request<unknown>('DELETE', `/admin/stories/${encodeURIComponent(id)}`, { note }),
   /** Baixa a mídia do story com o token e devolve um endereço temporário para exibir. */
@@ -152,7 +153,7 @@ export const api = {
     const blob = await response.blob();
     return { url: URL.createObjectURL(blob), mime: blob.type };
   },
-  venueStoryReports: (p: { resolved: boolean; offset: number }) => request<Page<VenueStoryReportRow>>('GET', `/admin/reports/venue-stories${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
+  venueStoryReports: (p: { resolved: boolean; offset: number }) => request<Page<VenueStoryReportRow>>('GET', `/admin/reports/venue-stories${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset, limit: getPageSize() })}`),
   resolveVenueStoryReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/venue-stories/${encodeURIComponent(id)}/resolve`, { resolution, note }),
   deleteVenueStory: (id: string, note: string) => request<unknown>('DELETE', `/admin/venue-stories/${encodeURIComponent(id)}`, { note }),
   async venueStoryMedia(id: string): Promise<{ url: string; mime: string }> {
@@ -161,15 +162,15 @@ export const api = {
     return { url: URL.createObjectURL(blob), mime: blob.type };
   },
   resolvePostReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/posts/${encodeURIComponent(id)}/resolve`, { resolution, note }),
-  userReports: (p: { resolved: boolean; offset: number }) => request<Page<UserReportRow>>('GET', `/admin/reports/users${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
+  userReports: (p: { resolved: boolean; offset: number }) => request<Page<UserReportRow>>('GET', `/admin/reports/users${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset, limit: getPageSize() })}`),
   resolveUserReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/users/${encodeURIComponent(id)}/resolve`, { resolution, note }),
   resolveConversationReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/conversations/${encodeURIComponent(id)}/resolve`, { resolution, note }),
 
-  feedPosts: (p: { q: string; status?: 'pending' | 'published'; offset: number }) => request<Page<FeedPostRow>>('GET', `/admin/feed/posts${query(p)}`),
+  feedPosts: (p: { q: string; status?: 'pending' | 'published'; offset: number }) => request<Page<FeedPostRow>>('GET', `/admin/feed/posts${query({ ...p, limit: getPageSize() })}`),
   feedComments: (postId: string) => request<{ items: FeedCommentRow[] }>('GET', `/admin/feed/posts/${encodeURIComponent(postId)}/comments`),
   deleteFeedPost: (id: string, note: string) => request<unknown>('DELETE', `/admin/feed/posts/${encodeURIComponent(id)}`, { note }),
   deleteFeedComment: (id: string, note: string) => request<unknown>('DELETE', `/admin/feed/comments/${encodeURIComponent(id)}`, { note }),
-  feedReports: (p: { resolved: boolean; offset: number }) => request<Page<FeedReportRow>>('GET', `/admin/reports/feed${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset })}`),
+  feedReports: (p: { resolved: boolean; offset: number }) => request<Page<FeedReportRow>>('GET', `/admin/reports/feed${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset, limit: getPageSize() })}`),
   resolveFeedReport: (id: string, resolution: Resolution, note: string) => request<unknown>('POST', `/admin/reports/feed/${encodeURIComponent(id)}/resolve`, { resolution, note }),
 
   deleteComment: (id: string, note: string) => request<unknown>('DELETE', `/admin/comments/${encodeURIComponent(id)}`, { note }),
@@ -185,7 +186,7 @@ export const api = {
   deleteTaste: (id: string) => request<{ items: Taste[] }>('DELETE', `/admin/tastes/${encodeURIComponent(id)}`),
   deleteEventExtra: (id: string) => request<{ items: EventExtra[] }>('DELETE', `/admin/event-extras/${encodeURIComponent(id)}`),
 
-  audit: (offset: number) => request<Page<AuditRow>>('GET', `/admin/audit${query({ offset })}`),
+  audit: (offset: number) => request<Page<AuditRow>>('GET', `/admin/audit${query({ offset, limit: getPageSize() })}`),
 };
 
 /** Foto de uma publicação do feed (endereço público, como no app). */

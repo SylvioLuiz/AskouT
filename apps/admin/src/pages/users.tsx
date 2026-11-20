@@ -125,7 +125,7 @@ export function UsersPage() {
                 ))}
               </tbody>
             </table>
-            <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+            <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} total={page.total} onChange={setOffset} />
           </>
         )}
       </Loadable>

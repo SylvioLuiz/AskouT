@@ -859,7 +859,11 @@ export interface AdminRepository {
   resolveUserReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean>;
   addAudit(record: AuditRecord): Promise<void>;
   listAudit(page: Page): Promise<AuditRow[]>;
+  /** Quantos registros cada lista da gestão tem com o mesmo filtro (para o total embaixo das tabelas). */
+  countList(kind: AdminCountKind, filter?: { text?: string; status?: UserStatus; onlyEvents?: boolean; open?: boolean }): Promise<number>;
 }
+
+export type AdminCountKind = 'USERS' | 'VENUES' | 'PLACE_EVENTS' | 'POSTS' | 'POST_REPORTS' | 'CONVERSATION_REPORTS' | 'STORY_REPORTS' | 'USER_REPORTS' | 'AUDIT';
 
 export interface EventSearchQuery {
   center?: { lat: number; lng: number };
@@ -1121,6 +1125,10 @@ export interface FeedRepository {
   openReportCounts(postIds: string[], commentIds: string[]): Promise<{ posts: Map<string, number>; comments: Map<string, number> }>;
   /** Publicações de todos os feeds, das mais novas para as mais antigas. `text` busca no texto. */
   adminListPosts(query: { status?: FeedPostStatus; text: string; page: Page }): Promise<FeedPostWithImages[]>;
+  /** Quantas publicações a mesma busca de `adminListPosts` encontra. */
+  countAdminPosts(query: { status?: FeedPostStatus; text: string }): Promise<number>;
+  /** Quantas denúncias (abertas ou decididas) existem. */
+  countReports(open: boolean): Promise<number>;
   countAllPosts(status: FeedPostStatus): Promise<number>;
 }
 
@@ -1193,6 +1201,7 @@ export interface VenueStoryRepository {
   reportedIds(userId: string, storyIds: string[]): Promise<Set<string>>;
   /** Denúncias abertas (ou já decididas), as mais antigas primeiro nas abertas. */
   listReports(open: boolean, page: Page): Promise<VenueStoryReportRecord[]>;
+  countReports(open: boolean): Promise<number>;
   findReport(id: string): Promise<VenueStoryReportRecord | undefined>;
   resolveReport(id: string, adminId: string, resolution: ReportResolution, note: string | null, at: Date): Promise<boolean>;
   /** Quantas pessoas diferentes têm denúncia ainda aberta contra stories deste local, desde `since`. */

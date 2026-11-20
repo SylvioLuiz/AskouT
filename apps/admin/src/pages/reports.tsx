@@ -433,7 +433,7 @@ export function ReportsPage() {
             page ? (
               <>
                 <div className="reports">{page.items.map((r) => <PostReportCard key={r.id} r={r} onAction={setAction} />)}</div>
-                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} total={page.total} onChange={setOffset} />
               </>
             ) : null
           }
@@ -444,7 +444,7 @@ export function ReportsPage() {
             page ? (
               <>
                 <div className="reports">{page.items.map((r) => <FeedReportCard key={r.id} r={r} onAction={setAction} />)}</div>
-                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} total={page.total} onChange={setOffset} />
               </>
             ) : null
           }
@@ -455,7 +455,7 @@ export function ReportsPage() {
             page ? (
               <>
                 <div className="reports">{page.items.map((r) => <StoryReportCard key={r.id} r={r} onAction={setAction} />)}</div>
-                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} total={page.total} onChange={setOffset} />
               </>
             ) : null
           }
@@ -466,7 +466,7 @@ export function ReportsPage() {
             page ? (
               <>
                 <div className="reports">{page.items.map((r) => <VenueStoryReportCard key={r.id} r={r} onAction={setAction} />)}</div>
-                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} total={page.total} onChange={setOffset} />
               </>
             ) : null
           }
@@ -477,7 +477,7 @@ export function ReportsPage() {
             page ? (
               <>
                 <div className="reports">{page.items.map((r) => <UserReportCard key={r.id} r={r} onAction={setAction} />)}</div>
-                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} total={page.total} onChange={setOffset} />
               </>
             ) : null
           }
@@ -488,7 +488,7 @@ export function ReportsPage() {
             page ? (
               <>
                 <div className="reports">{page.items.map((r) => <ConversationReportCard key={r.id} r={r} onAction={setAction} />)}</div>
-                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} onChange={setOffset} />
+                <Pager offset={page.offset} limit={page.limit} hasMore={page.hasMore} total={page.total} onChange={setOffset} />
               </>
             ) : null
           }

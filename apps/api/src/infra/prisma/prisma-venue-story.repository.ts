@@ -93,6 +93,10 @@ export class PrismaVenueStoryRepository implements VenueStoryRepository {
     return new Set(rows.map((r) => r.storyId));
   }
 
+  async countReports(open: boolean): Promise<number> {
+    return this.prisma.venueStoryReport.count({ where: { resolvedAt: open ? null : { not: null } } });
+  }
+
   async listReports(open: boolean, page: Page): Promise<VenueStoryReportRecord[]> {
     const rows = await this.prisma.venueStoryReport.findMany({
       where: { resolvedAt: open ? null : { not: null } },

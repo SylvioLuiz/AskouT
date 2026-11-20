@@ -321,3 +321,23 @@ test('comentário denunciado: a gestão apaga com motivo e fica na auditoria', a
   assert.equal((await w.core.admin.userReports(A, {})).items.find((r) => r.kind === 'COMMENT')!.commentExists, false);
   assert.equal((await w.core.admin.audit(A, {})).items[0]!.action, 'COMMENT_REMOVED');
 });
+
+test('as listas da gestão trazem o total de registros, que acompanha a busca e não o tamanho da página', async () => {
+  const { w, A } = await setup();
+  const all = await w.core.admin.searchUsers(A, {});
+  assert.equal(all.total, 4, 'os 4 usuários do cenário');
+  const two = await w.core.admin.searchUsers(A, { limit: '2' });
+  assert.equal(two.items.length, 2);
+  assert.equal(two.total, 4, 'o total é de tudo, não só desta página');
+  assert.equal(two.hasMore, true);
+  assert.equal((await w.core.admin.searchUsers(A, { q: 'ANA@exemplo' })).total, 1, 'a busca muda o total');
+  assert.equal((await w.core.admin.searchUsers(A, { q: 'ninguem-assim' })).total, 0);
+  assert.equal((await w.core.admin.searchVenues(A, {})).total, 1);
+  assert.equal((await w.core.admin.searchVenues(A, { q: 'não existe' })).total, 0);
+  assert.equal((await w.core.admin.searchPlaceEvents(A, {})).total, 0);
+  assert.equal((await w.core.admin.searchPosts(A, {})).total, 0);
+  assert.equal((await w.core.admin.audit(A, {})).total, (await w.core.admin.audit(A, { limit: '100' })).items.length);
+  assert.equal((await w.core.admin.postReports(A, {})).total, 0);
+  assert.equal((await w.core.admin.feedPosts(A, {})).total, 0);
+  assert.equal((await w.core.admin.feedReports(A, { status: 'resolved' })).total, 0);
+});
