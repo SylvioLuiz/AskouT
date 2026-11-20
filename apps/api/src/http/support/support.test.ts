@@ -105,6 +105,9 @@ describe('loadConfig', () => {
     // Em produção sem provedor, ligar é recusado (senão o app prometeria cobrar sem conseguir).
     const prod = { ...good, NODE_ENV: 'production', EMAIL_TRANSPORT: 'console' };
     assert.throws(() => loadConfig({ ...prod, PAYMENTS_ENABLED: 'true' }), /PAYMENTS_ENABLED=true exige/);
+    // Com a compra pelas lojas configurada, ligar sem provedor na web é aceito (a web só não cobra).
+    // (`prod` aqui já é recusado por outro motivo, o e-mail "console"; o que importa é não reclamar do pagamento.)
+    assert.throws(() => loadConfig({ ...prod, PAYMENTS_ENABLED: 'true', APPLE_APP_ID: 'br.com.askout' }), (e: Error) => !/PAYMENTS_ENABLED/.test(e.message));
   });
 
   it('Stripe: exige chaves e site, e em produção só a chave real e https', () => {
