@@ -368,3 +368,19 @@ describe('contas do motor de recomendação', () => {
     assert.equal(items.find((i) => i.event?.id === 'e-bia')!.source?.follow, 'FOLLOWING');
   });
 });
+
+describe('proximidade no Para você', () => {
+  it('perto só desempata depois das regras de sempre', async () => {
+  const { rankOrder, nearScore, RECO_NEAR_KM } = await import('./recommendation-service.ts');
+  // Nota maior vence, mesmo longe.
+  assert.ok(rankOrder({ score: 0.6, near: 0, id: 'a' }, { score: 0.3, near: 1, id: 'b' }) < 0);
+  // Na mesma faixa de nota, o mais perto vem antes.
+  assert.ok(rankOrder({ score: 0.31, near: 0.2, id: 'a' }, { score: 0.3, near: 0.9, id: 'b' }) > 0);
+  // Sem posição, vale só a nota e depois o id.
+  assert.ok(rankOrder({ score: 0.3, near: 0, id: 'a' }, { score: 0.3, near: 0, id: 'b' }) < 0);
+  const here = { lat: -23.96, lng: -46.33 };
+  assert.equal(nearScore(here, here), 1);
+  assert.equal(nearScore(here, { lat: -23.96 + (RECO_NEAR_KM + 5) / 111, lng: -46.33 }), 0);
+  assert.ok(nearScore(here, { lat: -23.96 + 10 / 111, lng: -46.33 }) > 0.7);
+});
+});

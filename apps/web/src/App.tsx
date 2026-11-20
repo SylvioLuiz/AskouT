@@ -6,6 +6,7 @@ import { TermsGate } from './components/terms-gate.tsx';
 import { CompleteProfileScreen } from './components/complete-profile.tsx';
 import { Onboarding } from './components/onboarding.tsx';
 import { PushAutoAsk } from './components/push-auto-ask.tsx';
+import { PositionAutoAsk } from './components/position-auto-ask.tsx';
 import { RingLoader } from './components/ring-loader.tsx';
 import { Button, EmptyState } from './components/ui.tsx';
 import { useTitle } from './hooks.ts';
@@ -280,6 +281,7 @@ function AppRoutes() {
           <Suspense fallback={<ScreenFallback />}>{priv ? priv.route.render(priv.params) : <NotFoundScreen />}</Suspense>
         </Shell>
         <Onboarding />
+        <PositionAutoAsk />
         <PushAutoAsk />
       </TermsGate>
     </FlashPresenceProvider>

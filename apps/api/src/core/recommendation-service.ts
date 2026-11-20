@@ -1,6 +1,7 @@
 import { buildEventCards } from './event-card.ts';
 import type { EventCardView } from './event-card.ts';
 import { fold, normalizeTag } from './explore-match.ts';
+import { distanceMeters } from './geo.ts';
 import type { MatchPick, MatchService } from './match-service.ts';
 import { MATCH_MAX_PER_VIEW } from './match.ts';
 import type { RecoExperiment } from './reco-experiment.ts';
@@ -45,6 +46,12 @@ export const RECO_TASTE_FRIENDS = 10;
 export const RECO_MAX_FRIENDS = 30;
 export const RECO_MAX_PER_SOURCE = 2;
 export const RECO_WEIGHTS = { social: 0.55, taste: 0.35, fresh: 0.1 } as const;
+/** Evento perto de quem vê (só com a posição da pessoa): só desempata DEPOIS das regras de sempre (amigos, gosto, urgência). */
+export const RECO_NEAR_BAND = 0.05;
+/** Até onde "perto" conta: a nota vai de 1 (no local) a 0 (nesta distância). */
+export const RECO_NEAR_KM = 40;
+/** Abaixo desta nota de proximidade, estar perto sozinho não basta para entrar na lista. */
+export const RECO_NEAR_MIN = 0.25;
 
 /** Características de um conteúdo, usadas para comparar com o gosto. */
 export interface Features {
@@ -146,6 +153,29 @@ export function finalScore(social: number, taste: number, fresh: number, persona
   return personalize ? w.social * s + w.taste * taste + w.fresh * fresh : (w.social + w.taste) * s + w.fresh * fresh;
 }
 
+/**
+ * Ordem final: a nota de sempre manda, em faixas de RECO_NEAR_BAND; dentro da faixa, o evento mais perto vem antes.
+ * Sem posição (`near` ausente) só vale a nota, como antes.
+ */
+export function rankOrder(a: { score: number; near: number; id: string }, b: { score: number; near: number; id: string }): number {
+  const band = (n: number) => Math.round(n / RECO_NEAR_BAND);
+  return band(b.score) - band(a.score) || b.near - a.near || b.score - a.score || (a.id < b.id ? -1 : 1);
+}
+
+/** Nota de proximidade de 0 a 1: 1 no local, 0 a RECO_NEAR_KM ou mais. */
+export function nearScore(here: { lat: number; lng: number }, venue: { lat: number; lng: number }): number {
+  const km = distanceMeters(here, venue) / 1000;
+  return Math.max(0, Math.min(1, 1 - km / RECO_NEAR_KM));
+}
+
+function parsePosition(lat: unknown, lng: unknown): { lat: number; lng: number } | undefined {
+  if (lat === undefined && lng === undefined) return undefined;
+  if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    throw validationError('Posição inválida', { lat: 'Envie lat e lng válidos, juntos' });
+  }
+  return { lat, lng };
+}
+
 /** Quem fez o post ou o evento (pessoa ou estabelecimento) e se a pessoa que vê já segue. A Home mostra o botão Seguir. */
 export interface RecommendationSource {
   kind: 'PERSON' | 'VENUE';
@@ -199,6 +229,8 @@ interface Candidate {
   engaged: Set<string>;
   /** Evento que ainda vai começar (urgência) ou post recente. */
   freshness: number;
+  /** Proximidade de quem vê (0 a 1), só para evento e só com posição. */
+  near?: number;
 }
 
 /**
@@ -235,12 +267,13 @@ export class RecommendationService {
     return { kind: 'VENUE', id: venue.id, name: venue.name, username: null, follow: following ? 'FOLLOWING' : 'NONE' };
   }
 
-  async recommend(viewerId: string, input: { personalize?: unknown; limit?: unknown } = {}): Promise<RecommendationsView> {
+  async recommend(viewerId: string, input: { personalize?: unknown; limit?: unknown; lat?: unknown; lng?: unknown } = {}): Promise<RecommendationsView> {
     const personalize = input.personalize === undefined ? true : input.personalize === true;
     if (input.limit !== undefined && (typeof input.limit !== 'number' || !Number.isInteger(input.limit) || input.limit < 1 || input.limit > RECO_MAX_LIMIT)) {
       throw validationError('Limite inválido', { limit: `Entre 1 e ${RECO_MAX_LIMIT}` });
     }
     const limit = (input.limit as number | undefined) ?? RECO_DEFAULT_LIMIT;
+    const here = parsePosition(input.lat, input.lng);
     const group = await this.experiment.groupFor(viewerId);
     const { clock, posts, places, eventRoom } = this.deps;
     const now = clock.now();
@@ -402,6 +435,7 @@ export class RecommendationService {
           const e = await eventOf(ref.id);
           if (!e || e.event.endsAt <= now) continue;
           const c = candidate('EVENT', e.event.id, eventFeatures(e.event, e.venue.category), upcomingFreshness(e.event.startsAt));
+          if (here) c.near = nearScore(here, e.venue);
           c.social += w;
           c.going.add(friendId);
         } else {
@@ -422,7 +456,19 @@ export class RecommendationService {
     }
     if (personalize && !isEmptyTaste(taste)) {
       const upcoming = await places.searchEvents({ from: now, to: new Date(now.getTime() + 14 * 86_400_000), limit: 200 });
-      for (const { event, venue } of upcoming) candidate('EVENT', event.id, eventFeatures(event, venue.category), upcomingFreshness(event.startsAt));
+      for (const { event, venue } of upcoming) {
+        const c = candidate('EVENT', event.id, eventFeatures(event, venue.category), upcomingFreshness(event.startsAt));
+        if (here) c.near = nearScore(here, venue);
+      }
+    }
+    // Com a posição da pessoa, entram também os eventos perto dela, mesmo sem amigos nem gosto marcado. Vêm depois dos que
+    // já pontuam pelas regras de sempre: perto só desempata (ver rankOrder).
+    if (here) {
+      const nearby = await places.searchEvents({ center: here, radiusM: RECO_NEAR_KM * 1000, from: now, to: new Date(now.getTime() + 14 * 86_400_000), limit: 80 });
+      for (const { event, venue } of nearby) {
+        const c = candidate('EVENT', event.id, eventFeatures(event, venue.category), upcomingFreshness(event.startsAt));
+        c.near = nearScore(here, venue);
+      }
     }
 
     // 4. Nota, filtros e diversidade.
@@ -432,10 +478,10 @@ export class RecommendationService {
       if (c.type === 'EVENT' && (sharedEvents.has(c.id) || (impressions.get(c.id) ?? 0) >= RECO_MAX_IMPRESSIONS || (await eventRoom.isGoing({ source: 'PLACE', id: c.id }, viewerId)))) continue;
       if (c.type === 'POST' && (await eventRoom.isGoing({ source: 'USER', id: c.id }, viewerId))) continue;
       const sim = personalize ? tasteSimilarity(taste, c.features) : 0;
-      if (c.social === 0 && sim === 0) continue;
+      if (c.social === 0 && sim === 0 && (c.near ?? 0) < RECO_NEAR_MIN) continue;
       scored.push({ c, sim, score: finalScore(c.social, sim, c.freshness, personalize) });
     }
-    scored.sort((a, b) => b.score - a.score || (a.c.id < b.c.id ? -1 : 1));
+    scored.sort((a, b) => rankOrder({ score: a.score, near: a.c.near ?? 0, id: a.c.id }, { score: b.score, near: b.c.near ?? 0, id: b.c.id }));
 
     const perSource = new Map<string, number>();
     const picked: typeof scored = [];
@@ -469,6 +515,7 @@ export class RecommendationService {
         const tag = c.features.tags.find((t) => taste.tags.has(t));
         reasons.push(tag ? `Tem a ver com #${tag}` : c.features.venueId && taste.venues.has(c.features.venueId) ? 'De um rolê que você curte' : 'Parecido com o que você curte');
       }
+      if ((c.near ?? 0) >= 0.5) reasons.push('Perto de você');
       items.push({ type: c.type, score: Math.round(score * 100) / 100, reasons, friendsGoing, friendsEngaged: c.engaged.size, event, post, sponsored: false, match: null, source: await this.sourceOf(viewerId, event, post) });
     }
 

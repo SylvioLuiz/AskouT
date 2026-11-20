@@ -9,6 +9,7 @@ import { SampleBadge } from './suggestions.tsx';
 import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
 import { readPersonalize } from '../lib/dwell.ts';
+import { positionWithin } from '../lib/position.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import type { RecommendationItem, RecommendationSource } from '../lib/types.ts';
 import { Link } from '../router.tsx';
@@ -170,7 +171,8 @@ export function ForYou({ reloadKey }: { reloadKey?: string }) {
   const [control, setControl] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    api.recommendations(readPersonalize(me)).then(
+    // Espera a posição um instante (ela é pedida ao entrar na Home); sem permissão ou sinal, segue sem ela.
+    positionWithin(3000).then((position) => api.recommendations(readPersonalize(me), position)).then(
       (r) => {
         if (!cancelled) {
           setItems(r.items);

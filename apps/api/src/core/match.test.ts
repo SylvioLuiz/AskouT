@@ -257,3 +257,33 @@ describe('Match no Para você', () => {
     assert.equal(r.items.length, 1);
   });
 });
+
+describe('Para você com a posição da pessoa', () => {
+  const ids = (r: { items: { event: { id: string } | null }[] }) => r.items.flatMap((i) => (i.event ? [i.event.id] : []));
+
+  it('eventos perto entram, sem amigos nem gosto, dizendo "Perto de você"; sem posição ou longe, não', async () => {
+    const { w, ana } = await setup();
+    assert.deepEqual(ids(await w.core.recommendations.recommend(ana)), [], 'sem posição e sem sinais, nada');
+    const near = await w.core.recommendations.recommend(ana, { lat: -23.56, lng: -46.64 });
+    assert.deepEqual(ids(near).sort(), ['noite', 'sem-tag']);
+    assert.ok(near.items.every((i) => i.reasons.includes('Perto de você')));
+    const far = await w.core.recommendations.recommend(ana, { lat: -22.9, lng: -43.2 });
+    assert.deepEqual(ids(far), [], 'no Rio, o bar de São Paulo não é perto');
+  });
+
+  it('perto só desempata: quem já pontua pelas regras de sempre vem na frente', async () => {
+    const { w, ana, likesRock } = await setup();
+    await likesRock(ana);
+    const r = await w.core.recommendations.recommend(ana, { lat: -23.56, lng: -46.64 });
+    const order = ids(r);
+    assert.equal(order[0], 'noite', 'o #rock combina com o gosto dela e vem antes do evento sem hashtag');
+    assert.ok(order.includes('sem-tag'));
+  });
+
+  it('recusa posição incompleta ou fora do mapa', async () => {
+    const { w, ana } = await setup();
+    await rejectsWith(w.core.recommendations.recommend(ana, { lat: -23.5 }), 'VALIDATION');
+    await rejectsWith(w.core.recommendations.recommend(ana, { lat: 120, lng: 10 }), 'VALIDATION');
+    await rejectsWith(w.core.recommendations.recommend(ana, { lat: Number.NaN, lng: Number.NaN }), 'VALIDATION');
+  });
+});

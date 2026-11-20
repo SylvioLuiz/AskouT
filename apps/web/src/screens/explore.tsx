@@ -49,38 +49,26 @@ import { DateBadge, PosterEvent } from '../components/poster.tsx';
 import { VenueLogo } from '../components/venue-logo.tsx';
 import { openStatus } from '../lib/venue-profile.ts';
 import { t } from '../lib/i18n/index.ts';
+import { cachedPosition, requestPosition } from '../lib/position.ts';
+import type { Position } from '../lib/position.ts';
 
-// ---------- Posição (só para esta consulta; nada é guardado no aparelho) ----------
+// ---------- Posição (uma só para o app; pedida logo depois do login, ver lib/position.ts) ----------
 
-type Position = { lat: number; lng: number };
 type LocationState = { status: 'asking' | 'denied' | 'unavailable'; position?: undefined } | { status: 'ok'; position: Position };
 
-let lastPosition: { position: Position; at: number } | undefined;
-const POSITION_MAX_AGE_MS = 5 * 60_000;
-
-/** Pede a posição ao abrir o Explorar. Só fica em memória nesta sessão da página. */
+/** A posição do aparelho: a que o app já pediu depois do login, ou pede agora se ainda não pediu. */
 export function useCurrentPosition(): LocationState {
-  const [state, setState] = useState<LocationState>(() =>
-    lastPosition && Date.now() - lastPosition.at < POSITION_MAX_AGE_MS ? { status: 'ok', position: lastPosition.position } : { status: 'asking' },
-  );
+  const [state, setState] = useState<LocationState>(() => {
+    const cached = cachedPosition();
+    return cached ? { status: 'ok', position: cached } : { status: 'asking' };
+  });
   useEffect(() => {
     if (state.status === 'ok') return;
-    if (!('geolocation' in navigator)) {
-      setState({ status: 'unavailable' });
-      return;
-    }
     let alive = true;
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        const position = { lat: p.coords.latitude, lng: p.coords.longitude };
-        lastPosition = { position, at: Date.now() };
-        if (alive) setState({ status: 'ok', position });
-      },
-      (err) => {
-        if (alive) setState({ status: err.code === 1 ? 'denied' : 'unavailable' });
-      },
-      { enableHighAccuracy: false, timeout: 10_000, maximumAge: POSITION_MAX_AGE_MS },
-    );
+    void requestPosition().then((result) => {
+      if (!alive) return;
+      setState(result.status === 'ok' ? { status: 'ok', position: result.position } : { status: result.status });
+    });
     return () => {
       alive = false;
     };
