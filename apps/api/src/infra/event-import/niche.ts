@@ -54,18 +54,28 @@ const KINDS: { kind: EventKind; test: RegExp }[] = [
   { kind: 'OUTDOOR', test: /\b(parque|praia|ao ar livre|piquenique|feira|feirinha|bazar|trilha|passeio|pôr do sol|por do sol|mirante|praca)\b/ },
 ];
 
-export function classifyEvent(event: Pick<ImportedEvent, 'title' | 'description' | 'venueName'>): NicheVerdict {
+/** No Sesc, palestra, oficina, curso, debate e conversa ficam (decisão do responsável): entram como tipo "Outro". */
+const TALKS = /\b(palestra|palestras|oficina|oficinas|curso|cursos|workshop|aula aberta|debate|bate-papo|conversa|roda de conversa|formacao|encontro com|mesa)\b/;
+const TALK_REASONS = new Set(['curso ou palestra']);
+
+export function classifyEvent(event: Pick<ImportedEvent, 'title' | 'description' | 'venueName'> & { source?: string }): NicheVerdict {
   const title = strip(event.title);
   const all = `${title} ${strip(event.description)} ${strip(event.venueName)}`;
-  for (const r of REJECT) {
+  const sesc = event.source === 'sesc-sp';
+  for (const r of sesc ? REJECT.filter((x) => !TALK_REASONS.has(x.reason)) : REJECT) {
     // O título manda: "Curso" no título descarta; no texto só descarta se o título não for de encontro.
     if (r.test.test(title)) return { keep: false, reason: r.reason };
   }
   const bySubject = KINDS.find((k) => k.test.test(title)) ?? KINDS.find((k) => k.test.test(all));
-  if (!bySubject) return { keep: false, reason: 'fora do nicho (nenhum tipo de encontro reconhecido)' };
-  for (const r of REJECT) {
+  if (!bySubject) {
+    if (sesc && TALKS.test(all)) return { keep: true, kind: 'OTHER' };
+    return { keep: false, reason: 'fora do nicho (nenhum tipo de encontro reconhecido)' };
+  }
+  for (const r of sesc ? REJECT.filter((x) => !TALK_REASONS.has(x.reason)) : REJECT) {
     if (r.test.test(all) && !KINDS.some((k) => k.test.test(title))) return { keep: false, reason: r.reason };
   }
+  // Cinema fica de fora do importador (decisão do responsável): sessão de cinema não é encontro de rolê.
+  if (bySubject.kind === 'CINEMA') return { keep: false, reason: 'cinema' };
   return { keep: true, kind: bySubject.kind };
 }
 

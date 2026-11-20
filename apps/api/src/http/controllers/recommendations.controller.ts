@@ -18,10 +18,12 @@ export class RecommendationsController {
   }
 
   @Get('me/recommendations')
-  recommendations(@CurrentActor() actor: Actor, @Query('personalize') personalize?: string, @Query('limit') limit?: string) {
+  recommendations(@CurrentActor() actor: Actor, @Query('personalize') personalize?: string, @Query('limit') limit?: string, @Query('lat') lat?: string, @Query('lng') lng?: string) {
     return this.core.recommendations.recommend(actor.userId, {
       personalize: personalize !== 'false',
       ...(limit !== undefined ? { limit: Number(limit) } : {}),
+      // Posição opcional (o app manda arredondada): só pesa eventos perto, não é guardada.
+      ...(lat !== undefined || lng !== undefined ? { lat: lat === undefined || lat === '' ? Number.NaN : Number(lat), lng: lng === undefined || lng === '' ? Number.NaN : Number(lng) } : {}),
     });
   }
 

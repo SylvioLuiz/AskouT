@@ -1,7 +1,7 @@
 // Importa EVENTOS REAIS de fontes autorizadas para o AskouT, só os que fazem sentido para o app (encontro de pessoas).
 //
-// Fontes: Juicy Santos (https://www.juicysantos.com.br/eventos-na-regiao/) e agenda da Prefeitura de Mogi das Cruzes
-// (https://www.mogidascruzes.sp.gov.br/eventos-festas), uso autorizado pelo responsável do AskouT.
+// Fontes: Juicy Santos, agenda da Prefeitura de Mogi das Cruzes, Centro Cultural São Paulo e programação do Sesc SP
+// (uso autorizado pelo responsável do AskouT). Cinema fica de fora.
 // Cada evento guarda o link da página de origem na descrição, como crédito.
 //
 //   npm run import:events                  SIMULAÇÃO (padrão): busca, filtra e mostra o que entraria e o que ficou de fora. Não grava.
@@ -20,6 +20,8 @@ import { PrismaClient } from '@prisma/client';
 import { GooglePlaceSource } from '../src/infra/google/google-place-source.ts';
 import { fetchJuicyEvents } from '../src/infra/event-import/juicy-santos.ts';
 import { fetchMogiEvents } from '../src/infra/event-import/mogi-prefeitura.ts';
+import { fetchCcspEvents } from '../src/infra/event-import/ccsp.ts';
+import { fetchSescEvents } from '../src/infra/event-import/sesc.ts';
 import { classifyEvent, IMPORT_TAGS } from '../src/infra/event-import/niche.ts';
 import type { ImportedEvent } from '../src/infra/event-import/niche.ts';
 import type { ExternalPlace } from '../src/core/types.ts';
@@ -63,7 +65,17 @@ async function main(): Promise<void> {
     console.log(`[importar] Mogi indisponível: ${e instanceof Error ? e.message : e}`);
     return [] as ImportedEvent[];
   });
-  const fetched = [...(await fetchJuicyEvents(now)), ...mogi];
+  const optional = async (name: string, load: () => Promise<ImportedEvent[]>): Promise<ImportedEvent[]> => {
+    try {
+      return await load();
+    } catch (e: unknown) {
+      console.log(`[importar] ${name} indisponível: ${e instanceof Error ? e.message : e}`);
+      return [];
+    }
+  };
+  const ccsp = await optional('CCSP', () => fetchCcspEvents(now));
+  const sesc = await optional('Sesc', () => fetchSescEvents(now));
+  const fetched = [...(await fetchJuicyEvents(now)), ...mogi, ...ccsp, ...sesc];
   const kept: { event: ImportedEvent; kind: Extract<ReturnType<typeof classifyEvent>, { keep: true }>['kind'] }[] = [];
   const dropped: { event: ImportedEvent; reason: string }[] = [];
   for (const event of fetched) {
@@ -71,7 +83,7 @@ async function main(): Promise<void> {
     if (verdict.keep) kept.push({ event, kind: verdict.kind });
     else dropped.push({ event, reason: verdict.reason });
   }
-  console.log(`[importar] Juicy Santos e Prefeitura de Mogi: ${fetched.length} evento(s) futuro(s); ${kept.length} no nicho, ${dropped.length} fora.`);
+  console.log(`[importar] todas as fontes: ${fetched.length} evento(s) futuro(s); ${kept.length} no nicho, ${dropped.length} fora.`);
   for (const d of dropped) console.log(`  fora: ${d.event.title} (${d.reason})`);
   for (const k of kept) console.log(`  entra [${k.kind}]: ${k.event.title} — ${k.event.venueName} — ${k.event.startsAt.toISOString().slice(0, 16)}Z${k.event.isFree ? ' (grátis)' : ''}`);
   if (!apply) return;

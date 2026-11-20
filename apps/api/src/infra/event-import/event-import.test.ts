@@ -97,3 +97,58 @@ test('agenda da Prefeitura de Mogi: só o que vem, com local; sem ano vira o ano
   assert.equal(events[0]!.startsAt.toISOString(), '2026-11-29T18:00:00.000Z');
   assert.equal(events[0]!.sourceId, '2026-11-29-roda-de-passinhos-do-funk-com-dj');
 });
+
+test('cinema fica de fora do importador', () => {
+  assert.deepEqual(classifyEvent({ title: 'Cinema de Billy Wilder 360º', description: 'Mostra de cinema', venueName: 'MISS' }), { keep: false, reason: 'cinema' });
+  assert.equal(classifyEvent({ title: 'Festa no cinema abandonado', description: '', venueName: '' }).keep, true);
+});
+
+test('CCSP: sessão única e sessão semanal viram ocorrências futuras com horário de São Paulo', async () => {
+  const { sessionEvents } = await import('./ccsp.ts');
+  const now = new Date('2026-11-20T12:00:00Z');
+  const day = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 1000;
+  const info = { slug: 's', link: 'https://centrocultural.sp.gov.br/evento/s/', excerpt: { rendered: '<p>Piano na praça &amp; música.</p>' } };
+  const single = sessionEvents({ id: 9, slug: 's', link: 'x', title: { rendered: 'Piano na Pra&ccedil;a' }, meta: { data_inicio: day('2026-12-05'), horario_inicio: '18:00', horario_termino: '19:00', valor_ingresso: '' } }, info, now);
+  assert.equal(single.length, 1);
+  assert.equal(single[0]!.startsAt.toISOString(), '2026-12-05T21:00:00.000Z');
+  assert.equal(single[0]!.isFree, true);
+  assert.equal(single[0]!.description, 'Piano na praça & música.');
+  assert.equal(single[0]!.link, 'https://centrocultural.sp.gov.br/evento/s/');
+  const weekly = sessionEvents({ id: 8, slug: 'w', link: 'x', title: { rendered: 'Passinho Charme' }, meta: { data_inicio: day('2026-11-27'), horario_inicio: '19:00', horario_termino: '21:00', recorrencia_tipo: 'semanal', recorrencia_fim: day('2026-12-18'), valor_ingresso: 'R$ 20' } }, undefined, now);
+  assert.deepEqual(weekly.map((e) => e.sourceId), ['8-2026-11-27', '8-2026-12-04', '8-2026-12-11', '8-2026-12-18']);
+  assert.equal(weekly[0]!.isFree, false);
+  const past = sessionEvents({ id: 7, slug: 'p', link: 'x', title: { rendered: 'Passado' }, meta: { data_inicio: day('2026-10-01'), horario_inicio: '19:00' } }, undefined, now);
+  assert.deepEqual(past, []);
+});
+
+test('Sesc: lê unidade, categoria, preço, local e datas da página; só presencial e futuro', async () => {
+  const { parseSescPage, sescEvents } = await import('./sesc.ts');
+  const html = `<html><head><meta property="og:image" content="https://www.sescsp.org.br/a.png"></head><body>
+<nav>Home | Itaquera | Shows, Espetáculos e Performances | Butterfly – Saindo …</nav>
+<h1>Butterfly &#8211; Saindo do Casulo</h1> Itaquera Duração: 90 minutos atividade presencial Grátis Local: PRAÇA DE EVENTOS  Sem retirada de ingressos.
+Data e horário 05/12 a 05/12 05/12 • Sábado • das 15h00 às 16h30 Compartilhe: Um espetáculo de dança em cadeira de rodas.</body></html>`;
+  const page = parseSescPage(html, 'https://www.sescsp.org.br/programacao/butterfly-saindo-do-casulo/')!;
+  assert.equal(page.unit, 'Itaquera');
+  assert.equal(page.category, 'Shows, Espetáculos e Performances');
+  assert.equal(page.free, true);
+  assert.equal(page.presencial, true);
+  assert.equal(page.place, 'PRAÇA DE EVENTOS');
+  assert.deepEqual(page.dates, [{ day: 5, month: 12, sh: 15, sm: 0, eh: 16, em: 30 }]);
+  const now = new Date('2026-11-20T12:00:00Z');
+  const events = sescEvents(page, now);
+  assert.equal(events.length, 1);
+  assert.equal(events[0]!.startsAt.toISOString(), '2026-12-05T18:00:00.000Z');
+  assert.equal(events[0]!.venueName, 'Sesc Itaquera');
+  assert.equal(events[0]!.area.name, 'São Paulo');
+  assert.deepEqual(sescEvents({ ...page, presencial: false }, now), []);
+  assert.deepEqual(sescEvents({ ...page, dates: [{ day: 1, month: 10, sh: 10, sm: 0 }] }, now), []);
+  assert.equal(sescEvents({ ...page, unit: 'Santos' }, now)[0]!.area.name, 'Santos');
+});
+
+test('Sesc: palestra, oficina e curso ficam como "Outro"; nas outras fontes continuam fora', () => {
+  const talk = { title: 'Oficina de bordado', description: 'Aprenda pontos básicos.', venueName: 'Sesc Santos' };
+  assert.deepEqual(classifyEvent({ ...talk, source: 'sesc-sp' }), { keep: true, kind: 'OTHER' });
+  assert.deepEqual(classifyEvent({ title: 'Palestra sobre economia criativa', description: '', venueName: 'Sesc Pompeia', source: 'sesc-sp' }), { keep: true, kind: 'OTHER' });
+  assert.equal(classifyEvent({ ...talk, source: 'juicy-santos' }).keep, false);
+  assert.equal(classifyEvent({ title: 'Palestra online do Sesc', description: 'transmissão online', venueName: 'Sesc', source: 'sesc-sp' }).keep, false, 'online continua fora');
+});

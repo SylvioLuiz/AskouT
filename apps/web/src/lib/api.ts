@@ -486,7 +486,9 @@ export function createApi(deps: ApiDeps) {
       }
       return request<{ places: ExplorePlace[]; placesAvailable: boolean }>('GET', `/explore/place-search?${query.toString()}`);
     },
-    recommendations: (personalize: boolean) => request<Recommendations>('GET', `/me/recommendations?personalize=${personalize ? 'true' : 'false'}`),
+    /** `position`: onde a pessoa está, para pesar eventos perto. Vai arredondada (~1 km); o servidor não guarda. */
+    recommendations: (personalize: boolean, position?: { lat: number; lng: number }) =>
+      request<Recommendations>('GET', `/me/recommendations?personalize=${personalize ? 'true' : 'false'}${position ? `&lat=${position.lat.toFixed(2)}&lng=${position.lng.toFixed(2)}` : ''}`),
     recordDwell: (items: DwellEntry[]) => request<{ saved: number }>('POST', '/me/dwell', { body: { items } }),
     eraseDwell: () => request<{ removed: number }>('DELETE', '/me/dwell'),
     boostPricing: () => request<BoostPricing>('GET', '/boosts/pricing'),
