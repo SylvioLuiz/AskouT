@@ -42,19 +42,21 @@ import { VenueStoriesController } from './controllers/venue-stories.controller.t
 import { CalendarImportJob } from './calendar-import-job.ts';
 import { CalendarSyncJob } from './calendar-sync-job.ts';
 import { CalendarsController } from './controllers/calendars.controller.ts';
+import { HunterAdminController, HunterServiceController, hunterBridgeProvider } from './hunter/hunter.controller.ts';
 import { PollDeadlines } from './poll-deadlines.ts';
 import { PrismaShutdown, prismaProvider } from './prisma.provider.ts';
 import { loadConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
 
 @Module({
-  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, PublicController, GifsController, FeedController, GuestListController, VenuesController, BoostsController, OffersController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AlbumsController, VenueStoriesController, AdminController, ReferralsController],
+  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, PublicController, GifsController, FeedController, GuestListController, VenuesController, BoostsController, OffersController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AlbumsController, VenueStoriesController, AdminController, ReferralsController, HunterServiceController, HunterAdminController],
   providers: [
     { provide: CONFIG, useFactory: () => loadConfig(process.env) },
     prismaProvider,
     googleProvider,
     placePhotosProvider,
     coreProvider,
+    hunterBridgeProvider,
     PrismaShutdown,
     FlashPurge,
     PollDeadlines,

@@ -10,6 +10,7 @@ import { DashboardPage } from './pages/dashboard.tsx';
 import { EventsPage } from './pages/events.tsx';
 import { PostsPage } from './pages/posts.tsx';
 import { FeedPage } from './pages/feed.tsx';
+import { HunterPage } from './pages/hunter.tsx';
 import { PaymentsPage } from './pages/payments.tsx';
 import { EventExtrasPage } from './pages/event-extras.tsx';
 import { TastesPage } from './pages/tastes.tsx';
@@ -279,6 +280,8 @@ function Page({ route }: { route: RoutePath }) {
       return <ReferralsPage />;
     case '/pagamentos':
       return <PaymentsPage />;
+    case '/hunter':
+      return <HunterPage />;
     case '/auditoria':
       return <AuditPage />;
     default:

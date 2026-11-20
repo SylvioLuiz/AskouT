@@ -974,6 +974,7 @@ model PlaceEvent {
   cloakroom CloakroomSetting?
   cloakroomTickets CloakroomTicket[]
   guestList GuestList?
+  hunterLink HunterEventLink?
 
   @@index([startsAt])
   @@index([venueId])
@@ -2010,4 +2011,18 @@ model GuestListEntry {
 
   @@id([eventId, userId])
   @@index([userId])
+}
+
+/// Ponte com o AskouT Hunter (sistema separado). Cada evento que o Hunter cadastrou fica ligado aqui pela referência dele (`ref`).
+/// Apagar este modelo e o módulo `hunter` desliga a ponte; os eventos continuam como eventos normais dos locais.
+model HunterEventLink {
+  ref       String     @id
+  eventId   String     @unique @db.Uuid
+  venueId   String     @db.Uuid
+  createdAt DateTime   @default(now())
+
+  event PlaceEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([venueId])
 }
