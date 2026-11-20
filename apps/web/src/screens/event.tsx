@@ -340,7 +340,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                     </button>
                   </p>
                 ) : null}
-                {choosing ? <GoingChoiceSheet busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => { setChoosing(false); storyAfterGoing.current = false; }} /> : null}
+                {choosing ? <GoingChoiceSheet event={{ id: e.id, startsAt: e.startsAt, endsAt: e.endsAt }} busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => { setChoosing(false); storyAfterGoing.current = false; }} /> : null}
               </>
             )}
             {problem ? <Notice tone="error">{problem}</Notice> : null}

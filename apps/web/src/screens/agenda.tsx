@@ -355,21 +355,7 @@ export function AgendaScreen() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [finding, setFinding] = useState(false);
   const sharing = useAsync(() => api.availabilitySharing(), []);
-  const [shareBusy, setShareBusy] = useState(false);
-  const [shareError, setShareError] = useState<string | undefined>();
   const shared = sharing.data?.sharing === true;
-
-  async function toggleSharing() {
-    setShareBusy(true);
-    setShareError(undefined);
-    try {
-      sharing.setData(await api.setAvailabilitySharing(!shared));
-    } catch (failure) {
-      setShareError(toApiError(failure).message);
-    } finally {
-      setShareBusy(false);
-    }
-  }
   const [syncing, setSyncing] = useState(false);
   const [syncedN, setSyncedN] = useState(0);
   const search = useSearch();
@@ -514,18 +500,13 @@ export function AgendaScreen() {
       />
       {helpOpen ? <AgendaHelp onClose={() => setHelpOpen(false)} /> : null}
 
-      <section className="agshare" aria-labelledby="agshare-titulo">
+      <Link to="/configuracao/agenda" className="agshare agshare--link" aria-label={t('Agenda com amigos: {state}. Mudar nas configurações.', { state: shared ? t('ligada') : t('desligada') })}>
         <div className="agshare__text">
-          <h2 className="agshare__title" id="agshare-titulo">
-            {t('Mostrar meus horários para amigos')}
-          </h2>
-          <p className="agshare__help">{t('Seus amigos veem quando você está disponível, parcial ou indisponível, e podem achar horários em comum com você. Compromissos das agendas ligadas contam só como ocupado, sem o nome.')}</p>
+          <h2 className="agshare__title">{t('Agenda com amigos')}</h2>
+          <p className="agshare__help">{sharing.data === undefined ? t('Carregando…') : shared ? t('Ligada: seus amigos veem seus horários. Toque para mudar nas configurações.') : t('Desligada: só você vê seus horários. Toque para mudar nas configurações.')}</p>
         </div>
-        <button type="button" role="switch" aria-checked={shared} aria-labelledby="agshare-titulo" className="switch" onClick={() => void toggleSharing()} disabled={shareBusy || sharing.data === undefined}>
-          <span className="switch__thumb" />
-        </button>
-      </section>
-      {shareError ? <Notice tone="error">{shareError}</Notice> : null}
+        <ChevronRightIcon />
+      </Link>
       <Button variant="secondary" full onClick={() => setFinding(true)}>
         <UsersIcon /> {t('Achar horário com amigos')}
       </Button>

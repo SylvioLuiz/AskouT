@@ -7105,6 +7105,9 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .convskel--time { width: 34px; }
 @media (prefers-reduced-motion: reduce) { .convskel { animation: none; } }
 
+.going-choice__conflicts { margin: 0 0 12px; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 8px; }
+.agshare--link { align-items: center; color: inherit; text-decoration: none; }
+.agshare--link > svg { flex: none; color: var(--muted); }
 /* "Rolando agora": etiqueta discreta com bolinha que pulsa, nas cores do app. */
 .livetag { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 0.6875rem; font-weight: 700; line-height: 1.5; color: var(--brand-hover); background: var(--surface); box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent); }
 .livetag__dot { position: relative; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }

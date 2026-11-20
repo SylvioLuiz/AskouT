@@ -111,7 +111,7 @@ export function PosterEvent({
           )}
         </div>
       </div>
-      {choosing ? <GoingChoiceSheet busy={busy} onChoose={(onProfile) => void toggle(onProfile)} onClose={() => setChoosing(false)} /> : null}
+      {choosing ? <GoingChoiceSheet event={{ id: eventId, startsAt, endsAt }} busy={busy} onChoose={(onProfile) => void toggle(onProfile)} onClose={() => setChoosing(false)} /> : null}
     </article>
   );
 }

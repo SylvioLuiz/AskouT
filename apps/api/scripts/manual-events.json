@@ -144,7 +144,9 @@
     "area": "mogi",
     "kind": "NIGHT",
     "weekday": 5,
-    "skip": ["2026-11-20"],
+    "skip": [
+      "2026-11-20"
+    ],
     "start": "20:00",
     "description": "Sextou no Grow, com samba e passinho no centro histórico de Mogi. A programação muda toda semana: veja o Instagram do bar.",
     "credit": "Instagram do Grow (@instagrow.exe)",
@@ -224,5 +226,19 @@
     "description": "Autoral Day no Bequinho, com o drink Garota Carioca e DJ @lucassatoru na pista.",
     "credit": "Instagram do Bequinho (@bequinhodavm)",
     "link": "https://www.instagram.com/bequinhodavm/p/DfzoNfGoEKG/"
+  },
+  {
+    "title": "A festa do rock Brasil no Morrison: Chico Science, Pitty e Charlie Brown Jr. (tributos)",
+    "venue": "Morrison Rock Bar",
+    "address": "Rua Fidalga, 531 - Vila Madalena, São Paulo - SP",
+    "area": "sp",
+    "kind": "SHOW",
+    "date": "2026-11-20",
+    "start": "21:00",
+    "end": "03:00",
+    "description": "A festa do rock Brasil em São Paulo, com grandes bandas no palco: Ciência de Chico (tributo a Chico Science e Nação Zumbi, 23h), Desconcerto (cover de Pitty) e A União (tributo ao Charlie Brown Jr.). A casa abre às 21h.",
+    "credit": "Instagram do Morrison Rock Bar (@morrisonrockbar_oficial)",
+    "link": "https://www.instagram.com/morrisonrockbar_oficial/reel/DfzlnuJgOXO/",
+    "approxTime": false
   }
 ]
