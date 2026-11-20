@@ -259,7 +259,7 @@ export function AgendaRow({ event, now, preview = false, goingCount }: { event: 
       <span className="vagenda__meta">
         {kindLabel(event.kind)}
         {event.isFree ? t(' · Grátis') : ''}
-        {event.phase === 'LIVE' ? ' · Acontecendo agora' : ''}
+        {event.phase === 'LIVE' ? ' · Rolando agora' : ''}
         {goingCount === undefined || goingCount === 0 ? '' : goingCount === 1 ? t(' · 1 pessoa foi') : t(' · {n} pessoas foram', { n: goingCount })}
       </span>
     </>

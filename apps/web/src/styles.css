@@ -6423,6 +6423,8 @@ div.optrow__main { cursor: default; }
 .evcover__video { position: absolute; z-index: 1; top: 14px; left: 14px; color: #fff; filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.6)); }
 .evcover__kind { position: absolute; z-index: 1; left: 12px; bottom: 12px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #fff; color: var(--brand-text); }
 .evcover__kind svg { width: 22px; height: 22px; }
+/* Tipo escrito por extenso (Show, Noite, Gastronomia...): vira uma pílula que cresce com o texto, em vez de um círculo fixo onde a palavra não cabe. */
+.evcover__kind:not(.evcover__kind--icon) { width: auto; max-width: calc(100% - 24px); height: auto; padding: 3px 10px; border-radius: 999px; font-family: inherit; font-size: 0.6875rem; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .evcover__when { position: absolute; z-index: 1; left: 62px; right: 12px; bottom: 21px; color: #fff; font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .evcover--empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; background: var(--surface); border: 1.5px dashed var(--line-strong); }
 .evcover--empty p { margin: 0; color: var(--muted); }
@@ -7218,3 +7220,22 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
   text-decoration: none;
 }
 .auth__home svg { width: 20px; height: 20px; }
+
+/* Título do card: no máximo 3 linhas, com "..." se passar. */
+.evcard__title { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
+/* Página do evento: o que vem antes dos ":" do título fica em fonte menor, acima do restante. */
+.evhero__lead { display: block; margin-bottom: 4px; font-size: 0.75em; font-weight: 600; line-height: 1.2; opacity: 0.9; }
+
+/* Capa do evento: título com 3 linhas fica menor; local resumido (até 2 linhas) com ícone. */
+.evhero__title.evhero__title--small { font-size: 1.2rem; line-height: 1.15; }
+.evhero__placelink { align-items: flex-start; min-height: 0; padding: 6px 0; text-decoration: none; }
+.evhero__placelink .icon, .evhero__placelink svg { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.evhero__placelink::after { content: none; }
+.evhero__placetext { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.evhero__placelink--plain .evhero__placetext { text-decoration: none; }
+
+/* Card do Explorar expandido ao segurar. */
+.evcard__more { display: grid; gap: 4px; margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--border, rgb(128 128 128 / 0.25)); font-size: 0.8125rem; }
+.evcard__more p { margin: 0; }
+.evcard__desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
+.evcard--expanded .evcard__title { -webkit-line-clamp: unset; line-clamp: unset; }

@@ -518,7 +518,7 @@ export function CreatePostScreen() {
               <PhotoIcon /> {items.length > 1 ? t('Capa e fotos ({count})', { count: items.length }) : t('Trocar capa')}
             </button>
             {cover.kind === 'UPLOAD' && cover.video ? <span className="evcover__video" aria-hidden="true">▶</span> : null}
-            <span className="evcover__kind" aria-hidden="true">
+            <span className="evcover__kind evcover__kind--icon" aria-hidden="true">
               <EventKindIcon kind={eventKind} />
             </span>
             {when ? <span className="evcover__when">{when}</span> : null}

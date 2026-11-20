@@ -46,15 +46,17 @@ export function formatWhen(startsAt: string | null, endsAt: string | null, now: 
   const hasEnd = end !== undefined && !Number.isNaN(end.getTime());
   // O fim só leva a data quando cai em outro dia que o início (ou, em andamento, que hoje): eventos podem passar de 24 h.
   const sameDay = (a: Date, b: Date) => dayDiff(a, b) === 0;
-  const endDay = (e: Date) => {
-    const d = -dayDiff(e, now);
-    return d === 0 ? t('hoje') : d === 1 ? t('amanhã') : dayMonth.format(e);
-  };
+  // O fim só leva o dia quando passa de amanhã ("amanhã" não aparece: "Hoje às 22:00 até 02:00").
+  const farEnd = (e: Date, reference: Date) => !sameDay(e, reference) && -dayDiff(e, now) > 1;
   // Já terminou (ou, sem horário de fim, começou há mais de 24 h): não é mais "acontecendo agora".
   if ((hasEnd && end.getTime() <= now.getTime()) || (!hasEnd && now.getTime() - start.getTime() > 86_400_000)) return t('Aconteceu em {day}', { day: (start.getFullYear() === now.getFullYear() ? dayMonth : dayMonthYear).format(start) });
   const reference = start.getTime() <= now.getTime() ? now : start;
-  const until = hasEnd ? (sameDay(end, reference) ? t(' até {time}', { time: clock.format(end) }) : t(' até {day} às {time}', { day: endDay(end), time: clock.format(end) })) : '';
-  if (start.getTime() <= now.getTime()) return t('Acontecendo agora{until}', { until });
+  // Em andamento: só "Até 02:00" (sem "acontecendo", a etiqueta Rolando agora já diz).
+  if (start.getTime() <= now.getTime()) {
+    if (!hasEnd) return t('Agora');
+    return farEnd(end, reference) ? t('Até {day} às {time}', { day: dayMonth.format(end), time: clock.format(end) }) : t('Até {time}', { time: clock.format(end) });
+  }
+  const until = hasEnd ? (farEnd(end, reference) ? t(' até {day} às {time}', { day: dayMonth.format(end), time: clock.format(end) }) : t(' até {time}', { time: clock.format(end) })) : '';
   const diff = -dayDiff(start, now);
   const day = diff === 0 ? t('Hoje') : diff === 1 ? t('Amanhã') : dayLabel(startsAt, now);
   return t('{day} às {time}{until}', { day, time: clock.format(start), until });

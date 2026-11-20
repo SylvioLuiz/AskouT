@@ -44,6 +44,7 @@ import type { RangeId } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { pluralize } from '../lib/format.ts';
 import type { EventKind, ExploreEvent, ExplorePlace, ExploreResult } from '../lib/types.ts';
+import { useLongPress } from '../components/tile-press.tsx';
 import { trackClick, useDwell } from '../components/dwell.tsx';
 import { trackSponsoredOpen, useSponsoredView } from '../components/sponsored-view.tsx';
 import { Link, navigate, useSearch } from '../router.tsx';
@@ -120,9 +121,12 @@ export function EventCard({ event, now, poster }: { event: ExploreEvent; now: Da
 /** Evento em lista (Explorar). */
 function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
   const adRef = useSponsoredView<HTMLLIElement>(event.sponsored === true, 'EXPLORE', { eventId: event.id });
+  // Segurar o card expande/recolhe com mais detalhes (descrição, endereço, horário completo).
+  const [expanded, setExpanded] = useState(false);
+  const press = useLongPress(() => setExpanded((v) => !v), true);
   return (
-    <li className={`evcard${isLiveNow(event, now) ? ' evcard--live' : ''}`} ref={adRef}>
-      <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link" onClick={() => { if (event.sponsored) trackSponsoredOpen('EXPLORE', { eventId: event.id }); }}>
+    <li className={`evcard${isLiveNow(event, now) ? ' evcard--live' : ''}${expanded ? ' evcard--expanded' : ''}`} ref={adRef}>
+      <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link" {...press} aria-expanded={expanded} onClick={(ev) => { press.onClick?.(ev); if (ev.defaultPrevented) return; if (event.sponsored) trackSponsoredOpen('EXPLORE', { eventId: event.id }); }}>
         <EventCover event={event} shape={coverShape(event.id)} badge live={isLiveNow(event, now)} />
         <div className="evcard__body">
           <h3 className="evcard__title">{event.title}</h3>
@@ -135,6 +139,14 @@ function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
           <p className="evcard__when">{formatWhen(event.startsAt, event.endsAt, now)}</p>
           {event.goingCount !== undefined ? <p className="evcard__hot">{t('{n} confirmados agora', { n: event.goingCount })}</p> : null}
           {event.distanceM !== null ? <p className="evcard__dist">{t('a {distance}', { distance: formatDistance(event.distanceM) })}</p> : null}
+          {expanded ? (
+            <div className="evcard__more">
+              {event.venue.address ? <p>{event.venue.address}</p> : null}
+              <p>{kindLabel(event.kind)}{event.isFree ? ` · ${t('Grátis')}` : ''}</p>
+              {event.description ? <p className="evcard__desc">{event.description}</p> : null}
+              {event.tags.length > 0 ? <p>{event.tags.slice(0, 5).map((tg) => `#${tg}`).join(' ')}</p> : null}
+            </div>
+          ) : null}
         </div>
       </Link>
     </li>
@@ -143,6 +155,7 @@ function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
 
 /** Evento em formato de cartaz (Home): foto inteira, data em destaque e "Eu vou". */
 function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
+  const me = useUser();
   const dwellRef = useDwell<HTMLLIElement>('EVENT', event.id, 'FEED');
   // O cartaz patrocinado aparece na Home ("Rolês em destaque").
   useSponsoredView<HTMLLIElement>(event.sponsored === true, 'HOME', { eventId: event.id }, dwellRef);
@@ -163,6 +176,7 @@ function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
           </span>
         }
         count={event.goingCount}
+        hideGoing={event.author?.userId === me.id}
         tags={
           <>
             {isLiveNow(event, now) ? <LiveTag /> : null}

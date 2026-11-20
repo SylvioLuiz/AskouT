@@ -142,6 +142,7 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
       venue={<VenueLink venueId={post.placeVenueId} name={post.placeName ?? t('Evento')} />}
       image={first?.path ? api.assetUrl(first.path) : null}
       fallback={<span className="poster__kind" aria-hidden="true">{t('Evento')}</span>}
+      hideGoing={post.mine}
     />
   );
 }
