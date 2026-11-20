@@ -359,7 +359,7 @@ export function ConnectionsScreen({ username, direction }: { username: string; d
   const [loading, setLoading] = useState(false);
 
   const userId = view.data?.profile.userId;
-  const title = direction === 'followers' ? 'Seguidores' : 'Seguindo';
+  const title = direction === 'followers' ? t('Seguidores') : t('Seguindo');
   useTitle(t('{title} de @{username}', { title, username }));
 
   async function load(offset: number) {

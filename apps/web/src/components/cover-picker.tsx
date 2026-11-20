@@ -47,7 +47,7 @@ export function CoverPicker({ imageUrl, imageData, onChange, hint = t('Sem image
   return (
     <div className="cover">
       <div className={`cover__frame${logo ? ' cover__frame--logo' : ''}${current ? ' cover__frame--has' : ''}`}>
-        {current ? <img className="cover__img" src={current} alt={logo ? 'Logo' : 'Capa'} /> : <p className="cover__empty">{hint}</p>}
+        {current ? <img className="cover__img" src={current} alt={logo ? t('Logo') : t('Capa')} /> : <p className="cover__empty">{hint}</p>}
         {linking ? (
           <div className="cover__link">
             <input className="cover__input" type="url" inputMode="url" value={link} placeholder="https://" aria-label={t('Endereço da imagem')} autoFocus maxLength={500} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); useLink(); } }} />

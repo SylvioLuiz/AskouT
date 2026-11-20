@@ -143,7 +143,7 @@ export function SocialLogin() {
   if (!any) return null;
   return (
     <div className="social">
-      <p className="social__or">ou</p>
+      <p className="social__or">{t('ou')}</p>
       <SocialButtons onToken={finish} busy={busy} />
     </div>
   );

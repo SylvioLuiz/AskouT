@@ -112,7 +112,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
       {poll.status === 'FINALIZED' && poll.final ? (
         <section className="callout dpoll__final" aria-label={t('Data definida')}>
           <p className="callout__text">
-            <strong>Data definida: {longDay(poll.final.date)}</strong>
+            <strong>{t('Data definida: {day}', { day: longDay(poll.final.date) })}</strong>
             <br />
             {new Date(poll.final.startsAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })} {t('às')} {new Date(poll.final.endsAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })}
           </p>
@@ -133,7 +133,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           </div>
         </section>
       ) : null}
-      {poll.status === 'VOTING' && poll.votingClosed ? <Notice>Os votos foram encerrados. {poll.isOrganizer ? t('Escolha a data entre as melhores abaixo.') : t('Aguarde quem organiza escolher a data.')}</Notice> : null}
+      {poll.status === 'VOTING' && poll.votingClosed ? <Notice>{t('Os votos foram encerrados.')} {poll.isOrganizer ? t('Escolha a data entre as melhores abaixo.') : t('Aguarde quem organiza escolher a data.')}</Notice> : null}
       {best && bestDismissed ? (
         <div className="callout">
           <p className="callout__text">
@@ -501,7 +501,7 @@ function ProposalCard({ poll, busy, act }: { poll: PollView; busy: boolean; act:
   return (
     <section className="callout dpoll__proposal" aria-label={t('Data em confirmação')}>
       <p className="callout__text">
-        <strong>Data proposta: {longDay(p.date)}</strong>
+        <strong>{t('Data proposta: {day}', { day: longDay(p.date) })}</strong>
         <br />
         {new Date(p.startsAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })} · {percent(p.compatibility)} de compatibilidade
       </p>

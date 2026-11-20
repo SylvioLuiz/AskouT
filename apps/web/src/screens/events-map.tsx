@@ -139,7 +139,7 @@ function MapCard({ event, selected, index, onSelect }: { event: ExploreEvent; se
           </span>
           <span className="evmapcard__facts">
             <span>{timeRange(event.startsAt, event.endsAt)}</span>
-            {event.distanceM !== null ? <span>a {formatDistance(event.distanceM)}</span> : null}
+            {event.distanceM !== null ? <span>{t('a {distance}', { distance: formatDistance(event.distanceM) })}</span> : null}
             <span>{kindLabel(event.kind)}</span>
           </span>
         </div>
@@ -407,7 +407,7 @@ export function EventsMapScreen() {
         <ExploreViews current="map" floating />
         <div className="evmap__seg" role="group" aria-label={t('O que mostrar no carrossel')}>
           <button type="button" aria-pressed={mode === 'places'} className={mode === 'places' ? 'is-on' : ''} onClick={() => setMode('places')}>
-            Locais
+            {t('Locais')}
           </button>
           {noLiveEvents ? null : (
             <button type="button" aria-pressed={mode === 'events'} className={mode === 'events' ? 'is-on' : ''} onClick={() => setMode('events')}>

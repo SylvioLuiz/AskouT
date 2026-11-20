@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CSSProperties } from 'react';
 import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
 import { ChatHead } from '../components/chat-head.tsx';
@@ -30,7 +31,8 @@ import { canCompressVideo, prepareProgressText } from '../lib/video-prepare.ts';
 import { ApiError, toApiError } from '../lib/errors.ts';
 import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
 import { CommentGifView, CommentTools, GifImage } from '../components/comment-tools.tsx';
-import type { ChatMessage, CommentGif, ConversationItem } from '../lib/types.ts';
+import type { ChatMessage, CommentGif, ConversationItem, MessageStory } from '../lib/types.ts';
+import { StoryViewer } from '../components/event-story.tsx';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -180,14 +182,49 @@ interface StagedMedia {
   url: string;
 }
 
-/** Story respondido: aparece anexado em cima da resposta (some a imagem se o story já expirou ou for vídeo). */
-function StoryAttachment({ storyId, mine }: { storyId: string; mine: boolean }) {
+/**
+ * Story respondido, em cima da resposta, só enquanto ainda está no ar (quando acaba, some da conversa).
+ * Tocar abre o story. Quem recebeu a resposta vê a miniatura grande, centralizada; quem respondeu vê uma faixa
+ * compacta, "Você respondeu ao story de @fulana", com a miniatura pequena ao lado.
+ */
+function StoryAttachment({ story, mine }: { story: MessageStory; mine: boolean }) {
   const [failed, setFailed] = useState(false);
+  const [open, setOpen] = useState(false);
+  if (failed) return null;
+  const src = api.storyMediaUrl(story.id);
+  const thumb =
+    story.kind === 'VIDEO' ? (
+      <video src={src} muted playsInline preload="metadata" onError={() => setFailed(true)} />
+    ) : (
+      <img src={src} alt="" draggable={false} onError={() => setFailed(true)} />
+    );
+  const label = mine ? t('Você respondeu ao flash de @{username}', { username: story.author.username }) : t('Respondeu ao seu flash');
   return (
-    <div className="bubble__story" role="group" aria-label={mine ? t('Story que você respondeu') : t('Story respondido')}>
-      {failed ? null : <img src={api.storyMediaUrl(storyId)} alt="" draggable={false} onError={() => setFailed(true)} />}
-      <span>{failed ? t('Story indisponível') : mine ? t('Você respondeu ao story') : t('Respondeu ao seu story')}</span>
-    </div>
+    <>
+      <button
+        type="button"
+        className={`bubble__story${mine ? ' bubble__story--sent' : ''}`}
+        aria-label={t('{label}. Abrir o flash', { label })}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+      >
+        <span className="bubble__storythumb">{thumb}</span>
+        <span className="bubble__storylabel">{label}</span>
+      </button>
+      {open
+        ? createPortal(
+        <StoryViewer
+          groups={[{ author: story.author, mine: !mine, items: [{ id: story.id, kind: story.kind, caption: story.caption, captionY: story.captionY, createdAt: story.createdAt, expiresAt: story.expiresAt, canDelete: false, ...(story.overlays ? { overlays: story.overlays } : {}) }] }]}
+          start={{ group: 0, item: 0 }}
+          onClose={() => setOpen(false)}
+          onChanged={() => setOpen(false)}
+        />,
+          document.body,
+        )
+        : null}
+    </>
   );
 }
 
@@ -699,7 +736,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       {!cell && !selected && m.mine && hasActions(m) ? moreButton(m) : null}
       <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.reactions.length > 0 ? ' bubble--reacted' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} title={formatClock(m.createdAt)} onClick={(e) => tapBubble(m, e)} {...pressHandlers(m)}>
         {isGroup && !m.mine && m.senderName && (pos === 'first' || pos === 'single') ? <span className="bubble__sender">{m.senderName}</span> : null}
-        {m.storyId && !m.deleted ? <StoryAttachment storyId={m.storyId} mine={m.mine} /> : null}
+        {m.story && !m.deleted ? <StoryAttachment story={m.story} mine={m.mine} /> : null}
         {m.replyTo && !m.deleted ? (
           <button type="button" className="bubble__quote" aria-label={t('Ir para a mensagem respondida de {name}', { name: m.replyTo.mine ? t('você') : (m.replyTo.senderName ?? '') })} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
             <span className="bubble__quotetext">
@@ -784,7 +821,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             </Button>
           </div>
         ) : null}
-        {messages.length === 0 ? <p className="muted chat__empty">Nenhuma mensagem ainda. Diga oi{data.other ? ` para ${data.other.displayName}` : ' para o grupo'}.</p> : null}
+        {messages.length === 0 ? <p className="muted chat__empty">{data.other ? t('Nenhuma mensagem ainda. Diga oi para {name}.', { name: data.other.displayName }) : t('Nenhuma mensagem ainda. Diga oi para o grupo.')}</p> : null}
         {(() => {
           let prev: ChatMessage | undefined;
           return albums.map((group) => {

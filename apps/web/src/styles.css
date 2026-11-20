@@ -5468,7 +5468,9 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 /* Carrossel com cara de app: vai de borda a borda da tela, o próximo cartão aparece pela metade,
    para encaixado no cartão (alinhado com o texto da página), inércia no iOS, sem barra e sem
    prender a rolagem vertical da Home nem puxar o "voltar" do navegador ao chegar na ponta. */
-.foryou { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; margin-inline: -16px; min-width: 0; }
+.foryou { display: flex; flex-direction: column; gap: 8px; padding: 12px 0 0; margin-inline: -16px; min-width: 0; }
+/* No meio do feed: o vão normal entre posts (22px) já separa; encosta um pouco mais no post seguinte. */
+.postlist__item > .foryou { margin-bottom: -8px; }
 .foryou > .section__title { padding-inline: 16px; }
 .foryou__list {
   list-style: none; margin: 0; padding: 0 16px 4px;
@@ -5479,17 +5481,33 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
   scrollbar-width: none; -ms-overflow-style: none;
 }
 .foryou__list::-webkit-scrollbar { display: none; }
-.foryou__card { flex: none; width: min(200px, calc(100vw - 96px)); display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; scroll-snap-stop: normal; }
+.foryou__head { display: flex; flex-direction: column; gap: 2px; padding-inline: 16px; }
+.foryou__head .section__title { margin: 0; }
+.foryou__sub { margin: 0; color: var(--muted); font-size: 0.8125rem; }
+.foryou__card { flex: none; width: min(210px, calc(100vw - 96px)); display: flex; flex-direction: column; gap: 8px; scroll-snap-align: start; scroll-snap-stop: normal; }
 .foryou__post { flex: none; width: min(300px, calc(100vw - 72px)); display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; scroll-snap-stop: normal; }
 @media (hover: hover) and (pointer: fine) { .foryou__list { scroll-snap-type: x proximity; } }
-.foryou__link { display: flex; flex-direction: column; gap: 4px; color: inherit; text-decoration: none; }
-.foryou__cover { display: grid; place-items: center; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; background: var(--brand-soft); }
+/* Cartaz: foto inteira em 3:4, data num canto, "+" para seguir no outro, título e lugar numa faixa escura embaixo. */
+.foryou__poster { position: relative; border-radius: 18px; overflow: hidden; background: var(--brand); }
+.foryou__link { position: relative; display: block; aspect-ratio: 3 / 4; color: #fff; text-decoration: none; }
+.foryou__cover { position: absolute; inset: 0; display: grid; place-items: center; }
 .foryou__cover img { width: 100%; height: 100%; object-fit: cover; }
-.foryou__title { font-size: 0.9375rem; }
-.foryou__meta { color: var(--muted); font-size: 0.8125rem; }
-.foryou__reasons { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.foryou__reasons li { padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; color: var(--ink-2); background: var(--brand-soft); }
-.foryou__reasons .foryou__faces { display: flex; padding: 0; background: transparent; }
+.foryou__icon { display: grid; place-items: center; color: rgb(255 255 255 / 0.5); }
+.foryou__icon svg { width: 56px; height: 56px; }
+.foryou__link .poster__date { position: absolute; top: 10px; left: 10px; }
+.foryou__caption { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 3px; padding: 32px 12px 12px; background: linear-gradient(to top, rgb(0 0 0 / 0.8) 50%, rgb(0 0 0 / 0)); }
+.foryou__tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 2px; }
+.foryou__tags:empty { display: none; }
+.foryou__title { font-size: 1rem; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.foryou__meta { color: rgb(255 255 255 / 0.82); font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.foryou__plus { position: absolute; top: 8px; right: 8px; z-index: 2; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: rgb(20 20 35 / 0.6); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: rgb(255 255 255); cursor: pointer; }
+.foryou__plus svg { width: 18px; height: 18px; }
+.foryou__plus--done { background: var(--brand); color: var(--brand-ink); cursor: default; }
+.foryou__plus:disabled { opacity: 0.7; }
+.foryou__why { display: flex; align-items: center; gap: 8px; margin: 0; min-height: 22px; color: var(--muted); font-size: 0.8125rem; line-height: 1.3; }
+.foryou__faces { display: flex; flex: none; }
+.foryou__faces > * { border-radius: 50%; box-shadow: 0 0 0 2px var(--bg, #fff); }
+.foryou__faces > * + * { margin-left: -7px; }
 .setting__actions { padding: 0 16px 8px; }
 
 .evticket { display: flex; flex-direction: column; gap: 6px; }
@@ -6319,7 +6337,24 @@ div.optrow__main { cursor: default; }
 .evwho { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); }
 .evwho__title { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--font-display); font-size: 0.9375rem; color: var(--ink-2); }
 .evwho__count { padding: 1px 8px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-text); font-size: 0.75rem; font-weight: 700; }
-.evwho .evgoing__faces { flex-wrap: nowrap; gap: 12px; margin: 0 -14px; padding: 0 14px 2px; overflow-x: auto; scrollbar-width: none; }
+.evwho .evgoing__faces { flex-wrap: wrap; justify-content: center; gap: 12px; margin: 0; padding: 0; }
+/* "Quem vai": tudo centralizado; com muita gente, os rostos ficam sobrepostos e o grupo inteiro abre a lista. */
+.evwho__title { justify-content: center; }
+.evwho__row { display: flex; align-items: flex-start; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.evwho__row--stacked { align-items: center; }
+.evwho__stack { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.evwho__faces { display: flex; align-items: center; }
+.evwho__faces > * { flex: none; border-radius: 50%; box-shadow: 0 0 0 2px var(--surface); }
+.evwho__faces > * + * { margin-left: -12px; }
+.evwho__rest { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--brand-soft); color: var(--brand-text); font-weight: 700; font-size: 0.8125rem; }
+.evwho__see { color: var(--brand-text); font-size: 0.8125rem; font-weight: 600; }
+.evwho__stack:focus-visible { outline: 2px solid var(--brand-text); outline-offset: 4px; border-radius: 12px; }
+.evwho__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.evwho__item { display: flex; align-items: center; gap: 12px; }
+.evwho__who { display: flex; flex-direction: column; min-width: 0; color: var(--ink); text-decoration: none; line-height: 1.25; }
+.evwho__who span { color: var(--muted); font-size: 0.8125rem; }
+.evwho__who strong, .evwho__who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evwho__more { margin: 12px 0 0; text-align: center; }
 .evwho .evgoing__faces::-webkit-scrollbar { display: none; }
 .evwho .evgoing__faces > li { flex: none; }
 .evwho__person { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 52px; }
@@ -6709,9 +6744,14 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .chat__dock .replybar { margin: 0; }
 .chat__dock .composer { position: static; margin: 0; }
 
-.bubble__story { display: flex; flex-direction: column; gap: 4px; width: 120px; margin: 0 0 6px; }
-.bubble__story img { display: block; width: 120px; aspect-ratio: 9 / 16; max-height: 200px; object-fit: cover; border-radius: 10px; background: rgba(0, 0, 0, 0.08); }
-.bubble__story span { font-size: 0.75rem; opacity: 0.8; }
+/* Story respondido: quem recebeu vê a miniatura grande no centro do balão; quem respondeu, uma faixa compacta. */
+.bubble__story { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; min-width: 140px; margin: 0 0 8px; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.bubble__storythumb { display: block; width: 132px; aspect-ratio: 9 / 16; border-radius: 12px; overflow: hidden; background: rgba(0, 0, 0, 0.08); }
+.bubble__storythumb img, .bubble__storythumb video { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.bubble__storylabel { font-size: 0.75rem; opacity: 0.85; }
+.bubble__story:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 12px; }
+.bubble__story--sent { flex-direction: row; align-items: center; gap: 10px; min-width: 0; text-align: left; padding: 6px; border-radius: 12px; background: rgba(0, 0, 0, 0.1); }
+.bubble__story--sent .bubble__storythumb { width: 40px; flex: none; border-radius: 8px; }
 
 .going-choice__text { margin: 0 0 20px; }
 
