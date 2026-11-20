@@ -2,42 +2,97 @@ import { t } from '../lib/i18n/index.ts';
 import type { EventKind } from './types.ts';
 
 /**
- * Os gostos de rolê que a pessoa escolhe no cadastro e edita nas configurações. Para abrir outro, inclua aqui e em
- * TASTE_IDS da API (que valida o que a conta guarda). A ordem daqui é a ordem das telas.
+ * Os gostos de rolê que a pessoa escolhe no cadastro e edita nas configurações. A lista vem da API (a gestão cadastra em
+ * "Gostos"); `DEFAULT_DEFINITIONS` é a de origem: vale até a API responder e se ela não responder. A ordem é a das telas.
+ * `THEMES` é uma lista viva (trocada no lugar por `setThemes`); telas que a desenham usam `useThemes()`.
  */
-export type ThemeId = 'BAR' | 'NIGHT' | 'SHOW' | 'FOOD' | 'CAFE' | 'CULTURE' | 'GAMES' | 'OUTDOOR' | 'SPORT';
+export type ThemeId = string;
 
 export interface Theme {
   id: ThemeId;
   label: string;
   hint: string;
-  /** Casa com o tipo do local (texto livre do dono ou tipo vindo do Google/OpenStreetMap). */
+  /** Casa com o tipo do local já passado por `normalizeCategory` (texto livre do dono ou tipo do Google/OpenStreetMap). */
   category: RegExp;
   /** Tipos de evento que já são deste gosto, seja qual for o local. */
   kinds?: readonly EventKind[];
 }
 
-export const THEMES: readonly Theme[] = [
-  { id: 'BAR', label: t('Bares'), hint: t('Boteco, pub, música ao vivo, happy hour'), category: /\b(bar|pub|boteco|botequim|choperia|cervejaria|biergarten|casa de shows?|samba)\b|bar_|_bar/i },
-  { id: 'NIGHT', label: t('Baladas'), hint: t('Balada, festa, pista, noite'), category: /night|balada|boate|danceteria|\bclub\b|club\b|festa|casa noturna/i, kinds: ['NIGHT'] },
-  { id: 'SHOW', label: t('Shows'), hint: t('Música ao vivo, samba, pagode, sertanejo, rock'), category: /casa de shows?|\bshows?\b|concert|live_music|music_venue|m[uú]sica ao vivo|samba|pagode|forr[oó]|sertanej|\brock\b|jazz/i, kinds: ['SHOW'] },
-  { id: 'FOOD', label: t('Restaurantes'), hint: t('Jantar, pizza, hambúrguer, japonês, rodízio'), category: /restaura|pizza|hamburg|burger|churrasc|steak|sushi|japon|lanchonete|bistr[oô]|cantina|rod[ií]zio|gastrono|comida|\bfood\b|fast_food|_restaurant|restaurant_/i, kinds: ['GASTRONOMY'] },
-  { id: 'CAFE', label: t('Cafés e docerias'), hint: t('Café, padaria, brunch, sorvete'), category: /\bcaf[eé]s?\b|cafeteria|coffee|padaria|bakery|confeitaria|doceria|sorvet|ice_cream|brunch|tea_house|_cafe|cafe_/i },
-  { id: 'CULTURE', label: t('Cinema e cultura'), hint: t('Cinema, teatro, museu, exposição, stand-up'), category: /cinema|movie|teatro|theat(er|re)|museu|museum|galeria|gallery|arts_centre|centro cultural|exposi|stand.?up|com[eé]dia|performing_arts/i, kinds: ['CINEMA', 'THEATER', 'EXHIBITION'] },
-  { id: 'GAMES', label: t('Karaokê e jogos'), hint: t('Karaokê, sinuca, boliche, fliperama, escape room'), category: /karaok|sinuca|bilhar|snooker|boliche|bowling|fliperama|arcade|escape|jogos|games?\b|amusement_center/i },
-  { id: 'OUTDOOR', label: t('Ao ar livre'), hint: t('Parque, praia, trilha, feira, piquenique'), category: /\bpark\b|_park|park_|parque|praia|beach|pra[çc]a|jardim|garden|trilha|hiking|mirante|viewpoint|camping|feira/i, kinds: ['OUTDOOR'] },
-  { id: 'SPORT', label: t('Esportes'), hint: t('Jogo no estádio, futebol, beach tennis, corrida'), category: /stadium|est[aá]dio|arena|gin[aá]sio|esporte|sports?\b|futebol|soccer|quadra|beach tennis|t[eê]nis|padel|golf|surf|skate|corrida/i, kinds: ['SPORT'] },
+/** Gosto como a API entrega: palavras no lugar de expressão regular. */
+export interface TasteDefinition {
+  id: string;
+  label: string;
+  hint: string;
+  keywords: readonly string[];
+  kinds: readonly string[];
+}
+
+/** Texto sem acento, minúsculo, com `_` e `-` como espaço (tipos do Google vêm como "night_club"). */
+export function normalizeCategory(text: string): string {
+  return text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[_\-\s]+/g, ' ').trim();
+}
+
+/**
+ * Palavras do gosto viram uma expressão: "bar" casa só a palavra inteira; "restaura*" casa o começo de uma palavra.
+ * Use com o texto já passado por `normalizeCategory`.
+ */
+export function keywordsRegExp(keywords: readonly string[]): RegExp {
+  const parts = keywords.flatMap((raw) => {
+    const stem = raw.trim().endsWith('*');
+    const word = normalizeCategory(raw.replace(/\*+$/, ''));
+    if (word === '') return [];
+    const body = word.split(' ').map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join(' ');
+    return [`(?<![a-z0-9])${body}${stem ? '' : '(?![a-z0-9])'}`];
+  });
+  return parts.length === 0 ? /$^/ : new RegExp(parts.join('|'));
+}
+
+function build(def: TasteDefinition): Theme {
+  return { id: def.id, label: t(def.label), hint: t(def.hint), category: keywordsRegExp(def.keywords), kinds: def.kinds as readonly EventKind[] };
+}
+
+/** Os nove gostos de origem (os mesmos de DEFAULT_TASTES na API). Os textos passam pelo t() para a tradução achar. */
+const DEFAULT_DEFINITIONS: readonly TasteDefinition[] = [
+  { id: 'BAR', label: 'Bares', hint: 'Boteco, pub, música ao vivo, happy hour', keywords: ['bar', 'pub', 'boteco', 'botequim', 'choperia', 'cervejaria', 'biergarten', 'casa de show', 'casa de shows', 'samba'], kinds: [] },
+  { id: 'NIGHT', label: 'Baladas', hint: 'Balada, festa, pista, noite', keywords: ['night*', 'balada*', 'boate*', 'danceteria', 'club', 'festa*', 'casa noturna'], kinds: ['NIGHT'] },
+  { id: 'SHOW', label: 'Shows', hint: 'Música ao vivo, samba, pagode, sertanejo, rock', keywords: ['casa de show', 'casa de shows', 'show', 'shows', 'concert*', 'live music', 'music venue', 'musica ao vivo', 'samba', 'pagode', 'forro', 'sertanej*', 'rock', 'jazz'], kinds: ['SHOW'] },
+  { id: 'FOOD', label: 'Restaurantes', hint: 'Jantar, pizza, hambúrguer, japonês, rodízio', keywords: ['restaura*', 'pizza*', 'hamburg*', 'burger*', 'churrasc*', 'steak*', 'sushi*', 'japon*', 'lanchonete*', 'bistro*', 'cantina*', 'rodizio*', 'gastrono*', 'comida*', 'food'], kinds: ['GASTRONOMY'] },
+  { id: 'CAFE', label: 'Cafés e docerias', hint: 'Café, padaria, brunch, sorvete', keywords: ['cafe', 'cafes', 'cafeteria*', 'coffee*', 'padaria*', 'bakery*', 'confeitaria*', 'doceria*', 'sorvet*', 'ice cream', 'brunch*', 'tea house'], kinds: [] },
+  { id: 'CULTURE', label: 'Cinema e cultura', hint: 'Cinema, teatro, museu, exposição, stand-up', keywords: ['cinema*', 'movie*', 'teatro*', 'theater', 'theatre', 'museu*', 'museum*', 'galeria*', 'gallery', 'arts centre', 'centro cultural', 'exposi*', 'stand up', 'standup', 'comedia*', 'performing arts'], kinds: ['CINEMA', 'THEATER', 'EXHIBITION'] },
+  { id: 'GAMES', label: 'Karaokê e jogos', hint: 'Karaokê, sinuca, boliche, fliperama, escape room', keywords: ['karaok*', 'sinuca*', 'bilhar*', 'snooker*', 'boliche*', 'bowling*', 'fliperama*', 'arcade*', 'escape*', 'jogos', 'game', 'games', 'amusement center'], kinds: [] },
+  { id: 'OUTDOOR', label: 'Ao ar livre', hint: 'Parque, praia, trilha, feira, piquenique', keywords: ['park', 'parque*', 'praia*', 'beach*', 'praca*', 'jardim*', 'garden*', 'trilha*', 'hiking', 'mirante*', 'viewpoint', 'camping*', 'feira*'], kinds: ['OUTDOOR'] },
+  { id: 'SPORT', label: 'Esportes', hint: 'Jogo no estádio, futebol, beach tennis, corrida', keywords: ['stadium*', 'estadio*', 'arena*', 'ginasio*', 'esporte*', 'sport', 'sports', 'futebol*', 'soccer*', 'quadra*', 'beach tennis', 'tenis*', 'padel*', 'golf*', 'surf*', 'skate*', 'corrida*'], kinds: ['SPORT'] },
 ];
 
-const ALL_IDS: readonly ThemeId[] = THEMES.map((theme) => theme.id);
+/** A lista viva. Quem só lê pode importar; quem desenha a lista usa `useThemes()` para redesenhar quando ela chegar. */
+export const THEMES: Theme[] = DEFAULT_DEFINITIONS.map(build);
+
+type Listener = () => void;
+const listeners = new Set<Listener>();
+let version = 0;
+
+/** Troca a lista (resposta da API). Lista vazia é ignorada: o app nunca fica sem gostos. */
+export function setThemes(definitions: readonly TasteDefinition[]): void {
+  if (definitions.length === 0) return;
+  THEMES.splice(0, THEMES.length, ...definitions.map(build));
+  version += 1;
+  for (const listener of listeners) listener();
+}
+
+export function subscribeThemes(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => void listeners.delete(listener);
+}
+
+export const themesVersion = (): number => version;
 
 export function themeLabel(id: ThemeId): string {
-  return THEMES.find((t) => t.id === id)?.label ?? '';
+  return THEMES.find((x) => x.id === id)?.label ?? '';
 }
 
 /** Todos os gostos de um local pelo tipo (um “bar com música ao vivo” é Bares e Shows), na ordem de THEMES. */
 export function themesOfCategory(category: string | null | undefined): ThemeId[] {
-  const text = (category ?? '').trim();
+  const text = normalizeCategory(category ?? '');
   if (text === '') return [];
   return THEMES.filter((theme) => theme.category.test(text)).map((theme) => theme.id);
 }
@@ -56,7 +111,7 @@ export function themesOfEvent(event: { kind: EventKind; venue: { category: strin
   const byKind = THEMES.filter((theme) => theme.kinds?.includes(event.kind)).map((theme) => theme.id);
   const byPlace = themesOfCategory(event.venue.category);
   const all = [...new Set([...byKind, ...byPlace])];
-  if (all.length === 0) return ['BAR'];
+  if (all.length === 0) return THEMES.some((theme) => theme.id === 'BAR') ? ['BAR'] : [];
   return all.includes('NIGHT') ? ['NIGHT', ...all.filter((id) => id !== 'NIGHT')] : all;
 }
 
@@ -67,7 +122,7 @@ export function themeOfEvent(event: { kind: EventKind; venue: { category: string
 
 /** Mantém só ids conhecidos, sem repetir, na ordem de THEMES. */
 export function cleanThemes(value: unknown): ThemeId[] {
-  return Array.isArray(value) ? ALL_IDS.filter((id) => value.includes(id)) : [];
+  return Array.isArray(value) ? THEMES.map((theme) => theme.id).filter((id) => value.includes(id)) : [];
 }
 
 /**

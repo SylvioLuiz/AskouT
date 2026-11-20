@@ -1,6 +1,6 @@
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, EventExtra, EventExtraInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -178,6 +178,11 @@ export const api = {
   createEventExtra: (input: EventExtraInput) => request<{ items: EventExtra[] }>('POST', '/admin/event-extras', input),
   updateEventExtra: (id: string, input: EventExtraInput) => request<{ items: EventExtra[] }>('PUT', `/admin/event-extras/${encodeURIComponent(id)}`, input),
   moveEventExtra: (id: string, direction: 'up' | 'down') => request<{ items: EventExtra[] }>('POST', `/admin/event-extras/${encodeURIComponent(id)}/move`, { direction }),
+  tastes: () => request<{ items: Taste[] }>('GET', '/admin/tastes'),
+  createTaste: (input: TasteInput) => request<{ items: Taste[] }>('POST', '/admin/tastes', input),
+  updateTaste: (id: string, input: TasteInput) => request<{ items: Taste[] }>('PUT', `/admin/tastes/${encodeURIComponent(id)}`, input),
+  moveTaste: (id: string, direction: 'up' | 'down') => request<{ items: Taste[] }>('POST', `/admin/tastes/${encodeURIComponent(id)}/move`, { direction }),
+  deleteTaste: (id: string) => request<{ items: Taste[] }>('DELETE', `/admin/tastes/${encodeURIComponent(id)}`),
   deleteEventExtra: (id: string) => request<{ items: EventExtra[] }>('DELETE', `/admin/event-extras/${encodeURIComponent(id)}`),
 
   audit: (offset: number) => request<Page<AuditRow>>('GET', `/admin/audit${query({ offset })}`),

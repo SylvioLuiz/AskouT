@@ -12,6 +12,7 @@ import { PostsPage } from './pages/posts.tsx';
 import { FeedPage } from './pages/feed.tsx';
 import { PaymentsPage } from './pages/payments.tsx';
 import { EventExtrasPage } from './pages/event-extras.tsx';
+import { TastesPage } from './pages/tastes.tsx';
 import { RetentionPage } from './pages/retention.tsx';
 import { ReferralsPage } from './pages/referrals.tsx';
 import { ReportsPage } from './pages/reports.tsx';
@@ -266,6 +267,8 @@ function Page({ route }: { route: RoutePath }) {
       return <EventsPage />;
     case '/config-eventos':
       return <EventExtrasPage />;
+    case '/gostos':
+      return <TastesPage />;
     case '/posts':
       return <PostsPage />;
     case '/feed':

@@ -15,6 +15,7 @@ import { statusLabel } from '../lib/meetup.ts';
 import type { RegionView } from '../lib/types.ts';
 import { applyTheme, readTheme, saveTheme, THEME_LABELS } from '../lib/theme.ts';
 import { saveThemes, themeLabel, THEMES, userThemes } from '../lib/themes.ts';
+import { useThemes } from '../lib/use-themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 import { TastePicker, toggleTaste } from '../components/tastes.tsx';
 import type { ThemeChoice } from '../lib/theme.ts';
@@ -249,6 +250,7 @@ export function SettingsScreen() {
   const theme = readTheme(window.localStorage);
   const language = LOCALES.find((item) => item.code === getLocale())?.label;
   const radius = nowRadiusKm();
+  useThemes();
   const tastes = userThemes(safeLocalStorage(), user);
   return (
     <>
@@ -381,6 +383,7 @@ export function TastesSettingsScreen() {
   useTitle(t('Seus gostos'));
   const user = useUser();
   const { setSessionUser } = useAuthContext();
+  useThemes();
   const [chosen, setChosen] = useState<ReadonlySet<ThemeId>>(() => new Set(userThemes(safeLocalStorage(), user)));
   const [message, setMessage] = useState<Message>();
   const [saving, setSaving] = useState(false);

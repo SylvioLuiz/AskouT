@@ -8,6 +8,8 @@ import type { VenueService } from './venue-service.ts';
 import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
 import { EVENT_EXTRA_ICONS, EventExtrasCatalog } from './event-extras.ts';
 import type { EventExtraInput, EventExtraOption } from './event-extras.ts';
+import { TastesCatalog } from './tastes.ts';
+import type { TasteInput, TasteOption } from './tastes.ts';
 import { buildExperimentReport } from './reco-experiment.ts';
 import type { ExperimentReport, RecoExperiment, RecoExperimentState } from './reco-experiment.ts';
 import type { Actor, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
@@ -274,6 +276,45 @@ export class AdminService {
     this.assertAdmin(actor);
     const { option, items } = await this.eventExtrasCatalog.remove(id, actor.userId);
     await this.log(actor.userId, 'EVENT_EXTRA_REMOVED', 'SETTING', option.id, option.label);
+    return { items };
+  }
+
+  // ---------- Gostos de rolê (Bares, Baladas, Shows...) ----------
+
+  private get tastesCatalog(): TastesCatalog {
+    return new TastesCatalog(this.deps);
+  }
+
+  async tastes(actor: Actor): Promise<{ items: TasteOption[] }> {
+    this.assertAdmin(actor);
+    return { items: await this.tastesCatalog.list() };
+  }
+
+  async createTaste(actor: Actor, input: TasteInput): Promise<{ items: TasteOption[] }> {
+    this.assertAdmin(actor);
+    const { taste, items } = await this.tastesCatalog.create(input, actor.userId);
+    await this.log(actor.userId, 'TASTE_CREATED', 'SETTING', taste.id, taste.label);
+    return { items };
+  }
+
+  async updateTaste(actor: Actor, id: unknown, input: TasteInput): Promise<{ items: TasteOption[] }> {
+    this.assertAdmin(actor);
+    const { before, taste, items } = await this.tastesCatalog.update(id, input, actor.userId);
+    const note = before.label === taste.label ? taste.label : `${before.label} → ${taste.label}`;
+    await this.log(actor.userId, 'TASTE_UPDATED', 'SETTING', taste.id, note.slice(0, 300));
+    return { items };
+  }
+
+  async moveTaste(actor: Actor, id: unknown, direction: unknown): Promise<{ items: TasteOption[] }> {
+    this.assertAdmin(actor);
+    const { items } = await this.tastesCatalog.move(id, direction, actor.userId);
+    return { items };
+  }
+
+  async deleteTaste(actor: Actor, id: unknown): Promise<{ items: TasteOption[] }> {
+    this.assertAdmin(actor);
+    const { taste, items } = await this.tastesCatalog.remove(id, actor.userId);
+    await this.log(actor.userId, 'TASTE_REMOVED', 'SETTING', taste.id, taste.label);
     return { items };
   }
 

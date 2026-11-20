@@ -1,8 +1,9 @@
-import { THEMES } from '../lib/themes.ts';
+import { useThemes } from '../lib/use-themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 
 /** Botões dos gostos de rolê (cadastro e configurações): cada um liga e desliga. */
 export function TastePicker({ chosen, onToggle, disabled }: { chosen: ReadonlySet<ThemeId>; onToggle: (id: ThemeId) => void; disabled?: boolean }) {
+  const THEMES = useThemes();
   return (
     <ul className="onb__themes">
       {THEMES.map((theme) => {
