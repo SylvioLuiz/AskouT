@@ -294,7 +294,7 @@ test('responder e curtir um flash: resposta de amiga vai para a conversa; curtid
 
   const reply = await w.core.storyReactions.reply(ana, story, '  Que lugar lindo!  ');
   assert.ok(reply.conversationId, 'amigas: vira mensagem');
-  assert.equal((await w.core.conversations.messages(bia, reply.conversationId!)).messages.at(-1)?.body, 'Respondeu ao seu flash: Que lugar lindo!');
+  assert.equal((await w.core.conversations.messages(bia, reply.conversationId!)).messages.at(-1)?.body, 'Que lugar lindo!', 'com o flash anexado, o balão fica só com a resposta');
   assert.equal((await w.core.storyReactions.reply(duda, story, 'Oi!', 'e1')).conversationId, null, 'não são amigas: só o aviso');
   await rejectsWith(w.core.storyReactions.reply(ana, story, '   '), 'VALIDATION');
   await rejectsWith(w.core.storyReactions.reply(ana, story, 'a'.repeat(501)), 'VALIDATION');
@@ -330,4 +330,36 @@ test('flash com texto por cima: guarda o texto e a altura, limpa espaços e conf
   assert.equal(blank.items[0]!.caption, null);
   assert.equal(blank.items[0]!.captionY, null);
   await rejectsWith(w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), false, undefined, { caption: 'x'.repeat(201) }), 'VALIDATION');
+});
+
+test('flash respondido na conversa: vem junto enquanto está no ar (para mostrar e abrir) e some quando acaba', async () => {
+  const { w, ana, bia } = await setup();
+  for (const who of [ana, bia]) await w.core.eventPages.go(who, 'e1');
+  const story = (await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), true)).items[0]!;
+  const reply = await w.core.storyReactions.reply(ana, story.id, 'Que demais!');
+  const last = async (who: string) => (await w.core.conversations.messages(who, reply.conversationId!)).messages.at(-1)!;
+  const forBia = await last(bia);
+  assert.equal(forBia.story?.id, story.id);
+  assert.equal(forBia.story?.kind, 'IMAGE');
+  assert.equal(forBia.story?.eventId, 'e1');
+  assert.equal(forBia.story?.author.userId, bia);
+  assert.equal((await last(ana)).story?.id, story.id, 'quem respondeu também vê');
+  w.clock.tick(25 * 3_600_000);
+  const after = await last(bia);
+  assert.equal(after.story, null, 'acabou: não aparece mais');
+  assert.equal(after.storyId, story.id);
+});
+
+test('resposta a flash: quem mandou lê do próprio ponto de vista; quem recebeu, "Respondeu ao seu flash"', async () => {
+  const { w, ana, bia } = await setup();
+  for (const who of [ana, bia]) await w.core.eventPages.go(who, 'e1');
+  const story = (await w.core.eventPages.createStory(bia, 'e1', 'image/jpeg', JPG_BYTES(), true)).items[0]!;
+  const reply = await w.core.storyReactions.reply(ana, story.id, 'Que demais!');
+  await w.core.storyReactions.react(ana, story.id, '🔥');
+  const msgs = async (who: string) => (await w.core.conversations.messages(who, reply.conversationId!)).messages.map((m) => m.body);
+  assert.deepEqual((await msgs(bia)).slice(-2), ['Que demais!', 'Reagiu ao seu flash: 🔥'], 'flash anexado: a faixa explica, o balão fica com a resposta');
+  assert.deepEqual((await msgs(ana)).slice(-2), ['Que demais!', 'Você reagiu ao flash: 🔥']);
+  w.clock.tick(25 * 3_600_000);
+  assert.deepEqual((await msgs(bia)).slice(-2), ['Respondeu ao seu flash: Que demais!', 'Reagiu ao seu flash: 🔥'], 'flash acabou: o texto explica');
+  assert.deepEqual((await msgs(ana)).slice(-2), ['Você respondeu ao flash: Que demais!', 'Você reagiu ao flash: 🔥']);
 });

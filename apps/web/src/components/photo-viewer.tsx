@@ -84,7 +84,7 @@ export function PhotoViewer({ images, start, onClose }: { images: PostImage[]; s
         {photos.map((photo, i) => (
           <figure key={photo.id} className="photoview__slide" aria-label={t('Foto {index} de {total}', { index: i + 1, total: photos.length })}>
             <img src={/^(https?:|blob:|data:)/.test(photo.path!) ? photo.path! : api.assetUrl(photo.path!)} alt="" referrerPolicy="no-referrer" draggable={false} />
-            {photo.kind === 'PLACE' ? <figcaption>Foto: {photo.photoAuthor ? `${photo.photoAuthor} · ` : ''}Google</figcaption> : null}
+            {photo.kind === 'PLACE' ? <figcaption>{t('Foto:')} {photo.photoAuthor ? `${photo.photoAuthor} · ` : ''}Google</figcaption> : null}
           </figure>
         ))}
       </div>

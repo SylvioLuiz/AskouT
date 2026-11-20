@@ -42,7 +42,7 @@ export function PlacePhoto({ path, author }: { path: string; author: string | nu
   return (
     <figure className="sugcard__photo">
       <img src={api.assetUrl(path)} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
-      <figcaption>Foto: {author ? `${author} · ` : ''}Google</figcaption>
+      <figcaption>{t('Foto:')} {author ? `${author} · ` : ''}Google</figcaption>
     </figure>
   );
 }

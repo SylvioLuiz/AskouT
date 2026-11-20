@@ -472,7 +472,7 @@ function ClaimRow({ claim, onChanged }: { claim: VenueClaim; onChanged: () => vo
         <span className={`tag claimrow__status claimrow__status--${claim.status.toLowerCase()}`}>{claimStatusLabel(claim.status)}</span>
       </div>
       {claim.status === 'PENDING' ? <p className="claimrow__help">{t('Um administrador está avaliando o documento enviado em {date}. Você recebe um aviso quando houver resposta.', { date: new Date(claim.createdAt).toLocaleDateString(intlLocale(), { day: 'numeric', month: 'long' }) })}</p> : null}
-      {claim.status === 'REJECTED' && claim.reviewNote ? <p className="muted">Motivo: {claim.reviewNote}</p> : null}
+      {claim.status === 'REJECTED' && claim.reviewNote ? <p className="muted">{t('Motivo: {note}', { note: claim.reviewNote })}</p> : null}
       {claim.status === 'PENDING' ? (
         asking ? (
           <Confirm question={t('Desistir deste pedido?')} confirmLabel={t('Desistir')} danger busy={busy} onConfirm={cancel} onCancel={() => setAsking(false)} />

@@ -37,7 +37,7 @@ export function SuggestedPeople() {
             <Link to={`/u/${encodeURIComponent(p.username)}`} className="suggest__link">
               <Avatar profile={p} size={72} />
               <span className="suggest__name">{p.username}</span>
-              <span className="suggest__mutual">{p.mutualCount === 1 ? '1 amigo em comum' : `${p.mutualCount} amigos em comum`}</span>
+              <span className="suggest__mutual">{p.mutualCount === 1 ? t('1 amigo em comum') : t('{n} amigos em comum', { n: p.mutualCount })}</span>
             </Link>
           </li>
         ))}

@@ -122,7 +122,7 @@ export function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
     <>
       <InfoRow icon={<ClockIcon />} open={open} onToggle={() => setOpen((o) => !o)} label={open ? t('Esconder os horários da semana') : t('Ver os horários da semana')}>
         <span className={`vinfo__status${status ? (status.closingSoon ? ' vinfo__status--soon' : status.open ? ' vinfo__status--open' : ' vinfo__status--closed') : ''}`}>{status?.label ?? t('Horário de funcionamento')}</span>
-        {today && !open ? <span className="vinfo__sub">Hoje: {today.text}</span> : null}
+        {today && !open ? <span className="vinfo__sub">{t('Hoje: {text}', { text: today.text })}</span> : null}
       </InfoRow>
       {open ? (
         <ul className="vhours vhours--panel">
@@ -227,7 +227,7 @@ export function VenueHero({ venue, now, onShare, preview = false }: { venue: Ven
       <dl className="vstats">
         <div className="vstat vstat--followers">
           <dd className="vstat__value">{venue.followerCount}</dd>
-          <dt className="vstat__label">{venue.followerCount === 1 ? 'Seguidor' : 'Seguidores'}</dt>
+          <dt className="vstat__label">{venue.followerCount === 1 ? t('Seguidor') : t('Seguidores')}</dt>
         </div>
         <div className="vstat vstat--days">
           <dd className="vstat__value">{days ?? '—'}</dd>
@@ -238,7 +238,7 @@ export function VenueHero({ venue, now, onShare, preview = false }: { venue: Ven
           <dt className="vstat__label">{t('Horário')}</dt>
         </div>
       </dl>
-      {google && !coverFailed ? <p className="vhero__credit">Foto: {venue.photoAuthor ? `${venue.photoAuthor} · ` : ''}Google</p> : null}
+      {google && !coverFailed ? <p className="vhero__credit">{t('Foto:')} {venue.photoAuthor ? `${venue.photoAuthor} · ` : ''}Google</p> : null}
     </header>
   );
 }
@@ -560,7 +560,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
               {v.notify ? <BellIcon /> : <BellOffIcon />}
             </button>
             <OpenInMaps className="btn btn--quiet" mode="route" lat={v.lat} lng={v.lng} label={v.name}>
-              Rota{where.status === 'ok' ? ` · a ${formatDistance(distanceMeters(where.position, { lat: v.lat, lng: v.lng }))}` : ''}
+              {where.status === 'ok' ? t('Rota · a {distance}', { distance: formatDistance(distanceMeters(where.position, { lat: v.lat, lng: v.lng })) }) : t('Rota')}
             </OpenInMaps>
           </div>
         )}

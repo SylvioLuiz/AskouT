@@ -86,7 +86,7 @@ function Slide({ image, index, total, onFirstLoad, onOpen }: { image: PostImage;
         <span className="pcarousel__missing">{t('Foto indisponível')}</span>
       )}
       {hasSound(image) ? <SoundToggle muted={muted} onToggle={toggleSound} shifted={total > 1} /> : null}
-      {image.kind === 'PLACE' ? <figcaption>Foto: {image.photoAuthor ? `${image.photoAuthor} · ` : ''}Google</figcaption> : null}
+      {image.kind === 'PLACE' ? <figcaption>{t('Foto:')} {image.photoAuthor ? `${image.photoAuthor} · ` : ''}Google</figcaption> : null}
     </figure>
   );
 }
@@ -355,7 +355,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
           <div className="poster__foot">
             <div className="poster__row" role="group" aria-label={t('Ações do post')}>
       <div className="poster__glass poster__glass--actions">
-          <button type="button" className={`poster__act${post.likedByMe ? ' poster__act--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
+          <button type="button" className={`poster__act${post.likedByMe ? ' poster__act--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? t('Descurtir') : t('Curtir')}>
             <HeartIcon filled={post.likedByMe} />
             <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
           </button>
@@ -375,7 +375,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
       {viewing !== undefined ? <PhotoViewer images={post.images} start={viewing} onClose={() => setViewing(undefined)} /> : null}
       {cartaz ? null : (
       <div className="post__actions" role="group" aria-label={t('Ações do post')}>
-        <button type="button" className={`post__action${post.likedByMe ? ' post__action--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? 'Descurtir' : 'Curtir'}>
+        <button type="button" className={`post__action${post.likedByMe ? ' post__action--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? t('Descurtir') : t('Curtir')}>
           <HeartIcon filled={post.likedByMe} />
           <span>{post.likeCount > 0 ? post.likeCount : ''}</span>
         </button>

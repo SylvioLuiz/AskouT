@@ -11,6 +11,7 @@ import type { CoreDeps } from './ports.ts';
 import { distanceMeters } from './geo.ts';
 import { buildMeetupViews } from './meetup-view.ts';
 import type { MeetupView } from './meetup-view.ts';
+import type { StoryOverlay } from './story-overlays.ts';
 import type { ConversationRecord, MessageKind, MessageReactionRecord, MessageRecord, PostReportReason, PublicProfile, SuggestionCard } from './types.ts';
 import { DELETED_BODY, POST_REPORT_REASONS, toPublicProfile } from './types.ts';
 
@@ -62,6 +63,8 @@ export interface MessageView {
   gif: CommentGif | null;
   /** Story respondido/reagido: a conversa mostra o story anexado. */
   storyId: string | null;
+  /** O story respondido, enquanto ainda está no ar (null quando acabou): a conversa mostra e abre ao tocar. */
+  story: MessageStoryView | null;
   /** Apagada por quem enviou: o conteúdo some para todos. */
   deleted: boolean;
   /** Mensagem a que esta responde. */
@@ -229,7 +232,23 @@ export interface SendInput {
   storyId?: string;
 }
 
+/** Story anexado a uma resposta: o que a conversa precisa para mostrar a miniatura e abrir o story. */
+export interface MessageStoryView {
+  id: string;
+  kind: 'IMAGE' | 'VIDEO';
+  caption: string | null;
+  captionY: number | null;
+  overlays?: StoryOverlay[];
+  createdAt: string;
+  expiresAt: string;
+  /** Evento do story (as respostas e reações do visualizador usam). */
+  eventId: string;
+  /** Quem publicou o story. */
+  author: PublicProfile;
+}
+
 interface ViewExtras {
+  story?: MessageStoryView | null;
   distances?: MessageView['distances'];
   senderName?: string | null;
   meetup?: MeetupView | null;
@@ -264,13 +283,14 @@ function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {
     mine: m.senderId === actorId,
     senderName: extras.senderName ?? null,
     kind: m.kind,
-    body: gone ? '' : m.body,
+    body: gone ? '' : storyBody(m, actorId, extras.story ?? null),
     suggestion: gone ? null : m.suggestion,
     meetup: gone ? null : (extras.meetup ?? null),
     event: gone ? null : (extras.event ?? null),
     audio: !gone && m.kind === 'AUDIO' && m.audioMs ? { durationMs: m.audioMs, played: audioPlayed(m, actorId, extras.playedBy ?? []) } : null,
     gif: gone ? null : gifOf(m),
     storyId: gone ? null : (m.storyId ?? null),
+    story: gone ? null : (extras.story ?? null),
     deleted: gone,
     replyTo: gone ? null : (extras.replyTo ?? null),
     reactions: gone ? [] : (extras.reactions ?? []),
@@ -279,6 +299,23 @@ function toMessageView(m: MessageRecord, actorId: string, extras: ViewExtras = {
     distances: m.suggestion && !gone ? distances : null,
     createdAt: m.createdAt.toISOString(),
   };
+}
+
+/**
+ * Resposta ou reação a um flash: o texto guardado fala com quem recebeu ("Respondeu ao seu flash: oi").
+ * Com o flash ainda anexado, a resposta aparece só com o texto (a faixa em cima já explica). Depois que ele acaba,
+ * quem recebeu lê "Respondeu ao seu flash: oi" e quem mandou, "Você respondeu ao flash: oi".
+ */
+function storyBody(m: MessageRecord, actorId: string, story: MessageStoryView | null): string {
+  if (!m.storyId) return m.body;
+  const reply = 'Respondeu ao seu flash: ';
+  // Flash ainda anexado: a faixa em cima já diz quem respondeu a quem; o balão fica só com a resposta.
+  if (story && m.body.startsWith(reply)) return m.body.slice(reply.length);
+  if (m.senderId !== actorId) return m.body;
+  for (const [prefix, yours] of [[reply, 'Você respondeu ao flash: '], ['Reagiu ao seu flash: ', 'Você reagiu ao flash: ']] as const) {
+    if (m.body.startsWith(prefix)) return yours + m.body.slice(prefix.length);
+  }
+  return m.body;
 }
 
 function audioPlayed(m: MessageRecord, actorId: string, playedBy: readonly string[]): boolean {
@@ -529,6 +566,7 @@ export class ConversationService {
           replyTo: decor.replies.get(m.id) ?? null,
           reactions: decor.reactions.get(m.id) ?? [],
           playedBy: decor.plays.get(m.id) ?? [],
+          story: m.storyId ? (decor.stories.get(m.storyId) ?? null) : null,
         }),
       ),
       hasMore,
@@ -621,7 +659,7 @@ export class ConversationService {
     // Texto com link de evento: já volta com o cartão (como na lista de mensagens).
     const linked = linkedEventId(message);
     const linkCard = linked ? ((await buildEventCards(this.deps, [linked])).get(linked) ?? null) : null;
-    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard ?? linkCard, replyTo: decor.replies.get(message.id) ?? null });
+    return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard ?? linkCard, replyTo: decor.replies.get(message.id) ?? null, story: message.storyId ? (decor.stories.get(message.storyId) ?? null) : null });
   }
 
   /** Bytes de uma foto ou vídeo, só para quem está na conversa. */
@@ -719,8 +757,32 @@ export class ConversationService {
   }
 
   /** Respostas (trecho da original) e reações de um grupo de mensagens. */
-  private async decorate(actorId: string, items: MessageRecord[]): Promise<{ replies: Map<string, ReplyView>; reactions: Map<string, ReactionView[]>; plays: Map<string, string[]> }> {
+  private async decorate(actorId: string, items: MessageRecord[]): Promise<{ replies: Map<string, ReplyView>; reactions: Map<string, ReactionView[]>; plays: Map<string, string[]>; stories: Map<string, MessageStoryView> }> {
     const { conversations, users } = this.deps;
+    // Stories respondidos que ainda estão no ar (o que acabou não aparece mais na conversa).
+    const stories = new Map<string, MessageStoryView>();
+    const storyIds = [...new Set(items.filter((m) => m.storyId && !m.deletedAt).map((m) => m.storyId as string))];
+    if (storyIds.length > 0) {
+      const now = this.deps.clock.now().getTime();
+      const metas = (await Promise.all(storyIds.map((id) => this.deps.eventRoom.findStory(id)))).filter((r): r is NonNullable<typeof r> => r !== undefined && r.expiresAt.getTime() > now);
+      const authors = new Map((await users.findProfilesByIds([...new Set(metas.map((r) => r.userId))])).map((p) => [p.userId, p] as const));
+      for (const r of metas) {
+        const author = authors.get(r.userId);
+        if (!author) continue;
+        const caption = r.caption ?? null;
+        stories.set(r.id, {
+          id: r.id,
+          kind: r.video ? 'VIDEO' : 'IMAGE',
+          caption,
+          captionY: caption === null ? null : (r.captionY ?? 0.5),
+          ...(r.overlays?.length ? { overlays: r.overlays } : {}),
+          createdAt: r.createdAt.toISOString(),
+          expiresAt: r.expiresAt.toISOString(),
+          eventId: r.ref.id,
+          author: toPublicProfile(author),
+        });
+      }
+    }
     const plays = new Map<string, string[]>();
     const voiceIds = items.filter((m) => m.kind === 'AUDIO' && !m.deletedAt).map((m) => m.id);
     if (voiceIds.length > 0) {
@@ -743,7 +805,7 @@ export class ConversationService {
         replies.set(m.id, { id: o.id, senderName: names.get(o.senderId) ?? 'Alguém', mine: o.senderId === actorId, kind: o.kind, preview: previewOf(o), deleted: o.deletedAt != null });
       }
     }
-    return { replies, reactions, plays };
+    return { replies, reactions, plays, stories };
   }
 
   /** Bytes de uma mensagem de voz, só para quem está na conversa. */

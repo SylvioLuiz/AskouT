@@ -41,6 +41,10 @@ import { GoingChoiceSheet } from '../components/going-choice.tsx';
 const EVENT_POST_CAPTION_MAX = 500;
 /** Avatares na fileira; o resto vira "+N". */
 const STRIP_MAX = 7;
+/** Até quantas pessoas o "Quem vai" mostra os rostos lado a lado, com nome; acima disso, sobrepostos. */
+const WHO_SPREAD = 5;
+/** Quantos rostos sobrepostos aparecem antes do "+N". */
+const WHO_STACK = 6;
 /** Descrição maior que isso começa recolhida, com "Ver mais". */
 const ABOUT_CLAMP_CHARS = 220;
 
@@ -122,6 +126,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState<PostView | undefined>();
   const [calMessage, setCalMessage] = useState<string | undefined>();
+  /** Lista completa de quem vai (abre ao tocar nos rostos). */
+  const [whoOpen, setWhoOpen] = useState(false);
   const [creatingStory, setCreatingStory] = useState(false);
   /** Tocou em "Seu flash" sem ter marcado que vai: aviso de que só quem vai posta. */
   const [storyNeedsGoing, setStoryNeedsGoing] = useState(false);
@@ -226,7 +232,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
       {!waiting && loaded.error ? (
         <>
           <button type="button" className="evpage__plainback" onClick={goBack}>
-            <ChevronLeftIcon /> Voltar
+            <ChevronLeftIcon /> {t('Voltar')}
           </button>
           <ErrorState message={loaded.error.message} onRetry={loaded.reload} />
         </>
@@ -381,43 +387,83 @@ export function EventScreen({ eventId }: { eventId: string }) {
               <h2 className="evwho__title">
                 {t('Quem vai')} <span className="evwho__count">{e.confirmedCount}</span>
               </h2>
-              <ul className="evgoing__faces">
-                {showStoryButton ? (
-                  <li>
-                    <button type="button" className="evgoing__story" onClick={() => (canStory ? setCreatingStory(true) : setStoryNeedsGoing(true))} aria-label={t('Criar flash neste evento')}>
-                      <span className="evgoing__storyring">
-                        <PlusIcon />
-                      </span>
-                      <span className="evgoing__storylabel">{t('Seu flash')}</span>
+              {(() => {
+                // Até WHO_SPREAD pessoas: rostos lado a lado com o nome. Mais que isso: rostos sobrepostos, sem nome, e um toque abre a lista.
+                const stacked = e.confirmedCount > WHO_SPREAD;
+                const faces = stacked ? strip.shown.slice(0, WHO_STACK) : strip.shown;
+                const rest = e.confirmedCount - faces.length;
+                const face = (p: (typeof strip.shown)[number], size: number) =>
+                  e.storyUserIds.includes(p.userId) && startOf(storyGroups, p.userId) ? (
+                    <button type="button" className="evgoing__face evgoing__face--story" onClick={() => setViewing({ groups: queueFrom(storyGroups, strip.shown.map((x) => x.userId), p.userId), start: { group: 0, item: 0 } })} aria-label={t('Ver o flash de {username}', { username: p.username })}>
+                      <Avatar profile={p} size={size - 4} />
                     </button>
-                  </li>
-                ) : null}
-                {strip.shown.map((p) => (
-                  <li key={p.userId} className="evwho__person">
-                    {e.storyUserIds.includes(p.userId) && startOf(storyGroups, p.userId) ? (
-                      <button type="button" className="evgoing__face evgoing__face--story" onClick={() => setViewing({ groups: queueFrom(storyGroups, strip.shown.map((x) => x.userId), p.userId), start: { group: 0, item: 0 } })} aria-label={t('Ver o flash de {username}', { username: p.username })}>
-                        <Avatar profile={p} size={40} />
+                  ) : (
+                    <Link to={`/u/${encodeURIComponent(p.username)}`} aria-label={t('Perfil de {username}', { username: p.username })}>
+                      <Avatar profile={p} size={size} />
+                    </Link>
+                  );
+                return (
+                  <div className={`evwho__row${stacked ? ' evwho__row--stacked' : ''}`}>
+                    {showStoryButton ? (
+                      <button type="button" className="evgoing__story" onClick={() => (canStory ? setCreatingStory(true) : setStoryNeedsGoing(true))} aria-label={t('Criar flash neste evento')}>
+                        <span className="evgoing__storyring">
+                          <PlusIcon />
+                        </span>
+                        <span className="evgoing__storylabel">{t('Seu flash')}</span>
+                      </button>
+                    ) : null}
+                    {stacked ? (
+                      <button type="button" className="evwho__stack" onClick={() => setWhoOpen(true)} aria-label={t('Ver as {n} pessoas que vão', { n: e.confirmedCount })}>
+                        <span className="evwho__faces" aria-hidden="true">
+                          {faces.map((p) => (
+                            <Avatar key={p.userId} profile={p} size={40} />
+                          ))}
+                          {rest > 0 ? <span className="evwho__rest">+{rest}</span> : null}
+                        </span>
+                        <span className="evwho__see">{t('Ver todos')}</span>
                       </button>
                     ) : (
-                      <Link to={`/u/${encodeURIComponent(p.username)}`} aria-label={t('Perfil de {username}', { username: p.username })}>
-                        <Avatar profile={p} size={44} />
-                      </Link>
+                      <ul className="evgoing__faces">
+                        {faces.map((p) => (
+                          <li key={p.userId} className="evwho__person">
+                            {face(p, 44)}
+                            <span className="evwho__name" aria-hidden="true">
+                              {p.username}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
                     )}
-                    <span className="evwho__name" aria-hidden="true">{p.username}</span>
-                  </li>
-                ))}
-                {strip.more > 0 ? (
-                  <li className="evwho__person">
-                    <span className="evgoing__more" aria-label={t('mais {more} pessoas', { more: strip.more })}>
-                      +{strip.more}
-                    </span>
-                  </li>
-                ) : null}
-              </ul>
+                  </div>
+                );
+              })()}
               {strip.shown.length === 0 && !ended ? <p className="evwho__empty">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p> : null}
             </section>
           ) : !ended ? (
             <p className="evwho__empty">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
+          ) : null}
+
+          {whoOpen ? (
+            <Sheet title={t('Quem vai ({n})', { n: e.confirmedCount })} onClose={() => setWhoOpen(false)}>
+              <ul className="evwho__list">
+                {e.attendees.map((p) => (
+                  <li key={p.userId} className="evwho__item">
+                    {e.storyUserIds.includes(p.userId) && startOf(storyGroups, p.userId) ? (
+                      <button type="button" className="evgoing__face evgoing__face--story" onClick={() => { setWhoOpen(false); setViewing({ groups: queueFrom(storyGroups, e.attendees.map((x) => x.userId), p.userId), start: { group: 0, item: 0 } }); }} aria-label={t('Ver o flash de {username}', { username: p.username })}>
+                        <Avatar profile={p} size={40} />
+                      </button>
+                    ) : (
+                      <Avatar profile={p} size={44} />
+                    )}
+                    <Link to={`/u/${encodeURIComponent(p.username)}`} className="evwho__who" onClick={() => setWhoOpen(false)}>
+                      <strong>{p.displayName}</strong>
+                      <span>@{p.username}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              {e.confirmedCount > e.attendees.length ? <p className="muted evwho__more">{e.confirmedCount - e.attendees.length === 1 ? t('e mais 1 pessoa') : t('e mais {n} pessoas', { n: e.confirmedCount - e.attendees.length })}</p> : null}
+            </Sheet>
           ) : null}
 
           {e.source === 'PLACE' ? <GuestListCard eventId={e.id} ended={ended} /> : null}

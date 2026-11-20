@@ -94,6 +94,20 @@ const TAGS: Record<EventKind, string[]> = {
   SHOW: ['musicaaovivo', 'show'], NIGHT: ['balada', 'festa'], GASTRONOMY: ['gastronomia', 'comida'], SPORT: ['esporte'],
   THEATER: ['teatro'], CINEMA: ['cinema'], EXHIBITION: ['arte', 'exposicao'], OUTDOOR: ['arlivre'], DIGITAL: [], OTHER: [],
 };
+/** Fotos do Unsplash (licença livre) por tipo; as mesmas da migration 20270122120000_sample_event_images. */
+const PHOTOS: Record<EventKind, string[]> = {
+  SHOW: ['1501386761578-eac5c94b800a', '1470229722913-7c0e2dbbafd3', '1493225457124-a3eb161ffa5f', '1514525253161-7a46d19cd819', '1459749411175-04bf5292ceea', '1511192336575-5a79af67a629'],
+  NIGHT: ['1516450360452-9312f5e86fc7', '1566737236500-c8ac43014a67', '1574391884720-bbc3740c59d1'],
+  GASTRONOMY: ['1504674900247-0877df9cc836', '1414235077428-338989a2e8c0', '1555396273-367ea4eb4db5', '1568901346375-23c9450c58cd', '1513104890138-7c749659a591', '1510812431401-41d2bd2722f3'],
+  SPORT: ['1574629810360-7efbbe195018', '1461896836934-ffe607ba8211', '1517649763962-0c623066013b'],
+  THEATER: ['1503095396549-807759245b35', '1507676184212-d03ab07a01bf', '1585699324551-f6c309eedeca'],
+  CINEMA: ['1489599849927-2ee91cede3ba', '1536440136628-849c177e76a1'],
+  EXHIBITION: ['1544967082-d9d25d867d66', '1518998053901-5348d3961a04'],
+  OUTDOOR: ['1441974231531-c6227db76b6e', '1504280390367-361c6d9f38f4', '1511632765486-a01980e01a18'],
+  DIGITAL: ['1529156069898-49953e39b3ac', '1511632765486-a01980e01a18'],
+  OTHER: ['1529156069898-49953e39b3ac', '1511632765486-a01980e01a18'],
+};
+const photoFor = (kind: EventKind, h: number) => `https://images.unsplash.com/photo-${pick(PHOTOS[kind], h)}?w=1080&q=70&auto=format&fit=crop`;
 const START_HOUR: Record<EventKind, number[]> = {
   NIGHT: [23], SHOW: [21], THEATER: [20], CINEMA: [19, 21], GASTRONOMY: [12, 19, 20], EXHIBITION: [14], OUTDOOR: [9], SPORT: [16], DIGITAL: [20], OTHER: [19],
 };
@@ -173,7 +187,7 @@ async function runHistory(prisma: PrismaClient, force: boolean, apiKey: string |
 
     const now = Date.now();
     const today = todaySaoPaulo(now);
-    const events: { id: string; venueId: string; title: string; description: string; startsAt: Date; endsAt: Date; kind: EventKind; isFree: boolean; tags: string[]; isSample: true; createdAt: Date; updatedAt: Date }[] = [];
+    const events: { id: string; venueId: string; title: string; description: string; startsAt: Date; endsAt: Date; kind: EventKind; isFree: boolean; tags: string[]; imageUrl: string; isSample: true; createdAt: Date; updatedAt: Date }[] = [];
     for (const v of venues) {
       for (let n = 0; n < EVENTS_PER_VENUE; n++) {
         const h = hashOf(`askout-historico:g:${v.id}:${n}`);
@@ -192,6 +206,7 @@ async function runHistory(prisma: PrismaClient, force: boolean, apiKey: string |
           kind,
           isFree: (h >>> 12) % 3 === 0,
           tags: TAGS[kind],
+          imageUrl: photoFor(kind, h >>> 16),
           isSample: true,
           createdAt,
           updatedAt: createdAt,
@@ -246,7 +261,7 @@ async function runUpcoming(prisma: PrismaClient, force: boolean): Promise<void> 
   });
   const now = Date.now();
   const today = todaySaoPaulo(now);
-  const events: { id: string; venueId: string; title: string; description: string; startsAt: Date; endsAt: Date; kind: EventKind; isFree: boolean; tags: string[]; isSample: true; createdAt: Date; updatedAt: Date }[] = [];
+  const events: { id: string; venueId: string; title: string; description: string; startsAt: Date; endsAt: Date; kind: EventKind; isFree: boolean; tags: string[]; imageUrl: string; isSample: true; createdAt: Date; updatedAt: Date }[] = [];
   for (const v of venues) {
     const count = 1 + (hashOf(`askout-proximos:n:${v.id}`) % 3);
     for (let n = 0; n < count; n++) {
@@ -264,6 +279,7 @@ async function runUpcoming(prisma: PrismaClient, force: boolean): Promise<void> 
         kind,
         isFree: (h >>> 12) % 3 === 0,
         tags: TAGS[kind],
+        imageUrl: photoFor(kind, h >>> 16),
         isSample: true,
         createdAt: new Date(now),
         updatedAt: new Date(now),

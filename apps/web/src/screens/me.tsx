@@ -202,7 +202,7 @@ export function EditProfileScreen() {
         {age.locked ? (
           <p className="muted">
             {t('Pela data cadastrada, você ainda não tem 18 anos, então não dá para trocá-la por aqui. Se foi um erro de digitação,')}{' '}
-            {support ? <a href={support}>fale com o suporte</a> : 'fale com o suporte'}.
+            {support ? <a href={support}>{t('fale com o suporte')}</a> : t('fale com o suporte')}.
           </p>
         ) : (
           <Field

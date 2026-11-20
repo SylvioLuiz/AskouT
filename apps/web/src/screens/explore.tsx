@@ -128,8 +128,8 @@ function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
           ) : null}
           {event.author ? <p className="evcard__author">{t('Criado por @{username}', { username: event.author.username })}</p> : null}
           <p className="evcard__when">{formatWhen(event.startsAt, event.endsAt, now)}</p>
-          {event.goingCount !== undefined ? <p className="evcard__hot">{event.goingCount} confirmados agora</p> : null}
-          {event.distanceM !== null ? <p className="evcard__dist">a {formatDistance(event.distanceM)}</p> : null}
+          {event.goingCount !== undefined ? <p className="evcard__hot">{t('{n} confirmados agora', { n: event.goingCount })}</p> : null}
+          {event.distanceM !== null ? <p className="evcard__dist">{t('a {distance}', { distance: formatDistance(event.distanceM) })}</p> : null}
         </div>
       </Link>
     </li>

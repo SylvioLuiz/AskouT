@@ -554,6 +554,8 @@ export interface ChatMessage {
   gif?: CommentGif | null;
   /** Story respondido ou reagido (anexado à mensagem). */
   storyId?: string | null;
+  /** O story respondido, enquanto ainda está no ar (null quando acabou: aí não aparece). */
+  story?: MessageStory | null;
   /** Apagada por quem enviou: no lugar do conteúdo aparece "Mensagem apagada". */
   deleted: boolean;
   /** Mensagem a que esta responde. */
@@ -1527,4 +1529,17 @@ export interface GuestListOwnerView {
   people: number;
   checkedInPeople: number;
   entries: GuestListEntry[];
+}
+
+/** Story anexado a uma resposta na conversa: miniatura e o que o visualizador precisa para abrir. */
+export interface MessageStory {
+  id: string;
+  kind: 'IMAGE' | 'VIDEO';
+  caption: string | null;
+  captionY: number | null;
+  overlays?: StoryOverlay[];
+  createdAt: string;
+  expiresAt: string;
+  eventId: string;
+  author: PublicProfile;
 }
