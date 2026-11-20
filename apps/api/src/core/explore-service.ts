@@ -1,3 +1,4 @@
+import { byDayAndNightlife } from './explore-priority.ts';
 import { ratingView } from './venue-service.ts';
 import { notFound, validationError } from './errors.ts';
 import { fold, normalizeTag } from './explore-match.ts';
@@ -272,7 +273,7 @@ export class ExploreService {
 
     if (rawQ === '') {
       const [found, people] = await Promise.all([places.searchEvents(base), hot ? Promise.resolve([]) : this.peopleEvents(actorId, { center, radiusM, from, to, kind, freeOnly })]);
-      return { ...empty, events: mixByStart(await toItems(found), people) };
+      return { ...empty, events: hot ? await toItems(found) : mixByStart(await toItems(found), people) };
     }
 
     if (isTag) {
@@ -301,7 +302,7 @@ export class ExploreService {
     });
 
     const fromPeople = hot ? [] : await this.peopleEvents(actorId, { center, radiusM, from, to, kind, freeOnly, needle: fold(text) });
-    return { ...empty, events: mixByStart(await toItems(found), fromPeople), places: placeItems, people, tags, placesAvailable };
+    return { ...empty, events: hot ? await toItems(found) : mixByStart(await toItems(found), fromPeople), places: placeItems, people, tags, placesAvailable };
   }
 
   /**
@@ -509,10 +510,9 @@ export class ExploreService {
   }
 }
 
-/** Junta os eventos dos locais (patrocinados primeiro, como vieram) com os das pessoas, pela hora de começo. */
+/** Junta os eventos dos locais (patrocinados primeiro, como vieram) com os das pessoas: por dia, com bares, noite e baladas na frente. */
 function mixByStart(placeItems: ExploreEventItem[], peopleItems: ExploreEventItem[]): ExploreEventItem[] {
-  if (peopleItems.length === 0) return placeItems;
   const sponsored = placeItems.filter((i) => i.sponsored);
-  const rest = [...placeItems.filter((i) => !i.sponsored), ...peopleItems].sort((a, b) => (a.startsAt < b.startsAt ? -1 : a.startsAt > b.startsAt ? 1 : a.id < b.id ? -1 : 1));
+  const rest = byDayAndNightlife([...placeItems.filter((i) => !i.sponsored), ...peopleItems]);
   return [...sponsored, ...rest];
 }
