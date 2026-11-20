@@ -91,9 +91,10 @@ function EventCover({ event, shape, badge = false, live = false }: { event: Expl
       <span className="evcover__tags">
         {live ? <LiveTag /> : null}
         {event.sponsored ? <span className="tag-sponsored">{t('Patrocinado')}</span> : null}
-        {event.isFree ? <span className="tag tag--free">{t('Grátis')}</span> : null}
+        {event.isFree && !badge ? <span className="tag tag--free">{t('Grátis')}</span> : null}
         {event.sample ? <SampleBadge /> : null}
       </span>
+      {event.isFree && badge ? <span className="tag tag--free evcover__free">{t('Grátis')}</span> : null}
     </div>
   );
 }
@@ -107,7 +108,7 @@ export function EventCard({ event, now, poster }: { event: ExploreEvent; now: Da
 function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
   const adRef = useSponsoredView<HTMLLIElement>(event.sponsored === true, 'EXPLORE', { eventId: event.id });
   return (
-    <li className="evcard" ref={adRef}>
+    <li className={`evcard${isLiveNow(event, now) ? ' evcard--live' : ''}`} ref={adRef}>
       <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link" onClick={() => { if (event.sponsored) trackSponsoredOpen('EXPLORE', { eventId: event.id }); }}>
         <EventCover event={event} shape={coverShape(event.id)} badge live={isLiveNow(event, now)} />
         <div className="evcard__body">

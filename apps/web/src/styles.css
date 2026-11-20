@@ -7111,3 +7111,11 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .livetag__dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--brand); animation: livepulse 1.6s ease-out infinite; }
 @keyframes livepulse { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(3); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .livetag__dot::after { animation: none; } }
+
+/* Lista: "Grátis" fica logo abaixo do selo da data; a etiqueta "Rolando agora" fica no canto direito. */
+.evcard .evcover__free { position: absolute; top: 66px; left: 8px; z-index: 2; }
+/* Evento rolando agora: borda fina e translúcida, na cor da bolinha, que pulsa no mesmo ritmo dela. */
+.evcard--live { position: relative; }
+.evcard--live::after { content: ''; position: absolute; inset: 0; border-radius: 22px; border: 1.5px solid var(--brand); opacity: 0.18; pointer-events: none; animation: liveborder 1.6s ease-in-out infinite; }
+@keyframes liveborder { 0%, 100% { opacity: 0.12; } 50% { opacity: 0.5; } }
+@media (prefers-reduced-motion: reduce) { .evcard--live::after { animation: none; opacity: 0.3; } }
