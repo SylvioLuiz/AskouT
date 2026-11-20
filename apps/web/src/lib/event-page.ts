@@ -55,3 +55,9 @@ export function attendeeStrip<T>(attendees: readonly T[], total: number, max: nu
 export function eventLink(origin: string, eventId: string): string {
   return `${origin}/eventos/${encodeURIComponent(eventId)}`;
 }
+
+/** Local resumido para a capa: nome do lugar + só o começo do endereço (rua e número). */
+export function venueShort(venue: EventPage['venue']): string {
+  const street = venue.address ? venue.address.split(',').slice(0, 2).join(',').trim() : '';
+  return [venue.name, street].filter(Boolean).join(' · ');
+}

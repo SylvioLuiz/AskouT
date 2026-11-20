@@ -7155,3 +7155,17 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .evcard__title { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; }
 /* Página do evento: o que vem antes dos ":" do título fica em fonte menor, acima do restante. */
 .evhero__lead { display: block; margin-bottom: 4px; font-size: 0.75em; font-weight: 600; line-height: 1.2; opacity: 0.9; }
+
+/* Capa do evento: título com 3 linhas fica menor; local resumido (até 2 linhas) com ícone. */
+.evhero__title.evhero__title--small { font-size: 1.2rem; line-height: 1.15; }
+.evhero__placelink { align-items: flex-start; min-height: 0; padding: 6px 0; text-decoration: none; }
+.evhero__placelink .icon, .evhero__placelink svg { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.evhero__placelink::after { content: none; }
+.evhero__placetext { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; text-align: left; text-decoration: underline; text-underline-offset: 3px; }
+.evhero__placelink--plain .evhero__placetext { text-decoration: none; }
+
+/* Card do Explorar expandido ao segurar. */
+.evcard__more { display: grid; gap: 4px; margin: 6px 0 0; padding-top: 6px; border-top: 1px solid var(--border, rgb(128 128 128 / 0.25)); font-size: 0.8125rem; }
+.evcard__more p { margin: 0; }
+.evcard__desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
+.evcard--expanded .evcard__title { -webkit-line-clamp: unset; line-clamp: unset; }
