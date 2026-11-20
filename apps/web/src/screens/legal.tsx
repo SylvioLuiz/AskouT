@@ -1,15 +1,14 @@
 import { ChevronLeftIcon } from '../components/icons.tsx';
 import { useTitle } from '../hooks.ts';
 import { buildLegal, LEGAL_REVIEWED, LEGAL_UPDATED, privacyEmail } from '../lib/legal-text.ts';
-import { Link, navigate } from '../router.tsx';
+import { Link, navigate, goBack as routerGoBack } from '../router.tsx';
 
 /** Data da versão dos padrões de segurança infantil (mudar a cada alteração). */
 const CSAE_UPDATED = '9 de novembro de 2026';
 import { getLocale, t } from '../lib/i18n/index.ts';
 
 function goBack() {
-  if (window.history.length > 1) window.history.back();
-  else navigate('/');
+  routerGoBack('/');
 }
 
 /** Política de Privacidade e Termos de Uso. Páginas públicas: abrem com ou sem login. */

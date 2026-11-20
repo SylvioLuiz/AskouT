@@ -52,10 +52,37 @@ export function rememberScroll(): void {
   scrolls.set(here(), window.scrollY);
 }
 
+/**
+ * Posição da tela atual na pilha do app (0 = a primeira). Fica guardada no próprio histórico, porque
+ * `history.length` também conta as telas à frente: voltar de uma tela para a primeira deixa `length` em 2,
+ * e aí um "voltar" baseado nele não faria nada (era o que travava o voltar do evento no app do celular).
+ */
+const INDEX_KEY = 'askoutIdx';
+function historyIndex(): number {
+  const state: unknown = window.history.state;
+  const value = state && typeof state === 'object' ? (state as Record<string, unknown>)[INDEX_KEY] : undefined;
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+if (typeof window !== 'undefined' && historyIndex() === 0) {
+  const state: unknown = window.history.state;
+  window.history.replaceState({ ...(state && typeof state === 'object' ? state : {}), [INDEX_KEY]: 0 }, '');
+}
+
+/** Há uma tela do app atrás desta? */
+export function canGoBack(): boolean {
+  return historyIndex() > 0;
+}
+
+/** Botão "voltar" das telas: volta uma tela; se esta é a primeira (aberta por link ou aviso), vai para `fallback`. */
+export function goBack(fallback: string): void {
+  if (canGoBack()) window.history.back();
+  else navigate(fallback, { replace: true });
+}
+
 export function navigate(to: string, options: { replace?: boolean } = {}): void {
   scrolls.set(here(), window.scrollY);
-  if (options.replace) window.history.replaceState(null, '', to);
-  else window.history.pushState(null, '', to);
+  if (options.replace) window.history.replaceState({ [INDEX_KEY]: historyIndex() }, '', to);
+  else window.history.pushState({ [INDEX_KEY]: historyIndex() + 1 }, '', to);
   window.scrollTo(0, 0);
   listeners.forEach((listener) => listener());
   focusContent();

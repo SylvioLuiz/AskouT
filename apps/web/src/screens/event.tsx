@@ -31,7 +31,7 @@ import type { EventPage, FeedSettings, PostView } from '../lib/types.ts';
 import { Feed } from '../components/feed.tsx';
 import { GuestListCard } from '../components/guest-list.tsx';
 import { policyNote } from '../lib/feed.ts';
-import { Link, navigate, useSearch } from '../router.tsx';
+import { Link, navigate, useSearch, goBack as routerGoBack } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
 import { t } from '../lib/i18n/index.ts';
 import { trackTicketClick } from '../components/sponsored-view.tsx';
@@ -60,8 +60,7 @@ async function addEventToCalendar(page: EventPage): Promise<void> {
 }
 
 function goBack() {
-  if (window.history.length > 1) window.history.back();
-  else navigate('/explorar');
+  routerGoBack('/explorar');
 }
 
 /** Menu ⋯ do evento: editar (quem criou o evento), compartilhar e adicionar à agenda. */

@@ -22,7 +22,7 @@ import { Feed } from '../components/feed.tsx';
 import { policyNote } from '../lib/feed.ts';
 import { DAY_LONG, VENUE_ADDRESS_MAX, VENUE_CATEGORY_MAX, VENUE_DESCRIPTION_MAX, VENUE_NAME_MAX, VENUE_POST_CAPTION_MAX, VENUE_POST_PHOTOS_MAX, applyToAll, daysSummary, draftFromProfile, friendsWentLabel, hoursLines, openStatus, profileBody, profileProblem } from '../lib/venue-profile.ts';
 import type { VenueProfileDraft } from '../lib/venue-profile.ts';
-import { Link, navigate, useSearch } from '../router.tsx';
+import { Link, navigate, useSearch, goBack as routerGoBack } from '../router.tsx';
 import { ClaimSheet, VenueEventRow } from './venues.tsx';
 import { t } from '../lib/i18n/index.ts';
 
@@ -42,8 +42,7 @@ function PinIcon() {
 }
 
 function goBack() {
-  if (window.history.length > 1) window.history.back();
-  else navigate('/explorar');
+  routerGoBack('/explorar');
 }
 
 /** Topo da página: capa (a fachada) ao fundo, logo em círculo, nome, localização e os três números. */
