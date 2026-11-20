@@ -7104,3 +7104,10 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .convskel--text { display: inline-block; max-width: 100%; height: 0.8em; border-radius: 6px; vertical-align: middle; }
 .convskel--time { width: 34px; }
 @media (prefers-reduced-motion: reduce) { .convskel { animation: none; } }
+
+/* "Rolando agora": etiqueta discreta com bolinha que pulsa, nas cores do app. */
+.livetag { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font-size: 0.6875rem; font-weight: 700; line-height: 1.5; color: var(--brand-hover); background: var(--surface); box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent); }
+.livetag__dot { position: relative; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); }
+.livetag__dot::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--brand); animation: livepulse 1.6s ease-out infinite; }
+@keyframes livepulse { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(3); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .livetag__dot::after { animation: none; } }

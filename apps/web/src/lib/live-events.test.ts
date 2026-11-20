@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { liveEvents, timeRange } from './live-events.ts';
+import { isLiveNow, liveEvents, liveFirst, timeRange } from './live-events.ts';
 import type { ExploreEvent } from './types.ts';
 
 const ev = (id: string, start: string, end: string, distanceM: number | null): ExploreEvent =>
@@ -23,4 +23,22 @@ test('só eventos em andamento, do mais perto ao mais longe', () => {
 
 test('faixa de horário no relógio do aparelho', () => {
   assert.equal(timeRange('2026-10-15T20:00:00-03:00', '2026-10-16T02:30:00-03:00'), '20:00 – 02:30');
+});
+
+test('liveFirst: patrocinado no topo, depois o que está rolando, e o resto na ordem de antes', () => {
+  const now = new Date('2026-10-15T22:00:00-03:00');
+  const mk = (id: string, start: string, end: string, sponsored = false) => ({ id, startsAt: start, endsAt: end, sponsored });
+  const out = liveFirst(
+    [
+      mk('amanha', '2026-10-16T20:00:00-03:00', '2026-10-17T02:00:00-03:00'),
+      mk('agora1', '2026-10-15T21:00:00-03:00', '2026-10-15T23:00:00-03:00'),
+      mk('ad', '2026-10-20T20:00:00-03:00', '2026-10-20T23:00:00-03:00', true),
+      mk('depois', '2026-10-15T23:00:00-03:00', '2026-10-16T01:00:00-03:00'),
+      mk('agora2', '2026-10-15T20:00:00-03:00', '2026-10-16T02:00:00-03:00'),
+    ],
+    now,
+  ).map((e) => e.id);
+  assert.deepEqual(out, ['ad', 'agora1', 'agora2', 'amanha', 'depois']);
+  assert.equal(isLiveNow({ startsAt: '2026-10-15T22:00:00-03:00', endsAt: '2026-10-15T23:00:00-03:00' }, now), true);
+  assert.equal(isLiveNow({ startsAt: '2026-10-15T21:00:00-03:00', endsAt: '2026-10-15T22:00:00-03:00' }, now), false);
 });
