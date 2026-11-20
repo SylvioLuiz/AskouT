@@ -49,7 +49,7 @@ export function buildPrivacyEn(email: string): LegalDoc {
       {
         title: '4. Who sees what',
         text: [
-          'Your profile, posts and events appear to people according to your settings. With a private profile, only people you approve see the events you post, your calendar and your connections. Messages only reach people in the conversation.',
+          'Your profile, posts and events appear to people according to your settings. With a private profile, only people you approve see the events you post, your calendar and your connections. The times you mark in your calendar only show to your friends if you turn on "Show my times to friends"; then they see when you’re available and appointments from connected calendars, only as busy. Messages only reach people in the conversation.',
           'We do not sell your personal data and we do not use what you do on AskouT for third-party advertising.',
         ],
       },

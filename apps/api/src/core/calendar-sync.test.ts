@@ -134,6 +134,7 @@ test('Google tirou o acesso: o job marca para reconectar e os horários saem; o 
   const { ana, bia } = await w.signUpMany('ana', 'bia');
   await w.core.follows.follow(ana!, bia!);
   await w.core.follows.follow(bia!, ana!);
+  await w.core.availability.setSharing(bia!, true); // bia mostra a agenda para os amigos
   const google = w.googleCalendar!;
   google.busy.set('primary@gmail.com', [{ start: T('2026-10-15T20:00Z'), end: T('2026-10-15T23:00Z') }]);
   const { url } = await w.core.calendarSync.googleStart(bia!, 'web');

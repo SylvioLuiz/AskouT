@@ -171,8 +171,9 @@ export function CreatePostScreen() {
   const prefill = useSearch();
   const startAsEvent = prefill.get('votacao') !== null || prefill.get('tipo') === 'evento';
   const fileRef = useRef<HTMLInputElement>(null);
-  // Evento abre direto na tela única (capa, nome e as linhas Quando/Onde/Tipo/Quem vê); post começa pelas fotos.
-  const [step, setStep] = useState<Step>(startAsEvent ? 'details' : 'photos');
+  // Evento e post abrem direto na tela única. No post, foto é opcional: texto, fotos e o evento ou rolê ficam na mesma tela;
+  // a tela de fotos só abre para editar (ordem, recorte, foto de um rolê).
+  const [step, setStep] = useState<Step>('details');
   const [source, setSource] = useState<Source>('photos');
   const [items, setItems] = useState<DraftImage[]>([]);
   const [focusKey, setFocusKey] = useState<string | undefined>();
@@ -706,9 +707,10 @@ export function CreatePostScreen() {
   if (step === 'details') {
     return (
       <div className="compose compose--details">
+        {fileInput}
         <header className="compose__bar">
-          <button type="button" className="iconbtn" onClick={() => setStep('photos')} aria-label={t('Voltar para as fotos')} disabled={busy}>
-            <ChevronLeftIcon />
+          <button type="button" className="iconbtn" onClick={leave} aria-label={t('Cancelar')} disabled={busy}>
+            <XIcon />
           </button>
           <h1 className="compose__title">{kind === 'EVENT' ? t('Novo evento') : t('Nova publicação')}</h1>
           <span aria-hidden="true" />
@@ -759,6 +761,23 @@ export function CreatePostScreen() {
           <p className={`compose__count${captionLength > POST_CAPTION_MAX ? ' compose__count--over' : ''}`} aria-live="polite">
             {captionLength}/{POST_CAPTION_MAX}
           </p>
+        ) : null}
+        {kind === 'POST' ? (
+          <div className="compose__media">
+            <Button small variant="secondary" loading={reading} disabled={busy || room <= 0} onClick={() => fileRef.current?.click()}>
+              <PhotoIcon /> {items.length > 0 ? t('Adicionar mais') : t('Fotos ou vídeo')}
+            </Button>
+            <Button small variant="quiet" disabled={busy} onClick={() => { setSource('place'); setStep('photos'); }}>
+              <LocationIcon /> {t('Foto de um rolê')}
+            </Button>
+            {items.length > 0 ? (
+              <Button small variant="quiet" disabled={busy} onClick={() => { setSource('photos'); setStep('photos'); }}>
+                {t('Editar fotos')}
+              </Button>
+            ) : (
+              <span className="muted compose__mediahint">{t('Opcional')}</span>
+            )}
+          </div>
         ) : null}
         {kind === 'POST' ? <p className="muted compose__linkhint">{place || linkedEvent ? t('Seu post fica vinculado a este evento ou rolê.') : t('Todo post precisa de um evento ou de um rolê. Escolha abaixo.')}</p> : null}
         <ul className="optrows">
@@ -876,12 +895,12 @@ export function CreatePostScreen() {
         </header>
       ) : (
         <header className="compose__bar">
-          <button type="button" className="iconbtn" onClick={leave} aria-label={t('Cancelar')}>
-            <XIcon />
+          <button type="button" className="iconbtn" onClick={() => setStep('details')} aria-label={t('Voltar para a publicação')} disabled={reading || cropKey !== undefined}>
+            <ChevronLeftIcon />
           </button>
-          <h1 className="compose__title">{t('Nova publicação')}</h1>
+          <h1 className="compose__title">{t('Fotos da publicação')}</h1>
           <button type="button" className="compose__next" disabled={reading || cropKey !== undefined} onClick={() => setStep('details')}>
-            {t('Avançar')}
+            {t('Concluir')}
           </button>
         </header>
       )}
@@ -914,7 +933,7 @@ export function CreatePostScreen() {
               <PhotoIcon />
             </span>
             <p className="compose__emptytitle">{reading ? t('Preparando as fotos…') : kind === 'EVENT' ? t('Capa do evento') : t('Fotos e vídeos do rolê')}</p>
-            <p className="compose__emptyhint">{kind === 'EVENT' ? t('A primeira foto é a capa. Até {max} itens, com no máximo 1 vídeo.', { max: POST_IMAGES_MAX }) : t('Até {max} itens, com no máximo 1 vídeo. Ou toque em Avançar para escrever só um texto.', { max: POST_IMAGES_MAX })}</p>
+            <p className="compose__emptyhint">{kind === 'EVENT' ? t('A primeira foto é a capa. Até {max} itens, com no máximo 1 vídeo.', { max: POST_IMAGES_MAX }) : t('Até {max} itens, com no máximo 1 vídeo.', { max: POST_IMAGES_MAX })}</p>
             <Button small loading={reading} onClick={() => fileRef.current?.click()}>
               {t('Escolher da galeria')}
             </Button>

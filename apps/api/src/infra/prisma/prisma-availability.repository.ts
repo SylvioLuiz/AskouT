@@ -56,6 +56,24 @@ export class PrismaAvailabilityRepository implements AvailabilityRepository {
     }
   }
 
+  async isSharing(userId: string): Promise<boolean> {
+    if (!isUuid(userId)) return false;
+    const row = await this.prisma.userSettings.findUnique({ where: { userId }, select: { shareAvailability: true } });
+    return row?.shareAvailability === true;
+  }
+
+  async setSharing(userId: string, on: boolean): Promise<void> {
+    if (!isUuid(userId)) return;
+    await this.prisma.userSettings.upsert({ where: { userId }, create: { userId, shareAvailability: on }, update: { shareAvailability: on } });
+  }
+
+  async sharingAmong(userIds: string[]): Promise<string[]> {
+    const ids = onlyUuids(userIds);
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.userSettings.findMany({ where: { userId: { in: ids }, shareAvailability: true }, select: { userId: true } });
+    return rows.map((r) => r.userId);
+  }
+
   async delete(userId: string, slotId: string): Promise<boolean> {
     if (!isUuid(userId) || !isUuid(slotId)) return false;
     const result = await this.prisma.availabilitySlot.deleteMany({ where: { id: slotId, userId } });

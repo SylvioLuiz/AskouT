@@ -332,6 +332,20 @@ export class InMemoryBlockRepository implements BlockRepository {
 
 export class InMemoryAvailabilityRepository implements AvailabilityRepository {
   readonly rows = new Map<string, AvailabilitySlotRecord>();
+  readonly sharing = new Set<string>();
+
+  async isSharing(userId: string): Promise<boolean> {
+    return this.sharing.has(userId);
+  }
+
+  async setSharing(userId: string, on: boolean): Promise<void> {
+    if (on) this.sharing.add(userId);
+    else this.sharing.delete(userId);
+  }
+
+  async sharingAmong(userIds: string[]): Promise<string[]> {
+    return userIds.filter((id) => this.sharing.has(id));
+  }
 
   async add(slot: AvailabilitySlotRecord): Promise<void> {
     for (const r of this.rows.values()) {

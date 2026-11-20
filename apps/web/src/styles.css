@@ -2636,6 +2636,12 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   margin: 0 0 10px;
 }
 
+/* Texto explicativo de uma aba (convidar amigos, mostrar o "Eu vou" no perfil...): respiro até os botões. */
+.sheet__panel > :is(p, .notice) + :is(.stack, .sheetactions, .btn, button, a.btn),
+.sheet__panel > .stack > p + :is(.btn, button, a.btn, .sheetactions),
+.sheet__panel > :is(p, .notice) + .notice { margin-top: 20px; }
+.going-choice__text { margin: 0; }
+
 .sheet__foot {
   margin: 10px 0 0;
   font-size: 0.8125rem;
@@ -3791,6 +3797,9 @@ a.actlog__row:hover { background: var(--surface); }
 .post__textonly { margin: 0; padding: 20px 18px; border-radius: var(--radius-panel); background: color-mix(in srgb, var(--brand) 10%, var(--surface)); font-size: 1.25rem; line-height: 1.4; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
 .post__linkedevent { font-size: 0.9375rem; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
 .post__linkedevent .icon { width: 16px; height: 16px; flex: none; }
+.compose__media { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 8px; }
+.compose__media .btn svg { width: 18px; height: 18px; }
+.compose__mediahint { font-size: 0.8125rem; }
 .compose__linkhint { margin: 8px 0 0; font-size: 0.875rem; }
 
 .pcarousel { position: relative; border-radius: var(--radius-panel); overflow: hidden; background: var(--line); }
@@ -5084,6 +5093,24 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .dpcal__cell { position: relative; }
 
 /* ---------- Sincronizar agendas ---------- */
+/* Agenda: chave para mostrar os horários aos amigos e "Achar horário com amigos". */
+.agshare { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0 0 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); }
+.agshare__title { margin: 0; font-size: 0.9375rem; }
+.agshare__help { margin: 4px 0 0; color: var(--muted); font-size: 0.8125rem; line-height: 1.4; }
+.agshare .switch { flex: none; margin-top: 2px; }
+.agshare + .btn, .agshare + .notice + .btn { margin-bottom: 14px; }
+.agcommon__friends { display: flex; flex-direction: column; gap: 6px; margin: 14px 0; }
+.agcommon__friend { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.agcommon__friend--on { border-color: var(--brand); background: var(--brand-soft); }
+.agcommon__name { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.agcommon__name span { color: var(--muted); font-size: 0.8125rem; }
+.agcommon__results { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 0; }
+.agcommon__result { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-panel); background: var(--surface); }
+.agcommon__when { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px; }
+.agcommon__when span { color: var(--muted); font-size: 0.875rem; }
+.agcommon__people { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.8125rem; }
+.agcommon__people li { display: inline-flex; align-items: center; gap: 4px; }
+.agcommon__empty { margin-top: 14px; }
 .agsync { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 /* Alterna entre a faixa de dias e o mês inteiro. */
 .agview { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
@@ -6753,7 +6780,6 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .bubble__story--sent { flex-direction: row; align-items: center; gap: 10px; min-width: 0; text-align: left; padding: 6px; border-radius: 12px; background: rgba(0, 0, 0, 0.1); }
 .bubble__story--sent .bubble__storythumb { width: 40px; flex: none; border-radius: 8px; }
 
-.going-choice__text { margin: 0 0 20px; }
 
 /* ---------- NOW (redesenho) ---------- */
 /* Cores do espectro do logo; o resto segue os tokens do tema (claro e escuro). */
