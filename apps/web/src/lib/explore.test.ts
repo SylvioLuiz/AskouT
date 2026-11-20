@@ -81,3 +81,15 @@ test('widenSteps: do menos para o mais amplo, só com passos que mudam algo', as
   ]);
   assert.equal(widenSteps({ hasThemes: false, located: true }).at(-1)!.clearThemes, false);
 });
+
+test('cor da capa sem imagem: estável por evento, dentro da paleta e variando entre eventos', async () => {
+  const { eventTone, EVENT_TONES } = await import('./explore.ts');
+  assert.equal(eventTone('abc'), eventTone('abc'));
+  const ids = Array.from({ length: 200 }, (_, i) => `evento-${i}-${i * 7919}`);
+  const tones = ids.map(eventTone);
+  assert.ok(tones.every((n) => Number.isInteger(n) && n >= 0 && n < EVENT_TONES));
+  assert.equal(new Set(tones).size, EVENT_TONES, 'usa todas as cores da paleta');
+  const counts = new Map<number, number>();
+  for (const n of tones) counts.set(n, (counts.get(n) ?? 0) + 1);
+  assert.ok(Math.max(...counts.values()) < 45, 'nenhuma cor domina (200 eventos, 10 cores)');
+});

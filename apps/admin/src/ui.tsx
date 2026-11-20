@@ -19,7 +19,7 @@ export function PageHead({ title, hint, children }: { title: string; hint?: stri
   );
 }
 
-export function Badge({ tone = 'neutral', children }: { tone?: 'neutral' | 'ok' | 'warn' | 'bad' | 'info'; children: ReactNode }) {
+export function Badge({ tone = 'neutral', children }: { tone?: 'neutral' | 'ok' | 'warn' | 'bad' | 'info' | 'admin'; children: ReactNode }) {
   return <span className={`badge badge--${tone}`}>{children}</span>;
 }
 

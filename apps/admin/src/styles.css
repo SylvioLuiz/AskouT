@@ -14,6 +14,8 @@
   --warn-bg: #fff3d6;
   --info: #0057b8;
   --info-bg: #e5f0fc;
+  --admin: #6b3fb5;
+  --admin-bg: #efe7fb;
   --side: #1c1c1e;
   --side-ink: #f2f2f7;
   --radius: 10px;
@@ -37,6 +39,8 @@
     --warn-bg: #3b2c08;
     --info: #7db8ff;
     --info-bg: #10263f;
+    --admin: #c9a8ff;
+    --admin-bg: #2b1c47;
     --side: #111113;
   }
 }
@@ -109,6 +113,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .badge--bad { background: var(--danger-bg); color: var(--danger); }
 .badge--warn { background: var(--warn-bg); color: var(--warn); }
 .badge--info { background: var(--info-bg); color: var(--info); }
+/* Roxo, para o selo de administrador não se confundir com o azul dos selos Apple e Google. */
+.badge--admin { background: var(--admin-bg); color: var(--admin); }
 .notice { background: var(--info-bg); color: var(--info); border-radius: 8px; padding: 10px 12px; margin: 12px 0; }
 .notice--bad { background: var(--danger-bg); color: var(--danger); }
 .notice--warn { background: var(--warn-bg); color: var(--warn); }

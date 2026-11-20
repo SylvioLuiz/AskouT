@@ -420,6 +420,8 @@ export class AuthService {
     // Só e-mail verificado pela plataforma pode se juntar a uma conta que já existe.
     const existing = await users.findByEmail(email);
     if (existing) {
+      // Painel de gestão: conta comum não entra nem ganha vínculo com a Apple/Google por aqui (isso só no app).
+      if (options.requireRole && existing.role !== options.requireRole) throw unauthorized('Essa conta não tem acesso à gestão');
       await identities.link(provider, claims.subject, existing.id, now);
       await this.adoptPicture(existing.id, picture);
       return this.sessionFor(existing.id, options);

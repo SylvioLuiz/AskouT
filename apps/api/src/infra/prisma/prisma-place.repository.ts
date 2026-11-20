@@ -310,7 +310,7 @@ export class PrismaPlaceRepository implements PlaceRepository {
       const m = matchEvent(toEvent(r), toVenue(r.venue), q);
       if (m) out.push(m);
     }
-    return out.sort(compareMatches).slice(0, q.limit);
+    return out.sort(compareMatches).slice(q.offset ?? 0, (q.offset ?? 0) + q.limit);
   }
 
   async findEvent(id: string) {

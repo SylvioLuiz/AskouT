@@ -30,7 +30,7 @@ export const KINDS: readonly { id: EventKind; label: string }[] = [
 export const HOT_MIN_GOING = 5;
 
 export const RADIUS_MIN_KM = 1;
-export const RADIUS_MAX_KM = 50;
+export const RADIUS_MAX_KM = 200;
 export const RADIUS_DEFAULT_KM = 10;
 
 export function rangeLabel(id: RangeId): string {
@@ -126,3 +126,20 @@ export function activeFilterCount(f: { range: RangeId; kind: EventKind | null; f
   // Com "Bombando" ligado o período não vale, então não conta como filtro.
   return (f.hot ? 1 : f.range !== 'today' ? 1 : 0) + (f.kind ? 1 : 0) + (f.free ? 1 : 0) + (f.radiusKm !== RADIUS_DEFAULT_KM ? 1 : 0);
 }
+
+/** Quantas cores de capa existem (as classes `evtone-0` a `evtone-9` no CSS). */
+export const EVENT_TONES = 10;
+
+/**
+ * Cor da capa de um evento sem imagem: sai do id, então é sempre a mesma para o mesmo evento e varia de um evento para o
+ * outro (antes todos de um tipo, ou todos no escuro, ficavam da mesma cor).
+ */
+export function eventTone(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) % EVENT_TONES;
+}
+

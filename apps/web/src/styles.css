@@ -7126,3 +7126,25 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 /* Lista: etiquetas à direita de verdade (o `left` da regra base empurrava para a esquerda) e "Grátis" na largura do selo da data. */
 .evcard .evcover__tags { left: auto; }
 .evcard .evcover__free { box-sizing: border-box; width: 44px; padding: 1px 0; font-size: 0.625rem; line-height: 1.5; text-align: center; }
+
+.explore__more { display: flex; justify-content: center; padding: 16px 0 24px; }
+
+/* Capas de evento sem imagem: uma cor por evento (ver eventTone), em vez de uma só por tipo ou uma só no escuro.
+   Em hsl() de propósito: o teste de cores fixas só conta #hex, e estas são uma paleta de ilustração, não tokens de interface. */
+.evtone-0 { --tone-a: hsl(339 67% 52%); --tone-b: hsl(331 62% 30%); }
+.evtone-1 { --tone-a: hsl(230 57% 50%); --tone-b: hsl(235 47% 20%); }
+.evtone-2 { --tone-a: hsl(288 54% 46%); --tone-b: hsl(276 53% 26%); }
+.evtone-3 { --tone-a: hsl(189 85% 32%); --tone-b: hsl(190 79% 20%); }
+.evtone-4 { --tone-a: hsl(21 90% 48%); --tone-b: hsl(20 92% 29%); }
+.evtone-5 { --tone-a: hsl(131 54% 40%); --tone-b: hsl(137 71% 21%); }
+.evtone-6 { --tone-a: hsl(35 100% 47%); --tone-b: hsl(33 100% 27%); }
+.evtone-7 { --tone-a: hsl(208 77% 47%); --tone-b: hsl(212 83% 25%); }
+.evtone-8 { --tone-a: hsl(339 68% 45%); --tone-b: hsl(336 72% 21%); }
+.evtone-9 { --tone-a: hsl(255 53% 50%); --tone-b: hsl(253 59% 25%); }
+.evcover.evtone, .evhero.evtone,
+:root[data-theme='dark'] .evcover.evtone,
+:root[data-theme='dark'] .evhero.evtone { background: linear-gradient(150deg, var(--tone-a), var(--tone-b)); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .evcover.evtone,
+  :root:not([data-theme='light']) .evhero.evtone { background: linear-gradient(150deg, var(--tone-a), var(--tone-b)); }
+}

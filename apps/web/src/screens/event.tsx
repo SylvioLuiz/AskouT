@@ -19,7 +19,7 @@ import { queueFrom, startOf } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
 import { eventLink } from '../lib/share.ts';
 import { attendeeStrip, eventDateLabel, eventLongDate, eventTimeLabel, venueLine } from '../lib/event-page.ts';
-import { kindLabel, safeImage } from '../lib/explore.ts';
+import { eventTone, kindLabel, safeImage } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { ticketHost } from '../lib/venue.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -239,7 +239,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
       ) : null}
       {e && date && time && strip ? (
         <article className="evpage">
-          <section className={`evhero evhero--${e.kind.toLowerCase()}`} aria-label={t('Capa do evento')}>
+          <section className={`evhero evhero--${e.kind.toLowerCase()} evtone evtone-${eventTone(e.id)}`} aria-label={t('Capa do evento')}>
             {cover ? <img className="evhero__img" src={cover} alt="" referrerPolicy="no-referrer" onError={() => setCoverFailed(true)} /> : null}
             <div className="evhero__shade" aria-hidden="true" />
             <button type="button" className="evhero__btn evhero__btn--back" onClick={goBack} aria-label={t('Voltar')}>

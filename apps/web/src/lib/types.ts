@@ -932,6 +932,9 @@ export interface ExploreResult {
   from: string;
   to: string;
   events: ExploreEvent[];
+  /** Há mais eventos depois destes: pedir de novo com `offset` (a busca por nome ou # procura em qualquer distância). */
+  hasMore?: boolean;
+  offset?: number;
   places: ExplorePlace[];
   people: PublicProfile[];
   tags: { tag: string; count: number }[];
@@ -948,6 +951,8 @@ export interface ExploreParams {
   kind?: EventKind;
   free?: boolean;
   hot?: boolean;
+  /** Quantos eventos pular (carregar mais ao rolar). */
+  offset?: number;
 }
 
 export interface PostImage {

@@ -1,7 +1,7 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { ExploreViews } from '../components/explore-views.tsx';
 import { ExploreSearch } from '../components/explore-search.tsx';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
@@ -38,6 +38,7 @@ import {
   safeImage,
   sourceName,
 } from '../lib/explore.ts';
+import { eventTone } from '../lib/explore.ts';
 import type { RangeId } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { pluralize } from '../lib/format.ts';
@@ -85,7 +86,7 @@ function EventCover({ event, shape, badge = false, live = false }: { event: Expl
   const [failed, setFailed] = useState(false);
   const image = failed ? null : safeImage(event.imageUrl);
   return (
-    <div className={`evcover evcover--${shape} evcover--${event.kind.toLowerCase()}`}>
+    <div className={`evcover evcover--${shape} evcover--${event.kind.toLowerCase()} evtone evtone-${eventTone(event.id)}`}>
       {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="evcover__fallback" aria-hidden="true"><EventKindIcon kind={event.kind} /><span className="evcover__kind">{kindLabel(event.kind)}</span></span>}
       {badge ? <DateBadge startsAt={event.startsAt} mini /> : null}
       <span className="evcover__tags">
@@ -144,7 +145,7 @@ function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
         venue={<VenueLink venueId={event.venue.id} name={event.venue.name} />}
         image={safeImage(event.imageUrl)}
         fallback={
-          <span className={`evcover evcover--${event.kind.toLowerCase()} poster__fallback`} aria-hidden="true">
+          <span className={`evcover evcover--${event.kind.toLowerCase()} evtone evtone-${eventTone(event.id)} poster__fallback`} aria-hidden="true">
             <EventKindIcon kind={event.kind} />
             <span className="evcover__kind">{kindLabel(event.kind)}</span>
           </span>
@@ -319,7 +320,8 @@ export function ExploreScreen() {
       q: q || undefined,
       lat: position?.lat,
       lng: position?.lng,
-      radiusKm: position ? radiusKm : undefined,
+      // Sem texto vale o raio escolhido (padrão 10 km). Busca por nome ou # procura em qualquer distância.
+      radiusKm: position && !q ? radiusKm : undefined,
       from: from.toISOString(),
       to: to.toISOString(),
       kind: kind ?? undefined,
@@ -329,17 +331,56 @@ export function ExploreScreen() {
   }, [q, range, kind, free, hot, radiusKm, position?.lat, position?.lng, waiting]);
 
   const raw = result.data;
+  // "Carregar mais" ao rolar: páginas seguintes dos eventos, somadas à primeira (que vem do useAsync acima).
+  const [more, setMore] = useState<{ events: ExploreEvent[]; hasMore: boolean | undefined; loading: boolean }>({ events: [], hasMore: undefined, loading: false });
+  useEffect(() => {
+    setMore({ events: [], hasMore: undefined, loading: false });
+  }, [raw]);
+  const serverCount = (raw?.events.length ?? 0) + more.events.length;
+  const canLoadMore = !!raw && !hot && (more.hasMore ?? raw.hasMore) === true;
+  const loadMore = useCallback(async () => {
+    if (!raw || more.loading) return;
+    setMore((m) => ({ ...m, loading: true }));
+    try {
+      const { from, to } = rangeFor(range, new Date());
+      const page = await api.explore({
+        q: q || undefined,
+        lat: position?.lat,
+        lng: position?.lng,
+        radiusKm: position && !q ? radiusKm : undefined,
+        from: from.toISOString(),
+        to: to.toISOString(),
+        kind: kind ?? undefined,
+        free,
+        offset: serverCount,
+      });
+      setMore((m) => ({ events: [...m.events, ...page.events.filter((e) => !m.events.some((x) => x.id === e.id) && !raw.events.some((x) => x.id === e.id))], hasMore: page.hasMore === true, loading: false }));
+    } catch {
+      setMore((m) => ({ ...m, hasMore: false, loading: false }));
+    }
+  }, [raw, more.loading, range, q, position?.lat, position?.lng, radiusKm, kind, free, serverCount]);
+  // Quando o fim da lista chega perto da tela, busca a próxima página.
+  const sentinel = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !canLoadMore || more.loading || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) void loadMore();
+    }, { rootMargin: '600px 0px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [canLoadMore, more.loading, loadMore, serverCount]);
   // Tema é filtro de tela: a API devolve tudo e aqui fica só o que é dos gostos escolhidos.
   const data = useMemo(
     () =>
       raw
         ? {
             ...raw,
-            events: liveFirst(filterByThemes(raw.events, themes, themesOfEvent), new Date()),
+            events: liveFirst(filterByThemes([...raw.events, ...more.events], themes, themesOfEvent), new Date()),
             places: filterByThemes(raw.places, themes, (p) => themesOfCategory(p.category)),
           }
         : raw,
-    [raw, themes],
+    [raw, more.events, themes],
   );
   const now = useMemo(() => new Date(), [data]);
   const searching = q !== '';
@@ -600,6 +641,11 @@ export function ExploreScreen() {
                     <EventCard key={e.id} event={e} now={now} />
                   ))}
                 </ul>
+                {canLoadMore ? (
+                  <div ref={sentinel} className="explore__more" aria-live="polite">
+                    {more.loading ? <span className="muted">{t('Carregando mais…')}</span> : <Button small variant="secondary" onClick={() => void loadMore()}>{t('Ver mais eventos')}</Button>}
+                  </div>
+                ) : null}
               </>
             )
           ) : nothing ? (
@@ -630,6 +676,11 @@ export function ExploreScreen() {
                       <EventCard key={e.id} event={e} now={now} />
                     ))}
                   </ul>
+                  {canLoadMore ? (
+                    <div ref={sentinel} className="explore__more" aria-live="polite">
+                    {more.loading ? <span className="muted">{t('Carregando mais…')}</span> : <Button small variant="secondary" onClick={() => void loadMore()}>{t('Ver mais eventos')}</Button>}
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
               {show('places') && data.places.length > 0 ? (

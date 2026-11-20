@@ -879,6 +879,8 @@ export interface EventSearchQuery {
   text?: string;
   /** Só eventos destes locais. */
   venueIds?: string[];
+  /** Quantos pular (paginação: "carregar mais"). */
+  offset?: number;
   limit: number;
 }
 
