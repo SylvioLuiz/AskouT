@@ -27,6 +27,7 @@ import { fetchSescEvents } from '../src/infra/event-import/sesc.ts';
 import { fetchSymplaEvents, parseUrlList } from '../src/infra/event-import/sympla-event.ts';
 import { fetchClubeOutsEvents } from '../src/infra/event-import/clube-outs.ts';
 import { manualEvents, validateManual } from '../src/infra/event-import/manual-events.ts';
+import { automatedPublishGate } from '../src/core/automated-publish-gate.ts';
 import { classifyEvent, IMPORT_TAGS } from '../src/infra/event-import/niche.ts';
 import type { ImportedEvent } from '../src/infra/event-import/niche.ts';
 import type { ExternalPlace } from '../src/core/types.ts';
@@ -108,6 +109,7 @@ async function main(): Promise<void> {
     const venueByName = new Map<string, string | undefined>();
     let created = 0;
     let existing = 0;
+    const blocked = new Map<string, number>();
     const noPlace: string[] = [];
     for (const { event, kind } of kept) {
       const nameKey = `${event.area.name}|${event.venueName.toLowerCase()}`;
@@ -161,6 +163,16 @@ async function main(): Promise<void> {
         existing++;
         continue;
       }
+      // Propriedade: só publica em local sem responsável e sem pedido pendente. Conferido a cada evento, na hora de gravar.
+      const gate = await prisma.venue
+        .findUnique({ where: { id: venueId }, select: { ownerId: true, claims: { select: { status: true } } } })
+        .then((v) => automatedPublishGate(v, v ? v.claims.map((c) => c.status) : null))
+        .catch(() => automatedPublishGate(null, null));
+      if (!gate.allowed) {
+        blocked.set(gate.reason, (blocked.get(gate.reason) ?? 0) + 1);
+        console.log(`  bloqueado (${gate.reason}): ${event.title} (${event.venueName})`);
+        continue;
+      }
       const credit = `Fonte: ${event.sourceName} — ${event.link}`;
       await prisma.placeEvent.create({
         data: {
@@ -179,7 +191,7 @@ async function main(): Promise<void> {
       });
       created++;
     }
-    console.log(`[importar] gravados: ${created}; já existiam: ${existing}; sem local no Google: ${noPlace.length}.`);
+    console.log(`[importar] gravados: ${created}; já existiam: ${existing}; sem local no Google: ${noPlace.length}; bloqueados por propriedade: ${[...blocked.values()].reduce((x, y) => x + y, 0)}${blocked.size ? ` (${[...blocked].map(([k, n]) => `${k}: ${n}`).join(', ')})` : ''}.`);
     for (const n of noPlace) console.log(`  sem local: ${n}`);
   } finally {
     await prisma.$disconnect();
