@@ -1481,6 +1481,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Respondeu ao seu story": "Replied to your story",
   "Até {time}": "Until {time}",
   "Até {day} às {time}": "Until {day} at {time}",
+  "Agora": "Now",
   "Respondendo a {name}": "Replying to {name}",
   "Responder": "Reply",
   "Resultados": "Results",

@@ -53,7 +53,7 @@ export function formatWhen(startsAt: string | null, endsAt: string | null, now: 
   const reference = start.getTime() <= now.getTime() ? now : start;
   // Em andamento: só "Até 02:00" (sem "acontecendo", a etiqueta Rolando agora já diz).
   if (start.getTime() <= now.getTime()) {
-    if (!hasEnd) return t('Acontecendo agora');
+    if (!hasEnd) return t('Agora');
     return farEnd(end, reference) ? t('Até {day} às {time}', { day: dayMonth.format(end), time: clock.format(end) }) : t('Até {time}', { time: clock.format(end) });
   }
   const until = hasEnd ? (farEnd(end, reference) ? t(' até {day} às {time}', { day: dayMonth.format(end), time: clock.format(end) }) : t(' até {time}', { time: clock.format(end) })) : '';

@@ -10,7 +10,7 @@ const NOW = at(13, 18, 0);
 
 test('formatWhen: agora, hoje, amanhã, sem horário', () => {
   assert.equal(formatWhen(iso(at(13, 17, 0)), iso(at(13, 21, 30)), NOW), 'Até 21:30');
-  assert.equal(formatWhen(iso(at(13, 17, 0)), null, NOW), 'Acontecendo agora');
+  assert.equal(formatWhen(iso(at(13, 17, 0)), null, NOW), 'Agora');
   assert.equal(formatWhen(iso(at(13, 20, 15)), iso(at(13, 23, 0)), NOW), 'Hoje às 20:15 até 23:00');
   assert.equal(formatWhen(iso(at(14, 9, 0)), null, NOW), 'Amanhã às 09:00');
   assert.equal(formatWhen(iso(at(13, 22, 0)), iso(at(14, 2, 0)), NOW), 'Hoje às 22:00 até 02:00');
