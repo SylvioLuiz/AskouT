@@ -19,8 +19,12 @@ export interface ImportedEvent {
   address: string | null;
   isFree: boolean;
   imageUrl: string | null;
-  /** Página do evento na fonte (crédito e ingresso). */
+  /** Página do evento na fonte (crédito). */
   link: string;
+  /** Nome legível da fonte, para o crédito na descrição. */
+  sourceName: string;
+  /** Região onde procurar o local no Google. */
+  area: { name: string; lat: number; lng: number };
 }
 
 export type NicheVerdict = { keep: true; kind: EventKind } | { keep: false; reason: string };

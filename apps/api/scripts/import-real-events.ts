@@ -1,6 +1,7 @@
 // Importa EVENTOS REAIS de fontes autorizadas para o AskouT, só os que fazem sentido para o app (encontro de pessoas).
 //
-// Fontes: Juicy Santos (https://www.juicysantos.com.br/eventos-na-regiao/), uso autorizado pelo responsável do AskouT.
+// Fontes: Juicy Santos (https://www.juicysantos.com.br/eventos-na-regiao/) e agenda da Prefeitura de Mogi das Cruzes
+// (https://www.mogidascruzes.sp.gov.br/eventos-festas), uso autorizado pelo responsável do AskouT.
 // Cada evento guarda o link da página de origem na descrição, como crédito.
 //
 //   npm run import:events                  SIMULAÇÃO (padrão): busca, filtra e mostra o que entraria e o que ficou de fora. Não grava.
@@ -16,12 +17,12 @@ import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import { GooglePlaceSource } from '../src/infra/google/google-place-source.ts';
 import { fetchJuicyEvents } from '../src/infra/event-import/juicy-santos.ts';
+import { fetchMogiEvents } from '../src/infra/event-import/mogi-prefeitura.ts';
 import { classifyEvent, IMPORT_TAGS } from '../src/infra/event-import/niche.ts';
 import type { ImportedEvent } from '../src/infra/event-import/niche.ts';
 import type { ExternalPlace } from '../src/core/types.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CENTER = { lat: -23.9663, lng: -46.3336 }; // Santos
 const MAX_KM = 40;
 
 function env(name: string): string | undefined {
@@ -40,11 +41,11 @@ function uuidOf(text: string): string {
 const words = (s: string): string[] => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2);
 
 /** O nome do Google tem de lembrar o nome do evento-local (metade das palavras ou mais) e estar na região. */
-function bestPlace(venueName: string, places: readonly ExternalPlace[]): ExternalPlace | undefined {
+function bestPlace(venueName: string, center: { lat: number; lng: number }, places: readonly ExternalPlace[]): ExternalPlace | undefined {
   const want = words(venueName);
   if (want.length === 0) return undefined;
   return places.find((p) => {
-    const km = Math.hypot((p.lat - CENTER.lat) * 111, (p.lng - CENTER.lng) * 102);
+    const km = Math.hypot((p.lat - center.lat) * 111, (p.lng - center.lng) * 102);
     if (km > MAX_KM) return false;
     const got = new Set(words(p.name));
     return want.filter((w) => got.has(w)).length / want.length >= 0.5;
@@ -55,7 +56,11 @@ async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
   const now = new Date();
   console.log(`[importar] ${apply ? 'GRAVANDO' : 'simulação (nada será gravado; use --apply para gravar)'}`);
-  const fetched = await fetchJuicyEvents(now);
+  const mogi = await fetchMogiEvents(now).catch((e: unknown) => {
+    console.log(`[importar] Mogi indisponível: ${e instanceof Error ? e.message : e}`);
+    return [] as ImportedEvent[];
+  });
+  const fetched = [...(await fetchJuicyEvents(now)), ...mogi];
   const kept: { event: ImportedEvent; kind: Extract<ReturnType<typeof classifyEvent>, { keep: true }>['kind'] }[] = [];
   const dropped: { event: ImportedEvent; reason: string }[] = [];
   for (const event of fetched) {
@@ -63,7 +68,7 @@ async function main(): Promise<void> {
     if (verdict.keep) kept.push({ event, kind: verdict.kind });
     else dropped.push({ event, reason: verdict.reason });
   }
-  console.log(`[importar] Juicy Santos: ${fetched.length} evento(s) futuro(s); ${kept.length} no nicho, ${dropped.length} fora.`);
+  console.log(`[importar] Juicy Santos e Prefeitura de Mogi: ${fetched.length} evento(s) futuro(s); ${kept.length} no nicho, ${dropped.length} fora.`);
   for (const d of dropped) console.log(`  fora: ${d.event.title} (${d.reason})`);
   for (const k of kept) console.log(`  entra [${k.kind}]: ${k.event.title} — ${k.event.venueName} — ${k.event.startsAt.toISOString().slice(0, 16)}Z${k.event.isFree ? ' (grátis)' : ''}`);
   if (!apply) return;
@@ -80,10 +85,10 @@ async function main(): Promise<void> {
     let existing = 0;
     const noPlace: string[] = [];
     for (const { event, kind } of kept) {
-      const nameKey = event.venueName.toLowerCase();
+      const nameKey = `${event.area.name}|${event.venueName.toLowerCase()}`;
       if (!venueByName.has(nameKey)) {
-        const found = await google.search(`${event.venueName} ${event.address ?? 'Santos'}`, CENTER, 5);
-        const place = found.available ? bestPlace(event.venueName, found.places) : undefined;
+        const found = await google.search(`${event.venueName} ${event.address ?? event.area.name}`, event.area, 5);
+        const place = found.available ? bestPlace(event.venueName, event.area, found.places) : undefined;
         let venueId: string | undefined;
         if (place) {
           const externalKey = `google:${place.externalId}`;
@@ -121,7 +126,7 @@ async function main(): Promise<void> {
         existing++;
         continue;
       }
-      const credit = `Fonte: Juicy Santos — ${event.link}`;
+      const credit = `Fonte: ${event.sourceName} — ${event.link}`;
       await prisma.placeEvent.create({
         data: {
           id,

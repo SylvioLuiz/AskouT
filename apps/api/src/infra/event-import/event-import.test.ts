@@ -81,3 +81,19 @@ test('busca páginas, ignora o que já passou e para quando só há publicaçõe
   assert.deepEqual(events.map((e) => e.sourceId), ['2', '2']);
   assert.equal(calls.length, 2);
 });
+
+test('agenda da Prefeitura de Mogi: só o que vem, com local; sem ano vira o ano em curso', async () => {
+  const { parseMogiAgenda } = await import('./mogi-prefeitura.ts');
+  const item = (d: string, m: string, t: string, venue: string, time: string) => `<a><div class="row"><div class="data-evento"><h3>${d}</h3><p>${m}</p></div>
+<h4>${t}</h4><p><span class="glyphicon glyphicon-map-marker" aria-hidden="true"></span> ${venue}</p>
+<p><span class="glyphicon glyphicon-time" aria-hidden="true"></span> ${time}</p></div></a>`;
+  const html = item('01', 'Junho', 'Exposi&ccedil;&atilde;o fixa', 'Museu Mogiano', '09:00')
+    + item('29', 'Novembro', 'Roda de Passinhos do Funk com DJ', 'Pra&ccedil;a da Liberdade', '15:00')
+    + item('20', 'Novembro', 'Pagode da 27', '', '15:00');
+  const events = parseMogiAgenda(html, new Date('2026-11-20T12:00:00Z'));
+  assert.equal(events.length, 1);
+  assert.equal(events[0]!.title, 'Roda de Passinhos do Funk com DJ');
+  assert.equal(events[0]!.venueName, 'Praça da Liberdade');
+  assert.equal(events[0]!.startsAt.toISOString(), '2026-11-29T18:00:00.000Z');
+  assert.equal(events[0]!.sourceId, '2026-11-29-roda-de-passinhos-do-funk-com-dj');
+});

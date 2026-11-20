@@ -82,6 +82,8 @@ export function parseJuicyEvent(row: JuicyRow): ImportedEvent | undefined {
     isFree,
     imageUrl: image && /^https:\/\//.test(image) ? image : null,
     link: row.link,
+    sourceName: 'Juicy Santos',
+    area: { name: 'Santos', lat: -23.9663, lng: -46.3336 },
   };
 }
 
