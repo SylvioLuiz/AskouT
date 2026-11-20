@@ -7,6 +7,8 @@
 //   npm run import:events                  SIMULAÇÃO (padrão): busca, filtra e mostra o que entraria e o que ficou de fora. Não grava.
 //   npm run import:events -- --apply       grava no banco de DATABASE_URL (confira o banco de destino antes!)
 //
+// No servidor (Dockerfile) roda com --apply a cada deploy, em segundo plano; IMPORT_EVENTS=off desliga.
+//
 // Para gravar é preciso DATABASE_URL e GOOGLE_PLACES_API_KEY (o local de cada evento é achado no Google, na mesma forma que o
 // app abre um "lugar do Google": externalKey google:ID). Evento cujo local o Google não acha fica de fora e aparece no relatório.
 // Rodar de novo não duplica (o id do evento vem da fonte). Eventos de teste (`isSample`) NÃO são tocados por este script.
@@ -54,6 +56,7 @@ function bestPlace(venueName: string, center: { lat: number; lng: number }, plac
 
 async function main(): Promise<void> {
   const apply = process.argv.includes('--apply');
+  if (apply && env('IMPORT_EVENTS') === 'off') return console.log('[importar] IMPORT_EVENTS=off: importação desligada.');
   const now = new Date();
   console.log(`[importar] ${apply ? 'GRAVANDO' : 'simulação (nada será gravado; use --apply para gravar)'}`);
   const mogi = await fetchMogiEvents(now).catch((e: unknown) => {
