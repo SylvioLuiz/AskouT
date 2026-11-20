@@ -10,7 +10,10 @@ import type { EventKind, PlaceEventRecord, VenueHours, VenueRecord } from './typ
 import { EVENT_KINDS } from './types.ts';
 
 export const EXPLORE_DEFAULT_RADIUS_KM = 10;
-export const EXPLORE_MAX_RADIUS_KM = 100;
+export const EXPLORE_MAX_RADIUS_KM = 200;
+/** Busca por nome ou #tag não limita por distância: procura em qualquer lugar (o raio vale só para o que aparece ao abrir). */
+export const EXPLORE_SEARCH_RADIUS_M = 1_000_000;
+export const EXPLORE_MAX_OFFSET = 2000;
 export const EXPLORE_MAX_SPAN_DAYS = 62;
 export const EXPLORE_DEFAULT_SPAN_DAYS = 30;
 export const EXPLORE_QUERY_MAX = 80;
@@ -32,6 +35,8 @@ export interface ExploreInput {
   lat?: unknown;
   lng?: unknown;
   radiusKm?: unknown;
+  /** Quantos eventos pular, para carregar mais ao rolar. */
+  offset?: unknown;
   from?: unknown;
   to?: unknown;
   kind?: unknown;
@@ -104,6 +109,9 @@ export interface ExploreView {
   from: string;
   to: string;
   events: ExploreEventItem[];
+  /** Há mais eventos depois destes (pedir de novo com `offset`). */
+  hasMore: boolean;
+  offset: number;
   places: ExplorePlaceItem[];
   people: Awaited<ReturnType<ProfileService['search']>>;
   tags: { tag: string; count: number }[];
@@ -221,6 +229,8 @@ export class ExploreService {
     const radiusKm = parseNumber(input.radiusKm, 'radiusKm') ?? EXPLORE_DEFAULT_RADIUS_KM;
     if (radiusKm < 1 || radiusKm > EXPLORE_MAX_RADIUS_KM) throw validationError('Raio inválido', { radiusKm: `Entre 1 e ${EXPLORE_MAX_RADIUS_KM} km` });
     const radiusM = Math.round(radiusKm * 1000);
+    const offset = parseNumber(input.offset, 'offset') ?? 0;
+    if (!Number.isInteger(offset) || offset < 0 || offset > EXPLORE_MAX_OFFSET) throw validationError('Posição da lista inválida', { offset: `Entre 0 e ${EXPLORE_MAX_OFFSET}` });
 
     const now = clock.now();
     const hot = parseBool(input.hot);
@@ -240,7 +250,11 @@ export class ExploreService {
     const isTag = rawQ.startsWith('#');
     const tag = isTag ? normalizeTag(rawQ) : '';
     const text = isTag ? '' : rawQ;
-    const base = { center, radiusM: center ? radiusM : undefined, from, to, kind, freeOnly, limit: EVENT_LIMIT };
+    // Sem texto, vale o raio escolhido (padrão 10 km). Busca por nome ou #tag procura em qualquer distância e vai trazendo mais conforme rola.
+    const searching = rawQ !== '';
+    const searchRadiusM = searching ? EXPLORE_SEARCH_RADIUS_M : radiusM;
+    const base = { center, radiusM: center && !searching ? radiusM : undefined, from, to, kind, freeOnly, limit: EVENT_LIMIT + 1, offset };
+    const slicePage = <T,>(rows: T[]): { rows: T[]; hasMore: boolean } => ({ rows: rows.slice(0, EVENT_LIMIT), hasMore: rows.length > EVENT_LIMIT });
 
     const toItems = async (rows: { event: PlaceEventRecord; venue: VenueRecord; distanceM: number | null }[]): Promise<ExploreEventItem[]> => {
       const items = rows.map((r) => toEventItem(r.event, r.venue, r.distanceM));
@@ -265,44 +279,53 @@ export class ExploreService {
       from: from.toISOString(),
       to: to.toISOString(),
       events: [],
+      hasMore: false,
+      offset,
       places: [],
       people: [],
       tags: [],
       placesAvailable: true,
     };
 
+    // Da segunda página em diante (offset > 0) vêm só mais eventos: lugares, pessoas e hashtags já estão na primeira.
+    const first = offset === 0;
+
     if (rawQ === '') {
-      const [found, people] = await Promise.all([places.searchEvents(base), hot ? Promise.resolve([]) : this.peopleEvents(actorId, { center, radiusM, from, to, kind, freeOnly })]);
-      return { ...empty, events: hot ? await toItems(found) : mixByStart(await toItems(found), people) };
+      const [found, people] = await Promise.all([places.searchEvents(base), hot || !first ? Promise.resolve([]) : this.peopleEvents(actorId, { center, radiusM, from, to, kind, freeOnly })]);
+      const { rows, hasMore } = slicePage(found);
+      return { ...empty, events: hot ? await toItems(rows) : mixByStart(await toItems(rows), people), hasMore: !hot && hasMore };
     }
 
     if (isTag) {
       const [found, tags] = await Promise.all([
         tag ? places.searchEvents({ ...base, tagPrefix: tag }) : Promise.resolve([]),
-        places.listTags(tag, from, to, TAG_LIMIT),
+        first ? places.listTags(tag, from, to, TAG_LIMIT) : Promise.resolve([]),
       ]);
-      return { ...empty, events: await toItems(found), tags };
+      const { rows, hasMore } = slicePage(found);
+      return { ...empty, events: await toItems(rows), hasMore, tags };
     }
 
-    // Texto livre: eventos, hashtags, lugares e pessoas.
+    // Texto livre: eventos, hashtags, lugares e pessoas, em qualquer distância.
     const foldedTag = normalizeTag(text);
     const [found, tags, venues, people] = await Promise.all([
       places.searchEvents({ ...base, text }),
-      foldedTag ? places.listTags(foldedTag, from, to, TAG_LIMIT) : Promise.resolve([]),
-      places.searchVenues(text, center, radiusM, VENUE_LIMIT),
-      text.length >= 2 ? this.profiles.search(actorId, text, PEOPLE_LIMIT).catch(() => []) : Promise.resolve([]),
+      first && foldedTag ? places.listTags(foldedTag, from, to, TAG_LIMIT) : Promise.resolve([]),
+      first ? places.searchVenues(text, center, searchRadiusM, VENUE_LIMIT) : Promise.resolve([]),
+      first && text.length >= 2 ? this.profiles.search(actorId, text, PEOPLE_LIMIT).catch(() => []) : Promise.resolve([]),
     ]);
+    const page = slicePage(found);
+    if (!first) return { ...empty, events: await toItems(page.rows), hasMore: page.hasMore };
 
     const { placeItems, placesAvailable } = await this.collectPlaces(actorId, venues, {
       center,
-      radiusM,
+      radiusM: searchRadiusM,
       now,
       needle: !kind && !freeOnly && text.length >= 2 ? fold(text) : undefined,
       limit: VENUE_LIMIT,
     });
 
-    const fromPeople = hot ? [] : await this.peopleEvents(actorId, { center, radiusM, from, to, kind, freeOnly, needle: fold(text) });
-    return { ...empty, events: hot ? await toItems(found) : mixByStart(await toItems(found), fromPeople), places: placeItems, people, tags, placesAvailable };
+    const fromPeople = hot ? [] : await this.peopleEvents(actorId, { center, radiusM: searchRadiusM, from, to, kind, freeOnly, needle: fold(text) });
+    return { ...empty, events: hot ? await toItems(page.rows) : mixByStart(await toItems(page.rows), fromPeople), hasMore: !hot && page.hasMore, places: placeItems, people, tags, placesAvailable };
   }
 
   /**

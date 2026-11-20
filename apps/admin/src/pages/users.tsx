@@ -84,7 +84,7 @@ export function UsersPage() {
                   <tr key={u.id}>
                     <td>
                       <strong>{u.displayName}</strong> <span className="handle">@{u.username}</span>
-                      {u.role === 'ADMIN' ? <> <Badge tone="info">Admin</Badge></> : null}
+                      {u.role === 'ADMIN' ? <> <Badge tone="admin">Admin</Badge></> : null}
                     </td>
                     <td>{u.email}</td>
                     <td>

@@ -3319,4 +3319,6 @@ export const ES: Readonly<Record<string, string>> = {
   "Ligada: seus amigos veem seus horários. Toque para mudar nas configurações.": "Activada: tus amigos ven tus horarios. Toca para cambiarlo en ajustes.",
   "Desligada: só você vê seus horários. Toque para mudar nas configurações.": "Desactivada: solo tú ves tus horarios. Toca para cambiarlo en ajustes.",
   "Seus amigos veem quando você está disponível, parcial ou indisponível, e podem achar horários em comum com você. Compromissos das agendas ligadas contam só como ocupado. Dá para desligar quando quiser.": "Tus amigos ven cuándo estás disponible, parcialmente disponible o no disponible, y pueden encontrar horarios en común contigo. Los eventos de calendarios vinculados solo cuentan como ocupado. Puedes desactivarlo cuando quieras.",
+  "Carregando mais…": "Cargando más…",
+  "Ver mais eventos": "Ver más eventos",
 };

@@ -1814,7 +1814,7 @@ export class InMemoryPlaceRepository implements PlaceRepository {
       const m = matchEvent(event, venue, query);
       if (m) out.push(m);
     }
-    return out.sort(compareMatches).slice(0, query.limit);
+    return out.sort(compareMatches).slice(query.offset ?? 0, (query.offset ?? 0) + query.limit);
   }
 
   async findEvent(id: string) {

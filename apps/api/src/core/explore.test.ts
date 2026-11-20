@@ -112,7 +112,7 @@ test('entradas inválidas são recusadas', async () => {
   const { ana } = await w.signUpMany('ana');
   for (const bad of [
     { q: 'x'.repeat(81) }, { q: 'a\u0000b' }, { lat: 1 }, { lat: 91, lng: 0 }, { lat: 'abc', lng: 1 },
-    { radiusKm: 0 }, { radiusKm: 101 }, { kind: 'FESTA' }, { from: 'ontem' },
+    { radiusKm: 0 }, { radiusKm: 201 }, { offset: -1 }, { offset: 'x' }, { offset: 2.5 }, { kind: 'FESTA' }, { from: 'ontem' },
     { from: '2026-10-14T00:00:00Z', to: '2026-10-13T00:00:00Z' }, { from: '2026-10-01T00:00:00Z', to: '2027-01-01T00:00:00Z' },
   ]) {
     await rejectsWith(w.core.explore.search(ana!, bad), 'VALIDATION');
@@ -184,4 +184,49 @@ test('eventos públicos criados por pessoas entram na lista, misturados pela hor
   assert.deepEqual((await w.core.explore.search(ana!, { lat: HERE.lat, lng: HERE.lng, kind: 'NIGHT' })).events.map((e) => e.id), [pubId]);
   assert.ok(!(await w.core.explore.search(ana!, { lat: HERE.lat, lng: HERE.lng, free: true })).events.some((e) => e.author));
   assert.ok((await w.core.explore.search(ana!, { q: 'aniversario', lat: HERE.lat, lng: HERE.lng })).events.some((e) => e.id === pubId));
+});
+
+test('raio de até 200 km; busca por nome ou #tag ignora o raio e vai achar em qualquer distância', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  await seed(w);
+  // Bar longe (~150 km de quem consulta), como o Kill Beer em Mogi visto de outra cidade.
+  await w.places.createVenue({ id: 'v-mogi', name: 'Kill Beer Lab', address: null, category: 'bar', lat: HERE.lat - 1.35, lng: HERE.lng, isSample: false });
+  await w.places.createEvent({ id: 'e-mogi', venueId: 'v-mogi', title: 'Especial Subverso', description: null, kind: 'NIGHT', isFree: false, imageUrl: null, tags: ['rock'], startsAt: new Date(w.clock.now().getTime() + 5 * H), endsAt: new Date(w.clock.now().getTime() + 9 * H), isSample: false });
+  const here = { lat: HERE.lat, lng: HERE.lng };
+  const open = await w.core.explore.search(ana!, here);
+  assert.ok(!open.events.some((e) => e.id === 'e-mogi'), 'ao abrir vale o raio padrão de 10 km');
+  assert.ok(!(await w.core.explore.search(ana!, { ...here, radiusKm: 100 })).events.some((e) => e.id === 'e-mogi'));
+  assert.ok((await w.core.explore.search(ana!, { ...here, radiusKm: 200 })).events.some((e) => e.id === 'e-mogi'), '200 km é aceito e alcança');
+  const byName = await w.core.explore.search(ana!, { ...here, q: 'kill beer' });
+  assert.deepEqual(byName.events.map((e) => e.id), ['e-mogi'], 'por nome acha mesmo longe');
+  assert.deepEqual(byName.places.map((p) => p.name), ['Kill Beer Lab'], 'e o lugar também');
+  assert.ok(byName.events[0]!.distanceM !== null, 'mantém a distância para mostrar');
+  const byTag = await w.core.explore.search(ana!, { ...here, q: '#rock' });
+  assert.deepEqual(byTag.events.map((e) => e.id).sort(), ['e-mogi', 'e3']);
+});
+
+test('lista de eventos pagina: hasMore e offset trazem o resto sem repetir; da segunda página só vêm eventos', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  await w.places.createVenue({ id: 'v1', name: 'Bar Muitos', address: null, category: 'bar', lat: HERE.lat, lng: HERE.lng, isSample: false });
+  for (let i = 0; i < 95; i++) {
+    await w.places.createEvent({ id: `m${String(i).padStart(3, '0')}`, venueId: 'v1', title: `Festa ${i}`, description: null, kind: 'NIGHT', isFree: false, imageUrl: null, tags: [], startsAt: new Date(w.clock.now().getTime() + (i + 1) * H), endsAt: new Date(w.clock.now().getTime() + (i + 3) * H), isSample: false });
+  }
+  const q = { q: 'festa' };
+  const p1 = await w.core.explore.search(ana!, q);
+  assert.equal(p1.events.length, 40);
+  assert.equal(p1.hasMore, true);
+  assert.equal(p1.offset, 0);
+  assert.deepEqual(p1.places.map((p) => p.name), ['Bar Muitos'].filter(() => false), 'o nome do lugar não casa com "festa"');
+  const p2 = await w.core.explore.search(ana!, { ...q, offset: 40 });
+  assert.equal(p2.events.length, 40);
+  assert.equal(p2.hasMore, true);
+  assert.deepEqual([p2.places.length, p2.people.length, p2.tags.length], [0, 0, 0]);
+  const p3 = await w.core.explore.search(ana!, { ...q, offset: 80 });
+  assert.equal(p3.events.length, 15);
+  assert.equal(p3.hasMore, false);
+  const ids = [...p1.events, ...p2.events, ...p3.events].map((e) => e.id);
+  assert.equal(new Set(ids).size, 95, 'nenhum repetido');
+  assert.deepEqual(ids, [...ids].sort(), 'em ordem de hora');
 });

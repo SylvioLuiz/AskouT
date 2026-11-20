@@ -49,6 +49,7 @@ test('login do painel com a Apple: só admin entra e nunca cria conta', async ()
   assert.equal((await asSession(w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-adm', 'oculto@privaterelay.appleid.com') }))).user.role, 'ADMIN');
 
   await rejectsWith(w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-ana', 'ana@exemplo.com') }), 'UNAUTHORIZED');
+  assert.equal(await w.identities.find('APPLE', 'a-ana'), undefined, 'conta comum não ganha vínculo com a Apple pelo painel');
   await rejectsWith(w.core.admin.socialLogin({ provider: 'APPLE', idToken: 'lixo' }), 'UNAUTHORIZED');
 
   await rejectsWith(w.core.admin.socialLogin({ provider: 'APPLE', idToken: tok('a-nova', 'nova@exemplo.com') }), 'UNAUTHORIZED');
