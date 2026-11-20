@@ -291,6 +291,8 @@ model UserSettings {
   userId       String @id @db.Uuid
   timeZone     String @default("America/Sao_Paulo")
   notifyPrefs  Json   @default("{}")
+  /// A pessoa escolheu mostrar os horários da agenda para os amigos (e entrar nos horários em comum). Começa desligado.
+  shareAvailability Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

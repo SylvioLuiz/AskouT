@@ -197,7 +197,27 @@ export class AvailabilityService {
     return rows.map(toView);
   }
 
-  /** A agenda de uma pessoa só é visível para os amigos dela (seguimento mútuo, sem bloqueio). */
+  /** Você mostra os seus horários para os amigos? */
+  async sharing(actorId: string): Promise<{ sharing: boolean }> {
+    return { sharing: await this.deps.availability.isSharing(actorId) };
+  }
+
+  /** Liga ou desliga mostrar os seus horários para os amigos (e entrar nos horários em comum deles). */
+  async setSharing(actorId: string, on: unknown): Promise<{ sharing: boolean }> {
+    if (typeof on !== 'boolean') throw validationError('Valor inválido', { sharing: 'Use true ou false' });
+    await this.deps.availability.setSharing(actorId, on);
+    return { sharing: on };
+  }
+
+  /** Amigos que mostram os horários: só eles aparecem para ver a agenda e achar horários em comum. */
+  async sharingFriends(actorId: string): Promise<{ friends: PublicProfile[] }> {
+    const friends = await this.deps.follows.listFriendIds(actorId);
+    const sharing = await this.deps.availability.sharingAmong(friends);
+    const profiles = await this.deps.users.findProfilesByIds(sharing);
+    return { friends: profiles.map(toPublicProfile).sort((a, b) => a.username.localeCompare(b.username)) };
+  }
+
+  /** A agenda de uma pessoa só é visível para os amigos dela (seguimento mútuo, sem bloqueio) e se ela escolheu mostrar. */
   async listFriend(actorId: string, friendId: string, from: unknown, to: unknown): Promise<FriendAvailability> {
     const range = parseRange(from, to);
     await this.requireFriends(actorId, [friendId]);
@@ -281,6 +301,9 @@ export class AvailabilityService {
   private async requireFriends(actorId: string, otherIds: string[]): Promise<void> {
     const friends = new Set(await this.deps.follows.listFriendIds(actorId));
     if (!otherIds.every((id) => friends.has(id))) throw forbidden('Só amigos veem a agenda e comparam horários');
+    // A agenda é privada até a pessoa escolher mostrar: sem isso, nem amigos veem nem comparam.
+    const sharing = new Set(await this.deps.availability.sharingAmong(otherIds));
+    if (!otherIds.every((id) => sharing.has(id))) throw forbidden('Essa pessoa não mostra os horários da agenda');
   }
 
   private async loadParticipants(actorId: string, friendIds: string[], from: Date, to: Date) {

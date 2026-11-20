@@ -405,16 +405,17 @@ export function EventsMapScreen() {
         </button>
         <MapSearch />
         <ExploreViews current="map" floating />
-        <div className="evmap__seg" role="group" aria-label={t('O que mostrar no carrossel')}>
-          <button type="button" aria-pressed={mode === 'places'} className={mode === 'places' ? 'is-on' : ''} onClick={() => setMode('places')}>
-            {t('Locais')}
-          </button>
-          {noLiveEvents ? null : (
-            <button type="button" aria-pressed={mode === 'events'} className={mode === 'events' ? 'is-on' : ''} onClick={() => setMode('events')}>
-              Acontecendo agora{eventsResult.data ? ` ${events.length}` : ''}
+        {/* Só com eventos acontecendo agora há o que escolher; sozinho, "Locais" não fazia nada. */}
+        {eventsResult.data && events.length > 0 ? (
+          <div className="evmap__seg" role="group" aria-label={t('O que mostrar no carrossel')}>
+            <button type="button" aria-pressed={mode === 'places'} className={mode === 'places' ? 'is-on' : ''} onClick={() => setMode('places')}>
+              {t('Locais')}
             </button>
-          )}
-        </div>
+            <button type="button" aria-pressed={mode === 'events'} className={mode === 'events' ? 'is-on' : ''} onClick={() => setMode('events')}>
+              {t('Acontecendo agora {n}', { n: events.length })}
+            </button>
+          </div>
+        ) : null}
         {meHint && !moved && !searching ? (
           <p key={meHint} className="evmap__hint" role="status">
             <LocationIcon />

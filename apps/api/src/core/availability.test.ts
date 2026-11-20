@@ -5,9 +5,12 @@ import { makeWorld } from './testing/world.ts';
 
 type World = ReturnType<typeof makeWorld>;
 
+/** Amigas que mostram os horários uma para a outra (a agenda é privada até ligar). */
 async function befriend(w: World, a: string, b: string) {
   await w.core.follows.follow(a, b);
   await w.core.follows.follow(b, a);
+  await w.core.availability.setSharing(a, true);
+  await w.core.availability.setSharing(b, true);
 }
 
 // O relógio de teste começa em 2026-10-13T12:00Z (09:00 em São Paulo).
@@ -97,6 +100,8 @@ test('listFriend: só amigos veem; seguir sozinho, bloqueio e estranho não bast
   await w.core.follows.follow(ana!, bia!);
   await rejectsWith(w.core.availability.listFriend(ana!, bia!, ...range), 'FORBIDDEN'); // só um lado segue
   await w.core.follows.follow(bia!, ana!);
+  await rejectsWith(w.core.availability.listFriend(ana!, bia!, ...range), 'FORBIDDEN'); // amigas, mas bia não mostra
+  await w.core.availability.setSharing(bia!, true);
   const seen = await w.core.availability.listFriend(ana!, bia!, ...range);
   assert.equal(seen.profile.username, 'bia');
   assert.equal(seen.slots.length, 1);
@@ -246,4 +251,28 @@ test('bestDates: validação e só amigos', async () => {
   await rejectsWith(w.core.availability.bestDates(ana!, { ...ok, timeZone: 'Marte/Olimpo' }), 'VALIDATION');
   const fine = await w.core.availability.bestDates(ana!, ok);
   assert.ok(fine.length > 0 && fine.length <= 5);
+});
+
+test('agenda privada até ligar: amigo só vê e compara horários de quem escolheu mostrar', async () => {
+  const w = makeWorld();
+  const { ana, bia, caio } = await w.signUpMany('ana', 'bia', 'caio');
+  for (const [a, b] of [[ana!, bia!], [ana!, caio!]] as const) {
+    await w.core.follows.follow(a, b);
+    await w.core.follows.follow(b, a);
+  }
+  const range = [`${D}T00:00:00-03:00`, '2026-10-21T00:00:00-03:00'] as const;
+  await w.core.availability.addSlot(bia!, slot('19:00', '23:00'));
+  assert.deepEqual(await w.core.availability.sharing(bia!), { sharing: false }, 'começa desligado');
+  await rejectsWith(w.core.availability.listFriend(ana!, bia!, ...range), 'FORBIDDEN');
+  await rejectsWith(w.core.availability.bestDates(ana!, { friendIds: [bia!], fromDate: D, toDate: D }), 'FORBIDDEN');
+  assert.deepEqual((await w.core.availability.sharingFriends(ana!)).friends, []);
+
+  assert.deepEqual(await w.core.availability.setSharing(bia!, true), { sharing: true });
+  assert.equal((await w.core.availability.listFriend(ana!, bia!, ...range)).slots.length, 1);
+  assert.deepEqual((await w.core.availability.sharingFriends(ana!)).friends.map((p) => p.username), ['bia']);
+  await rejectsWith(w.core.availability.listFriend(ana!, caio!, ...range), 'FORBIDDEN', );
+  await rejectsWith(w.core.availability.setSharing(bia!, 'sim'), 'VALIDATION');
+
+  await w.core.availability.setSharing(bia!, false);
+  await rejectsWith(w.core.availability.listFriend(ana!, bia!, ...range), 'FORBIDDEN');
 });

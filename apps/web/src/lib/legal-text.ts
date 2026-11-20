@@ -57,7 +57,7 @@ export function buildPrivacy(email: string): LegalDoc {
       {
         title: '4. Quem vê o quê',
         text: [
-          'Seu perfil, posts e eventos aparecem para as pessoas conforme as suas configurações. Com o perfil privado, só quem você aprova vê seus eventos postados, sua agenda e suas conexões. Mensagens só chegam a quem participa da conversa.',
+          'Seu perfil, posts e eventos aparecem para as pessoas conforme as suas configurações. Com o perfil privado, só quem você aprova vê seus eventos postados, sua agenda e suas conexões. Os horários que você marca na agenda só aparecem para seus amigos se você ligar "Mostrar meus horários para amigos"; aí eles veem quando você está disponível e os compromissos das agendas ligadas, só como ocupado. Mensagens só chegam a quem participa da conversa.',
           'Nós não vendemos seus dados pessoais e não usamos o que você faz no AskouT para anúncios de terceiros.',
         ],
       },

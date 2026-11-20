@@ -348,6 +348,11 @@ export interface AvailabilityRepository {
   listForUsers(userIds: string[], from: Date, to: Date): Promise<AvailabilitySlotRecord[]>;
   /** Quantidade de horários do usuário que ainda não terminaram em `since`. */
   countActive(userId: string, since: Date): Promise<number>;
+  /** A pessoa mostra os horários para os amigos? (começa desligado) */
+  isSharing(userId: string): Promise<boolean>;
+  setSharing(userId: string, on: boolean): Promise<void>;
+  /** Destas pessoas, as que mostram os horários para os amigos. */
+  sharingAmong(userIds: string[]): Promise<string[]>;
 }
 
 export interface FlashRepository {
