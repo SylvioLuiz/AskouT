@@ -1197,6 +1197,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Não foi possível estimar o alcance agora. Você ainda pode comprar.": "Couldn't estimate the reach right now. You can still buy.",
   "Não foi possível gravar o áudio. Tente de novo.": "Couldn't record the audio. Try again.",
   "Não foi possível ler essa imagem. Tente uma foto JPEG ou PNG.": "Couldn't read that image. Try a JPEG or PNG photo.",
+  "Esse formato de foto (HEIC) não é aceito aqui. Escolha outra foto ou mude a câmera para \"Mais compatível\".": "This photo format (HEIC) isn't supported here. Pick another photo or set your camera to \"Most Compatible\".",
   "Não foi possível ler este vídeo. Tente outro arquivo.": "Couldn't read this video. Try another file.",
   "Não foi possível ler o arquivo.": "Couldn't read the file.",
   "Não foi possível pegar a sua localização. Os eventos aparecem sem distância.": "Couldn't get your location. Events appear without distance.",
