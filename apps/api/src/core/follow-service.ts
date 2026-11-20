@@ -1,6 +1,8 @@
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import { evaluateFriendship } from './friendship.ts';
 import type { CoreDeps } from './ports.ts';
+import { PEOPLE_MAX_ATTENDEES_PER_EVENT, PEOPLE_MAX_EVENTS, PEOPLE_MAX_FOLLOWERS, PEOPLE_MAX_FRIENDS, PEOPLE_MAX_ITEMS, scorePerson } from './people-suggestions.ts';
+import type { PeopleReason, PeopleSignals } from './people-suggestions.ts';
 import type { Direction, FollowStatus, Page, Profile, PublicProfile } from './types.ts';
 import { MAX_PAGE_LIMIT, normalizePage, toPublicProfile } from './types.ts';
 
@@ -20,6 +22,9 @@ export interface FollowResult {
   status: FollowStatus;
   isFriend: boolean;
 }
+
+/** Sugestão de pessoa: o perfil, os sinais que a trouxeram e o motivo principal (o app mostra um). */
+export type SuggestedPerson = PublicProfile & PeopleSignals & { reason: PeopleReason };
 
 export interface ConnectionsPage {
   items: PublicProfile[];
@@ -164,26 +169,61 @@ export class FollowService {
   }
 
   /**
-   * "Pessoas que você talvez conheça": amigos dos seus amigos, quem tem mais amigos em comum primeiro.
+   * "Pessoas que você talvez conheça": várias fontes num placar só (ver people-suggestions.ts): amigos em comum, eventos
+   * de local em que as duas pessoas confirmaram presença, quem já segue você e gostos de rolê em comum.
    * Fora: você, seus amigos, quem você já segue (ou pediu para seguir) e quem tem bloqueio com você.
    */
-  async suggestedPeople(actorId: string): Promise<{ items: (PublicProfile & { mutualCount: number })[]; followingCount: number }> {
-    const { follows, blocks, users } = this.deps;
+  async suggestedPeople(actorId: string): Promise<{ items: SuggestedPerson[]; followingCount: number }> {
+    const { follows, blocks, users, eventRoom } = this.deps;
     const friends = await follows.listFriendIds(actorId);
     const [followingCount, related] = await Promise.all([follows.count(actorId, 'following', 'ACCEPTED'), blocks.listRelatedIds(actorId)]);
     const skip = new Set<string>([actorId, ...friends, ...related, ...(await this.followedIds(actorId))]);
-    const mutual = new Map<string, number>();
-    for (const friendId of friends.slice(0, 100)) {
+    const signals = new Map<string, PeopleSignals>();
+    const signalOf = (id: string): PeopleSignals => {
+      let s = signals.get(id);
+      if (!s) {
+        s = { mutualCount: 0, sharedEvents: 0, followsYou: false, sharedTastes: 0 };
+        signals.set(id, s);
+      }
+      return s;
+    };
+
+    // Amigos em comum
+    for (const friendId of friends.slice(0, PEOPLE_MAX_FRIENDS)) {
       for (const candidate of await follows.listFriendIds(friendId)) {
-        if (!skip.has(candidate)) mutual.set(candidate, (mutual.get(candidate) ?? 0) + 1);
+        if (!skip.has(candidate)) signalOf(candidate).mutualCount += 1;
       }
     }
-    const top = [...mutual.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, 20);
-    const profiles = await users.findProfilesByIds(top.map(([id]) => id));
+    // Quem já segue você e você ainda não segue
+    for (const row of await follows.list(actorId, 'followers', 'ACCEPTED', { limit: Math.min(PEOPLE_MAX_FOLLOWERS, MAX_PAGE_LIMIT), offset: 0 })) {
+      if (!skip.has(row.followerId)) signalOf(row.followerId).followsYou = true;
+    }
+    // Eventos de local em que as duas pessoas confirmaram presença (eventos de pessoas ficam de fora: podem ser privados)
+    const going = (await eventRoom.listGoingByUser(actorId, PEOPLE_MAX_EVENTS)).filter((g) => g.ref.source === 'PLACE');
+    for (const { ref } of going) {
+      const attendees = (await eventRoom.listGoing(ref)).slice(0, PEOPLE_MAX_ATTENDEES_PER_EVENT);
+      for (const { userId } of attendees) {
+        if (!skip.has(userId)) signalOf(userId).sharedEvents += 1;
+      }
+    }
+    // Gostos de rolê em comum: só somam para quem já é candidato
+    const mine = new Set((await users.findById(actorId))?.tastes ?? []);
+    if (mine.size > 0) {
+      for (const [id, s] of signals) {
+        const theirs = (await users.findById(id))?.tastes ?? [];
+        s.sharedTastes = theirs.filter((t) => mine.has(t)).length;
+      }
+    }
+
+    const ranked = [...signals.entries()]
+      .map(([id, s]) => ({ id, s, ...scorePerson(s) }))
+      .sort((a, b) => b.score - a.score || b.s.mutualCount - a.s.mutualCount || (a.id < b.id ? -1 : 1))
+      .slice(0, PEOPLE_MAX_ITEMS);
+    const profiles = await users.findProfilesByIds(ranked.map((r) => r.id));
     const byId = new Map(profiles.map((p) => [p.userId, p]));
-    const items = top.flatMap(([id, count]) => {
-      const p = byId.get(id);
-      return p ? [{ ...toPublicProfile(p), mutualCount: count }] : [];
+    const items = ranked.flatMap((r): SuggestedPerson[] => {
+      const p = byId.get(r.id);
+      return p ? [{ ...toPublicProfile(p), mutualCount: r.s.mutualCount, sharedEvents: r.s.sharedEvents, followsYou: r.s.followsYou, sharedTastes: r.s.sharedTastes, reason: r.reason }] : [];
     });
     return { items, followingCount };
   }
