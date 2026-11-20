@@ -36,6 +36,7 @@ export function PosterEvent({
   count,
   tags,
   className,
+  hideGoing = false,
 }: {
   eventId: string;
   title: string;
@@ -49,6 +50,8 @@ export function PosterEvent({
   count?: number;
   tags?: ReactNode;
   className?: string;
+  /** Quem criou o evento já participa dele: sem o botão "Eu vou". */
+  hideGoing?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const [going, setGoing] = useState(false);
@@ -104,7 +107,7 @@ export function PosterEvent({
         {problem ? <p className="poster__problem" role="alert">{problem}</p> : null}
         <div className="poster__row">
           {label ? <span className="poster__glass">{label}</span> : <span />}
-          {over ? null : (
+          {over || hideGoing ? null : (
             <button type="button" className="poster__cta" onClick={() => void toggle()} aria-pressed={going} disabled={busy}>
               {going ? t('Confirmado') : t('Eu vou')}
             </button>

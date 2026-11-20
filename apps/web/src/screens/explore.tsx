@@ -131,6 +131,7 @@ function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
 
 /** Evento em formato de cartaz (Home): foto inteira, data em destaque e "Eu vou". */
 function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
+  const me = useUser();
   const dwellRef = useDwell<HTMLLIElement>('EVENT', event.id, 'FEED');
   // O cartaz patrocinado aparece na Home ("Rolês em destaque").
   useSponsoredView<HTMLLIElement>(event.sponsored === true, 'HOME', { eventId: event.id }, dwellRef);
@@ -151,6 +152,7 @@ function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
           </span>
         }
         count={event.goingCount}
+        hideGoing={event.author?.userId === me.id}
         tags={
           <>
             {isLiveNow(event, now) ? <LiveTag /> : null}
