@@ -1,7 +1,6 @@
 import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { ExploreViews } from '../components/explore-views.tsx';
 import { ExploreSearch } from '../components/explore-search.tsx';
-import { RollingNowStrip } from '../components/venue-story.tsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
@@ -528,7 +527,6 @@ export function ExploreScreen() {
         ) : null}
       </div>
       <ExploreViews current="list" />
-      {!q ? <RollingNowStrip position={position} waiting={waiting} /> : null}
 
       <div className="filters" role="group" aria-label={t('Filtros')}>
         {allThemes.map((theme) => (
