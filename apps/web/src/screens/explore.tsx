@@ -10,7 +10,8 @@ import { ClockIcon, EventKindIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
 import { Button, EmptyState, ErrorState, Loading, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
-import { useUser } from '../auth.tsx';
+import { useIsVisitor, useUser } from '../auth.tsx';
+import { useVisitorCity } from '../components/visitor.tsx';
 import { safeStorage } from '../lib/hints.ts';
 import { addRecent, buildSuggestions, readRecent, removeRecent, saveRecent } from '../lib/recent-searches.ts';
 import { filterByThemes, themeFilter, themesOfCategory, themesOfEvent, userThemes } from '../lib/themes.ts';
@@ -58,14 +59,25 @@ import type { Position } from '../lib/position.ts';
 
 type LocationState = { status: 'asking' | 'denied' | 'unavailable'; position?: undefined } | { status: 'ok'; position: Position };
 
-/** A posição do aparelho: a que o app já pediu depois do login, ou pede agora se ainda não pediu. */
+/**
+ * A posição do aparelho: a que o app já pediu depois do login, ou pede agora se ainda não pediu.
+ * Visitante (sem conta): nunca pede a localização; vale a cidade escolhida à mão (sem ela, fica indisponível).
+ */
 export function useCurrentPosition(): LocationState {
+  const visitor = useIsVisitor();
+  const city = useVisitorCity();
+  const device = useDevicePosition(!visitor);
+  if (visitor) return city ? { status: 'ok', position: city.position } : { status: 'unavailable' };
+  return device;
+}
+
+function useDevicePosition(enabled: boolean): LocationState {
   const [state, setState] = useState<LocationState>(() => {
     const cached = cachedPosition();
     return cached ? { status: 'ok', position: cached } : { status: 'asking' };
   });
   useEffect(() => {
-    if (state.status === 'ok') return;
+    if (!enabled || state.status === 'ok') return;
     let alive = true;
     void requestPosition().then((result) => {
       if (!alive) return;
@@ -501,6 +513,8 @@ export function ExploreScreen() {
 
   return (
     <>
+    {/* No celular é transparente (display: contents); no computador vira a coluna larga do Explorar. */}
+    <div className="explore">
       {/* Sem título visível: a aba do rodapé já diz que é o Explorar. */}
       <h1 className="visually-hidden">{t('Explorar')}</h1>
 
@@ -781,6 +795,7 @@ export function ExploreScreen() {
           </Button>
         </Sheet>
       ) : null}
+    </div>
     </>
   );
 }

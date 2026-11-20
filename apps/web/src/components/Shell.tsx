@@ -230,7 +230,7 @@ function MainShell({ children }: { children: ReactNode }) {
         <nav className="rail__nav" aria-label={t('Principal')}>
           <NavLink item={HOME} pathname={pathname} />
           <NavLink item={EXPLORE} pathname={pathname} />
-          <button type="button" className={`navlink navlink--button${inCompose ? ' navlink--active' : ''}`} onClick={() => setChoosing(true)} aria-haspopup="dialog">
+          <button type="button" className={`navlink navlink--button navlink--create${inCompose ? ' navlink--active' : ''}`} onClick={() => setChoosing(true)} aria-haspopup="dialog">
             <span className="navlink__icon">
               <PlusBigIcon />
             </span>

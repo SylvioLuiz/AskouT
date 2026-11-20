@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
-import { useUser } from '../auth.tsx';
-import { api } from '../client.ts';
+import { useOptionalUser } from '../auth.tsx';
+import { api, session } from '../client.ts';
 import { BoostStatQueue, SPONSORED_VIEW_MS } from '../lib/boost-stats.ts';
 import type { BoostPlacement, BoostStatEntry } from '../lib/boost-stats.ts';
 
@@ -59,11 +59,12 @@ function entry(kind: BoostStatEntry['kind'], placement: BoostPlacement, target: 
 export function useSponsoredView<T extends Element>(active: boolean, placement: BoostPlacement, target: SponsoredTarget, shared?: RefObject<T | null>): RefObject<T | null> {
   const own = useRef<T | null>(null);
   const ref = shared ?? own;
-  const me = useUser().profile.userId;
+  // Visitante (sem conta) não conta exibição.
+  const me = useOptionalUser()?.profile.userId;
   const { eventId, venueId } = target;
   useEffect(() => {
     const node = ref.current;
-    if (!active || !node || typeof IntersectionObserver === 'undefined') return;
+    if (!me || !active || !node || typeof IntersectionObserver === 'undefined') return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let inView = false;
     const stop = () => {
@@ -99,6 +100,7 @@ export function useSponsoredView<T extends Element>(active: boolean, placement: 
 
 /** A pessoa abriu o cartão patrocinado. */
 export function trackSponsoredOpen(placement: BoostPlacement, target: SponsoredTarget): void {
+  if (session.get() === undefined) return; // visitante não conta
   enqueue(undefined, entry('OPEN', placement, target));
   flush();
 }

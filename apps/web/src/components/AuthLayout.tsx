@@ -1,6 +1,8 @@
 import { useLayoutEffect } from 'react';
 import type { ReactNode } from 'react';
 import { t } from '../lib/i18n/index.ts';
+import { Link } from '../router.tsx';
+import { ChevronLeftIcon } from './icons.tsx';
 
 /** Entrada e cadastro ficam sempre no visual noturno; ao sair da tela, volta o tema que a pessoa escolheu. */
 function useNightTheme(): void {
@@ -21,6 +23,11 @@ export function AuthLayout({ children, fit = false }: { children: ReactNode; fit
   return (
     <div className={fit ? 'auth auth--fit' : 'auth'}>
       <section className="auth__hero">
+        {/* Sem conta dá para ver os rolês da cidade escolhida: a entrada sempre tem caminho de volta para a Home. */}
+        <Link to="/" className="auth__home" aria-label={t('Voltar para a Home')}>
+          <ChevronLeftIcon />
+          <span>{t('Voltar')}</span>
+        </Link>
         <img className="auth__scene" src="/auth-hero.jpg" alt={t('AskouT')} width="780" height="540" />
         <h1 className="auth__headline">{t('Menos tempo combinando. Mais tempo juntos.')}</h1>
       </section>

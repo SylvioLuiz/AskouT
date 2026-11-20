@@ -17,6 +17,7 @@ import { FeedService } from './feed-service.ts';
 import { GuestListService } from './guest-list-service.ts';
 import { EventReminderService } from './event-reminder-service.ts';
 import { ExploreService } from './explore-service.ts';
+import { PublicService } from './public-service.ts';
 import { VenueService } from './venue-service.ts';
 import { CalendarImportService } from './calendar-import-service.ts';
 import { CalendarSyncService } from './calendar-sync-service.ts';
@@ -82,6 +83,7 @@ export function createCore(input: CoreInput) {
     match,
     paymentsSwitch,
   );
+  const explore = new ExploreService(deps, profiles, boosts);
   return {
     boosts,
     boostStats: new BoostStatsService(deps),
@@ -96,7 +98,8 @@ export function createCore(input: CoreInput) {
     conversations,
     storyReactions: new StoryReactionService(deps, eventPages, conversations),
     suggestions: new SuggestionService(deps, flash),
-    explore: new ExploreService(deps, profiles, boosts),
+    explore,
+    publicReads: new PublicService(explore, eventPages, venues),
     eventPages,
     feed: new FeedService(deps, eventPages),
     guestList: new GuestListService(deps, eventPages),
@@ -111,7 +114,7 @@ export function createCore(input: CoreInput) {
     posts,
     eventExtras: new EventExtrasCatalog(deps),
     tastes: new TastesCatalog(deps),
-    albums: new AlbumService(deps, posts),
+    albums: new AlbumService(deps, posts, eventPages),
     venueStories,
     dwell: new DwellService(deps),
     activity: new ActivityService(deps),

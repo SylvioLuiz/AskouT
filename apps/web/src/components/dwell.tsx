@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
-import { useUser } from '../auth.tsx';
+import { useOptionalUser } from '../auth.tsx';
 import { api } from '../client.ts';
 import { DwellQueue, VisibleTimer, readPersonalize } from '../lib/dwell.ts';
 import type { DwellSource, DwellTarget } from '../lib/dwell.ts';
@@ -38,8 +38,10 @@ function ensureScheduler(): void {
  */
 export function useDwell<T extends Element>(targetType: DwellTarget, targetId: string, source: DwellSource | false): RefObject<T | null> {
   const ref = useRef<T | null>(null);
-  const me = useUser().profile.userId;
+  // Visitante (sem conta) não é medido.
+  const me = useOptionalUser()?.profile.userId;
   useEffect(() => {
+    if (!me) return;
     userId = me;
     const node = ref.current;
     if (source === false || !node || typeof IntersectionObserver === 'undefined' || !readPersonalize(me)) return;

@@ -15,6 +15,7 @@ import { DatePollsController } from './controllers/date-polls.controller.ts';
 import { NotificationsController } from './controllers/notifications.controller.ts';
 import { PostsController } from './controllers/posts.controller.ts';
 import { ExploreController } from './controllers/explore.controller.ts';
+import { PublicController } from './controllers/public.controller.ts';
 import { GifsController } from './controllers/gifs.controller.ts';
 import { FeedController } from './controllers/feed.controller.ts';
 import { GuestListController } from './controllers/guest-list.controller.ts';
@@ -47,7 +48,7 @@ import { loadConfig } from './support/config.ts';
 import { CONFIG } from './tokens.ts';
 
 @Module({
-  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, GifsController, FeedController, GuestListController, VenuesController, BoostsController, OffersController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AlbumsController, VenueStoriesController, AdminController, ReferralsController],
+  controllers: [ActivityController, AuthController, ProfilesController, FollowsController, BlocksController, AvailabilityController, CalendarsController, FlashController, ConversationsController, PlacesController, ExploreController, PublicController, GifsController, FeedController, GuestListController, VenuesController, BoostsController, OffersController, CloakroomController, HealthController, RecommendationsController, RegionController, AccountController, MeetupsController, DatePollsController, NotificationsController, AvatarController, PostsController, AlbumsController, VenueStoriesController, AdminController, ReferralsController],
   providers: [
     { provide: CONFIG, useFactory: () => loadConfig(process.env) },
     prismaProvider,

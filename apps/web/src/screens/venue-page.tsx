@@ -9,7 +9,9 @@ import { PlacePhoto, SampleBadge } from '../components/suggestions.tsx';
 import { BellIcon, BellOffIcon, CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ClockIcon, LocationIcon, ShareIcon, StarIcon } from '../components/icons.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
-import { api } from '../client.ts';
+import { api, session } from '../client.ts';
+import { useIsVisitor } from '../auth.tsx';
+import { askLogin } from '../components/visitor.tsx';
 import { useAsync, useTitle } from '../hooks.ts';
 import { formatRating, formatWhen, starPercent } from '../lib/chat.ts';
 import { distanceMeters, formatDistance } from '../lib/flash.ts';
@@ -42,7 +44,7 @@ function PinIcon() {
 }
 
 function goBack() {
-  routerGoBack('/explorar');
+  routerGoBack(session.get() === undefined ? '/' : '/explorar');
 }
 
 /** Topo da página: capa (a fachada) ao fundo, logo em círculo, nome, localização e os três números. */
@@ -54,6 +56,10 @@ function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
   const mine = venue.rating.mine;
   async function pick(stars: number) {
     if (busy) return;
+    if (session.get() === undefined) {
+      askLogin(t('Entre para avaliar o rolê.'));
+      return;
+    }
     setBusy(true);
     setProblem(undefined);
     try {
@@ -454,10 +460,13 @@ export function OwnerEvents({ venueId, now, reloadKey, onNew, onEdit, onChanged 
 }
 
 export function VenuePageScreen({ venueId }: { venueId: string }) {
+  const visitor = useIsVisitor();
+  const backTo = visitor ? '/' : '/explorar';
   const page = useAsync(() => api.venueProfile(venueId), [venueId]);
   const v = page.data;
   useTitle(v?.name ?? t('Rolê'));
-  const [tab, setTab] = useState<Tab>('feed');
+  // Visitante: só Eventos e Sobre (publicações, ranking e fotos têm gente).
+  const [tab, setTab] = useState<Tab>(visitor ? 'events' : 'feed');
   const [feedSettings, setFeedSettings] = useState<FeedSettings | undefined>();
   const search = useSearch();
   const [followBusy, setFollowBusy] = useState(false);
@@ -474,6 +483,10 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   /** Sininho: ligar já segue e avisa de cada evento novo; desligar só para os avisos. */
   async function toggleBell() {
     if (!v || bellBusy) return;
+    if (visitor) {
+      askLogin(t('Entre para receber um aviso a cada evento novo deste rolê.'));
+      return;
+    }
     setBellBusy(true);
     setProblem(undefined);
     try {
@@ -489,6 +502,10 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
 
   async function toggleFollow() {
     if (!v || followBusy) return;
+    if (visitor) {
+      askLogin(t('Entre para seguir o rolê e ver os eventos dele no seu feed.'));
+      return;
+    }
     setFollowBusy(true);
     setProblem(undefined);
     setBellNote(undefined);
@@ -506,7 +523,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   if (page.loading && !v) {
     return (
       <>
-        <PageHead title={t('Rolê')} back="/explorar" />
+        <PageHead title={t('Rolê')} back={backTo} />
         <Loading />
       </>
     );
@@ -514,25 +531,29 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   if (!v) {
     return (
       <>
-        <PageHead title={t('Rolê')} back="/explorar" />
+        <PageHead title={t('Rolê')} back={backTo} />
         <ErrorState message={page.error?.message ?? t('Não foi possível abrir esta página.')} onRetry={page.reload} />
       </>
     );
   }
 
   const lines = hoursLines(v.hours, now);
-  const tabs: { id: Tab; label: string; n?: number }[] = [
+  const allTabs: { id: Tab; label: string; n?: number }[] = [
     { id: 'feed', label: t('Publicações') },
     { id: 'about', label: t('Sobre') },
     { id: 'events', label: t('Eventos'), n: v.upcomingEvents.length },
     { id: 'regulars', label: t('Ranking') },
     { id: 'posts', label: t('Fotos') },
   ];
+  const tabs = visitor ? allTabs.filter((x) => x.id === 'events' || x.id === 'about') : allTabs;
   const status = openStatus(v.hours, now);
   const today = lines.find((l) => l.today);
 
   return (
     <>
+      {/* No celular os dois blocos são transparentes (display: contents); no computador, capa e ações ficam à esquerda e as abas à direita. */}
+      <div className="vpage">
+      <div className="vpage__side">
       <VenueHero venue={v} now={now} onShare={() => setSharing(true)} />
       <div className="vhead">
         {v.canManage ? (
@@ -570,13 +591,15 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         {!v.claimed && !claimSent ? (
           <p className="muted vhead__unclaimed">
             {t('Esta página ainda não tem responsável.')}{' '}
-            <button type="button" className="linkbtn" onClick={() => setClaiming(true)}>
+            <button type="button" className="linkbtn" onClick={() => (visitor ? askLogin(t('Entre para pedir a administração da página.')) : setClaiming(true))}>
               {t('É o dono? Peça para administrar.')}
             </button>
           </p>
         ) : null}
       </div>
+      </div>
 
+      <div className="vpage__main">
       <div className="segtabs segtabs--fill" role="tablist" aria-label={t('Seções da página')}>
         {tabs.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} className="segtabs__tab" onClick={() => setTab(t.id)}>
@@ -586,7 +609,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         ))}
       </div>
 
-      {tab === 'feed' ? (
+      {tab === 'feed' && !visitor ? (
         <Feed
           where="venues"
           targetId={v.id}
@@ -677,7 +700,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         </>
       ) : null}
 
-      {tab === 'regulars' ? (
+      {tab === 'regulars' && !visitor ? (
         v.regulars.length === 0 ? (
           <EmptyState title={t('O ranking ainda está vazio')}>Quem fizer check-in no QR de {v.name} ou confirmar presença nos eventos e for aparece aqui.</EmptyState>
         ) : (
@@ -707,8 +730,10 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         )
       ) : null}
 
-      {tab === 'posts' ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={v.canManage ? t('Abra Administrar e toque em Novo post para publicar fotos do rolê.') : t('Os posts do rolê aparecem aqui e no seu feed se você seguir.')} reloadKey={String(postsKey)} /> : null}
+      {tab === 'posts' && !visitor ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={v.canManage ? t('Abra Administrar e toque em Novo post para publicar fotos do rolê.') : t('Os posts do rolê aparecem aqui e no seu feed se você seguir.')} reloadKey={String(postsKey)} /> : null}
 
+      </div>
+      </div>
       {sharing ? <ShareLinkSheet url={`${shareOrigin()}/bares/${encodeURIComponent(v.id)}`} text={t('{name} no AskouT', { name: v.name })} onClose={() => setSharing(false)} /> : null}
     </>
   );

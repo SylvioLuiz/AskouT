@@ -6,6 +6,8 @@ import { confirmedLabel, dateTile } from '../lib/poster.ts';
 import { Link } from '../router.tsx';
 import { GoingChoiceSheet } from './going-choice.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { useIsVisitor } from '../auth.tsx';
+import { askLogin } from './visitor.tsx';
 
 /** Selo com o dia do evento ("SÁB 25 OUT"), em vidro sobre a foto. */
 export function DateBadge({ startsAt, mini = false }: { startsAt: string; mini?: boolean }) {
@@ -58,8 +60,15 @@ export function PosterEvent({
 
   const [choosing, setChoosing] = useState(false);
 
+  const visitor = useIsVisitor();
+
   async function toggle(onProfile?: boolean) {
     if (busy) return;
+    // Sem conta: o "Eu vou" pede para entrar, como o resto do modo visitante.
+    if (visitor) {
+      askLogin(t('Entre para dizer "Eu vou" e receber um lembrete antes de começar.'));
+      return;
+    }
     // Confirmar pergunta antes se o evento aparece na aba Eventos do perfil.
     if (!going && onProfile === undefined) {
       setChoosing(true);

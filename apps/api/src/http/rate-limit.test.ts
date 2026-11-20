@@ -4,7 +4,7 @@ import { DomainError } from '../core/errors.ts';
 import { describeError } from './support/error-mapping.ts';
 import { loadConfig } from './support/config.ts';
 import { RateLimiter } from './support/rate-limiter.ts';
-import { RateLimitPolicy, AUTH_PER_IP, GENERAL, GUESS_PER_ACCOUNT, MAIL_PER_ACCOUNT } from './support/rate-limit-policy.ts';
+import { RateLimitPolicy, AUTH_PER_IP, GENERAL, GUESS_PER_ACCOUNT, MAIL_PER_ACCOUNT, PUBLIC_PER_IP } from './support/rate-limit-policy.ts';
 
 const env = { DATABASE_URL: 'postgresql://u:p@localhost:5432/askout', JWT_SECRET: 'j'.repeat(40), CODE_SECRET: 'c'.repeat(40) };
 
@@ -95,5 +95,16 @@ describe('RateLimitPolicy', () => {
     assert.equal(loadConfig(env).trustProxyHops, 0);
     assert.equal(loadConfig({ ...env, TRUST_PROXY_HOPS: '2' }).trustProxyHops, 2);
     assert.throws(() => loadConfig({ ...env, TRUST_PROXY_HOPS: 'x' }), /TRUST_PROXY_HOPS/);
+  });
+});
+
+describe('RateLimitPolicy: modo visitante', () => {
+  it('as leituras sem login têm limite próprio por endereço, sem afetar as outras rotas', () => {
+    const { g } = guard();
+    const req = { method: 'GET', path: '/public/explore', ip: '9.9.9.9' };
+    for (let i = 0; i < PUBLIC_PER_IP.limit; i++) g.check(req);
+    blocked(() => g.check(req));
+    g.check({ method: 'GET', path: '/explore', ip: '9.9.9.9' });
+    g.check({ method: 'GET', path: '/public/explore', ip: '8.8.8.8' });
   });
 });

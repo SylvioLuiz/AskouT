@@ -12,8 +12,11 @@ import { EventExtrasList } from '../components/event-extras.tsx';
 import { CalendarIcon, CalendarPlusIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
-import { Avatar, Button, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
-import { api } from '../client.ts';
+import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
+import { AlbumContent } from './albums.tsx';
+import { api, session } from '../client.ts';
+import { useIsVisitor } from '../auth.tsx';
+import { askLogin } from '../components/visitor.tsx';
 import { useAsync, useTitle } from '../hooks.ts';
 import { queueFrom, startOf } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
@@ -61,7 +64,8 @@ async function addEventToCalendar(page: EventPage): Promise<void> {
 }
 
 function goBack() {
-  routerGoBack('/explorar');
+  // Visitante não tem Explorar: volta para a Home.
+  routerGoBack(session.get() === undefined ? '/' : '/explorar');
 }
 
 /** Menu ⋯ do evento: editar (quem criou o evento), compartilhar e adicionar à agenda. */
@@ -109,9 +113,34 @@ function EventMenuSheet({ page, onShare, onEdit, onClose }: { page: EventPage; o
   );
 }
 
+// ---------- Álbum ----------
+
+/** Aba Álbum: fotos de quem foi. Abre quando o evento começa; quem não confirmou presença vê como entrar. */
+function EventAlbumTab({ eventId, onGo }: { eventId: string; onGo: () => void }) {
+  const album = useAsync(() => api.eventAlbum(eventId), [eventId]);
+  if (album.loading && !album.data) return <Loading />;
+  if (album.error) return <ErrorState message={album.error.message} onRetry={album.reload} />;
+  const data = album.data;
+  if (!data) return null;
+  if (data.state === 'OPEN') return <section className="evalbum" aria-label={t('Álbum do evento')}><AlbumContent albumId={data.album.id} embedded /></section>;
+  if (data.state === 'SOON') {
+    return (
+      <EmptyState title={t('O álbum abre quando o evento começar')}>
+        {t('A partir de {when}, quem confirmou presença coloca as fotos do rolê aqui.', { when: eventLongDate(data.startsAt, data.startsAt) })}
+      </EmptyState>
+    );
+  }
+  return (
+    <EmptyState title={t('Álbum de quem foi')} action={<Button onClick={onGo}>{t('Eu vou')}</Button>}>
+      {t('Só quem confirmou presença vê e adiciona fotos. Marque “Eu vou” para entrar no álbum.')}
+    </EmptyState>
+  );
+}
+
 // ---------- Página ----------
 
 export function EventScreen({ eventId }: { eventId: string }) {
+  const visitor = useIsVisitor();
   const where = useCurrentPosition();
   const waiting = where.status === 'asking';
   const loaded = useAsync<EventPage | null>(async () => (waiting ? null : api.eventPage(eventId, where.position)), [eventId, waiting, where.position?.lat, where.position?.lng]);
@@ -152,7 +181,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [problem, setProblem] = useState<string | undefined>();
   const search = useSearch();
   // Abre nas informações (o que quem recebeu o evento quer ver primeiro); link de publicação abre direto no feed.
-  const [tab, setTab] = useState<'feed' | 'info'>(() => (search.get('post') || search.get('pendentes') === '1' ? 'feed' : 'info'));
+  const [tab, setTab] = useState<'feed' | 'info' | 'album'>(() => (search.get('post') || search.get('pendentes') === '1' ? 'feed' : search.get('aba') === 'album' ? 'album' : 'info'));
   const [aboutOpen, setAboutOpen] = useState(false);
   const openPost = search.get('post');
   useEffect(() => {
@@ -162,6 +191,10 @@ export function EventScreen({ eventId }: { eventId: string }) {
 
   async function toggleGoing() {
     if (!e) return;
+    if (visitor) {
+      askLogin(t('Entre para dizer “Eu vou”, ver quem vai e receber os avisos do evento.'));
+      return;
+    }
     // Confirmar pergunta antes se o evento aparece na aba Eventos do perfil.
     if (!e.going) {
       setChoosing(true);
@@ -278,6 +311,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
             </div>
           </section>
 
+          {/* No celular é transparente (display: contents); no computador vira a coluna da direita, ao lado da capa. */}
+          <div className="evpage__main">
+
           {e.owner ? (
             <Link to={`/u/${encodeURIComponent(e.owner.username)}`} className="evhost">
               <Avatar profile={e.owner} size={44} />
@@ -326,7 +362,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                     )}
                   </Button>
                   {e.source === 'PLACE' ? (
-                    <Button full variant="secondary" onClick={() => setPlanning(true)}>
+                    <Button full variant="secondary" onClick={() => (visitor ? askLogin(t('Entre para combinar um encontro com seus amigos.')) : setPlanning(true))}>
                       {MEETUP_ACTION_LABEL}
                     </Button>
                   ) : null}
@@ -372,18 +408,25 @@ export function EventScreen({ eventId }: { eventId: string }) {
               <span className="quickacts__icon" aria-hidden="true"><CalendarPlusIcon /></span>
               <span className="quickacts__label">{t('Agenda')}</span>
             </button>
-            <Link to={`/criar?tipo=post&evento=${encodeURIComponent(e.id)}&eventoNome=${encodeURIComponent(e.title)}`} className="quickacts__btn" aria-label={t('Publicar sobre o evento')}>
-              <span className="quickacts__icon" aria-hidden="true"><PlusIcon /></span>
-              <span className="quickacts__label">{t('Publicar')}</span>
-            </Link>
-            <button type="button" className="quickacts__btn" onClick={() => setSharing(true)}>
+            {visitor ? (
+              <button type="button" className="quickacts__btn" aria-label={t('Publicar sobre o evento')} onClick={() => askLogin(t('Entre para publicar fotos e comentários sobre o evento.'))}>
+                <span className="quickacts__icon" aria-hidden="true"><PlusIcon /></span>
+                <span className="quickacts__label">{t('Publicar')}</span>
+              </button>
+            ) : (
+              <Link to={`/criar?tipo=post&evento=${encodeURIComponent(e.id)}&eventoNome=${encodeURIComponent(e.title)}`} className="quickacts__btn" aria-label={t('Publicar sobre o evento')}>
+                <span className="quickacts__icon" aria-hidden="true"><PlusIcon /></span>
+                <span className="quickacts__label">{t('Publicar')}</span>
+              </Link>
+            )}
+            <button type="button" className="quickacts__btn" onClick={() => (visitor ? askLogin(t('Entre para mandar o evento para seus amigos.')) : setSharing(true))}>
               <span className="quickacts__icon" aria-hidden="true"><ShareIcon /></span>
               <span className="quickacts__label">{t('Compartilhar')}</span>
             </button>
           </nav>
           {calMessage ? <Notice tone="error">{calMessage}</Notice> : null}
 
-          {strip.shown.length > 0 || showStoryButton ? (
+          {visitor ? null : strip.shown.length > 0 || showStoryButton ? (
             <section className="evwho" aria-label={t('Quem vai')}>
               <h2 className="evwho__title">
                 {t('Quem vai')} <span className="evwho__count">{e.confirmedCount}</span>
@@ -467,8 +510,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
             </Sheet>
           ) : null}
 
-          {e.source === 'PLACE' ? <GuestListCard eventId={e.id} ended={ended} /> : null}
+          {e.source === 'PLACE' && !visitor ? <GuestListCard eventId={e.id} ended={ended} /> : null}
 
+          {visitor ? null : (
           <div className="segtabs segtabs--fill evtabs" role="tablist" aria-label={t('Seções do evento')}>
             <button type="button" role="tab" aria-selected={tab === 'info'} className="segtabs__tab" onClick={() => setTab('info')}>
               {t('Informações')}
@@ -476,9 +520,15 @@ export function EventScreen({ eventId }: { eventId: string }) {
             <button type="button" role="tab" aria-selected={tab === 'feed'} className="segtabs__tab" onClick={() => setTab('feed')}>
               {t('Publicações')}
             </button>
+            <button type="button" role="tab" aria-selected={tab === 'album'} className="segtabs__tab" onClick={() => setTab('album')}>
+              {t('Álbum')}
+            </button>
           </div>
+          )}
 
-          {tab === 'feed' ? (
+          {tab === 'album' && !visitor ? (
+            <EventAlbumTab key={String(e.going)} eventId={e.id} onGo={() => void toggleGoing()} />
+          ) : tab === 'feed' && !visitor ? (
             <Feed where="events" targetId={e.id} openPostId={search.get('post')} openPending={search.get('pendentes') === '1'} onSettings={setFeedSettings} />
           ) : (
             <section className="evinfo" aria-label={t('Informações do evento')}>
@@ -522,7 +572,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                       )
                     ) : null}
                     {e.venue.address ? <p className="evinfo__sub">{e.venue.address}</p> : null}
-                    {e.distanceM !== null ? <p className="evinfo__sub">{t('a {distance} de você', { distance: formatDistance(e.distanceM) })}</p> : null}
+                    {e.distanceM !== null && !visitor ? <p className="evinfo__sub">{t('a {distance} de você', { distance: formatDistance(e.distanceM) })}</p> : null}
                     <OpenInMaps className="evinfo__more" lat={e.venue.lat} lng={e.venue.lng} label={e.venue.name} address={e.venue.address}>
                       {t('Abrir no mapa')}
                     </OpenInMaps>
@@ -558,14 +608,17 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   </Button>
                 </div>
               ) : null}
-              {e.source === 'PLACE' && !ended ? <CloakroomCard eventId={e.id} /> : null}
+              {e.source === 'PLACE' && !ended && !visitor ? <CloakroomCard eventId={e.id} /> : null}
+              {visitor ? null : (
               <button type="button" className="evinfo__block evinfo__feedlink" onClick={() => setTab('feed')}>
                 <span className="evinfo__title">{t('Publicações')}</span>
                 <span className="muted">{feedSettings ? policyNote(feedSettings) : t('Avisos, fotos e comentários de quem vai.')}</span>
                 <span className="evinfo__more">{t('Ver publicações')}</span>
               </button>
+              )}
             </section>
           )}
+          </div>
         </article>
       ) : null}
       {sharing && e ? (

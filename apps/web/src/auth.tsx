@@ -151,3 +151,14 @@ export function useUser(): SessionUser {
   if (state.status !== 'user') throw new Error(t('useUser fora de uma tela privada'));
   return state.user;
 }
+
+/** Usuário logado, ou undefined no modo visitante (telas que abrem com e sem conta). */
+export function useOptionalUser(): SessionUser | undefined {
+  const { state } = useAuthContext();
+  return state.status === 'user' ? state.user : undefined;
+}
+
+/** Sem conta: navegando como visitante. */
+export function useIsVisitor(): boolean {
+  return useAuthContext().state.status !== 'user';
+}

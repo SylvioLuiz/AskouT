@@ -3321,4 +3321,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Seus amigos veem quando você está disponível, parcial ou indisponível, e podem achar horários em comum com você. Compromissos das agendas ligadas contam só como ocupado. Dá para desligar quando quiser.": "Your friends see when you are available, partly available or unavailable, and can find times in common with you. Events from linked calendars only count as busy. You can turn it off any time.",
   "Carregando mais…": "Loading more…",
   "Ver mais eventos": "See more events",
+  "Suas conversas": "Your chats",
+  "Escolha uma conversa na lista para abrir aqui, ou comece uma nova.": "Pick a chat from the list to open it here, or start a new one.",
+  "Seus planos e sugestões": "Your plans and suggestions",
+  "Entre para dizer \"Eu vou\" e receber um lembrete antes de começar.": "Sign in to say \"I'm going\" and get a reminder before it starts.",
 };

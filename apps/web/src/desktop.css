@@ -1,0 +1,131 @@
+/* ---------- Layout de computador ----------
+ * Carregado depois de styles.css. Tudo aqui vale só a partir de 900 px de largura, menos a primeira regra:
+ * os invólucros que existem só para o desktop são transparentes no celular (display: contents),
+ * então os filhos continuam no mesmo fluxo de antes, com os mesmos espaçamentos.
+ */
+.explore, .homegrid, .homegrid__main, .evpage__main, .vpage, .vpage__side, .vpage__main, .profilepage, .profilepage__side, .profilepage__main { display: contents; }
+
+@media (min-width: 900px) {
+  /* Barra lateral: cara de app de computador (fundo próprio, item ativo marcado, Criar em destaque). */
+  .rail { background: var(--surface); border-right: 0.5px solid var(--line-strong); padding: 24px 14px 18px; gap: 22px; }
+  .rail .wordmark { padding: 0 12px; font-size: 1.625rem; }
+  .rail .navlink { border-radius: 14px; position: relative; }
+  .rail .navlink--active { background: var(--brand-soft); color: var(--brand-text); }
+  .rail .navlink--active .navlink__label { color: var(--ink); }
+  .rail .navlink:focus-visible { outline: 2px solid var(--brand-text); outline-offset: 2px; }
+  .rail .navlink--button { width: 100%; border: 0; font: inherit; justify-content: flex-start; cursor: pointer; background: transparent; }
+  .rail .navlink--create { margin: 6px 0; background: var(--brand-grad); color: var(--brand-ink); font-weight: 700; box-shadow: 0 6px 18px var(--shadow-brand); }
+  .rail .navlink--create:hover, .rail .navlink--create.navlink--active { background: var(--brand-grad); color: var(--brand-ink); filter: brightness(1.06); }
+  .rail .navlink--create.navlink--active .navlink__label { color: var(--brand-ink); }
+  .rail__me { border: 0.5px solid var(--line); }
+
+  /* Coluna central: centralizada no espaço ao lado da barra, em vez de colada à esquerda. */
+  .content { margin: 0 auto; max-width: calc(var(--column) + 64px); padding: 32px 32px 64px; }
+
+  /* Cards de evento: dois por linha, mais largos, com a capa à esquerda e as informações à direita. */
+  .content .evgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+  .evgrid .evcard { height: 100%; }
+  .evgrid .evcard__link { display: grid; grid-template-columns: minmax(150px, 42%) minmax(0, 1fr); height: 100%; min-height: 188px; }
+  .evgrid .evcard .evcover { aspect-ratio: auto; height: 100%; min-height: 188px; }
+  .evgrid .evcard .evcover::after { inset: 0 0 0 auto; width: 40%; height: auto; background: linear-gradient(90deg, rgb(20 20 31 / 0), rgb(20 20 31 / 0.85)); }
+  .evgrid .evcard__body { display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 18px 20px; }
+  .evgrid .evcard__title { margin-bottom: 4px; font-size: 1.125rem; line-height: 1.2; }
+  .evgrid .evcard__venue, .evgrid .evcard__author, .evgrid .evcard__when, .evgrid .evcard__hot, .evgrid .evcard__dist { font-size: 0.875rem; }
+  .evgrid .evcard__when { margin-top: 6px; }
+  .content .evposters { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+
+  /* Explorar: coluna larga, filtros quebram linha em vez de rolar de lado. */
+  /* Listas de eventos (Explorar, Home de quem não entrou): bem mais largas que a coluna padrão. */
+  .content:has(> .explore), .content:has(.evgrid) { max-width: 1440px; }
+  .explore__sticky { margin: 0 -32px 4px; padding: 8px 32px 4px; }
+  .explore .viewtabs { max-width: 300px; }
+  .content .visitorcta { max-width: 640px; margin-inline: auto; }
+  .explore .filters { flex-wrap: wrap; margin: 0 0 16px; padding: 2px 0 6px; overflow: visible; }
+
+  /* Capa do evento e do local: cartão arredondado, sem sangrar até a borda. */
+  .evhero { margin: 0; border-radius: 28px; }
+  .vhero { margin: 0 0 16px; border-radius: 24px; }
+}
+
+/* Barra compacta (só ícones) em telas de computador estreitas, para sobrar espaço para o conteúdo. */
+@media (min-width: 900px) and (max-width: 1179px) {
+  .shell { grid-template-columns: 84px minmax(0, 1fr); }
+  .rail { padding: 20px 12px; align-items: center; }
+  /* Só a inicial da marca (o nome completo continua no aria-label do link). */
+  .rail .wordmark { width: 44px; padding: 0; justify-content: center; font-size: 0; }
+  .rail .wordmark::before { content: 'A'; font-size: 1.75rem; }
+  .rail__nav { width: 100%; }
+  .rail .navlink { justify-content: center; padding: 12px 0; }
+  .rail .navlink__label, .rail__who, .rail__venue, .rail .vadminback span, .rail .visitorcity__name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .rail .navlink--button { justify-content: center; }
+  .rail__me { border: 0; padding: 4px; }
+  .rail .visitorcity { align-self: center; }
+}
+
+@media (min-width: 1100px) {
+  /* ---- Home: feed no meio, planos e sugestões na coluna da direita ---- */
+  .content:has(.homegrid) { max-width: 1080px; }
+  .homegrid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 40px; align-items: start; }
+  .homegrid__main { display: block; min-width: 0; }
+  .homegrid__side { position: sticky; top: 32px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100dvh - 64px); overflow-y: auto; scrollbar-width: thin; padding-bottom: 8px; }
+  .homegrid__side > .nextplan, .homegrid__side > .flashcta { margin: 0; }
+  .homegrid__side .section { margin: 0; padding: 16px; background: var(--surface); border: 0.5px solid var(--line-strong); border-radius: var(--radius-panel); }
+  .homegrid__side .suggest__track { flex-direction: column; gap: 4px; padding: 0; overflow: visible; }
+  .homegrid__side .suggest__card { width: auto; }
+  .homegrid__side .suggest__card:nth-child(n + 6) { display: none; }
+  .homegrid__side .suggest__link { display: grid; grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 0; align-items: center; padding: 8px; border: 0; border-radius: 12px; background: transparent; text-align: left; }
+  /* O avatar vem com o tamanho do cartão do celular (inline); na lista lateral ele fica menor. */
+  .homegrid__side .suggest__link .avatar { grid-row: 1 / 3; width: 44px !important; height: 44px !important; font-size: 17px !important; }
+  .homegrid__side .suggest__name { align-self: end; }
+  .homegrid__side .suggest__mutual { align-self: start; }
+  .homegrid__side .suggest__link:hover { background: var(--brand-soft); }
+  .homegrid__foot { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 4px 8px; font-size: 0.8125rem; color: var(--muted); }
+  .homegrid__foot a { color: var(--muted); text-decoration: none; }
+  .homegrid__foot a:hover { color: var(--ink); text-decoration: underline; }
+
+  /* ---- Evento: capa à esquerda (presa ao rolar), informações à direita ---- */
+  .content:has(> .evpage) { max-width: 1180px; }
+  .evpage { display: grid; grid-template-columns: minmax(340px, 0.85fr) minmax(0, 1fr); gap: 0 40px; align-items: start; }
+  .evpage > .evhero { position: sticky; top: 32px; min-height: min(680px, calc(100dvh - 64px)); }
+  .evpage > .evhero .evhero__body { padding: 56px 28px 32px; }
+  .evpage > .evhero .evhero__title { font-size: 1.75rem; }
+  .evpage__main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  /* ---- Local: capa, ações e avisos à esquerda; abas à direita ---- */
+  .content:has(> .vpage) { max-width: 1180px; }
+  .vpage { display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); gap: 0 40px; align-items: start; }
+  .vpage__side { display: block; position: sticky; top: 32px; }
+  .vpage__side .vhero { min-height: 420px; }
+  .vpage__main { display: block; min-width: 0; }
+
+  /* ---- Perfil: cartão do perfil à esquerda, eventos e posts à direita ---- */
+  .content:has(> .profilepage) { max-width: 1120px; }
+  .profilepage { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0 40px; align-items: start; }
+  .profilepage__side { display: block; position: sticky; top: 32px; padding: 24px; background: var(--surface); border: 0.5px solid var(--line-strong); border-radius: var(--radius-panel); }
+  .profilepage__side .profile__actions { flex-wrap: wrap; }
+  .profilepage__main { display: block; min-width: 0; }
+  .profilepage__main > .tabs { margin-top: 0; }
+
+  /* ---- Conversas: lista e chat lado a lado, na altura da janela ---- */
+  .content:has(> .convsplit) { max-width: none; padding: 0; }
+  .convsplit { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); min-height: 100dvh; }
+  .convsplit__list { position: sticky; top: 0; height: 100dvh; overflow-y: auto; padding: 28px 20px 96px; border-right: 0.5px solid var(--line-strong); }
+  .convsplit__list .convrow { padding: 10px 12px; margin: 0 -12px; border-bottom: 0; border-radius: 14px; }
+  .convsplit__list .convrow:hover { background: color-mix(in srgb, var(--brand-soft) 60%, transparent); }
+  .convsplit__list .convrow--active { background: var(--brand-soft); }
+  .convsplit .fab--split { left: calc(var(--rail) + 20px); right: auto; bottom: 20px; }
+  .convsplit__chat { min-width: 0; padding: 0 32px; }
+  .convsplit__chat .chat { margin-top: 0; max-width: 880px; margin-inline: auto; min-height: 100dvh; }
+  .convsplit__chat .chathead { margin: 0 -32px 8px; padding: 14px 32px; }
+  .convsplit__chat .chat__dock { margin: 0 -32px; padding: 0 32px 12px; }
+  .convsplit__chat .chat--bg::before { position: absolute; }
+  .convsplit__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 100dvh; padding: 32px; text-align: center; }
+  .convsplit__empty p { max-width: 340px; margin: 0; }
+  .convsplit__icon { display: grid; place-items: center; width: 72px; height: 72px; margin-bottom: 8px; border-radius: 50%; background: var(--brand-soft); color: var(--brand-text); }
+  .convsplit__icon svg { width: 32px; height: 32px; }
+  .convsplit__title { margin: 0; font-family: var(--font-display); font-size: 1.25rem; }
+}
+
+@media (min-width: 1100px) and (max-width: 1179px) {
+  .convsplit .fab--split { left: 104px; }
+}

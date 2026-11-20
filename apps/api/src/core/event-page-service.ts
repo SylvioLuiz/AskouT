@@ -1,3 +1,4 @@
+import { VISITOR_ID } from './visitor.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
 import { parseStoryOverlays } from './story-overlays.ts';
 import type { StoryOverlay } from './story-overlays.ts';
@@ -276,6 +277,30 @@ export class EventPageService {
       storyUserIds: [...new Set((await this.visibleStories(viewerId, ref, hidden)).map((s) => s.userId))],
       canStory: (isOwner || iGo) && Date.parse(base.view.endsAt) > this.deps.clock.now().getTime(),
       goingOnProfile: !isOwner && iGo ? (await this.deps.eventRoom.goingOnProfile(ref, viewerId)) === true : false,
+    };
+  }
+
+  /**
+   * Página do evento para quem não entrou: só evento de local, sem ninguém (nem dono, nem quem vai, nem stories), só o número de confirmados.
+   * Evento criado por uma pessoa não abre sem conta.
+   */
+  async publicGet(rawId: unknown, input: { lat?: number; lng?: number } = {}): Promise<EventPageView> {
+    const id = parseId(rawId);
+    if (!(await this.deps.places.findEvent(id))) throw notFound('Evento não encontrado');
+    const ref: EventRef = { source: 'PLACE', id };
+    const base = await this.base(VISITOR_ID, ref, input);
+    const counts = await this.deps.eventRoom.countGoing([ref]);
+    return {
+      ...base.view,
+      postedByMe: false,
+      confirmedCount: counts.get(id) ?? 0,
+      going: false,
+      attendees: [],
+      owner: null,
+      isOwner: false,
+      storyUserIds: [],
+      canStory: false,
+      goingOnProfile: false,
     };
   }
 

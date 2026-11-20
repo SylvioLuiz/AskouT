@@ -8,6 +8,8 @@ import { Onboarding } from './components/onboarding.tsx';
 import { PushAutoAsk } from './components/push-auto-ask.tsx';
 import { PositionAutoAsk } from './components/position-auto-ask.tsx';
 import { RingLoader } from './components/ring-loader.tsx';
+import { VisitorCityGate, VisitorHomeScreen, VisitorShell } from './components/visitor.tsx';
+import { takeLoginReturn } from './lib/visitor-city.ts';
 import { Button, EmptyState } from './components/ui.tsx';
 import { useTitle } from './hooks.ts';
 import { Link, navigate, resolveRoute, usePathname } from './router.tsx';
@@ -34,8 +36,7 @@ const ActivityScreen = lazyWithReload(() => import('./screens/activity.tsx').the
 const ForgotPasswordScreen = lazyWithReload(() => import('./screens/auth.tsx').then((m) => ({ default: m.ForgotPasswordScreen })));
 const LoginScreen = lazyWithReload(() => import('./screens/auth.tsx').then((m) => ({ default: m.LoginScreen })));
 const SignupScreen = lazyWithReload(() => import('./screens/auth.tsx').then((m) => ({ default: m.SignupScreen })));
-const ChatScreen = lazyWithReload(() => import('./screens/conversations.tsx').then((m) => ({ default: m.ChatScreen })));
-const ConversationsScreen = lazyWithReload(() => import('./screens/conversations.tsx').then((m) => ({ default: m.ConversationsScreen })));
+const ConversationsRoute = lazyWithReload(() => import('./screens/conversations.tsx').then((m) => ({ default: m.ConversationsRoute })));
 const FlashScreen = lazyWithReload(() => import('./screens/flash.tsx').then((m) => ({ default: m.FlashScreen })));
 const MatchScreen = lazyWithReload(() => import('./screens/flash.tsx').then((m) => ({ default: m.MatchScreen })));
 const DatePollCreateScreen = lazyWithReload(() => import('./components/date-poll-create.tsx').then((m) => ({ default: m.DatePollCreateScreen })));
@@ -132,6 +133,17 @@ const GUEST_ROUTES: RouteDef[] = [
   { path: '/esqueci-senha', render: () => <ForgotPasswordScreen /> },
 ];
 
+/**
+ * Modo visitante (sem conta): só a Home com os eventos dos locais da cidade escolhida, a página do evento de local e a do local.
+ * Sem cidade escolhida à mão, nada carrega (pede a cidade ou o login). Qualquer outra tela leva ao login.
+ */
+const VISITOR_ROUTES: RouteDef[] = [
+  { path: '/', render: () => <VisitorHomeScreen /> },
+  { path: '/eventos/:id', render: (p) => <VisitorCityGate><EventScreen key={p['id']} eventId={p['id'] ?? ''} /></VisitorCityGate> },
+  { path: '/bares/:id', render: (p) => <VisitorCityGate><VenuePageScreen key={p['id']} venueId={p['id'] ?? ''} /></VisitorCityGate> },
+  { path: '/locais/:id', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}`} /> },
+];
+
 function OwnProfile() {
   const user = useUser();
   return <ProfileScreen key={user.profile.username} username={user.profile.username} />;
@@ -143,10 +155,10 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/explorar', render: () => <ExploreScreen /> },
   { path: '/explorar/mapa', render: () => <EventsMapScreen /> },
   { path: '/eventos/:id', render: (p) => <EventScreen key={p['id']} eventId={p['id'] ?? ''} /> },
-  { path: '/conversas', render: () => <ConversationsScreen /> },
+  { path: '/conversas', render: () => <ConversationsRoute /> },
   { path: '/conversas/:id/info', render: (p) => <ChatInfoScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/conversas/:id/grupo', render: (p) => <GroupScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
-  { path: '/conversas/:id', render: (p) => <ChatScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
+  { path: '/conversas/:id', render: (p) => <ConversationsRoute conversationId={p['id'] ?? ''} /> },
   { path: '/planejar/nova/:id', render: (p) => <DatePollCreateScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/planejar/:id', render: (p) => <DatePollScreen key={p['id']} pollId={p['id'] ?? ''} /> },
   { path: '/agenda', render: () => <AgendaScreen /> },
@@ -242,6 +254,7 @@ function AppRoutes() {
   const guest = resolveRoute(GUEST_ROUTES, pathname);
   const priv = resolveRoute(PRIVATE_ROUTES, pathname);
   const legal = resolveRoute(LEGAL_ROUTES, pathname);
+  const visitor = resolveRoute(VISITOR_ROUTES, pathname);
 
   useEffect(() => {
     if (state.status === 'user') warmUp();
@@ -249,13 +262,13 @@ function AppRoutes() {
 
   useEffect(() => {
     if (legal) return;
-    if (state.status === 'user' && guest) navigate(takeCheckinReturn(safeStorage()) ?? '/', { replace: true });
-    if (state.status === 'guest' && !guest) {
+    if (state.status === 'user' && guest) navigate(takeCheckinReturn(safeStorage()) ?? takeLoginReturn(safeStorage()) ?? '/', { replace: true });
+    if (state.status === 'guest' && !guest && !visitor) {
       // Quem abriu o QR do local sem ter entrado volta ao check-in depois do login.
       rememberCheckinReturn(safeStorage(), window.location.pathname + window.location.search);
       navigate('/entrar', { replace: true });
     }
-  }, [state.status, guest, legal, pathname]);
+  }, [state.status, guest, legal, visitor, pathname]);
 
   if (legal) return <Suspense fallback={<Splash />}>{legal.route.render(legal.params)}</Suspense>;
   if (state.status === 'loading') return <Splash />;
@@ -269,7 +282,17 @@ function AppRoutes() {
     );
   }
 
-  if (state.status === 'guest') return guest ? <Suspense fallback={<Splash />}>{guest.route.render(guest.params)}</Suspense> : null;
+  if (state.status === 'guest') {
+    if (guest) return <Suspense fallback={<Splash />}>{guest.route.render(guest.params)}</Suspense>;
+    if (visitor) {
+      return (
+        <VisitorShell>
+          <Suspense fallback={<ScreenFallback />}>{visitor.route.render(visitor.params)}</Suspense>
+        </VisitorShell>
+      );
+    }
+    return null;
+  }
 
   if (guest) return null; // redirecionando para a Home
 

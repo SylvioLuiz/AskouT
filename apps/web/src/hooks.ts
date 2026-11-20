@@ -45,8 +45,10 @@ export function useAsync<T>(load: () => Promise<T>, deps: readonly unknown[]): A
   return { data, error, loading, reload, setData };
 }
 
-export function useTitle(title: string): void {
+/** Título da aba do navegador. `undefined`: não mexe (parte de outra tela, que já põe o próprio título). */
+export function useTitle(title: string | undefined): void {
   useEffect(() => {
+    if (title === undefined) return;
     document.title = title === '' ? 'AskouT' : `${title} · AskouT`;
   }, [title]);
 }
