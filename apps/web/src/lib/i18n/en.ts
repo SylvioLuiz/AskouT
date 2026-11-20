@@ -3295,4 +3295,5 @@ export const EN: Readonly<Record<string, string>> = {
   "Número {n}": "Digit {n}",
   "Só quem vai pode postar": "Only people going can post",
   "Os flashes deste evento são de quem vai. Marque que você vai para postar o seu.": "This event's flashes are from people who are going. Mark that you're going to post yours.",
+  "Carregando conversas…": "Loading conversations…",
 };
