@@ -6,7 +6,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { MEETUP_ACTION_LABEL } from '../lib/meetup.ts';
-import { ClockIcon, EventKindIcon } from '../components/icons.tsx';
+import { ClockIcon, EventKindIcon, LocationIcon } from '../components/icons.tsx';
 import { PlacePhoto, Rating, SampleBadge } from '../components/suggestions.tsx';
 import { Button, EmptyState, ErrorState, Loading, PersonRow } from '../components/ui.tsx';
 import { api } from '../client.ts';
@@ -44,7 +44,8 @@ import type { RangeId } from '../lib/explore.ts';
 import { formatDistance } from '../lib/flash.ts';
 import { pluralize } from '../lib/format.ts';
 import type { EventKind, ExploreEvent, ExplorePlace, ExploreResult } from '../lib/types.ts';
-import { useLongPress } from '../components/tile-press.tsx';
+import { useHoldPreview } from '../components/hold-preview.ts';
+import { createPortal } from 'react-dom';
 import { trackClick, useDwell } from '../components/dwell.tsx';
 import { trackSponsoredOpen, useSponsoredView } from '../components/sponsored-view.tsx';
 import { Link, navigate, useSearch } from '../router.tsx';
@@ -121,12 +122,12 @@ export function EventCard({ event, now, poster }: { event: ExploreEvent; now: Da
 /** Evento em lista (Explorar). */
 function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
   const adRef = useSponsoredView<HTMLLIElement>(event.sponsored === true, 'EXPLORE', { eventId: event.id });
-  // Segurar o card expande/recolhe com mais detalhes (descrição, endereço, horário completo).
-  const [expanded, setExpanded] = useState(false);
-  const press = useLongPress(() => setExpanded((v) => !v), true);
+  // Segurar o card abre uma prévia do evento (como ele fica aberto); soltar o dedo fecha.
+  const [preview, setPreview] = useState(false);
+  const press = useHoldPreview(() => setPreview(true), () => setPreview(false));
   return (
-    <li className={`evcard${isLiveNow(event, now) ? ' evcard--live' : ''}${expanded ? ' evcard--expanded' : ''}`} ref={adRef}>
-      <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link" {...press} aria-expanded={expanded} onClick={(ev) => { press.onClick?.(ev); if (ev.defaultPrevented) return; if (event.sponsored) trackSponsoredOpen('EXPLORE', { eventId: event.id }); }}>
+    <li className={`evcard${isLiveNow(event, now) ? ' evcard--live' : ''}`} ref={adRef}>
+      <Link to={`/eventos/${encodeURIComponent(event.id)}`} className="evcard__link" {...press} onClick={(ev) => { press.onClick?.(ev); if (ev.defaultPrevented) return; if (event.sponsored) trackSponsoredOpen('EXPLORE', { eventId: event.id }); }}>
         <EventCover event={event} shape={coverShape(event.id)} badge live={isLiveNow(event, now)} />
         <div className="evcard__body">
           <h3 className="evcard__title">{event.title}</h3>
@@ -139,17 +140,39 @@ function ListEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
           <p className="evcard__when">{formatWhen(event.startsAt, event.endsAt, now)}</p>
           {event.goingCount !== undefined ? <p className="evcard__hot">{t('{n} confirmados agora', { n: event.goingCount })}</p> : null}
           {event.distanceM !== null ? <p className="evcard__dist">{t('a {distance}', { distance: formatDistance(event.distanceM) })}</p> : null}
-          {expanded ? (
-            <div className="evcard__more">
-              {event.venue.address ? <p>{event.venue.address}</p> : null}
-              <p>{kindLabel(event.kind)}{event.isFree ? ` · ${t('Grátis')}` : ''}</p>
-              {event.description ? <p className="evcard__desc">{event.description}</p> : null}
-              {event.tags.length > 0 ? <p>{event.tags.slice(0, 5).map((tg) => `#${tg}`).join(' ')}</p> : null}
-            </div>
-          ) : null}
         </div>
       </Link>
+      {preview ? <EventPreview event={event} now={now} /> : null}
     </li>
+  );
+}
+
+/** Prévia que aparece enquanto o card é segurado: um mini "evento aberto". Não recebe toques (soltar o dedo fecha). */
+function EventPreview({ event, now }: { event: ExploreEvent; now: Date }) {
+  const image = safeImage(event.imageUrl);
+  const where = [event.venue.name, (event.venue.address ?? '').split(',')[0]?.trim()].filter(Boolean).join(' · ');
+  return createPortal(
+    <div className="evpreview" aria-hidden="true">
+      <div className={`evpreview__card evtone evtone-${eventTone(event.id)}`}>
+        <div className="evpreview__cover">
+          {image ? <img src={image} alt="" referrerPolicy="no-referrer" /> : <EventKindIcon kind={event.kind} />}
+          <div className="evpreview__shade" />
+          <div className="evpreview__head">
+            <span className="evhero__pill">{kindLabel(event.kind)}</span>
+            {event.isFree ? <span className="evhero__pill">{t('Grátis')}</span> : null}
+            <h3 className="evpreview__title">{event.title}</h3>
+            {where ? <p className="evpreview__place"><LocationIcon /><span>{where}</span></p> : null}
+          </div>
+        </div>
+        <div className="evpreview__body">
+          <p className="evpreview__when">{formatWhen(event.startsAt, event.endsAt, now)}</p>
+          {event.goingCount !== undefined ? <p>{t('{n} confirmados agora', { n: event.goingCount })}</p> : null}
+          {event.description ? <p className="evpreview__desc">{event.description}</p> : null}
+          {event.tags.length > 0 ? <p className="evpreview__tags">{event.tags.slice(0, 5).map((tg) => `#${tg}`).join(' ')}</p> : null}
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

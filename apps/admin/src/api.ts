@@ -1,7 +1,7 @@
 import { getPageSize } from './page-size.ts';
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -113,6 +113,10 @@ export const api = {
   },
   me: () => request<SessionUser>('GET', '/auth/me'),
   stats: () => request<Stats>('GET', '/admin/stats'),
+  hunter: (limit = 50, offset = 0) => request<HunterOverview>('GET', `/admin/hunter?limit=${limit}&offset=${offset}`),
+  setHunter: (enabled: boolean) => request<{ enabled: boolean }>('POST', '/admin/hunter/enabled', { enabled }),
+  removeHunterEvent: (ref: string) => request<{ removed: number }>('DELETE', `/admin/hunter/events/${encodeURIComponent(ref)}`),
+  removeAllHunterEvents: () => request<{ removed: number }>('DELETE', '/admin/hunter/events'),
   payments: () => request<PaymentsState>('GET', '/admin/payments'),
   setPayments: (enabled: boolean, note: string) => request<PaymentsState>('PUT', '/admin/payments', { enabled, note }),
   topInviters: (limit = 20) => request<TopInviter[]>('GET', `/admin/referrals/top${query({ limit })}`),

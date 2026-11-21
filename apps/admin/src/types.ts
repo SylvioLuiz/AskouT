@@ -291,6 +291,16 @@ export interface PaymentsState {
   updatedBy: string | null;
 }
 
+// ---------- Hunter ----------
+
+export interface HunterOverview {
+  enabled: boolean;
+  /** O servidor tem o token de serviço (HUNTER_SERVICE_TOKEN)? Sem ele o Hunter não liga. */
+  serviceConfigured: boolean;
+  total: number;
+  items: { ref: string; eventId: string; title: string; venueId: string; venueName: string; startsAt: string; createdAt: string }[];
+}
+
 // ---------- Retenção ----------
 
 export interface RetentionSource {

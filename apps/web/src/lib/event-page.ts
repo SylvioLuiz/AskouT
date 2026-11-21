@@ -64,6 +64,6 @@ export function eventLink(origin: string, eventId: string): string {
 
 /** Local resumido para a capa: nome do lugar + só o começo do endereço (rua e número). */
 export function venueShort(venue: EventPage['venue']): string {
-  const street = venue.address ? venue.address.split(',').slice(0, 2).join(',').trim() : '';
+  const street = venue.address ? (venue.address.split(',')[0] ?? '').trim() : '';
   return [venue.name, street].filter(Boolean).join(' · ');
 }
