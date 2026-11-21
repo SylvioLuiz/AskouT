@@ -44,7 +44,7 @@ export interface AlbumPhotoView {
 
 /** O álbum visto de dentro da página do evento. */
 export type EventAlbumView =
-  | { state: 'SOON'; startsAt: string }
+  | { state: 'SOON'; startsAt: string | null }
   | { state: 'LOCKED' }
   | { state: 'OPEN'; album: AlbumView };
 
@@ -88,6 +88,8 @@ export class AlbumService {
   async forEvent(viewerId: string, eventId: unknown): Promise<EventAlbumView> {
     if (!this.eventPages) throw notFound('Álbum não encontrado');
     const page = await this.eventPages.get(viewerId, eventId);
+    // Data ainda em votação: o álbum espera a data ser definida.
+    if (!page.startsAt) return { state: 'SOON', startsAt: null };
     const startedAt = new Date(page.startsAt);
     if (startedAt > this.deps.clock.now()) return { state: 'SOON', startsAt: page.startsAt };
     if (!page.going && !page.isOwner) return { state: 'LOCKED' };

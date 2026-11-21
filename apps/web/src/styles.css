@@ -7266,3 +7266,9 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .replybanner { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 6px; padding: 4px 4px 4px 12px; border-radius: 12px; background: var(--brand-soft); color: var(--ink); font-size: 0.8125rem; }
 .replybanner__close { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
 .replybanner__close svg { width: 16px; height: 16px; }
+
+/* Folha "Quando": deixar a data para uma votação. */
+.evwhen__poll { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+.evwhen__polltext { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.evwhen__polltext .muted { font-size: 0.85rem; }
+.evwhen__poll .switch { flex-shrink: 0; }

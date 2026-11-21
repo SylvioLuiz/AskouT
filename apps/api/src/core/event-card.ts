@@ -10,8 +10,9 @@ export interface EventCardView {
   imageUrl: string | null;
   venueId: string;
   venueName: string;
-  startsAt: string;
-  endsAt: string;
+  /** Nulo em evento de pessoa cuja data ainda vai ser decidida numa votação. */
+  startsAt: string | null;
+  endsAt: string | null;
   /** Dado de exemplo para teste, nunca um evento real. */
   sample: boolean;
   /** Evento criado por uma pessoa (id do post): `venueId` vem vazio e `venueName` é o lugar que ela escolheu. */
@@ -37,11 +38,11 @@ export async function buildEventCards(deps: CoreDeps, ids: string[]): Promise<Ma
   for (const { id, found, post } of looked) {
     if (!found) {
       const p = post?.post;
-      if (!p || !p.eventTitle || !p.eventStartsAt || !p.eventEndsAt || p.archivedAt) continue;
+      if (!p || !p.eventTitle || p.archivedAt) continue;
       // Capa: a primeira foto enviada (a rota da imagem é pública, o id é aleatório). Foto do Google fica de fora.
       const first = [...(post?.images ?? [])].sort((a, b) => a.position - b.position)[0];
       const cover = first?.isUpload ? `/posts/images/${first.id}` : null;
-      out.set(id, { id: p.id, title: p.eventTitle, kind: p.eventKind, isFree: false, imageUrl: cover, venueId: '', venueName: p.placeName ?? '', startsAt: p.eventStartsAt.toISOString(), endsAt: p.eventEndsAt.toISOString(), sample: false, userEvent: true, ownerId: p.authorId, private: p.eventPrivate === true });
+      out.set(id, { id: p.id, title: p.eventTitle, kind: p.eventKind, isFree: false, imageUrl: cover, venueId: '', venueName: p.placeName ?? '', startsAt: p.eventStartsAt ? p.eventStartsAt.toISOString() : null, endsAt: p.eventEndsAt ? p.eventEndsAt.toISOString() : null, sample: false, userEvent: true, ownerId: p.authorId, private: p.eventPrivate === true });
       continue;
     }
     const { event, venue } = found;

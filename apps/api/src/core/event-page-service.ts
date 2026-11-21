@@ -73,8 +73,8 @@ export interface ProfileStoryEventView {
   id: string;
   title: string;
   kind: EventKind;
-  startsAt: string;
-  endsAt: string;
+  startsAt: string | null;
+  endsAt: string | null;
   /** Nome do local (do evento do local ou o lugar informado no evento criado por uma pessoa). */
   place: string | null;
   address: string | null;
@@ -111,8 +111,9 @@ export interface EventPageView {
   title: string;
   description: string | null;
   kind: EventKind;
-  startsAt: string;
-  endsAt: string;
+  /** Nulo em evento de pessoa cuja data ainda vai ser decidida numa votação. */
+  startsAt: string | null;
+  endsAt: string | null;
   isFree: boolean;
   /** Dado de exemplo para teste, nunca um evento real. */
   sample: boolean;
@@ -229,7 +230,7 @@ export class EventPageService {
     if (await this.deps.places.findEvent(id)) return { ref: { source: 'PLACE', id }, owner: null };
     const found = await this.deps.posts.findById(id);
     const post = found?.post;
-    if (!post || post.eventTitle === null || !post.eventStartsAt || !post.eventEndsAt) throw notFound('Evento não encontrado');
+    if (!post || post.eventTitle === null) throw notFound('Evento não encontrado');
     if (post.archivedAt !== null && post.authorId !== viewerId) throw notFound('Evento não encontrado');
     if (post.authorId !== viewerId) {
       if (await this.deps.blocks.existsEitherWay(viewerId, post.authorId)) throw notFound('Evento não encontrado');
@@ -275,7 +276,7 @@ export class EventPageService {
       owner,
       isOwner,
       storyUserIds: [...new Set((await this.visibleStories(viewerId, ref, hidden)).map((s) => s.userId))],
-      canStory: (isOwner || iGo) && Date.parse(base.view.endsAt) > this.deps.clock.now().getTime(),
+      canStory: (isOwner || iGo) && base.view.endsAt !== null && Date.parse(base.view.endsAt) > this.deps.clock.now().getTime(),
       goingOnProfile: !isOwner && iGo ? (await this.deps.eventRoom.goingOnProfile(ref, viewerId)) === true : false,
     };
   }
@@ -336,7 +337,7 @@ export class EventPageService {
     const title = found?.post.eventTitle;
     const startsAt = found?.post.eventStartsAt;
     const endsAt = found?.post.eventEndsAt;
-    if (!found || !title || !startsAt || !endsAt) throw notFound('Evento não encontrado');
+    if (!found || !title) throw notFound('Evento não encontrado');
     const { post, images } = found;
     const first = [...images].sort((a, b) => a.position - b.position)[0];
     const cover: EventCoverView | null = !first ? null : first.isUpload ? { kind: 'UPLOAD', imageId: first.id } : first.placePhotoRef ? { kind: 'PLACE', photoRef: first.placePhotoRef, author: first.placePhotoAuthor } : null;
@@ -349,8 +350,8 @@ export class EventPageService {
         title,
         description: post.caption,
         kind: post.eventKind,
-        startsAt: startsAt.toISOString(),
-        endsAt: endsAt.toISOString(),
+        startsAt: startsAt ? startsAt.toISOString() : null,
+        endsAt: endsAt ? endsAt.toISOString() : null,
         isFree: false,
         sample: false,
         cover,
@@ -394,7 +395,8 @@ export class EventPageService {
         try {
           await this.resolve(viewerId, row.ref.id);
           const { view } = await this.base(viewerId, row.ref, {});
-          if (Date.parse(view.endsAt) < now) return undefined;
+          // Data ainda em votação: não entra na lista de "vou" (ela é ordenada pela data).
+          if (!view.startsAt || !view.endsAt || Date.parse(view.endsAt) < now) return undefined;
           return { id: view.id, source: view.source, title: view.title, startsAt: view.startsAt, endsAt: view.endsAt, venueName: view.venue.name === '' ? null : view.venue.name };
         } catch (failure) {
           if (!(failure instanceof DomainError)) throw failure;
@@ -458,7 +460,7 @@ export class EventPageService {
         return { ...card, attendedAt: row.createdAt.toISOString() };
       }),
     );
-    const all = checked.filter((v): v is AttendedEventView => v !== undefined).sort((a, b) => Date.parse(b.startsAt) - Date.parse(a.startsAt));
+    const all = checked.filter((v): v is AttendedEventView => v !== undefined).sort((a, b) => (b.startsAt ?? '9999').localeCompare(a.startsAt ?? '9999')); // sem data (em votação) vem primeiro
     return { items: all.slice(page.offset, page.offset + page.limit), total: all.length, ...page };
   }
 
@@ -682,6 +684,7 @@ export class EventPageService {
     if (!isOwner && !(await this.deps.eventRoom.isGoing(ref, viewerId))) throw forbidden('Confirme presença para publicar um flash neste evento');
     const { view } = await this.base(viewerId, ref, {});
     const now = this.deps.clock.now();
+    if (!view.endsAt) throw forbidden('A data do evento ainda está em votação');
     const endsAt = Date.parse(view.endsAt);
     if (endsAt <= now.getTime()) throw forbidden('Esse evento já terminou');
     const mine = (await this.deps.eventRoom.listStories(ref, now)).filter((s) => s.userId === viewerId);

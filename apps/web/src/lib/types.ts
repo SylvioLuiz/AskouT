@@ -435,8 +435,9 @@ export interface EventCard {
   imageUrl: string | null;
   venueId: string;
   venueName: string;
-  startsAt: string;
-  endsAt: string;
+  /** Nulo em evento de pessoa cuja data ainda vai ser decidida numa votação. */
+  startsAt: string | null;
+  endsAt: string | null;
   sample: boolean;
   /** Nos cartões da conversa: você já confirmou presença neste evento. */
   going?: boolean;
@@ -874,8 +875,9 @@ export interface EventPage {
   title: string;
   description: string | null;
   kind: EventKind;
-  startsAt: string;
-  endsAt: string;
+  /** Nulo em evento de pessoa cuja data ainda vai ser decidida numa votação. */
+  startsAt: string | null;
+  endsAt: string | null;
   isFree: boolean;
   /** Dado de exemplo para teste, nunca um evento real. */
   sample: boolean;
@@ -979,9 +981,10 @@ export interface PostView {
   placeVenueId?: string | null;
   placeAddress: string | null;
   /** Preenchido quando o post é um evento criado pela pessoa. */
-  event: { title: string; kind: EventKind; startsAt: string; endsAt: string; private?: boolean; extras?: EventExtraAnswer[] } | null;
+  /** `startsAt`/`endsAt` nulos: a data ainda vai ser decidida numa votação. */
+  event: { title: string; kind: EventKind; startsAt: string | null; endsAt: string | null; private?: boolean; extras?: EventExtraAnswer[] } | null;
   /** Evento ao qual o post (foto, vídeo ou só texto) está vinculado; o nome leva à página do evento. */
-  linkedEvent?: { id: string; source: 'PLACE' | 'USER'; title: string; startsAt: string } | null;
+  linkedEvent?: { id: string; source: 'PLACE' | 'USER'; title: string; startsAt: string | null } | null;
   createdAt: string;
   /** Pode vir vazio: post só de texto. */
   images: PostImage[];

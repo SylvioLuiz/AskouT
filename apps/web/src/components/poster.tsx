@@ -42,9 +42,10 @@ export function PosterEvent({
 }: {
   eventId: string;
   title: string;
-  startsAt: string;
+  /** Nulo: data ainda em votação (sem selo de data e sem "acabou"). */
+  startsAt: string | null;
   /** Fim do evento: depois dele não há mais "Eu vou". Sem fim, vale o começo. */
-  endsAt?: string;
+  endsAt?: string | null;
   whenText: string;
   venue: ReactNode;
   image: string | null;
@@ -91,7 +92,7 @@ export function PosterEvent({
     }
   }
 
-  const over = Date.parse(endsAt ?? startsAt) <= Date.now();
+  const over = startsAt !== null && Date.parse(endsAt ?? startsAt) <= Date.now();
   const label = confirmedLabel(confirmed);
   return (
     <article className={`poster poster--event${className ? ` ${className}` : ''}`}>
@@ -101,7 +102,7 @@ export function PosterEvent({
       <div className="poster__scrim" aria-hidden="true" />
       {/* O cartaz inteiro abre o evento; o título continua sendo o link para teclado e leitor de tela. */}
       <Link to={`/eventos/${encodeURIComponent(eventId)}`} className="poster__hit" tabIndex={-1} aria-hidden="true">{null}</Link>
-      <DateBadge startsAt={startsAt} />
+      {startsAt ? <DateBadge startsAt={startsAt} /> : null}
       {tags ? <div className="poster__tags">{tags}</div> : null}
       <div className="poster__info">
         <div className="poster__meta">
@@ -123,7 +124,7 @@ export function PosterEvent({
           )}
         </div>
       </div>
-      {choosing ? <GoingChoiceSheet event={{ id: eventId, startsAt, endsAt }} busy={busy} onChoose={(onProfile) => void toggle(onProfile)} onClose={() => setChoosing(false)} /> : null}
+      {choosing ? <GoingChoiceSheet {...(startsAt ? { event: { id: eventId, startsAt, ...(endsAt ? { endsAt } : {}) } } : {})} busy={busy} onChoose={(onProfile) => void toggle(onProfile)} onClose={() => setChoosing(false)} /> : null}
     </article>
   );
 }

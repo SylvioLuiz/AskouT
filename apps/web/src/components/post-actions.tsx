@@ -407,8 +407,8 @@ export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { p
   const [kind, setKind] = useState<'POST' | 'EVENT'>(post.event ? 'EVENT' : 'POST');
   const [title, setTitle] = useState(post.event?.title ?? '');
   const [eventKind, setEventKind] = useState<EventKind>(post.event?.kind ?? 'OTHER');
-  const [starts, setStarts] = useState(post.event ? isoToLocalInput(post.event.startsAt) : '');
-  const [ends, setEnds] = useState(post.event ? isoToLocalInput(post.event.endsAt) : '');
+  const [starts, setStarts] = useState(post.event?.startsAt ? isoToLocalInput(post.event.startsAt) : '');
+  const [ends, setEnds] = useState(post.event?.endsAt ? isoToLocalInput(post.event.endsAt) : '');
   const [extras, setExtras] = useState<EventExtrasDraft>(() => extrasDraftFrom(post.event?.extras));
   const extraOptions = useAsync(() => (kind === 'EVENT' ? api.eventExtras().then((r) => r.items) : Promise.resolve(null)), [kind === 'EVENT']);
   const [busy, setBusy] = useState(false);
@@ -418,9 +418,11 @@ export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { p
     setMessage(undefined);
     const place = placeName.trim() ? { name: placeName.trim(), address: placeAddress.trim() || null } : null;
     // O início só precisa estar no futuro se a pessoa mudou o horário.
-    const unchanged = post.event && starts === isoToLocalInput(post.event.startsAt);
+    const unchanged = post.event?.startsAt && starts === isoToLocalInput(post.event.startsAt);
+    // Evento cuja data ainda está em votação: sem data nova, continua esperando a votação.
+    const dateByPoll = post.event !== null && post.event.startsAt === null && !starts;
     if (kind === 'EVENT') {
-      const problem = eventProblem({ title, kind: eventKind, startsAt: starts, endsAt: ends }, place, unchanged ? new Date(0) : new Date());
+      const problem = eventProblem({ title, kind: eventKind, startsAt: starts, endsAt: ends, dateByPoll }, place, unchanged ? new Date(0) : new Date());
       if (problem) {
         setMessage({ tone: 'error', text: problem });
         return;

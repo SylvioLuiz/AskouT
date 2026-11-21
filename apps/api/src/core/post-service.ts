@@ -42,7 +42,7 @@ export interface PostInput {
   linkedEventId?: unknown;
   /** Amigos marcados (até 10). Cada um precisa aceitar para o post entrar no feed e no perfil dele. */
   tagUserIds?: unknown;
-  /** Evento criado pela pessoa: `{title, startsAt, endsAt?}` (ISO). O lugar é opcional. */
+  /** Evento criado pela pessoa: `{title, startsAt, endsAt?}` (ISO), ou `{title, dateByPoll: true}` sem data (decidida numa votação). O lugar é opcional. */
   event?: unknown;
   /** Votação de datas concluída da qual este evento é consequência (só quem organizou a votação). */
   datePollId?: unknown;
@@ -63,14 +63,18 @@ export interface PostLinkedEventView {
   id: string;
   source: 'PLACE' | 'USER';
   title: string;
-  startsAt: string;
+  startsAt: string | null;
 }
+
+/** Evento lido do pedido: sem início nem fim enquanto a data espera a votação. */
+type ParsedEvent = { title: string; startsAt: Date | null; endsAt: Date | null; kind: EventKind };
 
 export interface PostEventView {
   title: string;
   kind: EventKind;
-  startsAt: string;
-  endsAt: string;
+  /** Nulos quando a data ainda vai ser decidida numa votação. */
+  startsAt: string | null;
+  endsAt: string | null;
   /** Evento privado: só o dono e quem recebeu o cartão numa conversa. */
   private: boolean;
   /** Respostas às configurações de evento (para preencher a edição). */
@@ -510,11 +514,12 @@ export class PostService {
     // Escolheu outro local do AskouT: vincula. Digitou outro nome sem escolher: o vínculo antigo não vale mais.
     const placeVenueId =
       input.placeVenueId !== undefined ? ((await this.placeVenue(input.placeVenueId))?.id ?? null) : placeName === post.placeName ? (post.placeVenueId ?? null) : null;
-    let event: { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null;
+    let event: ParsedEvent | null;
     if (input.event === undefined) {
-      event = post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, startsAt: post.eventStartsAt, endsAt: post.eventEndsAt, kind: post.eventKind } : null;
+      event = post.eventTitle ? { title: post.eventTitle, startsAt: post.eventStartsAt, endsAt: post.eventEndsAt, kind: post.eventKind } : null;
     } else {
-      event = this.parseEvent(input.event, placeName, post.eventStartsAt, post.eventKind);
+      // Evento que ainda espera a votação continua sem data se a edição não trouxer uma.
+      event = this.parseEvent(input.event, placeName, post.eventStartsAt, post.eventKind, post.eventTitle !== null && post.eventStartsAt === null);
     }
     // `event.extras` ausente mantém as respostas; virar post comum apaga.
     const rawExtras = input.event !== undefined && input.event !== null ? (input.event as { extras?: unknown }).extras : undefined;
@@ -738,7 +743,7 @@ export class PostService {
     if (await this.deps.places.findEvent(raw)) return { id: raw };
     const found = await this.deps.posts.findById(raw);
     const post = found?.post;
-    if (!post || post.eventTitle === null || !post.eventStartsAt || !post.eventEndsAt) throw invalid();
+    if (!post || post.eventTitle === null) throw invalid();
     if (post.authorId === actorId) return { id: post.id };
     if (post.archivedAt !== null) throw invalid();
     if (await this.deps.blocks.existsEitherWay(actorId, post.authorId)) throw invalid();
@@ -757,20 +762,21 @@ export class PostService {
         continue;
       }
       const post = (await this.deps.posts.findById(id))?.post;
-      if (!post || post.eventTitle === null || !post.eventStartsAt || !post.eventEndsAt) continue;
+      if (!post || post.eventTitle === null) continue;
       if (post.authorId !== viewerId) {
         if (post.archivedAt !== null) continue;
         if (post.eventPrivate && !(await this.openedByCard(viewerId, post))) continue;
       }
-      out.set(id, { id, source: 'USER', title: post.eventTitle, startsAt: post.eventStartsAt.toISOString() });
+      out.set(id, { id, source: 'USER', title: post.eventTitle, startsAt: post.eventStartsAt ? post.eventStartsAt.toISOString() : null });
     }
     return out;
   }
 
-  private parseEvent(raw: unknown, placeName: string | null, keepStart?: Date | null, keepKind?: EventKind): { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null {
+  /** `keepUndated`: editando um evento que ainda espera a votação, sem data nova continua sem data. */
+  private parseEvent(raw: unknown, placeName: string | null, keepStart?: Date | null, keepKind?: EventKind, keepUndated = false): ParsedEvent | null {
     if (raw === undefined || raw === null) return null;
     if (typeof raw !== 'object' || Array.isArray(raw)) throw validationError('Evento inválido', { event: 'Dados do evento inválidos' });
-    const e = raw as { title?: unknown; startsAt?: unknown; endsAt?: unknown; kind?: unknown };
+    const e = raw as { title?: unknown; startsAt?: unknown; endsAt?: unknown; kind?: unknown; dateByPoll?: unknown };
     let kind: EventKind = keepKind ?? 'OTHER';
     if (e.kind !== undefined && e.kind !== null) {
       if (typeof e.kind !== 'string' || !(EVENT_KINDS as readonly string[]).includes(e.kind)) throw validationError('Evento inválido', { event: 'Tipo de evento inválido' });
@@ -783,6 +789,10 @@ export class PostService {
       if (Number.isNaN(d.getTime())) throw validationError('Evento inválido', { event: `${label} inválido` });
       return d;
     };
+    // Sem data só quando ela vai ser decidida numa votação (pedido explícito, ou o evento já estava assim).
+    const noStart = e.startsAt === undefined || e.startsAt === null || e.startsAt === '';
+    if (noStart && (e.dateByPoll === true || keepUndated)) return { title, startsAt: null, endsAt: null, kind };
+    if (e.dateByPoll !== undefined && typeof e.dateByPoll !== 'boolean') throw validationError('Evento inválido', { event: 'Use true ou false em dateByPoll' });
     const now = this.deps.clock.now().getTime();
     const startsAt = date(e.startsAt, 'Início');
     // Data no passado vale (registrar um rolê que já rolou), até 2 anos atrás; quem mantém o início de antes nunca esbarra nisso.
@@ -908,7 +918,7 @@ export class PostService {
           placeName: post.placeName,
           placeVenueId: post.venueId ? post.venueId : post.placeVenueId ? post.placeVenueId : post.placeName ? (placeVenues.get(post.placeName.trim().toLowerCase()) ?? null) : null,
           placeAddress: post.placeAddress,
-          event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString(), private: post.eventPrivate === true, extras: post.eventExtras ?? [] } : null,
+          event: post.eventTitle ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt ? post.eventStartsAt.toISOString() : null, endsAt: post.eventEndsAt ? post.eventEndsAt.toISOString() : null, private: post.eventPrivate === true, extras: post.eventExtras ?? [] } : null,
           linkedEvent: (post.linkedEventId && !post.eventTitle ? linked.get(post.linkedEventId) : undefined) ?? null,
           createdAt: post.createdAt.toISOString(),
           mine: post.authorId === viewerId,

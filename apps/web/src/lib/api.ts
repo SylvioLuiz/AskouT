@@ -289,7 +289,7 @@ export function createApi(deps: ApiDeps) {
     sendGif: (conversationId: string, gif: CommentGif, replyToId?: string) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { gif, ...(replyToId ? { replyToId } : {}) } }),
     sendEvent: (conversationId: string, eventId: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { eventId } }),
-    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; placeVenueId?: string; linkedEventId?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; private?: boolean; extras?: EventExtraAnswer[] }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
+    createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; placeVenueId?: string; linkedEventId?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt?: string | null; endsAt?: string | null; dateByPoll?: boolean; private?: boolean; extras?: EventExtraAnswer[] }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
     /** Configurações de evento cadastradas pela gestão, para responder ao criar ou editar um evento. */
     eventExtras: () => request<{ items: EventExtraOption[] }>('GET', '/event-extras'),
     /** Gostos de rolê cadastrados pela gestão (cadastro, configurações e filtro do Explorar). */
@@ -548,7 +548,7 @@ export function createApi(deps: ApiDeps) {
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
       request<EventPage>('GET', `${visitor() ? '/public' : ''}/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`, visitor() ? { auth: false } : {}),
     /** Aba Álbum do evento: SOON antes de começar, LOCKED para quem não confirmou, OPEN com o álbum. */
-    eventAlbum: (eventId: string) => request<{ state: 'SOON'; startsAt: string } | { state: 'LOCKED' } | { state: 'OPEN'; album: AlbumDetail }>('GET', `/events/${id(eventId)}/album`),
+    eventAlbum: (eventId: string) => request<{ state: 'SOON'; startsAt: string | null } | { state: 'LOCKED' } | { state: 'OPEN'; album: AlbumDetail }>('GET', `/events/${id(eventId)}/album`),
     eventStories: (eventId: string) => request<{ groups: EventStoryGroup[] }>('GET', `/events/${id(eventId)}/stories`),
     /**
      * `onProfile`: publica também no perfil, para os amigos verem na página inicial.

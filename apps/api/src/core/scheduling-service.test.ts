@@ -334,3 +334,29 @@ test('editar: só quem organiza muda nome, datas e regra; dias novos reabrem que
   await w.core.scheduling.cancel(ana, poll.id);
   await rejectsWith(w.core.scheduling.update(ana, poll.id, { title: 'Tarde demais' }), 'CONFLICT');
 });
+
+test('evento sem data decidida por votação: cria sem data, a votação liga ao evento e, ao fechar, o evento ganha o dia', async () => {
+  const { w, ana, bia, caio, dani, group } = await setup('MAJORITY');
+  // Sem data só com dateByPoll.
+  await rejectsWith(w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Aniversário' } }), 'VALIDATION');
+  const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Aniversário', dateByPoll: true } });
+  assert.equal(post.event?.startsAt, null);
+  assert.equal(post.event?.endsAt, null);
+  const page = await w.core.eventPages.get(ana, post.id);
+  assert.equal(page.startsAt, null);
+  // Só o dono liga a votação a um evento seu sem data.
+  await rejectsWith(w.core.scheduling.create(bia, group.id, { title: 'X', rangeStart: '2026-10-20', rangeEnd: '2026-10-22', eventPostId: post.id }), 'VALIDATION');
+  const poll = await w.core.scheduling.create(ana, group.id, { title: 'Aniversário', rangeStart: '2026-10-20', rangeEnd: '2026-10-22', eventPostId: post.id });
+  await rejectsWith(w.core.scheduling.create(ana, group.id, { title: 'De novo', rangeStart: '2026-10-20', rangeEnd: '2026-10-22', eventPostId: post.id }), 'CONFLICT');
+  for (const id of [ana, bia, caio]) await w.core.scheduling.vote(id, poll.id, { status: 'YES', dates: ['2026-10-21'] });
+  for (const id of [ana, bia, caio, dani]) await w.core.scheduling.finish(id, poll.id, true);
+  const v = await w.core.scheduling.confirmBest(ana, poll.id, '2026-10-21');
+  assert.equal(v.status, 'FINALIZED');
+  const after = await w.core.eventPages.get(bia, post.id);
+  assert.equal(after.startsAt, v.final?.startsAt);
+  assert.equal(after.endsAt, v.final?.endsAt);
+  assert.equal(after.going, true, 'quem votou "posso" já vai');
+  // Com data, a edição sem data nova mantém a data.
+  const edited = await w.core.posts.update(ana, post.id, { event: { title: 'Aniversário da Ana', startsAt: v.final!.startsAt } });
+  assert.equal(edited.event?.startsAt, v.final?.startsAt);
+});

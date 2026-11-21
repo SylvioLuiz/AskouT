@@ -5,6 +5,7 @@ import { CalendarIcon, CarouselIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon
 import { EventAudienceSheet, EventKindSheet, EventRow, EventWhenSheet } from '../components/event-compose.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
+import { PollChatSheet } from '../components/poll-chat-sheet.tsx';
 import { CropEditor } from '../components/crop.tsx';
 import { EventDates } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
@@ -231,13 +232,16 @@ export function CreatePostScreen() {
   const [eventStart, setEventStart] = useState(startAsEvent ? (prefill.get('inicio') ?? '') : '');
   const [eventEnd, setEventEnd] = useState(startAsEvent ? (prefill.get('fim') ?? '') : '');
   const [eventPrivate, setEventPrivate] = useState(false);
+  // Data decidida depois, numa votação: o evento nasce sem data.
+  const [eventDateByPoll, setEventDateByPoll] = useState(false);
   // Configurações de evento da gestão ("Pode fumar?", "Estacionamento"...), respondidas num acordeon recolhido.
   const [extras, setExtras] = useState<EventExtrasDraft>({});
   const extraOptions = useAsync(() => (kind === 'EVENT' ? api.eventExtras().then((r) => r.items) : Promise.resolve(null)), [kind === 'EVENT']);
   // A conversa da votação já vem marcada no passo de enviar, que aparece depois que o evento é criado.
   const pollConversation = fromPoll ? prefill.get('conversa') : null;
   // Evento criado: em vez de sair direto, mostra o passo "Enviar para conversas".
-  const [created, setCreated] = useState<{ id: string; title: string; private: boolean; cover: string | undefined } | undefined>();
+  const [created, setCreated] = useState<{ id: string; title: string; private: boolean; cover: string | undefined; dateByPoll: boolean } | undefined>();
+  const [pickingPollChat, setPickingPollChat] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [sharingOutside, setSharingOutside] = useState(false);
   const [sharedOnce, setSharedOnce] = useState(false);
@@ -337,7 +341,7 @@ export function CreatePostScreen() {
   async function publish() {
     setBusy(true);
     setMessage(undefined);
-    const eventDraft = kind === 'EVENT' ? { title: eventTitle, kind: eventKind, startsAt: eventStart, endsAt: eventEnd, private: eventPrivate, extras: extrasFromDraft(extras, extraOptions.data ?? []) } : null;
+    const eventDraft = kind === 'EVENT' ? { title: eventTitle, kind: eventKind, startsAt: eventDateByPoll ? '' : eventStart, endsAt: eventDateByPoll ? '' : eventEnd, dateByPoll: eventDateByPoll, private: eventPrivate, extras: extrasFromDraft(extras, extraOptions.data ?? []) } : null;
     const problem = eventDraft && items.length === 0 ? t('Escolha uma capa para o evento.') : eventDraft ? eventProblem(eventDraft, effectivePlace(items, linked), new Date()) : postProblem({ items: items.length, caption, place: effectivePlace(items, linked), event: linkedEvent });
     if (problem) {
       setMessage({ tone: 'error', text: problem });
@@ -374,8 +378,11 @@ export function CreatePostScreen() {
       setUpload(undefined);
       if (created.event) {
         // O evento já existe: agora (e só agora) vem o passo de enviar para conversas, que dá para pular.
-        setCreated({ id: created.id, title: created.event.title, private: eventPrivate, cover: items[0]?.preview });
-        setSharing(true);
+        const byPoll = created.event.startsAt === null;
+        setCreated({ id: created.id, title: created.event.title, private: eventPrivate, cover: items[0]?.preview, dateByPoll: byPoll });
+        // Data por votação: o próximo passo é escolher a conversa da votação; senão, enviar para conversas.
+        if (byPoll) setPickingPollChat(true);
+        else setSharing(true);
         setBusy(false);
         return;
       }
@@ -460,7 +467,15 @@ export function CreatePostScreen() {
               ? t('Seu evento privado está pronto. Ele só chega a quem receber nas conversas.')
               : t('Seu evento está pronto e já aparece no seu perfil.')}
           </p>
-          <Button full onClick={() => setSharing(true)}>
+          {created.dateByPoll ? (
+            <>
+              <p className="muted">{t('A data vai ser decidida numa votação. Escolha a conversa ou o grupo que vai votar.')}</p>
+              <Button full onClick={() => setPickingPollChat(true)}>
+                <CalendarIcon /> {t('Abrir a votação da data')}
+              </Button>
+            </>
+          ) : null}
+          <Button full variant={created.dateByPoll ? 'secondary' : 'primary'} onClick={() => setSharing(true)}>
             <SendIcon /> {sharedOnce ? t('Enviar para mais conversas') : t('Enviar para conversas e grupos')}
           </Button>
           {created.private ? null : (
@@ -488,6 +503,12 @@ export function CreatePostScreen() {
             onClose={() => setSharing(false)}
           />
         ) : null}
+        {pickingPollChat ? (
+          <PollChatSheet
+            onPick={(conversationId) => navigate(`/planejar/nova/${encodeURIComponent(conversationId)}?${new URLSearchParams({ evento: created.id, titulo: created.title }).toString()}`)}
+            onClose={() => setPickingPollChat(false)}
+          />
+        ) : null}
         {sharingOutside ? (
           <ShareEventSheet
             eventId={created.id}
@@ -508,9 +529,9 @@ export function CreatePostScreen() {
 
   if (step === 'details' && kind === 'EVENT') {
     // Tela única do evento: capa no topo, nome grande e as linhas Quando / Onde / Tipo / Quem vê, cada uma com sua folha.
-    const missing = [eventTitle.trim() ? null : t('nome'), eventStart ? null : t('data'), cover ? null : t('capa')].filter((m): m is string => m !== null);
+    const missing = [eventTitle.trim() ? null : t('nome'), eventStart || eventDateByPoll ? null : t('data'), cover ? null : t('capa')].filter((m): m is string => m !== null);
     const missingText = missing.length > 0 ? t('Falta: {what}', { what: missing.length > 1 ? `${missing.slice(0, -1).join(', ')} ${t('e')} ${missing[missing.length - 1]}` : missing[0]! }) : null;
-    const when = whenLabel(eventStart, eventEnd, new Date());
+    const when = eventDateByPoll ? t('Por votação') : whenLabel(eventStart, eventEnd, new Date());
     const kindLabel = KINDS.find((k) => k.id === eventKind)?.label ?? t('Outros');
     const linkedPhoto = linked?.photo && !(placePhoto && placePhoto.placeName === linked.name) ? linked.photo : null;
     const extrasAnswered = extrasFromDraft(extras, extraOptions.data ?? []).length;
@@ -663,9 +684,15 @@ export function CreatePostScreen() {
           <EventWhenSheet
             starts={eventStart}
             ends={eventEnd}
-            onDone={(s, e) => {
-              setEventStart(s);
-              setEventEnd(e);
+            dateByPoll={eventDateByPoll}
+            // Vindo de uma votação já fechada, a data já está decidida.
+            allowPoll={!fromPoll}
+            onDone={(s, e, byPoll) => {
+              setEventDateByPoll(byPoll);
+              if (!byPoll) {
+                setEventStart(s);
+                setEventEnd(e);
+              }
               setSheet(undefined);
             }}
             onClose={() => setSheet(undefined)}
