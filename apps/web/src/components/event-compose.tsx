@@ -4,7 +4,7 @@ import { Sheet } from './agenda.tsx';
 import { ChevronRightIcon, EventKindIcon, GlobeIcon, LockIcon } from './icons.tsx';
 import { Button, Field } from './ui.tsx';
 import { KINDS } from '../lib/explore.ts';
-import { addHoursLocal, joinLocal, localDate, QUICK_TIMES, splitLocal, upcomingDays } from '../lib/event-when.ts';
+import { addHoursLocal, joinLocal, QUICK_TIMES, splitLocal, upcomingDays } from '../lib/event-when.ts';
 import type { EventKind } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
@@ -48,7 +48,6 @@ export function EventWhenSheet({ starts, ends, onDone, onClose }: { starts: stri
   const [end, setEnd] = useState(ends);
   const [withEnd, setWithEnd] = useState(ends !== '');
   const start = joinLocal(date, time);
-  const today = localDate(now);
 
   function addEnd() {
     setWithEnd(true);
@@ -66,7 +65,7 @@ export function EventWhenSheet({ starts, ends, onDone, onClose }: { starts: stri
             </button>
           ))}
         </div>
-        <Field label={t('Outra data')} type="date" value={date} onChange={setDate} min={today} />
+        <Field label={t('Outra data')} type="date" value={date} onChange={setDate} />
         <div className="evwhen__label" id="evwhen-times">
           {t('Começa às')}
         </div>

@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>O AskouT lê só os horários ocupados das agendas que você escolher, para mostrar na sua agenda e achar horários livres com seus amigos. Títulos e detalhes não saem do celular.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>O AskouT abre a tela de novo evento da sua agenda, já preenchida, quando você toca em "Adicionar à agenda". Você confere e salva.</string>
 	<key>NSCalendarsUsageDescription</key>
 	<string>O AskouT lê só os horários ocupados das agendas que você escolher, para mostrar na sua agenda e achar horários livres com seus amigos. Títulos e detalhes não saem do celular.</string>
 	<key>NSContactsUsageDescription</key>

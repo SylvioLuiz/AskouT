@@ -147,10 +147,10 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
   );
 }
 
-export function PostCard({ post: initial, onGone, asEvent, poster, track }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean; poster?: boolean; track?: DwellSource }) {
+export function PostCard({ post: initial, onGone, asEvent, poster, track, openComments }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean; poster?: boolean; track?: DwellSource; /** Abre já com os comentários à vista (veio de um aviso de comentário). */ openComments?: boolean }) {
   const dwellRef = useDwell<HTMLElement>('POST', initial.id, track ?? false);
   const [post, setPost] = useState(initial);
-  const [sheet, setSheet] = useState<'menu' | 'edit' | 'adjust' | 'report' | 'comments' | 'share' | undefined>();
+  const [sheet, setSheet] = useState<'menu' | 'edit' | 'adjust' | 'report' | 'comments' | 'share' | undefined>(openComments ? 'comments' : undefined);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [myTag, setMyTag] = useState(initial.myTag);
@@ -373,7 +373,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
         </div>
       ) : null}
       {eventCard || cartaz ? null : textOnly ? (post.caption ? <p className="post__textonly">{post.caption}</p> : null) : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} onOpen={openMedia} />}
-      {viewing !== undefined ? <PhotoViewer images={post.images} start={viewing} onClose={() => setViewing(undefined)} /> : null}
+      {viewing !== undefined ? <PhotoViewer images={post.images} start={viewing} onClose={() => setViewing(undefined)} downloadName={`askout-${post.author.username}`} /> : null}
       {cartaz ? null : (
       <div className="post__actions" role="group" aria-label={t('Ações do post')}>
         <button type="button" className={`post__action${post.likedByMe ? ' post__action--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? t('Descurtir') : t('Curtir')}>

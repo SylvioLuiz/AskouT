@@ -355,7 +355,7 @@ export function createApi(deps: ApiDeps) {
     likePost: (postId: string) => request<{ liked: true; likeCount: number }>('POST', `/posts/${id(postId)}/like`),
     unlikePost: (postId: string) => request<{ liked: false; likeCount: number }>('DELETE', `/posts/${id(postId)}/like`),
     postComments: (postId: string, page?: PageRequest) => request<PostCommentsPage>('GET', `/posts/${id(postId)}/comments${pageQuery(page)}`),
-    addComment: (postId: string, body: string, gif?: CommentGif) => request<PostComment>('POST', `/posts/${id(postId)}/comments`, { body: { body, ...(gif ? { gif } : {}) } }),
+    addComment: (postId: string, body: string, gif?: CommentGif, replyTo?: string) => request<PostComment>('POST', `/posts/${id(postId)}/comments`, { body: { body, ...(gif ? { gif } : {}), ...(replyTo ? { replyTo } : {}) } }),
     gifStatus: () => request<{ enabled: boolean }>('GET', '/gifs/status'),
     gifs: (q: string, offset: number, lang: string) => request<GifResults>('GET', `/gifs${toQuery({ q: q.trim() || undefined, offset: offset || undefined, lang })}`),
     likeComment: (postId: string, commentId: string, liked: boolean) =>
@@ -430,6 +430,7 @@ export function createApi(deps: ApiDeps) {
     flashOn: (minutes: number, note: string, area?: { lat: number; lng: number }) =>
       request<FlashStatus>('POST', '/me/flash', { body: { minutes, ...(note === '' ? {} : { note }), ...(area ?? {}) } }),
     flashExtend: (minutes: 30 | 60) => request<FlashStatus>('POST', '/me/flash/extend', { body: { minutes } }),
+    flashSetNote: (note: string) => request<FlashStatus>('PUT', '/me/flash/note', { body: { note } }),
     flashOff: () => request<{ ended: boolean }>('DELETE', '/me/flash'),
     flashActive: () => request<{ userIds: string[] }>('GET', '/flash/active'),
     flashVisibility: (userId: string) => request<FlashVisibility>('GET', `/flash/visibility/${id(userId)}`),
@@ -651,7 +652,7 @@ export function createApi(deps: ApiDeps) {
     rejectFeedPost: (postId: string) => request<{ rejected: true }>('POST', `/feed/posts/${id(postId)}/reject`),
     reactFeedPost: (postId: string, emoji: string | null) => request<FeedReactions>('PUT', `/feed/posts/${id(postId)}/reaction`, { body: { emoji } }),
     feedComments: (postId: string, cursor?: string | null) => request<{ items: FeedComment[]; nextCursor: string | null }>('GET', `/feed/posts/${id(postId)}/comments${toQuery({ cursor: cursor ?? undefined })}`),
-    addFeedComment: (postId: string, body: string, gif?: CommentGif) => request<FeedComment>('POST', `/feed/posts/${id(postId)}/comments`, { body: { body, ...(gif ? { gif } : {}) } }),
+    addFeedComment: (postId: string, body: string, gif?: CommentGif, replyTo?: string) => request<FeedComment>('POST', `/feed/posts/${id(postId)}/comments`, { body: { body, ...(gif ? { gif } : {}), ...(replyTo ? { replyTo } : {}) } }),
     deleteFeedComment: (commentId: string) => request<{ deleted: true }>('DELETE', `/feed/comments/${id(commentId)}`),
     reactFeedComment: (commentId: string, emoji: string | null) => request<FeedReactions>('PUT', `/feed/comments/${id(commentId)}/reaction`, { body: { emoji } }),
     reportFeedPost: (postId: string, reason: ReportReason, details?: string) => request<{ reported: true }>('POST', `/feed/posts/${id(postId)}/report`, { body: { reason, ...(details ? { details } : {}) } }),

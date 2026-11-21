@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { useAlbumPhoto } from '../components/album-photo.tsx';
+import { saveImages } from '../lib/save-file.ts';
+import { showToast } from '../lib/toast.ts';
 import { PhotoIcon } from '../components/icons.tsx';
 import { AvatarViewer } from '../components/photo-viewer.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
@@ -143,9 +145,35 @@ function MyPhotoSheet({ album, photo, onClose, onView, onDeleted }: { album: Alb
   );
 }
 
-function ViewOnly({ albumId, photoId, onClose }: { albumId: string; photoId: string; onClose: () => void }) {
+function ViewOnly({ albumId, photoId, name, onClose }: { albumId: string; photoId: string; name: string; onClose: () => void }) {
   const { url } = useAlbumPhoto(albumId, photoId);
-  return url ? <AvatarViewer url={url} onClose={onClose} /> : null;
+  return url ? <AvatarViewer url={url} onClose={onClose} downloadName={name} /> : null;
+}
+
+/** Baixa todas as fotos do álbum de uma vez (no celular, um só menu com "Salvar imagens"). */
+function DownloadAll({ album }: { album: AlbumDetail }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  async function run() {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const base = `askout-${albumName(album)}`;
+      const images = await Promise.all(album.photos.map(async (photo, i) => ({ blob: await api.albumPhoto(album.id, photo.id), name: `${base}-${i + 1}` })));
+      if (await saveImages(images)) showToast(album.photos.length === 1 ? t('Foto salva') : t('Fotos salvas'), 1400);
+    } catch (failure) {
+      setError(failure instanceof Error && !('code' in failure) ? t('Não foi possível baixar as fotos.') : toApiError(failure).message);
+    }
+    setBusy(false);
+  }
+  return (
+    <>
+      <Button full variant="secondary" loading={busy} onClick={() => void run()}>
+        {album.photos.length === 1 ? t('Baixar foto') : t('Baixar todas as fotos ({n})', { n: album.photos.length })}
+      </Button>
+      {error ? <Notice tone="error">{error}</Notice> : null}
+    </>
+  );
 }
 
 export function AlbumScreen({ albumId }: { albumId: string }) {
@@ -215,11 +243,14 @@ export function AlbumContent({ albumId, embedded = false }: { albumId: string; e
       {data.photos.length === 0 ? (
         <EmptyState title={t('Nenhuma foto ainda')}>{t('Seja o primeiro a adicionar uma foto do encontro.')}</EmptyState>
       ) : (
+        <>
         <div className="albumgrid">
           {data.photos.map((photo) => (
             <Thumb key={photo.id} albumId={data.id} photoId={photo.id} onOpen={() => (photo.mine ? setMine(photo) : setViewing(photo.id))} />
           ))}
         </div>
+        <DownloadAll album={data} />
+        </>
       )}
       {mine ? (
         <MyPhotoSheet
@@ -236,7 +267,7 @@ export function AlbumContent({ albumId, embedded = false }: { albumId: string; e
           }}
         />
       ) : null}
-      {viewing ? <ViewOnly albumId={data.id} photoId={viewing} onClose={() => setViewing(undefined)} /> : null}
+      {viewing ? <ViewOnly albumId={data.id} photoId={viewing} name={`askout-${albumName(data)}-${data.photos.findIndex((p) => p.id === viewing) + 1}`} onClose={() => setViewing(undefined)} /> : null}
     </>
   );
 }

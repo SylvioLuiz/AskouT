@@ -267,7 +267,7 @@ export class PrismaPostRepository implements PostRepository {
   }
 
   async addComment(comment: PostCommentRecord): Promise<void> {
-    await this.prisma.postComment.create({ data: { id: comment.id, postId: comment.postId, authorId: comment.authorId, body: comment.body, createdAt: comment.createdAt, venueId: comment.venueId ?? null, gifId: comment.gifId ?? null, gifUrl: comment.gifUrl ?? null } });
+    await this.prisma.postComment.create({ data: { id: comment.id, postId: comment.postId, authorId: comment.authorId, body: comment.body, createdAt: comment.createdAt, venueId: comment.venueId ?? null, gifId: comment.gifId ?? null, gifUrl: comment.gifUrl ?? null, parentId: comment.parentId ?? null } });
   }
 
   async findComment(id: string): Promise<PostCommentRecord | undefined> {

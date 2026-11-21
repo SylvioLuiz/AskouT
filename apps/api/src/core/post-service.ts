@@ -157,6 +157,8 @@ export interface PostCommentView {
   likedByMe: boolean;
   /** Nomes de usuário marcados com @ que existem (a tela só faz link para estes). */
   mentions: string[];
+  /** Resposta: o comentário de cima da conversa. */
+  parentId: string | null;
 }
 
 export interface PostCommentsPage {
@@ -363,23 +365,33 @@ export class PostService {
     return { items: await this.commentViews(viewerId, post.authorId, rows.slice(0, page.limit)), ...page, hasMore };
   }
 
-  async addComment(viewerId: string, postId: unknown, body: unknown, rawGif?: unknown): Promise<PostCommentView> {
+  /** `replyTo`: o comentário respondido. A resposta fica sempre debaixo do comentário de cima da conversa. */
+  async addComment(viewerId: string, postId: unknown, body: unknown, rawGif?: unknown, replyTo?: unknown): Promise<PostCommentView> {
     const { post } = await this.seeable(viewerId, postId);
     const text = optionalText(body, POST_COMMENT_MAX, 'body', 'Comentário') ?? '';
     const gif = parseCommentGif(rawGif);
     if (!text && !gif) throw validationError('Comentário vazio', { body: 'Escreva algo para comentar' });
+    let replied: PostCommentRecord | undefined;
+    if (replyTo !== undefined && replyTo !== null) {
+      replied = typeof replyTo === 'string' && replyTo.length <= 64 ? await this.deps.posts.findComment(replyTo) : undefined;
+      if (!replied || replied.postId !== post.id || (replied.authorId !== viewerId && (await this.deps.blocks.existsEitherWay(viewerId, replied.authorId)))) throw notFound('Comentário não encontrado');
+    }
     // Quem administra o bar e comenta num post do próprio bar comenta como o bar.
     let asVenue: string | null = null;
     if (post.venueId) {
       const venue = await this.deps.places.findVenue(post.venueId);
       if (venue && (await canManageVenue(this.deps.places, viewerId, venue))) asVenue = venue.id;
     }
-    const record: PostCommentRecord = { id: this.deps.ids.next(), postId: post.id, authorId: viewerId, body: text, createdAt: this.deps.clock.now(), venueId: asVenue, gifId: gif?.id ?? null, gifUrl: gif?.url ?? null };
+    const record: PostCommentRecord = { id: this.deps.ids.next(), postId: post.id, authorId: viewerId, body: text, createdAt: this.deps.clock.now(), venueId: asVenue, gifId: gif?.id ?? null, gifUrl: gif?.url ?? null, parentId: replied ? (replied.parentId ?? replied.id) : null };
     await this.deps.posts.addComment(record);
     const me = await this.deps.users.findProfileById(viewerId);
     const mentioned = await this.notifyMentions(viewerId, me?.username ?? 'Alguém', post, record.id, text);
+    if (replied && replied.authorId !== viewerId && !mentioned.has(replied.authorId)) {
+      await this.deps.notifier.notify({ userId: replied.authorId, type: 'POST_COMMENT', title: `${me?.username ?? 'Alguém'} respondeu seu comentário`, body: text.slice(0, 80) || 'GIF', url: `/posts/${post.id}`, dedupeKey: `comment-reply:${record.id}`, actorId: viewerId });
+      mentioned.add(replied.authorId);
+    }
     if (post.authorId !== viewerId && !mentioned.has(post.authorId)) {
-      await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_COMMENT', title: `${me?.username ?? 'Alguém'} comentou no seu post`, body: text.slice(0, 80) || 'GIF', url: `/posts/${post.id}`, dedupeKey: `post-comment:${record.id}`, actorId: viewerId });
+      await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_COMMENT', title: `${me?.username ?? 'Alguém'} comentou no seu post`, body: text.slice(0, 80) || 'GIF', url: `/posts/${post.id}?comentarios=1`, dedupeKey: `post-comment:${record.id}`, actorId: viewerId });
     }
     return (await this.commentViews(viewerId, post.authorId, [record]))[0] as PostCommentView;
   }
@@ -393,7 +405,7 @@ export class PostService {
       if (await this.deps.blocks.existsEitherWay(viewerId, target.userId)) continue;
       const canOpen = post.venueId !== null && post.venueId !== undefined ? true : target.userId === post.authorId || (!post.eventPrivate && (await this.canSee(target.userId, post.authorId)));
       if (!canOpen) continue;
-      await this.deps.notifier.notify({ userId: target.userId, type: 'POST_COMMENT', title: `${viewerName} mencionou você num comentário`, body: text.slice(0, 80), url: `/posts/${post.id}`, dedupeKey: `comment-mention:${commentId}:${target.userId}`, actorId: viewerId });
+      await this.deps.notifier.notify({ userId: target.userId, type: 'POST_COMMENT', title: `${viewerName} mencionou você num comentário`, body: text.slice(0, 80), url: `/posts/${post.id}?comentarios=1`, dedupeKey: `comment-mention:${commentId}:${target.userId}`, actorId: viewerId });
       notified.add(target.userId);
     }
     return notified;
@@ -408,7 +420,7 @@ export class PostService {
       await this.deps.posts.likeComment(comment.id, viewerId, this.deps.clock.now());
       if (comment.authorId !== viewerId) {
         const me = await this.deps.users.findProfileById(viewerId);
-        await this.deps.notifier.notify({ userId: comment.authorId, type: 'POST_LIKE', title: `${me?.username ?? 'Alguém'} curtiu seu comentário`, body: comment.body.slice(0, 80) || 'GIF', url: `/posts/${post.id}`, dedupeKey: `comment-like:${comment.id}:${viewerId}`, actorId: viewerId });
+        await this.deps.notifier.notify({ userId: comment.authorId, type: 'POST_LIKE', title: `${me?.username ?? 'Alguém'} curtiu seu comentário`, body: comment.body.slice(0, 80) || 'GIF', url: `/posts/${post.id}?comentarios=1`, dedupeKey: `comment-like:${comment.id}:${viewerId}`, actorId: viewerId });
       }
     } else {
       await this.deps.posts.unlikeComment(comment.id, viewerId);
@@ -441,7 +453,7 @@ export class PostService {
       }
       return valid;
     };
-    const extra = async (row: PostCommentRecord) => ({ likeCount: stats.get(row.id)?.count ?? 0, likedByMe: stats.get(row.id)?.liked ?? false, mentions: await mentionsOf(row.body) });
+    const extra = async (row: PostCommentRecord) => ({ likeCount: stats.get(row.id)?.count ?? 0, likedByMe: stats.get(row.id)?.liked ?? false, mentions: await mentionsOf(row.body), parentId: row.parentId ?? null });
     const venueIds = [...new Set(rows.flatMap((r) => (r.venueId ? [r.venueId] : [])))];
     const venues = new Map((await Promise.all(venueIds.map((id) => this.deps.places.findVenue(id)))).flatMap((v) => (v ? [[v.id, { id: v.id, name: v.name, logoUrl: v.logoUrl ?? null }] as const] : [])));
     for (const row of rows) {
@@ -709,7 +721,7 @@ export class PostService {
     return this.deps.posts.findImage(imageId);
   }
 
-  /** Evento: título, início no futuro (até 2 anos), fim opcional (padrão: 3 h depois; no máximo 30 dias). O lugar é opcional. */
+  /** Evento: título, início de até 2 anos atrás a até 2 anos à frente, fim opcional (padrão: 3 h depois; no máximo 30 dias). O lugar é opcional. */
   /** Local do AskouT escolhido como rolê. Id que não existe (ou apagado) só não vincula: o nome digitado continua valendo. */
   private async placeVenue(raw: unknown): Promise<{ id: string; name: string; address: string | null } | undefined> {
     if (raw === undefined || raw === null || raw === '') return undefined;
@@ -773,8 +785,9 @@ export class PostService {
     };
     const now = this.deps.clock.now().getTime();
     const startsAt = date(e.startsAt, 'Início');
+    // Data no passado vale (registrar um rolê que já rolou), até 2 anos atrás; quem mantém o início de antes nunca esbarra nisso.
     const unchanged = keepStart !== undefined && keepStart !== null && keepStart.getTime() === startsAt.getTime();
-    if (!unchanged && startsAt.getTime() < now - 5 * 60_000) throw validationError('Evento inválido', { event: 'O início precisa ser no futuro' });
+    if (!unchanged && startsAt.getTime() < now - 2 * 365 * 24 * 3_600_000) throw validationError('Evento inválido', { event: 'Início antigo demais' });
     if (startsAt.getTime() > now + 2 * 365 * 24 * 3_600_000) throw validationError('Evento inválido', { event: 'Início distante demais' });
     const endsAt = e.endsAt === undefined || e.endsAt === null || e.endsAt === '' ? new Date(startsAt.getTime() + 3 * 3_600_000) : date(e.endsAt, 'Fim');
     if (endsAt.getTime() <= startsAt.getTime()) throw validationError('Evento inválido', { event: 'O fim precisa ser depois do início' });

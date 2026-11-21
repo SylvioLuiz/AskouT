@@ -359,6 +359,15 @@ export const BellOffIcon = () => (
   </Line>
 );
 
+/** Atalho "Instagram" da folha de compartilhar (cartão pronto para Feed/Stories). */
+export const InstagramIcon = () => (
+  <Line>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="5" />
+    <circle cx="12" cy="12" r="4" />
+    <circle cx="17.2" cy="6.8" r="0.6" fill="currentColor" />
+  </Line>
+);
+
 export const PhotoIcon = () => (
   <Line>
     <rect x="3" y="5" width="18" height="14" rx="3" />
@@ -374,6 +383,11 @@ export const CameraIcon = () => (
   </Line>
 );
 
+export const DownloadIcon = () => (
+  <Svg>
+    <path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14" />
+  </Svg>
+);
 export const CopyIcon = () => (
   <Line>
     <rect x="8" y="8" width="12" height="12" rx="2.5" />

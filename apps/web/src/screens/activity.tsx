@@ -219,6 +219,11 @@ export function ActivityScreen() {
       setTab('requests');
       return;
     }
+    // Aviso de comentário abre o post já com os comentários à vista (avisos antigos vinham sem o `?comentarios=1`).
+    if (item.type === 'POST_COMMENT' && /^\/posts\/[^/?#]+$/.test(item.url)) {
+      navigate(`${item.url}?comentarios=1`);
+      return;
+    }
     navigate(item.url);
   }
 

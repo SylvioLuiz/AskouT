@@ -741,6 +741,8 @@ export interface FeedComment {
   canReport: boolean;
   reactions: FeedReactions;
   mentions: string[];
+  /** Resposta: o comentário de cima da conversa. */
+  parentId?: string | null;
 }
 
 export interface FeedSettings {
@@ -1011,6 +1013,8 @@ export interface PostComment {
   likedByMe: boolean;
   /** Nomes marcados com @ que existem de verdade. */
   mentions: string[];
+  /** Resposta: o comentário de cima da conversa. */
+  parentId?: string | null;
 }
 
 export interface PostCommentsPage {

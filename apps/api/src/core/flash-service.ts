@@ -303,6 +303,21 @@ export class FlashService {
     return sessionView({ ...session, expiresAt });
   }
 
+  /** Adiciona, troca ou tira (texto vazio) o recado do NOW já ligado, sem mexer no tempo nem nos convites. */
+  async setNote(actorId: string, input: { note?: unknown }): Promise<FlashStatusView> {
+    const { flash, clock } = this.deps;
+    const now = clock.now();
+    let note: string | null;
+    try {
+      note = parseNote(input.note ?? '');
+    } catch {
+      throw validationError('Confira o recado', { note: `Use no máximo ${FLASH_NOTE_MAX} caracteres, sem caracteres especiais` });
+    }
+    const session = await this.requireActive(actorId, now);
+    if (!(await flash.setSessionNote(actorId, now, note))) throw forbidden('Ligue seu NOW primeiro');
+    return sessionView({ ...session, note });
+  }
+
   /** Desliga o Flash: cancela convites e encerra encontros, e a posição some. Idempotente. */
   async turnOff(actorId: string): Promise<{ ended: boolean }> {
     const { flash, clock } = this.deps;

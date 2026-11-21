@@ -9,6 +9,7 @@ import { asString, normalizeUsername, usernameProblem } from './validation.ts';
  *  - o convite é registrado uma vez só, logo depois do cadastro concluído (e-mail confirmado ou login social);
  *  - só vale nas primeiras horas da conta (CLAIM_WINDOW_HOURS) e nunca troca depois;
  *  - ignora quem convidou se a conta não existe, está suspensa, é a própria pessoa ou há bloqueio entre as duas;
+ *  - convite válido já deixa as duas pessoas amigas (seguimento aceito nos dois sentidos);
  *  - "Você trouxe N amigos" mostra quem entrou (sem suspensos nem bloqueados nos dois sentidos);
  *  - o selo só conta convites CONFIRMADOS: a pessoa voltou ao app pelo menos CONFIRM_AFTER_HOURS depois de criar a conta.
  *    Isso encarece contas criadas em massa: cada uma precisa de e-mail confirmado e de um retorno em outro dia.
@@ -79,7 +80,29 @@ export class ReferralService {
     if (!inviter || inviter.status !== ACTIVE) return { counted: false };
     if (await blocks.existsEitherWay(actor.userId, inviter.id)) return { counted: false };
     const created = await referrals.create({ inviteeId: actor.userId, inviterId: inviter.id, createdAt: now, qualifiedAt: null });
+    if (created) await this.befriend(actor.userId, inviter.id);
     return { counted: created };
+  }
+
+  /**
+   * Quem entrou pelo convite já começa amigo de quem convidou: seguimento aceito nos dois sentidos,
+   * mesmo com perfil privado (quem compartilhou o link já topou). Avisa quem convidou.
+   */
+  private async befriend(inviteeId: string, inviterId: string): Promise<void> {
+    const { follows, clock, notifier, users } = this.deps;
+    const now = clock.now();
+    await follows.save({ followerId: inviteeId, followeeId: inviterId, status: 'ACCEPTED', createdAt: now });
+    await follows.save({ followerId: inviterId, followeeId: inviteeId, status: 'ACCEPTED', createdAt: now });
+    const invitee = (await users.findProfilesByIds([inviteeId]))[0]?.username;
+    await notifier.notify({
+      userId: inviterId,
+      type: 'FOLLOW_NEW',
+      title: `${invitee ?? 'Alguém'} entrou pelo seu convite`,
+      body: 'Vocês já são amigos no AskouT',
+      url: invitee ? `/u/${encodeURIComponent(invitee)}` : '/atividades',
+      dedupeKey: `follow-new:${inviteeId}`,
+      actorId: inviteeId,
+    });
   }
 
   /** Chamado quando a pessoa abre o app: se já passou tempo suficiente desde o cadastro, o convite dela passa a contar. */

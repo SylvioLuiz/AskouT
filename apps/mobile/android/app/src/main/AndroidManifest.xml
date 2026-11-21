@@ -31,6 +31,20 @@
                 <data android:scheme="br.com.askout" />
             </intent-filter>
 
+            <!--
+              Convite (https://askout.com.br/convite/usuario) abre o app instalado. A verificação automática precisa do
+              https://askout.com.br/.well-known/assetlinks.json com o SHA-256 da chave da Play (ver GOLIVE.md). Sem ela, a página
+              do convite chama o app pelo intent:// (br.com.askout://convite/usuario) ou leva ao Google Play.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="askout.com.br" />
+                <data android:pathPrefix="/convite/" />
+            </intent-filter>
+
         </activity>
 
         <!-- Avisos (push) chegam no canal "notificacoes", de importância alta, para mostrar a prévia no topo da tela. O app cria o canal ao abrir. -->

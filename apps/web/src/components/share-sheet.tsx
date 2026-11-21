@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
-import { CheckIcon, CopyIcon, MailIcon, MoreIcon, SearchIcon, SendIcon, WhatsAppIcon } from './icons.tsx';
+import { CheckIcon, CopyIcon, InstagramIcon, MailIcon, MoreIcon, SearchIcon, SendIcon, WhatsAppIcon } from './icons.tsx';
 import { Avatar, Button, ErrorState, GroupAvatar, Loading, Notice, useOnce } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { emailLink, filterTargets, nativeShare, nativeShareAvailable, sentText, shareTargets, telegramLink, whatsappLink } from '../lib/share-targets.ts';
 import type { ShareTarget } from '../lib/share-targets.ts';
+import { renderShareCard, shareCardImage } from '../lib/share-card.ts';
+import type { ShareCard } from '../lib/share-card.ts';
 import { showToast } from '../lib/toast.ts';
 import { t } from '../lib/i18n/index.ts';
 import './share-sheet.css';
@@ -59,11 +61,13 @@ async function copyText(text: string): Promise<void> {
 /**
  * Folha de compartilhar no padrão dos apps de mercado: busca + grade de conversas e amigos recentes
  * (toque em um ou mais, mensagem opcional, Enviar) e, embaixo, uma linha de atalhos (copiar link, WhatsApp...).
- * `link` vazio = só dentro do app (ex.: evento privado).
+ * `link` vazio = só dentro do app (ex.: evento privado). `inApp={false}` = só os atalhos de fora (WhatsApp, link...).
  */
-export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, actions = [], note, sentToast, initialConversations = [], onClose }: {
+export function ShareSheet({ title = t('Compartilhar'), link, card, send, onShared, actions = [], note, sentToast, initialConversations = [], inApp = true, onClose }: {
   title?: string;
   link?: { title: string; text: string; url: string };
+  /** Cartão pronto para postar no Instagram (Feed/Stories) e outras redes: imagem + legenda. Só com `link`. */
+  card?: () => Promise<ShareCard>;
   /** Envia para uma conversa; `message` é o texto opcional que a pessoa escreveu. */
   send: (conversationId: string, message: string | undefined) => Promise<unknown>;
   onShared?: () => void;
@@ -73,9 +77,11 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
   sentToast?: (names: string[]) => string;
   /** Conversas que já abrem marcadas (ex.: a conversa da votação de data que virou evento). */
   initialConversations?: string[];
+  /** false: sem a grade de conversas e amigos, só os atalhos para fora do app. */
+  inApp?: boolean;
   onClose: () => void;
 }) {
-  const data = useAsync(() => Promise.all([api.conversations(), api.friends().catch(() => [])]), []);
+  const data = useAsync(() => (inApp ? Promise.all([api.conversations(), api.friends().catch(() => [])]) : Promise.resolve(null)), [inApp]);
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState<string[]>(() => initialConversations.map((id) => `c:${id}`));
   const [message, setMessage] = useState('');
@@ -86,6 +92,18 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
   const opened = useRef(new Map<string, string>());
   const copiedTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+
+  // O cartão é montado assim que a folha abre: no toque, o menu do aparelho precisa abrir na hora
+  // (o Safari recusa o navigator.share se a imagem demorar a ficar pronta depois do toque).
+  const cardRef = useRef(card);
+  const [prepared, setPrepared] = useState<Promise<{ card: ShareCard; blob: Blob }> | undefined>();
+  useEffect(() => {
+    const build = cardRef.current;
+    if (!build || !link) return;
+    const job = build().then(async (c) => ({ card: c, blob: await renderShareCard(c) }));
+    job.catch(() => undefined);
+    setPrepared(job);
+  }, [Boolean(link)]);
 
   const targets = useMemo(() => (data.data ? shareTargets(data.data[0].items, data.data[1]) : []), [data.data]);
   const visible = useMemo(() => filterTargets(targets, query), [targets, query]);
@@ -163,6 +181,33 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
     }
   });
 
+  const [postCard, postingCard] = useOnce(async () => {
+    if (!prepared) return;
+    setFeedback(undefined);
+    let ready: { card: ShareCard; blob: Blob };
+    try {
+      ready = await prepared;
+    } catch {
+      setFeedback({ tone: 'error', text: t('Não foi possível montar a imagem. Use "Copiar link".') });
+      return;
+    }
+    let copiedCaption = true;
+    try {
+      await copyText(ready.card.caption);
+    } catch {
+      copiedCaption = false;
+    }
+    try {
+      const result = await shareCardImage(ready.blob, ready.card.name, ready.card.caption);
+      if (result === 'cancelled') return;
+      onShared?.();
+      if (result === 'saved') setFeedback({ tone: 'ok', text: copiedCaption ? t('Imagem baixada e legenda copiada. Poste no Instagram e cole a legenda.') : t('Imagem baixada. Poste no Instagram com o link do AskouT.') });
+      else if (copiedCaption) showToast(t('Legenda copiada: é só colar no post.'), 2500);
+    } catch {
+      setFeedback({ tone: 'error', text: t('Não foi possível abrir o menu do aparelho. Use "Copiar link".') });
+    }
+  });
+
   /** WhatsApp, Telegram, e-mail: no app nativo a navegação sai para o app certo; no navegador abre outra aba. */
   function external(href: string, newTab = true) {
     onShared?.();
@@ -171,7 +216,7 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
   }
 
   const loading = data.loading && !data.data;
-  const empty = !loading && !data.error && targets.length === 0;
+  const empty = inApp && !loading && !data.error && targets.length === 0;
 
   return (
     <Sheet title={title} onClose={onClose}>
@@ -257,6 +302,16 @@ export function ShareSheet({ title = t('Compartilhar'), link, send, onShared, ac
                       <span>{copied ? t('Copiado') : t('Copiar link')}</span>
                     </button>
                   </li>
+                  {prepared ? (
+                    <li>
+                      <button type="button" className="sharesheet__action" disabled={postingCard} onClick={() => postCard()} aria-label={t('Instagram: imagem pronta com legenda para o Feed ou Stories')}>
+                        <span className="sharesheet__bubble sharesheet__bubble--instagram">
+                          <InstagramIcon />
+                        </span>
+                        <span>{t('Instagram')}</span>
+                      </button>
+                    </li>
+                  ) : null}
                   <li>
                     <button type="button" className="sharesheet__action" onClick={() => external(whatsappLink(link.text, link.url))}>
                       <span className="sharesheet__bubble sharesheet__bubble--whatsapp">

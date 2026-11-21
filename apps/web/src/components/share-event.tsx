@@ -13,9 +13,27 @@ import { kindLabel, safeImage } from '../lib/explore.ts';
 import { formatWhen } from '../lib/chat.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { cardCaption, cardInvite } from '../lib/share-card.ts';
+import type { ShareCard } from '../lib/share-card.ts';
+
+/** Cartão do evento para o Instagram/Stories: capa, título, quando e onde. */
+async function eventCard(eventId: string, url: string): Promise<ShareCard> {
+  const page = await api.eventPage(eventId);
+  const cover = page.coverPath ? (page.coverPath.startsWith('/') ? api.assetUrl(page.coverPath) : safeImage(page.coverPath)) : null;
+  const lines = [formatWhen(page.startsAt, page.endsAt, new Date()), page.venue.name, page.isFree ? t('Entrada grátis') : ''].filter(Boolean);
+  return {
+    kicker: kindLabel(page.kind),
+    title: page.title,
+    lines,
+    imageUrl: cover,
+    url,
+    caption: cardCaption({ title: page.title, lines, url, invite: cardInvite('event'), tags: [page.venue.name, ...page.tags.slice(0, 3)] }),
+    name: `askout-${page.title}`,
+  };
+}
 
 /** Compartilhar um evento: numa ou mais conversas (vai o cartão do evento), no perfil (feed) ou fora do app. */
-export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPostedChange, profile = 'toggle', outside: allowOutside = true, sheetTitle, initialConversations, onShared, onClose }: { eventId: string; source?: 'PLACE' | 'USER'; title: string; posted: boolean; onPostedChange: (posted: boolean) => void; profile?: 'toggle' | 'owner' | 'private'; outside?: boolean; sheetTitle?: string; initialConversations?: string[]; onShared?: () => void; onClose: () => void }) {
+export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPostedChange, profile = 'toggle', outside: allowOutside = true, sheetTitle, initialConversations, inApp = true, onShared, onClose }: { eventId: string; source?: 'PLACE' | 'USER'; title: string; posted: boolean; onPostedChange: (posted: boolean) => void; profile?: 'toggle' | 'owner' | 'private'; outside?: boolean; sheetTitle?: string; initialConversations?: string[]; /** false: só os atalhos de fora do app (WhatsApp, link...). */ inApp?: boolean; onShared?: () => void; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
 
@@ -51,13 +69,15 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
             : { key: 'profile', label: posted ? t('No seu perfil') : t('Postar no perfil'), icon: posted ? <CheckIcon /> : <PlusIcon />, on: posted, busy, onClick: () => void togglePost() },
         ]
       : [];
-  const note = problem ?? (profile === 'toggle' && source === 'USER' && !posted ? t('Repostar coloca o evento no seu perfil e no Início de quem segue você.') : profile === 'private' ? t('Evento privado: só vai para as conversas que você escolher, e ninguém posta no perfil.') : profile === 'owner' ? t('Seu evento já aparece na aba Eventos do seu perfil.') : undefined);
+  const note = problem ?? (!inApp ? undefined : profile === 'toggle' && source === 'USER' && !posted ? t('Repostar coloca o evento no seu perfil e no Início de quem segue você.') : profile === 'private' ? t('Evento privado: só vai para as conversas que você escolher, e ninguém posta no perfil.') : profile === 'owner' ? t('Seu evento já aparece na aba Eventos do seu perfil.') : undefined);
 
   return (
     <ShareSheet
       {...(sheetTitle ? { title: sheetTitle } : {})}
       {...(initialConversations ? { initialConversations } : {})}
+      inApp={inApp}
       link={allowOutside ? { title, text: eventShareText(title), url: eventLink(shareOrigin(), eventId) } : undefined}
+      {...(allowOutside ? { card: () => eventCard(eventId, eventLink(shareOrigin(), eventId)) } : {})}
       send={send}
       onShared={() => {
         shared();

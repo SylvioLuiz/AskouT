@@ -424,6 +424,16 @@ export class InMemoryFlashRepository implements FlashRepository {
     this.sessions.set(session.id, { ...session, area: session.area ? { ...session.area } : null });
   }
 
+  async setSessionNote(userId: string, now: Date, note: string | null): Promise<boolean> {
+    for (const s of this.sessions.values()) {
+      if (s.userId === userId && this.active(s, now)) {
+        s.note = note;
+        return true;
+      }
+    }
+    return false;
+  }
+
   async extendSession(userId: string, now: Date, expiresAt: Date): Promise<boolean> {
     for (const s of this.sessions.values()) {
       if (s.userId === userId && this.active(s, now)) {
@@ -2431,6 +2441,7 @@ export class InMemoryPostRepository implements PostRepository {
   async deleteComment(id: string): Promise<void> {
     this.comments.delete(id);
     for (const key of [...this.commentLikes.keys()]) if (key.startsWith(`${id}|`)) this.commentLikes.delete(key);
+    for (const c of this.comments.values()) if (c.parentId === id) c.parentId = null;
   }
 
   async likeComment(commentId: string, userId: string, at: Date): Promise<void> {
@@ -2802,6 +2813,7 @@ export class InMemoryFeedRepository implements FeedRepository {
 
   async deleteComment(id: string): Promise<boolean> {
     if (!this.comments.delete(id)) return false;
+    for (const c of this.comments.values()) if (c.parentId === id) c.parentId = null;
     for (const [k, r] of this.commentReactions) if (r.commentId === id) this.commentReactions.delete(k);
     for (const [k, r] of this.reports) if (r.commentId === id) this.reports.delete(k);
     return true;

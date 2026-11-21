@@ -3,3 +3,7 @@
 # no _worker.js, que sobrescreve este cabeçalho.
 /*
   Cache-Control: no-cache
+
+# Universal Links do iPhone: a Apple lê este arquivo (sem extensão) e exige JSON.
+/.well-known/apple-app-site-association
+  Content-Type: application/json

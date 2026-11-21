@@ -1,4 +1,5 @@
 import { t } from '../lib/i18n/index.ts';
+import type { ExploreEvent, ExplorePlace } from './types.ts';
 /** Quantos rolês o passo guiado pede para a Home nascer com eventos. */
 export const ONBOARDING_FOLLOW_GOAL = 3;
 
@@ -32,6 +33,37 @@ export function markOnboardingDone(storage: Pick<Storage, 'setItem'> | undefined
  */
 export function shouldShowOnboarding(storage: Pick<Storage, 'getItem'> | undefined, user: { id: string; onboarded?: boolean }): boolean {
   return user.onboarded !== true && !onboardingDone(storage, user.id);
+}
+
+/**
+ * Locais dos próximos eventos, para o passo “siga 3 rolês” quando não há lista de locais por perto
+ * (sem localização, ou nada perto): um por local, sem os eventos criados por pessoas sem rolê vinculado.
+ */
+export function placesFromEvents(events: readonly ExploreEvent[]): ExplorePlace[] {
+  const seen = new Set<string>();
+  const out: ExplorePlace[] = [];
+  for (const { venue, sample, distanceM } of events) {
+    if (!venue.id || seen.has(venue.id)) continue;
+    seen.add(venue.id);
+    out.push({
+      key: `askout:${venue.id}`,
+      source: 'ASKOUT',
+      name: venue.name,
+      category: venue.category,
+      address: venue.address,
+      lat: venue.lat,
+      lng: venue.lng,
+      sample,
+      distanceM,
+      rating: null,
+      ratingCount: null,
+      photoPath: null,
+      photoAuthor: null,
+      mapsUri: null,
+      venue: { id: venue.id, logoUrl: venue.logoUrl, hours: null, followerCount: 0, following: false, claimed: false },
+    });
+  }
+  return out;
 }
 
 /** Texto do progresso do passo “siga 3 rolês”. */

@@ -1,16 +1,18 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeftIcon, ChevronRightIcon, XIcon } from './icons.tsx';
+import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, XIcon } from './icons.tsx';
 import { api } from '../client.ts';
 import type { PostImage } from '../lib/types.ts';
 import { rememberScroll } from '../router.tsx';
+import { fetchImage, saveImages } from '../lib/save-file.ts';
+import { showToast } from '../lib/toast.ts';
 import { t } from '../lib/i18n/index.ts';
 
 /**
  * Fotos do post em tela cheia: arrasta para o lado entre as fotos, pinça para dar zoom,
  * fecha no X, no Esc ou no "voltar" do aparelho.
  */
-export function PhotoViewer({ images, start, onClose }: { images: PostImage[]; start: number; onClose: () => void }) {
+export function PhotoViewer({ images, start, onClose, downloadName }: { images: PostImage[]; start: number; onClose: () => void; /** Com nome: mostra o botão de baixar (só fotos enviadas, nunca as do Google). */ downloadName?: string }) {
   const photos = images.filter((image) => image.path && !image.videoPath);
   const first = Math.max(0, photos.findIndex((p) => p.id === images[start]?.id));
   const [index, setIndex] = useState(first);
@@ -70,6 +72,23 @@ export function PhotoViewer({ images, start, onClose }: { images: PostImage[]; s
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  const [saving, setSaving] = useState(false);
+  const current = photos[index];
+  const canDownload = downloadName !== undefined && current?.kind === 'UPLOAD';
+  async function download() {
+    if (!current?.path || saving) return;
+    setSaving(true);
+    try {
+      const src = /^(https?:|blob:|data:)/.test(current.path) ? current.path : api.assetUrl(current.path);
+      const blob = await fetchImage(src);
+      const name = photos.length > 1 ? `${downloadName}-${index + 1}` : downloadName!;
+      if (await saveImages([{ blob, name }])) showToast(t('Foto salva'), 1400);
+    } catch {
+      showToast(t('Não foi possível baixar a foto.'), 2000);
+    }
+    setSaving(false);
+  }
+
   if (photos.length === 0) return null;
   return createPortal(
     <div className="photoview" role="dialog" aria-modal="true" aria-label={t('Foto em tela cheia')}>
@@ -96,9 +115,16 @@ export function PhotoViewer({ images, start, onClose }: { images: PostImage[]; s
         ) : (
           <span />
         )}
-        <button type="button" className="photoview__btn" onClick={onClose} aria-label={t('Fechar')}>
-          <XIcon />
-        </button>
+        <span className="photoview__actions">
+          {canDownload ? (
+            <button type="button" className="photoview__btn" onClick={() => void download()} disabled={saving} aria-label={t('Baixar foto')}>
+              <DownloadIcon />
+            </button>
+          ) : null}
+          <button type="button" className="photoview__btn" onClick={onClose} aria-label={t('Fechar')}>
+            <XIcon />
+          </button>
+        </span>
       </header>
       {photos.length > 1 ? (
         <>
@@ -121,6 +147,6 @@ export function PhotoViewer({ images, start, onClose }: { images: PostImage[]; s
 }
 
 /** Foto de perfil em tela cheia (mesmo visualizador das fotos de post). */
-export function AvatarViewer({ url, onClose }: { url: string; onClose: () => void }) {
-  return <PhotoViewer images={[{ id: 'avatar', kind: 'UPLOAD', path: url, photoAuthor: null }]} start={0} onClose={onClose} />;
+export function AvatarViewer({ url, onClose, downloadName }: { url: string; onClose: () => void; downloadName?: string }) {
+  return <PhotoViewer images={[{ id: 'avatar', kind: 'UPLOAD', path: url, photoAuthor: null }]} start={0} onClose={onClose} downloadName={downloadName} />;
 }

@@ -127,6 +127,12 @@ export class PrismaFlashRepository implements FlashRepository {
     return result.count > 0;
   }
 
+  async setSessionNote(userId: string, now: Date, note: string | null): Promise<boolean> {
+    if (!isUuid(userId)) return false;
+    const result = await this.prisma.flashSession.updateMany({ where: { userId, endedAt: null, expiresAt: { gt: now } }, data: { note } });
+    return result.count > 0;
+  }
+
   async endSession(userId: string, now: Date): Promise<boolean> {
     if (!isUuid(userId)) return false;
     const result = await this.prisma.flashSession.updateMany({

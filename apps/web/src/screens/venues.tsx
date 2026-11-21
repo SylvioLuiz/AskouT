@@ -280,7 +280,7 @@ export function NewVenueSheet({ onClose, onSent }: { onClose: () => void; onSent
             ))}
           </div>
         </div>
-        <Field label={t('Endereço')} value={address} onChange={setAddress} placeholder={t('Ex.: Rua das Flores, 120 - Centro')} maxLength={NEW_VENUE_ADDRESS_MAX} autoComplete="street-address" />
+        <Field label={t('Endereço')} value={address} onChange={setAddress} placeholder={t('Ex.: Rua Exemplo, 123 - Bairro')} maxLength={NEW_VENUE_ADDRESS_MAX} autoComplete="street-address" />
         {where.status === 'ok' ? (
           <p className="muted">{t('O local fica no mapa onde você está agora. Faça o pedido de dentro do local.')}</p>
         ) : where.status === 'asking' ? (

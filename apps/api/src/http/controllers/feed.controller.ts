@@ -112,7 +112,7 @@ export class FeedController {
   @Post('feed/posts/:postId/comments')
   @HttpCode(200)
   addComment(@CurrentActor() actor: Actor, @Param('postId') postId: string, @Body() body: unknown) {
-    return this.core.feed.addComment(actor.userId, postId, asBody(body).body, asBody(body).gif);
+    return this.core.feed.addComment(actor.userId, postId, asBody(body).body, asBody(body).gif, asBody(body).replyTo);
   }
 
   @Delete('feed/comments/:commentId')

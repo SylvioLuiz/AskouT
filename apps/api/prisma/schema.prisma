@@ -1072,14 +1072,19 @@ model PostComment {
   /// GIF da Giphy anexado: id e endereço (https, servidor da Giphy).
   gifId     String?
   gifUrl    String?
+  /// Resposta a outro comentário: sempre o comentário de cima da conversa (um nível só). Apagar o de cima solta as respostas.
+  parentId  String?  @db.Uuid
 
   post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
   venue  Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
   author User @relation("PostComments", fields: [authorId], references: [id], onDelete: Cascade)
+  parent  PostComment?  @relation("PostCommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies PostComment[] @relation("PostCommentReplies")
 
   likes  PostCommentLike[]
 
   @@index([postId, createdAt])
+  @@index([parentId])
 }
 
 /// Curtida em comentário: uma por pessoa.
@@ -1742,13 +1747,18 @@ model FeedComment {
   /// GIF da Giphy anexado: id e endereço (https, servidor da Giphy).
   gifId     String?
   gifUrl    String?
+  /// Resposta a outro comentário: sempre o comentário de cima da conversa (um nível só). Apagar o de cima solta as respostas.
+  parentId  String?  @db.Uuid
 
   post      FeedPost              @relation(fields: [postId], references: [id], onDelete: Cascade)
   author    User                  @relation("FeedCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  parent    FeedComment?          @relation("FeedCommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies   FeedComment[]         @relation("FeedCommentReplies")
   reactions FeedCommentReaction[]
   reports   FeedReport[]
 
   @@index([postId, createdAt])
+  @@index([parentId])
   @@index([authorId])
 }
 

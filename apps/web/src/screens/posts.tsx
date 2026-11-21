@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
-import { CalendarIcon, CarouselIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, EventKindIcon, GlobeIcon, LocationIcon, LockIcon, PhotoIcon, PlusIcon, SendIcon, UsersIcon, XIcon } from '../components/icons.tsx';
+import { CalendarIcon, CarouselIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, EventKindIcon, GlobeIcon, LocationIcon, LockIcon, PhotoIcon, PlusIcon, SendIcon, ShareIcon, UsersIcon, XIcon } from '../components/icons.tsx';
 import { EventAudienceSheet, EventKindSheet, EventRow, EventWhenSheet } from '../components/event-compose.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
@@ -239,6 +239,7 @@ export function CreatePostScreen() {
   // Evento criado: em vez de sair direto, mostra o passo "Enviar para conversas".
   const [created, setCreated] = useState<{ id: string; title: string; private: boolean; cover: string | undefined } | undefined>();
   const [sharing, setSharing] = useState(false);
+  const [sharingOutside, setSharingOutside] = useState(false);
   const [sharedOnce, setSharedOnce] = useState(false);
   useTitle(created ? t('Evento criado') : kind === 'EVENT' ? t('Novo evento') : t('Nova publicação'));
   const [discarding, setDiscarding] = useState(false);
@@ -462,6 +463,12 @@ export function CreatePostScreen() {
           <Button full onClick={() => setSharing(true)}>
             <SendIcon /> {sharedOnce ? t('Enviar para mais conversas') : t('Enviar para conversas e grupos')}
           </Button>
+          {created.private ? null : (
+            // Fora do app (WhatsApp, Telegram, link...) tem botão próprio: some da folha quando se escolhe um amigo e ela fecha ao enviar.
+            <Button full variant="secondary" onClick={() => setSharingOutside(true)}>
+              <ShareIcon /> {t('Compartilhar fora do app')}
+            </Button>
+          )}
           <Button variant="quiet" full onClick={() => navigate(eventPath)}>
             {t('Ver evento')}
           </Button>
@@ -479,6 +486,20 @@ export function CreatePostScreen() {
             {...(pollConversation && !sharedOnce ? { initialConversations: [pollConversation] } : {})}
             onShared={() => setSharedOnce(true)}
             onClose={() => setSharing(false)}
+          />
+        ) : null}
+        {sharingOutside ? (
+          <ShareEventSheet
+            eventId={created.id}
+            source="USER"
+            title={created.title}
+            sheetTitle={t('Compartilhar fora do app')}
+            posted={false}
+            onPostedChange={() => undefined}
+            profile="owner"
+            inApp={false}
+            onShared={() => setSharedOnce(true)}
+            onClose={() => setSharingOutside(false)}
           />
         ) : null}
       </div>
@@ -1000,6 +1021,7 @@ export function ArchivedScreen() {
 
 export function PostScreen({ postId }: { postId: string }) {
   useTitle(t('Post'));
+  const search = useSearch();
   const post = useAsync(() => api.post(postId), [postId]);
   if (post.loading && !post.data) return <Loading />;
   if (post.error) {
@@ -1022,7 +1044,7 @@ export function PostScreen({ postId }: { postId: string }) {
   return (
     <>
       <PageHead title={t('Post')} back={`/u/${encodeURIComponent(post.data.author.username)}`} />
-      <PostCard poster post={post.data} onGone={(_id, why) => navigate(why === 'hidden' ? '/' : '/perfil')} />
+      <PostCard poster post={post.data} openComments={search.get('comentarios') === '1'} onGone={(_id, why) => navigate(why === 'hidden' ? '/' : '/perfil')} />
     </>
   );
 }
