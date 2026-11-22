@@ -21,7 +21,7 @@ RUN npx prisma generate --schema apps/api/prisma/schema.prisma
 
 ENV NODE_ENV=production
 EXPOSE 3000
-# Aplica as migrações pendentes, dispara em segundo plano o histórico de exemplo com lugares do Google (roda uma vez por
+# Aplica as migrações pendentes, aplica em segundo plano os SQL de prisma/sql (restrições; ver apps/api/scripts/apply-sql.mjs), dispara em segundo plano o histórico de exemplo com lugares do Google (roda uma vez por
 # banco; ver apps/api/scripts/seed-history-places.ts), importa em segundo plano os eventos reais do Juicy Santos e da
 # Prefeitura de Mogi (a cada deploy, sem duplicar; IMPORT_EVENTS=off desliga; ver apps/api/scripts/import-real-events.ts) e sobe a API. A porta vem da variável PORT (a hospedagem define).
-CMD ["sh", "-c", "npx prisma migrate deploy --schema apps/api/prisma/schema.prisma && (npx tsx apps/api/scripts/seed-history-places.ts &) && (npx tsx apps/api/scripts/import-real-events.ts --apply &) && exec npx tsx --tsconfig apps/api/tsconfig.build.json apps/api/src/http/main.ts"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema apps/api/prisma/schema.prisma && (node apps/api/scripts/apply-sql.mjs &) && (npx tsx apps/api/scripts/seed-history-places.ts &) && (npx tsx apps/api/scripts/import-real-events.ts --apply &) && exec npx tsx --tsconfig apps/api/tsconfig.build.json apps/api/src/http/main.ts"]
