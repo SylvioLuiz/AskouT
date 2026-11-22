@@ -51,6 +51,29 @@ const bundles = (await api(`/v1/bundleIds?filter[identifier]=${encodeURIComponen
 const bundle = bundles.find((b) => b.attributes.identifier === BUNDLE_ID);
 if (!bundle) throw new Error(`Bundle id ${BUNDLE_ID} não encontrado na conta.`);
 
+// 2b. Capacidades que o App.entitlements pede: o perfil só leva as que estão ligadas no App ID.
+// Associated Domains (o link de convite abre o app) entrou depois; liga aqui se ainda estiver desligada.
+const NEEDED = ['ASSOCIATED_DOMAINS', 'PUSH_NOTIFICATIONS', 'APPLE_ID_AUTH'];
+const caps = (await api(`/v1/bundleIds/${bundle.id}/bundleIdCapabilities?limit=200`)).data ?? [];
+const on = new Set(caps.map((c) => c.attributes.capabilityType));
+for (const type of NEEDED.filter((t) => !on.has(t))) {
+  try {
+    await api('/v1/bundleIdCapabilities', {
+      method: 'POST',
+      body: JSON.stringify({
+        data: {
+          type: 'bundleIdCapabilities',
+          attributes: { capabilityType: type, ...(type === 'APPLE_ID_AUTH' ? { settings: [{ key: 'APPLE_ID_AUTH_APP_CONSENT', options: [{ key: 'PRIMARY_APP_CONSENT' }] }] } : {}) },
+          relationships: { bundleId: { data: { type: 'bundleIds', id: bundle.id } } },
+        },
+      }),
+    });
+    console.log(`Capacidade ${type} ligada no App ID ${BUNDLE_ID}.`);
+  } catch (failure) {
+    throw new Error(`Não deu para ligar ${type} no App ID ${BUNDLE_ID} (a chave da API precisa ser Admin). Ligue à mão em developer.apple.com > Identifiers > ${BUNDLE_ID}. Detalhe: ${failure.message}`);
+  }
+}
+
 // 3. iPhones cadastrados (o perfil de desenvolvimento exige pelo menos um).
 const devices = (await api('/v1/devices?filter[platform]=IOS&filter[status]=ENABLED&limit=200')).data ?? [];
 if (!devices.length) throw new Error('Nenhum iPhone cadastrado na conta: o perfil de desenvolvimento precisa de pelo menos um.');
