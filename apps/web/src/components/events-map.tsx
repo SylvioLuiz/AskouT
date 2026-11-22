@@ -8,9 +8,30 @@ export interface EventPin {
   id: string;
   lat: number;
   lng: number;
-  /** Local (bar, casa…) ou evento acontecendo agora: cada um tem a sua cor. */
-  kind: 'place' | 'event';
+  /**
+   * Local (bar, casa…), evento acontecendo agora, ou lugar com eventos que não está entre os locais do mapa (não está
+   * no Google): cada um tem a sua cor.
+   */
+  kind: 'place' | 'event' | 'loose';
   label: string;
+  /** Quantos eventos vêm por aí neste lugar: aparece num selo sobre o pin. */
+  count?: number;
+}
+
+/** Selo com o número de eventos sobre o pin (some quando não há). */
+function setCount(el: HTMLElement, count: number | undefined) {
+  let badge = el.querySelector<HTMLElement>('.evpin__count');
+  if (!count) {
+    badge?.remove();
+    return;
+  }
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'evpin__count';
+    badge.setAttribute('aria-hidden', 'true');
+    el.appendChild(badge);
+  }
+  badge.textContent = count > 99 ? '99+' : String(count);
 }
 
 interface Props {
@@ -90,12 +111,14 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail, auto
       if (marker) {
         marker.setPosition(pin);
         marker.element.setAttribute('aria-label', pin.label);
+        setCount(marker.element, pin.count);
       } else {
         const el = document.createElement('button');
         el.type = 'button';
         el.className = `evpin evpin--${pin.kind}`;
         el.setAttribute('aria-label', pin.label);
         el.dataset['id'] = pin.id;
+        setCount(el, pin.count);
         el.addEventListener('click', () => selectRef.current(pin.id));
         marker = map.addMarker(el, pin, 'bottom');
         state.markers.set(pin.id, marker);

@@ -7312,3 +7312,8 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .evhero--video { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .evhero__video { z-index: 0; background: #000; }
 .evhero__videohint { position: absolute; top: calc(18px + var(--sa-top)); left: 50%; transform: translateX(-50%); z-index: 2; padding: 6px 12px; border-radius: 999px; background: rgb(0 0 0 / 0.5); color: #fff; font-size: 0.75rem; font-weight: 600; white-space: nowrap; pointer-events: none; }
+
+/* Mapa: número de eventos sobre o pin do local, e lugar com eventos que não está entre os locais (outra cor). */
+.evpin { position: relative; }
+.evpin__count { position: absolute; top: -8px; right: -10px; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; display: grid; place-items: center; border: 2px solid #fff; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 0.6875rem; font-weight: 800; line-height: 1; box-shadow: 0 1px 4px rgba(0,0,0,.35); pointer-events: none; }
+.evpin--loose::before { background: var(--warn); }
