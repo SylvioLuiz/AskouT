@@ -237,6 +237,11 @@ export class InMemoryUserRepository implements UserRepository {
     this.profiles.set(profile.userId, { ...profile });
   }
 
+  async updateUsername(userId: string, username: string): Promise<void> {
+    const p = this.profiles.get(userId);
+    if (p) this.profiles.set(userId, { ...p, username });
+  }
+
   async searchProfiles(query: string, limit: number, excludeIds: string[]): Promise<Profile[]> {
     const q = query.toLowerCase();
     const excluded = new Set(excludeIds);

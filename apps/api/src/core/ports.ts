@@ -43,6 +43,8 @@ export interface UserRepository {
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
   findProfileById(userId: string): Promise<Profile | undefined>;
   findProfileByUsername(username: string): Promise<Profile | undefined>;
+  /** Troca o @usuário (já normalizado e conferido como livre). */
+  updateUsername(userId: string, username: string): Promise<void>;
   /** Mantém a ordem de `ids`; ignora ausentes e usuários suspensos. */
   findProfilesByIds(ids: string[]): Promise<Profile[]>;
   updateProfile(profile: Profile): Promise<void>;
