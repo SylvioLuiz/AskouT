@@ -54,7 +54,7 @@ if (!bundle) throw new Error(`Bundle id ${BUNDLE_ID} não encontrado na conta.`)
 // 2b. Capacidades que o App.entitlements pede: o perfil só leva as que estão ligadas no App ID.
 // Associated Domains (o link de convite abre o app) entrou depois; liga aqui se ainda estiver desligada.
 const NEEDED = ['ASSOCIATED_DOMAINS', 'PUSH_NOTIFICATIONS', 'APPLE_ID_AUTH'];
-const caps = (await api(`/v1/bundleIds/${bundle.id}/bundleIdCapabilities?limit=200`)).data ?? [];
+const caps = (await api(`/v1/bundleIds/${bundle.id}/bundleIdCapabilities`)).data ?? [];
 const on = new Set(caps.map((c) => c.attributes.capabilityType));
 for (const type of NEEDED.filter((t) => !on.has(t))) {
   try {
