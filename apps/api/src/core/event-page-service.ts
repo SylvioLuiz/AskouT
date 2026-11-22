@@ -281,7 +281,8 @@ export class EventPageService {
       owner,
       isOwner,
       storyUserIds: [...new Set((await this.visibleStories(viewerId, ref, hidden)).map((s) => s.userId))],
-      canStory: (isOwner || iGo) && base.view.endsAt !== null && Date.parse(base.view.endsAt) > this.deps.clock.now().getTime(),
+      // Evento sem data (em votação) ainda não acabou: dá para postar flash.
+      canStory: (isOwner || iGo) && (base.view.endsAt === null || Date.parse(base.view.endsAt) > this.deps.clock.now().getTime()),
       goingOnProfile: !isOwner && iGo ? (await this.deps.eventRoom.goingOnProfile(ref, viewerId)) === true : false,
       datePollId: await this.datePollFor(viewerId, ref, base.view.startsAt, isOwner),
     };
@@ -707,8 +708,8 @@ export class EventPageService {
     if (!isOwner && !(await this.deps.eventRoom.isGoing(ref, viewerId))) throw forbidden('Confirme presença para publicar um flash neste evento');
     const { view } = await this.base(viewerId, ref, {});
     const now = this.deps.clock.now();
-    if (!view.endsAt) throw forbidden('A data do evento ainda está em votação');
-    const endsAt = Date.parse(view.endsAt);
+    // Sem data (em votação): o flash dura as horas de sempre; com data, some no fim do evento.
+    const endsAt = view.endsAt ? Date.parse(view.endsAt) : Number.POSITIVE_INFINITY;
     if (endsAt <= now.getTime()) throw forbidden('Esse evento já terminou');
     const mine = (await this.deps.eventRoom.listStories(ref, now)).filter((s) => s.userId === viewerId);
     if (mine.length >= EVENT_STORY_MAX_PER_USER) throw validationError('Muitos flashes', { media: `Você já tem ${EVENT_STORY_MAX_PER_USER} flashes no ar neste evento` });

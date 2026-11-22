@@ -375,7 +375,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
               <ul className="homestories__list">
                 {showStoryButton ? (
                   <li>
-                    <button type="button" className="homestories__item" onClick={() => (canStory ? setCreatingStory(true) : setStoryNeedsGoing(true))} aria-label={t('Criar flash neste evento')}>
+                    <button type="button" className="homestories__item" onClick={() => (canStory ? setCreatingStory(true) : e.isOwner ? setProblem(t('Esse evento já terminou: não dá mais para postar flash.')) : setStoryNeedsGoing(true))} aria-label={t('Criar flash neste evento')}>
                       <span className="evflashes__add">
                         <PlusIcon />
                       </span>
