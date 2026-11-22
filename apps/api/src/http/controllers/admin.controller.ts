@@ -191,6 +191,25 @@ export class AdminController {
     return this.core.admin.setUserBirthDate(actor, id, b.birthDate, b.note);
   }
 
+  /** Uma pessoa: nome, @usuário, biografia (para o formulário de editar). */
+  @Get('users/:id')
+  user(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.admin.userDetail(actor, id);
+  }
+
+  /** `{displayName?, username?, bio?, note}`: corrige o perfil (motivo obrigatório, fica na auditoria). */
+  @Put('users/:id/profile')
+  editUser(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.admin.editUser(actor, id, { displayName: b.displayName, username: b.username, bio: b.bio, note: b.note });
+  }
+
+  /** Atividade da pessoa (`kind`: LIKE, COMMENT, POST, FOLLOW, EVENT; `cursor` da página anterior). */
+  @Get('users/:id/activity')
+  userActivity(@CurrentActor() actor: Actor, @Param('id') id: string, @Query() q: { kind?: unknown; cursor?: unknown }) {
+    return this.core.admin.userActivity(actor, id, q);
+  }
+
   @Get('venues')
   venues(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; limit?: unknown; offset?: unknown }) {
     return this.core.admin.searchVenues(actor, q);

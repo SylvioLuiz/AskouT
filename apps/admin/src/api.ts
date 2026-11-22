@@ -1,7 +1,7 @@
 import { getPageSize } from './page-size.ts';
 import { query } from './labels.ts';
 import type {
-  AuditRow, AuthResult, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -135,6 +135,10 @@ export const api = {
 
   users: (p: { q: string; status?: UserStatus; offset: number }) => request<Page<UserRow>>('GET', `/admin/users${query({ q: p.q, status: p.status, offset: p.offset, limit: getPageSize() })}`),
   setUserBirthDate: (id: string, birthDate: string, note: string) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/birth-date`, { birthDate, note }),
+  userDetail: (id: string) => request<{ id: string; username: string; displayName: string; bio: string | null }>('GET', `/admin/users/${encodeURIComponent(id)}`),
+  editUser: (id: string, body: { displayName?: string; username?: string; bio?: string | null; note: string }) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/profile`, body),
+  userActivity: (id: string, p: { kind: string; cursor: string | null }) =>
+    request<{ items: UserActivityItem[]; nextCursor: string | null }>('GET', `/admin/users/${encodeURIComponent(id)}/activity${query({ kind: p.kind || undefined, cursor: p.cursor ?? undefined })}`),
   setUserStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED', note: string) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/status`, { status, note }),
 
   venues: (p: { q: string; offset: number }) => request<Page<VenueRow>>('GET', `/admin/venues${query({ ...p, limit: getPageSize() })}`),

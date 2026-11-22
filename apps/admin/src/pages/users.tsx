@@ -5,12 +5,15 @@ import { STATUS_LABEL, formatBirthDate, formatDate } from '../labels.ts';
 import type { UserRow, UserStatus } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead, Pager, SearchBox } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
+import { EditUserDialog, UserActivityDialog } from './user-dialogs.tsx';
 
 export function UsersPage() {
   const [text, setText] = useState('');
   const [status, setStatus] = useState<UserStatus | ''>('');
   const [offset, setOffset] = useState(0);
   const [action, setAction] = useState<ActionSpec>();
+  const [editing, setEditing] = useState<UserRow>();
+  const [watching, setWatching] = useState<UserRow>();
   const q = useDebounced(text.trim());
   const list = useAsync(() => api.users({ q, status: status || undefined, offset }), [q, status, offset]);
 
@@ -106,6 +109,14 @@ export function UsersPage() {
                     <td>{formatBirthDate(u.birthDate)}</td>
                     <td>{formatDate(u.createdAt)}</td>
                     <td className="right">
+                      <button type="button" className="btn btn--small" onClick={() => setWatching(u)}>
+                        Atividade
+                      </button>{' '}
+                      {u.role === 'ADMIN' ? null : (
+                        <button type="button" className="btn btn--small" onClick={() => setEditing(u)}>
+                          Editar
+                        </button>
+                      )}{' '}
                       {u.role === 'ADMIN' ? null : (
                         <button type="button" className="btn btn--small" onClick={() => fixBirth(u)}>
                           Corrigir idade
@@ -130,6 +141,8 @@ export function UsersPage() {
         )}
       </Loadable>
       {action ? <ActionDialog spec={action} onClose={() => setAction(undefined)} onDone={list.reload} /> : null}
+      {editing ? <EditUserDialog user={editing} onClose={() => setEditing(undefined)} onDone={list.reload} /> : null}
+      {watching ? <UserActivityDialog user={watching} onClose={() => setWatching(undefined)} /> : null}
     </>
   );
 }

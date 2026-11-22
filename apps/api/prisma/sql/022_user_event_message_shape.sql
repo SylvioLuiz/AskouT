@@ -7,6 +7,10 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'message_suggestion_shape' AND conrelid = '"Message"'::regclass AND pg_get_constraintdef(oid) LIKE '%postEventId%') THEN
     RETURN;
   END IF;
+  -- Já tem foto ou vídeo no chat: a regra certa vem no 023.
+  IF EXISTS (SELECT 1 FROM "Message" WHERE kind IN ('IMAGE', 'VIDEO')) THEN
+    RETURN;
+  END IF;
   ALTER TABLE "Message" DROP CONSTRAINT IF EXISTS message_suggestion_shape;
   ALTER TABLE "Message" ADD CONSTRAINT message_suggestion_shape CHECK (
     (kind = 'SUGGESTION' AND suggestion IS NOT NULL AND "meetupId" IS NULL AND "eventId" IS NULL AND "postEventId" IS NULL AND "audioMs" IS NULL)

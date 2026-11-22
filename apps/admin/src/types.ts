@@ -78,6 +78,19 @@ export interface UserRow {
   loginProviders: ('GOOGLE' | 'APPLE')[];
 }
 
+/** Um item da atividade de uma pessoa (curtiu, comentou, publicou, foi, seguiu). */
+export interface UserActivityItem {
+  id: string;
+  kind: string;
+  action: string;
+  at: string;
+  available: boolean;
+  person: { userId: string; username: string; displayName: string } | null;
+  title: string | null;
+  text: string | null;
+  pending: boolean;
+}
+
 export interface VenueRow {
   id: string;
   name: string;

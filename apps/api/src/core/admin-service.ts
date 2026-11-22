@@ -1,4 +1,7 @@
 import { MIN_ACCOUNT_AGE, parseBirthDate } from './age-service.ts';
+import { ActivityService } from './activity-service.ts';
+import type { ActivityPage } from './activity-service.ts';
+import { bioProblem, displayNameProblem, normalizeBio, normalizeDisplayName, normalizeUsername, usernameProblem } from './validation.ts';
 import { buildRetentionReport } from './retention.ts';
 import type { RetentionReport } from './retention.ts';
 import { conflict, forbidden, notFound, unauthorized, validationError } from './errors.ts';
@@ -262,6 +265,81 @@ export class AdminService {
     await this.deps.users.updateBirthDate(target.id, parsed.birthDate);
     await this.log(actor.userId, 'USER_BIRTHDATE_CHANGED', 'USER', target.id, `${reason ?? ''} (de ${before ?? 'sem data'} para ${parsed.birthDate})`.slice(0, 400));
     return { id: target.id, birthDate: parsed.birthDate };
+  }
+
+  /** Dados que a gestão pode editar de uma pessoa (para abrir o formulário já preenchido). */
+  async userDetail(actor: Actor, userId: unknown): Promise<{ id: string; email: string; username: string; displayName: string; bio: string | null; status: UserStatus; role: string }> {
+    this.assertAdmin(actor);
+    const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
+    const profile = target ? await this.deps.users.findProfileById(target.id) : undefined;
+    if (!target || !profile) throw notFound('Usuário não encontrado');
+    return { id: target.id, email: target.email, username: profile.username, displayName: profile.displayName, bio: profile.bio, status: target.status, role: target.role };
+  }
+
+  /**
+   * Corrige nome, @usuário e biografia de uma pessoa (ex.: nome ofensivo, @ de outra marca). Motivo obrigatório; o que mudou
+   * (de → para) fica na auditoria. Contas de administrador não passam por aqui.
+   */
+  async editUser(actor: Actor, userId: unknown, input: { displayName?: unknown; username?: unknown; bio?: unknown; note?: unknown }): Promise<{ id: string; username: string; displayName: string; bio: string | null }> {
+    this.assertAdmin(actor);
+    const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
+    const current = target ? await this.deps.users.findProfileById(target.id) : undefined;
+    if (!target || !current) throw notFound('Usuário não encontrado');
+    if (target.role === 'ADMIN') throw conflict('Contas de administrador não passam por aqui');
+    const reason = noteText(input.note, true);
+    const problems: Record<string, string> = {};
+    const next = { ...current };
+    if (input.displayName !== undefined) {
+      if (typeof input.displayName !== 'string') problems['displayName'] = 'Informe um nome';
+      else {
+        next.displayName = normalizeDisplayName(input.displayName);
+        const p = displayNameProblem(next.displayName);
+        if (p) problems['displayName'] = p;
+      }
+    }
+    if (input.bio !== undefined) {
+      if (input.bio !== null && typeof input.bio !== 'string') problems['bio'] = 'Biografia inválida';
+      else {
+        next.bio = normalizeBio(input.bio as string | null);
+        const p = bioProblem(next.bio);
+        if (p) problems['bio'] = p;
+      }
+    }
+    if (input.username !== undefined) {
+      if (typeof input.username !== 'string') problems['username'] = 'Informe o @usuário';
+      else {
+        next.username = normalizeUsername(input.username);
+        const p = usernameProblem(next.username);
+        if (p) problems['username'] = p;
+        else if (next.username !== current.username) {
+          const taken = await this.deps.users.findProfileByUsername(next.username);
+          if (taken && taken.userId !== current.userId) problems['username'] = 'Esse @usuário já está em uso';
+        }
+      }
+    }
+    if (Object.keys(problems).length > 0) throw validationError('Dados inválidos', problems);
+    const changes = [
+      next.displayName !== current.displayName ? `nome: "${current.displayName}" → "${next.displayName}"` : null,
+      next.username !== current.username ? `@${current.username} → @${next.username}` : null,
+      next.bio !== current.bio ? 'biografia alterada' : null,
+    ].filter((c): c is string => c !== null);
+    if (changes.length === 0) throw conflict('Nada mudou');
+    if (next.username !== current.username) await this.deps.users.updateUsername(current.userId, next.username);
+    await this.deps.users.updateProfile(next);
+    await this.log(actor.userId, 'USER_PROFILE_EDITED', 'USER', target.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400));
+    return { id: target.id, username: next.username, displayName: next.displayName, bio: next.bio };
+  }
+
+  /** O registro de atividade de uma pessoa (curtidas, comentários, posts, eventos, quem seguiu), como ela vê no app. */
+  async userActivity(actor: Actor, userId: unknown, query: { kind?: unknown; cursor?: unknown }): Promise<ActivityPage> {
+    this.assertAdmin(actor);
+    const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
+    if (!target) throw notFound('Usuário não encontrado');
+    return new ActivityService(this.deps).list(target.id, {
+      ...(typeof query.kind === 'string' && query.kind !== '' ? { kind: query.kind } : {}),
+      ...(typeof query.cursor === 'string' && query.cursor !== '' ? { cursor: query.cursor } : {}),
+      limit: 30,
+    });
   }
 
   // ---------- Pagamentos (chave geral do impulsionamento) ----------

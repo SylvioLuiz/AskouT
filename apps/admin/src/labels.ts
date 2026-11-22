@@ -30,6 +30,7 @@ export const ACTION_LABEL: Record<string, string> = {
   USER_SUSPENDED: 'Suspendeu a conta',
   USER_REACTIVATED: 'Reativou a conta',
   USER_BIRTHDATE_CHANGED: 'Corrigiu a data de nascimento',
+  USER_PROFILE_EDITED: 'Editou o perfil',
   CLAIM_APPROVED: 'Aprovou pedido de dono',
   CLAIM_REJECTED: 'Recusou pedido de dono',
   VENUE_OWNER_REMOVED: 'Tirou o responsável do local',

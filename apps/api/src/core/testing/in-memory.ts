@@ -237,6 +237,11 @@ export class InMemoryUserRepository implements UserRepository {
     this.profiles.set(profile.userId, { ...profile });
   }
 
+  async updateUsername(userId: string, username: string): Promise<void> {
+    const p = this.profiles.get(userId);
+    if (p) this.profiles.set(userId, { ...p, username });
+  }
+
   async searchProfiles(query: string, limit: number, excludeIds: string[]): Promise<Profile[]> {
     const q = query.toLowerCase();
     const excluded = new Set(excludeIds);
@@ -3246,7 +3251,8 @@ export class InMemorySchedulingRepository implements SchedulingRepository {
   }
 
   async findByEventPost(postId: string): Promise<PollRecord | undefined> {
-    const p = [...this.polls.values()].find((x) => x.eventPostId === postId);
+    const all = [...this.polls.values()].filter((x) => x.eventPostId === postId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const p = all.find((x) => x.status !== 'CANCELLED') ?? all[0];
     return p ? { ...p } : undefined;
   }
 

@@ -167,6 +167,10 @@ export class PrismaUserRepository implements UserRepository {
     return row ? toProfile(row) : undefined;
   }
 
+  async updateUsername(userId: string, username: string): Promise<void> {
+    await this.prisma.profile.update({ where: { userId }, data: { username } });
+  }
+
   async findProfileByUsername(username: string): Promise<Profile | undefined> {
     const row = await this.prisma.profile.findUnique({ where: { username } });
     return row ? toProfile(row) : undefined;

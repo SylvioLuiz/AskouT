@@ -396,3 +396,28 @@ test('detalhe do evento na gestão: cadastro, local, responsável e quem confirm
   assert.equal(d.goingCount, 1);
   assert.deepEqual(d.going.map((g) => g.username), ['bia']);
 });
+
+test('gestão edita nome, @usuário e biografia de uma pessoa (com motivo na auditoria) e vê a atividade dela', async () => {
+  const { w, A, U, adm, ana, bia } = await setup();
+  await rejectsWith(w.core.admin.editUser(U(ana), bia, { displayName: 'X', note: 'x' }), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.editUser(A, bia, { displayName: 'Bia Nova' }), 'VALIDATION'); // sem motivo
+  await rejectsWith(w.core.admin.editUser(A, bia, { username: 'ana', note: 'troca' }), 'VALIDATION'); // @ já em uso
+  await rejectsWith(w.core.admin.editUser(A, adm, { displayName: 'Outro', note: 'x' }), 'CONFLICT'); // conta admin
+
+  const before = await w.core.admin.userDetail(A, bia);
+  assert.equal(before.username, 'bia');
+  const edited = await w.core.admin.editUser(A, bia, { displayName: 'Bia Nova', username: 'bia.nova', bio: 'Oi', note: 'Pedido da própria pessoa' });
+  assert.deepEqual([edited.displayName, edited.username, edited.bio], ['Bia Nova', 'bia.nova', 'Oi']);
+  assert.equal((await w.users.findProfileByUsername('bia.nova'))?.userId, bia);
+  assert.equal(await w.users.findProfileByUsername('bia'), undefined);
+  const log = await w.core.admin.audit(A, {});
+  assert.ok(log.items.some((r) => r.action === 'USER_PROFILE_EDITED' && /@bia → @bia\.nova/.test(r.note ?? '')));
+  await rejectsWith(w.core.admin.editUser(A, bia, { displayName: 'Bia Nova', note: 'de novo' }), 'CONFLICT'); // nada mudou
+
+  // Atividade: o que a pessoa fez (aqui, seguiu a ana).
+  await rejectsWith(w.core.admin.userActivity(U(ana), bia, {}), 'FORBIDDEN');
+  const activity = await w.core.admin.userActivity(A, bia, {});
+  assert.ok(activity.items.some((i) => i.action === 'FOLLOW_USER'));
+  const follows = await w.core.admin.userActivity(A, bia, { kind: 'LIKE' });
+  assert.ok(follows.items.every((i) => i.kind === 'LIKE'));
+});

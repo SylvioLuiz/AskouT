@@ -43,6 +43,8 @@ export interface UserRepository {
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
   findProfileById(userId: string): Promise<Profile | undefined>;
   findProfileByUsername(username: string): Promise<Profile | undefined>;
+  /** Troca o @usuário (já normalizado e conferido como livre). */
+  updateUsername(userId: string, username: string): Promise<void>;
   /** Mantém a ordem de `ids`; ignora ausentes e usuários suspensos. */
   findProfilesByIds(ids: string[]): Promise<Profile[]>;
   updateProfile(profile: Profile): Promise<void>;
@@ -503,7 +505,7 @@ export interface SchedulingRepository {
   /** Grava a votação com os participantes (quem organiza inclusive). */
   create(poll: PollRecord, participantIds: string[], at: Date): Promise<void>;
   find(id: string): Promise<PollRecord | undefined>;
-  /** A votação que gerou este evento (post), se houver. */
+  /** A votação deste evento (post), se houver: a mais recente que não foi cancelada (senão, a mais recente). */
   findByEventPost(postId: string): Promise<PollRecord | undefined>;
   /** Votações de uma conversa, a mais recente primeiro. */
   listForConversation(conversationId: string): Promise<PollRecord[]>;
