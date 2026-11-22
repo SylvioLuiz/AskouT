@@ -4276,7 +4276,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .venuelink:hover { text-decoration-color: currentColor; }
 
 /* Mapa de eventos acontecendo agora (tela cheia) */
-.pagehead__action { margin-left: auto; }
+.pagehead__action { margin-left: auto; flex: none; }
 .pagehead__action .btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .pagehead__action svg { width: 18px; height: 18px; }
 .evmap { position: fixed; inset: 0; z-index: 60; background: var(--bg); animation: evmap-fade .22s ease-out both; --evmap-float: rgba(255,255,255,.96); --evmap-float-ink: rgb(26 11 46); --evmap-float-muted: rgb(60 60 67); }
@@ -6818,7 +6818,7 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .nowhead__title { display: flex; align-items: center; gap: 8px; margin: 0; font-family: var(--now-display); font-size: 1.875rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; }
 .nowhead__title svg { width: 26px; height: 26px; color: var(--now-pink); }
 .nowhead__sub { margin: 4px 0 0; color: var(--muted); font-size: 1rem; }
-.nowhead__how { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+.nowhead__how { display: inline-flex; align-items: center; gap: 6px; flex: none; white-space: nowrap; min-height: 34px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
 .nowhead__how svg { width: 16px; height: 16px; }
 
 /* Balão de recado (estilo notas): a ponta aponta para a foto embaixo. */
@@ -7307,3 +7307,8 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 
 /* Cartaz do post: som do vídeo no rodapé, ao lado de compartilhar (em cima, o ⋯ cobria o botão). */
 .poster__end { display: flex; align-items: center; gap: 8px; }
+
+/* Capa do evento em vídeo: segurar toca; o aviso fica no alto, entre voltar e o menu. */
+.evhero--video { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.evhero__video { z-index: 0; background: #000; }
+.evhero__videohint { position: absolute; top: calc(18px + var(--sa-top)); left: 50%; transform: translateX(-50%); z-index: 2; padding: 6px 12px; border-radius: 999px; background: rgb(0 0 0 / 0.5); color: #fff; font-size: 0.75rem; font-weight: 600; white-space: nowrap; pointer-events: none; }

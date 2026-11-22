@@ -883,6 +883,8 @@ export interface EventPage {
   sample: boolean;
   /** Capa: a primeira foto do evento (enviada, do Google ou a imagem do evento do local). */
   coverPath: string | null;
+  /** A capa é um vídeo: segurar a capa toca o vídeo. */
+  coverVideoPath?: string | null;
   coverAuthor: string | null;
   venue: { id?: string; name: string; address: string | null; lat: number | null; lng: number | null };
   tags: string[];

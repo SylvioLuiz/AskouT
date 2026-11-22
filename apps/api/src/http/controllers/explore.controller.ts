@@ -280,6 +280,6 @@ export class ExploreController {
 
   private presentPage(view: EventPageView) {
     const { cover, ...rest } = view;
-    return { ...rest, coverPath: this.coverPath(cover), coverAuthor: cover?.kind === 'PLACE' ? cover.author : null };
+    return { ...rest, coverPath: this.coverPath(cover), coverVideoPath: cover?.kind === 'UPLOAD' && cover.video ? `/posts/videos/${cover.imageId}` : null, coverAuthor: cover?.kind === 'PLACE' ? cover.author : null };
   }
 }

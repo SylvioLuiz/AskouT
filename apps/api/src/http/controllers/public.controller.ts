@@ -49,7 +49,7 @@ export class PublicController {
     const view: EventPageView = await this.core.publicReads.event(id, lat !== undefined && lng !== undefined ? { lat, lng } : {});
     const { cover, ...rest } = view;
     const coverPath = !cover ? null : cover.kind === 'URL' ? cover.url : cover.kind === 'UPLOAD' ? `/posts/images/${cover.imageId}` : this.photoPath(cover.photoRef);
-    return { ...rest, coverPath, coverAuthor: cover?.kind === 'PLACE' ? cover.author : null };
+    return { ...rest, coverPath, coverVideoPath: cover?.kind === 'UPLOAD' && cover.video ? `/posts/videos/${cover.imageId}` : null, coverAuthor: cover?.kind === 'PLACE' ? cover.author : null };
   }
 
   @Get('venues/:id')

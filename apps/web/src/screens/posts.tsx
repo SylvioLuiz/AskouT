@@ -283,7 +283,8 @@ export function CreatePostScreen() {
     setBusy(true);
     setMessage(undefined);
     const eventDraft = kind === 'EVENT' ? { title: eventTitle, kind: eventKind, startsAt: eventDateByPoll ? '' : eventStart, endsAt: eventDateByPoll ? '' : eventEnd, dateByPoll: eventDateByPoll, private: eventPrivate, extras: extrasFromDraft(extras, extraOptions.data ?? []) } : null;
-    const problem = eventDraft && items.length === 0 ? t('Escolha uma capa para o evento.') : eventDraft ? eventProblem(eventDraft, effectivePlace(items, linked), new Date()) : postProblem({ items: items.length, caption, place: effectivePlace(items, linked), event: linkedEvent });
+    // Evento sem foto vale: a página e o cartaz usam a capa padrão do tipo de evento.
+    const problem = eventDraft ? eventProblem(eventDraft, effectivePlace(items, linked), new Date()) : postProblem({ items: items.length, caption, place: effectivePlace(items, linked), event: linkedEvent });
     if (problem) {
       setMessage({ tone: 'error', text: problem });
       setBusy(false);
@@ -475,7 +476,7 @@ export function CreatePostScreen() {
 
   if (step === 'details' && kind === 'EVENT') {
     // Tela única do evento: capa no topo, nome grande e as linhas Quando / Onde / Tipo / Quem vê, cada uma com sua folha.
-    const missing = [eventTitle.trim() ? null : t('nome'), eventStart || eventDateByPoll ? null : t('data'), cover ? null : t('capa')].filter((m): m is string => m !== null);
+    const missing = [eventTitle.trim() ? null : t('nome'), eventStart || eventDateByPoll ? null : t('data')].filter((m): m is string => m !== null);
     const missingText = missing.length > 0 ? t('Falta: {what}', { what: missing.length > 1 ? `${missing.slice(0, -1).join(', ')} ${t('e')} ${missing[missing.length - 1]}` : missing[0]! }) : null;
     const when = eventDateByPoll ? t('Por votação') : whenLabel(eventStart, eventEnd, new Date());
     const kindLabel = KINDS.find((k) => k.id === eventKind)?.label ?? t('Outros');
@@ -513,7 +514,7 @@ export function CreatePostScreen() {
           </div>
         ) : (
           <div className="evcover evcover--empty">
-            <p>{reading ? t('Preparando as fotos…') : t('Adicione uma capa')}</p>
+            <p>{reading ? t('Preparando as fotos…') : t('Adicione uma capa (opcional)')}</p>
             <div className="evcover__actions">
               <Button small variant="secondary" loading={reading} onClick={() => fileRef.current?.click()}>
                 <PhotoIcon /> {t('Galeria')}
