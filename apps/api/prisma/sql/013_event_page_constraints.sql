@@ -7,7 +7,8 @@ BEGIN
       ("placeEventId" IS NOT NULL AND "postId" IS NULL) OR ("placeEventId" IS NULL AND "postId" IS NOT NULL)
     );
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'event_post_shape') THEN
+  -- EventPost foi substituída pelo feed do evento (migration event_feed): só aplica se a tabela ainda existir.
+  IF to_regclass('"EventPost"') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'event_post_shape') THEN
     ALTER TABLE "EventPost" ADD CONSTRAINT event_post_shape CHECK (
       char_length("caption") BETWEEN 1 AND 500
       AND (("mime" IS NULL) = ("data" IS NULL))

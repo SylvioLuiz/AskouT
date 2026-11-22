@@ -27,17 +27,8 @@ BEGIN
 END
 $$;
 
--- Evento: título, início e fim vêm juntos (ou nenhum), e o fim não é antes do início.
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'post_event_shape') THEN
-    ALTER TABLE "Post" ADD CONSTRAINT post_event_shape CHECK (
-      ("eventTitle" IS NULL AND "eventStartsAt" IS NULL AND "eventEndsAt" IS NULL)
-      OR ("eventTitle" IS NOT NULL AND "eventStartsAt" IS NOT NULL AND "eventEndsAt" IS NOT NULL AND "eventEndsAt" >= "eventStartsAt" AND char_length("eventTitle") BETWEEN 1 AND 120)
-    );
-  END IF;
-END
-$$;
+-- A forma do evento (post_event_shape) fica no 025: evento de pessoa pode estar sem data (em votação). Criar aqui a
+-- versão antiga, que exige data, falhava em todo banco que já tem um evento em votação.
 
 -- Comentário: texto de 1 a 500 caracteres. Denúncia: só motivos conhecidos.
 DO $$

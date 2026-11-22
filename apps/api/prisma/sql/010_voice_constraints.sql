@@ -8,6 +8,10 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'message_suggestion_shape' AND conrelid = '"Message"'::regclass AND pg_get_constraintdef(oid) LIKE '%audioMs%') THEN
     RETURN;
   END IF;
+  -- Banco que já tem mensagens dos tipos mais novos (evento de pessoa, foto, vídeo, story): a regra certa vem no 022/023.
+  IF EXISTS (SELECT 1 FROM "Message" WHERE kind NOT IN ('SUGGESTION', 'TEXT', 'SYSTEM', 'MEETUP', 'EVENT', 'AUDIO') OR (kind = 'EVENT' AND "eventId" IS NULL)) THEN
+    RETURN;
+  END IF;
   ALTER TABLE "Message" DROP CONSTRAINT IF EXISTS message_suggestion_shape;
   ALTER TABLE "Message" ADD CONSTRAINT message_suggestion_shape CHECK (
     (kind = 'SUGGESTION' AND suggestion IS NOT NULL AND "meetupId" IS NULL AND "eventId" IS NULL AND "audioMs" IS NULL)
