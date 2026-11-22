@@ -35,34 +35,47 @@ function Tile({ event, mine, onRemove, busy }: { event: PostedEvent; mine: boole
           {t('Opções de {title}', { title: event.title })}
         </button>
       ) : null}
-      {mine && menu.open ? <TileMenu title={event.title} actions={[{ label: t('Tirar do perfil'), busy, run: onRemove }]} onClose={() => menu.setOpen(false)} /> : null}
+      {mine && menu.open ? <TileMenu title={event.title} actions={[{ label: t('Tirar da aba Eventos'), busy, run: onRemove }]} onClose={() => menu.setOpen(false)} /> : null}
     </li>
   );
 }
 
 /** Evento que a pessoa publicou como post: mesmo desenho do evento postado, com a foto do post de capa. */
-function PostTile({ post, mine, onRemove, busy }: { post: PostView; mine: boolean; onRemove: () => void; busy: boolean }) {
+function PostTile({ post, mine, onRemove, onHide, busy }: { post: PostView; mine: boolean; onRemove: () => void; onHide: () => void; busy: boolean }) {
   const [failed, setFailed] = useState(false);
   const [asking, setAsking] = useState(false);
+  // Segurar o cartão: deixar só no Participou (some da aba Eventos) ou apagar.
+  const menu = useTileMenu(mine);
   const first = post.images[0];
   const image = first?.path && !failed ? api.assetUrl(first.path) : null;
   const event = post.event;
   if (!event) return null;
   return (
-    <li className="ptile">
-      <Link to={`/eventos/${encodeURIComponent(post.id)}`} className={`ptile__link evcover--other${image ? '' : ' ptile__link--plain'}`}>
+    <li className={`ptile${mine ? ' ptile--press' : ''}`}>
+      <Link {...menu.press} to={`/eventos/${encodeURIComponent(post.id)}`} className={`ptile__link evcover--other${image ? '' : ' ptile__link--plain'}`}>
         {image ? <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} /> : <span className="ptile__kind" aria-hidden="true">{t('Evento')}</span>}
         <span className="ptile__info">
           <span className="ptile__title">{event.title}</span>
           <span className="ptile__when">{formatWhen(event.startsAt, event.endsAt, new Date())}</span>
         </span>
       </Link>
+      {mine ? (
+        <button type="button" className="visually-hidden" onClick={() => menu.setOpen(true)}>
+          {t('Opções de {title}', { title: event.title })}
+        </button>
+      ) : null}
+      {mine && menu.open ? (
+        <TileMenu
+          title={event.title}
+          actions={[
+            { label: t('Deixar só no Participou'), busy, run: onHide },
+            { label: t('Apagar evento'), busy, danger: true, run: () => setAsking(true) },
+          ]}
+          onClose={() => menu.setOpen(false)}
+        />
+      ) : null}
       {mine && asking ? (
         <Confirm danger question={t('Apagar o evento {title}? Quem confirmou presença deixa de vê-lo e não dá para desfazer.', { title: event.title })} confirmLabel={t('Apagar')} busy={busy} onConfirm={() => { setAsking(false); onRemove(); }} onCancel={() => setAsking(false)} />
-      ) : mine ? (
-        <button type="button" className="ptile__remove" onClick={() => setAsking(true)} disabled={busy} aria-label={t('Apagar o evento {title}', { title: event.title })}>
-          {t('Apagar evento')}
-        </button>
       ) : null}
     </li>
   );
@@ -112,6 +125,7 @@ export function PostedEvents({ username, mine, onCount, quietEmpty }: { username
     setBusyId(event.id);
     try {
       await api.unpostEvent(event.id);
+      await api.setGoingOnProfile(event.id, false).catch(() => undefined); // não foi ("Eu vou"): só sai do perfil
       setPage((current) => (current ? { ...current, total: current.total - 1, items: current.items.filter((x) => x.id !== event.id) } : current));
       onCount?.((page?.total ?? 1) - 1 + eventPosts.length + going.length);
     } catch (failure) {
@@ -125,6 +139,21 @@ export function PostedEvents({ username, mine, onCount, quietEmpty }: { username
     setBusyId(post.id);
     try {
       await api.deletePost(post.id);
+      const rest = eventPosts.filter((x) => x.id !== post.id);
+      setEventPosts(rest);
+      onCount?.((page?.total ?? 0) + rest.length + going.length);
+    } catch (failure) {
+      setError(toApiError(failure));
+    } finally {
+      setBusyId(undefined);
+    }
+  }
+
+  /** Evento criado pela pessoa: sai da aba Eventos e fica só no Participou. */
+  async function hidePost(post: PostView) {
+    setBusyId(post.id);
+    try {
+      await api.setGoingOnProfile(post.id, false);
       const rest = eventPosts.filter((x) => x.id !== post.id);
       setEventPosts(rest);
       onCount?.((page?.total ?? 0) + rest.length + going.length);
@@ -171,7 +200,7 @@ export function PostedEvents({ username, mine, onCount, quietEmpty }: { username
 
   // Os eventos publicados como post vêm primeiro (mais novos), depois os eventos postados do Explorar.
   const tiles = [
-    ...eventPosts.map((post) => <PostTile key={`p-${post.id}`} post={post} mine={mine} busy={busyId === post.id} onRemove={() => void removePost(post)} />),
+    ...eventPosts.map((post) => <PostTile key={`p-${post.id}`} post={post} mine={mine} busy={busyId === post.id} onRemove={() => void removePost(post)} onHide={() => void hidePost(post)} />),
     ...page.items.map((event) => <Tile key={event.id} event={event} mine={mine} busy={busyId === event.id} onRemove={() => void remove(event)} />),
     // Presenças mostradas no perfil, sem repetir o que já está postado. Tirar daqui leva o evento para a aba Participou.
     ...going

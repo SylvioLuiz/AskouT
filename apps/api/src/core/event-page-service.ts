@@ -101,7 +101,7 @@ export interface ProfileStoryGroupView {
 /** A capa: o que o dono enviou, a foto que o Google deu para o lugar ou a imagem do evento do local. */
 export type EventCoverView =
   | { kind: 'URL'; url: string }
-  | { kind: 'UPLOAD'; imageId: string }
+  | { kind: 'UPLOAD'; imageId: string; /** A capa é a imagem de um vídeo: a página toca o vídeo ao segurar a capa. */ video?: boolean }
   | { kind: 'PLACE'; photoRef: string; author: string | null };
 
 export interface EventPageView {
@@ -340,7 +340,7 @@ export class EventPageService {
     if (!found || !title) throw notFound('Evento não encontrado');
     const { post, images } = found;
     const first = [...images].sort((a, b) => a.position - b.position)[0];
-    const cover: EventCoverView | null = !first ? null : first.isUpload ? { kind: 'UPLOAD', imageId: first.id } : first.placePhotoRef ? { kind: 'PLACE', photoRef: first.placePhotoRef, author: first.placePhotoAuthor } : null;
+    const cover: EventCoverView | null = !first ? null : first.isUpload ? { kind: 'UPLOAD', imageId: first.id, ...(first.videoMime ? { video: true } : {}) } : first.placePhotoRef ? { kind: 'PLACE', photoRef: first.placePhotoRef, author: first.placePhotoAuthor } : null;
     // Rolê escolhido entre os locais do AskouT: a página do evento ganha o link e o ponto no mapa do local.
     const linked = post.placeVenueId ? await this.deps.places.findVenue(post.placeVenueId) : undefined;
     return {
@@ -446,7 +446,8 @@ export class EventPageService {
     const checked = await Promise.all(
       rows.map(async (row): Promise<AttendedEventView | undefined> => {
         const card = cards.get(row.ref.id);
-        if (!card || card.ownerId === ownerId) return undefined;
+        // Evento da própria pessoa só entra no Participou (quando ela o tirou da aba Eventos); na aba Eventos ele já vem como post.
+        if (!card || (card.ownerId === ownerId && onProfile)) return undefined;
         if (card.ownerId && card.ownerId !== viewerId && hidden.has(card.ownerId)) return undefined;
         // O visitante só vê o evento se ele mesmo poderia abri-lo (evento privado: só com acesso a ele).
         if (!isSelf) {
@@ -464,11 +465,17 @@ export class EventPageService {
     return { items: all.slice(page.offset, page.offset + page.limit), total: all.length, ...page };
   }
 
-  /** Muda se a presença aparece na aba Eventos (true) ou só na aba Participou (false). Precisa ter confirmado presença. */
+  /**
+   * Muda se a presença aparece na aba Eventos (true) ou só na aba Participou (false). Precisa ter confirmado presença.
+   * Quem criou o evento já conta como confirmado: false tira o evento dela da aba Eventos e deixa só no Participou.
+   */
   async setGoingOnProfile(viewerId: string, rawId: unknown, onProfile: unknown): Promise<EventPageView> {
     if (typeof onProfile !== 'boolean') throw validationError('Valor inválido', { onProfile: 'Use true ou false' });
-    const { ref } = await this.resolve(viewerId, rawId);
-    if (!(await this.deps.eventRoom.setGoingOnProfile(ref, viewerId, onProfile))) throw conflict('Confirme presença com Eu vou antes');
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    if (owner?.userId === viewerId) {
+      // O dono não tem presença gravada até escolher isso; a contagem de confirmados já ignora o dono na lista.
+      if (!(await this.deps.eventRoom.addGoing(ref, viewerId, this.deps.clock.now(), onProfile))) await this.deps.eventRoom.setGoingOnProfile(ref, viewerId, onProfile);
+    } else if (!(await this.deps.eventRoom.setGoingOnProfile(ref, viewerId, onProfile))) throw conflict('Confirme presença com Eu vou antes');
     return this.get(viewerId, ref.id);
   }
 

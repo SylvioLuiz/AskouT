@@ -443,9 +443,11 @@ test('post comum precisa de um evento ou de um rolê; pode ser só texto', async
   assert.equal(text.linkedEvent, null);
   assert.ok((await w.core.posts.feed(bia)).items.some((i) => i.id === text.id), 'post só de texto entra no feed');
 
-  // Evento continua com capa obrigatória.
+  // Evento pode ser criado sem foto (a página usa a capa padrão do tipo), até sem texto.
   const startsAt = new Date(w.clock.now().getTime() + 24 * 3_600_000).toISOString();
-  await rejectsWith(w.core.posts.create(ana, { caption: 'oi', event: { title: 'Festa', startsAt } }), 'VALIDATION');
+  const semFoto = await w.core.posts.create(ana, { event: { title: 'Festa sem foto', startsAt } });
+  assert.equal(semFoto.images.length, 0);
+  assert.equal((await w.core.eventPages.get(bia, semFoto.id)).cover, null);
   const ev = await w.core.posts.create(ana, { images: [JPEG()], event: { title: 'Festa', startsAt } });
   assert.ok(ev.event);
 });

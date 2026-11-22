@@ -27,29 +27,55 @@ export function useLongPress(onLongPress: () => void, enabled: boolean) {
     window.clearTimeout(timer.current);
     start.current = undefined;
   };
+  const begin = (x: number, y: number) => {
+    fired.current = false;
+    start.current = { x, y };
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      fired.current = true;
+      start.current = undefined;
+      navigator.vibrate?.(10);
+      callback.current();
+    }, LONG_PRESS_MS);
+  };
+  const moved = (x: number, y: number) => {
+    const s = start.current;
+    if (s && Math.hypot(x - s.x, y - s.y) > MOVE_TOLERANCE_PX) cancel();
+  };
   return {
-    onPointerDown: (event: PointerEvent<HTMLElement>) => {
-      if (event.pointerType === 'mouse' && event.button !== 0) return;
-      fired.current = false;
-      start.current = { x: event.clientX, y: event.clientY };
-      window.clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => {
-        fired.current = true;
-        start.current = undefined;
-        navigator.vibrate?.(10);
-        callback.current();
-      }, LONG_PRESS_MS);
+    // Dedo: eventos de toque. No iPhone, segurar um link dispara "pointercancel" e o menu nunca abria pelos eventos de pointer.
+    onTouchStart: (event: TouchEvent<HTMLElement>) => {
+      const touch = event.touches[0];
+      if (touch && event.touches.length === 1) begin(touch.clientX, touch.clientY);
+      else cancel();
     },
-    onPointerMove: (event: PointerEvent<HTMLElement>) => {
-      const s = start.current;
-      if (s && Math.hypot(event.clientX - s.x, event.clientY - s.y) > MOVE_TOLERANCE_PX) cancel();
+    onTouchMove: (event: TouchEvent<HTMLElement>) => {
+      const touch = event.touches[0];
+      if (touch) moved(touch.clientX, touch.clientY);
     },
-    onPointerUp: cancel,
-    onPointerCancel: cancel,
-    onPointerLeave: cancel,
+    onTouchCancel: cancel,
     /** Depois de segurar, soltar o dedo não gera o clique de compatibilidade (que fecharia o menu recém-aberto). */
     onTouchEnd: (event: TouchEvent<HTMLElement>) => {
+      cancel();
       if (fired.current && event.cancelable) event.preventDefault();
+    },
+    // Mouse e caneta: eventos de pointer.
+    onPointerDown: (event: PointerEvent<HTMLElement>) => {
+      if (event.pointerType === 'touch') return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      begin(event.clientX, event.clientY);
+    },
+    onPointerMove: (event: PointerEvent<HTMLElement>) => {
+      if (event.pointerType !== 'touch') moved(event.clientX, event.clientY);
+    },
+    onPointerUp: (event: PointerEvent<HTMLElement>) => {
+      if (event.pointerType !== 'touch') cancel();
+    },
+    onPointerCancel: (event: PointerEvent<HTMLElement>) => {
+      if (event.pointerType !== 'touch') cancel();
+    },
+    onPointerLeave: (event: PointerEvent<HTMLElement>) => {
+      if (event.pointerType !== 'touch') cancel();
     },
     onContextMenu: (event: MouseEvent<HTMLElement>) => {
       event.preventDefault();

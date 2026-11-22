@@ -12,6 +12,10 @@ const config: CapacitorConfig = {
     // Origem do app no Android: https://localhost (e capacitor://localhost no iOS). Ambas entram no CORS_ORIGINS da API.
     androidScheme: 'https',
   },
+  ios: {
+    // Segurar um link no iPhone abria a prévia do link do sistema, que engole o "tocar e segurar" do app (menu dos cartões, capa do evento).
+    allowsLinkPreview: false,
+  },
   plugins: {
     SplashScreen: { launchAutoHide: true, launchShowDuration: 800 },
   },

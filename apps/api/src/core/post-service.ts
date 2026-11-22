@@ -253,12 +253,12 @@ export class PostService {
       throw validationError('Escolha um evento ou um local', { place: 'Todo post precisa de um evento ou de um local vinculado' });
     }
     const raw = input.images === undefined || input.images === null ? [] : input.images;
-    // Post comum pode ser só texto (sem foto); evento e post de local continuam com pelo menos uma foto (a capa).
-    const minImages = event === null && !venue ? 0 : 1;
+    // Post comum e evento podem ficar sem foto (o evento usa a capa padrão do tipo); post de local continua com pelo menos uma.
+    const minImages = venue ? 1 : 0;
     if (!Array.isArray(raw) || raw.length < minImages || raw.length > POST_IMAGES_MAX) {
       throw validationError('Fotos inválidas', { images: minImages === 0 ? `Envie até ${POST_IMAGES_MAX} fotos` : `Envie de 1 a ${POST_IMAGES_MAX} fotos` });
     }
-    if (raw.length === 0 && !caption) throw validationError('Post vazio', { caption: 'Escreva algo ou escolha uma foto ou um vídeo' });
+    if (raw.length === 0 && !caption && event === null) throw validationError('Post vazio', { caption: 'Escreva algo ou escolha uma foto ou um vídeo' });
     const postId = ids.next();
     let placePhotos = 0;
     const images: PostImageRecord[] = raw.map((item: unknown, position) => {
@@ -532,7 +532,7 @@ export class PostService {
     if (event === null && !post.venueId && hadLink && !placeName && !linkedEventId) {
       throw validationError('Escolha um evento ou um local', { place: 'Todo post precisa de um evento ou de um local vinculado' });
     }
-    if (!caption && images.length === 0) throw validationError('Post vazio', { caption: 'Post sem foto precisa de um texto' });
+    if (!caption && images.length === 0 && event === null) throw validationError('Post vazio', { caption: 'Post sem foto precisa de um texto' });
     // "Quem vê" (público ou só convidados) muda na edição quando vier; virar post comum deixa público.
     const rawPrivate = input.event !== undefined && input.event !== null ? (input.event as { private?: unknown }).private : undefined;
     const eventPrivate = event === null ? false : rawPrivate === undefined ? undefined : this.parsePrivate(input.event);
@@ -589,10 +589,25 @@ export class PostService {
     if (!view.canViewContent) throw forbidden('Esta conta é privada');
     const page = parsePage(query);
     const { posts } = this.deps;
-    const [rows, total] = await Promise.all([posts.listFor([view.profile.userId], [view.profile.userId], { limit: page.limit + 1, offset: page.offset }, only), posts.countFor(view.profile.userId, only)]);
+    const [all, count] = await Promise.all([posts.listFor([view.profile.userId], [view.profile.userId], { limit: page.limit + 1, offset: page.offset }, only), posts.countFor(view.profile.userId, only)]);
+    // Aba Eventos: sem os eventos que a pessoa deixou só no Participou.
+    const hidden = only === 'EVENT' ? await this.eventsOnlyAttended(view.profile.userId) : new Set<string>();
+    const rows = all.filter((r) => !hidden.has(r.post.id));
+    const total = Math.max(0, count - hidden.size);
     const hasMore = rows.length > page.limit;
     const visible = await this.onlySeeable(viewerId, rows.slice(0, page.limit));
     return { items: await this.views(viewerId, visible), total, ...page, hasMore };
+  }
+
+  /** Eventos criados pela pessoa que ela tirou da aba Eventos (ficam só no Participou, que só ela vê). */
+  private async eventsOnlyAttended(userId: string): Promise<Set<string>> {
+    const rows = await this.deps.eventRoom.listGoingByUser(userId, 500);
+    const out = new Set<string>();
+    for (const r of rows) {
+      if (r.onProfile || r.ref.source !== 'USER') continue;
+      if ((await this.deps.posts.findById(r.ref.id))?.post.authorId === userId) out.add(r.ref.id);
+    }
+    return out;
   }
 
   /**

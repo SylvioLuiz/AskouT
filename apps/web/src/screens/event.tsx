@@ -2,7 +2,8 @@ import { CloakroomCard } from '../components/cloakroom-card.tsx';
 import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { shareOrigin } from '../lib/public-origin.ts';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, PointerEvent, TouchEvent } from 'react';
+import { useHoldPreview } from '../components/hold-preview.ts';
 import { CreateMeetupSheet } from '../components/meetup.tsx';
 import { StoryViewer } from '../components/event-story.tsx';
 import { StoryCreator } from '../components/story-creator.tsx';
@@ -51,6 +52,21 @@ const WHO_STACK = 6;
 const ABOUT_CLAMP_CHARS = 220;
 
 /** Capa: endereço https (evento do local) ou caminho da própria API (foto enviada / foto assinada do Google). */
+/** Vídeo da capa, enquanto a pessoa segura: tenta com som (o toque libera) e, se o navegador recusar, toca sem. */
+function HeroVideo({ src, poster }: { src: string; poster: string | null }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const video = ref.current;
+    if (!video) return;
+    video.muted = false;
+    void video.play().catch(() => {
+      video.muted = true;
+      void video.play().catch(() => undefined);
+    });
+  }, []);
+  return <video ref={ref} className="evhero__img evhero__video" src={src} poster={poster ?? undefined} playsInline loop preload="auto" aria-label={t('Vídeo da capa')} />;
+}
+
 function coverSrc(path: string | null): string | null {
   if (!path) return null;
   return path.startsWith('/') ? api.assetUrl(path) : safeImage(path);
@@ -250,6 +266,23 @@ export function EventScreen({ eventId }: { eventId: string }) {
   }
 
   const cover = e && !coverFailed ? coverSrc(e.coverPath) : null;
+  // Capa em vídeo: segurar a capa toca o vídeo; soltar volta para a foto.
+  const coverVideo = e?.coverVideoPath ? api.assetUrl(e.coverVideoPath) : null;
+  const [playingCover, setPlayingCover] = useState(false);
+  const holdCover = useHoldPreview(() => setPlayingCover(true), () => setPlayingCover(false));
+  // Segurar os botões da capa (voltar, ⋯) não toca o vídeo.
+  const onControl = (target: EventTarget) => target instanceof Element && target.closest('button, a') !== null;
+  const coverPress = coverVideo
+    ? {
+        ...holdCover,
+        onTouchStart: (event: TouchEvent<HTMLElement>) => {
+          if (!onControl(event.target)) holdCover.onTouchStart(event);
+        },
+        onPointerDown: (event: PointerEvent<HTMLElement>) => {
+          if (!onControl(event.target)) holdCover.onPointerDown(event);
+        },
+      }
+    : {};
   const date = e ? eventDateLabel(e.startsAt, e.endsAt) : null;
   const time = e ? eventTimeLabel(e.startsAt, e.endsAt) : null;
   const strip = e ? attendeeStrip(e.attendees, e.confirmedCount, STRIP_MAX) : null;
@@ -282,8 +315,14 @@ export function EventScreen({ eventId }: { eventId: string }) {
       ) : null}
       {e && date && time && strip ? (
         <article className="evpage">
-          <section className={`evhero evhero--${e.kind.toLowerCase()} evtone evtone-${eventTone(e.id)}`} aria-label={t('Capa do evento')}>
+          <section {...coverPress} className={`evhero evhero--${e.kind.toLowerCase()} evtone evtone-${eventTone(e.id)}${coverVideo ? ' evhero--video' : ''}`} aria-label={t('Capa do evento')}>
             {cover ? <img className="evhero__img" src={cover} alt="" referrerPolicy="no-referrer" onError={() => setCoverFailed(true)} /> : null}
+            {coverVideo && playingCover ? <HeroVideo src={coverVideo} poster={cover} /> : null}
+            {coverVideo && !playingCover ? (
+              <span className="evhero__videohint" aria-hidden="true">
+                ▶ {t('Segure para ver o vídeo')}
+              </span>
+            ) : null}
             <div className="evhero__shade" aria-hidden="true" />
             <button type="button" className="evhero__btn evhero__btn--back" onClick={goBack} aria-label={t('Voltar')}>
               <ChevronLeftIcon />
