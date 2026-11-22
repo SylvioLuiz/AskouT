@@ -69,9 +69,11 @@ export interface EventDraft {
   title: string;
   /** Tipo do evento (decide o ícone da página). Sem escolha, "Outros". */
   kind?: EventKind;
-  /** Valor de <input type="datetime-local">, na hora do aparelho. */
+  /** Valor de <input type="datetime-local">, na hora do aparelho. Vazio só com `dateByPoll`. */
   startsAt: string;
   endsAt: string;
+  /** A data vai ser decidida numa votação: o evento nasce sem data. */
+  dateByPoll?: boolean;
   /** Evento privado: só vai para as conversas escolhidas e ninguém posta no perfil. */
   private?: boolean;
   /** Respostas às configurações de evento da gestão. */
@@ -112,9 +114,11 @@ export function postProblem(input: { items: number; caption: string; place: Link
 /** O que falta para publicar como evento (null = tudo certo). */
 export function eventProblem(event: EventDraft, _place: LinkedPlace | null, now: Date): string | null {
   if (!event.title.trim()) return t('Dê um nome ao evento.');
+  if (event.dateByPoll && !event.startsAt) return null;
   const start = localToIso(event.startsAt);
   if (!start) return t('Escolha o dia e a hora de início.');
-  if (new Date(start).getTime() < now.getTime() - 5 * 60_000) return t('O início precisa ser no futuro.');
+  // Pode ser no passado (um rolê que já rolou), até 2 anos atrás.
+  if (new Date(start).getTime() < now.getTime() - 2 * 365 * 24 * 3_600_000) return t('O início pode ser de no máximo 2 anos atrás.');
   if (event.endsAt) {
     const end = localToIso(event.endsAt);
     if (!end || new Date(end).getTime() <= new Date(start).getTime()) return t('O fim precisa ser depois do início.');
@@ -133,6 +137,6 @@ export function buildPostBody(images: readonly DraftImage[], caption: string, li
     ...(place ? { placeName: place.name, ...(place.address ? { placeAddress: place.address } : {}), ...(place.venueId ? { placeVenueId: place.venueId } : {}) } : {}),
     ...(tagUserIds.length > 0 ? { tagUserIds: [...tagUserIds] } : {}),
     ...(event && datePollId ? { datePollId } : {}),
-    ...(event ? { event: { title: event.title.trim(), kind: event.kind ?? 'OTHER', startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}), ...(event.private ? { private: true } : {}), ...(event.extras && event.extras.length > 0 ? { extras: event.extras } : {}) } } : {}),
+    ...(event ? { event: { title: event.title.trim(), kind: event.kind ?? 'OTHER', ...(event.dateByPoll && !event.startsAt ? { dateByPoll: true } : { startsAt: localToIso(event.startsAt), ...(event.endsAt ? { endsAt: localToIso(event.endsAt) } : {}) }), ...(event.private ? { private: true } : {}), ...(event.extras && event.extras.length > 0 ? { extras: event.extras } : {}) } } : {}),
   };
 }

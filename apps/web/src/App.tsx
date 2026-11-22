@@ -27,6 +27,7 @@ const AgendaScreen = lazyWithReload(() => import('./screens/agenda.tsx').then((m
 const AccountDeletionInfoScreen = lazyWithReload(() => import('./screens/legal.tsx').then((m) => ({ default: m.AccountDeletionInfoScreen })));
 const CsaeStandardsScreen = lazyWithReload(() => import('./screens/legal.tsx').then((m) => ({ default: m.CsaeStandardsScreen })));
 const LegalScreen = lazyWithReload(() => import('./screens/legal.tsx').then((m) => ({ default: m.LegalScreen })));
+const InviteLandingScreen = lazyWithReload(() => import('./screens/invite-landing.tsx').then((m) => ({ default: m.InviteLandingScreen })));
 const SupportScreen = lazyWithReload(() => import('./screens/legal.tsx').then((m) => ({ default: m.SupportScreen })));
 const DeleteAccountScreen = lazyWithReload(() => import('./screens/delete-account.tsx').then((m) => ({ default: m.DeleteAccountScreen })));
 const ChangePasswordScreen = lazyWithReload(() => import('./screens/change-password.tsx').then((m) => ({ default: m.ChangePasswordScreen })));
@@ -125,6 +126,8 @@ const LEGAL_ROUTES: RouteDef[] = [
   { path: '/suporte', render: () => <SupportScreen /> },
   { path: '/excluir-conta', render: () => <AccountDeletionInfoScreen /> },
   { path: '/padroes-de-seguranca-infantil', render: () => <CsaeStandardsScreen /> },
+  // Link do convite: abre o app (ou a loja) e, no app, leva ao cadastro com quem convidou.
+  { path: '/convite/:username', render: (p) => <InviteLandingScreen username={p['username'] ?? ''} /> },
 ];
 
 const GUEST_ROUTES: RouteDef[] = [

@@ -1,22 +1,31 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { inviteUrl, parseInvite, rememberInvite, shareableInviteUrl, storeLink, takeInvite, whatsappUrl } from './invite.ts';
+import { APP_STORE_URL, PLAY_STORE_URL, inviteLandingTarget, invitePlatform, inviteUrl, parseInvite, rememberInvite, takeInvite, whatsappUrl } from './invite.ts';
 
 describe('link do convite', () => {
-  it('compartilha o link do site enquanto não há loja e o da loja quando houver', () => {
-    assert.equal(storeLink(undefined), undefined);
-    assert.equal(storeLink('   '), undefined);
-    assert.equal(storeLink('javascript:alert(1)'), undefined);
-    assert.equal(storeLink('apps.apple.com/app/x'), undefined, 'sem http(s) não vale');
-    assert.equal(storeLink(' https://apps.apple.com/br/app/askout/id1 '), 'https://apps.apple.com/br/app/askout/id1');
-    assert.equal(shareableInviteUrl('https://askout.com.br', 'ana', undefined), 'https://askout.com.br/cadastro?convite=ana');
-    assert.equal(shareableInviteUrl('https://askout.com.br', 'ana', 'https://loja.example/askout'), 'https://loja.example/askout');
+  it('reconhece o celular pelo navegador', () => {
+    assert.equal(invitePlatform('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'), 'ios');
+    assert.equal(invitePlatform('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 5), 'ios', 'iPad em modo computador');
+    assert.equal(invitePlatform('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 0), 'other');
+    assert.equal(invitePlatform('Mozilla/5.0 (Linux; Android 14; Pixel 8)'), 'android');
+    assert.equal(invitePlatform('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'), 'other');
+  });
+  it('no app abre o cadastro ou o perfil; no celular sem app, a loja; no computador, o cadastro', () => {
+    const base = { username: 'ana.s', native: false, loggedIn: false };
+    assert.deepEqual(inviteLandingTarget({ ...base, native: true, platform: 'ios' }), { kind: 'route', to: '/cadastro?convite=ana.s' });
+    assert.deepEqual(inviteLandingTarget({ ...base, native: true, loggedIn: true, platform: 'android' }), { kind: 'route', to: '/u/ana.s' });
+    assert.deepEqual(inviteLandingTarget({ ...base, platform: 'other' }), { kind: 'route', to: '/cadastro?convite=ana.s' });
+    assert.deepEqual(inviteLandingTarget({ ...base, platform: 'ios' }), { kind: 'external', to: APP_STORE_URL });
+    const android = inviteLandingTarget({ ...base, platform: 'android' });
+    assert.equal(android.kind, 'external');
+    assert.ok(android.to.startsWith('intent://convite/ana.s#Intent;scheme=br.com.askout;package=br.com.askout;'));
+    assert.ok(android.to.includes(`S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)}`));
   });
 });
 
 describe('convite por link', () => {
   it('monta o link e o WhatsApp', () => {
-    assert.equal(inviteUrl('https://askout.app', 'ana.s'), 'https://askout.app/cadastro?convite=ana.s');
+    assert.equal(inviteUrl('https://askout.app', 'ana.s'), 'https://askout.app/convite/ana.s');
     const wa = whatsappUrl('Oi', 'https://x/y?a=1');
     assert.ok(wa.startsWith('https://wa.me/?text='));
     assert.equal(decodeURIComponent(wa.split('text=')[1] ?? ''), 'Oi https://x/y?a=1');

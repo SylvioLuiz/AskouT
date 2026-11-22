@@ -5,6 +5,7 @@ import { useDebounced } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { getLocale, t } from '../lib/i18n/index.ts';
 import type { CommentGif, GifItem } from '../lib/types.ts';
+import { XIcon } from './icons.tsx';
 
 /** Emojis mais usados em comentários. Quem quiser outros usa o teclado do aparelho. */
 export const COMMENT_EMOJIS = [
@@ -146,4 +147,25 @@ export function GifImage({ url, className, alt = t('GIF'), width, height }: { ur
 /** O GIF dentro de um comentário ou de uma mensagem. */
 export function CommentGifView({ gif }: { gif: CommentGif }) {
   return <GifImage url={gif.url} className="comment__gif" />;
+}
+
+/** Faixa acima da caixa de texto: "Respondendo a fulano", com o X para voltar a comentar normal. */
+export function ReplyBanner({ name, onCancel }: { name: string; onCancel: () => void }) {
+  return (
+    <div className="replybanner" role="status">
+      <span>{t('Respondendo a {name}', { name })}</span>
+      <button type="button" className="replybanner__close" onClick={onCancel} aria-label={t('Cancelar resposta')}>
+        <XIcon />
+      </button>
+    </div>
+  );
+}
+
+/** Botão "Responder" debaixo do comentário. */
+export function ReplyButton({ name, onReply }: { name: string; onReply: () => void }) {
+  return (
+    <button type="button" className="comment__reply" onClick={onReply} aria-label={t('Responder {name}', { name })}>
+      {t('Responder')}
+    </button>
+  );
 }

@@ -48,6 +48,23 @@ test('turnOn: só 1, 2 ou 3 horas; recado opcional com limite', async () => {
   assert.equal(Date.parse(on.expiresAt!) - w.clock.now().getTime(), 3 * 3_600_000);
 });
 
+test('setNote: adiciona, troca e tira o recado com o NOW ligado, sem mexer no tempo', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  await rejectsWith(w.core.flash.setNote(ana!, { note: 'oi' }), 'FORBIDDEN');
+  const on = await w.core.flash.turnOn(ana!, { hours: 1 });
+  assert.equal(on.note, null);
+  const added = await w.core.flash.setNote(ana!, { note: '  cerveja?  ' });
+  assert.equal(added.note, 'cerveja?');
+  assert.equal(added.expiresAt, on.expiresAt);
+  assert.equal((await w.core.flash.status(ana!)).note, 'cerveja?');
+  assert.equal((await w.core.flash.setNote(ana!, { note: 'cinema' })).note, 'cinema');
+  const err = await rejectsWith(w.core.flash.setNote(ana!, { note: 'x'.repeat(61) }), 'VALIDATION');
+  assert.ok(err.details && 'note' in err.details);
+  assert.equal((await w.core.flash.setNote(ana!, { note: '' })).note, null);
+  assert.equal((await w.core.flash.status(ana!)).note, null);
+});
+
 test('turnOn: só um NOW por vez; depois de desligar ou expirar liga de novo', async () => {
   const w = makeWorld();
   const { ana } = await w.signUpMany('ana');

@@ -1,3 +1,4 @@
+import { dateByPollLabel } from '../lib/event-page.ts';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { CarouselIcon, CalendarIcon, CommentIcon, HeartIcon, MoreIcon, RepostIcon, SendIcon } from './icons.tsx';
@@ -138,7 +139,7 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
       title={event.title}
       startsAt={event.startsAt}
       endsAt={event.endsAt}
-      whenText={formatWhen(event.startsAt, event.endsAt, new Date())}
+      whenText={event.startsAt ? formatWhen(event.startsAt, event.endsAt, new Date()) : dateByPollLabel()}
       venue={<VenueLink venueId={post.placeVenueId} name={post.placeName ?? t('Evento')} />}
       image={first?.path ? api.assetUrl(first.path) : null}
       fallback={<span className="poster__kind" aria-hidden="true">{t('Evento')}</span>}
@@ -147,10 +148,10 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
   );
 }
 
-export function PostCard({ post: initial, onGone, asEvent, poster, track }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean; poster?: boolean; track?: DwellSource }) {
+export function PostCard({ post: initial, onGone, asEvent, poster, track, openComments }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean; poster?: boolean; track?: DwellSource; /** Abre já com os comentários à vista (veio de um aviso de comentário). */ openComments?: boolean }) {
   const dwellRef = useDwell<HTMLElement>('POST', initial.id, track ?? false);
   const [post, setPost] = useState(initial);
-  const [sheet, setSheet] = useState<'menu' | 'edit' | 'adjust' | 'report' | 'comments' | 'share' | undefined>();
+  const [sheet, setSheet] = useState<'menu' | 'edit' | 'adjust' | 'report' | 'comments' | 'share' | undefined>(openComments ? 'comments' : undefined);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [myTag, setMyTag] = useState(initial.myTag);
@@ -373,7 +374,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track }: { po
         </div>
       ) : null}
       {eventCard || cartaz ? null : textOnly ? (post.caption ? <p className="post__textonly">{post.caption}</p> : null) : <Carousel key={post.images.map((i) => i.id).join()} images={post.images} onOpen={openMedia} />}
-      {viewing !== undefined ? <PhotoViewer images={post.images} start={viewing} onClose={() => setViewing(undefined)} /> : null}
+      {viewing !== undefined ? <PhotoViewer images={post.images} start={viewing} onClose={() => setViewing(undefined)} downloadName={`askout-${post.author.username}`} /> : null}
       {cartaz ? null : (
       <div className="post__actions" role="group" aria-label={t('Ações do post')}>
         <button type="button" className={`post__action${post.likedByMe ? ' post__action--on' : ''}`} onClick={() => void toggleLike()} aria-pressed={post.likedByMe} aria-label={post.likedByMe ? t('Descurtir') : t('Curtir')}>
@@ -603,8 +604,8 @@ const jumpLabel = new Intl.DateTimeFormat(intlLocale(), { month: 'long', year: '
 
 /** Grade de quadrados do perfil: toque abre o post. */
 const eventFmt = new Intl.DateTimeFormat(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
-function eventWhen(iso: string): string {
-  return eventFmt.format(new Date(iso));
+function eventWhen(iso: string | null): string {
+  return iso ? eventFmt.format(new Date(iso)) : dateByPollLabel();
 }
 
 /** Grade de posts de uma pessoa. `kind` separa eventos de posts comuns; `quiet` não mostra o aviso de lista vazia. */

@@ -61,6 +61,7 @@ function coverSrc(path: string | null): string | null {
 
 /** Cria o arquivo de agenda do evento e abre na agenda (ou baixa, no navegador). */
 async function addEventToCalendar(page: EventPage): Promise<void> {
+  if (!page.startsAt || !page.endsAt) throw new Error(t('A data ainda está em votação.'));
   await addToCalendar({ id: page.id, title: page.title, description: page.description, startsAt: page.startsAt, endsAt: page.endsAt, venue: page.venue.name ? { name: page.venue.name, address: page.venue.address } : null, url: eventLink(shareOrigin(), page.id) });
 }
 
@@ -254,7 +255,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const date = e ? eventDateLabel(e.startsAt, e.endsAt) : null;
   const time = e ? eventTimeLabel(e.startsAt, e.endsAt) : null;
   const strip = e ? attendeeStrip(e.attendees, e.confirmedCount, STRIP_MAX) : null;
-  const ended = e ? Date.parse(e.endsAt) <= Date.now() : false;
+  const ended = e?.endsAt ? Date.parse(e.endsAt) <= Date.now() : false;
   const canStory = e ? e.canStory : false;
   // O botão de postar flash fica sempre à vista enquanto o evento não acabou; quem ainda não marcou que vai vê um aviso.
   const titleParts = splitEventTitle(e?.title ?? '');
@@ -298,7 +299,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 <span className="visually-hidden">{kindLabel(e.kind)}</span>
               </span>
               <div className="evhero__pills">
-                {Date.parse(e.startsAt) <= Date.now() && Date.now() < Date.parse(e.endsAt) ? <LiveTag /> : null}
+                {e.startsAt && e.endsAt && Date.parse(e.startsAt) <= Date.now() && Date.now() < Date.parse(e.endsAt) ? <LiveTag /> : null}
                 <span className="evhero__pill">{kindLabel(e.kind)}</span>
                 {e.isFree ? <span className="evhero__pill">{t('Grátis')}</span> : null}
                 {e.isPrivate ? (
@@ -394,7 +395,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
                     </button>
                   </p>
                 ) : null}
-                {choosing ? <GoingChoiceSheet event={{ id: e.id, startsAt: e.startsAt, endsAt: e.endsAt }} busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => { setChoosing(false); storyAfterGoing.current = false; }} /> : null}
+                {choosing ? <GoingChoiceSheet {...(e.startsAt && e.endsAt ? { event: { id: e.id, startsAt: e.startsAt, endsAt: e.endsAt } } : {})} busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => { setChoosing(false); storyAfterGoing.current = false; }} /> : null}
               </>
             )}
             {problem ? <Notice tone="error">{problem}</Notice> : null}

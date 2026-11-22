@@ -604,6 +604,8 @@ export interface PostCommentRecord {
   /** GIF (Giphy) anexado: id e endereço em servidor da Giphy. O texto pode ficar vazio quando há GIF. */
   gifId?: string | null;
   gifUrl?: string | null;
+  /** Resposta: o comentário de cima da conversa (um nível só). */
+  parentId?: string | null;
 }
 
 export const POST_REPORT_REASONS = ['SPAM', 'OFFENSIVE', 'NUDITY', 'VIOLENCE', 'FALSE_INFO', 'OTHER'] as const;
@@ -686,6 +688,8 @@ export interface FeedCommentRecord {
   /** GIF (Giphy) anexado; o texto pode ficar vazio quando há GIF. */
   gifId?: string | null;
   gifUrl?: string | null;
+  /** Resposta: o comentário de cima da conversa (um nível só). */
+  parentId?: string | null;
 }
 
 /** Denúncia de uma publicação ou de um comentário do feed. `evidence`: o texto como estava na hora. */

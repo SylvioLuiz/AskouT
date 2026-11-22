@@ -165,6 +165,24 @@ test('comentários: @menção avisa quem pode ver, quem publicou é avisado, rea
   await rejectsWith(w.core.feed.get(bia, p.id), 'NOT_FOUND');
 });
 
+test('responder comentário do feed: fica na conversa de cima, avisa quem foi respondido; não vale de outra publicação', async () => {
+  const { w, ana, bia, caio, ev } = await setup();
+  await w.core.feed.setPolicy(ana, 'event', ev.id, 'OPEN');
+  const p = await w.core.feed.create(bia, 'event', ev.id, { body: 'Quem vai?' });
+  const q = await w.core.feed.create(bia, 'event', ev.id, { body: 'Outra' });
+  const top = await w.core.feed.addComment(caio, p.id, 'Eu vou');
+  assert.equal(top.parentId, null);
+  const r1 = await w.core.feed.addComment(ana, p.id, 'Boa', undefined, top.id);
+  assert.equal(r1.parentId, top.id);
+  assert.equal((await news(w, caio, 'FEED_COMMENT')).length, 1, 'quem foi respondido é avisado');
+  const r2 = await w.core.feed.addComment(bia, p.id, 'Fechou', undefined, r1.id);
+  assert.equal(r2.parentId, top.id, 'responder uma resposta continua na mesma conversa');
+  assert.equal((await news(w, ana, 'FEED_COMMENT')).length, 1);
+  await rejectsWith(w.core.feed.addComment(ana, q.id, 'oi', undefined, top.id), 'NOT_FOUND');
+  await w.core.feed.deleteComment(caio, top.id);
+  assert.deepEqual((await w.core.feed.comments(ana, p.id)).items.map((c) => c.parentId), [null, null]);
+});
+
 test('quem não vê o evento não vê o feed; bloqueio esconde publicações e comentários', async () => {
   const { w, ana, bia, caio, duda, ev } = await setup();
   await w.core.profiles.setPrivacy(ana, true);

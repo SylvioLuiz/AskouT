@@ -4,7 +4,7 @@ import { Sheet } from './agenda.tsx';
 import { ChevronRightIcon, EventKindIcon, GlobeIcon, LockIcon } from './icons.tsx';
 import { Button, Field } from './ui.tsx';
 import { KINDS } from '../lib/explore.ts';
-import { addHoursLocal, joinLocal, localDate, QUICK_TIMES, splitLocal, upcomingDays } from '../lib/event-when.ts';
+import { addHoursLocal, joinLocal, QUICK_TIMES, splitLocal, upcomingDays } from '../lib/event-when.ts';
 import type { EventKind } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
@@ -38,8 +38,11 @@ export function EventRow({ icon, label, value, placeholder, onClick, trailing, d
   );
 }
 
-/** Folha "Quando": dia e hora em atalhos, com campos para qualquer outra data ou horário, e término opcional. */
-export function EventWhenSheet({ starts, ends, onDone, onClose }: { starts: string; ends: string; onDone: (starts: string, ends: string) => void; onClose: () => void }) {
+/**
+ * Folha "Quando": dia e hora em atalhos, com campos para qualquer outra data ou horário, e término opcional.
+ * `allowPoll`: dá para deixar a data para uma votação (o evento nasce sem data e a votação decide o dia).
+ */
+export function EventWhenSheet({ starts, ends, dateByPoll = false, allowPoll = false, onDone, onClose }: { starts: string; ends: string; dateByPoll?: boolean; allowPoll?: boolean; onDone: (starts: string, ends: string, dateByPoll: boolean) => void; onClose: () => void }) {
   const now = useMemo(() => new Date(), []);
   const days = useMemo(() => upcomingDays(now), [now]);
   const initial = splitLocal(starts);
@@ -47,8 +50,8 @@ export function EventWhenSheet({ starts, ends, onDone, onClose }: { starts: stri
   const [time, setTime] = useState(initial.time);
   const [end, setEnd] = useState(ends);
   const [withEnd, setWithEnd] = useState(ends !== '');
+  const [byPoll, setByPoll] = useState(dateByPoll);
   const start = joinLocal(date, time);
-  const today = localDate(now);
 
   function addEnd() {
     setWithEnd(true);
@@ -58,6 +61,19 @@ export function EventWhenSheet({ starts, ends, onDone, onClose }: { starts: stri
   return (
     <Sheet title={t('Quando')} onClose={onClose}>
       <div className="evwhen">
+        {allowPoll ? (
+          <div className="evwhen__poll">
+            <span className="evwhen__polltext">
+              <strong id="evwhen-poll">{t('Decidir a data por votação')}</strong>
+              <span className="muted">{t('O evento é criado sem data. Depois você abre a votação numa conversa e o dia escolhido vira a data do evento.')}</span>
+            </span>
+            <button type="button" role="switch" aria-checked={byPoll} aria-labelledby="evwhen-poll" className="switch" onClick={() => setByPoll((v) => !v)}>
+              <span className="switch__thumb" />
+            </button>
+          </div>
+        ) : null}
+        {byPoll ? null : (
+          <>
         <div className="evwhen__days" role="group" aria-label={t('Dia')}>
           {days.map((d) => (
             <button key={d.value} type="button" className={`evday${date === d.value ? ' evday--on' : ''}`} aria-pressed={date === d.value} aria-label={d.label} onClick={() => setDate(d.value)}>
@@ -66,7 +82,7 @@ export function EventWhenSheet({ starts, ends, onDone, onClose }: { starts: stri
             </button>
           ))}
         </div>
-        <Field label={t('Outra data')} type="date" value={date} onChange={setDate} min={today} />
+        <Field label={t('Outra data')} type="date" value={date} onChange={setDate} />
         <div className="evwhen__label" id="evwhen-times">
           {t('Começa às')}
         </div>
@@ -93,7 +109,9 @@ export function EventWhenSheet({ starts, ends, onDone, onClose }: { starts: stri
             <span className="muted">{t('Sem término, dura 3 horas.')}</span>
           </div>
         )}
-        <Button full disabled={!start} onClick={() => onDone(start, withEnd ? end : '')}>
+          </>
+        )}
+        <Button full disabled={!byPoll && !start} onClick={() => (byPoll ? onDone('', '', true) : onDone(start, withEnd ? end : '', false))}>
           {t('Pronto')}
         </Button>
       </div>

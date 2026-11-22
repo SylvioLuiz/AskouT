@@ -93,7 +93,7 @@ export function EditProfileScreen() {
       age.locked || birth === saved!.birth
         ? undefined
         : (birthDateProblem(birth, new Date()) ?? (ageOnDate(birth, new Date()) < MIN_ACCOUNT_AGE ? t('O AskouT é para quem tem {MIN_ACCOUNT_AGE} anos ou mais', { MIN_ACCOUNT_AGE }) : undefined));
-    const phoneProblem = phone.trim() !== '' && phone !== saved!.phone && !normalizePhone(phone) ? t('Informe o celular com DDD, ex.: (11) 98765-4321') : undefined;
+    const phoneProblem = phone.trim() !== '' && phone !== saved!.phone && !normalizePhone(phone) ? t('Informe o celular com DDD, ex.: (99) 99999-9999') : undefined;
     return compact({ displayName: displayNameProblem(displayName, true), bio: bioProblem(bio), phone: phoneProblem, birthDate: birthProblem });
   }
 
@@ -197,7 +197,7 @@ export function EditProfileScreen() {
           error={errors['phone']}
           autoComplete="tel"
           maxLength={25}
-          placeholder="(11) 98765-4321"
+          placeholder="(99) 99999-9999"
           hint={t('Não aparece para ninguém. Serve para seus amigos acharem você pela agenda do celular.')}
         />
         {age.locked ? (

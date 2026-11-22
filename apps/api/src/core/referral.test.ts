@@ -133,3 +133,15 @@ test('gestão: maiores convidantes, só para administradores', async () => {
   assert.equal((await w.core.referrals.adminTop(admin, 1)).length, 1);
   await assert.rejects(w.core.referrals.adminTop(actorOf(bia)), (e: unknown) => (e as { code?: string }).code === 'FORBIDDEN');
 });
+
+test('convite: quem entrou já fica amigo de quem convidou, e quem convidou recebe aviso', async () => {
+  const w = makeWorld();
+  const ana = await w.signUp('ana');
+  const bia = await w.signUp('bia');
+  assert.equal((await w.core.referrals.claim(actorOf(bia), 'ana')).counted, true);
+  assert.deepEqual((await w.core.follows.listFriends(ana.user.id)).map((p) => p.username), ['bia']);
+  assert.deepEqual((await w.core.follows.listFriends(bia.user.id)).map((p) => p.username), ['ana']);
+  const caio = await w.signUp('caio');
+  assert.equal((await w.core.referrals.claim(actorOf(caio), 'ninguem')).counted, false);
+  assert.deepEqual(await w.core.follows.listFriends(caio.user.id), [], 'convite inválido não cria amizade');
+});

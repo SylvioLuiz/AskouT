@@ -4,7 +4,8 @@ import { useAuthContext, useUser } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { takeInvite } from '../lib/invite.ts';
-import { followProgressLabel, markOnboardingDone, ONBOARDING_FOLLOW_GOAL, ONBOARDING_SLIDES, onboardingDone, shouldShowOnboarding } from '../lib/onboarding.ts';
+import { followProgressLabel, markOnboardingDone, ONBOARDING_FOLLOW_GOAL, ONBOARDING_SLIDES, onboardingDone, placesFromEvents, shouldShowOnboarding } from '../lib/onboarding.ts';
+import { positionWithin } from '../lib/position.ts';
 import { filterByThemes, saveThemes, themeFilter, themesOfCategory } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 import type { ExplorePlace } from '../lib/types.ts';
@@ -23,12 +24,29 @@ function storage(): Storage | undefined {
   }
 }
 
+/**
+ * Rolês para o passo guiado: os locais perto (AskouT e de fora), como no mapa do Explorar. Sem localização ou sem nada
+ * perto, os locais dos próximos eventos. (A busca do Explorar sem texto não traz locais, só eventos.)
+ */
+async function loadFollowPlaces(): Promise<ExplorePlace[]> {
+  const position = await positionWithin(POSITION_WAIT_MS);
+  if (position) {
+    const nearby = await api.explorePlaces({ lat: position.lat, lng: position.lng }).catch(() => null);
+    const open = nearby?.places.filter((p) => !p.venue?.following) ?? [];
+    if (open.length > 0) return open;
+  }
+  const upcoming = await api.explore(position ? { lat: position.lat, lng: position.lng } : {});
+  return placesFromEvents(upcoming.events);
+}
+
+const POSITION_WAIT_MS = 8000;
+
 function FollowStep({ themes, onDone }: { themes: ReadonlySet<ThemeId>; onDone: () => void }) {
-  const places = useAsync(() => api.explore({}), []);
+  const places = useAsync(loadFollowPlaces, []);
   const [followed, setFollowed] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState<string | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
-  const all = places.data?.places ?? [];
+  const all = places.data ?? [];
   const byTheme = filterByThemes(all, themes, (p) => themesOfCategory(p.category));
   // Se nada bate com o tema escolhido (fonte de fora fora do ar, locais sem tipo), mostra o que houver em vez de uma tela vazia.
   const list = (byTheme.length > 0 ? byTheme : all).slice(0, 12);
@@ -106,17 +124,20 @@ export function Onboarding() {
   const [step, setStep] = useState(0);
   const [chosen, setChosen] = useState<ReadonlySet<ThemeId>>(new Set());
   const [invited, setInvited] = useState<string | undefined>();
-  // Cadastro por link de convite: segue quem convidou (a pessoa só vira amiga quando seguir de volta).
+  const [invitedFriend, setInvitedFriend] = useState(false);
+  // Cadastro por link de convite: a API registra quem convidou e já deixa as duas pessoas amigas.
+  // Se o convite não contar (ex.: conta antiga), só segue quem convidou, como antes.
   useEffect(() => {
     if (!open) return;
     const who = takeInvite(storage());
     if (!who || who === user.profile.username) return;
-    // Registra quem trouxe esta pessoa (conta para a contagem de quem convidou); o convite inválido é ignorado pela API.
-    api.claimReferral(who).catch(() => undefined);
     api
-      .getProfile(who)
-      .then((view) => api.follow(view.profile.userId))
-      .then(() => setInvited(who))
+      .claimReferral(who)
+      .then(async ({ counted }) => {
+        if (!counted) await api.getProfile(who).then((view) => api.follow(view.profile.userId));
+        setInvitedFriend(counted);
+        setInvited(who);
+      })
       .catch(() => undefined);
     // Roda uma vez, ao abrir pela primeira vez.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,7 +159,7 @@ export function Onboarding() {
             <div className="onb__art" aria-hidden="true">{SLIDE_ICONS[step]}</div>
             <h2 id="onb-titulo" className="onb__title">{slide.title}</h2>
             <p className="onb__text">{slide.text}</p>
-            {invited && step === 0 ? <p className="onb__invited" role="status">{t('Você entrou pelo convite de @{invited} e já segue essa pessoa.', { invited })}</p> : null}
+            {invited && step === 0 ? <p className="onb__invited" role="status">{invitedFriend ? t('Você entrou pelo convite de @{invited} e vocês já são amigos.', { invited }) : t('Você entrou pelo convite de @{invited} e já segue essa pessoa.', { invited })}</p> : null}
             <div className="onb__dots" aria-hidden="true">
               {ONBOARDING_SLIDES.map((s, i) => (
                 <span key={s.title} className={`onb__dot${i === step ? ' onb__dot--on' : ''}`} />

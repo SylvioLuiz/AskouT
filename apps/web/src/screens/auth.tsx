@@ -28,6 +28,7 @@ import { safeStorage } from '../lib/hints.ts';
 import { ChevronLeftIcon } from '../components/icons.tsx';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { isNativeApp, storeLinks } from '../lib/store-links.ts';
 
 function useNow(intervalMs = 1000): number {
   const [now, setNow] = useState(() => Date.now());
@@ -92,7 +93,7 @@ export function LoginScreen() {
             password: password === '' ? t('Informe sua senha') : undefined,
           })
         : compact({
-            phone: phone.trim() === '' ? t('Informe seu celular') : normalizePhone(phone) ? undefined : t('Informe o celular com DDD, ex.: (11) 98765-4321'),
+            phone: phone.trim() === '' ? t('Informe seu celular') : normalizePhone(phone) ? undefined : t('Informe o celular com DDD, ex.: (99) 99999-9999'),
           });
     setErrors(found);
     setFormError(undefined);
@@ -154,7 +155,7 @@ export function LoginScreen() {
               error={errors['phone']}
               autoComplete="tel"
               maxLength={25}
-              placeholder="(11) 98765-4321"
+              placeholder="(99) 99999-9999"
               autoFocus
               hint={t('Sem senha: depois você confirma com o código do app autenticador. Ative em Configurações > Verificação em duas etapas, com o celular salvo no seu perfil.')}
             />
@@ -170,7 +171,41 @@ export function LoginScreen() {
       </form>
       <SocialLogin />
       <LegalNote />
+      <StoreBadges />
     </AuthLayout>
+  );
+}
+
+/** No navegador, o rodapé da entrada leva para o app nas lojas. Dentro do app não aparece. */
+function StoreBadges() {
+  if (isNativeApp()) return null;
+  const links = storeLinks({
+    apple: import.meta.env.VITE_APP_STORE_URL as string | undefined,
+    google: import.meta.env.VITE_PLAY_STORE_URL as string | undefined,
+  });
+  if (!links.apple && !links.google) return null;
+  return (
+    <nav className="auth__stores" aria-label={t('Baixe o app')}>
+      <span className="auth__stores-label">{t('Baixe o app')}</span>
+      <div className="auth__stores-row">
+        {links.apple ? (
+          <a className="store-badge" href={links.apple} target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+              <path fill="currentColor" d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.87-.76-1.47.02-2.83.86-3.59 2.18-1.54 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.24 2.73 2.2 1.1-.05 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.4 1.2-2.46-.03-.01-2.3-.88-2.3-3.5ZM14.2 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.55 1.31-.56.65-1.05 1.69-.92 2.68.97.08 1.96-.49 2.57-1.23Z" />
+            </svg>
+            <span>{t('App Store')}</span>
+          </a>
+        ) : null}
+        {links.google ? (
+          <a className="store-badge" href={links.google} target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+              <path fill="currentColor" d="M4.2 2.6c-.25.26-.4.67-.4 1.2v16.4c0 .53.15.94.4 1.2l.07.06 9.19-9.19v-.22L4.27 2.54l-.07.06Zm12.32 12.53-3.06-3.06v-.22l3.06-3.06.07.04 3.63 2.06c1.04.59 1.04 1.55 0 2.14l-3.63 2.06-.07.04Zm.07-.04L13.46 12l-9.26 9.26c.34.36.9.4 1.54.05l10.85-6.22M16.59 8.91 5.74 2.69c-.64-.36-1.2-.32-1.54.05L13.46 12l3.13-3.09Z" />
+            </svg>
+            <span>{t('Google Play')}</span>
+          </a>
+        ) : null}
+      </div>
+    </nav>
   );
 }
 

@@ -365,6 +365,8 @@ export interface FlashRepository {
   endSession(userId: string, now: Date): Promise<boolean>;
   /** Troca o fim da sessão ativa da pessoa. Retorna se havia uma. */
   extendSession(userId: string, now: Date, expiresAt: Date): Promise<boolean>;
+  /** Troca o recado (etiqueta) da sessão aberta. `false` se não há sessão ligada. */
+  setSessionNote(userId: string, now: Date, note: string | null): Promise<boolean>;
 
   /** Insere o convite. CONFLICT se já há um aberto (pendente ou aceito, não expirado) entre os dois, em qualquer sentido. */
   createInvite(invite: FlashInviteRecord, now: Date): Promise<void>;

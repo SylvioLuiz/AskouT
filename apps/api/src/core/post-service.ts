@@ -42,7 +42,7 @@ export interface PostInput {
   linkedEventId?: unknown;
   /** Amigos marcados (até 10). Cada um precisa aceitar para o post entrar no feed e no perfil dele. */
   tagUserIds?: unknown;
-  /** Evento criado pela pessoa: `{title, startsAt, endsAt?}` (ISO). O lugar é opcional. */
+  /** Evento criado pela pessoa: `{title, startsAt, endsAt?}` (ISO), ou `{title, dateByPoll: true}` sem data (decidida numa votação). O lugar é opcional. */
   event?: unknown;
   /** Votação de datas concluída da qual este evento é consequência (só quem organizou a votação). */
   datePollId?: unknown;
@@ -63,14 +63,18 @@ export interface PostLinkedEventView {
   id: string;
   source: 'PLACE' | 'USER';
   title: string;
-  startsAt: string;
+  startsAt: string | null;
 }
+
+/** Evento lido do pedido: sem início nem fim enquanto a data espera a votação. */
+type ParsedEvent = { title: string; startsAt: Date | null; endsAt: Date | null; kind: EventKind };
 
 export interface PostEventView {
   title: string;
   kind: EventKind;
-  startsAt: string;
-  endsAt: string;
+  /** Nulos quando a data ainda vai ser decidida numa votação. */
+  startsAt: string | null;
+  endsAt: string | null;
   /** Evento privado: só o dono e quem recebeu o cartão numa conversa. */
   private: boolean;
   /** Respostas às configurações de evento (para preencher a edição). */
@@ -157,6 +161,8 @@ export interface PostCommentView {
   likedByMe: boolean;
   /** Nomes de usuário marcados com @ que existem (a tela só faz link para estes). */
   mentions: string[];
+  /** Resposta: o comentário de cima da conversa. */
+  parentId: string | null;
 }
 
 export interface PostCommentsPage {
@@ -363,23 +369,33 @@ export class PostService {
     return { items: await this.commentViews(viewerId, post.authorId, rows.slice(0, page.limit)), ...page, hasMore };
   }
 
-  async addComment(viewerId: string, postId: unknown, body: unknown, rawGif?: unknown): Promise<PostCommentView> {
+  /** `replyTo`: o comentário respondido. A resposta fica sempre debaixo do comentário de cima da conversa. */
+  async addComment(viewerId: string, postId: unknown, body: unknown, rawGif?: unknown, replyTo?: unknown): Promise<PostCommentView> {
     const { post } = await this.seeable(viewerId, postId);
     const text = optionalText(body, POST_COMMENT_MAX, 'body', 'Comentário') ?? '';
     const gif = parseCommentGif(rawGif);
     if (!text && !gif) throw validationError('Comentário vazio', { body: 'Escreva algo para comentar' });
+    let replied: PostCommentRecord | undefined;
+    if (replyTo !== undefined && replyTo !== null) {
+      replied = typeof replyTo === 'string' && replyTo.length <= 64 ? await this.deps.posts.findComment(replyTo) : undefined;
+      if (!replied || replied.postId !== post.id || (replied.authorId !== viewerId && (await this.deps.blocks.existsEitherWay(viewerId, replied.authorId)))) throw notFound('Comentário não encontrado');
+    }
     // Quem administra o bar e comenta num post do próprio bar comenta como o bar.
     let asVenue: string | null = null;
     if (post.venueId) {
       const venue = await this.deps.places.findVenue(post.venueId);
       if (venue && (await canManageVenue(this.deps.places, viewerId, venue))) asVenue = venue.id;
     }
-    const record: PostCommentRecord = { id: this.deps.ids.next(), postId: post.id, authorId: viewerId, body: text, createdAt: this.deps.clock.now(), venueId: asVenue, gifId: gif?.id ?? null, gifUrl: gif?.url ?? null };
+    const record: PostCommentRecord = { id: this.deps.ids.next(), postId: post.id, authorId: viewerId, body: text, createdAt: this.deps.clock.now(), venueId: asVenue, gifId: gif?.id ?? null, gifUrl: gif?.url ?? null, parentId: replied ? (replied.parentId ?? replied.id) : null };
     await this.deps.posts.addComment(record);
     const me = await this.deps.users.findProfileById(viewerId);
     const mentioned = await this.notifyMentions(viewerId, me?.username ?? 'Alguém', post, record.id, text);
+    if (replied && replied.authorId !== viewerId && !mentioned.has(replied.authorId)) {
+      await this.deps.notifier.notify({ userId: replied.authorId, type: 'POST_COMMENT', title: `${me?.username ?? 'Alguém'} respondeu seu comentário`, body: text.slice(0, 80) || 'GIF', url: `/posts/${post.id}`, dedupeKey: `comment-reply:${record.id}`, actorId: viewerId });
+      mentioned.add(replied.authorId);
+    }
     if (post.authorId !== viewerId && !mentioned.has(post.authorId)) {
-      await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_COMMENT', title: `${me?.username ?? 'Alguém'} comentou no seu post`, body: text.slice(0, 80) || 'GIF', url: `/posts/${post.id}`, dedupeKey: `post-comment:${record.id}`, actorId: viewerId });
+      await this.deps.notifier.notify({ userId: post.authorId, type: 'POST_COMMENT', title: `${me?.username ?? 'Alguém'} comentou no seu post`, body: text.slice(0, 80) || 'GIF', url: `/posts/${post.id}?comentarios=1`, dedupeKey: `post-comment:${record.id}`, actorId: viewerId });
     }
     return (await this.commentViews(viewerId, post.authorId, [record]))[0] as PostCommentView;
   }
@@ -393,7 +409,7 @@ export class PostService {
       if (await this.deps.blocks.existsEitherWay(viewerId, target.userId)) continue;
       const canOpen = post.venueId !== null && post.venueId !== undefined ? true : target.userId === post.authorId || (!post.eventPrivate && (await this.canSee(target.userId, post.authorId)));
       if (!canOpen) continue;
-      await this.deps.notifier.notify({ userId: target.userId, type: 'POST_COMMENT', title: `${viewerName} mencionou você num comentário`, body: text.slice(0, 80), url: `/posts/${post.id}`, dedupeKey: `comment-mention:${commentId}:${target.userId}`, actorId: viewerId });
+      await this.deps.notifier.notify({ userId: target.userId, type: 'POST_COMMENT', title: `${viewerName} mencionou você num comentário`, body: text.slice(0, 80), url: `/posts/${post.id}?comentarios=1`, dedupeKey: `comment-mention:${commentId}:${target.userId}`, actorId: viewerId });
       notified.add(target.userId);
     }
     return notified;
@@ -408,7 +424,7 @@ export class PostService {
       await this.deps.posts.likeComment(comment.id, viewerId, this.deps.clock.now());
       if (comment.authorId !== viewerId) {
         const me = await this.deps.users.findProfileById(viewerId);
-        await this.deps.notifier.notify({ userId: comment.authorId, type: 'POST_LIKE', title: `${me?.username ?? 'Alguém'} curtiu seu comentário`, body: comment.body.slice(0, 80) || 'GIF', url: `/posts/${post.id}`, dedupeKey: `comment-like:${comment.id}:${viewerId}`, actorId: viewerId });
+        await this.deps.notifier.notify({ userId: comment.authorId, type: 'POST_LIKE', title: `${me?.username ?? 'Alguém'} curtiu seu comentário`, body: comment.body.slice(0, 80) || 'GIF', url: `/posts/${post.id}?comentarios=1`, dedupeKey: `comment-like:${comment.id}:${viewerId}`, actorId: viewerId });
       }
     } else {
       await this.deps.posts.unlikeComment(comment.id, viewerId);
@@ -441,7 +457,7 @@ export class PostService {
       }
       return valid;
     };
-    const extra = async (row: PostCommentRecord) => ({ likeCount: stats.get(row.id)?.count ?? 0, likedByMe: stats.get(row.id)?.liked ?? false, mentions: await mentionsOf(row.body) });
+    const extra = async (row: PostCommentRecord) => ({ likeCount: stats.get(row.id)?.count ?? 0, likedByMe: stats.get(row.id)?.liked ?? false, mentions: await mentionsOf(row.body), parentId: row.parentId ?? null });
     const venueIds = [...new Set(rows.flatMap((r) => (r.venueId ? [r.venueId] : [])))];
     const venues = new Map((await Promise.all(venueIds.map((id) => this.deps.places.findVenue(id)))).flatMap((v) => (v ? [[v.id, { id: v.id, name: v.name, logoUrl: v.logoUrl ?? null }] as const] : [])));
     for (const row of rows) {
@@ -498,11 +514,12 @@ export class PostService {
     // Escolheu outro local do AskouT: vincula. Digitou outro nome sem escolher: o vínculo antigo não vale mais.
     const placeVenueId =
       input.placeVenueId !== undefined ? ((await this.placeVenue(input.placeVenueId))?.id ?? null) : placeName === post.placeName ? (post.placeVenueId ?? null) : null;
-    let event: { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null;
+    let event: ParsedEvent | null;
     if (input.event === undefined) {
-      event = post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, startsAt: post.eventStartsAt, endsAt: post.eventEndsAt, kind: post.eventKind } : null;
+      event = post.eventTitle ? { title: post.eventTitle, startsAt: post.eventStartsAt, endsAt: post.eventEndsAt, kind: post.eventKind } : null;
     } else {
-      event = this.parseEvent(input.event, placeName, post.eventStartsAt, post.eventKind);
+      // Evento que ainda espera a votação continua sem data se a edição não trouxer uma.
+      event = this.parseEvent(input.event, placeName, post.eventStartsAt, post.eventKind, post.eventTitle !== null && post.eventStartsAt === null);
     }
     // `event.extras` ausente mantém as respostas; virar post comum apaga.
     const rawExtras = input.event !== undefined && input.event !== null ? (input.event as { extras?: unknown }).extras : undefined;
@@ -709,7 +726,7 @@ export class PostService {
     return this.deps.posts.findImage(imageId);
   }
 
-  /** Evento: título, início no futuro (até 2 anos), fim opcional (padrão: 3 h depois; no máximo 30 dias). O lugar é opcional. */
+  /** Evento: título, início de até 2 anos atrás a até 2 anos à frente, fim opcional (padrão: 3 h depois; no máximo 30 dias). O lugar é opcional. */
   /** Local do AskouT escolhido como rolê. Id que não existe (ou apagado) só não vincula: o nome digitado continua valendo. */
   private async placeVenue(raw: unknown): Promise<{ id: string; name: string; address: string | null } | undefined> {
     if (raw === undefined || raw === null || raw === '') return undefined;
@@ -726,7 +743,7 @@ export class PostService {
     if (await this.deps.places.findEvent(raw)) return { id: raw };
     const found = await this.deps.posts.findById(raw);
     const post = found?.post;
-    if (!post || post.eventTitle === null || !post.eventStartsAt || !post.eventEndsAt) throw invalid();
+    if (!post || post.eventTitle === null) throw invalid();
     if (post.authorId === actorId) return { id: post.id };
     if (post.archivedAt !== null) throw invalid();
     if (await this.deps.blocks.existsEitherWay(actorId, post.authorId)) throw invalid();
@@ -745,20 +762,21 @@ export class PostService {
         continue;
       }
       const post = (await this.deps.posts.findById(id))?.post;
-      if (!post || post.eventTitle === null || !post.eventStartsAt || !post.eventEndsAt) continue;
+      if (!post || post.eventTitle === null) continue;
       if (post.authorId !== viewerId) {
         if (post.archivedAt !== null) continue;
         if (post.eventPrivate && !(await this.openedByCard(viewerId, post))) continue;
       }
-      out.set(id, { id, source: 'USER', title: post.eventTitle, startsAt: post.eventStartsAt.toISOString() });
+      out.set(id, { id, source: 'USER', title: post.eventTitle, startsAt: post.eventStartsAt ? post.eventStartsAt.toISOString() : null });
     }
     return out;
   }
 
-  private parseEvent(raw: unknown, placeName: string | null, keepStart?: Date | null, keepKind?: EventKind): { title: string; startsAt: Date; endsAt: Date; kind: EventKind } | null {
+  /** `keepUndated`: editando um evento que ainda espera a votação, sem data nova continua sem data. */
+  private parseEvent(raw: unknown, placeName: string | null, keepStart?: Date | null, keepKind?: EventKind, keepUndated = false): ParsedEvent | null {
     if (raw === undefined || raw === null) return null;
     if (typeof raw !== 'object' || Array.isArray(raw)) throw validationError('Evento inválido', { event: 'Dados do evento inválidos' });
-    const e = raw as { title?: unknown; startsAt?: unknown; endsAt?: unknown; kind?: unknown };
+    const e = raw as { title?: unknown; startsAt?: unknown; endsAt?: unknown; kind?: unknown; dateByPoll?: unknown };
     let kind: EventKind = keepKind ?? 'OTHER';
     if (e.kind !== undefined && e.kind !== null) {
       if (typeof e.kind !== 'string' || !(EVENT_KINDS as readonly string[]).includes(e.kind)) throw validationError('Evento inválido', { event: 'Tipo de evento inválido' });
@@ -771,10 +789,15 @@ export class PostService {
       if (Number.isNaN(d.getTime())) throw validationError('Evento inválido', { event: `${label} inválido` });
       return d;
     };
+    // Sem data só quando ela vai ser decidida numa votação (pedido explícito, ou o evento já estava assim).
+    const noStart = e.startsAt === undefined || e.startsAt === null || e.startsAt === '';
+    if (noStart && (e.dateByPoll === true || keepUndated)) return { title, startsAt: null, endsAt: null, kind };
+    if (e.dateByPoll !== undefined && typeof e.dateByPoll !== 'boolean') throw validationError('Evento inválido', { event: 'Use true ou false em dateByPoll' });
     const now = this.deps.clock.now().getTime();
     const startsAt = date(e.startsAt, 'Início');
+    // Data no passado vale (registrar um rolê que já rolou), até 2 anos atrás; quem mantém o início de antes nunca esbarra nisso.
     const unchanged = keepStart !== undefined && keepStart !== null && keepStart.getTime() === startsAt.getTime();
-    if (!unchanged && startsAt.getTime() < now - 5 * 60_000) throw validationError('Evento inválido', { event: 'O início precisa ser no futuro' });
+    if (!unchanged && startsAt.getTime() < now - 2 * 365 * 24 * 3_600_000) throw validationError('Evento inválido', { event: 'Início antigo demais' });
     if (startsAt.getTime() > now + 2 * 365 * 24 * 3_600_000) throw validationError('Evento inválido', { event: 'Início distante demais' });
     const endsAt = e.endsAt === undefined || e.endsAt === null || e.endsAt === '' ? new Date(startsAt.getTime() + 3 * 3_600_000) : date(e.endsAt, 'Fim');
     if (endsAt.getTime() <= startsAt.getTime()) throw validationError('Evento inválido', { event: 'O fim precisa ser depois do início' });
@@ -895,7 +918,7 @@ export class PostService {
           placeName: post.placeName,
           placeVenueId: post.venueId ? post.venueId : post.placeVenueId ? post.placeVenueId : post.placeName ? (placeVenues.get(post.placeName.trim().toLowerCase()) ?? null) : null,
           placeAddress: post.placeAddress,
-          event: post.eventTitle && post.eventStartsAt && post.eventEndsAt ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt.toISOString(), endsAt: post.eventEndsAt.toISOString(), private: post.eventPrivate === true, extras: post.eventExtras ?? [] } : null,
+          event: post.eventTitle ? { title: post.eventTitle, kind: post.eventKind, startsAt: post.eventStartsAt ? post.eventStartsAt.toISOString() : null, endsAt: post.eventEndsAt ? post.eventEndsAt.toISOString() : null, private: post.eventPrivate === true, extras: post.eventExtras ?? [] } : null,
           linkedEvent: (post.linkedEventId && !post.eventTitle ? linked.get(post.linkedEventId) : undefined) ?? null,
           createdAt: post.createdAt.toISOString(),
           mine: post.authorId === viewerId,

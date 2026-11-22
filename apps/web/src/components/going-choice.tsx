@@ -85,7 +85,7 @@ export function GoingChoiceSheet({ onChoose, onClose, busy, event }: { onChoose:
   }
   return createPortal(
     <Sheet title={t('Mostrar no seu perfil?')} onClose={onClose}>
-      <p className="muted going-choice__text">{t('Na aba Eventos, quem visita seu perfil vê que você vai. Se preferir, o evento fica só na aba Participou, que só você vê.')}</p>
+      <p className="muted going-choice__text">{t('Na aba Eventos, quem visita seu perfil vê que você vai, mas só quem pode ver o evento. Se preferir, o evento fica só na aba Participou, que só você vê.')}</p>
       <div className="sheetactions">
         <Button full loading={busy} onClick={() => onChoose(true)}>
           {t('Mostrar na aba Eventos')}

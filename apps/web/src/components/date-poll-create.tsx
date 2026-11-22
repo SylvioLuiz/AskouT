@@ -11,7 +11,7 @@ import { SLOT_TIME, chipDay, dayInZone, eventDays, longDay, monthTitle, monthWee
 import type { DaySlot, Policy } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
-import { navigate } from '../router.tsx';
+import { navigate, useSearch } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 const WEEK_HEAD = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -29,7 +29,10 @@ export const POLICY_TEXT: Record<Policy, string> = {
 /** "Combinar uma data": nome, período e pronto. O resto é opcional. */
 export function DatePollCreateScreen({ conversationId }: { conversationId: string }) {
   useTitle(t('Combinar uma data'));
-  const [title, setTitle] = useState('');
+  // Vindo de um evento criado sem data (`?evento=...&titulo=...`): a votação decide a data dele.
+  const search = useSearch();
+  const undatedEventId = search.get('evento') ?? undefined;
+  const [title, setTitle] = useState(() => (search.get('titulo') ?? '').slice(0, 120));
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [slot, setSlot] = useState<DaySlot | undefined>();
@@ -63,6 +66,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
         ...(slot ? { preferredTimeStart: SLOT_TIME[slot] } : {}),
         ...(deadline ? { votingDeadline: new Date(deadline).toISOString() } : {}),
         confirmationPolicy: policy,
+        ...(undatedEventId ? { eventPostId: undatedEventId } : {}),
       });
       navigate(`/planejar/${poll.id}`, { replace: true });
     } catch (failure) {
@@ -87,11 +91,14 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
               placeholder={t('Ex.: Churrasco de aniversário')}
               autoComplete="off"
               trailing={
-                <button type="button" className="iconbtn" aria-label={t('Usar um evento que já existe')} onClick={() => setPicking(true)}>
-                  <PlusIcon />
-                </button>
+                undatedEventId ? undefined : (
+                  <button type="button" className="iconbtn" aria-label={t('Usar um evento que já existe')} onClick={() => setPicking(true)}>
+                    <PlusIcon />
+                  </button>
+                )
               }
             />
+            {undatedEventId ? <p className="muted">{t('O dia escolhido nesta votação vira a data do seu evento.')}</p> : null}
           </div>
         </section>
 

@@ -158,6 +158,15 @@ function FlashContent() {
   const [plusOpen, setPlusOpen] = useState(false);
   // Convites em foco: o resto da tela fica esmaecido até responder ou tocar fora.
   const [unfocused, setUnfocused] = useState<string>('');
+  // Quando o foco começa (convite novo, ou o mapa fechou com convite esperando), a tela rola até o convite:
+  // com a página rolada para baixo, só se veria a tela esmaecida.
+  const inviteStackRef = useRef<HTMLDivElement>(null);
+  const pendingInvites = (invites.data?.received ?? []).map((i) => i.id).join(',');
+  useEffect(() => {
+    if (!pendingInvites || pendingInvites === unfocused || mapOpen) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    inviteStackRef.current?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+  }, [pendingInvites, unfocused, mapOpen]);
 
   // O aviso de "NOW ativado" some sozinho depois de 3 segundos.
   useEffect(() => {
@@ -253,6 +262,27 @@ function FlashContent() {
       setFeedback({ tone: 'error', text: toApiError(failure).message });
     } finally {
       setExtending(undefined);
+    }
+  }
+
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
+  async function saveNote(value: string) {
+    const problem = flashNoteProblem(value);
+    setNoteError(problem);
+    if (problem) return;
+    setSavingNote(true);
+    try {
+      const next = await api.flashSetNote(value.trim());
+      status.setData(next);
+      setEditingNote(false);
+      announceFlashChange();
+    } catch (failure) {
+      const error = toApiError(failure);
+      setNoteError(error.fields['note'] ?? error.message);
+    } finally {
+      setSavingNote(false);
     }
   }
 
@@ -382,7 +412,8 @@ function FlashContent() {
   const eligible = friends.filter((f) => f.invite === null);
   const friendById = new Map(friends.map((f) => [f.profile.userId, f] as const));
   const focusKey = received.map((i) => i.id).join(',');
-  const focusing = received.length > 0 && unfocused !== focusKey;
+  // Com o mapa aberto, o convite aparece dentro da janela do mapa (o foco da tela ficaria por baixo dela).
+  const focusing = received.length > 0 && unfocused !== focusKey && !mapOpen;
 
   // Distância exata só de quem aceitou o convite e já enviou a posição.
   const exactById = new Map<string, { lat: number; lng: number; km: string }>();
@@ -441,7 +472,7 @@ function FlashContent() {
       {received.length > 0 ? (
         <>
           {focusing ? <button type="button" className="nowon__veil" aria-label={t('Voltar para a tela')} onClick={() => setUnfocused(focusKey)} /> : null}
-          <div className="nowinv-stack">
+          <div className="nowinv-stack" ref={inviteStackRef}>
             {received.map((invite) => (
               <InviteFocusCard key={invite.id} invite={invite} friend={friendById.get(invite.other.userId)} onDone={reloadAll} />
             ))}
@@ -480,20 +511,24 @@ function FlashContent() {
           </div>
         ) : null}
         <span className="nowcard__me">
-          {status.data?.note ? <span className="nownote nownote--small">{status.data.note}</span> : null}
+          <button
+            type="button"
+            className={`nownote nownote--small nownote--edit${status.data?.note ? '' : ' nownote--add'}`}
+            aria-label={status.data?.note ? t('Editar recado: {note}', { note: status.data.note }) : t('Adicionar recado')}
+            onClick={() => {
+              setNoteDraft(status.data?.note ?? '');
+              setNoteError(undefined);
+              setEditingNote(true);
+            }}
+          >
+            {status.data?.note ?? t('+ Recado')}
+          </button>
           <span className="nowcard__ring">
             <NowFace profile={user.profile} size={56} />
           </span>
         </span>
         <div className="nowcard__info">
-          <span className="nowcard__time">
-            <button type="button" className="nowcard__stop" aria-label={t('Parar o NOW')} onClick={() => setConfirmOff(true)}>
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" />
-              </svg>
-            </button>
-            {expiresAt ? <NowClock expiresAt={expiresAt} /> : null}
-          </span>
+          <span className="nowcard__time">{expiresAt ? <NowClock expiresAt={expiresAt} /> : null}</span>
           <span className="nowcard__until">{t('NOW ativo · até {time}', { time: until })}</span>
           {share.state.phase === 'sharing' ? (
             <button type="button" className="nowloc nowloc--on" onClick={share.stop} title={t('Desligar a localização')}>
@@ -508,9 +543,57 @@ function FlashContent() {
               {share.state.phase === 'error' ? t('Tentar ligar a localização') : t('Ligar localização')}
             </button>
           )}
+          <button type="button" className="nowcard__stop" onClick={() => setConfirmOff(true)}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" />
+            </svg>
+            {t('Parar o NOW')}
+          </button>
         </div>
         {expiresAt ? <NowBar startsAt={status.data?.startsAt ?? null} expiresAt={expiresAt} /> : null}
       </section>
+      {editingNote ? (
+        <Sheet title={status.data?.note ? t('Editar recado') : t('Adicionar recado')} onClose={() => setEditingNote(false)}>
+          <form
+            className="nownote-edit"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveNote(noteDraft);
+            }}
+          >
+            <label className="nownote nownote--input">
+              <span className="visually-hidden">{t('Recado (opcional)')}</span>
+              <input
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                placeholder={t('No que você tá a fim?')}
+                maxLength={FLASH_NOTE_MAX + 20}
+                autoComplete="off"
+                autoFocus
+                aria-invalid={noteError ? true : undefined}
+                aria-describedby={noteError ? 'now-note-edit-error' : undefined}
+              />
+            </label>
+            {noteError ? (
+              <p className="nowoff__error" id="now-note-edit-error" role="alert">
+                {noteError}
+              </p>
+            ) : noteDraft !== '' ? (
+              <p className="nowoff__count">
+                {Array.from(noteDraft).length}/{FLASH_NOTE_MAX}
+              </p>
+            ) : null}
+            <Button full type="submit" disabled={savingNote}>
+              {t('Salvar')}
+            </Button>
+            {status.data?.note ? (
+              <Button full variant="secondary" type="button" disabled={savingNote} onClick={() => void saveNote('')}>
+                {t('Tirar recado')}
+              </Button>
+            ) : null}
+          </form>
+        </Sheet>
+      ) : null}
       {share.state.phase === 'error' ? <p className="muted nowcard__hint">{share.state.message}</p> : null}
       {confirmOff ? <Confirm question={t('Parar o NOW? Convites abertos e encontros em andamento serão encerrados.')} confirmLabel={t('Parar')} onConfirm={turnOff} onCancel={() => setConfirmOff(false)} busy={busy} danger /> : null}
 
@@ -594,6 +677,9 @@ function FlashContent() {
       {askSheet}
       {mapOpen ? (
         <FriendsMapSheet
+          invites={received.map((invite) => (
+            <InviteFocusCard key={invite.id} invite={invite} friend={friendById.get(invite.other.userId)} onDone={reloadAll} />
+          ))}
           friends={friends}
           me={share.mine}
           exactById={exactById}
@@ -778,7 +864,10 @@ function FriendsMapSheet({
   onChanged,
   onFeedback,
   onClose,
+  invites,
 }: {
+  /** Convites recebidos enquanto o mapa está aberto: ficam no topo da janela, para responder sem fechar o mapa. */
+  invites?: ReactNode[];
   friends: readonly AvailableFriend[];
   me: { lat: number; lng: number } | undefined;
   exactById: Map<string, { lat: number; lng: number }>;
@@ -803,6 +892,7 @@ function FriendsMapSheet({
   const hidden = friends.length - pins.length;
   return (
     <Sheet title={t('Amigos livres no mapa')} onClose={onClose}>
+      {invites && invites.length > 0 ? <div className="nowmap__invites">{invites}</div> : null}
       <div className="nowmapwrap">
         {!mapFailed && (pins.length > 0 || me) ? (
           <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label={t('Carregando o mapa')} /></div>}>

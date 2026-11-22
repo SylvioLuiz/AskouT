@@ -3,7 +3,8 @@ import { shareOrigin } from '../lib/public-origin.ts';
 import { Sheet } from './agenda.tsx';
 import { CropEditor } from './crop.tsx';
 import { EventDates } from './event-dates.tsx';
-import { CommentGifView, CommentTools } from './comment-tools.tsx';
+import { CommentGifView, CommentTools, ReplyBanner, ReplyButton } from './comment-tools.tsx';
+import { removeComment, replyPrefill, threadComments } from '../lib/comment-threads.ts';
 import { EventKindPicker } from './event-kind-picker.tsx';
 import { EventExtrasFields } from './event-extras.tsx';
 import { extrasDraftFrom, extrasFromDraft } from '../lib/event-extras.ts';
@@ -23,6 +24,9 @@ import { applyMention, mentionQueryAt, splitMentions } from '../lib/mentions.ts'
 import { eventProblem, isoToLocalInput, localToIso, POST_CAPTION_MAX } from '../lib/post-draft.ts';
 import { postLink, postShareText } from '../lib/share.ts';
 import { chatLinkMessage } from '../lib/share-targets.ts';
+import { cardCaption, cardInvite } from '../lib/share-card.ts';
+import type { ShareCard } from '../lib/share-card.ts';
+import { formatWhen } from '../lib/chat.ts';
 import type { CommentGif, EventKind, PostComment, PostView, PublicProfile, ReportReason } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
@@ -163,9 +167,9 @@ export function ReasonSheet({ title, doneText, extra, submit, onClose, onDone }:
 
 // ---------- Comentários ----------
 
-function CommentRow({ comment, onDelete, onLike, onReport, busy }: { comment: PostComment; onDelete: () => void; onLike: () => void; onReport: () => void; busy: boolean }) {
+function CommentRow({ comment, reply, onDelete, onLike, onReport, onReply, busy }: { comment: PostComment; reply: boolean; onDelete: () => void; onLike: () => void; onReport: () => void; onReply: () => void; busy: boolean }) {
   return (
-    <li className="comment">
+    <li className={`comment${reply ? ' comment--reply' : ''}`}>
       {comment.venue ? (
         <Link to={`/bares/${encodeURIComponent(comment.venue.id)}`} aria-label={t('Página de {name}', { name: comment.venue.name })}>
           <VenueLogo name={comment.venue.name} logoUrl={comment.venue.logoUrl} size={32} />
@@ -202,6 +206,7 @@ function CommentRow({ comment, onDelete, onLike, onReport, busy }: { comment: Po
         </p>
         ) : null}
         {comment.gif ? <CommentGifView gif={comment.gif} /> : null}
+        <ReplyButton name={comment.venue?.name ?? comment.author.username} onReply={onReply} />
       </div>
       <button type="button" className={`comment__like${comment.likedByMe ? ' comment__like--on' : ''}`} onClick={onLike} aria-pressed={comment.likedByMe} aria-label={comment.likedByMe ? t('Descurtir comentário') : t('Curtir comentário')}>
         <HeartIcon filled={comment.likedByMe} />
@@ -230,7 +235,10 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<string | undefined>();
   const [reporting, setReporting] = useState<PostComment | undefined>();
+  /** Comentário sendo respondido. */
+  const [replyTo, setReplyTo] = useState<PostComment | undefined>();
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const query = mentionQueryAt(text);
   const debouncedQuery = useDebounced(query, 250);
   const [people, setPeople] = useState<PublicProfile[]>([]);
@@ -282,16 +290,24 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
     setBusy(true);
     setError(undefined);
     try {
-      const created = await api.addComment(postId, body, gif);
+      const created = await api.addComment(postId, body, gif, replyTo?.id);
       setItems((current) => [...current, created]);
       onCountChange(1);
       setText('');
-      requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: 'nearest' }));
+      setReplyTo(undefined);
+      if (!created.parentId) requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: 'nearest' }));
     } catch (failure) {
       setError(toApiError(failure).message);
     } finally {
       setBusy(false);
     }
+  }
+
+  function startReply(comment: PostComment) {
+    setReplyTo(comment);
+    // Comentário do bar: não marca a pessoa que administra.
+    setText((current) => replyPrefill(current, comment.venue ? undefined : comment.author.username, comment.mine));
+    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   /** Comentário esperando a confirmação para ser apagado. */
@@ -303,7 +319,8 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
     setError(undefined);
     try {
       await api.deleteComment(postId, comment.id);
-      setItems((current) => current.filter((c) => c.id !== comment.id));
+      setItems((current) => removeComment(current, comment.id));
+      if (replyTo?.id === comment.id) setReplyTo(undefined);
       onCountChange(-1);
     } catch (failure) {
       setError(toApiError(failure).message);
@@ -330,8 +347,8 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
       {!loaded ? <Loading /> : null}
       {loaded && items.length === 0 && !error ? <p className="comments__empty">{t('Seja o primeiro a comentar')}</p> : null}
       <ul className="comments">
-        {items.map((c) => (
-          <CommentRow key={c.id} comment={c} busy={deleting === c.id} onDelete={() => setAskDelete(c)} onLike={() => void toggleLike(c)} onReport={() => setReporting(c)} />
+        {threadComments(items).map(({ comment: c, reply }) => (
+          <CommentRow key={c.id} comment={c} reply={reply} busy={deleting === c.id} onDelete={() => setAskDelete(c)} onLike={() => void toggleLike(c)} onReport={() => setReporting(c)} onReply={() => startReply(c)} />
         ))}
       </ul>
       {hasMore ? (
@@ -365,8 +382,9 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
             ))}
           </ul>
         ) : null}
+        {replyTo ? <ReplyBanner name={replyTo.venue?.name ?? replyTo.author.username} onCancel={() => setReplyTo(undefined)} /> : null}
         <div className="commentbox">
-          <input id="comment-input" className="commentbox__input" value={text} onChange={(event) => setText(event.target.value)} maxLength={520} placeholder={t('Escreva um comentário')} autoComplete="off" enterKeyHint="send" />
+          <input ref={inputRef} id="comment-input" className="commentbox__input" value={text} onChange={(event) => setText(event.target.value)} maxLength={520} placeholder={t('Escreva um comentário')} autoComplete="off" enterKeyHint="send" />
           {text.trim() !== '' ? (
             <button type="submit" className="commentbox__send" disabled={busy} aria-label={t('Publicar comentário')} aria-busy={busy || undefined}>
               <ArrowUpIcon />
@@ -389,8 +407,8 @@ export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { p
   const [kind, setKind] = useState<'POST' | 'EVENT'>(post.event ? 'EVENT' : 'POST');
   const [title, setTitle] = useState(post.event?.title ?? '');
   const [eventKind, setEventKind] = useState<EventKind>(post.event?.kind ?? 'OTHER');
-  const [starts, setStarts] = useState(post.event ? isoToLocalInput(post.event.startsAt) : '');
-  const [ends, setEnds] = useState(post.event ? isoToLocalInput(post.event.endsAt) : '');
+  const [starts, setStarts] = useState(post.event?.startsAt ? isoToLocalInput(post.event.startsAt) : '');
+  const [ends, setEnds] = useState(post.event?.endsAt ? isoToLocalInput(post.event.endsAt) : '');
   const [extras, setExtras] = useState<EventExtrasDraft>(() => extrasDraftFrom(post.event?.extras));
   const extraOptions = useAsync(() => (kind === 'EVENT' ? api.eventExtras().then((r) => r.items) : Promise.resolve(null)), [kind === 'EVENT']);
   const [busy, setBusy] = useState(false);
@@ -400,9 +418,11 @@ export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { p
     setMessage(undefined);
     const place = placeName.trim() ? { name: placeName.trim(), address: placeAddress.trim() || null } : null;
     // O início só precisa estar no futuro se a pessoa mudou o horário.
-    const unchanged = post.event && starts === isoToLocalInput(post.event.startsAt);
+    const unchanged = post.event?.startsAt && starts === isoToLocalInput(post.event.startsAt);
+    // Evento cuja data ainda está em votação: sem data nova, continua esperando a votação.
+    const dateByPoll = post.event !== null && post.event.startsAt === null && !starts;
     if (kind === 'EVENT') {
-      const problem = eventProblem({ title, kind: eventKind, startsAt: starts, endsAt: ends }, place, unchanged ? new Date(0) : new Date());
+      const problem = eventProblem({ title, kind: eventKind, startsAt: starts, endsAt: ends, dateByPoll }, place, unchanged ? new Date(0) : new Date());
       if (problem) {
         setMessage({ tone: 'error', text: problem });
         return;
@@ -545,14 +565,33 @@ export function AdjustSheet({ post, onClose, onSaved }: { post: PostView; onClos
 // ---------- Compartilhar ----------
 
 export function SharePostSheet({ post, onClose }: { post: PostView; onClose: () => void }) {
-  return <ShareLinkSheet url={postLink(shareOrigin(), post.id)} text={postShareText(post.author.username)} onShared={() => trackShare('POST', post.id)} onClose={onClose} />;
+  const url = postLink(shareOrigin(), post.id);
+  return <ShareLinkSheet url={url} text={postShareText(post.author.username)} card={async () => postCard(post, url)} onShared={() => trackShare('POST', post.id)} onClose={onClose} />;
 }
 
-/** Compartilhar um link: numa ou mais conversas do app (com mensagem opcional) ou fora dele (copiar, WhatsApp, menu do aparelho). */
-export function ShareLinkSheet({ url, text, onShared, onClose }: { url: string; text: string; onShared?: () => void; onClose: () => void }) {
+/** Cartão do post para o Instagram/Stories: a primeira foto, o texto do post e quem postou. */
+export function postCard(post: PostView, url: string): ShareCard {
+  const who = post.venue?.name ?? `@${post.author.username}`;
+  const photo = post.images.find((image) => image.path);
+  const title = post.event?.title ?? post.caption?.trim() ?? post.placeName ?? t('{name} no AskouT', { name: who });
+  const lines = [post.event ? formatWhen(post.event.startsAt, post.event.endsAt, new Date()) : '', post.placeName ?? '', who].filter((line) => line && line !== title);
+  return {
+    kicker: post.event ? t('Evento') : t('Post'),
+    title,
+    lines,
+    imageUrl: photo?.path ? api.assetUrl(photo.path) : null,
+    url,
+    caption: cardCaption({ title, lines, url, invite: cardInvite(post.event ? 'event' : 'post'), tags: post.placeName ? [post.placeName] : [] }),
+    name: `askout-${post.event?.title ?? post.author.username}`,
+  };
+}
+
+/** Compartilhar um link: numa ou mais conversas do app (com mensagem opcional) ou fora dele (copiar, WhatsApp, Instagram, menu do aparelho). */
+export function ShareLinkSheet({ url, text, card, onShared, onClose }: { url: string; text: string; card?: () => Promise<ShareCard>; onShared?: () => void; onClose: () => void }) {
   return (
     <ShareSheet
       link={{ title: t('AskouT'), text, url }}
+      {...(card ? { card } : {})}
       send={(conversationId, message) => api.sendText(conversationId, chatLinkMessage(text, url, message))}
       onShared={onShared}
       onClose={onClose}

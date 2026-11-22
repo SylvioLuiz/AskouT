@@ -2228,13 +2228,11 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   color: var(--muted);
 }
 
-.flashcta--on {
-  background: var(--ink);
-  box-shadow: none;
-}
-
+/* NOW ligado: degradê da marca (igual ao tema escuro). Antes era var(--ink), quase preto, e o texto escuro sumia. */
+.flashcta--on,
 .flashcta--on:hover {
-  background: var(--ink-2);
+  color: var(--brand-ink);
+  background: var(--brand-grad);
 }
 
 .flashcta__icon {
@@ -5568,6 +5566,12 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .legal__switch { margin-top: 32px; }
 .auth__legal { margin: 14px 0 0; text-align: center; font-size: 13px; line-height: 1.45; color: var(--muted); }
 .auth__legal a { color: inherit; text-decoration: underline; }
+/* Links das lojas no rodapé da entrada (só no navegador). */
+.auth__stores { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 14px; }
+.auth__stores-label { font-size: 12px; color: var(--muted); }
+.auth__stores-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.store-badge { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent); color: var(--ink); font-size: 0.875rem; font-weight: 600; text-decoration: none; }
+.store-badge:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
 
 .setting--stack { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
 .btn--danger-text { color: var(--danger); text-align: center; }
@@ -5635,6 +5639,8 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
   .auth--fit .field__input { min-height: 40px; padding-top: 0; padding-bottom: 0; }
   .auth--fit .social { margin-top: 10px; gap: 8px; }
   .auth--fit .auth__legal { margin: 8px 0 0; font-size: 11.5px; line-height: 1.35; }
+  .auth--fit .auth__stores { margin-top: 10px; gap: 6px; }
+  .auth--fit .store-badge { min-height: 34px; padding: 0 12px; font-size: 0.8125rem; }
   .auth--fit .auth__hero { overflow: hidden; }
 }
 @media (max-width: 899px) and (max-height: 720px) {
@@ -5833,6 +5839,8 @@ button.reactlist__row { cursor: pointer; }
 .photoview__slide figcaption { position: absolute; left: 12px; bottom: max(12px, var(--sa-bottom)); font-size: 0.75rem; color: rgb(255 255 255 / 0.7); }
 .photoview__head { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: max(10px, var(--sa-top)) 10px 10px 16px; background: linear-gradient(to bottom, rgb(0 0 0 / 0.5), transparent); pointer-events: none; }
 .photoview__head > * { pointer-events: auto; }
+.photoview__actions { display: flex; gap: 8px; }
+.photoview__btn:disabled { opacity: 0.5; cursor: default; }
 .photoview__count { font-size: 0.875rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .photoview__btn { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: rgb(255 255 255 / 0.14); color: #fff; cursor: pointer; }
 .photoview__nav { position: absolute; top: 50%; z-index: 2; display: none; place-items: center; width: 44px; height: 44px; margin-top: -22px; padding: 0; border: 0; border-radius: 50%; background: rgb(255 255 255 / 0.14); color: #fff; cursor: pointer; }
@@ -6881,8 +6889,15 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .nowcard__ring .nowface { border: 3px solid var(--surface); }
 .nowcard__info { display: grid; gap: 4px; min-width: 0; }
 .nowcard__time { display: flex; align-items: center; gap: 10px; }
-.nowcard__stop { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border: 1.5px solid var(--line-strong); border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; }
-.nowcard__stop svg { width: 13px; height: 13px; }
+/* Parar: botão com texto, no vermelho de perigo, para não passar despercebido. */
+.nowcard__stop { display: inline-flex; align-items: center; gap: 6px; width: fit-content; min-height: 36px; margin-top: 6px; padding: 0 14px; border: 1.5px solid var(--danger); border-radius: 999px; background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); font: inherit; font-size: 0.875rem; font-weight: 700; cursor: pointer; }
+.nowcard__stop:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); }
+.nowcard__stop svg { width: 14px; height: 14px; }
+/* Recado no NOW ligado: toca para editar; sem recado, aparece "+ Recado" tracejado. */
+button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cursor: pointer; }
+.nownote--add { border-style: dashed; border-color: var(--now-pink); color: var(--brand-text); background: var(--surface); }
+.nownote-edit { display: grid; gap: 12px; }
+.nownote-edit .nownote--input { margin-top: 4px; }
 .nowcard__clock { font-family: var(--now-display); font-size: 2.125rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
 .nowcard__until { color: var(--muted); font-size: 0.8125rem; }
 .nowcard__hint { margin: -10px 0 0; font-size: 0.8125rem; }
@@ -6930,7 +6945,9 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 
 /* Convite recebido em foco */
 .nowon__veil { position: fixed; inset: 0; z-index: 4; border: 0; padding: 0; background: transparent; cursor: default; }
-.nowon--focus > :not(.nowinv-stack):not(.nowon__veil):not(.flashtoast) { opacity: 0.28; transition: opacity 0.2s; }
+.nowon--focus > :not(.nowinv-stack):not(.nowon__veil):not(.flashtoast):not(.sheet) { opacity: 0.28; transition: opacity 0.2s; }
+/* Convite que chega com o mapa aberto: no topo da janela do mapa. */
+.nowmap__invites { display: grid; gap: 12px; margin-bottom: 12px; }
 .nowinv-stack { position: relative; z-index: 5; display: grid; gap: 12px; }
 .nowinv { position: relative; display: grid; gap: 28px; padding: 30px 16px 28px; border-radius: 20px; border: 1px solid rgb(250 114 201 / 0.55); background: linear-gradient(160deg, rgb(250 114 201 / 0.22), rgb(169 139 255 / 0.14) 60%, var(--surface)); }
 .nowinv__tools { position: absolute; top: 10px; right: 12px; display: flex; align-items: center; gap: 14px; }
@@ -7239,6 +7256,22 @@ button.tabbar__create { border: 0; cursor: pointer; font: inherit; }
 .evcard__more p { margin: 0; }
 .evcard__desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 6; line-clamp: 6; overflow: hidden; }
 .evcard--expanded .evcard__title { -webkit-line-clamp: unset; line-clamp: unset; }
+
+/* Respostas a comentários: recuadas debaixo do comentário de cima; "Responder" discreto embaixo do texto. */
+.comment__reply { display: inline-flex; align-items: center; min-height: 28px; margin: 2px 0 0; padding: 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.comment__reply:hover, .comment__reply:focus-visible { color: var(--ink); }
+.feedcomment__meta .comment__reply { min-height: 30px; margin: 0; }
+.comment--reply { margin-left: 42px; }
+.feedcomment__row--reply { margin-left: 42px; }
+.replybanner { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 6px; padding: 4px 4px 4px 12px; border-radius: 12px; background: var(--brand-soft); color: var(--ink); font-size: 0.8125rem; }
+.replybanner__close { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.replybanner__close svg { width: 16px; height: 16px; }
+
+/* Folha "Quando": deixar a data para uma votação. */
+.evwhen__poll { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+.evwhen__polltext { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.evwhen__polltext .muted { font-size: 0.85rem; }
+.evwhen__poll .switch { flex-shrink: 0; }
 
 /* Endereço da capa: sempre uma linha só. */
 .evhero__placetext { display: block; -webkit-line-clamp: unset; line-clamp: unset; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100vw - 72px); }

@@ -12,7 +12,7 @@ export interface IcsEvent {
 
 /** Escapa texto: barra, ponto e vírgula, vírgula e quebras de linha (RFC 5545 §3.3.11). */
 export function icsText(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+  return value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 }
 
 /** Quebra linhas com mais de 75 bytes (a continuação começa com um espaço), sem cortar um caractere no meio. */
@@ -82,9 +82,33 @@ export function icsFilename(title: string): string {
   return `${base || 'evento'}.ics`;
 }
 
-/** Ponte do app (`window.AskouTCalendar`, ver apps/mobile): abre o menu de compartilhar do iPhone, que tem "Adicionar à Agenda". */
+/** Campos do evento para a tela nativa de novo evento do aparelho. */
+export interface NativeCalendarEvent {
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  location: string | null;
+  description: string | null;
+  url: string | null;
+}
+
+/**
+ * Ponte do app (`window.AskouTCalendar`, ver apps/mobile): abre a tela nativa de novo evento da agenda do aparelho
+ * com `event`; o `.ics` vai junto como plano B (e para versões antigas do app, que só compartilham o arquivo).
+ */
 export interface NativeCalendarBridge {
-  addEvent(o: { filename: string; ics: string }): Promise<void>;
+  addEvent(o: { filename: string; ics: string; event?: NativeCalendarEvent }): Promise<void>;
+}
+
+/** Monta os campos para a tela nativa (mesmas regras do .ics: fim inválido vira início + 2h). */
+export function nativeCalendarEvent(event: IcsEvent): NativeCalendarEvent | null {
+  const start = new Date(event.startsAt);
+  if (Number.isNaN(start.getTime())) return null;
+  let end = new Date(event.endsAt);
+  if (Number.isNaN(end.getTime()) || end.getTime() <= start.getTime()) end = new Date(start.getTime() + 2 * 3600_000);
+  const location = event.venue ? (event.venue.address ? `${event.venue.name}, ${event.venue.address}` : event.venue.name) : null;
+  const description = [event.description?.trim(), event.url].filter((x): x is string => Boolean(x)).join('\n\n') || null;
+  return { title: event.title, startsAt: start.toISOString(), endsAt: end.toISOString(), location, description, url: event.url ?? null };
 }
 
 export function nativeCalendarBridge(host: unknown = typeof window === 'undefined' ? undefined : window): NativeCalendarBridge | undefined {
@@ -92,14 +116,14 @@ export function nativeCalendarBridge(host: unknown = typeof window === 'undefine
   return b && typeof b.addEvent === 'function' ? (b as NativeCalendarBridge) : undefined;
 }
 
-/** No app, abre pelo iPhone; no navegador, baixa o arquivo (o celular/computador oferece abrir na agenda). */
+/** No app, abre a tela de novo evento da agenda do aparelho; no navegador, baixa o arquivo (o celular/computador oferece abrir na agenda). */
 export async function addToCalendar(event: IcsEvent): Promise<void> {
   const ics = buildEventIcs(event);
   if (ics === null) throw new Error(t('Este evento não tem data válida para a agenda.'));
   const filename = icsFilename(event.title);
   const bridge = nativeCalendarBridge();
   if (bridge) {
-    await bridge.addEvent({ filename, ics });
+    await bridge.addEvent({ filename, ics, event: nativeCalendarEvent(event) ?? undefined });
     return;
   }
   const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));

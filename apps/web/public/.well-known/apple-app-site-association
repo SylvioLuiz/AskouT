@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["359NDWACC5.br.com.askout"],
+        "components": [{ "/": "/convite/*", "comment": "Convite: abre o app instalado" }]
+      }
+    ]
+  }
+}

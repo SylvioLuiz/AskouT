@@ -86,7 +86,7 @@ export interface PollSummary {
   votingDeadline: string | null;
   meetupId: string | null;
   /** Evento criado a partir da votação: ele substitui a votação nas listas do grupo. */
-  event: { id: string; title: string; startsAt: string; endsAt: string } | null;
+  event: { id: string; title: string; startsAt: string | null; endsAt: string | null } | null;
 }
 
 export interface PollInput {
@@ -98,6 +98,8 @@ export interface PollInput {
   preferredTimeStart?: string;
   votingDeadline?: string;
   confirmationPolicy: Policy;
+  /** Evento seu ainda sem data: a votação decide a data dele. */
+  eventPostId?: string;
 }
 
 export const VOTE_LABEL: Record<VoteStatus, string> = { YES: 'Posso', MAYBE: 'Talvez', NO: t('Não posso') };

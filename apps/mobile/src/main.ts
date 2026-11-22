@@ -17,6 +17,7 @@ import { deepLinkPath } from './deep-link.ts';
 import { createLocationBridge, guardGeolocation } from './location-bridge.ts';
 import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
+import { createFilesBridge } from './files-bridge.ts';
 import { createDeviceCalendarBridge } from './device-calendar-bridge.ts';
 import { createContactsBridge } from './contacts-bridge.ts';
 import { createPushBridge, openInApp } from './push-bridge.ts';
@@ -47,6 +48,7 @@ if (Capacitor.isNativePlatform()) {
     });
   }
   // Volta do login da agenda no navegador (br.com.askout://agenda?agendas=google): abre a Agenda com o aviso.
+  // Link do convite (https://askout.com.br/convite/usuario, ou br.com.askout://convite/usuario no Android): abre o cadastro.
   void App.addListener('appUrlOpen', ({ url }) => {
     const path = deepLinkPath(url);
     if (path) openInApp(path, window);
@@ -76,13 +78,19 @@ if (Capacitor.isNativePlatform()) {
     },
     platform: () => Capacitor.getPlatform(),
   });
-  // "Adicionar à agenda": grava o .ics e abre o menu de compartilhar (iPhone e Android).
+  // "Adicionar à agenda": abre a tela nativa de novo evento (iPhone e Android); plano B: .ics pelo menu de compartilhar.
   w['AskouTCalendar'] = createCalendarBridge({
+    calendar: CapacitorCalendar as never,
     writeFile: (o) => Filesystem.writeFile({ path: o.path, data: o.data, directory: Directory.Cache, encoding: Encoding.UTF8 }),
     share: (o) => Share.share(o),
   });
   // "Sincronizar agendas": lê as agendas do aparelho (Google, Outlook, iCloud ligados no celular), só horários ocupados.
   w['AskouTDeviceCalendar'] = createDeviceCalendarBridge({ calendar: CapacitorCalendar as never, platform: () => Capacitor.getPlatform() });
+  // "Baixar foto" (álbum do evento, posts): grava no cache e abre o menu do aparelho, que tem "Salvar imagem".
+  w['AskouTFiles'] = createFilesBridge({
+    writeFile: (o) => Filesystem.writeFile({ path: o.path, data: o.data, directory: Directory.Cache }),
+    share: (o) => Share.share(o),
+  });
   // "Mais opções" da folha de compartilhar: abre o menu nativo do aparelho (o WebView do Android não tem navigator.share).
   w['AskouTShare'] = { share: (o: { title?: string; text?: string; url?: string; dialogTitle?: string }) => Share.share(o) };
   // "Achar nos contatos": lê celulares e e-mails da agenda (iPhone e Android), com a permissão do aparelho.

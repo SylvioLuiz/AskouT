@@ -35,6 +35,12 @@ export class FlashController {
     return this.core.flash.extend(actor.userId, { minutes: asBody(body).minutes });
   }
 
+  /** Troca o recado do NOW ligado: `{note: string}` (vazio tira o recado). */
+  @Put('me/flash/note')
+  setNote(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.flash.setNote(actor.userId, { note: asBody(body).note });
+  }
+
   @Delete('me/flash')
   turnOff(@CurrentActor() actor: Actor) {
     return this.core.flash.turnOff(actor.userId);

@@ -170,6 +170,7 @@
   transition: transform 0.12s ease-out;
 }
 .sharesheet__action:active .sharesheet__bubble { transform: scale(0.94); }
+.sharesheet__bubble--instagram { background: linear-gradient(45deg, #f9ce34, #ee2a7b 55%, #6228d7); border-color: transparent; color: #fff; }
 .sharesheet__bubble--whatsapp { background: #25d366; border-color: #25d366; color: #fff; }
 .sharesheet__bubble--telegram { background: #2aabee; border-color: #2aabee; color: #fff; }
 .sharesheet__action--on .sharesheet__bubble { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }

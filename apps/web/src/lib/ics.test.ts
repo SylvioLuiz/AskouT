@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { buildEventIcs, icsFilename, icsFold, icsText, nativeCalendarBridge } from './ics.ts';
+import { buildEventIcs, icsFilename, icsFold, icsText, nativeCalendarBridge, nativeCalendarEvent } from './ics.ts';
 
 const base = { id: 'ev1', title: 'Samba, chopp; e festa', startsAt: '2026-11-07T22:00:00.000Z', endsAt: '2026-11-08T02:00:00.000Z', venue: { name: 'Bar do Zé', address: 'Rua A, 10' } };
 
@@ -14,7 +14,7 @@ describe('arquivo de agenda (.ics)', () => {
     assert.ok(lines.includes('DTSTAMP:20261024T120000Z'));
     assert.ok(lines.includes('DTSTART:20261107T220000Z'));
     assert.ok(lines.includes('DTEND:20261108T020000Z'));
-    assert.ok(lines.includes('SUMMARY:Samba\\, chopp\; e festa'));
+    assert.ok(lines.includes('SUMMARY:Samba\\, chopp\\; e festa'));
     assert.ok(lines.includes('LOCATION:Bar do Zé\\, Rua A\\, 10'));
     assert.ok(lines.includes('DESCRIPTION:Linha 1\\nLinha 2\\n\\nhttps://askout.com.br/eventos/ev1'));
     assert.ok(lines.includes('TRIGGER:-PT1H'));
@@ -25,7 +25,7 @@ describe('arquivo de agenda (.ics)', () => {
     assert.equal(buildEventIcs({ ...base, startsAt: 'x' }), null);
   });
   it('escapa e quebra linhas longas sem cortar acentos', () => {
-    assert.equal(icsText('a\\b;c,d\ne'), 'a\\\\b\;c\\,d\\ne');
+    assert.equal(icsText('a\\b;c,d\ne'), 'a\\\\b\\;c\\,d\\ne');
     const folded = icsFold(`SUMMARY:${'ç'.repeat(80)}`);
     for (const part of folded.split('\r\n')) assert.ok(new TextEncoder().encode(part).length <= 75);
     assert.equal(folded.replace(/\r\n /g, ''), `SUMMARY:${'ç'.repeat(80)}`);
@@ -33,6 +33,18 @@ describe('arquivo de agenda (.ics)', () => {
   it('nome do arquivo sem acentos nem símbolos', () => {
     assert.equal(icsFilename('Forró & Açaí — Noite!'), 'Forro-Acai-Noite.ics');
     assert.equal(icsFilename('!!!'), 'evento.ics');
+  });
+  it('monta os campos da tela nativa de novo evento', () => {
+    assert.deepEqual(nativeCalendarEvent({ ...base, description: ' Roda ', url: 'https://askout.com.br/eventos/ev1' }), {
+      title: base.title,
+      startsAt: base.startsAt,
+      endsAt: base.endsAt,
+      location: 'Bar do Zé, Rua A, 10',
+      description: 'Roda\n\nhttps://askout.com.br/eventos/ev1',
+      url: 'https://askout.com.br/eventos/ev1',
+    });
+    assert.equal(nativeCalendarEvent({ ...base, endsAt: 'x', venue: null })!.endsAt, '2026-11-08T00:00:00.000Z');
+    assert.equal(nativeCalendarEvent({ ...base, startsAt: 'x' }), null);
   });
   it('reconhece só a ponte nativa completa', () => {
     assert.equal(nativeCalendarBridge({}), undefined);

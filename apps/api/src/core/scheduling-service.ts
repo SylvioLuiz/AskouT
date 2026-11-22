@@ -25,6 +25,8 @@ export interface PollInput {
   votingDeadline?: unknown;
   confirmationPolicy?: unknown;
   thresholds?: unknown;
+  /** Evento seu ainda sem data: a votação decide a data dele (ao fechar, o evento ganha o dia escolhido). */
+  eventPostId?: unknown;
 }
 
 export interface PollProposalView {
@@ -109,7 +111,8 @@ export interface PollSummary {
   /** Encontro (agenda) gerado ao definir a data. */
   meetupId: string | null;
   /** Evento criado a partir desta votação; quando existe, substitui a votação nas listas do grupo. */
-  event: { id: string; title: string; startsAt: string; endsAt: string } | null;
+  /** Evento ligado à votação; sem data enquanto ela não fecha (quando a votação decide a data do evento). */
+  event: { id: string; title: string; startsAt: string | null; endsAt: string | null } | null;
 }
 
 function parseThresholds(raw: unknown): Thresholds {
@@ -206,6 +209,7 @@ export class SchedulingService {
     const policy = input.confirmationPolicy === undefined || input.confirmationPolicy === null ? 'MAJORITY' : input.confirmationPolicy;
     if (typeof policy !== 'string' || !POLICIES.includes(policy as ConfirmationPolicy)) throw validationError('Regra inválida', { confirmationPolicy: 'Use unanimidade, maioria ou decisão manual' });
     const th = parseThresholds(input.thresholds);
+    const eventPostId = input.eventPostId === undefined || input.eventPostId === null || input.eventPostId === '' ? null : await this.undatedEvent(actorId, input.eventPostId);
 
     const poll: PollRecord = {
       id: ids.next(),
@@ -229,6 +233,10 @@ export class SchedulingService {
       createdAt: now,
     };
     await scheduling.create(poll, [actorId, ...others], now);
+    if (eventPostId) {
+      await scheduling.updatePoll(poll.id, { eventPostId });
+      poll.eventPostId = eventPostId;
+    }
 
     const name = await this.nameOf(actorId);
     await this.postSystem(conversation.id, actorId, `${name} abriu uma votação de datas: ${title}`, now);
@@ -499,6 +507,7 @@ export class SchedulingService {
     await scheduling.createProposal(proposal);
     for (const userId of going) await scheduling.setConfirmation(proposal.id, poll.id, userId, 'CONFIRMED', now);
     await meetups.create(meetup);
+    await this.fillEventDate(poll, startsAt, endsAt, going);
     await scheduling.updatePoll(poll.id, { status: 'FINALIZED', finalProposalId: proposal.id, meetupId: meetup.id, ...(poll.votingClosedAt ? {} : { votingClosedAt: now }) });
     const card: MessageRecord = { id: ids.next(), conversationId: poll.conversationId, senderId: poll.organizerId, kind: 'MEETUP', body: `Encontro: ${poll.title}`, suggestion: null, response: null, respondedAt: null, meetupId: meetup.id, createdAt: now };
     await conversations.addMessage(card);
@@ -631,6 +640,7 @@ export class SchedulingService {
       }),
     };
     await meetups.create(meetup);
+    await this.fillEventDate(poll, proposal.candidateStartAt, proposal.candidateEndAt, meetup.participants.filter((p) => p.status === 'CONFIRMED').map((p) => p.userId));
     await scheduling.updateProposal(proposal.id, { status: 'CONFIRMED' });
     await scheduling.updatePoll(poll.id, { status: 'FINALIZED', finalProposalId: proposal.id, meetupId: meetup.id });
     const card: MessageRecord = { id: ids.next(), conversationId: poll.conversationId, senderId: poll.organizerId, kind: 'MEETUP', body: `Encontro: ${poll.title}`, suggestion: null, response: null, respondedAt: null, meetupId: meetup.id, createdAt: now };
@@ -638,6 +648,38 @@ export class SchedulingService {
     await this.postSystem(poll.conversationId, poll.organizerId, `Data definida: ${dayFmt(proposal.candidateDate)} para "${poll.title}"`, now);
     await this.notifyAll(poll.organizerId, participants.filter((id) => id !== poll.organizerId), poll, `Data definida: ${dayFmt(proposal.candidateDate)}`, `"${poll.title}" está marcado. Veja na sua agenda.`);
     return { ...poll, status: 'FINALIZED', finalProposalId: proposal.id, meetupId: meetup.id };
+  }
+
+  /** O evento (seu, de pessoa) que espera a votação para ter data: sem data, não arquivado e sem outra votação. */
+  private async undatedEvent(actorId: string, raw: unknown): Promise<string> {
+    const invalid = () => validationError('Evento inválido', { eventPostId: 'Evento não encontrado' });
+    if (typeof raw !== 'string' || raw.length > 64) throw invalid();
+    const post = (await this.deps.posts.findById(raw))?.post;
+    if (!post || post.authorId !== actorId || post.eventTitle === null || post.archivedAt !== null) throw invalid();
+    if (post.eventStartsAt !== null) throw conflict('Este evento já tem data');
+    const other = await this.deps.scheduling.findByEventPost(post.id);
+    if (other && other.status !== 'CANCELLED') throw conflict('Este evento já tem uma votação');
+    return post.id;
+  }
+
+  /** Votação de um evento sem data: o dia escolhido vira a data do evento, e quem confirmou já vai. */
+  private async fillEventDate(poll: PollRecord, startsAt: Date, endsAt: Date, going: readonly string[]): Promise<void> {
+    if (!poll.eventPostId) return;
+    const { posts, eventRoom, clock } = this.deps;
+    const post = (await posts.findById(poll.eventPostId))?.post;
+    if (!post || post.eventTitle === null || post.eventStartsAt !== null) return;
+    await posts.update(post.id, post.authorId, {
+      caption: post.caption,
+      placeName: post.placeName,
+      placeAddress: post.placeAddress,
+      eventTitle: post.eventTitle,
+      eventStartsAt: startsAt,
+      eventEndsAt: endsAt,
+      eventKind: post.eventKind,
+      editedAt: clock.now(),
+    });
+    const ref = { source: 'USER' as const, id: post.id };
+    for (const userId of new Set([post.authorId, ...going])) await eventRoom.addGoing(ref, userId, clock.now());
   }
 
   private async nameOf(userId: string): Promise<string> {
@@ -687,7 +729,7 @@ export class SchedulingService {
         finalEndsAt = fin ? fin.candidateEndAt.toISOString() : null;
       }
       const eventPost = p.eventPostId ? await this.deps.posts.findById(p.eventPostId) : undefined;
-      const event = eventPost?.post.eventTitle && eventPost.post.eventStartsAt && eventPost.post.eventEndsAt ? { id: eventPost.post.id, title: eventPost.post.eventTitle, startsAt: eventPost.post.eventStartsAt.toISOString(), endsAt: eventPost.post.eventEndsAt.toISOString() } : null;
+      const event = eventPost?.post.eventTitle ? { id: eventPost.post.id, title: eventPost.post.eventTitle, startsAt: eventPost.post.eventStartsAt ? eventPost.post.eventStartsAt.toISOString() : null, endsAt: eventPost.post.eventEndsAt ? eventPost.post.eventEndsAt.toISOString() : null } : null;
       out.push({ id: p.id, conversationId: p.conversationId, title: p.title, status: p.status, rangeStart: p.rangeStart, rangeEnd: p.rangeEnd, finalDate, needsMyVote: p.status === 'VOTING' && !this.isClosed(p) && mine.finishedAt === null, needsMyConfirmation, participantCount: participants.length, votedCount, finalEndsAt, finishedCount: participants.filter((x) => x.finishedAt !== null).length, best, proposedDate, votingDeadline: p.votingDeadline ? p.votingDeadline.toISOString() : null, meetupId: p.meetupId ?? null, event });
     }
     return out;

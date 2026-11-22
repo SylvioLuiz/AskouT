@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { followProgressLabel, markOnboardingDone, onboardingDone, ONBOARDING_SLIDES, shouldShowOnboarding } from './onboarding.ts';
+import { followProgressLabel, markOnboardingDone, onboardingDone, ONBOARDING_SLIDES, placesFromEvents, shouldShowOnboarding } from './onboarding.ts';
+import type { ExploreEvent } from './types.ts';
 
 function memory() {
   const data = new Map<string, string>();
@@ -35,5 +36,13 @@ describe('onboarding', () => {
     assert.equal(followProgressLabel(0), 'Siga mais 3 rolês (0 de 3)');
     assert.equal(followProgressLabel(2), 'Siga mais 1 rolê (2 de 3)');
     assert.match(followProgressLabel(3), /Pronto/);
+  });
+  it('sem locais perto, usa os locais dos próximos eventos (um por local, sem evento de pessoa sem rolê)', () => {
+    const ev = (id: string, venueId: string, name: string): ExploreEvent => ({
+      id, title: id, description: null, startsAt: '2026-11-22T20:00:00Z', endsAt: '2026-11-22T23:00:00Z', kind: 'PARTY' as ExploreEvent['kind'], isFree: false, imageUrl: null, tags: [], sample: false,
+      venue: { id: venueId, name, address: null, category: 'bar', lat: 1, lng: 2, logoUrl: null }, distanceM: null,
+    });
+    const places = placesFromEvents([ev('e1', 'v1', 'Bar A'), ev('e2', 'v1', 'Bar A'), ev('e3', '', 'Casa da Ana'), ev('e4', 'v2', 'Bar B')]);
+    assert.deepEqual(places.map((p) => [p.key, p.name, p.venue?.id]), [['askout:v1', 'Bar A', 'v1'], ['askout:v2', 'Bar B', 'v2']]);
   });
 });

@@ -5,7 +5,7 @@ import { badgeProgressText, broughtText } from '../lib/referrals.ts';
 import { Link } from '../router.tsx';
 import { shareOrigin } from '../lib/public-origin.ts';
 import { useUser } from '../auth.tsx';
-import { inviteText, shareableInviteUrl, storeLink, whatsappUrl } from '../lib/invite.ts';
+import { inviteText, inviteUrl, whatsappUrl } from '../lib/invite.ts';
 import { Sheet } from './agenda.tsx';
 import { Avatar, Button, Notice } from './ui.tsx';
 import { t } from '../lib/i18n/index.ts';
@@ -13,8 +13,8 @@ import { t } from '../lib/i18n/index.ts';
 /** Convidar quem ainda não está no AskouT: WhatsApp, compartilhar do aparelho ou copiar o link. */
 export function InviteSheet({ onClose }: { onClose: () => void }) {
   const user = useUser();
-  const store = storeLink(import.meta.env.VITE_STORE_URL as string | undefined);
-  const url = shareableInviteUrl(shareOrigin(), user.profile.username, store);
+  // Abre o app de quem já tem; quem não tem vai para a loja do celular (ou para o cadastro do site, no computador).
+  const url = inviteUrl(shareOrigin(), user.profile.username);
   const text = inviteText(user.profile.displayName);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | undefined>();
   const referrals = useAsync(() => api.referrals(), []);
@@ -50,9 +50,7 @@ export function InviteSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet title={t('Convidar amigos')} onClose={onClose}>
       <p className="muted">
-        {store
-          ? t('Mande o link para a galera baixar o app. Depois, é só se seguirem para virarem amigos.')
-          : t('Quem entrar pelo seu link já passa a seguir você. Para virarem amigos, é só você seguir de volta.')}
+        {t('Quem entrar pelo seu link já passa a seguir você. Para virarem amigos, é só você seguir de volta.')}
       </p>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
       <div className="stack">

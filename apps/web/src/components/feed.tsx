@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, ReactNode } from 'react';
 import { Sheet } from './agenda.tsx';
-import { CommentGifView, CommentTools } from './comment-tools.tsx';
+import { CommentGifView, CommentTools, ReplyBanner, ReplyButton } from './comment-tools.tsx';
+import { removeComment, replyPrefill, threadComments } from '../lib/comment-threads.ts';
 import { Carousel } from './post.tsx';
 import { PhotoViewer } from './photo-viewer.tsx';
 import { ArrowUpIcon, CommentIcon, HeartIcon, MoreIcon, PhotoIcon, PlusIcon, TrashIcon, XIcon } from './icons.tsx';
@@ -273,7 +274,7 @@ function FeedPostCard({ post, onChange, onGone, onComments, onApprove, onReject 
       </header>
       {post.body ? <RichText body={post.body} mentions={post.mentions} className="feedpost__text" /> : null}
       {images.length > 0 ? <Carousel key={images.map((i) => i.id).join()} images={images} onOpen={(i) => setViewing(i)} /> : null}
-      {viewing !== undefined ? <PhotoViewer images={images} start={viewing} onClose={() => setViewing(undefined)} /> : null}
+      {viewing !== undefined ? <PhotoViewer images={images} start={viewing} onClose={() => setViewing(undefined)} downloadName={`askout-${post.author.username}`} /> : null}
       {problem ? <p className="field__error">{problem}</p> : null}
       {published ? (
         <>
@@ -521,7 +522,7 @@ const LONG_PRESS_MS = 450;
  * Um comentário. Segurar (ou clique direito) abre as opções (apagar, denunciar); arrastar para a esquerda mostra o
  * "Apagar" para quem pode apagar. Um botão escondido abre as mesmas opções pelo teclado e leitor de tela.
  */
-function CommentRow({ comment, onChange, onDelete, onMenu }: { comment: FeedComment; onChange: (c: FeedComment) => void; onDelete: () => void; onMenu: () => void }) {
+function CommentRow({ comment, reply, onChange, onDelete, onMenu, onReply }: { comment: FeedComment; reply: boolean; onChange: (c: FeedComment) => void; onDelete: () => void; onMenu: () => void; onReply: () => void }) {
   const [shift, setShift] = useState(0);
   const [dragging, setDragging] = useState(false);
   const gesture = useRef<{ x: number; y: number; id: number; base: number; mode: 'wait' | 'swipe' | 'scroll' } | undefined>(undefined);
@@ -537,7 +538,7 @@ function CommentRow({ comment, onChange, onDelete, onMenu }: { comment: FeedComm
 
   function down(event: React.PointerEvent<HTMLDivElement>) {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
-    if ((event.target as HTMLElement).closest('.react')) return;
+    if ((event.target as HTMLElement).closest('.react, .comment__reply')) return;
     pressed.current = false;
     gesture.current = { x: event.clientX, y: event.clientY, id: event.pointerId, base: shift, mode: 'wait' };
     if (hasMenu) {
@@ -586,7 +587,7 @@ function CommentRow({ comment, onChange, onDelete, onMenu }: { comment: FeedComm
     }
   }
   return (
-    <li className="feedcomment__row">
+    <li className={`feedcomment__row${reply ? ' feedcomment__row--reply' : ''}`}>
       {comment.canDelete ? (
         <button type="button" className="feedcomment__swipedel" onClick={onDelete} tabIndex={shift < 0 ? 0 : -1} aria-hidden={shift < 0 ? undefined : true}>
           <TrashIcon />
@@ -631,6 +632,7 @@ function CommentRow({ comment, onChange, onDelete, onMenu }: { comment: FeedComm
             <span className="muted feedcomment__when">{timeAgo(comment.createdAt, new Date())}</span>
             <ReactButton small reactions={comment.reactions} onReact={(emoji) => void react(emoji)} />
             <ReactionSummary reactions={comment.reactions} />
+            <ReplyButton name={comment.author.username} onReply={onReply} />
             {hasMenu ? (
               <button type="button" className="visually-hidden" onClick={onMenu}>
                 {t('Opções do comentário de {username}', { username: comment.author.username })}
@@ -653,7 +655,10 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
   const [menuFor, setMenuFor] = useState<FeedComment | undefined>();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [reporting, setReporting] = useState<FeedComment | undefined>();
+  /** Comentário sendo respondido. */
+  const [replyTo, setReplyTo] = useState<FeedComment | undefined>();
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { people } = useMentionPeople(text);
 
   async function load(after: string | null) {
@@ -679,11 +684,12 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
     setBusy(true);
     setError(undefined);
     try {
-      const created = await api.addFeedComment(post.id, body, gif);
+      const created = await api.addFeedComment(post.id, body, gif, replyTo?.id);
       setItems((current) => [...current, created]);
       onCountChange(1);
       setText('');
-      requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: 'nearest' }));
+      setReplyTo(undefined);
+      if (!created.parentId) requestAnimationFrame(() => endRef.current?.scrollIntoView({ block: 'nearest' }));
     } catch (failure) {
       setError(toApiError(failure).message);
     } finally {
@@ -691,11 +697,18 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
     }
   }
 
+  function startReply(comment: FeedComment) {
+    setReplyTo(comment);
+    setText((current) => replyPrefill(current, comment.author.username, comment.mine));
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
   async function remove(comment: FeedComment) {
     setError(undefined);
     try {
       await api.deleteFeedComment(comment.id);
-      setItems((current) => current.filter((c) => c.id !== comment.id));
+      setItems((current) => removeComment(current, comment.id));
+      if (replyTo?.id === comment.id) setReplyTo(undefined);
       onCountChange(-1);
     } catch (failure) {
       setError(toApiError(failure).message);
@@ -756,7 +769,8 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
           onDone={() => {
             const gone = reporting;
             setReporting(undefined);
-            setItems((current) => current.filter((c) => c.id !== gone.id));
+            setItems((current) => removeComment(current, gone.id));
+            if (replyTo?.id === gone.id) setReplyTo(undefined);
             onCountChange(-1);
           }}
         />
@@ -765,10 +779,12 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
       {!loaded ? <Loading /> : null}
       {loaded && items.length === 0 && !error ? <p className="comments__empty">{t('Seja o primeiro a comentar')}</p> : null}
       <ul className="comments">
-        {items.map((c) => (
+        {threadComments(items).map(({ comment: c, reply }) => (
           <CommentRow
             key={c.id}
             comment={c}
+            reply={reply}
+            onReply={() => startReply(c)}
             onChange={(next) => setItems((current) => current.map((x) => (x.id === next.id ? next : x)))}
             onDelete={() => void remove(c)}
             onMenu={() => {
@@ -795,8 +811,9 @@ function CommentsSheet({ post, onClose, onCountChange }: { post: FeedPost; onClo
           {t('Escreva um comentário')}
         </label>
         <MentionList people={people} onPick={(username) => setText((current) => applyMention(current, username))} />
+        {replyTo ? <ReplyBanner name={replyTo.author.username} onCancel={() => setReplyTo(undefined)} /> : null}
         <div className="commentbox">
-          <input id="feed-comment-input" className="commentbox__input" value={text} onChange={(event) => setText(event.target.value)} maxLength={FEED_COMMENT_MAX + 20} placeholder={t('Comente ou marque alguém com @')} autoComplete="off" enterKeyHint="send" />
+          <input ref={inputRef} id="feed-comment-input" className="commentbox__input" value={text} onChange={(event) => setText(event.target.value)} maxLength={FEED_COMMENT_MAX + 20} placeholder={t('Comente ou marque alguém com @')} autoComplete="off" enterKeyHint="send" />
           {text.trim() !== '' ? (
             <button type="submit" className="commentbox__send" disabled={busy} aria-label={t('Publicar comentário')} aria-busy={busy || undefined}>
               <ArrowUpIcon />

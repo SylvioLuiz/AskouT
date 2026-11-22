@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { CHUNK_BYTES, createVideoBridge, qualityFor, type VideoBridgeDeps } from './video-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
+import { createFilesBridge } from './files-bridge.ts';
 import { createAppleBridge } from './apple-bridge.ts';
 import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
@@ -248,7 +249,28 @@ describe('ponte de avisos (push)', () => {
 
 describe('ponte da agenda', () => {
   const ics = 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n';
-  it('grava o arquivo e abre o menu de compartilhar com o endereço dele', async () => {
+  const event = { title: 'Samba', startsAt: '2026-11-07T22:00:00.000Z', endsAt: '2026-11-08T02:00:00.000Z', location: 'Bar do Zé, Rua A, 10', description: 'Roda', url: 'https://askout.com.br/eventos/ev1' };
+  it('abre a tela nativa de novo evento já preenchida, sem compartilhar o .ics', async () => {
+    const calls: unknown[] = [];
+    const bridge = createCalendarBridge({
+      calendar: { createEventWithPrompt: async (o) => void calls.push(o) },
+      writeFile: async () => (calls.push('write'), { uri: 'file:///x' }),
+      share: async () => void calls.push('share'),
+    });
+    await bridge.addEvent({ filename: 'samba.ics', ics, event });
+    assert.deepEqual(calls, [
+      { title: 'Samba', startDate: Date.parse(event.startsAt), endDate: Date.parse(event.endsAt), location: event.location, description: 'Roda', url: event.url, alerts: [-60] },
+    ]);
+  });
+  it('fechar a tela nativa não é erro; falha dela cai no .ics', async () => {
+    const calls: string[] = [];
+    const deps = { writeFile: async () => ({ uri: 'file:///x' }), share: async () => void calls.push('share') };
+    await createCalendarBridge({ ...deps, calendar: { createEventWithPrompt: async () => Promise.reject(new Error('User canceled')) } }).addEvent({ filename: 'x.ics', ics, event });
+    assert.deepEqual(calls, []);
+    await createCalendarBridge({ ...deps, calendar: { createEventWithPrompt: async () => Promise.reject(new Error('No activity')) } }).addEvent({ filename: 'x.ics', ics, event });
+    assert.deepEqual(calls, ['share']);
+  });
+  it('sem os campos do evento (site antigo), grava o arquivo e abre o menu de compartilhar', async () => {
     const calls: string[] = [];
     const bridge = createCalendarBridge({
       writeFile: async (o) => (calls.push(`write:${o.path}:${o.data.length}`), { uri: `file:///cache/${o.path}` }),
@@ -266,6 +288,37 @@ describe('ponte da agenda', () => {
     await cancelled.addEvent({ filename: 'x.ics', ics });
     const broken = createCalendarBridge({ writeFile: async () => ({ uri: 'file:///x' }), share: async () => Promise.reject(new Error('falhou')) });
     await assert.rejects(broken.addEvent({ filename: 'x.ics', ics }), /falhou/);
+  });
+});
+
+describe('ponte de salvar fotos', () => {
+  it('grava cada foto e abre um só menu de compartilhar com todas', async () => {
+    const calls: string[] = [];
+    const bridge = createFilesBridge({
+      writeFile: async (o) => (calls.push(`write:${o.path}`), { uri: `file:///cache/${o.path}` }),
+      share: async (o) => void calls.push(`share:${o.files.join(',')}`),
+    });
+    await bridge.saveImages({ files: [{ filename: 'a.jpg', base64: 'AA==' }, { filename: 'b.jpg', base64: 'AA==' }] });
+    assert.deepEqual(calls, ['write:a.jpg', 'write:b.jpg', 'share:file:///cache/a.jpg,file:///cache/b.jpg']);
+  });
+  it('recusa nome estranho e ignora o cancelamento do menu', async () => {
+    const ok = createFilesBridge({ writeFile: async () => ({ uri: 'file:///x' }), share: async () => undefined });
+    await assert.rejects(ok.saveImages({ files: [{ filename: '../a.jpg', base64: 'AA==' }] }), /inválido/);
+    await assert.rejects(ok.saveImages({ files: [] }), /Nada/);
+    const cancelled = createFilesBridge({ writeFile: async () => ({ uri: 'file:///x' }), share: async () => Promise.reject(new Error('Share canceled')) });
+    await cancelled.saveImages({ files: [{ filename: 'a.jpg', base64: 'AA==' }] });
+  });
+  it('compartilha um cartão com a legenda e avisa quando a pessoa fecha o menu', async () => {
+    const calls: unknown[] = [];
+    const bridge = createFilesBridge({
+      writeFile: async (o) => ({ uri: `file:///cache/${o.path}` }),
+      share: async (o) => void calls.push(o),
+    });
+    assert.equal(await bridge.shareImage({ filename: 'askout-samba.png', base64: 'AA==', text: 'Bora?' }), true);
+    assert.deepEqual(calls, [{ files: ['file:///cache/askout-samba.png'], dialogTitle: 'Compartilhar', text: 'Bora?' }]);
+    await assert.rejects(bridge.shareImage({ filename: 'x.exe', base64: 'AA==' }), /inválido/);
+    const cancelled = createFilesBridge({ writeFile: async () => ({ uri: 'file:///x' }), share: async () => Promise.reject(new Error('Share canceled')) });
+    assert.equal(await cancelled.shareImage({ filename: 'a.png', base64: 'AA==' }), false);
   });
 });
 
@@ -472,6 +525,18 @@ it('link br.com.askout:// abre só rotas conhecidas do app', async () => {
   assert.equal(deepLinkPath('br.com.askout:///agenda/'), '/agenda');
   assert.equal(deepLinkPath('br.com.askout://configuracoes'), undefined);
   assert.equal(deepLinkPath('https://evil.example/agenda'), undefined);
+});
+
+it('link do convite abre o app pelo site (Universal Link / App Link) ou pelo intent do Android', async () => {
+  const { deepLinkPath } = await import('./deep-link.ts');
+  assert.equal(deepLinkPath('https://askout.com.br/convite/ana.s'), '/convite/ana.s');
+  assert.equal(deepLinkPath('https://www.askout.com.br/convite/ana.s/?x=1'), '/convite/ana.s');
+  assert.equal(deepLinkPath('br.com.askout://convite/ana.s'), '/convite/ana.s');
+  assert.equal(deepLinkPath('https://askout.com.br/agenda?agendas=google'), '/agenda?agendas=google');
+  assert.equal(deepLinkPath('https://askout.com.br/configuracoes'), undefined);
+  assert.equal(deepLinkPath('https://askout.com.br.evil.example/convite/ana'), undefined);
+  assert.equal(deepLinkPath('http://askout.com.br/convite/ana'), undefined);
+  assert.equal(deepLinkPath('https://askout.com.br/convite/<x>'), undefined);
 });
 
 describe('galeria (iPhone)', () => {

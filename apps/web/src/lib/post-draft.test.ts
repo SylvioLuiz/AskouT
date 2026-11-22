@@ -48,14 +48,15 @@ describe('rascunho do post', () => {
   });
 });
 
-it('evento: pede nome, lugar e início no futuro; corpo leva o evento em ISO', () => {
+it('evento: pede nome e início (pode ser no passado); corpo leva o evento em ISO', () => {
   const now = new Date('2026-10-13T12:00:00Z');
   const place = { name: 'Bar do Zé', address: null };
   const ok = { title: 'Pagode', startsAt: '2026-10-20T20:00', endsAt: '' };
   assert.equal(eventProblem(ok, place, now), null);
   assert.match(eventProblem({ ...ok, title: ' ' }, place, now) ?? '', /nome/);
   assert.equal(eventProblem(ok, null, now), null, 'o lugar é opcional');
-  assert.match(eventProblem({ ...ok, startsAt: '2026-10-01T20:00' }, place, now) ?? '', /futuro/);
+  assert.equal(eventProblem({ ...ok, startsAt: '2026-10-01T20:00', endsAt: '' }, place, now), null, 'data no passado vale');
+  assert.match(eventProblem({ ...ok, startsAt: '2024-01-01T20:00' }, place, now) ?? '', /2 anos/);
   assert.match(eventProblem({ ...ok, startsAt: '' }, place, now) ?? '', /início/);
   assert.match(eventProblem({ ...ok, endsAt: '2026-10-20T19:00' }, place, now) ?? '', /depois/);
   assert.equal(eventProblem({ ...ok, endsAt: '2026-10-23T12:00' }, place, now), null, 'mais de 24 h é permitido');

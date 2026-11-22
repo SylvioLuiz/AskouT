@@ -77,6 +77,8 @@ export interface FeedCommentView {
   canReport: boolean;
   reactions: FeedReactionsView;
   mentions: string[];
+  /** Resposta: o comentário de cima da conversa. */
+  parentId: string | null;
 }
 
 export interface FeedSettingsView {
@@ -504,18 +506,28 @@ export class FeedService {
     return { items: await this.commentViews(viewerId, ctx, found.post, page), nextCursor: rows.length > limit && last ? encodeCursor(last) : null };
   }
 
-  async addComment(viewerId: string, postId: unknown, rawBody: unknown, rawGif?: unknown): Promise<FeedCommentView> {
+  /** `replyTo`: o comentário respondido. A resposta fica sempre debaixo do comentário de cima da conversa. */
+  async addComment(viewerId: string, postId: unknown, rawBody: unknown, rawGif?: unknown, replyTo?: unknown): Promise<FeedCommentView> {
     const { found, ctx } = await this.postFor(viewerId, postId);
     if (found.post.status !== 'PUBLISHED') throw forbidden('Espere a publicação ser aprovada');
     const body = text(rawBody, FEED_COMMENT_MAX, 'body', 'Comentário') ?? '';
     const gif = parseCommentGif(rawGif);
     if (!body && !gif) throw validationError('Comentário vazio', { body: 'Escreva algo para comentar' });
-    const record: FeedCommentRecord = { id: this.deps.ids.next(), postId: found.post.id, authorId: viewerId, body, createdAt: this.deps.clock.now(), gifId: gif?.id ?? null, gifUrl: gif?.url ?? null };
+    let replied: FeedCommentRecord | undefined;
+    if (replyTo !== undefined && replyTo !== null) {
+      replied = (await this.commentFor(viewerId, replyTo)).comment;
+      if (replied.postId !== found.post.id) throw notFound('Comentário não encontrado');
+    }
+    const record: FeedCommentRecord = { id: this.deps.ids.next(), postId: found.post.id, authorId: viewerId, body, createdAt: this.deps.clock.now(), gifId: gif?.id ?? null, gifUrl: gif?.url ?? null, parentId: replied ? (replied.parentId ?? replied.id) : null };
     await this.deps.feed.addComment(record);
     const me = await this.deps.users.findProfileById(viewerId);
     const name = me?.username ?? 'Alguém';
     const url = `${ctx.url}?post=${found.post.id}`;
     const mentioned = await this.notifyMentions(viewerId, name, ctx, body, url, `feed-comment-mention:${record.id}`, 'num comentário');
+    if (replied && replied.authorId !== viewerId && !mentioned.has(replied.authorId)) {
+      await this.deps.notifier.notify({ userId: replied.authorId, type: 'FEED_COMMENT', title: `${name} respondeu seu comentário em ${ctx.title}`, body: snippet(body, 'Toque para ver'), url, dedupeKey: `feed-comment-reply:${record.id}` });
+      mentioned.add(replied.authorId);
+    }
     if (found.post.authorId !== viewerId && !mentioned.has(found.post.authorId)) {
       await this.deps.notifier.notify({ userId: found.post.authorId, type: 'FEED_COMMENT', title: `${name} comentou sua publicação em ${ctx.title}`, body: snippet(body, 'Toque para ver'), url, dedupeKey: `feed-comment:${record.id}` });
     }
@@ -582,6 +594,7 @@ export class FeedService {
           canReport: !mine,
           reactions: FeedService.reactions(statsById.get(r.id)),
           mentions: mentions.get(r.body) ?? [],
+          parentId: r.parentId ?? null,
         },
       ];
     });

@@ -27,13 +27,13 @@ export function GroupPolls({ items }: { items: PollSummary[] }) {
       <ul className="dpsum">
         {items.map((p) => {
           if (p.event) {
-            const starts = new Date(p.event.startsAt);
+            const starts = p.event.startsAt ? new Date(p.event.startsAt) : null;
             return (
               <li key={p.id}>
                 <Link to={`/eventos/${encodeURIComponent(p.event.id)}`} className="dpsum__item">
                   <strong>{p.event.title}</strong>
-                  <span>{starts.toLocaleString(intlLocale(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                  <span className="muted">{t('Evento marcado pela votação')}</span>
+                  <span>{starts ? starts.toLocaleString(intlLocale(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : t('Data em votação')}</span>
+                  <span className="muted">{starts ? t('Evento marcado pela votação') : t('A votação decide a data deste evento')}</span>
                 </Link>
               </li>
             );

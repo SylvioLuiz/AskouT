@@ -201,7 +201,7 @@ export class PostsController {
   @Post('posts/:id/comments')
   @HttpCode(200)
   addComment(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
-    return this.core.posts.addComment(actor.userId, id, asBody(body).body, asBody(body).gif);
+    return this.core.posts.addComment(actor.userId, id, asBody(body).body, asBody(body).gif, asBody(body).replyTo);
   }
 
   @Post('posts/:id/comments/:commentId/like')
