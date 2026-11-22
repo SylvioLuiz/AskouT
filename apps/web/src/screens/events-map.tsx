@@ -10,6 +10,7 @@ import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { distanceMeters, formatDistance } from '../lib/flash.ts';
+import { eventsByPlace } from '../lib/map-pins.ts';
 import { liveEvents, timeRange } from '../lib/live-events.ts';
 import { Rating } from '../components/suggestions.tsx';
 import { toApiError } from '../lib/errors.ts';
@@ -273,12 +274,28 @@ export function EventsMapScreen() {
   }, [noLiveEvents]);
   const places = useMemo(() => placesResult.data?.places ?? [], [placesResult.data]);
 
+  // Próximos eventos da área (30 dias): contam no pin de cada local; os que estão num lugar fora da lista de locais
+  // (não está no Google) ganham pin próprio, de outra cor.
+  const upcomingResult = useAsync<ExploreEvent[] | null>(async () => {
+    const center = area ?? position;
+    if (waiting || !center) return null;
+    const at = new Date();
+    const r = await api.explore({ lat: center.lat, lng: center.lng, radiusKm: area ? area.radiusKm : PLACES_RADIUS_KM, from: at.toISOString(), to: new Date(at.getTime() + 30 * 86_400_000).toISOString() });
+    return r.events;
+  }, [waiting, position?.lat, position?.lng, area]);
+  const upcoming = useMemo(() => upcomingResult.data ?? [], [upcomingResult.data]);
+  const { countByPlace, loose } = useMemo(() => eventsByPlace(places, upcoming), [places, upcoming]);
+
   const pins = useMemo(
     () => [
-      ...places.map((p) => ({ id: `p:${p.key}`, lat: p.lat, lng: p.lng, kind: 'place' as const, label: t('Ver {name}', { name: p.name }) })),
+      ...places.map((p) => {
+        const count = countByPlace.get(p.key) ?? 0;
+        return { id: `p:${p.key}`, lat: p.lat, lng: p.lng, kind: 'place' as const, count, label: count > 0 ? t('Ver {name}, {count} eventos', { name: p.name, count }) : t('Ver {name}', { name: p.name }) };
+      }),
       ...events.map((e) => ({ id: `e:${e.id}`, lat: e.venue.lat, lng: e.venue.lng, kind: 'event' as const, label: t('Ver evento {title}', { title: e.title }) })),
+      ...loose.map((l) => ({ id: `l:${l.eventId}`, lat: l.lat, lng: l.lng, kind: 'loose' as const, count: l.count, label: t('{count} eventos em {name}', { count: l.count, name: l.name }) })),
     ],
-    [places, events],
+    [places, events, countByPlace, loose],
   );
 
   const ids = useMemo(() => (mode === 'places' ? places.map((p) => `p:${p.key}`) : events.map((e) => `e:${e.id}`)), [mode, places, events]);
@@ -287,6 +304,12 @@ export function EventsMapScreen() {
 
   // Pin tocado → troca para a lista do tipo dele e leva o carrossel até o cartão.
   function pick(id: string) {
+    // Lugar fora da lista de locais: abre a página do local (se é um local do AskouT) ou o evento.
+    if (id.startsWith('l:')) {
+      const spot = loose.find((l) => `l:${l.eventId}` === id);
+      if (spot) navigate(spot.venueId && spot.count > 1 ? `/bares/${encodeURIComponent(spot.venueId)}` : `/eventos/${encodeURIComponent(spot.eventId)}`);
+      return;
+    }
     setAtMe(false);
     const nextMode: Mode = id.startsWith('p:') ? 'places' : 'events';
     setMode(nextMode);
