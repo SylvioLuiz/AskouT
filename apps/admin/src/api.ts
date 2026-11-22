@@ -137,6 +137,8 @@ export const api = {
   setUserBirthDate: (id: string, birthDate: string, note: string) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/birth-date`, { birthDate, note }),
   userDetail: (id: string) => request<{ id: string; username: string; displayName: string; bio: string | null }>('GET', `/admin/users/${encodeURIComponent(id)}`),
   editUser: (id: string, body: { displayName?: string; username?: string; bio?: string | null; note: string }) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/profile`, body),
+  usernameAvailableFor: (id: string, username: string) =>
+    request<{ username: string; available: boolean; problem?: string }>('GET', `/admin/users/${encodeURIComponent(id)}/username-available${query({ username })}`),
   userActivity: (id: string, p: { kind: string; cursor: string | null }) =>
     request<{ items: UserActivityItem[]; nextCursor: string | null }>('GET', `/admin/users/${encodeURIComponent(id)}/activity${query({ kind: p.kind || undefined, cursor: p.cursor ?? undefined })}`),
   setUserStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED', note: string) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/status`, { status, note }),

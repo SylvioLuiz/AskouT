@@ -326,8 +326,21 @@ export class AdminService {
     if (changes.length === 0) throw conflict('Nada mudou');
     if (next.username !== current.username) await this.deps.users.updateUsername(current.userId, next.username);
     await this.deps.users.updateProfile(next);
-    await this.log(actor.userId, 'USER_PROFILE_EDITED', 'USER', target.id, `${reason ?? ''} (${changes.join('; ')})`.slice(0, 400));
+    await this.log(actor.userId, 'USER_PROFILE_EDITED', 'USER', target.id, (reason ? `${reason} (${changes.join('; ')})` : changes.join('; ')).slice(0, 400));
     return { id: target.id, username: next.username, displayName: next.displayName, bio: next.bio };
+  }
+
+  /** O @ está livre para esta pessoa (o dela mesma conta como livre)? Para o formulário avisar antes de salvar. */
+  async usernameAvailableFor(actor: Actor, userId: unknown, raw: unknown): Promise<{ username: string; available: boolean; problem?: string }> {
+    this.assertAdmin(actor);
+    const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
+    if (!target) throw notFound('Usuário não encontrado');
+    const username = normalizeUsername(typeof raw === 'string' ? raw : '');
+    const problem = usernameProblem(username);
+    if (problem) return { username, available: false, problem };
+    const taken = await this.deps.users.findProfileByUsername(username);
+    if (taken && taken.userId !== target.id) return { username, available: false, problem: 'Esse @usuário já está em uso' };
+    return { username, available: true };
   }
 
   /** O registro de atividade de uma pessoa (curtidas, comentários, posts, eventos, quem seguiu), como ela vê no app. */

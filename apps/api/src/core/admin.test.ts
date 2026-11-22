@@ -402,6 +402,10 @@ test('gestão edita nome, @usuário e biografia de uma pessoa (com motivo na aud
   await rejectsWith(w.core.admin.editUser(U(ana), bia, { displayName: 'X', note: 'x' }), 'FORBIDDEN');
   await rejectsWith(w.core.admin.editUser(A, bia, { displayName: 'Bia Nova' }), 'VALIDATION'); // sem motivo
   await rejectsWith(w.core.admin.editUser(A, bia, { username: 'ana', note: 'troca' }), 'VALIDATION'); // @ já em uso
+  assert.deepEqual(await w.core.admin.usernameAvailableFor(A, bia, 'ana'), { username: 'ana', available: false, problem: 'Esse @usuário já está em uso' });
+  assert.equal((await w.core.admin.usernameAvailableFor(A, bia, 'bia')).available, true, 'o @ dela mesma');
+  assert.equal((await w.core.admin.usernameAvailableFor(A, bia, 'Bia.Livre')).username, 'bia.livre');
+  await rejectsWith(w.core.admin.usernameAvailableFor(U(ana), bia, 'x'), 'FORBIDDEN');
   await rejectsWith(w.core.admin.editUser(A, adm, { displayName: 'Outro', note: 'x' }), 'CONFLICT'); // conta admin
 
   const before = await w.core.admin.userDetail(A, bia);
