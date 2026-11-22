@@ -106,7 +106,7 @@ export interface LinkedEvent {
 
 /** O que falta para publicar um post comum (null = tudo certo): um evento ou um rolê, e foto, vídeo ou texto. */
 export function postProblem(input: { items: number; caption: string; place: LinkedPlace | null; event: LinkedEvent | null }): string | null {
-  if (!input.place && !input.event) return t('Escolha um evento ou um rolê para publicar.');
+  if (!input.place && !input.event) return t('Escolha um evento ou um local para publicar.');
   if (input.items === 0 && input.caption.trim() === '') return t('Escreva algo ou escolha uma foto ou um vídeo.');
   return null;
 }

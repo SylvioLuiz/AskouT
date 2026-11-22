@@ -57,7 +57,7 @@ function StarPicker({ venue, onChanged }: { venue: VenueProfile; onChanged: () =
   async function pick(stars: number) {
     if (busy) return;
     if (session.get() === undefined) {
-      askLogin(t('Entre para avaliar o rolê.'));
+      askLogin(t('Entre para avaliar o local.'));
       return;
     }
     setBusy(true);
@@ -120,7 +120,7 @@ export function HoursInfo({ venue, now }: { venue: VenueProfile; now: Date }) {
   const lines = hoursLines(venue.hours, now);
   const status = openStatus(venue.hours, now);
   if (lines.length === 0) {
-    return <InfoRow icon={<ClockIcon />}><span className="muted">{venue.canManage ? t('Informe os horários em Administrar > Painel > Editar perfil.') : t('O rolê ainda não informou os horários.')}</span></InfoRow>;
+    return <InfoRow icon={<ClockIcon />}><span className="muted">{venue.canManage ? t('Informe os horários em Administrar > Painel > Editar perfil.') : t('O local ainda não informou os horários.')}</span></InfoRow>;
   }
   const today = lines.find((l) => l.today);
   return (
@@ -187,7 +187,7 @@ export function VenueHero({ venue, now, onShare, preview = false }: { venue: Ven
           <button type="button" className="vhero__back" onClick={goBack} aria-label={t('Voltar')}>
             <ChevronLeftIcon />
           </button>
-          <button type="button" className="vhero__share" onClick={onShare} aria-label={t('Compartilhar página do rolê')}>
+          <button type="button" className="vhero__share" onClick={onShare} aria-label={t('Compartilhar página do local')}>
             <ShareIcon />
           </button>
         </>
@@ -337,14 +337,14 @@ export function ProfileEditSheet({ venue, onClose, onSaved }: { venue: VenueProf
   }
 
   return (
-    <Sheet title={t('Editar perfil do rolê')} onClose={onClose}>
+    <Sheet title={t('Editar perfil do local')} onClose={onClose}>
       <div className="claim">
-        <CoverPicker imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} hint={t('Foto de fundo da página, de preferência a fachada do rolê.')} />
+        <CoverPicker imageUrl={draft.imageUrl} imageData={draft.imageData} onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))} hint={t('Foto de fundo da página, de preferência a fachada do local.')} />
         <CoverPicker logo imageUrl={draft.logoUrl} imageData={draft.logoData} onChange={(patch) => setDraft((d) => ({ ...d, ...(patch.imageUrl !== undefined ? { logoUrl: patch.imageUrl } : {}), ...(patch.imageData !== undefined ? { logoData: patch.imageData } : {}) }))} hint={t('Aparece em círculo sobre a capa.')} />
-        <Field label={t('Nome do rolê')} value={draft.name} onChange={(v) => set('name', v)} maxLength={VENUE_NAME_MAX} />
-        <Field label={t('Tipo de rolê (opcional)')} value={draft.category} onChange={(v) => set('category', v)} maxLength={VENUE_CATEGORY_MAX} placeholder={t('Bar, balada, casa de shows…')} />
+        <Field label={t('Nome do local')} value={draft.name} onChange={(v) => set('name', v)} maxLength={VENUE_NAME_MAX} />
+        <Field label={t('Tipo de local (opcional)')} value={draft.category} onChange={(v) => set('category', v)} maxLength={VENUE_CATEGORY_MAX} placeholder={t('Bar, balada, casa de shows…')} />
         <Field label={t('Endereço (opcional)')} value={draft.address} onChange={(v) => set('address', v)} maxLength={VENUE_ADDRESS_MAX} />
-        <Field label={t('Sobre o rolê (opcional)')} value={draft.description} onChange={(v) => set('description', v)} multiline maxLength={VENUE_DESCRIPTION_MAX} hint={t('O que as pessoas encontram aí: música, comida, ambiente.')} />
+        <Field label={t('Sobre o local (opcional)')} value={draft.description} onChange={(v) => set('description', v)} multiline maxLength={VENUE_DESCRIPTION_MAX} hint={t('O que as pessoas encontram aí: música, comida, ambiente.')} />
         <HoursEditor draft={draft} onChange={(days) => set('days', days)} />
         {message ? <Notice tone="error">{message}</Notice> : null}
         <Button full loading={busy} onClick={save}>
@@ -397,7 +397,7 @@ export function VenuePostSheet({ venueId, onClose, onSaved }: { venueId: string;
   }
 
   return (
-    <Sheet title={t('Novo post do rolê')} onClose={onClose}>
+    <Sheet title={t('Novo post do local')} onClose={onClose}>
       <div className="claim">
         {photos.length > 0 ? (
           <ul className="vpost__thumbs" aria-label={t('Fotos do post')}>
@@ -439,7 +439,7 @@ export function OwnerEvents({ venueId, now, reloadKey, onNew, onEdit, onChanged 
       {panel.error && !panel.data ? <ErrorState message={panel.error.message} onRetry={panel.reload} /> : null}
       {panel.data && panel.data.events.length === 0 ? <EmptyState title={t('Nenhum evento ainda')}>{t('Os eventos que você criar aparecem aqui e no Explorar para quem está perto.')}</EmptyState> : null}
       {panel.data && panel.data.events.length > 0 ? (
-        <ul className="velist" aria-label={t('Eventos do rolê')}>
+        <ul className="velist" aria-label={t('Eventos do local')}>
           {panel.data.events.map((e) => (
             <VenueEventRow
               key={e.id}
@@ -464,7 +464,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const backTo = visitor ? '/' : '/explorar';
   const page = useAsync(() => api.venueProfile(venueId), [venueId]);
   const v = page.data;
-  useTitle(v?.name ?? t('Rolê'));
+  useTitle(v?.name ?? t('Local'));
   // Visitante: só Eventos e Sobre (publicações, ranking e fotos têm gente).
   const [tab, setTab] = useState<Tab>(visitor ? 'events' : 'feed');
   const [feedSettings, setFeedSettings] = useState<FeedSettings | undefined>();
@@ -484,7 +484,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   async function toggleBell() {
     if (!v || bellBusy) return;
     if (visitor) {
-      askLogin(t('Entre para receber um aviso a cada evento novo deste rolê.'));
+      askLogin(t('Entre para receber um aviso a cada evento novo deste local.'));
       return;
     }
     setBellBusy(true);
@@ -503,7 +503,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   async function toggleFollow() {
     if (!v || followBusy) return;
     if (visitor) {
-      askLogin(t('Entre para seguir o rolê e ver os eventos dele no seu feed.'));
+      askLogin(t('Entre para seguir o local e ver os eventos dele no seu feed.'));
       return;
     }
     setFollowBusy(true);
@@ -523,7 +523,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   if (page.loading && !v) {
     return (
       <>
-        <PageHead title={t('Rolê')} back={backTo} />
+        <PageHead title={t('Local')} back={backTo} />
         <Loading />
       </>
     );
@@ -531,7 +531,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   if (!v) {
     return (
       <>
-        <PageHead title={t('Rolê')} back={backTo} />
+        <PageHead title={t('Local')} back={backTo} />
         <ErrorState message={page.error?.message ?? t('Não foi possível abrir esta página.')} onRetry={page.reload} />
       </>
     );
@@ -679,7 +679,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
       {tab === 'events' ? (
         <>
           {v.upcomingEvents.length === 0 ? (
-            <EmptyState title={t('Nenhum evento marcado')}>{t('Quando o rolê divulgar eventos, eles aparecem aqui.')}</EmptyState>
+            <EmptyState title={t('Nenhum evento marcado')}>{t('Quando o local divulgar eventos, eles aparecem aqui.')}</EmptyState>
           ) : (
             <ul className="vagenda" aria-label={t('Próximos eventos')}>
               {v.upcomingEvents.map((e) => (
@@ -730,7 +730,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
         )
       ) : null}
 
-      {tab === 'posts' && !visitor ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={v.canManage ? t('Abra Administrar e toque em Novo post para publicar fotos do rolê.') : t('Os posts do rolê aparecem aqui e no seu feed se você seguir.')} reloadKey={String(postsKey)} /> : null}
+      {tab === 'posts' && !visitor ? <PostList load={(offset) => api.venuePosts(v.id, { limit: 6, offset })} emptyTitle={t('Ainda não há posts')} emptyHint={v.canManage ? t('Abra Administrar e toque em Novo post para publicar fotos do local.') : t('Os posts do local aparecem aqui e no seu feed se você seguir.')} reloadKey={String(postsKey)} /> : null}
 
       </div>
       </div>

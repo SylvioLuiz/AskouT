@@ -7,6 +7,7 @@ import { CommentGifView, CommentTools, ReplyBanner, ReplyButton } from './commen
 import { removeComment, replyPrefill, threadComments } from '../lib/comment-threads.ts';
 import { EventKindPicker } from './event-kind-picker.tsx';
 import { EventExtrasFields } from './event-extras.tsx';
+import { EditEventSheet } from './event-edit.tsx';
 import { extrasDraftFrom, extrasFromDraft } from '../lib/event-extras.ts';
 import type { EventExtrasDraft } from '../lib/event-extras.ts';
 import { ArrowUpIcon, CropIcon, HeartIcon, TrashIcon } from './icons.tsx';
@@ -74,7 +75,7 @@ export function PostMenuSheet({ post, onClose, onEdit, onAdjust, onReport, onArc
         <Confirm danger question={t('Excluir este post? As fotos, curtidas e comentários são removidos.')} confirmLabel={t('Excluir')} busy={busy} onCancel={() => setConfirming(false)} onConfirm={onDelete} />
       ) : post.mine ? (
         <ul className="sharelist">
-          {item('Editar', t('Legenda, rolê e dados do evento.'), onEdit)}
+          {item('Editar', t('Legenda, local e dados do evento.'), onEdit)}
           {item('Ajustar', t('Recortar as fotos que você enviou.'), onAdjust, { icon: true })}
           {item(post.archived ? t('Desarquivar') : 'Arquivar', post.archived ? t('O post volta para o seu perfil e o feed.') : t('Só você vê. Sai do feed e do seu perfil.'), onArchiveToggle)}
           {item('Excluir', t('Apaga o post para sempre.'), () => setConfirming(true), { danger: true })}
@@ -183,7 +184,7 @@ function CommentRow({ comment, reply, onDelete, onLike, onReport, onReply, busy 
         <p>
           {comment.venue ? (
             <Link to={`/bares/${encodeURIComponent(comment.venue.id)}`} className="comment__name">
-              {comment.venue.name} <span className="tag tag--event">{t('Rolê')}</span>
+              {comment.venue.name} <span className="tag tag--event">{t('Local')}</span>
             </Link>
           ) : (
             <Link to={`/u/${encodeURIComponent(comment.author.username)}`} className="comment__name">
@@ -400,7 +401,13 @@ export function CommentsSheet({ postId, onClose, onCountChange }: { postId: stri
 // ---------- Editar ----------
 
 /** `eventOnly`: aberto da página do evento; continua sendo evento (sem a troca para post comum). */
-export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { post: PostView; onClose: () => void; onSaved: (post: PostView) => void; eventOnly?: boolean }) {
+export function EditPostSheet(props: { post: PostView; onClose: () => void; onSaved: (post: PostView) => void; eventOnly?: boolean }) {
+  // Evento edita na mesma tela da criação (Quando / Onde / Tipo / Quem vê); o local é opcional.
+  if (props.post.event) return <EditEventSheet post={props.post} onClose={props.onClose} onSaved={props.onSaved} />;
+  return <EditPlainPostSheet {...props} />;
+}
+
+function EditPlainPostSheet({ post, onClose, onSaved, eventOnly = false }: { post: PostView; onClose: () => void; onSaved: (post: PostView) => void; eventOnly?: boolean }) {
   const [caption, setCaption] = useState(post.caption ?? '');
   const [placeName, setPlaceName] = useState(post.placeName ?? '');
   const [placeAddress, setPlaceAddress] = useState(post.placeAddress ?? '');
@@ -475,7 +482,7 @@ export function EditPostSheet({ post, onClose, onSaved, eventOnly = false }: { p
         </>
       ) : null}
       <Field label={t('Descrição')} value={caption} onChange={setCaption} multiline maxLength={POST_CAPTION_MAX + 20} hint={`${Array.from(caption).length}/${POST_CAPTION_MAX}`} />
-      <Field label={kind === 'EVENT' ? t('Rolê (obrigatório no evento)') : t('Rolê (opcional)')} value={placeName} onChange={setPlaceName} maxLength={120} />
+      <Field label={t('Local (opcional)')} value={placeName} onChange={setPlaceName} maxLength={120} />
       {placeName.trim() ? <Field label={t('Endereço (opcional)')} value={placeAddress} onChange={setPlaceAddress} maxLength={200} /> : null}
       <Button full loading={busy} disabled={Array.from(caption).length > POST_CAPTION_MAX} onClick={() => save()}>
         {t('Salvar')}
@@ -539,7 +546,7 @@ export function AdjustSheet({ post, onClose, onSaved }: { post: PostView; onClos
   return (
     <Sheet title={t('Ajustar foto')} onClose={onClose}>
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-      {uploads.length === 0 ? <p className="muted">{t('Só fotos que você enviou podem ser ajustadas. A foto de um rolê não pode ser recortada.')}</p> : null}
+      {uploads.length === 0 ? <p className="muted">{t('Só fotos que você enviou podem ser ajustadas. A foto de um local não pode ser recortada.')}</p> : null}
       {uploads.length > 1 ? (
         <>
           <p className="muted">{t('Escolha a foto para recortar.')}</p>

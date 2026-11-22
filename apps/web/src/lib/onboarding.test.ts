@@ -33,8 +33,8 @@ describe('onboarding', () => {
     assert.equal(shouldShowOnboarding(s, { id: 'a', onboarded: false }), false, 'já visto neste navegador');
   });
   it('progresso do follow', () => {
-    assert.equal(followProgressLabel(0), 'Siga mais 3 rolês (0 de 3)');
-    assert.equal(followProgressLabel(2), 'Siga mais 1 rolê (2 de 3)');
+    assert.equal(followProgressLabel(0), 'Siga mais 3 locais (0 de 3)');
+    assert.equal(followProgressLabel(2), 'Siga mais 1 local (2 de 3)');
     assert.match(followProgressLabel(3), /Pronto/);
   });
   it('sem locais perto, usa os locais dos próximos eventos (um por local, sem evento de pessoa sem rolê)', () => {

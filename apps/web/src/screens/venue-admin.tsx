@@ -57,7 +57,7 @@ function PublicPreview({ venue, now }: { venue: VenueProfile; now: Date }) {
         </div>
         <h2 className="section__title">{t('Próximos eventos')}</h2>
         {venue.upcomingEvents.length === 0 ? (
-          <p className="muted">{t('Nenhum evento marcado. Quando o rolê divulgar eventos, eles aparecem aqui.')}</p>
+          <p className="muted">{t('Nenhum evento marcado. Quando o local divulgar eventos, eles aparecem aqui.')}</p>
         ) : (
           <ul className="vagenda" aria-label={t('Próximos eventos')}>
             {venue.upcomingEvents.map((e) => (

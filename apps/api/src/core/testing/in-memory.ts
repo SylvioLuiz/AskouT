@@ -1496,6 +1496,10 @@ export class InMemoryConversationRepository implements ConversationRepository {
   async hasPostEventAccess(userId: string, postId: string): Promise<boolean> {
     return this.messages.some((m) => m.postEventId === postId && this.participants.get(m.conversationId)?.has(userId));
   }
+
+  async postEventConversationIds(postId: string, senderId: string): Promise<string[]> {
+    return [...new Set(this.messages.filter((m) => m.postEventId === postId && m.senderId === senderId && !m.deletedAt).map((m) => m.conversationId))];
+  }
 }
 
 export class InMemoryMeetupRepository implements MeetupRepository {
@@ -3285,6 +3289,12 @@ export class InMemorySchedulingRepository implements SchedulingRepository {
       if (status === null) m.delete(`${userId}|${date}`);
       else m.set(`${userId}|${date}`, { userId, date, status });
     }
+  }
+
+  async addParticipant(pollId: string, userId: string, at: Date): Promise<void> {
+    void at;
+    const m = this.participants.get(pollId);
+    if (m && !m.has(userId)) m.set(userId, null);
   }
 
   async setFinished(pollId: string, userId: string, at: Date | null): Promise<void> {

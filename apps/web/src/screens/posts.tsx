@@ -5,7 +5,6 @@ import { CalendarIcon, CarouselIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon
 import { EventAudienceSheet, EventKindSheet, EventRow, EventWhenSheet } from '../components/event-compose.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
-import { PollChatSheet } from '../components/poll-chat-sheet.tsx';
 import { CropEditor } from '../components/crop.tsx';
 import { EventDates } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
@@ -31,6 +30,7 @@ import type { DraftImage, LinkedEvent, LinkedPlace } from '../lib/post-draft.ts'
 import type { EventKind, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
+import { LinkPlaceSheet } from '../components/link-place-sheet.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 let counter = 0;
@@ -50,65 +50,7 @@ function usePlaceSearch(q: string, withPhoto: boolean) {
 }
 
 function LocationNotice({ status }: { status: string }) {
-  return status === 'denied' || status === 'unavailable' ? <Notice tone="error">{t('Para achar rolês perto de você, permita a localização no navegador.')}</Notice> : null;
-}
-
-/**
- * Busca para vincular um rolê: locais do AskouT e qualquer lugar do Google pelo nome ou endereço, mesmo longe.
- * A posição (se liberada) só põe o que está perto primeiro; sem ela a busca funciona do mesmo jeito.
- */
-function useLinkPlaceSearch(q: string) {
-  const term = useDebounced(q.trim(), 350);
-  const where = useCurrentPosition();
-  const position = where.status === 'ok' ? where.position : undefined;
-  const result = useAsync(
-    () => (term.length >= 2 ? api.searchPlaces({ q: term, lat: position?.lat, lng: position?.lng }) : Promise.resolve(null)),
-    [term, position?.lat, position?.lng],
-  );
-  return { term, result, places: result.data?.places ?? [] };
-}
-
-/** Escolher o lugar a vincular ao post (qualquer lugar, com ou sem foto, do AskouT ou do Google). */
-function LinkPlaceSheet({ onPick, onClose }: { onPick: (place: LinkedPlace) => void; onClose: () => void }) {
-  const [q, setQ] = useState('');
-  const [picking, setPicking] = useState<string | undefined>();
-  const { term, result, places } = useLinkPlaceSearch(q);
-
-  async function pick(p: ExplorePlace) {
-    const base = { name: p.name, address: p.address, photo: p.photoPath ? { photoPath: p.photoPath, author: p.photoAuthor } : null };
-    if (p.venue) return onPick({ ...base, venueId: p.venue.id });
-    // Lugar que ainda não está no AskouT: cria o local a partir do Google e já vincula.
-    setPicking(p.key);
-    const venueId = await api
-      .openExternalVenue({ key: p.key, lat: p.lat, lng: p.lng })
-      .then((r) => r.venueId)
-      .catch(() => null);
-    setPicking(undefined);
-    onPick({ ...base, venueId });
-  }
-
-  return (
-    <Sheet title={t('Vincular um rolê')} onClose={onClose}>
-      <Field label={t('Buscar rolê')} type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint={t('Nome ou endereço do lugar')} />
-      {term.length < 2 ? <p className="muted">{t('Digite o nome ou o endereço do rolê.')}</p> : null}
-      {result.loading && !result.data ? <Loading /> : null}
-      {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
-      {result.data && places.length === 0 ? <p className="muted">{result.data.placesAvailable ? t('Nenhum rolê encontrado.') : t('A busca de rolês ainda não está ligada neste ambiente.')}</p> : null}
-      <ul className="placepick">
-        {places.map((p) => (
-          <li key={p.key}>
-            <button type="button" className="placepick__item" disabled={picking !== undefined} aria-busy={picking === p.key || undefined} onClick={() => void pick(p)}>
-              <span>
-                <strong>{p.name}</strong>
-                {p.address ? <span className="muted"> {p.address}</span> : null}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-      {places.some((p) => p.source === 'GOOGLE') ? <p className="muted">{t('Resultados do Google.')}</p> : null}
-    </Sheet>
-  );
+  return status === 'denied' || status === 'unavailable' ? <Notice tone="error">{t('Para achar locais perto de você, permita a localização no navegador.')}</Notice> : null;
 }
 
 /** Eventos para vincular ao post: os que você confirmou presença ou criou, inclusive os que acabaram nos últimos 7 dias. */
@@ -120,7 +62,7 @@ function LinkEventSheet({ onPick, onClose }: { onPick: (event: LinkedEvent) => v
       <p className="muted">{t('Eventos em que você confirmou presença ou que criou. Para outro evento, abra a página dele e toque em Publicar sobre o evento.')}</p>
       {going.loading && !going.data ? <Loading /> : null}
       {going.error ? <ErrorState message={going.error.message} onRetry={going.reload} /> : null}
-      {going.data && items.length === 0 ? <p className="muted">{t('Nenhum evento por aqui ainda. Confirme presença em um evento ou vincule um rolê.')}</p> : null}
+      {going.data && items.length === 0 ? <p className="muted">{t('Nenhum evento por aqui ainda. Confirme presença em um evento ou vincule um local.')}</p> : null}
       <ul className="placepick">
         {items.map((e) => (
           <li key={e.id}>
@@ -143,14 +85,14 @@ function PlacePhotoGrid({ picked, onPick }: { picked: string | undefined; onPick
   const { term, where, result, places } = usePlaceSearch(q, true);
   return (
     <>
-      <Field label={t('Buscar rolê')} type="search" value={q} onChange={setQ} autoComplete="off" hint={t('Ex.: bar, balada, show')} />
+      <Field label={t('Buscar local')} type="search" value={q} onChange={setQ} autoComplete="off" hint={t('Ex.: bar, balada, show')} />
       <LocationNotice status={where.status} />
-      {term.length < 2 ? <p className="muted">{t('Digite o nome ou o tipo do rolê para ver as fotos.')}</p> : null}
+      {term.length < 2 ? <p className="muted">{t('Digite o nome ou o tipo do local para ver as fotos.')}</p> : null}
       {result.loading && !result.data ? <Loading /> : null}
       {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
-      {result.data && !result.data.placesAvailable ? <Notice>{t('A busca de rolês com foto ainda não está ligada neste ambiente.')}</Notice> : null}
-      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">{t('Nenhum rolê com foto para essa busca.')}</p> : null}
-      <ul className="placegrid" aria-label={t('Fotos de rolês')}>
+      {result.data && !result.data.placesAvailable ? <Notice>{t('A busca de locais com foto ainda não está ligada neste ambiente.')}</Notice> : null}
+      {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">{t('Nenhum local com foto para essa busca.')}</p> : null}
+      <ul className="placegrid" aria-label={t('Fotos de locais')}>
         {places.map((p) => (
           <li key={p.key}>
             <button type="button" className="placegrid__item" aria-pressed={picked === p.name} onClick={() => onPick(p)}>
@@ -160,7 +102,7 @@ function PlacePhotoGrid({ picked, onPick }: { picked: string | undefined; onPick
           </li>
         ))}
       </ul>
-      <p className="muted">{t('Fotos de rolês são do Google, com o crédito de quem tirou.')}</p>
+      <p className="muted">{t('Fotos de locais são do Google, com o crédito de quem tirou.')}</p>
     </>
   );
 }
@@ -241,7 +183,6 @@ export function CreatePostScreen() {
   const pollConversation = fromPoll ? prefill.get('conversa') : null;
   // Evento criado: em vez de sair direto, mostra o passo "Enviar para conversas".
   const [created, setCreated] = useState<{ id: string; title: string; private: boolean; cover: string | undefined; dateByPoll: boolean } | undefined>();
-  const [pickingPollChat, setPickingPollChat] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [sharingOutside, setSharingOutside] = useState(false);
   const [sharedOnce, setSharedOnce] = useState(false);
@@ -307,7 +248,7 @@ export function CreatePostScreen() {
   function addPlaceImage(image: Extract<DraftImage, { kind: 'PLACE' }>): boolean {
     const next = addImages(items, [image]);
     if (!next.includes(image)) {
-      setMessage({ tone: 'error', text: t('Já são {POST_IMAGES_MAX} fotos. Remova uma para usar a foto do rolê.', { POST_IMAGES_MAX }) });
+      setMessage({ tone: 'error', text: t('Já são {POST_IMAGES_MAX} fotos. Remova uma para usar a foto do local.', { POST_IMAGES_MAX }) });
       return false;
     }
     setItems(kind === 'EVENT' ? [image, ...next.filter((i) => i !== image)] : next);
@@ -381,8 +322,8 @@ export function CreatePostScreen() {
         const byPoll = created.event.startsAt === null;
         setCreated({ id: created.id, title: created.event.title, private: eventPrivate, cover: items[0]?.preview, dateByPoll: byPoll });
         // Data por votação: o próximo passo é escolher a conversa da votação; senão, enviar para conversas.
-        if (byPoll) setPickingPollChat(true);
-        else setSharing(true);
+        // Data por votação: primeiro convida (a votação abre com todos os convidados); senão, enviar para conversas.
+        setSharing(true);
         setBusy(false);
         return;
       }
@@ -444,6 +385,7 @@ export function CreatePostScreen() {
 
   if (created) {
     const eventPath = `/eventos/${encodeURIComponent(created.id)}`;
+    const pollPath = `/planejar/evento/${encodeURIComponent(created.id)}?${new URLSearchParams({ titulo: created.title }).toString()}`;
     const finish = () => navigate(created.private ? eventPath : '/perfil?aba=eventos');
     return (
       <div className="compose compose--created">
@@ -469,15 +411,21 @@ export function CreatePostScreen() {
           </p>
           {created.dateByPoll ? (
             <>
-              <p className="muted">{t('A data vai ser decidida numa votação. Escolha a conversa ou o grupo que vai votar.')}</p>
-              <Button full onClick={() => setPickingPollChat(true)}>
-                <CalendarIcon /> {t('Abrir a votação da data')}
+              <p className="muted">{t('A data vai ser decidida numa votação com todos os convidados. Quem você convidar depois entra na votação também.')}</p>
+              <Button full onClick={() => setSharing(true)}>
+                <UsersIcon /> {sharedOnce ? t('Convidar mais pessoas') : t('Convidar pessoas')}
               </Button>
+              {sharedOnce ? (
+                <Button full variant="secondary" onClick={() => navigate(pollPath)}>
+                  <CalendarIcon /> {t('Abrir a votação da data')}
+                </Button>
+              ) : null}
             </>
-          ) : null}
-          <Button full variant={created.dateByPoll ? 'secondary' : 'primary'} onClick={() => setSharing(true)}>
-            <SendIcon /> {sharedOnce ? t('Enviar para mais conversas') : t('Enviar para conversas e grupos')}
-          </Button>
+          ) : (
+            <Button full onClick={() => setSharing(true)}>
+              <SendIcon /> {sharedOnce ? t('Enviar para mais conversas') : t('Enviar para conversas e grupos')}
+            </Button>
+          )}
           {created.private ? null : (
             // Fora do app (WhatsApp, Telegram, link...) tem botão próprio: some da folha quando se escolhe um amigo e ela fecha ao enviar.
             <Button full variant="secondary" onClick={() => setSharingOutside(true)}>
@@ -493,20 +441,18 @@ export function CreatePostScreen() {
             eventId={created.id}
             source="USER"
             title={created.title}
-            sheetTitle={t('Enviar o evento')}
+            sheetTitle={created.dateByPoll ? t('Convidar pessoas') : t('Enviar o evento')}
             posted={false}
             onPostedChange={() => undefined}
             profile={created.private ? 'private' : 'owner'}
             outside={!created.private}
             {...(pollConversation && !sharedOnce ? { initialConversations: [pollConversation] } : {})}
-            onShared={() => setSharedOnce(true)}
+            onShared={() => {
+              setSharedOnce(true);
+              // Convidou: já segue para abrir a votação (o grupo dela junta todos os convidados).
+              if (created.dateByPoll) navigate(pollPath);
+            }}
             onClose={() => setSharing(false)}
-          />
-        ) : null}
-        {pickingPollChat ? (
-          <PollChatSheet
-            onPick={(conversationId) => navigate(`/planejar/nova/${encodeURIComponent(conversationId)}?${new URLSearchParams({ evento: created.id, titulo: created.title }).toString()}`)}
-            onClose={() => setPickingPollChat(false)}
           />
         ) : null}
         {sharingOutside ? (
@@ -573,7 +519,7 @@ export function CreatePostScreen() {
                 <PhotoIcon /> {t('Galeria')}
               </Button>
               <Button small variant="secondary" onClick={() => setSheet('placePhoto')}>
-                <LocationIcon /> {t('Foto de um rolê')}
+                <LocationIcon /> {t('Foto de um local')}
               </Button>
             </div>
           </div>
@@ -624,7 +570,7 @@ export function CreatePostScreen() {
             disabled={busy}
             trailing={
               linked ? (
-                <button type="button" className="evrow__clear" onClick={() => setLinked(null)} aria-label={t('Remover o rolê vinculado')}>
+                <button type="button" className="evrow__clear" onClick={() => setLinked(null)} aria-label={t('Remover o local vinculado')}>
                   <XIcon />
                 </button>
               ) : null
@@ -719,7 +665,7 @@ export function CreatePostScreen() {
           />
         ) : null}
         {sheet === 'placePhoto' ? (
-          <Sheet title={t('Foto de um rolê')} onClose={() => setSheet(undefined)}>
+          <Sheet title={t('Foto de um local')} onClose={() => setSheet(undefined)}>
             <PlacePhotoGrid
               picked={placePhoto?.placeName}
               onPick={(p) => {
@@ -771,7 +717,7 @@ export function CreatePostScreen() {
             <EventKindPicker value={eventKind} onChange={setEventKind} />
             <EventDates starts={eventStart} ends={eventEnd} onStarts={setEventStart} onEnds={setEventEnd} />
             <EventExtrasFields options={extraOptions.data ?? []} value={extras} onChange={setExtras} />
-            <p className="muted">{t('O rolê é opcional: escolha abaixo se quiser.')}</p>
+            <p className="muted">{t('O local é opcional: escolha abaixo se quiser.')}</p>
             <label className="check">
               <input type="checkbox" checked={eventPrivate} onChange={(e) => setEventPrivate(e.target.checked)} />
               <span>
@@ -816,7 +762,7 @@ export function CreatePostScreen() {
               <PhotoIcon /> {items.length > 0 ? t('Adicionar mais') : t('Fotos ou vídeo')}
             </Button>
             <Button small variant="quiet" disabled={busy} onClick={() => { setSource('place'); setStep('photos'); }}>
-              <LocationIcon /> {t('Foto de um rolê')}
+              <LocationIcon /> {t('Foto de um local')}
             </Button>
             {items.length > 0 ? (
               <Button small variant="quiet" disabled={busy} onClick={() => { setSource('photos'); setStep('photos'); }}>
@@ -827,7 +773,7 @@ export function CreatePostScreen() {
             )}
           </div>
         ) : null}
-        {kind === 'POST' ? <p className="muted compose__linkhint">{place || linkedEvent ? t('Seu post fica vinculado a este evento ou rolê.') : t('Todo post precisa de um evento ou de um rolê. Escolha abaixo.')}</p> : null}
+        {kind === 'POST' ? <p className="muted compose__linkhint">{place || linkedEvent ? t('Seu post fica vinculado a este evento ou local.') : t('Todo post precisa de um evento ou de um local. Escolha abaixo.')}</p> : null}
         <ul className="optrows">
           {kind === 'POST' ? (
             <li className="optrow">
@@ -852,21 +798,21 @@ export function CreatePostScreen() {
                 <span className="optrow__icon"><LocationIcon /></span>
                 <span className="optrow__text">
                   <span className="optrow__label">{place?.name}</span>
-                  <span className="optrow__sub">{t('O rolê vem da foto do rolê que você escolheu.')}</span>
+                  <span className="optrow__sub">{t('O local vem da foto do local que você escolheu.')}</span>
                 </span>
               </div>
             ) : (
               <button type="button" className="optrow__main" onClick={() => setLinking(true)}>
                 <span className="optrow__icon"><LocationIcon /></span>
                 <span className="optrow__text">
-                  <span className="optrow__label">{place ? place.name : t('Vincular um rolê')}</span>
+                  <span className="optrow__label">{place ? place.name : t('Vincular um local')}</span>
                   {place?.address ? <span className="optrow__sub">{place.address}</span> : null}
                 </span>
                 {linked ? null : <span className="optrow__chev"><ChevronRightIcon /></span>}
               </button>
             )}
             {linked && !placeFromPhoto ? (
-              <button type="button" className="optrow__clear" onClick={() => setLinked(null)} aria-label={t('Remover o rolê vinculado')}>
+              <button type="button" className="optrow__clear" onClick={() => setLinked(null)} aria-label={t('Remover o local vinculado')}>
                 <XIcon />
               </button>
             ) : null}
@@ -960,7 +906,7 @@ export function CreatePostScreen() {
           {t('Escolher fotos')}
         </button>
         <button type="button" role="tab" aria-selected={source === 'place'} className={`segmented__tab${source === 'place' ? ' segmented__tab--on' : ''}`} onClick={() => setSource('place')}>
-          {t('Foto de um rolê')}
+          {t('Foto de um local')}
         </button>
       </div>
 
@@ -991,7 +937,7 @@ export function CreatePostScreen() {
             <span className="compose__emptyicon" aria-hidden="true">
               <LocationIcon />
             </span>
-            <p className="compose__emptyhint">{t('Busque um rolê abaixo para usar a foto dele.')}</p>
+            <p className="compose__emptyhint">{t('Busque um local abaixo para usar a foto dele.')}</p>
           </div>
         )}
         {items.length > 0 ? <span className="stage__count">{items.findIndex((i) => i.key === focused?.key) + 1}/{items.length}</span> : null}
@@ -1047,9 +993,11 @@ export function ArchivedScreen() {
 }
 
 export function PostScreen({ postId }: { postId: string }) {
-  useTitle(t('Post'));
   const search = useSearch();
   const post = useAsync(() => api.post(postId), [postId]);
+  // Post de evento: o nome do evento é o título da página (no lugar de "Post").
+  const heading = post.data?.event?.title ?? t('Post');
+  useTitle(heading);
   if (post.loading && !post.data) return <Loading />;
   if (post.error) {
     return post.error.code === 'NOT_FOUND' ? (
@@ -1070,8 +1018,8 @@ export function PostScreen({ postId }: { postId: string }) {
   if (!post.data) return null;
   return (
     <>
-      <PageHead title={t('Post')} back={`/u/${encodeURIComponent(post.data.author.username)}`} />
-      <PostCard poster post={post.data} openComments={search.get('comentarios') === '1'} onGone={(_id, why) => navigate(why === 'hidden' ? '/' : '/perfil')} />
+      <PageHead title={heading} back={`/u/${encodeURIComponent(post.data.author.username)}`} />
+      <PostCard poster eventInTitle post={post.data} openComments={search.get('comentarios') === '1'} onGone={(_id, why) => navigate(why === 'hidden' ? '/' : '/perfil')} />
     </>
   );
 }

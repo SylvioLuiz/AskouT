@@ -187,6 +187,12 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
     );
   }
 
+  async addParticipant(pollId: string, userId: string, at: Date): Promise<void> {
+    void at;
+    if (!isUuid(pollId) || !isUuid(userId)) return;
+    await this.prisma.datePollParticipant.createMany({ data: [{ pollId, userId }], skipDuplicates: true });
+  }
+
   async setFinished(pollId: string, userId: string, at: Date | null): Promise<void> {
     if (!isUuid(pollId) || !isUuid(userId)) return;
     await this.prisma.datePollParticipant.updateMany({ where: { pollId, userId }, data: { finishedAt: at } });

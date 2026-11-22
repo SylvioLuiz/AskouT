@@ -68,11 +68,11 @@ function FollowStep({ themes, onDone }: { themes: ReadonlySet<ThemeId>; onDone: 
   const ready = followed.size >= ONBOARDING_FOLLOW_GOAL;
   return (
     <>
-      <h2 id="onb-titulo" className="onb__title">{t('Siga 3 rolês para começar')}</h2>
+      <h2 id="onb-titulo" className="onb__title">{t('Siga 3 locais para começar')}</h2>
       <p className="onb__text">{t('É assim que a sua Home ganha eventos. Você pode seguir e deixar de seguir quando quiser.')}</p>
       {places.loading ? <Loading /> : null}
-      {places.error ? <p className="muted">{t('Não deu para listar rolês agora. Você pode seguir depois, em Explorar.')}</p> : null}
-      {!places.loading && !places.error && list.length === 0 ? <p className="muted">{t('Ainda não há rolês por aqui. Você pode procurar depois, em Explorar.')}</p> : null}
+      {places.error ? <p className="muted">{t('Não deu para listar locais agora. Você pode seguir depois, em Explorar.')}</p> : null}
+      {!places.loading && !places.error && list.length === 0 ? <p className="muted">{t('Ainda não há locais por aqui. Você pode procurar depois, em Explorar.')}</p> : null}
       <ul className="onb__places">
         {list.map((place) => {
           const on = followed.has(place.key);

@@ -31,9 +31,9 @@ export function MatchPlaces({ bothShared, loading, error, suggestions, places, o
   return (
     <section className="matchplaces" aria-label={t('Lugares entre vocês')}>
       <h2 className="matchplaces__h">{t('Lugares entre vocês')}</h2>
-      {loading && !suggestions ? <Loading label={t('Buscando rolês')} /> : null}
+      {loading && !suggestions ? <Loading label={t('Buscando locais')} /> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {suggestions && suggestions.reason === null && places.length === 0 ? <p className="muted">{t('Nenhum evento ou rolê encontrado por perto agora.')}</p> : null}
+      {suggestions && suggestions.reason === null && places.length === 0 ? <p className="muted">{t('Nenhum evento ou local encontrado por perto agora.')}</p> : null}
       {places.length > 0 ? (
         <>
           <p className="muted">{t('Toque em um lugar para ver no mapa e escolha onde se encontrar.')}</p>
@@ -63,7 +63,7 @@ export function MatchPlaces({ bothShared, loading, error, suggestions, places, o
           </ol>
         </>
       ) : null}
-      {suggestions && !suggestions.placesAvailable ? <p className="muted">{t('Não foi possível buscar rolês agora. Mostrando só eventos do AskouT.')}</p> : null}
+      {suggestions && !suggestions.placesAvailable ? <p className="muted">{t('Não foi possível buscar locais agora. Mostrando só eventos do AskouT.')}</p> : null}
     </section>
   );
 }

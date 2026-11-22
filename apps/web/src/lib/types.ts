@@ -1033,7 +1033,8 @@ export interface PostEdit {
   caption?: string | null;
   placeName?: string | null;
   placeAddress?: string | null;
-  event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; extras?: EventExtraAnswer[] } | null;
+  placeVenueId?: string | null;
+  event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; private?: boolean; extras?: EventExtraAnswer[] } | null;
 }
 
 /** Evento de bar repostado por alguém que você segue, como item do Início (só com `mixed=1`). */

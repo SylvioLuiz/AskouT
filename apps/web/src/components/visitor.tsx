@@ -106,7 +106,7 @@ function CityPickerHost() {
 
   return (
     <Sheet title={t('Escolha sua cidade')} onClose={() => setOpen(false)}>
-      <p className="muted">{t('Mostramos os rolês perto da cidade escolhida. Nada é enviado sobre você.')}</p>
+      <p className="muted">{t('Mostramos os locais perto da cidade escolhida. Nada é enviado sobre você.')}</p>
       <ul className="citylist">
         {VISITOR_CITIES.map((city) => (
           <li key={city.id}>
@@ -151,7 +151,7 @@ export function VisitorCityGate({ children }: { children: ReactNode }) {
           </div>
         }
       >
-        {t('Escolha sua cidade para ver os rolês e eventos perto, ou entre na sua conta.')}
+        {t('Escolha sua cidade para ver os locais e eventos perto, ou entre na sua conta.')}
       </EmptyState>
     </div>
   );
@@ -192,7 +192,7 @@ function VisitorEvents() {
     <section className="section enter" aria-labelledby="visitante-titulo">
       <div className="section__head">
         <h2 id="visitante-titulo" className="section__title">
-          {t('Rolês perto de {city}', { city: city.id === HERE_ID ? t('você') : city.name })}
+          {t('Locais perto de {city}', { city: city.id === HERE_ID ? t('você') : city.name })}
         </h2>
         <button type="button" className="linkbtn" onClick={openCityPicker}>
           {t('Trocar cidade')}
@@ -201,7 +201,7 @@ function VisitorEvents() {
       {loaded.error && offset === 0 ? <ErrorState message={loaded.error.message} onRetry={loaded.reload} /> : null}
       {loaded.loading && items.length === 0 ? <Loading /> : null}
       {!loaded.loading && !loaded.error && items.length === 0 ? (
-        <EmptyState title={t('Nenhum rolê por aqui ainda')}>{t('Tente outra cidade ou entre para buscar no Explorar.')}</EmptyState>
+        <EmptyState title={t('Nenhum local por aqui ainda')}>{t('Tente outra cidade ou entre para buscar no Explorar.')}</EmptyState>
       ) : null}
       {items.length > 0 ? (
         // Celular: um por linha, no cartão grande da Home logada. Computador: dois por linha, capa à esquerda.

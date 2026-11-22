@@ -425,6 +425,12 @@ export class PrismaConversationRepository implements ConversationRepository {
     return this.prisma.message.count({ where: { senderId: userId, createdAt: { gte: since } } });
   }
 
+  async postEventConversationIds(postId: string, senderId: string): Promise<string[]> {
+    if (!isUuid(postId) || !isUuid(senderId)) return [];
+    const rows = await this.prisma.message.findMany({ where: { postEventId: postId, senderId, deletedAt: null }, select: { conversationId: true }, distinct: ['conversationId'], take: 200 });
+    return rows.map((r) => r.conversationId);
+  }
+
   async hasPostEventAccess(userId: string, postId: string): Promise<boolean> {
     if (!isUuid(userId) || !isUuid(postId)) return false;
     const rows = await this.prisma.message.findMany({ where: { postEventId: postId }, select: { conversationId: true }, distinct: ['conversationId'], take: 50 });

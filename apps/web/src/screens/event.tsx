@@ -9,7 +9,7 @@ import { StoryCreator } from '../components/story-creator.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { EditPostSheet } from '../components/post-actions.tsx';
 import { EventExtrasList } from '../components/event-extras.tsx';
-import { CalendarIcon, CalendarPlusIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon } from '../components/icons.tsx';
+import { CalendarIcon, CalendarPlusIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UsersIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
@@ -18,7 +18,6 @@ import { api, session } from '../client.ts';
 import { useIsVisitor } from '../auth.tsx';
 import { askLogin } from '../components/visitor.tsx';
 import { useAsync, useTitle } from '../hooks.ts';
-import { queueFrom, startOf } from '../lib/stories.ts';
 import type { StoryPos } from '../lib/stories.ts';
 import { eventLink } from '../lib/share.ts';
 import { attendeeStrip, eventDateLabel, eventLongDate, eventTimeLabel, venueShort } from '../lib/event-page.ts';
@@ -46,8 +45,6 @@ import { GoingChoiceSheet } from '../components/going-choice.tsx';
 const EVENT_POST_CAPTION_MAX = 500;
 /** Avatares na fileira; o resto vira "+N". */
 const STRIP_MAX = 7;
-/** Até quantas pessoas o "Quem vai" mostra os rostos lado a lado, com nome; acima disso, sobrepostos. */
-const WHO_SPREAD = 5;
 /** Quantos rostos sobrepostos aparecem antes do "+N". */
 const WHO_STACK = 6;
 /** Descrição maior que isso começa recolhida, com "Ver mais". */
@@ -156,6 +153,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [sharing, setSharing] = useState(false);
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState<PostView | undefined>();
+  const [inviting, setInviting] = useState(false);
   const [calMessage, setCalMessage] = useState<string | undefined>();
   /** Lista completa de quem vai (abre ao tocar nos rostos). */
   const [whoOpen, setWhoOpen] = useState(false);
@@ -333,6 +331,33 @@ export function EventScreen({ eventId }: { eventId: string }) {
           {/* No celular é transparente (display: contents); no computador vira a coluna da direita, ao lado da capa. */}
           <div className="evpage__main">
 
+          {!visitor && (showStoryButton || storyGroups.length > 0) ? (
+            <section className="homestories evflashes" aria-label={t('Flashes do evento')}>
+              <ul className="homestories__list">
+                {showStoryButton ? (
+                  <li>
+                    <button type="button" className="homestories__item" onClick={() => (canStory ? setCreatingStory(true) : setStoryNeedsGoing(true))} aria-label={t('Criar flash neste evento')}>
+                      <span className="evflashes__add">
+                        <PlusIcon />
+                      </span>
+                      <span className="homestories__name">{t('Seu flash')}</span>
+                    </button>
+                  </li>
+                ) : null}
+                {storyGroups.map((group, index) => (
+                  <li key={group.author.userId}>
+                    <button type="button" className="homestories__item" onClick={() => setViewing({ groups: storyGroups, start: { group: index, item: 0 } })} aria-label={group.mine ? t('Ver o seu flash') : t('Ver o flash de {username}', { username: group.author.username })}>
+                      <span className="homestories__ring">
+                        <Avatar profile={group.author} size={60} />
+                      </span>
+                      <span className="homestories__name">{group.mine ? t('Você') : group.author.username}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           {e.owner ? (
             <Link to={`/u/${encodeURIComponent(e.owner.username)}`} className="evhost">
               <Avatar profile={e.owner} size={44} />
@@ -365,7 +390,16 @@ export function EventScreen({ eventId }: { eventId: string }) {
           </dl>
 
           <section className="evgoing" aria-label={t('Presença')}>
-            {e.isOwner ? null : ended ? (
+            {e.isOwner ? (
+              ended ? null : (
+                // Quem criou chama mais gente: o evento chega na conversa e a pessoa vira convidada (e vota na data, se houver votação).
+                <div className="evgo">
+                  <Button full onClick={() => setInviting(true)}>
+                    <UsersIcon /> {t('Convidar')}
+                  </Button>
+                </div>
+              )
+            ) : ended ? (
               <p className="evgoing__ended">{t('Esse evento já terminou.')}</p>
             ) : (
               <>
@@ -445,62 +479,26 @@ export function EventScreen({ eventId }: { eventId: string }) {
           </nav>
           {calMessage ? <Notice tone="error">{calMessage}</Notice> : null}
 
-          {visitor ? null : strip.shown.length > 0 || showStoryButton ? (
+          {visitor ? null : e.confirmedCount > 0 ? (
             <section className="evwho" aria-label={t('Quem vai')}>
               <h2 className="evwho__title">
                 {t('Quem vai')} <span className="evwho__count">{e.confirmedCount}</span>
               </h2>
               {(() => {
-                // Até WHO_SPREAD pessoas: rostos lado a lado com o nome. Mais que isso: rostos sobrepostos, sem nome, e um toque abre a lista.
-                const stacked = e.confirmedCount > WHO_SPREAD;
-                const faces = stacked ? strip.shown.slice(0, WHO_STACK) : strip.shown;
+                const faces = strip.shown.slice(0, WHO_STACK);
                 const rest = e.confirmedCount - faces.length;
-                const face = (p: (typeof strip.shown)[number], size: number) =>
-                  e.storyUserIds.includes(p.userId) && startOf(storyGroups, p.userId) ? (
-                    <button type="button" className="evgoing__face evgoing__face--story" onClick={() => setViewing({ groups: queueFrom(storyGroups, strip.shown.map((x) => x.userId), p.userId), start: { group: 0, item: 0 } })} aria-label={t('Ver o flash de {username}', { username: p.username })}>
-                      <Avatar profile={p} size={size - 4} />
-                    </button>
-                  ) : (
-                    <Link to={`/u/${encodeURIComponent(p.username)}`} aria-label={t('Perfil de {username}', { username: p.username })}>
-                      <Avatar profile={p} size={size} />
-                    </Link>
-                  );
                 return (
-                  <div className={`evwho__row${stacked ? ' evwho__row--stacked' : ''}`}>
-                    {showStoryButton ? (
-                      <button type="button" className="evgoing__story" onClick={() => (canStory ? setCreatingStory(true) : setStoryNeedsGoing(true))} aria-label={t('Criar flash neste evento')}>
-                        <span className="evgoing__storyring">
-                          <PlusIcon />
-                        </span>
-                        <span className="evgoing__storylabel">{t('Seu flash')}</span>
-                      </button>
-                    ) : null}
-                    {stacked ? (
-                      <button type="button" className="evwho__stack" onClick={() => setWhoOpen(true)} aria-label={t('Ver as {n} pessoas que vão', { n: e.confirmedCount })}>
-                        <span className="evwho__faces" aria-hidden="true">
-                          {faces.map((p) => (
-                            <Avatar key={p.userId} profile={p} size={40} />
-                          ))}
-                          {rest > 0 ? <span className="evwho__rest">+{rest}</span> : null}
-                        </span>
-                        <span className="evwho__see">{t('Ver todos')}</span>
-                      </button>
-                    ) : (
-                      <ul className="evgoing__faces">
-                        {faces.map((p) => (
-                          <li key={p.userId} className="evwho__person">
-                            {face(p, 44)}
-                            <span className="evwho__name" aria-hidden="true">
-                              {p.username}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                  <button type="button" className="evwho__stack" onClick={() => setWhoOpen(true)} aria-label={t('Ver as {n} pessoas que vão', { n: e.confirmedCount })}>
+                    <span className="evwho__faces" aria-hidden="true">
+                      {faces.map((p) => (
+                        <Avatar key={p.userId} profile={p} size={40} />
+                      ))}
+                      {rest > 0 ? <span className="evwho__rest">+{rest}</span> : null}
+                    </span>
+                    <span className="evwho__see">{t('Ver todos')}</span>
+                  </button>
                 );
               })()}
-              {strip.shown.length === 0 && !ended ? <p className="evwho__empty">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p> : null}
             </section>
           ) : !ended ? (
             <p className="evwho__empty">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
@@ -511,13 +509,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
               <ul className="evwho__list">
                 {e.attendees.map((p) => (
                   <li key={p.userId} className="evwho__item">
-                    {e.storyUserIds.includes(p.userId) && startOf(storyGroups, p.userId) ? (
-                      <button type="button" className="evgoing__face evgoing__face--story" onClick={() => { setWhoOpen(false); setViewing({ groups: queueFrom(storyGroups, e.attendees.map((x) => x.userId), p.userId), start: { group: 0, item: 0 } }); }} aria-label={t('Ver o flash de {username}', { username: p.username })}>
-                        <Avatar profile={p} size={40} />
-                      </button>
-                    ) : (
-                      <Avatar profile={p} size={44} />
-                    )}
+                    <Avatar profile={p} size={44} />
                     <Link to={`/u/${encodeURIComponent(p.username)}`} className="evwho__who" onClick={() => setWhoOpen(false)}>
                       <strong>{p.displayName}</strong>
                       <span>@{p.username}</span>
@@ -639,6 +631,19 @@ export function EventScreen({ eventId }: { eventId: string }) {
           )}
           </div>
         </article>
+      ) : null}
+      {inviting && e ? (
+        <ShareEventSheet
+          eventId={e.id}
+          source={e.source}
+          title={e.title}
+          posted={isPosted}
+          onPostedChange={setPosted}
+          profile={e.source === 'PLACE' ? 'toggle' : e.isPrivate ? 'private' : 'owner'}
+          outside={!e.isPrivate}
+          sheetTitle={t('Convidar pessoas')}
+          onClose={() => setInviting(false)}
+        />
       ) : null}
       {sharing && e ? (
         <ShareEventSheet

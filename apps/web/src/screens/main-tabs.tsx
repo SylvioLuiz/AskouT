@@ -98,7 +98,7 @@ export function HomeScreen() {
         <section className="section enter" aria-labelledby="seguindo-titulo">
           <div className="section__head">
             <h2 id="seguindo-titulo" className="section__title">
-              {t('Eventos dos rolês que você segue')}
+              {t('Eventos dos locais que você segue')}
             </h2>
           </div>
           <ul className="evposters">
@@ -113,7 +113,7 @@ export function HomeScreen() {
         <section className="section enter" aria-labelledby="patrocinado-titulo">
           <div className="section__head">
             <h2 id="patrocinado-titulo" className="section__title">
-              {t('Rolês em destaque')}
+              {t('Locais em destaque')}
             </h2>
             <span className="tag-sponsored">{t('Patrocinado')}</span>
           </div>

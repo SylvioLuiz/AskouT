@@ -10,6 +10,7 @@ import { conflict, forbidden, notFound, rateLimited, validationError } from './e
 import type { CoreDeps } from './ports.ts';
 import { distanceMeters } from './geo.ts';
 import { buildMeetupViews } from './meetup-view.ts';
+import { SchedulingService } from './scheduling-service.ts';
 import type { MeetupView } from './meetup-view.ts';
 import type { StoryOverlay } from './story-overlays.ts';
 import type { ConversationRecord, MessageKind, MessageReactionRecord, MessageRecord, PostReportReason, PublicProfile, SuggestionCard } from './types.ts';
@@ -384,7 +385,7 @@ export function parseSuggestion(value: unknown): SuggestionCard {
   const lat = v.lat;
   const lng = v.lng;
   if (typeof lat !== 'number' || !Number.isFinite(lat) || lat < -90 || lat > 90 || typeof lng !== 'number' || !Number.isFinite(lng) || lng < -180 || lng > 180) {
-    throw validationError('Sugestão inválida', { suggestion: 'Localização do rolê inválida' });
+    throw validationError('Sugestão inválida', { suggestion: 'Localização do lugar inválida' });
   }
   if (typeof v.sample !== 'boolean') throw validationError('Sugestão inválida', { suggestion: 'Campo sample inválido' });
   return {
@@ -583,7 +584,7 @@ export class ConversationService {
     const hasMedia = input.media !== undefined && input.media !== null;
     const hasGif = input.gif !== undefined && input.gif !== null;
     if ([hasText, hasSuggestion, hasEvent, hasAudio, hasMedia, hasGif].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo', { body: 'Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo' });
-    if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de rolê só em conversas 1 a 1', { suggestion: 'Sugestões de rolê só em conversas 1 a 1' });
+    if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de local só em conversas 1 a 1', { suggestion: 'Sugestões de local só em conversas 1 a 1' });
 
     let kind: MessageKind = 'TEXT';
     let body = '';
@@ -645,6 +646,8 @@ export class ConversationService {
     const replyToId = await this.parseReply(conversationId, input.replyToId);
     const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, ...(input.storyId ? { storyId: input.storyId } : {}), ...(gif ? { gifId: gif.id, gifUrl: gif.url } : {}), createdAt: now };
     await conversations.addMessage(message, audio ?? (media ? { mime: media.mime, data: media.data } : undefined));
+    // Evento com a data em votação: quem recebe de quem criou entra na votação.
+    if (postEventId) await new SchedulingService(this.deps).addEventInvitees(actorId, postEventId, conversationId);
     this.typingUntil.delete(`${conversationId}|${actorId}`);
     await conversations.markRead(conversationId, actorId, now);
     const positions = suggestion && otherId ? await this.livePositions(actorId, otherId, now) : null;
@@ -654,7 +657,7 @@ export class ConversationService {
     const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
     // Mensagem de texto: o aviso (sino/push) mostra um pedaço do que foi escrito; os outros tipos dizem o que foi enviado.
     const preview = kind === 'TEXT' && !gif ? messagePreview(body) : undefined;
-    await this.notifyMembers(actorId, actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um rolê' : 'enviou uma mensagem', preview);
+    await this.notifyMembers(actorId, actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
     const decor = await this.decorate(actorId, [message]);
     // Texto com link de evento: já volta com o cartão (como na lista de mensagens).
     const linked = linkedEventId(message);

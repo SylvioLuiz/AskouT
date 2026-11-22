@@ -30,7 +30,7 @@ describe('impulsionamento (web)', () => {
   });
   it('nomeia o alvo', () => {
     assert.equal(boostTitle({ target: 'EVENT', eventTitle: 'Samba' }), 'Samba');
-    assert.equal(boostTitle({ target: 'VENUE', eventTitle: null }), 'O rolê (página do local)');
+    assert.equal(boostTitle({ target: 'VENUE', eventTitle: null }), 'A página do local');
   });
   it('marca e desmarca hashtags até o máximo', () => {
     assert.deepEqual(toggleTag(['rock'], 'metal', 5), ['rock', 'metal']);

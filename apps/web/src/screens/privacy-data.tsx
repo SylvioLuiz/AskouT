@@ -20,7 +20,7 @@ function purposeLabel(purpose: ConsentPurpose): string {
 
 function purposeHelp(purpose: ConsentPurpose): string {
   return purpose === 'MARKETING_EMAIL'
-    ? t('Lançamentos, dicas e rolês em destaque. Avisos sobre a sua conta e a sua segurança chegam sempre, mesmo desligado.')
+    ? t('Lançamentos, dicas e locais em destaque. Avisos sobre a sua conta e a sua segurança chegam sempre, mesmo desligado.')
     : t('Promoções e novidades do AskouT. Avisos de amigos, conversas e eventos continuam em Notificações.');
 }
 

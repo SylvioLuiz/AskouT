@@ -90,7 +90,8 @@ export interface PollSummary {
 }
 
 export interface PollInput {
-  conversationId: string;
+  /** Sem conversa (com `eventPostId`): a votação abre num grupo com todos os convidados do evento. */
+  conversationId?: string;
   title: string;
   rangeStart: string;
   rangeEnd: string;

@@ -27,11 +27,15 @@ export const POLICY_TEXT: Record<Policy, string> = {
 };
 
 /** "Combinar uma data": nome, período e pronto. O resto é opcional. */
-export function DatePollCreateScreen({ conversationId }: { conversationId: string }) {
+/**
+ * Com `conversationId`, a votação abre naquela conversa. Com `eventPostId` (evento sem data), abre num grupo com todos os
+ * convidados do evento e o dia escolhido vira a data dele.
+ */
+export function DatePollCreateScreen({ conversationId, eventPostId }: { conversationId?: string; eventPostId?: string }) {
   useTitle(t('Combinar uma data'));
-  // Vindo de um evento criado sem data (`?evento=...&titulo=...`): a votação decide a data dele.
   const search = useSearch();
-  const undatedEventId = search.get('evento') ?? undefined;
+  // Compatibilidade: `/planejar/nova/<conversa>?evento=...` também liga a votação a um evento sem data.
+  const undatedEventId = eventPostId || (search.get('evento') ?? undefined);
   const [title, setTitle] = useState(() => (search.get('titulo') ?? '').slice(0, 120));
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
@@ -59,7 +63,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
     setBusy(true);
     try {
       const poll = await api.createPoll({
-        conversationId,
+        ...(conversationId ? { conversationId } : {}),
         title: title.trim(),
         rangeStart: start,
         rangeEnd: end,
@@ -77,7 +81,7 @@ export function DatePollCreateScreen({ conversationId }: { conversationId: strin
 
   return (
     <div className="pollform">
-      <PageHead title={t('Combinar uma data')} back={`/conversas/${conversationId}`} subtitle={t('Crie uma votação e encontre o melhor dia para reunir a galera.')} />
+      <PageHead title={t('Combinar uma data')} back={conversationId ? `/conversas/${conversationId}` : `/eventos/${encodeURIComponent(undatedEventId ?? '')}`} subtitle={t('Crie uma votação e encontre o melhor dia para reunir a galera.')} />
       <form className="pollform__form" onSubmit={(e) => void submit(e)} noValidate>
         {problem ? <Notice tone="error">{problem}</Notice> : null}
 

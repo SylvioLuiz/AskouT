@@ -77,7 +77,7 @@ export function effectiveQuery(raw: string): string {
 }
 
 export function sourceName(source: ExplorePlace['source']): string {
-  return source === 'ASKOUT' ? t('Local no AskouT') : source === 'GOOGLE' ? t('Rolê do Google') : t('Rolê do OpenStreetMap');
+  return source === 'ASKOUT' ? t('Local no AskouT') : source === 'GOOGLE' ? t('Local do Google') : t('Local do OpenStreetMap');
 }
 
 /** Variação de altura da capa na grade (mosaico), estável por evento. */

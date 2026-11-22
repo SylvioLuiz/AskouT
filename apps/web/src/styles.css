@@ -7297,3 +7297,13 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .evpreview__tags { opacity: 0.7; }
 @keyframes evpreview-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .evpreview { animation: none; } }
+
+/* ---------- Editar evento (mesma cara da criação, por cima da tela) ---------- */
+.evedit { position: fixed; inset: 0; z-index: 65; overflow-y: auto; background: var(--bg); }
+.evedit__inner { max-width: 520px; margin: 0 auto; padding: 0 16px calc(24px + var(--sa-bottom)); }
+.evflashes { margin: 4px -16px 0; }
+.evflashes__add { display: grid; place-items: center; width: 66px; height: 66px; border: 2px dashed var(--brand); border-radius: 50%; color: var(--brand-text); }
+.evflashes__add svg { width: 24px; height: 24px; }
+
+/* Cartaz do post: som do vídeo no rodapé, ao lado de compartilhar (em cima, o ⋯ cobria o botão). */
+.poster__end { display: flex; align-items: center; gap: 8px; }

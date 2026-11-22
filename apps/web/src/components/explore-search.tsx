@@ -35,7 +35,7 @@ export function ExploreSearch({ id, value, onChange, onSubmit, onFocus, onBlur, 
         <SearchIcon />
       </span>
       <label className="visually-hidden" htmlFor={id}>
-        {t('Buscar eventos, rolês, pessoas ou #')}
+        {t('Buscar eventos, locais, pessoas ou #')}
       </label>
       <input
         id={id}
@@ -43,7 +43,7 @@ export function ExploreSearch({ id, value, onChange, onSubmit, onFocus, onBlur, 
         className="xsearch__input"
         type="search"
         enterKeyHint="search"
-        placeholder={t('Eventos, rolês, pessoas ou #')}
+        placeholder={t('Eventos, locais, pessoas ou #')}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         onFocus={onFocus}

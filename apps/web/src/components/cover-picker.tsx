@@ -8,7 +8,7 @@ import { resizeEventCover, resizeVenueLogo } from '../lib/image.ts';
 import { t } from '../lib/i18n/index.ts';
 
 /** Imagem de capa (evento ou estabelecimento): um quadro que mostra a imagem e, dentro dele, os botões das duas origens (aparelho ou link da web). */
-export function CoverPicker({ imageUrl, imageData, onChange, hint = t('Sem imagem, a capa usa a foto do rolê.'), logo = false, linkOnly = false, venueId }: { imageUrl: string; imageData: string; onChange: (patch: { imageUrl?: string; imageData?: string }) => void; hint?: string; logo?: boolean; linkOnly?: boolean; venueId?: string }) {
+export function CoverPicker({ imageUrl, imageData, onChange, hint = t('Sem imagem, a capa usa a foto do local.'), logo = false, linkOnly = false, venueId }: { imageUrl: string; imageData: string; onChange: (patch: { imageUrl?: string; imageData?: string }) => void; hint?: string; logo?: boolean; linkOnly?: boolean; venueId?: string }) {
   const [linking, setLinking] = useState(false);
   const [link, setLink] = useState('');
   const [error, setError] = useState<string | undefined>();
@@ -129,7 +129,7 @@ function VenuePhotos({ venueId, onPick, onError }: { venueId: string; onPick: (p
   return (
     <div className="coverpics">
       <Button small variant="secondary" onClick={() => setOpen((v) => !v)} loading={photos.loading && !photos.data}>
-        {open ? t('Fechar fotos do rolê') : t('Fotos do rolê')}
+        {open ? t('Fechar fotos do local') : t('Fotos do local')}
       </Button>
       {open && photos.data ? (
         <ul className="coverpics__grid">

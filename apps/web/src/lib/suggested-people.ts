@@ -19,7 +19,7 @@ export function suggestionReasonText(p: SuggestedPerson): string {
   if (reason === 'FOLLOWS_YOU') return t('Segue você');
   if (reason === 'EVENTS') {
     const n = p.sharedEvents ?? 0;
-    return n === 1 ? t('1 rolê em comum') : t('{n} rolês em comum', { n });
+    return n === 1 ? t('1 local em comum') : t('{n} locais em comum', { n });
   }
   if (reason === 'TASTES') return t('Curte rolês parecidos');
   return p.mutualCount === 1 ? t('1 amigo em comum') : t('{n} amigos em comum', { n: p.mutualCount });

@@ -472,6 +472,8 @@ export interface ConversationRepository {
   countSentSince(userId: string, since: Date): Promise<number>;
   /** A pessoa está numa conversa em que o evento (post) foi compartilhado: pode abri-lo mesmo sem seguir o dono. */
   hasPostEventAccess(userId: string, postId: string): Promise<boolean>;
+  /** Conversas em que `senderId` mandou o evento (post): quem está nelas foi convidado por ele. */
+  postEventConversationIds(postId: string, senderId: string): Promise<string[]>;
 }
 
 export interface MeetupRepository {
@@ -510,6 +512,8 @@ export interface SchedulingRepository {
   /** Votações abertas (votando ou confirmando) em que a pessoa participa, a mais recente primeiro. */
   listOpenForUser(userId: string, limit: number): Promise<PollRecord[]>;
   listParticipants(pollId: string): Promise<PollParticipantRecord[]>;
+  /** Põe mais alguém na votação (idempotente). */
+  addParticipant(pollId: string, userId: string, at: Date): Promise<void>;
   listVotes(pollId: string): Promise<PollVoteRecord[]>;
   /** Define (ou, com `null`, apaga) o voto da pessoa nos dias. Um voto por pessoa, votação e dia. */
   setVotes(pollId: string, userId: string, dates: string[], status: 'YES' | 'MAYBE' | 'NO' | null, at: Date): Promise<void>;

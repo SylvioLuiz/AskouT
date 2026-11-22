@@ -770,6 +770,8 @@ export interface PostPatch {
   eventKind: EventKind;
   /** Sem o campo, as respostas não mudam. */
   eventExtras?: EventExtraAnswer[];
+  /** Sem o campo, "quem vê" não muda. */
+  eventPrivate?: boolean;
   editedAt: Date;
 }
 

@@ -135,8 +135,8 @@ type CreateSource = 'google' | 'askout' | 'scratch';
 /** Primeiro passo do botão "Criar local": de onde vem o local. */
 function CreateVenueChooser({ onPick, onClose }: { onPick: (source: CreateSource) => void; onClose: () => void }) {
   const options: { source: CreateSource; icon: ReactNode; title: string; sub: string }[] = [
-    { source: 'google', icon: <GlobeIcon />, title: t('A partir de um lugar do Google'), sub: t('Busque o seu rolê no Google e use o nome e o endereço de lá.') },
-    { source: 'askout', icon: <SearchIcon />, title: t('Um local que já está no AskouT'), sub: t('O seu rolê já aparece no app? Peça para administrá-lo.') },
+    { source: 'google', icon: <GlobeIcon />, title: t('A partir de um lugar do Google'), sub: t('Busque o seu local no Google e use o nome e o endereço de lá.') },
+    { source: 'askout', icon: <SearchIcon />, title: t('Um local que já está no AskouT'), sub: t('O seu local já aparece no app? Peça para administrá-lo.') },
     { source: 'scratch', icon: <EditIcon />, title: t('Criar do zero'), sub: t('Não achou em lugar nenhum? Preencha nome, tipo e endereço.') },
   ];
   return (
@@ -192,7 +192,7 @@ function GoogleVenueSheet({ onPicked, onClose }: { onPicked: (venue: { id: strin
     <Sheet title={t('Criar a partir do Google')} onClose={onClose}>
       <div className="claim">
         <Field label={t('Buscar no Google')} type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint={t('Nome ou endereço do lugar')} />
-        {term.length < 2 ? <p className="muted">{t('Digite o nome ou o endereço do seu rolê.')}</p> : null}
+        {term.length < 2 ? <p className="muted">{t('Digite o nome ou o endereço do seu local.')}</p> : null}
         {result.loading && !result.data ? <Loading /> : null}
         {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
         {result.data && places.length === 0 ? <p className="muted">{result.data.placesAvailable ? t('Nenhum lugar do Google com esse nome. Tente o endereço ou crie do zero.') : t('A busca do Google ainda não está ligada neste ambiente.')}</p> : null}
@@ -541,7 +541,7 @@ export function VenuesScreen() {
 
   return (
     <>
-      <PageHead title={t('Meus locais')} back="/perfil" subtitle={t('Rolês que você administra no AskouT.')} />
+      <PageHead title={t('Meus locais')} back="/perfil" subtitle={t('Locais que você administra no AskouT.')} />
       {sent ? <Notice tone="ok">{t('Pedido enviado. Um administrador vai analisar o documento e você recebe um aviso com a resposta.')}</Notice> : null}
       {mine.loading && !mine.data ? <Loading /> : null}
       {mine.error && !mine.data ? <ErrorState message={mine.error.message} onRetry={mine.reload} /> : null}
@@ -572,7 +572,7 @@ export function VenuesScreen() {
             </section>
           ) : null}
           {mine.data.venues.length === 0 && mine.data.managed.length === 0 && mine.data.invites.length === 0 && mine.data.claims.length === 0 ? (
-            <EmptyState title={t('Você ainda não administra nenhum local')}>{t('Toque em Criar local para trazer o seu rolê (bar, balada ou casa) do Google, do AskouT ou do zero. O pedido é analisado por um administrador.')}</EmptyState>
+            <EmptyState title={t('Você ainda não administra nenhum local')}>{t('Toque em Criar local para trazer o seu local (bar, balada ou casa) do Google, do AskouT ou do zero. O pedido é analisado por um administrador.')}</EmptyState>
           ) : mine.data.venues.length + mine.data.managed.length === 0 ? null : (
             <ul className="venuelist" aria-label={t('Locais que você administra')}>
               {[...mine.data.venues, ...mine.data.managed].map((v) => (
