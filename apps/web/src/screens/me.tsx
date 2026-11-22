@@ -548,7 +548,7 @@ function NowRadiusSetting() {
     <section className="setting setting--stack">
       <div>
         <h2 className="setting__title" id="now-raio-titulo">
-          {t('Distância dos rolês no NOW')}
+          {t('Distância dos locais no NOW')}
         </h2>
         <p className="setting__help">{t('Até quantos km do meio do caminho entre você e o amigo buscar bares e eventos. No automático, a busca cresce quanto mais longe vocês estão.')}</p>
       </div>
@@ -789,7 +789,7 @@ function RegionSetting({ userId }: { userId: string }) {
         <div className="setting__text">
           <h2 className="setting__title">{t('Minha região')}</h2>
           <p className="setting__help">
-            {t('Opcional. Se você informar mais ou menos onde mora, bares e casas de show perto de você podem mostrar, no “Para você”, rolês com a etiqueta “Patrocinado” que combinam com o que você curte (por exemplo, rock). Usamos a localização uma vez e guardamos só uma posição aproximada, de cerca de 1 km. Quem anuncia vê apenas um número aproximado de pessoas, nunca quem você é. Funciona só com as recomendações personalizadas ligadas.')}
+            {t('Opcional. Se você informar mais ou menos onde mora, bares e casas de show perto de você podem mostrar, no “Para você”, locais com a etiqueta “Patrocinado” que combinam com o que você curte (por exemplo, rock). Usamos a localização uma vez e guardamos só uma posição aproximada, de cerca de 1 km. Quem anuncia vê apenas um número aproximado de pessoas, nunca quem você é. Funciona só com as recomendações personalizadas ligadas.')}
           </p>
           {current ? <p className="setting__help"><strong>{t('Região salva.')}</strong> Atualizada em {new Date(current.updatedAt).toLocaleDateString(intlLocale())}.</p> : null}
           {!personalizing ? <p className="setting__help">{t('Ligue as recomendações personalizadas para poder informar a região.')}</p> : null}

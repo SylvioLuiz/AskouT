@@ -163,6 +163,8 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/conversas/:id/grupo', render: (p) => <GroupScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/conversas/:id', render: (p) => <ConversationsRoute conversationId={p['id'] ?? ''} /> },
   { path: '/planejar/nova/:id', render: (p) => <DatePollCreateScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
+  // Votação da data de um evento sem data: abre num grupo com todos os convidados do evento.
+  { path: '/planejar/evento/:id', render: (p) => <DatePollCreateScreen key={`evento-${p['id']}`} eventPostId={p['id'] ?? ''} /> },
   { path: '/planejar/:id', render: (p) => <DatePollScreen key={p['id']} pollId={p['id'] ?? ''} /> },
   { path: '/agenda', render: () => <AgendaScreen /> },
   { path: '/now', render: () => <FlashScreen /> },

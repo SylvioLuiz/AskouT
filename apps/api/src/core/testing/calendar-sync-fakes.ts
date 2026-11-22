@@ -1,5 +1,5 @@
 import { CalendarAccessRevoked } from '../ports.ts';
-import type { BusyIntervalRecord, GoogleCalendarAgenda, GoogleCalendarClient, OAuthStateTokens, PersonalCalendarConnection, PersonalCalendarRepository, UserBusyRecord } from '../ports.ts';
+import type { BusyIntervalRecord, GoogleCalendarAgenda, GoogleCalendarClient, OAuthAccess, OAuthStateTokens, PersonalCalendarConnection, PersonalCalendarRepository, UserBusyRecord } from '../ports.ts';
 import type { ExternalProvider } from '../types.ts';
 import type { InMemoryIdentityRepository } from './in-memory.ts';
 
@@ -72,6 +72,11 @@ export class FakeGoogleCalendarClient implements GoogleCalendarClient {
   ];
   busy = new Map<string, BusyIntervalRecord[]>();
   revoked = false;
+  /** Erro que não é revogação (ex.: segredo do app vencido). */
+  failure: Error | undefined;
+  /** Igual à Microsoft: cada refresh devolve um refresh token novo. */
+  rotate = false;
+  readonly validRefresh = new Set(['refresh-1']);
   readonly revokedTokens: string[] = [];
   readonly freeBusyCalls: string[][] = [];
   email: string | null = 'ana@gmail.com';
@@ -85,9 +90,13 @@ export class FakeGoogleCalendarClient implements GoogleCalendarClient {
     return { refreshToken: 'refresh-1', accessToken: 'access-1', email: this.email };
   }
 
-  async accessToken(refreshToken: string): Promise<string> {
-    if (this.revoked || refreshToken !== 'refresh-1') throw new CalendarAccessRevoked();
-    return 'access-2';
+  async accessToken(refreshToken: string): Promise<OAuthAccess> {
+    if (this.failure) throw this.failure;
+    if (this.revoked || !this.validRefresh.has(refreshToken)) throw new CalendarAccessRevoked();
+    if (!this.rotate) return { accessToken: 'access-2', refreshToken: null };
+    const next = `refresh-${this.validRefresh.size + 1}`;
+    this.validRefresh.add(next);
+    return { accessToken: 'access-2', refreshToken: next };
   }
 
   async listCalendars(): Promise<GoogleCalendarAgenda[]> {

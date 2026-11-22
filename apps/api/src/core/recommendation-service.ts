@@ -513,7 +513,7 @@ export class RecommendationService {
       if (c.engaged.size > 0) reasons.push(c.engaged.size === 1 ? '1 amigo curtiu ou comentou' : `${c.engaged.size} amigos curtiram ou comentaram`);
       if (sim > 0) {
         const tag = c.features.tags.find((t) => taste.tags.has(t));
-        reasons.push(tag ? `Tem a ver com #${tag}` : c.features.venueId && taste.venues.has(c.features.venueId) ? 'De um rolê que você curte' : 'Parecido com o que você curte');
+        reasons.push(tag ? `Tem a ver com #${tag}` : c.features.venueId && taste.venues.has(c.features.venueId) ? 'De um local que você curte' : 'Parecido com o que você curte');
       }
       if ((c.near ?? 0) >= 0.5) reasons.push('Perto de você');
       items.push({ type: c.type, score: Math.round(score * 100) / 100, reasons, friendsGoing, friendsEngaged: c.engaged.size, event, post, sponsored: false, match: null, source: await this.sourceOf(viewerId, event, post) });

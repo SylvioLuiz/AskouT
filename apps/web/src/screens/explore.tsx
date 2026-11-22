@@ -181,7 +181,7 @@ function PosterEventCard({ event, now }: { event: ExploreEvent; now: Date }) {
   // Também aparece na Home de quem não entrou (sem usuário): aí o "Eu vou" sempre aparece e pede login.
   const me = useOptionalUser();
   const dwellRef = useDwell<HTMLLIElement>('EVENT', event.id, 'FEED');
-  // O cartaz patrocinado aparece na Home ("Rolês em destaque").
+  // O cartaz patrocinado aparece na Home ("Locais em destaque").
   useSponsoredView<HTMLLIElement>(event.sponsored === true, 'HOME', { eventId: event.id }, dwellRef);
   return (
     <li className="poster-item" ref={dwellRef} onClickCapture={(ev) => { if ((ev.target as Element).closest('a')) { trackClick('EVENT', event.id, 'FEED'); if (event.sponsored) trackSponsoredOpen('HOME', { eventId: event.id }); } }}>
@@ -680,7 +680,7 @@ export function ExploreScreen() {
               >
                 {hot
                   ? (data.located ? t('Nenhum evento acontecendo agora tem {n} ou mais pessoas confirmadas a até {km} km.', { n: HOT_MIN_GOING, km: data.radiusKm }) : t('Nenhum evento acontecendo agora tem {n} ou mais pessoas confirmadas.', { n: HOT_MIN_GOING }))
-                  : (data.located ? t('Ainda não há eventos cadastrados a até {km} km neste período. Busque por um rolê, uma pessoa ou uma #.', { km: data.radiusKm }) : t('Ainda não há eventos cadastrados neste período. Busque por um rolê, uma pessoa ou uma #.'))}
+                  : (data.located ? t('Ainda não há eventos cadastrados a até {km} km neste período. Busque por um local, uma pessoa ou uma #.', { km: data.radiusKm }) : t('Ainda não há eventos cadastrados neste período. Busque por um local, uma pessoa ou uma #.'))}
               </EmptyState>
             ) : (
               <>
@@ -702,7 +702,7 @@ export function ExploreScreen() {
             )
           ) : nothing ? (
             <EmptyState title={t('Nada encontrado')}>
-              {q.startsWith('#') ? t('Nenhum evento com essa #.') : t('Confira o que digitou ou aumente o raio. Rolês de fora só aparecem com a sua localização liberada.')}
+              {q.startsWith('#') ? t('Nenhum evento com essa #.') : t('Confira o que digitou ou aumente o raio. Locais de fora só aparecem com a sua localização liberada.')}
             </EmptyState>
           ) : (
             <div className="results">
@@ -737,7 +737,7 @@ export function ExploreScreen() {
               ) : null}
               {show('places') && data.places.length > 0 ? (
                 <section aria-label={t('Locais')}>
-                  <h2 className="results__h">{t('Rolês')}</h2>
+                  <h2 className="results__h">{t('Locais')}</h2>
                   <ul className="placelist">
                     {data.places.map((p) => (
                       <PlaceRow key={p.key} place={p} />
@@ -745,7 +745,7 @@ export function ExploreScreen() {
                   </ul>
                 </section>
               ) : null}
-              {show('places') && !data.placesAvailable ? <p className="muted">{t('A fonte de rolês de fora não respondeu agora. Os locais do AskouT aparecem normalmente.')}</p> : null}
+              {show('places') && !data.placesAvailable ? <p className="muted">{t('A fonte de locais de fora não respondeu agora. Os locais do AskouT aparecem normalmente.')}</p> : null}
               {show('people') && data.people.length > 0 ? (
                 <section aria-label={t('Pessoas')}>
                   <h2 className="results__h">{t('Pessoas')}</h2>

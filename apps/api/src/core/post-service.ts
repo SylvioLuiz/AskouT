@@ -241,7 +241,7 @@ export class PostService {
     const { posts, ids, clock } = this.deps;
     const caption = optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
     const placeVenue = venue ? undefined : await this.placeVenue(input.placeVenueId);
-    const placeName = venue ? venue.name : (optionalText(input.placeName, 120, 'placeName', 'Nome do rolê') ?? placeVenue?.name.slice(0, 120) ?? null);
+    const placeName = venue ? venue.name : (optionalText(input.placeName, 120, 'placeName', 'Nome do local') ?? placeVenue?.name.slice(0, 120) ?? null);
     const placeAddress = venue ? venue.address : (optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço') ?? placeVenue?.address?.slice(0, 200) ?? null);
     const event = this.parseEvent(input.event, placeName);
     const eventPrivate = event !== null && this.parsePrivate(input.event);
@@ -250,7 +250,7 @@ export class PostService {
     // Evento criado pela pessoa já é o próprio evento; post de local já tem o local. Os demais vinculam um evento ou um rolê.
     const linkedEvent = event === null && !venue ? await this.linkableEvent(actorId, input.linkedEventId) : undefined;
     if (event === null && !venue && !linkedEvent && !placeName) {
-      throw validationError('Escolha um evento ou um rolê', { place: 'Todo post precisa de um evento ou de um rolê vinculado' });
+      throw validationError('Escolha um evento ou um local', { place: 'Todo post precisa de um evento ou de um local vinculado' });
     }
     const raw = input.images === undefined || input.images === null ? [] : input.images;
     // Post comum pode ser só texto (sem foto); evento e post de local continuam com pelo menos uma foto (a capa).
@@ -275,7 +275,7 @@ export class PostService {
       const author = optionalText(place.placePhotoAuthor, 100, 'images', 'Autor da foto');
       return { id, postId, position, mime: null, data: null, placePhotoRef: place.placePhotoRef, placePhotoAuthor: author };
     });
-    if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do rolê por post' });
+    if (placePhotos > 1) throw validationError('Fotos inválidas', { images: 'Use só uma foto do local por post' });
     const tagIds = await this.validTags(actorId, input.tagUserIds);
     await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, eventExtras, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null, linkedEventId: linkedEvent?.id ?? null }, images);
     if (tagIds.length > 0) {
@@ -509,7 +509,7 @@ export class PostService {
     const { post, images } = await this.seeable(actorId, postId);
     if (post.authorId !== actorId) throw forbidden('Só quem publicou edita o post');
     const caption = input.caption === undefined ? post.caption : optionalText(input.caption, POST_CAPTION_MAX, 'caption', 'Legenda');
-    const placeName = input.placeName === undefined ? post.placeName : optionalText(input.placeName, 120, 'placeName', 'Nome do rolê');
+    const placeName = input.placeName === undefined ? post.placeName : optionalText(input.placeName, 120, 'placeName', 'Nome do local');
     const placeAddress = input.placeAddress === undefined ? post.placeAddress : optionalText(input.placeAddress, 200, 'placeAddress', 'Endereço');
     // Escolheu outro local do AskouT: vincula. Digitou outro nome sem escolher: o vínculo antigo não vale mais.
     const placeVenueId =
@@ -530,10 +530,13 @@ export class PostService {
     // Quem já tinha evento ou rolê não pode ficar sem nenhum (posts antigos, de antes da regra, seguem editáveis).
     const hadLink = Boolean(post.placeName || post.linkedEventId);
     if (event === null && !post.venueId && hadLink && !placeName && !linkedEventId) {
-      throw validationError('Escolha um evento ou um rolê', { place: 'Todo post precisa de um evento ou de um rolê vinculado' });
+      throw validationError('Escolha um evento ou um local', { place: 'Todo post precisa de um evento ou de um local vinculado' });
     }
     if (!caption && images.length === 0) throw validationError('Post vazio', { caption: 'Post sem foto precisa de um texto' });
-    const patch: PostPatch = { caption, placeName, placeAddress, placeVenueId, linkedEventId, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventExtras, editedAt: this.deps.clock.now() };
+    // "Quem vê" (público ou só convidados) muda na edição quando vier; virar post comum deixa público.
+    const rawPrivate = input.event !== undefined && input.event !== null ? (input.event as { private?: unknown }).private : undefined;
+    const eventPrivate = event === null ? false : rawPrivate === undefined ? undefined : this.parsePrivate(input.event);
+    const patch: PostPatch = { caption, placeName, placeAddress, placeVenueId, linkedEventId, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventExtras, ...(eventPrivate === undefined ? {} : { eventPrivate }), editedAt: this.deps.clock.now() };
     if (!(await this.deps.posts.update(post.id, actorId, patch))) throw notFound('Post não encontrado');
     if (event) {
       await this.syncPollTitle(post.id, event.title);
@@ -730,7 +733,7 @@ export class PostService {
   /** Local do AskouT escolhido como rolê. Id que não existe (ou apagado) só não vincula: o nome digitado continua valendo. */
   private async placeVenue(raw: unknown): Promise<{ id: string; name: string; address: string | null } | undefined> {
     if (raw === undefined || raw === null || raw === '') return undefined;
-    if (typeof raw !== 'string' || raw.length > 64) throw validationError('Rolê inválido', { placeVenueId: 'Local inválido' });
+    if (typeof raw !== 'string' || raw.length > 64) throw validationError('Local inválido', { placeVenueId: 'Local inválido' });
     const venue = await this.deps.places.findVenue(raw);
     return venue ? { id: venue.id, name: venue.name, address: venue.address } : undefined;
   }

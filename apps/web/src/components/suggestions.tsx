@@ -49,7 +49,7 @@ export function PlacePhoto({ path, author }: { path: string; author: string | nu
 
 function Distances({ distances, otherName }: { distances: { meM: number; themM: number }; otherName: string }) {
   return (
-    <ul className="sugcard__routes" aria-label={t('Distância até o rolê, em linha reta')}>
+    <ul className="sugcard__routes" aria-label={t('Distância até o local, em linha reta')}>
       <li>
         <strong>{t('Você')}</strong> a {formatDistance(distances.meM)}
       </li>
@@ -154,10 +154,10 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
   const hasGoogle = data?.items.some((i) => i.source === 'GOOGLE') ?? false;
 
   return (
-    <Sheet title={t('Sugerir um rolê')} onClose={onClose}>
+    <Sheet title={t('Sugerir um local')} onClose={onClose}>
       <p className="muted sheet__lead">{t('Perto do ponto médio entre você e {otherName}, até {km} km.', { otherName, km: data ? Math.round(data.radiusM / 1000) : 3 })}</p>
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {result.loading && !data ? <Loading label={t('Buscando rolês')} /> : null}
+      {result.loading && !data ? <Loading label={t('Buscando locais')} /> : null}
       {result.error && !data ? (
         result.error.code === 'CONFLICT' ? (
           <Notice>{t('Os dois precisam compartilhar a localização no encontro para ver sugestões perto de vocês.')}</Notice>
@@ -166,7 +166,7 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
         )
       ) : null}
       {data && data.reason === null && data.items.length === 0 ? (
-        <Notice>{t('Nenhum evento ou rolê encontrado por perto agora.')}</Notice>
+        <Notice>{t('Nenhum evento ou local encontrado por perto agora.')}</Notice>
       ) : null}
       {data && data.items.length > 0 ? (
         <ul className="carousel" aria-label={t('Sugestões')}>
@@ -203,7 +203,7 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, onClose,
           ))}
         </ul>
       ) : null}
-      {data && !data.placesAvailable ? <p className="muted sheet__foot">{t('Não foi possível buscar rolês agora. Mostrando só eventos do AskouT.')}</p> : null}
+      {data && !data.placesAvailable ? <p className="muted sheet__foot">{t('Não foi possível buscar locais agora. Mostrando só eventos do AskouT.')}</p> : null}
       {hasGoogle ? <p className="muted sheet__foot">{t('Notas, fotos e lugares: Google.')}</p> : null}
       {hasOsm ? <p className="muted sheet__foot">{t('Lugares: © colaboradores do OpenStreetMap.')}</p> : null}
     </Sheet>

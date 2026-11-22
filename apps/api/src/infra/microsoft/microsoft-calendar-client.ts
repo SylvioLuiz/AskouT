@@ -1,5 +1,5 @@
 import { CalendarAccessRevoked } from '../../core/ports.ts';
-import type { BusyIntervalRecord, GoogleCalendarAgenda, OAuthCalendarClient } from '../../core/ports.ts';
+import type { BusyIntervalRecord, GoogleCalendarAgenda, OAuthAccess, OAuthCalendarClient } from '../../core/ports.ts';
 
 const AUTHORITY = 'https://login.microsoftonline.com/common/oauth2/v2.0';
 const GRAPH = 'https://graph.microsoft.com/v1.0';
@@ -9,6 +9,43 @@ const GRAPH = 'https://graph.microsoft.com/v1.0';
  * que dá início/fim e disponibilidade dos compromissos sem corpo nem anexos. Não exige aprovação de administrador.
  */
 export const MICROSOFT_CALENDAR_SCOPES = ['openid', 'email', 'offline_access', 'https://graph.microsoft.com/Calendars.ReadBasic'];
+
+/**
+ * Erros do token que querem dizer "a pessoa precisa entrar de novo". Os demais (invalid_client = segredo do app errado
+ * ou vencido no Entra, invalid_scope, invalid_request, 5xx) são problema nosso ou passageiro e não desligam a agenda.
+ */
+const REVOKED_TOKEN_ERRORS = new Set(['invalid_grant', 'interaction_required', 'consent_required', 'login_required']);
+
+function warn(message: string): void {
+  console.warn(`[microsoft-calendar] ${message}`);
+}
+
+/** "AADSTS7000215: Invalid client secret provided..." → "AADSTS7000215". */
+function aadCode(body: Record<string, unknown>): string {
+  const d = typeof body['error_description'] === 'string' ? body['error_description'] : '';
+  return /AADSTS\d+/.exec(d)?.[0] ?? '';
+}
+
+/** Com o cabeçalho de fuso UTC, a Graph devolve a hora sem o "Z" e com 7 casas nos segundos ("2026-10-14T13:00:00.0000000"). */
+export function graphTime(value: string | undefined): Date {
+  if (!value) return new Date(NaN);
+  const m = /^(\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?)(\.\d+)?(Z|[+-]\d\d:\d\d)?$/i.exec(value);
+  if (!m) return new Date(value);
+  const ms = m[2] ? m[2].slice(0, 4).padEnd(4, '0') : '';
+  return new Date(`${m[1]}${ms}${m[3] ?? 'Z'}`);
+}
+
+/** Resposta de erro da Graph que não é token recusado (ex.: 403 numa agenda, 404, 429, 5xx). */
+export class GraphError extends Error {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string) {
+    super(`Microsoft Graph HTTP ${status} ${code}`.trim());
+    this.status = status;
+    this.code = code;
+  }
+}
 
 export interface MicrosoftCalendarOptions {
   clientId: string;
@@ -64,16 +101,24 @@ export class GraphMicrosoftCalendarClient implements OAuthCalendarClient {
 
   async exchange(code: string): Promise<{ refreshToken: string | null; accessToken: string; email: string | null }> {
     const { status, body } = await this.token({ grant_type: 'authorization_code', code, redirect_uri: this.o.redirectUri });
-    if (status !== 200 || typeof body['access_token'] !== 'string') throw new CalendarAccessRevoked(String(body['error'] ?? status));
+    if (status !== 200 || typeof body['access_token'] !== 'string') {
+      warn(`troca do código recusada: HTTP ${status} ${String(body['error'] ?? '')} ${aadCode(body)}`.trim());
+      throw new CalendarAccessRevoked(`${String(body['error'] ?? status)} ${aadCode(body)}`.trim());
+    }
     return { accessToken: body['access_token'], refreshToken: typeof body['refresh_token'] === 'string' ? body['refresh_token'] : null, email: emailFromIdToken(body['id_token']) };
   }
 
-  async accessToken(refreshToken: string): Promise<string> {
+  async accessToken(refreshToken: string): Promise<OAuthAccess> {
     if (!refreshToken) throw new CalendarAccessRevoked();
     const { status, body } = await this.token({ grant_type: 'refresh_token', refresh_token: refreshToken });
-    if (status === 400 || status === 401) throw new CalendarAccessRevoked(String(body['error'] ?? status));
-    if (status !== 200 || typeof body['access_token'] !== 'string') throw new Error(`Microsoft token HTTP ${status}`);
-    return body['access_token'];
+    if (status === 200 && typeof body['access_token'] === 'string') {
+      // A Microsoft devolve um refresh token novo a cada uso; quem chama guarda o novo.
+      return { accessToken: body['access_token'], refreshToken: typeof body['refresh_token'] === 'string' ? body['refresh_token'] : null };
+    }
+    const error = typeof body['error'] === 'string' ? body['error'] : '';
+    warn(`refresh recusado: HTTP ${status} ${error} ${aadCode(body)}`.trim());
+    if (REVOKED_TOKEN_ERRORS.has(error)) throw new CalendarAccessRevoked(`${error} ${aadCode(body)}`.trim());
+    throw new Error(`Microsoft token HTTP ${status} ${error} ${aadCode(body)}`.trim());
   }
 
   private async get(token: string, url: string): Promise<Record<string, unknown>> {
@@ -81,9 +126,13 @@ export class GraphMicrosoftCalendarClient implements OAuthCalendarClient {
       headers: { Authorization: `Bearer ${token}`, Prefer: 'outlook.timezone="UTC"' },
       signal: AbortSignal.timeout(this.o.timeoutMs),
     });
-    if (res.status === 401 || res.status === 403) throw new CalendarAccessRevoked(`HTTP ${res.status}`);
-    if (!res.ok) throw new Error(`Microsoft Graph HTTP ${res.status}`);
-    return (await res.json()) as Record<string, unknown>;
+    if (res.ok) return (await res.json()) as Record<string, unknown>;
+    const body = (await res.json().catch(() => ({}))) as { error?: { code?: string; message?: string } };
+    const code = body.error?.code ?? '';
+    warn(`${url.split('?')[0].replace(/calendars\/[^/]+/, 'calendars/…')}: HTTP ${res.status} ${code} ${body.error?.message ?? ''}`.trim());
+    // Só 401 é token recusado. 403 (agenda compartilhada, de grupo, sem permissão) é daquela agenda, não da conta.
+    if (res.status === 401) throw new CalendarAccessRevoked(`HTTP 401 ${code}`.trim());
+    throw new GraphError(res.status, code);
   }
 
   async listCalendars(token: string): Promise<GoogleCalendarAgenda[]> {
@@ -105,23 +154,33 @@ export class GraphMicrosoftCalendarClient implements OAuthCalendarClient {
 
   async freeBusy(token: string, calendarIds: string[], from: Date, to: Date): Promise<BusyIntervalRecord[]> {
     const out: BusyIntervalRecord[] = [];
+    let failed: unknown;
+    let read = 0;
     for (const id of calendarIds) {
-      const q = new URLSearchParams({ startDateTime: from.toISOString(), endDateTime: to.toISOString(), $select: 'start,end,showAs,isAllDay,isCancelled', $top: '500' });
+      const q = new URLSearchParams({ startDateTime: from.toISOString(), endDateTime: to.toISOString(), $select: 'start,end,showAs,isAllDay,isCancelled', $top: '200' });
       let next: string | undefined = `/me/calendars/${encodeURIComponent(id)}/calendarView?${q.toString()}`;
-      for (let page = 0; next && page < 10; page += 1) {
-        const body: Record<string, unknown> = await this.get(token, next);
-        for (const e of Array.isArray(body['value']) ? (body['value'] as Record<string, unknown>[]) : []) {
-          if (e['isCancelled'] === true || e['isAllDay'] === true || e['showAs'] === 'free' || e['showAs'] === 'workingElsewhere') continue;
-          const s = (e['start'] as { dateTime?: string } | undefined)?.dateTime;
-          const f = (e['end'] as { dateTime?: string } | undefined)?.dateTime;
-          // Com o cabeçalho de fuso UTC, a Graph devolve sem o "Z".
-          const start = new Date(s && !/[zZ]|[+-]\d\d:\d\d$/.test(s) ? `${s}Z` : s ?? '');
-          const end = new Date(f && !/[zZ]|[+-]\d\d:\d\d$/.test(f) ? `${f}Z` : f ?? '');
-          if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end > start) out.push({ start, end });
+      const mine: BusyIntervalRecord[] = [];
+      try {
+        for (let page = 0; next && page < 25; page += 1) {
+          const body: Record<string, unknown> = await this.get(token, next);
+          for (const e of Array.isArray(body['value']) ? (body['value'] as Record<string, unknown>[]) : []) {
+            if (e['isCancelled'] === true || e['isAllDay'] === true || e['showAs'] === 'free' || e['showAs'] === 'workingElsewhere') continue;
+            const start = graphTime((e['start'] as { dateTime?: string } | undefined)?.dateTime);
+            const end = graphTime((e['end'] as { dateTime?: string } | undefined)?.dateTime);
+            if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end > start) mine.push({ start, end });
+          }
+          next = typeof body['@odata.nextLink'] === 'string' ? body['@odata.nextLink'] : undefined;
         }
-        next = typeof body['@odata.nextLink'] === 'string' ? body['@odata.nextLink'] : undefined;
+      } catch (e) {
+        // Uma agenda que a Graph não deixa ler (403/404: compartilhada, de grupo, apagada) não derruba as outras.
+        if (!(e instanceof GraphError) || (e.status !== 403 && e.status !== 404)) throw e;
+        failed = e;
+        continue;
       }
+      read += 1;
+      out.push(...mine);
     }
+    if (read === 0 && failed) throw failed;
     return out;
   }
 

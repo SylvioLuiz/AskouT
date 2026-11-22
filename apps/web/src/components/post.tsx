@@ -1,7 +1,7 @@
 import { dateByPollLabel } from '../lib/event-page.ts';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { CarouselIcon, CalendarIcon, CommentIcon, HeartIcon, MoreIcon, RepostIcon, SendIcon } from './icons.tsx';
+import { CarouselIcon, CalendarIcon, CommentIcon, HeartIcon, MoreIcon, RepostIcon, SendIcon, VolumeIcon, VolumeOffIcon } from './icons.tsx';
 import { SoundToggle } from './sound-toggle.tsx';
 import { hasSound } from '../lib/sound.ts';
 import { AdjustSheet, CommentsSheet, EditPostSheet, PostMenuSheet, ReportSheet, SharePostSheet } from './post-actions.tsx';
@@ -27,16 +27,28 @@ import { railBefore, railMonths } from '../lib/date-rail.ts';
 import type { RailMonth } from '../lib/date-rail.ts';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
+/**
+ * Som dos vídeos controlado de fora (no cartaz o botão fica no rodapé, junto das ações, e não em cima do vídeo,
+ * onde o botão ⋯ cobria). Sem ele, cada vídeo tem o próprio botão por cima.
+ */
+const PostSound = createContext<{ muted: boolean; setMuted: (muted: boolean) => void } | null>(null);
+
 function Slide({ image, index, total, onFirstLoad, onOpen }: { image: PostImage; index: number; total: number; onFirstLoad?: (w: number, h: number) => void; onOpen?: (index: number) => void }) {
   const [failed, setFailed] = useState(false);
   // O navegador só deixa o vídeo começar sozinho sem som; quem quiser o som toca no botão.
-  const [muted, setMuted] = useState(true);
+  const shared = useContext(PostSound);
+  const [ownMuted, setOwnMuted] = useState(true);
+  const muted = shared ? shared.muted : ownMuted;
   const videoRef = useRef<HTMLVideoElement>(null);
   const toggleSound = () => {
     const next = !muted;
     if (videoRef.current) videoRef.current.muted = next;
-    setMuted(next);
+    setOwnMuted(next);
   };
+  // Som mudado pelo botão do rodapé.
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = muted;
+  }, [muted]);
   // Toca sozinho quando o vídeo aparece na tela (e é o item visível do carrossel) e pausa quando sai.
   useEffect(() => {
     const video = videoRef.current;
@@ -86,7 +98,7 @@ function Slide({ image, index, total, onFirstLoad, onOpen }: { image: PostImage;
       ) : (
         <span className="pcarousel__missing">{t('Foto indisponível')}</span>
       )}
-      {hasSound(image) ? <SoundToggle muted={muted} onToggle={toggleSound} shifted={total > 1} /> : null}
+      {hasSound(image) && !shared ? <SoundToggle muted={muted} onToggle={toggleSound} shifted={total > 1} /> : null}
       {image.kind === 'PLACE' ? <figcaption>{t('Foto:')} {image.photoAuthor ? `${image.photoAuthor} · ` : ''}Google</figcaption> : null}
     </figure>
   );
@@ -148,7 +160,7 @@ function EventPostCard({ post, event }: { post: PostView; event: NonNullable<Pos
   );
 }
 
-export function PostCard({ post: initial, onGone, asEvent, poster, track, openComments }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean; poster?: boolean; track?: DwellSource; /** Abre já com os comentários à vista (veio de um aviso de comentário). */ openComments?: boolean }) {
+export function PostCard({ post: initial, onGone, asEvent, poster, track, openComments, eventInTitle }: { post: PostView; onGone?: (id: string, why: PostGone) => void; asEvent?: boolean; poster?: boolean; track?: DwellSource; /** Abre já com os comentários à vista (veio de um aviso de comentário). */ openComments?: boolean; /** O nome do evento já está no título da página: não repete a linha "Evento". */ eventInTitle?: boolean }) {
   const dwellRef = useDwell<HTMLElement>('POST', initial.id, track ?? false);
   const [post, setPost] = useState(initial);
   const [sheet, setSheet] = useState<'menu' | 'edit' | 'adjust' | 'report' | 'comments' | 'share' | undefined>(openComments ? 'comments' : undefined);
@@ -231,6 +243,9 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track, openCo
     else setViewing(index);
   }
   const hasVideo = post.images.some((i) => i.videoPath);
+  const [muted, setMuted] = useState(true);
+  const sound = useMemo(() => ({ muted, setMuted }), [muted]);
+  const withSound = post.images.some(hasSound);
   return (
     <article className="post" ref={dwellRef} onClickCapture={track ? (ev) => { if ((ev.target as Element).closest('a')) trackClick('POST', initial.id, track); } : undefined}>
       {post.repostedBy ? (
@@ -282,7 +297,7 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track, openCo
         </div>
       ) : null}
       {post.event && eventCard ? <EventPostCard post={post} event={post.event} /> : null}
-      {post.event && !eventCard ? (
+      {post.event && !eventCard && !eventInTitle ? (
         <p className="post__event">
           <span className="post__eventbadge">{t('Evento')}</span> <strong>{post.event.title}</strong>
           <span className="muted"> · {eventWhen(post.event.startsAt)}</span>
@@ -292,7 +307,9 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track, openCo
         <div className={`poster poster--post${hasVideo ? ' poster--video' : ''}${post.images.length > 1 ? ' poster--multi' : ''}`}>
           <div className="poster__stage">
           <div className="poster__media">
-            <Carousel key={post.images.map((i) => i.id).join()} images={post.images} onOpen={openMedia} />
+            <PostSound.Provider value={sound}>
+              <Carousel key={post.images.map((i) => i.id).join()} images={post.images} onOpen={openMedia} />
+            </PostSound.Provider>
           </div>
           <div className="poster__scrim poster__scrim--post" aria-hidden="true" />
           <div className="poster__top">
@@ -366,9 +383,16 @@ export function PostCard({ post: initial, onGone, asEvent, poster, track, openCo
             <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
           </button>
         </div>
-        <button type="button" className="poster__act poster__share" onClick={() => setSheet('share')} aria-label={t('Compartilhar')}>
-          <SendIcon />
-        </button>
+        <span className="poster__end">
+          {withSound ? (
+            <button type="button" className="poster__act poster__sound" onClick={() => setMuted(!muted)} aria-pressed={muted} aria-label={muted ? t('Ligar o som') : t('Tirar o som')}>
+              {muted ? <VolumeOffIcon /> : <VolumeIcon />}
+            </button>
+          ) : null}
+          <button type="button" className="poster__act poster__share" onClick={() => setSheet('share')} aria-label={t('Compartilhar')}>
+            <SendIcon />
+          </button>
+        </span>
       </div>
           </div>
         </div>

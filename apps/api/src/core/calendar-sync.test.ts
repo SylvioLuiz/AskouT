@@ -169,3 +169,29 @@ test('Outlook (Microsoft): mesmo fluxo, state de um provedor não vale no outro'
   assert.equal(o.connections[0]!.label, 'Outlook · ana@outlook.com');
   assert.equal((await w.core.calendarSync.busy(ana!, '2026-10-13T00:00:00Z', '2026-10-20T00:00:00Z')).length, 1);
 });
+
+test('Outlook: "Atualizar agora" guarda o refresh token novo e falha do nosso lado não desconecta a conta', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  const ms = w.microsoftCalendar!;
+  ms.email = 'ana@outlook.com';
+  ms.rotate = true;
+  ms.busy.set('primary@gmail.com', [{ start: T('2026-10-15T20:00Z'), end: T('2026-10-15T21:00Z') }]);
+  const { url } = await w.core.calendarSync.oauthStart(ana!, 'MICROSOFT', 'web');
+  await w.core.calendarSync.oauthCallback('MICROSOFT', { code: 'codigo-bom', state: new URL(url).searchParams.get('state')! });
+  const [conn] = (await w.core.calendarSync.overview(ana!)).connections;
+
+  // A Microsoft troca o refresh token a cada uso e o antigo deixa de valer: as próximas atualizações usam o novo.
+  assert.equal((await w.core.calendarSync.syncNow(ana!, conn!.id)).status, 'ACTIVE');
+  ms.validRefresh.delete('refresh-1');
+  const second = await w.core.calendarSync.syncNow(ana!, conn!.id);
+  assert.equal(second.status, 'ACTIVE');
+  assert.equal(second.lastError, null);
+
+  // Segredo do app vencido (invalid_client) ou Microsoft fora do ar: avisa, mas a conta continua ligada e os horários ficam.
+  ms.failure = new Error('Microsoft token HTTP 401 invalid_client AADSTS7000222');
+  const failed = await w.core.calendarSync.syncNow(ana!, conn!.id);
+  assert.equal(failed.status, 'ACTIVE');
+  assert.match(failed.lastError ?? '', /tentar de novo/);
+  assert.equal((await w.core.calendarSync.busy(ana!, '2026-10-13T00:00:00Z', '2026-10-20T00:00:00Z')).length, 1);
+});

@@ -327,7 +327,13 @@ export class CalendarSyncService {
   private async syncOAuth(connection: PersonalCalendarConnection, accessToken?: string): Promise<void> {
     const client = this.client(connection.provider as OAuthCalendarSource);
     if (!client) throw new Error('oauth-off');
-    const token = accessToken ?? (await client.accessToken(this.deps.secretBox.open(connection.refreshTokenSealed ?? '') ?? ''));
+    let token = accessToken;
+    if (!token) {
+      const access = await client.accessToken(this.deps.secretBox.open(connection.refreshTokenSealed ?? '') ?? '');
+      token = access.accessToken;
+      // A Microsoft troca o refresh token a cada uso: guarda o novo, senão o antigo acaba recusado e a agenda "desconecta".
+      if (access.refreshToken) connection.refreshTokenSealed = this.deps.secretBox.seal(access.refreshToken);
+    }
     const agendas = await client.listCalendars(token);
     const known = new Map(connection.calendars.map((c) => [c.id, c.selected] as const));
     const firstTime = connection.calendars.length === 0;
@@ -341,7 +347,8 @@ export class CalendarSyncService {
     }));
     const ids = connection.calendars.filter((c) => c.selected).map((c) => c.id);
     const { from, to } = this.window();
-    const busy = ids.length > 0 ? await client.freeBusy(token, ids, from, to) : [];
+    const zones = Object.fromEntries(agendas.flatMap((a) => (a.timeZone ? [[a.id, a.timeZone] as const] : [])));
+    const busy = ids.length > 0 ? await client.freeBusy(token, ids, from, to, zones) : [];
     connection.lastSyncAt = this.deps.clock.now();
     connection.lastError = null;
     connection.status = 'ACTIVE';

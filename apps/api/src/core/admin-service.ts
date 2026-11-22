@@ -628,7 +628,7 @@ export class AdminService {
       return { type: target.type, id: target.id, title: found?.post.eventTitle ?? '(evento removido)', url: `/eventos/${target.id}` };
     }
     const venue = await this.deps.places.findVenue(target.id);
-    return { type: target.type, id: target.id, title: venue?.name ?? '(rolê removido)', url: `/bares/${target.id}` };
+    return { type: target.type, id: target.id, title: venue?.name ?? '(local removido)', url: `/bares/${target.id}` };
   }
 
   private async usernames(ids: string[]): Promise<Map<string, string>> {

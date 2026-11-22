@@ -726,7 +726,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       </p>
       <div className="row-actions">
         <Button small onClick={() => setSuggesting(true)}>
-          {t('Sugerir um rolê')}
+          {t('Sugerir um local')}
         </Button>
         <Link to={`/now/encontro/${match.id}`} className="btn btn--secondary btn--small">
           {t('Ver no mapa')}

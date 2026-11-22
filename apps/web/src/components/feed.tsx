@@ -395,7 +395,7 @@ function ComposeSheet({ where, targetId, settings, onClose, onCreated }: { where
     <Sheet title={t('Nova publicação')} onClose={onClose}>
       <div className="segmented" role="group" aria-label={t('Tipo de publicação')}>
         <button type="button" className={`segmented__tab${kind === 'POST' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'POST'} onClick={() => setKind('POST')}>
-          {t('Fotos do rolê')}
+          {t('Fotos do local')}
         </button>
         <button type="button" className={`segmented__tab${kind === 'NOTICE' ? ' segmented__tab--on' : ''}`} aria-pressed={kind === 'NOTICE'} onClick={() => setKind('NOTICE')}>
           {t('Aviso')}
@@ -917,7 +917,7 @@ export function Feed({ where, targetId, intro, openPostId, openPending, onSettin
         <div className="feedcompose">
           {me ? <Avatar profile={me} size={40} /> : null}
           <button type="button" className="feedcompose__field" onClick={() => setSheet('compose')}>
-            {settings.isModerator ? t('Escreva um aviso ou poste fotos do rolê…') : t('Poste fotos do rolê ou deixe um recado…')}
+            {settings.isModerator ? t('Escreva um aviso ou poste fotos do local…') : t('Poste fotos do rolê ou deixe um recado…')}
           </button>
           <button type="button" className="iconbtn feedcompose__photo" onClick={() => setSheet('compose')} aria-label={t('Postar fotos')}>
             <PhotoIcon />

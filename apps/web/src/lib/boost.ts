@@ -36,7 +36,7 @@ export function sortBoosts(items: BoostView[]): BoostView[] {
 }
 
 export function boostTitle(boost: Pick<BoostView, 'target' | 'eventTitle'>): string {
-  return boost.target === 'EVENT' ? (boost.eventTitle ?? 'Evento') : t('O rolê (página do local)');
+  return boost.target === 'EVENT' ? (boost.eventTitle ?? 'Evento') : t('A página do local');
 }
 
 /** Marca ou desmarca uma hashtag, sem passar do máximo. */

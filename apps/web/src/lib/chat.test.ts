@@ -79,7 +79,7 @@ test('nota do Google: texto, rótulo acessível e estrelas em meias unidades', (
 });
 
 test('fonte', () => {
-  assert.equal(sourceLabel('GOOGLE'), 'Rolê do Google');
+  assert.equal(sourceLabel('GOOGLE'), 'Local do Google');
 });
 
 test('previewOf: mensagem de voz mostra a duração', () => {

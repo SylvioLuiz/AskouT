@@ -5,6 +5,9 @@ import type { ConfirmationPolicy, ConfirmationStatus, ConfirmationTally, DateSta
 import type { MeetupRecord, MessageRecord, PollProposalRecord, PollRecord, PollStatus, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
 
+/** Nome do grupo da votação de um evento (o mesmo limite dos grupos). */
+const EVENT_GROUP_NAME_MAX = 60;
+
 export const POLL_TITLE_MAX = 120;
 /** Dias que cabem num intervalo (inclusive). */
 export const POLL_MAX_DAYS = 60;
@@ -161,9 +164,14 @@ export class SchedulingService {
 
   // ---------- Criar ----------
 
-  /** Abre a votação numa conversa sua (grupo ou 1 a 1). Entram todos os membros da conversa, menos quem tem bloqueio com você. */
-  async create(actorId: string, conversationId: unknown, input: PollInput): Promise<PollView> {
+  /**
+   * Abre a votação numa conversa sua (grupo ou 1 a 1). Entram todos os membros da conversa, menos quem tem bloqueio com você.
+   * Sem conversa e com `eventPostId` (evento seu sem data): a votação abre num grupo do evento com todos os convidados.
+   */
+  async create(actorId: string, conversationIdRaw: unknown, input: PollInput): Promise<PollView> {
     const { conversations, blocks, follows, scheduling, clock, ids } = this.deps;
+    const byEvent = (conversationIdRaw === undefined || conversationIdRaw === null || conversationIdRaw === '') && typeof input.eventPostId === 'string' && input.eventPostId !== '';
+    const conversationId = byEvent ? await this.eventGroup(actorId, input.eventPostId) : conversationIdRaw;
     const conversation = typeof conversationId === 'string' && conversationId !== '' && conversationId.length <= 64 ? await conversations.findById(conversationId) : undefined;
     const members = conversation ? await conversations.participantIds(conversation.id) : undefined;
     if (!conversation || !members || !members.includes(actorId)) throw notFound('Conversa não encontrada');
@@ -660,6 +668,54 @@ export class SchedulingService {
     const other = await this.deps.scheduling.findByEventPost(post.id);
     if (other && other.status !== 'CANCELLED') throw conflict('Este evento já tem uma votação');
     return post.id;
+  }
+
+  /** Quem foi convidado para o evento: está numa conversa em que quem criou mandou o evento (menos quem tem bloqueio). */
+  private async inviteesOf(organizerId: string, postId: string): Promise<string[]> {
+    const { conversations, blocks } = this.deps;
+    const related = new Set(await blocks.listRelatedIds(organizerId));
+    const out = new Set<string>();
+    for (const id of await conversations.postEventConversationIds(postId, organizerId)) {
+      for (const userId of (await conversations.participantIds(id)) ?? []) if (userId !== organizerId && !related.has(userId)) out.add(userId);
+    }
+    return [...out];
+  }
+
+  /** Grupo da votação de um evento sem data, com quem criou e todos os convidados. */
+  private async eventGroup(actorId: string, rawPostId: unknown): Promise<string> {
+    const { conversations, posts, clock, ids } = this.deps;
+    const postId = await this.undatedEvent(actorId, rawPostId);
+    const invitees = await this.inviteesOf(actorId, postId);
+    if (invitees.length === 0) throw validationError('Convide alguém para o evento primeiro', { eventPostId: 'Mande o evento para quem vai votar na data' });
+    const title = (await posts.findById(postId))?.post.eventTitle ?? 'Evento';
+    const now = clock.now();
+    const group = await conversations.createGroup({ id: ids.next(), name: Array.from(title).slice(0, EVENT_GROUP_NAME_MAX).join(''), ownerId: actorId, now });
+    for (const userId of invitees) await conversations.addParticipant(group.id, userId, now);
+    await conversations.markRead(group.id, actorId, now);
+    return group.id;
+  }
+
+  /**
+   * Quem criou o evento mandou ele para mais gente enquanto a data está em votação: as pessoas novas entram no grupo e na
+   * votação, com aviso. Chamado depois de cada envio do evento numa conversa.
+   */
+  async addEventInvitees(senderId: string, postId: string, conversationId: string): Promise<void> {
+    const { scheduling, conversations, blocks, clock } = this.deps;
+    const poll = await scheduling.findByEventPost(postId);
+    if (!poll || poll.status !== 'VOTING' || poll.organizerId !== senderId || poll.conversationId === conversationId) return;
+    const related = new Set(await blocks.listRelatedIds(senderId));
+    const inPoll = new Set((await scheduling.listParticipants(poll.id)).map((p) => p.userId));
+    const inGroup = new Set((await conversations.participantIds(poll.conversationId)) ?? []);
+    const newcomers = ((await conversations.participantIds(conversationId)) ?? []).filter((id) => id !== senderId && !related.has(id) && !inPoll.has(id));
+    if (newcomers.length === 0) return;
+    const now = clock.now();
+    for (const userId of newcomers) {
+      if (!inGroup.has(userId)) await conversations.addParticipant(poll.conversationId, userId, now);
+      await scheduling.addParticipant(poll.id, userId, now);
+    }
+    const name = await this.nameOf(senderId);
+    await this.postSystem(poll.conversationId, senderId, newcomers.length === 1 ? `${name} convidou mais uma pessoa para "${poll.title}"` : `${name} convidou mais ${newcomers.length} pessoas para "${poll.title}"`, now);
+    await this.notifyAll(senderId, newcomers, poll, `${name} quer achar a melhor data`, `${poll.title}: marque os dias em que você pode.`);
   }
 
   /** Votação de um evento sem data: o dia escolhido vira a data do evento, e quem confirmou já vai. */

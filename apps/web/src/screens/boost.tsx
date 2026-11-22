@@ -172,7 +172,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
       <>
         <PageHead title={t('Impulsionar')} back={back} subtitle={v.name} />
         <div className="boost">
-          <EmptyState title={t('Impulsionar chega em breve')}>{t('Em breve você poderá destacar seu rolê e seus eventos aqui. Avisaremos quando abrir.')}</EmptyState>
+          <EmptyState title={t('Impulsionar chega em breve')}>{t('Em breve você poderá destacar seu local e seus eventos aqui. Avisaremos quando abrir.')}</EmptyState>
           {items.length > 0 ? listBlock : null}
         </div>
       </>
@@ -183,7 +183,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
     <>
       <PageHead title={t('Impulsionar')} back={back} subtitle={v.name} />
       <div className="boost">
-        <p className="boost__lead">{t('Seu rolê aparece primeiro na busca e na Home de quem segue bares como o seu, sempre com a etiqueta “Patrocinado”.')}</p>
+        <p className="boost__lead">{t('Seu local aparece primeiro na busca e na Home de quem segue bares como o seu, sempre com a etiqueta “Patrocinado”.')}</p>
         {returned === 'ok' ? <Notice tone="ok">{t('Pagamento enviado. Assim que for confirmado, seu impulsionamento começa. O Pix pode levar alguns minutos.')}</Notice> : null}
         {returned === 'cancelado' ? <Notice tone="info">{t('O pagamento foi cancelado e nada foi cobrado. Você pode tentar de novo quando quiser.')}</Notice> : null}
         {price.sandbox && !onStore ? <Notice tone="info">{t('Modo de teste: nenhum valor é cobrado de verdade. Depois de criar o pedido, use “Simular pagamento”.')}</Notice> : null}
@@ -194,7 +194,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
           <h2 id="boost-what" className="boost__h">{t('O que impulsionar')}</h2>
           <div className="boost__choices" role="radiogroup" aria-labelledby="boost-what">
             <button type="button" role="radio" aria-checked={target === 'VENUE'} className="boost__choice" onClick={() => pickTarget('VENUE')}>
-              <strong>{t('O rolê (página do local)')}</strong>
+              <strong>{t('A página do local')}</strong>
               <span>{t('Mostra o próximo evento do local')}</span>
             </button>
             {v.upcomingEvents.map((e) => (

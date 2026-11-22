@@ -4,7 +4,7 @@ import type { ExploreEvent, ExplorePlace } from './types.ts';
 export const ONBOARDING_FOLLOW_GOAL = 3;
 
 export const ONBOARDING_SLIDES: readonly { title: string; text: string }[] = [
-  { title: t('Siga bares e baladas, veja eventos'), text: t('Os eventos dos rolês que você segue aparecem na sua Home. Toque em “Eu vou” para confirmar presença e receber um lembrete antes de começar.') },
+  { title: t('Siga bares e baladas, veja eventos'), text: t('Os eventos dos locais que você segue aparecem na sua Home. Toque em “Eu vou” para confirmar presença e receber um lembrete antes de começar.') },
   { title: t('Amigo é quem se segue'), text: t('Quando você segue alguém e essa pessoa segue você de volta, vocês viram amigos. Só amigos veem seus planos e conversam direto com você.') },
   { title: t('NOW: encontre quem quer sair agora'), text: t('Ligue o NOW para avisar os amigos que você está livre. Quem também estiver livre pode te chamar, e a conversa abre na hora.') },
 ];
@@ -70,5 +70,5 @@ export function placesFromEvents(events: readonly ExploreEvent[]): ExplorePlace[
 export function followProgressLabel(count: number): string {
   if (count >= ONBOARDING_FOLLOW_GOAL) return t('Pronto! Sua Home já terá eventos.');
   const missing = ONBOARDING_FOLLOW_GOAL - count;
-  return missing === 1 ? t('Siga mais 1 rolê ({count} de {goal})', { count, goal: ONBOARDING_FOLLOW_GOAL }) : t('Siga mais {missing} rolês ({count} de {goal})', { missing, count, goal: ONBOARDING_FOLLOW_GOAL });
+  return missing === 1 ? t('Siga mais 1 local ({count} de {goal})', { count, goal: ONBOARDING_FOLLOW_GOAL }) : t('Siga mais {missing} locais ({count} de {goal})', { missing, count, goal: ONBOARDING_FOLLOW_GOAL });
 }

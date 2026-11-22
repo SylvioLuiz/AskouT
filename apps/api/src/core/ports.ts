@@ -472,6 +472,8 @@ export interface ConversationRepository {
   countSentSince(userId: string, since: Date): Promise<number>;
   /** A pessoa está numa conversa em que o evento (post) foi compartilhado: pode abri-lo mesmo sem seguir o dono. */
   hasPostEventAccess(userId: string, postId: string): Promise<boolean>;
+  /** Conversas em que `senderId` mandou o evento (post): quem está nelas foi convidado por ele. */
+  postEventConversationIds(postId: string, senderId: string): Promise<string[]>;
 }
 
 export interface MeetupRepository {
@@ -510,6 +512,8 @@ export interface SchedulingRepository {
   /** Votações abertas (votando ou confirmando) em que a pessoa participa, a mais recente primeiro. */
   listOpenForUser(userId: string, limit: number): Promise<PollRecord[]>;
   listParticipants(pollId: string): Promise<PollParticipantRecord[]>;
+  /** Põe mais alguém na votação (idempotente). */
+  addParticipant(pollId: string, userId: string, at: Date): Promise<void>;
   listVotes(pollId: string): Promise<PollVoteRecord[]>;
   /** Define (ou, com `null`, apaga) o voto da pessoa nos dias. Um voto por pessoa, votação e dia. */
   setVotes(pollId: string, userId: string, dates: string[], status: 'YES' | 'MAYBE' | 'NO' | null, at: Date): Promise<void>;
@@ -791,9 +795,17 @@ export interface GoogleCalendarAgenda {
   id: string;
   name: string;
   primary: boolean;
-  /** Visível na Google Agenda da pessoa. */
+  /** Entra por padrão na primeira sincronização (a principal e as agendas próprias que a pessoa deixa visíveis). */
   visible: boolean;
   color: string | null;
+  /** Fuso da agenda (IANA), para reconhecer os compromissos de dia inteiro nos horários ocupados. */
+  timeZone?: string;
+}
+
+/** Novo acesso a partir do refresh token. A Microsoft troca o refresh token a cada uso: guarde o novo quando vier. */
+export interface OAuthAccess {
+  accessToken: string;
+  refreshToken: string | null;
 }
 
 /** Agenda de uma conta com login (Google Agenda, Outlook): OAuth com acesso só de leitura a agendas e horários ocupados. */
@@ -801,10 +813,14 @@ export interface OAuthCalendarClient {
   authUrl(state: string): string;
   /** Troca o código do retorno do Google. Lança `CalendarAccessRevoked` se o código não vale. */
   exchange(code: string): Promise<{ refreshToken: string | null; accessToken: string; email: string | null }>;
-  /** Lança `CalendarAccessRevoked` se o Google não aceitar mais o refresh token. */
-  accessToken(refreshToken: string): Promise<string>;
+  /**
+   * Lança `CalendarAccessRevoked` só quando a conta não aceita mais o refresh token (a pessoa tirou o acesso, ele venceu).
+   * Falha do nosso lado (segredo do app vencido, escopo, rede) é um `Error` comum: não desliga a agenda da pessoa.
+   */
+  accessToken(refreshToken: string): Promise<OAuthAccess>;
   listCalendars(accessToken: string): Promise<GoogleCalendarAgenda[]>;
-  freeBusy(accessToken: string, calendarIds: string[], from: Date, to: Date): Promise<BusyIntervalRecord[]>;
+  /** `timeZones`: fuso de cada agenda (de `listCalendars`), para tirar os compromissos de dia inteiro. */
+  freeBusy(accessToken: string, calendarIds: string[], from: Date, to: Date, timeZones?: Readonly<Record<string, string>>): Promise<BusyIntervalRecord[]>;
   revoke(token: string): Promise<void>;
 }
 
