@@ -905,6 +905,8 @@ export interface EventPage {
   canStory: boolean;
   /** Só quando confirmou: escolheu mostrar o evento na aba Eventos do perfil (senão fica na aba Participou, só sua). */
   goingOnProfile?: boolean;
+  /** Evento sem data com votação aberta (para quem criou ou participa). Nulo: sem votação. */
+  datePollId?: string | null;
   owner: PublicProfile | null;
   isOwner: boolean;
 }

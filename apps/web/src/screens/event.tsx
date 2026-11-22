@@ -436,8 +436,27 @@ export function EventScreen({ eventId }: { eventId: string }) {
                   <Button full onClick={() => setInviting(true)}>
                     <UsersIcon /> {t('Convidar')}
                   </Button>
+                  {/* Evento sem data: abrir a votação (se ainda não tem) ou ir para ela, onde o lápis edita. */}
+                  {e.startsAt === null ? (
+                    <Button
+                      full
+                      variant="secondary"
+                      onClick={() =>
+                        navigate(e.datePollId ? `/planejar/${encodeURIComponent(e.datePollId)}` : `/planejar/evento/${encodeURIComponent(e.id)}?${new URLSearchParams({ titulo: e.title }).toString()}`)
+                      }
+                    >
+                      <CalendarIcon /> {e.datePollId ? t('Ver e editar a votação') : t('Abrir a votação da data')}
+                    </Button>
+                  ) : null}
                 </div>
               )
+            ) : e.datePollId && !ended ? (
+              // Convidado de um evento sem data: vota na data.
+              <div className="evgo">
+                <Button full onClick={() => navigate(`/planejar/${encodeURIComponent(e.datePollId ?? '')}`)}>
+                  <CalendarIcon /> {t('Votar na data')}
+                </Button>
+              </div>
             ) : ended ? (
               <p className="evgoing__ended">{t('Esse evento já terminou.')}</p>
             ) : (

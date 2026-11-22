@@ -503,7 +503,7 @@ export interface SchedulingRepository {
   /** Grava a votação com os participantes (quem organiza inclusive). */
   create(poll: PollRecord, participantIds: string[], at: Date): Promise<void>;
   find(id: string): Promise<PollRecord | undefined>;
-  /** A votação que gerou este evento (post), se houver. */
+  /** A votação deste evento (post), se houver: a mais recente que não foi cancelada (senão, a mais recente). */
   findByEventPost(postId: string): Promise<PollRecord | undefined>;
   /** Votações de uma conversa, a mais recente primeiro. */
   listForConversation(conversationId: string): Promise<PollRecord[]>;

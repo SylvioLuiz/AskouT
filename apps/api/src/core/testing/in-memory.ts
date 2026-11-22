@@ -3246,7 +3246,8 @@ export class InMemorySchedulingRepository implements SchedulingRepository {
   }
 
   async findByEventPost(postId: string): Promise<PollRecord | undefined> {
-    const p = [...this.polls.values()].find((x) => x.eventPostId === postId);
+    const all = [...this.polls.values()].filter((x) => x.eventPostId === postId).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const p = all.find((x) => x.status !== 'CANCELLED') ?? all[0];
     return p ? { ...p } : undefined;
   }
 

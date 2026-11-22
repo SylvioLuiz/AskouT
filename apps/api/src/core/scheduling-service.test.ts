@@ -394,3 +394,21 @@ test('evento sem data: a votação abre num grupo com todos os convidados e quem
   await w.core.conversations.send(ana, withDani.id, { eventId: post.id });
   assert.equal((await w.core.scheduling.get(ana, poll.id)).participants.length, 4);
 });
+
+test('página do evento sem data: o dono vê se já tem votação (para abrir ou editar) e quem participa vê para votar', async () => {
+  const { w, ana, bia, caio } = await setup('MAJORITY');
+  const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Churras', dateByPoll: true } });
+  assert.equal((await w.core.eventPages.get(ana, post.id)).datePollId, null, 'sem votação: o dono vê o botão de abrir');
+  const withBia = await w.core.conversations.open(ana, bia);
+  await w.core.conversations.send(ana, withBia.id, { eventId: post.id });
+  const poll = await w.core.scheduling.create(ana, undefined, { title: 'Churras', rangeStart: '2026-10-20', rangeEnd: '2026-10-22', eventPostId: post.id });
+  assert.equal((await w.core.eventPages.get(ana, post.id)).datePollId, poll.id);
+  assert.equal((await w.core.eventPages.get(bia, post.id)).datePollId, poll.id, 'convidada vota');
+  // Cancelada: volta a poder abrir outra, e a nova é a que vale.
+  await w.core.scheduling.cancel(ana, poll.id);
+  assert.equal((await w.core.eventPages.get(ana, post.id)).datePollId, null);
+  w.clock.tick(60_000);
+  const again = await w.core.scheduling.create(ana, undefined, { title: 'Churras', rangeStart: '2026-10-20', rangeEnd: '2026-10-22', eventPostId: post.id });
+  assert.equal((await w.core.eventPages.get(ana, post.id)).datePollId, again.id);
+  void caio;
+});

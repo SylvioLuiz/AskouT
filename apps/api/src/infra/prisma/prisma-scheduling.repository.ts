@@ -133,7 +133,10 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
 
   async findByEventPost(postId: string): Promise<PollRecord | undefined> {
     if (!isUuid(postId)) return undefined;
-    const row = await this.prisma.datePoll.findFirst({ where: { eventPostId: postId } });
+    // A que vale é a mais recente que não foi cancelada (cancelar e abrir de novo deixa a antiga guardada).
+    const row =
+      (await this.prisma.datePoll.findFirst({ where: { eventPostId: postId, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' } })) ??
+      (await this.prisma.datePoll.findFirst({ where: { eventPostId: postId }, orderBy: { createdAt: 'desc' } }));
     return row ? toPoll(row) : undefined;
   }
 

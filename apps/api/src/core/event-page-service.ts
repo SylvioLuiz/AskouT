@@ -144,6 +144,11 @@ export interface EventPageView {
   canStory: boolean;
   /** Só quando o visitante confirmou: escolheu mostrar o evento na aba Eventos do perfil (senão fica na aba Participou, só dele). */
   goingOnProfile: boolean;
+  /**
+   * Evento ainda sem data com votação aberta: o id dela, para quem criou (editar) e para quem participa (votar).
+   * Nulo também quando não há votação: quem criou vê o botão para abrir uma.
+   */
+  datePollId: string | null;
 }
 
 /** Evento em que a pessoa confirmou presença, no formato curto que a agenda usa. */
@@ -278,7 +283,17 @@ export class EventPageService {
       storyUserIds: [...new Set((await this.visibleStories(viewerId, ref, hidden)).map((s) => s.userId))],
       canStory: (isOwner || iGo) && base.view.endsAt !== null && Date.parse(base.view.endsAt) > this.deps.clock.now().getTime(),
       goingOnProfile: !isOwner && iGo ? (await this.deps.eventRoom.goingOnProfile(ref, viewerId)) === true : false,
+      datePollId: await this.datePollFor(viewerId, ref, base.view.startsAt, isOwner),
     };
+  }
+
+  /** Votação aberta da data de um evento sem data, se quem vê é o dono ou participa dela. */
+  private async datePollFor(viewerId: string, ref: EventRef, startsAt: string | null, isOwner: boolean): Promise<string | null> {
+    if (ref.source !== 'USER' || startsAt !== null) return null;
+    const poll = await this.deps.scheduling.findByEventPost(ref.id);
+    if (!poll || poll.status === 'CANCELLED' || poll.status === 'FINALIZED') return null;
+    if (isOwner) return poll.id;
+    return (await this.deps.scheduling.listParticipants(poll.id)).some((p) => p.userId === viewerId) ? poll.id : null;
   }
 
   /**
@@ -302,10 +317,11 @@ export class EventPageService {
       storyUserIds: [],
       canStory: false,
       goingOnProfile: false,
+      datePollId: null,
     };
   }
 
-  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'goingOnProfile'> }> {
+  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'goingOnProfile' | 'datePollId'> }> {
     if (ref.source === 'PLACE') {
       const found = await this.deps.places.findEvent(ref.id);
       if (!found) throw notFound('Evento não encontrado');
