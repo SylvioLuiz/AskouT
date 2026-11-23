@@ -6,6 +6,7 @@ import { toApiError } from '../lib/errors.ts';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 import type { AvailableFriend, FlashInvite, FlashInviteConflict, PublicProfile } from '../lib/types.ts';
 import { navigate } from '../router.tsx';
+import { recentNowFix } from '../lib/now-fix.ts';
 import { Sheet } from './agenda.tsx';
 import { BoltIcon, ChevronDownIcon, ClockIcon, LocationIcon } from './icons.tsx';
 
@@ -121,7 +122,8 @@ function useAnswer(invite: FlashInvite, onDone: () => void) {
     setBusy(action);
     setError(undefined);
     try {
-      await api.flashRespond(invite.id, action, approx);
+      // Aceitando: sua posição vai junto, para quem convidou já ver você no mapa.
+      await api.flashRespond(invite.id, action, approx, action === 'accept' ? recentNowFix() : undefined);
       announceFlashChange();
       if (action === 'accept') navigate(`/now/encontro/${invite.id}`);
       onDone();

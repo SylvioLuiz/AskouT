@@ -9,7 +9,7 @@ type MessageRow = {
   id: string;
   conversationId: string;
   senderId: string;
-  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO';
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO' | 'FILE';
   body: string;
   suggestion: unknown;
   response: 'ACCEPTED' | 'DECLINED' | 'CANCELED' | null;

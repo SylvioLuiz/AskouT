@@ -7,6 +7,7 @@ import { useUser } from '../auth.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { RingLoader } from '../components/ring-loader.tsx';
 import { nowRadiusKm } from '../lib/now-radius.ts';
+import { recentNowFix, rememberNowFix } from '../lib/now-fix.ts';
 import { ChatButton } from '../components/chat-button.tsx';
 import { InviteSheet } from '../components/invite.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
@@ -433,7 +434,7 @@ function FlashContent() {
   async function callAll() {
     setCallingAll(true);
     setFeedback(undefined);
-    const results = await Promise.allSettled(eligible.map((f) => api.flashInvite(f.profile.userId, approxAll)));
+    const results = await Promise.allSettled(eligible.map((f) => api.flashInvite(f.profile.userId, approxAll, recentNowFix())));
     const sent = results.filter((r) => r.status === 'fulfilled').length;
     const failed = results.length - sent;
     setCallingAll(false);
@@ -935,7 +936,7 @@ function MapFriendCard({ friend, exact, distance, onChanged, onFeedback, onClose
   async function sendInvite() {
     setBusy(true);
     try {
-      await api.flashInvite(profile.userId, approx);
+      await api.flashInvite(profile.userId, approx, recentNowFix());
       onFeedback({ tone: 'ok', text: t('Convite enviado para {username}. Vale por 15 minutos. Se aceitar, o encontro aparece no topo da tela do NOW.', { username: profile.username }) });
       onChanged();
     } catch (failure) {
@@ -1342,6 +1343,7 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void, aut
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         setMine({ lat: latitude, lng: longitude });
+        rememberNowFix({ lat: latitude, lng: longitude, accuracyM: Math.round(accuracy) });
         const now = Date.now();
         setState((current) => (current.phase === 'error' ? current : { phase: 'sharing', accuracyM: Math.round(accuracy), lastSentAt: current.phase === 'sharing' ? current.lastSentAt : undefined }));
         if (now - lastSent.current < SEND_EVERY_MS) return;

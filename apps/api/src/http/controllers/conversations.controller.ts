@@ -95,13 +95,23 @@ export class ConversationsController {
     return this.core.conversations.send(actor.userId, id, { media: { mime: contentType, data: Buffer.isBuffer(body) ? new Uint8Array(body.buffer, body.byteOffset, body.byteLength) : undefined }, replyToId: replyTo });
   }
 
-  /** Foto ou vídeo de uma mensagem. Exige o token: o app baixa e mostra a partir de um blob. */
+  /**
+   * Documento (PDF, Word, Excel, PowerPoint, texto): o corpo é o arquivo cru, com o `Content-Type` dele.
+   * `?nome=` traz o nome do arquivo (o que a pessoa vê) e `?replyTo=` responde a uma mensagem.
+   */
+  @Post(':id/files')
+  uploadFile(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Headers('content-type') contentType: string | undefined, @Body() body: unknown, @Query('nome') name?: string, @Query('replyTo') replyTo?: string) {
+    return this.core.conversations.send(actor.userId, id, { file: { mime: contentType, data: Buffer.isBuffer(body) ? new Uint8Array(body.buffer, body.byteOffset, body.byteLength) : undefined, name }, replyToId: replyTo });
+  }
+
+  /** Foto, vídeo ou documento de uma mensagem. Exige o token: o app baixa e mostra a partir de um blob. */
   @Get(':id/messages/:messageId/media')
   @Header('Cache-Control', 'private, max-age=86400')
   @Header('X-Content-Type-Options', 'nosniff')
   async media(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string, @Param('messageId', new ParseUUIDPipe()) messageId: string) {
     const found = await this.core.conversations.media(actor.userId, id, messageId);
-    return new StreamableFile(found.data, { type: found.mime });
+    // Documento: baixa com o nome original e nunca abre como página do site (só foto e vídeo aparecem em linha).
+    return new StreamableFile(found.data, { type: found.mime, ...(found.name !== undefined ? { disposition: `attachment; filename="arquivo"; filename*=UTF-8''${encodeURIComponent(found.name)}` } : {}) });
   }
 
   /** `{emoji}` reage (o mesmo emoji de novo ou `null` tira). */

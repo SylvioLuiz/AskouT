@@ -677,3 +677,18 @@ test('convite recebido avisa o que você já aceitou no mesmo horário (NOW com 
   assert.equal(conflicts[1]!.title, 'Evento soon');
   assert.ok(conflicts.every((c) => c.startsAt && c.endsAt), 'traz dia e horário');
 });
+
+test('posição junto do convite: quem aceita já vê quem convidou no mapa; recusado, a posição some', async () => {
+  const { w, ana, bia } = await pair();
+  const invite = await w.core.flash.invite(ana, bia, { lat: -23.55, lng: -46.63, accuracyM: 10 });
+  await w.core.flash.respond(bia, invite.id, 'accept', { lat: -23.56, lng: -46.64 });
+  const forBia = await w.core.flash.getMatch(bia, invite.id);
+  assert.deepEqual([forBia.them?.lat, forBia.them?.lng], [-23.55, -46.63], 'Bia vê a Ana na hora');
+  assert.deepEqual([forBia.me?.lat, forBia.me?.lng], [-23.56, -46.64], 'e a própria posição já está lá');
+
+  const { w: w2, ana: a2, bia: b2 } = await pair();
+  const declined = await w2.core.flash.invite(a2, b2, { lat: -23.55, lng: -46.63 });
+  assert.equal(w2.flash.positions.size, 1);
+  await w2.core.flash.respond(b2, declined.id, 'decline');
+  assert.equal(w2.flash.positions.size, 0, 'recusou: a posição de quem convidou é apagada');
+});
