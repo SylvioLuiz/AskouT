@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toApiError } from './lib/errors.ts';
 import type { ApiError } from './lib/errors.ts';
+import { setBaseTitle } from './lib/tab-badge.ts';
 
 export interface AsyncState<T> {
   data: T | undefined;
@@ -49,7 +50,8 @@ export function useAsync<T>(load: () => Promise<T>, deps: readonly unknown[]): A
 export function useTitle(title: string | undefined): void {
   useEffect(() => {
     if (title === undefined) return;
-    document.title = title === '' ? 'AskouT' : `${title} · AskouT`;
+    // O número de mensagens novas, se houver, entra na frente (lib/tab-badge.ts).
+    setBaseTitle(title === '' ? 'AskouT' : `${title} · AskouT`);
   }, [title]);
 }
 
@@ -88,6 +90,21 @@ export const PUSH_EVENT = 'askout:push';
  * Mantém uma tela atualizada sozinha: de tempos em tempos (só com a aba visível), ao voltar para o app,
  * ao reconectar à internet e na hora em que chega um aviso.
  */
+/**
+ * Com a aba escondida (você está em outra aba ou janela), continua chamando `tick`, mais espaçado: é o que mantém o
+ * aviso de mensagem nova na aba do navegador. Com a aba aberta, quem atualiza é o usePolling/useLiveRefresh.
+ */
+export function useHiddenPolling(tick: () => void, everyMs: number): void {
+  const ref = useRef(tick);
+  ref.current = tick;
+  useEffect(() => {
+    const handle = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') ref.current();
+    }, everyMs);
+    return () => window.clearInterval(handle);
+  }, [everyMs]);
+}
+
 export function useLiveRefresh(tick: () => void, everyMs: number): void {
   usePolling(tick, everyMs);
   const ref = useRef(tick);
