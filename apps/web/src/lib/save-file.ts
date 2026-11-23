@@ -10,6 +10,7 @@ export interface ImageToSave {
 
 interface FilesBridge {
   saveImages(o: { files: { filename: string; base64: string }[] }): Promise<void>;
+  openDocument(o: { filename: string; base64: string }): Promise<void>;
 }
 
 interface SaveEnv {
@@ -54,6 +55,32 @@ function downloadOne(blob: Blob, filename: string) {
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Nome que serve em qualquer sistema (e passa na ponte nativa): letras simples, mantendo a extensão. */
+export function documentFileName(name: string): string {
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 ? name.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 5) : '';
+  const base = (dot > 0 ? name.slice(0, dot) : name)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9._ -]+/g, '-')
+    .replace(/^[-. ]+|[-. ]+$/g, '')
+    .slice(0, 80);
+  return `${base || 'arquivo'}${ext ? `.${ext}` : ''}`;
+}
+
+/**
+ * Abre um documento recebido na conversa. No app: grava no aparelho e abre o menu "Abrir com" (leitor de PDF, Drive,
+ * salvar em Arquivos...). No navegador: baixa com o nome original.
+ */
+export async function openDocument(blob: Blob, name: string, env: SaveEnv = globalThis as never): Promise<void> {
+  const bridge = env.AskouTFiles;
+  if (typeof bridge?.openDocument === 'function') {
+    await bridge.openDocument({ filename: documentFileName(name), base64: await toBase64(blob) });
+    return;
+  }
+  downloadOne(blob, name);
+}
 
 /** Salva as imagens. Devolve false se a pessoa fechou o menu sem salvar. */
 export async function saveImages(images: ImageToSave[], env: SaveEnv = globalThis as never): Promise<boolean> {
