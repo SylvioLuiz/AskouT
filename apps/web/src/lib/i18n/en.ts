@@ -3388,4 +3388,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Se escolher só o grupo, a capa do evento continua como está.": "If you choose only the group, the event cover stays as it is.",
   "Grupo e evento": "Group and event",
   "Só o grupo": "Only the group",
+  "O AskouT manda sua posição até o encontro acabar ou você parar.": "AskouT sends your location until the meetup ends or you stop.",
+  "{name} vê nas notificações quanto falta para você chegar. Pode bloquear o celular: o AskouT continua mandando sua posição até o encontro acabar ou você parar.": "{name} sees in their notifications how long until you arrive. You can lock your phone: AskouT keeps sending your location until the meetup ends or you stop.",
+  "Sem permissão de localização, sua chegada só atualiza com o AskouT aberto.": "Without location permission, your arrival only updates with AskouT open.",
+  "Abrir ajustes": "Open settings",
 };

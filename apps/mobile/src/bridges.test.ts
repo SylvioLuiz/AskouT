@@ -568,3 +568,55 @@ describe('galeria (iPhone)', () => {
     assert.deepEqual(discarded, ['file:///tmp/x.jpg']);
   });
 });
+
+describe('ponte de localização em segundo plano', () => {
+  it('liga o vigia com o aviso do Android, repassa posições e erros, e para uma vez só', async () => {
+    const { createBackgroundLocationBridge } = await import('./background-location-bridge.ts');
+    let cb: ((l?: { latitude: number; longitude: number; accuracy: number; time: number | null }, e?: { code?: string }) => void) | undefined;
+    const removed: string[] = [];
+    let options: Record<string, unknown> = {};
+    const bridge = createBackgroundLocationBridge({
+      plugin: {
+        async addWatcher(o, c) {
+          options = o;
+          cb = c;
+          return 'w1';
+        },
+        async removeWatcher(o) {
+          removed.push(o.id);
+        },
+        async openSettings() {},
+      },
+      http: { request: async () => ({ status: 200 }) },
+    });
+    const fixes: number[] = [];
+    const errors: string[] = [];
+    const stop = await bridge.start({ title: 'T', message: 'M', onFix: (f) => fixes.push(f.lat), onError: (c) => errors.push(c) });
+    assert.equal(options['backgroundMessage'], 'M');
+    assert.equal(options['backgroundTitle'], 'T');
+    cb?.({ latitude: -23.5, longitude: -46.6, accuracy: 9.6, time: 1 });
+    cb?.(undefined, { code: 'NOT_AUTHORIZED' });
+    assert.deepEqual(fixes, [-23.5]);
+    assert.deepEqual(errors, ['NOT_AUTHORIZED']);
+    await stop();
+    await stop();
+    assert.deepEqual(removed, ['w1']);
+  });
+
+  it('put: manda JSON pelo HTTP nativo e devolve 0 quando a conexão falha', async () => {
+    const { createBackgroundLocationBridge } = await import('./background-location-bridge.ts');
+    const sent: { headers: Record<string, string>; data?: unknown }[] = [];
+    const ok = createBackgroundLocationBridge({
+      plugin: { addWatcher: async () => 'x', removeWatcher: async () => {}, openSettings: async () => {} },
+      http: { request: async (o) => (sent.push(o), { status: 204 }) },
+    });
+    assert.equal(await ok.put('https://api/x', { Authorization: 'Bearer t' }, { lat: 1 }), 204);
+    assert.equal(sent[0]?.headers['Content-Type'], 'application/json');
+    assert.equal(sent[0]?.headers['Authorization'], 'Bearer t');
+    const down = createBackgroundLocationBridge({
+      plugin: { addWatcher: async () => 'x', removeWatcher: async () => {}, openSettings: async () => {} },
+      http: { request: async () => Promise.reject(new Error('offline')) },
+    });
+    assert.equal(await down.put('https://api/x', {}, {}), 0);
+  });
+});

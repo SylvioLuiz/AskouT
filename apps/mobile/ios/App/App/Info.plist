@@ -40,6 +40,12 @@
 	<string>O AskouT usa o microfone para gravar vídeos e mensagens de voz.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>O AskouT usa sua localização só quando você ativa o NOW, para seus amigos saberem onde te encontrar.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Só quando você escolhe mostrar sua chegada a um amigo no NOW: o AskouT continua mandando sua posição com o celular bloqueado até o encontro acabar ou você parar.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>

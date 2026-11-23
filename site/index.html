@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>AskouT · Menos tempo combinando. Mais tempo juntos.</title>
+  <meta name="description" content="AskouT: descubra quem está livre agora, encontre a melhor data com os amigos, vote no rolê e ache os melhores bares e eventos da cidade." />
+  <meta name="theme-color" content="#07051a" />
+  <meta property="og:title" content="AskouT · Menos tempo combinando. Mais tempo juntos." />
+  <meta property="og:description" content="Bares, eventos e amigos. Sem o grupo de 200 mensagens." />
+  <meta property="og:image" content="assets/icone-512.png" />
+  <link rel="icon" href="assets/favicon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@200;300;500;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Carregando -->
+  <div class="loader" id="loader" aria-hidden="true">
+    <div class="loader__mark">
+      <img src="assets/logo.png" alt="" class="loader__fill" id="loaderFill" />
+    </div>
+    <p class="loader__line">Menos tempo combinando.</p>
+    <p class="loader__count"><span id="loaderCount">0</span><small>%</small></p>
+  </div>
+
+  <div class="ambient" aria-hidden="true"><i></i><i></i></div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="progress" aria-hidden="true"><span id="progress"></span></div>
+
+  <!-- Navegação -->
+  <header class="nav" id="nav">
+    <a href="#topo" class="nav__logo" aria-label="AskouT, voltar ao topo">
+      <img src="assets/icone-512.png" alt="" />
+      <span>AskouT</span>
+    </a>
+    <div class="nav__right">
+      <a href="#baixar" class="btn btn--small btn--glow magnetic">Baixar</a>
+      <button class="nav__burger magnetic" id="burger" aria-label="Abrir menu" aria-expanded="false">
+        <span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <nav class="menu" id="menu" aria-hidden="true">
+    <ol class="menu__list">
+      <li><a href="#now"><small>01</small>NOW</a></li>
+      <li><a href="#agenda"><small>02</small>Agenda</a></li>
+      <li><a href="#eventos"><small>03</small>Eventos</a></li>
+      <li><a href="#explorar"><small>04</small>Explorar</a></li>
+      <li><a href="#locais"><small>05</small>Para bares</a></li>
+      <li><a href="#baixar"><small>06</small>Baixar</a></li>
+    </ol>
+    <p class="menu__foot">Menos tempo combinando. Mais tempo juntos.</p>
+  </nav>
+
+  <main id="topo">
+    <!-- 1. Intro: zoom através do nome -->
+    <section class="intro" id="intro">
+      <div class="intro__sticky">
+        <canvas class="intro__scene" id="scene"></canvas>
+        <div class="intro__brand" id="brand">
+          <div class="intro__ring">
+            <svg class="ring" id="ring" viewBox="0 0 200 200" aria-hidden="true"><g class="ring__spin"></g></svg>
+            <img class="ring__logo" src="assets/logo.png" alt="" />
+          </div>
+          <p class="intro__word" aria-label="AskouT"><span>A</span><span>S</span><span>K</span><span>O</span><span>U</span><span>T</span></p>
+        </div>
+
+        <div class="intro__top" id="introTop">
+          <p class="kicker">Bares · eventos · amigos</p>
+        </div>
+        <div class="intro__bottom" id="introBottom">
+          <p>O app pra sair com quem você gosta.<br />Sem o grupo de 200 mensagens.</p>
+          <span class="scrollhint"><i></i>Role para entrar</span>
+        </div>
+
+        <div class="intro__hero" id="introHero">
+          <h1 class="display">
+            <span class="line"><span>Menos tempo</span></span>
+            <span class="line"><span>combinando.</span></span>
+            <span class="line"><span class="grad">Mais tempo juntos.</span></span>
+          </h1>
+          <div class="intro__ctas">
+            <a href="#baixar" class="btn btn--glow magnetic">Quero o AskouT</a>
+            <a href="#now" class="btn btn--ghost magnetic">Ver como funciona</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Manifesto: palavras acendem com a rolagem -->
+    <section class="manifesto" id="manifesto">
+      <div class="manifesto__sticky">
+        <p class="manifesto__text" id="manifestoText">O grupo tem 200 mensagens. Ninguém decidiu nada. Cada um pode num dia. O bar lotou. E o rolê ficou pra próxima. <em>Chega disso.</em></p>
+      </div>
+    </section>
+
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee__track">
+        <span>Livre agora? <b>✦</b> Bora sexta? <b>✦</b> Quem vai? <b>✦</b> Onde é? <b>✦</b> Rooftop <b>✦</b> Happy hour <b>✦</b> Show <b>✦</b> Aniversário <b>✦</b> </span>
+        <span>Livre agora? <b>✦</b> Bora sexta? <b>✦</b> Quem vai? <b>✦</b> Onde é? <b>✦</b> Rooftop <b>✦</b> Happy hour <b>✦</b> Show <b>✦</b> Aniversário <b>✦</b> </span>
+      </div>
+    </div>
+
+    <section class="cardrev" data-c1="#ff4fb0" data-c2="#5a2bff" aria-hidden="true">
+      <div class="cardrev__sticky">
+        <div class="cardrev__frame" style="--g1:#ff4fb0;--g2:#5a2bff">
+          <div class="cardrev__word">NOW</div>
+          <div class="cardrev__text">
+            <p class="cardrev__num">Capítulo 01</p>
+            <p class="cardrev__title">NOW</p>
+            <p class="cardrev__tag">Quem tá livre, tá perto.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. NOW (livre agora) -->
+    <section class="chapter" id="now" data-c1="#ff4fb0" data-c2="#5a2bff">
+      <div class="chapter__bigword" data-drift="-1">NOW</div>
+      <div class="chapter__grid">
+        <div class="chapter__copy reveal">
+          <p class="chapter__num"><span>01</span> NOW</p>
+          <h2 class="display">Livre<br /><span class="grad">agora?</span></h2>
+          <p class="lead">Ative o NOW e veja quais amigos também estão livres neste momento. Um toque e o encontro está marcado.</p>
+          <ul class="ticks">
+            <li><b>Só seus amigos</b> veem você</li>
+            <li><b>Tempo limitado</b>: some sozinho quando acaba</li>
+            <li><b>Você controla</b> a sua localização</li>
+            <li><b>Chegada ao vivo</b>: acompanhe o amigo chegando nas notificações do celular, como o carro no Uber (só se ele liberar)</li>
+          </ul>
+        </div>
+
+        <div class="demo demo--flash reveal" id="flashDemo">
+          <div class="radar" id="radar">
+            <span class="radar__ring"></span><span class="radar__ring"></span><span class="radar__ring"></span>
+            <span class="radar__sweep"></span>
+            <button class="radar__core magnetic" id="flashBtn" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4 14h6.5L9.5 22 20 9.5h-6.6L13.5 2Z" /></svg>
+              <span id="flashLabel">Ativar</span>
+            </button>
+            <div class="radar__friend" style="--a:-35deg;--r:46%" data-name="Marina" data-dist="600 m"><img src="assets/avatares/a.jpg" alt="" /></div>
+            <div class="radar__friend" style="--a:40deg;--r:44%" data-name="Rafa" data-dist="1,2 km"><img src="assets/avatares/b.jpg" alt="" /></div>
+            <div class="radar__friend" style="--a:150deg;--r:45%" data-name="Bia" data-dist="900 m"><img src="assets/avatares/c.jpg" alt="" /></div>
+            <div class="radar__friend" style="--a:225deg;--r:42%" data-name="Léo" data-dist="2 km"><img src="assets/avatares/d.jpg" alt="" /></div>
+          </div>
+          <div class="chips" role="radiogroup" aria-label="Por quanto tempo">
+            <button class="chip" data-min="30">30 min</button>
+            <button class="chip" data-min="60">1 hora</button>
+            <button class="chip is-on" data-min="120">2 horas</button>
+            <button class="chip" data-min="180">3 horas</button>
+          </div>
+          <p class="demo__status" id="flashStatus">Escolha por quanto tempo e toque no raio.</p>
+          <div class="toasts" id="toasts" aria-live="polite"></div>
+          <div class="arrival" id="arrival" aria-label="Exemplo de notificação de chegada">
+            <div class="arrival__head"><span class="arrival__app">AskouT</span><span class="arrival__when">agora</span></div>
+            <div class="arrival__row">
+              <img src="assets/avatares/a.jpg" alt="" />
+              <div>
+                <b id="arrivalTitle">Marina está a caminho</b>
+                <small id="arrivalBody">Chega em ~8 min · 650 m até Bar do Zé</small>
+              </div>
+            </div>
+            <div class="arrival__bar"><span id="arrivalBar"></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Agenda -->
+    <section class="chapter chapter--flip" id="agenda" data-c1="#ff8a5c" data-c2="#ff2d87">
+      <div class="chapter__bigword" data-drift="1">AGENDA</div>
+      <div class="chapter__grid">
+        <div class="chapter__copy reveal">
+          <p class="chapter__num"><span>02</span> Agenda</p>
+          <h2 class="display">A melhor data<br /><span class="grad">em um toque.</span></h2>
+          <p class="lead">O AskouT cruza a agenda de todo mundo e mostra quando o grupo inteiro pode. Sincronize com Google, Outlook ou a agenda do celular: só os horários ocupados entram, nunca o que você vai fazer.</p>
+          <p class="hint">Toque nos horários em que <b>você</b> está livre e depois em “Encontrar melhor data”.</p>
+        </div>
+
+        <div class="demo demo--agenda reveal">
+          <div class="agenda" id="agendaGrid" role="grid" aria-label="Disponibilidade da semana"></div>
+          <div class="agenda__legend">
+            <span><i class="lg lg--you"></i>Você livre</span>
+            <span><i class="lg lg--heat"></i>Amigos livres</span>
+          </div>
+          <div class="demo__actions">
+            <button class="btn btn--ghost btn--small magnetic" id="syncBtn">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4" /></svg>
+              Sincronizar agenda
+            </button>
+            <button class="btn btn--glow btn--small magnetic" id="bestBtn">Encontrar melhor data</button>
+          </div>
+          <p class="demo__status" id="agendaStatus">5 pessoas no grupo · Marina, Rafa, Bia, Léo e você</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Eventos e votação -->
+    <section class="chapter" id="eventos" data-c1="#a35cff" data-c2="#ff4fb0">
+      <div class="chapter__bigword" data-drift="-1">ROLÊ</div>
+      <div class="chapter__grid">
+        <div class="chapter__copy reveal">
+          <p class="chapter__num"><span>03</span> Eventos</p>
+          <h2 class="display">Crie o rolê.<br /><span class="grad">A galera vota.</span></h2>
+          <p class="lead">Sem data definida? Abra uma votação. Cada um escolhe o que pode, o evento mostra quem vai, e o grupo conversa ali mesmo, com fotos, posts e álbum do rolê depois.</p>
+          <ul class="ticks">
+            <li><b>Votação de datas</b> com resultado ao vivo</li>
+            <li><b>“Eu vou”</b> e lista de quem confirmou</li>
+            <li><b>Álbum</b> do evento para todo mundo</li>
+          </ul>
+        </div>
+
+        <div class="demo demo--poll reveal" id="poll">
+          <div class="evcard">
+            <div class="evcard__cover">
+              <span class="badge">Data em votação</span>
+              <h3>Aniversário da Bia</h3>
+              <p>Rooftop Aurora · Pinheiros</p>
+            </div>
+            <div class="evcard__body">
+              <p class="evcard__q">Qual dia fica melhor pra você?</p>
+              <div class="poll" id="pollOpts">
+                <button class="poll__opt" data-i="0"><span class="poll__fill"></span><span class="poll__label">Sex, 4 dez · 20h</span><span class="poll__pct">0%</span></button>
+                <button class="poll__opt" data-i="1"><span class="poll__fill"></span><span class="poll__label">Sáb, 5 dez · 21h</span><span class="poll__pct">0%</span></button>
+                <button class="poll__opt" data-i="2"><span class="poll__fill"></span><span class="poll__label">Sex, 11 dez · 19h</span><span class="poll__pct">0%</span></button>
+              </div>
+              <div class="evcard__foot">
+                <div class="stack" id="pollStack"></div>
+                <span id="pollCount">0 votos</span>
+              </div>
+              <button class="btn btn--glow btn--block magnetic" id="goingBtn" disabled>Vote para confirmar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cardrev" data-c1="#5ac8ff" data-c2="#a35cff" aria-hidden="true">
+      <div class="cardrev__sticky">
+        <div class="cardrev__frame" style="--g1:#5ac8ff;--g2:#a35cff">
+          <div class="cardrev__word">Explorar</div>
+          <div class="cardrev__text">
+            <p class="cardrev__num">Capítulo 04</p>
+            <p class="cardrev__title">Explorar</p>
+            <p class="cardrev__tag">O que rola hoje na sua cidade.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Explorar: mapa -->
+    <section class="chapter chapter--flip" id="explorar" data-c1="#5ac8ff" data-c2="#a35cff">
+      <div class="chapter__bigword" data-drift="1">CIDADE</div>
+      <div class="chapter__grid">
+        <div class="chapter__copy reveal">
+          <p class="chapter__num"><span>04</span> Explorar</p>
+          <h2 class="display">A cidade<br /><span class="grad">acesa.</span></h2>
+          <p class="lead">Bares, rooftops, shows e festas no mapa. O pin mostra quantos eventos cada lugar tem, e o que rola fora dos locais aparece em outra cor. Toque e veja o que tem hoje.</p>
+          <div class="chips chips--left" id="mapFilters">
+            <button class="chip is-on" data-f="all">Tudo</button>
+            <button class="chip" data-f="hoje">Hoje</button>
+            <button class="chip" data-f="fds">Fim de semana</button>
+          </div>
+        </div>
+
+        <div class="demo demo--map reveal">
+          <div class="map" id="map">
+            <svg class="map__svg" id="mapSvg" viewBox="0 0 600 600" aria-hidden="true"></svg>
+            <div class="map__pins" id="mapPins"></div>
+            <div class="map__card" id="mapCard" hidden></div>
+          </div>
+          <div class="agenda__legend">
+            <span><i class="lg lg--pin"></i>Locais</span>
+            <span><i class="lg lg--ev"></i>Eventos em outros lugares</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. Conversas -->
+    <section class="chapter" id="conversas" data-c1="#ff6f91" data-c2="#a35cff">
+      <div class="chapter__bigword" data-drift="-1">BORA?</div>
+      <div class="chapter__grid">
+        <div class="chapter__copy reveal">
+          <p class="chapter__num"><span>✦</span> Conversas</p>
+          <h2 class="display">Do “bora?”<br /><span class="grad">ao “cheguei”.</span></h2>
+          <p class="lead">Converse com os amigos, mostre o rolê no Flash, do jeito dos stories, e receba sugestões de lugares perto de todo mundo. A conversa vira encontro sem sair do app.</p>
+          <button class="btn btn--ghost btn--small magnetic" id="chatReplay">Repetir conversa</button>
+        </div>
+        <div class="demo demo--chat reveal">
+          <div class="chat" id="chat" aria-live="polite">
+            <div class="chat__head"><img src="assets/avatares/c.jpg" alt="" /><div><b>Sextou 🍻</b><small>Marina, Rafa, Bia, Léo</small></div></div>
+            <div class="chat__body" id="chatBody"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cardrev" data-c1="#ffc48a" data-c2="#ff4fb0" aria-hidden="true">
+      <div class="cardrev__sticky">
+        <div class="cardrev__frame" style="--g1:#ffc48a;--g2:#ff4fb0">
+          <div class="cardrev__word">Bares</div>
+          <div class="cardrev__text">
+            <p class="cardrev__num">Capítulo 05</p>
+            <p class="cardrev__title">Bares</p>
+            <p class="cardrev__tag">Seu lugar no centro do rolê.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. Para bares -->
+    <section class="venues" id="locais" data-c1="#ffc48a" data-c2="#ff4fb0">
+      <div class="venues__head reveal">
+        <p class="chapter__num"><span>05</span> Para bares e casas</p>
+        <h2 class="display">Seu lugar no<br /><span class="grad">mapa do rolê.</span></h2>
+        <p class="lead">Reivindique seu local, publique eventos e ofertas e apareça para quem está decidindo onde ir agora.</p>
+      </div>
+      <div class="cards">
+        <article class="card tilt reveal"><span class="card__n">A</span><h3>Reivindique seu local</h3><p>Assuma a página do seu bar, com fotos, horários e endereço certinhos.</p></article>
+        <article class="card tilt reveal"><span class="card__n">B</span><h3>Eventos e agenda</h3><p>Publique a programação e veja quantas pessoas disseram “Eu vou”.</p></article>
+        <article class="card tilt reveal"><span class="card__n">C</span><h3>Ofertas</h3><p>Happy hour, combo, open bar: mostre o que tem de bom hoje.</p></article>
+        <article class="card tilt reveal"><span class="card__n">D</span><h3>Check-in e guarda-volumes</h3><p>Entrada organizada e guarda-volumes pelo celular, sem fila de papel.</p></article>
+        <article class="card card--hot tilt reveal"><span class="card__n">⚡</span><h3>Impulsione</h3><p>Coloque o evento na frente de mais gente perto de você.</p><p class="card__price">a partir de <b>R$ 14,90</b> / dia</p></article>
+      </div>
+    </section>
+
+    <!-- 10. Baixar -->
+    <section class="outro" id="baixar" data-c1="#ff4fb0" data-c2="#5ac8ff">
+      <div class="outro__ring" id="outroRing">
+        <img class="ring__logo" src="assets/logo.png" alt="Logo do AskouT" />
+      </div>
+      <h2 class="display outro__title"><span class="grad">Bora?</span></h2>
+      <p class="lead">O AskouT está chegando na App Store e no Google Play.<br />Enquanto isso, já dá pra usar no navegador.</p>
+      <div class="stores">
+        <a class="store magnetic" href="#baixar" aria-disabled="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.3ZM13.9 5.2c.7-.9 1.2-2 1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3.1-1.5Z" /></svg>
+          <span><small>Em breve na</small>App Store</span>
+        </a>
+        <a class="store magnetic" href="#baixar" aria-disabled="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.6 2.2 13.4 12l-9.8 9.8c-.3-.2-.5-.6-.5-1.1V3.3c0-.5.2-.9.5-1.1Zm10.6 10.6 2.6 2.6-11.3 6.4 8.7-9Zm3.6-3.6 2.9 1.7c.8.5.8 1.7 0 2.2l-2.9 1.7-2.8-2.8 2.8-2.8ZM5.5 2.2l11.3 6.4-2.6 2.6-8.7-9Z" /></svg>
+          <span><small>Em breve no</small>Google Play</span>
+        </a>
+      </div>
+      <a href="https://askout.com.br" class="btn btn--glow magnetic">Abrir no navegador</a>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <img src="assets/icone-512.png" alt="" />
+    <p>© 2026 AskouT · Menos tempo combinando. Mais tempo juntos.</p>
+    <nav>
+      <a href="https://askout.com.br/politica-de-privacidade">Privacidade</a>
+      <a href="https://askout.com.br">askout.com.br</a>
+    </nav>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
