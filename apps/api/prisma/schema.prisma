@@ -153,6 +153,8 @@ enum MessageKind {
   AUDIO
   IMAGE
   VIDEO
+  /// Documento (PDF, Word, Excel, PowerPoint, texto). O nome do arquivo fica no body; os bytes, em MessageMedia.
+  FILE
 }
 
 model User {

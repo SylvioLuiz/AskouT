@@ -3,7 +3,8 @@ import { buildEventCards } from './event-card.ts';
 import type { EventCardView } from './event-card.ts';
 import { decodeAudioDataUrl, parseAudioDuration } from './audio.ts';
 import { decodeImageDataUrl } from './image.ts';
-import { parseChatMedia } from './media.ts';
+import { parseChatFile, parseChatMedia } from './media.ts';
+import type { ChatFile } from './media.ts';
 import { commentEvidence, gifOf, parseCommentGif } from './gif.ts';
 import type { CommentGif } from './gif.ts';
 import type { ChatMedia } from './media.ts';
@@ -270,6 +271,8 @@ export interface SendInput {
   gif?: unknown;
   /** Responde a esta mensagem (junto de qualquer conteúdo). */
   replyToId?: unknown;
+  /** Documento: `{mime, data, name}` (arquivo cru, como foto e vídeo). */
+  file?: unknown;
   /** Uso interno (resposta/reação de story): anexa o story à mensagem. Nunca vem do corpo da requisição. */
   storyId?: string;
 }
@@ -819,7 +822,8 @@ export class ConversationService {
     const hasAudio = input.audio !== undefined && input.audio !== null;
     const hasMedia = input.media !== undefined && input.media !== null;
     const hasGif = input.gif !== undefined && input.gif !== null;
-    if ([hasText, hasSuggestion, hasEvent, hasAudio, hasMedia, hasGif].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo', { body: 'Envie um texto, uma sugestão, um evento, um áudio, uma foto ou um vídeo' });
+    const hasFile = input.file !== undefined && input.file !== null;
+    if ([hasText, hasSuggestion, hasEvent, hasAudio, hasMedia, hasGif, hasFile].filter(Boolean).length !== 1) throw validationError('Envie um texto, uma sugestão, um evento, um áudio, uma foto, um vídeo ou um arquivo', { body: 'Envie um texto, uma sugestão, um evento, um áudio, uma foto, um vídeo ou um arquivo' });
     if (hasSuggestion && conversation.type === 'GROUP') throw validationError('Sugestões de local só em conversas 1 a 1', { suggestion: 'Sugestões de local só em conversas 1 a 1' });
 
     let kind: MessageKind = 'TEXT';
@@ -832,7 +836,13 @@ export class ConversationService {
     let media: ChatMedia | undefined;
     let audioMs: number | null = null;
     let gif: CommentGif | null = null;
-    if (hasGif) {
+    let file: ChatFile | undefined;
+    if (hasFile) {
+      const f = input.file as { mime?: unknown; data?: unknown; name?: unknown };
+      file = parseChatFile(f.mime, f.data, f.name);
+      kind = 'FILE';
+      body = file.name;
+    } else if (hasGif) {
       gif = parseCommentGif(input.gif);
       body = 'GIF';
     } else if (hasMedia) {
@@ -879,7 +889,7 @@ export class ConversationService {
 
     const replyToId = await this.parseReply(conversationId, input.replyToId);
     const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, ...(input.storyId ? { storyId: input.storyId } : {}), ...(gif ? { gifId: gif.id, gifUrl: gif.url } : {}), createdAt: now };
-    await conversations.addMessage(message, audio ?? (media ? { mime: media.mime, data: media.data } : undefined));
+    await conversations.addMessage(message, audio ?? (media ? { mime: media.mime, data: media.data } : file ? { mime: file.mime, data: file.data } : undefined));
     const asRequest = delivery === 'REQUEST' && otherId !== null;
     if (asRequest && (conversation.requestToId !== otherId || conversation.requestDeclinedAt)) {
       // Nova solicitação, ou recusada que volta com a mensagem nova.
@@ -901,7 +911,7 @@ export class ConversationService {
     const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
     // Mensagem de texto: o aviso (sino/push) mostra um pedaço do que foi escrito; os outros tipos dizem o que foi enviado.
     const preview = kind === 'TEXT' && !gif ? messagePreview(body) : undefined;
-    if (!asRequest) await this.notifyMembers(actorId, conversation.venueId ? await this.venueNoticeName(actorId, conversation, actorName) : actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
+    if (!asRequest) await this.notifyMembers(actorId, conversation.venueId ? await this.venueNoticeName(actorId, conversation, actorName) : actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : file ? 'enviou um arquivo' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
     const decor = await this.decorate(actorId, [message]);
     // Texto com link de evento: já volta com o cartão (como na lista de mensagens).
     const linked = linkedEventId(message);
@@ -909,14 +919,14 @@ export class ConversationService {
     return toMessageView(message, actorId, { distances: suggestion ? this.distancesOf(suggestion, positions) : null, senderName, event: eventCard ?? linkCard, replyTo: decor.replies.get(message.id) ?? null, story: message.storyId ? (decor.stories.get(message.storyId) ?? null) : null });
   }
 
-  /** Bytes de uma foto ou vídeo, só para quem está na conversa. */
-  async media(actorId: string, conversationId: string, messageId: string): Promise<{ mime: string; data: Uint8Array }> {
+  /** Bytes de uma foto, vídeo ou documento, só para quem está na conversa. Documento vem com o nome (para baixar). */
+  async media(actorId: string, conversationId: string, messageId: string): Promise<{ mime: string; data: Uint8Array; name?: string }> {
     await this.access(actorId, conversationId);
     const message = typeof messageId === 'string' && messageId.length <= 64 ? await this.deps.conversations.findMessage(messageId) : undefined;
-    if (!message || message.conversationId !== conversationId || (message.kind !== 'IMAGE' && message.kind !== 'VIDEO') || message.deletedAt) throw notFound('Arquivo não encontrado');
+    if (!message || message.conversationId !== conversationId || (message.kind !== 'IMAGE' && message.kind !== 'VIDEO' && message.kind !== 'FILE') || message.deletedAt) throw notFound('Arquivo não encontrado');
     const found = await this.deps.conversations.findMedia(messageId);
     if (!found) throw notFound('Arquivo não encontrado');
-    return found;
+    return message.kind === 'FILE' ? { ...found, name: message.body } : found;
   }
 
   /** Reage com qualquer emoji (um por pessoa); mandar o mesmo de novo (ou `null`) tira a reação. */
@@ -939,7 +949,7 @@ export class ConversationService {
     await this.access(actorId, conversationId);
     const message = await this.visibleMessage(actorId, conversationId, messageId);
     if (message.senderId !== actorId) throw forbidden('Só quem enviou apaga a mensagem');
-    if (!['TEXT', 'AUDIO', 'IMAGE', 'VIDEO', 'EVENT'].includes(message.kind)) throw validationError('Esta mensagem não pode ser apagada', { message: 'Só texto, áudio, foto, vídeo e evento' });
+    if (!['TEXT', 'AUDIO', 'IMAGE', 'VIDEO', 'FILE', 'EVENT'].includes(message.kind)) throw validationError('Esta mensagem não pode ser apagada', { message: 'Só texto, áudio, foto, vídeo, arquivo e evento' });
     const now = clock.now();
     if (!(await conversations.softDeleteMessage(messageId, now))) throw conflict('Esta mensagem já foi apagada');
     return toMessageView({ ...message, body: DELETED_BODY, deletedAt: now }, actorId);
@@ -1195,6 +1205,8 @@ export class ConversationService {
         if (m.audioMs != null) voice.push({ ...base, durationMs: m.audioMs });
         continue;
       }
+      // O nome de um documento não é link.
+      if (m.kind === 'FILE') continue;
       for (const url of extractLinks(m.body)) links.push({ ...base, url });
     }
     const views = await buildMeetupViews(this.deps, actorId, await meetups.listForConversation(conversationId));

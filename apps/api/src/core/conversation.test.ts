@@ -420,3 +420,17 @@ test('messages: myReadAt diz até onde você tinha lido antes de abrir (para a d
   assert.equal((await w.core.conversations.messages(bia, id)).myReadAt, readAt);
   assert.notEqual((await w.core.conversations.messages(bia, id)).myReadAt, readAt, 'abrir de novo já conta como lido');
 });
+
+test('arquivo: PDF vira mensagem FILE com o nome, baixa com o nome e só para quem está na conversa', async () => {
+  const { w, ana, bia, caio, id } = await friends();
+  const pdf = new Uint8Array(Buffer.from('%PDF-1.7 conteúdo', 'latin1'));
+  const sent = await w.core.conversations.send(ana, id, { file: { mime: 'application/pdf', data: pdf, name: 'Ingresso show.pdf' } });
+  assert.equal(sent.kind, 'FILE');
+  assert.equal(sent.body, 'Ingresso show.pdf');
+  const got = await w.core.conversations.media(bia, id, sent.id);
+  assert.equal(got.mime, 'application/pdf');
+  assert.equal(got.name, 'Ingresso show.pdf');
+  assert.deepEqual([...got.data], [...pdf]);
+  await rejectsWith(w.core.conversations.media(caio, id, sent.id), 'NOT_FOUND');
+  await rejectsWith(w.core.conversations.send(ana, id, { file: { mime: 'application/pdf', data: new Uint8Array(Buffer.from('MZ', 'latin1')), name: 'x.pdf' } }), 'VALIDATION');
+});
