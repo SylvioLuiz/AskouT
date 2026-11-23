@@ -4736,6 +4736,13 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .dpsum__todo { font-weight: 700; color: var(--brand-text); }
 .chathead { flex-wrap: wrap; }
 .chathead__below { flex: 0 0 100%; min-width: 0; }
+/* Encontro do NOW fixado no topo do chat. */
+.matchpin { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 4px 2px 0; }
+.matchpin__icon { color: var(--now-pink, var(--brand-text)); }
+.matchpin__main .pollpin__status { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.matchpin__tools { display: flex; gap: 6px; }
+.matchpin__chip { min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.8125rem; font-weight: 600; cursor: pointer; }
+.matchpin__chip:hover, .matchpin__chip:focus-visible { border-color: var(--brand-text); }
 .pollline { display: flex; flex-direction: column; gap: 2px; padding: 4px 2px 0; }
 .pollline__item { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 0.8125rem; color: var(--ink-2); text-decoration: none; min-height: 24px; line-height: 24px; }
 .pollline__name { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -6060,6 +6067,9 @@ button.reactlist__row { cursor: pointer; }
 /* Mensagens novas enquanto você lia lá em cima */
 .chat__newbtn { position: sticky; bottom: calc(84px + var(--sa-bottom)); z-index: 5; align-self: center; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin: 0 0 8px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font: inherit; font-size: 0.875rem; font-weight: 500; box-shadow: 0 4px 14px rgb(0 0 0 / 0.2); cursor: pointer; animation: msgpop-in 160ms ease-out; }
 .chat__newbtn svg { width: 18px; height: 18px; }
+/* Links no texto das mensagens: sublinhados, na cor do balão, e quebram em vez de vazar. */
+.textlink { color: inherit; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; word-break: break-word; }
+.bubble:not(.bubble--mine) .textlink { color: var(--brand-text); }
 /* "Enviar para…" (compartilhado de outro app). */
 .sharein { display: grid; gap: 12px; padding-bottom: calc(84px + var(--sa-bottom)); }
 .sharein__items { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -6584,7 +6594,10 @@ div.optrow__main { cursor: default; }
 
 /* Emoji e GIF dentro da caixa do chat, antes do enviar; a lista de emojis abre acima da barra. */
 .composer__pill .commenttools { display: flex; flex: none; gap: 0; margin: 0; }
-.composer__pill .commenttools__btn { min-width: 36px; min-height: 40px; padding: 0 6px; border: 0; background: transparent; font-size: 0.75rem; }
+.composer__pill .commenttools__btn { min-width: 34px; min-height: 40px; padding: 0 5px; border: 0; background: transparent; font-size: 0.75rem; }
+/* Caixa vazia: emoji, GIF, clipe, galeria e microfone cabem numa tela de 375 px sem espremer o campo. */
+.composer__pill .composer__tool { width: 36px; }
+.composer__pill .composer__input--pill { min-width: 72px; }
 .composer__pill .commenttools__btn > span { font-size: 1.25rem; }
 .composer__pill .commenttools__btn--on { background: var(--brand-soft); }
 .composer .emojipanel { position: absolute; left: 16px; right: 16px; bottom: 100%; z-index: 2; margin: 0 0 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .18); }
