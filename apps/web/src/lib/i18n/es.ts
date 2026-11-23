@@ -3426,4 +3426,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Convite enviado para: {name} e mais {n}": "Invitación enviada a: {name} y {n} más",
   "Quem você marcou já está convidado.": "La persona que etiquetaste ya está invitada.",
   "As {n} pessoas que você marcou já estão convidadas.": "Las {n} personas que etiquetaste ya están invitadas.",
+  "Amigos em comum: {a}": "Amigos en común: {a}",
+  "Amigos em comum: {a} e {b}": "Amigos en común: {a} y {b}",
+  "Amigos em comum: {a}, {b} e mais {n}": "Amigos en común: {a}, {b} y {n} más",
+  "Amigos em comum ({n})": "Amigos en común ({n})",
 };

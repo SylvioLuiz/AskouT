@@ -140,6 +140,27 @@ export class FollowService {
       .sort((a, b) => a.username.localeCompare(b.username, 'pt-BR') || a.userId.localeCompare(b.userId));
   }
 
+  /**
+   * Amigos em comum entre o visitante e o dono do perfil: amigos dos dois (seguimento mútuo, sem bloqueio),
+   * fora quem tem bloqueio com o visitante. No próprio perfil ou sem nenhum em comum, a lista vem vazia.
+   * Mostra os amigos do próprio visitante, então vale até para perfil privado.
+   */
+  async mutualFriends(viewerId: string, targetId: string): Promise<{ items: PublicProfile[]; total: number }> {
+    if (viewerId === targetId) return { items: [], total: 0 };
+    await this.requireVisibleTarget(viewerId, targetId);
+    const { follows, blocks, users } = this.deps;
+    const [mine, theirs, related] = await Promise.all([follows.listFriendIds(viewerId), follows.listFriendIds(targetId), blocks.listRelatedIds(viewerId)]);
+    const hidden = new Set([viewerId, targetId, ...related]);
+    const theirSet = new Set(theirs);
+    const ids = mine.filter((id) => theirSet.has(id) && !hidden.has(id));
+    if (ids.length === 0) return { items: [], total: 0 };
+    const profiles = await users.findProfilesByIds(ids);
+    const items = profiles
+      .map(toPublicProfile)
+      .sort((a, b) => a.username.localeCompare(b.username, 'pt-BR') || a.userId.localeCompare(b.userId));
+    return { items, total: items.length };
+  }
+
   /** Quem a pessoa já segue ou pediu para seguir. */
   private async followedIds(actorId: string): Promise<Set<string>> {
     const out = new Set<string>();

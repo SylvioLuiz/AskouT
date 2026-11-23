@@ -8,6 +8,7 @@ import { ProfileActions } from '../components/profile-actions.tsx';
 import { ProfileMenu } from '../components/profile-menu.tsx';
 import { PostedEvents } from '../components/profile-events.tsx';
 import { AttendedEvents } from '../components/profile-attended.tsx';
+import { MutualFriends } from '../components/profile-mutual.tsx';
 import { PostGrid } from '../components/post.tsx';
 import { ChatButton } from '../components/chat-button.tsx';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
@@ -255,6 +256,8 @@ export function ProfileScreen({ username }: { username: string }) {
           </span>
         </p>
       ) : null}
+
+      {!relationship.isSelf && !relationship.blockedByViewer ? <MutualFriends userId={profile.userId} /> : null}
 
       {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
 
