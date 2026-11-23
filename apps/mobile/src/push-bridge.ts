@@ -57,6 +57,8 @@ export function openInApp(path: string, win: InAppWindow): void {
 /** Plugin do app no iPhone (ArrivalActivities.swift): token "push-to-start" da Live Activity da chegada ao vivo. */
 export interface LiveActivityPluginLike {
   startToken(): Promise<{ token?: string }>;
+  /** A chegada `tag` está na tela bloqueada agora? Sem `showing` onde não há Live Activity. */
+  isShowing?(options: { tag: string }): Promise<{ showing?: boolean }>;
 }
 
 export function createPushBridge(deps: { push: PushPluginLike; open: (path: string) => void; timeoutMs?: number; liveActivity?: LiveActivityPluginLike | undefined }) {
@@ -96,6 +98,16 @@ export function createPushBridge(deps: { push: PushPluginLike; open: (path: stri
       try {
         const token = (await deps.liveActivity.startToken()).token;
         return typeof token === 'string' && /^[0-9a-f]{32,200}$/i.test(token) ? token : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    /** A Live Activity da chegada `tag` está na tela? `undefined` onde não há (Android, iPhone antigo, build antigo). */
+    async liveActivityShowing(tag: string): Promise<boolean | undefined> {
+      if (!deps.liveActivity?.isShowing) return undefined;
+      try {
+        const { showing } = await deps.liveActivity.isShowing({ tag });
+        return typeof showing === 'boolean' ? showing : undefined;
       } catch {
         return undefined;
       }

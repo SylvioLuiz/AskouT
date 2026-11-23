@@ -207,6 +207,16 @@ describe('ponte de avisos (push)', () => {
     assert.equal(await createPushBridge({ push, open: () => undefined, liveActivity: { startToken: async () => Promise.reject(new Error('x')) } }).liveActivityToken(), undefined);
   });
 
+  it('liveActivityShowing: diz se a chegada está na tela, e nada sem o plugin', async () => {
+    const push = fakePush({ token: 'ab12' }).push;
+    assert.equal(await createPushBridge({ push, open: () => undefined }).liveActivityShowing('arrival:1:2'), undefined);
+    const asked: string[] = [];
+    const bridge = createPushBridge({ push, open: () => undefined, liveActivity: { startToken: async () => ({}), isShowing: async ({ tag }) => (asked.push(tag), { showing: false }) } });
+    assert.equal(await bridge.liveActivityShowing('arrival:1:2'), false);
+    assert.deepEqual(asked, ['arrival:1:2']);
+    assert.equal(await createPushBridge({ push, open: () => undefined, liveActivity: { startToken: async () => ({}), isShowing: async () => ({}) } }).liveActivityShowing('t'), undefined);
+  });
+
   it('não pede de novo quando já está liberado, e devolve undefined quando a pessoa recusa', async () => {
     const ok = fakePush({ receive: 'granted', token: 'cd34' });
     assert.equal(await createPushBridge({ push: ok.push, open: () => undefined }).register(), 'cd34');

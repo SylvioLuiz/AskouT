@@ -107,6 +107,8 @@ export interface NativePushBridge {
   replies?: boolean;
   /** iPhone: token "push-to-start" da Live Activity da chegada ao vivo (versões novas da casca, iOS 17.2+). */
   liveActivityToken?(): Promise<string | undefined>;
+  /** iPhone: a Live Activity da chegada `tag` está na tela? `undefined` onde não há. */
+  liveActivityShowing?(tag: string): Promise<boolean | undefined>;
 }
 
 const LIVE_TOKEN_KEY = 'askout.push.live-token';

@@ -101,6 +101,15 @@ export class NotificationsController {
     return this.core.notifications.registerLiveActivity(b.registration, b.token);
   }
 
+  /** A pessoa fechou a Live Activity da chegada no iPhone: `{registration, token}` (como no registro acima). */
+  @Public()
+  @Post('push/live-activity/closed')
+  @HttpCode(200)
+  liveActivityClosed(@Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.notifications.closeLiveActivity(b.registration, b.token);
+  }
+
   @Public()
   @Post('push/reply')
   @HttpCode(200)

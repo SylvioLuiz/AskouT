@@ -12,7 +12,9 @@ import ActivityKit
 ///    (ponte `window.AskouTPush.liveActivityToken`, ver apps/web/src/lib/push.ts);
 /// 2. quando o servidor abre uma atividade, manda o token dela para `<API>/notifications/push/live-activity`, com o
 ///    `registration` assinado que veio dentro da atividade (sem login: o iPhone pode abrir o app em segundo plano só
-///    para isso). Depois disso as atualizações vão direto para a atividade.
+///    para isso). Depois disso as atualizações vão direto para a atividade;
+/// 3. quando a pessoa fecha a atividade, avisa `<API>/notifications/push/live-activity/closed`; ao voltar ao NOW, o
+///    app web pergunta se ela está na tela (`isShowing`) e, se não, pede ao servidor para abrir de novo.
 final class ArrivalActivities {
     static let shared = ArrivalActivities()
 
@@ -24,7 +26,8 @@ final class ArrivalActivities {
     /// Chamado ao abrir o app (inclusive quando o iPhone abre em segundo plano para entregar o token da atividade).
     func start() {
         #if canImport(ActivityKit)
-        guard #available(iOS 16.1, *) else { return }
+        // `.dismissed` (a pessoa fechou) existe do iOS 16.2 em diante; abrir por push só do 17.2.
+        guard #available(iOS 16.2, *) else { return }
         for activity in Activity<ArrivalAttributes>.activities { watch(activity) }
         Task {
             for await activity in Activity<ArrivalAttributes>.activityUpdates { self.watch(activity) }
@@ -67,26 +70,55 @@ final class ArrivalActivities {
         }
     }
 
+    /// A chegada `tag` está na tela agora (tela bloqueada / Dynamic Island)? `nil` onde não há Live Activity.
+    func isShowing(tag: String) -> Bool? {
+        #if canImport(ActivityKit)
+        guard #available(iOS 17.2, *), ActivityAuthorizationInfo().areActivitiesEnabled else { return nil }
+        return Activity<ArrivalAttributes>.activities.contains { $0.attributes.tag == tag && $0.activityState == .active }
+        #else
+        return nil
+        #endif
+    }
+
     #if canImport(ActivityKit)
-    @available(iOS 16.1, *)
+    @available(iOS 16.2, *)
     private func watch(_ activity: Activity<ArrivalAttributes>) {
         let first: Bool = queue.sync { self.watching.insert(activity.id).inserted }
         guard first else { return }
         let registration = activity.attributes.registration
+        // Fechada antes de o app abrir (o iPhone ainda lista por um tempo): avisa o servidor.
+        if activity.activityState == .dismissed {
+            closed(registration: registration, token: activity.pushToken.map(Self.hex))
+            return
+        }
         Task {
             for await data in activity.pushTokenUpdates {
-                self.register(registration: registration, token: Self.hex(data))
+                self.post(path: "/notifications/push/live-activity", body: ["registration": registration, "token": Self.hex(data)])
+            }
+        }
+        // A pessoa fechou (arrastou para o lado): o servidor para de mandar para ela e não abre outra sozinha; a
+        // chegada vai como aviso comum. Abre de novo quando a pessoa volta ao NOW no app.
+        Task {
+            for await state in activity.activityStateUpdates where state == .dismissed {
+                self.closed(registration: registration, token: activity.pushToken.map(Self.hex))
+                break
             }
         }
     }
     #endif
 
-    private func register(registration: String, token: String) {
-        guard let url = Self.apiURL(path: "/notifications/push/live-activity") else { return }
+    private func closed(registration: String, token: String?) {
+        var body: [String: Any] = ["registration": registration]
+        if let token = token { body["token"] = token }
+        post(path: "/notifications/push/live-activity/closed", body: body)
+    }
+
+    private func post(path: String, body: [String: Any]) {
+        guard let url = Self.apiURL(path: path) else { return }
         var request = URLRequest(url: url, timeoutInterval: 20)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: ["registration": registration, "token": token])
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         // Com o app em segundo plano, o iPhone dá alguns segundos: segura até o registro sair.
         DispatchQueue.main.async {
             var task: UIBackgroundTaskIdentifier = .invalid
@@ -126,7 +158,18 @@ public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "AskouTLiveActivity"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "startToken", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isShowing", returnType: CAPPluginReturnPromise),
     ]
+
+    /// `{ tag }` → `{ showing?: boolean }` (sem `showing` onde não há Live Activity).
+    @objc func isShowing(_ call: CAPPluginCall) {
+        guard let tag = call.getString("tag"), !tag.isEmpty else { call.reject("tag"); return }
+        if let showing = ArrivalActivities.shared.isShowing(tag: tag) {
+            call.resolve(["showing": showing])
+        } else {
+            call.resolve([:])
+        }
+    }
 
     @objc func startToken(_ call: CAPPluginCall) {
         ArrivalActivities.shared.currentStartToken(timeout: 5) { token in

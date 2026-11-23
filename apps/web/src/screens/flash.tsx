@@ -14,6 +14,8 @@ import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice
 import { OfferBanner } from '../components/offer-banner.tsx';
 import { api, apiBaseUrl, session } from '../client.ts';
 import { backgroundLocationBridge, ownArrivalStep, shouldSendFix } from '../lib/background-arrival.ts';
+import { reopenClosedArrivals } from '../lib/live-arrival.ts';
+import { nativePushBridge } from '../lib/push.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import {
   announceFlashChange,
@@ -134,6 +136,7 @@ function FlashContent() {
     () => (matchIds.length > 0 ? Promise.all(matchIds.map((id) => api.flashMatch(id).catch(() => undefined))).then((r) => r.filter((m): m is FlashMatch => m !== undefined)) : Promise.resolve([] as FlashMatch[])),
     [matchKey],
   );
+  useReopenLiveArrival(matchViews.data);
   const share = useShareLocation(
     matchIds,
     () => {
@@ -1158,6 +1161,33 @@ const arrivalAskKey = (inviteId: string) => `askout.now.arrival-asked.${inviteId
  * Com a chegada ligada, o app do celular continua mandando a posição com a tela bloqueada (ponte nativa, HTTP
  * nativo). No navegador não há ponte: o envio segue só com a tela aberta (useShareLocation).
  */
+/** Já perguntou ao iPhone por estes encontros (vale para a sessão do app inteira, entre as telas do NOW). */
+const reopenAsked = new Map<string, number>();
+
+/**
+ * iPhone: a pessoa fechou a Live Activity da chegada do amigo e voltou ao NOW (ou ao encontro): abre de novo, em
+ * silêncio, depois de alguns segundos. Também ao voltar ao app com a tela aberta.
+ */
+function useReopenLiveArrival(matches: readonly FlashMatch[] | undefined): void {
+  const key = (matches ?? []).filter((m) => m.themArrival).map((m) => m.inviteId).join(',');
+  const ref = useRef(matches);
+  ref.current = matches;
+  useEffect(() => {
+    if (key === '') return undefined;
+    const run = () => {
+      const bridge = nativePushBridge();
+      const showing = bridge?.liveActivityShowing ? (tag: string) => bridge.liveActivityShowing!(tag) : undefined;
+      void reopenClosedArrivals(ref.current ?? [], { showing, reopen: (id) => api.flashReopenArrival(id), asked: reopenAsked, nowMs: Date.now() });
+    };
+    run();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') run();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [key]);
+}
+
 function useBackgroundArrival(match: FlashMatch | undefined, onEnded: () => void): { available: boolean; denied: boolean } {
   const active = match?.meArrival === true;
   const inviteId = match?.inviteId;
@@ -1451,6 +1481,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const viewer = useUser();
   const match = useAsync(() => api.flashMatch(inviteId), [inviteId]);
   usePolling(match.reload, 8_000);
+  useReopenLiveArrival(match.data ? [match.data] : undefined);
   const tickNow = useTick(1000);
 
   const [confirmEnd, setConfirmEnd] = useState(false);
