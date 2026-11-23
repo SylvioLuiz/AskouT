@@ -78,6 +78,8 @@ class MainViewController: CAPBridgeViewController {
         if let router = bridge?.notificationRouter { NotificationReply.shared.attach(router: router) }
         // Mensagens de voz tocadas pelo iPhone, fora do "Tocando agora" (ver AudioPlugin.swift).
         bridge?.registerPluginInstance(AudioPlugin())
+        // Sessão para a folha "Compartilhar com o AskouT" (Share Extension), no Keychain compartilhado.
+        bridge?.registerPluginInstance(ShareSessionPlugin())
     }
 
     override func viewDidLoad() {

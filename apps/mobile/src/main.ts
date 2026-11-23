@@ -110,7 +110,12 @@ if (Capacitor.isNativePlatform()) {
   w['AskouTContacts'] = createContactsBridge({ contacts: Contacts as never });
   // O botão do Google da web não abre dentro do app (o Google bloqueia login em WebView): entra a janela nativa.
   w['AskouTGoogle'] = createGoogleBridge({ login: SocialLogin as never, platform: () => Capacitor.getPlatform() });
-  // "Compartilhar com o AskouT" vindo de outro app (só Android por enquanto; ShareInPlugin.java). O app web abre
+  // iPhone: a folha de compartilhar (Share Extension) envia direto, com a sessão que o app guarda no Keychain
+  // compartilhado (ShareSessionPlugin.swift). O app web chama set/clear (apps/web/src/lib/share-session.ts).
+  if (Capacitor.isPluginAvailable('AskouTShareSession')) {
+    w['AskouTShareSession'] = registerPlugin<{ set(o: { token: string; apiBase: string }): Promise<void>; clear(): Promise<void> }>('AskouTShareSession');
+  }
+  // "Compartilhar com o AskouT" vindo de outro app (Android; ShareInPlugin.java). No iPhone a extensão envia sozinha. O app web abre
   // "Enviar para…" (apps/web/src/lib/share-in.ts). Build antigo, sem o plugin: a ponte não existe.
   if (Capacitor.isPluginAvailable('AskouTShareIn')) {
     const shareIn = registerPlugin<{

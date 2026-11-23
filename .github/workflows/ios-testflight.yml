@@ -96,6 +96,19 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: node .github/scripts/ios-dev-profile.mjs
 
+      - name: Perfil da extensão "Compartilhar com o AskouT"
+        # Mesmo certificado fixo; cria o App ID br.com.askout.ShareExtension na primeira vez (sem capacidades extras:
+        # o Keychain compartilhado com o app não precisa de nada no portal).
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          BUNDLE_ID: br.com.askout.ShareExtension
+          PROFILE_NAME: AskouT CI Share Extension
+          PROFILE_ENV: SHARE_PROFILE_NAME
+          CAPABILITIES: ''
+          CREATE_BUNDLE: '1'
+        run: node .github/scripts/ios-dev-profile.mjs
+
       - name: Assinatura manual no build (só no CI)
         # No Mac de vocês o projeto continua com assinatura automática; aqui o Release do app passa a usar
         # o certificado fixo e o perfil acima. O aps-environment vai como development no Archive
@@ -106,13 +119,18 @@ jobs:
           import os, re
           p = 'App.xcodeproj/project.pbxproj'
           s = open(p).read()
-          i = s.index('504EC3181FED79650016851F /* Release */ = {')
-          j = s.index('name = Release;', i)
-          block = s[i:j]
-          assert 'CODE_SIGN_STYLE = Automatic;' in block, 'bloco Release do app não encontrado'
-          block = block.replace('CODE_SIGN_STYLE = Automatic;',
-            'CODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_IDENTITY = "Apple Development";\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "%s";' % os.environ['PROFILE_NAME'])
-          open(p, 'w').write(s[:i] + block + s[j:])
+          def manual(s, marker, profile):
+              i = s.index(marker)
+              j = s.index('name = Release;', i)
+              block = s[i:j]
+              assert 'CODE_SIGN_STYLE = Automatic;' in block, 'bloco Release não encontrado: ' + marker
+              block = block.replace('CODE_SIGN_STYLE = Automatic;',
+                'CODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_IDENTITY = "Apple Development";\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "%s";' % profile)
+              return s[:i] + block + s[j:]
+          # App e a extensão "Compartilhar" (ShareExtension), cada um com o seu perfil.
+          s = manual(s, '504EC3181FED79650016851F /* Release */ = {', os.environ['PROFILE_NAME'])
+          s = manual(s, 'A5C7E2422FF0000100A5C7E2 /* Release */ = {', os.environ['SHARE_PROFILE_NAME'])
+          open(p, 'w').write(s)
           e = 'App/App.entitlements'
           t = open(e).read()
           open(e, 'w').write(re.sub(r'(<key>aps-environment</key>\s*<string>)production(</string>)', r'\1development\2', t))
