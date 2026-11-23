@@ -2,10 +2,28 @@ import type { PlaceSource } from '../../core/ports.ts';
 import type { ExternalPlace } from '../../core/types.ts';
 
 const ENDPOINT = 'https://places.googleapis.com/v1';
-const FIELDS = 'places.id,places.displayName,places.location,places.rating,places.userRatingCount,places.primaryType,places.googleMapsUri,places.photos';
+/**
+ * Só campos da faixa "Pro" do Google (5.000 chamadas grátis por mês em cada tipo de busca). Nota (`rating`) e número de
+ * avaliações (`userRatingCount`) jogam a chamada inteira para a faixa "Enterprise" (só 1.000 grátis e bem mais cara),
+ * por isso ficam de fora.
+ */
+const FIELDS = 'places.id,places.displayName,places.location,places.primaryType,places.googleMapsUri,places.photos';
 /** Busca por texto e detalhe de um lugar também trazem o endereço, que vira o endereço do rolê vinculado. */
 const SEARCH_FIELDS = `${FIELDS},places.formattedAddress`;
-const DETAIL_FIELDS = 'id,displayName,location,rating,userRatingCount,primaryType,googleMapsUri,photos,formattedAddress';
+const DETAIL_FIELDS = 'id,displayName,location,primaryType,googleMapsUri,photos,formattedAddress';
+
+/** Tipos de chamada, cada um com a sua franquia gratuita mensal no Google e o seu teto diário aqui. */
+export type GoogleCallKind = 'nearby' | 'search' | 'lookup' | 'photo';
+
+/**
+ * Tetos diários padrão, abaixo da franquia gratuita mensal dividida por 31 dias: busca por perto, por texto e detalhe
+ * (faixa Pro, 5.000/mês) e fotos (1.000/mês). O console do Google tem cotas iguais como trava de verdade.
+ */
+/** Buscas iguais dentro de 10 minutos reaproveitam a resposta, sem chamar (nem pagar) o Google de novo. */
+const CACHE_TTL_MS = 10 * 60_000;
+const CACHE_MAX = 300;
+
+export const GOOGLE_DAILY_DEFAULTS: Record<GoogleCallKind, number> = { nearby: 150, search: 150, lookup: 150, photo: 30 };
 /** Id de lugar do Google: só letras, números, `_` e `-` (o servidor monta a URL com ele). */
 const PLACE_ID_RE = /^[A-Za-z0-9_-]{1,300}$/;
 /** Só aceita referências de foto no formato do Google (evita usar o servidor como proxy aberto). */
@@ -13,8 +31,10 @@ export const PHOTO_REF_RE = /^places\/[A-Za-z0-9_-]{1,200}\/photos\/[A-Za-z0-9_-
 
 export interface GoogleOptions {
   apiKey: string;
-  /** Teto de buscas por dia (UTC) para a conta não passar do crédito gratuito sem você saber. */
+  /** Teto geral por dia (UTC) para cada tipo de chamada; vale o menor entre ele e o teto do tipo. */
   dailyLimit?: number;
+  /** Teto por dia (UTC) de cada tipo de chamada, para a conta não passar da franquia gratuita. */
+  dailyLimits?: Partial<Record<GoogleCallKind, number>>;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
   now?: () => number;
@@ -33,57 +53,93 @@ interface GooglePlace {
 }
 
 /**
- * Google Places (API nova): bares, cafés e restaurantes perto de um ponto, com nota, avaliações e foto.
- * Regras dos termos do Google que este código respeita: os dados ficam só na memória da requisição (não há cache nem banco),
+ * Google Places (API nova): bares, cafés e restaurantes perto de um ponto, com foto.
+ * Os resultados das buscas ficam até 10 minutos na memória do servidor (escolha da dona do app para não pagar duas vezes
+ * pela mesma busca); nada vai para o banco além do que a pessoa escolhe vincular,
  * a foto é buscada pelo servidor (a chave nunca vai ao app) e quem usa deve mostrar o crédito ao Google.
  * Nunca lança: qualquer falha vira `available: false`.
  */
 export class GooglePlaceSource implements PlaceSource {
   private readonly apiKey: string;
-  private readonly dailyLimit: number;
+  private readonly limits: Record<GoogleCallKind, number>;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
   private readonly now: () => number;
   private day = '';
-  private used = 0;
+  private used: Record<GoogleCallKind, number> = { nearby: 0, search: 0, lookup: 0, photo: 0 };
+  private readonly cache = new Map<string, { at: number; places: ExternalPlace[] }>();
+  /** A busca por texto só existe no Google, e ele cobra: o app só usa quando a pessoa pede. */
+  readonly premiumSearch = true;
 
   constructor(options: GoogleOptions) {
     this.apiKey = options.apiKey;
-    this.dailyLimit = options.dailyLimit ?? 500;
+    const cap = options.dailyLimit ?? Number.POSITIVE_INFINITY;
+    const limits = { ...GOOGLE_DAILY_DEFAULTS, ...options.dailyLimits };
+    this.limits = {
+      nearby: Math.min(cap, limits.nearby),
+      search: Math.min(cap, limits.search),
+      lookup: Math.min(cap, limits.lookup),
+      photo: Math.min(cap, limits.photo),
+    };
     this.timeoutMs = options.timeoutMs ?? 6000;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.now = options.now ?? Date.now;
   }
 
-  private spend(): boolean {
+  private cached(key: string): ExternalPlace[] | undefined {
+    const hit = this.cache.get(key);
+    if (!hit) return undefined;
+    if (this.now() - hit.at >= CACHE_TTL_MS) {
+      this.cache.delete(key);
+      return undefined;
+    }
+    return hit.places.map((p) => ({ ...p }));
+  }
+
+  private remember(key: string, places: ExternalPlace[]): void {
+    this.cache.delete(key);
+    if (this.cache.size >= CACHE_MAX) this.cache.delete(this.cache.keys().next().value as string);
+    this.cache.set(key, { at: this.now(), places });
+  }
+
+  private spend(kind: GoogleCallKind): boolean {
     const today = new Date(this.now()).toISOString().slice(0, 10);
     if (today !== this.day) {
       this.day = today;
-      this.used = 0;
+      this.used = { nearby: 0, search: 0, lookup: 0, photo: 0 };
     }
-    if (this.used >= this.dailyLimit) return false;
-    this.used += 1;
+    if (this.used[kind] >= this.limits[kind]) return false;
+    this.used[kind] += 1;
     return true;
   }
 
   async nearby(center: { lat: number; lng: number }, radiusM: number, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }> {
-    if (!this.spend()) return { available: false, places: [] };
+    // Arredondar a ~110 m deixa pedidos vizinhos compartilharem a mesma resposta guardada.
+    const lat = Math.round(center.lat * 1000) / 1000;
+    const lng = Math.round(center.lng * 1000) / 1000;
+    const count = Math.max(1, Math.min(limit, 20));
+    const key = `nearby|${lat},${lng}|${Math.round(radiusM)}|${count}`;
+    const hit = this.cached(key);
+    if (hit) return { available: true, places: hit };
+    if (!this.spend('nearby')) return { available: false, places: [] };
     try {
       const response = await this.fetchImpl(`${ENDPOINT}/places:searchNearby`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey, 'x-goog-fieldmask': FIELDS },
         body: JSON.stringify({
           includedTypes: ['bar', 'night_club', 'restaurant', 'cafe'],
-          maxResultCount: Math.max(1, Math.min(limit, 20)),
+          maxResultCount: count,
           rankPreference: 'POPULARITY',
           languageCode: 'pt-BR',
-          locationRestriction: { circle: { center: { latitude: center.lat, longitude: center.lng }, radius: Math.min(50_000, Math.max(1, radiusM)) } },
+          locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius: Math.min(50_000, Math.max(1, radiusM)) } },
         }),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
       if (!response.ok) return { available: false, places: [] };
       const json = (await response.json()) as { places?: GooglePlace[] };
-      return { available: true, places: parse(json.places) };
+      const places = parse(json.places);
+      this.remember(key, places);
+      return { available: true, places: places.map((p) => ({ ...p })) };
     } catch {
       return { available: false, places: [] };
     }
@@ -93,24 +149,32 @@ export class GooglePlaceSource implements PlaceSource {
    * Qualquer lugar pelo nome ou endereço (não só bares perto): é o que a pessoa digita ao vincular um rolê que ainda não
    * está no AskouT. Com `center`, os resultados perto dele vêm primeiro.
    */
-  async search(text: string, center: { lat: number; lng: number } | undefined, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }> {
-    if (!this.spend()) return { available: false, places: [] };
+  async search(text: string, center: { lat: number; lng: number } | undefined, limit: number, _opts?: { premium?: boolean }): Promise<{ available: boolean; places: ExternalPlace[] }> {
+    const at = center ? `${Math.round(center.lat * 100) / 100},${Math.round(center.lng * 100) / 100}` : '-';
+    const size = Math.max(1, Math.min(limit, 20));
+    const key = `search|${text.trim().toLowerCase().replace(/\s+/g, ' ')}|${at}|${size}`;
+    const hit = this.cached(key);
+    if (hit) return { available: true, places: hit };
+    if (!this.spend('search')) return { available: false, places: [] };
     try {
       const response = await this.fetchImpl(`${ENDPOINT}/places:searchText`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey, 'x-goog-fieldmask': SEARCH_FIELDS },
         body: JSON.stringify({
           textQuery: text,
-          pageSize: Math.max(1, Math.min(limit, 20)),
+          pageSize: size,
           languageCode: 'pt-BR',
           regionCode: 'BR',
-          ...(center ? { locationBias: { circle: { center: { latitude: center.lat, longitude: center.lng }, radius: 50_000 } } } : {}),
+          // A posição só ordena os resultados; arredondada a ~1 km, vizinhos reaproveitam a mesma busca guardada.
+          ...(center ? { locationBias: { circle: { center: { latitude: Math.round(center.lat * 100) / 100, longitude: Math.round(center.lng * 100) / 100 }, radius: 50_000 } } } : {}),
         }),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
       if (!response.ok) return { available: false, places: [] };
       const json = (await response.json()) as { places?: GooglePlace[] };
-      return { available: true, places: parse(json.places) };
+      const places = parse(json.places);
+      this.remember(key, places);
+      return { available: true, places: places.map((p) => ({ ...p })) };
     } catch {
       return { available: false, places: [] };
     }
@@ -118,7 +182,7 @@ export class GooglePlaceSource implements PlaceSource {
 
   /** Um lugar pelo id do Google, para confirmar que existe antes de criar o local no AskouT. */
   async lookup(externalId: string): Promise<ExternalPlace | undefined> {
-    if (!PLACE_ID_RE.test(externalId) || !this.spend()) return undefined;
+    if (!PLACE_ID_RE.test(externalId) || !this.spend('lookup')) return undefined;
     try {
       const response = await this.fetchImpl(`${ENDPOINT}/places/${externalId}?languageCode=pt-BR`, {
         headers: { 'x-goog-api-key': this.apiKey, 'x-goog-fieldmask': DETAIL_FIELDS },
@@ -133,7 +197,7 @@ export class GooglePlaceSource implements PlaceSource {
 
   /** Baixa a foto no servidor. Devolve undefined se a referência for inválida ou o Google não entregar. */
   async photo(ref: string): Promise<{ type: string; bytes: Uint8Array } | undefined> {
-    if (!PHOTO_REF_RE.test(ref)) return undefined;
+    if (!PHOTO_REF_RE.test(ref) || !this.spend('photo')) return undefined;
     try {
       const response = await this.fetchImpl(`${ENDPOINT}/${ref}/media?maxWidthPx=640&maxHeightPx=400&key=${encodeURIComponent(this.apiKey)}`, {
         signal: AbortSignal.timeout(this.timeoutMs),

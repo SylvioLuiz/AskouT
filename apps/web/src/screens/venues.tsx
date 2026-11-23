@@ -5,6 +5,7 @@ import { CoverPicker } from '../components/cover-picker.tsx';
 import { EventDates } from '../components/event-dates.tsx';
 import { EventKindPicker } from '../components/event-kind-picker.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
+import { PlaceSearchMore } from '../components/place-search-more.tsx';
 import { Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { ChevronRightIcon, EditIcon, GlobeIcon, PlusIcon, SearchIcon } from '../components/icons.tsx';
 import { api } from '../client.ts';
@@ -171,7 +172,9 @@ function GoogleVenueSheet({ onPicked, onClose }: { onPicked: (venue: { id: strin
   const term = useDebounced(q.trim(), 350);
   const where = useCurrentPosition();
   const position = where.status === 'ok' ? where.position : undefined;
-  const result = useAsync(() => (term.length >= 2 ? api.searchPlaces({ q: term, lat: position?.lat, lng: position?.lng }) : Promise.resolve(null)), [term, position?.lat, position?.lng]);
+  const [googleFor, setGoogleFor] = useState<string | null>(null);
+  const google = googleFor === term;
+  const result = useAsync(() => (term.length >= 2 ? api.searchPlaces({ q: term, lat: position?.lat, lng: position?.lng, google }) : Promise.resolve(null)), [term, position?.lat, position?.lng, google]);
   const places = (result.data?.places ?? []).filter((p) => p.venue === null);
   const [picking, setPicking] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
@@ -191,7 +194,7 @@ function GoogleVenueSheet({ onPicked, onClose }: { onPicked: (venue: { id: strin
   return (
     <Sheet title={t('Criar a partir do Google')} onClose={onClose}>
       <div className="claim">
-        <Field label={t('Buscar no Google')} type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint={t('Nome ou endereço do lugar')} />
+        <Field label={t('Buscar local')} type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint={t('Nome ou endereço do lugar')} />
         {term.length < 2 ? <p className="muted">{t('Digite o nome ou o endereço do seu local.')}</p> : null}
         {result.loading && !result.data ? <Loading shape="rows" rows={3} /> : null}
         {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
@@ -212,7 +215,7 @@ function GoogleVenueSheet({ onPicked, onClose }: { onPicked: (venue: { id: strin
           </ul>
         ) : null}
         {message ? <Notice tone="error">{message}</Notice> : null}
-        {places.some((p) => p.source === 'GOOGLE') ? <p className="muted">{t('Resultados do Google.')}</p> : null}
+        <PlaceSearchMore data={result.data} google={google} busy={result.loading || picking !== undefined} onGoogle={() => setGoogleFor(term)} />
       </div>
     </Sheet>
   );

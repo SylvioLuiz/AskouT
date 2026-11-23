@@ -54,3 +54,19 @@ test('o lugar do Google vira local do AskouT e fica vinculado ao evento', async 
   assert.equal(other.placeName, 'Casa da Ana');
   assert.equal(other.placeVenueId, null);
 });
+
+test('a busca por nome só gasta o Google quando a pessoa pede, com 3 letras ou mais', async () => {
+  const w = makeWorld();
+  const { ana } = await w.signUpMany('ana');
+  w.placeSource.searchable = [ARENA];
+  w.placeSource.premiumSearch = true;
+  const free = await w.core.explore.searchPlaces(ana!, { q: 'arena' });
+  assert.equal(w.placeSource.premiumCalls, 0);
+  assert.equal(free.canSearchGoogle, true);
+  const paid = await w.core.explore.searchPlaces(ana!, { q: 'arena', google: 'true' });
+  assert.equal(w.placeSource.premiumCalls, 1);
+  assert.equal(paid.canSearchGoogle, false);
+  const short = await w.core.explore.searchPlaces(ana!, { q: 'ar', google: 'true' });
+  assert.equal(w.placeSource.premiumCalls, 1);
+  assert.equal(short.canSearchGoogle, false);
+});

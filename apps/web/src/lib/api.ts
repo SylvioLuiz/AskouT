@@ -105,6 +105,7 @@ import type {
   ExploreParams,
   ExploreResult,
   ExplorePlace,
+  PlaceSearchResult,
   PageRequest,
   Profile,
   ProfilePatch,
@@ -481,13 +482,15 @@ export function createApi(deps: ApiDeps) {
       return request<{ places: ExplorePlace[]; placesAvailable: boolean }>('GET', `${visitor() ? '/public' : ''}/explore/places?${query.toString()}`, visitor() ? { auth: false } : {});
     },
     /** Vincular um rolê: locais do AskouT e lugares do Google pelo nome ou endereço, em qualquer lugar. */
-    searchPlaces: (params: { q: string; lat?: number | undefined; lng?: number | undefined }) => {
+    searchPlaces: (params: { q: string; lat?: number | undefined; lng?: number | undefined; google?: boolean }) => {
       const query = new URLSearchParams({ q: params.q });
       if (params.lat !== undefined && params.lng !== undefined) {
         query.set('lat', String(params.lat));
         query.set('lng', String(params.lng));
       }
-      return request<{ places: ExplorePlace[]; placesAvailable: boolean }>('GET', `/explore/place-search?${query.toString()}`);
+      // O Google cobra por busca: só vai quando a pessoa aperta "Buscar mais no Google".
+      if (params.google) query.set('google', 'true');
+      return request<PlaceSearchResult>('GET', `/explore/place-search?${query.toString()}`);
     },
     /** `position`: onde a pessoa está, para pesar eventos perto. Vai arredondada (~1 km); o servidor não guarda. */
     recommendations: (personalize: boolean, position?: { lat: number; lng: number }) =>
