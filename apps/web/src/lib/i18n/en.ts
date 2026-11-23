@@ -2931,6 +2931,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Próximos": "Upcoming",
   "Tipos de interação": "Interaction types",
   "Ver": "View",
+  "Votar": "Vote",
+  "Votação fixada: {name}, {status}": "Pinned poll: {name}, {status}",
   "Criar local": "Create venue",
   "A partir de um lugar do Google": "From a Google place",
   "Busque o seu local no Google e use o nome e o endereço de lá.": "Find your venue on Google and use its name and address.",

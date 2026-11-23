@@ -204,6 +204,12 @@ export class AdminController {
     return this.core.admin.editUser(actor, id, { displayName: b.displayName, username: b.username, bio: b.bio, note: b.note });
   }
 
+  /** O @ está livre para esta pessoa? (o formulário de editar confere antes de salvar) */
+  @Get('users/:id/username-available')
+  usernameAvailable(@CurrentActor() actor: Actor, @Param('id') id: string, @Query('username') username: unknown) {
+    return this.core.admin.usernameAvailableFor(actor, id, username);
+  }
+
   /** Atividade da pessoa (`kind`: LIKE, COMMENT, POST, FOLLOW, EVENT; `cursor` da página anterior). */
   @Get('users/:id/activity')
   userActivity(@CurrentActor() actor: Actor, @Param('id') id: string, @Query() q: { kind?: unknown; cursor?: unknown }) {

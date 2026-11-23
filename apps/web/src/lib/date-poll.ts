@@ -191,6 +191,18 @@ export function pollLine(p: PollSummary, now: Date): { name: string; status: str
   return { name: p.title, status: t('em votação: {share}% dos votos', { share }) };
 }
 
+/**
+ * Votação ainda aberta (votando ou confirmando a data): fica fixada no topo da conversa dela (o grupo do evento,
+ * no caso de um evento sem data), com o que a pessoa tem a fazer. Marcada, cancelada ou vencida: `null`.
+ */
+export function pinnedPoll(p: PollSummary, now: Date): { name: string; status: string; action: 'vote' | 'confirm' | 'view' } | null {
+  if (p.status !== 'VOTING' && p.status !== 'CONFIRMING') return null;
+  const line = pollLine(p, now);
+  if (!line) return null;
+  const action = p.needsMyConfirmation ? 'confirm' : p.status === 'VOTING' && p.needsMyVote ? 'vote' : 'view';
+  return { ...line, action };
+}
+
 /** Dia (AAAA-MM-DD) de um instante no fuso da votação. */
 export function dayInZone(iso: string, timeZone = 'America/Sao_Paulo'): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));

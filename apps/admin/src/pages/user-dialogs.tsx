@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { ApiError, api } from '../api.ts';
+import { useDebounced } from '../hooks.ts';
 import { formatDateTime } from '../labels.ts';
 import type { UserActivityItem, UserRow } from '../types.ts';
 import { Modal } from '../ui.tsx';
@@ -9,9 +10,14 @@ export function EditUserDialog({ user, onClose, onDone }: { user: UserRow; onClo
   const [displayName, setDisplayName] = useState(user.displayName);
   const [username, setUsername] = useState(user.username);
   const [bio, setBio] = useState<string | undefined>();
+  const [initialBio, setInitialBio] = useState<string | undefined>();
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [noteMissing, setNoteMissing] = useState(false);
+  // O @ novo é conferido enquanto se digita: livre, já em uso ou fora do formato.
+  const [check, setCheck] = useState<{ username: string; available: boolean; problem?: string } | undefined>();
+  const typed = useDebounced(username.trim());
   const ids = { name: useId(), user: useId(), bio: useId(), note: useId() };
 
   // A biografia não vem na lista: busca a pessoa para o formulário começar preenchido.
@@ -20,25 +26,67 @@ export function EditUserDialog({ user, onClose, onDone }: { user: UserRow; onClo
     api
       .userDetail(user.id)
       .then((d) => {
-        if (alive) setBio(d.bio ?? '');
+        if (alive) {
+          setBio(d.bio ?? '');
+          setInitialBio(d.bio ?? '');
+        }
       })
       .catch(() => {
-        if (alive) setBio('');
+        if (alive) {
+          setBio('');
+          setInitialBio('');
+        }
       });
     return () => {
       alive = false;
     };
   }, [user.id]);
 
+  useEffect(() => {
+    setCheck(undefined);
+    if (typed === '' || typed.toLowerCase() === user.username) return;
+    let alive = true;
+    api
+      .usernameAvailableFor(user.id, typed)
+      .then((r) => {
+        if (alive) setCheck(r);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [typed, user.id, user.username]);
+
+  const usernameChanged = username.trim().toLowerCase() !== user.username;
+  const bioChanged = bio !== undefined && bio !== initialBio;
+  const changed = displayName !== user.displayName || usernameChanged || bioChanged;
+  // Conferência do @ que está no campo agora (a resposta de um texto antigo não vale).
+  const current = check && typed === username.trim() ? check : undefined;
+  const usernameProblem = usernameChanged && current && !current.available ? (current.problem ?? 'Esse @usuário já está em uso') : undefined;
+
   async function save() {
-    if (busy || note.trim() === '') return;
+    if (busy || !changed) return;
+    if (note.trim() === '') {
+      setNoteMissing(true);
+      return;
+    }
+    if (usernameProblem) return;
     setBusy(true);
     setError(undefined);
     try {
+      // Confere de novo na hora de salvar: o @ pode ter sido pego enquanto o formulário estava aberto.
+      if (usernameChanged) {
+        const r = await api.usernameAvailableFor(user.id, username.trim());
+        if (!r.available) {
+          setCheck(r);
+          setBusy(false);
+          return;
+        }
+      }
       await api.editUser(user.id, {
         ...(displayName !== user.displayName ? { displayName } : {}),
-        ...(username !== user.username ? { username } : {}),
-        ...(bio !== undefined ? { bio: bio.trim() === '' ? null : bio } : {}),
+        ...(usernameChanged ? { username: username.trim() } : {}),
+        ...(bioChanged ? { bio: (bio ?? '').trim() === '' ? null : bio } : {}),
         note: note.trim(),
       });
       onDone();
@@ -60,16 +108,44 @@ export function EditUserDialog({ user, onClose, onDone }: { user: UserRow; onClo
       </div>
       <div className="field">
         <label htmlFor={ids.user}>@usuário</label>
-        <input id={ids.user} value={username} maxLength={30} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" spellCheck={false} />
+        <input
+          id={ids.user}
+          value={username}
+          maxLength={30}
+          onChange={(e) => setUsername(e.target.value)}
+          autoCapitalize="none"
+          spellCheck={false}
+          aria-invalid={usernameProblem ? true : undefined}
+          aria-describedby={`${ids.user}-hint`}
+        />
+        <span id={`${ids.user}-hint`} className={usernameProblem ? 'small alert' : 'muted small'} aria-live="polite">
+          {!usernameChanged ? '' : usernameProblem ? usernameProblem : current?.available ? `@${current.username} está livre` : 'Conferindo…'}
+        </span>
       </div>
       <div className="field">
         <label htmlFor={ids.bio}>Biografia</label>
         <textarea id={ids.bio} rows={3} maxLength={160} value={bio ?? ''} disabled={bio === undefined} onChange={(e) => setBio(e.target.value)} />
       </div>
       <div className="field">
-        <label htmlFor={ids.note}>Motivo</label>
-        <textarea id={ids.note} rows={2} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />
-        <span className="muted small">{note.length}/300 · fica registrado na auditoria</span>
+        <label htmlFor={ids.note}>Motivo (obrigatório)</label>
+        <textarea
+          id={ids.note}
+          rows={2}
+          maxLength={300}
+          value={note}
+          onChange={(e) => {
+            setNote(e.target.value);
+            if (e.target.value.trim() !== '') setNoteMissing(false);
+          }}
+          aria-invalid={noteMissing ? true : undefined}
+        />
+        {noteMissing ? (
+          <span className="small alert" role="alert">
+            Escreva o motivo para salvar.
+          </span>
+        ) : (
+          <span className="muted small">{note.length}/300 · fica registrado na auditoria</span>
+        )}
       </div>
       {error ? (
         <p className="notice notice--bad" role="alert">
@@ -80,7 +156,7 @@ export function EditUserDialog({ user, onClose, onDone }: { user: UserRow; onClo
         <button type="button" className="btn" onClick={onClose} disabled={busy}>
           Cancelar
         </button>
-        <button type="button" className="btn btn--primary" onClick={() => void save()} disabled={busy || note.trim() === '' || bio === undefined} aria-busy={busy || undefined}>
+        <button type="button" className="btn btn--primary" onClick={() => void save()} disabled={busy || !changed || usernameProblem !== undefined} aria-busy={busy || undefined}>
           {busy ? 'Aguarde…' : 'Salvar'}
         </button>
       </div>
