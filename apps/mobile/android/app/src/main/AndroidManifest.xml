@@ -115,4 +115,7 @@
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- O plugin de localização em segundo plano declara o GPS como obrigatório; isso tirava o app da loja em
+         aparelhos sem GPS (tablets, Chromebooks). O app funciona com a localização por rede, então o GPS é opcional. -->
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" tools:replace="android:required" />
 </manifest>
