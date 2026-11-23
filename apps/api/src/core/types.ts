@@ -794,6 +794,14 @@ export type PostKindFilter = 'EVENT' | 'POST';
 
 export type PostTagStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
 
+/** Convite para um evento criado por uma pessoa. `invitedById` nulo: quem convidou apagou a conta. */
+export interface EventInviteRecord {
+  postId: string;
+  userId: string;
+  invitedById: string | null;
+  createdAt: Date;
+}
+
 export interface PostTagRecord {
   postId: string;
   userId: string;

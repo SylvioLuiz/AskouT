@@ -32,10 +32,29 @@ async function eventCard(eventId: string, url: string): Promise<ShareCard> {
   };
 }
 
-/** Compartilhar um evento: numa ou mais conversas (vai o cartão do evento), no perfil (feed) ou fora do app. */
-export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPostedChange, profile = 'toggle', outside: allowOutside = true, sheetTitle, initialConversations, inApp = true, onShared, onClose }: { eventId: string; source?: 'PLACE' | 'USER'; title: string; posted: boolean; onPostedChange: (posted: boolean) => void; profile?: 'toggle' | 'owner' | 'private'; outside?: boolean; sheetTitle?: string; initialConversations?: string[]; /** false: só os atalhos de fora do app (WhatsApp, link...). */ inApp?: boolean; onShared?: () => void; onClose: () => void }) {
+/**
+ * Compartilhar um evento: numa ou mais conversas (vai o cartão do evento), no perfil (feed) ou fora do app.
+ * `invite`: é a folha de convidar de um evento criado por pessoa. Quem já foi convidado (marcado na criação ou que já
+ * recebeu) aparece como "Convidado"; em evento privado, convidar também marca a pessoa no evento.
+ */
+export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPostedChange, profile = 'toggle', outside: allowOutside = true, sheetTitle, initialConversations, inApp = true, invite = false, onShared, onClose }: { eventId: string; source?: 'PLACE' | 'USER'; title: string; posted: boolean; onPostedChange: (posted: boolean) => void; profile?: 'toggle' | 'owner' | 'private'; outside?: boolean; sheetTitle?: string; initialConversations?: string[]; /** false: só os atalhos de fora do app (WhatsApp, link...). */ inApp?: boolean; invite?: boolean; onShared?: () => void; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  const inviting = invite && source === 'USER' && inApp;
+  const [invited, setInvited] = useState<ReadonlySet<string> | undefined>();
+  useEffect(() => {
+    if (!inviting) return;
+    let cancelled = false;
+    api.eventInvites(eventId).then(
+      (r) => {
+        if (!cancelled) setInvited(new Set(r.invites.map((i) => i.user.userId)));
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId, inviting]);
 
   /** Conta como compartilhamento para as recomendações (evento de local é EVENT; evento de pessoa é um post). */
   const shared = () => trackShare(source === 'USER' ? 'POST' : 'EVENT', eventId);
@@ -69,7 +88,8 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
             : { key: 'profile', label: posted ? t('No seu perfil') : t('Postar no perfil'), icon: posted ? <CheckIcon /> : <PlusIcon />, on: posted, busy, onClick: () => void togglePost() },
         ]
       : [];
-  const note = problem ?? (!inApp ? undefined : profile === 'toggle' && source === 'USER' && !posted ? t('Repostar coloca o evento no seu perfil e no Início de quem segue você.') : profile === 'private' ? t('Evento privado: só vai para as conversas que você escolher, e ninguém posta no perfil.') : profile === 'owner' ? t('Seu evento já aparece na aba Eventos do seu perfil.') : undefined);
+  const invitedNote = inviting && invited && invited.size > 0 ? (invited.size === 1 ? t('1 pessoa já está convidada.') : t('{n} pessoas já estão convidadas.', { n: invited.size })) : undefined;
+  const note = problem ?? (!inApp ? undefined : inviting ? [invitedNote, profile === 'private' ? t('Evento privado: quem você convidar fica marcado no evento e só essas pessoas veem.') : t('Quem você convidar recebe o evento na conversa e marca “Eu vou” se for.')].filter(Boolean).join(' ') : profile === 'toggle' && source === 'USER' && !posted ? t('Repostar coloca o evento no seu perfil e no Início de quem segue você.') : profile === 'private' ? t('Evento privado: só vai para as conversas que você escolher, e ninguém posta no perfil.') : profile === 'owner' ? t('Seu evento já aparece na aba Eventos do seu perfil.') : undefined);
 
   return (
     <ShareSheet
@@ -83,7 +103,8 @@ export function ShareEventSheet({ eventId, source = 'PLACE', title, posted, onPo
         shared();
         onShared?.();
       }}
-      sentToast={(names) => (names.length === 1 ? t('Evento enviado para: {name}', { name: names[0]! }) : t('Evento enviado para: {name} e mais {n}', { name: names[0]!, n: names.length - 1 }))}
+      {...(inviting ? { already: { userIds: invited ?? new Set<string>(), label: t('Convidado') } } : {})}
+      sentToast={(names) => inviting ? (names.length === 1 ? t('Convite enviado para: {name}', { name: names[0]! }) : t('Convite enviado para: {name} e mais {n}', { name: names[0]!, n: names.length - 1 })) : (names.length === 1 ? t('Evento enviado para: {name}', { name: names[0]! }) : t('Evento enviado para: {name} e mais {n}', { name: names[0]!, n: names.length - 1 }))}
       actions={actions}
       note={note}
       onClose={onClose}

@@ -1,3 +1,4 @@
+import { canOpenByInvite } from './event-invites.ts';
 import { canManageVenue, managedVenueIds } from './venue-access.ts';
 import { decodeImageDataUrl } from './image.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
@@ -280,6 +281,8 @@ export class PostService {
     await posts.create({ id: postId, authorId: actorId, caption, placeName, placeAddress, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventPrivate, eventExtras, archivedAt: null, editedAt: null, createdAt: clock.now(), venueId: venue?.id ?? null, placeVenueId: placeVenue?.id ?? null, linkedEventId: linkedEvent?.id ?? null }, images);
     if (tagIds.length > 0) {
       await posts.createTags(postId, tagIds, clock.now());
+      // Marcar alguém no evento já é convidar: aparece como convidado e abre o evento (mesmo privado).
+      if (event) await posts.addInvites(postId, tagIds, actorId, clock.now());
       const me = await this.deps.users.findProfileById(actorId);
       for (const userId of tagIds) {
         const who = me?.username ?? 'Alguém';
@@ -838,9 +841,9 @@ export class PostService {
     return parseEventExtraAnswers(value, await loadEventExtras(this.deps));
   }
 
-  /** Quem recebeu o cartão do evento numa conversa abre o post, mesmo sem seguir o dono. */
+  /** Quem foi convidado para o evento (marcado ou recebeu o cartão numa conversa) abre o post, mesmo sem seguir o dono. */
   private async openedByCard(viewerId: string, post: { id: string; eventTitle?: string | null }): Promise<boolean> {
-    return post.eventTitle ? this.deps.conversations.hasPostEventAccess(viewerId, post.id) : false;
+    return post.eventTitle ? canOpenByInvite(this.deps, viewerId, post.id) : false;
   }
 
   private async validTags(actorId: string, raw: unknown): Promise<string[]> {

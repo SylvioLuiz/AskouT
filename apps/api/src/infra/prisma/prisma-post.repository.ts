@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { storedEventExtraAnswers } from '../../core/event-extras.ts';
 import type { PostRepository } from '../../core/ports.ts';
-import type { EngagementRow, Page, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages } from '../../core/types.ts';
+import type { EngagementRow, Page, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, EventInviteRecord } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 export class PrismaPostRepository implements PostRepository {
@@ -167,6 +167,27 @@ export class PrismaPostRepository implements PostRepository {
     if (!isUuid(postId) || !isUuid(userId)) return false;
     const result = await this.prisma.postTag.updateMany({ where: { postId, userId }, data: { status } });
     return result.count > 0;
+  }
+
+  async addInvites(postId: string, userIds: string[], invitedById: string, at: Date): Promise<string[]> {
+    const ids = [...new Set(userIds.filter(isUuid))];
+    if (!isUuid(postId) || !isUuid(invitedById) || ids.length === 0) return [];
+    const existing = new Set((await this.prisma.eventInvite.findMany({ where: { postId, userId: { in: ids } }, select: { userId: true } })).map((r) => r.userId));
+    const fresh = ids.filter((id) => !existing.has(id));
+    if (fresh.length === 0) return [];
+    await this.prisma.eventInvite.createMany({ data: fresh.map((userId) => ({ postId, userId, invitedById, createdAt: at })), skipDuplicates: true });
+    return fresh;
+  }
+
+  async listInvites(postId: string): Promise<EventInviteRecord[]> {
+    if (!isUuid(postId)) return [];
+    const rows = await this.prisma.eventInvite.findMany({ where: { postId }, orderBy: { createdAt: 'asc' }, take: 1000 });
+    return rows.map((r) => ({ postId: r.postId, userId: r.userId, invitedById: r.invitedById, createdAt: r.createdAt }));
+  }
+
+  async isInvited(postId: string, userId: string): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(userId)) return false;
+    return (await this.prisma.eventInvite.count({ where: { postId, userId } })) > 0;
   }
 
   async listPendingTags(userId: string, page: Page): Promise<PostWithImages[]> {

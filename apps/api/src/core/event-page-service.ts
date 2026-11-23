@@ -1,3 +1,4 @@
+import { canOpenByInvite } from './event-invites.ts';
 import { VISITOR_ID } from './visitor.ts';
 import { POST_VIDEO_MAX_BYTES, parseChatMedia } from './media.ts';
 import { parseStoryOverlays } from './story-overlays.ts';
@@ -151,6 +152,16 @@ export interface EventPageView {
   datePollId: string | null;
 }
 
+/** Pessoa convidada para um evento criado por uma pessoa. */
+export interface EventInviteView {
+  user: PublicProfile;
+  /** Quem convidou (nulo se apagou a conta). */
+  invitedBy: PublicProfile | null;
+  invitedAt: string;
+  /** Também está marcada no evento (e não recusou a marcação). */
+  tagged: boolean;
+}
+
 /** Evento em que a pessoa confirmou presença, no formato curto que a agenda usa. */
 export interface GoingEventView {
   id: string;
@@ -247,9 +258,9 @@ export class EventPageService {
       } catch {
         canSee = false;
       }
-      // Quem recebeu o cartão numa conversa abre o evento mesmo sem seguir o dono; evento privado só abre assim.
+      // Quem foi convidado (marcado ou recebeu o cartão numa conversa) abre o evento mesmo sem seguir o dono; evento privado só abre assim.
       if (post.eventPrivate) canSee = false;
-      if (!canSee && !(await this.deps.conversations.hasPostEventAccess(viewerId, post.id))) throw notFound('Evento não encontrado');
+      if (!canSee && !(await canOpenByInvite(this.deps, viewerId, post.id))) throw notFound('Evento não encontrado');
     }
     const authorProfile = await this.deps.users.findProfileById(post.authorId);
     return { ref: { source: 'USER', id }, owner: authorProfile ? toPublicProfile(authorProfile) : null };
@@ -285,6 +296,28 @@ export class EventPageService {
       canStory: (isOwner || iGo) && (base.view.endsAt === null || Date.parse(base.view.endsAt) > this.deps.clock.now().getTime()),
       goingOnProfile: !isOwner && iGo ? (await this.deps.eventRoom.goingOnProfile(ref, viewerId)) === true : false,
       datePollId: await this.datePollFor(viewerId, ref, base.view.startsAt, isOwner),
+    };
+  }
+
+  /**
+   * Quem já foi convidado para o evento (marcado na criação ou que recebeu o cartão), para a folha de convidar mostrar
+   * "Convidado". O dono vê todos e quem convidou cada um; os demais veem só quem eles convidaram. Evento de local não tem convites.
+   */
+  async invites(viewerId: string, rawId: unknown): Promise<{ invites: EventInviteView[] }> {
+    const { ref, owner } = await this.resolve(viewerId, rawId);
+    if (ref.source !== 'USER') return { invites: [] };
+    const isOwner = owner?.userId === viewerId;
+    const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
+    const rows = (await this.deps.posts.listInvites(ref.id)).filter((r) => (isOwner || r.invitedById === viewerId) && !hidden.has(r.userId));
+    const tagged = new Map((await this.deps.posts.tagsFor([ref.id])).map((t) => [t.userId, t.status]));
+    const ids = [...new Set(rows.flatMap((r) => [r.userId, ...(r.invitedById ? [r.invitedById] : [])]))];
+    const byId = new Map((await this.deps.users.findProfilesByIds(ids)).map((p) => [p.userId, toPublicProfile(p)]));
+    return {
+      invites: rows.flatMap((r): EventInviteView[] => {
+        const user = byId.get(r.userId);
+        if (!user) return [];
+        return [{ user, invitedBy: r.invitedById ? (byId.get(r.invitedById) ?? null) : null, invitedAt: r.createdAt.toISOString(), tagged: tagged.has(r.userId) && tagged.get(r.userId) !== 'DECLINED' }];
+      }),
     };
   }
 
