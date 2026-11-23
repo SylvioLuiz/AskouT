@@ -3502,4 +3502,6 @@ export const EN: Readonly<Record<string, string>> = {
   "Ver {name} no mapa com vocês dois": "See {name} on the map with both of you",
   "Vocês ainda não marcaram um local.": "You haven't picked a place yet.",
   "A localização aparece quando cada um compartilha no encontro NOW.": "Locations show up once each of you shares in the NOW meetup.",
+  "Buscar pelo nome": "Search by name",
+  "Voltar ao local combinado": "Back to the agreed place",
 };

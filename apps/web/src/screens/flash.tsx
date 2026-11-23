@@ -1,4 +1,3 @@
-import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { lazyWithReload } from '../lib/chunk-reload.ts';
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { BoltIcon, ChatIcon, CheckIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, MapIcon, PlusIcon, RefreshIcon, UserPlusIcon, UsersIcon, XIcon } from '../components/icons.tsx';
@@ -1377,6 +1376,7 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void, aut
 
 export function MatchScreen({ inviteId }: { inviteId: string }) {
   useTitle(t('Encontro'));
+  const viewer = useUser();
   const match = useAsync(() => api.flashMatch(inviteId), [inviteId]);
   usePolling(match.reload, 8_000);
 
@@ -1389,6 +1389,8 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const [pickedKey, setPickedKey] = useState<string | undefined>();
   const [mode, setMode] = useState<'foot' | 'driving'>('foot');
   const [destBusy, setDestBusy] = useState(false);
+  /** Com um local já combinado, a lista de lugares só abre ao tocar em "Sugerir outro lugar". */
+  const [choosing, setChoosing] = useState(false);
   const [precisionBusy, setPrecisionBusy] = useState(false);
 
   async function changePrecision(approx: boolean) {
@@ -1483,6 +1485,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
     }
   }
 
+  const showList = !dest || choosing;
   const places = sortByFairness(suggestions.data?.items ?? []).slice(0, MAX_PLACES_ON_MAP);
   const placePins: PlacePin[] = places.map((p) => ({ key: p.key, name: placeName(p), lat: p.lat, lng: p.lng }));
   const left = minutesLeft(data.expiresAt, Date.parse(data.now));
@@ -1528,58 +1531,69 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
             <p className="muted">{t('Atualizado {when}.', { when: formatAge(them.updatedAt, data.now) })}{data.themApprox ? t(' Localização aproximada (uns 3 km).') : ''}{distance === undefined ? t(' Compartilhe a sua para ver a distância.') : ''}</p>
           </>
         )}
-        {them ? (
-          <OpenInMaps className="whereis__link" lat={them.lat} lng={them.lng}>
-            {t('Abrir no mapa')}
-          </OpenInMaps>
-        ) : null}
       </section>
 
       {!mapFailed && (them || myPoint) ? (
         <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label={t('Carregando o mapa')} /></div>}>
           <MatchMap
             me={myPoint}
+            mePhoto={viewer.profile.avatarUrl}
             others={
-              them ? [{ id: inviteId, lat: them.lat, lng: them.lng, stale: them.stale, initials: initials(data.other.username) }] : []
+              them ? [{ id: inviteId, lat: them.lat, lng: them.lng, stale: them.stale, initials: initials(data.other.username), photoUrl: data.other.avatarUrl }] : []
             }
-            places={dest ? [] : placePins}
+            places={showList ? placePins : []}
             selectedKey={pickedKey}
             onPick={setPickedKey}
-            destination={dest ? { lat: dest.lat, lng: dest.lng, name: dest.name } : undefined}
-            routes={routeLines}
+            destination={dest && !showList ? { lat: dest.lat, lng: dest.lng, name: dest.name } : undefined}
+            routes={showList ? undefined : routeLines}
             onFail={() => setMapFailed(true)}
           />
         </Suspense>
       ) : null}
 
-      {dest ? (
-        <MatchDestination match={data} mode={mode} onMode={setMode} me={routes.data?.me} them={routes.data?.them} routesLoading={routes.loading} busy={destBusy} onClear={() => void clearDestination()} />
-      ) : null}
-      <MatchPlaces
-        bothShared={bothShared}
-        loading={suggestions.loading}
-        error={suggestions.error && suggestions.error.code !== 'CONFLICT' ? suggestions.error.message : undefined}
-        suggestions={suggestions.data}
-        places={dest ? places.filter((p) => placeName(p) !== dest.name) : places}
-        otherName={data.other.username}
-        selectedKey={pickedKey}
-        busy={destBusy}
-        onSelect={setPickedKey}
-        onChoose={(item) => void suggestInChat(item)}
-      />
-      {suggestions.data ? (
-        <p className="muted matchradius">
-          {radiusKm === null
-            ? t('Buscando até {km} km do meio do caminho (automático).', { km: Math.round(suggestions.data.radiusM / 100) / 10 })
-            : t('Buscando até {km} km do meio do caminho.', { km: radiusKm })}{' '}
-          <Link to="/configuracao/now">{t('Mudar')}</Link>
-        </p>
-      ) : null}
-      <div className="placesearch placesearch--closed">
-        <Link to={`/conversas/${data.conversationId}?sugerir=outro`} className="btn btn--secondary btn--full">
-          {t('Sugerir outro lugar')}
-        </Link>
-      </div>
+      {dest && !showList ? (
+        <>
+          <MatchDestination match={data} mode={mode} onMode={setMode} me={routes.data?.me} them={routes.data?.them} routesLoading={routes.loading} busy={destBusy} onClear={() => void clearDestination()} />
+          <div className="placesearch placesearch--closed">
+            <Button variant="secondary" full onClick={() => setChoosing(true)}>
+              {t('Sugerir outro lugar')}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <MatchPlaces
+            bothShared={bothShared}
+            loading={suggestions.loading}
+            error={suggestions.error && suggestions.error.code !== 'CONFLICT' ? suggestions.error.message : undefined}
+            suggestions={suggestions.data}
+            places={dest ? places.filter((p) => placeName(p) !== dest.name) : places}
+            otherName={data.other.username}
+            selectedKey={pickedKey}
+            busy={destBusy}
+            onSelect={setPickedKey}
+            onChoose={(item) => void suggestInChat(item)}
+          />
+          {suggestions.data ? (
+            <p className="muted matchradius">
+              {radiusKm === null
+                ? t('Buscando até {km} km do meio do caminho (automático).', { km: Math.round(suggestions.data.radiusM / 100) / 10 })
+                : t('Buscando até {km} km do meio do caminho.', { km: radiusKm })}{' '}
+              <Link to="/configuracao/now">{t('Mudar')}</Link>
+            </p>
+          ) : null}
+          <div className="placesearch placesearch--closed row-actions">
+            <Link to={`/conversas/${data.conversationId}?sugerir=outro`} className="btn btn--secondary btn--small">
+              {t('Buscar pelo nome')}
+            </Link>
+            {dest ? (
+              <Button small variant="quiet" onClick={() => { setChoosing(false); setPickedKey(undefined); }}>
+                {t('Voltar ao local combinado')}
+              </Button>
+            ) : null}
+          </div>
+        </>
+      )}
 
       <ArrivalShare match={data} background={background} onChanged={match.reload} onFeedback={setFeedback} />
 
