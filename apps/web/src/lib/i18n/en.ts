@@ -3622,4 +3622,6 @@ export const EN: Readonly<Record<string, string>> = {
   "Texto na foto": "Text on the photo",
   "Texto: {text}. Toque para mudar ou arraste": "Text: {text}. Tap to change or drag",
   "Editar foto {n}": "Edit photo {n}",
+  "Buscar mais no Google": "Search more on Google",
+  "Resultados do OpenStreetMap.": "Results from OpenStreetMap.",
 };

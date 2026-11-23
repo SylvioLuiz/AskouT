@@ -3623,4 +3623,6 @@ export const ES: Readonly<Record<string, string>> = {
   "Texto na foto": "Texto en la foto",
   "Texto: {text}. Toque para mudar ou arraste": "Texto: {text}. Toca para cambiar o arrastra",
   "Editar foto {n}": "Editar foto {n}",
+  "Buscar mais no Google": "Buscar más en Google",
+  "Resultados do OpenStreetMap.": "Resultados de OpenStreetMap.",
 };

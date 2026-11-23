@@ -4,7 +4,8 @@ import { Button, Notice } from './ui.tsx';
 import { formatDistance } from '../lib/flash.ts';
 import { t } from '../lib/i18n/index.ts';
 import { toApiError } from '../lib/errors.ts';
-import type { ExplorePlace } from '../lib/types.ts';
+import type { ExplorePlace, PlaceSearchResult } from '../lib/types.ts';
+import { PlaceSearchMore } from './place-search-more.tsx';
 
 const MIN_CHARS = 2;
 
@@ -23,6 +24,10 @@ export function MatchPlaceSearch({ center, otherName, busy, startOpen = false, o
   const [open, setOpen] = useState(startOpen);
   const [q, setQ] = useState('');
   const [results, setResults] = useState<ExplorePlace[] | undefined>();
+  const [data, setData] = useState<PlaceSearchResult | undefined>();
+  // "Buscar mais no Google" vale só para o texto em que foi apertado.
+  const [googleFor, setGoogleFor] = useState<string | null>(null);
+  const google = googleFor !== null && googleFor === q.trim();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -30,6 +35,7 @@ export function MatchPlaceSearch({ center, otherName, busy, startOpen = false, o
     const text = q.trim();
     if (!open || text.length < MIN_CHARS) {
       setResults(undefined);
+      setData(undefined);
       setLoading(false);
       return;
     }
@@ -38,10 +44,11 @@ export function MatchPlaceSearch({ center, otherName, busy, startOpen = false, o
     const timer = window.setTimeout(() => {
       api
         // Sem limite de distância: qualquer lugar pelo nome ou endereço (os mais perto de vocês aparecem primeiro).
-        .searchPlaces({ q: text, ...(center ? { lat: center.lat, lng: center.lng } : {}) })
+        .searchPlaces({ q: text, ...(center ? { lat: center.lat, lng: center.lng } : {}), google })
         .then((r) => {
           if (cancelled) return;
           setResults(r.places);
+          setData(r);
           setError(undefined);
         })
         .catch((failure: unknown) => {
@@ -55,7 +62,7 @@ export function MatchPlaceSearch({ center, otherName, busy, startOpen = false, o
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [q, open, center?.lat, center?.lng]);
+  }, [q, open, center?.lat, center?.lng, google]);
 
   if (!open) {
     return (
@@ -105,6 +112,7 @@ export function MatchPlaceSearch({ center, otherName, busy, startOpen = false, o
           ))}
         </ul>
       ) : null}
+      <PlaceSearchMore data={data} google={google} busy={loading} onGoogle={() => setGoogleFor(q.trim())} />
     </section>
   );
 }
