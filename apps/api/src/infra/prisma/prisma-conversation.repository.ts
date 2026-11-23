@@ -47,7 +47,7 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   createdAt: r.createdAt,
 });
 
-type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; group: { name: string; ownerId: string; imageUrl: string | null; eventPostId: string | null } | null };
+type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; requestToId?: string | null; requestDeclinedAt?: Date | null; acceptedAt?: Date | null; group: { name: string; ownerId: string; imageUrl: string | null; eventPostId: string | null } | null };
 
 const toConversation = (c: ConversationRow): ConversationRecord => ({
   id: c.id,
@@ -57,6 +57,7 @@ const toConversation = (c: ConversationRow): ConversationRecord => ({
   ownerId: c.group?.ownerId ?? null,
   imageUrl: c.group?.imageUrl ?? null,
   eventPostId: c.group?.eventPostId ?? null,
+  ...(c.type === 'DIRECT' ? { requestToId: c.requestToId ?? null, requestDeclinedAt: c.requestDeclinedAt ?? null, acceptedAt: c.acceptedAt ?? null } : {}),
   createdAt: c.createdAt,
 });
 
@@ -87,7 +88,7 @@ export class PrismaConversationRepository implements ConversationRepository {
           participants: { create: [{ userId: a }, { userId: b }] },
         },
       });
-      return { id, type: 'DIRECT', directKey, name: null, ownerId: null, imageUrl: null, createdAt: now };
+      return { id, type: 'DIRECT', directKey, name: null, ownerId: null, imageUrl: null, eventPostId: null, requestToId: null, requestDeclinedAt: null, acceptedAt: null, createdAt: now };
     } catch (error) {
       // Duas requisições criaram ao mesmo tempo: a segunda usa a conversa da primeira.
       if (uniqueViolationTargets(error) !== undefined) {
@@ -102,6 +103,28 @@ export class PrismaConversationRepository implements ConversationRepository {
     if (!isUuid(id)) return undefined;
     const row = await this.prisma.conversation.findUnique({ where: { id }, include: { group: true } });
     return row ? toConversation(row) : undefined;
+  }
+
+  async findDirect(a: string, b: string): Promise<ConversationRecord | undefined> {
+    if (!isUuid(a) || !isUuid(b)) return undefined;
+    const row = await this.prisma.conversation.findUnique({ where: { directKey: directKeyOf(a, b) }, include: { group: true } });
+    return row ? toConversation(row) : undefined;
+  }
+
+  async setRequest(conversationId: string, patch: { requestToId?: string | null; requestDeclinedAt?: Date | null; acceptedAt?: Date | null }): Promise<void> {
+    if (!isUuid(conversationId)) return;
+    await this.prisma.conversation.updateMany({ where: { id: conversationId, type: 'DIRECT' }, data: patch });
+  }
+
+  async getOpenDms(userId: string): Promise<boolean> {
+    if (!isUuid(userId)) return false;
+    const row = await this.prisma.userSettings.findUnique({ where: { userId }, select: { openDms: true } });
+    return row?.openDms === true;
+  }
+
+  async setOpenDms(userId: string, on: boolean): Promise<void> {
+    if (!isUuid(userId)) return;
+    await this.prisma.userSettings.upsert({ where: { userId }, create: { userId, openDms: on }, update: { openDms: on } });
   }
 
   async participantIds(conversationId: string): Promise<string[] | undefined> {

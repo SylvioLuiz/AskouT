@@ -993,6 +993,34 @@ export function defineRepositoryContract(
         assert.notEqual(other.id, first.id);
       });
 
+      it('solicitação de mensagem: estado na conversa 1 a 1, findDirect não cria, e a opção de receber de qualquer pessoa', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        assert.equal(await h.conversations.findDirect(ana, bia), undefined);
+        const c = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        assert.equal((await h.conversations.findDirect(bia, ana))?.id, c.id);
+        assert.equal((await h.conversations.findById(c.id))?.requestToId ?? null, null);
+        await h.conversations.setRequest(c.id, { requestToId: bia });
+        let found = await h.conversations.findById(c.id);
+        assert.equal(found?.requestToId, bia);
+        assert.equal(found?.requestDeclinedAt ?? null, null);
+        await h.conversations.setRequest(c.id, { requestDeclinedAt: at(3) });
+        found = await h.conversations.findById(c.id);
+        assert.equal(found?.requestToId, bia, 'só o campo informado muda');
+        assert.equal(found?.requestDeclinedAt?.getTime(), at(3).getTime());
+        await h.conversations.setRequest(c.id, { requestToId: null, requestDeclinedAt: null, acceptedAt: at(5) });
+        found = await h.conversations.findDirect(ana, bia);
+        assert.equal(found?.requestToId ?? null, null);
+        assert.equal(found?.acceptedAt?.getTime(), at(5).getTime());
+
+        assert.equal(await h.conversations.getOpenDms(bia), false);
+        await h.conversations.setOpenDms(bia, true);
+        assert.equal(await h.conversations.getOpenDms(bia), true);
+        assert.equal(await h.conversations.getOpenDms(ana), false);
+        await h.conversations.setOpenDms(bia, false);
+        assert.equal(await h.conversations.getOpenDms(bia), false);
+      });
+
       it('mensagens: ordem cronológica, limite e paginação para trás', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');

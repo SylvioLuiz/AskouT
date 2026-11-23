@@ -295,6 +295,8 @@ model UserSettings {
   notifyPrefs  Json   @default("{}")
   /// A pessoa escolheu mostrar os horários da agenda para os amigos (e entrar nos horários em comum). Começa desligado.
   shareAvailability Boolean @default(false)
+  /// Perfil público aceita mensagens de quem ele não segue direto na caixa de conversas (sem virar solicitação).
+  openDms Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -467,6 +469,12 @@ model Conversation {
   /// Só nas conversas DIRECT: "<menor id>:<maior id>" da dupla, para existir uma única conversa por par.
   directKey String?        @unique
   createdAt DateTime       @default(now())
+  /// Só DIRECT: solicitação de mensagem pendente para esta pessoa (alguém que ela não segue escreveu). Nula = conversa normal.
+  requestToId       String?   @db.Uuid
+  /// Quem recebeu a solicitação recusou (some para ela até chegar mensagem nova).
+  requestDeclinedAt DateTime?
+  /// Quem recebeu aceitou a solicitação: a conversa fica liberada nos dois sentidos.
+  acceptedAt        DateTime?
 
   group        Group?                    @relation(fields: [groupId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]

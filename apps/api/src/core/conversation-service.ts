@@ -9,6 +9,8 @@ import type { CommentGif } from './gif.ts';
 import type { ChatMedia } from './media.ts';
 import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
+import { messageDelivery, requestRole } from './message-requests.ts';
+import type { MessageDelivery, MessageRequestRole } from './message-requests.ts';
 import { distanceMeters } from './geo.ts';
 import { buildMeetupViews } from './meetup-view.ts';
 import { SchedulingService } from './scheduling-service.ts';
@@ -120,8 +122,10 @@ export interface ConversationListItem {
   memberCount: number;
   lastMessage: MessageView | null;
   unread: number;
-  /** Na 1 a 1, só amigos conversam: se deixaram de ser, o histórico continua legível, mas sem enviar. */
+  /** Na 1 a 1, dá para enviar se a mensagem chega (ver `messageDelivery`); quem recebeu uma solicitação precisa aceitar antes. */
   canSend: boolean;
+  /** Solicitação de mensagem pendente: INCOMING = alguém que você não segue escreveu; OUTGOING = você escreveu e a pessoa ainda não aceitou. */
+  request: MessageRequestRole;
   /** Fixada no topo da lista (só para você). */
   pinned: boolean;
   /** Sem avisos de mensagem nova (só para você). */
@@ -136,6 +140,8 @@ export interface ConversationView {
   imageUrl: string | null;
   memberCount: number;
   canSend: boolean;
+  /** Solicitação de mensagem pendente (ver `ConversationListItem.request`). */
+  request: MessageRequestRole;
   /** Você é quem criou o grupo (pode renomear, trocar a foto e remover pessoas). */
   isOwner: boolean;
   pinned: boolean;
@@ -426,6 +432,9 @@ export function parseGroupImage(value: unknown): string {
 
 const GROUP_MAX_MEMBERS = 15;
 
+const NEED_FOLLOW = 'Para mandar mensagem, siga a pessoa.';
+const ACCEPT_FIRST = 'Aceite a solicitação de mensagem para responder.';
+
 export class ConversationService {
   private readonly deps: CoreDeps;
   /** Quem está digitando: `conversa|pessoa` → instante em que o sinal expira. Fica só na memória (é efêmero). */
@@ -435,16 +444,86 @@ export class ConversationService {
     this.deps = deps;
   }
 
-  /** Abre (ou cria) a conversa com um amigo. */
-  async open(actorId: string, otherId: unknown): Promise<{ id: string }> {
-    const { conversations, follows, blocks, clock, ids } = this.deps;
+  /**
+   * Abre (ou cria) a conversa 1 a 1. Com quem não segue você de volta, a conversa vira uma solicitação de mensagem
+   * para a outra pessoa (ela aceita, recusa ou bloqueia). Conversa que já existe continua como está.
+   */
+  async open(actorId: string, otherId: unknown): Promise<{ id: string; request: MessageRequestRole }> {
+    const { conversations, blocks, clock, ids } = this.deps;
     if (typeof otherId !== 'string' || otherId === '' || otherId.length > 64) throw validationError('Pessoa inválida', { userId: 'Pessoa inválida' });
     if (otherId === actorId) throw validationError('Você não pode conversar consigo mesmo');
     if (await blocks.existsEitherWay(actorId, otherId)) throw notFound('Pessoa não encontrada');
-    const friends = await follows.listFriendIds(actorId);
-    if (!friends.includes(otherId)) throw forbidden('Só amigos podem conversar');
-    const conversation = await conversations.getOrCreateDirect(actorId, otherId, ids.next(), clock.now());
-    return { id: conversation.id };
+    const found = await conversations.findDirect(actorId, otherId);
+    const existing = found ? await this.settle(found) : undefined;
+    // Quem recebeu a solicitação abre a conversa normalmente (para aceitar ou recusar).
+    if (existing?.requestToId === actorId) return { id: existing.id, request: 'INCOMING' };
+    const delivery = await messageDelivery(this.deps, actorId, otherId, existing);
+    if (delivery === 'NONE') throw forbidden(NEED_FOLLOW);
+    const conversation = existing ?? (await conversations.getOrCreateDirect(actorId, otherId, ids.next(), clock.now()));
+    return { id: conversation.id, request: delivery === 'REQUEST' ? 'OUTGOING' : null };
+  }
+
+  /**
+   * Solicitação pendente que já não precisa ser solicitação (quem recebeu passou a seguir de volta ou abriu as mensagens
+   * para qualquer pessoa) vira conversa normal.
+   */
+  private async settle(conversation: ConversationRecord): Promise<ConversationRecord> {
+    if (conversation.type !== 'DIRECT' || !conversation.requestToId) return conversation;
+    const recipientId = conversation.requestToId;
+    const requesterId = (await this.deps.conversations.participantIds(conversation.id))?.find((id) => id !== recipientId);
+    if (!requesterId) return conversation;
+    const probe = { ...conversation, acceptedAt: null };
+    if ((await messageDelivery(this.deps, requesterId, recipientId, probe)) !== 'DIRECT') return conversation;
+    const now = this.deps.clock.now();
+    await this.deps.conversations.setRequest(conversation.id, { requestToId: null, requestDeclinedAt: null, acceptedAt: now });
+    return { ...conversation, requestToId: null, requestDeclinedAt: null, acceptedAt: now };
+  }
+
+  /** Pode enviar (ou reagir, responder cartões) na conversa 1 a 1? */
+  private async directCanSend(actorId: string, conversation: ConversationRecord, otherId: string): Promise<boolean> {
+    if (requestRole(conversation, actorId) === 'INCOMING') return false;
+    return (await messageDelivery(this.deps, actorId, otherId, conversation)) !== 'NONE';
+  }
+
+  private async assertCanSend(actorId: string, conversation: ConversationRecord, otherId: string | null): Promise<MessageDelivery> {
+    if (!otherId) return 'DIRECT';
+    if (requestRole(conversation, actorId) === 'INCOMING') throw forbidden(ACCEPT_FIRST);
+    const delivery = await messageDelivery(this.deps, actorId, otherId, conversation);
+    if (delivery === 'NONE') throw forbidden(NEED_FOLLOW);
+    return delivery;
+  }
+
+  /** Aceita a solicitação de mensagem: a conversa vai para a caixa normal e fica liberada nos dois sentidos. */
+  async acceptRequest(actorId: string, conversationId: string): Promise<{ ok: true }> {
+    const { conversation } = await this.access(actorId, conversationId);
+    if (conversation.requestToId !== actorId) throw notFound('Solicitação não encontrada');
+    await this.deps.conversations.setRequest(conversationId, { requestToId: null, requestDeclinedAt: null, acceptedAt: this.deps.clock.now() });
+    return { ok: true };
+  }
+
+  /**
+   * Recusa a solicitação: some das suas solicitações e as mensagens até agora são apagadas para você. Quem enviou não é
+   * avisado. Se a pessoa escrever de novo, chega uma nova solicitação (só com as mensagens novas).
+   */
+  async declineRequest(actorId: string, conversationId: string): Promise<{ ok: true }> {
+    const { conversation } = await this.access(actorId, conversationId);
+    if (conversation.requestToId !== actorId) throw notFound('Solicitação não encontrada');
+    const now = this.deps.clock.now();
+    await this.deps.conversations.setRequest(conversationId, { requestDeclinedAt: now });
+    await this.deps.conversations.setCleared(conversationId, actorId, now);
+    return { ok: true };
+  }
+
+  /** Configuração de mensagens: perfil público pode receber mensagens de qualquer pessoa direto na caixa de conversas. */
+  async messageSettings(actorId: string): Promise<{ openDms: boolean; isPrivate: boolean }> {
+    const [profile] = await this.deps.users.findProfilesByIds([actorId]);
+    return { openDms: await this.deps.conversations.getOpenDms(actorId), isPrivate: profile?.isPrivate ?? false };
+  }
+
+  async setMessageSettings(actorId: string, input: { openDms?: unknown }): Promise<{ openDms: boolean; isPrivate: boolean }> {
+    if (typeof input.openDms !== 'boolean') throw validationError('Valor inválido', { openDms: 'Use true ou false' });
+    await this.deps.conversations.setOpenDms(actorId, input.openDms);
+    return this.messageSettings(actorId);
   }
 
   /** Cria um grupo com amigos (2 a 15 pessoas além de quem cria). Quem criou é o dono; as pessoas entram direto e recebem um aviso. */
@@ -515,15 +594,44 @@ export class ConversationService {
   }
 
   async list(actorId: string): Promise<ConversationListItem[]> {
+    return (await this.inbox(actorId)).items;
+  }
+
+  /** Caixa de conversas e quantas solicitações de mensagem estão esperando (com mensagem nova não lida). */
+  async inbox(actorId: string): Promise<{ items: ConversationListItem[]; requestCount: number; requestUnread: number }> {
+    const all = await this.listItems(actorId);
+    const requests = all.filter((i) => i.request === 'INCOMING');
+    return { items: all.filter((i) => i.request !== 'INCOMING'), requestCount: requests.length, requestUnread: requests.filter((i) => i.unread > 0).length };
+  }
+
+  /** Solicitações de mensagem: conversas começadas por quem você não segue, esperando você aceitar, recusar ou bloquear. */
+  async requests(actorId: string): Promise<ConversationListItem[]> {
+    return (await this.listItems(actorId)).filter((i) => i.request === 'INCOMING');
+  }
+
+  private async listItems(actorId: string): Promise<ConversationListItem[]> {
     const { conversations, follows, blocks, users } = this.deps;
     const blocked = await blocks.listRelatedIds(actorId);
     const [summaries, friends] = await Promise.all([conversations.listForUser(actorId, blocked), follows.listFriendIds(actorId)]);
     const hidden = new Set(blocked);
+    // Solicitações que já não precisam ser solicitação viram conversa normal.
+    await Promise.all(summaries.filter((s) => s.conversation.requestToId).map(async (s) => (s.conversation = await this.settle(s.conversation))));
     const rows = summaries
       .map((s) => ({ s, otherId: s.conversation.type === 'DIRECT' ? (s.participantIds.find((id) => id !== actorId) ?? null) : null }))
       .filter(({ s, otherId }) => s.conversation.type === 'GROUP' || (otherId !== null && !hidden.has(otherId)))
       // "Apagar conversa" (1 a 1): some da lista até chegar mensagem nova. As mensagens continuam para a outra pessoa.
-      .filter(({ s }) => !(s.conversation.type === 'DIRECT' && s.clearedAt != null && s.lastMessage === null));
+      .filter(({ s }) => !(s.conversation.type === 'DIRECT' && s.clearedAt != null && s.lastMessage === null))
+      // Solicitação recebida: só aparece com mensagem, e some quando recusada (até chegar mensagem nova).
+      .filter(({ s }) => requestRole(s.conversation, actorId) !== 'INCOMING' || (s.lastMessage !== null && !s.conversation.requestDeclinedAt));
+    const friendSet = new Set(friends);
+    // Só amigos (o caso comum) dispensam a conferência de para onde a mensagem iria.
+    const sendable = new Map(
+      await Promise.all(
+        rows
+          .filter(({ s, otherId }) => s.conversation.type === 'DIRECT' && otherId !== null && !friendSet.has(otherId))
+          .map(async ({ s, otherId }) => [s.conversation.id, await this.directCanSend(actorId, s.conversation, otherId as string)] as const),
+      ),
+    );
     const profiles = new Map((await users.findProfilesByIds(rows.flatMap((v) => (v.otherId ? [v.otherId] : [])))).map((p) => [p.userId, p] as const));
     const items: ConversationListItem[] = [];
     const pins = new Map<string, number>();
@@ -547,7 +655,8 @@ export class ConversationService {
         memberCount: s.conversation.type === 'GROUP' ? s.participantIds.filter((id) => !hidden.has(id)).length : s.participantIds.length,
         lastMessage: s.lastMessage ? toMessageView(s.lastMessage, actorId) : null,
         unread: s.unread,
-        canSend: s.conversation.type === 'GROUP' ? true : otherId !== null && friends.includes(otherId),
+        canSend: s.conversation.type === 'GROUP' ? true : otherId !== null && (sendable.get(s.conversation.id) ?? (friendSet.has(otherId) && requestRole(s.conversation, actorId) !== 'INCOMING')),
+        request: requestRole(s.conversation, actorId),
         pinned: s.pinnedAt != null,
         muted: s.muted === true,
       });
@@ -580,7 +689,8 @@ export class ConversationService {
     const items = hasMore ? page.slice(page.length - limit) : page;
     if (before === undefined) await conversations.markRead(conversationId, actorId, now);
     const isGroup = conversation.type === 'GROUP';
-    const friends = isGroup ? [] : await this.deps.follows.listFriendIds(actorId);
+    const request = requestRole(conversation, actorId);
+    const canSend = isGroup ? true : otherId !== null && (await this.directCanSend(actorId, conversation, otherId));
     const positions = otherId && items.some((m) => m.suggestion) ? await this.livePositions(actorId, otherId, now) : null;
 
     const meetupIds = [...new Set(items.flatMap((m) => (m.meetupId ? [m.meetupId] : [])))];
@@ -598,7 +708,9 @@ export class ConversationService {
     const readProfiles = new Map((other ? [other] : await this.deps.users.findProfilesByIds(reads.map((r) => r.userId))).map((p) => [p.userId, p] as const));
     const members: MemberReadView[] = reads.flatMap((r) => {
       const profile = readProfiles.get(r.userId);
-      return profile ? [{ profile: toPublicProfile(profile), readAt: r.lastReadAt ? r.lastReadAt.toISOString() : null }] : [];
+      // Solicitação ainda não aceita: quem enviou não fica sabendo se a pessoa leu.
+      const readAt = request === 'OUTGOING' ? null : r.lastReadAt ? r.lastReadAt.toISOString() : null;
+      return profile ? [{ profile: toPublicProfile(profile), readAt }] : [];
     });
 
     return {
@@ -614,7 +726,8 @@ export class ConversationService {
       color: prefs.color,
       typing: await this.typingNames(actorId, conversationId, memberIds, hiddenIds, now),
       members,
-      canSend: isGroup ? true : otherId !== null && friends.includes(otherId),
+      canSend,
+      request,
       now: now.toISOString(),
       messages: items.map((m) =>
         toMessageView(m, actorId, {
@@ -692,10 +805,8 @@ export class ConversationService {
       body = parseText(input.body);
     }
 
-    if (otherId) {
-      const friends = await follows.listFriendIds(actorId);
-      if (!friends.includes(otherId)) throw forbidden('Vocês não são mais amigos. Não dá para enviar mensagens.');
-    }
+    // 1 a 1: com quem não segue você de volta, a mensagem vira (ou continua) solicitação, sem aviso para a outra pessoa.
+    const delivery = await this.assertCanSend(actorId, conversation, otherId);
 
     const now = clock.now();
     const recent = await conversations.countSentSince(actorId, new Date(now.getTime() - 60_000));
@@ -704,6 +815,11 @@ export class ConversationService {
     const replyToId = await this.parseReply(conversationId, input.replyToId);
     const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, ...(input.storyId ? { storyId: input.storyId } : {}), ...(gif ? { gifId: gif.id, gifUrl: gif.url } : {}), createdAt: now };
     await conversations.addMessage(message, audio ?? (media ? { mime: media.mime, data: media.data } : undefined));
+    const asRequest = delivery === 'REQUEST' && otherId !== null;
+    if (asRequest && (conversation.requestToId !== otherId || conversation.requestDeclinedAt)) {
+      // Nova solicitação, ou recusada que volta com a mensagem nova.
+      await conversations.setRequest(conversationId, { requestToId: otherId, requestDeclinedAt: null });
+    }
     if (postEventId) {
       // Quem está na conversa vira convidado (fica registrado quem convidou; em evento privado, vira marcação).
       const eventPost = (await this.deps.posts.findById(postEventId))?.post;
@@ -720,7 +836,7 @@ export class ConversationService {
     const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
     // Mensagem de texto: o aviso (sino/push) mostra um pedaço do que foi escrito; os outros tipos dizem o que foi enviado.
     const preview = kind === 'TEXT' && !gif ? messagePreview(body) : undefined;
-    await this.notifyMembers(actorId, actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
+    if (!asRequest) await this.notifyMembers(actorId, actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
     const decor = await this.decorate(actorId, [message]);
     // Texto com link de evento: já volta com o cartão (como na lista de mensagens).
     const linked = linkedEventId(message);
@@ -740,12 +856,12 @@ export class ConversationService {
 
   /** Reage com qualquer emoji (um por pessoa); mandar o mesmo de novo (ou `null`) tira a reação. */
   async react(actorId: string, conversationId: string, messageId: string, emoji: unknown): Promise<{ reactions: ReactionView[] }> {
-    const { conversations, follows, clock } = this.deps;
-    const { otherId } = await this.access(actorId, conversationId);
+    const { conversations, clock } = this.deps;
+    const { conversation, otherId } = await this.access(actorId, conversationId);
     if (emoji !== null && !isEmoji(emoji)) throw validationError('Reação inválida', { emoji: 'Use um emoji' });
     const message = await this.visibleMessage(actorId, conversationId, messageId);
     if (message.deletedAt || message.kind === 'SYSTEM') throw notFound('Mensagem não encontrada');
-    if (otherId && !(await follows.listFriendIds(actorId)).includes(otherId)) throw forbidden('Vocês não são mais amigos.');
+    await this.assertCanSend(actorId, conversation, otherId);
     const current = (await conversations.listReactions([messageId])).find((r) => r.userId === actorId)?.emoji ?? null;
     await conversations.setReaction(messageId, actorId, emoji === current ? null : (emoji as string | null), clock.now());
     const rows = await conversations.listReactions([messageId]);
@@ -787,7 +903,8 @@ export class ConversationService {
 
   /** "Digitando…": sinal efêmero (some em poucos segundos) guardado só na memória do servidor. */
   async typing(actorId: string, conversationId: string): Promise<{ ok: true }> {
-    await this.access(actorId, conversationId);
+    const { conversation } = await this.access(actorId, conversationId);
+    if (requestRole(conversation, actorId) === 'INCOMING') return { ok: true };
     this.typingUntil.set(`${conversationId}|${actorId}`, this.deps.clock.now().getTime() + TYPING_TTL_MS);
     return { ok: true };
   }
@@ -912,14 +1029,13 @@ export class ConversationService {
   /** Quem recebeu o cartão aceita ou recusa o lugar. Só uma resposta, só do destinatário, só entre amigos. */
   async respond(actorId: string, conversationId: string, messageId: string, action: unknown): Promise<MessageView> {
     if (action !== 'accept' && action !== 'decline') throw validationError('Ação inválida', { action: 'Use accept ou decline' });
-    const { conversations, follows, clock } = this.deps;
-    const { otherId } = await this.access(actorId, conversationId);
+    const { conversations, clock } = this.deps;
+    const { conversation, otherId } = await this.access(actorId, conversationId);
     if (!otherId) throw notFound('Sugestão não encontrada');
     const message = typeof messageId === 'string' && messageId.length <= 64 ? await conversations.findMessage(messageId) : undefined;
     if (!message || message.conversationId !== conversationId || message.kind !== 'SUGGESTION') throw notFound('Sugestão não encontrada');
     if (message.senderId === actorId) throw forbidden('Quem sugeriu não responde à própria sugestão');
-    const friends = await follows.listFriendIds(actorId);
-    if (!friends.includes(otherId)) throw forbidden('Vocês não são mais amigos.');
+    await this.assertCanSend(actorId, conversation, otherId);
     const now = clock.now();
     const response = action === 'accept' ? 'ACCEPTED' : 'DECLINED';
     const saved = await conversations.setSuggestionResponse(messageId, response, now);
@@ -1264,7 +1380,7 @@ export class ConversationService {
     if (await blocks.existsEitherWay(actorId, otherId)) throw notFound('Conversa não encontrada');
     const [other] = await users.findProfilesByIds([otherId]);
     if (!other) throw notFound('Conversa não encontrada');
-    return { conversation, memberIds, otherId, other };
+    return { conversation: await this.settle(conversation), memberIds, otherId, other };
   }
 }
 

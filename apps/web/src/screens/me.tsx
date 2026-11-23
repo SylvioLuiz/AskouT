@@ -520,6 +520,49 @@ function NowRadiusSetting() {
   );
 }
 
+/**
+ * Mensagens de quem você não segue: por padrão viram solicitação. Perfil público (ex.: página de um local) pode
+ * receber direto na caixa de conversas. No perfil privado a opção não vale.
+ */
+function OpenMessagesSetting({ isPrivate }: { isPrivate: boolean }) {
+  const settings = useAsync(() => api.messageSettings(), []);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+  const on = settings.data?.openDms === true;
+
+  async function toggle() {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      settings.setData(await api.setMessageSettings(!on));
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!settings.data) return null;
+  return (
+    <section className="setting">
+      <div className="setting__text">
+        <h2 className="setting__title" id="mensagens-titulo">
+          {t('Receber mensagens de qualquer pessoa')}
+        </h2>
+        <p className="setting__help">
+          {isPrivate
+            ? t('Só para perfil público. No perfil privado, mensagens de quem você não segue chegam como solicitação.')
+            : t('Mensagens de quem você não segue chegam direto nas suas conversas, sem passar pelas solicitações. Bom para páginas de locais e organizadores.')}
+        </p>
+        {problem ? <Notice tone="error">{problem}</Notice> : null}
+      </div>
+      <button type="button" role="switch" aria-checked={on && !isPrivate} aria-labelledby="mensagens-titulo" className="switch" onClick={toggle} disabled={busy || isPrivate}>
+        <span className="switch__thumb" />
+      </button>
+    </section>
+  );
+}
+
 export function PrivacyScreen() {
   useTitle(t('Privacidade'));
   const user = useUser();
@@ -567,6 +610,7 @@ export function PrivacyScreen() {
           <span className="switch__thumb" />
         </button>
       </section>
+      <OpenMessagesSetting isPrivate={isPrivate} />
       <PersonalizeSetting userId={user.profile.userId} onChange={() => setPersonalizeRev((n) => n + 1)} />
       <RegionSetting key={personalizeRev} userId={user.profile.userId} />
       <nav className="linklist" aria-label={t('Privacidade')}>

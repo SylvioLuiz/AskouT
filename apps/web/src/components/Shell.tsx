@@ -196,7 +196,8 @@ function MainShell({ children }: { children: ReactNode }) {
     window.addEventListener(CHATS_CHANGED_EVENT, convs.reload);
     return () => window.removeEventListener(CHATS_CHANGED_EVENT, convs.reload);
   }, [convs.reload]);
-  const unreadChats = (convs.data?.items ?? []).filter((c) => c.unread > 0).length;
+  // Solicitação de mensagem com mensagem nova também acende o ícone (sem aviso de mensagem, como no Instagram).
+  const unreadChats = (convs.data?.items ?? []).filter((c) => c.unread > 0).length + (convs.data?.requestUnread ?? 0);
   const hasUnread = unreadChats > 0;
   const inChat = /^\/conversas\/[^/]+$/.test(pathname);
   const inEvent = /^\/eventos\/[^/]+$/.test(pathname);

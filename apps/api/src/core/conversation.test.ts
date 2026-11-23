@@ -76,7 +76,9 @@ test('privacidade: quem não participa não vê nem envia; bloqueio esconde; dei
   await rejectsWith(w.core.conversations.messages(ana, 'nao-e-uuid'), 'NOT_FOUND');
   assert.deepEqual(await w.core.conversations.list(caio), []);
 
+  // Ninguém segue ninguém: a conversa fica só para leitura (seguir só um lado viraria solicitação de mensagem).
   await w.core.follows.unfollow(bia, ana);
+  await w.core.follows.unfollow(ana, bia);
   const view = await w.core.conversations.messages(ana, id);
   assert.equal(view.canSend, false);
   assert.equal(view.messages.length, 1, 'histórico continua legível');
@@ -171,7 +173,9 @@ test('respond: mensagem de texto não é sugestão, estranhos não respondem, ex
   await rejectsWith(w.core.conversations.respond(bia, id, text.id, 'accept'), 'NOT_FOUND');
   const card2 = await w.core.conversations.send(ana, id, { suggestion: card });
   await rejectsWith(w.core.conversations.respond(caio, id, card2.id, 'accept'), 'NOT_FOUND');
+  // Ninguém segue ninguém: a conversa fica só para leitura (seguir só um lado viraria solicitação de mensagem).
   await w.core.follows.unfollow(bia, ana);
+  await w.core.follows.unfollow(ana, bia);
   await rejectsWith(w.core.conversations.respond(bia, id, card2.id, 'accept'), 'FORBIDDEN');
 });
 
@@ -263,7 +267,9 @@ test('áudio: recusa arquivo falso, grande demais, duração fora de 1–90 s e 
 
 test('áudio: deixou de ser amigo, não envia; aviso não carrega o conteúdo', async () => {
   const { w, ana, bia, id } = await friends();
+  // Ninguém segue ninguém: a conversa fica só para leitura (seguir só um lado viraria solicitação de mensagem).
   await w.core.follows.unfollow(bia, ana);
+  await w.core.follows.unfollow(ana, bia);
   await rejectsWith(w.core.conversations.send(ana, id, { audio: voice(WEBM), audioMs: 3000 }), 'FORBIDDEN');
 });
 

@@ -13,12 +13,42 @@ export class ConversationsController {
     this.core = core;
   }
 
+  /** Caixa de conversas, mais quantas solicitações de mensagem estão esperando (`requestCount`, `requestUnread`). */
   @Get()
-  async list(@CurrentActor() actor: Actor) {
-    return { items: await this.core.conversations.list(actor.userId) };
+  list(@CurrentActor() actor: Actor) {
+    return this.core.conversations.inbox(actor.userId);
   }
 
-  /** Abre (ou cria) a conversa com um amigo. */
+  /** Solicitações de mensagem: conversas de quem você não segue, esperando aceitar, recusar ou bloquear. */
+  @Get('requests')
+  async requests(@CurrentActor() actor: Actor) {
+    return { items: await this.core.conversations.requests(actor.userId) };
+  }
+
+  /** `{openDms, isPrivate}`: perfil público pode receber mensagens de qualquer pessoa direto na caixa. */
+  @Get('settings')
+  settings(@CurrentActor() actor: Actor) {
+    return this.core.conversations.messageSettings(actor.userId);
+  }
+
+  @Put('settings')
+  setSettings(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.conversations.setMessageSettings(actor.userId, { openDms: asBody(body).openDms });
+  }
+
+  @Post(':id/request/accept')
+  @HttpCode(200)
+  acceptRequest(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.conversations.acceptRequest(actor.userId, id);
+  }
+
+  @Post(':id/request/decline')
+  @HttpCode(200)
+  declineRequest(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
+    return this.core.conversations.declineRequest(actor.userId, id);
+  }
+
+  /** Abre (ou cria) a conversa 1 a 1 (com quem não segue você de volta, vira solicitação de mensagem). */
   @Post()
   @HttpCode(200)
   open(@CurrentActor() actor: Actor, @Body() body: unknown) {
