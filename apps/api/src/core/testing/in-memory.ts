@@ -1287,6 +1287,29 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return c ? { ...c } : undefined;
   }
 
+  readonly openDms = new Set<string>();
+
+  async findDirect(a: string, b: string): Promise<ConversationRecord | undefined> {
+    const directKey = a < b ? `${a}:${b}` : `${b}:${a}`;
+    for (const c of this.conversations.values()) if (c.directKey === directKey) return { ...c };
+    return undefined;
+  }
+
+  async setRequest(conversationId: string, patch: { requestToId?: string | null; requestDeclinedAt?: Date | null; acceptedAt?: Date | null }): Promise<void> {
+    const c = this.conversations.get(conversationId);
+    if (!c || c.type !== 'DIRECT') return;
+    for (const [k, v] of Object.entries(patch)) if (v !== undefined) (c as unknown as Record<string, unknown>)[k] = v;
+  }
+
+  async getOpenDms(userId: string): Promise<boolean> {
+    return this.openDms.has(userId);
+  }
+
+  async setOpenDms(userId: string, on: boolean): Promise<void> {
+    if (on) this.openDms.add(userId);
+    else this.openDms.delete(userId);
+  }
+
   async participantIds(conversationId: string): Promise<string[] | undefined> {
     const p = this.participants.get(conversationId);
     return p ? [...p.keys()] : undefined;

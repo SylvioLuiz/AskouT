@@ -271,6 +271,12 @@ export interface ConversationRecord {
   imageUrl: string | null;
   /** Grupo criado para um evento de pessoa (post): pela página do evento ou pela votação da data. */
   eventPostId?: string | null;
+  /** Só DIRECT: solicitação de mensagem pendente para esta pessoa (nula = conversa normal). */
+  requestToId?: string | null;
+  /** Quem recebeu a solicitação recusou: some para ela até chegar mensagem nova. */
+  requestDeclinedAt?: Date | null;
+  /** A solicitação foi aceita: a conversa fica liberada nos dois sentidos, mesmo sem seguir. */
+  acceptedAt?: Date | null;
   createdAt: Date;
 }
 

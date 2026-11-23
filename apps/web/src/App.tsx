@@ -38,6 +38,7 @@ const ForgotPasswordScreen = lazyWithReload(() => import('./screens/auth.tsx').t
 const LoginScreen = lazyWithReload(() => import('./screens/auth.tsx').then((m) => ({ default: m.LoginScreen })));
 const SignupScreen = lazyWithReload(() => import('./screens/auth.tsx').then((m) => ({ default: m.SignupScreen })));
 const ConversationsRoute = lazyWithReload(() => import('./screens/conversations.tsx').then((m) => ({ default: m.ConversationsRoute })));
+const MessageRequestsScreen = lazyWithReload(() => import('./screens/conversations.tsx').then((m) => ({ default: m.MessageRequestsScreen })));
 const FlashScreen = lazyWithReload(() => import('./screens/flash.tsx').then((m) => ({ default: m.FlashScreen })));
 const MatchScreen = lazyWithReload(() => import('./screens/flash.tsx').then((m) => ({ default: m.MatchScreen })));
 const DatePollCreateScreen = lazyWithReload(() => import('./components/date-poll-create.tsx').then((m) => ({ default: m.DatePollCreateScreen })));
@@ -159,6 +160,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/explorar/mapa', render: () => <EventsMapScreen /> },
   { path: '/eventos/:id', render: (p) => <EventScreen key={p['id']} eventId={p['id'] ?? ''} /> },
   { path: '/conversas', render: () => <ConversationsRoute /> },
+  { path: '/conversas/solicitacoes', render: () => <MessageRequestsScreen /> },
   { path: '/conversas/:id/info', render: (p) => <ChatInfoScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/conversas/:id/grupo', render: (p) => <GroupScreen key={p['id']} conversationId={p['id'] ?? ''} /> },
   { path: '/conversas/:id', render: (p) => <ConversationsRoute conversationId={p['id'] ?? ''} /> },

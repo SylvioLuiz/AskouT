@@ -4,6 +4,8 @@ import { normalizePhone } from './phone.ts';
 import { forbidden, notFound, validationError } from './errors.ts';
 import { parseReportInput } from './report-input.ts';
 import { evaluateFriendship } from './friendship.ts';
+import { directBetween, messageDelivery } from './message-requests.ts';
+import type { MessageDelivery } from './message-requests.ts';
 import type { CoreDeps } from './ports.ts';
 import type { FollowStatus, Profile, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
@@ -34,6 +36,8 @@ export interface ProfileView {
     followsYou: RelationState;
     isFriend: boolean;
     blockedByViewer: boolean;
+    /** Mensagem do visitante para este perfil: DIRECT (caixa de conversas), REQUEST (solicitação) ou NONE (precisa seguir). */
+    message: MessageDelivery;
   };
   /** Fonte única para liberar conteúdo (publicações etc.): perfil público, próprio ou seguidor aprovado. */
   canViewContent: boolean;
@@ -77,7 +81,7 @@ export class ProfileService {
       return {
         profile,
         counts,
-        relationship: { isSelf: true, following: 'NONE', followsYou: 'NONE', isFriend: false, blockedByViewer: false },
+        relationship: { isSelf: true, following: 'NONE', followsYou: 'NONE', isFriend: false, blockedByViewer: false, message: 'NONE' },
         canViewContent: true,
         referralBadge,
       };
@@ -101,6 +105,7 @@ export class ProfileService {
         followsYou: targetFollows?.status ?? 'NONE',
         isFriend: evaluateFriendship(viewerFollows, targetFollows, blockedByViewer),
         blockedByViewer,
+        message: blockedByViewer ? 'NONE' : await messageDelivery(this.deps, viewerId, profile.userId, await directBetween(this.deps, viewerId, profile.userId)),
       },
       canViewContent: !blockedByViewer && (!profile.isPrivate || viewerFollows?.status === 'ACCEPTED'),
       referralBadge,

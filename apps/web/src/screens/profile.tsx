@@ -295,7 +295,7 @@ export function ProfileScreen({ username }: { username: string }) {
               <ChevronDownIcon />
             </Button>
           ) : null}
-          {relationship.isFriend && action.kind !== 'blocked' ? <ChatButton userId={profile.userId} variant="secondary" small label={t('Mensagem')} onError={(text) => setMessage({ tone: 'error', text })} /> : null}
+          {(relationship.message ? relationship.message !== 'NONE' : relationship.isFriend) && action.kind !== 'blocked' ? <ChatButton userId={profile.userId} variant="secondary" small label={t('Mensagem')} onError={(text) => setMessage({ tone: 'error', text })} /> : null}
           {action.kind === 'blocked' ? (
             <Button small variant="secondary" loading={busy} onClick={() => run(() => api.unblock(profile.userId), t('Você desbloqueou @{username}.', { username: profile.username }))}>
               {t('Desbloquear')}

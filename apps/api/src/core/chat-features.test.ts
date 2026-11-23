@@ -103,7 +103,9 @@ test('reagir: sem reação em mensagem de sistema, apagada ou de quem deixou de 
   await w.core.conversations.deleteMessage(ana, id, m.id);
   await rejectsWith(w.core.conversations.react(bia, id, m.id, '👍'), 'NOT_FOUND');
   const m2 = await w.core.conversations.send(ana, id, { body: 'de novo' });
+  // Ninguém segue ninguém: a conversa fica só para leitura (seguir só um lado viraria solicitação de mensagem).
   await w.core.follows.unfollow(bia, ana);
+  await w.core.follows.unfollow(ana, bia);
   await rejectsWith(w.core.conversations.react(bia, id, m2.id, '👍'), 'FORBIDDEN');
 });
 

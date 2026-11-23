@@ -7375,3 +7375,17 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 }
 .evpin__count--long { font-size: 0.625rem; letter-spacing: -.04em; }
 .evpin:hover .evpin__count, .evpin:focus-visible .evpin__count, .evpin--on .evpin__count { transform: scale(1.25); }
+
+/* Solicitações de mensagem (de quem você não segue): atalho no topo das conversas, tela própria e barra no chat. */
+.convrequests { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 0; color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+.convrequests__icon { flex: none; width: 48px; height: 48px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand); }
+.convrequests__icon svg { width: 22px; height: 22px; }
+.convrequests__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.convrequests__text span { color: var(--muted); font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.convrequests--unread .convrequests__text span { color: var(--ink); font-weight: 600; }
+.convrequests__help { margin: 0 0 8px; font-size: 0.875rem; }
+.chat__request { position: sticky; bottom: 0; z-index: 5; margin: 0 -16px; padding: 14px 16px calc(14px + var(--sa-bottom, 0px)); background: var(--bg); border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.chat__requesttext { margin: 0; display: flex; flex-direction: column; gap: 4px; text-align: center; }
+.chat__requesttext span { color: var(--muted); font-size: 0.875rem; }
+.chat__requestactions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.chat__requestnote { margin: 0 0 6px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--ink); font-size: 0.8125rem; text-align: center; }

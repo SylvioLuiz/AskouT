@@ -409,6 +409,13 @@ export interface ConversationRepository {
   /** Idempotente: devolve a conversa da dupla, criando (com os dois participantes) se não existir. */
   getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord>;
   findById(id: string): Promise<ConversationRecord | undefined>;
+  /** Conversa 1 a 1 da dupla, se existir (não cria). */
+  findDirect(a: string, b: string): Promise<ConversationRecord | undefined>;
+  /** Estado da solicitação de mensagem de uma conversa 1 a 1 (só os campos informados mudam). */
+  setRequest(conversationId: string, patch: { requestToId?: string | null; requestDeclinedAt?: Date | null; acceptedAt?: Date | null }): Promise<void>;
+  /** A pessoa (perfil público) escolheu receber mensagens de quem ela não segue direto na caixa de conversas. */
+  getOpenDms(userId: string): Promise<boolean>;
+  setOpenDms(userId: string, on: boolean): Promise<void>;
   /** Quem participa da conversa (dois na 1 a 1; os que entraram no grupo). */
   participantIds(conversationId: string): Promise<string[] | undefined>;
   /** Cria a conversa de grupo só com quem organiza. */

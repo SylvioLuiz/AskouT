@@ -32,9 +32,9 @@ import { canCompressVideo, prepareProgressText } from '../lib/video-prepare.ts';
 import { ApiError, toApiError } from '../lib/errors.ts';
 import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
 import { CommentGifView, CommentTools, GifImage } from '../components/comment-tools.tsx';
-import type { ChatMessage, CommentGif, ConversationItem, MessageStory } from '../lib/types.ts';
+import type { ChatMessage, CommentGif, ConversationItem, MessageStory, PublicProfile } from '../lib/types.ts';
 import { StoryViewer } from '../components/event-story.tsx';
-import { Link } from '../router.tsx';
+import { Link, navigate } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 export const MESSAGE_MAX = 2000;
@@ -83,6 +83,8 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
   }
   if (list.error && !list.data) return <ErrorState message={list.error.message} onRetry={list.reload} />;
   const items = list.data?.items ?? [];
+  const requestCount = list.data?.requestCount ?? 0;
+  const requestUnread = list.data?.requestUnread ?? 0;
   const shown = filterConversations(items, query);
   const searching = query.trim() !== '';
 
@@ -97,6 +99,22 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
     >
     <div className={`convscreen${cameBack ? ' convscreen--back' : ''}`}>
       <PageHead title={t('Conversas')} />
+      {requestCount > 0 ? (
+        <Link to="/conversas/solicitacoes" className={`convrequests${requestUnread > 0 ? ' convrequests--unread' : ''}`}>
+          <span className="convrequests__icon" aria-hidden="true">
+            <ChatIcon />
+          </span>
+          <span className="convrequests__text">
+            <strong>{t('Solicitações de mensagem')}</strong>
+            <span>{requestCount === 1 ? t('1 pessoa que você não segue quer conversar') : t('{count} pessoas que você não segue querem conversar', { count: requestCount })}</span>
+          </span>
+          {requestUnread > 0 ? (
+            <span className="convrow__count" aria-label={requestUnread === 1 ? t('1 não lida') : t('{count} não lidas', { count: requestUnread })}>
+              {requestUnread > 9 ? '9+' : requestUnread}
+            </span>
+          ) : null}
+        </Link>
+      ) : null}
       {items.length === 0 ? (
         <EmptyState
           title={t('Nenhuma conversa ainda')}
@@ -185,6 +203,113 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
     </div>
     </PullRefresh>
     </>
+  );
+}
+
+/**
+ * Solicitações de mensagem: conversas começadas por quem você não segue (como no Instagram). Abrir a conversa não
+ * avisa a pessoa; lá dentro você aceita, recusa ou bloqueia.
+ */
+export function MessageRequestsScreen() {
+  useTitle(t('Solicitações de mensagem'));
+  const list = useAsync(() => api.messageRequests(), []);
+  useLiveRefresh(list.reload, 10_000);
+  const now = new Date();
+  if (list.loading && !list.data) return <Loading />;
+  if (list.error && !list.data) return <ErrorState message={list.error.message} onRetry={list.reload} />;
+  const items = list.data?.items ?? [];
+  return (
+    <div className="convscreen">
+      <PageHead title={t('Solicitações de mensagem')} back="/conversas" />
+      <p className="muted convrequests__help">{t('Mensagens de quem você não segue. A pessoa só fica sabendo que você viu se você aceitar.')}</p>
+      {items.length === 0 ? (
+        <EmptyState title={t('Nenhuma solicitação')}>{t('Quando alguém que você não segue mandar mensagem, ela aparece aqui.')}</EmptyState>
+      ) : (
+        <ul className="list convlist">
+          {items.map((c) => (
+            <li key={c.id} className="convitem">
+              <Link to={`/conversas/${c.id}`} className={`convrow${c.unread > 0 ? ' convrow--unread' : ''}`}>
+                {c.other ? <Avatar profile={c.other} size={48} /> : null}
+                <span className="convrow__body">
+                  <span className="convrow__top">
+                    <span className="convrow__name">{c.other?.displayName ?? ''}</span>
+                    {c.lastMessage ? <span className="convrow__time">{listTimeLabel(c.lastMessage.createdAt, now)}</span> : null}
+                  </span>
+                  <span className="convrow__preview">{previewOf(c.lastMessage)}</span>
+                </span>
+                {c.unread > 0 ? (
+                  <span className="convrow__count" aria-label={c.unread === 1 ? t('1 não lida') : t('{count} não lidas', { count: c.unread })}>
+                    {c.unread > 9 ? '9+' : c.unread}
+                  </span>
+                ) : null}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Barra no lugar da caixa de texto quando a conversa é uma solicitação recebida: aceitar, recusar ou bloquear. */
+function MessageRequestBar({ conversationId, other, onAccepted }: { conversationId: string; other: PublicProfile; onAccepted: () => void }) {
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
+
+  async function attempt(action: () => Promise<unknown>, after: () => void) {
+    setProblem(undefined);
+    try {
+      await action();
+      announceChatsChanged();
+      after();
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    }
+  }
+
+  async function block() {
+    setBlocking(true);
+    await attempt(
+      async () => {
+        await api.declineMessageRequest(conversationId);
+        await api.block(other.userId);
+      },
+      () => navigate('/conversas/solicitacoes', { replace: true }),
+    );
+    setBlocking(false);
+  }
+
+  return (
+    <div className="chat__request" role="group" aria-label={t('Solicitação de mensagem')}>
+      <p className="chat__requesttext">
+        <strong>{t('{name} quer mandar mensagem para você', { name: other.displayName })}</strong>
+        <span>{t('Você não segue @{username}. A pessoa só fica sabendo que você viu se você aceitar. Recusar não avisa ninguém.', { username: other.username })}</span>
+      </p>
+      {problem ? <Notice tone="error">{problem}</Notice> : null}
+      {confirmBlock ? (
+        <Confirm
+          question={t('Bloquear @{username}? A pessoa não consegue mais mandar mensagem nem ver seu perfil.', { username: other.username })}
+          confirmLabel={t('Bloquear')}
+          danger
+          busy={blocking}
+          onConfirm={() => void block()}
+          onCancel={() => setConfirmBlock(false)}
+        />
+      ) : (
+        <div className="chat__requestactions">
+          <Button variant="secondary" small onClick={() => setConfirmBlock(true)}>
+            {t('Bloquear')}
+          </Button>
+          <Button variant="secondary" small onClick={() => attempt(() => api.declineMessageRequest(conversationId), () => navigate('/conversas/solicitacoes', { replace: true }))}>
+            {t('Recusar')}
+          </Button>
+          <Button small onClick={() => attempt(() => api.acceptMessageRequest(conversationId), onAccepted)}>
+            {t('Aceitar')}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1014,6 +1139,9 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         </div>
       ) : data.canSend ? (
         <>
+          {data.request === 'OUTGOING' && data.other ? (
+            <p className="chat__requestnote">{t('{name} ainda não segue você: sua mensagem chega como solicitação, sem aviso, e a pessoa decide se aceita.', { name: data.other.displayName })}</p>
+          ) : null}
           <div className="chat__dock">
           {glow > 0 ? <span key={glow} className="chat__glow" aria-hidden="true" /> : null}
           {replyTo ? (
@@ -1132,8 +1260,10 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             </form>
           </div>
         </>
+      ) : data.request === 'INCOMING' && data.other ? (
+        <MessageRequestBar conversationId={conversationId} other={data.other} onAccepted={view.reload} />
       ) : (
-        <Notice>{t('Vocês não são mais amigos. O histórico continua aqui, mas não dá para enviar novas mensagens.')}</Notice>
+        <Notice>{t('Vocês não se seguem mais. O histórico continua aqui; para mandar mensagem, siga a pessoa.')}</Notice>
       )}
 
       {actionsFor ? (

@@ -49,6 +49,7 @@ import type {
   ChatReaction,
   ChatView,
   ConversationItem,
+  MessageRequestRole,
   SuggestionCard,
   Suggestions,
   FlashInvite,
@@ -725,9 +726,15 @@ export function createApi(deps: ApiDeps) {
     deleteVenueEvent: (venueId: string, eventId: string) => request<{ deleted: true }>('DELETE', `/me/venues/${id(venueId)}/events/${id(eventId)}`),
 
     // Conversas
-    conversations: () => request<{ items: ConversationItem[] }>('GET', '/conversations'),
+    /** `requestCount`/`requestUnread`: solicitações de mensagem esperando (servidor antigo não manda). */
+    conversations: () => request<{ items: ConversationItem[]; requestCount?: number; requestUnread?: number }>('GET', '/conversations'),
+    messageRequests: () => request<{ items: ConversationItem[] }>('GET', '/conversations/requests'),
+    acceptMessageRequest: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/request/accept`),
+    declineMessageRequest: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/request/decline`),
+    messageSettings: () => request<{ openDms: boolean; isPrivate: boolean }>('GET', '/conversations/settings'),
+    setMessageSettings: (openDms: boolean) => request<{ openDms: boolean; isPrivate: boolean }>('PUT', '/conversations/settings', { body: { openDms } }),
     createGroup: (name: string, memberIds: string[]) => request<{ id: string }>('POST', '/conversations/groups', { body: { name, memberIds } }),
-    openConversation: (userId: string) => request<{ id: string }>('POST', '/conversations', { body: { userId } }),
+    openConversation: (userId: string) => request<{ id: string; request?: MessageRequestRole }>('POST', '/conversations', { body: { userId } }),
     messages: (conversationId: string, options: { before?: string; limit?: number } = {}) => {
       const params: string[] = [];
       if (options.before !== undefined) params.push(`before=${id(options.before)}`);

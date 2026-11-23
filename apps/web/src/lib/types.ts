@@ -24,7 +24,13 @@ export interface Relationship {
   followsYou: RelationState;
   isFriend: boolean;
   blockedByViewer: boolean;
+  /** Mensagem para este perfil: DIRECT (caixa de conversas), REQUEST (vira solicitação) ou NONE (precisa seguir). Servidor antigo não manda. */
+  message?: MessageDelivery;
 }
+
+export type MessageDelivery = 'DIRECT' | 'REQUEST' | 'NONE';
+/** Solicitação de mensagem pendente: INCOMING = alguém que você não segue escreveu; OUTGOING = você escreveu e espera aceitarem. */
+export type MessageRequestRole = 'INCOMING' | 'OUTGOING' | null;
 
 export interface ProfileView {
   profile: Profile;
@@ -603,6 +609,8 @@ export interface ConversationItem {
   lastMessage: ChatMessage | null;
   unread: number;
   canSend: boolean;
+  /** Servidor antigo não manda. */
+  request?: MessageRequestRole;
   pinned: boolean;
   muted: boolean;
 }
@@ -616,6 +624,8 @@ export interface ChatView {
   isOwner: boolean;
   memberCount: number;
   canSend: boolean;
+  /** Servidor antigo não manda. */
+  request?: MessageRequestRole;
   pinned: boolean;
   muted: boolean;
   /** Cor escolhida para a conversa (só para você); nula = cor padrão do app. Servidor antigo não manda. */
