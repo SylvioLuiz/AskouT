@@ -4332,20 +4332,20 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmapcard__venue { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
 .evmapcard__venue .venuelink { text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .evmapcard__facts { display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; gap: 4px 12px; font-size: 13px; opacity: .9; }
-/* Pins do mapa no estilo do site: gota colorida com brilho, número dentro, sombrinha no chão e entrada caindo de cima.
+/* Pins do mapa: gota colorida com borda branca (separa um pin do outro quando ficam juntos), número dentro, sombrinha no chão e entrada caindo de cima.
+   Sem brilho colorido: ele borrava a divisa entre pins vizinhos.
    As animações ficam nas partes de dentro (gota, número, sombra): o MapLibre posiciona o pin pelo transform do próprio .evpin. */
-.evpin { --pin: var(--brand); --pin-glow: color-mix(in srgb, var(--pin) 70%, transparent); width: 38px; height: 46px; padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.evpin { --pin: var(--brand); width: 38px; height: 46px; padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .evpin::before {
   content: ''; position: absolute; left: 4px; top: 0; width: 30px; height: 30px; box-sizing: border-box;
-  border-radius: 50% 50% 50% 0; background: var(--pin);
-  box-shadow: 0 6px 24px var(--pin-glow), 0 1px 3px rgba(0, 0, 0, .35);
+  border: 3px solid #fff; border-radius: 50% 50% 50% 0; background: var(--pin);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
   transform: rotate(-45deg); transform-origin: 50% 50%;
   transition: transform .35s cubic-bezier(.2, .8, .2, 1), background .2s;
   animation: evpin-drop .7s cubic-bezier(.2, .8, .2, 1) both;
 }
 .evpin::after { content: ''; position: absolute; left: 12px; bottom: 0; width: 14px; height: 5px; border-radius: 50%; background: rgba(0, 0, 0, .45); filter: blur(2px); animation: evpin-shadow .7s cubic-bezier(.2, .8, .2, 1) both; pointer-events: none; }
 .evpin:hover::before, .evpin:focus-visible::before, .evpin--on::before { transform: rotate(-45deg) scale(1.25); }
-.evpin--on::before { animation: evpin-drop .7s cubic-bezier(.2, .8, .2, 1) both, evpin-glow 1.2s ease-in-out .7s infinite; }
 .evpin:focus-visible { outline: none; }
 .evpin:focus-visible::before { outline: 2px solid #fff; outline-offset: 2px; }
 .evmap__seg { display: flex; padding: 3px; border-radius: 22px; background: var(--evmap-float); box-shadow: 0 2px 10px rgba(0,0,0,.25); }
@@ -4418,7 +4418,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 @keyframes evmap-drop { from { opacity: 0; transform: translateY(-8px) scale(.96); } }
 @keyframes evpin-drop { from { opacity: 0; translate: 0 -40px; } }
 @keyframes evpin-shadow { from { opacity: 0; scale: .3; } }
-@keyframes evpin-glow { 50% { box-shadow: 0 0 0 8px rgba(255, 255, 255, .22), 0 6px 40px var(--pin), 0 1px 3px rgba(0, 0, 0, .35); } }
 @keyframes evmap-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .evmap__bottom > *, .evmap__strip > .evmap__slide, .evpin::before, .evpin::after, .evpin__count, .evmap__area, .evskel { animation: none; }
