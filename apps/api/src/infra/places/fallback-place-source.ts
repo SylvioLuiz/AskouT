@@ -18,10 +18,22 @@ export class FallbackPlaceSource implements PlaceSource {
     return { available: second.available || first.available, places: second.places };
   }
 
-  /** Busca por texto: a primeira fonte que souber buscar. */
-  async search(text: string, center: { lat: number; lng: number } | undefined, limit: number) {
-    if (this.primary.search) return this.primary.search(text, center, limit);
+  /** Só existe busca paga quando a fonte principal (Google) sabe buscar por texto. */
+  get premiumSearch(): boolean {
+    return this.primary.premiumSearch === true && typeof this.primary.search === 'function';
+  }
+
+  /**
+   * Busca por texto. Sem `premium`, só a reserva gratuita (OpenStreetMap). Com `premium` (a pessoa pediu "buscar no
+   * Google"), a principal; se ela não responder ou bater no teto do dia, cai na reserva.
+   */
+  async search(text: string, center: { lat: number; lng: number } | undefined, limit: number, opts?: { premium?: boolean }) {
+    if (opts?.premium && this.primary.search) {
+      const first = await this.primary.search(text, center, limit, opts);
+      if (first.available) return first;
+    }
     if (this.backup.search) return this.backup.search(text, center, limit);
+    if (!opts?.premium && this.primary.search && !this.primary.premiumSearch) return this.primary.search(text, center, limit);
     return { available: false, places: [] };
   }
 

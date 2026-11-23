@@ -979,6 +979,14 @@ export interface EventPage {
   isOwner: boolean;
 }
 
+/** Busca de lugar pelo nome: AskouT e OpenStreetMap (grátis); Google só quando a pessoa pede. */
+export interface PlaceSearchResult {
+  places: ExplorePlace[];
+  placesAvailable: boolean;
+  /** Dá para buscar mais no Google (pago): o app mostra o botão. */
+  canSearchGoogle?: boolean;
+}
+
 export interface ExplorePlace {
   key: string;
   source: 'ASKOUT' | 'GOOGLE' | 'OSM';

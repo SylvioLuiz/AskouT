@@ -932,8 +932,13 @@ export interface EventSearchQuery {
 /** Fonte externa de lugares (OpenStreetMap). Nunca lança: se não conseguir, devolve `available: false`. */
 export interface PlaceSource {
   nearby(center: { lat: number; lng: number }, radiusM: number, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }>;
-  /** Qualquer lugar pelo nome ou endereço (só fontes que suportam, como o Google). */
-  search?(text: string, center: { lat: number; lng: number } | undefined, limit: number): Promise<{ available: boolean; places: ExternalPlace[] }>;
+  /**
+   * Qualquer lugar pelo nome ou endereço. `premium: true` pede a fonte paga (Google), que só é usada quando a pessoa
+   * pede "buscar mais no Google"; sem isso, a busca usa só fontes gratuitas (OpenStreetMap).
+   */
+  search?(text: string, center: { lat: number; lng: number } | undefined, limit: number, opts?: { premium?: boolean }): Promise<{ available: boolean; places: ExternalPlace[] }>;
+  /** Há uma fonte paga (Google) para a busca por texto, que o app oferece num botão à parte. */
+  readonly premiumSearch?: boolean;
   /** Um lugar pelo id na fonte, para confirmar que existe. */
   lookup?(externalId: string): Promise<ExternalPlace | undefined>;
 }

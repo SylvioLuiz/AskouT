@@ -37,7 +37,9 @@ test('a chave vai em cabeçalho (nunca na URL), com máscara de campos e círcul
   assert.equal(call.url.includes('SEGREDO'), false);
   const h = call.init.headers as Record<string, string>;
   assert.equal(h['x-goog-api-key'], 'SEGREDO');
-  assert.match(h['x-goog-fieldmask']!, /places\.rating/);
+  // Nota e avaliações jogam a chamada para a faixa cara (Enterprise): ficam fora da máscara.
+  assert.doesNotMatch(h['x-goog-fieldmask']!, /rating|userRatingCount/);
+  assert.match(h['x-goog-fieldmask']!, /places\.photos/);
   const sent = JSON.parse(String(call.init.body));
   assert.equal(sent.maxResultCount, 20);
   assert.deepEqual(sent.locationRestriction.circle, { center: { latitude: C.lat, longitude: C.lng }, radius: 3000 });
@@ -54,12 +56,38 @@ test('teto diário de buscas: passou, nem chama o Google; no dia seguinte volta'
   let t = Date.parse('2026-10-13T12:00:00Z');
   const f = fake(() => Response.json(body));
   const src = new GooglePlaceSource({ apiKey: 'K', fetchImpl: f.fetchImpl, dailyLimit: 2, now: () => t });
-  await src.nearby(C, 3000, 10);
-  await src.nearby(C, 3000, 10);
-  assert.equal((await src.nearby(C, 3000, 10)).available, false);
+  await src.nearby({ lat: 1, lng: 1 }, 3000, 10);
+  await src.nearby({ lat: 2, lng: 2 }, 3000, 10);
+  assert.equal((await src.nearby({ lat: 3, lng: 3 }, 3000, 10)).available, false);
   assert.equal(f.calls.length, 2);
   t += 24 * 3600_000;
+  assert.equal((await src.nearby({ lat: 4, lng: 4 }, 3000, 10)).available, true);
+});
+
+test('cada tipo de chamada tem o seu teto: esgotar fotos não bloqueia a busca', async () => {
+  const f = fake((url) => (url.includes('/media') ? new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/jpeg' } }) : Response.json(body)));
+  const src = new GooglePlaceSource({ apiKey: 'K', fetchImpl: f.fetchImpl, dailyLimits: { photo: 1, search: 1 } });
+  assert.ok(await src.photo('places/a/photos/b'));
+  assert.equal(await src.photo('places/a/photos/c'), undefined);
+  assert.equal((await src.search('bar', undefined, 5)).available, true);
+  assert.equal((await src.search('outro', undefined, 5)).available, false);
   assert.equal((await src.nearby(C, 3000, 10)).available, true);
+});
+
+test('busca igual em até 10 minutos reaproveita a resposta sem chamar o Google', async () => {
+  let t = Date.parse('2026-10-13T12:00:00Z');
+  const f = fake(() => Response.json(body));
+  const src = new GooglePlaceSource({ apiKey: 'K', fetchImpl: f.fetchImpl, now: () => t });
+  await src.search('Bar do Zé', C, 10);
+  const again = await src.search('  bar  do zé ', { lat: C.lat + 0.001, lng: C.lng }, 10);
+  assert.equal(again.places[0]!.name, 'Bar do Zé');
+  await src.nearby(C, 3000, 10);
+  await src.nearby({ lat: C.lat + 0.0001, lng: C.lng }, 3000, 10);
+  assert.equal(f.calls.length, 2);
+  t += 11 * 60_000;
+  await src.search('Bar do Zé', C, 10);
+  await src.nearby(C, 3000, 10);
+  assert.equal(f.calls.length, 4);
 });
 
 test('foto: só referência no formato do Google, só imagem; chave só na chamada ao Google', async () => {
@@ -82,4 +110,19 @@ test('fallback: Google vazio ou fora do ar cai para a reserva; indisponível só
   assert.equal((await new FallbackPlaceSource(down, ok(['O'])).nearby(C, 1, 1)).places[0]!.name, 'O');
   assert.equal((await new FallbackPlaceSource(ok([]), ok([])).nearby(C, 1, 1)).available, true);
   assert.equal((await new FallbackPlaceSource(down, down).nearby(C, 1, 1)).available, false);
+});
+
+test('fallback na busca por texto: sem pedir o Google, só a reserva gratuita; pedindo, Google e reserva se ele falhar', async () => {
+  const place = (name: string) => [{ externalId: name, source: 'OSM' as const, name, category: null, lat: 0, lng: 0 }];
+  const calls: string[] = [];
+  const google = { premiumSearch: true, nearby: async () => ({ available: true, places: [] }), search: async () => (calls.push('google'), { available: true, places: place('G') }) };
+  const googleDown = { ...google, search: async () => (calls.push('google'), { available: false, places: [] }) };
+  const osm = { nearby: async () => ({ available: true, places: [] }), search: async () => (calls.push('osm'), { available: true, places: place('O') }) };
+  const both = new FallbackPlaceSource(google, osm);
+  assert.equal(both.premiumSearch, true);
+  assert.equal((await both.search('x', undefined, 5)).places[0]!.name, 'O');
+  assert.deepEqual(calls, ['osm']);
+  assert.equal((await both.search('x', undefined, 5, { premium: true })).places[0]!.name, 'G');
+  assert.equal((await new FallbackPlaceSource(googleDown, osm).search('x', undefined, 5, { premium: true })).places[0]!.name, 'O');
+  assert.equal(new FallbackPlaceSource(osm, osm).premiumSearch, false);
 });
