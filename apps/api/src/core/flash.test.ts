@@ -592,3 +592,48 @@ test('listAvailable: ponto aproximado (grade de ~3 km) para o mapa só de quem l
   const [item] = await w.core.flash.listAvailable(ana!);
   assert.deepEqual(item!.point, { lat: -23.55, lng: -46.65 });
 });
+
+test('ligar o NOW avisa os amigos que conseguem ver o NOW, e não repete quem liga e desliga em pouco tempo', async () => {
+  const w = makeWorld();
+  const { ana, bia, caio, duda, edu, fabi } = await w.signUpMany('ana', 'bia', 'caio', 'duda', 'edu', 'fabi');
+  await befriend(w, ana!, bia!);
+  await befriend(w, ana!, duda!);
+  await befriend(w, ana!, edu!);
+  await befriend(w, ana!, fabi!);
+  await w.core.follows.follow(caio!, ana!); // só segue, não é amigo
+  await w.core.flash.setVisibility(ana!, duda!, { hideMine: true }); // Ana não deixa a Duda ver o NOW dela
+  await w.core.flash.setVisibility(edu!, ana!, { hideTheirs: true }); // Edu ocultou o NOW da Ana
+  await w.core.blocks.block(fabi!, ana!);
+
+  const onAvisos = async (id: string) => (await w.core.notifications.list(id)).items.filter((n) => n.title === 'ana ligou o NOW');
+
+  await w.core.flash.turnOn(ana!, { hours: 1 });
+  const [aviso] = await onAvisos(bia!);
+  assert.ok(aviso, 'amiga recebe o aviso');
+  assert.equal(aviso!.type, 'FLASH_INVITE');
+  assert.equal(aviso!.url, '/now');
+  assert.equal(aviso!.actor?.userId, ana);
+  for (const id of [caio!, duda!, edu!, fabi!]) assert.deepEqual(await onAvisos(id), [], 'não amigo, ocultos e bloqueio ficam de fora');
+
+  await w.core.notifications.markRead(bia!);
+  await w.core.flash.turnOff(ana!);
+  w.clock.tick(30 * 60 * 1000);
+  await w.core.flash.turnOn(ana!, { hours: 1 });
+  assert.equal((await onAvisos(bia!)).length, 1, 'religou em menos de 2 h: sem aviso novo');
+
+  await w.core.flash.turnOff(ana!);
+  w.clock.tick(2 * 60 * 60 * 1000);
+  await w.core.flash.turnOn(ana!, { hours: 1 });
+  assert.equal((await onAvisos(bia!)).length, 2, 'depois de 2 h avisa de novo');
+});
+
+test('quem perguntou "está livre?" recebe só o aviso da pergunta, não dois', async () => {
+  const w = makeWorld();
+  const { ana, bia } = await w.signUpMany('ana', 'bia');
+  await befriend(w, ana!, bia!);
+  await w.core.flash.ask(ana!, { userIds: [bia!] });
+  await w.core.flash.turnOn(bia!, { hours: 1 });
+  const avisos = (await w.core.notifications.list(ana!)).items.filter((n) => n.title === 'bia ligou o NOW');
+  assert.equal(avisos.length, 1);
+  assert.equal(avisos[0]!.body, 'Você perguntou se estava livre. Bora?');
+});

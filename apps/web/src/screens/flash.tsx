@@ -321,7 +321,7 @@ function FlashContent() {
             <h1 className="nowhead__title">
               NOW <BoltIcon filled />
             </h1>
-            <p className="nowhead__sub">{t('Livre agora? Encontre alguém para sair.')}</p>
+            <p className="nowhead__sub">{t('Livre agora? Ligue o NOW para ver quais amigos também estão e chamar para sair.')}</p>
           </div>
           <button type="button" className="nowhead__how" onClick={() => setInfoOpen(true)}>
             <HelpIcon />
@@ -336,7 +336,7 @@ function FlashContent() {
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            placeholder={t('No que você tá a fim?')}
+            placeholder={t('No que você tá a fim? (opcional)')}
             maxLength={FLASH_NOTE_MAX + 20}
             autoComplete="off"
             aria-invalid={noteError ? true : undefined}
@@ -353,7 +353,7 @@ function FlashContent() {
           </p>
         ) : null}
 
-        <div className="nowdur" role="radiogroup" aria-label={t('Duração do NOW')}>
+        <div className="nowdur" role="radiogroup" aria-label={t('Por quanto tempo você está livre?')}>
           {DURATIONS.map((d) => (
             <button key={d.minutes} type="button" role="radio" aria-checked={minutes === d.minutes} aria-label={d.label} className="nowdur__opt" onClick={() => setMinutes(d.minutes)}>
               {d.value} {d.unit}
@@ -363,7 +363,7 @@ function FlashContent() {
 
         <button type="button" className="nowgo" disabled={busy} aria-busy={busy || undefined} onClick={turnOn}>
           <BoltIcon filled />
-          {t('Ativar NOW')}
+          {t('Ativar NOW por {duration}', { duration: formatFlashDuration(minutes) })}
         </button>
         <p className="nowoff__privacy">
           <LockIcon />
@@ -440,6 +440,18 @@ function FlashContent() {
     reloadAll();
   }
 
+  // A linha embaixo do título diz o próximo passo, conforme o que está acontecendo.
+  const nextStep =
+    received.length > 0
+      ? t('Te chamaram para sair: responda o convite abaixo.')
+      : matches.length > 0
+        ? t('Convite aceito! Abra o encontro para combinar o lugar.')
+        : friends.length > 0
+          ? t('Toque em um amigo livre para convidar.')
+          : empty
+            ? t('Seus amigos já veem que você está livre. Quem ligar o NOW aparece abaixo.')
+            : t('Você está disponível agora.');
+
   const expiresAt = status.data?.expiresAt ?? null;
   const until = expiresAt ? new Date(expiresAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit' }) : '';
   const left = expiresAt ? minutesLeft(expiresAt, Date.now()) : 0;
@@ -460,7 +472,7 @@ function FlashContent() {
           <h1 className="nowhead__title">
             NOW <BoltIcon filled />
           </h1>
-          <p className="nowhead__sub">{t('Você está disponível agora.')}</p>
+          <p className="nowhead__sub">{nextStep}</p>
         </div>
         <button type="button" className="nowhead__how" onClick={() => setInfoOpen(true)}>
           <HelpIcon />
@@ -489,7 +501,7 @@ function FlashContent() {
                 <NowFace profile={invite.other} size={36} />
                 <span>
                   <strong>{t('{name} aceitou sair com você', { name: invite.other.username })}</strong>
-                  <span>{t('Ver encontro e mapa')}</span>
+                  <span>{t('Combinar o lugar e ver no mapa')}</span>
                 </span>
                 <ChevronRightIcon />
               </Link>
@@ -639,7 +651,7 @@ function FlashContent() {
                       <NowFace profile={f.profile} size={52} />
                       <span className="nowfriend__name">{f.profile.username}</span>
                       <span className="nowfriend__detail">{[distanceOf(f), state].filter(Boolean).join(' · ') || ' '}</span>
-                      <span className="visually-hidden">{t('Livre agora. Abrir opções.')}</span>
+                      <span className="visually-hidden">{t('Livre agora. Toque para convidar ou conversar.')}</span>
                     </button>
                   </li>
                 );
@@ -652,14 +664,14 @@ function FlashContent() {
               </button>
               <button type="button" className="nowbtn nowbtn--ghost" disabled={eligible.length === 0} onClick={() => setCallAllOpen(true)}>
                 <UsersIcon />
-                {t('Chamar todos')}
+                {t('Convidar todos')}
               </button>
             </div>
           </>
         ) : empty ? (
           <div className="nowempty">
             <strong>{t('Ninguém livre por enquanto')}</strong>
-            <span>{t('Pergunte a alguns amigos se estão livres. Quando ligarem o NOW, você fica sabendo.')}</span>
+            <span>{t('Deixe o NOW ligado: quem ligar aparece aqui. Para não ficar só esperando, pergunte a amigos se estão livres.')}</span>
           </div>
         ) : null}
         <button type="button" className="nowask nowask--dashed" onClick={() => setAsking(true)}>
@@ -696,7 +708,7 @@ function FlashContent() {
         />
       ) : null}
       {callAllOpen ? (
-        <Sheet title={t('Chamar todos')} onClose={() => (callingAll ? undefined : setCallAllOpen(false))}>
+        <Sheet title={t('Convidar todos')} onClose={() => (callingAll ? undefined : setCallAllOpen(false))}>
           <p>
             {eligible.length === 1 ? t('Enviar convite para 1 amigo que está livre agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.') : t('Enviar convite para {count} amigos que estão livres agora? Cada convite vale por 15 minutos. Quem já foi convidado não recebe de novo.', { count: eligible.length })}
           </p>
@@ -760,11 +772,14 @@ function NowBar({ startsAt, expiresAt }: { startsAt: string | null; expiresAt: s
 
 /** "Como funciona?": as regras do NOW em poucas linhas. */
 function HowItWorks({ onClose }: { onClose: () => void }) {
+  // Primeiro o passo a passo, na ordem em que acontece; depois os detalhes.
   const rules: { icon: ReactNode; title: string; text: string }[] = [
-    { icon: <UsersIcon />, title: t('Só amigos'), text: t('Só amigos (quem se segue de volta) veem que você está livre. Para ver quem está livre, você também liga o NOW.') },
-    { icon: <ClockIcon />, title: t('Você escolhe o tempo'), text: t('De 30 minutos a 3 horas. No + do cartão dá para estender, e o quadrado para o NOW na hora.') },
+    { icon: <BoltIcon filled />, title: t('1. Ligue o NOW'), text: t('Escolha por quanto tempo está livre e, se quiser, deixe um recado. Só amigos (quem se segue de volta) veem que você está livre.') },
+    { icon: <UsersIcon />, title: t('2. Veja quem está livre'), text: t('Aparecem os amigos que também ligaram o NOW. Ninguém por perto? Toque em Perguntar se está livre.') },
+    { icon: <CheckIcon />, title: t('3. Convide ou responda'), text: t('Toque num amigo e em Convidar para sair. O convite vale 15 minutos. Se alguém chamar você, toque em Bora! ou em Agora não.') },
+    { icon: <MapIcon />, title: t('4. Encontrem-se'), text: t('Com o convite aceito, abre o encontro: vocês veem no mapa onde cada um está, escolhem um lugar e conversam.') },
+    { icon: <ClockIcon />, title: t('Mais tempo ou parar'), text: t('No + do cartão dá para estender, e em Parar o NOW você desliga na hora.') },
     { icon: <ChatIcon />, title: t('Recado no balão'), text: t('O que você escrever aparece num balão na sua foto, só na tela do NOW e só para esses amigos.') },
-    { icon: <BoltIcon filled />, title: t('Convites de 15 minutos'), text: t('Um convite chega como aviso no topo de qualquer tela. Toque em Bora! para abrir o encontro, ou em Agora não.') },
     { icon: <LocationIcon />, title: t('Localização sob controle'), text: t('No mapa, seus amigos veem só a região aproximada (uns 3 km) de onde você ligou. A posição exata vai só para quem aceitar sair com você, e você pode escolher mandar só a aproximada.') },
     { icon: <UserPlusIcon />, title: t('Perguntar se está livre'), text: t('Mande um aviso para amigos que estão com o NOW desligado. Quando ligarem, você fica sabendo. Um pedido por amigo a cada 3 horas.') },
   ];
@@ -930,7 +945,7 @@ function MapFriendCard({ friend, exact, distance, onChanged, onFeedback, onClose
     setBusy(true);
     try {
       await api.flashInvite(profile.userId, approx);
-      onFeedback({ tone: 'ok', text: t('Convite enviado para {username}. Vale por 15 minutos.', { username: profile.username }) });
+      onFeedback({ tone: 'ok', text: t('Convite enviado para {username}. Vale por 15 minutos. Se aceitar, o encontro aparece no topo da tela do NOW.', { username: profile.username }) });
       onChanged();
     } catch (failure) {
       onFeedback({ tone: 'error', text: toApiError(failure).message });
@@ -991,7 +1006,7 @@ function MapFriendCard({ friend, exact, distance, onChanged, onFeedback, onClose
           </button>
         ) : (
           <button type="button" className="nowbtn nowbtn--yes" disabled={busy} aria-busy={busy || undefined} onClick={() => void sendInvite()}>
-            {t('Convidar')}
+            {t('Convidar para sair')}
           </button>
         )}
         <ChatButton userId={profile.userId} small label={t('Conversar')} />

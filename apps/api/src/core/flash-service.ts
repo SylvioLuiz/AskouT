@@ -31,6 +31,13 @@ export const POSITION_STALE_SECONDS = 120;
 /** "Perguntar se está livre": no máximo um pedido por amigo a cada 3 h, até 20 amigos de uma vez. */
 export const ASK_COOLDOWN_HOURS = 3;
 export const ASK_MAX_USERS = 20;
+/**
+ * Aviso "fulano ligou o NOW" para os amigos: sai só se a pessoa não tinha ligado o NOW nas últimas 2 h, para quem
+ * liga e desliga várias vezes não encher o celular dos amigos.
+ */
+export const FRIENDS_ON_COOLDOWN_HOURS = 2;
+/** Quantos avisos aos amigos saem ao mesmo tempo. */
+const FRIENDS_ON_BATCH = 20;
 
 const HOUR_MS = 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
@@ -238,6 +245,7 @@ export class FlashService {
     if (Object.keys(problems).length > 0) throw validationError('Confira os dados do NOW', problems);
 
     const now = clock.now();
+    const previousStart = await flash.lastSessionStart(actorId);
     const session: FlashSessionRecord = {
       id: ids.next(),
       userId: actorId,
@@ -248,23 +256,49 @@ export class FlashService {
       area,
     };
     await flash.createSession(session, now);
-    await this.notifyAskers(actorId, now);
+    const askers = await this.notifyAskers(actorId, now);
+    const recentlyOn = previousStart !== undefined && now.getTime() - previousStart.getTime() < FRIENDS_ON_COOLDOWN_HOURS * HOUR_MS;
+    if (!recentlyOn) await this.notifyFriendsOn(actorId, askers);
     return sessionView(session);
   }
 
-  /** Avisa quem perguntou "está livre?" nas últimas horas que a pessoa ligou o NOW, e limpa os pedidos. */
-  private async notifyAskers(actorId: string, now: Date): Promise<void> {
+  /**
+   * Avisa os amigos (os dois se seguem, sem bloqueio) que a pessoa ligou o NOW. Só quem consegue ver o NOW dela
+   * recebe: fica de fora quem ela ocultou ("ela não vê o meu NOW") e quem ocultou o NOW dela. Quem perguntou
+   * "está livre?" já recebeu o aviso próprio e não recebe outro.
+   */
+  private async notifyFriendsOn(actorId: string, skip: Set<string>): Promise<void> {
+    const { flash, follows, users, notifier } = this.deps;
+    const rows = await flash.listHidden(actorId);
+    const cannotSee = new Set([...rows.filter((r) => r.ownerId === actorId && r.hideMine).map((r) => r.otherId), ...rows.filter((r) => r.otherId === actorId && r.hideTheirs).map((r) => r.ownerId)]);
+    const targets = (await follows.listFriendIds(actorId)).filter((id) => id !== actorId && !skip.has(id) && !cannotSee.has(id));
+    if (targets.length === 0) return;
+    const who = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Um amigo';
+    for (let i = 0; i < targets.length; i += FRIENDS_ON_BATCH) {
+      await Promise.all(
+        targets.slice(i, i + FRIENDS_ON_BATCH).map((id) =>
+          notifier.notify({ userId: id, type: 'FLASH_INVITE', title: `${who} ligou o NOW`, body: 'Tá livre agora. Bora sair?', url: '/now', dedupeKey: `flash-on:${actorId}`, actorId }),
+        ),
+      );
+    }
+  }
+
+  /** Avisa quem perguntou "está livre?" nas últimas horas que a pessoa ligou o NOW, e limpa os pedidos. Devolve quem foi avisado. */
+  private async notifyAskers(actorId: string, now: Date): Promise<Set<string>> {
     const { flash, follows, users, notifier } = this.deps;
     const askers = await flash.listAskersOf(actorId, new Date(now.getTime() - ASK_COOLDOWN_HOURS * HOUR_MS));
     await flash.clearAsksFor(actorId);
-    if (askers.length === 0) return;
+    const notified = new Set<string>();
+    if (askers.length === 0) return notified;
     const friends = new Set(await follows.listFriendIds(actorId));
     const unseen = new Set(unseenBy(actorId, await flash.listHidden(actorId)));
     const who = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Seu amigo';
     for (const askerId of askers) {
       if (!friends.has(askerId) || unseen.has(askerId)) continue;
       await notifier.notify({ userId: askerId, type: 'FLASH_INVITE', title: `${who} ligou o NOW`, body: 'Você perguntou se estava livre. Bora?', url: '/now', dedupeKey: `flash-ask-on:${actorId}`, actorId });
+      notified.add(askerId);
     }
+    return notified;
   }
 
   /**
