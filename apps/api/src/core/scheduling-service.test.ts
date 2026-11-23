@@ -422,3 +422,32 @@ test('evento sem data (em votação): o dono pode postar flash sem "Eu vou"', as
   assert.equal(group.items.length, 1);
   void bia;
 });
+
+test('grupo do evento: sem foto própria mostra a capa do evento; a foto trocada vale só para o grupo', async () => {
+  const { w, ana, bia } = await setup('MAJORITY');
+  const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Aniversário', dateByPoll: true } });
+  const withBia = await w.core.conversations.open(ana, bia);
+  await w.core.conversations.send(ana, withBia.id, { eventId: post.id });
+  const poll = await w.core.scheduling.create(ana, undefined, { title: 'Aniversário', rangeStart: '2026-10-20', rangeEnd: '2026-10-22', eventPostId: post.id });
+  const cover = `/posts/images/${post.images[0]!.id}`;
+
+  const group = await w.core.conversations.group(ana, poll.conversationId);
+  assert.equal(group.imageUrl, cover, 'o grupo mostra a capa do evento');
+  assert.equal(group.ownImage, false);
+  assert.deepEqual(group.event, { id: post.id, title: 'Aniversário', coverUrl: cover, coverImageId: post.images[0]!.id, canEditCover: true });
+  const forBia = await w.core.conversations.group(bia, poll.conversationId);
+  assert.equal(forBia.event?.canEditCover, false, 'só quem criou o evento troca a capa');
+  assert.equal(forBia.event?.coverImageId, null);
+  assert.equal((await w.core.conversations.list(bia)).find((c) => c.id === poll.conversationId)?.imageUrl, cover, 'na lista de conversas também');
+
+  // Foto própria do grupo: a capa do evento não muda.
+  const own = JPEG;
+  await w.core.conversations.setGroupPhoto(ana, poll.conversationId, own);
+  const after = await w.core.conversations.group(ana, poll.conversationId);
+  assert.equal(after.imageUrl, own);
+  assert.equal(after.ownImage, true);
+  assert.equal(after.event?.coverUrl, cover);
+  // Tirar a foto do grupo volta a mostrar a capa.
+  await w.core.conversations.setGroupPhoto(ana, poll.conversationId, null);
+  assert.equal((await w.core.conversations.group(ana, poll.conversationId)).imageUrl, cover);
+});

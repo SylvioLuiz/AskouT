@@ -1,5 +1,5 @@
 import { api } from '../client.ts';
-import { safeGroupImage } from '../lib/image.ts';
+import { groupPhotoSrc } from '../lib/image.ts';
 import { useCallback, useId, useRef, useState } from 'react';
 import type { ButtonHTMLAttributes, HTMLInputTypeAttribute, MouseEvent, ReactNode } from 'react';
 import { initials, tintIndex } from '../lib/avatar.ts';
@@ -308,7 +308,7 @@ export function Confirm({ question, confirmLabel, onConfirm, onCancel, busy, dan
 /** Círculo do grupo: a inicial do nome sobre uma cor fixa (ainda não há foto de grupo). */
 export function GroupAvatar({ name, size = 44, imageUrl }: { name: string; size?: number; imageUrl?: string | null }) {
   const letter = Array.from(name.trim())[0]?.toUpperCase() ?? '#';
-  const image = safeGroupImage(imageUrl);
+  const image = groupPhotoSrc(imageUrl);
   return (
     <span className="avatar avatar--group" style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }} aria-hidden="true">
       {image ? <img className="avatar--group__img" src={image} alt="" /> : letter}

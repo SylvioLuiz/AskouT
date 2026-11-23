@@ -205,14 +205,30 @@ export interface GroupDetails {
   id: string;
   name: string;
   ownerId: string;
-  /** Foto do grupo (data URL) ou nula. */
+  /** Foto do grupo (data URL), a capa do evento do grupo (endereço da imagem) quando ele não tem foto própria, ou nula. */
   imageUrl: string | null;
+  /** O grupo tem foto própria (trocada no grupo). Falso quando mostra a capa do evento ou nada. */
+  ownImage: boolean;
+  /** Evento do grupo (o da votação de data ou o do encontro). Nulo em grupo comum. */
+  event: GroupEventView | null;
   members: { profile: PublicProfile; role: GroupRoleView; follow: 'NONE' | 'PENDING' | 'FOLLOWING' }[];
   /** Você é o dono ou administrador: pode editar nome e foto e remover membros. */
   canManage: boolean;
   meetups: MeetupView[];
   /** Fotos e vídeos da conversa ficam na aba Mídia (`GET .../shared`). */
   mediaAvailable: true;
+}
+
+/** Evento ao qual o grupo pertence. */
+export interface GroupEventView {
+  id: string;
+  title: string;
+  /** Capa do evento (endereço da imagem) ou nula. */
+  coverUrl: string | null;
+  /** Foto do post que é a capa, para trocar (`PUT /posts/:id/images/:imageId`). Só para quem criou o evento e só se a capa é uma foto enviada. */
+  coverImageId: string | null;
+  /** Você criou o evento e pode trocar a capa dele junto com a foto do grupo. */
+  canEditCover: boolean;
 }
 
 export interface SendInput {
@@ -477,6 +493,14 @@ export class ConversationService {
     const profiles = new Map((await users.findProfilesByIds(rows.flatMap((v) => (v.otherId ? [v.otherId] : [])))).map((p) => [p.userId, p] as const));
     const items: ConversationListItem[] = [];
     const pins = new Map<string, number>();
+    // Grupo de evento sem foto própria mostra a capa do evento.
+    const covers = new Map(
+      await Promise.all(
+        rows
+          .filter(({ s }) => s.conversation.type === 'GROUP' && !s.conversation.imageUrl)
+          .map(async ({ s }) => [s.conversation.id, (await this.groupEvent(s.conversation.id).catch(() => undefined))?.card.imageUrl ?? null] as const),
+      ),
+    );
     for (const { s, otherId } of rows) {
       const profile = otherId ? profiles.get(otherId) : undefined;
       if (s.conversation.type === 'DIRECT' && !profile) continue;
@@ -485,7 +509,7 @@ export class ConversationService {
         type: s.conversation.type,
         other: profile ? toPublicProfile(profile) : null,
         name: s.conversation.name,
-        imageUrl: s.conversation.imageUrl,
+        imageUrl: s.conversation.imageUrl ?? covers.get(s.conversation.id) ?? null,
         memberCount: s.conversation.type === 'GROUP' ? s.participantIds.filter((id) => !hidden.has(id)).length : s.participantIds.length,
         lastMessage: s.lastMessage ? toMessageView(s.lastMessage, actorId) : null,
         unread: s.unread,
@@ -548,7 +572,7 @@ export class ConversationService {
       type: conversation.type,
       other: other ? toPublicProfile(other) : null,
       name: conversation.name,
-      imageUrl: conversation.imageUrl,
+      imageUrl: await this.groupImage(conversation),
       memberCount: memberIds.filter((id) => !hiddenIds.includes(id)).length,
       isOwner: conversation.ownerId === actorId,
       pinned: prefs.pinnedAt !== null,
@@ -920,7 +944,7 @@ export class ConversationService {
       for (const url of extractLinks(m.body)) links.push({ ...base, url });
     }
     const views = await buildMeetupViews(this.deps, actorId, await meetups.listForConversation(conversationId));
-    return { type: conversation.type, other: other ? toPublicProfile(other) : null, name: conversation.name, imageUrl: conversation.imageUrl, meetups: views, links, voice, media };
+    return { type: conversation.type, other: other ? toPublicProfile(other) : null, name: conversation.name, imageUrl: await this.groupImage(conversation), meetups: views, links, voice, media };
   }
 
   /** Detalhes do grupo (tocar no nome): pessoas, eventos e mídia. Só quem está no grupo. */
@@ -943,7 +967,15 @@ export class ConversationService {
     }
     members.sort((a, b) => (a.role === b.role ? a.profile.displayName.localeCompare(b.profile.displayName, 'pt-BR') : rank[a.role] - rank[b.role]));
     const meetups = await buildMeetupViews(this.deps, actorId, await this.deps.meetups.listForConversation(conversationId));
-    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl, members, canManage: roleOf(actorId) !== 'MEMBER', meetups, mediaAvailable: true };
+    const found = await this.groupEvent(conversationId).catch(() => undefined);
+    const event: GroupEventView | null = found
+      ? (() => {
+          const mine = found.card.userEvent === true && found.card.ownerId === actorId;
+          const coverImageId = mine ? (/^\/posts\/images\/([\w-]+)$/.exec(found.card.imageUrl ?? '')?.[1] ?? null) : null;
+          return { id: found.card.id, title: found.card.title, coverUrl: found.card.imageUrl, coverImageId, canEditCover: coverImageId !== null };
+        })()
+      : null;
+    return { id: conversationId, name: conversation.name, ownerId, imageUrl: conversation.imageUrl ?? event?.coverUrl ?? null, ownImage: conversation.imageUrl !== null, event, members, canManage: roleOf(actorId) !== 'MEMBER', meetups, mediaAvailable: true };
   }
 
   // ---------- Gestão do grupo ----------
@@ -1071,6 +1103,29 @@ export class ConversationService {
     if (ownerId === actorId) return;
     if ((await this.deps.conversations.adminIds(conversationId)).includes(actorId)) return;
     throw forbidden(`Só quem criou o grupo ou administra pode ${what}`);
+  }
+
+  /**
+   * Evento do grupo: o da votação de data que abriu o grupo (evento sem data) ou o do encontro criado a partir de um
+   * evento. Votação cancelada e encontro cancelado não contam.
+   */
+  private async groupEvent(conversationId: string): Promise<{ card: EventCardView } | undefined> {
+    const { scheduling, meetups } = this.deps;
+    const poll = (await scheduling.listForConversation(conversationId)).find((p) => p.status !== 'CANCELLED' && p.eventPostId);
+    let eventId = poll?.eventPostId ?? null;
+    if (!eventId) {
+      const meetup = (await meetups.listForConversation(conversationId)).find((m) => m.status === 'ACTIVE' && (m.eventPostId || m.eventId));
+      eventId = meetup ? (meetup.eventPostId ?? meetup.eventId) : null;
+    }
+    if (!eventId) return undefined;
+    const card = (await buildEventCards(this.deps, [eventId])).get(eventId);
+    return card ? { card } : undefined;
+  }
+
+  /** Foto que o grupo mostra: a própria ou, sem ela, a capa do evento do grupo. Conversa 1 a 1: a dela (nula). */
+  private async groupImage(conversation: ConversationRecord): Promise<string | null> {
+    if (conversation.imageUrl || conversation.type !== 'GROUP') return conversation.imageUrl;
+    return (await this.groupEvent(conversation.id).catch(() => undefined))?.card.imageUrl ?? null;
   }
 
   private async groupAccess(actorId: string, conversationId: string) {

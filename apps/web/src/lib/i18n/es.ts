@@ -3382,4 +3382,10 @@ export const ES: Readonly<Record<string, string>> = {
   "Como o carro chegando no Uber: {name} acompanha nas notificações do celular quanto falta para você chegar ao lugar combinado (ou até onde a pessoa está). Só durante este encontro, e você pode parar quando quiser.": "Como el auto llegando en Uber: {name} sigue en las notificaciones del celular cuánto falta para que llegues al lugar acordado (o hasta donde está). Solo durante este encuentro, y puedes dejar de mostrarlo cuando quieras.",
   "Mostrar minha chegada": "Mostrar mi llegada",
   "Agora só a sua localização aproximada é mostrada, e sua chegada deixou de ser mostrada.": "Ahora solo se muestra tu ubicación aproximada, y tu llegada dejó de mostrarse.",
+  "Usando a capa do evento": "Usando la portada del evento",
+  "Voltar à capa do evento": "Volver a la portada del evento",
+  "Trocar também a capa do evento \"{title}\"?": "¿Cambiar también la portada del evento \"{title}\"?",
+  "Se escolher só o grupo, a capa do evento continua como está.": "Si eliges solo el grupo, la portada del evento queda como está.",
+  "Grupo e evento": "Grupo y evento",
+  "Só o grupo": "Solo el grupo",
 };

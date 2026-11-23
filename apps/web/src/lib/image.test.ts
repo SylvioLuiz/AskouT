@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { dataUrlBytes, fitWithin, safeGroupImage } from './image.ts';
+import { dataUrlBytes, fitWithin, groupPhotoSrc, safeGroupImage } from './image.ts';
 
 describe('image', () => {
   it('reduz mantendo a proporção e não amplia', () => {
@@ -18,4 +18,13 @@ describe('image', () => {
     assert.equal(safeGroupImage('data:text/html;base64,AAAA'), null);
     assert.equal(safeGroupImage(null), null);
   });
+});
+
+it('foto do grupo: a própria (data URL) ou a capa do evento mandada pelo servidor', () => {
+  assert.equal(groupPhotoSrc('data:image/jpeg;base64,/9j/4A=='), 'data:image/jpeg;base64,/9j/4A==');
+  assert.equal(groupPhotoSrc('/posts/images/abc-123'), '/posts/images/abc-123');
+  assert.equal(groupPhotoSrc('https://cdn.exemplo.com/capa.jpg'), 'https://cdn.exemplo.com/capa.jpg');
+  assert.equal(groupPhotoSrc('javascript:alert(1)'), null);
+  assert.equal(groupPhotoSrc('/outra/coisa'), null);
+  assert.equal(groupPhotoSrc(null), null);
 });
