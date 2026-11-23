@@ -9,7 +9,7 @@ import type { VoiceControl } from '../components/voice.tsx';
 import { haptic } from '../lib/haptics.ts';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
 import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EditIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
-import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
+import { MediaBubble, ReplyThumb, galleryOf } from '../components/chat-media.tsx';
 import { ImageEditor } from '../components/image-editor.tsx';
 import { canEditImage } from '../lib/image-edit.ts';
 import { FileBubble } from '../components/chat-file.tsx';
@@ -1279,6 +1279,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const positions = runPositions(visible);
   const posOf = new Map(visible.map((m, i) => [m.id, positions[i] ?? 'single'] as const));
   const albums = groupAlbums(visible);
+  const gallery = galleryOf(visible);
   const seen = seenLabel(visible, data.members, isGroup);
   const profileOf = (senderId: string) => (data.other && data.other.userId === senderId ? data.other : data.members.find((x) => x.profile.userId === senderId)?.profile);
   const face = (senderId: string) => {
@@ -1345,7 +1346,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         ) : m.kind === 'AUDIO' && m.audio ? (
           <VoiceBubble message={m} conversationId={conversationId} />
         ) : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? (
-          <MediaBubble message={m} conversationId={conversationId} onTap={(x, y) => registerTap(m, x, y)} />
+          <MediaBubble message={m} conversationId={conversationId} onTap={(x, y) => registerTap(m, x, y)} gallery={gallery} />
         ) : m.kind === 'FILE' ? (
           <FileBubble message={m} conversationId={conversationId} />
         ) : m.kind === 'EVENT' && m.event ? (
