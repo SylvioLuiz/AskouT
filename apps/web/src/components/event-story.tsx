@@ -17,6 +17,7 @@ import { formatWhen } from '../lib/chat.ts';
 import { kindLabel, safeImage } from '../lib/explore.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { haptic } from '../lib/haptics.ts';
 
 /** Reações rápidas: aparecem ao tocar em "Enviar mensagem", como no Instagram. */
 const STORY_REACTIONS = ['😂', '😮', '😍', '😢', '👏', '🔥', '🎉', '💯'] as const;
@@ -235,7 +236,7 @@ export function StoryViewer({ eventId, groups, start, onClose, onChanged }: { ev
     if (next) {
       setLikePop(storyId);
       window.setTimeout(() => setLikePop((s) => (s === storyId ? undefined : s)), 500);
-      navigator.vibrate?.(10);
+      haptic('tap');
     }
     try {
       await api.likeStory(storyId, next, eventId);

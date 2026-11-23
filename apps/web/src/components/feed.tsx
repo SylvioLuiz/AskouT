@@ -23,6 +23,7 @@ import { applyMention, mentionQueryAt, splitMentions } from '../lib/mentions.ts'
 import type { CommentGif, FeedComment, FeedPolicy, FeedPost, FeedReactions, FeedSettings, PostImage, PublicProfile } from '../lib/types.ts';
 import { Link } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { haptic } from '../lib/haptics.ts';
 
 const PAGE = 10;
 
@@ -140,7 +141,7 @@ function ReactButton({ reactions, onReact, small }: { reactions: FeedReactions; 
           timer.current = window.setTimeout(() => {
             held.current = true;
             setOpen(true);
-            navigator.vibrate?.(10);
+            haptic('tap');
           }, LONG_PRESS_MS);
         }}
         onPointerUp={stopTimer}
@@ -546,7 +547,7 @@ function CommentRow({ comment, reply, onChange, onDelete, onMenu, onReply }: { c
         pressed.current = true;
         gesture.current = undefined;
         setShift(0);
-        if ('vibrate' in navigator) navigator.vibrate?.(10);
+        haptic('tap');
         onMenu();
       }, LONG_PRESS_MS);
     }

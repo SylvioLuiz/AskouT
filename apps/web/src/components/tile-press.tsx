@@ -5,6 +5,7 @@ import { Sheet } from './agenda.tsx';
 import { Button } from './ui.tsx';
 import { LONG_PRESS_MS } from '../lib/chat.ts';
 import { t } from '../lib/i18n/index.ts';
+import { haptic } from '../lib/haptics.ts';
 
 /** Quanto o dedo pode andar antes de virar rolagem (e cancelar o "segurar"). */
 const MOVE_TOLERANCE_PX = 10;
@@ -34,7 +35,7 @@ export function useLongPress(onLongPress: () => void, enabled: boolean) {
     timer.current = window.setTimeout(() => {
       fired.current = true;
       start.current = undefined;
-      navigator.vibrate?.(10);
+      haptic('tap');
       callback.current();
     }, LONG_PRESS_MS);
   };

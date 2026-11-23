@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { MouseEvent, PointerEvent, TouchEvent } from 'react';
 import { LONG_PRESS_MS } from '../lib/chat.ts';
+import { haptic } from '../lib/haptics.ts';
 
 const MOVE_TOLERANCE_PX = 10;
 
@@ -29,7 +30,7 @@ export function useHoldPreview(onOpen: () => void, onClose: () => void) {
     timer.current = window.setTimeout(() => {
       fired.current = true;
       start.current = undefined;
-      navigator.vibrate?.(10);
+      haptic('tap');
       open.current();
     }, LONG_PRESS_MS);
   };

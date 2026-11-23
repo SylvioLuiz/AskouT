@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react';
 import { ReplyIcon } from './icons.tsx';
 import { SLOP, TRIGGER_OFFSET, rubberOffset, swipeTriggered } from '../lib/swipe.ts';
+import { haptic } from '../lib/haptics.ts';
 
 /**
  * Linha de mensagem que acompanha o dedo ao ser puxada para a direita e volta sozinha, como uma mola.
@@ -51,7 +52,7 @@ export function SwipeRow({ id, className, enabled, onReply, children }: { id?: s
     }
     g.offset = rubberOffset(dx - SLOP);
     const crossed = swipeTriggered(g.offset);
-    if (crossed && !g.armed && typeof navigator.vibrate === 'function') navigator.vibrate(12);
+    if (crossed && !g.armed) haptic('success');
     g.armed = crossed;
     paint(g.offset, false);
   }

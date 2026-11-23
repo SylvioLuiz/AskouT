@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import { railIndexAt, railIndexOf } from '../lib/date-rail.ts';
 import type { RailMonth } from '../lib/date-rail.ts';
 import { intlLocale, t } from '../lib/i18n/index.ts';
+import { haptic } from '../lib/haptics.ts';
 
 const monthFmt = new Intl.DateTimeFormat(intlLocale(), { month: 'short', year: 'numeric' });
 const label = (m: RailMonth) => monthFmt.format(new Date(m.year, m.month, 15));
@@ -64,7 +65,7 @@ export function DateRail({ months, onJump }: { months: RailMonth[]; onJump: (ind
   function move(event: ReactPointerEvent<HTMLDivElement>) {
     if (!dragging) return;
     const next = indexFor(event.clientY);
-    if (next !== drag && 'vibrate' in navigator) navigator.vibrate?.(4);
+    if (next !== drag) haptic('tick');
     setDrag(next);
   }
   function up() {
