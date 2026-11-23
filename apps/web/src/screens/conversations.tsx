@@ -1566,10 +1566,11 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                       if (e.key === 'Enter' && !e.shiftKey && window.matchMedia('(hover: hover)').matches) void send(e);
                     }}
                   />
+                  {/* Emoji e GIF sempre à mão, como a figurinha do Instagram: dá para mandar um GIF sem escrever nada. */}
+                  <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
                   {draft.trim() !== '' || staged.length > 0 || pendingGif ? (
                     <>
-                      {/* Emoji e GIF só aparecem enquanto você escreve; com a caixa vazia o canto fica para o microfone, como nos outros apps. */}
-                      <CommentTools disabled={sending} onEmoji={(emoji) => setDraft((current) => (Array.from(current).length < MESSAGE_MAX ? current + emoji : current))} onGif={(gif) => setPendingGif(gif)} />
+                      {/* Escrevendo (ou com foto/GIF na fila): o canto vira o botão de enviar, como no Instagram. */}
                       <button
                         type="submit"
                         className="composer__sendtext"

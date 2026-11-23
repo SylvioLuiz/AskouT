@@ -6584,7 +6584,10 @@ div.optrow__main { cursor: default; }
 
 /* Emoji e GIF dentro da caixa do chat, antes do enviar; a lista de emojis abre acima da barra. */
 .composer__pill .commenttools { display: flex; flex: none; gap: 0; margin: 0; }
-.composer__pill .commenttools__btn { min-width: 36px; min-height: 40px; padding: 0 6px; border: 0; background: transparent; font-size: 0.75rem; }
+.composer__pill .commenttools__btn { min-width: 34px; min-height: 40px; padding: 0 5px; border: 0; background: transparent; font-size: 0.75rem; }
+/* Caixa vazia: emoji, GIF, clipe, galeria e microfone cabem numa tela de 375 px sem espremer o campo. */
+.composer__pill .composer__tool { width: 36px; }
+.composer__pill .composer__input--pill { min-width: 72px; }
 .composer__pill .commenttools__btn > span { font-size: 1.25rem; }
 .composer__pill .commenttools__btn--on { background: var(--brand-soft); }
 .composer .emojipanel { position: absolute; left: 16px; right: 16px; bottom: 100%; z-index: 2; margin: 0 0 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .18); }
