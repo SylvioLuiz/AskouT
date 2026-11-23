@@ -33,6 +33,8 @@ export interface AlbumSummaryView {
   photoCount: number;
   /** Primeira foto, para a capa. */
   coverPhotoId: string | null;
+  /** Álbum de evento: o id da página do evento (`/eventos/:id`). Encontro do NOW: null. */
+  eventId: string | null;
 }
 
 export interface AlbumPhotoView {
@@ -245,6 +247,7 @@ export class AlbumService {
       friendCount: members.filter((id) => id !== viewerId && !blocked.has(id)).length,
       photoCount: photos.length,
       coverPhotoId: photos[0]?.id ?? null,
+      eventId: album.kind === 'EVENT' ? album.refId.slice(album.refId.indexOf(':') + 1) : null,
     };
   }
 }

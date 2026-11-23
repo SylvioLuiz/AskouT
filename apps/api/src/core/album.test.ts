@@ -65,6 +65,7 @@ test('evento de pessoa: o dono também faz parte do álbum', async () => {
   await w.core.albums.syncEvents();
   assert.equal((await w.core.albums.list(ana!)).length, 1);
   assert.equal((await w.core.albums.list(bia!))[0]?.friendCount, 1);
+  assert.equal((await w.core.albums.list(bia!))[0]?.eventId, ev.id, 'o álbum do evento aponta para a página do evento');
 });
 
 test('fotos: quem foi envia, vê e apaga a própria; foto inválida e excesso são recusados', async () => {

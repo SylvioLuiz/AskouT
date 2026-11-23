@@ -1529,6 +1529,8 @@ export interface AlbumSummary {
   friendCount: number;
   photoCount: number;
   coverPhotoId: string | null;
+  /** Álbum de evento: o id da página do evento. Encontro do NOW: null. */
+  eventId: string | null;
 }
 
 export interface AlbumPhoto {
