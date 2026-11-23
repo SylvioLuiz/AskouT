@@ -3495,4 +3495,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Toque em um lugar para ver no mapa e sugira no chat.": "Tap a place to see it on the map and suggest it in the chat.",
   "Local combinado com {other}. Para trocar, sugira outro no chat.": "Place agreed with {other}. To change it, suggest another one in the chat.",
   "Essa sugestão não está aceita": "That suggestion isn't accepted",
+  "Mandar mensagem para {name}": "Message {name}",
+  "Entre para mandar mensagem para o local.": "Sign in to message this place.",
+  "Página do local": "Venue page",
+  "@{username} · mensagem para {venue}": "@{username} · message to {venue}",
 };

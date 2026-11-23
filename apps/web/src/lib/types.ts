@@ -29,6 +29,13 @@ export interface Relationship {
 }
 
 export type MessageDelivery = 'DIRECT' | 'REQUEST' | 'NONE';
+/** Conversa pela página de um local: quem escreveu (CUSTOMER) vê o local; o dono (OWNER) vê a pessoa e por qual local ela escreveu. */
+export interface VenueChat {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  role: 'CUSTOMER' | 'OWNER';
+}
 /** Solicitação de mensagem pendente: INCOMING = alguém que você não segue escreveu; OUTGOING = você escreveu e espera aceitarem. */
 export type MessageRequestRole = 'INCOMING' | 'OUTGOING' | null;
 
@@ -611,6 +618,8 @@ export interface ConversationItem {
   canSend: boolean;
   /** Servidor antigo não manda. */
   request?: MessageRequestRole;
+  /** Conversa pela página de um local (nula nas outras; servidor antigo não manda). */
+  venue?: VenueChat | null;
   pinned: boolean;
   muted: boolean;
 }
@@ -626,6 +635,8 @@ export interface ChatView {
   canSend: boolean;
   /** Servidor antigo não manda. */
   request?: MessageRequestRole;
+  /** Conversa pela página de um local (nula nas outras; servidor antigo não manda). */
+  venue?: VenueChat | null;
   pinned: boolean;
   muted: boolean;
   /** Cor escolhida para a conversa (só para você); nula = cor padrão do app. Servidor antigo não manda. */

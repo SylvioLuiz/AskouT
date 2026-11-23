@@ -30,6 +30,7 @@ import { CHAT_VIDEO_MAX_BYTES, mediaKind, mediaProblem, prepareImage, typingLabe
 import { prepareVideoUpload, withMediaType } from '../lib/media-file.ts';
 import { canCompressVideo, prepareProgressText } from '../lib/video-prepare.ts';
 import { ApiError, toApiError } from '../lib/errors.ts';
+import { safeImage } from '../lib/explore.ts';
 import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
 import { CommentGifView, CommentTools, GifImage } from '../components/comment-tools.tsx';
 import type { ChatMessage, CommentGif, ConversationItem, MessageStory, PublicProfile } from '../lib/types.ts';
@@ -154,10 +155,13 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
               {shown.map((c) => (
                 <li key={c.id} className="convitem">
                   <Link to={`/conversas/${c.id}`} className={`convrow${c.unread > 0 ? ' convrow--unread' : ''}${c.id === activeId ? ' convrow--active' : ''}`} aria-current={c.id === activeId ? 'page' : undefined}>
-                    {c.other ? <Avatar profile={c.other} size={48} /> : <GroupAvatar name={c.name ?? t('Grupo')} size={48} imageUrl={c.imageUrl} />}
+                    {c.venue?.role === 'CUSTOMER' ? <GroupAvatar name={c.venue.name} size={48} imageUrl={safeImage(c.venue.logoUrl)} /> : c.other ? <Avatar profile={c.other} size={48} /> : <GroupAvatar name={c.name ?? t('Grupo')} size={48} imageUrl={c.imageUrl} />}
                     <span className="convrow__body">
                       <span className="convrow__top">
-                        <span className="convrow__name">{c.other ? c.other.displayName : (c.name ?? 'Grupo')}</span>
+                        <span className="convrow__name">
+                          {c.venue?.role === 'CUSTOMER' ? c.venue.name : c.other ? c.other.displayName : (c.name ?? 'Grupo')}
+                          {c.venue?.role === 'OWNER' ? <span className="convrow__via"> · {c.venue.name}</span> : null}
+                        </span>
                         {c.pinned && !searching ? (
                           <span className="convrow__flag" title={t('Fixada no topo')}>
                             <PinIcon />
@@ -1045,7 +1049,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         onPrefsChanged={view.reload}
         color={color}
         onColorChange={setPickedColor}
-        subtitle={isGroup ? `${peopleLabel(data.memberCount)} · toque para ver o grupo` : data.other ? `@${data.other.username}` : undefined}
+        venue={data.venue ?? null}
+        subtitle={isGroup ? `${peopleLabel(data.memberCount)} · toque para ver o grupo` : data.venue?.role === 'CUSTOMER' ? t('Página do local') : data.venue?.role === 'OWNER' && data.other ? t('@{username} · mensagem para {venue}', { username: data.other.username, venue: data.venue.name }) : data.other ? `@${data.other.username}` : undefined}
         onCleared={() => {
           setMessages([]);
           setOlder({ hasMore: false, loading: false });

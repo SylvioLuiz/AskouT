@@ -1295,6 +1295,20 @@ export class InMemoryConversationRepository implements ConversationRepository {
 
   readonly openDms = new Set<string>();
 
+  async getOrCreateVenueDirect(venueId: string, customerId: string, ownerId: string, id: string, now: Date): Promise<ConversationRecord> {
+    const directKey = `venue:${venueId}:${customerId}`;
+    let record = [...this.conversations.values()].find((c) => c.directKey === directKey);
+    if (!record) {
+      record = { id, type: 'DIRECT', directKey, name: null, ownerId: null, imageUrl: null, venueId, createdAt: now };
+      this.conversations.set(id, record);
+      this.participants.set(id, new Map([[customerId, null], [ownerId, null]]));
+    }
+    const p = this.participants.get(record.id)!;
+    for (const u of [...p.keys()]) if (u !== customerId && u !== ownerId) p.delete(u);
+    if (!p.has(ownerId)) p.set(ownerId, null);
+    return { ...record };
+  }
+
   async findDirect(a: string, b: string): Promise<ConversationRecord | undefined> {
     const directKey = a < b ? `${a}:${b}` : `${b}:${a}`;
     for (const c of this.conversations.values()) if (c.directKey === directKey) return { ...c };

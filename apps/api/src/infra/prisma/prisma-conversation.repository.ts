@@ -47,7 +47,7 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   createdAt: r.createdAt,
 });
 
-type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; requestToId?: string | null; requestDeclinedAt?: Date | null; acceptedAt?: Date | null; group: { name: string; ownerId: string; imageUrl: string | null; eventPostId: string | null } | null };
+type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; requestToId?: string | null; requestDeclinedAt?: Date | null; acceptedAt?: Date | null; venueId?: string | null; group: { name: string; ownerId: string; imageUrl: string | null; eventPostId: string | null } | null };
 
 const toConversation = (c: ConversationRow): ConversationRecord => ({
   id: c.id,
@@ -57,7 +57,7 @@ const toConversation = (c: ConversationRow): ConversationRecord => ({
   ownerId: c.group?.ownerId ?? null,
   imageUrl: c.group?.imageUrl ?? null,
   eventPostId: c.group?.eventPostId ?? null,
-  ...(c.type === 'DIRECT' ? { requestToId: c.requestToId ?? null, requestDeclinedAt: c.requestDeclinedAt ?? null, acceptedAt: c.acceptedAt ?? null } : {}),
+  ...(c.type === 'DIRECT' ? { requestToId: c.requestToId ?? null, requestDeclinedAt: c.requestDeclinedAt ?? null, acceptedAt: c.acceptedAt ?? null, venueId: c.venueId ?? null } : {}),
   createdAt: c.createdAt,
 });
 
@@ -88,7 +88,7 @@ export class PrismaConversationRepository implements ConversationRepository {
           participants: { create: [{ userId: a }, { userId: b }] },
         },
       });
-      return { id, type: 'DIRECT', directKey, name: null, ownerId: null, imageUrl: null, eventPostId: null, requestToId: null, requestDeclinedAt: null, acceptedAt: null, createdAt: now };
+      return { id, type: 'DIRECT', directKey, name: null, ownerId: null, imageUrl: null, eventPostId: null, requestToId: null, requestDeclinedAt: null, acceptedAt: null, venueId: null, createdAt: now };
     } catch (error) {
       // Duas requisições criaram ao mesmo tempo: a segunda usa a conversa da primeira.
       if (uniqueViolationTargets(error) !== undefined) {
@@ -103,6 +103,33 @@ export class PrismaConversationRepository implements ConversationRepository {
     if (!isUuid(id)) return undefined;
     const row = await this.prisma.conversation.findUnique({ where: { id }, include: { group: true } });
     return row ? toConversation(row) : undefined;
+  }
+
+  async getOrCreateVenueDirect(venueId: string, customerId: string, ownerId: string, id: string, now: Date): Promise<ConversationRecord> {
+    const directKey = `venue:${venueId}:${customerId}`;
+    const find = async () => {
+      const row = await this.prisma.conversation.findUnique({ where: { directKey }, include: { group: true, participants: { select: { userId: true } } } });
+      return row;
+    };
+    let row = await find();
+    if (!row) {
+      try {
+        await this.prisma.conversation.create({ data: { id, type: 'DIRECT', directKey, venueId, createdAt: now, participants: { create: [{ userId: customerId }, { userId: ownerId }] } } });
+      } catch (error) {
+        if (uniqueViolationTargets(error) === undefined) throw error;
+      }
+      row = await find();
+      if (!row) throw new Error('conversa do local não encontrada');
+    }
+    // O local trocou de dono: a outra ponta passa a ser o dono atual.
+    const stale = row.participants.map((p: { userId: string }) => p.userId).filter((u: string) => u !== customerId && u !== ownerId);
+    if (stale.length > 0 || !row.participants.some((p: { userId: string }) => p.userId === ownerId)) {
+      await this.prisma.$transaction([
+        this.prisma.conversationParticipant.deleteMany({ where: { conversationId: row.id, userId: { in: stale } } }),
+        this.prisma.conversationParticipant.upsert({ where: { conversationId_userId: { conversationId: row.id, userId: ownerId } }, create: { conversationId: row.id, userId: ownerId }, update: {} }),
+      ]);
+    }
+    return toConversation(row);
   }
 
   async findDirect(a: string, b: string): Promise<ConversationRecord | undefined> {

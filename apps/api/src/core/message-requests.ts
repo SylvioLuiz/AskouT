@@ -15,7 +15,8 @@ export type MessageDelivery = 'DIRECT' | 'REQUEST' | 'NONE';
 export async function messageDelivery(deps: CoreDeps, senderId: string, recipientId: string, conversation?: ConversationRecord): Promise<MessageDelivery> {
   const { follows, blocks, users, conversations } = deps;
   if (senderId === recipientId || (await blocks.existsEitherWay(senderId, recipientId))) return 'NONE';
-  if (conversation?.acceptedAt) return 'DIRECT';
+  // Conversa pela página de um local: o local recebe de qualquer pessoa e o dono responde, sempre direto.
+  if (conversation?.venueId || conversation?.acceptedAt) return 'DIRECT';
   const [back, forth] = await Promise.all([follows.get(recipientId, senderId), follows.get(senderId, recipientId)]);
   if (back?.status === 'ACCEPTED') return 'DIRECT';
   const [profile] = await users.findProfilesByIds([recipientId]);

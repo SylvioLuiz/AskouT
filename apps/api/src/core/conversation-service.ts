@@ -10,6 +10,7 @@ import type { ChatMedia } from './media.ts';
 import { conflict, forbidden, notFound, rateLimited, validationError } from './errors.ts';
 import type { CoreDeps } from './ports.ts';
 import { messageDelivery, requestRole } from './message-requests.ts';
+import { canManageVenue } from './venue-access.ts';
 import type { MessageDelivery, MessageRequestRole } from './message-requests.ts';
 import { distanceMeters } from './geo.ts';
 import { buildMeetupViews } from './meetup-view.ts';
@@ -110,6 +111,14 @@ export interface MemberReadView {
   readAt: string | null;
 }
 
+/** Conversa pela página de um local: quem escreveu (CUSTOMER) vê o local; o dono (OWNER) vê a pessoa e por qual local ela escreveu. */
+export interface VenueChatView {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  role: 'CUSTOMER' | 'OWNER';
+}
+
 export interface ConversationListItem {
   id: string;
   type: 'DIRECT' | 'GROUP';
@@ -126,6 +135,8 @@ export interface ConversationListItem {
   canSend: boolean;
   /** Solicitação de mensagem pendente: INCOMING = alguém que você não segue escreveu; OUTGOING = você escreveu e a pessoa ainda não aceitou. */
   request: MessageRequestRole;
+  /** Conversa pela página de um local (nula nas outras). */
+  venue: VenueChatView | null;
   /** Fixada no topo da lista (só para você). */
   pinned: boolean;
   /** Sem avisos de mensagem nova (só para você). */
@@ -142,6 +153,8 @@ export interface ConversationView {
   canSend: boolean;
   /** Solicitação de mensagem pendente (ver `ConversationListItem.request`). */
   request: MessageRequestRole;
+  /** Conversa pela página de um local (nula nas outras). */
+  venue: VenueChatView | null;
   /** Você é quem criou o grupo (pode renomear, trocar a foto e remover pessoas). */
   isOwner: boolean;
   pinned: boolean;
@@ -474,6 +487,38 @@ export class ConversationService {
   }
 
   /**
+   * Mensagem pela página de um local que tem dono: abre (ou cria) a conversa da pessoa com o local. Chega direto para o
+   * dono, com aviso, sem virar solicitação. Fica separada da conversa pessoal entre os dois.
+   */
+  async openVenue(actorId: string, rawVenueId: unknown): Promise<{ id: string }> {
+    const { conversations, places, blocks, clock, ids } = this.deps;
+    const venue = typeof rawVenueId === 'string' && rawVenueId !== '' && rawVenueId.length <= 64 ? await places.findVenue(rawVenueId) : undefined;
+    if (!venue) throw notFound('Local não encontrado');
+    if (!venue.ownerId) throw forbidden('Este local ainda não tem ninguém administrando a página para responder mensagens');
+    if (await canManageVenue(places, actorId, venue)) throw forbidden('Você administra este local: as mensagens dele chegam para você');
+    if (await blocks.existsEitherWay(actorId, venue.ownerId)) throw notFound('Local não encontrado');
+    const conversation = await conversations.getOrCreateVenueDirect(venue.id, actorId, venue.ownerId, ids.next(), clock.now());
+    return { id: conversation.id };
+  }
+
+  /** Quem escreveu para o local, pela chave "venue:<local>:<cliente>". */
+  private venueCustomerOf(conversation: ConversationRecord): string | null {
+    return conversation.venueId && conversation.directKey?.startsWith('venue:') ? (conversation.directKey.split(':')[2] ?? null) : null;
+  }
+
+  private async venueViews(actorId: string, list: ConversationRecord[]): Promise<Map<string, VenueChatView>> {
+    const out = new Map<string, VenueChatView>();
+    const venueIds = [...new Set(list.flatMap((c) => (c.venueId ? [c.venueId] : [])))];
+    const venues = new Map((await Promise.all(venueIds.map((id) => this.deps.places.findVenue(id)))).flatMap((v) => (v ? [[v.id, v] as const] : [])));
+    for (const c of list) {
+      const venue = c.venueId ? venues.get(c.venueId) : undefined;
+      if (!venue) continue;
+      out.set(c.id, { id: venue.id, name: venue.name, logoUrl: venue.logoUrl ?? null, role: this.venueCustomerOf(c) === actorId ? 'CUSTOMER' : 'OWNER' });
+    }
+    return out;
+  }
+
+  /**
    * Solicitação pendente que já não precisa ser solicitação (quem recebeu passou a seguir de volta ou abriu as mensagens
    * para qualquer pessoa) vira conversa normal.
    */
@@ -634,6 +679,7 @@ export class ConversationService {
       // Solicitação recebida: só aparece com mensagem, e some quando recusada (até chegar mensagem nova).
       .filter(({ s }) => requestRole(s.conversation, actorId) !== 'INCOMING' || (s.lastMessage !== null && !s.conversation.requestDeclinedAt));
     const friendSet = new Set(friends);
+    const venueChats = await this.venueViews(actorId, rows.map(({ s }) => s.conversation));
     // Só amigos (o caso comum) dispensam a conferência de para onde a mensagem iria.
     const sendable = new Map(
       await Promise.all(
@@ -667,6 +713,7 @@ export class ConversationService {
         unread: s.unread,
         canSend: s.conversation.type === 'GROUP' ? true : otherId !== null && (sendable.get(s.conversation.id) ?? (friendSet.has(otherId) && requestRole(s.conversation, actorId) !== 'INCOMING')),
         request: requestRole(s.conversation, actorId),
+        venue: venueChats.get(s.conversation.id) ?? null,
         pinned: s.pinnedAt != null,
         muted: s.muted === true,
       });
@@ -738,6 +785,7 @@ export class ConversationService {
       members,
       canSend,
       request,
+      venue: (await this.venueViews(actorId, [conversation])).get(conversation.id) ?? null,
       now: now.toISOString(),
       messages: items.map((m) =>
         toMessageView(m, actorId, {
@@ -846,7 +894,7 @@ export class ConversationService {
     const senderName = conversation.type === 'GROUP' ? (actorProfile?.displayName ?? actorName) : null;
     // Mensagem de texto: o aviso (sino/push) mostra um pedaço do que foi escrito; os outros tipos dizem o que foi enviado.
     const preview = kind === 'TEXT' && !gif ? messagePreview(body) : undefined;
-    if (!asRequest) await this.notifyMembers(actorId, actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
+    if (!asRequest) await this.notifyMembers(actorId, conversation.venueId ? await this.venueNoticeName(actorId, conversation, actorName) : actorName, conversation, memberIds, gif ? 'enviou um GIF' : audio ? 'enviou um áudio' : media ? (media.kind === 'IMAGE' ? 'enviou uma foto' : 'enviou um vídeo') : eventCard ? 'compartilhou um evento' : suggestion ? 'sugeriu um local' : 'enviou uma mensagem', preview);
     const decor = await this.decorate(actorId, [message]);
     // Texto com link de evento: já volta com o cartão (como na lista de mensagens).
     const linked = linkedEventId(message);
@@ -1018,6 +1066,13 @@ export class ConversationService {
     if (message.kind !== 'AUDIO' || message.deletedAt) throw notFound('Áudio não encontrado');
     if (message.senderId !== actorId) await this.deps.conversations.markAudioPlayed(messageId, actorId, this.deps.clock.now());
     return { played: true };
+  }
+
+  /** No aviso da conversa pela página do local: o dono vê "@pessoa · Local"; quem escreveu vê o nome do local respondendo. */
+  private async venueNoticeName(actorId: string, conversation: ConversationRecord, actorName: string): Promise<string> {
+    const venue = conversation.venueId ? await this.deps.places.findVenue(conversation.venueId) : undefined;
+    if (!venue) return actorName;
+    return this.venueCustomerOf(conversation) === actorId ? `${actorName} · ${venue.name}` : venue.name;
   }
 
   /** Avisa os outros membros (menos quem bloqueou ou foi bloqueado por quem escreveu). O texto da mensagem não vai no aviso. */
@@ -1396,12 +1451,23 @@ export class ConversationService {
     const memberIds = conversation ? await conversations.participantIds(conversationId) : undefined;
     if (!conversation || !memberIds || !memberIds.includes(actorId)) throw notFound('Conversa não encontrada');
     if (conversation.type === 'GROUP') return { conversation, memberIds, otherId: null, other: null };
-    const otherId = memberIds.find((id) => id !== actorId);
+    let members = memberIds;
+    if (conversation.venueId) {
+      // Conversa pela página do local: só quem escreveu e o dono atual (se o local trocou de dono, a conversa passa para o novo).
+      const customerId = this.venueCustomerOf(conversation);
+      const venue = await this.deps.places.findVenue(conversation.venueId);
+      if (venue?.ownerId && customerId && venue.ownerId !== customerId && !members.includes(venue.ownerId)) {
+        await conversations.getOrCreateVenueDirect(venue.id, customerId, venue.ownerId, this.deps.ids.next(), this.deps.clock.now());
+        members = (await conversations.participantIds(conversationId)) ?? members;
+      }
+      if (actorId !== customerId && actorId !== venue?.ownerId) throw notFound('Conversa não encontrada');
+    }
+    const otherId = members.find((id) => id !== actorId);
     if (!otherId) throw notFound('Conversa não encontrada');
     if (await blocks.existsEitherWay(actorId, otherId)) throw notFound('Conversa não encontrada');
     const [other] = await users.findProfilesByIds([otherId]);
     if (!other) throw notFound('Conversa não encontrada');
-    return { conversation: await this.settle(conversation), memberIds, otherId, other };
+    return { conversation: await this.settle(conversation), memberIds: members, otherId, other };
   }
 }
 

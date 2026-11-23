@@ -36,6 +36,13 @@ export class ConversationsController {
     return this.core.conversations.setMessageSettings(actor.userId, { openDms: asBody(body).openDms });
   }
 
+  /** `{venueId}`: mensagem pela página de um local com dono (chega direto para o dono responder). */
+  @Post('venue')
+  @HttpCode(200)
+  openVenue(@CurrentActor() actor: Actor, @Body() body: unknown) {
+    return this.core.conversations.openVenue(actor.userId, asBody(body).venueId);
+  }
+
   @Post(':id/request/accept')
   @HttpCode(200)
   acceptRequest(@CurrentActor() actor: Actor, @Param('id', new ParseUUIDPipe()) id: string) {
