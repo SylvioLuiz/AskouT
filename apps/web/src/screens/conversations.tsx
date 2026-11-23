@@ -821,6 +821,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   }
   function tapBubble(m: ChatMessage, e: MouseEvent) {
     if ((e.target as HTMLElement).closest('button, a, input, textarea, audio, video, [role="slider"]')) return;
+    // Arrastar para selecionar texto (computador) não conta como toque na mensagem.
+    if (window.getSelection()?.isCollapsed === false) return;
     registerTap(m, e.clientX, e.clientY);
   }
 

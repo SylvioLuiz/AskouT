@@ -4650,6 +4650,14 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 @media (hover: none) {
   .chat__thread, .chat__thread * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 }
+/* No computador (mouse), o texto das mensagens pode ser selecionado e copiado com Ctrl+C. */
+@media (hover: hover) and (pointer: fine) {
+  .chat__thread .bubble__text,
+  .chat__thread .bubble__text *,
+  .chat__thread .bubble__sender,
+  .chat__thread .bubble__quotetext,
+  .chat__thread .bubble__quotetext * { -webkit-user-select: text; user-select: text; cursor: text; }
+}
 /* O popup da mensagem não é texto: nada nele é selecionável (emojis, opções). */
 .msgpop, .msgpop * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 .person__aside { display: flex; align-items: center; gap: 4px; }
