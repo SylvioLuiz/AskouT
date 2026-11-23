@@ -159,6 +159,19 @@ export function filterConversations(items: readonly ConversationItem[], query: s
   });
 }
 
+/** Abas da lista de conversas. Conversa com a página de um local conta como individual. */
+export type ConversationTab = 'all' | 'direct' | 'group';
+
+export function inConversationTab(c: ConversationItem, tab: ConversationTab): boolean {
+  if (tab === 'all') return true;
+  return tab === 'group' ? c.type === 'GROUP' : c.type !== 'GROUP';
+}
+
+/** Quantas conversas não silenciadas têm mensagem não lida na aba (o número ao lado do nome da aba). */
+export function unreadInTab(items: readonly ConversationItem[], tab: ConversationTab): number {
+  return items.filter((c) => c.unread > 0 && !c.muted && inConversationTab(c, tab)).length;
+}
+
 /** Avisa o resto do app (a bolinha da aba Conversas) que as não lidas podem ter mudado. */
 export const CHATS_CHANGED_EVENT = 'askout:chats-changed';
 export function announceChatsChanged(): void {

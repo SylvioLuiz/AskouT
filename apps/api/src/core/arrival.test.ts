@@ -171,6 +171,7 @@ test('chegada no iPhone com Live Activity: abre pelo push-to-start, atualiza pel
   assert.equal(opened.token, start);
   assert.equal(opened.attributes?.name, 'ana');
   assert.equal(opened.attributes?.tag, `arrival:${inviteId}:${ana}`);
+  assert.equal(opened.attributes?.url, `/now/encontro/${inviteId}`);
   assert.equal(opened.state.title, 'ana está a caminho');
   assert.equal(opened.state.progress, 0);
   assert.ok(opened.alert, 'a primeira avisa');

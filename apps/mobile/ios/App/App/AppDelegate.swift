@@ -22,6 +22,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // iPhone pode abrir o app em segundo plano só para entregar a resposta, sem tela e sem o Capacitor.
         NotificationReply.shared.registerCategories()
         NotificationReply.shared.install()
+        // Chegada ao vivo do NOW na tela bloqueada (Live Activity): token "push-to-start" e registro das atividades.
+        ArrivalActivities.shared.start()
         return true
     }
 
@@ -80,6 +82,8 @@ class MainViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(AudioPlugin())
         // Sessão para a folha "Compartilhar com o AskouT" (Share Extension), no Keychain compartilhado.
         bridge?.registerPluginInstance(ShareSessionPlugin())
+        // Token da Live Activity da chegada ao vivo (ver ArrivalActivities.swift).
+        bridge?.registerPluginInstance(LiveActivityPlugin())
     }
 
     override func viewDidLoad() {

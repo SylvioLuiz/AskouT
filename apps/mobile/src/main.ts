@@ -21,7 +21,7 @@ import { createCalendarBridge } from './calendar-bridge.ts';
 import { createFilesBridge } from './files-bridge.ts';
 import { createDeviceCalendarBridge } from './device-calendar-bridge.ts';
 import { createContactsBridge } from './contacts-bridge.ts';
-import { createPushBridge, openInApp } from './push-bridge.ts';
+import { createPushBridge, openInApp, type LiveActivityPluginLike } from './push-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createVideoBridge } from './video-bridge.ts';
 import { createGalleryBridge, type GalleryPluginLike } from './gallery-bridge.ts';
@@ -161,7 +161,10 @@ if (Capacitor.isNativePlatform()) {
   }
   // Avisos fora do app (iPhone pela Apple, Android pelo FCM): o token vai para o servidor pelo app web
   // (`apns:` ou `fcm:`); tocar no aviso abre a tela certa.
-  w['AskouTPush'] = createPushBridge({ push: PushNotifications as never, open: (path) => openInApp(path, window) });
+  // No iPhone, o token da Live Activity da chegada ao vivo (build antigo sem o plugin: segue só com o aviso comum).
+  const liveActivity =
+    Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('AskouTLiveActivity') ? registerPlugin<LiveActivityPluginLike>('AskouTLiveActivity') : undefined;
+  w['AskouTPush'] = createPushBridge({ push: PushNotifications as never, open: (path) => openInApp(path, window), liveActivity });
   if (Capacitor.getPlatform() === 'android') {
     // Canal "notificacoes" com importância alta: o Android mostra o aviso no topo da tela, com o título e o texto (a prévia).
     // Sem ele, o aviso cai no canal genérico, de importância normal, e só aparece como ícone na barra.
