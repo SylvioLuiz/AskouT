@@ -1567,7 +1567,27 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
 
   return (
     <>
-      <PageHead title={data.other.username} back="/now" subtitle={t('Encontro NOW · acaba em {left}', { left: formatRemaining(left) })} />
+      <PageHead
+        title={data.other.username}
+        back="/now"
+        subtitle={t('Encontro NOW · acaba em {left}', { left: formatRemaining(left) })}
+        action={
+          // Encerrar sempre à mão no topo do encontro (a localização dos dois para na hora).
+          <button
+            type="button"
+            className="matchend"
+            onClick={() => {
+              setConfirmEnd(true);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          >
+            {t('Encerrar')}
+          </button>
+        }
+      />
+      {confirmEnd ? (
+        <Confirm question={t('Encerrar o encontro? A localização dos dois deixa de ser compartilhada.')} confirmLabel={t('Encerrar')} onConfirm={endMatch} onCancel={() => setConfirmEnd(false)} busy={busy} danger />
+      ) : null}
       {feedback ? <Notice tone={feedback.tone}>{feedback.text}</Notice> : null}
 
       <section className="whereis" aria-label={t('Onde {username} está', { username: data.other.username })}>
@@ -1703,10 +1723,15 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         <Link to={`/conversas/${data.conversationId}`} className="btn btn--primary btn--full">
           {t('Conversar e sugerir um local')}
         </Link>
-        {confirmEnd ? (
-          <Confirm question={t('Encerrar o encontro? A localização dos dois deixa de ser compartilhada.')} confirmLabel={t('Encerrar')} onConfirm={endMatch} onCancel={() => setConfirmEnd(false)} busy={busy} danger />
-        ) : (
-          <Button variant="secondary" full onClick={() => setConfirmEnd(true)}>
+        {confirmEnd ? null : (
+          <Button
+            variant="secondary"
+            full
+            onClick={() => {
+              setConfirmEnd(true);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          >
             {t('Encerrar encontro')}
           </Button>
         )}

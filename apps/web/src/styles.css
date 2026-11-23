@@ -7183,7 +7183,11 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .nowmatches__item { display: grid; gap: 8px; }
 .nowmatches__row { display: flex; align-items: stretch; gap: 8px; }
 .nowmatches__row .nowmatch { flex: 1; min-width: 0; }
-.nowmatches__end { flex: none; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--danger); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+/* Encerrar na lista do NOW: discreto (o principal é abrir o encontro); a confirmação aparece antes de encerrar. */
+.nowmatches__end { flex: none; align-self: center; min-height: 44px; padding: 0 6px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 0.8125rem; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.nowmatches__end:hover, .nowmatches__end:focus-visible { color: var(--danger); }
+/* Encerrar no topo da tela do encontro. */
+.matchend { min-height: 36px; padding: 0 14px; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: 999px; background: transparent; color: var(--danger); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
 .nowmatch { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 16px; background: color-mix(in srgb, var(--now-pink) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--now-pink) 40%, transparent); color: var(--ink); text-decoration: none; }
 .nowmatch > span { display: grid; flex: 1; min-width: 0; }
 .nowmatch strong { font-size: 0.9375rem; }
