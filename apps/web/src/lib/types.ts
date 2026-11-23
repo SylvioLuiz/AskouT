@@ -508,11 +508,25 @@ export interface SharedView {
   media: SharedMedia[];
 }
 
+export interface GroupEventInfo {
+  id: string;
+  title: string;
+  coverUrl: string | null;
+  /** Foto do post que é a capa: só para quem criou o evento (para trocar junto com a foto do grupo). */
+  coverImageId: string | null;
+  canEditCover: boolean;
+}
+
 export interface GroupDetails {
   id: string;
   name: string;
   ownerId: string;
+  /** Foto do grupo ou, sem foto própria, a capa do evento do grupo. */
   imageUrl: string | null;
+  /** O grupo tem foto própria (não é a capa do evento). Ausente em servidores antigos. */
+  ownImage?: boolean;
+  /** Evento do grupo (o da votação de data ou o do encontro). */
+  event?: GroupEventInfo | null;
   members: { profile: PublicProfile; role: 'OWNER' | 'ADMIN' | 'MEMBER'; follow: 'NONE' | 'PENDING' | 'FOLLOWING' }[];
   /** Você é dono ou administrador: pode editar nome e foto e remover pessoas. */
   canManage: boolean;

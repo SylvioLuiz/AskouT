@@ -8,7 +8,7 @@ import { AvatarViewer } from '../components/photo-viewer.tsx';
 import { Button, EmptyState, ErrorState, Field, GroupAvatar, Loading, PageHead, PersonRow } from '../components/ui.tsx';
 import { useUser } from '../auth.tsx';
 import { toApiError } from '../lib/errors.ts';
-import { resizeGroupPhoto } from '../lib/image.ts';
+import { resizeGroupPhoto, resizePostPhoto } from '../lib/image.ts';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { peopleLabel, toggleId } from '../lib/meetup.ts';
@@ -33,6 +33,8 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   const [picked, setPicked] = useState<string[]>([]);
   const [name, setName] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  /** Foto escolhida no grupo de um evento seu com capa: falta responder se ela vira a capa do evento também. */
+  const [pendingPhoto, setPendingPhoto] = useState<File | undefined>();
   useTitle(group.data?.name ?? t('Grupo'));
 
   if (group.loading && !group.data) return <Loading />;
@@ -71,10 +73,29 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   }
 
   async function pickPhoto(file: File | undefined) {
-    if (!file) return;
-    await act(async () => api.setGroupPhoto(conversationId, await resizeGroupPhoto(file)));
     if (fileRef.current) fileRef.current.value = '';
+    if (!file) return;
+    // Grupo de um evento seu com capa: a foto pode ficar só no grupo ou virar também a capa do evento. Pergunta antes de salvar.
+    if (data.event?.canEditCover && data.event.coverImageId) {
+      setProblem(undefined);
+      setPendingPhoto(file);
+      return;
+    }
+    await act(async () => api.setGroupPhoto(conversationId, await resizeGroupPhoto(file)));
   }
+
+  /** Salva a foto escolhida no grupo e, se pedido, também como capa do evento (a capa do evento não muda sem pedir). */
+  async function savePendingPhoto(alsoCover: boolean) {
+    const file = pendingPhoto;
+    const event = data.event;
+    if (!file) return;
+    await act(async () => {
+      await api.setGroupPhoto(conversationId, await resizeGroupPhoto(file));
+      if (alsoCover && event?.coverImageId) await api.adjustPostImage(event.id, event.coverImageId, await resizePostPhoto(file));
+    }, () => setPendingPhoto(undefined));
+  }
+  const ownImage = data.ownImage ?? data.imageUrl !== null;
+  const showsCover = !ownImage && data.imageUrl !== null && data.event?.coverUrl === data.imageUrl;
   const tabs: { id: Tab; label: string }[] = [
     { id: 'people', label: t('Pessoas') },
     { id: 'events', label: t('Eventos') },
@@ -176,22 +197,40 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
       ) : null}
 
       {sheet === 'edit' ? (
-        <Sheet title={t('Editar grupo')} onClose={() => setSheet(undefined)}>
+        <Sheet title={t('Editar grupo')} onClose={() => { setPendingPhoto(undefined); setSheet(undefined); }}>
           <div className="groupedit">
             <div className="groupedit__photo">
               <GroupAvatar name={data.name} size={96} imageUrl={data.imageUrl} />
               <div className="groupedit__actions">
+                {showsCover ? <span className="muted groupedit__hint">{t('Usando a capa do evento')}</span> : null}
                 <span className="btn btn--secondary btn--small filebtn">
                   {data.imageUrl ? t('Trocar foto') : t('Adicionar foto')}
                   <input ref={fileRef} type="file" accept="image/*" aria-label={data.imageUrl ? t('Trocar foto do grupo') : t('Adicionar foto do grupo')} onChange={(e) => void pickPhoto(e.target.files?.[0])} />
                 </span>
-                {data.imageUrl ? (
+                {ownImage && data.imageUrl ? (
                   <Button small variant="quiet" onClick={() => act(() => api.setGroupPhoto(conversationId, null))}>
-                    {t('Remover foto')}
+                    {data.event?.coverUrl ? t('Voltar à capa do evento') : t('Remover foto')}
                   </Button>
                 ) : null}
               </div>
             </div>
+            {pendingPhoto && data.event ? (
+              <div className="confirm" role="group" aria-label={t('Trocar também a capa do evento "{title}"?', { title: data.event.title })}>
+                <p className="confirm__question">{t('Trocar também a capa do evento "{title}"?', { title: data.event.title })}</p>
+                <p className="muted">{t('Se escolher só o grupo, a capa do evento continua como está.')}</p>
+                <div className="confirm__actions">
+                  <Button small onClick={() => void savePendingPhoto(true)} loading={busy}>
+                    {t('Grupo e evento')}
+                  </Button>
+                  <Button small variant="secondary" onClick={() => void savePendingPhoto(false)} disabled={busy}>
+                    {t('Só o grupo')}
+                  </Button>
+                  <Button small variant="quiet" onClick={() => setPendingPhoto(undefined)} disabled={busy}>
+                    {t('Cancelar')}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             <div className="groupedit__form">
               <Field label={t('Nome do grupo')} value={name} onChange={setName} maxLength={60} />
               <Button full loading={busy} disabled={name.trim() === '' || name.trim() === data.name} onClick={() => act(() => api.renameGroup(conversationId, name.trim()))}>
@@ -270,6 +309,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
       {sheet === 'add' ? (
         <Sheet title={t('Adicionar ao grupo')} onClose={() => setSheet(undefined)}>
           <FriendPicker picked={picked} onToggle={(userId) => setPicked((cur) => toggleId(cur, userId))} exclude={data.members.map((m) => m.profile.userId)} />
+          {data.event ? <p className="muted">{t('Quem você adicionar também é convidado para o evento "{title}".', { title: data.event.title })}</p> : null}
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full loading={busy} disabled={picked.length === 0} onClick={() => act(() => api.addGroupMembers(conversationId, picked))}>
             {picked.length > 1 ? t('Adicionar {length} pessoas', { length: picked.length }) : t('Adicionar')}

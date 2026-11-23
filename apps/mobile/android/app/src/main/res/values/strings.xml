@@ -4,4 +4,7 @@
     <string name="title_activity_main">AskouT</string>
     <string name="package_name">br.com.askout</string>
     <string name="custom_url_scheme">br.com.askout</string>
+    <!-- Aviso fixo do plugin de localização em segundo plano (chegada no NOW). -->
+    <string name="capacitor_background_geolocation_notification_channel_name">Chegada no NOW</string>
+    <string name="capacitor_background_geolocation_notification_icon">drawable/ic_stat_askout</string>
 </resources>

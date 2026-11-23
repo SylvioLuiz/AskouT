@@ -1,5 +1,5 @@
 import { App } from '@capacitor/app';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { Contacts } from '@capacitor-community/contacts';
 import { PushNotifications } from '@capacitor/push-notifications';
@@ -15,6 +15,7 @@ import { createAppleBridge } from './apple-bridge.ts';
 import { installBackButton } from './back-button.ts';
 import { deepLinkPath } from './deep-link.ts';
 import { createLocationBridge, guardGeolocation } from './location-bridge.ts';
+import { createBackgroundLocationBridge, type BackgroundPluginLike } from './background-location-bridge.ts';
 import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
 import { createFilesBridge } from './files-bridge.ts';
@@ -58,6 +59,8 @@ if (Capacitor.isNativePlatform()) {
     requestPermissions: () => Geolocation.requestPermissions(),
   });
   w['AskouTLocation'] = location;
+  // Chegada no NOW com o celular bloqueado (só liga quando a pessoa escolhe mostrar a chegada).
+  w['AskouTBackgroundLocation'] = createBackgroundLocationBridge({ plugin: registerPlugin<BackgroundPluginLike>('BackgroundGeolocation'), http: CapacitorHttp });
   // O WebView do Android não mostra o pedido de localização sozinho: toda leitura de posição pede antes pelo sistema.
   if (typeof navigator !== 'undefined' && navigator.geolocation) guardGeolocation(navigator.geolocation, () => location.ensure());
   w['AskouTVideo'] = createVideoBridge({

@@ -4308,13 +4308,28 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmapcard__venue { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
 .evmapcard__venue .venuelink { text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .evmapcard__facts { display: flex; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; gap: 4px 12px; font-size: 13px; opacity: .9; }
-.evpin { width: 30px; height: 38px; padding: 0; border: 0; background: none; cursor: pointer; }
-.evpin::before { content: ''; display: block; width: 30px; height: 30px; box-sizing: border-box; border: 3px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #1aa7a7; box-shadow: 0 2px 6px rgba(0,0,0,.45); transition: transform .15s, background .15s; }
-.evpin--on::before { background: var(--brand, #3a36f5); transform: rotate(-45deg) scale(1.3); }
+/* Pins do mapa no estilo do site: gota colorida com brilho, número dentro, sombrinha no chão e entrada caindo de cima.
+   As animações ficam nas partes de dentro (gota, número, sombra): o MapLibre posiciona o pin pelo transform do próprio .evpin. */
+.evpin { --pin: var(--brand); --pin-glow: color-mix(in srgb, var(--pin) 70%, transparent); width: 38px; height: 46px; padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.evpin::before {
+  content: ''; position: absolute; left: 4px; top: 0; width: 30px; height: 30px; box-sizing: border-box;
+  border-radius: 50% 50% 50% 0; background: var(--pin);
+  box-shadow: 0 6px 24px var(--pin-glow), 0 1px 3px rgba(0, 0, 0, .35);
+  transform: rotate(-45deg); transform-origin: 50% 50%;
+  transition: transform .35s cubic-bezier(.2, .8, .2, 1), background .2s;
+  animation: evpin-drop .7s cubic-bezier(.2, .8, .2, 1) both;
+}
+.evpin::after { content: ''; position: absolute; left: 12px; bottom: 0; width: 14px; height: 5px; border-radius: 50%; background: rgba(0, 0, 0, .45); filter: blur(2px); animation: evpin-shadow .7s cubic-bezier(.2, .8, .2, 1) both; pointer-events: none; }
+.evpin:hover::before, .evpin:focus-visible::before, .evpin--on::before { transform: rotate(-45deg) scale(1.25); }
+.evpin--on::before { animation: evpin-drop .7s cubic-bezier(.2, .8, .2, 1) both, evpin-glow 1.2s ease-in-out .7s infinite; }
+.evpin:focus-visible { outline: none; }
+.evpin:focus-visible::before { outline: 2px solid #fff; outline-offset: 2px; }
 .evmap__seg { display: flex; padding: 3px; border-radius: 22px; background: var(--evmap-float); box-shadow: 0 2px 10px rgba(0,0,0,.25); }
 .evmap__seg button { min-height: 38px; padding: 0 14px; border: 0; border-radius: 19px; background: transparent; color: var(--evmap-float-muted); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
 .evmap__seg button.is-on { background: var(--brand-grad, var(--brand, rgb(58 54 245))); color: rgb(26 11 46); }
-.evpin--place::before { background: rgb(124 77 255); }
+.evpin--place { --pin: var(--brand); }
+.evpin--event { --pin: var(--now-peach); }
+.evpin--loose { --pin: var(--now-blue); }
 .evpin--on { z-index: 2; }
 .evmapcard--place { position: relative; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 16px 18px; }
 .evmapplace__bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -4331,7 +4346,7 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmapplace__credit { font-size: 10px; opacity: .6; text-shadow: 0 1px 3px rgba(0,0,0,.8); }
 .evmapcard--place .tag-sponsored { align-self: flex-start; }
 .evpin--me { width: 18px; height: 18px; border: 3px solid #fff; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 6px var(--shadow-brand); cursor: default; }
-.evpin--me::before { content: none; }
+.evpin--me::before, .evpin--me::after { content: none; }
 /* Mapa do Explorar: cartões do rodapé entram suaves, sem pulos de altura. */
 .evmap__bottom > * { animation: evmap-fade .22s ease-out both; }
 .evmap__strip { transition: opacity .2s ease; }
@@ -4350,7 +4365,6 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evskel--button { width: 104px; height: 36px; border-radius: 18px; }
 .evskel--quiet { width: 64px; opacity: .6; }
 .evskel--cover { height: 140px; border-radius: 0; }
-.evpin { animation: evpin-in .26s ease-out both; }
 .evmap__area { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border: 0; border-radius: 20px; background: var(--evmap-float); color: var(--evmap-float-ink); font: inherit; font-size: 14px; font-weight: 600; box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer; animation: evmap-drop .24s cubic-bezier(.2,.8,.2,1) both; }
 .evmap__area svg { width: 18px; height: 18px; }
 .evmap__area:disabled { cursor: default; opacity: .92; }
@@ -4368,10 +4382,13 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 @keyframes evmap-fade { from { opacity: 0; } }
 @keyframes evmap-card-in { from { opacity: 0; transform: translateY(18px); } }
 @keyframes evmap-drop { from { opacity: 0; transform: translateY(-8px) scale(.96); } }
-@keyframes evpin-in { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes evpin-drop { from { opacity: 0; translate: 0 -40px; } }
+@keyframes evpin-shadow { from { opacity: 0; scale: .3; } }
+@keyframes evpin-glow { 50% { box-shadow: 0 0 0 8px rgba(255, 255, 255, .22), 0 6px 40px var(--pin), 0 1px 3px rgba(0, 0, 0, .35); } }
 @keyframes evmap-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .evmap__bottom > *, .evmap__strip > .evmap__slide, .evpin, .evmap__area, .evskel { animation: none; }
+  .evmap__bottom > *, .evmap__strip > .evmap__slide, .evpin::before, .evpin::after, .evpin__count, .evmap__area, .evskel { animation: none; }
+  .evpin::before, .evpin__count { transition: none; }
   .evmap__hint { animation: evmap-fade .2s ease both; }
   .fadeimg, .evmap__strip, .evmapcard { transition: none; }
 }
@@ -7323,5 +7340,11 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 
 /* Mapa: número de eventos sobre o pin do local, e lugar com eventos que não está entre os locais (outra cor). */
 .evpin { position: relative; }
-.evpin__count { position: absolute; top: -8px; right: -10px; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; display: grid; place-items: center; border: 2px solid #fff; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font-size: 0.6875rem; font-weight: 800; line-height: 1; box-shadow: 0 1px 4px rgba(0,0,0,.35); pointer-events: none; }
-.evpin--loose::before { background: var(--warn); }
+.evpin__count {
+  position: absolute; left: 4px; top: 0; width: 30px; height: 30px; display: grid; place-items: center;
+  color: var(--brand-ink); font-size: 0.8125rem; font-weight: 800; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+  pointer-events: none; transition: transform .35s cubic-bezier(.2, .8, .2, 1);
+  animation: evpin-drop .7s cubic-bezier(.2, .8, .2, 1) both;
+}
+.evpin__count--long { font-size: 0.625rem; letter-spacing: -.04em; }
+.evpin:hover .evpin__count, .evpin:focus-visible .evpin__count, .evpin--on .evpin__count { transform: scale(1.25); }

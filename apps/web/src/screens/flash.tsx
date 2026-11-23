@@ -13,7 +13,8 @@ import { ChatButton } from '../components/chat-button.tsx';
 import { InviteSheet } from '../components/invite.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { OfferBanner } from '../components/offer-banner.tsx';
-import { api } from '../client.ts';
+import { api, apiBaseUrl, session } from '../client.ts';
+import { backgroundLocationBridge, shouldSendFix } from '../lib/background-arrival.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import {
   announceFlashChange,
@@ -1069,10 +1070,63 @@ function PrecisionPicker({ approx, onChange, text, disabled }: { approx: boolean
 const arrivalAskKey = (inviteId: string) => `askout.now.arrival-asked.${inviteId}`;
 
 /**
+ * Com a chegada ligada, o app do celular continua mandando a posição com a tela bloqueada (ponte nativa, HTTP
+ * nativo). No navegador não há ponte: o envio segue só com a tela aberta (useShareLocation).
+ */
+function useBackgroundArrival(match: FlashMatch | undefined, onEnded: () => void): { available: boolean; denied: boolean } {
+  const active = match?.meArrival === true;
+  const inviteId = match?.inviteId;
+  const name = match?.other.username ?? '';
+  const [denied, setDenied] = useState(false);
+  const endedRef = useRef(onEnded);
+  endedRef.current = onEnded;
+  useEffect(() => {
+    const bridge = backgroundLocationBridge();
+    if (!active || !bridge || !inviteId) return undefined;
+    setDenied(false);
+    let stop: (() => Promise<void>) | undefined;
+    let cancelled = false;
+    let last: { at: number; lat: number; lng: number } | undefined;
+    const url = `${apiBaseUrl}/flash/matches/${encodeURIComponent(inviteId)}/location`;
+    bridge
+      .start({
+        title: t('Mostrando sua chegada para {name}', { name }),
+        message: t('O AskouT manda sua posição até o encontro acabar ou você parar.'),
+        onFix: (fix) => {
+          const now = Date.now();
+          if (!shouldSendFix(last, fix, now)) return;
+          last = { at: now, lat: fix.lat, lng: fix.lng };
+          const token = session.get();
+          void bridge.put(url, token !== undefined ? { Authorization: `Bearer ${token}` } : {}, { lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM }).then((status) => {
+            // Encontro acabou: para de acompanhar (some o aviso fixo do Android).
+            if (status === 404) {
+              void stop?.();
+              endedRef.current();
+            }
+          });
+        },
+        onError: (code) => {
+          if (code === 'NOT_AUTHORIZED') setDenied(true);
+        },
+      })
+      .then((s) => {
+        if (cancelled) void s();
+        else stop = s;
+      })
+      .catch(() => setDenied(true));
+    return () => {
+      cancelled = true;
+      void stop?.();
+    };
+  }, [active, inviteId, name]);
+  return { available: backgroundLocationBridge() !== undefined, denied };
+}
+
+/**
  * "Mostrar sua chegada": pergunta se a outra pessoa pode acompanhar, nas notificações do celular dela, quanto falta
  * para você chegar (como o carro chegando no Uber). Nada é mostrado sem você liberar; dá para parar a qualquer hora.
  */
-function ArrivalShare({ match, onChanged, onFeedback }: { match: FlashMatch; onChanged: () => void; onFeedback: (f: Feedback) => void }) {
+function ArrivalShare({ match, background, onChanged, onFeedback }: { match: FlashMatch; background: { available: boolean; denied: boolean }; onChanged: () => void; onFeedback: (f: Feedback) => void }) {
   const storage = safeStorage();
   const [dismissed, setDismissed] = useState(() => storage?.getItem(arrivalAskKey(match.inviteId)) === '1');
   const [busy, setBusy] = useState(false);
@@ -1104,7 +1158,19 @@ function ArrivalShare({ match, onChanged, onFeedback }: { match: FlashMatch; onC
     return (
       <section className="sharebox" aria-label={t('Sua chegada')}>
         <p className="sharebox__title">{t('Mostrando sua chegada para {name}', { name })}</p>
-        <p className="muted">{t('{name} vê nas notificações quanto falta para você chegar. Deixe o AskouT aberto no caminho para o tempo ir se atualizando.', { name })}</p>
+        <p className="muted">
+          {background.available
+            ? t('{name} vê nas notificações quanto falta para você chegar. Pode bloquear o celular: o AskouT continua mandando sua posição até o encontro acabar ou você parar.', { name })
+            : t('{name} vê nas notificações quanto falta para você chegar. Deixe o AskouT aberto no caminho para o tempo ir se atualizando.', { name })}
+        </p>
+        {background.denied ? (
+          <Notice tone="error">
+            {t('Sem permissão de localização, sua chegada só atualiza com o AskouT aberto.')}{' '}
+            <button type="button" className="linkbtn" onClick={() => void backgroundLocationBridge()?.openSettings()}>
+              {t('Abrir ajustes')}
+            </button>
+          </Notice>
+        ) : null}
         {theirs}
         <Button variant="secondary" full loading={busy} onClick={() => void set(false)}>
           {t('Parar de mostrar minha chegada')}
@@ -1274,6 +1340,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>();
   const share = useShareLocation([inviteId], match.reload, match.data !== undefined);
+  const background = useBackgroundArrival(match.data, match.reload);
   const [mapFailed, setMapFailed] = useState(false);
   const [pickedKey, setPickedKey] = useState<string | undefined>();
   const [mode, setMode] = useState<'foot' | 'driving'>('foot');
@@ -1482,7 +1549,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
       ) : null}
       <MatchPlaceSearch center={myPoint ?? (them ? { lat: them.lat, lng: them.lng } : undefined)} otherName={data.other.username} busy={destBusy} onSuggest={(place) => void suggestPlace(place)} />
 
-      <ArrivalShare match={data} onChanged={match.reload} onFeedback={setFeedback} />
+      <ArrivalShare match={data} background={background} onChanged={match.reload} onFeedback={setFeedback} />
 
       <section className="sharebox" aria-label={t('Sua localização')}>
         <PrecisionPicker approx={data.meApprox === true} disabled={precisionBusy} onChange={(approx) => void changePrecision(approx)} text={t('{name} vê sua localização {how}.', { name: data.other.username, how: data.meApprox ? t('aproximada') : t('exata') })} />

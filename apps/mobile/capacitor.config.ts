@@ -12,6 +12,11 @@ const config: CapacitorConfig = {
     // Origem do app no Android: https://localhost (e capacitor://localhost no iOS). Ambas entram no CORS_ORIGINS da API.
     androidScheme: 'https',
   },
+  android: {
+    // Exigido pelo plugin de localização em segundo plano (chegada no NOW): com a ponte nova, o Android para de
+    // entregar posições depois de ~5 min com o app em segundo plano (capacitor-community/background-geolocation#89).
+    useLegacyBridge: true,
+  },
   ios: {
     // Segurar um link no iPhone abria a prévia do link do sistema, que engole o "tocar e segurar" do app (menu dos cartões, capa do evento).
     allowsLinkPreview: false,

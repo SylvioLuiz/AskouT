@@ -1,6 +1,7 @@
 import { cropToPixels } from './crop.ts';
 import type { CropRect } from './crop.ts';
 import { t } from '../lib/i18n/index.ts';
+import { safeImage } from './explore.ts';
 
 /** Maior lado da foto do grupo, em pixels. */
 export const GROUP_PHOTO_SIDE = 256;
@@ -25,6 +26,14 @@ export function dataUrlBytes(dataUrl: string): number {
 /** Só mostra imagens que o próprio app gerou (data URL de imagem). */
 export function safeGroupImage(value: string | null | undefined): string | null {
   return typeof value === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(value) ? value : null;
+}
+
+/**
+ * Foto que o grupo mostra: a dele (data URL) ou, no grupo de um evento sem foto própria, a capa do evento que o
+ * servidor manda (endereço de imagem do AskouT ou https). Qualquer outra coisa não aparece.
+ */
+export function groupPhotoSrc(value: string | null | undefined): string | null {
+  return safeGroupImage(value) ?? (typeof value === 'string' ? safeImage(value) : null);
 }
 
 export interface ResizeOptions {

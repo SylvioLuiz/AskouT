@@ -68,6 +68,20 @@ services:
       # (askout-512422) e precisa do papel "Administrador da API Firebase Cloud Messaging" no askout-2cdcd.
       - key: FCM_PROJECT_ID
         value: askout-2cdcd
+  # Site de apresentação (pasta site/): estático, sem build. O subdomínio entra em Settings → Custom Domains
+  # do serviço, e na Hostinger um CNAME do subdomínio apontando para o endereço .onrender.com dele.
+  - type: web
+    name: askout-site
+    runtime: static
+    buildCommand: echo "site estático, sem build"
+    staticPublishPath: ./site
+    buildFilter:
+      paths:
+        - site/**
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=604800
 databases:
   - name: askout-db
     plan: basic-256mb

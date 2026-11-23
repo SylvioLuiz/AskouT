@@ -21,6 +21,8 @@ export function setUnauthorizedHandler(handler: () => void): void {
 }
 
 const baseUrl = (import.meta.env.VITE_API_URL as string | undefined) ?? '/api';
+/** Endereço da API, para o envio nativo em segundo plano (chegada no NOW). */
+export const apiBaseUrl = baseUrl;
 
 setAssetBase(baseUrl);
 
