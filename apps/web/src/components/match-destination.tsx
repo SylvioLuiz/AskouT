@@ -1,5 +1,6 @@
 import { Button, Loading, Notice } from './ui.tsx';
-import { formatDistance, formatTravel, placeName } from '../lib/flash.ts';
+import { formatDistance, formatTravel } from '../lib/flash.ts';
+import { PlaceCarousel } from './suggestions.tsx';
 import { OpenInMaps } from './open-in-maps.tsx';
 import type { FlashLeg, FlashMatch, SuggestionItem, Suggestions } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
@@ -18,7 +19,7 @@ interface PlacesProps {
   onChoose: (item: SuggestionItem) => void;
 }
 
-/** Lista dos lugares entre os dois, numerados como os pins do mapa. Tocar seleciona; "Escolher" avisa a outra pessoa. */
+/** Lugares entre os dois, em cartões com rolagem horizontal numerados como os pins do mapa. "Sugerir no chat" manda o cartão para a conversa. */
 export function MatchPlaces({ bothShared, loading, error, suggestions, places, otherName, selectedKey, busy, onSelect, onChoose }: PlacesProps) {
   if (!bothShared) {
     return (
@@ -34,35 +35,18 @@ export function MatchPlaces({ bothShared, loading, error, suggestions, places, o
       {loading && !suggestions ? <Loading label={t('Buscando locais')} /> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
       {suggestions && suggestions.reason === null && places.length === 0 ? <p className="muted">{t('Nenhum evento ou local encontrado por perto agora.')}</p> : null}
-      {places.length > 0 ? (
-        <>
-          <p className="muted">{t('Toque em um lugar para ver no mapa e sugira no chat.')}</p>
-          <ol className="matchplaces__list">
-            {places.map((item, index) => {
-              const selected = item.key === selectedKey;
-              return (
-                <li key={item.key} className={`mplace${selected ? ' is-selected' : ''}`}>
-                  <button type="button" className="mplace__main" aria-pressed={selected} onClick={() => onSelect(item.key)}>
-                    <span className="mplace__num" aria-hidden="true">
-                      {index + 1}
-                    </span>
-                    <span className="mplace__text">
-                      <strong>{placeName(item)}</strong>
-                      {item.title !== placeName(item) ? <span className="muted">{item.title}</span> : null}
-                      <span className="muted">{t('a {me} de você · {them} de {otherName}', { me: formatDistance(item.distanceFromMeM), them: formatDistance(item.distanceFromThemM), otherName })}</span>
-                    </span>
-                  </button>
-                  {selected ? (
-                    <Button small loading={busy} onClick={() => onChoose(item)}>
-                      {t('Sugerir no chat')}
-                    </Button>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ol>
-        </>
-      ) : null}
+      {places.length > 0 ? <p className="muted">{t('Toque em um lugar para ver no mapa e sugira no chat.')}</p> : null}
+      <PlaceCarousel
+        items={places}
+        otherName={otherName}
+        picked={selectedKey}
+        onPick={onSelect}
+        action={(item) => (
+          <Button small loading={busy && item.key === selectedKey} disabled={busy} onClick={() => onChoose(item)}>
+            {t('Sugerir no chat')}
+          </Button>
+        )}
+      />
       {suggestions && !suggestions.placesAvailable ? <p className="muted">{t('Não foi possível buscar locais agora. Mostrando só eventos do AskouT.')}</p> : null}
     </section>
   );

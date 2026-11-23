@@ -1,12 +1,12 @@
 import { OpenInMaps } from './open-in-maps.tsx';
 import { VenueLink } from './venue-link.tsx';
-import { Suspense, useRef, useState } from 'react';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { formatDistances, formatRating, formatWhen, ratingLabel, sourceLabel, starPercent, toCard } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
-import type { ChatMessage, ExplorePlace, SuggestionCard } from '../lib/types.ts';
+import type { ChatMessage, ExplorePlace, SuggestionCard, SuggestionItem } from '../lib/types.ts';
 import { MAX_PLACES_ON_MAP, formatDistance, placeName, sortByFairness } from '../lib/flash.ts';
 import { nowRadiusKm } from '../lib/now-radius.ts';
 import { initials } from '../lib/avatar.ts';
@@ -171,8 +171,6 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, s
   const [error, setError] = useState<string | undefined>();
   const [picked, setPicked] = useState<string | undefined>();
   const [mapFailed, setMapFailed] = useState(false);
-  const slides = useRef(new Map<string, HTMLLIElement>());
-  const now = new Date();
 
   async function send(key: string, card: SuggestionCard) {
     setSending(key);
@@ -188,10 +186,6 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, s
     }
   }
 
-  function pickFromMap(key: string) {
-    setPicked(key);
-    slides.current.get(key)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-  }
 
   const data = result.data;
   const items = sortByFairness(data?.items ?? []).slice(0, MAX_PLACES_ON_MAP);
@@ -211,7 +205,7 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, s
       {!mapFailed && (me || them.length > 0) ? (
         <Suspense fallback={<div className="matchmap matchmap--chat matchmap--loading"><RingLoader size={56} label={t('Carregando o mapa')} /></div>}>
           <div className="chatmap">
-            <MatchMap me={me} mePhoto={mePhoto} others={them} places={pins} selectedKey={picked} onPick={pickFromMap} destination={dest} onFail={() => setMapFailed(true)} />
+            <MatchMap me={me} mePhoto={mePhoto} others={them} places={pins} selectedKey={picked} onPick={setPicked} destination={dest} onFail={() => setMapFailed(true)} />
           </div>
         </Suspense>
       ) : null}
@@ -224,49 +218,17 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, s
         )
       ) : null}
       {data && data.reason === null && items.length === 0 ? <Notice>{t('Nenhum evento ou local encontrado por perto agora.')}</Notice> : null}
-      {items.length > 0 ? (
-        <ul className="carousel" aria-label={t('Lugares entre vocês')}>
-          {items.map((item, index) => (
-            <li
-              key={item.key}
-              className="carousel__slide"
-              ref={(el) => {
-                if (el) slides.current.set(item.key, el);
-                else slides.current.delete(item.key);
-              }}
-            >
-              <article className={`sugcard${picked === item.key ? ' sugcard--picked' : ''}`} onClick={() => setPicked(item.key)}>
-                {item.photoPath ? <PlacePhoto path={item.photoPath} author={item.photoAuthor} /> : null}
-                <div className="sugcard__tags">
-                  <span className="sugcard__num" aria-hidden="true">{index + 1}</span>
-                  <SourceTag source={item.source} />
-                  {item.sample ? <SampleBadge /> : null}
-                </div>
-                <h3 className="sugcard__title">{item.title}</h3>
-                {item.venueName !== item.title ? (
-                  <p className="sugcard__venue">
-                    <VenueLink venueId={item.venueId} name={item.venueName} />
-                  </p>
-                ) : null}
-                {item.rating !== null ? <Rating rating={item.rating} count={item.ratingCount} /> : null}
-                <p className="sugcard__when">{formatWhen(item.startsAt, item.endsAt, now)}</p>
-                <p className="sugcard__dist">{formatDistances(item, otherName)}</p>
-                <div className="sugcard__actions">
-                  <Button small loading={sending === item.key} disabled={sent.has(item.key) || sending !== undefined} onClick={() => send(item.key, toCard(item))}>
-                    {sent.has(item.key) ? t('Enviado') : t('Sugerir')}
-                  </Button>
-                  <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={item.lat} lng={item.lng} label={item.venueName}>
-                    {t('Rota')}
-                  </OpenInMaps>
-                  <OpenInMaps className="btn btn--quiet btn--small" lat={item.lat} lng={item.lng} label={item.venueName} googleUrl={item.mapsUri}>
-                    {t('Mapa')}
-                  </OpenInMaps>
-                </div>
-              </article>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <PlaceCarousel
+        items={items}
+        otherName={otherName}
+        picked={picked}
+        onPick={setPicked}
+        action={(item) => (
+          <Button small loading={sending === item.key} disabled={sent.has(item.key) || sending !== undefined} onClick={() => send(item.key, toCard(item))}>
+            {sent.has(item.key) ? t('Enviado') : t('Sugerir')}
+          </Button>
+        )}
+      />
       {data && !data.placesAvailable ? <p className="muted sheet__foot">{t('Não foi possível buscar locais agora. Mostrando só eventos do AskouT.')}</p> : null}
       {hasGoogle ? <p className="muted sheet__foot">{t('Notas, fotos e lugares: Google.')}</p> : null}
       {hasOsm ? <p className="muted sheet__foot">{t('Lugares: © colaboradores do OpenStreetMap.')}</p> : null}
@@ -316,5 +278,59 @@ export function PlaceMapSheet({ inviteId, otherName, place, onClose }: { inviteI
         </div>
       ) : null}
     </Sheet>
+  );
+}
+
+/**
+ * Cartões dos locais entre vocês em rolagem horizontal, numerados como os pins do mapa (chat e página do encontro).
+ * Tocar um cartão destaca o pin; escolher um pin no mapa traz o cartão para a vista.
+ */
+export function PlaceCarousel({ items, otherName, picked, onPick, action }: { items: readonly SuggestionItem[]; otherName: string; picked: string | undefined; onPick: (key: string) => void; action: (item: SuggestionItem) => ReactNode }) {
+  const slides = useRef(new Map<string, HTMLLIElement>());
+  const now = new Date();
+  useEffect(() => {
+    if (picked) slides.current.get(picked)?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+  }, [picked]);
+  if (items.length === 0) return null;
+  return (
+    <ul className="carousel" aria-label={t('Lugares entre vocês')}>
+      {items.map((item, index) => (
+        <li
+          key={item.key}
+          className="carousel__slide"
+          ref={(el) => {
+            if (el) slides.current.set(item.key, el);
+            else slides.current.delete(item.key);
+          }}
+        >
+          <article className={`sugcard${picked === item.key ? ' sugcard--picked' : ''}`} onClick={() => onPick(item.key)}>
+            {item.photoPath ? <PlacePhoto path={item.photoPath} author={item.photoAuthor} /> : null}
+            <div className="sugcard__tags">
+              <span className="sugcard__num" aria-hidden="true">{index + 1}</span>
+              <SourceTag source={item.source} />
+              {item.sample ? <SampleBadge /> : null}
+            </div>
+            <h3 className="sugcard__title">{item.title}</h3>
+            {item.venueName !== item.title ? (
+              <p className="sugcard__venue">
+                <VenueLink venueId={item.venueId} name={item.venueName} />
+              </p>
+            ) : null}
+            {item.rating !== null ? <Rating rating={item.rating} count={item.ratingCount} /> : null}
+            <p className="sugcard__when">{formatWhen(item.startsAt, item.endsAt, now)}</p>
+            <p className="sugcard__dist">{formatDistances(item, otherName)}</p>
+            <div className="sugcard__actions">
+              {action(item)}
+              <OpenInMaps className="btn btn--quiet btn--small" mode="route" lat={item.lat} lng={item.lng} label={item.venueName}>
+                {t('Rota')}
+              </OpenInMaps>
+              <OpenInMaps className="btn btn--quiet btn--small" lat={item.lat} lng={item.lng} label={item.venueName} googleUrl={item.mapsUri}>
+                {t('Mapa')}
+              </OpenInMaps>
+            </div>
+          </article>
+        </li>
+      ))}
+    </ul>
   );
 }

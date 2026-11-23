@@ -1,4 +1,3 @@
-import { OpenInMaps } from '../components/open-in-maps.tsx';
 import { lazyWithReload } from '../lib/chunk-reload.ts';
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { BoltIcon, ChatIcon, CheckIcon, ChevronRightIcon, ClockIcon, HelpIcon, LocationIcon, LockIcon, MapIcon, PlusIcon, RefreshIcon, UserPlusIcon, UsersIcon, XIcon } from '../components/icons.tsx';
@@ -1377,6 +1376,7 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void, aut
 
 export function MatchScreen({ inviteId }: { inviteId: string }) {
   useTitle(t('Encontro'));
+  const viewer = useUser();
   const match = useAsync(() => api.flashMatch(inviteId), [inviteId]);
   usePolling(match.reload, 8_000);
 
@@ -1528,19 +1528,15 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
             <p className="muted">{t('Atualizado {when}.', { when: formatAge(them.updatedAt, data.now) })}{data.themApprox ? t(' Localização aproximada (uns 3 km).') : ''}{distance === undefined ? t(' Compartilhe a sua para ver a distância.') : ''}</p>
           </>
         )}
-        {them ? (
-          <OpenInMaps className="whereis__link" lat={them.lat} lng={them.lng}>
-            {t('Abrir no mapa')}
-          </OpenInMaps>
-        ) : null}
       </section>
 
       {!mapFailed && (them || myPoint) ? (
         <Suspense fallback={<div className="matchmap matchmap--loading"><RingLoader size={72} label={t('Carregando o mapa')} /></div>}>
           <MatchMap
             me={myPoint}
+            mePhoto={viewer.profile.avatarUrl}
             others={
-              them ? [{ id: inviteId, lat: them.lat, lng: them.lng, stale: them.stale, initials: initials(data.other.username) }] : []
+              them ? [{ id: inviteId, lat: them.lat, lng: them.lng, stale: them.stale, initials: initials(data.other.username), photoUrl: data.other.avatarUrl }] : []
             }
             places={dest ? [] : placePins}
             selectedKey={pickedKey}
