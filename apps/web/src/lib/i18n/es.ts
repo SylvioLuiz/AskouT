@@ -3485,4 +3485,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Talvez, ou só parte do período": "Tal vez, o solo parte del período",
   "Estou ocupado neste período": "Estoy ocupado en este período",
   "Conecte suas agendas: os compromissos aparecem como \"ocupado\" na sua agenda do AskouT. Títulos e detalhes não saem da sua agenda.": "Conecta tus agendas: los compromisos aparecen como \"ocupado\" en tu agenda de AskouT. Títulos y detalles no salen de tu agenda.",
+  "Mandar mensagem para {name}": "Enviar mensaje a {name}",
+  "Entre para mandar mensagem para o local.": "Inicia sesión para enviar un mensaje al local.",
+  "Página do local": "Página del local",
+  "@{username} · mensagem para {venue}": "@{username} · mensaje para {venue}",
 };
