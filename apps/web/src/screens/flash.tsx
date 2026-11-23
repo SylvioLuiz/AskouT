@@ -1110,6 +1110,7 @@ function useBackgroundArrival(match: FlashMatch | undefined, onEnded: () => void
     let cancelled = false;
     let last: { at: number; lat: number; lng: number } | undefined;
     let startM: number | undefined;
+    let targetKey: string | undefined;
     const url = `${apiBaseUrl}/flash/matches/${encodeURIComponent(inviteId)}/location`;
     const title = t('Mostrando sua chegada para {name}', { name });
     bridge
@@ -1122,6 +1123,10 @@ function useBackgroundArrival(match: FlashMatch | undefined, onEnded: () => void
           last = { at: now, lat: fix.lat, lng: fix.lng };
           const target = targetRef.current;
           if (target && bridge.progress && !cancelled) {
+            // Trocou ou tirou o lugar: a barra recomeça do zero, como no aviso do amigo.
+            const key = `${target.lat},${target.lng}`;
+            if (key !== targetKey) startM = undefined;
+            targetKey = key;
             const step = ownArrivalStep(startM, fix, target);
             startM = step.startM;
             const text = step.arrived
