@@ -365,7 +365,7 @@ export interface FlashRoutes {
 
 /** Cartão de sugestão de lugar ou evento, enviado numa conversa. Nunca traz a posição de ninguém. */
 export interface SuggestionCard {
-  source: 'EVENT' | 'OSM' | 'GOOGLE';
+  source: 'EVENT' | 'OSM' | 'GOOGLE' | 'PLACE';
   title: string;
   venueName: string;
   lat: number;

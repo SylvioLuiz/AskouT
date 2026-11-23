@@ -467,6 +467,8 @@ export interface ConversationRepository {
   findMessage(id: string): Promise<MessageRecord | undefined>;
   /** Grava a resposta ao cartão só se ainda não houver uma. Devolve false se já tinha. */
   setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean>;
+  /** Volta o cartão para "sem resposta", só se a resposta atual for `expected`. Devolve false se não era. */
+  clearSuggestionResponse(messageId: string, expected: SuggestionResponse): Promise<boolean>;
   /** Mensagens em ordem cronológica. `before` pagina para trás (só as anteriores a esse instante). */
   listMessages(conversationId: string, limit: number, before?: Date, excludeSenderIds?: readonly string[], after?: Date): Promise<MessageRecord[]>;
   /** Mensagens de voz, fotos, vídeos e textos com link (http/https), da mais recente para a mais antiga. Sem as apagadas. */

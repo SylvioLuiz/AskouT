@@ -799,7 +799,7 @@ export function createApi(deps: ApiDeps) {
     markAudioPlayed: (conversationId: string, messageId: string) => request<{ played: true }>('POST', `/conversations/${id(conversationId)}/messages/${id(messageId)}/audio/played`),
     sendSuggestion: (conversationId: string, suggestion: SuggestionCard) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { suggestion } }),
-    respondSuggestion: (conversationId: string, messageId: string, action: 'accept' | 'decline') =>
+    respondSuggestion: (conversationId: string, messageId: string, action: 'accept' | 'decline' | 'cancel') =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages/${id(messageId)}/respond`, { body: { action } }),
     /** Endereço completo de um recurso da API (a foto do lugar), a partir do caminho que ela devolveu. */
     assetUrl: (path: string) => `${deps.baseUrl}${path}`,

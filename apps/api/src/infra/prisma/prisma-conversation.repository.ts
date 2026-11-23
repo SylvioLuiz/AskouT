@@ -395,6 +395,12 @@ export class PrismaConversationRepository implements ConversationRepository {
     return row ? toMessage(row as MessageRow) : undefined;
   }
 
+  async clearSuggestionResponse(messageId: string, expected: SuggestionResponse): Promise<boolean> {
+    if (!isUuid(messageId)) return false;
+    const result = await this.prisma.message.updateMany({ where: { id: messageId, kind: 'SUGGESTION', response: expected }, data: { response: null, respondedAt: null } });
+    return result.count > 0;
+  }
+
   async setSuggestionResponse(messageId: string, response: SuggestionResponse, at: Date): Promise<boolean> {
     if (!isUuid(messageId)) return false;
     // Só grava se ainda não houver resposta: duas respostas ao mesmo tempo não se sobrescrevem.

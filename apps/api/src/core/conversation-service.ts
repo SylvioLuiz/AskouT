@@ -417,7 +417,7 @@ function isoOrNull(value: unknown, field: string): string | null {
 export function parseSuggestion(value: unknown): SuggestionCard {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw validationError('Sugestão inválida', { suggestion: 'Sugestão inválida' });
   const v = value as Record<string, unknown>;
-  if (v.source !== 'EVENT' && v.source !== 'OSM' && v.source !== 'GOOGLE') throw validationError('Sugestão inválida', { suggestion: 'Campo source inválido' });
+  if (v.source !== 'EVENT' && v.source !== 'OSM' && v.source !== 'GOOGLE' && v.source !== 'PLACE') throw validationError('Sugestão inválida', { suggestion: 'Campo source inválido' });
   const lat = v.lat;
   const lng = v.lng;
   if (typeof lat !== 'number' || !Number.isFinite(lat) || lat < -90 || lat > 90 || typeof lng !== 'number' || !Number.isFinite(lng) || lng < -180 || lng > 180) {
@@ -446,6 +446,12 @@ export function parseGroupImage(value: unknown): string {
 const GROUP_MAX_MEMBERS = 15;
 
 const NEED_FOLLOW = 'Para mandar mensagem, siga a pessoa.';
+/** O que acontece fora do chat quando um local é combinado: hoje, o lugar do encontro NOW. */
+export interface PlaceAgreement {
+  destinationAgreedInChat(actorId: string, otherId: string, place: { name: string; lat: number; lng: number }): Promise<void>;
+  destinationWithdrawnInChat(actorId: string, otherId: string, place: { lat: number; lng: number }): Promise<void>;
+}
+
 const ACCEPT_FIRST = 'Aceite a solicitação de mensagem para responder.';
 
 export class ConversationService {
@@ -453,8 +459,12 @@ export class ConversationService {
   /** Quem está digitando: `conversa|pessoa` → instante em que o sinal expira. Fica só na memória (é efêmero). */
   private readonly typingUntil = new Map<string, number>();
 
-  constructor(deps: CoreDeps) {
+  /** Avisado quando uma sugestão de local é aceita ou tem o aceite cancelado (o encontro NOW passa a ir para lá). */
+  private readonly places: PlaceAgreement | undefined;
+
+  constructor(deps: CoreDeps, places?: PlaceAgreement) {
     this.deps = deps;
+    this.places = places;
   }
 
   /**
@@ -1081,9 +1091,12 @@ export class ConversationService {
     }
   }
 
-  /** Quem recebeu o cartão aceita ou recusa o lugar. Só uma resposta, só do destinatário, só entre amigos. */
+  /**
+   * Quem recebeu o cartão aceita ou recusa o lugar. Só uma resposta, só do destinatário, só entre amigos.
+   * `cancel` desfaz um aceite (o cartão volta a esperar resposta).
+   */
   async respond(actorId: string, conversationId: string, messageId: string, action: unknown): Promise<MessageView> {
-    if (action !== 'accept' && action !== 'decline') throw validationError('Ação inválida', { action: 'Use accept ou decline' });
+    if (action !== 'accept' && action !== 'decline' && action !== 'cancel') throw validationError('Ação inválida', { action: 'Use accept, decline ou cancel' });
     const { conversations, clock } = this.deps;
     const { conversation, otherId } = await this.access(actorId, conversationId);
     if (!otherId) throw notFound('Sugestão não encontrada');
@@ -1092,10 +1105,18 @@ export class ConversationService {
     if (message.senderId === actorId) throw forbidden('Quem sugeriu não responde à própria sugestão');
     await this.assertCanSend(actorId, conversation, otherId);
     const now = clock.now();
+    if (action === 'cancel') {
+      if (!(await conversations.clearSuggestionResponse(messageId, 'ACCEPTED'))) throw conflict('Essa sugestão não está aceita');
+      const reopened = { ...message, response: null, respondedAt: null } satisfies MessageRecord;
+      if (message.suggestion) await this.places?.destinationWithdrawnInChat(actorId, otherId, message.suggestion);
+      const positions = await this.livePositions(actorId, otherId, now);
+      return toMessageView(reopened, actorId, { distances: reopened.suggestion ? this.distancesOf(reopened.suggestion, positions) : null });
+    }
     const response = action === 'accept' ? 'ACCEPTED' : 'DECLINED';
     const saved = await conversations.setSuggestionResponse(messageId, response, now);
     if (!saved) throw conflict('Essa sugestão já foi respondida');
     const updated = { ...message, response, respondedAt: now } satisfies MessageRecord;
+    if (response === 'ACCEPTED' && message.suggestion) await this.places?.destinationAgreedInChat(actorId, otherId, { name: message.suggestion.venueName, lat: message.suggestion.lat, lng: message.suggestion.lng });
     const positions = await this.livePositions(actorId, otherId, now);
     return toMessageView(updated, actorId, { distances: updated.suggestion ? this.distancesOf(updated.suggestion, positions) : null });
   }

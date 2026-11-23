@@ -2712,6 +2712,54 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   background: transparent;
 }
 
+/* Miniatura do mapa no cartão de sugestão do chat: só para ver onde fica, não responde a toques. */
+.minimap {
+  width: 100%;
+  min-width: 200px;
+  height: 120px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--brand-soft);
+  border-radius: calc(var(--radius-panel) - 4px);
+}
+
+.pin--mini {
+  width: 30px;
+  height: 30px;
+  font-size: 1rem;
+}
+
+/* Mapa dos locais entre vocês, dentro do chat. */
+.chatmap .matchmap,
+.matchmap--chat {
+  height: 220px;
+  margin-bottom: 10px;
+}
+
+.sugcard--picked {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--brand-soft);
+}
+
+.sugcard__num {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  color: var(--brand-ink);
+  background: var(--brand);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.chat__matchlink {
+  color: inherit;
+  text-decoration: none;
+}
+
 .sugcard__tags {
   display: flex;
   flex-wrap: wrap;
