@@ -54,6 +54,24 @@ Feito pelo Claude depois que houver um build e capturas de tela:
 
 O primeiro produto de compra precisa ser enviado junto com a primeira versão do app.
 
+## Compartilhar com o AskouT (Share Extension)
+O iPhone mostra o AskouT na folha de compartilhar de qualquer app (Fotos, Arquivos, Safari...). Como no WhatsApp, a
+folha lista as conversas e os amigos: a pessoa escolhe para quem vai (até 10), escreve uma mensagem opcional e envia
+sem sair do app em que estava. Fotos (reduzidas até 1600 px), vídeos até 60 MB, PDF/Word/Excel/PowerPoint/texto até
+25 MB e links.
+
+- Código: `ios/App/ShareExtension/` (alvo **ShareExtension**, bundle `br.com.askout.ShareExtension`, embutido no app).
+- Sessão: o app grava o token no Keychain compartilhado (`ShareSessionPlugin.swift`, grupo
+  `<TeamID>.br.com.askout.shared`). Quem nunca entrou no app neste iPhone vê "Entre no AskouT".
+- **Não precisa de App Group** nem de configurar nada no portal: o GitHub Actions cria o App ID
+  `br.com.askout.ShareExtension` e o perfil dele sozinho (`.github/scripts/ios-dev-profile.mjs`).
+- **Versão:** a extensão tem `MARKETING_VERSION` própria (hoje 1.0.8). Ao mudar a versão do app no Xcode, mude a da
+  extensão também (alvo ShareExtension → General → Version), senão a Apple recusa o envio. O número do build vem do
+  GitHub Actions para os dois.
+- Nunca foi compilado: no primeiro build, se o Xcode reclamar, mande a mensagem ao Claude. No Mac, com assinatura
+  automática, selecione a equipe também no alvo **ShareExtension** (Signing & Capabilities).
+- Teste: em Fotos, escolha uma foto → Compartilhar → AskouT (se não aparecer, role a fileira de apps até "Mais" e ative).
+
 ## Pontos de atenção conhecidos
 - **Login com Apple dentro do app:** no iPhone o app usa a janela NATIVA da Apple (plugin `@capgo/capacitor-social-login`, ponte `AskouTApple` em `src/apple-bridge.ts`); o servidor aceita o token com o bundle id como público (`APPLE_APP_ID=br.com.askout`). Nunca foi compilado nem testado em aparelho: no teste, toque em "Continuar com a Apple" e confirme que entra. Se o Xcode reclamar do plugin (ele traz junto as bibliotecas do Facebook e do Google), mande a mensagem ao Claude. Lembre de ter a capacidade **Sign in with Apple** no Xcode (passo 3).
 - **Verificação de compra:** o servidor confere a transação assinada do StoreKit 2 (cadeia de certificados até a raiz da Apple, bundle id, produto e devolução) quando `APPLE_APP_ID` está definido. Nunca foi testada com uma transação real da Apple, só com uma cadeia de teste: faça uma compra Sandbox antes de abrir ao público. O Google Play ainda não é conferido.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { ErrorState, Loading, Notice, PageHead, PageHeadSkeleton } from '../components/ui.tsx';
 import { BellIcon, ChevronRightIcon, DocIcon, HelpIcon, LockIcon, ShieldIcon, UserIcon } from '../components/icons.tsx';
 import { api } from '../client.ts';
 import { useUser } from '../auth.tsx';
@@ -64,7 +64,7 @@ export function PrivacyDataScreen() {
     if (view.data) setStatus(view.data);
   }, [view.data]);
 
-  if (view.loading && !status) return <Loading shape="lines" />;
+  if (view.loading && !status) return (<><PageHeadSkeleton title={t('Privacidade e dados')} back="/configuracao" /><Loading shape="toggles" /></>);
   if (view.error && !status) return <ErrorState message={view.error.message} onRetry={view.reload} />;
   if (!status) return null;
 

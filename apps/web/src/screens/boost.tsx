@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, EmptyState, ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Button, EmptyState, ErrorState, Loading, Notice, PageHead, PageHeadSkeleton } from '../components/ui.tsx';
 import { BoostResults, hasResults } from '../components/boost-results.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -62,7 +62,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
     return () => window.clearInterval(timer);
   }, [waiting]);
 
-  if (profile.loading || pricing.loading || boosts.loading) return (<><PageHead title={t('Impulsionar')} back={back} /><Loading shape="page" /></>);
+  if (profile.loading || pricing.loading || boosts.loading) return (<><PageHeadSkeleton title={t('Impulsionar')} back={back} subtitle /><Loading shape="lines" rows={2} /></>);
   if (profile.error || pricing.error || boosts.error || !profile.data || !pricing.data || !boosts.data) {
     const e = profile.error ?? pricing.error ?? boosts.error;
     return (<><PageHead title={t('Impulsionar')} back={back} /><ErrorState message={e?.message ?? t('Não foi possível carregar.')} onRetry={() => { profile.reload(); pricing.reload(); boosts.reload(); }} /></>);

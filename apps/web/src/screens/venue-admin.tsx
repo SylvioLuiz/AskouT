@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { VenueLogo } from '../components/venue-logo.tsx';
-import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PageHeadSkeleton } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { formatRating, formatWhen } from '../lib/chat.ts';
@@ -80,7 +80,7 @@ export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
   const [view, setView] = useState<'manage' | 'public'>('manage');
   const now = new Date();
 
-  if (page.loading && !v) return <Loading shape="page" />;
+  if (page.loading && !v) return (<><PageHeadSkeleton title={t('Painel')} subtitle /><Loading shape="panel" /></>);
   if (!v) return <ErrorState message={page.error?.message ?? t('Não foi possível abrir o painel.')} onRetry={page.reload} />;
   if (!v.canManage) return <NotAllowed />;
   const next = v.upcomingEvents[0];
@@ -203,7 +203,7 @@ export function VenueAdminEventsScreen({ venueId }: { venueId: string }) {
   const [key, setKey] = useState(0);
   const now = new Date();
   const v = page.data;
-  if (page.loading && !v) return <Loading shape="page" />;
+  if (page.loading && !v) return (<><PageHeadSkeleton title={t('Eventos')} subtitle /><Loading shape="cards" rows={2} /></>);
   if (!v) return <ErrorState message={page.error?.message ?? t('Não foi possível abrir os eventos.')} onRetry={page.reload} />;
   if (!v.canManage) return <NotAllowed />;
   return (
@@ -262,7 +262,7 @@ export function VenueTeamScreen({ venueId }: { venueId: string }) {
   const [removing, setRemoving] = useState<TeamMember | undefined>();
   const [leaving, setLeaving] = useState(false);
 
-  if (team.loading && !team.data) return <Loading />;
+  if (team.loading && !team.data) return (<><PageHeadSkeleton title={t('Equipe')} subtitle /><Loading shape="lines" rows={1} /><Loading shape="form" rows={1} /></>);
   if (!team.data) return <ErrorState message={team.error?.message ?? t('Não foi possível abrir a equipe.')} onRetry={team.reload} />;
   const owner = team.data.role === 'OWNER';
   const name = profile.data?.name;

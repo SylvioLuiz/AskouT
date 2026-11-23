@@ -4,7 +4,9 @@
 // (iOS App Development) com ele e todos os iPhones cadastrados, e instala o perfil no Mac.
 // Usa a mesma chave da API do App Store Connect do fluxo (ASC_KEY_PATH, ASC_KEY_ID, ASC_ISSUER_ID).
 // Entrada: CERT_SERIAL (número de série do certificado, em hexadecimal).
-// Saída: imprime o nome do perfil e grava PROFILE_NAME em $GITHUB_ENV.
+// Saída: imprime o nome do perfil e grava PROFILE_NAME (ou o nome em PROFILE_ENV) em $GITHUB_ENV.
+// Também serve para a extensão "Compartilhar" (ShareExtension): BUNDLE_ID, PROFILE_NAME, CAPABILITIES (lista separada
+// por vírgula, vazia na extensão), CREATE_BUNDLE=1 (cria o App ID se ainda não existir) e PROFILE_ENV.
 import { createPrivateKey, sign } from 'node:crypto';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -12,6 +14,8 @@ import { join } from 'node:path';
 
 const BUNDLE_ID = process.env.BUNDLE_ID ?? 'br.com.askout';
 const PROFILE_NAME = process.env.PROFILE_NAME ?? 'AskouT CI Development';
+const PROFILE_ENV = process.env.PROFILE_ENV ?? 'PROFILE_NAME';
+const CREATE_BUNDLE = process.env.CREATE_BUNDLE === '1';
 const { ASC_KEY_PATH, ASC_KEY_ID, ASC_ISSUER_ID, CERT_SERIAL } = process.env;
 if (!ASC_KEY_PATH || !ASC_KEY_ID || !ASC_ISSUER_ID) throw new Error('Faltam ASC_KEY_PATH, ASC_KEY_ID ou ASC_ISSUER_ID.');
 if (!CERT_SERIAL) throw new Error('Falta CERT_SERIAL (número de série do certificado do .p12).');
@@ -48,12 +52,16 @@ console.log(`Certificado fixo: ${cert.attributes.name} (${cert.attributes.certif
 
 // 2. App (bundle id).
 const bundles = (await api(`/v1/bundleIds?filter[identifier]=${encodeURIComponent(BUNDLE_ID)}&limit=200`)).data ?? [];
-const bundle = bundles.find((b) => b.attributes.identifier === BUNDLE_ID);
+let bundle = bundles.find((b) => b.attributes.identifier === BUNDLE_ID);
+if (!bundle && CREATE_BUNDLE) {
+  bundle = (await api('/v1/bundleIds', { method: 'POST', body: JSON.stringify({ data: { type: 'bundleIds', attributes: { identifier: BUNDLE_ID, name: `AskouT ${BUNDLE_ID.split('.').pop()}`, platform: 'IOS' } } }) })).data;
+  console.log(`App ID ${BUNDLE_ID} criado na conta.`);
+}
 if (!bundle) throw new Error(`Bundle id ${BUNDLE_ID} não encontrado na conta.`);
 
 // 2b. Capacidades que o App.entitlements pede: o perfil só leva as que estão ligadas no App ID.
 // Associated Domains (o link de convite abre o app) entrou depois; liga aqui se ainda estiver desligada.
-const NEEDED = ['ASSOCIATED_DOMAINS', 'PUSH_NOTIFICATIONS', 'APPLE_ID_AUTH'];
+const NEEDED = (process.env.CAPABILITIES ?? 'ASSOCIATED_DOMAINS,PUSH_NOTIFICATIONS,APPLE_ID_AUTH').split(',').map((c) => c.trim()).filter(Boolean);
 const caps = (await api(`/v1/bundleIds/${bundle.id}/bundleIdCapabilities`)).data ?? [];
 const on = new Set(caps.map((c) => c.attributes.capabilityType));
 for (const type of NEEDED.filter((t) => !on.has(t))) {
@@ -104,4 +112,4 @@ for (const dir of [join(homedir(), 'Library/MobileDevice/Provisioning Profiles')
   writeFileSync(join(dir, `${uuid}.mobileprovision`), content);
 }
 console.log(`Perfil "${PROFILE_NAME}" criado com ${devices.length} aparelho(s) e instalado (${uuid}).`);
-if (process.env.GITHUB_ENV) appendFileSync(process.env.GITHUB_ENV, `PROFILE_NAME=${PROFILE_NAME}\n`);
+if (process.env.GITHUB_ENV) appendFileSync(process.env.GITHUB_ENV, `${PROFILE_ENV}=${PROFILE_NAME}\n`);

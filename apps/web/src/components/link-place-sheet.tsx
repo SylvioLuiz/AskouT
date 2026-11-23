@@ -46,7 +46,7 @@ export function LinkPlaceSheet({ onPick, onClose }: { onPick: (place: LinkedPlac
     <Sheet title={t('Vincular um local')} onClose={onClose}>
       <Field label={t('Buscar local')} type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint={t('Nome ou endereço do lugar')} />
       {term.length < 2 ? <p className="muted">{t('Digite o nome ou o endereço do local.')}</p> : null}
-      {result.loading && !result.data ? <Loading /> : null}
+      {result.loading && !result.data ? <Loading shape="rows" rows={3} /> : null}
       {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
       {result.data && places.length === 0 ? <p className="muted">{result.data.placesAvailable ? t('Nenhum local encontrado.') : t('A busca de locais ainda não está ligada neste ambiente.')}</p> : null}
       <ul className="placepick">

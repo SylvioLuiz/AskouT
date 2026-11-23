@@ -178,13 +178,17 @@ export function allDeletable(messages: readonly ChatMessage[]): boolean {
   return messages.length > 0 && messages.every((m) => m.mine && !m.deleted && DELETABLE_KINDS.includes(m.kind));
 }
 
-/** Texto para copiar: uma mensagem sai pura; várias saem como "[hh:mm] Nome: texto", na ordem da conversa. Só texto entra. */
-export function copyText(messages: readonly ChatMessage[]): string {
-  const texts = messages.filter((m) => m.kind === 'TEXT' && !m.deleted && m.body.trim() !== '');
+/**
+ * Texto para copiar: uma mensagem sai pura; várias saem como "[hh:mm] Nome: texto", na ordem da conversa (como no
+ * WhatsApp Web). `otherName`: nome da outra pessoa na conversa 1 a 1 (lá as mensagens não trazem o nome).
+ * Texto, link e o nome de um arquivo entram; foto, áudio e cartões ficam de fora.
+ */
+export function copyText(messages: readonly ChatMessage[], otherName?: string): string {
+  const texts = messages.filter((m) => (m.kind === 'TEXT' || m.kind === 'FILE') && !m.deleted && m.body.trim() !== '');
   if (texts.length === 0) return '';
   const first = texts[0];
   if (messages.length === 1 && first) return first.body;
-  return texts.map((m) => `[${formatClock(m.createdAt)}] ${m.mine ? t('Você') : (m.senderName ?? t('Contato'))}: ${m.body}`).join('\n');
+  return texts.map((m) => `[${formatClock(m.createdAt)}] ${m.mine ? t('Você') : (m.senderName ?? otherName ?? t('Contato'))}: ${m.kind === 'FILE' ? `📎 ${m.body}` : m.body}`).join('\n');
 }
 
 // ---------- Layout no estilo das DMs ----------

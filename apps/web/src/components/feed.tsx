@@ -502,7 +502,7 @@ function PendingSheet({ where, targetId, onClose, onApproved, onCountChange }: {
     <Sheet title={t('Aguardando aprovação')} onClose={onClose}>
       {error ? <ErrorState message={error} /> : null}
       {message ? <Notice tone="error">{message}</Notice> : null}
-      {!items && !error ? <Loading shape="posts" /> : null}
+      {!items && !error ? <Loading shape="feed" /> : null}
       {items && items.length === 0 ? <p className="muted">{t('Nada esperando aprovação.')}</p> : null}
       <div className="feed__list feed__list--pending">
         {(items ?? []).map((post) => (
@@ -948,7 +948,7 @@ export function Feed({ where, targetId, intro, openPostId, openPending, onSettin
         </div>
       ) : null}
       {error && items.length === 0 ? <ErrorState message={error.message} onRetry={() => void load(null)} /> : null}
-      {!settings && !error ? <Loading shape="posts" /> : null}
+      {!settings && !error ? <Loading shape="feed" /> : null}
       {settings && items.length === 0 && !loading && !error ? (
         <div className="feed__empty">
           <strong>{t('Nenhuma publicação ainda')}</strong>
@@ -963,7 +963,7 @@ export function Feed({ where, targetId, intro, openPostId, openPending, onSettin
       {error && items.length > 0 ? <ErrorState message={error.message} onRetry={() => void load(cursor)} /> : null}
       {cursor ? (
         <div ref={sentinel} className="feed__more">
-          {loading ? <Loading shape="posts" rows={1} /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => load(cursor)}>{t('Carregar mais')}</Button> : null}
+          {loading ? <Loading shape="feed" rows={1} /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => load(cursor)}>{t('Carregar mais')}</Button> : null}
         </div>
       ) : null}
 

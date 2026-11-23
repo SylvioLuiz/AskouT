@@ -240,3 +240,11 @@ test('dayPillLabel: hoje, ontem e data', () => {
   assert.equal(dayPillLabel('2026-11-22T23:00:00-03:00', now), 'Ontem');
   assert.match(dayPillLabel('2026-11-18T12:00:00-03:00', now), /18/);
 });
+
+test('copyText: na conversa 1 a 1 usa o nome da outra pessoa; arquivo entra pelo nome', () => {
+  const base = { senderId: 'b', senderName: null, deleted: false, reactions: [], replyTo: null } as const;
+  const m1 = { ...base, id: '1', mine: false, kind: 'TEXT', body: 'oi', createdAt: '2026-11-23T17:00:00.000Z' };
+  const m2 = { ...base, id: '2', mine: false, kind: 'FILE', body: 'Ingresso.pdf', createdAt: '2026-11-23T17:01:00.000Z' };
+  const text = copyText([m1, m2] as never, 'Bia Souza');
+  assert.match(text, /\] Bia Souza: oi\n\[\d\d:\d\d\] Bia Souza: 📎 Ingresso\.pdf$/);
+});

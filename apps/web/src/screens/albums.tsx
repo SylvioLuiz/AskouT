@@ -42,7 +42,7 @@ export function AlbumsScreen() {
     <>
       <PageHead title={t('Álbuns dos encontros')} back="/perfil" />
       <p className="muted">{t('Fotos do NOW e dos eventos aonde você foi. Só quem foi vê.')}</p>
-      {list.loading && !list.data ? <Loading shape="tiles" /> : null}
+      {list.loading && !list.data ? <Loading shape="rows" /> : null}
       {list.error ? <ErrorState message={list.error.message} onRetry={list.reload} /> : null}
       {list.data && list.data.items.length === 0 ? (
         <EmptyState title={t('Nenhum álbum ainda')}>{t('Depois de um encontro do NOW ou de um evento em que você confirmou presença, o álbum aparece aqui.')}</EmptyState>

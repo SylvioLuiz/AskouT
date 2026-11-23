@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { CSSProperties } from 'react';
-import type { ChangeEvent, FormEvent, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import type { ChangeEvent, ClipboardEvent as ReactClipboardEvent, FormEvent, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VOICE_CANCEL_DX, VOICE_LOCK_DY, VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
@@ -223,7 +223,15 @@ export function MessageRequestsScreen() {
   const list = useAsync(() => api.messageRequests(), []);
   useLiveRefresh(list.reload, 10_000);
   const now = new Date();
-  if (list.loading && !list.data) return <Loading />;
+  if (list.loading && !list.data) {
+    return (
+      <div className="convscreen">
+        <PageHead title={t('Solicitações de mensagem')} back="/conversas" />
+        <p className="muted convrequests__help">{t('Mensagens de quem você não segue. A pessoa só fica sabendo que você viu se você aceitar.')}</p>
+        <Loading />
+      </div>
+    );
+  }
   if (list.error && !list.data) return <ErrorState message={list.error.message} onRetry={list.reload} />;
   const items = list.data?.items ?? [];
   return (
@@ -900,6 +908,24 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const match = data.other ? flash.data?.matches.find((m) => m.other.userId === data.other?.userId) : undefined;
   const serverNow = Date.parse(data.now);
 
+  /**
+   * Ctrl+C com o mouse selecionando mais de uma mensagem: copia com a hora e o nome de quem mandou cada uma
+   * ("[14:02] Bia: oi"), como no WhatsApp Web. Dentro de uma mensagem só, copia o trecho selecionado, como sempre.
+   */
+  function copySelection(e: ReactClipboardEvent<HTMLDivElement>) {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    const ids = messages.filter((m) => {
+      const el = document.getElementById(`msg-${m.id}`);
+      return el ? sel.containsNode(el, true) : false;
+    });
+    if (ids.length < 2) return;
+    const text = copyText(ids, data?.other?.displayName);
+    if (text === '') return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', text);
+  }
+
   /** Responder: marca a mensagem e já abre o teclado no campo. */
   function startReply(m: ChatMessage) {
     setReplyTo(m);
@@ -1150,7 +1176,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     });
   }
   async function copyChosen() {
-    const text = copyText(chosen);
+    const text = copyText(chosen, data?.other?.displayName);
     if (text === '') return;
     try {
       await navigator.clipboard.writeText(text);
@@ -1328,7 +1354,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       />
       )}
 
-      <div ref={threadRef} className="chat__thread" aria-live="polite" {...reveal}>
+      <div ref={threadRef} className="chat__thread" aria-live="polite" {...reveal} onCopy={copySelection}>
         {older.hasMore ? (
           <div className="chat__older">
             <Button small variant="quiet" loading={older.loading} onClick={loadOlder}>

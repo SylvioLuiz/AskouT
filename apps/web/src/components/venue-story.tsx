@@ -363,7 +363,7 @@ export function VenueStorySheet({ venueId, onClose }: { venueId: string; onClose
     <Sheet title={t('Flashes do local')} onClose={onClose}>
       <p className="muted">{t('Foto ou vídeo. Quem segue o local vê na página inicial e o Explorar mostra em Rolando agora. Fica no ar por 24 h.')}</p>
       <input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="visually-hidden" onChange={(event) => void pick(event)} aria-label={t('Escolher foto ou vídeo')} />
-      {list.loading && !data ? <Loading /> : null}
+      {list.loading && !data ? <Loading shape="stories" /> : null}
       {list.error && !data ? <ErrorState message={list.error.message} onRetry={list.reload} /> : null}
       {data?.suspended ? <Notice tone="error">{t('A publicação de flashes deste local está suspensa até a equipe do AskouT analisar as denúncias.')}</Notice> : null}
       {problem ? <Notice tone="error">{problem}</Notice> : null}

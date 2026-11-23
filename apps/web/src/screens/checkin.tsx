@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Sheet } from '../components/agenda.tsx';
-import { Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead, PageHeadSkeleton } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { checkinLink, codeFromSearch, qrFileName } from '../lib/checkin.ts';
@@ -143,7 +143,7 @@ export function CheckinScreen({ venueId }: { venueId: string }) {
     }
   }
 
-  if (venue.loading && !venue.data) return <Loading shape="page" />;
+  if (venue.loading && !venue.data) return (<><PageHeadSkeleton title={t('Estive aqui')} back={`/bares/${encodeURIComponent(venueId)}`} /><Loading shape="lines" rows={2} /></>);
   if (venue.error || !venue.data) return <ErrorState message={venue.error?.message ?? t('Não foi possível abrir esta página.')} onRetry={venue.reload} />;
   const name = venue.data.name;
   const page = `/bares/${encodeURIComponent(venueId)}`;

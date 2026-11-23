@@ -2,6 +2,7 @@ import { createApi } from './lib/api.ts';
 import { setAssetBase } from './lib/explore.ts';
 import { createSessionStore } from './lib/session.ts';
 import type { StorageLike } from './lib/session.ts';
+import { withShareSession } from './lib/share-session.ts';
 
 function browserStorage(): StorageLike | undefined {
   try {
@@ -11,7 +12,7 @@ function browserStorage(): StorageLike | undefined {
   }
 }
 
-export const session = createSessionStore(browserStorage());
+export const session = withShareSession(createSessionStore(browserStorage()), () => apiBaseUrl);
 
 let onUnauthorized: () => void = () => {};
 
