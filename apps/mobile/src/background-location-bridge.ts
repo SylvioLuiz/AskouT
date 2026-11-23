@@ -26,11 +26,16 @@ export interface BackgroundPluginLike {
   openSettings(): Promise<void>;
 }
 
+/** Plugin do próprio app (ArrivalProgressPlugin.java, só Android): troca o aviso fixo por um com a barra de progresso. */
+export interface ArrivalProgressPluginLike {
+  update(options: { title: string; text: string; progress: number; arrived: boolean }): Promise<{ shown: boolean }>;
+}
+
 export interface NativeHttpLike {
   request(options: { method: string; url: string; headers: Record<string, string>; data?: unknown }): Promise<{ status: number }>;
 }
 
-export function createBackgroundLocationBridge(deps: { plugin: BackgroundPluginLike; http: NativeHttpLike }) {
+export function createBackgroundLocationBridge(deps: { plugin: BackgroundPluginLike; http: NativeHttpLike; progress?: ArrivalProgressPluginLike | undefined }) {
   return {
     /**
      * Começa a acompanhar a posição. `onFix` recebe cada posição nova; `onError('NOT_AUTHORIZED')` quando a pessoa
@@ -64,6 +69,18 @@ export function createBackgroundLocationBridge(deps: { plugin: BackgroundPluginL
       }
     },
     openSettings: () => deps.plugin.openSettings(),
+    /**
+     * Atualiza o aviso fixo com quanto falta (texto) e a barra (0–100). Só no Android com o plugin do app; no iPhone
+     * (barra azul do sistema) e em versões antigas do app não faz nada.
+     */
+    async progress(update: { title: string; text: string; progress: number; arrived: boolean }): Promise<void> {
+      if (!deps.progress) return;
+      try {
+        await deps.progress.update(update);
+      } catch {
+        // Sem o aviso atualizado a chegada segue igual.
+      }
+    },
   };
 }
 

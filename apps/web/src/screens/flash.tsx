@@ -14,7 +14,7 @@ import { InviteSheet } from '../components/invite.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { OfferBanner } from '../components/offer-banner.tsx';
 import { api, apiBaseUrl, session } from '../client.ts';
-import { backgroundLocationBridge, shouldSendFix } from '../lib/background-arrival.ts';
+import { backgroundLocationBridge, ownArrivalStep, shouldSendFix } from '../lib/background-arrival.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import {
   announceFlashChange,
@@ -1080,6 +1080,13 @@ function useBackgroundArrival(match: FlashMatch | undefined, onEnded: () => void
   const [denied, setDenied] = useState(false);
   const endedRef = useRef(onEnded);
   endedRef.current = onEnded;
+  // Para onde vai (lugar escolhido, ou onde o amigo está): a barra do aviso fixo mede quanto falta até lá.
+  const targetRef = useRef<{ lat: number; lng: number; name: string | null } | undefined>(undefined);
+  targetRef.current = match?.destination
+    ? { lat: match.destination.lat, lng: match.destination.lng, name: match.destination.name }
+    : match?.them
+      ? { lat: match.them.lat, lng: match.them.lng, name: null }
+      : undefined;
   useEffect(() => {
     const bridge = backgroundLocationBridge();
     if (!active || !bridge || !inviteId) return undefined;
@@ -1087,15 +1094,32 @@ function useBackgroundArrival(match: FlashMatch | undefined, onEnded: () => void
     let stop: (() => Promise<void>) | undefined;
     let cancelled = false;
     let last: { at: number; lat: number; lng: number } | undefined;
+    let startM: number | undefined;
     const url = `${apiBaseUrl}/flash/matches/${encodeURIComponent(inviteId)}/location`;
+    const title = t('Mostrando sua chegada para {name}', { name });
     bridge
       .start({
-        title: t('Mostrando sua chegada para {name}', { name }),
+        title,
         message: t('O AskouT manda sua posição até o encontro acabar ou você parar.'),
         onFix: (fix) => {
           const now = Date.now();
           if (!shouldSendFix(last, fix, now)) return;
           last = { at: now, lat: fix.lat, lng: fix.lng };
+          const target = targetRef.current;
+          if (target && bridge.progress && !cancelled) {
+            const step = ownArrivalStep(startM, fix, target);
+            startM = step.startM;
+            const text = step.arrived
+              ? target.name
+                ? t('Você chegou em {place}', { place: target.name })
+                : t('Você está bem perto de {name}', { name })
+              : t('Chega em ~{minutes} min · {distance} até {place}', {
+                  minutes: step.minutes,
+                  distance: formatDistance(step.distanceM),
+                  place: target.name ?? name,
+                });
+            void bridge.progress({ title, text, progress: step.progress, arrived: step.arrived });
+          }
           const token = session.get();
           void bridge.put(url, token !== undefined ? { Authorization: `Bearer ${token}` } : {}, { lat: fix.lat, lng: fix.lng, accuracyM: fix.accuracyM }).then((status) => {
             // Encontro acabou: para de acompanhar (some o aviso fixo do Android).
