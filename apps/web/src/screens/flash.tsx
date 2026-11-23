@@ -37,7 +37,7 @@ import { toApiError } from '../lib/errors.ts';
 import { FLASH_PRIVACY_POINTS, flashNoticeSeen, markFlashNoticeSeen, safeStorage } from '../lib/hints.ts';
 import type { PlacePin, RouteLine } from '../components/match-map.tsx';
 import { MatchDestination, MatchPlaces } from '../components/match-destination.tsx';
-import { ReplaceConfirm } from '../components/suggestions.tsx';
+import { ReplaceConfirm, useMorePlaces } from '../components/suggestions.tsx';
 import { MAX_PLACES_ON_MAP, placeName, sortByFairness } from '../lib/flash.ts';
 import { toCard } from '../lib/chat.ts';
 import type { AvailableFriend, AvailableOrder, FlashMatch, PublicProfile, SuggestionItem } from '../lib/types.ts';
@@ -1427,6 +1427,16 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const routes = useAsync(() => (dest ? api.flashRoutes(inviteId, mode) : Promise.resolve(undefined)), [inviteId, mode, dest?.lat, dest?.lng]);
   usePolling(routes.reload, 20_000, dest !== null);
 
+  // `before` no futuro: lê as últimas mensagens sem marcar a conversa como lida.
+  // Suas sugestões ainda sem resposta no chat: o cartão do lugar mostra "Sugestão aberta" no lugar de "Sugerir no chat".
+  const conversationId = match.data?.conversationId;
+  const chat = useAsync(() => (conversationId ? api.messages(conversationId, { limit: 100, before: new Date(Date.now() + 86_400_000).toISOString() }) : Promise.resolve(undefined)), [conversationId]);
+  usePolling(chat.reload, 15_000, conversationId !== undefined);
+  const openKeys = new Set((chat.data?.messages ?? []).flatMap((m) => (m.kind === 'SUGGESTION' && m.mine && !m.deleted && m.response === null && m.suggestion ? [m.suggestion.externalId] : [])));
+
+  const baseKeys = sortByFairness(suggestions.data?.items ?? []).slice(0, MAX_PLACES_ON_MAP).map((p) => p.key);
+  const more = useMorePlaces(inviteId, suggestions.data?.radiusM, baseKeys);
+
   if (match.loading && !match.data && !match.error) return <Loading />;
   if (match.error && !match.data) {
     if (match.error.code === 'NOT_FOUND') {
@@ -1494,7 +1504,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   }
 
   const showList = !dest || choosing;
-  const places = sortByFairness(suggestions.data?.items ?? []).slice(0, MAX_PLACES_ON_MAP);
+  const places = [...sortByFairness(suggestions.data?.items ?? []).slice(0, MAX_PLACES_ON_MAP), ...more.items];
   const placePins: PlacePin[] = places.map((p) => ({ key: p.key, name: placeName(p), lat: p.lat, lng: p.lng }));
   const left = minutesLeft(data.expiresAt, Date.parse(data.now));
   const them = data.them;
@@ -1581,6 +1591,8 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
             busy={destBusy}
             onSelect={setPickedKey}
             onChoose={suggestInChat}
+            openKeys={openKeys}
+            more={suggestions.data && suggestions.data.items.length > 0 ? more : undefined}
           />
           {suggestions.data ? (
             <p className="muted matchradius">

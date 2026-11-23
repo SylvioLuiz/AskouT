@@ -1062,7 +1062,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 // Aceitar um local cancela o aceite do anterior (o servidor já fez; aqui aparece na hora).
                 mergeMessages(updated.response === 'ACCEPTED' ? current.map((x) => (x.id !== updated.id && x.kind === 'SUGGESTION' && x.response === 'ACCEPTED' ? { ...x, response: null, respondedAt: null } : x)) : current, [updated]),
               )
-            } onOpenMap={(place) => setMapFor({ place })} agreed={agreed} />
+            } onOpenMap={(place) => setMapFor({ place })} agreed={agreed} onSuggestOther={match ? () => setSuggesting('suggest') : undefined} />
         ) : m.kind === 'MEETUP' && m.meetup ? (
           <MeetupBubble meetup={m.meetup} nowIso={data.now} onUpdated={(updated) => setMessages((current) => current.map((x) => (x.id === m.id || x.meetup?.id === updated.id ? { ...x, meetup: updated } : x)))} />
         ) : m.kind === 'AUDIO' && m.audio ? (

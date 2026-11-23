@@ -12,7 +12,7 @@ type MessageRow = {
   kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO';
   body: string;
   suggestion: unknown;
-  response: 'ACCEPTED' | 'DECLINED' | null;
+  response: 'ACCEPTED' | 'DECLINED' | 'CANCELED' | null;
   respondedAt: Date | null;
   meetupId: string | null;
   eventId: string | null;
@@ -393,6 +393,12 @@ export class PrismaConversationRepository implements ConversationRepository {
     if (!isUuid(id)) return undefined;
     const row = await this.prisma.message.findUnique({ where: { id } });
     return row ? toMessage(row as MessageRow) : undefined;
+  }
+
+  async withdrawSuggestion(messageId: string, at: Date): Promise<boolean> {
+    if (!isUuid(messageId)) return false;
+    const result = await this.prisma.message.updateMany({ where: { id: messageId, kind: 'SUGGESTION', OR: [{ response: null }, { response: 'ACCEPTED' }] }, data: { response: 'CANCELED', respondedAt: at } });
+    return result.count > 0;
   }
 
   async clearSuggestionResponse(messageId: string, expected: SuggestionResponse): Promise<boolean> {

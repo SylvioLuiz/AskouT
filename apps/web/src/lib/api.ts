@@ -449,7 +449,8 @@ export function createApi(deps: ApiDeps) {
     flashChooseDestination: (inviteId: string, place: { name: string; lat: number; lng: number }) => request<{ ok: true }>('PUT', `/flash/matches/${id(inviteId)}/destination`, { body: place }),
     flashClearDestination: (inviteId: string) => request<{ ok: true }>('DELETE', `/flash/matches/${id(inviteId)}/destination`),
     flashRoutes: (inviteId: string, mode: 'foot' | 'driving') => request<FlashRoutes>('GET', `/flash/matches/${id(inviteId)}/routes?modo=${mode === 'driving' ? 'carro' : 'a-pe'}`),
-    flashSuggestions: (inviteId: string, radiusKm?: number | null) => request<Suggestions>('GET', `/flash/matches/${id(inviteId)}/suggestions${radiusKm ? `?raioKm=${radiusKm}` : ''}`),
+    flashSuggestions: (inviteId: string, radiusKm?: number | null, innerKm?: number) =>
+      request<Suggestions>('GET', `/flash/matches/${id(inviteId)}/suggestions${radiusKm ? `?raioKm=${radiusKm}${innerKm ? `&desdeKm=${innerKm}` : ''}` : ''}`),
 
     notificationMute: () => request<NotificationMute>('GET', '/notifications/settings'),
     setNotificationMute: (patch: Partial<NotificationMute>) => request<NotificationMute>('PUT', '/notifications/settings', { body: patch }),
@@ -799,7 +800,7 @@ export function createApi(deps: ApiDeps) {
     markAudioPlayed: (conversationId: string, messageId: string) => request<{ played: true }>('POST', `/conversations/${id(conversationId)}/messages/${id(messageId)}/audio/played`),
     sendSuggestion: (conversationId: string, suggestion: SuggestionCard) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { suggestion } }),
-    respondSuggestion: (conversationId: string, messageId: string, action: 'accept' | 'decline' | 'cancel') =>
+    respondSuggestion: (conversationId: string, messageId: string, action: 'accept' | 'decline' | 'cancel' | 'withdraw') =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages/${id(messageId)}/respond`, { body: { action } }),
     /** Endereço completo de um recurso da API (a foto do lugar), a partir do caminho que ela devolveu. */
     assetUrl: (path: string) => `${deps.baseUrl}${path}`,

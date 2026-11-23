@@ -2804,6 +2804,50 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   font-size: 0;
 }
 
+.sugcard__answer--canceled {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.sugcard--more {
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  width: 100%;
+  text-align: center;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.sugcard--more:disabled {
+  cursor: progress;
+}
+
+.sugcard--more__plus {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--brand-ink);
+  background: var(--brand);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.carousel__slide--more {
+  flex-basis: 55%;
+  align-self: stretch;
+}
+
+.radiuschips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
 .sugcard--picked {
   border-color: var(--brand);
   box-shadow: 0 0 0 2px var(--brand-soft);

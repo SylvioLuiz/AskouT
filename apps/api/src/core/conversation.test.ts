@@ -225,6 +225,26 @@ test('respond: aceitar uma segunda sugestão cancela o aceite da primeira', asyn
   assert.equal(msgs.find((m) => m.id === second.id)!.response, 'ACCEPTED');
 });
 
+test('respond withdraw: quem sugeriu cancela (aberta ou aceita) e o cartão fica cancelado; aceito some do encontro', async () => {
+  const { w, ana, bia, id } = await friends();
+  await w.core.flash.turnOn(ana, { hours: 2 });
+  await w.core.flash.turnOn(bia, { hours: 2 });
+  const invite = await w.core.flash.invite(ana, bia);
+  await w.core.flash.respond(bia, invite.id, 'accept');
+  const open = await w.core.conversations.send(ana, id, { suggestion: card });
+  await rejectsWith(w.core.conversations.respond(bia, id, open.id, 'withdraw'), 'FORBIDDEN');
+  const gone = await w.core.conversations.respond(ana, id, open.id, 'withdraw');
+  assert.equal(gone.response, 'CANCELED');
+  await rejectsWith(w.core.conversations.respond(bia, id, open.id, 'accept'), 'CONFLICT');
+  await rejectsWith(w.core.conversations.respond(ana, id, open.id, 'withdraw'), 'CONFLICT');
+  const second = await w.core.conversations.send(ana, id, { suggestion: { ...card, externalId: 'event:9' } });
+  await w.core.conversations.respond(bia, id, second.id, 'accept');
+  assert.equal((await w.core.flash.getMatch(ana, invite.id)).destination?.name, 'Bar do Zé');
+  await w.core.conversations.respond(ana, id, second.id, 'withdraw');
+  assert.equal((await w.core.flash.getMatch(ana, invite.id)).destination, null);
+  assert.equal((await w.core.conversations.messages(bia, id)).messages.at(-1)!.response, 'CANCELED');
+});
+
 test('respond: mensagem de texto não é sugestão, estranhos não respondem, ex-amigos não respondem', async () => {
   const { w, ana, bia, caio, id } = await sentCard();
   const text = await w.core.conversations.send(ana, id, { body: 'oi' });
