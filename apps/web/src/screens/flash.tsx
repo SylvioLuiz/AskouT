@@ -1132,7 +1132,7 @@ function MatchList({ matches, after, onEnded }: { matches: readonly FlashInvite[
               </span>
               <ChevronRightIcon />
             </Link>
-            {ending !== invite.id ? (
+            {after && ending !== invite.id ? (
               <button type="button" className="nowmatches__end" onClick={() => setEnding(invite.id)} aria-label={t('Encerrar encontro com {name}', { name: invite.other.username })}>
                 {t('Encerrar')}
               </button>
@@ -1451,6 +1451,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const viewer = useUser();
   const match = useAsync(() => api.flashMatch(inviteId), [inviteId]);
   usePolling(match.reload, 8_000);
+  const tickNow = useTick(1000);
 
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1578,6 +1579,8 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const places = [...sortByFairness(suggestions.data?.items ?? []).slice(0, MAX_PLACES_ON_MAP), ...more.items];
   const placePins: PlacePin[] = places.map((p) => ({ key: p.key, name: placeName(p), lat: p.lat, lng: p.lng }));
   const left = minutesLeft(data.expiresAt, Date.parse(data.now));
+  // "Encerrar" só aparece depois que o NOW acabou (antes disso ele termina sozinho no horário).
+  const nowEnded = Date.parse(data.expiresAt) <= Math.max(tickNow, Date.parse(data.now));
   const them = data.them;
   const myPoint = share.mine ?? (data.me ? { lat: data.me.lat, lng: data.me.lng } : undefined);
   const distance = them && myPoint ? distanceMeters(myPoint, them) : undefined;
@@ -1596,17 +1599,18 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         back="/now"
         subtitle={t('Encontro NOW · acaba em {left}', { left: formatRemaining(left) })}
         action={
-          // Encerrar sempre à mão no topo do encontro (a localização dos dois para na hora).
-          <button
-            type="button"
-            className="matchend"
-            onClick={() => {
-              setConfirmEnd(true);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          >
-            {t('Encerrar')}
-          </button>
+          nowEnded ? (
+            <button
+              type="button"
+              className="matchend"
+              onClick={() => {
+                setConfirmEnd(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            >
+              {t('Encerrar')}
+            </button>
+          ) : undefined
         }
       />
       {confirmEnd ? (
@@ -1759,7 +1763,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         <Link to={`/conversas/${data.conversationId}`} className="btn btn--primary btn--full">
           {t('Conversar e sugerir um local')}
         </Link>
-        {confirmEnd ? null : (
+        {confirmEnd || !nowEnded ? null : (
           <Button
             variant="secondary"
             full
