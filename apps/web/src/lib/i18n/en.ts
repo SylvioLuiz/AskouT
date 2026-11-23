@@ -3548,4 +3548,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Deslize para cancelar": "Slide to cancel",
   "Gravar áudio (segure para gravar e solte para enviar)": "Record audio (hold to record, release to send)",
   "Segure para gravar, solte para enviar": "Hold to record, release to send",
+  "Aceitar mesmo com outro compromisso?": "Accept even with other plans?",
+  "O convite de {name} bate com o que você já aceitou:": "{name}'s invite clashes with what you already accepted:",
+  "Aceitar mesmo assim": "Accept anyway",
+  "Choque com o que você já aceitou ({when})": "Clashes with something you accepted ({when})",
 };
