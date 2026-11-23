@@ -118,6 +118,13 @@ function PrecisionChip({ approx, onChange, disabled }: { approx: boolean; onChan
 function useAnswer(invite: FlashInvite, onDone: () => void) {
   const [busy, setBusy] = useState<'accept' | 'decline' | undefined>();
   const [error, setError] = useState<string | undefined>();
+  const [confirming, setConfirming] = useState<{ approx: boolean } | undefined>();
+  const conflicts = invite.conflicts ?? [];
+  /** "Bora!": se o convite bate com algo que você já aceitou, pergunta antes; senão aceita direto. */
+  function accept(approx: boolean) {
+    if (conflicts.length > 0) setConfirming({ approx });
+    else void answer('accept', approx);
+  }
   async function answer(action: 'accept' | 'decline', approx: boolean) {
     setBusy(action);
     setError(undefined);
@@ -134,7 +141,45 @@ function useAnswer(invite: FlashInvite, onDone: () => void) {
       setBusy(undefined);
     }
   }
-  return { busy, error, answer };
+  const confirm =
+    confirming && conflicts.length > 0 ? (
+      <ConflictConfirm
+        invite={invite}
+        onCancel={() => setConfirming(undefined)}
+        onConfirm={() => {
+          const { approx } = confirming;
+          setConfirming(undefined);
+          void answer('accept', approx);
+        }}
+      />
+    ) : null;
+  return { busy, error, answer, accept, confirm };
+}
+
+/** Confirmação antes de aceitar um convite que bate com o que você já aceitou. Não bloqueia: dá para aceitar mesmo assim. */
+function ConflictConfirm({ invite, onCancel, onConfirm }: { invite: FlashInvite; onCancel: () => void; onConfirm: () => void }) {
+  const list = invite.conflicts ?? [];
+  return (
+    <div className="nowmodal" role="dialog" aria-modal="true" aria-labelledby={`nowconf-${invite.id}`} onClick={onCancel}>
+      <div className="nowmodal__box nowmodal__box--conflict" onClick={(e) => e.stopPropagation()}>
+        <strong id={`nowconf-${invite.id}`}>{t('Aceitar mesmo com outro compromisso?')}</strong>
+        <p>{t('O convite de {name} bate com o que você já aceitou:', { name: invite.other.username })}</p>
+        <ul className="nowmodal__conflicts">
+          {list.map((c) => (
+            <li key={`${c.kind}:${c.startsAt}:${c.title ?? ''}:${c.withName ?? ''}`}>{conflictText(c)}</li>
+          ))}
+        </ul>
+        <div className="nowmodal__row">
+          <button type="button" className="nowmodal__back" onClick={onCancel} autoFocus>
+            {t('Voltar')}
+          </button>
+          <button type="button" className="nowmodal__ok" onClick={onConfirm}>
+            {t('Aceitar mesmo assim')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface InviteProps {
@@ -182,7 +227,7 @@ function InviteConflicts({ invite }: { invite: FlashInvite }) {
 export function InviteFocusCard({ invite, friend, onDone }: InviteProps) {
   const [approx, setApprox] = useState(false);
   const [clock, setClock] = useState(false);
-  const { busy, error, answer } = useAnswer(invite, onDone);
+  const { busy, error, answer, accept, confirm } = useAnswer(invite, onDone);
   const distance = friend?.approx ? t('{distance} de você', { distance: formatApprox(friend.approx, true) }) : t('Livre agora');
   return (
     <section className="nowinv" aria-labelledby={`nowinv-${invite.id}`}>
@@ -205,11 +250,12 @@ export function InviteFocusCard({ invite, friend, onDone }: InviteProps) {
         <button type="button" className="nowbtn nowbtn--no" disabled={busy !== undefined} aria-busy={busy === 'decline' || undefined} onClick={() => void answer('decline', false)}>
           {t('Agora não')}
         </button>
-        <button type="button" className="nowbtn nowbtn--yes" disabled={busy !== undefined} aria-busy={busy === 'accept' || undefined} onClick={() => void answer('accept', approx)}>
+        <button type="button" className="nowbtn nowbtn--yes" disabled={busy !== undefined} aria-busy={busy === 'accept' || undefined} onClick={() => accept(approx)}>
           {t('Bora!')}
         </button>
       </div>
       {clock ? <TimeModal invite={invite} onClose={() => setClock(false)} /> : null}
+      {confirm}
     </section>
   );
 }
@@ -218,7 +264,7 @@ export function InviteFocusCard({ invite, friend, onDone }: InviteProps) {
 function InviteSheetBody({ invite, friend, onDone }: InviteProps) {
   const [approx, setApprox] = useState(false);
   const now = useTick(15_000);
-  const { busy, error, answer } = useAnswer(invite, onDone);
+  const { busy, error, answer, accept, confirm } = useAnswer(invite, onDone);
   const left = minutesLeft(invite.expiresAt, now);
   return (
     <div className="nowsheet">
@@ -237,10 +283,11 @@ function InviteSheetBody({ invite, friend, onDone }: InviteProps) {
         <button type="button" className="nowbtn nowbtn--no" disabled={busy !== undefined} onClick={() => void answer('decline', false)}>
           {t('Agora não')}
         </button>
-        <button type="button" className="nowbtn nowbtn--yes" disabled={busy !== undefined} onClick={() => void answer('accept', approx)}>
+        <button type="button" className="nowbtn nowbtn--yes" disabled={busy !== undefined} onClick={() => accept(approx)}>
           {t('Bora!')}
         </button>
       </div>
+      {confirm}
     </div>
   );
 }
@@ -335,7 +382,11 @@ export function NowInviteToast({ received, enabled }: { received: readonly Flash
           <NowFace profile={shown.other} size={38} />
           <span className="nowtoast__text">
             <strong>{t('{name} te chamou para sair agora', { name: shown.other.username })}</strong>
-            <span>{[friend?.note, friend?.approx ? formatApprox(friend.approx, true) : undefined].filter(Boolean).join(' · ') || t('Toque para responder')}</span>
+            {shown.conflicts && shown.conflicts.length > 0 ? (
+              <span className="nowtoast__warn">{t('Choque com o que você já aceitou ({when})', { when: conflictWhen(shown.conflicts[0]!) })}</span>
+            ) : (
+              <span>{[friend?.note, friend?.approx ? formatApprox(friend.approx, true) : undefined].filter(Boolean).join(' · ') || t('Toque para responder')}</span>
+            )}
           </span>
           <span className="nowtoast__bolt" aria-hidden="true">
             <BoltIcon filled />

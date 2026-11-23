@@ -118,6 +118,7 @@ export function previewOf(m: ChatMessage | null): string {
   if (m.deleted) return `${who}${t('Mensagem apagada')}`;
   if (m.kind === 'IMAGE') return `${who}${t('Foto')}`;
   if (m.kind === 'VIDEO') return `${who}${t('Vídeo')}`;
+  if (m.kind === 'FILE') return `${who}📎 ${m.body}`;
   if (m.kind === 'SUGGESTION' && m.suggestion) return `${prefix}${t('Sugeriu {venueName}', { venueName: m.suggestion.venueName })}`;
   if (m.kind === 'AUDIO') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}${t('Mensagem de voz')}${m.audio ? ` (${formatVoiceTime(m.audio.durationMs)})` : ''}`;
   if (m.kind === 'MEETUP') return `${prefix}${m.body}`;
@@ -132,6 +133,7 @@ export function replyPreview(m: ChatMessage): string {
   if (m.kind === 'AUDIO') return t('Mensagem de voz');
   if (m.kind === 'IMAGE') return t('Foto');
   if (m.kind === 'VIDEO') return t('Vídeo');
+  if (m.kind === 'FILE') return `📎 ${m.body}`;
   if (m.kind === 'EVENT') return t('Evento: {title}', { title: m.event?.title ?? t('compartilhado') });
   if (m.kind === 'SUGGESTION' && m.suggestion) return t('Sugestão: {venueName}', { venueName: m.suggestion.venueName });
   return Array.from(m.body.replace(/\s+/g, ' ')).slice(0, 100).join('');
@@ -164,7 +166,7 @@ export function announceChatsChanged(): void {
 }
 
 /** Tipos que a pessoa pode apagar para todos (só as próprias mensagens). */
-export const DELETABLE_KINDS: readonly ChatMessage['kind'][] = ['TEXT', 'AUDIO', 'IMAGE', 'VIDEO', 'EVENT'];
+export const DELETABLE_KINDS: readonly ChatMessage['kind'][] = ['TEXT', 'AUDIO', 'IMAGE', 'VIDEO', 'FILE', 'EVENT'];
 
 /** Mensagens sem opções: avisos do sistema e as já apagadas. */
 export function selectable(m: ChatMessage): boolean {
@@ -176,13 +178,17 @@ export function allDeletable(messages: readonly ChatMessage[]): boolean {
   return messages.length > 0 && messages.every((m) => m.mine && !m.deleted && DELETABLE_KINDS.includes(m.kind));
 }
 
-/** Texto para copiar: uma mensagem sai pura; várias saem como "[hh:mm] Nome: texto", na ordem da conversa. Só texto entra. */
-export function copyText(messages: readonly ChatMessage[]): string {
-  const texts = messages.filter((m) => m.kind === 'TEXT' && !m.deleted && m.body.trim() !== '');
+/**
+ * Texto para copiar: uma mensagem sai pura; várias saem como "[hh:mm] Nome: texto", na ordem da conversa (como no
+ * WhatsApp Web). `otherName`: nome da outra pessoa na conversa 1 a 1 (lá as mensagens não trazem o nome).
+ * Texto, link e o nome de um arquivo entram; foto, áudio e cartões ficam de fora.
+ */
+export function copyText(messages: readonly ChatMessage[], otherName?: string): string {
+  const texts = messages.filter((m) => (m.kind === 'TEXT' || m.kind === 'FILE') && !m.deleted && m.body.trim() !== '');
   if (texts.length === 0) return '';
   const first = texts[0];
   if (messages.length === 1 && first) return first.body;
-  return texts.map((m) => `[${formatClock(m.createdAt)}] ${m.mine ? t('Você') : (m.senderName ?? t('Contato'))}: ${m.body}`).join('\n');
+  return texts.map((m) => `[${formatClock(m.createdAt)}] ${m.mine ? t('Você') : (m.senderName ?? otherName ?? t('Contato'))}: ${m.kind === 'FILE' ? `📎 ${m.body}` : m.body}`).join('\n');
 }
 
 // ---------- Layout no estilo das DMs ----------

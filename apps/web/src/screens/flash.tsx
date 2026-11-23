@@ -329,6 +329,24 @@ function FlashContent() {
         {feedbackLine}
         <OfferBanner />
         <MatchList matches={invites.data?.matches ?? []} after onEnded={reloadAll} />
+        {(invites.data?.matches.length ?? 0) > 0 ? (
+          <div className="nowloc-row">
+            {share.state.phase === 'sharing' ? (
+              <span className="nowloc nowloc--on">
+                <i aria-hidden="true" />
+                {t('Localização ligada')}
+              </span>
+            ) : share.state.phase === 'asking' ? (
+              <span className="nowloc">{t('Ligando a localização…')}</span>
+            ) : (
+              <button type="button" className="nowloc nowloc--off" onClick={share.start}>
+                <LocationIcon />
+                {share.state.phase === 'error' ? t('Tentar ligar a localização') : t('Ligar localização')}
+              </button>
+            )}
+            {share.state.phase === 'error' ? <p className="muted nowcard__hint">{share.state.message}</p> : null}
+          </div>
+        ) : null}
         <header className="nowhead">
           <div>
             <h1 className="nowhead__title">
@@ -1370,7 +1388,7 @@ function useShareLocation(inviteIds: readonly string[], onEnded: () => void, aut
           start(false);
           return;
         }
-        setState({ phase: 'error', message: geolocationMessage(failure.code, true) });
+        setState({ phase: 'error', message: geolocationMessage(failure.code, true, failure.message) });
       },
       { enableHighAccuracy: highAccuracy, maximumAge: highAccuracy ? 5_000 : 60_000, timeout: 20_000 },
     );
@@ -1717,9 +1735,21 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
           <>
             <p className="sharebox__title">{t('Mostrar onde estou')}</p>
             <p className="muted">{t('Só {name} vê sua localização, só durante este encontro, e ela some quando ele acabar. Ao aceitar o convite, o envio começa sozinho.', { name: data.other.username })}</p>
-            {share.state.phase === 'error' ? <Notice tone="error">{share.state.message}</Notice> : null}
+            {share.state.phase === 'error' ? (
+              <Notice tone="error">
+                {share.state.message}
+                {backgroundLocationBridge() ? (
+                  <>
+                    {' '}
+                    <button type="button" className="linkbtn" onClick={() => void backgroundLocationBridge()?.openSettings()}>
+                      {t('Abrir ajustes')}
+                    </button>
+                  </>
+                ) : null}
+              </Notice>
+            ) : null}
             <Button full loading={share.state.phase === 'asking'} onClick={share.start}>
-              {t('Compartilhar minha localização')}
+              {share.state.phase === 'error' ? t('Tentar de novo') : t('Compartilhar minha localização')}
             </Button>
           </>
         )}

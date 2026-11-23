@@ -14,7 +14,7 @@ import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';
 import { createAppleBridge } from './apple-bridge.ts';
 import { installBackButton } from './back-button.ts';
 import { deepLinkPath } from './deep-link.ts';
-import { createLocationBridge, guardGeolocation } from './location-bridge.ts';
+import { createLocationBridge, useNativeGeolocation } from './location-bridge.ts';
 import { createBackgroundLocationBridge, type ArrivalProgressPluginLike, type BackgroundPluginLike } from './background-location-bridge.ts';
 import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
@@ -71,7 +71,8 @@ if (Capacitor.isNativePlatform()) {
         : undefined,
   });
   // O WebView do Android não mostra o pedido de localização sozinho: toda leitura de posição pede antes pelo sistema.
-  if (typeof navigator !== 'undefined' && navigator.geolocation) guardGeolocation(navigator.geolocation, () => location.ensure());
+  // A posição vem do GPS nativo (plugin), não do WebView: no Android o WebView às vezes não responde (ver location-bridge.ts).
+  if (typeof navigator !== 'undefined' && navigator.geolocation) useNativeGeolocation(navigator.geolocation, Geolocation as never, () => location.ensure());
   w['AskouTVideo'] = createVideoBridge({
     filesystem: {
       writeFile: (o) => Filesystem.writeFile({ path: o.path, data: o.data, directory: Directory.Cache }),
@@ -109,6 +110,23 @@ if (Capacitor.isNativePlatform()) {
   w['AskouTContacts'] = createContactsBridge({ contacts: Contacts as never });
   // O botão do Google da web não abre dentro do app (o Google bloqueia login em WebView): entra a janela nativa.
   w['AskouTGoogle'] = createGoogleBridge({ login: SocialLogin as never, platform: () => Capacitor.getPlatform() });
+  // "Compartilhar com o AskouT" vindo de outro app (só Android por enquanto; ShareInPlugin.java). O app web abre
+  // "Enviar para…" (apps/web/src/lib/share-in.ts). Build antigo, sem o plugin: a ponte não existe.
+  if (Capacitor.isPluginAvailable('AskouTShareIn')) {
+    const shareIn = registerPlugin<{
+      take(): Promise<{ share: { items: { path: string; name: string; mime: string }[]; text?: string } | null }>;
+      addListener(event: 'received', cb: () => void): Promise<{ remove(): Promise<void> }>;
+    }>('AskouTShareIn');
+    w['AskouTShareIn'] = {
+      take: async () => (await shareIn.take()).share ?? null,
+      onShare(cb: () => void): () => void {
+        const handle = shareIn.addListener('received', cb);
+        return () => {
+          void handle.then((h) => h.remove()).catch(() => undefined);
+        };
+      },
+    };
+  }
   // Vibração curta de confirmação (arrastar para responder, segurar, etc.): no iPhone o navigator.vibrate não existe.
   // Contrato do lado web: apps/web/src/lib/haptics.ts. Build antigo, sem o plugin: o web cai no navigator.vibrate.
   if (Capacitor.isPluginAvailable('Haptics')) {

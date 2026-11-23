@@ -107,8 +107,12 @@ export function flashNoteProblem(note: string): string | undefined {
 }
 
 /** Mensagem para cada motivo de falha do navegador ao pegar a localização (códigos de GeolocationPositionError). */
-export function geolocationMessage(code: number | undefined, secure: boolean): string {
+/** O app do celular avisa assim quando a localização do aparelho (GPS) está desligada (apps/mobile/src/location-bridge.ts). */
+export const LOCATION_SERVICES_OFF = 'askout:services-off';
+
+export function geolocationMessage(code: number | undefined, secure: boolean, detail?: string): string {
   if (!secure) return t('O navegador só libera a localização em conexão segura (https).');
+  if (detail === LOCATION_SERVICES_OFF) return t('A localização do celular está desligada. Ligue em Ajustes (ou no atalho "Localização" da barra de cima do celular) e toque em ligar de novo.');
   if (code === 1) return t('A localização está bloqueada, e o aparelho não deixa perguntar de novo. No computador, clique no ícone ao lado do endereço e permita a localização. No celular, vá em Ajustes, no AskouT ou no navegador, e permita a localização. Assim que liberar, ela liga sozinha.');
   if (code === 2) return t('Não foi possível descobrir onde você está agora. Vá para um lugar com melhor sinal.');
   if (code === 3) return t('A localização demorou demais. Toque em compartilhar para tentar de novo.');

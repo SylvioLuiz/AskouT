@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { CSSProperties } from 'react';
-import type { ChangeEvent, FormEvent, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import type { ChangeEvent, ClipboardEvent as ReactClipboardEvent, FormEvent, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VOICE_CANCEL_DX, VOICE_LOCK_DY, VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
@@ -10,6 +10,8 @@ import { haptic } from '../lib/haptics.ts';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
 import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
+import { FileBubble } from '../components/chat-file.tsx';
+import { CHAT_FILE_ACCEPT, documentType, fileProblem } from '../lib/chat-file.ts';
 import { MessagePopup, ReactionSummary, ReactionsSheet, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { SwipeRow, useTimeReveal } from '../components/swipe-reply.tsx';
@@ -637,6 +639,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const deleteTimer = useRef<number | undefined>(undefined);
   const deleteIds = useRef<string[] | undefined>(undefined);
   const galleryRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [staged, setStaged] = useState<StagedMedia[]>([]);
@@ -905,6 +908,24 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const match = data.other ? flash.data?.matches.find((m) => m.other.userId === data.other?.userId) : undefined;
   const serverNow = Date.parse(data.now);
 
+  /**
+   * Ctrl+C com o mouse selecionando mais de uma mensagem: copia com a hora e o nome de quem mandou cada uma
+   * ("[14:02] Bia: oi"), como no WhatsApp Web. Dentro de uma mensagem só, copia o trecho selecionado, como sempre.
+   */
+  function copySelection(e: ReactClipboardEvent<HTMLDivElement>) {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    const ids = messages.filter((m) => {
+      const el = document.getElementById(`msg-${m.id}`);
+      return el ? sel.containsNode(el, true) : false;
+    });
+    if (ids.length < 2) return;
+    const text = copyText(ids, data?.other?.displayName);
+    if (text === '') return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', text);
+  }
+
   /** Responder: marca a mensagem e já abre o teclado no campo. */
   function startReply(m: ChatMessage) {
     setReplyTo(m);
@@ -993,6 +1014,36 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       ok.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, file, kind: mediaKind(file) === 'IMAGE' ? 'IMAGE' : 'VIDEO', url: URL.createObjectURL(file) });
     }
     if (ok.length > 0) setStaged((current) => [...current, ...ok]);
+  }
+
+  /** Documento (PDF, Word...): sai na hora, um por vez, respondendo à mensagem marcada. */
+  async function pickFile(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (files.length === 0) return;
+    setProblem(undefined);
+    let reply = replyTo?.id;
+    setSending(true);
+    setUploading(true);
+    try {
+      for (const file of files) {
+        const trouble = fileProblem(file);
+        if (trouble) {
+          setProblem(trouble);
+          continue;
+        }
+        const message = await api.sendFile(conversationId, file, file.name, documentType(file.name, file.type) ?? file.type, reply);
+        reply = undefined;
+        stickToEnd.current = true;
+        setMessages((current) => mergeMessages(current, [message]));
+      }
+      setReplyTo(undefined);
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setSending(false);
+      setUploading(false);
+    }
   }
 
   function unstage(id: string) {
@@ -1125,7 +1176,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     });
   }
   async function copyChosen() {
-    const text = copyText(chosen);
+    const text = copyText(chosen, data?.other?.displayName);
     if (text === '') return;
     try {
       await navigator.clipboard.writeText(text);
@@ -1243,6 +1294,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           <VoiceBubble message={m} conversationId={conversationId} />
         ) : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? (
           <MediaBubble message={m} conversationId={conversationId} onTap={(x, y) => registerTap(m, x, y)} />
+        ) : m.kind === 'FILE' ? (
+          <FileBubble message={m} conversationId={conversationId} />
         ) : m.kind === 'EVENT' && m.event ? (
           <EventBubble event={m.event} />
         ) : m.gif ? (
@@ -1301,7 +1354,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       />
       )}
 
-      <div ref={threadRef} className="chat__thread" aria-live="polite" {...reveal}>
+      <div ref={threadRef} className="chat__thread" aria-live="polite" {...reveal} onCopy={copySelection}>
         {older.hasMore ? (
           <div className="chat__older">
             <Button small variant="quiet" loading={older.loading} onClick={loadOlder}>
@@ -1487,6 +1540,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 Mensagem para {chatName}
               </label>
               <input ref={galleryRef} type="file" multiple accept="image/*,video/*" className="visually-hidden" aria-label={t('Escolher fotos ou vídeos')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
+              <input ref={fileRef} type="file" multiple accept={CHAT_FILE_ACCEPT} className="visually-hidden" aria-label={t('Escolher arquivo')} tabIndex={-1} onChange={(e) => void pickFile(e)} />
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="visually-hidden" aria-label={t('Tirar foto')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
               {recording ? (
                 <VoiceRecorderBar mode={recording} slide={voiceSlide} control={voiceControl} onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
@@ -1532,6 +1586,11 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                     </>
                   ) : (
                     <span className="composer__tools">
+                      <button type="button" className="composer__tool" aria-label={t('Enviar arquivo (PDF, documento, planilha)')} disabled={sending} onClick={() => fileRef.current?.click()}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M20.5 11.5 12.6 19.4a5 5 0 0 1-7.1-7.1l8.1-8.1a3.3 3.3 0 0 1 4.7 4.7l-8.1 8.1a1.7 1.7 0 0 1-2.4-2.4l7.4-7.4" />
+                        </svg>
+                      </button>
                       <button type="button" className="composer__tool" aria-label={t('Enviar fotos ou vídeos da galeria')} onClick={() => galleryRef.current?.click()}>
                         <PhotoIcon />
                       </button>

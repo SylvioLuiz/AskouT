@@ -19,6 +19,7 @@ import { rememberCheckinReturn, takeCheckinReturn } from './lib/checkin.ts';
 import { safeStorage } from './lib/hints.ts';
 import { t } from './lib/i18n/index.ts';
 import { lazyWithReload } from './lib/chunk-reload.ts';
+import { ShareInScreen } from './screens/share-in.tsx';
 
 // Cada tela vira um arquivo separado, baixado só quando é aberta (antes tudo vinha junto na primeira carga).
 // A Home fica no pacote principal por ser a primeira tela; as outras são aquecidas em segundo plano (ver warmScreens).
@@ -208,6 +209,7 @@ const PRIVATE_ROUTES: RouteDef[] = [
   { path: '/bares/:id/impulsionar', render: (p) => <BoostScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/bares/:id', render: (p) => <VenuePageScreen key={p['id']} venueId={p['id'] ?? ''} /> },
   { path: '/locais/:id', render: (p) => <Redirect to={`/bares/${encodeURIComponent(p['id'] ?? '')}`} /> },
+  { path: '/compartilhar', render: () => <ShareInScreen /> },
   { path: '/amigos', render: () => <FriendsScreen /> },
   { path: '/amigos/contatos', render: () => <ContactsScreen /> },
   { path: '/bloqueados', render: () => <BlockedScreen /> },

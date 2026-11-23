@@ -4,6 +4,7 @@ import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
 import { PUSH_EVENT, useAsync, useHiddenPolling, useLiveRefresh, usePolling } from '../hooks.ts';
 import { setTabBadge } from '../lib/tab-badge.ts';
+import { loadIncomingShare, setIncomingShare, shareInBridge } from '../lib/share-in.ts';
 import { CHATS_CHANGED_EVENT } from '../lib/chat.ts';
 import { FLASH_CHANGED_EVENT } from '../lib/flash.ts';
 import { hasNewActivity, NOTIFICATIONS_CHANGED_EVENT, readActivitySeen } from '../lib/notifications.ts';
@@ -127,6 +128,26 @@ export function Shell({ children }: { children: ReactNode }) {
 function MainShell({ children }: { children: ReactNode }) {
   const user = useUser();
   const pathname = usePathname();
+  // Outro app compartilhou com o AskouT (foto, PDF, link...): abre "Enviar para…". Vale ao abrir o app pelo
+  // compartilhamento e quando ele chega com o app já aberto.
+  useEffect(() => {
+    const bridge = shareInBridge();
+    if (!bridge) return undefined;
+    const capacitor = (window as unknown as { Capacitor?: { convertFileSrc?: (path: string) => string } }).Capacitor;
+    const read = async (path: string) => (await fetch(capacitor?.convertFileSrc ? capacitor.convertFileSrc(path) : path)).blob();
+    const check = () => {
+      void bridge
+        .take()
+        .then(async (raw) => {
+          if (!raw || (raw.items.length === 0 && !raw.text)) return;
+          setIncomingShare(await loadIncomingShare(raw, read));
+          navigate('/compartilhar');
+        })
+        .catch(() => undefined);
+    };
+    check();
+    return bridge.onShare(check);
+  }, []);
   // Abriu a tela de um aviso no app (pela lista ou não): o aviso dela sai da bandeja do celular. Vale também ao voltar
   // para o app já nessa tela.
   useEffect(() => {

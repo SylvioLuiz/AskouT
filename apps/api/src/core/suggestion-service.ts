@@ -13,7 +13,9 @@ export function suggestionRadiusM(apartM: number): number {
   return Math.round(Math.min(SUGGESTION_MAX_RADIUS_M, Math.max(SUGGESTION_RADIUS_M, apartM * 0.25)));
 }
 /** Raio escolhido pela pessoa na Configuração (km). Fora disso, vale o automático. */
-export const SUGGESTION_RADIUS_CHOICES_KM: readonly number[] = [2, 5, 10, 25, 50];
+export const SUGGESTION_RADIUS_CHOICES_KM: readonly number[] = [2, 5, 10, 25, 50, 100, 200];
+/** Lugares de fora (Google, OpenStreetMap) vêm de até 50 km: o Google não busca além disso e o OpenStreetMap ficaria lento. Eventos do AskouT usam o raio todo. */
+export const SUGGESTION_EXTERNAL_MAX_RADIUS_M = 50_000;
 
 /** Raio escolhido pela pessoa, se for uma das opções; senão `undefined` (automático). */
 export function chosenRadiusM(radiusKm: unknown): number | undefined {
@@ -117,7 +119,7 @@ export class SuggestionService {
 
     let placesAvailable = true;
     if (items.length < SUGGESTION_MIN_EVENTS) {
-      const osm = await placeSource.nearby(mid, radiusM, innerM > 0 ? SUGGESTION_MAX_ITEMS * 4 : SUGGESTION_MAX_ITEMS * 2);
+      const osm = await placeSource.nearby(mid, Math.min(radiusM, SUGGESTION_EXTERNAL_MAX_RADIUS_M), innerM > 0 ? SUGGESTION_MAX_ITEMS * 4 : SUGGESTION_MAX_ITEMS * 2);
       placesAvailable = osm.available;
       const seen = new Set(items.map((i) => i.venueName.trim().toLowerCase()));
       const extra = osm.places

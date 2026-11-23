@@ -9,6 +9,7 @@ import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Confirm, GroupAvatar, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
+import { useUser } from '../auth.tsx';
 import { pinnedPoll } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { PublicProfile, VenueChat } from '../lib/types.ts';
@@ -16,7 +17,7 @@ import { safeImage } from '../lib/explore.ts';
 import { Link, navigate } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
-type Step = 'menu' | 'clear' | 'remove' | 'block' | 'report' | 'prefs' | 'background' | 'color';
+type Step = 'menu' | 'clear' | 'remove' | 'leave' | 'block' | 'report' | 'prefs' | 'background' | 'color';
 
 /** Topo da conversa: voltar, foto e nome (preso ao rolar) e o menu ⋯ no canto oposto. */
 export function ChatHead({ conversationId, other, venue, groupName, groupImageUrl, subtitle, onCleared, below, pinned, muted, onPrefsChanged, color, onColorChange }: { conversationId: string; other: PublicProfile | null; venue?: VenueChat | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode; pinned: boolean; muted: boolean; onPrefsChanged: () => void; color: string | null; onColorChange: (color: string | null) => void }) {
@@ -52,9 +53,14 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const isGroup = !other;
+  const me = useUser();
   // Votação de data ainda aberta nesta conversa: não faz sentido abrir outra, o menu leva até ela.
   const polls = useAsync(() => api.conversationPolls(conversationId), [conversationId]);
-  const openPoll = (polls.data?.items ?? []).find((p) => pinnedPoll(p, new Date()) !== null);
+  const now = new Date();
+  const openPoll = (polls.data?.items ?? []).map((p) => ({ id: p.id, line: pinnedPoll(p, now) })).find((p) => p.line !== null);
+  // Grupo: o evento dele (grupo de um evento) e quem criou, para "Ver o evento" e "Sair do grupo".
+  const group = useAsync(() => (isGroup ? api.group(conversationId) : Promise.resolve(null)), [conversationId, isGroup]);
+  const groupEvent = group.data?.event ?? null;
 
   async function run(work: () => Promise<unknown>, after: () => void) {
     setBusy(true);
@@ -118,6 +124,15 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
           onCancel={() => setStep('menu')}
           onConfirm={() => void run(() => api.clearConversation(conversationId), () => navigate('/conversas'))}
         />
+      ) : step === 'leave' && isGroup ? (
+        <Confirm
+          danger
+          question={`${t('Você deixa de ver as mensagens do grupo e sai dos encontros dele.')}${group.data && group.data.ownerId === me.id && group.data.members.length > 1 ? t(' Outra pessoa passa a administrar o grupo.') : ''} ${t('Para voltar, só com um novo convite.')}`}
+          confirmLabel={t('Sair do grupo')}
+          busy={busy}
+          onCancel={() => setStep('menu')}
+          onConfirm={() => void run(() => api.leaveGroup(conversationId), () => navigate('/conversas'))}
+        />
       ) : step === 'block' && other ? (
         <Confirm
           danger
@@ -129,19 +144,32 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
         />
       ) : (
         <ul className="sharelist">
-          {openPoll
-            ? row(t('Ver a votação de data'), go(`/planejar/${openPoll.id}`), false, openPoll.title)
-            : row(t('Encontrar a melhor data'), go(`/planejar/nova/${conversationId}`), false, undefined, polls.loading && !polls.data)}
+          {/* O que o grupo está combinando: a votação aberta (ou criar uma, se não houver), o evento e as pessoas. */}
+          {openPoll?.line
+            ? row(t('Ver a votação'), go(`/planejar/${openPoll.id}`), false, `${openPoll.line.name} · ${openPoll.line.status}`)
+            : row(t('Combinar uma data'), go(`/planejar/nova/${conversationId}`), false, undefined, polls.loading && !polls.data)}
+          {groupEvent ? row(t('Ver o evento'), go(`/eventos/${encodeURIComponent(groupEvent.id)}`), false, groupEvent.title) : null}
           {isGroup ? row(t('Pessoas e dados do grupo'), go(`/conversas/${conversationId}/grupo`)) : null}
-          {row(pinned || muted ? t('Fixar e silenciar (ativo)') : t('Fixar e silenciar'), () => setStep('prefs'))}
+          {/* Do jeito de cada um: só muda para você. */}
+          {row(t('Fixar e silenciar'), () => setStep('prefs'), false, prefsHint(pinned, muted))}
           {row(t('Cor da conversa'), () => setStep('color'))}
           {row(t('Imagem de fundo'), () => setStep('background'))}
           {row(t('Limpar conversa'), () => setStep('clear'))}
+          {/* Saídas e segurança, por último. */}
           {other ? row(t('Apagar conversa'), () => setStep('remove'), true) : null}
+          {isGroup ? row(t('Sair do grupo'), () => setStep('leave'), true) : null}
           {other ? row(t('Bloquear'), () => setStep('block'), true) : null}
           {row(isGroup ? t('Denunciar grupo') : t('Denunciar'), () => setStep('report'), true)}
         </ul>
       )}
     </Sheet>
   );
+}
+
+/** Estado de fixar e silenciar, como dica abaixo do item do menu. Nada ativo: sem dica. */
+function prefsHint(pinned: boolean, muted: boolean): string | undefined {
+  if (pinned && muted) return t('Fixada e silenciada');
+  if (pinned) return t('Fixada');
+  if (muted) return t('Silenciada');
+  return undefined;
 }
