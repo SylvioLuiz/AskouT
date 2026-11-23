@@ -2,6 +2,7 @@ import { OpenInMaps } from './open-in-maps.tsx';
 import { VenueLink } from './venue-link.tsx';
 import { Suspense, useRef, useState } from 'react';
 import { api } from '../client.ts';
+import { useUser } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { formatDistances, formatRating, formatWhen, ratingLabel, sourceLabel, starPercent, toCard } from '../lib/chat.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -70,7 +71,7 @@ function Distances({ distances, otherName }: { distances: { meM: number; themM: 
 }
 
 /** O cartão dentro de uma mensagem da conversa: distâncias dos dois, rota e aceitar/recusar. */
-export function SuggestionBubble({ message, otherName, nowIso, conversationId, onUpdated }: { message: ChatMessage; otherName: string; nowIso: string; conversationId: string; onUpdated: (m: ChatMessage) => void }) {
+export function SuggestionBubble({ message, otherName, nowIso, conversationId, onUpdated, onOpenMap }: { message: ChatMessage; otherName: string; nowIso: string; conversationId: string; onUpdated: (m: ChatMessage) => void; onOpenMap?: (place: { name: string; lat: number; lng: number }) => void }) {
   const card = message.suggestion as SuggestionCard;
   const [busy, setBusy] = useState<'accept' | 'decline' | 'cancel' | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
@@ -89,9 +90,11 @@ export function SuggestionBubble({ message, otherName, nowIso, conversationId, o
 
   return (
     <div className="sugcard sugcard--inline">
-      <Suspense fallback={<div className="minimap" aria-hidden="true" />}>
-        <MiniPlaceMap lat={card.lat} lng={card.lng} name={card.venueName} />
-      </Suspense>
+      <button type="button" className="minimap__open" onClick={() => onOpenMap?.({ name: card.venueName, lat: card.lat, lng: card.lng })} aria-label={t('Ver {name} no mapa com vocês dois', { name: card.venueName })}>
+        <Suspense fallback={<div className="minimap" aria-hidden="true" />}>
+          <MiniPlaceMap lat={card.lat} lng={card.lng} name={card.venueName} />
+        </Suspense>
+      </button>
       <div className="sugcard__tags">
         <SourceTag source={card.source} />
         {card.sample ? <SampleBadge /> : null}
@@ -196,7 +199,8 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, s
   const hasGoogle = items.some((i) => i.source === 'GOOGLE');
   const m = match.data;
   const me = m?.me ? { lat: m.me.lat, lng: m.me.lng } : undefined;
-  const them = m?.them ? [{ id: inviteId, lat: m.them.lat, lng: m.them.lng, stale: m.them.stale, initials: initials(otherName) }] : [];
+  const them = m?.them ? [{ id: inviteId, lat: m.them.lat, lng: m.them.lng, stale: m.them.stale, initials: initials(otherName), photoUrl: m.other.avatarUrl }] : [];
+  const mePhoto = useUser().profile.avatarUrl;
   const pins: PlacePin[] = items.map((p) => ({ key: p.key, name: placeName(p), lat: p.lat, lng: p.lng }));
   const dest = m?.destination ? { lat: m.destination.lat, lng: m.destination.lng, name: m.destination.name } : undefined;
 
@@ -207,7 +211,7 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, s
       {!mapFailed && (me || them.length > 0) ? (
         <Suspense fallback={<div className="matchmap matchmap--chat matchmap--loading"><RingLoader size={56} label={t('Carregando o mapa')} /></div>}>
           <div className="chatmap">
-            <MatchMap me={me} others={them} places={pins} selectedKey={picked} onPick={pickFromMap} destination={dest} onFail={() => setMapFailed(true)} />
+            <MatchMap me={me} mePhoto={mePhoto} others={them} places={pins} selectedKey={picked} onPick={pickFromMap} destination={dest} onFail={() => setMapFailed(true)} />
           </div>
         </Suspense>
       ) : null}
@@ -267,6 +271,50 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, s
       {hasGoogle ? <p className="muted sheet__foot">{t('Notas, fotos e lugares: Google.')}</p> : null}
       {hasOsm ? <p className="muted sheet__foot">{t('Lugares: © colaboradores do OpenStreetMap.')}</p> : null}
       <MatchPlaceSearch center={me ?? (them[0] ? { lat: them[0].lat, lng: them[0].lng } : undefined)} otherName={otherName} busy={sending !== undefined} startOpen={searchOpen} onSuggest={(place) => void send(place.key, placeCard(place))} />
+    </Sheet>
+  );
+}
+
+/**
+ * Mapa em modal, aberto pelo "Ver no mapa" do chat ou pela miniatura de um cartão: a sua localização, a do amigo
+ * e o local (o combinado entre vocês ou o do cartão tocado). Sem encontro NOW ativo, mostra só o local.
+ */
+export function PlaceMapSheet({ inviteId, otherName, place, onClose }: { inviteId: string | undefined; otherName: string; place: { name: string; lat: number; lng: number } | undefined; onClose: () => void }) {
+  const match = useAsync(() => (inviteId ? api.flashMatch(inviteId) : Promise.resolve(undefined)), [inviteId]);
+  const [mapFailed, setMapFailed] = useState(false);
+  const m = match.data;
+  const me = m?.me ? { lat: m.me.lat, lng: m.me.lng } : undefined;
+  const them = m?.them && inviteId ? [{ id: inviteId, lat: m.them.lat, lng: m.them.lng, stale: m.them.stale, initials: initials(otherName), photoUrl: m.other.avatarUrl }] : [];
+  const mePhoto = useUser().profile.avatarUrl;
+  // Sem local vindo do cartão, vale o lugar combinado no encontro.
+  const target = place ?? (m?.destination ? { name: m.destination.name, lat: m.destination.lat, lng: m.destination.lng } : undefined);
+  const waiting = inviteId !== undefined && match.loading && !m;
+  return (
+    <Sheet title={target ? target.name : t('Ver no mapa')} onClose={onClose}>
+      {waiting ? <Loading label={t('Carregando o mapa')} /> : null}
+      {!waiting && !mapFailed && (target || me || them.length > 0) ? (
+        <Suspense fallback={<div className="matchmap matchmap--modal matchmap--loading"><RingLoader size={56} label={t('Carregando o mapa')} /></div>}>
+          <div className="placemap">
+            <MatchMap me={me} mePhoto={mePhoto} others={them} destination={target} onFail={() => setMapFailed(true)} />
+          </div>
+        </Suspense>
+      ) : null}
+      {mapFailed ? <Notice tone="error">{t('Não foi possível carregar o mapa agora.')}</Notice> : null}
+      {!waiting ? (
+        <ul className="placemap__legend">
+          {me ? <li><span className="pin pin--me placemap__dot" aria-hidden="true" /> {t('Você')}</li> : null}
+          {them.length > 0 ? <li><span className="pin pin--them placemap__dot" aria-hidden="true" /> {otherName}</li> : null}
+          {target ? <li><span aria-hidden="true">★</span> {target.name}</li> : <li className="muted">{t('Vocês ainda não marcaram um local.')}</li>}
+        </ul>
+      ) : null}
+      {!waiting && inviteId && (!me || them.length === 0) ? <p className="muted sheet__foot">{t('A localização aparece quando cada um compartilha no encontro NOW.')}</p> : null}
+      {target ? (
+        <div className="row-actions">
+          <OpenInMaps className="btn btn--secondary btn--small" mode="route" lat={target.lat} lng={target.lng} label={target.name}>
+            {t('Rota até lá')}
+          </OpenInMaps>
+        </div>
+      ) : null}
     </Sheet>
   );
 }

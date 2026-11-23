@@ -3499,4 +3499,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Entre para mandar mensagem para o local.": "Inicia sesión para enviar un mensaje al local.",
   "Página do local": "Página del local",
   "@{username} · mensagem para {venue}": "@{username} · mensaje para {venue}",
+  "Ver {name} no mapa com vocês dois": "Ver {name} en el mapa con ustedes dos",
+  "Vocês ainda não marcaram um local.": "Todavía no eligieron un lugar.",
+  "A localização aparece quando cada um compartilha no encontro NOW.": "La ubicación aparece cuando cada uno la comparte en el encuentro NOW.",
 };
