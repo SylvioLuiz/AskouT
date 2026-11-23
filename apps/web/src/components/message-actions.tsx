@@ -25,7 +25,7 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [copied, setCopied] = useState(false);
-  const [pos, setPos] = useState<{ barTop: number; menuTop: number } | undefined>();
+  const [pos, setPos] = useState<{ barTop: number; menuTop: number; side: number } | undefined>();
   const menuRef = useRef<HTMLDivElement>(null);
   // Ao soltar o dedo de um toque longo, o toque "vaza" para o fundo; ignora fechar nos primeiros instantes.
   const openedAt = useRef(Date.now());
@@ -59,7 +59,18 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
       const menuH = menuRef.current?.offsetHeight ?? 160;
       const top = Math.max(rect?.top ?? window.innerHeight / 2, BAR_H + GAP + EDGE + 56);
       const bottom = Math.min(rect?.bottom ?? window.innerHeight / 2, window.innerHeight - menuH - GAP - EDGE);
-      setPos({ barTop: Math.max(EDGE + 56, top - BAR_H - GAP), menuTop: Math.max(bottom + GAP, top) });
+      // Na horizontal, alinha com o balão (no computador o chat não ocupa a tela toda): à direita na sua, à esquerda na do outro.
+      const bubble = el?.querySelector('.bubble')?.getBoundingClientRect();
+      const menuW = menuRef.current?.offsetWidth ?? 240;
+      const room = Math.max(EDGE, window.innerWidth - menuW - EDGE);
+      const side = bubble ? Math.min(room, Math.max(EDGE, message.mine ? window.innerWidth - bubble.right : bubble.left)) : EDGE;
+      // Sem espaço abaixo da mensagem (as últimas da conversa): o menu sobe para cima dela, com as reações acima dele.
+      if (rect && rect.bottom + GAP + menuH + EDGE > window.innerHeight) {
+        const menuTop = Math.max(EDGE + 56 + BAR_H + GAP, rect.top - GAP - menuH);
+        setPos({ barTop: menuTop - GAP - BAR_H, menuTop, side });
+        return;
+      }
+      setPos({ barTop: Math.max(EDGE + 56, top - BAR_H - GAP), menuTop: Math.max(bottom + GAP, top), side });
     };
     place();
     return () => el?.classList.remove('msg--lifted');
@@ -112,7 +123,7 @@ export function MessagePopup({ message, conversationId, canSend, onClose, onRepl
   if (step === 'emoji') return <EmojiSheet selected={mine} busy={busy} problem={problem} onPick={(emoji) => void react(emoji)} onClose={onClose} />;
 
   const side = message.mine ? 'msgpop--mine' : 'msgpop--theirs';
-  const style = (top: number | undefined) => (top === undefined ? { visibility: 'hidden' as const } : { top });
+  const style = (top: number | undefined) => (top === undefined || !pos ? { visibility: 'hidden' as const } : message.mine ? { top, right: pos.side } : { top, left: pos.side });
   return (
     <div className={`msgpop ${side}`} role="dialog" aria-modal="true" aria-label={t('Opções da mensagem')}>
       <div className="msgpop__scrim" onClick={() => { if (Date.now() - openedAt.current > 600) onClose(); }} />

@@ -6121,10 +6121,12 @@ button.reactlist__row { cursor: pointer; }
 @media (min-width: 900px) { .shell--chat .chat { min-height: calc(100dvh - 16px); } }
 
 /* Transição entre a lista de conversas e o chat: o chat entra da direita; ao voltar, a lista entra da esquerda. */
-.chat--enter { animation: chat-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+/* `backwards`, não `both`: terminada a entrada, o chat fica sem transform. Um transform que sobra (mesmo o neutro)
+   vira referência para os filhos `position: fixed` e o menu de opções da mensagem abria fora da tela no computador. */
+.chat--enter { animation: chat-enter 260ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 /* Espaço para o botão flutuante "Nova conversa" não cobrir a última conversa. */
 .convscreen { padding-bottom: 72px; }
-.convscreen--back { animation: convscreen-back 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.convscreen--back { animation: convscreen-back 240ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 @keyframes chat-enter { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 @keyframes convscreen-back { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
