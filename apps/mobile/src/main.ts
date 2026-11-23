@@ -14,7 +14,7 @@ import { CapacitorCalendar } from '@ebarooni/capacitor-calendar';
 import { createAppleBridge } from './apple-bridge.ts';
 import { installBackButton } from './back-button.ts';
 import { deepLinkPath } from './deep-link.ts';
-import { createLocationBridge, guardGeolocation } from './location-bridge.ts';
+import { createLocationBridge, useNativeGeolocation } from './location-bridge.ts';
 import { createBackgroundLocationBridge, type ArrivalProgressPluginLike, type BackgroundPluginLike } from './background-location-bridge.ts';
 import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
@@ -71,7 +71,8 @@ if (Capacitor.isNativePlatform()) {
         : undefined,
   });
   // O WebView do Android não mostra o pedido de localização sozinho: toda leitura de posição pede antes pelo sistema.
-  if (typeof navigator !== 'undefined' && navigator.geolocation) guardGeolocation(navigator.geolocation, () => location.ensure());
+  // A posição vem do GPS nativo (plugin), não do WebView: no Android o WebView às vezes não responde (ver location-bridge.ts).
+  if (typeof navigator !== 'undefined' && navigator.geolocation) useNativeGeolocation(navigator.geolocation, Geolocation as never, () => location.ensure());
   w['AskouTVideo'] = createVideoBridge({
     filesystem: {
       writeFile: (o) => Filesystem.writeFile({ path: o.path, data: o.data, directory: Directory.Cache }),

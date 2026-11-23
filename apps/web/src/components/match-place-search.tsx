@@ -6,8 +6,6 @@ import { t } from '../lib/i18n/index.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { ExplorePlace } from '../lib/types.ts';
 
-/** Busca até 100 km em volta de quem pesquisa: dá para sugerir um rolê fora do meio do caminho. */
-const SEARCH_RADIUS_KM = 100;
 const MIN_CHARS = 2;
 
 interface Props {
@@ -39,7 +37,8 @@ export function MatchPlaceSearch({ center, otherName, busy, startOpen = false, o
     setLoading(true);
     const timer = window.setTimeout(() => {
       api
-        .explore({ q: text, ...(center ? { lat: center.lat, lng: center.lng, radiusKm: SEARCH_RADIUS_KM } : {}) })
+        // Sem limite de distância: qualquer lugar pelo nome ou endereço (os mais perto de vocês aparecem primeiro).
+        .searchPlaces({ q: text, ...(center ? { lat: center.lat, lng: center.lng } : {}) })
         .then((r) => {
           if (cancelled) return;
           setResults(r.places);

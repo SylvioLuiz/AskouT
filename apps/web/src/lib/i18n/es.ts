@@ -3579,4 +3579,5 @@ export const ES: Readonly<Record<string, string>> = {
   "O convite de {name} bate com o que você já aceitou:": "La invitación de {name} coincide con lo que ya aceptaste:",
   "Aceitar mesmo assim": "Aceptar de todos modos",
   "Choque com o que você já aceitou ({when})": "Coincide con algo que ya aceptaste ({when})",
+  "A localização do celular está desligada. Ligue em Ajustes (ou no atalho \"Localização\" da barra de cima do celular) e toque em ligar de novo.": "La ubicación del celular está desactivada. Actívala en Ajustes (o en el atajo \"Ubicación\" de la barra superior del celular) y toca para activarla de nuevo.",
 };
