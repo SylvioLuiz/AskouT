@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { CSSProperties } from 'react';
-import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
+import type { ChangeEvent, FormEvent, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
-import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
+import { VOICE_CANCEL_DX, VOICE_LOCK_DY, VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
+import type { VoiceControl } from '../components/voice.tsx';
+import { haptic } from '../lib/haptics.ts';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
 import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
@@ -526,7 +528,74 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [older, setOlder] = useState<{ hasMore: boolean; loading: boolean }>({ hasMore: false, loading: false });
   const [draft, setDraft] = useState(() => readDraft(conversationId));
   const [sending, setSending] = useState(false);
-  const [recording, setRecording] = useState(false);
+  /** Gravando áudio: `hold` enquanto segura o microfone, `locked` gravando sem segurar (travou ou clicou). */
+  const [recording, setRecording] = useState<false | 'hold' | 'locked'>(false);
+  const voiceControl = useRef<VoiceControl | undefined>(undefined);
+  const [voiceSlide, setVoiceSlide] = useState({ dx: 0, dy: 0 });
+  const [micHint, setMicHint] = useState(false);
+  const lastTouchAt = useRef(0);
+  useEffect(() => {
+    if (!micHint) return undefined;
+    const timer = window.setTimeout(() => setMicHint(false), 2200);
+    return () => window.clearTimeout(timer);
+  }, [micHint]);
+
+  /**
+   * Segurar o microfone grava (como no WhatsApp): soltar envia, arrastar para a esquerda cancela e para cima trava.
+   * Toque rápido só mostra a dica. Com mouse, o clique grava no modo travado (onClick).
+   */
+  function holdMic(e: ReactPointerEvent<HTMLButtonElement>) {
+    if (e.pointerType === 'mouse' || recording) return;
+    e.preventDefault();
+    lastTouchAt.current = Date.now();
+    const start = { x: e.clientX, y: e.clientY, at: Date.now(), id: e.pointerId };
+    setProblem(undefined);
+    setMicHint(false);
+    setVoiceSlide({ dx: 0, dy: 0 });
+    setRecording('hold');
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+    };
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== start.id) return;
+      const dx = ev.clientX - start.x;
+      const dy = ev.clientY - start.y;
+      setVoiceSlide({ dx, dy });
+      if (dx < VOICE_CANCEL_DX) {
+        stop();
+        haptic('tap');
+        voiceControl.current?.finish(false);
+      } else if (dy < VOICE_LOCK_DY) {
+        stop();
+        haptic('tick');
+        setRecording('locked');
+      }
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== start.id) return;
+      stop();
+      lastTouchAt.current = Date.now();
+      // Toque rápido: não grava nada, só ensina o gesto.
+      if (Date.now() - start.at < 350) {
+        voiceControl.current?.finish(false);
+        setRecording(false);
+        setMicHint(true);
+        return;
+      }
+      voiceControl.current?.finish(true);
+    };
+    const cancel = (ev: PointerEvent) => {
+      if (ev.pointerId !== start.id) return;
+      stop();
+      voiceControl.current?.finish(false);
+      setRecording(false);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+  }
   const [problem, setProblem] = useState<string | undefined>();
   // Mapa dos locais entre vocês, aberto dentro do chat. `search` já abre a busca de outro lugar (vindo da página do NOW).
   /** Mapa em modal: você, o amigo e o local (`place` vazio = o local combinado). */
@@ -1412,7 +1481,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
               <input ref={galleryRef} type="file" multiple accept="image/*,video/*" className="visually-hidden" aria-label={t('Escolher fotos ou vídeos')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="visually-hidden" aria-label={t('Tirar foto')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
               {recording ? (
-                <VoiceRecorderBar onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
+                <VoiceRecorderBar mode={recording} slide={voiceSlide} control={voiceControl} onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
               ) : (
                 <div className="composer__pill">
                   <button type="button" className="composer__camera" aria-label={t('Tirar foto')} disabled={sending} onClick={() => cameraRef.current?.click()}>
@@ -1458,12 +1527,26 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                       <button type="button" className="composer__tool" aria-label={t('Enviar fotos ou vídeos da galeria')} onClick={() => galleryRef.current?.click()}>
                         <PhotoIcon />
                       </button>
-                      <button type="button" className="composer__tool" aria-label={t('Gravar áudio')} onClick={() => {
+                      <button
+                        type="button"
+                        className="composer__tool composer__mic"
+                        aria-label={t('Gravar áudio (segure para gravar e solte para enviar)')}
+                        onPointerDown={holdMic}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={() => {
+                          // Toque no celular já foi tratado pelo gesto; aqui é o clique do mouse ou o teclado.
+                          if (Date.now() - lastTouchAt.current < 800) return;
                           setProblem(undefined);
-                          setRecording(true);
-                        }}>
+                          setRecording('locked');
+                        }}
+                      >
                         <MicIcon />
                       </button>
+                      {micHint ? (
+                        <span className="composer__michint" role="status">
+                          {t('Segure para gravar, solte para enviar')}
+                        </span>
+                      ) : null}
                     </span>
                   )}
                 </div>

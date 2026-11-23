@@ -4,7 +4,9 @@ import { toApiError } from '../lib/errors.ts';
 import type { ChatMessage } from '../lib/types.ts';
 import { encodeWav, nativeAudio, nativeErrorCode, toBase64 } from '../lib/native-audio.ts';
 import type { NativeAudio, NativeAudioStopped } from '../lib/native-audio.ts';
-import { ArrowUpIcon, CheckIcon, MicIcon, PauseIcon, PlayIcon, XIcon } from './icons.tsx';
+import { ArrowUpIcon, CheckIcon, ChevronLeftIcon, LockIcon, MicIcon, PauseIcon, PlayIcon, XIcon } from './icons.tsx';
+import type { MutableRefObject } from 'react';
+import { haptic } from '../lib/haptics.ts';
 import {
   formatVoiceTime,
   pickVoiceMime,
@@ -52,11 +54,22 @@ function toDataUrl(blob: Blob, fallbackMime: string): Promise<string> {
 
 // ---------- Gravar ----------
 
+/** Quem segura o microfone (o botão, fora da barra) termina a gravação por aqui: soltar envia, arrastar cancela. */
+export interface VoiceControl {
+  finish(send: boolean): void;
+}
+
+/** Arrastar o dedo enquanto segura: para a esquerda cancela, para cima trava (grava sem segurar). */
+export const VOICE_CANCEL_DX = -110;
+export const VOICE_LOCK_DY = -90;
+
 /**
- * Barra de gravação no lugar do campo de texto: cancelar (X), tempo e enviar (seta). Começa a gravar ao aparecer.
+ * Barra de gravação no lugar do campo de texto. Começa a gravar ao aparecer. Dois modos, como no WhatsApp:
+ * `hold` (segurando o microfone: soltar envia, arrastar para a esquerda cancela, para cima trava) e `locked`
+ * (mãos livres: cancelar no X e enviar na seta; é também o modo do clique no computador).
  * Passando dos 90 s a gravação para e é enviada sozinha.
  */
-export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (audio: string, durationMs: number) => Promise<void>; onCancel: () => void; onProblem: (message: string) => void }) {
+export function VoiceRecorderBar({ onSend, onCancel, onProblem, mode = 'locked', slide, control }: { onSend: (audio: string, durationMs: number) => Promise<void>; onCancel: () => void; onProblem: (message: string) => void; mode?: 'hold' | 'locked'; slide?: { dx: number; dy: number }; control?: MutableRefObject<VoiceControl | undefined> }) {
   const [elapsed, setElapsed] = useState(0);
   const [busy, setBusy] = useState(false);
   const recorder = useRef<MediaRecorder | undefined>(undefined);
@@ -106,6 +119,7 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
         rec.onstop = () => void done(rec.mimeType || mimeType || '');
         rec.start(500);
         startedAt.current = Date.now();
+        haptic('tap');
       } catch (failure) {
         setAudioSession('auto');
         callbacks.current.onProblem(voiceProblemMessage(voiceProblemFrom(failure)));
@@ -161,6 +175,30 @@ export function VoiceRecorderBar({ onSend, onCancel, onProblem }: { onSend: (aud
       callbacks.current.onCancel();
     }
     if (!send) callbacks.current.onCancel();
+  }
+
+  if (control) control.current = { finish };
+
+  if (mode === 'hold') {
+    const dx = Math.min(0, slide?.dx ?? 0);
+    const dy = Math.min(0, slide?.dy ?? 0);
+    const cancelShare = Math.min(1, dx / VOICE_CANCEL_DX);
+    return (
+      <div className="recbar recbar--hold" role="group" aria-label={t('Gravando áudio')}>
+        <span className="recbar__dot" aria-hidden="true" />
+        <span className="recbar__time" role="timer" aria-live="off">
+          {formatVoiceTime(elapsed)}
+        </span>
+        <span className="recbar__slide" style={{ transform: `translateX(${dx * 0.6}px)`, opacity: 1 - cancelShare * 0.7 }}>
+          <ChevronLeftIcon />
+          {t('Deslize para cancelar')}
+        </span>
+        <span className="recbar__lock" aria-hidden="true" style={{ transform: `translateY(${Math.max(dy, VOICE_LOCK_DY) * 0.5}px)` }}>
+          <LockIcon />
+          <ArrowUpIcon />
+        </span>
+      </div>
+    );
   }
 
   return (

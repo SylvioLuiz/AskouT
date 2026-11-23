@@ -3545,4 +3545,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Mensagens novas": "Mensajes nuevos",
   "Ir para a última mensagem": "Ir al último mensaje",
   "Essa mensagem é antiga demais para mostrar aqui.": "Ese mensaje es demasiado antiguo para mostrarlo aquí.",
+  "Deslize para cancelar": "Desliza para cancelar",
+  "Gravar áudio (segure para gravar e solte para enviar)": "Grabar audio (mantén para grabar y suelta para enviar)",
+  "Segure para gravar, solte para enviar": "Mantén para grabar, suelta para enviar",
 };
