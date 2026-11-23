@@ -7633,3 +7633,67 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .msg .chatskel__bubble--mine { margin-left: auto; background: var(--brand-soft); border-color: transparent; }
 .chatskel__line { display: block; width: 100%; height: 10px; }
 .chatskel__pill { flex: 1; height: 48px; border-radius: 26px; }
+
+/* ---------- Esqueletos (2ª revisão): formas que faltavam e ajustes para bater com as telas prontas ---------- */
+/* Posts da Home: cabeçalho curto (foto pequena + nome) e a foto ocupando a largura toda no celular, como o .pcarousel. */
+.skeleton__post .skeleton__row .skeleton__avatar { width: 36px; height: 36px; }
+.skeleton__post .skeleton__row .skeleton__line + .skeleton__line { display: none; }
+.skeleton__media { aspect-ratio: 1; }
+@media (max-width: 719px) { .skeleton__media { width: auto; margin-inline: -16px; border-radius: 0; } }
+@media (min-width: 720px) { .skeleton__post { max-width: 600px; } }
+/* Cartões de evento (Explorar, perfil): capa em cima e o texto embaixo, dentro de um cartão da mesma altura. */
+.skeleton__tile { gap: 0; padding-bottom: 14px; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.skeleton__tile .skeleton__cover { border-radius: 0; margin-bottom: 14px; }
+.skeleton__tile .skeleton__line { margin: 0 12px 8px; }
+.skeleton__tile .skeleton__line--wide { height: 16px; width: 72%; }
+.skeleton__tile .skeleton__line--short { width: 40%; margin-top: 4px; }
+.skeleton__avatar--square { width: 64px; height: 64px; border-radius: 12px; }
+.skeleton__line--label { width: 34%; height: 11px; }
+.skeleton__line--strong { height: 15px; }
+.skeleton__line--head { width: 150px; height: 22px; border-radius: 8px; }
+.skeleton__line--sub { width: 110px; height: 11px; margin-top: 6px; }
+.pagehead__skel { display: flex; flex-direction: column; min-width: 0; }
+.skeleton__field { display: flex; flex-direction: column; gap: 8px; }
+.skeleton__input { height: 48px; border-radius: var(--radius-control); }
+.skeleton__wide { height: 44px; border-radius: var(--radius-control); }
+.skeleton__wide--tabs { height: 44px; border-radius: 0; opacity: 0.55; }
+.skeleton__toggles { display: flex; flex-direction: column; }
+.skeleton__toggle { display: flex; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.skeleton__switch { flex: none; width: 44px; height: 26px; border-radius: 999px; }
+.skeleton__card { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: var(--radius-panel); background: var(--surface); }
+.skeleton__card--row { flex-direction: row; align-items: center; gap: 14px; }
+.skeleton__button--small { width: 84px; height: 36px; border-radius: var(--radius-control); }
+.skeleton__stat--tall { height: 82px; }
+
+/* Telas com capa (evento, local): a capa vira um bloco cinza do mesmo tamanho e as barras de dentro ficam claras. */
+.skelhero { background: var(--line) !important; color: var(--ink); }
+.skelhero .skeleton__bone, .skelhero .skeleton__line, .skelhero .skeleton__avatar { background: linear-gradient(90deg, rgb(255 255 255 / 0.45) 25%, rgb(255 255 255 / 0.75) 50%, rgb(255 255 255 / 0.45) 75%); background-size: 200% 100%; }
+.skelhero .skeleton__line { margin-inline: auto; }
+.skelpill { display: inline-block; width: 56px; height: 22px; border-radius: 999px; }
+.skelpills { display: flex; gap: 6px; justify-content: center; }
+.skelcircle { display: block; flex: none; border-radius: 50%; }
+.skelcenter { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.skelrow { display: flex; gap: 8px; }
+.skelrow > * { flex: 1; }
+.skelround { display: grid; grid-template-columns: repeat(5, 1fr); justify-items: center; gap: 4px; }
+.skelround > span { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.skelstat { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.skelradar { display: grid; place-items: center; }
+.skelradar__ring { display: grid; place-items: center; width: 82%; aspect-ratio: 1; border-radius: 50%; border: 1px dashed var(--line-strong); }
+.skelradar__ring > .skeleton__avatar { width: 88px; height: 88px; }
+.skeltabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 12px; padding: 12px 8px; border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+.skeltabs > span { justify-self: center; width: 60%; }
+.skelgrow { flex: 1; min-width: 0; }
+.skelcol { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.skelposter { display: block; width: 100%; aspect-ratio: 358 / 460; max-width: 600px; border-radius: 28px; }
+.profile__counts .skelstat { flex: 1; }
+.skeleton__grid--stories { gap: 8px; }
+.skeleton__story { aspect-ratio: 9 / 16; border-radius: 10px; }
+.skeleton__card--feed { border: 1px solid var(--line); padding: 14px; }
+.skeleton__card--feed .skeleton__avatar { width: 36px; height: 36px; }
+.skeleton__card--feed .skeleton__row .skeleton__line + .skeleton__line { width: 30%; }
+.skeleton__feedmedia { margin: 0 -14px; aspect-ratio: 4 / 3; }
+.skeleton__tile { aspect-ratio: 0.69; }
+.skeleton__tile .skeleton__cover { flex: none; }
+.skelflash { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; align-self: flex-start; margin: 8px 0 0 4px; }
+.profile__actions > .skeleton__wide { height: 36px; border-radius: 10px; }

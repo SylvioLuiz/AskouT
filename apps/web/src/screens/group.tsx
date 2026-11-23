@@ -15,6 +15,7 @@ import { peopleLabel, toggleId } from '../lib/meetup.ts';
 import type { MeetupView } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { ChatInfoSkeleton } from '../components/skeletons.tsx';
 
 type Tab = 'people' | 'events' | 'media' | 'links';
 
@@ -37,7 +38,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   const [pendingPhoto, setPendingPhoto] = useState<File | undefined>();
   useTitle(group.data?.name ?? t('Grupo'));
 
-  if (group.loading && !group.data) return <Loading shape="profile" />;
+  if (group.loading && !group.data) return <ChatInfoSkeleton back={`/conversas/${conversationId}`} group />;
   if (group.error && !group.data) {
     return (
       <>

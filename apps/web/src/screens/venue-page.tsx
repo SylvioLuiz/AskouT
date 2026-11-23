@@ -27,6 +27,7 @@ import type { VenueProfileDraft } from '../lib/venue-profile.ts';
 import { Link, navigate, useSearch, goBack as routerGoBack } from '../router.tsx';
 import { ClaimSheet, VenueEventRow } from './venues.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { VenueSkeleton } from '../components/skeletons.tsx';
 
 type Tab = 'feed' | 'about' | 'events' | 'regulars' | 'posts';
 
@@ -435,7 +436,7 @@ export function OwnerEvents({ venueId, now, reloadKey, onNew, onEdit, onChanged 
       <Button full onClick={onNew}>
         {t('Novo evento')}
       </Button>
-      {panel.loading && !panel.data ? <Loading /> : null}
+      {panel.loading && !panel.data ? <Loading shape="lines" /> : null}
       {panel.error && !panel.data ? <ErrorState message={panel.error.message} onRetry={panel.reload} /> : null}
       {panel.data && panel.data.events.length === 0 ? <EmptyState title={t('Nenhum evento ainda')}>{t('Os eventos que você criar aparecem aqui e no Explorar para quem está perto.')}</EmptyState> : null}
       {panel.data && panel.data.events.length > 0 ? (
@@ -541,8 +542,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   if (page.loading && !v) {
     return (
       <>
-        <PageHead title={t('Local')} back={backTo} />
-        <Loading shape="page" />
+        <VenueSkeleton onBack={goBack} />
       </>
     );
   }

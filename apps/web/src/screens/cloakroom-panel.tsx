@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Button, ErrorState, Field, Loading, Notice, PageHead, PageHeadSkeleton } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -25,7 +25,7 @@ export function CloakroomPanelScreen({ venueId, eventId }: { venueId: string; ev
   const [busy, setBusy] = useState(false);
 
   const panel = loaded.data;
-  if (loaded.loading && !panel) return <Loading shape="page" />;
+  if (loaded.loading && !panel) return (<><PageHeadSkeleton title={t('Chapelaria')} subtitle back={`/bares/${encodeURIComponent(venueId)}/eventos`} /><Loading shape="form" rows={2} /><Loading shape="lines" rows={2} /></>);
   if (!panel) return <ErrorState message={loaded.error?.message ?? t('Não deu certo')} onRetry={loaded.reload} />;
   const setting = panel.setting;
 

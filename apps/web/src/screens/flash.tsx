@@ -10,7 +10,7 @@ import { nowRadiusKm } from '../lib/now-radius.ts';
 import { recentNowFix, rememberNowFix } from '../lib/now-fix.ts';
 import { ChatButton } from '../components/chat-button.tsx';
 import { InviteSheet } from '../components/invite.tsx';
-import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Avatar, Button, Confirm, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PageHeadSkeleton } from '../components/ui.tsx';
 import { OfferBanner } from '../components/offer-banner.tsx';
 import { api, apiBaseUrl, session } from '../client.ts';
 import { backgroundLocationBridge, ownArrivalStep, shouldSendFix } from '../lib/background-arrival.ts';
@@ -44,6 +44,7 @@ import { toCard } from '../lib/chat.ts';
 import type { AvailableFriend, AvailableOrder, FlashInvite, FlashMatch, PublicProfile, SuggestionItem } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
+import { NowSkeleton } from '../components/skeletons.tsx';
 
 const POLL_MS = 10_000;
 /** Durações oferecidas ao ligar o Flash (a API aceita de 5 min a 3 h). */
@@ -310,7 +311,12 @@ function FlashContent() {
     }
   }
 
-  if (status.loading && !status.data) return <Loading shape="page" />;
+  if (status.loading && !status.data) return (
+    <>
+      <NowSkeleton onHow={() => setInfoOpen(true)} />
+      {infoOpen ? <HowItWorks onClose={() => setInfoOpen(false)} /> : null}
+    </>
+  );
   if (status.error && !status.data) return <ErrorState message={status.error.message} onRetry={status.reload} />;
 
   const howSheet = infoOpen ? <HowItWorks onClose={() => setInfoOpen(false)} /> : null;
@@ -1484,7 +1490,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const baseKeys = sortByFairness(suggestions.data?.items ?? []).slice(0, MAX_PLACES_ON_MAP).map((p) => p.key);
   const more = useMorePlaces(inviteId, suggestions.data?.radiusM, baseKeys);
 
-  if (match.loading && !match.data && !match.error) return <Loading shape="page" />;
+  if (match.loading && !match.data && !match.error) return (<><PageHeadSkeleton subtitle back="/now" /><Loading shape="lines" rows={1} /><Loading shape="block" /></>);
   if (match.error && !match.data) {
     if (match.error.code === 'NOT_FOUND') {
       return (

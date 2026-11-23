@@ -3,7 +3,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { RangeCalendar, POLICY_TEXT } from '../components/date-poll-create.tsx';
 import { EditIcon } from '../components/icons.tsx';
 import './date-poll-steps.css';
-import { Avatar, Button, Confirm, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Avatar, Button, Confirm, ErrorState, Field, Loading, Notice, PageHead, PageHeadSkeleton } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { agendaEvents, agendaEventsOnDay } from '../lib/agenda.ts';
@@ -31,7 +31,7 @@ export function DatePollScreen({ pollId }: { pollId: string }) {
 
   if (!poll) {
     if (load.error) return <ErrorState message={load.error.message} onRetry={load.reload} />;
-    return <Loading shape="page" />;
+    return (<><PageHeadSkeleton subtitle back="/conversas" /><Loading shape="cards" rows={3} /></>);
   }
   return <PollBody poll={poll} setPoll={setPoll} />;
 }

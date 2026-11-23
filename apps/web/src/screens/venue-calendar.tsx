@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Wheel } from '../components/wheel.tsx';
-import { Button, Confirm, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Button, Confirm, ErrorState, Field, Loading, Notice, PageHead, PageHeadSkeleton } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { CALENDAR_LEAD_DEFAULT, CALENDAR_LEAD_VALUES, calendarUrlProblem, draftStatusLabel, eventDraftOf, leadLabel, publishLabel, syncLabel } from '../lib/calendar-import.ts';
@@ -162,8 +162,8 @@ export function VenueCalendarScreen({ venueId }: { venueId: string }) {
 
   return (
     <>
-      <PageHead title={t('Agenda do local')} back={`/bares/${encodeURIComponent(venueId)}/painel`} subtitle={venue.data?.venue.name ?? t('Traga os eventos do Google Agenda ou de outro calendário.')} />
-      {panel.loading && !panel.data ? <Loading shape="lines" /> : null}
+      {venue.loading && !venue.data ? <PageHeadSkeleton title={t('Agenda do local')} back={`/bares/${encodeURIComponent(venueId)}/painel`} subtitle /> : <PageHead title={t('Agenda do local')} back={`/bares/${encodeURIComponent(venueId)}/painel`} subtitle={venue.data?.venue.name ?? t('Traga os eventos do Google Agenda ou de outro calendário.')} />}
+      {panel.loading && !panel.data ? <Loading shape="form" rows={1} /> : null}
       {panel.error && !panel.data ? <ErrorState message={panel.error.message} onRetry={panel.reload} /> : null}
       {notice ? <Notice tone="ok">{notice}</Notice> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}

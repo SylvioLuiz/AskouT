@@ -125,7 +125,7 @@ export function MuteCard() {
   }
 
   if (current.error) return <ErrorState message={current.error.message} onRetry={current.reload} />;
-  if (!value) return <Loading />;
+  if (!value) return <Loading shape="toggles" />;
   return (
     <>
       {problem ? <Notice tone="error">{problem}</Notice> : null}

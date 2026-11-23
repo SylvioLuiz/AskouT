@@ -6,6 +6,7 @@ import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { Link, navigate } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { ChatInfoSkeleton } from '../components/skeletons.tsx';
 
 type Tab = 'events' | 'media' | 'links';
 
@@ -22,7 +23,7 @@ export function ChatInfoScreen({ conversationId }: { conversationId: string }) {
   }, [data?.type, conversationId]);
 
   const back = `/conversas/${conversationId}`;
-  if (shared.loading && !data) return <Loading shape="profile" />;
+  if (shared.loading && !data) return <ChatInfoSkeleton title={t('Informações')} back={back} />;
   if (shared.error && !data) {
     return (
       <>

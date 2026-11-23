@@ -15,7 +15,7 @@ import { PhotoPickerSheet } from '../components/photo-picker.tsx';
 import { AvatarViewer } from '../components/photo-viewer.tsx';
 import { useAuthContext } from '../auth.tsx';
 import { AvatarCropper } from '../components/avatar-cropper.tsx';
-import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow } from '../components/ui.tsx';
+import { Avatar, Button, Confirm, EmptyState, ErrorState, Loading, Notice, PageHead, PersonRow, PageHeadSkeleton } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -26,6 +26,7 @@ import type { ConnectionsPage } from '../lib/types.ts';
 import { FOLLOW_HINT, safeStorage, takeFirstFollowHint } from '../lib/hints.ts';
 import { Link, useSearch } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { ProfileSkeleton } from '../components/skeletons.tsx';
 
 type Pending = 'unfollow' | undefined;
 
@@ -60,7 +61,8 @@ export function ProfileScreen({ username }: { username: string }) {
   const [viewOpen, setViewOpen] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File>();
-  const { setOwnProfile } = useAuthContext();
+  const { setOwnProfile, state: authState } = useAuthContext();
+  const ownUsername = authState.status === 'user' ? authState.user.profile.username : undefined;
   const search = useSearch();
   const initialTab = search.get('aba');
   const [tab, setTab] = useState<'events' | 'posts' | 'attended'>(initialTab === 'posts' ? 'posts' : initialTab === 'participou' ? 'attended' : 'events');
@@ -114,7 +116,7 @@ export function ProfileScreen({ username }: { username: string }) {
     }
   }
 
-  if (view.loading && !data) return <Loading shape="profile" />;
+  if (view.loading && !data) return <ProfileSkeleton self={ownUsername === username} />;
   if (view.error && !data) return <NotFoundProfile error={view.error} onRetry={view.reload} />;
   if (!data) return null;
 
@@ -394,7 +396,7 @@ export function ConnectionsScreen({ username, direction }: { username: string; d
   }, [userId, direction]);
 
   const back = `/u/${encodeURIComponent(username)}`;
-  if (view.loading && !view.data) return <Loading />;
+  if (view.loading && !view.data) return (<><PageHeadSkeleton title={title} back={back} subtitle /><Loading /></>);
   if (view.error) return <NotFoundProfile error={view.error} onRetry={view.reload} />;
 
   const hasMore = page ? page.items.length < page.total && page.items.length > 0 : false;
