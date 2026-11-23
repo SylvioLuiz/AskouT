@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { describe, it, test } from 'node:test';
 import { CHUNK_BYTES, createVideoBridge, qualityFor, type VideoBridgeDeps } from './video-bridge.ts';
 import { createStoreBridge } from './store-bridge.ts';
 import { createFilesBridge } from './files-bridge.ts';
@@ -632,4 +632,28 @@ describe('ponte de localização em segundo plano', () => {
     await failing.progress({ title: 't', text: '', progress: 0, arrived: false });
     await createBackgroundLocationBridge({ plugin, http }).progress({ title: 't', text: '', progress: 0, arrived: false });
   });
+});
+
+test('push: tira da bandeja só os avisos da tela aberta (caminho no iPhone/Android ou título e texto)', async () => {
+  const { createPushBridge } = await import('./push-bridge.ts');
+  const delivered = [
+    { id: 1, data: { url: '/conversas/1' } },
+    { id: 2, tag: 'msg:2', data: { 'askout.url': '/conversas/2' } },
+    { id: 3, title: 'ana ligou o NOW', body: 'Bora?', data: {} },
+    { id: 4, data: { url: '/conversas/9' } },
+  ];
+  let removed: unknown[] = [];
+  const push = {
+    checkPermissions: async () => ({ receive: 'granted' }),
+    requestPermissions: async () => ({ receive: 'granted' }),
+    register: async () => undefined,
+    addListener: async () => ({ remove: async () => undefined }),
+    getDeliveredNotifications: async () => ({ notifications: delivered }),
+    removeDeliveredNotifications: async (o: { notifications: unknown[] }) => void (removed = o.notifications),
+  };
+  const bridge = createPushBridge({ push: push as never, open: () => undefined });
+  assert.equal(await bridge.clearDelivered({ url: '/conversas/2', texts: [] }), 1);
+  assert.deepEqual(removed.map((n) => (n as { id: number }).id), [2]);
+  assert.equal(await bridge.clearDelivered({ url: '/now', texts: [{ title: 'ana ligou o NOW', body: 'Bora?' }] }), 1);
+  assert.deepEqual(removed.map((n) => (n as { id: number }).id), [3]);
 });

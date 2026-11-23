@@ -10,6 +10,7 @@ import { Link, navigate, usePathname } from '../router.tsx';
 import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, ChevronLeftIcon, HomeIcon, ListIcon, PlusBigIcon, SearchIcon, UserIcon, UsersIcon } from './icons.tsx';
 import { venueAdminRoute, venueAdminTabs } from '../lib/venue-admin-mode.ts';
 import type { VenueAdminRoute, VenueAdminSection } from '../lib/venue-admin-mode.ts';
+import { clearTrayFor } from '../lib/tray.ts';
 import { Avatar } from './ui.tsx';
 import { CreateChooser } from './create-chooser.tsx';
 import { NowInviteToast } from './now-invite.tsx';
@@ -125,6 +126,16 @@ export function Shell({ children }: { children: ReactNode }) {
 function MainShell({ children }: { children: ReactNode }) {
   const user = useUser();
   const pathname = usePathname();
+  // Abriu a tela de um aviso no app (pela lista ou não): o aviso dela sai da bandeja do celular. Vale também ao voltar
+  // para o app já nessa tela.
+  useEffect(() => {
+    clearTrayFor(pathname);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') clearTrayFor(window.location.pathname);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [pathname]);
   // Faixas coladas no topo (como o cabeçalho da conversa) precisam saber a altura da barra do app.
   const topbarRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
