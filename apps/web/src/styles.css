@@ -7135,6 +7135,10 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .nowcard__bar i { display: block; height: 100%; border-radius: 0 999px 999px 0; background: linear-gradient(90deg, var(--now-peach), var(--now-coral), var(--now-pink), var(--now-lilac)); box-shadow: 0 0 10px rgb(250 114 201 / 0.55); transition: width 1s linear; }
 
 .nowmatches { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.nowmatches__item { display: grid; gap: 8px; }
+.nowmatches__row { display: flex; align-items: stretch; gap: 8px; }
+.nowmatches__row .nowmatch { flex: 1; min-width: 0; }
+.nowmatches__end { flex: none; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--danger); font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
 .nowmatch { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 16px; background: color-mix(in srgb, var(--now-pink) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--now-pink) 40%, transparent); color: var(--ink); text-decoration: none; }
 .nowmatch > span { display: grid; flex: 1; min-width: 0; }
 .nowmatch strong { font-size: 0.9375rem; }

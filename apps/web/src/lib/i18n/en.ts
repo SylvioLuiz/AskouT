@@ -3539,4 +3539,6 @@ export const EN: Readonly<Record<string, string>> = {
   "{name} sugeriu · responda no chat": "{name} suggested · reply in the chat",
   "1 sugestão ainda sem resposta no chat.": "1 suggestion still unanswered in the chat.",
   "{count} sugestões ainda sem resposta no chat.": "{count} suggestions still unanswered in the chat.",
+  "Encerrar encontro com {name}": "End meetup with {name}",
+  "Encerrar o encontro com {name}? A localização dos dois deixa de ser compartilhada.": "End the meetup with {name}? Neither location will be shared anymore.",
 };

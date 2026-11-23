@@ -321,7 +321,7 @@ function FlashContent() {
       <section className="nowoff" aria-label={t('Ligar o NOW')}>
         {feedbackLine}
         <OfferBanner />
-        <MatchList matches={invites.data?.matches ?? []} after />
+        <MatchList matches={invites.data?.matches ?? []} after onEnded={reloadAll} />
         <header className="nowhead">
           <div>
             <h1 className="nowhead__title">
@@ -499,7 +499,7 @@ function FlashContent() {
         </>
       ) : null}
 
-      <MatchList matches={matches} />
+      <MatchList matches={matches} onEnded={reloadAll} />
 
       <section className="nowcard" aria-label={t('Seu NOW')}>
         <button type="button" className="nowcard__plus" aria-haspopup="menu" aria-expanded={plusOpen} aria-label={t('Estender o NOW')} disabled={left >= 179} onClick={() => setPlusOpen((o) => !o)}>
@@ -1071,21 +1071,54 @@ function PrecisionPicker({ approx, onChange, text, disabled }: { approx: boolean
   );
 }
 
-/** Encontros aceitos. `after`: o NOW já acabou, mas o encontro continua (com a localização) até terminar. */
-function MatchList({ matches, after }: { matches: readonly FlashInvite[]; after?: boolean }) {
+/**
+ * Encontros aceitos. `after`: o NOW já acabou, mas o encontro continua (com a localização) até terminar.
+ * Cada um tem o "Encerrar" à mão: com o NOW desligado, é por aqui que a localização para.
+ */
+function MatchList({ matches, after, onEnded }: { matches: readonly FlashInvite[]; after?: boolean; onEnded: () => void }) {
+  const [ending, setEnding] = useState<string | undefined>();
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>();
   if (matches.length === 0) return null;
+  async function end(id: string) {
+    setBusy(true);
+    setProblem(undefined);
+    try {
+      await api.flashEnd(id);
+      setEnding(undefined);
+      announceFlashChange();
+      onEnded();
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <ul className="nowmatches" aria-label={t('Encontros em andamento')}>
       {matches.map((invite) => (
-        <li key={invite.id}>
-          <Link to={`/now/encontro/${invite.id}`} className="nowmatch">
-            <NowFace profile={invite.other} size={36} />
-            <span>
-              <strong>{after ? t('Encontro com {name} em andamento', { name: invite.other.username }) : t('{name} aceitou sair com você', { name: invite.other.username })}</strong>
-              <span>{after ? t('Sua localização continua até o encontro acabar') : t('Combinar o lugar e ver no mapa')}</span>
-            </span>
-            <ChevronRightIcon />
-          </Link>
+        <li key={invite.id} className="nowmatches__item">
+          <div className="nowmatches__row">
+            <Link to={`/now/encontro/${invite.id}`} className="nowmatch">
+              <NowFace profile={invite.other} size={36} />
+              <span>
+                <strong>{after ? t('Encontro com {name} em andamento', { name: invite.other.username }) : t('{name} aceitou sair com você', { name: invite.other.username })}</strong>
+                <span>{after ? t('Sua localização continua até o encontro acabar') : t('Combinar o lugar e ver no mapa')}</span>
+              </span>
+              <ChevronRightIcon />
+            </Link>
+            {ending !== invite.id ? (
+              <button type="button" className="nowmatches__end" onClick={() => setEnding(invite.id)} aria-label={t('Encerrar encontro com {name}', { name: invite.other.username })}>
+                {t('Encerrar')}
+              </button>
+            ) : null}
+          </div>
+          {ending === invite.id ? (
+            <>
+              {problem ? <Notice tone="error">{problem}</Notice> : null}
+              <Confirm question={t('Encerrar o encontro com {name}? A localização dos dois deixa de ser compartilhada.', { name: invite.other.username })} confirmLabel={t('Encerrar')} onConfirm={() => void end(invite.id)} onCancel={() => setEnding(undefined)} busy={busy} danger />
+            </>
+          ) : null}
         </li>
       ))}
     </ul>
