@@ -3532,4 +3532,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Você confirmou \"{title}\" com {name} ({when}).": "Confirmaste \"{title}\" con {name} ({when}).",
   "Você organiza \"{title}\" ({when}).": "Organizas \"{title}\" ({when}).",
   "Choque de horário": "Choque de horario",
+  "Ver a votação de data": "Ver la votación de fecha",
+  "Pessoas e dados do grupo": "Personas y datos del grupo",
+  "Limpar esta conversa? As mensagens somem só para você; as outras pessoas do grupo continuam vendo.": "¿Vaciar este chat? Los mensajes desaparecen solo para ti; las demás personas del grupo siguen viéndolos.",
 };
