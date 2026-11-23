@@ -32,7 +32,8 @@ import { api } from '../client.ts';
 import { useAsync, useLiveRefresh, usePolling, useTitle } from '../hooks.ts';
 import { PullRefresh } from '../components/pull-refresh.tsx';
 import { useWideDesktop } from '../lib/use-desktop.ts';
-import { allDeletable, announceChatsChanged, breakLabel, copyText, dayPillLabel, firstUnreadId, filterConversations, formatClock, groupAlbums, isDoubleTap, LONG_PRESS_MS, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
+import type { ConversationTab } from '../lib/chat.ts';
+import { allDeletable, announceChatsChanged, breakLabel, copyText, dayPillLabel, firstUnreadId, filterConversations, formatClock, inConversationTab, unreadInTab, groupAlbums, isDoubleTap, LONG_PRESS_MS, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
 import type { RunPosition } from '../lib/chat.ts';
 import { CHAT_VIDEO_MAX_BYTES, mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
 import { prepareVideoUpload, withMediaType } from '../lib/media-file.ts';
@@ -55,6 +56,17 @@ const UNDO_MS = 6000;
 let chatLeftAt = 0;
 const BACK_WINDOW_MS = 1500;
 
+/** A aba escolhida (Todas, Individuais, Grupos) fica lembrada enquanto o app está aberto, para voltar do chat nela. */
+const CONV_TAB_KEY = 'askout:conv-tab';
+function readConvTab(): ConversationTab {
+  try {
+    const saved = sessionStorage.getItem(CONV_TAB_KEY);
+    return saved === 'direct' || saved === 'group' ? saved : 'all';
+  } catch {
+    return 'all';
+  }
+}
+
 export function ConversationsScreen({ activeId, split = false }: { activeId?: string; split?: boolean } = {}) {
   // Lado a lado com o chat (computador): quem dá o título da aba é a conversa aberta.
   useTitle(split && activeId ? undefined : t('Conversas'));
@@ -66,6 +78,15 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
   }, [list.data]);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState('');
+  const [tab, setTab] = useState<ConversationTab>(readConvTab);
+  function chooseTab(next: ConversationTab) {
+    setTab(next);
+    try {
+      sessionStorage.setItem(CONV_TAB_KEY, next);
+    } catch {
+      // Sem armazenamento (aba anônima etc.): a aba só não fica lembrada.
+    }
+  }
   const [prefsFor, setPrefsFor] = useState<ConversationItem | undefined>();
   const now = new Date();
 
@@ -93,7 +114,12 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
   const items = list.data?.items ?? [];
   const requestCount = list.data?.requestCount ?? 0;
   const requestUnread = list.data?.requestUnread ?? 0;
-  const shown = filterConversations(items, query);
+  const shown = filterConversations(items, query).filter((c) => inConversationTab(c, tab));
+  const tabs: { id: ConversationTab; label: string }[] = [
+    { id: 'all', label: t('Todas') },
+    { id: 'direct', label: t('Individuais') },
+    { id: 'group', label: t('Grupos') },
+  ];
   const searching = query.trim() !== '';
 
   return (
@@ -145,7 +171,26 @@ export function ConversationsScreen({ activeId, split = false }: { activeId?: st
             </label>
             <input id="busca-conversas" className="search__input search__input--icon" type="search" placeholder={t('Buscar nas conversas')} value={query} maxLength={60} autoComplete="off" onChange={(e) => setQuery(e.target.value)} />
           </div>
-          {shown.length === 0 ? (
+          <div className="segtabs segtabs--fill convtabs" role="tablist" aria-label={t('Tipos de conversa')}>
+            {tabs.map((x) => {
+              const unread = unreadInTab(items, x.id);
+              return (
+                <button key={x.id} type="button" role="tab" aria-selected={tab === x.id} className="segtabs__tab" onClick={() => chooseTab(x.id)}>
+                  {x.label}
+                  {unread > 0 ? (
+                    <span className="segtabs__n" aria-label={unread === 1 ? t('1 conversa não lida') : t('{count} conversas não lidas', { count: unread })}>
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+          {shown.length === 0 && !searching && tab !== 'all' ? (
+            <EmptyState title={tab === 'group' ? t('Nenhum grupo ainda') : t('Nenhuma conversa individual ainda')}>
+              {tab === 'group' ? t('Toque em Nova conversa para criar um grupo com seus amigos.') : t('Escreva para um amigo pelo perfil dele ou toque em Nova conversa.')}
+            </EmptyState>
+          ) : shown.length === 0 ? (
             <EmptyState title={searching ? t('Nada encontrado para "{trim}"', { trim: query.trim() }) : t('Nenhuma conversa encontrada')}>
               {t('Procure pelo nome da pessoa ou do grupo, pelo @usuário ou por um trecho da última mensagem.')}
               {searching ? (

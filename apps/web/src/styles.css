@@ -4818,6 +4818,7 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .mediathumb__img { width: 100%; height: 100%; object-fit: cover; }
 .mediathumb__wait { color: var(--muted); }
 .search--convs { position: relative; margin: 0 0 8px; }
+.convtabs { margin-bottom: 4px; }
 .convitem { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); }
 .convitem .convrow { flex: 1; min-width: 0; border-bottom: 0; }
 .convitem__more { flex: none; color: var(--muted); }

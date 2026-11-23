@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { allDeletable, copyText, dayLabel, dayPillLabel, firstUnreadId, filterConversations, formatDistances, formatWhen, listTimeLabel, mergeMessages, previewOf, replyPreview, selectable, toCard } from './chat.ts';
+import { allDeletable, copyText, dayLabel, dayPillLabel, firstUnreadId, filterConversations, inConversationTab, unreadInTab, formatDistances, formatWhen, listTimeLabel, mergeMessages, previewOf, replyPreview, selectable, toCard } from './chat.ts';
 import { fitWithin, mediaKind, mediaProblem, typingLabel } from './chat-media.ts';
 import type { ChatMessage, ConversationItem, SuggestionItem } from './types.ts';
 
@@ -130,6 +130,22 @@ test('filterConversations ignora acento e procura na última mensagem', () => {
   assert.deepEqual(filterConversations(items, 'ALMOCO').map((c) => c.id), ['2']);
   assert.deepEqual(filterConversations(items, 'quinta bora').map((c) => c.id), ['1']);
   assert.equal(filterConversations(items, '  ').length, 2);
+});
+
+test('abas da lista: individuais (com local) e grupos', () => {
+  const base = { other: null, name: 'x', imageUrl: null, memberCount: 2, lastMessage: null, canSend: true, pinned: false } as const;
+  const items: ConversationItem[] = [
+    { ...base, id: 'g1', type: 'GROUP', unread: 3, muted: false },
+    { ...base, id: 'g2', type: 'GROUP', unread: 1, muted: true },
+    { ...base, id: 'd1', type: 'DIRECT', unread: 2, muted: false },
+    { ...base, id: 'v1', type: 'DIRECT', unread: 0, muted: false, venue: { id: 'l', name: 'Bar', logoUrl: null, role: 'CUSTOMER' } as ConversationItem['venue'] },
+  ];
+  assert.deepEqual(items.filter((c) => inConversationTab(c, 'direct')).map((c) => c.id), ['d1', 'v1']);
+  assert.deepEqual(items.filter((c) => inConversationTab(c, 'group')).map((c) => c.id), ['g1', 'g2']);
+  assert.equal(items.filter((c) => inConversationTab(c, 'all')).length, 4);
+  assert.equal(unreadInTab(items, 'all'), 2);
+  assert.equal(unreadInTab(items, 'group'), 1);
+  assert.equal(unreadInTab(items, 'direct'), 1);
 });
 
 test('puxar para responder: curva de borracha e ponto de disparo', async () => {
