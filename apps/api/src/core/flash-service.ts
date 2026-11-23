@@ -620,7 +620,7 @@ export class FlashService {
   }
 
   /** Manda a atualização da chegada de `position.userId` para a outra pessoa, se for a hora (ver ArrivalTracker). */
-  private async pushArrival(invite: FlashInviteRecord, position: FlashPositionRecord, now: Date): Promise<void> {
+  private async pushArrival(invite: FlashInviteRecord, position: FlashPositionRecord, now: Date, retarget = false): Promise<void> {
     const notifier = this.deps.notifier;
     if (!notifier.live) return;
     const sharerId = position.userId;
@@ -649,7 +649,7 @@ export class FlashService {
       body,
       url: `/now/encontro/${invite.id}`,
       tag: arrivalTag(invite.id, sharerId),
-      live: { state: estimate.arrived ? 'arrived' : 'moving', progress: step.progress, quiet: !step.first && !estimate.arrived, untilMs: invite.expiresAt.getTime() },
+      live: { state: estimate.arrived ? 'arrived' : 'moving', progress: step.progress, quiet: (!step.first || retarget) && !estimate.arrived, untilMs: invite.expiresAt.getTime() },
     });
   }
 
@@ -783,7 +783,9 @@ export class FlashService {
     } else if (known.length === 1 && distanceMeters(known[0]!, { lat, lng }) > DESTINATION_MAX_FROM_MID_M) {
       throw validationError('Lugar longe demais', { lat: 'Escolha um lugar perto dos dois' });
     }
-    await flash.saveInvite({ ...invite, destination: { name, lat, lng, chosenById: actorId, chosenAt: now } });
+    const saved: FlashInviteRecord = { ...invite, destination: { name, lat, lng, chosenById: actorId, chosenAt: now } };
+    await flash.saveInvite(saved);
+    await this.retargetArrivals(saved, now);
     const otherId = invite.fromUserId === actorId ? invite.toUserId : invite.fromUserId;
     const who = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
     await notifier.notify({ userId: otherId, type: 'FLASH_INVITE', title: `${who} escolheu um lugar`, body: name, url: `/now/encontro/${inviteId}`, dedupeKey: `flash-destination:${inviteId}:${name}`, actorId });
@@ -792,9 +794,27 @@ export class FlashService {
 
   /** Tira o lugar escolhido (qualquer um dos dois). */
   async clearDestination(actorId: string, inviteId: string): Promise<{ ok: true }> {
-    const invite = await this.requireAcceptedMatch(actorId, inviteId, this.deps.clock.now());
-    await this.deps.flash.saveInvite({ ...invite, destination: null });
+    const now = this.deps.clock.now();
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
+    const saved: FlashInviteRecord = { ...invite, destination: null };
+    await this.deps.flash.saveInvite(saved);
+    await this.retargetArrivals(saved, now);
     return { ok: true };
+  }
+
+  /**
+   * O lugar mudou (ou saiu): quem está mostrando a chegada passa a ir para o novo alvo (o lugar, ou a outra pessoa).
+   * A barra recomeça do zero e o aviso do amigo troca na hora, em silêncio, sem esperar a próxima posição.
+   */
+  private async retargetArrivals(invite: FlashInviteRecord, now: Date): Promise<void> {
+    const sharers = [invite.fromUserId, invite.toUserId].filter((id) => arrivalFor(invite, id));
+    if (sharers.length === 0) return;
+    const positions = await this.deps.flash.listPositions(invite.id);
+    for (const id of sharers) {
+      this.arrivals.forget(arrivalTag(invite.id, id));
+      const position = positions.find((p) => p.userId === id);
+      if (position) await this.pushArrival(invite, position, now, true).catch(() => undefined);
+    }
   }
 
   /** Rota de cada um (da última posição dele) até o lugar escolhido. Sem lugar escolhido, não há rota. */
