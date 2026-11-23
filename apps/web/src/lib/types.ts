@@ -272,12 +272,24 @@ export interface FlashStatus {
 
 export type InviteDirection = 'SENT' | 'RECEIVED' | 'MATCHED';
 
+/** Algo que você já aceitou e bate com o horário do convite do NOW recebido. */
+export interface FlashInviteConflict {
+  kind: 'NOW' | 'MEETUP';
+  title: string | null;
+  /** Com quem; nulo quando você mesmo organiza. */
+  withName: string | null;
+  startsAt: string;
+  endsAt: string;
+}
+
 export interface FlashInvite {
   id: string;
   direction: InviteDirection;
   other: PublicProfile;
   createdAt: string;
   expiresAt: string;
+  /** Só nos recebidos: compromissos já aceitos no mesmo horário. */
+  conflicts?: FlashInviteConflict[];
 }
 
 /** Ordem de "Livres agora": quem está mais perto ou com quem você mais interage. */

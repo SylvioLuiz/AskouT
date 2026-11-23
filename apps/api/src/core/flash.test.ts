@@ -649,3 +649,31 @@ test('quem perguntou "está livre?" recebe só o aviso da pergunta, não dois', 
   assert.equal(avisos.length, 1);
   assert.equal(avisos[0]!.body, 'Você perguntou se estava livre. Bora?');
 });
+
+test('convite recebido avisa o que você já aceitou no mesmo horário (NOW com outra pessoa e encontro de evento)', async () => {
+  const { w, ana, bia, caio } = await pair();
+  const H = 3_600_000;
+  await befriend(w, caio, bia);
+  await befriend(w, caio, ana);
+  await w.core.flash.turnOn(caio, { hours: 1 });
+  // Bia já aceitou sair com a Ana no NOW.
+  const first = await w.core.flash.invite(ana, bia);
+  await w.core.flash.respond(bia, first.id, 'accept');
+  // E confirmou um encontro de evento da Ana daqui a 1 h (dentro do NOW dela) e outro amanhã (fora).
+  await w.places.createVenue({ id: 'v1', name: 'Bar', address: null, category: 'bar', lat: -23.55, lng: -46.63, isSample: true });
+  const event = (id: string, inH: number) =>
+    w.places.createEvent({ id, venueId: 'v1', title: `Evento ${id}`, description: null, kind: 'OTHER', isFree: true, imageUrl: null, tags: [], startsAt: new Date(w.clock.now().getTime() + inH * H), endsAt: new Date(w.clock.now().getTime() + (inH + 3) * H), isSample: true });
+  await event('soon', 1);
+  await event('tomorrow', 24);
+  const soon = await w.core.meetups.create(ana, { eventId: 'soon', guestIds: [bia] });
+  await w.core.meetups.respond(bia, soon.id, 'accept');
+  const later = await w.core.meetups.create(ana, { eventId: 'tomorrow', guestIds: [bia] });
+  await w.core.meetups.respond(bia, later.id, 'accept');
+
+  await w.core.flash.invite(caio, bia);
+  const [received] = (await w.core.flash.listInvites(bia)).received;
+  const conflicts = received!.conflicts!;
+  assert.deepEqual(conflicts.map((c) => [c.kind, c.withName]), [['NOW', 'ana'], ['MEETUP', 'ana']]);
+  assert.equal(conflicts[1]!.title, 'Evento soon');
+  assert.ok(conflicts.every((c) => c.startsAt && c.endsAt), 'traz dia e horário');
+});

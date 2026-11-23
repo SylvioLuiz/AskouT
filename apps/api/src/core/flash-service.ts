@@ -131,13 +131,29 @@ export function approxTrip(meters: number): ApproxTrip {
   return { km: km < 1 ? 0 : Math.round(km), minutes: Math.max(5, Math.round(raw / 5) * 5), mode: walk ? 'walk' : 'car' };
 }
 
+/** Algo que você já aceitou e bate com o horário de um convite do NOW recebido (para avisar antes de responder). */
+export interface InviteConflict {
+  /** NOW: encontro do NOW já aceito com outra pessoa. MEETUP: encontro de evento que você confirmou. */
+  kind: 'NOW' | 'MEETUP';
+  title: string | null;
+  /** Com quem (quem organiza o encontro ou a outra pessoa do NOW); nulo se você mesmo organiza. */
+  withName: string | null;
+  startsAt: string;
+  endsAt: string;
+}
+
 export interface InviteView {
   id: string;
   direction: InviteDirection;
   other: PublicProfile;
   createdAt: string;
   expiresAt: string;
+  /** Só nos convites recebidos: compromissos já aceitos no mesmo horário (lista vazia quando não há). */
+  conflicts?: InviteConflict[];
 }
+
+/** Sem NOW ligado, o "agora" de um convite vale por estas horas para procurar choque de horário. */
+const CONFLICT_WINDOW_FALLBACK_MS = 2 * 3_600_000;
 
 export interface InvitesOverview {
   received: InviteView[];
@@ -698,7 +714,37 @@ export class FlashService {
       else if (invite.toUserId === actorId) overview.received.push(view);
       else overview.sent.push(view);
     }
+    if (overview.received.length > 0) {
+      const busy = await this.acceptedCommitments(actorId, open, profiles);
+      for (const view of overview.received) view.conflicts = busy.filter((c) => !(c.kind === 'NOW' && c.withName === view.other.username));
+    }
     return overview;
+  }
+
+  /**
+   * O que você já aceitou e acontece durante o seu "agora" (até o NOW acabar): encontros do NOW em andamento com
+   * outras pessoas e encontros de evento confirmados. Serve para avisar, no convite recebido, dia e horário do choque.
+   */
+  private async acceptedCommitments(actorId: string, open: FlashInviteRecord[], profiles: Map<string, { username: string }>): Promise<InviteConflict[]> {
+    const { flash, meetups, users, clock } = this.deps;
+    const now = clock.now();
+    const session = await flash.findActiveSession(actorId, now);
+    const windowEnd = session ? session.expiresAt.getTime() : now.getTime() + CONFLICT_WINDOW_FALLBACK_MS;
+    const out: InviteConflict[] = [];
+    for (const match of open) {
+      if (match.status !== 'ACCEPTED') continue;
+      const otherId = match.fromUserId === actorId ? match.toUserId : match.fromUserId;
+      out.push({ kind: 'NOW', title: match.destination?.name ?? null, withName: profiles.get(otherId)?.username ?? null, startsAt: (match.respondedAt ?? match.createdAt).toISOString(), endsAt: match.expiresAt.toISOString() });
+    }
+    const confirmed = (await meetups.listForUser(actorId, 50)).filter((m) => {
+      if (m.status !== 'ACTIVE' || m.endsAt.getTime() <= now.getTime() || m.startsAt.getTime() >= windowEnd) return false;
+      return m.organizerId === actorId || m.participants.some((p) => p.userId === actorId && p.status === 'CONFIRMED');
+    });
+    const organizers = new Map((await users.findProfilesByIds([...new Set(confirmed.map((m) => m.organizerId))])).map((p) => [p.userId, p.username] as const));
+    for (const m of confirmed) {
+      out.push({ kind: 'MEETUP', title: m.title, withName: m.organizerId === actorId ? null : (organizers.get(m.organizerId) ?? null), startsAt: m.startsAt.toISOString(), endsAt: m.endsAt.toISOString() });
+    }
+    return out.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   }
 
   /** Atualiza a sua posição num encontro aceito. Só a última posição é guardada, sem histórico. */

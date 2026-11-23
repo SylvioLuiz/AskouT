@@ -3526,4 +3526,10 @@ export const EN: Readonly<Record<string, string>> = {
   "Encontro com {name} em andamento": "Meetup with {name} in progress",
   "Sua localização continua até o encontro acabar": "Your location keeps going until the meetup ends",
   "O encontro venceu ou alguém encerrou. A localização compartilhada já foi apagada.": "The meetup expired or someone ended it. The shared location has already been deleted.",
+  "Você já combinou sair com {name} pelo NOW ({when}).": "You already agreed to meet {name} on NOW ({when}).",
+  "Você já tem um encontro do NOW ({when}).": "You already have a NOW meetup ({when}).",
+  "um encontro": "a meetup",
+  "Você confirmou \"{title}\" com {name} ({when}).": "You confirmed \"{title}\" with {name} ({when}).",
+  "Você organiza \"{title}\" ({when}).": "You're organizing \"{title}\" ({when}).",
+  "Choque de horário": "Time clash",
 };

@@ -3526,4 +3526,10 @@ export const ES: Readonly<Record<string, string>> = {
   "Encontro com {name} em andamento": "Encuentro con {name} en curso",
   "Sua localização continua até o encontro acabar": "Tu ubicación sigue hasta que termine el encuentro",
   "O encontro venceu ou alguém encerrou. A localização compartilhada já foi apagada.": "El encuentro venció o alguien lo terminó. La ubicación compartida ya se eliminó.",
+  "Você já combinou sair com {name} pelo NOW ({when}).": "Ya quedaste con {name} por NOW ({when}).",
+  "Você já tem um encontro do NOW ({when}).": "Ya tienes un encuentro de NOW ({when}).",
+  "um encontro": "un encuentro",
+  "Você confirmou \"{title}\" com {name} ({when}).": "Confirmaste \"{title}\" con {name} ({when}).",
+  "Você organiza \"{title}\" ({when}).": "Organizas \"{title}\" ({when}).",
+  "Choque de horário": "Choque de horario",
 };

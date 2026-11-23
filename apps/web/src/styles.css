@@ -7185,6 +7185,9 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .nowinv__text span { color: var(--muted); font-size: 0.875rem; }
 .nowinv__act { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .nowinv__error { margin: -16px 0 0; color: var(--danger); font-size: 0.875rem; }
+.nowinv__conflict { display: grid; gap: 4px; justify-self: stretch; margin: -10px 0 0; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, #f5a524 16%, transparent); border: 1px solid color-mix(in srgb, #f5a524 45%, transparent); font-size: 0.875rem; text-align: left; }
+.nowinv__conflict strong { font-size: 0.8125rem; text-transform: uppercase; letter-spacing: .04em; }
+.nowinv__conflict ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .nowchip-wrap { position: relative; }
 .nowchip { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.75rem; font-weight: 600; cursor: pointer; }
 .nowchip svg { width: 13px; height: 13px; }
