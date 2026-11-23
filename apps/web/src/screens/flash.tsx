@@ -1427,6 +1427,13 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const routes = useAsync(() => (dest ? api.flashRoutes(inviteId, mode) : Promise.resolve(undefined)), [inviteId, mode, dest?.lat, dest?.lng]);
   usePolling(routes.reload, 20_000, dest !== null);
 
+  // `before` no futuro: lê as últimas mensagens sem marcar a conversa como lida.
+  // Suas sugestões ainda sem resposta no chat: o cartão do lugar mostra "Sugestão aberta" no lugar de "Sugerir no chat".
+  const conversationId = match.data?.conversationId;
+  const chat = useAsync(() => (conversationId ? api.messages(conversationId, { limit: 100, before: new Date(Date.now() + 86_400_000).toISOString() }) : Promise.resolve(undefined)), [conversationId]);
+  usePolling(chat.reload, 15_000, conversationId !== undefined);
+  const openKeys = new Set((chat.data?.messages ?? []).flatMap((m) => (m.kind === 'SUGGESTION' && m.mine && !m.deleted && m.response === null && m.suggestion ? [m.suggestion.externalId] : [])));
+
   if (match.loading && !match.data && !match.error) return <Loading />;
   if (match.error && !match.data) {
     if (match.error.code === 'NOT_FOUND') {
@@ -1581,6 +1588,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
             busy={destBusy}
             onSelect={setPickedKey}
             onChoose={suggestInChat}
+            openKeys={openKeys}
           />
           {suggestions.data ? (
             <p className="muted matchradius">

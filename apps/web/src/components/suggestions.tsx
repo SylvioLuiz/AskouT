@@ -71,16 +71,16 @@ function Distances({ distances, otherName }: { distances: { meM: number; themM: 
 }
 
 /** O cartão dentro de uma mensagem da conversa: distâncias dos dois, rota e aceitar/recusar. */
-export function SuggestionBubble({ message, otherName, nowIso, conversationId, onUpdated, onOpenMap, agreed }: { message: ChatMessage; otherName: string; nowIso: string; conversationId: string; onUpdated: (m: ChatMessage) => void; onOpenMap?: (place: { name: string; lat: number; lng: number }) => void; agreed?: { id: string; name: string } | undefined }) {
+export function SuggestionBubble({ message, otherName, nowIso, conversationId, onUpdated, onOpenMap, agreed, onSuggestOther }: { message: ChatMessage; otherName: string; nowIso: string; conversationId: string; onUpdated: (m: ChatMessage) => void; onOpenMap?: (place: { name: string; lat: number; lng: number }) => void; agreed?: { id: string; name: string } | undefined; onSuggestOther?: (() => void) | undefined }) {
   const card = message.suggestion as SuggestionCard;
-  const [busy, setBusy] = useState<'accept' | 'decline' | 'cancel' | undefined>();
+  const [busy, setBusy] = useState<'accept' | 'decline' | 'cancel' | 'withdraw' | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
 
   const [confirmAccept, setConfirmAccept] = useState(false);
   /** Já há outro local aceito: aceitar este cancela aquele, então pergunta antes. */
   const replaces = agreed && agreed.id !== message.id ? agreed : undefined;
 
-  async function answer(action: 'accept' | 'decline' | 'cancel') {
+  async function answer(action: 'accept' | 'decline' | 'cancel' | 'withdraw') {
     setBusy(action);
     setProblem(undefined);
     try {
@@ -121,7 +121,11 @@ export function SuggestionBubble({ message, otherName, nowIso, conversationId, o
           </OpenInMaps>
         )}
       </div>
-      {message.response ? (
+      {message.response === 'CANCELED' ? (
+        <p className="sugcard__answer sugcard__answer--canceled" role="status">
+          {message.mine ? t('Você cancelou esta sugestão') : t('Sugestão cancelada')}
+        </p>
+      ) : message.response ? (
         <>
           <p className={`sugcard__answer sugcard__answer--${message.response === 'ACCEPTED' ? 'yes' : 'no'}`} role="status">
             {message.response === 'ACCEPTED' ? (message.mine ? t('{name} aceitou', { name: otherName }) : t('Você aceitou')) : message.mine ? t('{name} recusou', { name: otherName }) : t('Você recusou')}
@@ -133,11 +137,25 @@ export function SuggestionBubble({ message, otherName, nowIso, conversationId, o
               </Button>
             </div>
           ) : null}
+          {message.response === 'ACCEPTED' && message.mine ? (
+            <div className="sugcard__actions">
+              <Button small variant="quiet" loading={busy === 'withdraw'} onClick={() => answer('withdraw')}>
+                {t('Cancelar sugestão')}
+              </Button>
+            </div>
+          ) : null}
         </>
       ) : message.mine ? (
-        <p className="sugcard__answer" role="status">
-          Aguardando {otherName}
-        </p>
+        <>
+          <p className="sugcard__answer" role="status">
+            {t('Aguardando {name}', { name: otherName })}
+          </p>
+          <div className="sugcard__actions">
+            <Button small variant="quiet" loading={busy === 'withdraw'} onClick={() => answer('withdraw')}>
+              {t('Cancelar sugestão')}
+            </Button>
+          </div>
+        </>
       ) : (
         <div className="sugcard__actions">
           <Button small loading={busy === 'accept'} disabled={busy === 'decline'} onClick={() => (replaces ? setConfirmAccept(true) : void answer('accept'))}>
@@ -146,6 +164,11 @@ export function SuggestionBubble({ message, otherName, nowIso, conversationId, o
           <Button small variant="secondary" loading={busy === 'decline'} disabled={busy === 'accept'} onClick={() => answer('decline')}>
             {t('Recusar')}
           </Button>
+          {onSuggestOther ? (
+            <Button small variant="quiet" disabled={busy !== undefined} onClick={onSuggestOther}>
+              {t('Sugerir outro')}
+            </Button>
+          ) : null}
         </div>
       )}
       {problem ? <p className="sugcard__problem">{problem}</p> : null}

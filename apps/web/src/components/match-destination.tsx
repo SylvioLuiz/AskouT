@@ -17,10 +17,12 @@ interface PlacesProps {
   busy: boolean;
   onSelect: (key: string) => void;
   onChoose: (item: SuggestionItem) => void;
+  /** Lugares que você já sugeriu no chat e ainda esperam resposta. */
+  openKeys?: ReadonlySet<string>;
 }
 
 /** Lugares entre os dois, em cartões com rolagem horizontal numerados como os pins do mapa. "Sugerir no chat" manda o cartão para a conversa. */
-export function MatchPlaces({ bothShared, loading, error, suggestions, places, otherName, selectedKey, busy, onSelect, onChoose }: PlacesProps) {
+export function MatchPlaces({ bothShared, loading, error, suggestions, places, otherName, selectedKey, busy, onSelect, onChoose, openKeys }: PlacesProps) {
   if (!bothShared) {
     return (
       <section className="matchplaces" aria-label={t('Lugares entre vocês')}>
@@ -41,11 +43,17 @@ export function MatchPlaces({ bothShared, loading, error, suggestions, places, o
         otherName={otherName}
         picked={selectedKey}
         onPick={onSelect}
-        action={(item) => (
-          <Button small loading={busy && item.key === selectedKey} disabled={busy} onClick={() => onChoose(item)}>
-            {t('Sugerir no chat')}
-          </Button>
-        )}
+        action={(item) =>
+          openKeys?.has(item.key) ? (
+            <Button small variant="secondary" disabled>
+              {t('Sugestão aberta')}
+            </Button>
+          ) : (
+            <Button small loading={busy && item.key === selectedKey} disabled={busy} onClick={() => onChoose(item)}>
+              {t('Sugerir no chat')}
+            </Button>
+          )
+        }
       />
       {suggestions && !suggestions.placesAvailable ? <p className="muted">{t('Não foi possível buscar locais agora. Mostrando só eventos do AskouT.')}</p> : null}
     </section>

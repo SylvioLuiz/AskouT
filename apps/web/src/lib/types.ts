@@ -598,7 +598,7 @@ export interface ChatMessage {
   /** Cartão do encontro (kind MEETUP). */
   meetup: MeetupView | null;
   /** Resposta de quem recebeu o cartão. */
-  response: 'ACCEPTED' | 'DECLINED' | null;
+  response: 'ACCEPTED' | 'DECLINED' | 'CANCELED' | null;
   respondedAt: string | null;
   /** Distância em linha reta do lugar até cada um, só durante o encontro Flash. */
   distances: { meM: number; themM: number } | null;

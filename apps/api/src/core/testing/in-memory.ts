@@ -1486,6 +1486,14 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return m ? { ...m } : undefined;
   }
 
+  async withdrawSuggestion(messageId: string, at: Date): Promise<boolean> {
+    const m = this.messages.find((x) => x.id === messageId);
+    if (!m || m.kind !== 'SUGGESTION' || (m.response !== null && m.response !== 'ACCEPTED')) return false;
+    m.response = 'CANCELED';
+    m.respondedAt = at;
+    return true;
+  }
+
   async clearSuggestionResponse(messageId: string, expected: SuggestionResponse): Promise<boolean> {
     const m = this.messages.find((x) => x.id === messageId);
     if (!m || m.kind !== 'SUGGESTION' || m.response !== expected) return false;

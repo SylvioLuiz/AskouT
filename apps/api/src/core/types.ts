@@ -255,7 +255,7 @@ export interface FlashPositionRecord {
 // ---------- Conversas ----------
 
 export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO';
-export type SuggestionResponse = 'ACCEPTED' | 'DECLINED';
+export type SuggestionResponse = 'ACCEPTED' | 'DECLINED' | 'CANCELED';
 
 /**
  * Conversa 1 a 1 entre amigos (`directKey` = "<menor id>:<maior id>", único por dupla) ou grupo de um encontro

@@ -77,7 +77,7 @@ export interface MessageView {
   /** Reações agrupadas por emoji. */
   reactions: ReactionView[];
   /** Resposta de quem recebeu o cartão: aceitou ou recusou o lugar. */
-  response: 'ACCEPTED' | 'DECLINED' | null;
+  response: 'ACCEPTED' | 'DECLINED' | 'CANCELED' | null;
   respondedAt: string | null;
   /**
    * Distância em linha reta do lugar até cada um, enquanto o encontro Flash está ativo e os dois compartilham
@@ -1096,15 +1096,24 @@ export class ConversationService {
    * `cancel` desfaz um aceite (o cartão volta a esperar resposta).
    */
   async respond(actorId: string, conversationId: string, messageId: string, action: unknown): Promise<MessageView> {
-    if (action !== 'accept' && action !== 'decline' && action !== 'cancel') throw validationError('Ação inválida', { action: 'Use accept, decline ou cancel' });
+    if (action !== 'accept' && action !== 'decline' && action !== 'cancel' && action !== 'withdraw') throw validationError('Ação inválida', { action: 'Use accept, decline, cancel ou withdraw' });
     const { conversations, clock } = this.deps;
     const { conversation, otherId } = await this.access(actorId, conversationId);
     if (!otherId) throw notFound('Sugestão não encontrada');
     const message = typeof messageId === 'string' && messageId.length <= 64 ? await conversations.findMessage(messageId) : undefined;
     if (!message || message.conversationId !== conversationId || message.kind !== 'SUGGESTION') throw notFound('Sugestão não encontrada');
+    const now = clock.now();
+    if (action === 'withdraw') {
+      // Só quem sugeriu cancela a própria sugestão (aberta ou já aceita); o cartão fica como "Sugestão cancelada".
+      if (message.senderId !== actorId) throw forbidden('Só quem sugeriu pode cancelar a sugestão');
+      const wasAccepted = message.response === 'ACCEPTED';
+      if (!(await conversations.withdrawSuggestion(messageId, now))) throw conflict('Essa sugestão já foi recusada ou cancelada');
+      if (wasAccepted && message.suggestion) await this.places?.destinationWithdrawnInChat(actorId, otherId, message.suggestion);
+      const withdrawn = { ...message, response: 'CANCELED', respondedAt: now } satisfies MessageRecord;
+      return toMessageView(withdrawn, actorId, { distances: null });
+    }
     if (message.senderId === actorId) throw forbidden('Quem sugeriu não responde à própria sugestão');
     await this.assertCanSend(actorId, conversation, otherId);
-    const now = clock.now();
     if (action === 'cancel') {
       if (!(await conversations.clearSuggestionResponse(messageId, 'ACCEPTED'))) throw conflict('Essa sugestão não está aceita');
       const reopened = { ...message, response: null, respondedAt: null } satisfies MessageRecord;

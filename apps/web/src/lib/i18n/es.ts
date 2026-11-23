@@ -3511,4 +3511,12 @@ export const ES: Readonly<Record<string, string>> = {
   "Sugerir outro local?": "¿Sugerir otro lugar?",
   "Vocês já combinaram {place}. Se {name} aceitar {next}, o aceite de {place} é cancelado.": "Ya acordaron {place}. Si {name} acepta {next}, se cancela la aceptación de {place}.",
   "Sugerir mesmo assim": "Sugerir de todos modos",
+  "Você cancelou esta sugestão": "Cancelaste esta sugerencia",
+  "Sugestão cancelada": "Sugerencia cancelada",
+  "Cancelar sugestão": "Cancelar sugerencia",
+  "Aguardando {name}": "Esperando a {name}",
+  "Sugerir outro": "Sugerir otro",
+  "Sugestão aberta": "Sugerencia pendiente",
+  "Só quem sugeriu pode cancelar a sugestão": "Solo quien la sugirió puede cancelar la sugerencia",
+  "Essa sugestão já foi recusada ou cancelada": "Esa sugerencia ya fue rechazada o cancelada",
 };

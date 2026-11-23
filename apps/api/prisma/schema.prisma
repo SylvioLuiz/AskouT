@@ -97,6 +97,8 @@ enum EventKind {
 enum SuggestionResponse {
   ACCEPTED
   DECLINED
+  /// Quem sugeriu cancelou a sugestão.
+  CANCELED
 }
 
 /// Bytes de uma mensagem de voz (até 600 KB; a API confere antes). Só quem está na conversa consegue ouvir.
