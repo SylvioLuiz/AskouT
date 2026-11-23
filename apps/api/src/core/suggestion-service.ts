@@ -13,7 +13,7 @@ export function suggestionRadiusM(apartM: number): number {
   return Math.round(Math.min(SUGGESTION_MAX_RADIUS_M, Math.max(SUGGESTION_RADIUS_M, apartM * 0.25)));
 }
 /** Raio escolhido pela pessoa na Configuração (km). Fora disso, vale o automático. */
-export const SUGGESTION_RADIUS_CHOICES_KM: readonly number[] = [2, 5, 10, 25];
+export const SUGGESTION_RADIUS_CHOICES_KM: readonly number[] = [2, 5, 10, 25, 50];
 
 /** Raio escolhido pela pessoa, se for uma das opções; senão `undefined` (automático). */
 export function chosenRadiusM(radiusKm: unknown): number | undefined {
@@ -76,7 +76,8 @@ export class SuggestionService {
   }
 
   /** Lugares e eventos perto do ponto médio entre você e a pessoa do encontro. */
-  async forMatch(actorId: string, inviteId: string, options: { radiusKm?: unknown } = {}): Promise<SuggestionsView> {
+  /** `innerKm`: "ver mais" — só lugares além desse raio (os de dentro a tela já mostra). */
+  async forMatch(actorId: string, inviteId: string, options: { radiusKm?: unknown; innerKm?: unknown } = {}): Promise<SuggestionsView> {
     const { places, placeSource, clock } = this.deps;
     const { me, them } = await this.flash.positionsForMatch(actorId, inviteId);
     if (!me || !them) throw conflict('Os dois precisam compartilhar a localização para ver sugestões');
@@ -85,10 +86,13 @@ export class SuggestionService {
     const theirs = { lat: them.lat, lng: them.lng };
     const mid = midpoint(mine, theirs);
     const radiusM = chosenRadiusM(options.radiusKm) ?? suggestionRadiusM(distanceMeters(mine, theirs));
+    const innerRaw = typeof options.innerKm === 'string' && options.innerKm.trim() !== '' ? Number(options.innerKm) : options.innerKm;
+    const innerM = typeof innerRaw === 'number' && Number.isFinite(innerRaw) && innerRaw > 0 ? Math.min(innerRaw * 1000, radiusM) : 0;
+    const outside = (at: { lat: number; lng: number }) => innerM === 0 || distanceMeters(at, mid) > innerM;
 
     const now = clock.now();
     const to = new Date(now.getTime() + SUGGESTION_WINDOW_HOURS * 3_600_000);
-    const found = await places.findEventsNear(mid, radiusM, now, to, SUGGESTION_MAX_ITEMS);
+    const found = (await places.findEventsNear(mid, radiusM, now, to, innerM > 0 ? SUGGESTION_MAX_ITEMS * 3 : SUGGESTION_MAX_ITEMS)).filter(({ venue }) => outside(venue)).slice(0, SUGGESTION_MAX_ITEMS);
 
     const toItem = (item: Omit<SuggestionItem, 'distanceFromMeM' | 'distanceFromThemM' | 'distanceFromMidM' | 'rating' | 'ratingCount' | 'photoRef' | 'photoAuthor' | 'mapsUri'> & Partial<Pick<SuggestionItem, 'rating' | 'ratingCount' | 'photoRef' | 'photoAuthor' | 'mapsUri'>>): SuggestionItem => {
       const at = { lat: item.lat, lng: item.lng };
@@ -113,13 +117,13 @@ export class SuggestionService {
 
     let placesAvailable = true;
     if (items.length < SUGGESTION_MIN_EVENTS) {
-      const osm = await placeSource.nearby(mid, radiusM, SUGGESTION_MAX_ITEMS * 2);
+      const osm = await placeSource.nearby(mid, radiusM, innerM > 0 ? SUGGESTION_MAX_ITEMS * 4 : SUGGESTION_MAX_ITEMS * 2);
       placesAvailable = osm.available;
       const seen = new Set(items.map((i) => i.venueName.trim().toLowerCase()));
       const extra = osm.places
         .filter((p) => !seen.has(p.name.trim().toLowerCase()))
         .map((p) => ({ p, d: distanceMeters({ lat: p.lat, lng: p.lng }, mid) }))
-        .filter(({ d }) => d <= radiusM)
+        .filter(({ d }) => d <= radiusM && d > innerM)
         .sort((a, b) => a.d - b.d);
       for (const { p } of extra) {
         if (items.length >= SUGGESTION_MAX_ITEMS) break;

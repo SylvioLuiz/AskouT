@@ -1,6 +1,6 @@
 import { Button, Loading, Notice } from './ui.tsx';
 import { formatDistance, formatTravel } from '../lib/flash.ts';
-import { PlaceCarousel } from './suggestions.tsx';
+import { PlaceCarousel, type MorePlaces } from './suggestions.tsx';
 import { OpenInMaps } from './open-in-maps.tsx';
 import type { FlashLeg, FlashMatch, SuggestionItem, Suggestions } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
@@ -19,10 +19,12 @@ interface PlacesProps {
   onChoose: (item: SuggestionItem) => void;
   /** Lugares que você já sugeriu no chat e ainda esperam resposta. */
   openKeys?: ReadonlySet<string>;
+  /** "Ver mais" no fim da lista. */
+  more?: MorePlaces | undefined;
 }
 
 /** Lugares entre os dois, em cartões com rolagem horizontal numerados como os pins do mapa. "Sugerir no chat" manda o cartão para a conversa. */
-export function MatchPlaces({ bothShared, loading, error, suggestions, places, otherName, selectedKey, busy, onSelect, onChoose, openKeys }: PlacesProps) {
+export function MatchPlaces({ bothShared, loading, error, suggestions, places, otherName, selectedKey, busy, onSelect, onChoose, openKeys, more }: PlacesProps) {
   if (!bothShared) {
     return (
       <section className="matchplaces" aria-label={t('Lugares entre vocês')}>
@@ -43,6 +45,7 @@ export function MatchPlaces({ bothShared, loading, error, suggestions, places, o
         otherName={otherName}
         picked={selectedKey}
         onPick={onSelect}
+        more={more}
         action={(item) =>
           openKeys?.has(item.key) ? (
             <Button small variant="secondary" disabled>

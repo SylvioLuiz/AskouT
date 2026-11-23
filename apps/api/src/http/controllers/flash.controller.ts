@@ -116,9 +116,9 @@ export class FlashController {
   }
 
   @Get('flash/matches/:inviteId/suggestions')
-  /** `?raioKm=5`: raio escolhido na Configuração (2, 5, 10 ou 25 km). Sem ele, o raio cresce com a distância entre os dois. */
-  async suggestions(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string, @Query('raioKm') raioKm?: string) {
-    const view = await this.core.suggestions.forMatch(actor.userId, inviteId, { radiusKm: raioKm });
+  /** `?raioKm=5`: raio escolhido (2, 5, 10, 25 ou 50 km). Sem ele, o raio cresce com a distância entre os dois. `?desdeKm=5`: "ver mais", só além desse raio. */
+  async suggestions(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string, @Query('raioKm') raioKm?: string, @Query('desdeKm') desdeKm?: string) {
+    const view = await this.core.suggestions.forMatch(actor.userId, inviteId, { radiusKm: raioKm, innerKm: desdeKm });
     // A referência da foto não sai da API: o app recebe um endereço assinado e com validade.
     return {
       ...view,

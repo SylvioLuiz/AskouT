@@ -3519,4 +3519,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Sugestão aberta": "Sugerencia pendiente",
   "Só quem sugeriu pode cancelar a sugestão": "Solo quien la sugirió puede cancelar la sugerencia",
   "Essa sugestão já foi recusada ou cancelada": "Esa sugerencia ya fue rechazada o cancelada",
+  "Buscar até {km} km do meio do caminho": "Buscar hasta {km} km del punto medio",
+  "Nenhum outro local numa área maior.": "No hay otros lugares en un área mayor.",
+  "Área de busca": "Área de búsqueda",
 };

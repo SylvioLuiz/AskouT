@@ -8,7 +8,7 @@ import { formatDistances, formatRating, formatWhen, ratingLabel, sourceLabel, st
 import { toApiError } from '../lib/errors.ts';
 import type { ChatMessage, ExplorePlace, SuggestionCard, SuggestionItem } from '../lib/types.ts';
 import { MAX_PLACES_ON_MAP, formatDistance, placeName, sortByFairness } from '../lib/flash.ts';
-import { nowRadiusKm } from '../lib/now-radius.ts';
+import { NOW_RADIUS_CHOICES_KM, nextRadiusKm, nowRadiusKm, setNowRadiusKm } from '../lib/now-radius.ts';
 import { initials } from '../lib/avatar.ts';
 import { lazyWithReload } from '../lib/chunk-reload.ts';
 import type { PlacePin } from './match-map.tsx';
@@ -214,7 +214,8 @@ function placeCard(p: ExplorePlace): SuggestionCard {
  */
 export function SuggestionsSheet({ inviteId, conversationId, otherName, title, agreedName, searchOpen = false, onClose, onSent }: SheetProps) {
   const match = useAsync(() => api.flashMatch(inviteId), [inviteId]);
-  const result = useAsync(() => api.flashSuggestions(inviteId, nowRadiusKm()), [inviteId]);
+  const [radiusKm, setRadiusKm] = useState<number | null>(() => nowRadiusKm());
+  const result = useAsync(() => api.flashSuggestions(inviteId, radiusKm), [inviteId, radiusKm]);
   const [sending, setSending] = useState<string | undefined>();
   const [sent, setSent] = useState<ReadonlySet<string>>(new Set());
   const [error, setError] = useState<string | undefined>();
@@ -245,7 +246,9 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, a
 
 
   const data = result.data;
-  const items = sortByFairness(data?.items ?? []).slice(0, MAX_PLACES_ON_MAP);
+  const baseItems = sortByFairness(data?.items ?? []).slice(0, MAX_PLACES_ON_MAP);
+  const more = useMorePlaces(inviteId, data?.radiusM, baseItems.map((i) => i.key));
+  const items = [...baseItems, ...more.items];
   const hasOsm = items.some((i) => i.source === 'OSM');
   const hasGoogle = items.some((i) => i.source === 'GOOGLE');
   const m = match.data;
@@ -258,6 +261,22 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, a
   return (
     <Sheet title={title} onClose={onClose}>
       <p className="muted sheet__lead">{t('Perto do ponto médio entre você e {otherName}, até {km} km.', { otherName, km: data ? Math.round(data.radiusM / 1000) : 3 })}</p>
+      <div className="radiuschips" role="group" aria-label={t('Área de busca')}>
+        {[null, ...NOW_RADIUS_CHOICES_KM].map((km) => (
+          <button
+            key={km ?? 'auto'}
+            type="button"
+            className={`chip${radiusKm === km ? ' chip--on' : ''}`}
+            aria-pressed={radiusKm === km}
+            onClick={() => {
+              setRadiusKm(km);
+              setNowRadiusKm(km);
+            }}
+          >
+            {km === null ? t('Automático') : `${km} km`}
+          </button>
+        ))}
+      </div>
       {error ? <Notice tone="error">{error}</Notice> : null}
       {!mapFailed && (me || them.length > 0) ? (
         <Suspense fallback={<div className="matchmap matchmap--chat matchmap--loading"><RingLoader size={56} label={t('Carregando o mapa')} /></div>}>
@@ -280,6 +299,7 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, a
         otherName={otherName}
         picked={picked}
         onPick={setPicked}
+        more={data && data.items.length > 0 ? more : undefined}
         action={(item) => (
           <Button small loading={sending === item.key} disabled={sent.has(item.key) || sending !== undefined} onClick={() => send(item.key, toCard(item))}>
             {sent.has(item.key) ? t('Enviado') : t('Sugerir')}
@@ -347,7 +367,7 @@ export function PlaceMapSheet({ inviteId, otherName, place, onClose }: { inviteI
  * Cartões dos locais entre vocês em rolagem horizontal, numerados como os pins do mapa (chat e página do encontro).
  * Tocar um cartão destaca o pin; escolher um pin no mapa traz o cartão para a vista.
  */
-export function PlaceCarousel({ items, otherName, picked, onPick, action }: { items: readonly SuggestionItem[]; otherName: string; picked: string | undefined; onPick: (key: string) => void; action: (item: SuggestionItem) => ReactNode }) {
+export function PlaceCarousel({ items, otherName, picked, onPick, action, more }: { items: readonly SuggestionItem[]; otherName: string; picked: string | undefined; onPick: (key: string) => void; action: (item: SuggestionItem) => ReactNode; more?: MorePlaces | undefined }) {
   const slides = useRef(new Map<string, HTMLLIElement>());
   const now = new Date();
   useEffect(() => {
@@ -393,8 +413,60 @@ export function PlaceCarousel({ items, otherName, picked, onPick, action }: { it
           </article>
         </li>
       ))}
+      {more && more.canLoad ? (
+        <li className="carousel__slide carousel__slide--more">
+          <button type="button" className="sugcard sugcard--more" onClick={more.load} disabled={more.loading}>
+            {more.loading ? <RingLoader size={40} label={t('Buscando locais')} /> : <span className="sugcard--more__plus" aria-hidden="true">+</span>}
+            <strong>{t('Ver mais')}</strong>
+            <span className="muted">{more.nextKm ? t('Buscar até {km} km do meio do caminho', { km: more.nextKm }) : null}</span>
+            {more.error ? <span className="sugcard__problem">{more.error}</span> : null}
+          </button>
+        </li>
+      ) : null}
+      {more && more.empty ? (
+        <li className="carousel__slide carousel__slide--more">
+          <p className="sugcard sugcard--more muted">{t('Nenhum outro local numa área maior.')}</p>
+        </li>
+      ) : null}
     </ul>
   );
+}
+
+export interface MorePlaces {
+  items: SuggestionItem[];
+  nextKm: number | undefined;
+  canLoad: boolean;
+  loading: boolean;
+  empty: boolean;
+  error: string | undefined;
+  load: () => void;
+}
+
+/**
+ * "Ver mais" no fim dos lugares entre vocês: cada toque busca no próximo raio maior (até 50 km),
+ * só o que fica além do que já aparece, e junta à lista e ao mapa. Recomeça quando a busca base muda.
+ */
+export function useMorePlaces(inviteId: string, baseRadiusM: number | undefined, baseKeys: readonly string[]): MorePlaces {
+  const [state, setState] = useState<{ base: number | undefined; outerKm: number | undefined; items: SuggestionItem[]; loading: boolean; empty: boolean; error: string | undefined }>({ base: undefined, outerKm: undefined, items: [], loading: false, empty: false, error: undefined });
+  const current = state.base === baseRadiusM ? state : { base: baseRadiusM, outerKm: undefined, items: [], loading: false, empty: false, error: undefined };
+  if (current !== state) setState(current);
+  const outerKm = current.outerKm ?? (baseRadiusM ? baseRadiusM / 1000 : undefined);
+  const nextKm = outerKm !== undefined ? nextRadiusKm(outerKm) : undefined;
+  async function load() {
+    if (!nextKm || outerKm === undefined || current.loading) return;
+    setState((s) => ({ ...s, loading: true, error: undefined }));
+    try {
+      const r = await api.flashSuggestions(inviteId, nextKm, outerKm);
+      setState((s) => {
+        const seen = new Set([...baseKeys, ...s.items.map((i) => i.key)]);
+        const fresh = sortByFairness(r.items.filter((i) => !seen.has(i.key)));
+        return { ...s, outerKm: nextKm, items: [...s.items, ...fresh], loading: false, empty: fresh.length === 0 && nextRadiusKm(nextKm) === undefined };
+      });
+    } catch (failure) {
+      setState((s) => ({ ...s, loading: false, error: toApiError(failure).message }));
+    }
+  }
+  return { items: current.items, nextKm, canLoad: baseRadiusM !== undefined && nextKm !== undefined, loading: current.loading, empty: current.empty, error: current.error, load: () => void load() };
 }
 
 /** Aviso antes de sugerir outro local quando já há um aceito: se o amigo aceitar o novo, o anterior deixa de valer. */

@@ -92,6 +92,20 @@ test('completa com OpenStreetMap, sem duplicar nomes e identificando a origem', 
   assert.equal(osm.key, 'osm:node/3');
 });
 
+test('ver mais: raio maior traz só os lugares além do raio já mostrado', async () => {
+  const { w, ana, bia, inviteId } = await matched();
+  await share(w, ana, inviteId, ANA);
+  await share(w, bia, inviteId, BIA);
+  const mid = { lat: (ANA.lat + BIA.lat) / 2, lng: (ANA.lng + BIA.lng) / 2 };
+  w.placeSource.places = [
+    { source: 'OSM' as const, externalId: 'node/3', name: 'Café Perto', category: 'cafe', lat: mid.lat + 0.002, lng: mid.lng },
+    { source: 'OSM' as const, externalId: 'node/5', name: 'Bar a 6 km', category: 'bar', lat: mid.lat + 0.055, lng: mid.lng },
+  ];
+  const more = await w.core.suggestions.forMatch(ana, inviteId, { radiusKm: '10', innerKm: '5' });
+  assert.equal(more.radiusM, 10_000);
+  assert.deepEqual(more.items.map((i) => i.venueName), ['Bar a 6 km']);
+});
+
 test('se o OpenStreetMap não responde, devolve só os eventos e avisa', async () => {
   const { w, ana, bia, inviteId } = await matched();
   await share(w, ana, inviteId, ANA);
