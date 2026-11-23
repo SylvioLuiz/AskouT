@@ -155,6 +155,54 @@ test('chegada: tirar ou trocar o lugar troca o aviso na hora, em silêncio, com 
   assert.equal(changed.live?.quiet, true);
 });
 
+test('chegada no iPhone com Live Activity: abre pelo push-to-start, atualiza pelo token da atividade e fecha no fim', async () => {
+  const { w, ana, bia, inviteId } = await matched();
+  w.push.liveActivities = true;
+  const start = 'cd'.repeat(32);
+  await w.core.notifications.subscribe(bia, { endpoint: `apnsls:${start}`, keys: {} });
+  await w.core.flash.shareLocation(bia, inviteId, HERE);
+  await w.core.flash.shareLocation(ana, inviteId, north(1500));
+  await w.core.flash.setArrival(ana, inviteId, true);
+  await w.core.flushNotifications();
+
+  assert.equal(w.push.activities.length, 1);
+  const opened = w.push.activities[0]!;
+  assert.equal(opened.event, 'start');
+  assert.equal(opened.token, start);
+  assert.equal(opened.attributes?.name, 'ana');
+  assert.equal(opened.attributes?.tag, `arrival:${inviteId}:${ana}`);
+  assert.equal(opened.state.title, 'ana está a caminho');
+  assert.equal(opened.state.progress, 0);
+  assert.ok(opened.alert, 'a primeira avisa');
+  assert.equal(liveSent(w).filter((s) => s.subscription.endpoint.startsWith('apns:')).length, 0, 'no iPhone não vai o aviso comum');
+
+  // Antes de o app registrar a atividade, não abre outra.
+  w.clock.tick(ARRIVAL_MIN_INTERVAL_MS + 1);
+  await w.core.flash.shareLocation(ana, inviteId, north(700));
+  await w.core.flushNotifications();
+  assert.equal(w.push.activities.length, 1);
+
+  await rejectsWith(w.core.notifications.registerLiveActivity('lva.falso.x', 'ef'.repeat(32)), 'UNAUTHORIZED');
+  const activity = 'ef'.repeat(32);
+  await w.core.notifications.registerLiveActivity(opened.attributes!.registration, activity);
+  w.clock.tick(ARRIVAL_MIN_INTERVAL_MS + 1);
+  await w.core.flash.shareLocation(ana, inviteId, north(400));
+  await w.core.flushNotifications();
+  const update = w.push.activities[1]!;
+  assert.deepEqual([update.event, update.token], ['update', activity]);
+  assert.equal(update.alert, undefined, 'atualização em silêncio');
+  assert.ok(update.state.progress > 0.5);
+
+  await w.core.flash.setArrival(ana, inviteId, false);
+  await w.core.flushNotifications();
+  const end = w.push.activities[2]!;
+  assert.deepEqual([end.event, end.token], ['end', activity]);
+  assert.ok(!(await w.pushSubscriptions.listForUser(bia)).some((s) => s.endpoint.startsWith('apnsla:')), 'o token da atividade some');
+  // Os avisos comuns nunca vão para os tokens da Live Activity.
+  await w.core.flushNotifications();
+  assert.ok(!w.push.sent.some((s) => s.subscription.endpoint.startsWith('apnsl')));
+});
+
 test('chegada: exige posição exata, só quem está no encontro, e "aproximada" desliga', async () => {
   const { w, ana, caio, inviteId } = await matched();
   await rejectsWith(w.core.flash.setArrival(ana, inviteId, 'sim'), 'VALIDATION');

@@ -1,4 +1,4 @@
-import { AesGcmSecretBox, HmacMfaChallengeTokens, HmacOneTimeCodes, HmacPushReplyTokens, Hs256TokenService, ScryptPasswordHasher } from '../adapters/crypto.ts';
+import { AesGcmSecretBox, HmacMfaChallengeTokens, HmacOneTimeCodes, HmacPushReplyTokens, HmacLiveActivityTokens, Hs256TokenService, ScryptPasswordHasher } from '../adapters/crypto.ts';
 import { createCore } from '../index.ts';
 import { FakeGoogleCalendarClient, FakeOAuthStates, InMemoryPersonalCalendarRepository } from './calendar-sync-fakes.ts';
 import type { GifSource, RouteSource } from '../ports.ts';
@@ -112,10 +112,11 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
   const secretBox = new AesGcmSecretBox({ secret: TEST_SECRET });
   const mfaChallenges = new HmacMfaChallengeTokens({ secret: TEST_SECRET, nowMs: () => clock.now().getTime() });
   const pushReplies = new HmacPushReplyTokens({ secret: TEST_SECRET, nowMs: () => clock.now().getTime() });
+  const liveActivityTokens = new HmacLiveActivityTokens({ secret: TEST_SECRET, nowMs: () => clock.now().getTime() });
   // Códigos previsíveis nos testes (100001, 100002, ...), mas com o HMAC de verdade.
   let codeCounter = 100000;
   const codes = new HmacOneTimeCodes({ secret: TEST_SECRET, generate: () => String((codeCounter += 1)) });
-  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, personalCalendars, ...(googleCalendar ? { googleCalendar } : {}), ...(microsoftCalendar ? { microsoftCalendar } : {}), oauthStates, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), ...(options.gifs ? { gifs: options.gifs } : {}), pending, passwordResets, phoneCodes, ...(options.noSms ? {} : { sms }), mfa, secretBox, mfaChallenges, pushReplies, boosts, offers, boostStats, dwell, activity, regions, consents, cloakroom, account, payments, settings, referrals, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
+  const core = createCore({ users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, personalCalendars, ...(googleCalendar ? { googleCalendar } : {}), ...(microsoftCalendar ? { microsoftCalendar } : {}), oauthStates, admin, placeSource, ...(options.routes ? { routes: options.routes } : {}), ...(options.gifs ? { gifs: options.gifs } : {}), pending, passwordResets, phoneCodes, ...(options.noSms ? {} : { sms }), mfa, secretBox, mfaChallenges, pushReplies, liveActivityTokens, boosts, offers, boostStats, dwell, activity, regions, consents, cloakroom, account, payments, settings, referrals, ...(store ? { storeVerifier: store } : {}), ...(options.boostsEnabled === undefined ? {} : { boostsEnabled: options.boostsEnabled }), ...(options.pricePerDayCents === undefined ? {} : { boostPricePerDayCents: options.pricePerDayCents }), ...(options.storePricePerDayCents === undefined ? {} : { boostStorePricePerDayCents: options.storePricePerDayCents }), identities, verifier, mailer, codes, hasher, tokens, clock, ids });
 
   /** Cadastro completo (dados -> código por e-mail -> confirmação). Devolve a sessão. */
   async function signUp(username: string, extra: { displayName?: string; email?: string; minor?: boolean } = {}): Promise<AuthResult> {
@@ -135,7 +136,7 @@ export function makeWorld(options: { payments?: FakePaymentGateway; boostsEnable
     return out;
   }
 
-  return { personalCalendars, googleCalendar, microsoftCalendar, oauthStates, mfa, secretBox, mfaChallenges, core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, phoneCodes, sms, boosts, offers, boostStats, dwell, regions, consents, cloakroom, account, payments, settings, referrals, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
+  return { liveActivityTokens, personalCalendars, googleCalendar, microsoftCalendar, oauthStates, mfa, secretBox, mfaChallenges, core, users, follows, blocks, availability, flash, conversations, meetups, scheduling, profileEvents, posts, eventRoom, albums, venueStories, feed, guestLists, notifications, pushSubscriptions, push, places, claims, calendars, calendarFetcher, admin, placeSource, pending, passwordResets, phoneCodes, sms, boosts, offers, boostStats, dwell, regions, consents, cloakroom, account, payments, settings, referrals, identities, verifier, mailer, clock, ids, hasher, tokens, codes, signUp, signUpMany };
 }
 
 /** Nos testes sem verificação em duas etapas, o login sempre devolve a sessão. */

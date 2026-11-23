@@ -1,4 +1,4 @@
-import type { PushMessage, PushResult, PushSender } from '../../core/ports.ts';
+import type { LiveActivityPush, PushMessage, PushResult, PushSender } from '../../core/ports.ts';
 import type { PushSubscriptionRecord } from '../../core/types.ts';
 import type { FetchLike, GoogleAccessTokens } from '../google/service-account.ts';
 
@@ -68,6 +68,7 @@ export class FcmSender implements PushSender {
               title: message.title,
               body: message.body,
               tag: message.tag.slice(0, 64),
+              ...(message.image ? { image: message.image } : {}),
             },
             android: { priority: 'HIGH', ttl: '60s' },
           },
@@ -138,5 +139,11 @@ export class NativePushRouter implements PushSender {
   send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
     const sender = subscription.endpoint.startsWith(FCM_PREFIX) ? this.fcm : this.apns;
     return sender ? sender.send(subscription, message) : Promise.resolve('FAILED');
+  }
+
+  /** Live Activity: só iPhone (APNs). */
+  get liveActivity(): ((push: LiveActivityPush) => Promise<PushResult>) | undefined {
+    const apns = this.apns;
+    return apns?.liveActivity ? (push) => apns.liveActivity!(push) : undefined;
   }
 }

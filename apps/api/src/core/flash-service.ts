@@ -681,7 +681,8 @@ export class FlashService {
     const estimate = estimateArrival(position, target);
     const step = this.arrivals.next(arrivalTag(invite.id, sharerId), estimate, now.getTime());
     if (!step) return;
-    const who = (await this.deps.users.findProfilesByIds([sharerId]))[0]?.username ?? 'Seu amigo';
+    const profile = (await this.deps.users.findProfilesByIds([sharerId]))[0];
+    const who = profile?.username ?? 'Seu amigo';
     const title = estimate.arrived ? `${who} chegou` : `${who} está a caminho`;
     const body = estimate.arrived
       ? dest
@@ -696,6 +697,7 @@ export class FlashService {
       url: `/now/encontro/${invite.id}`,
       tag: arrivalTag(invite.id, sharerId),
       live: { state: estimate.arrived ? 'arrived' : 'moving', progress: step.progress, quiet: (!step.first || retarget) && !estimate.arrived, untilMs: invite.expiresAt.getTime() },
+      who: { name: who, ...(profile?.avatarUrl ? { image: profile.avatarUrl } : {}) },
     });
   }
 

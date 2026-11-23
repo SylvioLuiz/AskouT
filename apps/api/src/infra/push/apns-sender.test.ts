@@ -51,6 +51,36 @@ describe('APNs (aviso no iPhone)', () => {
     assert.deepEqual(JSON.parse(requests[0]!.body), { aps: { alert: { title: 'Ana', body: 'Nova mensagem' }, sound: 'default', category: 'MESSAGE', 'thread-id': 'msg:1' }, url: '/conversas/1', reply: 'rpl.x.y' });
   });
 
+  it('Live Activity: start com atributos e alerta, update silencioso em prioridade baixa, end com dismissal', async () => {
+    const requests: ApnsRequest[] = [];
+    const sender = new ApnsSender({ config, nowMs: () => 1_700_000_000_000, transport: async (r) => (requests.push(r), { status: 200, body: '' }) });
+    const state = { title: 'ana está a caminho', body: 'Chega em ~8 min', progress: 0.2, arrived: false };
+    assert.equal(
+      await sender.liveActivity({ token: TOKEN, event: 'start', state, attributes: { name: 'ana', tag: 'arrival:1:2', registration: 'lva.x.y' }, alert: { title: 'ana está a caminho', body: 'Chega em ~8 min' }, staleAtMs: 1_700_003_600_000 }),
+      'SENT',
+    );
+    const start = requests[0]!;
+    assert.equal(start.headers['apns-push-type'], 'liveactivity');
+    assert.equal(start.headers['apns-topic'], 'br.com.askout.push-type.liveactivity');
+    assert.equal(start.headers['apns-priority'], '10');
+    assert.deepEqual(JSON.parse(start.body), {
+      aps: {
+        timestamp: 1_700_000_000,
+        event: 'start',
+        'content-state': state,
+        'stale-date': 1_700_003_600,
+        'attributes-type': 'ArrivalAttributes',
+        attributes: { name: 'ana', tag: 'arrival:1:2', registration: 'lva.x.y' },
+        alert: { title: 'ana está a caminho', body: 'Chega em ~8 min', sound: 'default' },
+      },
+    });
+    await sender.liveActivity({ token: TOKEN, event: 'update', state, staleAtMs: 1_700_003_600_000 });
+    assert.equal(requests[1]!.headers['apns-priority'], '5');
+    assert.equal(JSON.parse(requests[1]!.body).aps.alert, undefined);
+    await sender.liveActivity({ token: TOKEN, event: 'end', state, staleAtMs: 1_700_003_600_000, dismissAtMs: 1_700_000_060_000 });
+    assert.equal(JSON.parse(requests[2]!.body).aps['dismissal-date'], 1_700_000_060);
+  });
+
   it('modo sandbox usa o servidor de testes da Apple', async () => {
     const requests: ApnsRequest[] = [];
     const sender = new ApnsSender({ config: { ...config, production: false }, transport: async (r) => (requests.push(r), { status: 200, body: '' }) });

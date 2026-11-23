@@ -54,7 +54,8 @@ public class ArrivalProgressPlugin extends Plugin {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setShowWhen(false)
+            .setShowWhen(true)
+            .setWhen(System.currentTimeMillis())
             .setProgress(100, arrived ? 100 : progress, false);
         Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         if (launch != null) {
