@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createMapEngine, type EngineMarker, type MapEngine, type MapLine } from './map-engine.ts';
 import { t } from '../lib/i18n/index.ts';
+import { api } from '../client.ts';
 
 // Mapa do encontro: Google Maps (ou MapLibre sem a chave, ver map-engine.ts). Carregado sob demanda, só na tela
 // do encontro, porque a biblioteca é grande. Os pins só existem aqui, depois do aceite do convite.
@@ -16,6 +17,8 @@ export interface OtherPin extends MapPin {
   stale: boolean;
   /** Iniciais da pessoa, desenhadas dentro do pin. */
   initials: string;
+  /** Foto de perfil: quando vem, o pin mostra a foto no lugar das iniciais. */
+  photoUrl?: string | null | undefined;
 }
 
 /** Lugar sugerido entre os dois (bar, evento): um pin numerado que se toca para escolher. */
@@ -32,6 +35,8 @@ export interface RouteLine {
 
 interface Props {
   me: MapPin | undefined;
+  /** Sua foto de perfil, para o seu pin. */
+  mePhoto?: string | null | undefined;
   others: readonly OtherPin[];
   places?: readonly PlacePin[];
   selectedKey?: string | undefined;
@@ -49,7 +54,26 @@ function pinElement(className: string, text: string): HTMLDivElement {
   return el;
 }
 
-export default function MatchMap({ me, others, places = [], selectedKey, onPick, destination, routes, onFail }: Props) {
+/** Pin de pessoa com a foto de perfil; se a foto não carregar, volta às iniciais (ou ao ponto). */
+function personPin(className: string, text: string, photo: string | null | undefined): HTMLDivElement {
+  const el = pinElement(className, text);
+  if (!photo) return el;
+  const img = document.createElement('img');
+  img.src = photo.startsWith('/') ? api.assetUrl(photo) : photo;
+  img.alt = '';
+  img.referrerPolicy = 'no-referrer';
+  img.addEventListener('error', () => {
+    img.remove();
+    el.classList.remove('pin--photo');
+    el.textContent = text;
+  });
+  el.textContent = '';
+  el.classList.add('pin--photo');
+  el.appendChild(img);
+  return el;
+}
+
+export default function MatchMap({ me, mePhoto, others, places = [], selectedKey, onPick, destination, routes, onFail }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const live = useRef<{ map: MapEngine; me?: EngineMarker; others: Map<string, EngineMarker>; places: Map<string, EngineMarker>; dest?: EngineMarker; fitKey: string } | undefined>(undefined);
   const pickRef = useRef(onPick);
@@ -91,7 +115,7 @@ export default function MatchMap({ me, others, places = [], selectedKey, onPick,
       state.me?.remove();
       state.me = undefined;
     } else if (state.me) state.me.setPosition(me);
-    else state.me = map.addMarker(pinElement('pin pin--me', ''), me, 'center');
+    else state.me = map.addMarker(personPin('pin pin--me', '', mePhoto), me, 'center');
 
     // Um pin por pessoa que aceitou sair com você; some quando o encontro acaba.
     const wanted = new Set(others.map((o) => o.id));
@@ -105,7 +129,7 @@ export default function MatchMap({ me, others, places = [], selectedKey, onPick,
       let marker = state.others.get(other.id);
       if (marker) marker.setPosition(other);
       else {
-        marker = map.addMarker(pinElement('pin pin--them', other.initials), other, 'center');
+        marker = map.addMarker(personPin('pin pin--them', other.initials, other.photoUrl), other, 'center');
         state.others.set(other.id, marker);
       }
       marker.element.classList.toggle('pin--stale', other.stale);

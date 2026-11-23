@@ -19,7 +19,7 @@ import { PollLine } from '../components/date-poll-strip.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
 import { EventBubble } from '../components/share-event.tsx';
 import { peopleLabel } from '../lib/meetup.ts';
-import { SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
+import { PlaceMapSheet, SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
 import { api } from '../client.ts';
 import { useAsync, useLiveRefresh, usePolling, useTitle } from '../hooks.ts';
 import { PullRefresh } from '../components/pull-refresh.tsx';
@@ -470,7 +470,9 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [recording, setRecording] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   // Mapa dos locais entre vocês, aberto dentro do chat. `search` já abre a busca de outro lugar (vindo da página do NOW).
-  const [suggesting, setSuggesting] = useState<'suggest' | 'map' | 'search' | undefined>(() => {
+  /** Mapa em modal: você, o amigo e o local (`place` vazio = o local combinado). */
+  const [mapFor, setMapFor] = useState<{ place?: { name: string; lat: number; lng: number } } | undefined>();
+  const [suggesting, setSuggesting] = useState<'suggest' | 'search' | undefined>(() => {
     const ask = new URLSearchParams(window.location.search).get('sugerir');
     return ask === 'outro' ? 'search' : ask !== null ? 'suggest' : undefined;
   });
@@ -872,7 +874,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         <Button small onClick={() => setSuggesting('suggest')}>
           {placeAgreed ? t('Mudar local sugerido') : t('Sugerir um local')}
         </Button>
-        <Button small variant="secondary" onClick={() => setSuggesting('map')}>
+        <Button small variant="secondary" onClick={() => setMapFor({ ...(placeAgreed && lastSuggestion?.suggestion ? { place: { name: lastSuggestion.suggestion.venueName, lat: lastSuggestion.suggestion.lat, lng: lastSuggestion.suggestion.lng } } : {}) })}>
           {t('Ver no mapa')}
         </Button>
       </div>
@@ -994,7 +996,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         {m.deleted ? (
           <p className="bubble__text bubble__text--deleted">{m.mine ? t('Você apagou esta mensagem') : t('Mensagem apagada')}</p>
         ) : m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
-          <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} />
+          <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} onOpenMap={(place) => setMapFor({ place })} />
         ) : m.kind === 'MEETUP' && m.meetup ? (
           <MeetupBubble meetup={m.meetup} nowIso={data.now} onUpdated={(updated) => setMessages((current) => current.map((x) => (x.id === m.id || x.meetup?.id === updated.id ? { ...x, meetup: updated } : x)))} />
         ) : m.kind === 'AUDIO' && m.audio ? (
@@ -1324,9 +1326,11 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         </Sheet>
       ) : null}
 
+      {mapFor ? <PlaceMapSheet inviteId={match?.id} otherName={data.other?.displayName ?? ''} place={mapFor.place} onClose={() => setMapFor(undefined)} /> : null}
+
       {suggesting && match ? (
         <SuggestionsSheet
-          title={suggesting === 'map' ? t('Lugares entre vocês') : placeAgreed ? t('Mudar local sugerido') : t('Sugerir um local')}
+          title={placeAgreed ? t('Mudar local sugerido') : t('Sugerir um local')}
           searchOpen={suggesting === 'search'}
           inviteId={match.id}
           conversationId={conversationId}
