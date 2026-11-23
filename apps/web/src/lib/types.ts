@@ -887,6 +887,16 @@ export interface VenueStoryOwnerView {
   items: VenueStoryItem[];
 }
 
+/** Pessoa convidada para um evento criado por uma pessoa. */
+export interface EventInvite {
+  user: PublicProfile;
+  /** Quem convidou (nulo se apagou a conta). */
+  invitedBy: PublicProfile | null;
+  invitedAt: string;
+  /** Também está marcada no evento. */
+  tagged: boolean;
+}
+
 export interface EventPage {
   id: string;
   source: 'PLACE' | 'USER';

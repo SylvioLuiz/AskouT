@@ -1,3 +1,4 @@
+import { canOpenByInvite } from './event-invites.ts';
 import { buildEventCards } from './event-card.ts';
 import type { EventCardView } from './event-card.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
@@ -67,7 +68,7 @@ export class ProfileEventService {
     if (post.authorId === actorId) throw conflict('Este evento já é seu: ele aparece no seu perfil sem precisar repostar');
     if (await blocks.existsEitherWay(actorId, post.authorId)) throw notFound('Evento não encontrado');
     if (post.eventPrivate) throw forbidden('O organizador marcou este evento como privado: ele não pode ser compartilhado no perfil');
-    const reachable = (await conversations.hasPostEventAccess(actorId, postId)) || (await follows.get(actorId, post.authorId))?.status === 'ACCEPTED';
+    const reachable = (await canOpenByInvite(this.deps, actorId, postId)) || (await follows.get(actorId, post.authorId))?.status === 'ACCEPTED';
     if (!reachable) throw notFound('Evento não encontrado');
     if ((await profileEvents.count(actorId)) >= POSTED_EVENTS_MAX && !(await profileEvents.hasPost(actorId, postId))) {
       throw conflict(`Você já postou ${POSTED_EVENTS_MAX} eventos. Tire algum do perfil para postar outro.`);

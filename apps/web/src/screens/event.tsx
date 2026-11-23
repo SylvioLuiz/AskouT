@@ -700,6 +700,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
           profile={e.source === 'PLACE' ? 'toggle' : e.isPrivate ? 'private' : 'owner'}
           outside={!e.isPrivate}
           sheetTitle={t('Convidar pessoas')}
+          invite
           onClose={() => setInviting(false)}
         />
       ) : null}

@@ -259,6 +259,8 @@ model User {
   feedReportsMade      FeedReport[]          @relation("FeedReportsMade")
   feedReportsReceived  FeedReport[]          @relation("FeedReportsReceived")
   postTags          PostTag[]
+  eventInvitesReceived EventInvite[] @relation("EventInvitesReceived")
+  eventInvitesSent     EventInvite[] @relation("EventInvitesSent")
   postLikes         PostLike[]    @relation("PostLikes")
   postComments      PostComment[] @relation("PostComments")
   postReports       PostReport[]  @relation("PostReports")
@@ -1016,6 +1018,7 @@ model Post {
   venue  Venue?      @relation(fields: [venueId], references: [id], onDelete: Cascade)
   images PostImage[]
   tags   PostTag[]
+  invites EventInvite[]
   likes    PostLike[]
   comments PostComment[]
   reports  PostReport[]
@@ -1149,6 +1152,22 @@ model PostTag {
 
   @@id([postId, userId])
   @@index([userId, status])
+}
+
+/// Convite para um evento criado por uma pessoa: quem foi marcado na criação ou recebeu o cartão do evento numa conversa.
+/// Vale o primeiro convite (quem convidou primeiro fica registrado). Em evento privado, é o convite que abre o evento.
+model EventInvite {
+  postId      String   @db.Uuid
+  userId      String   @db.Uuid
+  invitedById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+
+  post      Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User  @relation("EventInvitesReceived", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy User? @relation("EventInvitesSent", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@id([postId, userId])
+  @@index([userId])
 }
 
 // "Eu vou": presença confirmada num evento do local (placeEventId) ou num evento criado por uma pessoa (postId). Exatamente um dos dois.

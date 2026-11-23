@@ -63,7 +63,7 @@ async function copyText(text: string): Promise<void> {
  * (toque em um ou mais, mensagem opcional, Enviar) e, embaixo, uma linha de atalhos (copiar link, WhatsApp...).
  * `link` vazio = só dentro do app (ex.: evento privado). `inApp={false}` = só os atalhos de fora (WhatsApp, link...).
  */
-export function ShareSheet({ title = t('Compartilhar'), link, card, send, onShared, actions = [], note, sentToast, initialConversations = [], inApp = true, onClose }: {
+export function ShareSheet({ title = t('Compartilhar'), link, card, send, onShared, actions = [], note, sentToast, initialConversations = [], inApp = true, already, onClose }: {
   title?: string;
   link?: { title: string; text: string; url: string };
   /** Cartão pronto para postar no Instagram (Feed/Stories) e outras redes: imagem + legenda. Só com `link`. */
@@ -79,6 +79,8 @@ export function ShareSheet({ title = t('Compartilhar'), link, card, send, onShar
   initialConversations?: string[];
   /** false: sem a grade de conversas e amigos, só os atalhos para fora do app. */
   inApp?: boolean;
+  /** Pessoas que já receberam (ex.: convidados de um evento): aparecem com o selo `label` e continuam podendo receber de novo. */
+  already?: { userIds: ReadonlySet<string>; label: string };
   onClose: () => void;
 }) {
   const data = useAsync(() => (inApp ? Promise.all([api.conversations(), api.friends().catch(() => [])]) : Promise.resolve(null)), [inApp]);
@@ -244,6 +246,7 @@ export function ShareSheet({ title = t('Compartilhar'), link, card, send, onShar
             {visible.map((target) => {
               const on = picked.includes(target.key);
               const done = sent.includes(target.key) && !on;
+              const before = !done && !on && target.profile !== undefined && already?.userIds.has(target.profile.userId) === true;
               return (
                 <li key={target.key}>
                   <button type="button" className={`sharesheet__person${on ? ' sharesheet__person--on' : ''}`} aria-pressed={on} onClick={() => toggle(target)} disabled={busy}>
@@ -256,7 +259,7 @@ export function ShareSheet({ title = t('Compartilhar'), link, card, send, onShar
                       ) : null}
                     </span>
                     <span className="sharesheet__name">{target.name}</span>
-                    {done ? <span className="sharesheet__sent">{t('Enviado')}</span> : null}
+                    {done ? <span className="sharesheet__sent">{already ? already.label : t('Enviado')}</span> : before ? <span className="sharesheet__sent sharesheet__sent--before">{already!.label}</span> : null}
                   </button>
                 </li>
               );

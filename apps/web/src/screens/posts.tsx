@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
-import { CalendarIcon, CarouselIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, EventKindIcon, GlobeIcon, LocationIcon, LockIcon, PhotoIcon, PlusIcon, SendIcon, ShareIcon, UsersIcon, XIcon } from '../components/icons.tsx';
+import { CalendarIcon, CarouselIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CropIcon, EventKindIcon, GlobeIcon, LocationIcon, LockIcon, PhotoIcon, PlusIcon, ShareIcon, UsersIcon, XIcon } from '../components/icons.tsx';
 import { EventAudienceSheet, EventKindSheet, EventRow, EventWhenSheet } from '../components/event-compose.tsx';
 import { FriendPicker } from '../components/meetup.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
@@ -182,7 +182,7 @@ export function CreatePostScreen() {
   // A conversa da votação já vem marcada no passo de enviar, que aparece depois que o evento é criado.
   const pollConversation = fromPoll ? prefill.get('conversa') : null;
   // Evento criado: em vez de sair direto, mostra o passo "Enviar para conversas".
-  const [created, setCreated] = useState<{ id: string; title: string; private: boolean; cover: string | undefined; dateByPoll: boolean } | undefined>();
+  const [created, setCreated] = useState<{ id: string; title: string; private: boolean; cover: string | undefined; dateByPoll: boolean; /** Marcados na criação: já são convidados. */ taggedCount: number } | undefined>();
   const [sharing, setSharing] = useState(false);
   const [sharingOutside, setSharingOutside] = useState(false);
   const [sharedOnce, setSharedOnce] = useState(false);
@@ -321,7 +321,7 @@ export function CreatePostScreen() {
       if (created.event) {
         // O evento já existe: agora (e só agora) vem o passo de enviar para conversas, que dá para pular.
         const byPoll = created.event.startsAt === null;
-        setCreated({ id: created.id, title: created.event.title, private: eventPrivate, cover: items[0]?.preview, dateByPoll: byPoll });
+        setCreated({ id: created.id, title: created.event.title, private: eventPrivate, cover: items[0]?.preview, dateByPoll: byPoll, taggedCount: tags.length });
         // Data por votação: o próximo passo é escolher a conversa da votação; senão, enviar para conversas.
         // Data por votação: primeiro convida (a votação abre com todos os convidados); senão, enviar para conversas.
         setSharing(true);
@@ -388,6 +388,9 @@ export function CreatePostScreen() {
     const eventPath = `/eventos/${encodeURIComponent(created.id)}`;
     const pollPath = `/planejar/evento/${encodeURIComponent(created.id)}?${new URLSearchParams({ titulo: created.title }).toString()}`;
     const finish = () => navigate(created.private ? eventPath : '/perfil?aba=eventos');
+    // Quem foi marcado já conta como convidado: o botão já é "Convidar mais pessoas" e a votação já pode abrir.
+    const hasInvites = sharedOnce || created.taggedCount > 0;
+    const inviteLabel = hasInvites ? t('Convidar mais pessoas') : t('Convidar pessoas');
     return (
       <div className="compose compose--created">
         <header className="compose__bar">
@@ -410,13 +413,16 @@ export function CreatePostScreen() {
               ? t('Seu evento privado está pronto. Ele só chega a quem receber nas conversas.')
               : t('Seu evento está pronto e já aparece no seu perfil.')}
           </p>
+          {created.taggedCount > 0 ? (
+            <p className="muted">{created.taggedCount === 1 ? t('Quem você marcou já está convidado.') : t('As {n} pessoas que você marcou já estão convidadas.', { n: created.taggedCount })}</p>
+          ) : null}
           {created.dateByPoll ? (
             <>
               <p className="muted">{t('A data vai ser decidida numa votação com todos os convidados. Quem você convidar depois entra na votação também.')}</p>
               <Button full onClick={() => setSharing(true)}>
-                <UsersIcon /> {sharedOnce ? t('Convidar mais pessoas') : t('Convidar pessoas')}
+                <UsersIcon /> {inviteLabel}
               </Button>
-              {sharedOnce ? (
+              {hasInvites ? (
                 <Button full variant="secondary" onClick={() => navigate(pollPath)}>
                   <CalendarIcon /> {t('Abrir a votação da data')}
                 </Button>
@@ -424,7 +430,7 @@ export function CreatePostScreen() {
             </>
           ) : (
             <Button full onClick={() => setSharing(true)}>
-              <SendIcon /> {sharedOnce ? t('Enviar para mais conversas') : t('Enviar para conversas e grupos')}
+              <UsersIcon /> {inviteLabel}
             </Button>
           )}
           {created.private ? null : (
@@ -442,17 +448,15 @@ export function CreatePostScreen() {
             eventId={created.id}
             source="USER"
             title={created.title}
-            sheetTitle={created.dateByPoll ? t('Convidar pessoas') : t('Enviar o evento')}
+            sheetTitle={t('Convidar pessoas')}
+            invite
             posted={false}
             onPostedChange={() => undefined}
             profile={created.private ? 'private' : 'owner'}
             outside={!created.private}
             {...(pollConversation && !sharedOnce ? { initialConversations: [pollConversation] } : {})}
-            onShared={() => {
-              setSharedOnce(true);
-              // Convidou: já segue para abrir a votação (o grupo dela junta todos os convidados).
-              if (created.dateByPoll) navigate(pollPath);
-            }}
+            // Depois de convidar, continua aqui: dá para convidar mais gente antes de abrir a votação ou concluir.
+            onShared={() => setSharedOnce(true)}
             onClose={() => setSharing(false)}
           />
         ) : null}

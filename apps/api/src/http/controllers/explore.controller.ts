@@ -82,6 +82,12 @@ export class ExploreController {
     return this.presentPage(await this.core.eventPages.get(actor.userId, id, lat !== undefined && lng !== undefined ? { lat, lng } : {}));
   }
 
+  /** Quem já foi convidado (marcado ou recebeu o cartão): o dono vê todos; os demais, quem eles convidaram. */
+  @Get('events/:id/invites')
+  eventInvites(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.eventPages.invites(actor.userId, id);
+  }
+
   /** Aba "Álbum" do evento: abre quando começa, só para quem confirmou presença (ou criou). */
   @Get('events/:id/album')
   eventAlbum(@CurrentActor() actor: Actor, @Param('id') id: string) {

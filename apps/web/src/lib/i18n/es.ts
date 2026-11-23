@@ -3418,4 +3418,12 @@ export const ES: Readonly<Record<string, string>> = {
   "ainda não respondeu": "todavía no respondió",
   "concluiu": "terminó",
   "ainda votando": "todavía votando",
+  "1 pessoa já está convidada.": "1 persona ya está invitada.",
+  "{n} pessoas já estão convidadas.": "{n} personas ya están invitadas.",
+  "Evento privado: quem você convidar fica marcado no evento e só essas pessoas veem.": "Evento privado: quien invites queda etiquetado en el evento y solo esas personas lo ven.",
+  "Quem você convidar recebe o evento na conversa e marca “Eu vou” se for.": "Quien invites recibe el evento en el chat y marca “Voy” si va.",
+  "Convite enviado para: {name}": "Invitación enviada a: {name}",
+  "Convite enviado para: {name} e mais {n}": "Invitación enviada a: {name} y {n} más",
+  "Quem você marcou já está convidado.": "La persona que etiquetaste ya está invitada.",
+  "As {n} pessoas que você marcou já estão convidadas.": "Las {n} personas que etiquetaste ya están invitadas.",
 };

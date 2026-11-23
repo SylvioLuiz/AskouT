@@ -64,6 +64,7 @@ import type {
   ConnectionsPage,
   EventKind,
   EventPage,
+  EventInvite,
   NotificationMute,
   EventStoryGroup,
   CommentGif,
@@ -549,6 +550,8 @@ export function createApi(deps: ApiDeps) {
     followedEvents: () => request<{ events: ExploreEvent[] }>('GET', '/explore/followed-events'),
     eventPage: (eventId: string, position?: { lat: number; lng: number }) =>
       request<EventPage>('GET', `${visitor() ? '/public' : ''}/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`, visitor() ? { auth: false } : {}),
+    /** Quem já foi convidado para o evento (marcado ou recebeu o cartão). O dono vê todos; os demais, quem eles convidaram. */
+    eventInvites: (eventId: string) => request<{ invites: EventInvite[] }>('GET', `/events/${id(eventId)}/invites`),
     /** Aba Álbum do evento: SOON antes de começar, LOCKED para quem não confirmou, OPEN com o álbum. */
     eventAlbum: (eventId: string) => request<{ state: 'SOON'; startsAt: string | null } | { state: 'LOCKED' } | { state: 'OPEN'; album: AlbumDetail }>('GET', `/events/${id(eventId)}/album`),
     eventStories: (eventId: string) => request<{ groups: EventStoryGroup[] }>('GET', `/events/${id(eventId)}/stories`),

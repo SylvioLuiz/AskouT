@@ -670,11 +670,12 @@ export class SchedulingService {
     return post.id;
   }
 
-  /** Quem foi convidado para o evento: está numa conversa em que quem criou mandou o evento (menos quem tem bloqueio). */
+  /** Quem foi convidado para o evento: marcado na criação, convidado registrado ou numa conversa em que quem criou mandou o evento (menos quem tem bloqueio). */
   private async inviteesOf(organizerId: string, postId: string): Promise<string[]> {
-    const { conversations, blocks } = this.deps;
+    const { conversations, blocks, posts } = this.deps;
     const related = new Set(await blocks.listRelatedIds(organizerId));
     const out = new Set<string>();
+    for (const invite of await posts.listInvites(postId)) if (invite.userId !== organizerId && !related.has(invite.userId)) out.add(invite.userId);
     for (const id of await conversations.postEventConversationIds(postId, organizerId)) {
       for (const userId of (await conversations.participantIds(id)) ?? []) if (userId !== organizerId && !related.has(userId)) out.add(userId);
     }

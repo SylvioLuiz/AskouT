@@ -1,3 +1,4 @@
+import { canOpenByInvite, recordCardInvites } from './event-invites.ts';
 import { buildEventCards } from './event-card.ts';
 import type { EventCardView } from './event-card.ts';
 import { decodeAudioDataUrl, parseAudioDuration } from './audio.ts';
@@ -642,7 +643,7 @@ export class ConversationService {
         // Evento de pessoa: o dono envia; outros só reencaminham o que receberam, e nunca um evento privado.
         if (eventCard.ownerId !== actorId) {
           if (eventCard.private) throw forbidden('Este evento é privado: só quem criou pode enviar');
-          if (!(await conversations.hasPostEventAccess(actorId, eventCard.id)) && !(await follows.get(actorId, eventCard.ownerId ?? ''))) throw notFound('Evento não encontrado');
+          if (!(await canOpenByInvite(this.deps, actorId, eventCard.id)) && !(await follows.get(actorId, eventCard.ownerId ?? ''))) throw notFound('Evento não encontrado');
         }
         postEventId = eventCard.id;
       } else {
@@ -670,8 +671,13 @@ export class ConversationService {
     const replyToId = await this.parseReply(conversationId, input.replyToId);
     const message: MessageRecord = { id: ids.next(), conversationId, senderId: actorId, kind, body, suggestion, response: null, respondedAt: null, meetupId: null, eventId, postEventId, audioMs, replyToId, ...(input.storyId ? { storyId: input.storyId } : {}), ...(gif ? { gifId: gif.id, gifUrl: gif.url } : {}), createdAt: now };
     await conversations.addMessage(message, audio ?? (media ? { mime: media.mime, data: media.data } : undefined));
-    // Evento com a data em votação: quem recebe de quem criou entra na votação.
-    if (postEventId) await new SchedulingService(this.deps).addEventInvitees(actorId, postEventId, conversationId);
+    if (postEventId) {
+      // Quem está na conversa vira convidado (fica registrado quem convidou; em evento privado, vira marcação).
+      const eventPost = (await this.deps.posts.findById(postEventId))?.post;
+      if (eventPost) await recordCardInvites(this.deps, actorId, eventPost, conversationId);
+      // Evento com a data em votação: quem recebe de quem criou entra na votação.
+      await new SchedulingService(this.deps).addEventInvitees(actorId, postEventId, conversationId);
+    }
     this.typingUntil.delete(`${conversationId}|${actorId}`);
     await conversations.markRead(conversationId, actorId, now);
     const positions = suggestion && otherId ? await this.livePositions(actorId, otherId, now) : null;
