@@ -328,6 +328,10 @@ export interface FlashMatch {
   meApprox?: boolean;
   /** A outra pessoa só mostra a posição aproximada (~1 km). */
   themApprox?: boolean;
+  /** Você liberou a outra pessoa a acompanhar a sua chegada nas notificações do celular. */
+  meArrival?: boolean;
+  /** A outra pessoa liberou você a acompanhar a chegada dela. */
+  themArrival?: boolean;
 }
 
 /** Rota de cada um até o lugar escolhido. `line` nulo: sem trajeto, o mapa desenha uma linha reta. */

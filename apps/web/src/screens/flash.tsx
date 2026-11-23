@@ -1066,6 +1066,82 @@ function PrecisionPicker({ approx, onChange, text, disabled }: { approx: boolean
 
 // ---------- Encontro ----------
 
+const arrivalAskKey = (inviteId: string) => `askout.now.arrival-asked.${inviteId}`;
+
+/**
+ * "Mostrar sua chegada": pergunta se a outra pessoa pode acompanhar, nas notificações do celular dela, quanto falta
+ * para você chegar (como o carro chegando no Uber). Nada é mostrado sem você liberar; dá para parar a qualquer hora.
+ */
+function ArrivalShare({ match, onChanged, onFeedback }: { match: FlashMatch; onChanged: () => void; onFeedback: (f: Feedback) => void }) {
+  const storage = safeStorage();
+  const [dismissed, setDismissed] = useState(() => storage?.getItem(arrivalAskKey(match.inviteId)) === '1');
+  const [busy, setBusy] = useState(false);
+  const name = match.other.username;
+
+  async function set(share: boolean) {
+    setBusy(true);
+    try {
+      await api.flashSetArrival(match.inviteId, share);
+      storage?.setItem(arrivalAskKey(match.inviteId), '1');
+      setDismissed(true);
+      onChanged();
+      onFeedback({ tone: 'ok', text: share ? t('{name} vai acompanhar sua chegada pelas notificações.', { name }) : t('{name} não acompanha mais a sua chegada.', { name }) });
+    } catch (failure) {
+      onFeedback({ tone: 'error', text: toApiError(failure).message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function notNow() {
+    storage?.setItem(arrivalAskKey(match.inviteId), '1');
+    setDismissed(true);
+  }
+
+  const theirs = match.themArrival ? <p className="muted">{t('{name} liberou você a acompanhar a chegada pelas notificações do celular.', { name })}</p> : null;
+
+  if (match.meArrival) {
+    return (
+      <section className="sharebox" aria-label={t('Sua chegada')}>
+        <p className="sharebox__title">{t('Mostrando sua chegada para {name}', { name })}</p>
+        <p className="muted">{t('{name} vê nas notificações quanto falta para você chegar. Deixe o AskouT aberto no caminho para o tempo ir se atualizando.', { name })}</p>
+        {theirs}
+        <Button variant="secondary" full loading={busy} onClick={() => void set(false)}>
+          {t('Parar de mostrar minha chegada')}
+        </Button>
+      </section>
+    );
+  }
+  if (match.meApprox) return theirs ? <section className="sharebox">{theirs}</section> : null;
+  if (dismissed) {
+    return (
+      <section className="sharebox" aria-label={t('Sua chegada')}>
+        {theirs}
+        <Button variant="secondary" full loading={busy} onClick={() => void set(true)}>
+          {t('Mostrar minha chegada para {name}', { name })}
+        </Button>
+      </section>
+    );
+  }
+  return (
+    <section className="sharebox" aria-label={t('Sua chegada')}>
+      <p className="sharebox__title">{t('Mostrar sua chegada para {name}?', { name })}</p>
+      <p className="muted">
+        {t('Como o carro chegando no Uber: {name} acompanha nas notificações do celular quanto falta para você chegar ao lugar combinado (ou até onde a pessoa está). Só durante este encontro, e você pode parar quando quiser.', { name })}
+      </p>
+      {theirs}
+      <div className="stack">
+        <Button full loading={busy} onClick={() => void set(true)}>
+          {t('Mostrar minha chegada')}
+        </Button>
+        <Button variant="secondary" full disabled={busy} onClick={notNow}>
+          {t('Agora não')}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 type ShareState =
   | { phase: 'idle' }
   | { phase: 'asking' }
@@ -1211,7 +1287,14 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
     try {
       await api.flashSetPrecision(inviteId, approx);
       match.reload();
-      setFeedback({ tone: 'ok', text: approx ? t('Agora só a sua localização aproximada é mostrada.') : t('Agora sua localização exata é mostrada.') });
+      setFeedback({
+        tone: 'ok',
+        text: approx
+          ? match.data?.meArrival
+            ? t('Agora só a sua localização aproximada é mostrada, e sua chegada deixou de ser mostrada.')
+            : t('Agora só a sua localização aproximada é mostrada.')
+          : t('Agora sua localização exata é mostrada.'),
+      });
     } catch (failure) {
       setFeedback({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -1398,6 +1481,8 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         </p>
       ) : null}
       <MatchPlaceSearch center={myPoint ?? (them ? { lat: them.lat, lng: them.lng } : undefined)} otherName={data.other.username} busy={destBusy} onSuggest={(place) => void suggestPlace(place)} />
+
+      <ArrivalShare match={data} onChanged={match.reload} onFeedback={setFeedback} />
 
       <section className="sharebox" aria-label={t('Sua localização')}>
         <PrecisionPicker approx={data.meApprox === true} disabled={precisionBusy} onChange={(approx) => void changePrecision(approx)} text={t('{name} vê sua localização {how}.', { name: data.other.username, how: data.meApprox ? t('aproximada') : t('exata') })} />

@@ -2,6 +2,7 @@ import { openFlashAlbum } from './album-service.ts';
 import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { CoreDeps, RouteResult } from './ports.ts';
 import { distanceMeters, midpoint } from './geo.ts';
+import { ArrivalTracker, estimateArrival, formatArrivalDistance } from './arrival.ts';
 import type { FlashHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, PublicProfile } from './types.ts';
 import { toPublicProfile } from './types.ts';
 import { decay, directCloseness } from './recommendation-service.ts';
@@ -93,6 +94,17 @@ function approxFor(invite: FlashInviteRecord, userId: string): boolean {
   return invite.fromUserId === userId ? invite.fromApprox === true : invite.toApprox === true;
 }
 
+/** Essa pessoa liberou o outro a acompanhar a chegada dela nas notificações do celular? */
+function arrivalFor(invite: FlashInviteRecord, userId: string): boolean {
+  return invite.fromUserId === userId ? invite.fromArrival === true : invite.toArrival === true;
+}
+
+function withArrival(invite: FlashInviteRecord, userId: string, share: boolean): FlashInviteRecord {
+  return invite.fromUserId === userId ? { ...invite, fromArrival: share } : { ...invite, toArrival: share };
+}
+
+const arrivalTag = (inviteId: string, userId: string): string => `arrival:${inviteId}:${userId}`;
+
 /** Encaixa numa grade de ~3 km quando a pessoa escolheu "aproximada". A posição exata nem chega a ser guardada. */
 function fuzzIfApprox(position: FlashPositionRecord, approx: boolean): FlashPositionRecord {
   if (!approx) return position;
@@ -145,6 +157,10 @@ export interface MatchView {
   meApprox: boolean;
   /** A outra pessoa só mostra a posição aproximada (~1 km). */
   themApprox: boolean;
+  /** Você liberou a outra pessoa a acompanhar a sua chegada nas notificações do celular. */
+  meArrival: boolean;
+  /** A outra pessoa liberou você a acompanhar a chegada dela. */
+  themArrival: boolean;
 }
 
 /** Rota de cada um até o lugar escolhido. `line` nulo: sem trajeto (o app desenha uma linha reta). */
@@ -185,6 +201,8 @@ function parseCoordinate(value: unknown, field: 'lat' | 'lng', limit: number): n
 
 export class FlashService {
   private readonly deps: CoreDeps;
+  /** Última atualização da chegada enviada por encontro e pessoa (só na memória). */
+  private readonly arrivals = new ArrivalTracker();
 
   constructor(deps: CoreDeps) {
     this.deps = deps;
@@ -538,7 +556,85 @@ export class FlashService {
 
     const status = invite.status === 'ACCEPTED' ? 'ENDED' : invite.fromUserId === actorId ? 'CANCELED' : 'DECLINED';
     await flash.saveInvite({ ...invite, status, endedAt: now, respondedAt: invite.respondedAt ?? (status === 'DECLINED' ? now : null) });
+    // Quem acompanhava a chegada de alguém tem o aviso fixo trocado por "encerrado".
+    for (const sharer of [invite.fromUserId, invite.toUserId]) {
+      if (arrivalFor(invite, sharer)) await this.stopArrival(invite, sharer, 'O encontro foi encerrado').catch(() => undefined);
+    }
     return { ended: true };
+  }
+
+  /**
+   * Libera (ou para) a outra pessoa de acompanhar a sua chegada nas notificações do celular, como o carro chegando
+   * no Uber. Só vale neste encontro e só com a posição exata (a aproximada daria um tempo de chegada sem sentido).
+   */
+  async setArrival(actorId: string, inviteId: string, share: unknown): Promise<{ share: boolean }> {
+    if (typeof share !== 'boolean') throw validationError('Escolha inválida', { share: 'Use true ou false' });
+    const { flash, clock } = this.deps;
+    const now = clock.now();
+    const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
+    if (share && approxFor(invite, actorId)) throw validationError('Para mostrar sua chegada, use a localização exata', { share: 'Use a localização exata para mostrar sua chegada' });
+    if (arrivalFor(invite, actorId) === share) return { share };
+    const saved = withArrival(invite, actorId, share);
+    await flash.saveInvite(saved);
+    if (share) {
+      const mine = (await flash.listPositions(inviteId)).find((p) => p.userId === actorId);
+      if (mine) await this.pushArrival(saved, mine, now).catch(() => undefined);
+    } else {
+      await this.stopArrival(saved, actorId, 'Parou de mostrar a chegada').catch(() => undefined);
+    }
+    return { share };
+  }
+
+  /** Manda a atualização da chegada de `position.userId` para a outra pessoa, se for a hora (ver ArrivalTracker). */
+  private async pushArrival(invite: FlashInviteRecord, position: FlashPositionRecord, now: Date): Promise<void> {
+    const notifier = this.deps.notifier;
+    if (!notifier.live) return;
+    const sharerId = position.userId;
+    const otherId = invite.fromUserId === sharerId ? invite.toUserId : invite.fromUserId;
+    const dest = invite.destination;
+    let target: { lat: number; lng: number } | undefined = dest ? { lat: dest.lat, lng: dest.lng } : undefined;
+    if (!target) {
+      const theirs = (await this.deps.flash.listPositions(invite.id)).find((p) => p.userId === otherId);
+      if (theirs) target = { lat: theirs.lat, lng: theirs.lng };
+    }
+    if (!target) return;
+    const estimate = estimateArrival(position, target);
+    const step = this.arrivals.next(arrivalTag(invite.id, sharerId), estimate, now.getTime());
+    if (!step) return;
+    const who = (await this.deps.users.findProfilesByIds([sharerId]))[0]?.username ?? 'Seu amigo';
+    const title = estimate.arrived ? `${who} chegou` : `${who} está a caminho`;
+    const body = estimate.arrived
+      ? dest
+        ? `Chegou em ${dest.name}`
+        : 'Está bem perto de você'
+      : `Chega em ~${estimate.minutes} min · ${formatArrivalDistance(estimate.distanceM)} até ${dest ? dest.name : 'você'}`;
+    await notifier.live({
+      userId: otherId,
+      type: 'FLASH_INVITE',
+      title,
+      body,
+      url: `/now/encontro/${invite.id}`,
+      tag: arrivalTag(invite.id, sharerId),
+      live: { state: estimate.arrived ? 'arrived' : 'moving', progress: step.progress, quiet: !step.first && !estimate.arrived, untilMs: invite.expiresAt.getTime() },
+    });
+  }
+
+  /** Troca o aviso fixo de quem acompanhava por um aviso final (o Android tira o fixo; o iPhone troca o texto). */
+  private async stopArrival(invite: FlashInviteRecord, sharerId: string, body: string): Promise<void> {
+    this.arrivals.forget(arrivalTag(invite.id, sharerId));
+    const notifier = this.deps.notifier;
+    if (!notifier.live) return;
+    const otherId = invite.fromUserId === sharerId ? invite.toUserId : invite.fromUserId;
+    const who = (await this.deps.users.findProfilesByIds([sharerId]))[0]?.username ?? 'Seu amigo';
+    await notifier.live({
+      userId: otherId,
+      type: 'FLASH_INVITE',
+      title: who,
+      body,
+      url: `/now/encontro/${invite.id}`,
+      tag: arrivalTag(invite.id, sharerId),
+      live: { state: 'stopped', progress: 0, quiet: true, untilMs: invite.expiresAt.getTime() },
+    });
   }
 
   async listInvites(actorId: string): Promise<InvitesOverview> {
@@ -572,7 +668,10 @@ export class FlashService {
     }
     const now = this.deps.clock.now();
     const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
-    await this.deps.flash.upsertPosition(fuzzIfApprox({ inviteId, userId: actorId, lat, lng, accuracyM, updatedAt: now }, approxFor(invite, actorId)));
+    const position = fuzzIfApprox({ inviteId, userId: actorId, lat, lng, accuracyM, updatedAt: now }, approxFor(invite, actorId));
+    await this.deps.flash.upsertPosition(position);
+    // Falha no aviso de chegada nunca atrapalha o envio da posição.
+    if (arrivalFor(invite, actorId)) await this.pushArrival(invite, position, now).catch(() => undefined);
     return { ok: true };
   }
 
@@ -582,7 +681,11 @@ export class FlashService {
     const { flash, clock } = this.deps;
     const now = clock.now();
     const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
-    await flash.saveInvite(invite.fromUserId === actorId ? { ...invite, fromApprox: approx } : { ...invite, toApprox: approx });
+    // Posição aproximada não combina com a chegada ao vivo: ela é desligada junto.
+    const changed: FlashInviteRecord = invite.fromUserId === actorId ? { ...invite, fromApprox: approx } : { ...invite, toApprox: approx };
+    const stopsArrival = approx && arrivalFor(invite, actorId);
+    await flash.saveInvite(stopsArrival ? withArrival(changed, actorId, false) : changed);
+    if (stopsArrival) await this.stopArrival(changed, actorId, 'Parou de mostrar a chegada').catch(() => undefined);
     if (approx) {
       const mine = (await flash.listPositions(inviteId)).find((p) => p.userId === actorId);
       if (mine) await flash.upsertPosition(fuzzIfApprox(mine, true));
@@ -623,6 +726,8 @@ export class FlashService {
         : null,
       meApprox: approxFor(invite, actorId),
       themApprox: approxFor(invite, otherId),
+      meArrival: arrivalFor(invite, actorId),
+      themArrival: arrivalFor(invite, otherId),
     };
   }
 

@@ -623,6 +623,9 @@ model FlashInvite {
   // Cada um escolhe ao convidar/aceitar: true = o outro só vê a posição arredondada (~1 km).
   fromApprox Boolean @default(false)
   toApprox   Boolean @default(false)
+  // Cada um escolhe durante o encontro: true = o outro acompanha a chegada dele nas notificações do celular.
+  fromArrival Boolean @default(false)
+  toArrival   Boolean @default(false)
 
   from      User            @relation("FlashInviteFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
   to        User            @relation("FlashInviteTo", fields: [toUserId], references: [id], onDelete: Cascade)

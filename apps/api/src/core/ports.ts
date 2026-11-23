@@ -1026,6 +1026,21 @@ export interface PushMessage {
    * Vale só para aquela conversa e aquele aparelho (ver PushReplyTokens).
    */
   reply?: string;
+  /**
+   * Aviso "ao vivo" (chegada do amigo no NOW): substitui o anterior com a mesma `tag` em silêncio, como o carro
+   * chegando no Uber. No Android o app monta uma notificação fixa com barra de progresso; no iPhone o aviso é trocado.
+   */
+  live?: PushLive;
+}
+
+export interface PushLive {
+  state: 'moving' | 'arrived' | 'stopped';
+  /** 0 a 1. */
+  progress: number;
+  /** Só a primeira atualização toca som/vibra; as seguintes trocam o aviso em silêncio. */
+  quiet: boolean;
+  /** Até quando o aviso vale (fim do encontro), em milissegundos desde 1970. */
+  untilMs: number;
 }
 
 /**
@@ -1055,6 +1070,8 @@ export interface PushSender {
 /** Cria o aviso dentro do app e tenta o push. Nunca lança erro: falha de aviso não derruba a ação principal. */
 export interface Notifier {
   notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string; actorId?: string }): Promise<void>;
+  /** Só push, sem guardar no sino: avisos que se atualizam (chegada do amigo). Opcional nos dublês de teste. */
+  live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive }): Promise<void>;
 }
 
 /** Presença ("Eu vou") e posts dentro de eventos criados por pessoas. */

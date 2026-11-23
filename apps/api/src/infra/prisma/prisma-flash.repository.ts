@@ -24,6 +24,8 @@ type InviteRow = {
   destinationChosenAt: Date | null;
   fromApprox?: boolean;
   toApprox?: boolean;
+  fromArrival?: boolean;
+  toArrival?: boolean;
 };
 type PositionRow = { inviteId: string; userId: string; lat: number; lng: number; accuracyM: number | null; updatedAt: Date };
 
@@ -51,6 +53,8 @@ const toInvite = (r: InviteRow): FlashInviteRecord => ({
       : null,
   fromApprox: r.fromApprox === true,
   toApprox: r.toApprox === true,
+  fromArrival: r.fromArrival === true,
+  toArrival: r.toArrival === true,
 });
 const toPosition = (r: PositionRow): FlashPositionRecord => ({
   inviteId: r.inviteId,
@@ -176,6 +180,8 @@ export class PrismaFlashRepository implements FlashRepository {
               endedAt: invite.endedAt,
               fromApprox: invite.fromApprox === true,
               toApprox: invite.toApprox === true,
+              fromArrival: invite.fromArrival === true,
+              toArrival: invite.toArrival === true,
             },
           });
         },
@@ -209,6 +215,8 @@ export class PrismaFlashRepository implements FlashRepository {
           destinationChosenAt: invite.destination?.chosenAt ?? null,
           fromApprox: invite.fromApprox === true,
           toApprox: invite.toApprox === true,
+          fromArrival: invite.fromArrival === true,
+          toArrival: invite.toArrival === true,
         },
       });
       // Só encontro aceito compartilha posição: em qualquer outro estado ela é apagada.
