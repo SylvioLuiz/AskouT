@@ -105,6 +105,16 @@ export class FlashController {
     return this.core.flash.setArrival(actor.userId, inviteId, asBody(body).share);
   }
 
+  /**
+   * iPhone: a pessoa voltou ao NOW e a Live Activity da chegada do amigo não está na tela (fechou): abre de novo,
+   * em silêncio, se a chegada ainda estiver em andamento.
+   */
+  @Post('flash/matches/:inviteId/arrival/reopen')
+  @HttpCode(200)
+  reopenArrival(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string) {
+    return this.core.flash.reopenArrival(actor.userId, inviteId);
+  }
+
   @Delete('flash/invites/:inviteId')
   end(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string) {
     return this.core.flash.end(actor.userId, inviteId);

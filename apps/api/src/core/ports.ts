@@ -1129,7 +1129,7 @@ export interface PushSender {
 export interface Notifier {
   notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string; actorId?: string }): Promise<void>;
   /** Só push, sem guardar no sino: avisos que se atualizam (chegada do amigo). Opcional nos dublês de teste. */
-  live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string } }): Promise<void>;
+  live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string }; reopen?: boolean }): Promise<void>;
 }
 
 /** Presença ("Eu vou") e posts dentro de eventos criados por pessoas. */

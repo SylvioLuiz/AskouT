@@ -21,7 +21,13 @@ export const FCM_ENDPOINT_PREFIX = 'fcm:';
  */
 export const LIVE_START_PREFIX = 'apnsls:';
 export const LIVE_ACTIVITY_PREFIX = 'apnsla:';
-const isLiveActivityEndpoint = (endpoint: string): boolean => endpoint.startsWith(LIVE_START_PREFIX) || endpoint.startsWith(LIVE_ACTIVITY_PREFIX);
+/**
+ * `apnsld:<pessoa>:<tag>`: a pessoa fechou a Live Activity dessa chegada no iPhone. Não abre outra sozinha (só quando
+ * ela volta ao NOW, ver `reopen`), e a chegada em si vai como aviso comum.
+ */
+export const LIVE_DISMISSED_PREFIX = 'apnsld:';
+const dismissedEndpoint = (userId: string, tag: string): string => `${LIVE_DISMISSED_PREFIX}${userId}:${tag}`;
+const isLiveActivityEndpoint = (endpoint: string): boolean => endpoint.startsWith(LIVE_START_PREFIX) || endpoint.startsWith(LIVE_ACTIVITY_PREFIX) || endpoint.startsWith(LIVE_DISMISSED_PREFIX);
 /** Sem o token da atividade (o app ainda não registrou), não abre outra igual por este tempo. */
 const LIVE_START_RETRY_MS = 10 * 60_000;
 const NATIVE_TOKEN = /^[0-9a-f]{32,200}$/i;
@@ -129,15 +135,17 @@ export class StoredNotifier implements Notifier {
    * Aviso que se atualiza (chegada do amigo no NOW): só push, nada no sino (seriam dezenas de avisos iguais).
    * Respeita o "silenciar todas". Vai só para o app do celular: o navegador não tem notificação fixa nem barra.
    */
-  async live(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string } }): Promise<void> {
+  async live(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string }; reopen?: boolean }): Promise<void> {
     const { notifications, pushSubscriptions, push } = this.deps;
     const job = (async () => {
       if (!push.nativeEnabled) return;
       if (isMuted(await notifications.getMuteSettings(input.userId), input.type)) return;
       const all = await pushSubscriptions.listForUser(input.userId);
       // iPhone com Live Activity: a chegada vai para a tela bloqueada (com a barra), e não como aviso comum.
-      const viaActivity = await this.liveActivity(input, all);
-      const subs = all.filter((s) => isNativeEndpoint(s.endpoint) && !(viaActivity && s.endpoint.startsWith(NATIVE_ENDPOINT_PREFIX)));
+      const route = await this.liveActivity(input, all);
+      // Live Activity fechada: no iPhone só vão os avisos que tocam (a chegada) e o de "parou"; as trocas silenciosas não.
+      const skipIphone = route === 'activity' || (route === 'dismissed' && input.live.quiet && input.live.state === 'moving');
+      const subs = all.filter((s) => isNativeEndpoint(s.endpoint) && !(skipIphone && s.endpoint.startsWith(NATIVE_ENDPOINT_PREFIX)));
       const image = input.who?.image;
       await Promise.all(
         subs.map(async (sub) => {
@@ -155,15 +163,29 @@ export class StoredNotifier implements Notifier {
 
   /**
    * Manda a chegada para a Live Activity do iPhone: atualiza a que está aberta (token registrado pelo app) ou abre
-   * uma pelo token "push-to-start". Devolve `true` se o iPhone foi atendido assim (aí não vai o aviso comum).
+   * uma pelo token "push-to-start". `activity`: o iPhone foi atendido assim (aí não vai o aviso comum); `dismissed`:
+   * a pessoa fechou a atividade; `none`: segue o aviso comum.
    */
-  private async liveActivity(input: { userId: string; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string } }, all: PushSubscriptionRecord[]): Promise<boolean> {
+  private async liveActivity(
+    input: { userId: string; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string }; reopen?: boolean },
+    all: PushSubscriptionRecord[],
+  ): Promise<'activity' | 'dismissed' | 'none'> {
     const { push, pushSubscriptions, clock } = this.deps;
     const tokens = this.deps.liveActivityTokens;
-    if (!push.liveActivity || !tokens) return false;
+    if (!push.liveActivity || !tokens) return 'none';
     const live = input.live;
     const nowMs = clock.now().getTime();
     const key = `${input.userId}|${input.tag}`;
+    const dismissed = all.find((s) => s.endpoint === dismissedEndpoint(input.userId, input.tag));
+    if (input.reopen) {
+      // Voltou ao NOW e a atividade não está na tela: esquece o "fechou" e as atividades antigas, e abre outra.
+      for (const s of all) if (s === dismissed || (s.endpoint.startsWith(LIVE_ACTIVITY_PREFIX) && s.auth === input.tag)) await pushSubscriptions.remove(s.endpoint);
+      all = all.filter((s) => s !== dismissed && !(s.endpoint.startsWith(LIVE_ACTIVITY_PREFIX) && s.auth === input.tag));
+      this.activityStarts.delete(key);
+    } else if (dismissed) {
+      if (live.state === 'stopped') await pushSubscriptions.remove(dismissed.endpoint);
+      return 'dismissed';
+    }
     const state = { title: input.title, body: input.body, progress: live.progress, arrived: live.state === 'arrived' };
     const alert = live.quiet || live.state === 'stopped' ? undefined : { title: input.title, body: input.body };
     const send = async (sub: PushSubscriptionRecord, event: 'start' | 'update' | 'end', extra: { attributes?: { name: string; tag: string; url: string; registration: string } } = {}) => {
@@ -186,22 +208,22 @@ export class StoredNotifier implements Notifier {
       const event = live.state === 'stopped' ? 'end' : 'update';
       await Promise.all(activities.map((sub) => send(sub, event)));
       if (event === 'end') this.activityStarts.delete(key);
-      return true;
+      return 'activity';
     }
     const starters = all.filter((s) => s.endpoint.startsWith(LIVE_START_PREFIX));
-    if (starters.length === 0) return false;
+    if (starters.length === 0) return 'none';
     if (live.state === 'stopped') {
       this.activityStarts.delete(key);
       // Abriu e o app não chegou a registrar: não há como fechar daqui. Ela fica desatualizada no fim do encontro.
-      return false;
+      return 'none';
     }
     const startedAt = this.activityStarts.get(key);
-    if (startedAt !== undefined && nowMs - startedAt < LIVE_START_RETRY_MS) return true;
+    if (startedAt !== undefined && nowMs - startedAt < LIVE_START_RETRY_MS) return 'activity';
     const attributes = { name: input.who?.name ?? '', tag: input.tag, url: input.url, registration: tokens.issue(input.userId, input.tag) };
     const results = await Promise.all(starters.map((sub) => send(sub, 'start', { attributes })));
-    if (!results.includes('SENT')) return false;
+    if (!results.includes('SENT')) return 'none';
     this.activityStarts.set(key, nowMs);
-    return true;
+    return 'activity';
   }
 
   /** Espera os envios em andamento (usado nos testes e no desligamento). */
@@ -438,6 +460,18 @@ export class NotificationService {
     const user = await this.deps.users.findById(claims.userId);
     if (!user || user.status === 'SUSPENDED') throw unauthorized('Registro inválido');
     await this.deps.pushSubscriptions.upsert({ userId: claims.userId, endpoint: LIVE_ACTIVITY_PREFIX + activityToken.toLowerCase(), p256dh: 'apnsla', auth: claims.tag, createdAt: this.deps.clock.now(), replyable: false });
+    return { ok: true };
+  }
+
+  /**
+   * A pessoa fechou a Live Activity da chegada no iPhone (o app avisa, sem login, com o `registration` da atividade):
+   * para de mandar para ela e não abre outra sozinha até a pessoa voltar ao NOW. A chegada vai como aviso comum.
+   */
+  async closeLiveActivity(registration: unknown, activityToken: unknown): Promise<{ ok: true }> {
+    const claims = this.deps.liveActivityTokens?.verify(registration);
+    if (!claims) throw unauthorized('Registro inválido');
+    if (typeof activityToken === 'string' && NATIVE_TOKEN.test(activityToken)) await this.deps.pushSubscriptions.remove(LIVE_ACTIVITY_PREFIX + activityToken.toLowerCase(), claims.userId);
+    await this.deps.pushSubscriptions.upsert({ userId: claims.userId, endpoint: dismissedEndpoint(claims.userId, claims.tag), p256dh: 'apnsld', auth: claims.tag, createdAt: this.deps.clock.now(), replyable: false });
     return { ok: true };
   }
 

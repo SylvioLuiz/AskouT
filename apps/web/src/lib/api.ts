@@ -443,6 +443,7 @@ export function createApi(deps: ApiDeps) {
     flashSetPrecision: (inviteId: string, approx: boolean) => request<{ approx: boolean }>('PUT', `/flash/matches/${id(inviteId)}/precision`, { body: { approx } }),
     /** Liberar (ou parar) a outra pessoa de acompanhar a sua chegada nas notificações do celular. */
     flashSetArrival: (inviteId: string, share: boolean) => request<{ share: boolean }>('PUT', `/flash/matches/${id(inviteId)}/arrival`, { body: { share } }),
+    flashReopenArrival: (inviteId: string) => request<{ reopened: boolean }>('POST', `/flash/matches/${id(inviteId)}/arrival/reopen`),
     flashEnd: (inviteId: string) => request<{ ended: boolean }>('DELETE', `/flash/invites/${id(inviteId)}`),
     flashMatch: (inviteId: string) => request<FlashMatch>('GET', `/flash/matches/${id(inviteId)}`),
     flashShareLocation: (inviteId: string, position: { lat: number; lng: number; accuracyM?: number }) =>
