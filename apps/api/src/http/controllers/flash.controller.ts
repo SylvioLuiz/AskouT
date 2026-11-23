@@ -83,14 +83,14 @@ export class FlashController {
   @Post('flash/invites')
   invite(@CurrentActor() actor: Actor, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.flash.invite(actor.userId, typeof b.userId === 'string' ? b.userId : '', { approx: b.approx });
+    return this.core.flash.invite(actor.userId, typeof b.userId === 'string' ? b.userId : '', { approx: b.approx, lat: b.lat, lng: b.lng, accuracyM: b.accuracyM });
   }
 
   @Post('flash/invites/:inviteId/respond')
   @HttpCode(200)
   respond(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string, @Body() body: unknown) {
     const b = asBody(body);
-    return this.core.flash.respond(actor.userId, inviteId, b.action, { approx: b.approx });
+    return this.core.flash.respond(actor.userId, inviteId, b.action, { approx: b.approx, lat: b.lat, lng: b.lng, accuracyM: b.accuracyM });
   }
 
   /** `{ approx: true }`: a outra pessoa passa a ver só a sua posição aproximada (~1 km). */

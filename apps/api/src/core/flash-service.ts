@@ -220,6 +220,17 @@ function parseNote(value: unknown): string | null {
   return note;
 }
 
+/**
+ * Posição que vem junto do convite ou do aceite (opcional): já fica no encontro, para a outra pessoa ver no mapa
+ * assim que ele começa, sem esperar o próximo envio do celular. Inválida ou ausente: ignorada (o envio normal cobre).
+ */
+function optionalFix(input: { lat?: unknown; lng?: unknown; accuracyM?: unknown }): { lat: number; lng: number; accuracyM: number | null } | undefined {
+  const { lat, lng, accuracyM } = input;
+  if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return undefined;
+  const accuracy = typeof accuracyM === 'number' && Number.isFinite(accuracyM) && accuracyM >= 0 && accuracyM <= 100_000 ? accuracyM : null;
+  return { lat, lng, accuracyM: accuracy };
+}
+
 function parseCoordinate(value: unknown, field: 'lat' | 'lng', limit: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < -limit || value > limit) {
     throw validationError('Localização inválida', { [field]: 'Localização inválida' });
@@ -532,7 +543,7 @@ export class FlashService {
   }
 
   /** Convida um amigo que está com o Flash ligado. O convite vale 15 minutos (ou até um dos Flash acabar). */
-  async invite(actorId: string, targetId: string, options: { approx?: unknown } = {}): Promise<InviteView> {
+  async invite(actorId: string, targetId: string, options: { approx?: unknown; lat?: unknown; lng?: unknown; accuracyM?: unknown } = {}): Promise<InviteView> {
     const { flash, follows, users, clock, ids } = this.deps;
     if (actorId === targetId) throw validationError('Você não pode convidar a si mesmo');
     const now = clock.now();
@@ -561,13 +572,17 @@ export class FlashService {
       toApprox: false,
     };
     await flash.createInvite(invite, now);
+    // Quem convida já deixa a posição no encontro: quem aceitar vê no mapa na hora. Até o aceite ninguém vê
+    // (getMatch exige convite aceito) e, se o convite for recusado, cancelado ou vencer, a posição é apagada.
+    const fix = optionalFix(options);
+    if (fix) await flash.upsertPosition(fuzzIfApprox({ inviteId: invite.id, userId: actorId, ...fix, updatedAt: now }, invite.fromApprox === true));
     const inviter = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
     await this.deps.notifier.notify({ userId: targetId, type: 'FLASH_INVITE', title: `${inviter} convidou você para o NOW`, body: 'Vale por poucos minutos', url: '/now', dedupeKey: `flash-invite:${actorId}`, actorId });
     return this.inviteView(invite, actorId, profile);
   }
 
   /** Quem recebeu aceita ou recusa. Ao aceitar, os dois passam a ver a posição um do outro até o encontro acabar. */
-  async respond(actorId: string, inviteId: string, action: unknown, options: { approx?: unknown } = {}): Promise<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }> {
+  async respond(actorId: string, inviteId: string, action: unknown, options: { approx?: unknown; lat?: unknown; lng?: unknown; accuracyM?: unknown } = {}): Promise<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }> {
     if (action !== 'accept' && action !== 'decline') {
       throw validationError('Ação inválida', { action: 'Use accept ou decline' });
     }
@@ -600,6 +615,9 @@ export class FlashService {
       toApprox: options.approx === true,
       expiresAt: new Date(now.getTime() + MATCH_TTL_MINUTES * MINUTE_MS),
     });
+    // Quem aceita também já entra no mapa de quem convidou.
+    const fix = optionalFix(options);
+    if (fix) await flash.upsertPosition(fuzzIfApprox({ inviteId: invite.id, userId: actorId, ...fix, updatedAt: now }, options.approx === true));
     await openFlashAlbum(this.deps, invite, now);
     const conversation = await this.deps.conversations.getOrCreateDirect(invite.fromUserId, invite.toUserId, this.deps.ids.next(), now);
     await this.deps.conversations.addMessage({ id: this.deps.ids.next(), conversationId: conversation.id, senderId: actorId, kind: 'SYSTEM', body: FLASH_MATCH_MESSAGE, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: now });
