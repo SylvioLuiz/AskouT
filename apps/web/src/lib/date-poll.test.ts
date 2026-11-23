@@ -37,6 +37,19 @@ test('linha da conversa: em votação, marcado e some depois da data', async () 
   assert.equal(pollLine({ ...base, status: 'VOTING' }, new Date('2026-10-28T12:00:00Z')), null);
 });
 
+test('votação aberta fica fixada no topo da conversa, com o que fazer', async () => {
+  const { pinnedPoll } = await import('./date-poll.ts');
+  const base = { id: 'p', conversationId: 'c', title: 'Aniversário', rangeStart: '2026-10-20', rangeEnd: '2026-10-26', finalDate: null, finalEndsAt: null, needsMyVote: false, needsMyConfirmation: false, participantCount: 4, votedCount: 1, finishedCount: 1, best: null, proposedDate: null, votingDeadline: null, meetupId: null, event: { id: 'e', title: 'Aniversário', startsAt: null, endsAt: null } };
+  const now = new Date('2026-10-22T12:00:00Z');
+  assert.deepEqual(pinnedPoll({ ...base, status: 'VOTING', needsMyVote: true }, now), { name: 'Aniversário', status: 'em votação: 25% dos votos', action: 'vote' });
+  assert.equal(pinnedPoll({ ...base, status: 'VOTING' }, now)?.action, 'view');
+  assert.equal(pinnedPoll({ ...base, status: 'CONFIRMING', proposedDate: '2026-10-24', needsMyConfirmation: true }, now)?.action, 'confirm');
+  // marcada, cancelada ou com o período vencido: sai do topo
+  assert.equal(pinnedPoll({ ...base, status: 'FINALIZED', finalDate: '2026-10-24' }, now), null);
+  assert.equal(pinnedPoll({ ...base, status: 'CANCELLED' }, now), null);
+  assert.equal(pinnedPoll({ ...base, status: 'VOTING' }, new Date('2026-10-28T12:00:00Z')), null);
+});
+
 test('período com evento não passa do dia do evento', () => {
   assert.equal(dayInZone('2026-11-15T02:30:00Z'), '2026-11-14');
   assert.deepEqual(clampRange('2026-11-01', '2026-11-30', '2026-11-14'), { start: '2026-11-01', end: '2026-11-14' });
