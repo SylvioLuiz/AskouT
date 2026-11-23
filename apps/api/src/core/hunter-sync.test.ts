@@ -67,3 +67,13 @@ test('dado inválido (evento já terminou) volta para revisão e repetir o pedid
   await syncFromHunter(w.bridge, w.feedOf([item(k('b'))]), NOW);
   assert.equal(w.events.size, 1);
 });
+
+test('local já vinculado no Hunter dispensa a busca; local inexistente/com dono volta para revisão', async () => {
+  const w = setup();
+  await syncFromHunter(w.bridge, w.feedOf([
+    { ...item(k('a'), { venueName: 'Nome Que Nenhuma Busca Acharia' }), venueId: V1 },
+    { ...item(k('b'), { title: 'Outro', venueName: 'X' }), venueId: V2 }, // com responsável
+    { ...item(k('c'), { title: 'Terceiro', venueName: 'Y' }), venueId: '99999999-9999-4999-8999-999999999999' }, // não existe
+  ]), NOW);
+  assert.deepEqual(w.acks, { [k('a')]: 'PUBLISHED', [k('b')]: 'REVIEW', [k('c')]: 'REVIEW' });
+});

@@ -5,7 +5,7 @@ import type { HunterBridge } from './hunter-bridge.ts';
  * A GESTÃO consulta o Hunter e publica. O Hunter só descobre e separa candidatos; aqui se acha o local, aplica a regra de
  * propriedade, barra duplicados e grava (tudo pela ponte). O que não puder publicar volta ao Hunter como "revisar" ou "rejeitado".
  */
-export interface FeedItem { key: string; candidate: Record<string, unknown> }
+export interface FeedItem { key: string; candidate: Record<string, unknown>; /** Local já vinculado no Hunter (local oficial ou achado na consulta): dispensa a busca por nome. */ venueId?: string }
 export type AckResult = 'PUBLISHED' | 'REVIEW' | 'REJECTED';
 
 export interface HunterFeed {
@@ -24,13 +24,14 @@ export function sameVenueName(a: string, b: string): boolean {
   return x.length >= 4 && y.length >= 4 && (x.includes(y) || y.includes(x));
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v : undefined);
 
 export async function syncFromHunter(bridge: HunterBridge, feed: HunterFeed, now: Date = new Date()): Promise<SyncReport> {
   const report: SyncReport = { at: now.toISOString(), seen: 0, published: 0, review: 0, rejected: 0, stoppedDisabled: false };
   if (!(await bridge.isEnabled())) { report.stoppedDisabled = true; return report; }
   const items = await feed.fetchApproved();
-  for (const { key, candidate: c } of items) {
+  for (const { key, candidate: c, venueId: linkedVenue } of items) {
     if (!/^[a-f0-9]{32}$/.test(key)) continue;
     report.seen += 1;
     const ref = `hunter:${key}`;
@@ -43,12 +44,17 @@ export async function syncFromHunter(bridge: HunterBridge, feed: HunterFeed, now
       const area = c['area'] as { lat?: unknown; lng?: unknown } | undefined;
       const startsAt = str(c['startsAt']);
       if (!name || !startsAt) { await done('REVIEW'); continue; }
-      const found = await bridge.lookupVenues({ q: name, lat: area?.lat, lng: area?.lng });
-      const venue = found.venues.find((v) => sameVenueName(v.name, name));
-      if (!venue || !venue.canPublish) { await done('REVIEW'); continue; }
+      // Vinculado no Hunter: usa direto (a regra de propriedade e a existência do local são conferidas ao criar). Senão, procura pelo nome.
+      let venueId = typeof linkedVenue === 'string' && UUID.test(linkedVenue) ? linkedVenue : undefined;
+      if (!venueId) {
+        const found = await bridge.lookupVenues({ q: name, lat: area?.lat, lng: area?.lng });
+        const venue = found.venues.find((v) => sameVenueName(v.name, name));
+        if (!venue || !venue.canPublish) { await done('REVIEW'); continue; }
+        venueId = venue.id;
+      }
       const endsAt = str(c['endsAt']) ?? new Date(Date.parse(startsAt) + 4 * 3_600_000).toISOString();
       const r = await bridge.create({
-        ref, venueId: venue.id, title: c['title'], description: c['description'], startsAt, endsAt,
+        ref, venueId, title: c['title'], description: c['description'], startsAt, endsAt,
         kind: c['kind'], isFree: c['free'] === true, imageUrl: c['imageUrl'], ticketUrl: c['ticketUrl'], tags: c['tags'],
       });
       if (r.ok) await done('PUBLISHED', ref);
