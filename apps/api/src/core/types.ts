@@ -269,6 +269,8 @@ export interface ConversationRecord {
   ownerId: string | null;
   /** Foto do grupo como data URL (jpeg/png/webp, até 40 KB). Ainda não há armazenamento de arquivos. */
   imageUrl: string | null;
+  /** Grupo criado para um evento de pessoa (post): pela página do evento ou pela votação da data. */
+  eventPostId?: string | null;
   createdAt: Date;
 }
 

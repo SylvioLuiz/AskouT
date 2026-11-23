@@ -6412,6 +6412,9 @@ div.optrow__main { cursor: default; }
 .evhost__label { color: var(--muted); font-size: 0.8125rem; }
 .evhost__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
 .evhost__user { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 0.8125rem; }
+.evgroup__icon { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); }
+.evgroup__icon .icon, .evgroup__icon svg { width: 22px; height: 22px; }
+.evgroup__create { display: flex; flex-direction: column; gap: 6px; }
 .evprivate { display: flex; align-items: center; gap: 8px; margin: -6px 2px 0; color: var(--muted); font-size: 0.8125rem; line-height: 1.35; }
 .evprivate .icon, .evprivate svg { flex: none; width: 15px; height: 15px; }
 .evstats { padding: 4px 0 0; }

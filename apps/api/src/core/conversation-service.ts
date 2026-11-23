@@ -476,6 +476,39 @@ export class ConversationService {
     return { id: group.id };
   }
 
+  /**
+   * Grupo do evento, criado pela página do evento. Só quem criou o evento (de pessoa, não arquivado) cria. Se já existe
+   * um grupo do evento em que você está, devolve ele. Entram direto os seus amigos que foram convidados ou confirmaram
+   * presença (no máximo o limite do grupo); os outros você adiciona depois, pelo grupo. O cartão do evento fica no grupo.
+   */
+  async createEventGroup(actorId: string, rawPostId: unknown): Promise<{ id: string; created: boolean }> {
+    const { conversations, follows, blocks, posts, eventRoom, clock, ids } = this.deps;
+    if (typeof rawPostId !== 'string' || rawPostId === '' || rawPostId.length > 64) throw notFound('Evento não encontrado');
+    const post = (await posts.findById(rawPostId))?.post;
+    if (!post || post.eventTitle === null || (post.archivedAt !== null && post.authorId !== actorId)) throw notFound('Evento não encontrado');
+    if (post.authorId !== actorId) throw forbidden('Só quem criou o evento pode criar o grupo dele');
+    if (post.archivedAt !== null) throw conflict('Este evento foi arquivado');
+    for (const id of await conversations.groupIdsForEventPost(post.id)) {
+      if (((await conversations.participantIds(id)) ?? []).includes(actorId)) return { id, created: false };
+    }
+    const [friends, related] = await Promise.all([follows.listFriendIds(actorId), blocks.listRelatedIds(actorId)]);
+    const friendSet = new Set(friends);
+    const hidden = new Set(related);
+    const candidates = [...(await posts.listInvites(post.id)).map((r) => r.userId), ...(await eventRoom.listGoing({ source: 'USER', id: post.id })).map((g) => g.userId)];
+    const members = [...new Set(candidates)].filter((id) => id !== actorId && friendSet.has(id) && !hidden.has(id)).slice(0, GROUP_MAX_MEMBERS);
+    const now = clock.now();
+    const name = Array.from(post.eventTitle.trim() || 'Evento').slice(0, GROUP_NAME_MAX).join('');
+    const group = await conversations.createGroup({ id: ids.next(), name, ownerId: actorId, now, eventPostId: post.id });
+    for (const m of members) await conversations.addParticipant(group.id, m, now);
+    const creator = await this.nameOf(actorId);
+    await this.postSystem(group.id, actorId, `${creator} criou o grupo do evento`, now);
+    // O cartão do evento no grupo dá acesso ao evento (privado inclusive) a quem está na conversa.
+    await conversations.addMessage({ id: ids.next(), conversationId: group.id, senderId: actorId, kind: 'EVENT', body: `Evento: ${post.eventTitle}`, suggestion: null, response: null, respondedAt: null, meetupId: null, eventId: null, postEventId: post.id, createdAt: now });
+    await conversations.markRead(group.id, actorId, now);
+    if (members.length > 0) await this.notifyMembers(actorId, creator, group, members, 'adicionou você ao grupo do evento');
+    return { id: group.id, created: true };
+  }
+
   /** Garante a conversa entre dois amigos (usado pelo Flash ao aceitar). Quem chama já checou amizade e bloqueio. */
   async ensureBetween(a: string, b: string): Promise<ConversationRecord> {
     return this.deps.conversations.getOrCreateDirect(a, b, this.deps.ids.next(), this.deps.clock.now());
@@ -1154,13 +1187,16 @@ export class ConversationService {
   }
 
   /**
-   * Evento do grupo: o da votação de data que abriu o grupo (evento sem data) ou o do encontro criado a partir de um
-   * evento. Votação cancelada e encontro cancelado não contam.
+   * Evento do grupo: o evento para o qual o grupo foi criado, o da votação de data que abriu o grupo (evento sem data) ou
+   * o do encontro criado a partir de um evento. Votação cancelada e encontro cancelado não contam.
    */
   private async groupEvent(conversationId: string): Promise<{ card: EventCardView } | undefined> {
-    const { scheduling, meetups } = this.deps;
-    const poll = (await scheduling.listForConversation(conversationId)).find((p) => p.status !== 'CANCELLED' && p.eventPostId);
-    let eventId = poll?.eventPostId ?? null;
+    const { scheduling, meetups, conversations } = this.deps;
+    let eventId = (await conversations.findById(conversationId))?.eventPostId ?? null;
+    if (!eventId) {
+      const poll = (await scheduling.listForConversation(conversationId)).find((p) => p.status !== 'CANCELLED' && p.eventPostId);
+      eventId = poll?.eventPostId ?? null;
+    }
     if (!eventId) {
       const meetup = (await meetups.listForConversation(conversationId)).find((m) => m.status === 'ACTIVE' && (m.eventPostId || m.eventId));
       eventId = meetup ? (meetup.eventPostId ?? meetup.eventId) : null;

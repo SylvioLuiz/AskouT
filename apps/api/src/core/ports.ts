@@ -412,7 +412,9 @@ export interface ConversationRepository {
   /** Quem participa da conversa (dois na 1 a 1; os que entraram no grupo). */
   participantIds(conversationId: string): Promise<string[] | undefined>;
   /** Cria a conversa de grupo só com quem organiza. */
-  createGroup(input: { id: string; name: string; ownerId: string; now: Date }): Promise<ConversationRecord>;
+  createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string }): Promise<ConversationRecord>;
+  /** Grupos criados para este evento (post), o mais antigo primeiro. */
+  groupIdsForEventPost(postId: string): Promise<string[]>;
   /** Idempotente: coloca a pessoa no grupo. */
   addParticipant(conversationId: string, userId: string, now: Date): Promise<void>;
   /** Tira a pessoa do grupo (idempotente). Quem entrou primeiro vem primeiro em `participantIds`. */

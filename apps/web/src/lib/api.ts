@@ -553,6 +553,8 @@ export function createApi(deps: ApiDeps) {
       request<EventPage>('GET', `${visitor() ? '/public' : ''}/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`, visitor() ? { auth: false } : {}),
     /** Quem já foi convidado para o evento (marcado ou recebeu o cartão). O dono vê todos; os demais, quem eles convidaram. */
     eventInvites: (eventId: string) => request<{ invites: EventInvite[] }>('GET', `/events/${id(eventId)}/invites`),
+    /** Cria o grupo do evento (só quem criou o evento) ou devolve o que já existe em que você está. */
+    createEventGroup: (eventId: string) => request<{ id: string; created: boolean }>('POST', `/events/${id(eventId)}/group`),
     /** Aba Álbum do evento: SOON antes de começar, LOCKED para quem não confirmou, OPEN com o álbum. */
     eventAlbum: (eventId: string) => request<{ state: 'SOON'; startsAt: string | null } | { state: 'LOCKED' } | { state: 'OPEN'; album: AlbumDetail }>('GET', `/events/${id(eventId)}/album`),
     eventStories: (eventId: string) => request<{ groups: EventStoryGroup[] }>('GET', `/events/${id(eventId)}/stories`),

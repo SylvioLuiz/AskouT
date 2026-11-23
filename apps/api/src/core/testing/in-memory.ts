@@ -1292,11 +1292,15 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return p ? [...p.keys()] : undefined;
   }
 
-  async createGroup(input: { id: string; name: string; ownerId: string; now: Date }): Promise<ConversationRecord> {
-    const record: ConversationRecord = { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, createdAt: input.now };
+  async createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string }): Promise<ConversationRecord> {
+    const record: ConversationRecord = { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, eventPostId: input.eventPostId ?? null, createdAt: input.now };
     this.conversations.set(input.id, record);
     this.participants.set(input.id, new Map([[input.ownerId, null]]));
     return { ...record };
+  }
+
+  async groupIdsForEventPost(postId: string): Promise<string[]> {
+    return [...this.conversations.values()].filter((c) => c.type === 'GROUP' && c.eventPostId === postId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).map((c) => c.id);
   }
 
   async addParticipant(conversationId: string, userId: string, now: Date): Promise<void> {
