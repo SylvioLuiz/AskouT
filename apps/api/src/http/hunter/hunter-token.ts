@@ -1,0 +1,1 @@
+export const HUNTER_BRIDGE = 'HUNTER_BRIDGE';

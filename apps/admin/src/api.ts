@@ -116,6 +116,7 @@ export const api = {
   hunter: (limit = 50, offset = 0) => request<HunterOverview>('GET', `/admin/hunter?limit=${limit}&offset=${offset}`),
   setHunter: (enabled: boolean) => request<{ enabled: boolean }>('POST', '/admin/hunter/enabled', { enabled }),
   removeHunterEvent: (ref: string) => request<{ removed: number }>('DELETE', `/admin/hunter/events/${encodeURIComponent(ref)}`),
+  syncHunter: () => request<{ at?: string; seen?: number; published?: number; review?: number; rejected?: number; error?: string }>('POST', '/admin/hunter/sync'),
   removeAllHunterEvents: () => request<{ removed: number }>('DELETE', '/admin/hunter/events'),
   payments: () => request<PaymentsState>('GET', '/admin/payments'),
   setPayments: (enabled: boolean, note: string) => request<PaymentsState>('PUT', '/admin/payments', { enabled, note }),

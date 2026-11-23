@@ -312,6 +312,9 @@ export interface HunterOverview {
   serviceConfigured: boolean;
   total: number;
   items: { ref: string; eventId: string; title: string; venueId: string; venueName: string; startsAt: string; createdAt: string }[];
+  /** O servidor sabe onde buscar no Hunter (HUNTER_URL e HUNTER_EXPORT_TOKEN)? */
+  feedConfigured: boolean;
+  lastSync: { at: string; seen: number; published: number; review: number; rejected: number; stoppedDisabled: boolean; error?: string } | null;
 }
 
 // ---------- Retenção ----------

@@ -25,3 +25,10 @@ Atualizado em 23/11/2026. O Hunter descobre eventos na internet e os publica no 
 1. **Deploy da API no Render** (manual, precisa do login do Sylvio): aplica as migrações pendentes (`hunter_bridge`, `comment_replies`, SQL 025). Nunca rodaram no Postgres de produção.
 2. **`HUNTER_SERVICE_TOKEN`** no Render. Sem ele o botão Ligar fica desabilitado.
 3. **Repositório `AskouT-Hunter`**: o Sylvio precisa criá-lo vazio e privado. Depois: esqueleto (painel, worker, `hunter_*`, auth de serviço), conectores (migrar os importadores atuais), conector Gemini, fila às 06h e 18h (America/Sao_Paulo), deduplicação, nota de confiança, fila de revisão, publicação, custo, seção de eventos sem local.
+
+## Divisão de funções (nov/2026): o Hunter descobre, a gestão publica
+
+- **Hunter** (repo AskouT-Hunter): coleta, filtra, pontua e guarda candidatos; o painel dele aprova/rejeita. Não grava mais no AskouT. Expõe `GET /export` (candidatos aprovados, status PUBLISH) e `POST /export/ack` com `Authorization: Bearer $HUNTER_EXPORT_TOKEN`.
+- **AskouT (API/gestão)**: o job `HunterSync` (`http/hunter/hunter-feed.ts`, a cada 10 min, e o botão "Buscar agora" na aba Hunter) lê `/export`, acha o local, aplica a regra de propriedade, barra duplicado (mesmo título + local + dia no AskouT → `DUPLICATE`) e cria o evento pela ponte (`core/hunter-sync.ts`). Devolve ao Hunter `PUBLISHED`, `REVIEW` (local sem cadastro/com dono, dado inválido) ou `REJECTED` (duplicado).
+- **Variáveis no servidor da API (Render `askout-api`)**: `HUNTER_URL=https://hunter.askout.com.br` e `HUNTER_EXPORT_TOKEN` (32+ caracteres, o mesmo valor no serviço `askout-hunter`). Sem elas a busca fica inativa. O interruptor da aba Hunter continua mandando: desligado, a gestão não busca nem publica.
+- O token `HUNTER_SERVICE_TOKEN` segue valendo para o Hunter consultar locais (`/hunter/venues`, `/hunter/regions`) ao pontuar; a rota de criar evento fica sem uso pelo Hunter.
