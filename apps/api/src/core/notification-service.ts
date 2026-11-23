@@ -157,7 +157,7 @@ export class StoredNotifier implements Notifier {
    * Manda a chegada para a Live Activity do iPhone: atualiza a que está aberta (token registrado pelo app) ou abre
    * uma pelo token "push-to-start". Devolve `true` se o iPhone foi atendido assim (aí não vai o aviso comum).
    */
-  private async liveActivity(input: { userId: string; title: string; body: string; tag: string; live: PushLive; who?: { name: string } }, all: PushSubscriptionRecord[]): Promise<boolean> {
+  private async liveActivity(input: { userId: string; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string } }, all: PushSubscriptionRecord[]): Promise<boolean> {
     const { push, pushSubscriptions, clock } = this.deps;
     const tokens = this.deps.liveActivityTokens;
     if (!push.liveActivity || !tokens) return false;
@@ -166,7 +166,7 @@ export class StoredNotifier implements Notifier {
     const key = `${input.userId}|${input.tag}`;
     const state = { title: input.title, body: input.body, progress: live.progress, arrived: live.state === 'arrived' };
     const alert = live.quiet || live.state === 'stopped' ? undefined : { title: input.title, body: input.body };
-    const send = async (sub: PushSubscriptionRecord, event: 'start' | 'update' | 'end', extra: { attributes?: { name: string; tag: string; registration: string } } = {}) => {
+    const send = async (sub: PushSubscriptionRecord, event: 'start' | 'update' | 'end', extra: { attributes?: { name: string; tag: string; url: string; registration: string } } = {}) => {
       const token = sub.endpoint.slice(sub.endpoint.startsWith(LIVE_START_PREFIX) ? LIVE_START_PREFIX.length : LIVE_ACTIVITY_PREFIX.length);
       const result = await push.liveActivity!({
         token,
@@ -197,7 +197,7 @@ export class StoredNotifier implements Notifier {
     }
     const startedAt = this.activityStarts.get(key);
     if (startedAt !== undefined && nowMs - startedAt < LIVE_START_RETRY_MS) return true;
-    const attributes = { name: input.who?.name ?? '', tag: input.tag, registration: tokens.issue(input.userId, input.tag) };
+    const attributes = { name: input.who?.name ?? '', tag: input.tag, url: input.url, registration: tokens.issue(input.userId, input.tag) };
     const results = await Promise.all(starters.map((sub) => send(sub, 'start', { attributes })));
     if (!results.includes('SENT')) return false;
     this.activityStarts.set(key, nowMs);
