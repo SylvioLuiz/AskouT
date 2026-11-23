@@ -24,6 +24,11 @@ export const FLASH_NOTE_MAX = 60;
 /** Mensagem de sistema que abre o encontro Flash na conversa; o app mostra nela o botão de sugerir lugar. */
 export const FLASH_MATCH_MESSAGE = 'NOW combinado! Vocês dois estão disponíveis agora.';
 export const INVITE_TTL_MINUTES = 15;
+/**
+ * Encontro aceito vale isto a partir do aceite (ou até alguém encerrar), mesmo que o NOW de um dos dois acabe antes:
+ * a localização e a chegada continuam até o encontro acabar.
+ */
+export const MATCH_TTL_MINUTES = 180;
 /** Quanto dá para estender o NOW de uma vez. O total que falta nunca passa de FLASH_MAX_MINUTES. */
 export const FLASH_EXTEND_MINUTES: readonly number[] = [30, 60];
 /** Depois disso a última posição conhecida é tratada como "sem sinal". */
@@ -370,12 +375,19 @@ export class FlashService {
     return sessionView({ ...session, note });
   }
 
-  /** Desliga o Flash: cancela convites e encerra encontros, e a posição some. Idempotente. */
+  /**
+   * Desliga o NOW: cancela os convites ainda sem resposta. Encontros já aceitos continuam (localização e chegada
+   * seguem até o encontro acabar ou alguém encerrar). Idempotente.
+   */
   async turnOff(actorId: string): Promise<{ ended: boolean }> {
     const { flash, clock } = this.deps;
     const now = clock.now();
     const ended = await flash.endSession(actorId, now);
-    await flash.closeOpenInvitesOf(actorId, now);
+    for (const invite of await flash.listOpenInvitesFor(actorId, now)) {
+      if (invite.status !== 'PENDING') continue;
+      const status = invite.fromUserId === actorId ? 'CANCELED' : 'DECLINED';
+      await flash.saveInvite({ ...invite, status, endedAt: now, respondedAt: invite.respondedAt ?? (status === 'DECLINED' ? now : null) });
+    }
     return { ended };
   }
 
@@ -570,7 +582,7 @@ export class FlashService {
       status: 'ACCEPTED',
       respondedAt: now,
       toApprox: options.approx === true,
-      expiresAt: new Date(Math.min(mine.expiresAt.getTime(), theirs.expiresAt.getTime())),
+      expiresAt: new Date(now.getTime() + MATCH_TTL_MINUTES * MINUTE_MS),
     });
     await openFlashAlbum(this.deps, invite, now);
     const conversation = await this.deps.conversations.getOrCreateDirect(invite.fromUserId, invite.toUserId, this.deps.ids.next(), now);

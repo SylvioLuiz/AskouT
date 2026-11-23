@@ -40,7 +40,7 @@ import { MatchDestination, MatchPlaces } from '../components/match-destination.t
 import { ReplaceConfirm, useMorePlaces } from '../components/suggestions.tsx';
 import { MAX_PLACES_ON_MAP, placeName, sortByFairness } from '../lib/flash.ts';
 import { toCard } from '../lib/chat.ts';
-import type { AvailableFriend, AvailableOrder, FlashMatch, PublicProfile, SuggestionItem } from '../lib/types.ts';
+import type { AvailableFriend, AvailableOrder, FlashInvite, FlashMatch, PublicProfile, SuggestionItem } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
@@ -128,8 +128,9 @@ function FlashContent() {
   const matchIds = (invites.data?.matches ?? []).map((m) => m.id);
   const matchKey = matchIds.join(',');
   const matchViews = useAsync(
-    () => (active && matchIds.length > 0 ? Promise.all(matchIds.map((id) => api.flashMatch(id).catch(() => undefined))).then((r) => r.filter((m): m is FlashMatch => m !== undefined)) : Promise.resolve([] as FlashMatch[])),
-    [active, matchKey],
+    // Encontro aceito continua mesmo depois que o NOW acaba: a posição segue até o encontro acabar.
+    () => (matchIds.length > 0 ? Promise.all(matchIds.map((id) => api.flashMatch(id).catch(() => undefined))).then((r) => r.filter((m): m is FlashMatch => m !== undefined)) : Promise.resolve([] as FlashMatch[])),
+    [matchKey],
   );
   const share = useShareLocation(
     matchIds,
@@ -137,8 +138,9 @@ function FlashContent() {
       invites.reload();
       matchViews.reload();
     },
-    // Ligou o NOW, a localização já liga. A posição exata só vai para quem você aprovou (convite aceito).
-    active,
+    // Ligou o NOW (ou tem encontro em andamento), a localização já liga. A posição exata só vai para quem você
+    // aprovou (convite aceito), e continua depois que o NOW acaba até o encontro terminar.
+    active || matchIds.length > 0,
   );
 
   const [minutes, setMinutes] = useState(FLASH_DEFAULT_MINUTES);
@@ -296,7 +298,10 @@ function FlashContent() {
       setNote('');
       reloadAll();
       announceFlashChange();
-      setFeedback({ tone: 'ok', text: t('NOW desligado. Seus convites foram cancelados.') });
+      setFeedback({
+        tone: 'ok',
+        text: (invites.data?.matches.length ?? 0) > 0 ? t('NOW desligado. Convites sem resposta foram cancelados; seus encontros continuam.') : t('NOW desligado. Seus convites foram cancelados.'),
+      });
     } catch (failure) {
       setFeedback({ tone: 'error', text: toApiError(failure).message });
     } finally {
@@ -316,6 +321,7 @@ function FlashContent() {
       <section className="nowoff" aria-label={t('Ligar o NOW')}>
         {feedbackLine}
         <OfferBanner />
+        <MatchList matches={invites.data?.matches ?? []} after />
         <header className="nowhead">
           <div>
             <h1 className="nowhead__title">
@@ -493,22 +499,7 @@ function FlashContent() {
         </>
       ) : null}
 
-      {matches.length > 0 ? (
-        <ul className="nowmatches" aria-label={t('Encontros em andamento')}>
-          {matches.map((invite) => (
-            <li key={invite.id}>
-              <Link to={`/now/encontro/${invite.id}`} className="nowmatch">
-                <NowFace profile={invite.other} size={36} />
-                <span>
-                  <strong>{t('{name} aceitou sair com você', { name: invite.other.username })}</strong>
-                  <span>{t('Combinar o lugar e ver no mapa')}</span>
-                </span>
-                <ChevronRightIcon />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <MatchList matches={matches} />
 
       <section className="nowcard" aria-label={t('Seu NOW')}>
         <button type="button" className="nowcard__plus" aria-haspopup="menu" aria-expanded={plusOpen} aria-label={t('Estender o NOW')} disabled={left >= 179} onClick={() => setPlusOpen((o) => !o)}>
@@ -608,7 +599,7 @@ function FlashContent() {
         </Sheet>
       ) : null}
       {share.state.phase === 'error' ? <p className="muted nowcard__hint">{share.state.message}</p> : null}
-      {confirmOff ? <Confirm question={t('Parar o NOW? Convites abertos e encontros em andamento serão encerrados.')} confirmLabel={t('Parar')} onConfirm={turnOff} onCancel={() => setConfirmOff(false)} busy={busy} danger /> : null}
+      {confirmOff ? <Confirm question={(invites.data?.matches.length ?? 0) > 0 ? t('Parar o NOW? Convites sem resposta serão cancelados. Seus encontros em andamento continuam, com a localização, até acabarem.') : t('Parar o NOW? Convites abertos serão cancelados.')} confirmLabel={t('Parar')} onConfirm={turnOff} onCancel={() => setConfirmOff(false)} busy={busy} danger /> : null}
 
       <section className="nowfree" aria-labelledby="livres-titulo">
         <div className="nowfree__row">
@@ -1080,6 +1071,27 @@ function PrecisionPicker({ approx, onChange, text, disabled }: { approx: boolean
   );
 }
 
+/** Encontros aceitos. `after`: o NOW já acabou, mas o encontro continua (com a localização) até terminar. */
+function MatchList({ matches, after }: { matches: readonly FlashInvite[]; after?: boolean }) {
+  if (matches.length === 0) return null;
+  return (
+    <ul className="nowmatches" aria-label={t('Encontros em andamento')}>
+      {matches.map((invite) => (
+        <li key={invite.id}>
+          <Link to={`/now/encontro/${invite.id}`} className="nowmatch">
+            <NowFace profile={invite.other} size={36} />
+            <span>
+              <strong>{after ? t('Encontro com {name} em andamento', { name: invite.other.username }) : t('{name} aceitou sair com você', { name: invite.other.username })}</strong>
+              <span>{after ? t('Sua localização continua até o encontro acabar') : t('Combinar o lugar e ver no mapa')}</span>
+            </span>
+            <ChevronRightIcon />
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ---------- Encontro ----------
 
 const arrivalAskKey = (inviteId: string) => `askout.now.arrival-asked.${inviteId}`;
@@ -1451,7 +1463,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
               </Link>
             }
           >
-            {t('O convite venceu, alguém encerrou ou o NOW foi desligado. A localização compartilhada já foi apagada.')}
+            {t('O encontro venceu ou alguém encerrou. A localização compartilhada já foi apagada.')}
           </EmptyState>
         </>
       );

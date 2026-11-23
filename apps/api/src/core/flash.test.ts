@@ -224,21 +224,33 @@ test('localização: posição antiga vira "sem sinal" (stale)', async () => {
   assert.equal((await w.core.flash.getMatch(bia, inviteId)).them!.stale, true);
 });
 
-test('desligar o NOW encerra o encontro e apaga as posições dos dois', async () => {
+test('desligar o NOW não encerra o encontro aceito: a localização continua', async () => {
   const { w, ana, bia, inviteId } = await matched();
   await w.core.flash.shareLocation(ana, inviteId, GPS);
   await w.core.flash.shareLocation(bia, inviteId, GPS);
-  assert.equal(w.flash.positions.size, 2);
   await w.core.flash.turnOff(ana);
-  assert.equal(w.flash.positions.size, 0);
-  await rejectsWith(w.core.flash.getMatch(bia, inviteId), 'NOT_FOUND');
-  await rejectsWith(w.core.flash.shareLocation(bia, inviteId, GPS), 'NOT_FOUND');
+  assert.equal(w.flash.positions.size, 2);
+  await w.core.flash.shareLocation(ana, inviteId, GPS);
+  assert.ok((await w.core.flash.getMatch(bia, inviteId)).them);
+  assert.equal((await w.core.flash.listInvites(ana)).matches.length, 1);
 });
 
-test('o encontro acaba quando o NOW de um dos dois expira', async () => {
+test('desligar o NOW cancela os convites ainda sem resposta', async () => {
+  const { w, ana, bia } = await pair();
+  const invite = await w.core.flash.invite(ana, bia);
+  await w.core.flash.turnOff(ana);
+  assert.deepEqual(await w.core.flash.listInvites(bia), { received: [], sent: [], matches: [] });
+  await rejectsWith(w.core.flash.respond(bia, invite.id, 'accept'), 'NOT_FOUND');
+});
+
+test('o encontro continua depois que o NOW expira e acaba 3 h depois do aceite', async () => {
   const { w, ana, bia, inviteId } = await matched();
   await w.core.flash.shareLocation(ana, inviteId, GPS);
   w.clock.tick(2 * 3_600_000 + 1000);
+  assert.equal((await w.core.flash.status(ana)).active, false, 'o NOW acabou');
+  await w.core.flash.shareLocation(bia, inviteId, GPS);
+  assert.ok((await w.core.flash.getMatch(ana, inviteId)).them, 'o encontro segue com a localização');
+  w.clock.tick(3_600_000);
   await rejectsWith(w.core.flash.getMatch(bia, inviteId), 'NOT_FOUND');
   await rejectsWith(w.core.flash.shareLocation(bia, inviteId, GPS), 'NOT_FOUND');
   const purged = await w.core.flash.purgeExpired();
