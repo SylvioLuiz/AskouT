@@ -143,7 +143,7 @@ export function BoostResults({ boostId }: { boostId: string }) {
 
 function ReportLoader({ boostId }: { boostId: string }) {
   const report = useAsync(() => api.boostReport(boostId), [boostId]);
-  if (report.loading) return <Loading />;
+  if (report.loading) return <Loading shape="lines" />;
   if (report.error || !report.data) return <ErrorState message={report.error?.message ?? t('Não foi possível carregar.')} onRetry={report.reload} />;
   return <ReportBody report={report.data} />;
 }

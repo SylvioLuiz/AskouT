@@ -8,6 +8,8 @@ import { ChatColorSheet } from './chat-color.tsx';
 import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Confirm, GroupAvatar, Notice } from './ui.tsx';
 import { api } from '../client.ts';
+import { useAsync } from '../hooks.ts';
+import { pinnedPoll } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import type { PublicProfile, VenueChat } from '../lib/types.ts';
 import { safeImage } from '../lib/explore.ts';
@@ -49,6 +51,10 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
   const [step, setStep] = useState<Step>('menu');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  const isGroup = !other;
+  // Votação de data ainda aberta nesta conversa: não faz sentido abrir outra, o menu leva até ela.
+  const polls = useAsync(() => api.conversationPolls(conversationId), [conversationId]);
+  const openPoll = (polls.data?.items ?? []).find((p) => pinnedPoll(p, new Date()) !== null);
 
   async function run(work: () => Promise<unknown>, after: () => void) {
     setBusy(true);
@@ -79,20 +85,25 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
     );
   }
 
-  const row = (label: string, onClick: () => void, danger?: boolean) => (
+  const row = (label: string, onClick: () => void, danger?: boolean, hint?: string, disabled?: boolean) => (
     <li>
-      <button type="button" className={`sharelist__item${danger ? ' sharelist__item--danger' : ''}`} onClick={onClick}>
+      <button type="button" className={`sharelist__item${danger ? ' sharelist__item--danger' : ''}`} onClick={onClick} disabled={disabled} aria-busy={disabled || undefined}>
         <strong>{label}</strong>
+        {hint ? <span>{hint}</span> : null}
       </button>
     </li>
   );
+  const go = (to: string) => () => {
+    onClose();
+    navigate(to);
+  };
 
   return (
     <Sheet title={t('Conversa')} onClose={onClose}>
       {problem ? <Notice tone="error">{problem}</Notice> : null}
       {step === 'clear' ? (
         <Confirm
-          question={t('Limpar esta conversa? As mensagens somem só para você; a outra parte continua vendo.')}
+          question={isGroup ? t('Limpar esta conversa? As mensagens somem só para você; as outras pessoas do grupo continuam vendo.') : t('Limpar esta conversa? As mensagens somem só para você; a outra parte continua vendo.')}
           confirmLabel={t('Limpar conversa')}
           busy={busy}
           onCancel={() => setStep('menu')}
@@ -118,17 +129,17 @@ function ChatMenu({ conversationId, title, other, pinned, muted, onPrefsChanged,
         />
       ) : (
         <ul className="sharelist">
-          {row(t('Encontrar a melhor data'), () => {
-            onClose();
-            navigate(`/planejar/nova/${conversationId}`);
-          })}
+          {openPoll
+            ? row(t('Ver a votação de data'), go(`/planejar/${openPoll.id}`), false, openPoll.title)
+            : row(t('Encontrar a melhor data'), go(`/planejar/nova/${conversationId}`), false, undefined, polls.loading && !polls.data)}
+          {isGroup ? row(t('Pessoas e dados do grupo'), go(`/conversas/${conversationId}/grupo`)) : null}
           {row(pinned || muted ? t('Fixar e silenciar (ativo)') : t('Fixar e silenciar'), () => setStep('prefs'))}
           {row(t('Cor da conversa'), () => setStep('color'))}
           {row(t('Imagem de fundo'), () => setStep('background'))}
           {row(t('Limpar conversa'), () => setStep('clear'))}
           {other ? row(t('Apagar conversa'), () => setStep('remove'), true) : null}
-          {other ? row('Bloquear', () => setStep('block'), true) : null}
-          {row('Denunciar', () => setStep('report'), true)}
+          {other ? row(t('Bloquear'), () => setStep('block'), true) : null}
+          {row(isGroup ? t('Denunciar grupo') : t('Denunciar'), () => setStep('report'), true)}
         </ul>
       )}
     </Sheet>

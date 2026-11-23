@@ -79,7 +79,7 @@ export function EditProfileScreen() {
     setPhoto(undefined);
   }, [loaded]);
 
-  if (view.loading && !loaded) return <Loading />;
+  if (view.loading && !loaded) return <Loading shape="profile" />;
   if (view.error && !loaded) return <ErrorState message={view.error.message} onRetry={view.reload} />;
   if (!loaded || !saved) return null;
   const age = loaded[2];
@@ -988,9 +988,11 @@ export function FriendsScreen() {
     <>
       <PageHead title={t('Amigos')} back="/perfil" subtitle={t('Pessoas que seguem você e que você segue')} action={<Link to="/amigos/contatos">{t('Achar nos contatos')}</Link>} />
       <ConnectContactsCard />
-      <Button full variant="secondary" onClick={() => setInviting(true)}>
-        {t('Convidar amigos para o AskouT')}
-      </Button>
+      <div className="friends__invite">
+        <Button full variant="secondary" onClick={() => setInviting(true)}>
+          {t('Convidar amigos para o AskouT')}
+        </Button>
+      </div>
       {inviting ? <InviteSheet onClose={() => setInviting(false)} /> : null}
       {friends.loading && !friends.data ? <Loading /> : null}
       {friends.error ? <ErrorState message={friends.error.message} onRetry={friends.reload} /> : null}

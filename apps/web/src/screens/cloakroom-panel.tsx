@@ -25,7 +25,7 @@ export function CloakroomPanelScreen({ venueId, eventId }: { venueId: string; ev
   const [busy, setBusy] = useState(false);
 
   const panel = loaded.data;
-  if (loaded.loading && !panel) return <Loading />;
+  if (loaded.loading && !panel) return <Loading shape="page" />;
   if (!panel) return <ErrorState message={loaded.error?.message ?? t('Não deu certo')} onRetry={loaded.reload} />;
   const setting = panel.setting;
 

@@ -3,6 +3,10 @@ import type { RouteResult, RouteSource } from '../../core/ports.ts';
 const PROFILE = { foot: 'foot', driving: 'driving' } as const;
 const CACHE_MAX = 500;
 const CACHE_TTL_MS = 60_000;
+/** Caminhada: 4,8 km/h. */
+export const WALK_SPEED_MS = 1.33;
+/** Acima disto (≈ 9 km/h) ninguém está andando: a resposta "a pé" veio com tempo de carro. */
+const WALK_MAX_SPEED_MS = 2.5;
 
 export interface OsrmOptions {
   /** Servidor OSRM. O público (router.project-osrm.org) é para uso leve; para muito tráfego, use o seu. */
@@ -62,7 +66,10 @@ export class OsrmRouteSource implements RouteSource {
       if (!route || typeof route.distance !== 'number' || typeof route.duration !== 'number' || !Array.isArray(coords)) return undefined;
       const line = coords.filter((c): c is [number, number] => Array.isArray(c) && typeof c[0] === 'number' && typeof c[1] === 'number');
       if (line.length < 2) return undefined;
-      return { distanceM: route.distance, durationS: route.duration, line: simplifyLine(line) };
+      // O servidor público do OSRM só tem o perfil de carro e ignora "foot" na URL: a pé vinha com o mesmo tempo
+      // de carro. Se a velocidade média não é de caminhada, o tempo a pé sai da distância da rota.
+      const walkFix = mode === 'foot' && route.duration > 0 && route.distance / route.duration > WALK_MAX_SPEED_MS;
+      return { distanceM: route.distance, durationS: walkFix ? route.distance / WALK_SPEED_MS : route.duration, line: simplifyLine(line) };
     } catch {
       return undefined;
     }

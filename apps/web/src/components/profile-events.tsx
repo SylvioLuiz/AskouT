@@ -179,7 +179,7 @@ export function PostedEvents({ username, mine, onCount, quietEmpty }: { username
   }
 
   if (error && !page) return <ErrorState message={error.message} onRetry={() => void load(0)} />;
-  if (!page) return <Loading />;
+  if (!page) return <Loading shape="tiles" />;
   if (page.items.length === 0 && eventPosts.length === 0 && going.length === 0) {
     if (quietEmpty) return null;
     return mine ? (

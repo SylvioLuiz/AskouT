@@ -31,7 +31,7 @@ export function DatePollScreen({ pollId }: { pollId: string }) {
 
   if (!poll) {
     if (load.error) return <ErrorState message={load.error.message} onRetry={load.reload} />;
-    return <Loading />;
+    return <Loading shape="page" />;
   }
   return <PollBody poll={poll} setPoll={setPoll} />;
 }

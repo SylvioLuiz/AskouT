@@ -79,7 +79,7 @@ export function AttendedEvents({ username }: { username: string }) {
   }
 
   if (error && !page) return <ErrorState message={error.message} onRetry={() => void load(0)} />;
-  if (!page) return <Loading />;
+  if (!page) return <Loading shape="tiles" />;
   // A explicação fica atrás de um ícone de informação, aberta só quando a pessoa toca nele.
   const intro = (
     <div className="attinfo">

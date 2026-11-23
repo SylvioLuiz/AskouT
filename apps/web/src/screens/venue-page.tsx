@@ -542,7 +542,7 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
     return (
       <>
         <PageHead title={t('Local')} back={backTo} />
-        <Loading />
+        <Loading shape="page" />
       </>
     );
   }

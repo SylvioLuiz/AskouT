@@ -17,6 +17,7 @@ import { STORY_COLORS, STORY_OVERLAYS_MAX, STORY_OVERLAY_TEXT_MAX, STORY_STICKER
 import type { Point } from '../lib/story-overlays.ts';
 import type { StoryOverlay, StoryOverlayStyle } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
+import { haptic } from '../lib/haptics.ts';
 
 /** Foto ou vídeo escolhido, com o tamanho real (para encaixar os textos no lugar certo). */
 interface StoryMedia {
@@ -488,7 +489,7 @@ function StoryEditor({ media, eventId, onBack, onCreated }: { media: StoryMedia;
       if (over !== onTrashRef.current) {
         onTrashRef.current = over;
         setOnTrash(over);
-        if (over) navigator.vibrate?.(10);
+        if (over) haptic('tap');
       }
     }
     setDragging(true);

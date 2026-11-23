@@ -184,21 +184,144 @@ export function EmptyState({ title, children, action }: { title: string; childre
   );
 }
 
-/** Enquanto carrega, mostra a forma da tela (linhas com foto e texto) em vez de só uma palavra. */
-export function Loading({ label = 'Carregando' }: { label?: string }) {
+/**
+ * Formato do esqueleto, imitando o que vai aparecer:
+ * list (pessoas, avisos, conversas), posts (cartões do feed), grid (fotos 3 por linha), tiles (eventos e locais com
+ * capa, 2 por linha), page (página de detalhe: capa, título, texto e botões), profile (cabeçalho de perfil),
+ * carousel (cartões lado a lado), lines (ajustes e textos), block (um quadro só: mapa, QR, recorte) e
+ * inline (uma linha curta, para "calculando" dentro de um cartão).
+ */
+export type LoadingShape = 'list' | 'posts' | 'grid' | 'tiles' | 'page' | 'profile' | 'carousel' | 'lines' | 'block' | 'inline';
+
+const Bone = ({ className }: { className: string }) => <span className={`skeleton__bone ${className}`} />;
+const times = (n: number) => Array.from({ length: n }, (_, i) => i);
+
+function ListRows({ rows }: { rows: number }) {
   return (
-    <div className="loading" role="status" aria-live="polite">
-      <span className="visually-hidden">{label}…</span>
-      <div className="skeleton" aria-hidden="true">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="skeleton__row">
-            <span className="skeleton__avatar" />
-            <span className="skeleton__lines">
+    <>
+      {times(rows).map((i) => (
+        <div key={i} className="skeleton__row">
+          <span className="skeleton__avatar" />
+          <span className="skeleton__lines">
+            <span className={`skeleton__line ${i % 2 === 0 ? 'skeleton__line--wide' : 'skeleton__line--mid'}`} />
+            <span className="skeleton__line" />
+          </span>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function SkeletonBody({ shape, rows }: { shape: LoadingShape; rows: number | undefined }) {
+  switch (shape) {
+    case 'posts':
+      return (
+        <>
+          {times(rows ?? 2).map((i) => (
+            <div key={i} className="skeleton__post">
+              <ListRows rows={1} />
+              <Bone className="skeleton__media" />
               <span className="skeleton__line skeleton__line--wide" />
               <span className="skeleton__line" />
-            </span>
+            </div>
+          ))}
+        </>
+      );
+    case 'grid':
+      return (
+        <div className="skeleton__grid">
+          {times(rows ?? 9).map((i) => (
+            <Bone key={i} className="skeleton__square" />
+          ))}
+        </div>
+      );
+    case 'tiles':
+      return (
+        <div className="skeleton__tiles">
+          {times(rows ?? 4).map((i) => (
+            <div key={i} className="skeleton__tile">
+              <Bone className="skeleton__cover" />
+              <span className="skeleton__line skeleton__line--wide" />
+              <span className="skeleton__line" />
+            </div>
+          ))}
+        </div>
+      );
+    case 'page':
+      return (
+        <>
+          <Bone className="skeleton__hero" />
+          <span className="skeleton__line skeleton__line--title" />
+          <span className="skeleton__line skeleton__line--mid" />
+          <div className="skeleton__buttons">
+            <Bone className="skeleton__button" />
+            <Bone className="skeleton__button" />
           </div>
-        ))}
+          <span className="skeleton__line skeleton__line--wide" />
+          <span className="skeleton__line skeleton__line--wide" />
+          <span className="skeleton__line" />
+        </>
+      );
+    case 'profile':
+      return (
+        <>
+          <div className="skeleton__head">
+            <span className="skeleton__avatar skeleton__avatar--big" />
+            <span className="skeleton__line skeleton__line--title" />
+            <span className="skeleton__line" />
+          </div>
+          <div className="skeleton__stats">
+            {times(3).map((i) => (
+              <Bone key={i} className="skeleton__stat" />
+            ))}
+          </div>
+          <div className="skeleton__grid">
+            {times(6).map((i) => (
+              <Bone key={i} className="skeleton__square" />
+            ))}
+          </div>
+        </>
+      );
+    case 'carousel':
+      return (
+        <div className="skeleton__carousel">
+          {times(rows ?? 3).map((i) => (
+            <div key={i} className="skeleton__slide">
+              <Bone className="skeleton__cover" />
+              <span className="skeleton__line skeleton__line--wide" />
+              <span className="skeleton__line" />
+              <Bone className="skeleton__button" />
+            </div>
+          ))}
+        </div>
+      );
+    case 'lines':
+      return (
+        <>
+          {times(rows ?? 3).map((i) => (
+            <div key={i} className="skeleton__setting">
+              <span className="skeleton__line skeleton__line--mid" />
+              <span className="skeleton__line skeleton__line--wide" />
+            </div>
+          ))}
+        </>
+      );
+    case 'block':
+      return <Bone className="skeleton__block" />;
+    case 'inline':
+      return <span className="skeleton__line skeleton__line--mid" />;
+    default:
+      return <ListRows rows={rows ?? 4} />;
+  }
+}
+
+/** Enquanto carrega, mostra a forma da tela (no formato `shape`) em vez de só uma palavra. */
+export function Loading({ label = 'Carregando', shape = 'list', rows }: { label?: string; shape?: LoadingShape; rows?: number }) {
+  return (
+    <div className={`loading loading--${shape}`} role="status" aria-live="polite">
+      <span className="visually-hidden">{label}…</span>
+      <div className={`skeleton skeleton--${shape}`} aria-hidden="true">
+        <SkeletonBody shape={shape} rows={rows} />
       </div>
     </div>
   );

@@ -46,3 +46,13 @@ test('simplifyLine: limita os pontos e mantém o primeiro e o último', () => {
   assert.deepEqual(out[99], [999, 999]);
   assert.equal(simplifyLine([[1, 1], [2, 2]], 100).length, 2);
 });
+
+test('osrm: "a pé" com tempo de carro (servidor público só tem carro) vira tempo de caminhada', async () => {
+  const car = () => new Response(JSON.stringify({ code: 'Ok', routes: [{ distance: 4000, duration: 480, geometry: { coordinates: [[1, 2], [3, 4]] } }] }), { status: 200 });
+  const src = new OsrmRouteSource({ fetchFn: async () => car() });
+  const foot = await src.route(A, B, 'foot');
+  const driving = await src.route(A, B, 'driving');
+  assert.equal(driving!.durationS, 480);
+  assert.equal(Math.round(foot!.durationS), Math.round(4000 / 1.33));
+  assert.equal(foot!.distanceM, 4000);
+});

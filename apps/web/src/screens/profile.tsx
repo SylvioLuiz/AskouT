@@ -114,7 +114,7 @@ export function ProfileScreen({ username }: { username: string }) {
     }
   }
 
-  if (view.loading && !data) return <Loading />;
+  if (view.loading && !data) return <Loading shape="profile" />;
   if (view.error && !data) return <NotFoundProfile error={view.error} onRetry={view.reload} />;
   if (!data) return null;
 

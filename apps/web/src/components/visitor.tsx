@@ -199,7 +199,7 @@ function VisitorEvents() {
         </button>
       </div>
       {loaded.error && offset === 0 ? <ErrorState message={loaded.error.message} onRetry={loaded.reload} /> : null}
-      {loaded.loading && items.length === 0 ? <Loading /> : null}
+      {loaded.loading && items.length === 0 ? <Loading shape="tiles" /> : null}
       {!loaded.loading && !loaded.error && items.length === 0 ? (
         <EmptyState title={t('Nenhum local por aqui ainda')}>{t('Tente outra cidade ou entre para buscar no Explorar.')}</EmptyState>
       ) : null}
