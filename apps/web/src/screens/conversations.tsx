@@ -8,8 +8,10 @@ import { VOICE_CANCEL_DX, VOICE_LOCK_DY, VoiceBubble, VoiceRecorderBar } from '.
 import type { VoiceControl } from '../components/voice.tsx';
 import { haptic } from '../lib/haptics.ts';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, EditIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
+import { ImageEditor } from '../components/image-editor.tsx';
+import { canEditImage } from '../lib/image-edit.ts';
 import { FileBubble } from '../components/chat-file.tsx';
 import { LinkedText } from '../components/linked-text.tsx';
 import { MatchPin } from '../components/match-pin.tsx';
@@ -644,6 +646,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const [staged, setStaged] = useState<StagedMedia[]>([]);
+  /** Foto da prévia aberta no editor (girar, recortar, desenhar, escrever). */
+  const [editingId, setEditingId] = useState<string | undefined>();
   /** GIF escolhido, ainda não enviado: aparece acima do campo até tocar em enviar. */
   const [pendingGif, setPendingGif] = useState<CommentGif | undefined>();
   const stagedRef = useRef<StagedMedia[]>([]);
@@ -1045,6 +1049,18 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       setSending(false);
       setUploading(false);
     }
+  }
+
+  /** A foto editada substitui a original na prévia, no mesmo lugar. */
+  function applyEdit(id: string, file: File) {
+    setEditingId(undefined);
+    setStaged((current) =>
+      current.map((x) => {
+        if (x.id !== id || x.file === file) return x;
+        URL.revokeObjectURL(x.url);
+        return { ...x, file, url: URL.createObjectURL(file) };
+      }),
+    );
   }
 
   function unstage(id: string) {
@@ -1507,7 +1523,16 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 <ul className="stagebar__list">
                   {staged.map((item, i) => (
                     <li key={item.id} className="stagebar__item">
-                      {item.kind === 'IMAGE' ? (
+                      {item.kind === 'IMAGE' && canEditImage(item.file.type) ? (
+                        <>
+                          <button type="button" className="stagebar__open" aria-label={t('Editar foto {n}', { n: i + 1 })} disabled={sending} onClick={() => setEditingId(item.id)}>
+                            <img src={item.url} alt="" draggable={false} />
+                          </button>
+                          <button type="button" className="stagebar__edit" aria-hidden="true" tabIndex={-1} disabled={sending} onClick={() => setEditingId(item.id)}>
+                            <EditIcon />
+                          </button>
+                        </>
+                      ) : item.kind === 'IMAGE' ? (
                         <img src={item.url} alt={t('Foto {n}', { n: i + 1 })} draggable={false} />
                       ) : (
                         <span className="stagebar__video">
@@ -1646,6 +1671,10 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         />
       ) : null}
 
+      {(() => {
+        const item = staged.find((x) => x.id === editingId);
+        return item ? <ImageEditor key={item.id} file={item.file} onDone={(file) => applyEdit(item.id, file)} onCancel={() => setEditingId(undefined)} /> : null;
+      })()}
       {pendingDelete ? (
         <div className="undobar" role="status">
           <span>{pendingDelete.length === 1 ? t('Mensagem apagada') : `${pendingDelete.length} mensagens apagadas`}</span>

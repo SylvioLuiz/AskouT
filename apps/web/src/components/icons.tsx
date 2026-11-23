@@ -594,3 +594,32 @@ export const DocIcon = () => (
     <path d="M9 12.5h6M9 16h6" />
   </Svg>
 );
+
+/** Girar a foto 90° (editor de foto do chat). */
+export const RotateIcon = () => (
+  <Svg>
+    <path d="M20 11a8 8 0 1 0-2.34 5.66" />
+    <path d="M20 4v7h-7" />
+  </Svg>
+);
+/** Desfazer o último passo. */
+export const UndoIcon = () => (
+  <Svg>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </Svg>
+);
+/** Pincel para desenhar na foto. */
+export const BrushIcon = () => (
+  <Svg>
+    <path d="M18.4 2.6a2 2 0 0 1 2.9 2.9l-8.6 8.6-2.9-2.9z" />
+    <path d="M9.1 12.9c-2.2 0-3.6 1.4-3.6 3.6 0 1.4-.9 2.6-2.5 3.1 1.2 1.2 2.9 1.9 4.8 1.9 2.7 0 4.6-2 4.6-4.6z" />
+  </Svg>
+);
+/** Recortar com moldura (cantos em L). */
+export const CropFrameIcon = () => (
+  <Svg>
+    <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+    <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+  </Svg>
+);

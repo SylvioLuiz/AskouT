@@ -7748,3 +7748,34 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .skeleton__tile .skeleton__cover { flex: none; }
 .skelflash { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; align-self: flex-start; margin: 8px 0 0 4px; }
 .profile__actions > .skeleton__wide { height: 36px; border-radius: 10px; }
+
+/* ---------- Editar foto antes de enviar no chat ---------- */
+.imgedit .storyedit__top { flex-wrap: nowrap; }
+.imgedit .storyedit__bottom { align-items: center; }
+.imgedit .storyedit__bottom > .storyedit__pill--main { min-width: 160px; }
+.imgedit__layer { position: absolute; touch-action: none; }
+.imgedit__layer--draw { cursor: crosshair; }
+.imgedit__canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.imgedit__layer--draw .imgedit__text { pointer-events: none; }
+.imgedit__text { position: absolute; transform: translate(-50%, -50%); margin: 0; font-family: var(--font-display); font-weight: 700; line-height: 1.25; text-align: center; white-space: pre; text-shadow: 0 0.03em 0.15em rgb(0 0 0 / 0.55); cursor: grab; touch-action: none; }
+.imgedit__text--boxed { padding: 0.2em 0.4em; border-radius: 0.3em; text-shadow: none; }
+.imgedit__text--input { position: static; transform: none; white-space: pre-wrap; cursor: text; caret-color: currentColor; }
+.imgedit__tools { gap: 12px; }
+.imgedit__sizes { display: flex; justify-content: center; gap: 14px; }
+.imgedit__size { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: rgb(0 0 0 / 0.4); cursor: pointer; }
+.imgedit__size span { display: block; border-radius: 50%; box-shadow: 0 0 0 1.5px rgb(255 255 255 / 0.85); }
+.imgedit__size.is-on { border-color: #fff; }
+.imgedit__palette { display: flex; gap: 10px; padding: 6px 4px; overflow-x: auto; scrollbar-width: none; }
+.imgedit__palette::-webkit-scrollbar { display: none; }
+@media (min-width: 560px) { .imgedit__palette { justify-content: center; } }
+.imgedit__writebar { position: absolute; left: 0; right: 0; bottom: calc(var(--kb, 0px) + max(12px, var(--sa-bottom))); z-index: 1; display: flex; flex-direction: column; gap: 8px; padding: 0 14px; }
+.imgedit__range { display: flex; align-items: center; gap: 10px; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 0.875rem; }
+.imgedit__range input { flex: 1; accent-color: #fff; }
+.imgedit__range-big { font-size: 1.375rem; }
+.imgedit__crop { position: absolute; inset: 0; z-index: 7; display: flex; flex-direction: column; justify-content: center; padding: max(16px, var(--sa-top)) 16px max(16px, var(--sa-bottom)); background: #000; overflow-y: auto; }
+.imgedit__crop .cropper__hint { color: rgb(255 255 255 / 0.75); }
+.imgedit .storyedit__top, .imgedit .storyedit__bottom { pointer-events: none; }
+.imgedit .storyedit__top > *, .imgedit .storyedit__bottom > * { pointer-events: auto; }
+.stagebar__edit { position: absolute; left: 4px; bottom: 4px; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: rgb(0 0 0 / 0.6); color: #fff; cursor: pointer; }
+.stagebar__edit svg { width: 15px; height: 15px; }
+.stagebar__open { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
