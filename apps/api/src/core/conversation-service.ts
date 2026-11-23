@@ -1116,6 +1116,13 @@ export class ConversationService {
     const saved = await conversations.setSuggestionResponse(messageId, response, now);
     if (!saved) throw conflict('Essa sugestão já foi respondida');
     const updated = { ...message, response, respondedAt: now } satisfies MessageRecord;
+    if (response === 'ACCEPTED') {
+      // Só um local aceito por vez: aceitar este cancela o aceite de qualquer sugestão anterior da conversa.
+      const recent = await conversations.listMessages(conversationId, 200);
+      for (const m of recent) {
+        if (m.id !== messageId && m.kind === 'SUGGESTION' && m.response === 'ACCEPTED') await conversations.clearSuggestionResponse(m.id, 'ACCEPTED');
+      }
+    }
     if (response === 'ACCEPTED' && message.suggestion) await this.places?.destinationAgreedInChat(actorId, otherId, { name: message.suggestion.venueName, lat: message.suggestion.lat, lng: message.suggestion.lng });
     const positions = await this.livePositions(actorId, otherId, now);
     return toMessageView(updated, actorId, { distances: updated.suggestion ? this.distancesOf(updated.suggestion, positions) : null });

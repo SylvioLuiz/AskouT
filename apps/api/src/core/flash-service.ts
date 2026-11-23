@@ -731,10 +731,12 @@ export class FlashService {
   async getMatch(actorId: string, inviteId: string): Promise<MatchView> {
     const { flash, users, clock } = this.deps;
     const now = clock.now();
-    const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
+    let invite = await this.requireAcceptedMatch(actorId, inviteId, now);
     const otherId = invite.fromUserId === actorId ? invite.toUserId : invite.fromUserId;
     const [profile] = await users.findProfilesByIds([otherId]);
     if (!profile) throw notFound('Encontro não encontrado ou encerrado');
+    const conversationId = (await this.deps.conversations.getOrCreateDirect(actorId, otherId, this.deps.ids.next(), now)).id;
+    if (!invite.destination) invite = await this.destinationFromChat(invite, conversationId, now);
 
     const positions = await flash.listPositions(inviteId);
     const view = (p: FlashPositionRecord | undefined): PositionView | null =>
@@ -754,7 +756,7 @@ export class FlashService {
       now: now.toISOString(),
       me: view(positions.find((p) => p.userId === actorId)),
       them: view(positions.find((p) => p.userId === otherId)),
-      conversationId: (await this.deps.conversations.getOrCreateDirect(actorId, otherId, this.deps.ids.next(), now)).id,
+      conversationId,
       destination: invite.destination
         ? { name: invite.destination.name, lat: invite.destination.lat, lng: invite.destination.lng, chosenByMe: invite.destination.chosenById === actorId, chosenAt: invite.destination.chosenAt.toISOString() }
         : null,
@@ -818,6 +820,37 @@ export class FlashService {
     await this.retargetArrivals(saved, now);
   }
 
+  /**
+   * Encontro sem lugar, mas com uma sugestão aceita no chat depois do aceite do convite (ex.: aceita antes de o
+   * aceite no chat passar a gravar o lugar): o lugar aceito vira o do encontro, e fica gravado.
+   */
+  private async destinationFromChat(invite: FlashInviteRecord, conversationId: string, now: Date): Promise<FlashInviteRecord> {
+    const since = invite.respondedAt ?? invite.createdAt;
+    const recent = await this.deps.conversations.listMessages(conversationId, 100, undefined, [], since);
+    const agreed = [...recent].reverse().find((m) => m.kind === 'SUGGESTION' && m.response === 'ACCEPTED' && !m.deletedAt && m.suggestion);
+    if (!agreed?.suggestion) return invite;
+    const name = agreed.suggestion.venueName.trim().slice(0, DESTINATION_NAME_MAX);
+    const responder = agreed.senderId === invite.fromUserId ? invite.toUserId : invite.fromUserId;
+    const saved: FlashInviteRecord = { ...invite, destination: { name, lat: agreed.suggestion.lat, lng: agreed.suggestion.lng, chosenById: responder, chosenAt: agreed.respondedAt ?? now } };
+    await this.deps.flash.saveInvite(saved);
+    await this.retargetArrivals(saved, now);
+    return saved;
+  }
+
+  /** Tirar o lugar do encontro também desfaz o aceite no chat, para o lugar não voltar sozinho. */
+  private async withdrawChatAgreement(invite: FlashInviteRecord, actorId: string, now: Date): Promise<void> {
+    const dest = invite.destination;
+    if (!dest) return;
+    const otherId = invite.fromUserId === actorId ? invite.toUserId : invite.fromUserId;
+    const conversationId = (await this.deps.conversations.getOrCreateDirect(actorId, otherId, this.deps.ids.next(), now)).id;
+    const recent = await this.deps.conversations.listMessages(conversationId, 100, undefined, [], invite.respondedAt ?? invite.createdAt);
+    for (const m of recent) {
+      if (m.kind === 'SUGGESTION' && m.response === 'ACCEPTED' && m.suggestion && Math.abs(m.suggestion.lat - dest.lat) < 1e-6 && Math.abs(m.suggestion.lng - dest.lng) < 1e-6) {
+        await this.deps.conversations.clearSuggestionResponse(m.id, 'ACCEPTED');
+      }
+    }
+  }
+
   private async activeMatchWith(actorId: string, otherId: string, now: Date): Promise<FlashInviteRecord | undefined> {
     const open = await this.deps.flash.listOpenInvitesFor(actorId, now);
     return open.find((i) => i.status === 'ACCEPTED' && i.expiresAt > now && (i.fromUserId === otherId || i.toUserId === otherId));
@@ -827,6 +860,7 @@ export class FlashService {
   async clearDestination(actorId: string, inviteId: string): Promise<{ ok: true }> {
     const now = this.deps.clock.now();
     const invite = await this.requireAcceptedMatch(actorId, inviteId, now);
+    await this.withdrawChatAgreement(invite, actorId, now);
     const saved: FlashInviteRecord = { ...invite, destination: null };
     await this.deps.flash.saveInvite(saved);
     await this.retargetArrivals(saved, now);

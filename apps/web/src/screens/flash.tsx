@@ -37,6 +37,7 @@ import { toApiError } from '../lib/errors.ts';
 import { FLASH_PRIVACY_POINTS, flashNoticeSeen, markFlashNoticeSeen, safeStorage } from '../lib/hints.ts';
 import type { PlacePin, RouteLine } from '../components/match-map.tsx';
 import { MatchDestination, MatchPlaces } from '../components/match-destination.tsx';
+import { ReplaceConfirm } from '../components/suggestions.tsx';
 import { MAX_PLACES_ON_MAP, placeName, sortByFairness } from '../lib/flash.ts';
 import { toCard } from '../lib/chat.ts';
 import type { AvailableFriend, AvailableOrder, FlashMatch, PublicProfile, SuggestionItem } from '../lib/types.ts';
@@ -1391,6 +1392,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const [destBusy, setDestBusy] = useState(false);
   /** Com um local já combinado, a lista de lugares só abre ao tocar em "Sugerir outro lugar". */
   const [choosing, setChoosing] = useState(false);
+  const [confirmSuggest, setConfirmSuggest] = useState<SuggestionItem | undefined>();
   const [precisionBusy, setPrecisionBusy] = useState(false);
 
   async function changePrecision(approx: boolean) {
@@ -1461,7 +1463,13 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   }
 
   /** Sugerir um local é no chat: o cartão vai para a conversa e a pessoa segue para lá, onde o amigo aceita ou recusa. */
-  async function suggestInChat(item: SuggestionItem) {
+  function suggestInChat(item: SuggestionItem) {
+    // Já há local combinado: avisa antes que, se o amigo aceitar o novo, o atual deixa de valer.
+    if (dest) setConfirmSuggest(item);
+    else void deliverInChat(item);
+  }
+
+  async function deliverInChat(item: SuggestionItem) {
     setDestBusy(true);
     setFeedback(undefined);
     try {
@@ -1572,7 +1580,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
             selectedKey={pickedKey}
             busy={destBusy}
             onSelect={setPickedKey}
-            onChoose={(item) => void suggestInChat(item)}
+            onChoose={suggestInChat}
           />
           {suggestions.data ? (
             <p className="muted matchradius">
@@ -1594,6 +1602,12 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
           </div>
         </>
       )}
+
+      {confirmSuggest && dest ? (
+        <Sheet title={t('Sugerir outro local?')} onClose={() => setConfirmSuggest(undefined)}>
+          <ReplaceConfirm place={dest.name} next={confirmSuggest.venueName} otherName={data.other.username} busy={destBusy} onCancel={() => setConfirmSuggest(undefined)} onConfirm={() => void deliverInChat(confirmSuggest)} />
+        </Sheet>
+      ) : null}
 
       <ArrivalShare match={data} background={background} onChanged={match.reload} onFeedback={setFeedback} />
 

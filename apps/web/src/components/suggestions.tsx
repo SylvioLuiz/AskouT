@@ -15,7 +15,7 @@ import type { PlacePin } from './match-map.tsx';
 import { MatchPlaceSearch } from './match-place-search.tsx';
 import { RingLoader } from './ring-loader.tsx';
 import { Sheet } from './agenda.tsx';
-import { Button, Loading, Notice } from './ui.tsx';
+import { Button, Confirm, Loading, Notice } from './ui.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 const MatchMap = lazyWithReload(() => import('./match-map.tsx'));
@@ -71,10 +71,14 @@ function Distances({ distances, otherName }: { distances: { meM: number; themM: 
 }
 
 /** O cartão dentro de uma mensagem da conversa: distâncias dos dois, rota e aceitar/recusar. */
-export function SuggestionBubble({ message, otherName, nowIso, conversationId, onUpdated, onOpenMap }: { message: ChatMessage; otherName: string; nowIso: string; conversationId: string; onUpdated: (m: ChatMessage) => void; onOpenMap?: (place: { name: string; lat: number; lng: number }) => void }) {
+export function SuggestionBubble({ message, otherName, nowIso, conversationId, onUpdated, onOpenMap, agreed }: { message: ChatMessage; otherName: string; nowIso: string; conversationId: string; onUpdated: (m: ChatMessage) => void; onOpenMap?: (place: { name: string; lat: number; lng: number }) => void; agreed?: { id: string; name: string } | undefined }) {
   const card = message.suggestion as SuggestionCard;
   const [busy, setBusy] = useState<'accept' | 'decline' | 'cancel' | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
+
+  const [confirmAccept, setConfirmAccept] = useState(false);
+  /** Já há outro local aceito: aceitar este cancela aquele, então pergunta antes. */
+  const replaces = agreed && agreed.id !== message.id ? agreed : undefined;
 
   async function answer(action: 'accept' | 'decline' | 'cancel') {
     setBusy(action);
@@ -136,7 +140,7 @@ export function SuggestionBubble({ message, otherName, nowIso, conversationId, o
         </p>
       ) : (
         <div className="sugcard__actions">
-          <Button small loading={busy === 'accept'} disabled={busy === 'decline'} onClick={() => answer('accept')}>
+          <Button small loading={busy === 'accept'} disabled={busy === 'decline'} onClick={() => (replaces ? setConfirmAccept(true) : void answer('accept'))}>
             {t('Aceitar')}
           </Button>
           <Button small variant="secondary" loading={busy === 'decline'} disabled={busy === 'accept'} onClick={() => answer('decline')}>
@@ -145,6 +149,20 @@ export function SuggestionBubble({ message, otherName, nowIso, conversationId, o
         </div>
       )}
       {problem ? <p className="sugcard__problem">{problem}</p> : null}
+      {confirmAccept && replaces ? (
+        <Sheet title={t('Trocar o local combinado?')} onClose={() => setConfirmAccept(false)}>
+          <Confirm
+            question={t('{place} já está aceito. Aceitar {next} cancela o aceite de {place}.', { place: replaces.name, next: card.venueName })}
+            confirmLabel={t('Aceitar e trocar')}
+            busy={busy === 'accept'}
+            onCancel={() => setConfirmAccept(false)}
+            onConfirm={() => {
+              setConfirmAccept(false);
+              void answer('accept');
+            }}
+          />
+        </Sheet>
+      ) : null}
     </div>
   );
 }
@@ -154,6 +172,8 @@ interface SheetProps {
   conversationId: string;
   otherName: string;
   title: string;
+  /** Local já aceito na conversa: sugerir outro pede confirmação, porque o aceite do novo cancela este. */
+  agreedName?: string | undefined;
   /** Já abre a busca "Sugerir outro lugar" (vindo da página do NOW). */
   searchOpen?: boolean;
   onClose: () => void;
@@ -169,7 +189,7 @@ function placeCard(p: ExplorePlace): SuggestionCard {
  * Mapa dentro do chat: vocês dois e os locais entre vocês, com a lista em rolagem horizontal logo abaixo.
  * Tocar um pin leva ao cartão; tocar um cartão destaca o pin. Daqui também se pesquisa qualquer outro lugar.
  */
-export function SuggestionsSheet({ inviteId, conversationId, otherName, title, searchOpen = false, onClose, onSent }: SheetProps) {
+export function SuggestionsSheet({ inviteId, conversationId, otherName, title, agreedName, searchOpen = false, onClose, onSent }: SheetProps) {
   const match = useAsync(() => api.flashMatch(inviteId), [inviteId]);
   const result = useAsync(() => api.flashSuggestions(inviteId, nowRadiusKm()), [inviteId]);
   const [sending, setSending] = useState<string | undefined>();
@@ -178,7 +198,15 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, s
   const [picked, setPicked] = useState<string | undefined>();
   const [mapFailed, setMapFailed] = useState(false);
 
-  async function send(key: string, card: SuggestionCard) {
+  const [pending, setPending] = useState<{ key: string; card: SuggestionCard } | undefined>();
+
+  function send(key: string, card: SuggestionCard) {
+    if (agreedName) setPending({ key, card });
+    else void deliver(key, card);
+  }
+
+  async function deliver(key: string, card: SuggestionCard) {
+    setPending(undefined);
     setSending(key);
     setError(undefined);
     try {
@@ -238,6 +266,11 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, s
       {data && !data.placesAvailable ? <p className="muted sheet__foot">{t('Não foi possível buscar locais agora. Mostrando só eventos do AskouT.')}</p> : null}
       {hasGoogle ? <p className="muted sheet__foot">{t('Notas, fotos e lugares: Google.')}</p> : null}
       {hasOsm ? <p className="muted sheet__foot">{t('Lugares: © colaboradores do OpenStreetMap.')}</p> : null}
+      {pending && agreedName ? (
+        <Sheet title={t('Sugerir outro local?')} onClose={() => setPending(undefined)}>
+          <ReplaceConfirm place={agreedName} next={pending.card.venueName} otherName={otherName} onCancel={() => setPending(undefined)} onConfirm={() => void deliver(pending.key, pending.card)} />
+        </Sheet>
+      ) : null}
       <MatchPlaceSearch center={me ?? (them[0] ? { lat: them[0].lat, lng: them[0].lng } : undefined)} otherName={otherName} busy={sending !== undefined} startOpen={searchOpen} onSuggest={(place) => void send(place.key, placeCard(place))} />
     </Sheet>
   );
@@ -338,5 +371,18 @@ export function PlaceCarousel({ items, otherName, picked, onPick, action }: { it
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Aviso antes de sugerir outro local quando já há um aceito: se o amigo aceitar o novo, o anterior deixa de valer. */
+export function ReplaceConfirm({ place, next, otherName, busy, onConfirm, onCancel }: { place: string; next: string; otherName: string; busy?: boolean; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <Confirm
+      question={t('Vocês já combinaram {place}. Se {name} aceitar {next}, o aceite de {place} é cancelado.', { place, next, name: otherName })}
+      confirmLabel={t('Sugerir mesmo assim')}
+      busy={busy ?? false}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    />
   );
 }
