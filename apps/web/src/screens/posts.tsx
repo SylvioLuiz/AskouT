@@ -32,6 +32,7 @@ import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
 import { LinkPlaceSheet } from '../components/link-place-sheet.tsx';
 import { t } from '../lib/i18n/index.ts';
+import { PostPageSkeleton } from '../components/skeletons.tsx';
 
 let counter = 0;
 const nextKey = () => `i${(counter += 1)}`;
@@ -60,7 +61,7 @@ function LinkEventSheet({ onPick, onClose }: { onPick: (event: LinkedEvent) => v
   return (
     <Sheet title={t('Vincular um evento')} onClose={onClose}>
       <p className="muted">{t('Eventos em que você confirmou presença ou que criou. Para outro evento, abra a página dele e toque em Publicar sobre o evento.')}</p>
-      {going.loading && !going.data ? <Loading /> : null}
+      {going.loading && !going.data ? <Loading shape="rows" rows={3} /> : null}
       {going.error ? <ErrorState message={going.error.message} onRetry={going.reload} /> : null}
       {going.data && items.length === 0 ? <p className="muted">{t('Nenhum evento por aqui ainda. Confirme presença em um evento ou vincule um local.')}</p> : null}
       <ul className="placepick">
@@ -88,7 +89,7 @@ function PlacePhotoGrid({ picked, onPick }: { picked: string | undefined; onPick
       <Field label={t('Buscar local')} type="search" value={q} onChange={setQ} autoComplete="off" hint={t('Ex.: bar, balada, show')} />
       <LocationNotice status={where.status} />
       {term.length < 2 ? <p className="muted">{t('Digite o nome ou o tipo do local para ver as fotos.')}</p> : null}
-      {result.loading && !result.data ? <Loading /> : null}
+      {result.loading && !result.data ? <Loading shape="grid" rows={6} /> : null}
       {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
       {result.data && !result.data.placesAvailable ? <Notice>{t('A busca de locais com foto ainda não está ligada neste ambiente.')}</Notice> : null}
       {result.data && result.data.placesAvailable && places.length === 0 ? <p className="muted">{t('Nenhum local com foto para essa busca.')}</p> : null}
@@ -1003,7 +1004,7 @@ export function PostScreen({ postId }: { postId: string }) {
   // Post de evento: o nome do evento é o título da página (no lugar de "Post").
   const heading = post.data?.event?.title ?? t('Post');
   useTitle(heading);
-  if (post.loading && !post.data) return <Loading shape="posts" rows={1} />;
+  if (post.loading && !post.data) return <PostPageSkeleton />;
   if (post.error) {
     return post.error.code === 'NOT_FOUND' ? (
       <EmptyState

@@ -223,7 +223,15 @@ export function MessageRequestsScreen() {
   const list = useAsync(() => api.messageRequests(), []);
   useLiveRefresh(list.reload, 10_000);
   const now = new Date();
-  if (list.loading && !list.data) return <Loading />;
+  if (list.loading && !list.data) {
+    return (
+      <div className="convscreen">
+        <PageHead title={t('Solicitações de mensagem')} back="/conversas" />
+        <p className="muted convrequests__help">{t('Mensagens de quem você não segue. A pessoa só fica sabendo que você viu se você aceitar.')}</p>
+        <Loading />
+      </div>
+    );
+  }
   if (list.error && !list.data) return <ErrorState message={list.error.message} onRetry={list.reload} />;
   const items = list.data?.items ?? [];
   return (

@@ -82,7 +82,7 @@ export function ClaimSheet({ onClose, onSent, fixed }: { onClose: () => void; on
         <div className="claim">
           <Field label={t('Nome do local')} value={query} onChange={setQuery} placeholder={t('Ex.: Bar do Zé ou Balada Nova')} autoFocus />
           {debounced.length < 2 ? <p className="muted">{t('Digite pelo menos 2 letras. Só aparecem locais já cadastrados no AskouT.')}</p> : null}
-          {found.loading ? <Loading /> : null}
+          {found.loading ? <Loading shape="lines" /> : null}
           {found.error ? <ErrorState message={found.error.message} onRetry={found.reload} /> : null}
           {found.data && debounced.length >= 2 && found.data.length === 0 ? <p className="muted">{t('Nenhum local com esse nome.')}</p> : null}
           {found.data && found.data.length > 0 ? (
@@ -193,7 +193,7 @@ function GoogleVenueSheet({ onPicked, onClose }: { onPicked: (venue: { id: strin
       <div className="claim">
         <Field label={t('Buscar no Google')} type="search" value={q} onChange={setQ} autoFocus autoComplete="off" hint={t('Nome ou endereço do lugar')} />
         {term.length < 2 ? <p className="muted">{t('Digite o nome ou o endereço do seu local.')}</p> : null}
-        {result.loading && !result.data ? <Loading /> : null}
+        {result.loading && !result.data ? <Loading shape="rows" rows={3} /> : null}
         {result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
         {result.data && places.length === 0 ? <p className="muted">{result.data.placesAvailable ? t('Nenhum lugar do Google com esse nome. Tente o endereço ou crie do zero.') : t('A busca do Google ainda não está ligada neste ambiente.')}</p> : null}
         {places.length > 0 ? (

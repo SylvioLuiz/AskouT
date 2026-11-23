@@ -188,20 +188,23 @@ export function EmptyState({ title, children, action }: { title: string; childre
  * Formato do esqueleto, imitando o que vai aparecer:
  * list (pessoas, avisos, conversas), posts (cartões do feed), grid (fotos 3 por linha), tiles (eventos e locais com
  * capa, 2 por linha), page (página de detalhe: capa, título, texto e botões), profile (cabeçalho de perfil),
- * carousel (cartões lado a lado), lines (ajustes e textos), block (um quadro só: mapa, QR, recorte) e
- * inline (uma linha curta, para "calculando" dentro de um cartão).
+ * carousel (cartões lado a lado), lines (ajustes e textos), block (um quadro só: mapa, QR, recorte),
+ * inline (uma linha curta, para "calculando" dentro de um cartão), rows (linhas com miniatura quadrada: álbuns),
+ * form (campos com rótulo e um botão), toggles (ajustes com chave liga/desliga), cards (cartões empilhados com
+ * título, texto e botões) panel (painel do local: cartão do local, três números e a pilha de botões), stories (flashes em pé, 3 por linha) e feed
+ * (posts do mural de um local ou evento: cartões com borda, autor, texto e foto).
  */
-export type LoadingShape = 'list' | 'posts' | 'grid' | 'tiles' | 'page' | 'profile' | 'carousel' | 'lines' | 'block' | 'inline';
+export type LoadingShape = 'list' | 'posts' | 'grid' | 'tiles' | 'page' | 'profile' | 'carousel' | 'lines' | 'block' | 'inline' | 'rows' | 'form' | 'toggles' | 'cards' | 'panel' | 'stories' | 'feed';
 
 const Bone = ({ className }: { className: string }) => <span className={`skeleton__bone ${className}`} />;
 const times = (n: number) => Array.from({ length: n }, (_, i) => i);
 
-function ListRows({ rows }: { rows: number }) {
+function ListRows({ rows, square = false }: { rows: number; square?: boolean }) {
   return (
     <>
       {times(rows).map((i) => (
         <div key={i} className="skeleton__row">
-          <span className="skeleton__avatar" />
+          <span className={`skeleton__avatar${square ? ' skeleton__avatar--square' : ''}`} />
           <span className="skeleton__lines">
             <span className={`skeleton__line ${i % 2 === 0 ? 'skeleton__line--wide' : 'skeleton__line--mid'}`} />
             <span className="skeleton__line" />
@@ -243,6 +246,7 @@ function SkeletonBody({ shape, rows }: { shape: LoadingShape; rows: number | und
               <Bone className="skeleton__cover" />
               <span className="skeleton__line skeleton__line--wide" />
               <span className="skeleton__line" />
+              <span className="skeleton__line skeleton__line--short" />
             </div>
           ))}
         </div>
@@ -306,6 +310,91 @@ function SkeletonBody({ shape, rows }: { shape: LoadingShape; rows: number | und
           ))}
         </>
       );
+    case 'rows':
+      return <ListRows rows={rows ?? 4} square />;
+    case 'form':
+      return (
+        <>
+          {times(rows ?? 3).map((i) => (
+            <div key={i} className="skeleton__field">
+              <span className="skeleton__line skeleton__line--label" />
+              <Bone className="skeleton__input" />
+            </div>
+          ))}
+          <Bone className="skeleton__wide" />
+        </>
+      );
+    case 'toggles':
+      return (
+        <div className="skeleton__toggles">
+          {times(rows ?? 4).map((i) => (
+            <div key={i} className="skeleton__toggle">
+              <span className="skeleton__lines">
+                <span className="skeleton__line skeleton__line--label" />
+                <span className={`skeleton__line ${i % 2 === 0 ? 'skeleton__line--wide' : 'skeleton__line--mid'}`} />
+              </span>
+              <Bone className="skeleton__switch" />
+            </div>
+          ))}
+        </div>
+      );
+    case 'cards':
+      return (
+        <>
+          {times(rows ?? 3).map((i) => (
+            <div key={i} className="skeleton__card">
+              <span className="skeleton__line skeleton__line--mid skeleton__line--strong" />
+              <span className="skeleton__line skeleton__line--wide" />
+              <span className="skeleton__line" />
+              <div className="skeleton__buttons">
+                <Bone className="skeleton__button skeleton__button--small" />
+                <Bone className="skeleton__button skeleton__button--small" />
+              </div>
+            </div>
+          ))}
+        </>
+      );
+    case 'panel':
+      return (
+        <>
+          <Bone className="skeleton__wide skeleton__wide--tabs" />
+          <div className="skeleton__card skeleton__card--row">
+            <span className="skeleton__avatar" />
+            <span className="skeleton__lines">
+              <span className="skeleton__line skeleton__line--mid skeleton__line--strong" />
+              <span className="skeleton__line" />
+            </span>
+          </div>
+          <div className="skeleton__stats">
+            {times(3).map((i) => (
+              <Bone key={i} className="skeleton__stat skeleton__stat--tall" />
+            ))}
+          </div>
+          {times(rows ?? 5).map((i) => (
+            <Bone key={i} className="skeleton__wide" />
+          ))}
+        </>
+      );
+    case 'feed':
+      return (
+        <>
+          {times(rows ?? 2).map((i) => (
+            <div key={i} className="skeleton__card skeleton__card--feed">
+              <ListRows rows={1} />
+              <span className="skeleton__line skeleton__line--wide" />
+              <Bone className="skeleton__feedmedia" />
+            </div>
+          ))}
+        </>
+      );
+    case 'stories':
+      return (
+        <div className="skeleton__grid skeleton__grid--stories">
+          {times(rows ?? 3).map((i) => (
+            <Bone key={i} className="skeleton__story" />
+          ))}
+        </div>
+      );
     case 'block':
       return <Bone className="skeleton__block" />;
     case 'inline':
@@ -324,6 +413,26 @@ export function Loading({ label = 'Carregando', shape = 'list', rows }: { label?
         <SkeletonBody shape={shape} rows={rows} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Cabeçalho de página enquanto os dados chegam: o mesmo `.pagehead` da tela pronta, com o título real quando ele já é
+ * conhecido (ou uma barra no lugar) e uma barra no lugar do subtítulo que depende dos dados, para nada pular depois.
+ */
+export function PageHeadSkeleton({ title, back, subtitle = false }: { title?: string; back?: string; subtitle?: boolean }) {
+  return (
+    <header className="pagehead">
+      {back ? (
+        <Link to={back} className="pagehead__back" aria-label={t('Voltar')}>
+          <ChevronLeftIcon />
+        </Link>
+      ) : null}
+      <div className="pagehead__skel">
+        {title ? <h1 className="pagehead__title">{title}</h1> : <span className="skeleton__line skeleton__line--head" aria-hidden="true" />}
+        {subtitle ? <span className="skeleton__line skeleton__line--sub" aria-hidden="true" /> : null}
+      </div>
+    </header>
   );
 }
 

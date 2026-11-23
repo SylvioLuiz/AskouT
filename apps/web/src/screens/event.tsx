@@ -41,6 +41,7 @@ import { trackTicketClick } from '../components/sponsored-view.tsx';
 import { splitEventTitle } from '../lib/event-title.ts';
 import { LiveTag } from '../components/live-tag.tsx';
 import { GoingChoiceSheet } from '../components/going-choice.tsx';
+import { EventSkeleton } from '../components/skeletons.tsx';
 
 /** O mesmo texto máximo que a API aceita num post de evento. */
 const EVENT_POST_CAPTION_MAX = 500;
@@ -321,7 +322,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
 
   return (
     <>
-      {waiting || loaded.loading ? <Loading shape="page" /> : null}
+      {waiting || loaded.loading ? <EventSkeleton onBack={goBack} /> : null}
       {!waiting && loaded.error ? (
         <>
           <button type="button" className="evpage__plainback" onClick={goBack}>

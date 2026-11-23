@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
+import { Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead, PageHeadSkeleton } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
@@ -17,7 +17,7 @@ export function VenueOffersScreen({ venueId }: { venueId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  if (profile.loading || offers.loading) return (<><PageHead title={t('Oferta relâmpago')} back={back} /><Loading shape="page" /></>);
+  if (profile.loading || offers.loading) return (<><PageHeadSkeleton title={t('Oferta relâmpago')} back={back} subtitle /><Loading shape="lines" rows={1} /><Loading shape="form" rows={2} /></>);
   if (profile.error || offers.error || !profile.data || !offers.data) {
     const e = profile.error ?? offers.error;
     return (<><PageHead title={t('Oferta relâmpago')} back={back} /><ErrorState message={e?.message ?? t('Não foi possível carregar.')} onRetry={() => { profile.reload(); offers.reload(); }} /></>);
