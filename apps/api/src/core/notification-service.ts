@@ -171,7 +171,7 @@ interface ActorLookupDeps {
   scheduling: Pick<SchedulingRepository, 'find'>;
 }
 
-const DIRECT_ACTOR_KEYS = new Set(['follow-request', 'follow-new', 'follow-accepted', 'flash-invite', 'flash-accepted']);
+const DIRECT_ACTOR_KEYS = new Set(['follow-request', 'follow-new', 'follow-accepted', 'flash-invite', 'flash-accepted', 'flash-on', 'flash-ask-on']);
 
 export class NotificationService {
   private readonly deps: NotifierDeps & ActorLookupDeps;
