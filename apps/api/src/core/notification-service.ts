@@ -1,7 +1,7 @@
 import { conflict, unauthorized, validationError } from './errors.ts';
 import { isNotificationCategory, notificationFilter, OVERVIEW_FILTER } from './notification-categories.ts';
-import type { Clock, ConversationRepository, IdGenerator, MeetupRepository, Notifier, NotificationRepository, PostRepository, PushLive, PushReplyTokens, PushSender, PushSubscriptionRepository, SchedulingRepository, UserRepository } from './ports.ts';
-import type { NotificationMuteSettings, NotificationRecord, NotificationType } from './types.ts';
+import type { Clock, ConversationRepository, IdGenerator, LiveActivityTokens, MeetupRepository, Notifier, NotificationRepository, PostRepository, PushLive, PushReplyTokens, PushSender, PushSubscriptionRepository, SchedulingRepository, UserRepository } from './ports.ts';
+import type { NotificationMuteSettings, NotificationRecord, NotificationType, PushSubscriptionRecord } from './types.ts';
 
 export const NOTIFICATIONS_PAGE = 30;
 export const MAX_PUSH_SUBSCRIPTIONS = 10;
@@ -13,6 +13,17 @@ const KEY_MAX = 200;
 export const NATIVE_ENDPOINT_PREFIX = 'apns:';
 /** Aparelhos Android guardam o token do FCM como `fcm:<token>`. */
 export const FCM_ENDPOINT_PREFIX = 'fcm:';
+/**
+ * Live Activity do iPhone (iOS 17.2+), guardada na mesma tabela das inscrições, sem mudar o banco:
+ * - `apnsls:<token>`: token "push-to-start" do aparelho (abre a atividade da chegada sem o app aberto);
+ * - `apnsla:<token>`: token de uma atividade aberta; o `auth` guarda a `tag` da chegada que ela mostra.
+ * Nenhum dos dois recebe os avisos comuns.
+ */
+export const LIVE_START_PREFIX = 'apnsls:';
+export const LIVE_ACTIVITY_PREFIX = 'apnsla:';
+const isLiveActivityEndpoint = (endpoint: string): boolean => endpoint.startsWith(LIVE_START_PREFIX) || endpoint.startsWith(LIVE_ACTIVITY_PREFIX);
+/** Sem o token da atividade (o app ainda não registrou), não abre outra igual por este tempo. */
+const LIVE_START_RETRY_MS = 10 * 60_000;
 const NATIVE_TOKEN = /^[0-9a-f]{32,200}$/i;
 const FCM_TOKEN = /^[A-Za-z0-9:_-]{50,400}$/;
 
@@ -62,6 +73,8 @@ interface NotifierDeps {
   ids: IdGenerator;
   /** Responder pela notificação (app no iPhone/Android). Opcional: sem ele, o push sai sem o campo de resposta. */
   pushReplies?: PushReplyTokens;
+  /** Live Activity da chegada no iPhone. Opcional: sem ele, a chegada vai como aviso comum. */
+  liveActivityTokens?: LiveActivityTokens;
 }
 
 /** Conversa de um aviso de mensagem (`/conversas/<id>`), para o token de resposta. */
@@ -116,21 +129,79 @@ export class StoredNotifier implements Notifier {
    * Aviso que se atualiza (chegada do amigo no NOW): só push, nada no sino (seriam dezenas de avisos iguais).
    * Respeita o "silenciar todas". Vai só para o app do celular: o navegador não tem notificação fixa nem barra.
    */
-  async live(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive }): Promise<void> {
+  async live(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string } }): Promise<void> {
     const { notifications, pushSubscriptions, push } = this.deps;
     const job = (async () => {
       if (!push.nativeEnabled) return;
       if (isMuted(await notifications.getMuteSettings(input.userId), input.type)) return;
-      const subs = (await pushSubscriptions.listForUser(input.userId)).filter((s) => isNativeEndpoint(s.endpoint));
+      const all = await pushSubscriptions.listForUser(input.userId);
+      // iPhone com Live Activity: a chegada vai para a tela bloqueada (com a barra), e não como aviso comum.
+      const viaActivity = await this.liveActivity(input, all);
+      const subs = all.filter((s) => isNativeEndpoint(s.endpoint) && !(viaActivity && s.endpoint.startsWith(NATIVE_ENDPOINT_PREFIX)));
+      const image = input.who?.image;
       await Promise.all(
         subs.map(async (sub) => {
-          const result = await push.send(sub, { title: input.title, body: input.body, url: input.url, tag: input.tag, live: input.live });
+          const result = await push.send(sub, { title: input.title, body: input.body, url: input.url, tag: input.tag, live: input.live, ...(image ? { image } : {}) });
           if (result === 'GONE') await pushSubscriptions.remove(sub.endpoint);
         }),
       );
     })().catch(() => undefined);
     this.inFlight.add(job);
     void job.finally(() => this.inFlight.delete(job));
+  }
+
+  /** Live Activities abertas (ou pedidas) por pessoa e chegada, enquanto o app ainda não registrou a atividade. */
+  private readonly activityStarts = new Map<string, number>();
+
+  /**
+   * Manda a chegada para a Live Activity do iPhone: atualiza a que está aberta (token registrado pelo app) ou abre
+   * uma pelo token "push-to-start". Devolve `true` se o iPhone foi atendido assim (aí não vai o aviso comum).
+   */
+  private async liveActivity(input: { userId: string; title: string; body: string; tag: string; live: PushLive; who?: { name: string } }, all: PushSubscriptionRecord[]): Promise<boolean> {
+    const { push, pushSubscriptions, clock } = this.deps;
+    const tokens = this.deps.liveActivityTokens;
+    if (!push.liveActivity || !tokens) return false;
+    const live = input.live;
+    const nowMs = clock.now().getTime();
+    const key = `${input.userId}|${input.tag}`;
+    const state = { title: input.title, body: input.body, progress: live.progress, arrived: live.state === 'arrived' };
+    const alert = live.quiet || live.state === 'stopped' ? undefined : { title: input.title, body: input.body };
+    const send = async (sub: PushSubscriptionRecord, event: 'start' | 'update' | 'end', extra: { attributes?: { name: string; tag: string; registration: string } } = {}) => {
+      const token = sub.endpoint.slice(sub.endpoint.startsWith(LIVE_START_PREFIX) ? LIVE_START_PREFIX.length : LIVE_ACTIVITY_PREFIX.length);
+      const result = await push.liveActivity!({
+        token,
+        event,
+        state,
+        ...(alert ? { alert } : {}),
+        ...extra,
+        staleAtMs: live.untilMs,
+        ...(event === 'end' ? { dismissAtMs: Math.min(live.untilMs, nowMs + 60_000) } : {}),
+      });
+      if (result === 'GONE' || (event === 'end' && sub.endpoint.startsWith(LIVE_ACTIVITY_PREFIX))) await pushSubscriptions.remove(sub.endpoint);
+      return result;
+    };
+
+    const activities = all.filter((s) => s.endpoint.startsWith(LIVE_ACTIVITY_PREFIX) && s.auth === input.tag);
+    if (activities.length > 0) {
+      const event = live.state === 'stopped' ? 'end' : 'update';
+      await Promise.all(activities.map((sub) => send(sub, event)));
+      if (event === 'end') this.activityStarts.delete(key);
+      return true;
+    }
+    const starters = all.filter((s) => s.endpoint.startsWith(LIVE_START_PREFIX));
+    if (starters.length === 0) return false;
+    if (live.state === 'stopped') {
+      this.activityStarts.delete(key);
+      // Abriu e o app não chegou a registrar: não há como fechar daqui. Ela fica desatualizada no fim do encontro.
+      return false;
+    }
+    const startedAt = this.activityStarts.get(key);
+    if (startedAt !== undefined && nowMs - startedAt < LIVE_START_RETRY_MS) return true;
+    const attributes = { name: input.who?.name ?? '', tag: input.tag, registration: tokens.issue(input.userId, input.tag) };
+    const results = await Promise.all(starters.map((sub) => send(sub, 'start', { attributes })));
+    if (!results.includes('SENT')) return false;
+    this.activityStarts.set(key, nowMs);
+    return true;
   }
 
   /** Espera os envios em andamento (usado nos testes e no desligamento). */
@@ -141,7 +212,7 @@ export class StoredNotifier implements Notifier {
   private async pushTo(input: { userId: string; title: string; body: string; url: string; type: NotificationType; dedupeKey?: string }): Promise<void> {
     const { pushSubscriptions, push } = this.deps;
     if (push.publicKey === null && !push.nativeEnabled) return;
-    const subs = await pushSubscriptions.listForUser(input.userId);
+    const subs = (await pushSubscriptions.listForUser(input.userId)).filter((s) => !isLiveActivityEndpoint(s.endpoint));
     const conversationId = replyConversationOf(input.type, input.url);
     const replies = this.deps.pushReplies;
     await Promise.all(
@@ -305,6 +376,13 @@ export class NotificationService {
     const endpoint = input.endpoint;
     const keys = typeof input.keys === 'object' && input.keys !== null ? (input.keys as Record<string, unknown>) : {};
     let { p256dh, auth } = keys;
+    if (typeof endpoint === 'string' && endpoint.startsWith(LIVE_START_PREFIX)) {
+      // iPhone: token "push-to-start" da Live Activity da chegada (ver `live`). Não conta no limite de aparelhos.
+      if (!push.nativeEnabled || !push.liveActivity || !this.deps.liveActivityTokens) throw conflict('A Live Activity não está configurada neste servidor');
+      if (!NATIVE_TOKEN.test(endpoint.slice(LIVE_START_PREFIX.length))) throw validationError('Inscrição inválida', { endpoint: 'Token inválido' });
+      await pushSubscriptions.upsert({ userId, endpoint, p256dh: 'apnsls', auth: 'apnsls', createdAt: clock.now(), replyable: false });
+      return { ok: true };
+    }
     if (typeof endpoint === 'string' && (endpoint.startsWith(NATIVE_ENDPOINT_PREFIX) || endpoint.startsWith(FCM_ENDPOINT_PREFIX))) {
       // Aparelho do app: o "endereço" é `apns:` (iPhone) ou `fcm:` (Android) + token do aparelho, sem chaves de criptografia.
       if (!push.nativeEnabled) throw conflict('O aviso fora do app não está configurado neste servidor');
@@ -323,7 +401,7 @@ export class NotificationService {
         throw validationError('Inscrição inválida', { keys: 'Chaves inválidas' });
       }
     }
-    const existing = await pushSubscriptions.listForUser(userId);
+    const existing = (await pushSubscriptions.listForUser(userId)).filter((s) => !isLiveActivityEndpoint(s.endpoint));
     if (existing.length >= MAX_PUSH_SUBSCRIPTIONS && !existing.some((s) => s.endpoint === endpoint)) {
       throw conflict('Você já tem avisos ligados em muitos aparelhos. Desligue em algum para ligar aqui.');
     }
@@ -346,6 +424,21 @@ export class NotificationService {
     const subs = await this.deps.pushSubscriptions.listForUser(claims.userId);
     if (!subs.some((s) => replies.endpointHash(s.endpoint) === claims.endpointHash)) throw unauthorized('Não deu para responder por aqui. Abra a conversa no app.');
     return { userId: claims.userId, conversationId: claims.conversationId };
+  }
+
+  /**
+   * O app do iPhone abriu a Live Activity da chegada e recebeu o token dela: `registration` veio dentro da própria
+   * atividade (assinado, preso à pessoa e à chegada). Sem login, porque quem chama é o código nativo, às vezes com
+   * o app aberto em segundo plano só para isso.
+   */
+  async registerLiveActivity(registration: unknown, activityToken: unknown): Promise<{ ok: true }> {
+    const claims = this.deps.liveActivityTokens?.verify(registration);
+    if (!claims) throw unauthorized('Registro inválido');
+    if (typeof activityToken !== 'string' || !NATIVE_TOKEN.test(activityToken)) throw validationError('Token inválido', { token: 'Token inválido' });
+    const user = await this.deps.users.findById(claims.userId);
+    if (!user || user.status === 'SUSPENDED') throw unauthorized('Registro inválido');
+    await this.deps.pushSubscriptions.upsert({ userId: claims.userId, endpoint: LIVE_ACTIVITY_PREFIX + activityToken.toLowerCase(), p256dh: 'apnsla', auth: claims.tag, createdAt: this.deps.clock.now(), replyable: false });
+    return { ok: true };
   }
 
   async unsubscribe(userId: string, endpoint: unknown): Promise<{ ok: true }> {

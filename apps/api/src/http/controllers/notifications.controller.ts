@@ -89,6 +89,18 @@ export class NotificationsController {
    * porque quem chama é o código nativo do aviso; o `token` veio no próprio push e só vale para aquela conversa,
    * naquele aparelho (ver NotificationService.replier).
    */
+  /**
+   * Live Activity da chegada no iPhone: o app registra o token da atividade que acabou de abrir. Sem login (o
+   * iPhone pode abrir o app em segundo plano só para isso); `registration` veio dentro da própria atividade.
+   */
+  @Public()
+  @Post('push/live-activity')
+  @HttpCode(200)
+  liveActivity(@Body() body: unknown) {
+    const b = asBody(body);
+    return this.core.notifications.registerLiveActivity(b.registration, b.token);
+  }
+
   @Public()
   @Post('push/reply')
   @HttpCode(200)

@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, hkdfSync, randomBytes, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
-import type { MfaChallengeTokens, PushReplyTokens, OAuthStateTokens, OneTimeCodes, PasswordHasher, SecretBox, TokenClaims, TokenService } from '../ports.ts';
+import type { MfaChallengeTokens, PushReplyTokens, LiveActivityTokens, OAuthStateTokens, OneTimeCodes, PasswordHasher, SecretBox, TokenClaims, TokenService } from '../ports.ts';
 import type { UserRole } from '../types.ts';
 
 /**
@@ -345,5 +345,48 @@ export class HmacPushReplyTokens implements PushReplyTokens {
   private sign(payload: string): string {
     return createHmac('sha256', this.key).update(`push-reply
 ${payload}`).digest('base64url');
+  }
+}
+
+/**
+ * Token que vai dentro da Live Activity da chegada (ver LiveActivityTokens): quem recebe e qual chegada, assinado e
+ * com validade de 12 horas (a atividade dura no máximo 8). Com ele o app registra o token da atividade sem login.
+ */
+export class HmacLiveActivityTokens implements LiveActivityTokens {
+  private readonly key: Buffer;
+  private readonly nowMs: () => number;
+  private readonly ttlSeconds: number;
+
+  constructor(options: { secret: string; ttlSeconds?: number; nowMs?: () => number }) {
+    this.key = deriveSubkey(options.secret, 'live-activity');
+    this.ttlSeconds = options.ttlSeconds ?? 12 * 3600;
+    this.nowMs = options.nowMs ?? Date.now;
+  }
+
+  issue(userId: string, tag: string): string {
+    const exp = Math.floor(this.nowMs() / 1000) + this.ttlSeconds;
+    const payload = Buffer.from(JSON.stringify({ sub: userId, tag, exp })).toString('base64url');
+    return `lva.${payload}.${this.sign(payload)}`;
+  }
+
+  verify(token: unknown): { userId: string; tag: string } | undefined {
+    if (typeof token !== 'string' || token.length > 1000) return undefined;
+    const [prefix, payload, signature] = token.split('.');
+    if (prefix !== 'lva' || !payload || !signature) return undefined;
+    const expected = Buffer.from(this.sign(payload));
+    const received = Buffer.from(signature);
+    if (expected.length !== received.length || !timingSafeEqual(expected, received)) return undefined;
+    try {
+      const { sub, tag, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Record<string, unknown>;
+      if (typeof sub !== 'string' || sub === '' || typeof tag !== 'string' || tag === '' || typeof exp !== 'number') return undefined;
+      if (Math.floor(this.nowMs() / 1000) >= exp) return undefined;
+      return { userId: sub, tag };
+    } catch {
+      return undefined;
+    }
+  }
+
+  private sign(payload: string): string {
+    return createHmac('sha256', this.key).update(`live-activity\n${payload}`).digest('base64url');
   }
 }

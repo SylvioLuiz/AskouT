@@ -1056,6 +1056,32 @@ export interface PushMessage {
    * chegando no Uber. No Android o app monta uma notificação fixa com barra de progresso; no iPhone o aviso é trocado.
    */
   live?: PushLive;
+  /** Foto (https) de quem o aviso fala: o Android mostra redonda no aviso da chegada. */
+  image?: string;
+}
+
+/**
+ * Live Activity do iPhone (chegada do amigo na tela bloqueada e na Dynamic Island, com a barra). `start` abre pelo
+ * token "push-to-start" do aparelho (iOS 17.2+); `update`/`end` vão para o token da atividade aberta.
+ */
+export interface LiveActivityPush {
+  token: string;
+  event: 'start' | 'update' | 'end';
+  state: { title: string; body: string; progress: number; arrived: boolean };
+  /** Só no `start`: o que fica fixo na atividade (nome de quem chega, `tag` e o token para registrar a atividade). */
+  attributes?: { name: string; tag: string; registration: string };
+  /** Toca/acende a tela (a primeira e a chegada); as outras trocam em silêncio. */
+  alert?: { title: string; body: string };
+  /** Depois disto a atividade aparece como desatualizada (fim do encontro). */
+  staleAtMs: number;
+  /** Só no `end`: quando some da tela bloqueada. */
+  dismissAtMs?: number;
+}
+
+/** Token assinado que vai na Live Activity: o app registra o token da atividade sem estar logado (ver NotificationService). */
+export interface LiveActivityTokens {
+  issue(userId: string, tag: string): string;
+  verify(token: unknown): { userId: string; tag: string } | undefined;
 }
 
 export interface PushLive {
@@ -1090,13 +1116,15 @@ export interface PushSender {
   /** Há envio para os aparelhos do app (iPhone), que não usa a chave pública acima. */
   readonly nativeEnabled?: boolean;
   send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult>;
+  /** Live Activity do iPhone (APNs `liveactivity`). Sem isso, a chegada vai como aviso comum. */
+  liveActivity?(push: LiveActivityPush): Promise<PushResult>;
 }
 
 /** Cria o aviso dentro do app e tenta o push. Nunca lança erro: falha de aviso não derruba a ação principal. */
 export interface Notifier {
   notify(input: { userId: string; type: NotificationType; title: string; body: string; url: string; dedupeKey?: string; actorId?: string }): Promise<void>;
   /** Só push, sem guardar no sino: avisos que se atualizam (chegada do amigo). Opcional nos dublês de teste. */
-  live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive }): Promise<void>;
+  live?(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive; who?: { name: string; image?: string } }): Promise<void>;
 }
 
 /** Presença ("Eu vou") e posts dentro de eventos criados por pessoas. */
@@ -1342,6 +1370,8 @@ export interface CoreDeps {
   mfaChallenges: MfaChallengeTokens;
   /** Responder mensagem pela notificação do app. Sem ele, os avisos saem sem o campo de resposta. */
   pushReplies?: PushReplyTokens;
+  /** Live Activity da chegada no iPhone. Sem ele, a chegada vai como aviso comum. */
+  liveActivityTokens?: LiveActivityTokens;
   boosts: BoostRepository;
   boostStats: BoostStatsRepository;
   offers: OfferRepository;

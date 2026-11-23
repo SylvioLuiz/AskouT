@@ -18,6 +18,7 @@ import type {
   SchedulingRepository,
   NotificationRepository,
   PushMessage,
+  LiveActivityPush,
   PushResult,
   PushSender,
   PushSubscriptionRepository,
@@ -2312,6 +2313,17 @@ export class FakePushSender implements PushSender {
   async send(subscription: PushSubscriptionRecord, message: PushMessage): Promise<PushResult> {
     this.sent.push({ subscription, message });
     return this.results.get(subscription.endpoint) ?? 'SENT';
+  }
+
+  /** Live Activity do iPhone: só existe quando o teste liga (`liveActivities = true`). */
+  liveActivities = false;
+  readonly activities: LiveActivityPush[] = [];
+  get liveActivity(): ((push: LiveActivityPush) => Promise<PushResult>) | undefined {
+    if (!this.liveActivities) return undefined;
+    return async (push) => {
+      this.activities.push(push);
+      return this.results.get(`la:${push.token}`) ?? 'SENT';
+    };
   }
 }
 

@@ -3,7 +3,7 @@ import { GooglePlayPurchaseVerifier, StorePurchaseRouter } from '../infra/store/
 import { GoogleAccessTokens } from '../infra/google/service-account.ts';
 import { FcmSender, NativePushRouter } from '../infra/push/fcm-sender.ts';
 import type { PrismaClient } from '@prisma/client';
-import { AesGcmSecretBox, HmacMfaChallengeTokens, HmacOAuthStateTokens, HmacPushReplyTokens, HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../core/adapters/crypto.ts';
+import { AesGcmSecretBox, HmacMfaChallengeTokens, HmacOAuthStateTokens, HmacPushReplyTokens, HmacLiveActivityTokens, HmacOneTimeCodes, Hs256TokenService, ScryptPasswordHasher } from '../core/adapters/crypto.ts';
 import { SystemClock, UuidGenerator } from '../core/adapters/system.ts';
 import { createCore } from '../core/index.ts';
 import {
@@ -124,6 +124,7 @@ export const coreProvider = {
       secretBox: new AesGcmSecretBox({ secret: config.codeSecret }),
       mfaChallenges: new HmacMfaChallengeTokens({ secret: config.codeSecret }),
       pushReplies: new HmacPushReplyTokens({ secret: config.codeSecret }),
+      liveActivityTokens: new HmacLiveActivityTokens({ secret: config.codeSecret }),
       boosts: new PrismaBoostRepository(prisma),
       boostStats: new PrismaBoostStatsRepository(prisma),
       offers: new PrismaOfferRepository(prisma),
