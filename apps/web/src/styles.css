@@ -6060,6 +6060,9 @@ button.reactlist__row { cursor: pointer; }
 /* Mensagens novas enquanto você lia lá em cima */
 .chat__newbtn { position: sticky; bottom: calc(84px + var(--sa-bottom)); z-index: 5; align-self: center; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin: 0 0 8px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font: inherit; font-size: 0.875rem; font-weight: 500; box-shadow: 0 4px 14px rgb(0 0 0 / 0.2); cursor: pointer; animation: msgpop-in 160ms ease-out; }
 .chat__newbtn svg { width: 18px; height: 18px; }
+/* Links no texto das mensagens: sublinhados, na cor do balão, e quebram em vez de vazar. */
+.textlink { color: inherit; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; word-break: break-word; }
+.bubble:not(.bubble--mine) .textlink { color: var(--brand-text); }
 /* "Enviar para…" (compartilhado de outro app). */
 .sharein { display: grid; gap: 12px; padding-bottom: calc(84px + var(--sa-bottom)); }
 .sharein__items { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }

@@ -11,6 +11,7 @@ import { NewConversationSheet } from '../components/new-conversation.tsx';
 import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
 import { FileBubble } from '../components/chat-file.tsx';
+import { LinkedText } from '../components/linked-text.tsx';
 import { CHAT_FILE_ACCEPT, documentType, fileProblem } from '../lib/chat-file.ts';
 import { MessagePopup, ReactionSummary, ReactionsSheet, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';
@@ -1303,11 +1304,11 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         ) : m.kind === 'TEXT' && m.event ? (
           // Texto com link de evento: o texto e, embaixo, o cartão do evento (foto, título e link).
           <>
-            <p className="bubble__text">{m.body}</p>
+            <p className="bubble__text"><LinkedText text={m.body} /></p>
             <EventBubble event={m.event} />
           </>
         ) : (
-          <p className="bubble__text">{m.body}</p>
+          <p className="bubble__text"><LinkedText text={m.body} /></p>
         )}
         <ReactionSummary reactions={m.reactions} onOpen={() => setReactionsFor(m)} />
         {burst === m.id ? (
