@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import { Body, Controller, Delete, ForbiddenException, Get, Headers, HttpCode, Inject, Param, Patch, Post, Query, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Headers, HttpCode, Inject, Param, Patch, Post, Query, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { HunterBridge } from '../../core/hunter-bridge.ts';
 import type { HunterRefusal } from '../../core/hunter-bridge.ts';
@@ -39,6 +39,7 @@ function sameToken(given: string, expected: string): boolean {
 
 /** Recusa com a resposta certa quando a regra de propriedade ou o interruptor barraram a operação. */
 function refuse(refusal: HunterRefusal): never {
+  if (refusal === 'DUPLICATE') throw new ConflictException({ code: 'HUNTER_DUPLICATE', message: 'Já existe um evento com o mesmo título, local e dia' });
   if (refusal === 'DISABLED') throw new ServiceUnavailableException({ code: 'HUNTER_DISABLED', message: 'O Hunter está desligado' });
   throw new ForbiddenException({ code: `HUNTER_${refusal}`, message: refusal === 'OWNED' ? 'O local tem responsável' : refusal === 'CLAIM_PENDING' ? 'Há um pedido de reivindicação pendente' : 'Local não encontrado ou situação desconhecida' });
 }

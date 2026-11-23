@@ -48,6 +48,8 @@ export interface HunterTx {
   createEvent(eventId: string, link: HunterLink, fields: HunterEventFields): Promise<void>;
   updateEvent(eventId: string, fields: Omit<HunterEventFields, 'venueId'>): Promise<void>;
   deleteEvent(eventId: string): Promise<void>;
+  /** Eventos do local que começam entre `from` (inclusive) e `to` (exclusivo), de qualquer origem (dono, usuário ou Hunter). */
+  eventsStartingBetween(venueId: string, from: Date, to: Date): Promise<{ id: string; title: string }[]>;
 }
 
 export interface HunterListItem {
@@ -84,7 +86,16 @@ export interface HunterDeps {
   newEventId(ref: string): string;
 }
 
-export type HunterRefusal = PublishDenied | 'DISABLED';
+export type HunterRefusal = PublishDenied | 'DISABLED' | 'DUPLICATE';
+
+const normTitle = (t: string): string => t.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Dia de São Paulo (UTC-3, sem horário de verão) que contém o instante: [início, fim) em UTC. */
+export function saoPauloDayWindow(at: Date): { from: Date; to: Date } {
+  const shifted = new Date(at.getTime() - 3 * 3_600_000);
+  const startUtc = Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()) + 3 * 3_600_000;
+  return { from: new Date(startUtc), to: new Date(startUtc + 24 * 3_600_000) };
+}
 
 const REF_RE = /^[A-Za-z0-9:_.\-]{6,120}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -205,6 +216,10 @@ export class HunterBridge {
       const v = await tx.venue(fields.venueId);
       const gate = automatedPublishGate(v, v ? v.claimStatuses : null);
       if (!gate.allowed) return { ok: false as const, refusal: gate.reason };
+      // Mesmo local + mesmo dia + mesmo título (sem acento/caixa) já existe no AskouT, venha de onde vier: não duplica.
+      const day = saoPauloDayWindow(fields.startsAt);
+      const sameDay = await tx.eventsStartingBetween(fields.venueId, day.from, day.to);
+      if (sameDay.some((e) => normTitle(e.title) === normTitle(fields.title))) return { ok: false as const, refusal: 'DUPLICATE' as const };
       const eventId = this.deps.newEventId(ref);
       await tx.createEvent(eventId, { ref, eventId, venueId: fields.venueId }, fields);
       return { ok: true as const, eventId, created: true };

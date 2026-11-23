@@ -30,6 +30,7 @@ function txOf(tx: Prisma.TransactionClient): HunterTx {
     deleteEvent: async (eventId) => {
       await tx.placeEvent.delete({ where: { id: eventId } });
     },
+    eventsStartingBetween: async (venueId, from, to) => tx.placeEvent.findMany({ where: { venueId, startsAt: { gte: from, lt: to } }, select: { id: true, title: true } }),
   };
 }
 

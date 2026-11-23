@@ -19,6 +19,7 @@ function world(opts: { venues?: HunterVenueState[] } = {}) {
     createEvent: async (eventId, link, fields) => { events.set(eventId, fields); links.set(link.ref, link); },
     updateEvent: async (eventId, fields) => { events.set(eventId, { ...(events.get(eventId) as HunterEventFields), ...fields }); },
     deleteEvent: async (eventId) => { events.delete(eventId); for (const [r, l] of links) if (l.eventId === eventId) links.delete(r); },
+    eventsStartingBetween: async (venueId, from, to) => [...events.entries()].filter(([, e]) => e.venueId === venueId && e.startsAt >= from && e.startsAt < to).map(([id, e]) => ({ id, title: e.title })),
   };
   const store: HunterStore = {
     isEnabled: async () => enabled,
@@ -114,7 +115,7 @@ test('gestão: liga e desliga, exige o token no servidor, lista e remove tudo co
   const w = world(); 
   assert.deepEqual(await w.bridge.setEnabled('adm', true), { enabled: true });
   await w.bridge.create(body());
-  await w.bridge.create(body({ ref: 'src:evento-2' }));
+  await w.bridge.create(body({ ref: 'src:evento-2', title: 'Outra festa' }));
   const o = await w.bridge.adminOverview(50, 0);
   assert.equal(o.total, 2);
   assert.equal(o.enabled, true);
@@ -129,4 +130,15 @@ test('gestão: liga e desliga, exige o token no servidor, lista e remove tudo co
 test('sem token de serviço no servidor não liga', async () => {
   const b = new HunterBridge({ store: {} as HunterStore, serviceToken: undefined, clock: { now: () => NOW }, newEventId: () => 'x' });
   await assert.rejects(() => b.setEnabled('adm', true), DomainError);
+});
+
+test('duplicidade: mesmo título, local e dia não entra de novo (mesmo com outra referência)', async () => {
+  const w = world();
+  w.enable();
+  assert.equal((await w.bridge.create(body())).ok, true);
+  assert.deepEqual(await w.bridge.create(body({ ref: 'outra:fonte-2', title: '  festa ANOS 80 ' })), { ok: false, refusal: 'DUPLICATE' });
+  assert.equal(w.events.size, 1);
+  // outro dia ou outro título passam
+  assert.equal((await w.bridge.create(body({ ref: 'outra:fonte-3', startsAt: '2027-03-27T22:00:00Z', endsAt: '2027-03-28T03:00:00Z' }))).ok, true);
+  assert.equal((await w.bridge.create(body({ ref: 'outra:fonte-4', title: 'Festa Anos 90' }))).ok, true);
 });
