@@ -53,7 +53,26 @@ export class FcmSender implements PushSender {
     const deviceToken = subscription.endpoint.slice(FCM_PREFIX.length);
     // Com `reply` (só aparelhos que avisaram que sabem), vai só com dados: o próprio app monta o aviso com o campo
     // "Responder" (ReplyMessagingService no Android). Com `notification`, o Android mostraria sozinho, sem o campo.
-    const body = message.reply
+    const body = message.live
+      ? // Chegada do amigo: só dados; o app monta uma notificação fixa com barra de progresso e a troca a cada envio
+        // (ArrivalNotifications no Android). Versões antigas do app ignoram (não há o que mostrar sem o app).
+        JSON.stringify({
+          message: {
+            token: deviceToken,
+            data: {
+              live: message.live.state,
+              progress: String(Math.round(message.live.progress * 100)),
+              quiet: message.live.quiet ? '1' : '0',
+              until: String(Math.round(message.live.untilMs)),
+              url: message.url,
+              title: message.title,
+              body: message.body,
+              tag: message.tag.slice(0, 64),
+            },
+            android: { priority: 'HIGH', ttl: '60s' },
+          },
+        })
+      : message.reply
       ? JSON.stringify({
           message: {
             token: deviceToken,

@@ -1,6 +1,6 @@
 import { conflict, unauthorized, validationError } from './errors.ts';
 import { isNotificationCategory, notificationFilter, OVERVIEW_FILTER } from './notification-categories.ts';
-import type { Clock, ConversationRepository, IdGenerator, MeetupRepository, Notifier, NotificationRepository, PostRepository, PushReplyTokens, PushSender, PushSubscriptionRepository, SchedulingRepository, UserRepository } from './ports.ts';
+import type { Clock, ConversationRepository, IdGenerator, MeetupRepository, Notifier, NotificationRepository, PostRepository, PushLive, PushReplyTokens, PushSender, PushSubscriptionRepository, SchedulingRepository, UserRepository } from './ports.ts';
 import type { NotificationMuteSettings, NotificationRecord, NotificationType } from './types.ts';
 
 export const NOTIFICATIONS_PAGE = 30;
@@ -108,6 +108,27 @@ export class StoredNotifier implements Notifier {
     // Silenciado: o aviso fica no sino, mas o aparelho não recebe push.
     if (muted) return;
     const job = this.pushTo(input).catch(() => undefined);
+    this.inFlight.add(job);
+    void job.finally(() => this.inFlight.delete(job));
+  }
+
+  /**
+   * Aviso que se atualiza (chegada do amigo no NOW): só push, nada no sino (seriam dezenas de avisos iguais).
+   * Respeita o "silenciar todas". Vai só para o app do celular: o navegador não tem notificação fixa nem barra.
+   */
+  async live(input: { userId: string; type: NotificationType; title: string; body: string; url: string; tag: string; live: PushLive }): Promise<void> {
+    const { notifications, pushSubscriptions, push } = this.deps;
+    const job = (async () => {
+      if (!push.nativeEnabled) return;
+      if (isMuted(await notifications.getMuteSettings(input.userId), input.type)) return;
+      const subs = (await pushSubscriptions.listForUser(input.userId)).filter((s) => isNativeEndpoint(s.endpoint));
+      await Promise.all(
+        subs.map(async (sub) => {
+          const result = await push.send(sub, { title: input.title, body: input.body, url: input.url, tag: input.tag, live: input.live });
+          if (result === 'GONE') await pushSubscriptions.remove(sub.endpoint);
+        }),
+      );
+    })().catch(() => undefined);
     this.inFlight.add(job);
     void job.finally(() => this.inFlight.delete(job));
   }

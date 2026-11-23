@@ -19,6 +19,11 @@ public class ReplyMessagingService extends MessagingService {
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
         Map<String, String> data = remoteMessage.getData();
+        // Chegada do amigo no NOW: aviso fixo que se atualiza. Aparece mesmo com o app aberto (como no Uber).
+        if (remoteMessage.getNotification() == null && data.containsKey("live")) {
+            ArrivalNotifications.show(this, remoteMessage.getMessageId(), data);
+            return;
+        }
         if (remoteMessage.getNotification() != null || !data.containsKey("reply") || !data.containsKey("title")) return;
         if (appInForeground()) return;
         MessageNotifications.show(this, remoteMessage.getMessageId(), data);

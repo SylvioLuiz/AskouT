@@ -227,6 +227,10 @@ export interface FlashInviteRecord {
   fromApprox?: boolean;
   /** Quem foi convidado escolheu mostrar só a posição aproximada (~1 km). */
   toApprox?: boolean;
+  /** Quem convidou liberou o outro a acompanhar a chegada dele nas notificações do celular. */
+  fromArrival?: boolean;
+  /** Quem foi convidado liberou o outro a acompanhar a chegada dele nas notificações do celular. */
+  toArrival?: boolean;
 }
 
 /** Lugar escolhido no mapa do encontro Flash. */

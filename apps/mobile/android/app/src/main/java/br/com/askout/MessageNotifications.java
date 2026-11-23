@@ -78,7 +78,7 @@ final class MessageNotifications {
      * Tocar no aviso abre o app como os avisos montados pelo Firebase: com `google.message_id` e os dados no Intent,
      * o plugin do Capacitor avisa o app web ("pushNotificationActionPerformed") e ele abre o `url`.
      */
-    private static NotificationCompat.Builder base(Context context, String tag, String url, String messageId) {
+    static NotificationCompat.Builder base(Context context, String tag, String url, String messageId) {
         Intent open = new Intent(context, MainActivity.class)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP)
             .putExtra("google.message_id", messageId != null ? messageId : "reply:" + tag)
@@ -104,7 +104,7 @@ final class MessageNotifications {
     }
 
     /** O app cria o canal ao abrir; se o push chegar antes disso (instalou e ainda não abriu), cria igual. */
-    private static void ensureChannel(Context context) {
+    static void ensureChannel(Context context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (manager == null || manager.getNotificationChannel(CHANNEL_ID) != null) return;
@@ -117,7 +117,7 @@ final class MessageNotifications {
     }
 
     /** Ícone pequeno do aviso: silhueta branca do AskouT (o Android pinta só o contorno; o ícone colorido do app viraria um quadrado). */
-    private static int icon(Context context) {
+    static int icon(Context context) {
         return R.drawable.ic_stat_askout;
     }
 

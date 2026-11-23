@@ -445,6 +445,8 @@ export function createApi(deps: ApiDeps) {
     flashRespond: (inviteId: string, action: 'accept' | 'decline', approx = false) =>
       request<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: action === 'accept' ? { action, approx } : { action } }),
     flashSetPrecision: (inviteId: string, approx: boolean) => request<{ approx: boolean }>('PUT', `/flash/matches/${id(inviteId)}/precision`, { body: { approx } }),
+    /** Liberar (ou parar) a outra pessoa de acompanhar a sua chegada nas notificações do celular. */
+    flashSetArrival: (inviteId: string, share: boolean) => request<{ share: boolean }>('PUT', `/flash/matches/${id(inviteId)}/arrival`, { body: { share } }),
     flashEnd: (inviteId: string) => request<{ ended: boolean }>('DELETE', `/flash/invites/${id(inviteId)}`),
     flashMatch: (inviteId: string) => request<FlashMatch>('GET', `/flash/matches/${id(inviteId)}`),
     flashShareLocation: (inviteId: string, position: { lat: number; lng: number; accuracyM?: number }) =>

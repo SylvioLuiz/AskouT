@@ -171,8 +171,22 @@ export class ApnsSender implements PushSender {
     const deviceToken = subscription.endpoint.slice(NATIVE_PREFIX.length);
     // Com `reply`, a categoria MESSAGE faz o iPhone mostrar o campo "Responder" (registrado no AppDelegate do app).
     // Em versões do app sem a categoria, o iPhone só ignora e mostra o aviso normal.
+    // Chegada do amigo (live): mesmo `apns-collapse-id` a cada envio, então o iPhone troca o aviso no lugar. Só o
+    // primeiro toca; os seguintes chegam em silêncio ("passive": não acende a tela nem faz barulho).
+    const live = message.live;
     const body = JSON.stringify(
-      message.reply
+      live
+        ? {
+            aps: {
+              alert: { title: message.title, body: message.body },
+              ...(live.quiet ? {} : { sound: 'default' }),
+              'interruption-level': live.quiet ? 'passive' : 'active',
+              'thread-id': message.tag.slice(0, 64),
+            },
+            url: message.url,
+            live: { state: live.state, progress: live.progress, until: live.untilMs },
+          }
+        : message.reply
         ? { aps: { alert: { title: message.title, body: message.body }, sound: 'default', category: APNS_REPLY_CATEGORY, 'thread-id': message.tag.slice(0, 64) }, url: message.url, reply: message.reply }
         : { aps: { alert: { title: message.title, body: message.body }, sound: 'default' }, url: message.url },
     );
@@ -185,7 +199,8 @@ export class ApnsSender implements PushSender {
           authorization: `bearer ${this.token(forceNew)}`,
           'apns-topic': this.config.bundleId,
           'apns-push-type': 'alert',
-          'apns-priority': '10',
+          'apns-priority': live?.quiet ? '5' : '10',
+          ...(live ? { 'apns-expiration': String(Math.floor(live.untilMs / 1000)) } : {}),
           'apns-collapse-id': message.tag.slice(0, 64),
           'content-type': 'application/json',
         },

@@ -99,6 +99,12 @@ export class FlashController {
     return this.core.flash.setPrecision(actor.userId, inviteId, asBody(body).approx);
   }
 
+  /** `{ share: true }`: a outra pessoa acompanha a sua chegada nas notificações do celular (só neste encontro). */
+  @Put('flash/matches/:inviteId/arrival')
+  arrival(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string, @Body() body: unknown) {
+    return this.core.flash.setArrival(actor.userId, inviteId, asBody(body).share);
+  }
+
   @Delete('flash/invites/:inviteId')
   end(@CurrentActor() actor: Actor, @Param('inviteId', new ParseUUIDPipe()) inviteId: string) {
     return this.core.flash.end(actor.userId, inviteId);
