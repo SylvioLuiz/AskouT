@@ -2947,6 +2947,9 @@ button.avatarbtn__badge:focus-visible { outline: 2px solid var(--ink); outline-o
   color: #174ea6;
 }
 
+/* Sugerir um local: local com sugestão ainda sem resposta no chat. */
+.tag--open { background: #fff1d6; color: #7a4a00; white-space: normal; }
+
 .rating {
   display: flex;
   align-items: center;

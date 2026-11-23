@@ -1402,6 +1402,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           inviteId={match.id}
           conversationId={conversationId}
           otherName={data.other?.displayName ?? ''}
+          messages={messages}
+          since={match.createdAt}
           onClose={() => setSuggesting(undefined)}
           onSent={(message) => {
             stickToEnd.current = true;

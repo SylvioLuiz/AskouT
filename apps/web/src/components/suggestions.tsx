@@ -199,8 +199,18 @@ interface SheetProps {
   agreedName?: string | undefined;
   /** Já abre a busca "Sugerir outro lugar" (vindo da página do NOW). */
   searchOpen?: boolean;
+  /** Mensagens já carregadas da conversa: marcam na lista os locais com sugestão ainda sem resposta. */
+  messages?: readonly ChatMessage[];
+  /** Quando o encontro do NOW começou: sugestões de antes são de outro encontro. */
+  since?: string;
   onClose: () => void;
   onSent: (message: ChatMessage) => void;
+}
+
+/** Mesmo lugar: a mesma chave da busca ou o mesmo nome a menos de ~50 m (a chave pode mudar entre buscas). */
+function samePlace(card: Pick<SuggestionCard, 'externalId' | 'venueName' | 'lat' | 'lng'>, item: Pick<SuggestionItem, 'key' | 'venueName' | 'lat' | 'lng'>): boolean {
+  if (card.externalId === item.key) return true;
+  return card.venueName.trim().toLowerCase() === item.venueName.trim().toLowerCase() && Math.abs(card.lat - item.lat) < 0.0005 && Math.abs(card.lng - item.lng) < 0.0005;
 }
 
 /** Lugar achado na busca "Sugerir outro lugar" vira um cartão de sugestão. */
@@ -212,7 +222,7 @@ function placeCard(p: ExplorePlace): SuggestionCard {
  * Mapa dentro do chat: vocês dois e os locais entre vocês, com a lista em rolagem horizontal logo abaixo.
  * Tocar um pin leva ao cartão; tocar um cartão destaca o pin. Daqui também se pesquisa qualquer outro lugar.
  */
-export function SuggestionsSheet({ inviteId, conversationId, otherName, title, agreedName, searchOpen = false, onClose, onSent }: SheetProps) {
+export function SuggestionsSheet({ inviteId, conversationId, otherName, title, agreedName, searchOpen = false, messages = [], since, onClose, onSent }: SheetProps) {
   const match = useAsync(() => api.flashMatch(inviteId), [inviteId]);
   const [radiusKm, setRadiusKm] = useState<number | null>(() => nowRadiusKm());
   const result = useAsync(() => api.flashSuggestions(inviteId, radiusKm), [inviteId, radiusKm]);
@@ -223,6 +233,9 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, a
   const [mapFailed, setMapFailed] = useState(false);
 
   const [pending, setPending] = useState<{ key: string; card: SuggestionCard } | undefined>();
+  // Sugestões deste encontro ainda sem resposta: o local aparece marcado na lista e não é sugerido de novo.
+  const open = messages.filter((m) => m.kind === 'SUGGESTION' && m.suggestion && m.response === null && (!since || m.createdAt >= since));
+  const openFor = (item: SuggestionItem) => open.find((m) => m.suggestion && samePlace(m.suggestion, item));
 
   function send(key: string, card: SuggestionCard) {
     if (agreedName) setPending({ key, card });
@@ -277,6 +290,7 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, a
           </button>
         ))}
       </div>
+      {open.length > 0 ? <p className="muted sheet__lead">{open.length === 1 ? t('1 sugestão ainda sem resposta no chat.') : t('{count} sugestões ainda sem resposta no chat.', { count: open.length })}</p> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
       {!mapFailed && (me || them.length > 0) ? (
         <Suspense fallback={<div className="matchmap matchmap--chat matchmap--loading"><RingLoader size={56} label={t('Carregando o mapa')} /></div>}>
@@ -300,11 +314,21 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, a
         picked={picked}
         onPick={setPicked}
         more={data && data.items.length > 0 ? more : undefined}
-        action={(item) => (
-          <Button small loading={sending === item.key} disabled={sent.has(item.key) || sending !== undefined} onClick={() => send(item.key, toCard(item))}>
-            {sent.has(item.key) ? t('Enviado') : t('Sugerir')}
-          </Button>
-        )}
+        action={(item) => {
+          const already = openFor(item);
+          if (already) {
+            return (
+              <span className="tag tag--open" role="status">
+                {already.mine ? t('Sugestão aberta · aguardando {name}', { name: otherName }) : t('{name} sugeriu · responda no chat', { name: otherName })}
+              </span>
+            );
+          }
+          return (
+            <Button small loading={sending === item.key} disabled={sent.has(item.key) || sending !== undefined} onClick={() => send(item.key, toCard(item))}>
+              {sent.has(item.key) ? t('Enviado') : t('Sugerir')}
+            </Button>
+          );
+        }}
       />
       {data && !data.placesAvailable ? <p className="muted sheet__foot">{t('Não foi possível buscar locais agora. Mostrando só eventos do AskouT.')}</p> : null}
       {hasGoogle ? <p className="muted sheet__foot">{t('Notas, fotos e lugares: Google.')}</p> : null}

@@ -3535,4 +3535,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Ver a votação de data": "See the date poll",
   "Pessoas e dados do grupo": "Group members and details",
   "Limpar esta conversa? As mensagens somem só para você; as outras pessoas do grupo continuam vendo.": "Clear this chat? The messages disappear only for you; the other people in the group still see them.",
+  "Sugestão aberta · aguardando {name}": "Suggestion pending · waiting for {name}",
+  "{name} sugeriu · responda no chat": "{name} suggested · reply in the chat",
+  "1 sugestão ainda sem resposta no chat.": "1 suggestion still unanswered in the chat.",
+  "{count} sugestões ainda sem resposta no chat.": "{count} suggestions still unanswered in the chat.",
 };
