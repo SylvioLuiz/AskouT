@@ -36,7 +36,7 @@ export function MatchPlaces({ bothShared, loading, error, suggestions, places, o
   return (
     <section className="matchplaces" aria-label={t('Lugares entre vocês')}>
       <h2 className="matchplaces__h">{t('Lugares entre vocês')}</h2>
-      {loading && !suggestions ? <Loading label={t('Buscando locais')} /> : null}
+      {loading && !suggestions ? <Loading shape="carousel" label={t('Buscando locais')} /> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
       {suggestions && suggestions.reason === null && places.length === 0 ? <p className="muted">{t('Nenhum evento ou local encontrado por perto agora.')}</p> : null}
       {places.length > 0 ? <p className="muted">{t('Toque em um lugar para ver no mapa e sugira no chat.')}</p> : null}
@@ -94,7 +94,7 @@ export function MatchDestination({ match, mode, onMode, me, them, routesLoading,
           {t('De carro')}
         </button>
       </div>
-      {routesLoading && !me && !them ? <Loading label={t('Calculando a rota')} /> : null}
+      {routesLoading && !me && !them ? <Loading shape="inline" label={t('Calculando a rota')} /> : null}
       <ul className="matchdest__legs">
         <li className="matchdest__leg matchdest__leg--me">
           <span className="matchdest__dot" aria-hidden="true" />

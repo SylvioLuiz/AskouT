@@ -1003,7 +1003,7 @@ export function PostScreen({ postId }: { postId: string }) {
   // Post de evento: o nome do evento é o título da página (no lugar de "Post").
   const heading = post.data?.event?.title ?? t('Post');
   useTitle(heading);
-  if (post.loading && !post.data) return <Loading />;
+  if (post.loading && !post.data) return <Loading shape="posts" rows={1} />;
   if (post.error) {
     return post.error.code === 'NOT_FOUND' ? (
       <EmptyState

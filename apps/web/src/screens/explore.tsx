@@ -661,7 +661,7 @@ export function ExploreScreen() {
         </div>
       ) : null}
 
-      {busy ? <Loading label={waiting ? t('Buscando a sua localização') : t('Buscando')} /> : null}
+      {busy ? <Loading shape="tiles" label={waiting ? t('Buscando a sua localização') : t('Buscando')} /> : null}
       {!waiting && result.error ? <ErrorState message={result.error.message} onRetry={result.reload} /> : null}
 
       {!busy && data ? (

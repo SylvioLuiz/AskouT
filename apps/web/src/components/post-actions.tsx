@@ -562,7 +562,7 @@ export function AdjustSheet({ post, onClose, onSaved }: { post: PostView; onClos
           </ul>
         </>
       ) : null}
-      {chosen && !source && !message ? <Loading /> : null}
+      {chosen && !source && !message ? <Loading shape="block" /> : null}
       {chosen && source ? <CropEditor key={chosen} source={source} busy={busy} onApply={(rect) => void apply(rect)} onCancel={onClose} /> : null}
       {chosen ? <p className="muted">{t('O recorte parte da foto já publicada (até 720 px).')}</p> : null}
     </Sheet>

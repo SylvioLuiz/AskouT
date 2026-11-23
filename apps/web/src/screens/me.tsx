@@ -79,7 +79,7 @@ export function EditProfileScreen() {
     setPhoto(undefined);
   }, [loaded]);
 
-  if (view.loading && !loaded) return <Loading />;
+  if (view.loading && !loaded) return <Loading shape="profile" />;
   if (view.error && !loaded) return <ErrorState message={view.error.message} onRetry={view.reload} />;
   if (!loaded || !saved) return null;
   const age = loaded[2];

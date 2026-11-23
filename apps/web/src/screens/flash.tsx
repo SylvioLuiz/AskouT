@@ -309,7 +309,7 @@ function FlashContent() {
     }
   }
 
-  if (status.loading && !status.data) return <Loading />;
+  if (status.loading && !status.data) return <Loading shape="page" />;
   if (status.error && !status.data) return <ErrorState message={status.error.message} onRetry={status.reload} />;
 
   const howSheet = infoOpen ? <HowItWorks onClose={() => setInfoOpen(false)} /> : null;
@@ -1482,7 +1482,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
   const baseKeys = sortByFairness(suggestions.data?.items ?? []).slice(0, MAX_PLACES_ON_MAP).map((p) => p.key);
   const more = useMorePlaces(inviteId, suggestions.data?.radiusM, baseKeys);
 
-  if (match.loading && !match.data && !match.error) return <Loading />;
+  if (match.loading && !match.data && !match.error) return <Loading shape="page" />;
   if (match.error && !match.data) {
     if (match.error.code === 'NOT_FOUND') {
       return (

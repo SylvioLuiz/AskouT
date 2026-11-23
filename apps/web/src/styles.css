@@ -4980,12 +4980,35 @@ select option:checked { color: var(--brand-ink); background-color: var(--brand);
 .skeleton { display: flex; flex-direction: column; gap: 16px; }
 .skeleton__row { display: flex; align-items: center; gap: 12px; }
 .skeleton__avatar { flex: none; width: 48px; height: 48px; border-radius: 50%; }
+.skeleton__avatar--big { width: 88px; height: 88px; }
 .skeleton__lines { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
 .skeleton__line { display: block; height: 12px; width: 55%; border-radius: 6px; }
 .skeleton__line--wide { width: 80%; }
-.skeleton__avatar, .skeleton__line { background: linear-gradient(90deg, var(--line) 25%, color-mix(in srgb, var(--line) 55%, var(--surface)) 50%, var(--line) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s ease-in-out infinite; }
+.skeleton__line--mid { width: 66%; }
+.skeleton__line--title { width: 60%; height: 20px; border-radius: 8px; }
+.skeleton__bone { display: block; }
+.skeleton__post { display: flex; flex-direction: column; gap: 10px; padding-bottom: 8px; }
+.skeleton__media { width: 100%; aspect-ratio: 4 / 3; border-radius: var(--radius-panel); }
+.skeleton__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+.skeleton__square { aspect-ratio: 1; border-radius: 4px; }
+.skeleton__tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.skeleton__tile, .skeleton__slide { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.skeleton__cover { width: 100%; aspect-ratio: 16 / 10; border-radius: 14px; }
+.skeleton__hero { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-panel); }
+.skeleton__buttons { display: flex; gap: 10px; }
+.skeleton__button { width: 112px; height: 36px; border-radius: 999px; }
+.skeleton__head { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.skeleton__head .skeleton__line { width: 40%; }
+.skeleton__head .skeleton__line--title { width: 50%; }
+.skeleton__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.skeleton__stat { height: 44px; border-radius: var(--radius-control); }
+.skeleton__carousel { display: grid; grid-auto-flow: column; grid-auto-columns: min(72%, 240px); gap: 12px; overflow: hidden; }
+.skeleton__setting { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-panel); }
+.skeleton__block { width: 100%; aspect-ratio: 4 / 3; border-radius: var(--radius-panel); }
+.loading--inline { padding: 6px 0; }
+.skeleton__avatar, .skeleton__line, .skeleton__bone { background: linear-gradient(90deg, var(--line) 25%, color-mix(in srgb, var(--line) 55%, var(--surface)) 50%, var(--line) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.4s ease-in-out infinite; }
 @keyframes skeleton-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { .skeleton__avatar, .skeleton__line { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .skeleton__avatar, .skeleton__line, .skeleton__bone { animation: none; } }
 
 /* Aviso de "Desfazer" depois de apagar mensagens. */
 .undobar { position: fixed; left: 50%; bottom: calc(88px + var(--sa-bottom)); transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 16px; padding: 10px 14px 10px 18px; border-radius: 999px; background: var(--ink); color: var(--bg); box-shadow: 0 8px 24px rgb(0 0 0 / 0.3); font-size: 0.9375rem; }

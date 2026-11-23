@@ -62,7 +62,7 @@ export function BoostScreen({ venueId }: { venueId: string }) {
     return () => window.clearInterval(timer);
   }, [waiting]);
 
-  if (profile.loading || pricing.loading || boosts.loading) return (<><PageHead title={t('Impulsionar')} back={back} /><Loading /></>);
+  if (profile.loading || pricing.loading || boosts.loading) return (<><PageHead title={t('Impulsionar')} back={back} /><Loading shape="page" /></>);
   if (profile.error || pricing.error || boosts.error || !profile.data || !pricing.data || !boosts.data) {
     const e = profile.error ?? pricing.error ?? boosts.error;
     return (<><PageHead title={t('Impulsionar')} back={back} /><ErrorState message={e?.message ?? t('Não foi possível carregar.')} onRetry={() => { profile.reload(); pricing.reload(); boosts.reload(); }} /></>);

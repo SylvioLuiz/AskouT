@@ -37,7 +37,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
   const [pendingPhoto, setPendingPhoto] = useState<File | undefined>();
   useTitle(group.data?.name ?? t('Grupo'));
 
-  if (group.loading && !group.data) return <Loading />;
+  if (group.loading && !group.data) return <Loading shape="profile" />;
   if (group.error && !group.data) {
     return (
       <>
@@ -192,7 +192,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
         ) : shared.error ? (
           <ErrorState message={shared.error.message} onRetry={shared.reload} />
         ) : (
-          <Loading />
+          <Loading shape="grid" />
         )
       ) : null}
 

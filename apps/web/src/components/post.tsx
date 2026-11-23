@@ -584,7 +584,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateR
     </div>
   ) : null;
   if (error && items.length === 0) return <div ref={top}>{banner}<ErrorState message={error.message} onRetry={() => void more(0)} />{rail}</div>;
-  if (!page) return <div ref={top}>{banner}<Loading />{rail}</div>;
+  if (!page) return <div ref={top}>{banner}<Loading shape="posts" />{rail}</div>;
   if (items.length === 0) {
     return (
       <div ref={top}>
@@ -616,7 +616,7 @@ export function PostList({ load, emptyTitle, emptyHint, reloadKey, inject, dateR
       {error ? <ErrorState message={error.message} onRetry={() => void more(items.length)} /> : null}
       {page.hasMore ? (
         <div className="more" ref={sentinel}>
-          {loading ? <Loading /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => more(items.length)}>{t('Carregar mais')}</Button> : null}
+          {loading ? <Loading shape="posts" rows={1} /> : typeof IntersectionObserver === 'undefined' ? <Button variant="secondary" onClick={() => more(items.length)}>{t('Carregar mais')}</Button> : null}
         </div>
       ) : null}
       {rail}
@@ -659,7 +659,7 @@ export function PostGrid({ username, kind, quiet, onCount }: { username: string;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [username, kind]);
   if (error && items.length === 0) return <ErrorState message={error.message} onRetry={() => void more(0)} />;
-  if (!page) return <Loading />;
+  if (!page) return <Loading shape="grid" />;
   if (items.length === 0) return quiet ? null : <EmptyState title={t('Nenhum post ainda')}>{t('Posts com fotos, vídeos e textos aparecem aqui.')}</EmptyState>;
   return (
     <>

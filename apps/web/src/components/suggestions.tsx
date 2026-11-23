@@ -299,7 +299,7 @@ export function SuggestionsSheet({ inviteId, conversationId, otherName, title, a
           </div>
         </Suspense>
       ) : null}
-      {result.loading && !data ? <Loading label={t('Buscando locais')} /> : null}
+      {result.loading && !data ? <Loading shape="carousel" label={t('Buscando locais')} /> : null}
       {result.error && !data ? (
         result.error.code === 'CONFLICT' ? (
           <Notice>{t('Os dois precisam compartilhar a localização no encontro para ver sugestões perto de vocês.')}</Notice>
@@ -359,7 +359,7 @@ export function PlaceMapSheet({ inviteId, otherName, place, onClose }: { inviteI
   const waiting = inviteId !== undefined && match.loading && !m;
   return (
     <Sheet title={target ? target.name : t('Ver no mapa')} onClose={onClose}>
-      {waiting ? <Loading label={t('Carregando o mapa')} /> : null}
+      {waiting ? <Loading shape="block" label={t('Carregando o mapa')} /> : null}
       {!waiting && !mapFailed && (target || me || them.length > 0) ? (
         <Suspense fallback={<div className="matchmap matchmap--modal matchmap--loading"><RingLoader size={56} label={t('Carregando o mapa')} /></div>}>
           <div className="placemap">
