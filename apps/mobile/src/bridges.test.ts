@@ -198,6 +198,15 @@ describe('ponte de avisos (push)', () => {
     assert.equal(createPushBridge({ push: fakePush({ token: 'ab12' }).push, open: () => undefined }).replies, true);
   });
 
+  it('liveActivityToken: devolve o token "push-to-start" do iPhone, e nada sem o plugin ou com token estranho', async () => {
+    const push = fakePush({ token: 'ab12' }).push;
+    assert.equal(await createPushBridge({ push, open: () => undefined }).liveActivityToken(), undefined);
+    const hex = 'ab'.repeat(32);
+    assert.equal(await createPushBridge({ push, open: () => undefined, liveActivity: { startToken: async () => ({ token: hex }) } }).liveActivityToken(), hex);
+    assert.equal(await createPushBridge({ push, open: () => undefined, liveActivity: { startToken: async () => ({ token: 'x y' }) } }).liveActivityToken(), undefined);
+    assert.equal(await createPushBridge({ push, open: () => undefined, liveActivity: { startToken: async () => Promise.reject(new Error('x')) } }).liveActivityToken(), undefined);
+  });
+
   it('não pede de novo quando já está liberado, e devolve undefined quando a pessoa recusa', async () => {
     const ok = fakePush({ receive: 'granted', token: 'cd34' });
     assert.equal(await createPushBridge({ push: ok.push, open: () => undefined }).register(), 'cd34');
@@ -524,6 +533,8 @@ it('link br.com.askout:// abre só rotas conhecidas do app', async () => {
   assert.equal(deepLinkPath('br.com.askout://agenda?agendas=google'), '/agenda?agendas=google');
   assert.equal(deepLinkPath('br.com.askout:///agenda/'), '/agenda');
   assert.equal(deepLinkPath('br.com.askout://configuracoes'), undefined);
+  assert.equal(deepLinkPath('br.com.askout://now/encontro/3f2a-77'), '/now/encontro/3f2a-77', 'Live Activity da chegada');
+  assert.equal(deepLinkPath('br.com.askout://now/encontro/../x'), undefined);
   assert.equal(deepLinkPath('https://evil.example/agenda'), undefined);
 });
 

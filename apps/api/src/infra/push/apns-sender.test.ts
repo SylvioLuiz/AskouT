@@ -56,7 +56,7 @@ describe('APNs (aviso no iPhone)', () => {
     const sender = new ApnsSender({ config, nowMs: () => 1_700_000_000_000, transport: async (r) => (requests.push(r), { status: 200, body: '' }) });
     const state = { title: 'ana está a caminho', body: 'Chega em ~8 min', progress: 0.2, arrived: false };
     assert.equal(
-      await sender.liveActivity({ token: TOKEN, event: 'start', state, attributes: { name: 'ana', tag: 'arrival:1:2', registration: 'lva.x.y' }, alert: { title: 'ana está a caminho', body: 'Chega em ~8 min' }, staleAtMs: 1_700_003_600_000 }),
+      await sender.liveActivity({ token: TOKEN, event: 'start', state, attributes: { name: 'ana', tag: 'arrival:1:2', url: '/now/encontro/1', registration: 'lva.x.y' }, alert: { title: 'ana está a caminho', body: 'Chega em ~8 min' }, staleAtMs: 1_700_003_600_000 }),
       'SENT',
     );
     const start = requests[0]!;
@@ -70,7 +70,7 @@ describe('APNs (aviso no iPhone)', () => {
         'content-state': state,
         'stale-date': 1_700_003_600,
         'attributes-type': 'ArrivalAttributes',
-        attributes: { name: 'ana', tag: 'arrival:1:2', registration: 'lva.x.y' },
+        attributes: { name: 'ana', tag: 'arrival:1:2', url: '/now/encontro/1', registration: 'lva.x.y' },
         alert: { title: 'ana está a caminho', body: 'Chega em ~8 min', sound: 'default' },
       },
     });

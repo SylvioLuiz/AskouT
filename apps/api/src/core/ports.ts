@@ -1068,8 +1068,8 @@ export interface LiveActivityPush {
   token: string;
   event: 'start' | 'update' | 'end';
   state: { title: string; body: string; progress: number; arrived: boolean };
-  /** Só no `start`: o que fica fixo na atividade (nome de quem chega, `tag` e o token para registrar a atividade). */
-  attributes?: { name: string; tag: string; registration: string };
+  /** Só no `start`: o que fica fixo na atividade (nome de quem chega, `tag`, tela do app e o token para registrar a atividade). */
+  attributes?: { name: string; tag: string; url: string; registration: string };
   /** Toca/acende a tela (a primeira e a chegada); as outras trocam em silêncio. */
   alert?: { title: string; body: string };
   /** Depois disto a atividade aparece como desatualizada (fim do encontro). */
