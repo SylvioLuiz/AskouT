@@ -1,0 +1,17 @@
+/* Etapas da votação de data (votar → confirmar a data → data marcada) e o cartão "Confirme a data". */
+.dpsteps { display: flex; gap: 4px; margin: 4px 0 12px; padding: 0; list-style: none; }
+.dpsteps__item { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; position: relative; color: var(--muted); font-size: 0.75rem; text-align: center; }
+/* Linha entre as bolinhas. */
+.dpsteps__item + .dpsteps__item::before { content: ''; position: absolute; top: 12px; right: calc(50% + 16px); width: calc(100% - 32px); height: 2px; background: var(--line); }
+.dpsteps__item.is-done + .dpsteps__item::before { background: var(--brand-text); }
+.dpsteps__dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--line-strong, var(--line)); font-weight: 700; font-size: 0.75rem; background: var(--bg); }
+.dpsteps__item.is-done .dpsteps__dot { border-color: var(--brand-text); color: var(--brand-text); }
+.dpsteps__item.is-current { color: var(--ink); font-weight: 700; }
+.dpsteps__item.is-current .dpsteps__dot { border: 0; background: var(--brand-grad, var(--brand-text)); color: #1a0b2e; }
+.dpsteps__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+.dpoll__proposal-kicker { margin: 0; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--brand-text); }
+.dpoll__proposal-day { margin: 0; font-size: 1.25rem; line-height: 1.25; }
+.dpoll__proposal-todo { margin: 0; font-weight: 600; }
+.dpoll__proposal-next { margin: 0; font-size: 0.875rem; }
+.dpoll__proposal-org { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); }

@@ -203,6 +203,29 @@ export function pinnedPoll(p: PollSummary, now: Date): { name: string; status: s
   return { ...line, action };
 }
 
+/** Resposta à data proposta, como aparece para a pessoa. */
+export const CONFIRMATION_LABEL: Record<ConfirmationAnswer, string> = { CONFIRMED: t('Vou'), ADJUST: t('Preciso ajustar'), DECLINED: t('Não posso') };
+
+/**
+ * Fase "confirmar a data" (data já proposta): o que esta pessoa precisa fazer agora, numa frase, e o que vem depois.
+ * `null` fora dessa fase.
+ */
+export function confirmStepText(poll: Pick<PollView, 'status' | 'isOrganizer' | 'confirmationPolicy' | 'proposal'>): { todo: string; next: string } | null {
+  const p = poll.proposal;
+  if (poll.status !== 'CONFIRMING' || !p) return null;
+  const waiting = p.tally.pending === 0 ? t('Todos já responderam.') : p.tally.pending === 1 ? t('Falta 1 pessoa responder.') : t('Faltam {n} pessoas responderem.', { n: p.tally.pending });
+  const rule =
+    poll.confirmationPolicy === 'MANUAL'
+      ? poll.isOrganizer
+        ? t('Quando quiser, toque em “Fechar a data” para marcar.')
+        : t('Quem organiza fecha a data quando achar melhor.')
+      : poll.confirmationPolicy === 'UNANIMITY'
+        ? t('A data fica marcada sozinha quando todos confirmarem.')
+        : t('A data fica marcada sozinha quando mais da metade confirmar.');
+  const todo = p.myConfirmation === null ? t('Confirme se você vai nesse dia.') : t('Você respondeu “{answer}”.', { answer: CONFIRMATION_LABEL[p.myConfirmation] });
+  return { todo, next: `${waiting} ${rule}` };
+}
+
 /** Dia (AAAA-MM-DD) de um instante no fuso da votação. */
 export function dayInZone(iso: string, timeZone = 'America/Sao_Paulo'): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
