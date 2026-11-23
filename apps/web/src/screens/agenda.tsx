@@ -439,7 +439,7 @@ export function AgendaScreen() {
         </h2>
 
         {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
-        {slots.loading && !slots.data ? <Loading /> : null}
+        {slots.loading && !slots.data ? <Loading shape="lines" /> : null}
         {slots.error ? <ErrorState message={slots.error.message} onRetry={slots.reload} /> : null}
 
         {slots.data && ofDay.length === 0 && busyToday.length === 0 ? (

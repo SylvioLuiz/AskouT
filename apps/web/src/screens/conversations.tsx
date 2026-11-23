@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { CSSProperties } from 'react';
-import type { ChangeEvent, FormEvent, MouseEvent } from 'react';
+import type { ChangeEvent, FormEvent, MouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
-import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
+import { VOICE_CANCEL_DX, VOICE_LOCK_DY, VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
+import type { VoiceControl } from '../components/voice.tsx';
+import { haptic } from '../lib/haptics.ts';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
 import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
@@ -24,7 +26,7 @@ import { api } from '../client.ts';
 import { useAsync, useLiveRefresh, usePolling, useTitle } from '../hooks.ts';
 import { PullRefresh } from '../components/pull-refresh.tsx';
 import { useWideDesktop } from '../lib/use-desktop.ts';
-import { allDeletable, announceChatsChanged, breakLabel, copyText, filterConversations, formatClock, groupAlbums, isDoubleTap, LONG_PRESS_MS, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
+import { allDeletable, announceChatsChanged, breakLabel, copyText, dayPillLabel, firstUnreadId, filterConversations, formatClock, groupAlbums, isDoubleTap, LONG_PRESS_MS, listTimeLabel, mergeMessages, previewOf, replyPreview, runPositions, seenLabel, timeBreak } from '../lib/chat.ts';
 import type { RunPosition } from '../lib/chat.ts';
 import { CHAT_VIDEO_MAX_BYTES, mediaKind, mediaProblem, prepareImage, typingLabel } from '../lib/chat-media.ts';
 import { prepareVideoUpload, withMediaType } from '../lib/media-file.ts';
@@ -526,7 +528,74 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [older, setOlder] = useState<{ hasMore: boolean; loading: boolean }>({ hasMore: false, loading: false });
   const [draft, setDraft] = useState(() => readDraft(conversationId));
   const [sending, setSending] = useState(false);
-  const [recording, setRecording] = useState(false);
+  /** Gravando áudio: `hold` enquanto segura o microfone, `locked` gravando sem segurar (travou ou clicou). */
+  const [recording, setRecording] = useState<false | 'hold' | 'locked'>(false);
+  const voiceControl = useRef<VoiceControl | undefined>(undefined);
+  const [voiceSlide, setVoiceSlide] = useState({ dx: 0, dy: 0 });
+  const [micHint, setMicHint] = useState(false);
+  const lastTouchAt = useRef(0);
+  useEffect(() => {
+    if (!micHint) return undefined;
+    const timer = window.setTimeout(() => setMicHint(false), 2200);
+    return () => window.clearTimeout(timer);
+  }, [micHint]);
+
+  /**
+   * Segurar o microfone grava (como no WhatsApp): soltar envia, arrastar para a esquerda cancela e para cima trava.
+   * Toque rápido só mostra a dica. Com mouse, o clique grava no modo travado (onClick).
+   */
+  function holdMic(e: ReactPointerEvent<HTMLButtonElement>) {
+    if (e.pointerType === 'mouse' || recording) return;
+    e.preventDefault();
+    lastTouchAt.current = Date.now();
+    const start = { x: e.clientX, y: e.clientY, at: Date.now(), id: e.pointerId };
+    setProblem(undefined);
+    setMicHint(false);
+    setVoiceSlide({ dx: 0, dy: 0 });
+    setRecording('hold');
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+    };
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== start.id) return;
+      const dx = ev.clientX - start.x;
+      const dy = ev.clientY - start.y;
+      setVoiceSlide({ dx, dy });
+      if (dx < VOICE_CANCEL_DX) {
+        stop();
+        haptic('tap');
+        voiceControl.current?.finish(false);
+      } else if (dy < VOICE_LOCK_DY) {
+        stop();
+        haptic('tick');
+        setRecording('locked');
+      }
+    };
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== start.id) return;
+      stop();
+      lastTouchAt.current = Date.now();
+      // Toque rápido: não grava nada, só ensina o gesto.
+      if (Date.now() - start.at < 350) {
+        voiceControl.current?.finish(false);
+        setRecording(false);
+        setMicHint(true);
+        return;
+      }
+      voiceControl.current?.finish(true);
+    };
+    const cancel = (ev: PointerEvent) => {
+      if (ev.pointerId !== start.id) return;
+      stop();
+      voiceControl.current?.finish(false);
+      setRecording(false);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+  }
   const [problem, setProblem] = useState<string | undefined>();
   // Mapa dos locais entre vocês, aberto dentro do chat. `search` já abre a busca de outro lugar (vindo da página do NOW).
   /** Mapa em modal: você, o amigo e o local (`place` vazio = o local combinado). */
@@ -577,6 +646,15 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const scrollToEnd = () => window.scrollTo({ top: document.documentElement.scrollHeight });
   const stickToEnd = useRef(true);
   const loadedFirst = useRef(false);
+  /** Primeira mensagem não lida ao abrir: a divisória "Mensagens novas" vem antes dela. */
+  const [unreadFrom, setUnreadFrom] = useState<string | undefined>();
+  const jumpToUnread = useRef(false);
+  /** Longe do fim (rolou para cima): aparece o botão para voltar à última mensagem. */
+  const [far, setFar] = useState(false);
+  /** Mensagem destacada por um instante (tocou na citação de uma resposta). */
+  const [flashId, setFlashId] = useState<string | undefined>();
+  /** Dia das mensagens no topo da tela, flutuando enquanto rola. */
+  const [dayPill, setDayPill] = useState<string | undefined>();
 
   const chatName = view.data ? (view.data.other ? view.data.other.displayName : (view.data.name ?? t('Grupo'))) : 'Conversa';
   useTitle(chatName);
@@ -590,6 +668,9 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     setSelected(undefined);
     setDeleting(false);
     setUnseen(0);
+    setUnreadFrom(undefined);
+    setFar(false);
+    setFlashId(undefined);
     lastSeenId.current = undefined;
     setDraft(readDraft(conversationId));
     setStaged((current) => {
@@ -612,6 +693,25 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     saveDraft(conversationId, draft);
   }, [conversationId, draft]);
 
+  // Esc cancela a resposta (no computador), se não houver seleção aberta.
+  useEffect(() => {
+    if (!replyTo || selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setReplyTo(undefined);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [replyTo, selected]);
+
+  // Abriu com muitas mensagens novas: leva até a divisória.
+  useLayoutEffect(() => {
+    if (!jumpToUnread.current || !unreadFrom) return;
+    const el = document.getElementById('chat-unread');
+    if (!el) return;
+    jumpToUnread.current = false;
+    el.scrollIntoView({ block: 'center' });
+  }, [unreadFrom, messages.length]);
+
   // Esc sai da seleção.
   useEffect(() => {
     if (!selected) return;
@@ -629,6 +729,15 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     if (!loadedFirst.current) {
       loadedFirst.current = true;
       setOlder((o) => ({ ...o, hasMore: view.data!.hasMore }));
+      const list = view.data.messages;
+      const from = firstUnreadId(list, view.data.myReadAt);
+      setUnreadFrom(from);
+      // Muitas mensagens novas: abre na divisória (para ler do começo), não no fim.
+      const index = from ? list.findIndex((m) => m.id === from) : -1;
+      if (index !== -1 && list.length - index > 6) {
+        stickToEnd.current = false;
+        jumpToUnread.current = true;
+      }
     }
   }, [view.data]);
 
@@ -647,8 +756,26 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       glowAt = now;
       setGlow((n) => n + 1);
     };
+    let pillTimer: number | undefined;
+    const showPill = () => {
+      // Dia da primeira mensagem visível logo abaixo do topo fixo da conversa.
+      const top = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--chat-top')) || 72;
+      const items = document.querySelectorAll<HTMLElement>('.chat__item[data-at]');
+      let at: string | undefined;
+      for (const item of items) {
+        if (item.getBoundingClientRect().bottom > top + 8) {
+          at = item.dataset['at'];
+          break;
+        }
+      }
+      setDayPill(at ? dayPillLabel(at, new Date()) : undefined);
+      window.clearTimeout(pillTimer);
+      pillTimer = window.setTimeout(() => setDayPill(undefined), 1200);
+    };
     const onScroll = () => {
       const gap = gapToEnd();
+      setFar(gap > 700);
+      if (performance.now() - userAt < 1200) showPill();
       stickToEnd.current = gap < 120;
       if (stickToEnd.current) setUnseen(0);
       const nowAtEnd = gap < 2;
@@ -678,6 +805,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     window.addEventListener('touchmove', onTouchMove, { passive: true });
     window.addEventListener('wheel', onWheel, { passive: true });
     return () => {
+      window.clearTimeout(pillTimer);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('touchstart', onTouchStart);
       window.removeEventListener('touchmove', onTouchMove);
@@ -768,6 +896,44 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const colorStyle = chatColorStyle(color);
   const match = data.other ? flash.data?.matches.find((m) => m.other.userId === data.other?.userId) : undefined;
   const serverNow = Date.parse(data.now);
+
+  /** Responder: marca a mensagem e já abre o teclado no campo. */
+  function startReply(m: ChatMessage) {
+    setReplyTo(m);
+    window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+  }
+
+  /** Vai até a mensagem citada (carregando as anteriores, se preciso) e a destaca por um instante. */
+  async function jumpTo(id: string) {
+    let list = messages;
+    let hasMore = older.hasMore;
+    try {
+      for (let tries = 0; !list.some((m) => m.id === id) && hasMore && tries < 8; tries += 1) {
+        const first = list[0];
+        if (!first) break;
+        const page = await api.messages(conversationId, { before: first.createdAt });
+        list = mergeMessages(page.messages, list);
+        hasMore = page.hasMore;
+      }
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      return;
+    }
+    if (list !== messages) {
+      stickToEnd.current = false;
+      const loaded = list;
+      setMessages((current) => mergeMessages(loaded, current));
+      setOlder({ hasMore, loading: false });
+    }
+    if (!list.some((m) => m.id === id)) {
+      setProblem(t('Essa mensagem é antiga demais para mostrar aqui.'));
+      return;
+    }
+    stickToEnd.current = false;
+    setFlashId(id);
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => document.getElementById(`msg-${id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })));
+    window.setTimeout(() => setFlashId((current) => (current === id ? undefined : current)), 1800);
+  }
 
   async function loadOlder() {
     const first = messages[0];
@@ -1034,7 +1200,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   }
 
   const row = (m: ChatMessage, pos: RunPosition, cell: boolean) => (
-    <SwipeRow key={m.id} className={`msg${m.mine ? ' msg--mine' : ''} msg--run-${pos}${cell ? ' msg--cell' : ''}${selected ? ' msg--selecting' : ''}${selected?.includes(m.id) ? ' msg--selected' : ''}`} id={`msg-${m.id}`} enabled={data.canSend && hasActions(m) && !selected} onReply={() => setReplyTo(m)}>
+    <SwipeRow key={m.id} className={`msg${m.mine ? ' msg--mine' : ''} msg--run-${pos}${cell ? ' msg--cell' : ''}${selected ? ' msg--selecting' : ''}${selected?.includes(m.id) ? ' msg--selected' : ''}${flashId === m.id ? ' msg--flash' : ''}`} id={`msg-${m.id}`} enabled={data.canSend && hasActions(m) && !selected} onReply={() => startReply(m)}>
       {selected && hasActions(m) ? (
         <button type="button" className="msg__pick" role="checkbox" aria-checked={selected.includes(m.id)} aria-label={t('Selecionar mensagem de {name}, {time}', { name: m.mine ? t('você') : (m.senderName ?? t('contato')), time: formatClock(m.createdAt) })} onClick={() => toggleChosen(m.id)}>
           <span className={`msg__check${selected.includes(m.id) ? ' is-on' : ''}`} aria-hidden="true">{selected.includes(m.id) ? <CheckIcon /> : null}</span>
@@ -1046,7 +1212,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         {isGroup && !m.mine && m.senderName && (pos === 'first' || pos === 'single') ? <span className="bubble__sender">{m.senderName}</span> : null}
         {m.story && !m.deleted ? <StoryAttachment story={m.story} mine={m.mine} /> : null}
         {m.replyTo && !m.deleted ? (
-          <button type="button" className="bubble__quote" aria-label={t('Ir para a mensagem respondida de {name}', { name: m.replyTo.mine ? t('você') : (m.replyTo.senderName ?? '') })} onClick={() => document.getElementById(`msg-${m.replyTo?.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+          <button type="button" className="bubble__quote" aria-label={t('Ir para a mensagem respondida de {name}', { name: m.replyTo.mine ? t('você') : (m.replyTo.senderName ?? '') })} onClick={() => void jumpTo(m.replyTo!.id)}>
             <span className="bubble__quotetext">
               <strong>{m.replyTo.mine ? t('Você') : m.replyTo.senderName}</strong>
               <span>{m.replyTo.deleted ? t('Mensagem apagada') : m.replyTo.preview}</span>
@@ -1138,6 +1304,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         {messages.length === 0 ? <p className="muted chat__empty">{data.other ? t('Nenhuma mensagem ainda. Diga oi para {name}.', { name: data.other.displayName }) : t('Nenhuma mensagem ainda. Diga oi para o grupo.')}</p> : null}
         {(() => {
           let prev: ChatMessage | undefined;
+          const unreadLine = (group: readonly ChatMessage[]) =>
+            unreadFrom && group.some((m) => m.id === unreadFrom) ? (
+              <p className="chat__unread" id="chat-unread">
+                <span>{t('Mensagens novas')}</span>
+              </p>
+            ) : null;
           return albums.map((group) => {
             const first = group[0] as ChatMessage;
             const last = group[group.length - 1] as ChatMessage;
@@ -1145,7 +1317,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             prev = last;
             if (first.kind === 'SYSTEM') {
               return (
-                <div key={first.id} className="chat__item">
+                <div key={first.id} className="chat__item" data-at={first.createdAt}>
                   {showBreak ? <p className="chat__day">{breakLabel(first.createdAt, new Date(serverNow))}</p> : null}
                   <p className="chat__system">{first.body}</p>
                   {match && first.id === matchMessageId ? matchCard : null}
@@ -1155,14 +1327,16 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
             const pos = posOf.get(last.id) ?? 'single';
             if (group.length === 1) {
               return (
-                <div key={first.id} className={`chat__item chat__item--${pos}`}>
+                <div key={first.id} className={`chat__item chat__item--${pos}`} data-at={first.createdAt}>
+                  {unreadLine(group)}
                   {showBreak ? <p className="chat__day">{breakLabel(first.createdAt, new Date(serverNow))}</p> : null}
                   {row(first, posOf.get(first.id) ?? 'single', false)}
                 </div>
               );
             }
             return (
-              <div key={first.id} className={`chat__item chat__item--${pos}`}>
+              <div key={first.id} className={`chat__item chat__item--${pos}`} data-at={first.createdAt}>
+                {unreadLine(group)}
                 {showBreak ? <p className="chat__day">{breakLabel(first.createdAt, new Date(serverNow))}</p> : null}
                 <div className={`albumrow${first.mine ? ' albumrow--mine' : ''}`}>
                   {!first.mine ? <span className="msg__face">{pos === 'last' || pos === 'single' ? face(first.senderId) : null}</span> : null}
@@ -1190,6 +1364,24 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         <div ref={endRef} />
       </div>
 
+      {dayPill ? (
+        <p className="chat__daypill" aria-hidden="true">
+          {dayPill}
+        </p>
+      ) : null}
+      {unseen === 0 && far ? (
+        <button
+          type="button"
+          className="chat__newbtn chat__newbtn--round"
+          aria-label={t('Ir para a última mensagem')}
+          onClick={() => {
+            stickToEnd.current = true;
+            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+          }}
+        >
+          <ChevronDownIcon />
+        </button>
+      ) : null}
       {unseen > 0 ? (
         <button
           type="button"
@@ -1212,7 +1404,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       ) : null}
       {selected ? (
         <div className="selectactions" role="toolbar" aria-label={t('Ações para as mensagens selecionadas')}>
-          <button type="button" className="selectactions__btn" disabled={selected.length !== 1 || !data.canSend} onClick={() => { const only = chosen[0]; if (only) { setReplyTo(only); setSelected(undefined); } }}>
+          <button type="button" className="selectactions__btn" disabled={selected.length !== 1 || !data.canSend} onClick={() => { const only = chosen[0]; if (only) { startReply(only); setSelected(undefined); } }}>
             <ReplyIcon />
             <span>{t('Responder')}</span>
           </button>
@@ -1289,7 +1481,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
               <input ref={galleryRef} type="file" multiple accept="image/*,video/*" className="visually-hidden" aria-label={t('Escolher fotos ou vídeos')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="visually-hidden" aria-label={t('Tirar foto')} tabIndex={-1} onChange={(e) => void pickMedia(e)} />
               {recording ? (
-                <VoiceRecorderBar onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
+                <VoiceRecorderBar mode={recording} slide={voiceSlide} control={voiceControl} onSend={sendVoice} onCancel={() => setRecording(false)} onProblem={setProblem} />
               ) : (
                 <div className="composer__pill">
                   <button type="button" className="composer__camera" aria-label={t('Tirar foto')} disabled={sending} onClick={() => cameraRef.current?.click()}>
@@ -1335,12 +1527,26 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                       <button type="button" className="composer__tool" aria-label={t('Enviar fotos ou vídeos da galeria')} onClick={() => galleryRef.current?.click()}>
                         <PhotoIcon />
                       </button>
-                      <button type="button" className="composer__tool" aria-label={t('Gravar áudio')} onClick={() => {
+                      <button
+                        type="button"
+                        className="composer__tool composer__mic"
+                        aria-label={t('Gravar áudio (segure para gravar e solte para enviar)')}
+                        onPointerDown={holdMic}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={() => {
+                          // Toque no celular já foi tratado pelo gesto; aqui é o clique do mouse ou o teclado.
+                          if (Date.now() - lastTouchAt.current < 800) return;
                           setProblem(undefined);
-                          setRecording(true);
-                        }}>
+                          setRecording('locked');
+                        }}
+                      >
                         <MicIcon />
                       </button>
+                      {micHint ? (
+                        <span className="composer__michint" role="status">
+                          {t('Segure para gravar, solte para enviar')}
+                        </span>
+                      ) : null}
                     </span>
                   )}
                 </div>
@@ -1360,7 +1566,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           conversationId={conversationId}
           canSend={data.canSend}
           onClose={() => setActionsFor(undefined)}
-          onReply={() => setReplyTo(actionsFor)}
+          onReply={() => startReply(actionsFor)}
           onSelect={() => setSelected([actionsFor.id])}
           onReacted={(reactions) => patchMessage(actionsFor.id, { reactions })}
           onDeleted={(updated) => setMessages((current) => mergeMessages(current, [updated]))}
@@ -1402,6 +1608,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           inviteId={match.id}
           conversationId={conversationId}
           otherName={data.other?.displayName ?? ''}
+          messages={messages}
+          since={match.createdAt}
           onClose={() => setSuggesting(undefined)}
           onSent={(message) => {
             stickToEnd.current = true;

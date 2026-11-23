@@ -42,7 +42,7 @@ export function AlbumsScreen() {
     <>
       <PageHead title={t('Álbuns dos encontros')} back="/perfil" />
       <p className="muted">{t('Fotos do NOW e dos eventos aonde você foi. Só quem foi vê.')}</p>
-      {list.loading && !list.data ? <Loading /> : null}
+      {list.loading && !list.data ? <Loading shape="tiles" /> : null}
       {list.error ? <ErrorState message={list.error.message} onRetry={list.reload} /> : null}
       {list.data && list.data.items.length === 0 ? (
         <EmptyState title={t('Nenhum álbum ainda')}>{t('Depois de um encontro do NOW ou de um evento em que você confirmou presença, o álbum aparece aqui.')}</EmptyState>
@@ -198,8 +198,8 @@ export function AlbumContent({ albumId, embedded = false }: { albumId: string; e
     if (eventId) navigate(`/eventos/${encodeURIComponent(eventId)}?aba=album`, { replace: true });
   }, [eventId]);
 
-  if (eventId) return <Loading />;
-  if (album.loading && !album.data) return <Loading />;
+  if (eventId) return <Loading shape="page" />;
+  if (album.loading && !album.data) return <Loading shape="grid" />;
   if (album.error) {
     return album.error.code === 'NOT_FOUND' ? (
       <EmptyState

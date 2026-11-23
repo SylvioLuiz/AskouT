@@ -435,9 +435,10 @@ export function createApi(deps: ApiDeps) {
     flashInvites: () => request<FlashInvites>('GET', '/flash/invites'),
     /** "Perguntar se está livre": cada amigo recebe um aviso que abre o NOW dele. */
     flashAsk: (userIds: string[]) => request<{ asked: string[]; skipped: string[] }>('POST', '/flash/ask', { body: { userIds } }),
-    flashInvite: (userId: string, approx = false) => request<FlashInvite>('POST', '/flash/invites', { body: { userId, approx } }),
-    flashRespond: (inviteId: string, action: 'accept' | 'decline', approx = false) =>
-      request<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: action === 'accept' ? { action, approx } : { action } }),
+    /** `fix`: sua posição agora; quem aceitar já vê você no mapa (ninguém vê antes do aceite). */
+    flashInvite: (userId: string, approx = false, fix?: { lat: number; lng: number; accuracyM: number }) => request<FlashInvite>('POST', '/flash/invites', { body: { userId, approx, ...(fix ?? {}) } }),
+    flashRespond: (inviteId: string, action: 'accept' | 'decline', approx = false, fix?: { lat: number; lng: number; accuracyM: number }) =>
+      request<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }>('POST', `/flash/invites/${id(inviteId)}/respond`, { body: action === 'accept' ? { action, approx, ...(fix ?? {}) } : { action } }),
     flashSetPrecision: (inviteId: string, approx: boolean) => request<{ approx: boolean }>('PUT', `/flash/matches/${id(inviteId)}/precision`, { body: { approx } }),
     /** Liberar (ou parar) a outra pessoa de acompanhar a sua chegada nas notificações do celular. */
     flashSetArrival: (inviteId: string, share: boolean) => request<{ share: boolean }>('PUT', `/flash/matches/${id(inviteId)}/arrival`, { body: { share } }),

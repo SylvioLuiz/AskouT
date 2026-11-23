@@ -84,7 +84,11 @@ final class MessageNotifications {
             .putExtra("google.message_id", messageId != null ? messageId : "reply:" + tag)
             .putExtra("url", url);
         PendingIntent openIntent = PendingIntent.getActivity(context, ("open:" + tag).hashCode(), open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        // O caminho fica no aviso: o app tira da bandeja os avisos da tela que a pessoa abriu (push-bridge.ts).
+        android.os.Bundle extras = new android.os.Bundle();
+        extras.putString("askout.url", url);
         return new NotificationCompat.Builder(context, CHANNEL_ID)
+            .addExtras(extras)
             .setSmallIcon(icon(context))
             .setColor(androidx.core.content.ContextCompat.getColor(context, R.color.notification_accent))
             .setContentIntent(openIntent)

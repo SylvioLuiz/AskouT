@@ -160,7 +160,7 @@ export function CalendarSyncSheet({ onClose, onChange, notice }: { onClose: () =
           {message.text}
         </Notice>
       ) : null}
-      {overview.loading && !data ? <Loading /> : null}
+      {overview.loading && !data ? <Loading shape="lines" /> : null}
       {overview.error ? <Notice tone="error">{overview.error.message}</Notice> : null}
 
       {data && data.connections.length > 0 ? (
@@ -337,7 +337,7 @@ function DevicePicker({ current, onBack, onSaved }: { current: CalendarConnectio
     <div>
       <p className="muted">{t('Estas são as agendas das contas do seu celular. Escolha quais entram.')}</p>
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {!calendars && !error ? <Loading /> : null}
+      {!calendars && !error ? <Loading shape="lines" /> : null}
       {calendars && calendars.length === 0 ? <Notice>{t('Nenhuma agenda encontrada no aparelho.')}</Notice> : null}
       {calendars
         ? groupByAccount(calendars).map((group) => (

@@ -89,7 +89,7 @@ export function CheckinQrSheet({ venueId, venueName, onClose }: { venueId: strin
   return (
     <Sheet title={t('QR code do local')} onClose={onClose}>
       <p className="muted">{t('Cole na mesa ou no balcão. Quem ler com o AskouT marca que esteve aí, e isso conta mais que confirmar presença no ranking e em "amigos que já foram".')}</p>
-      {code.loading && !current ? <Loading /> : null}
+      {code.loading && !current ? <Loading shape="block" /> : null}
       {code.error && !current ? <ErrorState message={code.error.message} onRetry={code.reload} /> : null}
       {svg ? (
         <div className="qrcard">
@@ -143,7 +143,7 @@ export function CheckinScreen({ venueId }: { venueId: string }) {
     }
   }
 
-  if (venue.loading && !venue.data) return <Loading />;
+  if (venue.loading && !venue.data) return <Loading shape="page" />;
   if (venue.error || !venue.data) return <ErrorState message={venue.error?.message ?? t('Não foi possível abrir esta página.')} onRetry={venue.reload} />;
   const name = venue.data.name;
   const page = `/bares/${encodeURIComponent(venueId)}`;

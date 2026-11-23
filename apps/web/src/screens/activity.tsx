@@ -10,6 +10,7 @@ import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { pluralize } from '../lib/format.ts';
+import { rememberNotifications } from '../lib/tray.ts';
 import type { NotificationCategory, NotificationItem, NotificationType, PublicProfile } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
@@ -124,6 +125,10 @@ export function ActivityScreen() {
   // Ao trocar de chip, a lista anterior some na hora (em vez de mostrar avisos de outra categoria até a resposta chegar).
   const news = { data: newsState.data?.category === filter ? newsState.data.list : undefined, error: newsState.error, reload: newsState.reload };
   const totalUnread = newsState.data?.list.unread ?? 0;
+  // Título e texto dos avisos: o app do celular usa para tirar da bandeja o aviso da tela aberta por aqui.
+  useEffect(() => {
+    if (newsState.data) rememberNotifications(newsState.data.list.items);
+  }, [newsState.data]);
   const tagReqs = useAsync(() => api.pendingTags({ limit: 20 }), []);
   const [tagBusy, setTagBusy] = useState<string | undefined>();
   const pendingTagIds = new Set(tagReqs.data?.items.map((p) => p.id) ?? []);

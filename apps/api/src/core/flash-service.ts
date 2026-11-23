@@ -24,6 +24,11 @@ export const FLASH_NOTE_MAX = 60;
 /** Mensagem de sistema que abre o encontro Flash na conversa; o app mostra nela o botão de sugerir lugar. */
 export const FLASH_MATCH_MESSAGE = 'NOW combinado! Vocês dois estão disponíveis agora.';
 export const INVITE_TTL_MINUTES = 15;
+/**
+ * Encontro aceito vale isto a partir do aceite (ou até alguém encerrar), mesmo que o NOW de um dos dois acabe antes:
+ * a localização e a chegada continuam até o encontro acabar.
+ */
+export const MATCH_TTL_MINUTES = 180;
 /** Quanto dá para estender o NOW de uma vez. O total que falta nunca passa de FLASH_MAX_MINUTES. */
 export const FLASH_EXTEND_MINUTES: readonly number[] = [30, 60];
 /** Depois disso a última posição conhecida é tratada como "sem sinal". */
@@ -126,13 +131,29 @@ export function approxTrip(meters: number): ApproxTrip {
   return { km: km < 1 ? 0 : Math.round(km), minutes: Math.max(5, Math.round(raw / 5) * 5), mode: walk ? 'walk' : 'car' };
 }
 
+/** Algo que você já aceitou e bate com o horário de um convite do NOW recebido (para avisar antes de responder). */
+export interface InviteConflict {
+  /** NOW: encontro do NOW já aceito com outra pessoa. MEETUP: encontro de evento que você confirmou. */
+  kind: 'NOW' | 'MEETUP';
+  title: string | null;
+  /** Com quem (quem organiza o encontro ou a outra pessoa do NOW); nulo se você mesmo organiza. */
+  withName: string | null;
+  startsAt: string;
+  endsAt: string;
+}
+
 export interface InviteView {
   id: string;
   direction: InviteDirection;
   other: PublicProfile;
   createdAt: string;
   expiresAt: string;
+  /** Só nos convites recebidos: compromissos já aceitos no mesmo horário (lista vazia quando não há). */
+  conflicts?: InviteConflict[];
 }
+
+/** Sem NOW ligado, o "agora" de um convite vale por estas horas para procurar choque de horário. */
+const CONFLICT_WINDOW_FALLBACK_MS = 2 * 3_600_000;
 
 export interface InvitesOverview {
   received: InviteView[];
@@ -197,6 +218,17 @@ function parseNote(value: unknown): string | null {
   }
   if (CONTROL_CHARS_RE.test(note)) throw validationError('Recado inválido', { note: 'Recado inválido' });
   return note;
+}
+
+/**
+ * Posição que vem junto do convite ou do aceite (opcional): já fica no encontro, para a outra pessoa ver no mapa
+ * assim que ele começa, sem esperar o próximo envio do celular. Inválida ou ausente: ignorada (o envio normal cobre).
+ */
+function optionalFix(input: { lat?: unknown; lng?: unknown; accuracyM?: unknown }): { lat: number; lng: number; accuracyM: number | null } | undefined {
+  const { lat, lng, accuracyM } = input;
+  if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return undefined;
+  const accuracy = typeof accuracyM === 'number' && Number.isFinite(accuracyM) && accuracyM >= 0 && accuracyM <= 100_000 ? accuracyM : null;
+  return { lat, lng, accuracyM: accuracy };
 }
 
 function parseCoordinate(value: unknown, field: 'lat' | 'lng', limit: number): number {
@@ -370,12 +402,19 @@ export class FlashService {
     return sessionView({ ...session, note });
   }
 
-  /** Desliga o Flash: cancela convites e encerra encontros, e a posição some. Idempotente. */
+  /**
+   * Desliga o NOW: cancela os convites ainda sem resposta. Encontros já aceitos continuam (localização e chegada
+   * seguem até o encontro acabar ou alguém encerrar). Idempotente.
+   */
   async turnOff(actorId: string): Promise<{ ended: boolean }> {
     const { flash, clock } = this.deps;
     const now = clock.now();
     const ended = await flash.endSession(actorId, now);
-    await flash.closeOpenInvitesOf(actorId, now);
+    for (const invite of await flash.listOpenInvitesFor(actorId, now)) {
+      if (invite.status !== 'PENDING') continue;
+      const status = invite.fromUserId === actorId ? 'CANCELED' : 'DECLINED';
+      await flash.saveInvite({ ...invite, status, endedAt: now, respondedAt: invite.respondedAt ?? (status === 'DECLINED' ? now : null) });
+    }
     return { ended };
   }
 
@@ -504,7 +543,7 @@ export class FlashService {
   }
 
   /** Convida um amigo que está com o Flash ligado. O convite vale 15 minutos (ou até um dos Flash acabar). */
-  async invite(actorId: string, targetId: string, options: { approx?: unknown } = {}): Promise<InviteView> {
+  async invite(actorId: string, targetId: string, options: { approx?: unknown; lat?: unknown; lng?: unknown; accuracyM?: unknown } = {}): Promise<InviteView> {
     const { flash, follows, users, clock, ids } = this.deps;
     if (actorId === targetId) throw validationError('Você não pode convidar a si mesmo');
     const now = clock.now();
@@ -533,13 +572,17 @@ export class FlashService {
       toApprox: false,
     };
     await flash.createInvite(invite, now);
+    // Quem convida já deixa a posição no encontro: quem aceitar vê no mapa na hora. Até o aceite ninguém vê
+    // (getMatch exige convite aceito) e, se o convite for recusado, cancelado ou vencer, a posição é apagada.
+    const fix = optionalFix(options);
+    if (fix) await flash.upsertPosition(fuzzIfApprox({ inviteId: invite.id, userId: actorId, ...fix, updatedAt: now }, invite.fromApprox === true));
     const inviter = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
     await this.deps.notifier.notify({ userId: targetId, type: 'FLASH_INVITE', title: `${inviter} convidou você para o NOW`, body: 'Vale por poucos minutos', url: '/now', dedupeKey: `flash-invite:${actorId}`, actorId });
     return this.inviteView(invite, actorId, profile);
   }
 
   /** Quem recebeu aceita ou recusa. Ao aceitar, os dois passam a ver a posição um do outro até o encontro acabar. */
-  async respond(actorId: string, inviteId: string, action: unknown, options: { approx?: unknown } = {}): Promise<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }> {
+  async respond(actorId: string, inviteId: string, action: unknown, options: { approx?: unknown; lat?: unknown; lng?: unknown; accuracyM?: unknown } = {}): Promise<{ status: 'ACCEPTED' | 'DECLINED'; conversationId: string | null }> {
     if (action !== 'accept' && action !== 'decline') {
       throw validationError('Ação inválida', { action: 'Use accept ou decline' });
     }
@@ -570,8 +613,11 @@ export class FlashService {
       status: 'ACCEPTED',
       respondedAt: now,
       toApprox: options.approx === true,
-      expiresAt: new Date(Math.min(mine.expiresAt.getTime(), theirs.expiresAt.getTime())),
+      expiresAt: new Date(now.getTime() + MATCH_TTL_MINUTES * MINUTE_MS),
     });
+    // Quem aceita também já entra no mapa de quem convidou.
+    const fix = optionalFix(options);
+    if (fix) await flash.upsertPosition(fuzzIfApprox({ inviteId: invite.id, userId: actorId, ...fix, updatedAt: now }, options.approx === true));
     await openFlashAlbum(this.deps, invite, now);
     const conversation = await this.deps.conversations.getOrCreateDirect(invite.fromUserId, invite.toUserId, this.deps.ids.next(), now);
     await this.deps.conversations.addMessage({ id: this.deps.ids.next(), conversationId: conversation.id, senderId: actorId, kind: 'SYSTEM', body: FLASH_MATCH_MESSAGE, suggestion: null, response: null, respondedAt: null, meetupId: null, createdAt: now });
@@ -686,7 +732,37 @@ export class FlashService {
       else if (invite.toUserId === actorId) overview.received.push(view);
       else overview.sent.push(view);
     }
+    if (overview.received.length > 0) {
+      const busy = await this.acceptedCommitments(actorId, open, profiles);
+      for (const view of overview.received) view.conflicts = busy.filter((c) => !(c.kind === 'NOW' && c.withName === view.other.username));
+    }
     return overview;
+  }
+
+  /**
+   * O que você já aceitou e acontece durante o seu "agora" (até o NOW acabar): encontros do NOW em andamento com
+   * outras pessoas e encontros de evento confirmados. Serve para avisar, no convite recebido, dia e horário do choque.
+   */
+  private async acceptedCommitments(actorId: string, open: FlashInviteRecord[], profiles: Map<string, { username: string }>): Promise<InviteConflict[]> {
+    const { flash, meetups, users, clock } = this.deps;
+    const now = clock.now();
+    const session = await flash.findActiveSession(actorId, now);
+    const windowEnd = session ? session.expiresAt.getTime() : now.getTime() + CONFLICT_WINDOW_FALLBACK_MS;
+    const out: InviteConflict[] = [];
+    for (const match of open) {
+      if (match.status !== 'ACCEPTED') continue;
+      const otherId = match.fromUserId === actorId ? match.toUserId : match.fromUserId;
+      out.push({ kind: 'NOW', title: match.destination?.name ?? null, withName: profiles.get(otherId)?.username ?? null, startsAt: (match.respondedAt ?? match.createdAt).toISOString(), endsAt: match.expiresAt.toISOString() });
+    }
+    const confirmed = (await meetups.listForUser(actorId, 50)).filter((m) => {
+      if (m.status !== 'ACTIVE' || m.endsAt.getTime() <= now.getTime() || m.startsAt.getTime() >= windowEnd) return false;
+      return m.organizerId === actorId || m.participants.some((p) => p.userId === actorId && p.status === 'CONFIRMED');
+    });
+    const organizers = new Map((await users.findProfilesByIds([...new Set(confirmed.map((m) => m.organizerId))])).map((p) => [p.userId, p.username] as const));
+    for (const m of confirmed) {
+      out.push({ kind: 'MEETUP', title: m.title, withName: m.organizerId === actorId ? null : (organizers.get(m.organizerId) ?? null), startsAt: m.startsAt.toISOString(), endsAt: m.endsAt.toISOString() });
+    }
+    return out.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   }
 
   /** Atualiza a sua posição num encontro aceito. Só a última posição é guardada, sem histórico. */

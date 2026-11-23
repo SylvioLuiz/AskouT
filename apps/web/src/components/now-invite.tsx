@@ -4,8 +4,9 @@ import { announceFlashChange, formatApprox, formatClock, minutesLeft } from '../
 import { initials, tintIndex } from '../lib/avatar.ts';
 import { toApiError } from '../lib/errors.ts';
 import { intlLocale, t } from '../lib/i18n/index.ts';
-import type { AvailableFriend, FlashInvite, PublicProfile } from '../lib/types.ts';
+import type { AvailableFriend, FlashInvite, FlashInviteConflict, PublicProfile } from '../lib/types.ts';
 import { navigate } from '../router.tsx';
+import { recentNowFix } from '../lib/now-fix.ts';
 import { Sheet } from './agenda.tsx';
 import { BoltIcon, ChevronDownIcon, ClockIcon, LocationIcon } from './icons.tsx';
 
@@ -121,7 +122,8 @@ function useAnswer(invite: FlashInvite, onDone: () => void) {
     setBusy(action);
     setError(undefined);
     try {
-      await api.flashRespond(invite.id, action, approx);
+      // Aceitando: sua posição vai junto, para quem convidou já ver você no mapa.
+      await api.flashRespond(invite.id, action, approx, action === 'accept' ? recentNowFix() : undefined);
       announceFlashChange();
       if (action === 'accept') navigate(`/now/encontro/${invite.id}`);
       onDone();
@@ -140,6 +142,40 @@ interface InviteProps {
   /** A mesma pessoa na lista de livres: traz o recado e a distância aproximada. */
   friend?: AvailableFriend | undefined;
   onDone: () => void;
+}
+
+/** "hoje, 19:30–22:30", "amanhã, 20:00–23:00" ou "sáb., 12/12, 20:00–02:00": dia e horário do compromisso. */
+export function conflictWhen(c: Pick<FlashInviteConflict, 'startsAt' | 'endsAt'>, now: Date = new Date()): string {
+  const start = new Date(c.startsAt);
+  const end = new Date(c.endsAt);
+  const clock = (d: Date) => d.toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit' });
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((midnight(start) - midnight(now)) / 86_400_000);
+  const day = days <= 0 ? t('hoje') : days === 1 ? t('amanhã') : start.toLocaleDateString(intlLocale(), { weekday: 'short', day: '2-digit', month: '2-digit' });
+  return `${day}, ${clock(start)}–${clock(end)}`;
+}
+
+function conflictText(c: FlashInviteConflict): string {
+  const when = conflictWhen(c);
+  if (c.kind === 'NOW') return c.withName ? t('Você já combinou sair com {name} pelo NOW ({when}).', { name: c.withName, when }) : t('Você já tem um encontro do NOW ({when}).', { when });
+  const title = c.title ?? t('um encontro');
+  return c.withName ? t('Você confirmou "{title}" com {name} ({when}).', { title, name: c.withName, when }) : t('Você organiza "{title}" ({when}).', { title, when });
+}
+
+/** Aviso antes de responder: o convite bate com algo que você já aceitou de outra pessoa. */
+function InviteConflicts({ invite }: { invite: FlashInvite }) {
+  const list = invite.conflicts ?? [];
+  if (list.length === 0) return null;
+  return (
+    <div className="nowinv__conflict" role="note">
+      <strong>{t('Choque de horário')}</strong>
+      <ul>
+        {list.map((c) => (
+          <li key={`${c.kind}:${c.startsAt}:${c.title ?? ''}:${c.withName ?? ''}`}>{conflictText(c)}</li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /** Cartão do convite em foco na tela do NOW. O resto da tela fica esmaecido até responder ou tocar fora. */
@@ -163,6 +199,7 @@ export function InviteFocusCard({ invite, friend, onDone }: InviteProps) {
           <span>{distance}</span>
         </div>
       </div>
+      <InviteConflicts invite={invite} />
       {error ? <p className="nowinv__error" role="alert">{error}</p> : null}
       <div className="nowinv__act">
         <button type="button" className="nowbtn nowbtn--no" disabled={busy !== undefined} aria-busy={busy === 'decline' || undefined} onClick={() => void answer('decline', false)}>
@@ -194,6 +231,7 @@ function InviteSheetBody({ invite, friend, onDone }: InviteProps) {
         {friend?.approx ? `${formatApprox(friend.approx, true)} · ` : ''}
         {t('responda em {left} min', { left })}
       </p>
+      <InviteConflicts invite={invite} />
       {error ? <p className="nowinv__error" role="alert">{error}</p> : null}
       <div className="nowinv__act">
         <button type="button" className="nowbtn nowbtn--no" disabled={busy !== undefined} onClick={() => void answer('decline', false)}>

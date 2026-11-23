@@ -269,3 +269,21 @@ export const LONG_PRESS_MS = 450;
 export function isDoubleTap(previous: { at: number; x: number; y: number } | undefined, current: { at: number; x: number; y: number }): boolean {
   return previous !== undefined && current.at - previous.at <= DOUBLE_TAP_MS && Math.hypot(current.x - previous.x, current.y - previous.y) <= 24;
 }
+
+/**
+ * Primeira mensagem de outra pessoa depois de `readAt` (até onde você tinha lido antes de abrir): a divisória
+ * "Mensagens novas" vai antes dela. Sem nada novo, `undefined`. `readAt` nulo (nunca abriu): a primeira dos outros.
+ */
+export function firstUnreadId(messages: readonly Pick<ChatMessage, 'id' | 'mine' | 'kind' | 'createdAt'>[], readAt: string | null | undefined): string | undefined {
+  if (readAt === undefined) return undefined;
+  return messages.find((m) => !m.mine && m.kind !== 'SYSTEM' && (readAt === null || m.createdAt > readAt))?.id;
+}
+
+/** Etiqueta do dia que aparece flutuando no topo enquanto você rola a conversa: "Hoje", "Ontem", "sáb., 21 de nov.". */
+export function dayPillLabel(iso: string, now: Date): string {
+  const date = new Date(iso);
+  const diff = dayDiff(date, now);
+  if (diff === 0) return t('Hoje');
+  if (diff === 1) return t('Ontem');
+  return date.toLocaleDateString(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short', ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) });
+}

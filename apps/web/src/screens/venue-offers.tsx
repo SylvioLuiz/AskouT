@@ -17,7 +17,7 @@ export function VenueOffersScreen({ venueId }: { venueId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
-  if (profile.loading || offers.loading) return (<><PageHead title={t('Oferta relâmpago')} back={back} /><Loading /></>);
+  if (profile.loading || offers.loading) return (<><PageHead title={t('Oferta relâmpago')} back={back} /><Loading shape="page" /></>);
   if (profile.error || offers.error || !profile.data || !offers.data) {
     const e = profile.error ?? offers.error;
     return (<><PageHead title={t('Oferta relâmpago')} back={back} /><ErrorState message={e?.message ?? t('Não foi possível carregar.')} onRetry={() => { profile.reload(); offers.reload(); }} /></>);

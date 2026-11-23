@@ -63,7 +63,7 @@ export function MfaSettingsScreen() {
   return (
     <>
       <PageHead title={t('Verificação em duas etapas')} back="/configuracao" />
-      {status.loading && !status.data ? <Loading /> : null}
+      {status.loading && !status.data ? <Loading shape="lines" /> : null}
       {status.error && !status.data ? <ErrorState message={status.error.message} onRetry={status.reload} /> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
 

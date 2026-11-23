@@ -80,7 +80,7 @@ export function VenueAdminHomeScreen({ venueId }: { venueId: string }) {
   const [view, setView] = useState<'manage' | 'public'>('manage');
   const now = new Date();
 
-  if (page.loading && !v) return <Loading />;
+  if (page.loading && !v) return <Loading shape="page" />;
   if (!v) return <ErrorState message={page.error?.message ?? t('Não foi possível abrir o painel.')} onRetry={page.reload} />;
   if (!v.canManage) return <NotAllowed />;
   const next = v.upcomingEvents[0];
@@ -203,7 +203,7 @@ export function VenueAdminEventsScreen({ venueId }: { venueId: string }) {
   const [key, setKey] = useState(0);
   const now = new Date();
   const v = page.data;
-  if (page.loading && !v) return <Loading />;
+  if (page.loading && !v) return <Loading shape="page" />;
   if (!v) return <ErrorState message={page.error?.message ?? t('Não foi possível abrir os eventos.')} onRetry={page.reload} />;
   if (!v.canManage) return <NotAllowed />;
   return (

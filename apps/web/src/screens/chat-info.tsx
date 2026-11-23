@@ -22,7 +22,7 @@ export function ChatInfoScreen({ conversationId }: { conversationId: string }) {
   }, [data?.type, conversationId]);
 
   const back = `/conversas/${conversationId}`;
-  if (shared.loading && !data) return <Loading />;
+  if (shared.loading && !data) return <Loading shape="profile" />;
   if (shared.error && !data) {
     return (
       <>

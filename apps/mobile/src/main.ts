@@ -26,6 +26,7 @@ import { createStoreBridge } from './store-bridge.ts';
 import { createVideoBridge } from './video-bridge.ts';
 import { createGalleryBridge, type GalleryPluginLike } from './gallery-bridge.ts';
 import { createAudioBridge, type AudioPluginLike } from './audio-bridge.ts';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 
 /** Carregado antes do app web (ver scripts/build-web.mjs): o app procura estas pontes na hora de usar. */
 const w = window as unknown as Record<string, unknown>;
@@ -108,6 +109,14 @@ if (Capacitor.isNativePlatform()) {
   w['AskouTContacts'] = createContactsBridge({ contacts: Contacts as never });
   // O botão do Google da web não abre dentro do app (o Google bloqueia login em WebView): entra a janela nativa.
   w['AskouTGoogle'] = createGoogleBridge({ login: SocialLogin as never, platform: () => Capacitor.getPlatform() });
+  // Vibração curta de confirmação (arrastar para responder, segurar, etc.): no iPhone o navigator.vibrate não existe.
+  // Contrato do lado web: apps/web/src/lib/haptics.ts. Build antigo, sem o plugin: o web cai no navigator.vibrate.
+  if (Capacitor.isPluginAvailable('Haptics')) {
+    w['AskouTHaptics'] = {
+      play: (kind: 'tick' | 'tap' | 'success') =>
+        kind === 'success' ? Haptics.notification({ type: NotificationType.Success }) : kind === 'tick' ? Haptics.selectionChanged() : Haptics.impact({ style: ImpactStyle.Light }),
+    };
+  }
   // Mensagens de voz: no iPhone tocam pelo plugin do app (AudioPlugin.swift), fora do "Tocando agora".
   // Build antigo, sem o plugin: a ponte não existe e o app web toca como antes.
   if (Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('AskouTAudio')) {

@@ -64,7 +64,7 @@ export function PrivacyDataScreen() {
     if (view.data) setStatus(view.data);
   }, [view.data]);
 
-  if (view.loading && !status) return <Loading />;
+  if (view.loading && !status) return <Loading shape="lines" />;
   if (view.error && !status) return <ErrorState message={view.error.message} onRetry={view.reload} />;
   if (!status) return null;
 

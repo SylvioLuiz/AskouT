@@ -133,7 +133,7 @@ function EventMenuSheet({ page, onShare, onEdit, onClose }: { page: EventPage; o
 /** Aba Álbum: fotos de quem foi. Abre quando o evento começa; quem não confirmou presença vê como entrar. */
 function EventAlbumTab({ eventId, onGo }: { eventId: string; onGo: () => void }) {
   const album = useAsync(() => api.eventAlbum(eventId), [eventId]);
-  if (album.loading && !album.data) return <Loading />;
+  if (album.loading && !album.data) return <Loading shape="grid" />;
   if (album.error) return <ErrorState message={album.error.message} onRetry={album.reload} />;
   const data = album.data;
   if (!data) return null;
@@ -321,7 +321,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
 
   return (
     <>
-      {waiting || loaded.loading ? <Loading /> : null}
+      {waiting || loaded.loading ? <Loading shape="page" /> : null}
       {!waiting && loaded.error ? (
         <>
           <button type="button" className="evpage__plainback" onClick={goBack}>

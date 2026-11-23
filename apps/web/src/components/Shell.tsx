@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useUser } from '../auth.tsx';
 import { api } from '../client.ts';
-import { PUSH_EVENT, useAsync, useLiveRefresh, usePolling } from '../hooks.ts';
+import { PUSH_EVENT, useAsync, useHiddenPolling, useLiveRefresh, usePolling } from '../hooks.ts';
+import { setTabBadge } from '../lib/tab-badge.ts';
 import { CHATS_CHANGED_EVENT } from '../lib/chat.ts';
 import { FLASH_CHANGED_EVENT } from '../lib/flash.ts';
 import { hasNewActivity, NOTIFICATIONS_CHANGED_EVENT, readActivitySeen } from '../lib/notifications.ts';
@@ -10,6 +11,7 @@ import { Link, navigate, usePathname } from '../router.tsx';
 import { BellIcon, BoltIcon, CalendarIcon, ChatIcon, ChevronLeftIcon, HomeIcon, ListIcon, PlusBigIcon, SearchIcon, UserIcon, UsersIcon } from './icons.tsx';
 import { venueAdminRoute, venueAdminTabs } from '../lib/venue-admin-mode.ts';
 import type { VenueAdminRoute, VenueAdminSection } from '../lib/venue-admin-mode.ts';
+import { clearTrayFor } from '../lib/tray.ts';
 import { Avatar } from './ui.tsx';
 import { CreateChooser } from './create-chooser.tsx';
 import { NowInviteToast } from './now-invite.tsx';
@@ -125,6 +127,16 @@ export function Shell({ children }: { children: ReactNode }) {
 function MainShell({ children }: { children: ReactNode }) {
   const user = useUser();
   const pathname = usePathname();
+  // Abriu a tela de um aviso no app (pela lista ou não): o aviso dela sai da bandeja do celular. Vale também ao voltar
+  // para o app já nessa tela.
+  useEffect(() => {
+    clearTrayFor(pathname);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') clearTrayFor(window.location.pathname);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [pathname]);
   // Faixas coladas no topo (como o cabeçalho da conversa) precisam saber a altura da barra do app.
   const topbarRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -199,6 +211,14 @@ function MainShell({ children }: { children: ReactNode }) {
   // Solicitação de mensagem com mensagem nova também acende o ícone (sem aviso de mensagem, como no Instagram).
   const unreadChats = (convs.data?.items ?? []).filter((c) => c.unread > 0).length + (convs.data?.requestUnread ?? 0);
   const hasUnread = unreadChats > 0;
+  // Aba do navegador, como no WhatsApp Web: "(2) …" no título e bolinha no ícone. Conversas silenciadas não contam.
+  // Com a aba escondida a lista continua sendo conferida (a cada 30 s), senão o aviso só chegaria ao voltar.
+  useHiddenPolling(convs.reload, 30_000);
+  const tabCount = (convs.data?.items ?? []).filter((c) => c.unread > 0 && !c.muted).length;
+  useEffect(() => {
+    setTabBadge(tabCount);
+  }, [tabCount]);
+  useEffect(() => () => setTabBadge(0), []);
   const inChat = /^\/conversas\/[^/]+$/.test(pathname);
   const inEvent = /^\/eventos\/[^/]+$/.test(pathname);
   // Criar publicação: tela cheia, como nos apps de foto (sem a barra de cima e a de baixo).

@@ -12,6 +12,27 @@ export interface PushPluginLike {
   addListener(event: 'registration', cb: (t: { value: string }) => void): Promise<{ remove(): Promise<void> }>;
   addListener(event: 'registrationError', cb: (e: { error: string }) => void): Promise<{ remove(): Promise<void> }>;
   addListener(event: 'pushNotificationActionPerformed', cb: (a: { notification: { data?: Record<string, unknown> } }) => void): Promise<{ remove(): Promise<void> }>;
+  getDeliveredNotifications?(): Promise<{ notifications: DeliveredLike[] }>;
+  removeDeliveredNotifications?(o: { notifications: DeliveredLike[] }): Promise<void>;
+}
+
+/** Aviso que está na bandeja do celular, como o plugin devolve. */
+export interface DeliveredLike {
+  id: string | number;
+  tag?: string;
+  title?: string;
+  body?: string;
+  data?: Record<string, unknown>;
+}
+
+/**
+ * Este aviso leva para a tela `url`? No iPhone o caminho vem em `data.url`; no Android, nos avisos de mensagem
+ * montados pelo app, em `data["askout.url"]`. Os montados pelo Firebase não guardam o caminho: aí vale título e texto.
+ */
+export function deliveredMatches(n: DeliveredLike, match: { url: string; texts: { title: string; body: string }[] }): boolean {
+  const screen = (v: unknown) => (typeof v === 'string' ? v.split(/[?#]/)[0] : undefined);
+  if (screen(n.data?.['url']) === match.url || screen(n.data?.['askout.url']) === match.url) return true;
+  return match.texts.some((t) => n.title === t.title && (n.body ?? '') === t.body);
 }
 
 const toPermission = (receive: string): PushPermission => (receive === 'granted' ? 'granted' : receive === 'denied' ? 'denied' : 'prompt');
@@ -51,6 +72,14 @@ export function createPushBridge(deps: { push: PushPluginLike; open: (path: stri
   };
   listen();
   return {
+    /** Tira da bandeja os avisos que levam para `match.url` (a pessoa abriu essa tela no app). Devolve quantos. */
+    async clearDelivered(match: { url: string; texts: { title: string; body: string }[] }): Promise<number> {
+      if (!deps.push.getDeliveredNotifications || !deps.push.removeDeliveredNotifications) return 0;
+      const { notifications } = await deps.push.getDeliveredNotifications();
+      const gone = notifications.filter((n) => deliveredMatches(n, match));
+      if (gone.length > 0) await deps.push.removeDeliveredNotifications({ notifications: gone });
+      return gone.length;
+    },
     /** Esta casca mostra "Responder" na notificação de mensagem (AppDelegate no iPhone, ReplyMessagingService no Android). */
     replies: true as const,
     async permission(): Promise<PushPermission> {

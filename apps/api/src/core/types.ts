@@ -254,7 +254,7 @@ export interface FlashPositionRecord {
 
 // ---------- Conversas ----------
 
-export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO';
+export type MessageKind = 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO' | 'FILE';
 export type SuggestionResponse = 'ACCEPTED' | 'DECLINED' | 'CANCELED';
 
 /**

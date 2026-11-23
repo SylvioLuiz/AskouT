@@ -62,7 +62,7 @@ export function LinkedAccountsScreen() {
   return (
     <>
       <PageHead title={t('Contas vinculadas')} back="/configuracao" />
-      {data.loading && !data.data ? <Loading /> : null}
+      {data.loading && !data.data ? <Loading shape="lines" /> : null}
       {data.error && !data.data ? <ErrorState message={data.error.message} onRetry={data.reload} /> : null}
       {current ? (
         <div className="linked">

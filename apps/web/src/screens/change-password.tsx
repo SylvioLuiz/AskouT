@@ -51,7 +51,7 @@ export function ChangePasswordScreen() {
   return (
     <>
       <PageHead title={t('Trocar senha')} back="/configuracao" />
-      {status.loading && !status.data ? <Loading /> : null}
+      {status.loading && !status.data ? <Loading shape="lines" /> : null}
       {status.error && !status.data ? <ErrorState message={status.error.message} onRetry={status.reload} /> : null}
       {status.data && !status.data.hasPassword ? <CreatePasswordForm onCreated={status.reload} /> : null}
       {status.data?.hasPassword ? (
