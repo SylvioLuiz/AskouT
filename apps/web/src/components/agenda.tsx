@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ReactNode } from 'react';
 import { addDays, addMonths, dayChip, dayLongLabel, monthLabel, monthShortLabel, monthStart, monthWeeks, weekdayInitials, LEVEL_LABEL, PARTICIPANT_LABEL, STATE_LABEL } from '../lib/agenda.ts';
 import type { CompatibilityLevel, ParticipantStatus, SlotState } from '../lib/types.ts';
@@ -484,7 +485,9 @@ export function Sheet({ title, hideTitle, onClose, children }: SheetProps) {
     // Só roda ao abrir e ao fechar: não pode devolver o foco à folha a cada nova renderização.
   }, []);
 
-  return (
+  // Vai direto no <body>: dentro de uma coluna com camada própria (a lista de conversas no computador é `sticky`),
+  // a folha ficava presa nela e a conversa aberta ao lado aparecia por cima.
+  return createPortal(
     <div className="sheet" onMouseDown={(event) => event.target === event.currentTarget && closeRef.current()}>
       <div className="sheet__panel" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={panelRef}>
         <div className="sheet__drag" onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}>
@@ -499,6 +502,7 @@ export function Sheet({ title, hideTitle, onClose, children }: SheetProps) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
