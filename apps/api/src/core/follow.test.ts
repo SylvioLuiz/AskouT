@@ -393,3 +393,29 @@ test('pessoas que você talvez conheça: placar com seguidores, eventos em comum
   await w.core.follows.follow(eu, duda);
   assert.deepEqual((await w.core.follows.suggestedPeople(eu)).items.map((p) => p.username), ['caio']);
 });
+
+test('amigos em comum: só quem é amigo dos dois, sem bloqueados, e vazio no próprio perfil', async () => {
+  const w = makeWorld();
+  const { ana, bia, caio, duda, edu } = await w.signUpMany('ana', 'bia', 'caio', 'duda', 'edu');
+  const f = w.core.follows;
+  const befriend = async (a: string, b: string) => {
+    await f.follow(a, b);
+    await f.follow(b, a);
+  };
+  await befriend(ana!, caio!);
+  await befriend(bia!, caio!);
+  await befriend(ana!, duda!);
+  await befriend(bia!, duda!);
+  await befriend(ana!, edu!);
+  await f.follow(bia!, edu!); // só segue: não é amizade
+
+  const r = await f.mutualFriends(ana!, bia!);
+  assert.deepEqual(r.items.map((p) => p.username), ['caio', 'duda']);
+  assert.equal(r.total, 2);
+
+  await w.core.blocks.block(ana!, duda!);
+  assert.deepEqual((await f.mutualFriends(ana!, bia!)).items.map((p) => p.username), ['caio']);
+
+  assert.deepEqual(await f.mutualFriends(ana!, ana!), { items: [], total: 0 });
+  assert.deepEqual(await f.mutualFriends(edu!, bia!), { items: [], total: 0 });
+});

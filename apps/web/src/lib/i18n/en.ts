@@ -3426,4 +3426,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Convite enviado para: {name} e mais {n}": "Invite sent to: {name} and {n} more",
   "Quem você marcou já está convidado.": "The person you tagged is already invited.",
   "As {n} pessoas que você marcou já estão convidadas.": "The {n} people you tagged are already invited.",
+  "Amigos em comum: {a}": "Mutual friends: {a}",
+  "Amigos em comum: {a} e {b}": "Mutual friends: {a} and {b}",
+  "Amigos em comum: {a}, {b} e mais {n}": "Mutual friends: {a}, {b} and {n} more",
+  "Amigos em comum ({n})": "Mutual friends ({n})",
 };

@@ -392,6 +392,7 @@ export function createApi(deps: ApiDeps) {
       request<ConnectionsPage>('GET', `/users/${id(userId)}/followers${pageQuery(page)}`),
     following: (userId: string, page?: PageRequest) =>
       request<ConnectionsPage>('GET', `/users/${id(userId)}/following${pageQuery(page)}`),
+    mutualFriends: (userId: string) => request<{ items: PublicProfile[]; total: number }>('GET', `/users/${id(userId)}/mutual-friends`),
     followRequests: (page?: PageRequest) =>
       request<ConnectionsPage>('GET', `/me/follow-requests${pageQuery(page)}`),
     approveRequest: (userId: string) =>

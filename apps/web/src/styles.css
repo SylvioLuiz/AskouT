@@ -1042,6 +1042,30 @@ button.menulist__item[aria-busy='true']::before {
   color: var(--ink);
 }
 
+/* Amigos em comum: rostos empilhados + nomes, logo abaixo dos números. Só aparece quando há alguém em comum. */
+.profile__mutual {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.profile__mutual:hover .profile__mutualtext { color: var(--brand-text); text-decoration: underline; }
+.profile__mutual:focus-visible { outline: 2px solid var(--brand-text); outline-offset: 4px; border-radius: 8px; }
+.profile__mutualfaces { display: flex; flex: none; align-items: center; }
+.profile__mutualfaces > * { flex: none; border-radius: 50%; box-shadow: 0 0 0 2px var(--bg); }
+.profile__mutualfaces > * + * { margin-left: -8px; }
+.profile__mutualtext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Fileira de ações no padrão dos apps sociais: botões de mesma largura lado a lado + um quadrado de compartilhar. */
 .profile__actions {
   display: flex;

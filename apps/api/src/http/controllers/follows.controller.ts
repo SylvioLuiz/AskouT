@@ -46,6 +46,11 @@ export class FollowsController {
     return this.core.follows.listFollowing(actor.userId, userId, { limit: parseIntParam(limit), offset: parseIntParam(offset) });
   }
 
+  @Get('users/:userId/mutual-friends')
+  mutualFriends(@CurrentActor() actor: Actor, @Param('userId', uuid()) userId: string) {
+    return this.core.follows.mutualFriends(actor.userId, userId);
+  }
+
   @Get('me/follow-requests')
   requests(@CurrentActor() actor: Actor, @Query('limit') limit: unknown, @Query('offset') offset: unknown) {
     return this.core.follows.listPendingRequests(actor.userId, { limit: parseIntParam(limit), offset: parseIntParam(offset) });
