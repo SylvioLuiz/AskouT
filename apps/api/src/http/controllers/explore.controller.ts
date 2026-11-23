@@ -88,6 +88,13 @@ export class ExploreController {
     return this.core.eventPages.invites(actor.userId, id);
   }
 
+  /** Cria o grupo do evento (só quem criou o evento) ou devolve o que já existe em que você está. */
+  @Post('events/:id/group')
+  @HttpCode(200)
+  eventGroup(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.conversations.createEventGroup(actor.userId, id);
+  }
+
   /** Aba "Álbum" do evento: abre quando começa, só para quem confirmou presença (ou criou). */
   @Get('events/:id/album')
   eventAlbum(@CurrentActor() actor: Actor, @Param('id') id: string) {

@@ -10,7 +10,7 @@ import { StoryCreator } from '../components/story-creator.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { EditPostSheet } from '../components/post-actions.tsx';
 import { EventExtrasList } from '../components/event-extras.tsx';
-import { CalendarIcon, CalendarPlusIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UsersIcon } from '../components/icons.tsx';
+import { CalendarIcon, CalendarPlusIcon, ChatIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UsersIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
 import { SampleBadge } from '../components/suggestions.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice } from '../components/ui.tsx';
@@ -195,6 +195,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [goBusy, setGoBusy] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
+  const [groupBusy, setGroupBusy] = useState(false);
+  const [groupProblem, setGroupProblem] = useState<string | undefined>();
   const search = useSearch();
   // Abre nas informações (o que quem recebeu o evento quer ver primeiro); link de publicação abre direto no feed.
   const [tab, setTab] = useState<'feed' | 'info' | 'album'>(() => (search.get('post') || search.get('pendentes') === '1' ? 'feed' : search.get('aba') === 'album' ? 'album' : 'info'));
@@ -224,6 +226,21 @@ export function EventScreen({ eventId }: { eventId: string }) {
       setProblem(toApiError(failure).message);
     } finally {
       setGoBusy(false);
+    }
+  }
+
+  /** Quem criou o evento cria o grupo dele (ou cai no que já existe) e vai para a conversa. */
+  async function createGroup() {
+    if (!e) return;
+    setGroupBusy(true);
+    setGroupProblem(undefined);
+    try {
+      const { id: conversationId } = await api.createEventGroup(e.id);
+      navigate(`/conversas/${encodeURIComponent(conversationId)}`);
+    } catch (failure) {
+      setGroupProblem(toApiError(failure).message);
+    } finally {
+      setGroupBusy(false);
     }
   }
 
@@ -407,6 +424,27 @@ export function EventScreen({ eventId }: { eventId: string }) {
               </span>
               <ChevronRightIcon />
             </Link>
+          ) : null}
+          {/* Grupo do evento: aparece só para quem está nele; quem criou o evento e ainda não tem grupo pode criar. */}
+          {!visitor && e.group ? (
+            <Link to={`/conversas/${encodeURIComponent(e.group.conversationId)}`} className="evhost evgroup">
+              <span className="evgroup__icon" aria-hidden="true">
+                <ChatIcon />
+              </span>
+              <span className="evhost__text">
+                <span className="evhost__label">{t('Grupo do evento')}</span>
+                <strong className="evhost__name">{e.group.name || t('Abrir o grupo')}</strong>
+              </span>
+              <ChevronRightIcon />
+            </Link>
+          ) : !visitor && e.canCreateGroup && !ended ? (
+            <div className="evgroup__create">
+              <Button full variant="secondary" loading={groupBusy} onClick={() => void createGroup()}>
+                <ChatIcon /> {t('Criar grupo do evento')}
+              </Button>
+              <p className="evgo__hint">{t('Entram seus amigos que foram convidados ou confirmaram. Depois dá para adicionar mais gente pelo grupo.')}</p>
+              {groupProblem ? <Notice tone="error">{groupProblem}</Notice> : null}
+            </div>
           ) : null}
           {e.isPrivate && !e.isOwner ? <p className="evprivate"><LockIcon /> {t('Só quem recebeu o convite vê este evento.')}</p> : null}
 

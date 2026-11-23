@@ -688,9 +688,16 @@ export class SchedulingService {
     const postId = await this.undatedEvent(actorId, rawPostId);
     const invitees = await this.inviteesOf(actorId, postId);
     if (invitees.length === 0) throw validationError('Convide alguém para o evento primeiro', { eventPostId: 'Mande o evento para quem vai votar na data' });
-    const title = (await posts.findById(postId))?.post.eventTitle ?? 'Evento';
     const now = clock.now();
-    const group = await conversations.createGroup({ id: ids.next(), name: Array.from(title).slice(0, EVENT_GROUP_NAME_MAX).join(''), ownerId: actorId, now });
+    // O evento já tem grupo (criado pela página do evento) em que você está: a votação abre nele, com os convidados que faltam.
+    for (const id of await conversations.groupIdsForEventPost(postId)) {
+      const members = (await conversations.participantIds(id)) ?? [];
+      if (!members.includes(actorId)) continue;
+      for (const userId of invitees) if (!members.includes(userId)) await conversations.addParticipant(id, userId, now);
+      return id;
+    }
+    const title = (await posts.findById(postId))?.post.eventTitle ?? 'Evento';
+    const group = await conversations.createGroup({ id: ids.next(), name: Array.from(title).slice(0, EVENT_GROUP_NAME_MAX).join(''), ownerId: actorId, now, eventPostId: postId });
     for (const userId of invitees) await conversations.addParticipant(group.id, userId, now);
     await conversations.markRead(group.id, actorId, now);
     return group.id;

@@ -361,6 +361,8 @@ export interface FlashRepository {
   /** Sessão ligada e ainda não expirada em `now`. */
   findActiveSession(userId: string, now: Date): Promise<FlashSessionRecord | undefined>;
   listActiveSessions(userIds: string[], now: Date): Promise<FlashSessionRecord[]>;
+  /** Quando a pessoa ligou o NOW pela última vez (qualquer sessão ainda guardada, ligada ou não). */
+  lastSessionStart(userId: string): Promise<Date | undefined>;
   /** Insere a sessão. CONFLICT se a pessoa já tem uma ligada e não expirada (uma por vez). */
   createSession(session: FlashSessionRecord, now: Date): Promise<void>;
   /** Encerra a sessão ativa da pessoa. Retorna se havia uma. */
@@ -412,7 +414,9 @@ export interface ConversationRepository {
   /** Quem participa da conversa (dois na 1 a 1; os que entraram no grupo). */
   participantIds(conversationId: string): Promise<string[] | undefined>;
   /** Cria a conversa de grupo só com quem organiza. */
-  createGroup(input: { id: string; name: string; ownerId: string; now: Date }): Promise<ConversationRecord>;
+  createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string }): Promise<ConversationRecord>;
+  /** Grupos criados para este evento (post), o mais antigo primeiro. */
+  groupIdsForEventPost(postId: string): Promise<string[]>;
   /** Idempotente: coloca a pessoa no grupo. */
   addParticipant(conversationId: string, userId: string, now: Date): Promise<void>;
   /** Tira a pessoa do grupo (idempotente). Quem entrou primeiro vem primeiro em `participantIds`. */

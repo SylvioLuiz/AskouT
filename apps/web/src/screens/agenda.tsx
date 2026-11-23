@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AgendaEvent } from '../lib/agenda.ts';
 import type { FormEvent } from 'react';
-import { DayStrip, LevelBadge, MonthCalendar, ParticipantMark, Sheet, StateMark } from '../components/agenda.tsx';
-import { Avatar } from '../components/ui.tsx';
+import { DayStrip, MonthCalendar, Sheet, StateMark } from '../components/agenda.tsx';
 import { CalendarSyncSheet, refreshDeviceCalendarsIfDue } from '../components/calendar-sync.tsx';
 import { busyColorsOnDay, busyOnDay, connectionColor, syncButtonLabel } from '../lib/calendar-sync.ts';
 import type { BusyBlock, CalendarConnection } from '../lib/calendar-sync.ts';
-import { CalendarIcon, ChevronRightIcon, ClockIcon, HelpIcon, LockIcon, PlusIcon, RefreshIcon, UsersIcon } from '../components/icons.tsx';
+import { CalendarIcon, ChevronRightIcon, ClockIcon, HelpIcon, LockIcon, PlusIcon, RefreshIcon } from '../components/icons.tsx';
 import { Button, Confirm, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, useTitle } from '../hooks.ts';
@@ -22,7 +21,6 @@ import {
   dayShortLabel,
   daysFrom,
   firstDayWith,
-  deviceTimeZone,
   localDateKey,
   monthDays,
   nextEventDayAfter,
@@ -33,7 +31,7 @@ import {
 } from '../lib/agenda.ts';
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
-import type { Compatibility, PublicProfile, Slot, SlotState } from '../lib/types.ts';
+import type { Slot, SlotState } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 
@@ -118,110 +116,13 @@ function SlotList({ slots, day, onRemove }: { slots: Slot[]; day: string; onRemo
   );
 }
 
-// ---------- Horários em comum ----------
-
-const COMMON_MAX_FRIENDS = 9;
-const COMMON_DAYS = 14;
-
-/** "Achar horário com amigos": escolhe amigos que mostram a agenda e vê o melhor horário de cada dia para todos. */
-function CommonTimesSheet({ today, onClose }: { today: string; onClose: () => void }) {
-  const friends = useAsync(() => api.sharingFriends(), []);
-  const [picked, setPicked] = useState<string[]>([]);
-  const [results, setResults] = useState<Compatibility[] | undefined>();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | undefined>();
-  const list: PublicProfile[] = friends.data?.friends ?? [];
-
-  function toggle(id: string) {
-    setResults(undefined);
-    setPicked((current) => (current.includes(id) ? current.filter((x) => x !== id) : current.length >= COMMON_MAX_FRIENDS ? current : [...current, id]));
-  }
-
-  async function search() {
-    setBusy(true);
-    setError(undefined);
-    try {
-      // Dia em que ninguém marcou nada ("aguardando informações") não ajuda a escolher: fica de fora.
-      const found = await api.bestDates({ friendIds: picked, fromDate: today, toDate: addDays(today, COMMON_DAYS - 1), durationMinutes: 120, earliestStart: '17:00', latestStart: '22:00', timeZone: deviceTimeZone(), limit: 20 });
-      setResults(found.filter((r) => r.level !== 'awaiting').slice(0, 5));
-    } catch (failure) {
-      setError(toApiError(failure).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Sheet title={t('Achar horário com amigos')} onClose={onClose}>
-      {friends.loading && !friends.data ? <Loading /> : null}
-      {friends.error ? <ErrorState message={friends.error.message} onRetry={friends.reload} /> : null}
-      {friends.data && list.length === 0 ? (
-        <p className="muted">{t('Nenhum amigo mostra os horários ainda. Quando alguém ligar Mostrar meus horários para amigos na agenda, aparece aqui.')}</p>
-      ) : null}
-      {list.length > 0 ? (
-        <>
-          <p className="muted">{t('Escolha até {max} amigos. O app procura nos próximos {days} dias, entre 17h e 22h, o melhor horário de cada dia para todo mundo.', { max: COMMON_MAX_FRIENDS, days: COMMON_DAYS })}</p>
-          <ul className="agcommon__friends">
-            {list.map((f) => (
-              <li key={f.userId}>
-                <label className={`agcommon__friend${picked.includes(f.userId) ? ' agcommon__friend--on' : ''}`}>
-                  <input type="checkbox" checked={picked.includes(f.userId)} onChange={() => toggle(f.userId)} disabled={!picked.includes(f.userId) && picked.length >= COMMON_MAX_FRIENDS} />
-                  <Avatar profile={f} size={32} />
-                  <span className="agcommon__name">
-                    <strong>{f.displayName}</strong>
-                    <span>@{f.username}</span>
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
-          {error ? <Notice tone="error">{error}</Notice> : null}
-          <Button full loading={busy} disabled={picked.length === 0} onClick={() => void search()}>
-            {t('Ver horários em comum')}
-          </Button>
-        </>
-      ) : null}
-      {results ? (
-        results.length === 0 ? (
-          <p className="muted agcommon__empty">{t('Nenhum horário bom nos próximos dias. Marquem horários na agenda e tentem de novo.')}</p>
-        ) : (
-          <ul className="agcommon__results" aria-label={t('Horários em comum')}>
-            {results.map((r) => {
-              const day = localDateKey(new Date(r.start));
-              return (
-                <li key={r.start} className="agcommon__result">
-                  <div className="agcommon__when">
-                    <strong>{capitalize(dayLongLabel(day))}</strong>
-                    <span>{timeRangeLabel(r, day)}</span>
-                  </div>
-                  <LevelBadge level={r.level} />
-                  <ul className="agcommon__people">
-                    {r.participants.map((p) => (
-                      <li key={p.profile.userId}>
-                        <span>{p.isMe ? t('Você') : `@${p.profile.username}`}</span>
-                        <ParticipantMark status={p.status} />
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              );
-            })}
-          </ul>
-        )
-      ) : null}
-    </Sheet>
-  );
-}
-
 // ---------- Minha agenda ----------
 
-/** "Como funciona?" da agenda: para que serve marcar horário e o que mais aparece nela. */
+/** "Como funciona?" da agenda: marcar horário (pessoal, só a pessoa vê) e o que mais aparece nela. */
 function AgendaHelp({ onClose }: { onClose: () => void }) {
   const rules: { icon: ReactNode; title: string; text: string }[] = [
-    { icon: <ClockIcon />, title: t('Marcar horário'), text: t('Toque em Marcar horário, escolha o dia e o período e diga como você está: disponível (topo sair), parcial (talvez, ou só parte do tempo) ou indisponível.') },
-    { icon: <PlusIcon />, title: t('Para que serve'), text: t('É o seu lembrete de quando dá para sair e, se você quiser, o jeito de mostrar aos amigos quando você topa.') },
-    { icon: <LockIcon />, title: t('Você escolhe quem vê'), text: t('Começa só para você. Se ligar Mostrar meus horários para amigos, seus amigos veem quando você está livre e podem achar horários em comum com você. Dá para desligar quando quiser.') },
-    { icon: <UsersIcon />, title: t('Horários em comum'), text: t('Toque em Achar horário com amigos, escolha quem vai e o app mostra o melhor horário de cada dia para todo mundo. Só entram amigos que também mostram os horários.') },
+    { icon: <ClockIcon />, title: t('Marcar horário'), text: t('Toque em Marcar horário, escolha o dia e o período e anote como você está: disponível, parcial (talvez, ou só parte do tempo) ou indisponível.') },
+    { icon: <LockIcon />, title: t('Só você vê'), text: t('Os horários que você marca são pessoais: servem de lembrete para você e não aparecem para ninguém.') },
     { icon: <RefreshIcon />, title: t('Sincronizar agendas'), text: t('Ligue o Google Agenda (ou outra) para ver aqui os seus compromissos como ocupado. Só o horário vem: o nome do compromisso não sai do seu calendário.') },
     { icon: <CalendarIcon />, title: t('Seus eventos'), text: t('Os eventos em que você confirmou presença aparecem no dia deles, junto com os seus horários.') },
   ];
@@ -353,9 +254,6 @@ export function AgendaScreen() {
   const picked = useRef(false);
   const [adding, setAdding] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [finding, setFinding] = useState(false);
-  const sharing = useAsync(() => api.availabilitySharing(), []);
-  const shared = sharing.data?.sharing === true;
   const [syncing, setSyncing] = useState(false);
   const [syncedN, setSyncedN] = useState(0);
   const search = useSearch();
@@ -490,7 +388,7 @@ export function AgendaScreen() {
     <>
       <PageHead
         title={t('Agenda')}
-        subtitle={shared ? t('Seus amigos veem esta agenda. Marque quando topa sair.') : t('Só você vê esta agenda. Marque quando topa sair.')}
+        subtitle={t('Só você vê esta agenda. Marque seus horários pessoais.')}
         action={
           <button type="button" className="nowhead__how" onClick={() => setHelpOpen(true)}>
             <HelpIcon />
@@ -499,18 +397,6 @@ export function AgendaScreen() {
         }
       />
       {helpOpen ? <AgendaHelp onClose={() => setHelpOpen(false)} /> : null}
-
-      <Link to="/configuracao/agenda" className="agshare agshare--link" aria-label={t('Agenda com amigos: {state}. Mudar nas configurações.', { state: shared ? t('ligada') : t('desligada') })}>
-        <div className="agshare__text">
-          <h2 className="agshare__title">{t('Agenda com amigos')}</h2>
-          <p className="agshare__help">{sharing.data === undefined ? t('Carregando…') : shared ? t('Ligada: seus amigos veem seus horários. Toque para mudar nas configurações.') : t('Desligada: só você vê seus horários. Toque para mudar nas configurações.')}</p>
-        </div>
-        <ChevronRightIcon />
-      </Link>
-      <Button variant="secondary" full onClick={() => setFinding(true)}>
-        <UsersIcon /> {t('Achar horário com amigos')}
-      </Button>
-      {finding ? <CommonTimesSheet today={today} onClose={() => setFinding(false)} /> : null}
 
       <div className="agsync">
         <div className="agview" role="group" aria-label={t('Visualização da agenda')}>

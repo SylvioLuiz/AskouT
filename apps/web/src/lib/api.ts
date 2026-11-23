@@ -110,8 +110,6 @@ import type {
   ProfileView,
   ReferralOverview,
   PublicProfile,
-  BestDatesInput,
-  Compatibility,
   SessionUser,
   SignupInput,
   AgeStatus,
@@ -407,13 +405,6 @@ export function createApi(deps: ApiDeps) {
     mySlots: (from: string, to: string) =>
       request<Slot[]>('GET', `/me/availability?from=${id(from)}&to=${id(to)}`),
     addSlot: (input: SlotInput) => request<Slot>('POST', '/me/availability', { body: input }),
-    /** Mostrar os seus horários para os amigos (começa desligado). */
-    availabilitySharing: () => request<{ sharing: boolean }>('GET', '/me/availability/sharing'),
-    setAvailabilitySharing: (sharing: boolean) => request<{ sharing: boolean }>('PUT', '/me/availability/sharing', { body: { sharing } }),
-    /** Amigos que mostram os horários (os únicos que entram nos horários em comum). */
-    sharingFriends: () => request<{ friends: PublicProfile[] }>('GET', '/friends/availability'),
-    /** Melhor horário de cada dia para você e os amigos escolhidos. */
-    bestDates: (input: BestDatesInput) => request<Compatibility[]>('POST', '/availability/best-dates', { body: input }),
     removeSlot: (slotId: string) => request<{ removed: boolean }>('DELETE', `/me/availability/${id(slotId)}`),
 
     // Sincronizar agendas (celular, Google Agenda, links iCal): só horários ocupados
@@ -553,6 +544,8 @@ export function createApi(deps: ApiDeps) {
       request<EventPage>('GET', `${visitor() ? '/public' : ''}/events/${id(eventId)}${position ? `?lat=${position.lat}&lng=${position.lng}` : ''}`, visitor() ? { auth: false } : {}),
     /** Quem já foi convidado para o evento (marcado ou recebeu o cartão). O dono vê todos; os demais, quem eles convidaram. */
     eventInvites: (eventId: string) => request<{ invites: EventInvite[] }>('GET', `/events/${id(eventId)}/invites`),
+    /** Cria o grupo do evento (só quem criou o evento) ou devolve o que já existe em que você está. */
+    createEventGroup: (eventId: string) => request<{ id: string; created: boolean }>('POST', `/events/${id(eventId)}/group`),
     /** Aba Álbum do evento: SOON antes de começar, LOCKED para quem não confirmou, OPEN com o álbum. */
     eventAlbum: (eventId: string) => request<{ state: 'SOON'; startsAt: string | null } | { state: 'LOCKED' } | { state: 'OPEN'; album: AlbumDetail }>('GET', `/events/${id(eventId)}/album`),
     eventStories: (eventId: string) => request<{ groups: EventStoryGroup[] }>('GET', `/events/${id(eventId)}/stories`),

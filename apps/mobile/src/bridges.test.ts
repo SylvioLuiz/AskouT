@@ -619,4 +619,17 @@ describe('ponte de localização em segundo plano', () => {
     });
     assert.equal(await down.put('https://api/x', {}, {}), 0);
   });
+
+  it('progress: atualiza o aviso fixo pelo plugin do app e não faz nada sem ele (iPhone, build antigo)', async () => {
+    const { createBackgroundLocationBridge } = await import('./background-location-bridge.ts');
+    const plugin = { addWatcher: async () => 'x', removeWatcher: async () => {}, openSettings: async () => {} };
+    const http = { request: async () => ({ status: 200 }) };
+    const updates: unknown[] = [];
+    const android = createBackgroundLocationBridge({ plugin, http, progress: { update: async (o) => (updates.push(o), { shown: true }) } });
+    await android.progress({ title: 'Mostrando', text: '~5 min', progress: 40, arrived: false });
+    assert.deepEqual(updates, [{ title: 'Mostrando', text: '~5 min', progress: 40, arrived: false }]);
+    const failing = createBackgroundLocationBridge({ plugin, http, progress: { update: async () => Promise.reject(new Error('x')) } });
+    await failing.progress({ title: 't', text: '', progress: 0, arrived: false });
+    await createBackgroundLocationBridge({ plugin, http }).progress({ title: 't', text: '', progress: 0, arrived: false });
+  });
 });

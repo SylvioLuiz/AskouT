@@ -376,12 +376,17 @@ model Group {
   ownerId   String   @db.Uuid
   name      String
   imageUrl  String?
+  /// Grupo criado para um evento de pessoa (pela página do evento ou pela votação da data). Liga pelo ID: o nome do evento pode mudar.
+  eventPostId String? @db.Uuid
   createdAt DateTime @default(now())
 
   owner   User          @relation("GroupOwner", fields: [ownerId], references: [id])
+  eventPost Post?       @relation("EventGroups", fields: [eventPostId], references: [id], onDelete: SetNull)
   members GroupMember[]
   meetings Meeting[]
   conversation Conversation?
+
+  @@index([eventPostId])
 }
 
 model GroupMember {
@@ -1019,6 +1024,7 @@ model Post {
   images PostImage[]
   tags   PostTag[]
   invites EventInvite[]
+  eventGroups Group[] @relation("EventGroups")
   likes    PostLike[]
   comments PostComment[]
   reports  PostReport[]

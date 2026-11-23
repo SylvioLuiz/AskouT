@@ -47,7 +47,7 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   createdAt: r.createdAt,
 });
 
-type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; group: { name: string; ownerId: string; imageUrl: string | null } | null };
+type ConversationRow = { id: string; type: 'DIRECT' | 'GROUP'; directKey: string | null; createdAt: Date; group: { name: string; ownerId: string; imageUrl: string | null; eventPostId: string | null } | null };
 
 const toConversation = (c: ConversationRow): ConversationRecord => ({
   id: c.id,
@@ -56,6 +56,7 @@ const toConversation = (c: ConversationRow): ConversationRecord => ({
   name: c.group?.name ?? null,
   ownerId: c.group?.ownerId ?? null,
   imageUrl: c.group?.imageUrl ?? null,
+  eventPostId: c.group?.eventPostId ?? null,
   createdAt: c.createdAt,
 });
 
@@ -116,19 +117,26 @@ export class PrismaConversationRepository implements ConversationRepository {
     return rows.length > 0 ? rows.map((r) => r.userId) : undefined;
   }
 
-  async createGroup(input: { id: string; name: string; ownerId: string; now: Date }): Promise<ConversationRecord> {
+  async createGroup(input: { id: string; name: string; ownerId: string; now: Date; eventPostId?: string }): Promise<ConversationRecord> {
     const groupId = randomUUID();
     await this.prisma.group.create({
       data: {
         id: groupId,
         ownerId: input.ownerId,
         name: input.name,
+        ...(input.eventPostId ? { eventPostId: input.eventPostId } : {}),
         createdAt: input.now,
         members: { create: [{ userId: input.ownerId, role: 'OWNER', joinedAt: input.now }] },
         conversation: { create: { id: input.id, type: 'GROUP', createdAt: input.now, participants: { create: [{ userId: input.ownerId }] } } },
       },
     });
-    return { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, createdAt: input.now };
+    return { id: input.id, type: 'GROUP', directKey: null, name: input.name, ownerId: input.ownerId, imageUrl: null, eventPostId: input.eventPostId ?? null, createdAt: input.now };
+  }
+
+  async groupIdsForEventPost(postId: string): Promise<string[]> {
+    if (!isUuid(postId)) return [];
+    const rows = await this.prisma.conversation.findMany({ where: { group: { eventPostId: postId } }, select: { id: true }, orderBy: { createdAt: 'asc' } });
+    return rows.map((r) => r.id);
   }
 
   async removeParticipant(conversationId: string, userId: string): Promise<void> {

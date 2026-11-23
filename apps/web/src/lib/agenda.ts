@@ -212,9 +212,9 @@ export const STATE_LABEL: Record<SlotState, string> = {
 };
 
 export const STATE_HELP: Record<SlotState, string> = {
-  AVAILABLE: t('Posso aceitar convites neste período'),
-  PARTIAL: t('Talvez, só parte do período ou com algum aviso'),
-  UNAVAILABLE: t('Não posso, mesmo que alguém convide'),
+  AVAILABLE: t('Estou livre neste período'),
+  PARTIAL: t('Talvez, ou só parte do período'),
+  UNAVAILABLE: t('Estou ocupado neste período'),
 };
 
 export const LEVEL_LABEL: Record<CompatibilityLevel, string> = {

@@ -935,6 +935,10 @@ export interface EventPage {
   goingOnProfile?: boolean;
   /** Evento sem data com votação aberta (para quem criou ou participa). Nulo: sem votação. */
   datePollId?: string | null;
+  /** Grupo (conversa) do evento em que você está. Nulo: não está em nenhum. */
+  group?: { conversationId: string; name: string } | null;
+  /** Quem criou o evento e ainda não está num grupo dele: pode criar. */
+  canCreateGroup?: boolean;
   owner: PublicProfile | null;
   isOwner: boolean;
 }

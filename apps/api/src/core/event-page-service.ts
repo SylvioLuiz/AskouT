@@ -150,6 +150,13 @@ export interface EventPageView {
    * Nulo também quando não há votação: quem criou vê o botão para abrir uma.
    */
   datePollId: string | null;
+  /**
+   * Grupo (conversa) do evento em que o visitante está: o criado para o evento, o da votação da data ou o do encontro
+   * que ele combinou a partir do evento. Nulo se não está em nenhum.
+   */
+  group: { conversationId: string; name: string } | null;
+  /** Quem criou o evento (de pessoa) ainda não está num grupo dele: vê o botão para criar. */
+  canCreateGroup: boolean;
 }
 
 /** Pessoa convidada para um evento criado por uma pessoa. */
@@ -296,7 +303,30 @@ export class EventPageService {
       canStory: (isOwner || iGo) && (base.view.endsAt === null || Date.parse(base.view.endsAt) > this.deps.clock.now().getTime()),
       goingOnProfile: !isOwner && iGo ? (await this.deps.eventRoom.goingOnProfile(ref, viewerId)) === true : false,
       datePollId: await this.datePollFor(viewerId, ref, base.view.startsAt, isOwner),
+      ...(await this.groupFor(viewerId, ref, isOwner)),
     };
+  }
+
+  /** Grupo do evento em que o visitante está (só mostra conversa de que ele já faz parte) e se ele pode criar um. */
+  private async groupFor(viewerId: string, ref: EventRef, isOwner: boolean): Promise<Pick<EventPageView, 'group' | 'canCreateGroup'>> {
+    const { conversations, scheduling, meetups } = this.deps;
+    const candidates: string[] = [];
+    if (ref.source === 'USER') {
+      candidates.push(...(await conversations.groupIdsForEventPost(ref.id)));
+      const poll = await scheduling.findByEventPost(ref.id);
+      if (poll && poll.status !== 'CANCELLED') candidates.push(poll.conversationId);
+    }
+    for (const m of await meetups.listForUser(viewerId, 50)) {
+      if (m.status === 'ACTIVE' && (m.eventPostId === ref.id || m.eventId === ref.id)) candidates.push(m.conversationId);
+    }
+    for (const id of [...new Set(candidates)]) {
+      const conversation = await conversations.findById(id);
+      if (conversation?.type !== 'GROUP') continue;
+      if (!((await conversations.participantIds(id)) ?? []).includes(viewerId)) continue;
+      return { group: { conversationId: id, name: conversation.name ?? '' }, canCreateGroup: false };
+    }
+    const canCreateGroup = ref.source === 'USER' && isOwner && (await this.deps.posts.findById(ref.id))?.post.archivedAt === null;
+    return { group: null, canCreateGroup };
   }
 
   /**
@@ -352,10 +382,12 @@ export class EventPageService {
       canStory: false,
       goingOnProfile: false,
       datePollId: null,
+      group: null,
+      canCreateGroup: false,
     };
   }
 
-  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'goingOnProfile' | 'datePollId'> }> {
+  private async base(viewerId: string, ref: EventRef, input: { lat?: number; lng?: number }): Promise<{ view: Omit<EventPageView, 'confirmedCount' | 'going' | 'attendees' | 'owner' | 'isOwner' | 'storyUserIds' | 'canStory' | 'goingOnProfile' | 'datePollId' | 'group' | 'canCreateGroup'> }> {
     if (ref.source === 'PLACE') {
       const found = await this.deps.places.findEvent(ref.id);
       if (!found) throw notFound('Evento não encontrado');
