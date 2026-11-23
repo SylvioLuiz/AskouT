@@ -12,6 +12,7 @@ import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownI
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
 import { FileBubble } from '../components/chat-file.tsx';
 import { LinkedText } from '../components/linked-text.tsx';
+import { MatchPin } from '../components/match-pin.tsx';
 import { CHAT_FILE_ACCEPT, documentType, fileProblem } from '../lib/chat-file.ts';
 import { MessagePopup, ReactionSummary, ReactionsSheet, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';
@@ -36,7 +37,6 @@ import { prepareVideoUpload, withMediaType } from '../lib/media-file.ts';
 import { canCompressVideo, prepareProgressText } from '../lib/video-prepare.ts';
 import { ApiError, toApiError } from '../lib/errors.ts';
 import { safeImage } from '../lib/explore.ts';
-import { FLASH_MATCH_MESSAGE, formatRemaining, minutesLeft } from '../lib/flash.ts';
 import { CommentGifView, CommentTools, GifImage } from '../components/comment-tools.tsx';
 import type { ChatMessage, CommentGif, ConversationItem, MessageStory, PublicProfile } from '../lib/types.ts';
 import { StoryViewer } from '../components/event-story.tsx';
@@ -1142,30 +1142,20 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     }
   }
 
-  // O botão de sugerir lugar vive na mensagem "Flash combinado" mais recente. Encontro antigo, sem essa mensagem, mostra o cartão no fim.
-  const matchMessageId = [...messages].reverse().find((m) => m.kind === 'SYSTEM' && m.body === FLASH_MATCH_MESSAGE)?.id;
   // Depois que um local foi aceito, o botão passa a ser para trocar o local (o aceite pode ser cancelado no cartão).
   // Só um local aceito por vez: o mais recente com aceite.
   const agreedMessage = [...messages].reverse().find((m) => m.kind === 'SUGGESTION' && !m.deleted && m.response === 'ACCEPTED' && m.suggestion);
   const agreed = agreedMessage?.suggestion ? { id: agreedMessage.id, name: agreedMessage.suggestion.venueName, lat: agreedMessage.suggestion.lat, lng: agreedMessage.suggestion.lng } : undefined;
   const placeAgreed = agreed !== undefined;
-  const matchCard = match ? (
-    <div className="callout chat__match">
-      <p className="callout__text">
-        <Link to={`/now/encontro/${match.id}`} className="chat__matchlink">
-          <strong>{t('Encontro NOW ativo')}</strong>
-        </Link>{' '}
-        · {t('acaba em {left}', { left: formatRemaining(minutesLeft(match.expiresAt, serverNow)) })}
-      </p>
-      <div className="row-actions">
-        <Button small onClick={() => setSuggesting('suggest')}>
-          {placeAgreed ? t('Mudar local sugerido') : t('Sugerir um local')}
-        </Button>
-        <Button small variant="secondary" onClick={() => setMapFor(agreed ? { place: { name: agreed.name, lat: agreed.lat, lng: agreed.lng } } : {})}>
-          {t('Ver no mapa')}
-        </Button>
-      </div>
-    </div>
+  // Encontro do NOW fixado no topo da conversa (tempo, local e localizações); tocar abre o encontro.
+  const matchPin = match ? (
+    <MatchPin
+      inviteId={match.id}
+      otherName={data.other?.displayName ?? ''}
+      agreedName={agreed?.name}
+      onSuggest={() => setSuggesting('suggest')}
+      onMap={() => setMapFor(agreed ? { place: { name: agreed.name, lat: agreed.lat, lng: agreed.lng } } : {})}
+    />
   ) : null;
 
   const chosen = selected ? messages.filter((m) => selected.includes(m.id)) : [];
@@ -1339,7 +1329,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         other={data.other}
         groupName={data.name}
         groupImageUrl={data.imageUrl}
-        below={<PollLine conversationId={conversationId} />}
+        below={
+          <>
+            {matchPin}
+            <PollLine conversationId={conversationId} />
+          </>
+        }
         pinned={data.pinned}
         muted={data.muted}
         onPrefsChanged={view.reload}
@@ -1382,7 +1377,6 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
                 <div key={first.id} className="chat__item" data-at={first.createdAt}>
                   {showBreak ? <p className="chat__day">{breakLabel(first.createdAt, new Date(serverNow))}</p> : null}
                   <p className="chat__system">{first.body}</p>
-                  {match && first.id === matchMessageId ? matchCard : null}
                 </div>
               );
             }
