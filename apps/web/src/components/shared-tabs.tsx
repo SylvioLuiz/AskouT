@@ -72,6 +72,8 @@ export function SharedEvents({ meetups }: { meetups: MeetupView[] }) {
 /** Mídia da conversa: fotos e vídeos em grade e as mensagens de voz em lista. */
 export function SharedMedia({ voice, media, conversationId }: { voice: SharedVoice[]; media: SharedMediaItem[]; conversationId: string }) {
   if (voice.length === 0 && media.length === 0) return <EmptyState title={t('Nenhuma mídia ainda')}>{t('As fotos, os vídeos e as mensagens de voz enviados aqui aparecem nesta aba.')}</EmptyState>;
+  const thumbLabel = (m: SharedMediaItem) => `${m.kind === 'VIDEO' ? 'Vídeo' : t('Foto')} de ${m.mine ? 'você' : m.senderName}, ${dateFmt.format(new Date(m.createdAt))}`;
+  const gallery = media.map((m) => ({ id: m.messageId, kind: m.kind, label: thumbLabel(m) }));
   return (
     <>
       {media.length > 0 ? (
@@ -79,7 +81,7 @@ export function SharedMedia({ voice, media, conversationId }: { voice: SharedVoi
           <ul className="mediagrid">
             {media.map((m) => (
               <li key={m.messageId}>
-                <MediaThumb conversationId={conversationId} messageId={m.messageId} kind={m.kind} label={`${m.kind === 'VIDEO' ? 'Vídeo' : t('Foto')} de ${m.mine ? 'você' : m.senderName}, ${dateFmt.format(new Date(m.createdAt))}`} />
+                <MediaThumb conversationId={conversationId} messageId={m.messageId} kind={m.kind} label={thumbLabel(m)} gallery={gallery} />
               </li>
             ))}
           </ul>
