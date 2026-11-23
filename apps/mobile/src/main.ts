@@ -109,6 +109,23 @@ if (Capacitor.isNativePlatform()) {
   w['AskouTContacts'] = createContactsBridge({ contacts: Contacts as never });
   // O botão do Google da web não abre dentro do app (o Google bloqueia login em WebView): entra a janela nativa.
   w['AskouTGoogle'] = createGoogleBridge({ login: SocialLogin as never, platform: () => Capacitor.getPlatform() });
+  // "Compartilhar com o AskouT" vindo de outro app (só Android por enquanto; ShareInPlugin.java). O app web abre
+  // "Enviar para…" (apps/web/src/lib/share-in.ts). Build antigo, sem o plugin: a ponte não existe.
+  if (Capacitor.isPluginAvailable('AskouTShareIn')) {
+    const shareIn = registerPlugin<{
+      take(): Promise<{ share: { items: { path: string; name: string; mime: string }[]; text?: string } | null }>;
+      addListener(event: 'received', cb: () => void): Promise<{ remove(): Promise<void> }>;
+    }>('AskouTShareIn');
+    w['AskouTShareIn'] = {
+      take: async () => (await shareIn.take()).share ?? null,
+      onShare(cb: () => void): () => void {
+        const handle = shareIn.addListener('received', cb);
+        return () => {
+          void handle.then((h) => h.remove()).catch(() => undefined);
+        };
+      },
+    };
+  }
   // Vibração curta de confirmação (arrastar para responder, segurar, etc.): no iPhone o navigator.vibrate não existe.
   // Contrato do lado web: apps/web/src/lib/haptics.ts. Build antigo, sem o plugin: o web cai no navigator.vibrate.
   if (Capacitor.isPluginAvailable('Haptics')) {

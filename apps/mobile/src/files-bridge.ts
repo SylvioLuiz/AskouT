@@ -12,6 +12,8 @@ export interface FilesDeps {
 }
 
 const NAME = /^[A-Za-z0-9._-]{1,80}\.(jpe?g|png|webp|gif|heic)$/i;
+/** Documento recebido na conversa (nome já limpo pelo app web, ver documentFileName). */
+const DOC_NAME = /^[A-Za-z0-9._ -]{1,90}\.(pdf|docx?|xlsx?|pptx?|odt|ods|odp|rtf|txt|csv)$/i;
 const MAX_FILES = 50;
 const TEXT_MAX = 2200; // limite da legenda do Instagram
 
@@ -30,6 +32,17 @@ export function createFilesBridge(deps: FilesDeps) {
       for (const f of o.files) uris.push((await deps.writeFile({ path: f.filename, data: f.base64 })).uri);
       try {
         await deps.share({ files: uris, dialogTitle: o.files.length === 1 ? 'Salvar foto' : 'Salvar fotos' });
+      } catch (e) {
+        if (isCancel(e)) return;
+        throw e;
+      }
+    },
+    /** Documento da conversa (PDF, Word...): grava no cache e abre o menu do aparelho para abrir ou salvar. */
+    async openDocument(o: { filename: string; base64: string }): Promise<void> {
+      if (!DOC_NAME.test(o.filename) || !o.base64) throw new Error('Arquivo inválido.');
+      const { uri } = await deps.writeFile({ path: o.filename, data: o.base64 });
+      try {
+        await deps.share({ files: [uri], dialogTitle: 'Abrir com' });
       } catch (e) {
         if (isCancel(e)) return;
         throw e;

@@ -118,6 +118,7 @@ export function previewOf(m: ChatMessage | null): string {
   if (m.deleted) return `${who}${t('Mensagem apagada')}`;
   if (m.kind === 'IMAGE') return `${who}${t('Foto')}`;
   if (m.kind === 'VIDEO') return `${who}${t('Vídeo')}`;
+  if (m.kind === 'FILE') return `${who}📎 ${m.body}`;
   if (m.kind === 'SUGGESTION' && m.suggestion) return `${prefix}${t('Sugeriu {venueName}', { venueName: m.suggestion.venueName })}`;
   if (m.kind === 'AUDIO') return `${m.senderName && !m.mine ? `${m.senderName}: ` : prefix}${t('Mensagem de voz')}${m.audio ? ` (${formatVoiceTime(m.audio.durationMs)})` : ''}`;
   if (m.kind === 'MEETUP') return `${prefix}${m.body}`;
@@ -132,6 +133,7 @@ export function replyPreview(m: ChatMessage): string {
   if (m.kind === 'AUDIO') return t('Mensagem de voz');
   if (m.kind === 'IMAGE') return t('Foto');
   if (m.kind === 'VIDEO') return t('Vídeo');
+  if (m.kind === 'FILE') return `📎 ${m.body}`;
   if (m.kind === 'EVENT') return t('Evento: {title}', { title: m.event?.title ?? t('compartilhado') });
   if (m.kind === 'SUGGESTION' && m.suggestion) return t('Sugestão: {venueName}', { venueName: m.suggestion.venueName });
   return Array.from(m.body.replace(/\s+/g, ' ')).slice(0, 100).join('');
@@ -164,7 +166,7 @@ export function announceChatsChanged(): void {
 }
 
 /** Tipos que a pessoa pode apagar para todos (só as próprias mensagens). */
-export const DELETABLE_KINDS: readonly ChatMessage['kind'][] = ['TEXT', 'AUDIO', 'IMAGE', 'VIDEO', 'EVENT'];
+export const DELETABLE_KINDS: readonly ChatMessage['kind'][] = ['TEXT', 'AUDIO', 'IMAGE', 'VIDEO', 'FILE', 'EVENT'];
 
 /** Mensagens sem opções: avisos do sistema e as já apagadas. */
 export function selectable(m: ChatMessage): boolean {

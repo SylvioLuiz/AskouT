@@ -6060,6 +6060,36 @@ button.reactlist__row { cursor: pointer; }
 /* Mensagens novas enquanto você lia lá em cima */
 .chat__newbtn { position: sticky; bottom: calc(84px + var(--sa-bottom)); z-index: 5; align-self: center; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin: 0 0 8px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font: inherit; font-size: 0.875rem; font-weight: 500; box-shadow: 0 4px 14px rgb(0 0 0 / 0.2); cursor: pointer; animation: msgpop-in 160ms ease-out; }
 .chat__newbtn svg { width: 18px; height: 18px; }
+/* "Enviar para…" (compartilhado de outro app). */
+.sharein { display: grid; gap: 12px; padding-bottom: calc(84px + var(--sa-bottom)); }
+.sharein__items { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sharein__items li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); }
+.sharein__items li.is-off { opacity: .5; }
+.sharein__items strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sharein__items span { flex: none; color: var(--muted); font-size: 0.8125rem; }
+.sharein__link { color: var(--brand-text); }
+.sharein__caption input, .sharein__search input { width: 100%; min-height: 44px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font: inherit; }
+.sharein__list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.sharein__row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 6px; border: 0; border-radius: 14px; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.sharein__row.is-on { background: color-mix(in srgb, var(--brand) 12%, transparent); }
+.sharein__who { display: grid; flex: 1; min-width: 0; }
+.sharein__who strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sharein__who span { color: var(--muted); font-size: 0.8125rem; }
+.sharein__check { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border: 2px solid var(--line-strong); border-radius: 50%; color: var(--brand-ink); }
+.sharein__row.is-on .sharein__check { border-color: var(--brand); background: var(--brand); }
+.sharein__check svg { width: 16px; height: 16px; }
+.sharein__bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px calc(10px + var(--sa-bottom)); border-top: 1px solid var(--line); background: var(--surface); }
+.sharein__count { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 0.875rem; }
+/* Documento na conversa (PDF, Word...). */
+.filebubble { display: grid; gap: 4px; min-width: 200px; max-width: 280px; }
+.filebubble__open { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 12px; background: color-mix(in srgb, var(--ink) 6%, transparent); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.filebubble__icon { position: relative; flex: none; display: grid; place-items: center; width: 40px; height: 44px; color: var(--brand-text); }
+.filebubble__icon svg { width: 40px; height: 44px; }
+.filebubble__ext { position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); padding: 0 3px; border-radius: 3px; background: var(--brand-text); color: var(--surface); font-size: 0.5625rem; font-weight: 800; letter-spacing: .02em; }
+.filebubble__text { display: grid; min-width: 0; }
+.filebubble__name { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-weight: 600; overflow-wrap: anywhere; }
+.filebubble__meta { color: var(--muted); font-size: 0.8125rem; }
+.filebubble__problem { color: var(--danger); font-size: 0.8125rem; }
 /* Botão redondo de voltar ao fim (rolou para cima, sem mensagem nova). */
 .chat__newbtn--round { width: 40px; min-height: 40px; justify-content: center; padding: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
 /* Divisória "Mensagens novas" ao abrir a conversa. */

@@ -588,7 +588,8 @@ export interface ChatMessage {
   mine: boolean;
   /** Nome de quem enviou; só em grupo. */
   senderName: string | null;
-  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO';
+  /** FILE: documento (PDF, Word...); o nome do arquivo vem em `body`. */
+  kind: 'TEXT' | 'SUGGESTION' | 'MEETUP' | 'SYSTEM' | 'EVENT' | 'AUDIO' | 'IMAGE' | 'VIDEO' | 'FILE';
   body: string;
   suggestion: SuggestionCard | null;
   /** Mensagem de voz (kind AUDIO): só a duração; o áudio é baixado ao tocar. */

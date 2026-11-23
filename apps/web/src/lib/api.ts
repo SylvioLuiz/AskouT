@@ -763,6 +763,29 @@ export function createApi(deps: ApiDeps) {
       if (error.code === 'UNAUTHORIZED' && token !== undefined && token === deps.getToken()) deps.onUnauthorized();
       throw error;
     },
+    /** Documento (PDF, Word...): o arquivo vai cru no corpo, com o tipo no Content-Type e o nome em `?nome=`. */
+    sendFile: async (conversationId: string, file: Blob, name: string, type: string, replyToId?: string): Promise<ChatMessage> => {
+      const token = deps.getToken();
+      const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': type };
+      if (token !== undefined) headers['Authorization'] = t('Bearer {token}', { token });
+      const query = new URLSearchParams({ nome: name, ...(replyToId ? { replyTo: replyToId } : {}) });
+      let response;
+      try {
+        response = await deps.fetch(`${deps.baseUrl}/conversations/${id(conversationId)}/files?${query.toString()}`, { method: 'POST', headers, body: file });
+      } catch {
+        throw networkError();
+      }
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = undefined;
+      }
+      if (response.ok) return payload as ChatMessage;
+      const error = errorFromResponse(response.status, payload, response.headers.get('Retry-After'));
+      if (error.code === 'UNAUTHORIZED' && token !== undefined && token === deps.getToken()) deps.onUnauthorized();
+      throw error;
+    },
     /** Baixa a foto ou o vídeo de uma mensagem (a rota exige o token, então não dá para usar <img src>). */
     messageMedia: async (conversationId: string, messageId: string): Promise<Blob> => {
       const token = deps.getToken();
