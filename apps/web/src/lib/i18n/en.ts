@@ -3551,4 +3551,8 @@ export const EN: Readonly<Record<string, string>> = {
   "Fixada e silenciada": "Pinned and muted",
   "Fixada": "Pinned",
   "Silenciada": "Muted",
+  "Aceitar mesmo com outro compromisso?": "Accept even with other plans?",
+  "O convite de {name} bate com o que você já aceitou:": "{name}'s invite clashes with what you already accepted:",
+  "Aceitar mesmo assim": "Accept anyway",
+  "Choque com o que você já aceitou ({when})": "Clashes with something you accepted ({when})",
 };
