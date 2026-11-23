@@ -361,6 +361,8 @@ export interface FlashRepository {
   /** Sessão ligada e ainda não expirada em `now`. */
   findActiveSession(userId: string, now: Date): Promise<FlashSessionRecord | undefined>;
   listActiveSessions(userIds: string[], now: Date): Promise<FlashSessionRecord[]>;
+  /** Quando a pessoa ligou o NOW pela última vez (qualquer sessão ainda guardada, ligada ou não). */
+  lastSessionStart(userId: string): Promise<Date | undefined>;
   /** Insere a sessão. CONFLICT se a pessoa já tem uma ligada e não expirada (uma por vez). */
   createSession(session: FlashSessionRecord, now: Date): Promise<void>;
   /** Encerra a sessão ativa da pessoa. Retorna se havia uma. */

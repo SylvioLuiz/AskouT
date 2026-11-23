@@ -17,7 +17,7 @@ import { toApiError } from '../lib/errors.ts';
 import type { ExploreEvent, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
-import { BackIcon, LocationIcon, RouteIcon, SearchIcon } from '../components/icons.tsx';
+import { BackIcon, LocationIcon, MinusIcon, PlusIcon, RouteIcon, SearchIcon } from '../components/icons.tsx';
 import type { MapView } from '../components/map-engine.ts';
 import { t } from '../lib/i18n/index.ts';
 import { trackSponsoredOpen, useSponsoredView } from '../components/sponsored-view.tsx';
@@ -235,6 +235,8 @@ export function EventsMapScreen() {
   // O mapa só se enquadra sozinho até a pessoa escolher uma área ou centralizar em si.
   const [manual, setManual] = useState(false);
   const [recenter, setRecenter] = useState(0);
+  const [zoomStep, setZoomStep] = useState<{ delta: number; seq: number } | undefined>();
+  const zoom = (delta: number) => setZoomStep((prev) => ({ delta, seq: (prev?.seq ?? 0) + 1 }));
   // Logo depois de "Centralizar na minha localização": o mapa fica em você até a pessoa escolher um cartão ou pin.
   const [atMe, setAtMe] = useState(false);
   const [meHint, setMeHint] = useState(0);
@@ -419,6 +421,7 @@ export function EventsMapScreen() {
             onUserMove={onUserMove}
             recenter={recenter}
             followSelection={!atMe}
+            zoomStep={zoomStep}
           />
         </Suspense>
       )}
@@ -453,11 +456,24 @@ export function EventsMapScreen() {
         ) : null}
       </header>
       <section className="evmap__bottom" aria-label={mode === 'places' ? t('Locais mais próximos') : t('Eventos mais próximos')}>
-        {position && !mapFailed ? (
-          <button type="button" className="evmap__locate" onClick={centerOnMe} aria-label={t('Centralizar na minha localização')} title={t('Centralizar na minha localização')}>
-            <LocationIcon />
-          </button>
-        ) : null}
+        {mapFailed ? null : (
+          <div className="evmap__tools">
+            {/* + e − só no computador (CSS); no celular o zoom é com os dedos. */}
+            <div className="evmap__zoom" role="group" aria-label={t('Zoom do mapa')}>
+              <button type="button" onClick={() => zoom(1)} aria-label={t('Aproximar')} title={t('Aproximar')}>
+                <PlusIcon />
+              </button>
+              <button type="button" onClick={() => zoom(-1)} aria-label={t('Afastar')} title={t('Afastar')}>
+                <MinusIcon />
+              </button>
+            </div>
+            {position ? (
+              <button type="button" className="evmap__locate" onClick={centerOnMe} aria-label={t('Centralizar na minha localização')} title={t('Centralizar na minha localização')}>
+                <LocationIcon />
+              </button>
+            ) : null}
+          </div>
+        )}
         {noLocation ? (
           <div className="evmap__status">
             <p>{t('Ative a localização para ver os locais perto de você.')}</p>

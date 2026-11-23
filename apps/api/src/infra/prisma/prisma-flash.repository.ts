@@ -95,6 +95,12 @@ export class PrismaFlashRepository implements FlashRepository {
     return (rows as SessionRow[]).map(toSession);
   }
 
+  async lastSessionStart(userId: string): Promise<Date | undefined> {
+    if (!isUuid(userId)) return undefined;
+    const row = await this.prisma.flashSession.findFirst({ where: { userId }, orderBy: { startsAt: 'desc' }, select: { startsAt: true } });
+    return row?.startsAt ?? undefined;
+  }
+
   async createSession(session: FlashSessionRecord, now: Date): Promise<void> {
     const message = 'Seu NOW já está ligado. Desligue para recomeçar.';
     try {

@@ -50,9 +50,11 @@ interface Props {
   recenter: number;
   /** Falso logo depois de centralizar em você: o mapa não corre para o cartão destacado até a pessoa escolher outro. */
   followSelection: boolean;
+  /** Muda a cada toque nos botões + e − (só no computador): `delta` 1 aproxima, -1 afasta. */
+  zoomStep?: { delta: number; seq: number };
 }
 
-export default function EventsMap({ pins, me, selectedId, onSelect, onFail, autoFit, onUserMove, recenter, followSelection }: Props) {
+export default function EventsMap({ pins, me, selectedId, onSelect, onFail, autoFit, onUserMove, recenter, followSelection, zoomStep }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const live = useRef<{ map: MapEngine; markers: Map<string, EngineMarker>; me?: EngineMarker; fitKey: string } | undefined>(undefined);
   const failRef = useRef(onFail);
@@ -68,7 +70,7 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail, auto
     (async () => {
       try {
         if (!box.current) return;
-        const map = await createMapEngine(box.current, { center: { lat: -23.5505, lng: -46.6333 }, zoom: 13, onFail: () => failRef.current() });
+        const map = await createMapEngine(box.current, { center: { lat: -23.5505, lng: -46.6333 }, zoom: 13, nativeZoom: false, onFail: () => failRef.current() });
         if (cancelled) {
           map.destroy();
           return;
@@ -158,6 +160,12 @@ export default function EventsMap({ pins, me, selectedId, onSelect, onFail, auto
     if (!ready || !state || !at || recenter === 0) return;
     state.map.moveTo(at, { zoom: 15, raiseBy: 90, animate: true });
   }, [ready, recenter]);
+
+  // Botões + e − da tela (o zoom do provedor fica escondido para não brigar com eles nem com os cartões).
+  useEffect(() => {
+    if (!ready || !zoomStep) return;
+    live.current?.map.zoomBy(zoomStep.delta);
+  }, [ready, zoomStep]);
 
   return <div ref={box} className={`evmap__canvas${ready ? ' evmap__canvas--ready' : ''}`} role="region" aria-label={t('Mapa com os locais e eventos perto')} />;
 }

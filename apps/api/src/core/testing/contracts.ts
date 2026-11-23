@@ -844,6 +844,16 @@ export function defineRepositoryContract(
         assert.ok(await h.flash.findActiveSession(ana, at(64 * MIN)));
       });
 
+      it('sessão: lastSessionStart devolve o início mais recente, ligada ou não', async () => {
+        const ana = await newUser('ana');
+        assert.equal(await h.flash.lastSessionStart(ana), undefined);
+        assert.equal(await h.flash.lastSessionStart('não-é-uuid'), undefined);
+        await h.flash.createSession(session(ana, 0, 60 * MIN), at(0));
+        await h.flash.endSession(ana, at(5));
+        await h.flash.createSession(session(ana, 10, 70 * MIN), at(10));
+        assert.equal((await h.flash.lastSessionStart(ana))?.getTime(), at(10).getTime());
+      });
+
       it('convite: cria, lê e atualiza; só um aberto por par, em qualquer sentido', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');

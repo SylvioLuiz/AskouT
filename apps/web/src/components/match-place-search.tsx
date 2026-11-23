@@ -58,9 +58,11 @@ export function MatchPlaceSearch({ center, otherName, busy, onSuggest }: Props) 
 
   if (!open) {
     return (
-      <Button variant="secondary" full onClick={() => setOpen(true)}>
-        {t('Sugerir outro lugar')}
-      </Button>
+      <div className="placesearch placesearch--closed">
+        <Button variant="secondary" full onClick={() => setOpen(true)}>
+          {t('Sugerir outro lugar')}
+        </Button>
+      </div>
     );
   }
 

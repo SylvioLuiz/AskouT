@@ -130,6 +130,31 @@ test('chegada: vai até o lugar escolhido; encerrar ou parar troca o aviso por "
   assert.equal(last.body, 'O encontro foi encerrado');
 });
 
+test('chegada: tirar ou trocar o lugar troca o aviso na hora, em silêncio, com a barra do zero', async () => {
+  const { w, ana, bia, inviteId } = await matched();
+  await w.core.flash.shareLocation(bia, inviteId, HERE);
+  await w.core.flash.shareLocation(ana, inviteId, north(900));
+  await w.core.flash.chooseDestination(bia, inviteId, { name: 'Bar do Zé', ...north(100) });
+  await w.core.flash.setArrival(ana, inviteId, true);
+  await w.core.flushNotifications();
+  assert.equal(liveSent(w).length, 1);
+
+  w.clock.tick(5_000);
+  await w.core.flash.clearDestination(bia, inviteId);
+  await w.core.flushNotifications();
+  const cleared = liveSent(w)[1]!.message;
+  assert.match(cleared.body, /até você$/, 'sem lugar, vai até onde a Bia está');
+  assert.equal(cleared.live?.quiet, true);
+  assert.equal(cleared.live?.progress, 0);
+
+  w.clock.tick(5_000);
+  await w.core.flash.chooseDestination(ana, inviteId, { name: 'Café', ...north(400) });
+  await w.core.flushNotifications();
+  const changed = liveSent(w)[2]!.message;
+  assert.match(changed.body, /até Café$/);
+  assert.equal(changed.live?.quiet, true);
+});
+
 test('chegada: exige posição exata, só quem está no encontro, e "aproximada" desliga', async () => {
   const { w, ana, caio, inviteId } = await matched();
   await rejectsWith(w.core.flash.setArrival(ana, inviteId, 'sim'), 'VALIDATION');

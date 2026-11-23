@@ -15,7 +15,7 @@ import { createAppleBridge } from './apple-bridge.ts';
 import { installBackButton } from './back-button.ts';
 import { deepLinkPath } from './deep-link.ts';
 import { createLocationBridge, guardGeolocation } from './location-bridge.ts';
-import { createBackgroundLocationBridge, type BackgroundPluginLike } from './background-location-bridge.ts';
+import { createBackgroundLocationBridge, type ArrivalProgressPluginLike, type BackgroundPluginLike } from './background-location-bridge.ts';
 import { createGoogleBridge } from './google-bridge.ts';
 import { createCalendarBridge } from './calendar-bridge.ts';
 import { createFilesBridge } from './files-bridge.ts';
@@ -60,7 +60,15 @@ if (Capacitor.isNativePlatform()) {
   });
   w['AskouTLocation'] = location;
   // Chegada no NOW com o celular bloqueado (só liga quando a pessoa escolhe mostrar a chegada).
-  w['AskouTBackgroundLocation'] = createBackgroundLocationBridge({ plugin: registerPlugin<BackgroundPluginLike>('BackgroundGeolocation'), http: CapacitorHttp });
+  // No Android o aviso fixo ganha a barra de quanto falta (plugin do app; build antigo sem ele segue só com o texto).
+  w['AskouTBackgroundLocation'] = createBackgroundLocationBridge({
+    plugin: registerPlugin<BackgroundPluginLike>('BackgroundGeolocation'),
+    http: CapacitorHttp,
+    progress:
+      Capacitor.getPlatform() === 'android' && Capacitor.isPluginAvailable('AskouTArrivalProgress')
+        ? registerPlugin<ArrivalProgressPluginLike>('AskouTArrivalProgress')
+        : undefined,
+  });
   // O WebView do Android não mostra o pedido de localização sozinho: toda leitura de posição pede antes pelo sistema.
   if (typeof navigator !== 'undefined' && navigator.geolocation) guardGeolocation(navigator.geolocation, () => location.ensure());
   w['AskouTVideo'] = createVideoBridge({
