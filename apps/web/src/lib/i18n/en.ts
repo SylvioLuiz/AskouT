@@ -3541,4 +3541,5 @@ export const EN: Readonly<Record<string, string>> = {
   "{count} sugestões ainda sem resposta no chat.": "{count} suggestions still unanswered in the chat.",
   "Encerrar encontro com {name}": "End meetup with {name}",
   "Encerrar o encontro com {name}? A localização dos dois deixa de ser compartilhada.": "End the meetup with {name}? Neither location will be shared anymore.",
+  "Ver minha lista de amigos": "See my friends list",
 };

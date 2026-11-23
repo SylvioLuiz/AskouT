@@ -7134,6 +7134,7 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .nowcard__bar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: var(--now-track); }
 .nowcard__bar i { display: block; height: 100%; border-radius: 0 999px 999px 0; background: linear-gradient(90deg, var(--now-peach), var(--now-coral), var(--now-pink), var(--now-lilac)); box-shadow: 0 0 10px rgb(250 114 201 / 0.55); transition: width 1s linear; }
 
+.friends__invite { margin: 4px 0 20px; }
 .nowmatches { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .nowmatches__item { display: grid; gap: 8px; }
 .nowmatches__row { display: flex; align-items: stretch; gap: 8px; }

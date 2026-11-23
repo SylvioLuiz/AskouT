@@ -162,6 +162,9 @@ export function ContactsScreen() {
           <input ref={fileRef} type="file" accept=".vcf,text/vcard,text/x-vcard" hidden onChange={(e) => void onFile(e)} />
         </div>
         {!native && !picker ? <p className="muted">{t('No iPhone, abra Contatos, escolha as pessoas, toque em Compartilhar e salve o arquivo .vcf para enviar aqui. No app do AskouT dá para sincronizar a agenda direto.')}</p> : null}
+        <Link to="/amigos" className="btn btn--quiet btn--full">
+          {t('Ver minha lista de amigos')}
+        </Link>
         <p className="muted">
           {t('Para seus amigos acharem você pela agenda deles,')} <Link to="/perfil/editar">{t('coloque seu celular no perfil')}</Link>.
         </p>

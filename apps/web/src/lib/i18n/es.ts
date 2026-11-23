@@ -3541,4 +3541,5 @@ export const ES: Readonly<Record<string, string>> = {
   "{count} sugestões ainda sem resposta no chat.": "{count} sugerencias aún sin respuesta en el chat.",
   "Encerrar encontro com {name}": "Terminar encuentro con {name}",
   "Encerrar o encontro com {name}? A localização dos dois deixa de ser compartilhada.": "¿Terminar el encuentro con {name}? La ubicación de ambos deja de compartirse.",
+  "Ver minha lista de amigos": "Ver mi lista de amigos",
 };
