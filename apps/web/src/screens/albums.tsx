@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import { Sheet } from '../components/agenda.tsx';
 import { useAlbumPhoto } from '../components/album-photo.tsx';
@@ -14,8 +14,11 @@ import { toApiError } from '../lib/errors.ts';
 import { resizePostPhoto } from '../lib/image.ts';
 import type { AlbumDetail, AlbumPhoto, AlbumSummary } from '../lib/types.ts';
 import { POST_CAPTION_MAX } from '../lib/post-draft.ts';
-import { Link } from '../router.tsx';
+import { Link, navigate } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
+
+/** Álbum de evento abre na página do evento, já na aba Álbum; o do NOW tem página própria. */
+const albumHref = (album: Pick<AlbumSummary, 'id' | 'eventId'>) => (album.eventId ? `/eventos/${encodeURIComponent(album.eventId)}?aba=album` : `/albuns/${encodeURIComponent(album.id)}`);
 
 const dayText = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
 
@@ -47,7 +50,7 @@ export function AlbumsScreen() {
       <ul className="albumlist">
         {(list.data?.items ?? []).map((album: AlbumSummary) => (
           <li key={album.id}>
-            <Link to={`/albuns/${encodeURIComponent(album.id)}`} className="albumlist__item">
+            <Link to={albumHref(album)} className="albumlist__item">
               <span className="albumlist__cover">{album.coverPhotoId ? <Thumb albumId={album.id} photoId={album.coverPhotoId} /> : <PhotoIcon />}</span>
               <span className="albumlist__text">
                 <span className="albumlist__title">{albumName(album)}</span>
@@ -189,7 +192,13 @@ export function AlbumContent({ albumId, embedded = false }: { albumId: string; e
   const [error, setError] = useState<string | undefined>();
   const [mine, setMine] = useState<AlbumPhoto | undefined>();
   const [viewing, setViewing] = useState<string | undefined>();
+  // Link antigo (notificação, lista) de um álbum de evento: mostra a página do evento na aba Álbum, igual à do evento.
+  const eventId = embedded ? null : (album.data?.eventId ?? null);
+  useEffect(() => {
+    if (eventId) navigate(`/eventos/${encodeURIComponent(eventId)}?aba=album`, { replace: true });
+  }, [eventId]);
 
+  if (eventId) return <Loading />;
   if (album.loading && !album.data) return <Loading />;
   if (album.error) {
     return album.error.code === 'NOT_FOUND' ? (
