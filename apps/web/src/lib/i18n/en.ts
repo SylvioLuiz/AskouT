@@ -3463,4 +3463,11 @@ export const EN: Readonly<Record<string, string>> = {
   "Com o convite aceito, abre o encontro: vocês veem no mapa onde cada um está, escolhem um lugar e conversam.": "Once the invite is accepted, the meetup opens: you both see each other on the map, pick a place and chat.",
   "Mais tempo ou parar": "More time or stop",
   "No + do cartão dá para estender, e em Parar o NOW você desliga na hora.": "Use the + on the card to extend, and Stop NOW turns it off right away.",
+  "Toque em Marcar horário, escolha o dia e o período e anote como você está: disponível, parcial (talvez, ou só parte do tempo) ou indisponível.": "Tap Set a time, pick the day and time range and note how you are: available, partial (maybe, or only part of the time) or unavailable.",
+  "Os horários que você marca são pessoais: servem de lembrete para você e não aparecem para ninguém.": "The times you set are personal: they're a reminder for you and aren't shown to anyone.",
+  "Só você vê esta agenda. Marque seus horários pessoais.": "Only you see this calendar. Set your personal times.",
+  "Estou livre neste período": "I'm free during this time",
+  "Talvez, ou só parte do período": "Maybe, or only part of the time",
+  "Estou ocupado neste período": "I'm busy during this time",
+  "Conecte suas agendas: os compromissos aparecem como \"ocupado\" na sua agenda do AskouT. Títulos e detalhes não saem da sua agenda.": "Connect your calendars: appointments show as \"busy\" in your AskouT calendar. Titles and details never leave your calendar.",
 };

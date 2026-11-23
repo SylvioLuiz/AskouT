@@ -110,8 +110,6 @@ import type {
   ProfileView,
   ReferralOverview,
   PublicProfile,
-  BestDatesInput,
-  Compatibility,
   SessionUser,
   SignupInput,
   AgeStatus,
@@ -407,13 +405,6 @@ export function createApi(deps: ApiDeps) {
     mySlots: (from: string, to: string) =>
       request<Slot[]>('GET', `/me/availability?from=${id(from)}&to=${id(to)}`),
     addSlot: (input: SlotInput) => request<Slot>('POST', '/me/availability', { body: input }),
-    /** Mostrar os seus horários para os amigos (começa desligado). */
-    availabilitySharing: () => request<{ sharing: boolean }>('GET', '/me/availability/sharing'),
-    setAvailabilitySharing: (sharing: boolean) => request<{ sharing: boolean }>('PUT', '/me/availability/sharing', { body: { sharing } }),
-    /** Amigos que mostram os horários (os únicos que entram nos horários em comum). */
-    sharingFriends: () => request<{ friends: PublicProfile[] }>('GET', '/friends/availability'),
-    /** Melhor horário de cada dia para você e os amigos escolhidos. */
-    bestDates: (input: BestDatesInput) => request<Compatibility[]>('POST', '/availability/best-dates', { body: input }),
     removeSlot: (slotId: string) => request<{ removed: boolean }>('DELETE', `/me/availability/${id(slotId)}`),
 
     // Sincronizar agendas (celular, Google Agenda, links iCal): só horários ocupados

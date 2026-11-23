@@ -3463,4 +3463,11 @@ export const ES: Readonly<Record<string, string>> = {
   "Com o convite aceito, abre o encontro: vocês veem no mapa onde cada um está, escolhem um lugar e conversam.": "Con la invitación aceptada, se abre el encuentro: ven en el mapa dónde está cada uno, eligen un lugar y conversan.",
   "Mais tempo ou parar": "Más tiempo o parar",
   "No + do cartão dá para estender, e em Parar o NOW você desliga na hora.": "Con el + de la tarjeta puedes extenderlo, y en Detener el NOW lo apagas al instante.",
+  "Toque em Marcar horário, escolha o dia e o período e anote como você está: disponível, parcial (talvez, ou só parte do tempo) ou indisponível.": "Toca Fijar horario, elige el día y el período y anota cómo estás: disponible, parcial (tal vez, o solo parte del tiempo) o no disponible.",
+  "Os horários que você marca são pessoais: servem de lembrete para você e não aparecem para ninguém.": "Los horarios que marcas son personales: te sirven de recordatorio y no se muestran a nadie.",
+  "Só você vê esta agenda. Marque seus horários pessoais.": "Solo tú ves esta agenda. Marca tus horarios personales.",
+  "Estou livre neste período": "Estoy libre en este período",
+  "Talvez, ou só parte do período": "Tal vez, o solo parte del período",
+  "Estou ocupado neste período": "Estoy ocupado en este período",
+  "Conecte suas agendas: os compromissos aparecem como \"ocupado\" na sua agenda do AskouT. Títulos e detalhes não saem da sua agenda.": "Conecta tus agendas: los compromisos aparecen como \"ocupado\" en tu agenda de AskouT. Títulos y detalles no salen de tu agenda.",
 };
