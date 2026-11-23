@@ -277,6 +277,8 @@ export interface ConversationRecord {
   requestDeclinedAt?: Date | null;
   /** A solicitação foi aceita: a conversa fica liberada nos dois sentidos, mesmo sem seguir. */
   acceptedAt?: Date | null;
+  /** Conversa com a página de um local: quem escreveu fala com o local, e o dono responde por ele. */
+  venueId?: string | null;
   createdAt: Date;
 }
 

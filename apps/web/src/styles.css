@@ -7400,3 +7400,5 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .chat__requesttext span { color: var(--muted); font-size: 0.875rem; }
 .chat__requestactions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .chat__requestnote { margin: 0 0 6px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--ink); font-size: 0.8125rem; text-align: center; }
+/* Conversa pela página de um local, na lista do dono: por qual local a pessoa escreveu. */
+.convrow__via { color: var(--muted); font-weight: 400; }

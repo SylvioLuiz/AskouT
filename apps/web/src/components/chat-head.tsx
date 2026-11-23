@@ -9,17 +9,20 @@ import { ReasonSheet } from './post-actions.tsx';
 import { Avatar, Confirm, GroupAvatar, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { toApiError } from '../lib/errors.ts';
-import type { PublicProfile } from '../lib/types.ts';
+import type { PublicProfile, VenueChat } from '../lib/types.ts';
+import { safeImage } from '../lib/explore.ts';
 import { Link, navigate } from '../router.tsx';
 import { t } from '../lib/i18n/index.ts';
 
 type Step = 'menu' | 'clear' | 'remove' | 'block' | 'report' | 'prefs' | 'background' | 'color';
 
 /** Topo da conversa: voltar, foto e nome (preso ao rolar) e o menu ⋯ no canto oposto. */
-export function ChatHead({ conversationId, other, groupName, groupImageUrl, subtitle, onCleared, below, pinned, muted, onPrefsChanged, color, onColorChange }: { conversationId: string; other: PublicProfile | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode; pinned: boolean; muted: boolean; onPrefsChanged: () => void; color: string | null; onColorChange: (color: string | null) => void }) {
+export function ChatHead({ conversationId, other, venue, groupName, groupImageUrl, subtitle, onCleared, below, pinned, muted, onPrefsChanged, color, onColorChange }: { conversationId: string; other: PublicProfile | null; venue?: VenueChat | null; groupName: string | null; groupImageUrl: string | null; subtitle?: string; onCleared: () => void; below?: ReactNode; pinned: boolean; muted: boolean; onPrefsChanged: () => void; color: string | null; onColorChange: (color: string | null) => void }) {
   const isGroup = !other;
-  const name = other ? other.displayName : (groupName ?? t('Grupo'));
-  const to = isGroup ? `/conversas/${conversationId}/grupo` : `/conversas/${conversationId}/info`;
+  // Conversa pela página de um local: quem escreveu vê o local (foto, nome e link para a página).
+  const asVenue = venue?.role === 'CUSTOMER' ? venue : null;
+  const name = asVenue ? asVenue.name : other ? other.displayName : (groupName ?? t('Grupo'));
+  const to = asVenue ? `/bares/${encodeURIComponent(asVenue.id)}` : isGroup ? `/conversas/${conversationId}/grupo` : `/conversas/${conversationId}/info`;
   const [open, setOpen] = useState(false);
   return (
     <header className="chathead">
@@ -27,7 +30,7 @@ export function ChatHead({ conversationId, other, groupName, groupImageUrl, subt
         <ChevronLeftIcon />
       </Link>
       <Link to={to} className="chathead__who" aria-label={t('Informações de {name}', { name })}>
-        {other ? <Avatar profile={other} size={40} /> : <GroupAvatar name={name} size={40} imageUrl={groupImageUrl} />}
+        {asVenue ? <GroupAvatar name={name} size={40} imageUrl={safeImage(asVenue.logoUrl)} /> : other ? <Avatar profile={other} size={40} /> : <GroupAvatar name={name} size={40} imageUrl={groupImageUrl} />}
         <span className="chathead__text">
           <span className="chathead__name">{name}</span>
           {subtitle ? <span className="chathead__sub">{subtitle}</span> : null}

@@ -719,6 +719,8 @@ export function createApi(deps: ApiDeps) {
     // Conversas
     /** `requestCount`/`requestUnread`: solicitações de mensagem esperando (servidor antigo não manda). */
     conversations: () => request<{ items: ConversationItem[]; requestCount?: number; requestUnread?: number }>('GET', '/conversations'),
+    /** Mensagem pela página de um local com dono: abre (ou cria) a conversa com o local. */
+    openVenueConversation: (venueId: string) => request<{ id: string }>('POST', '/conversations/venue', { body: { venueId } }),
     messageRequests: () => request<{ items: ConversationItem[] }>('GET', '/conversations/requests'),
     acceptMessageRequest: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/request/accept`),
     declineMessageRequest: (conversationId: string) => request<{ ok: true }>('POST', `/conversations/${id(conversationId)}/request/decline`),

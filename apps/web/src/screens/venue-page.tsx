@@ -6,7 +6,7 @@ import { Sheet } from '../components/agenda.tsx';
 import { CoverPicker } from '../components/cover-picker.tsx';
 import { PostList } from '../components/post.tsx';
 import { PlacePhoto, SampleBadge } from '../components/suggestions.tsx';
-import { BellIcon, BellOffIcon, CalendarIcon, ChevronDownIcon, ChevronLeftIcon, ClockIcon, LocationIcon, ShareIcon, StarIcon } from '../components/icons.tsx';
+import { BellIcon, BellOffIcon, CalendarIcon, ChatIcon, ChevronDownIcon, ChevronLeftIcon, ClockIcon, LocationIcon, ShareIcon, StarIcon } from '../components/icons.tsx';
 import { ShareLinkSheet } from '../components/post-actions.tsx';
 import { Avatar, Button, EmptyState, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api, session } from '../client.ts';
@@ -471,6 +471,24 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
   const search = useSearch();
   const [followBusy, setFollowBusy] = useState(false);
   const [bellBusy, setBellBusy] = useState(false);
+  const [messageBusy, setMessageBusy] = useState(false);
+
+  /** Mensagem pela página: chega direto para quem administra o local, que recebe um aviso para responder. */
+  async function openMessage() {
+    if (visitor) {
+      askLogin(t('Entre para mandar mensagem para o local.'));
+      return;
+    }
+    setMessageBusy(true);
+    setProblem(undefined);
+    try {
+      const { id } = await api.openVenueConversation(venueId);
+      navigate(`/conversas/${id}`);
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+      setMessageBusy(false);
+    }
+  }
   const [bellNote, setBellNote] = useState<string | undefined>();
   const [problem, setProblem] = useState<string | undefined>();
   const [sharing, setSharing] = useState(false);
@@ -579,6 +597,19 @@ export function VenuePageScreen({ venueId }: { venueId: string }) {
             >
               {v.notify ? <BellIcon /> : <BellOffIcon />}
             </button>
+            {v.claimed ? (
+              <button
+                type="button"
+                className="btn btn--secondary vhead__bell"
+                aria-label={t('Mandar mensagem para {name}', { name: v.name })}
+                title={t('Mandar mensagem para {name}', { name: v.name })}
+                disabled={messageBusy}
+                aria-busy={messageBusy || undefined}
+                onClick={() => void openMessage()}
+              >
+                <ChatIcon />
+              </button>
+            ) : null}
             <OpenInMaps className="btn btn--quiet" mode="route" lat={v.lat} lng={v.lng} label={v.name}>
               {where.status === 'ok' ? t('Rota · a {distance}', { distance: formatDistance(distanceMeters(where.position, { lat: v.lat, lng: v.lng })) }) : t('Rota')}
             </OpenInMaps>

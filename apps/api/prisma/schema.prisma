@@ -475,6 +475,8 @@ model Conversation {
   requestDeclinedAt DateTime?
   /// Quem recebeu aceitou a solicitação: a conversa fica liberada nos dois sentidos.
   acceptedAt        DateTime?
+  /// Só DIRECT: conversa com a página de um local (cliente ↔ dono). Chave "venue:<local>:<cliente>", separada da conversa pessoal da dupla.
+  venueId           String?   @db.Uuid
 
   group        Group?                    @relation(fields: [groupId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
@@ -482,6 +484,9 @@ model Conversation {
   meetings     Meeting[]
   datePolls    DatePoll[]
   reports      ConversationReport[]
+  venue        Venue?                    @relation(fields: [venueId], references: [id], onDelete: SetNull)
+
+  @@index([venueId])
 }
 
 model ConversationParticipant {
@@ -892,6 +897,7 @@ model Venue {
   calendarDrafts VenueCalendarDraft[]
   followers VenueFollow[]
   stories   VenueStory[]
+  conversations Conversation[]
   storyMutes VenueStoryMute[]
   ratings   VenueRating[]
   checkinCode VenueCheckinCode?

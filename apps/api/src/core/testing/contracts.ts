@@ -1021,6 +1021,23 @@ export function defineRepositoryContract(
         assert.equal(await h.conversations.getOpenDms(bia), false);
       });
 
+      it('conversa pela página do local: separada da pessoal, idempotente e segue o dono atual', async () => {
+        const ana = await newUser('ana');
+        const bia = await newUser('bia');
+        const cia = await newUser('cia');
+        const venueId = randomUUID();
+        await h.places.createVenue({ id: venueId, name: 'Bar', address: null, category: null, lat: 0, lng: 0, isSample: false, ownerId: ana });
+        const personal = await h.conversations.getOrCreateDirect(ana, bia, randomUUID(), at(0));
+        const c = await h.conversations.getOrCreateVenueDirect(venueId, bia, ana, randomUUID(), at(1));
+        assert.notEqual(c.id, personal.id);
+        assert.equal(c.venueId, venueId);
+        assert.equal((await h.conversations.findById(c.id))?.venueId, venueId);
+        assert.equal((await h.conversations.getOrCreateVenueDirect(venueId, bia, ana, randomUUID(), at(2))).id, c.id);
+        assert.equal((await h.conversations.findDirect(ana, bia))?.id, personal.id);
+        await h.conversations.getOrCreateVenueDirect(venueId, bia, cia, randomUUID(), at(3));
+        assert.deepEqual([...(await h.conversations.participantIds(c.id))!].sort(), [bia, cia].sort());
+      });
+
       it('mensagens: ordem cronológica, limite e paginação para trás', async () => {
         const ana = await newUser('ana');
         const bia = await newUser('bia');

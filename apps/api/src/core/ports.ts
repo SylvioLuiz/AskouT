@@ -411,6 +411,11 @@ export interface ConversationRepository {
   /** Idempotente: devolve a conversa da dupla, criando (com os dois participantes) se não existir. */
   getOrCreateDirect(a: string, b: string, id: string, now: Date): Promise<ConversationRecord>;
   findById(id: string): Promise<ConversationRecord | undefined>;
+  /**
+   * Idempotente: a conversa de `customerId` com a página do local (com o dono `ownerId` como a outra ponta), separada
+   * da conversa pessoal entre os dois. Se o local trocou de dono, a outra ponta passa a ser o dono novo.
+   */
+  getOrCreateVenueDirect(venueId: string, customerId: string, ownerId: string, id: string, now: Date): Promise<ConversationRecord>;
   /** Conversa 1 a 1 da dupla, se existir (não cria). */
   findDirect(a: string, b: string): Promise<ConversationRecord | undefined>;
   /** Estado da solicitação de mensagem de uma conversa 1 a 1 (só os campos informados mudam). */
