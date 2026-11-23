@@ -3572,4 +3572,8 @@ export const ES: Readonly<Record<string, string>> = {
   "Escolha para quem enviar": "Elige a quién enviar",
   "1 escolhido": "1 elegido",
   "{n} escolhidos": "{n} elegidos",
+  "Aceitar mesmo com outro compromisso?": "¿Aceptar aunque tengas otro compromiso?",
+  "O convite de {name} bate com o que você já aceitou:": "La invitación de {name} coincide con lo que ya aceptaste:",
+  "Aceitar mesmo assim": "Aceptar de todos modos",
+  "Choque com o que você já aceitou ({when})": "Coincide con algo que ya aceptaste ({when})",
 };
