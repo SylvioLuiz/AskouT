@@ -919,8 +919,10 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   // O botão de sugerir lugar vive na mensagem "Flash combinado" mais recente. Encontro antigo, sem essa mensagem, mostra o cartão no fim.
   const matchMessageId = [...messages].reverse().find((m) => m.kind === 'SYSTEM' && m.body === FLASH_MATCH_MESSAGE)?.id;
   // Depois que um local foi aceito, o botão passa a ser para trocar o local (o aceite pode ser cancelado no cartão).
-  const lastSuggestion = [...messages].reverse().find((m) => m.kind === 'SUGGESTION' && !m.deleted);
-  const placeAgreed = lastSuggestion?.response === 'ACCEPTED';
+  // Só um local aceito por vez: o mais recente com aceite.
+  const agreedMessage = [...messages].reverse().find((m) => m.kind === 'SUGGESTION' && !m.deleted && m.response === 'ACCEPTED' && m.suggestion);
+  const agreed = agreedMessage?.suggestion ? { id: agreedMessage.id, name: agreedMessage.suggestion.venueName, lat: agreedMessage.suggestion.lat, lng: agreedMessage.suggestion.lng } : undefined;
+  const placeAgreed = agreed !== undefined;
   const matchCard = match ? (
     <div className="callout chat__match">
       <p className="callout__text">
@@ -933,7 +935,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         <Button small onClick={() => setSuggesting('suggest')}>
           {placeAgreed ? t('Mudar local sugerido') : t('Sugerir um local')}
         </Button>
-        <Button small variant="secondary" onClick={() => setMapFor({ ...(placeAgreed && lastSuggestion?.suggestion ? { place: { name: lastSuggestion.suggestion.venueName, lat: lastSuggestion.suggestion.lat, lng: lastSuggestion.suggestion.lng } } : {}) })}>
+        <Button small variant="secondary" onClick={() => setMapFor(agreed ? { place: { name: agreed.name, lat: agreed.lat, lng: agreed.lng } } : {})}>
           {t('Ver no mapa')}
         </Button>
       </div>
@@ -1055,7 +1057,12 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
         {m.deleted ? (
           <p className="bubble__text bubble__text--deleted">{m.mine ? t('Você apagou esta mensagem') : t('Mensagem apagada')}</p>
         ) : m.kind === 'SUGGESTION' && m.suggestion && data.other ? (
-          <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) => setMessages((current) => mergeMessages(current, [updated]))} onOpenMap={(place) => setMapFor({ place })} />
+          <SuggestionBubble message={m} otherName={data.other.displayName} nowIso={data.now} conversationId={conversationId} onUpdated={(updated) =>
+              setMessages((current) =>
+                // Aceitar um local cancela o aceite do anterior (o servidor já fez; aqui aparece na hora).
+                mergeMessages(updated.response === 'ACCEPTED' ? current.map((x) => (x.id !== updated.id && x.kind === 'SUGGESTION' && x.response === 'ACCEPTED' ? { ...x, response: null, respondedAt: null } : x)) : current, [updated]),
+              )
+            } onOpenMap={(place) => setMapFor({ place })} agreed={agreed} />
         ) : m.kind === 'MEETUP' && m.meetup ? (
           <MeetupBubble meetup={m.meetup} nowIso={data.now} onUpdated={(updated) => setMessages((current) => current.map((x) => (x.id === m.id || x.meetup?.id === updated.id ? { ...x, meetup: updated } : x)))} />
         ) : m.kind === 'AUDIO' && m.audio ? (
@@ -1390,6 +1397,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       {suggesting && match ? (
         <SuggestionsSheet
           title={placeAgreed ? t('Mudar local sugerido') : t('Sugerir um local')}
+          agreedName={agreed?.name}
           searchOpen={suggesting === 'search'}
           inviteId={match.id}
           conversationId={conversationId}

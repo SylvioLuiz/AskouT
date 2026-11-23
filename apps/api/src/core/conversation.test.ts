@@ -196,6 +196,35 @@ test('respond: aceitar no chat vira o lugar do encontro NOW; cancelar o aceite t
   assert.equal((await w.core.flash.getMatch(ana, invite.id)).destination, null);
 });
 
+test('encontro sem lugar, mas com sugestão aceita no chat: o lugar aceito aparece no encontro; tirar o lugar desfaz o aceite', async () => {
+  const { w, ana, bia, id } = await friends();
+  await w.core.flash.turnOn(ana, { hours: 2 });
+  await w.core.flash.turnOn(bia, { hours: 2 });
+  const invite = await w.core.flash.invite(ana, bia);
+  await w.core.flash.respond(bia, invite.id, 'accept');
+  w.clock.tick(1000);
+  const sent = await w.core.conversations.send(ana, id, { suggestion: card });
+  await w.core.conversations.respond(bia, id, sent.id, 'accept');
+  // Simula um aceite gravado antes de o chat passar a definir o lugar.
+  const raw = (await w.flash.getInvite(invite.id))!;
+  await w.flash.saveInvite({ ...raw, destination: null });
+  assert.equal((await w.core.flash.getMatch(ana, invite.id)).destination?.name, 'Bar do Zé');
+  assert.equal((await w.flash.getInvite(invite.id))!.destination?.name, 'Bar do Zé', 'fica gravado');
+  await w.core.flash.clearDestination(ana, invite.id);
+  assert.equal((await w.core.flash.getMatch(ana, invite.id)).destination, null);
+  assert.equal((await w.core.conversations.messages(ana, id)).messages.at(-1)!.response, null);
+});
+
+test('respond: aceitar uma segunda sugestão cancela o aceite da primeira', async () => {
+  const { w, ana, bia, id, messageId } = await sentCard();
+  await w.core.conversations.respond(bia, id, messageId, 'accept');
+  const second = await w.core.conversations.send(bia, id, { suggestion: { ...card, venueName: 'Bar do Léo', externalId: 'event:2' } });
+  await w.core.conversations.respond(ana, id, second.id, 'accept');
+  const msgs = (await w.core.conversations.messages(ana, id)).messages;
+  assert.equal(msgs.find((m) => m.id === messageId)!.response, null);
+  assert.equal(msgs.find((m) => m.id === second.id)!.response, 'ACCEPTED');
+});
+
 test('respond: mensagem de texto não é sugestão, estranhos não respondem, ex-amigos não respondem', async () => {
   const { w, ana, bia, caio, id } = await sentCard();
   const text = await w.core.conversations.send(ana, id, { body: 'oi' });

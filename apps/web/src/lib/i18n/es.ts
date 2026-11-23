@@ -3505,4 +3505,10 @@ export const ES: Readonly<Record<string, string>> = {
   "A localização aparece quando cada um compartilha no encontro NOW.": "La ubicación aparece cuando cada uno la comparte en el encuentro NOW.",
   "Buscar pelo nome": "Buscar por nombre",
   "Voltar ao local combinado": "Volver al lugar acordado",
+  "Trocar o local combinado?": "¿Cambiar el lugar acordado?",
+  "{place} já está aceito. Aceitar {next} cancela o aceite de {place}.": "{place} ya está aceptado. Aceptar {next} cancela la aceptación de {place}.",
+  "Aceitar e trocar": "Aceptar y cambiar",
+  "Sugerir outro local?": "¿Sugerir otro lugar?",
+  "Vocês já combinaram {place}. Se {name} aceitar {next}, o aceite de {place} é cancelado.": "Ya acordaron {place}. Si {name} acepta {next}, se cancela la aceptación de {place}.",
+  "Sugerir mesmo assim": "Sugerir de todos modos",
 };

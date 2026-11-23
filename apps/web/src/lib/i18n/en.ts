@@ -3505,4 +3505,10 @@ export const EN: Readonly<Record<string, string>> = {
   "A localização aparece quando cada um compartilha no encontro NOW.": "Locations show up once each of you shares in the NOW meetup.",
   "Buscar pelo nome": "Search by name",
   "Voltar ao local combinado": "Back to the agreed place",
+  "Trocar o local combinado?": "Change the agreed place?",
+  "{place} já está aceito. Aceitar {next} cancela o aceite de {place}.": "{place} is already accepted. Accepting {next} cancels the acceptance of {place}.",
+  "Aceitar e trocar": "Accept and switch",
+  "Sugerir outro local?": "Suggest another place?",
+  "Vocês já combinaram {place}. Se {name} aceitar {next}, o aceite de {place} é cancelado.": "You already agreed on {place}. If {name} accepts {next}, the acceptance of {place} is canceled.",
+  "Sugerir mesmo assim": "Suggest anyway",
 };
