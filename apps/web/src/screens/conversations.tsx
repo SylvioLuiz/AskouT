@@ -6,7 +6,7 @@ import { ChatHead } from '../components/chat-head.tsx';
 import { Avatar, Button, Confirm, EmptyState, ErrorState, GroupAvatar, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { VoiceBubble, VoiceRecorderBar } from '../components/voice.tsx';
 import { NewConversationSheet } from '../components/new-conversation.tsx';
-import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
+import { ArrowUpIcon, BellOffIcon, CameraIcon, ChatIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, CopyIcon, HeartIcon, PlayIcon, ReplyIcon, TrashIcon, MicIcon, MoreIcon, PhotoIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '../components/icons.tsx';
 import { MediaBubble, ReplyThumb } from '../components/chat-media.tsx';
 import { MessagePopup, ReactionSummary, ReactionsSheet, hasActions } from '../components/message-actions.tsx';
 import { Sheet } from '../components/agenda.tsx';
@@ -399,6 +399,65 @@ function ConversationsSkeleton() {
 
 // ---------- Conversa ----------
 
+/** Balões falsos do esqueleto do chat: de quem é, a largura (em %) e quantas linhas de texto. */
+const CHAT_SKELETON: Array<{ mine: boolean; width: number; lines?: number; pos: RunPosition }> = [
+  { mine: false, width: 58, pos: 'first' },
+  { mine: false, width: 72, lines: 2, pos: 'last' },
+  { mine: true, width: 44, pos: 'first' },
+  { mine: true, width: 64, lines: 2, pos: 'last' },
+  { mine: false, width: 36, pos: 'single' },
+  { mine: true, width: 52, pos: 'single' },
+  { mine: false, width: 66, lines: 2, pos: 'first' },
+  { mine: false, width: 40, pos: 'last' },
+];
+
+/**
+ * Enquanto a conversa carrega: o mesmo topo (voltar, foto, nome e opções), balões dos dois lados encostados embaixo
+ * (a conversa abre no fim) e a caixa de mensagem, com as classes reais para nada pular quando as mensagens chegam.
+ * Antes aparecia o esqueleto genérico de lista (linhas com foto e texto), que não tem nada a ver com um chat.
+ */
+function ChatSkeleton() {
+  return (
+    <div className="chat chat--enter chat--pinned chatskel" role="status" aria-live="polite">
+      <span className="visually-hidden">{t('Carregando conversa…')}</span>
+      <header className="chathead">
+        <Link to="/conversas" className="pagehead__back" aria-label={t('Voltar')}>
+          <ChevronLeftIcon />
+        </Link>
+        <span className="chathead__who" aria-hidden="true">
+          <span className="convskel chatskel__avatar" />
+          <span className="chathead__text">
+            <span className="chathead__name">
+              <span className="convskel convskel--text chatskel__name" />
+            </span>
+            <span className="chathead__sub">
+              <span className="convskel convskel--text chatskel__sub" />
+            </span>
+          </span>
+        </span>
+        <span className="iconbtn chathead__more" aria-hidden="true" />
+      </header>
+      <div className="chat__thread chatskel__thread" aria-hidden="true">
+        {CHAT_SKELETON.map((b, i) => (
+          <div key={i} className={`msg${b.mine ? ' msg--mine' : ''} msg--run-${b.pos}${b.pos === 'first' || b.pos === 'single' ? ' chatskel__runstart' : ''}`}>
+            {!b.mine ? <span className="msg__face">{b.pos === 'last' || b.pos === 'single' ? <span className="convskel chatskel__face" /> : null}</span> : null}
+            <span className={`bubble chatskel__bubble${b.mine ? ' chatskel__bubble--mine' : ''}`} style={{ width: `${b.width}%` }}>
+              {Array.from({ length: b.lines ?? 1 }, (_, l) => (
+                <span key={l} className="convskel convskel--text chatskel__line" style={l > 0 ? { width: '60%' } : undefined} />
+              ))}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="chat__dock" aria-hidden="true">
+        <div className="composer">
+          <span className="convskel chatskel__pill" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const POLL_MS = 5_000;
 /** Quantas fotos ou vídeos dá para mandar de uma vez. */
 const STAGED_MAX = 10;
@@ -682,7 +741,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
     };
   }, [hasThread]);
 
-  if (view.loading && !view.data && !view.error) return <Loading />;
+  if (view.loading && !view.data && !view.error) return <ChatSkeleton />;
   if (view.error && !view.data) {
     if (view.error.code === 'NOT_FOUND') {
       return (

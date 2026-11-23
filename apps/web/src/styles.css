@@ -7517,3 +7517,16 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .chat__requestnote { margin: 0 0 6px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--ink); font-size: 0.8125rem; text-align: center; }
 /* Conversa pela página de um local, na lista do dono: por qual local a pessoa escreveu. */
 .convrow__via { color: var(--muted); font-weight: 400; }
+
+/* Esqueleto da conversa: topo, balões e caixa com as classes reais do chat; só o conteúdo é falso. */
+.chatskel__avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; }
+.chatskel__name { width: 128px; height: 0.9em; }
+.chatskel__sub { width: 88px; }
+.chatskel__thread { justify-content: flex-end; }
+.chatskel__runstart { margin-top: 6px; }
+.chatskel__face { display: block; width: 28px; height: 28px; border-radius: 50%; }
+.chatskel__bubble { display: flex; flex-direction: column; gap: 6px; min-width: 72px; max-width: min(82%, 320px); padding: 12px 14px; }
+/* O balão "meu" de verdade é rosa cheio; no esqueleto fica só um tom de rosa para não parecer mensagem já carregada. */
+.msg .chatskel__bubble--mine { margin-left: auto; background: var(--brand-soft); border-color: transparent; }
+.chatskel__line { display: block; width: 100%; height: 10px; }
+.chatskel__pill { flex: 1; height: 48px; border-radius: 26px; }

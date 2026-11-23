@@ -107,9 +107,15 @@ export function SuggestionBubble({ message, otherName, nowIso, conversationId, o
         <OpenInMaps mode="route" lat={card.lat} lng={card.lng} label={card.venueName}>
           {t('Rota até lá')}
         </OpenInMaps>
-        <OpenInMaps lat={card.lat} lng={card.lng} label={card.venueName}>
-          {t('Ver no mapa')}
-        </OpenInMaps>
+        {onOpenMap ? (
+          <button type="button" className="mapsbtn" onClick={() => onOpenMap({ name: card.venueName, lat: card.lat, lng: card.lng })}>
+            {t('Ver no mapa')}
+          </button>
+        ) : (
+          <OpenInMaps lat={card.lat} lng={card.lng} label={card.venueName}>
+            {t('Ver no mapa')}
+          </OpenInMaps>
+        )}
       </div>
       {message.response ? (
         <>
