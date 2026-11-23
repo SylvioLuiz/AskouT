@@ -451,3 +451,26 @@ test('grupo do evento: sem foto própria mostra a capa do evento; a foto trocada
   await w.core.conversations.setGroupPhoto(ana, poll.conversationId, null);
   assert.equal((await w.core.conversations.group(ana, poll.conversationId)).imageUrl, cover);
 });
+
+test('grupo do evento: quem é adicionado entra na votação e recebe convite; no privado ganha acesso ao evento', async () => {
+  for (const isPrivate of [false, true]) {
+    const { w, ana, bia, caio } = await setup('MAJORITY');
+    const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Aniversário', dateByPoll: true, private: isPrivate } });
+    const withBia = await w.core.conversations.open(ana, bia);
+    await w.core.conversations.send(ana, withBia.id, { eventId: post.id });
+    const poll = await w.core.scheduling.create(ana, undefined, { title: 'Aniversário', rangeStart: '2026-10-20', rangeEnd: '2026-10-22', eventPostId: post.id });
+    if (isPrivate) await rejectsWith(w.core.eventPages.get(caio, post.id), 'NOT_FOUND');
+
+    await w.core.conversations.addMembers(ana, poll.conversationId, [caio]);
+    assert.ok((await w.core.scheduling.get(caio, poll.id)).participants.some((p) => p.profile.username === 'caio'), 'entra na votação');
+    assert.equal((await w.core.eventPages.get(caio, post.id)).id, post.id, 'vê o evento (o cartão está no grupo)');
+    const invite = w.notifications.rows.find((n) => n.userId === caio && n.dedupeKey === `group-event-invite:${post.id}`);
+    assert.ok(invite, 'recebe o convite');
+    assert.equal(invite.url, `/eventos/${post.id}`);
+    assert.match(invite.title, /ana convidou você para Aniversário/);
+    assert.match(invite.body, isPrivate ? /faz parte deste evento privado/ : /Eu vou/);
+    // O cartão do evento entra no grupo uma vez só.
+    const cards = (await w.core.conversations.messages(ana, poll.conversationId)).messages.filter((m) => m.kind === 'EVENT');
+    assert.equal(cards.length, 1);
+  }
+});

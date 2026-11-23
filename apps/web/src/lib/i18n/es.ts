@@ -3392,4 +3392,5 @@ export const ES: Readonly<Record<string, string>> = {
   "{name} vê nas notificações quanto falta para você chegar. Pode bloquear o celular: o AskouT continua mandando sua posição até o encontro acabar ou você parar.": "{name} ve en sus notificaciones cuánto falta para que llegues. Puedes bloquear el celular: AskouT sigue enviando tu ubicación hasta que termine el encuentro o lo detengas.",
   "Sem permissão de localização, sua chegada só atualiza com o AskouT aberto.": "Sin permiso de ubicación, tu llegada solo se actualiza con AskouT abierto.",
   "Abrir ajustes": "Abrir ajustes",
+  "Quem você adicionar também é convidado para o evento \"{title}\".": "A quien agregues también se le invita al evento \"{title}\".",
 };

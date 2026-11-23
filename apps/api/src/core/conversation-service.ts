@@ -1076,7 +1076,49 @@ export class ConversationService {
       await this.postSystem(conversationId, actorId, `${actorName} adicionou ${await this.nameOf(t)}`, now);
     }
     await this.notifyMembers(actorId, actorName, conversation, wanted, 'adicionou você ao grupo');
+    // Grupo de um evento: quem entra é convidado para o evento. Falha aqui não desfaz a entrada no grupo.
+    await this.inviteToGroupEvent(actorId, conversation, wanted, now).catch(() => undefined);
     return { added: wanted.length };
+  }
+
+  /**
+   * Quem entra no grupo de um evento passa a fazer parte dele:
+   * - o cartão do evento fica no grupo (é ele que dá acesso a um evento privado a quem está na conversa);
+   * - se a data está em votação neste grupo, a pessoa entra na votação;
+   * - recebe um convite: evento público, para tocar em "Eu vou"; privado, avisando que agora faz parte do evento.
+   */
+  private async inviteToGroupEvent(actorId: string, conversation: ConversationRecord, newIds: string[], now: Date): Promise<void> {
+    const { conversations, scheduling, ids, notifier, users } = this.deps;
+    const card = (await this.groupEvent(conversation.id))?.card;
+    if (!card || newIds.length === 0) return;
+    if (card.userEvent) {
+      const ownerId = card.ownerId ?? actorId;
+      const members = (await conversations.participantIds(conversation.id)) ?? [];
+      const inGroup = async (senderId: string) => (await conversations.postEventConversationIds(card.id, senderId)).includes(conversation.id);
+      if (!(await inGroup(ownerId)) && (ownerId === actorId || !(await inGroup(actorId)))) {
+        // Em nome de quem criou o evento, se ainda está no grupo; senão, de quem adicionou.
+        const senderId = members.includes(ownerId) ? ownerId : actorId;
+        await conversations.addMessage({ id: ids.next(), conversationId: conversation.id, senderId, kind: 'EVENT', body: `Evento: ${card.title}`, suggestion: null, response: null, respondedAt: null, meetupId: null, eventId: null, postEventId: card.id, createdAt: now });
+      }
+      const poll = await scheduling.findByEventPost(card.id);
+      if (poll && poll.status === 'VOTING' && poll.conversationId === conversation.id) {
+        const inPoll = new Set((await scheduling.listParticipants(poll.id)).map((p) => p.userId));
+        for (const userId of newIds) if (!inPoll.has(userId)) await scheduling.addParticipant(poll.id, userId, now);
+      }
+    }
+    const datePending = card.startsAt === null;
+    const body = card.private
+      ? datePending
+        ? 'Você agora faz parte deste evento privado. A data está em votação no grupo.'
+        : 'Você agora faz parte deste evento privado. Veja os detalhes.'
+      : datePending
+        ? 'A data está em votação no grupo. Vote e depois toque em "Eu vou".'
+        : 'Toque em "Eu vou" se você for.';
+    // O aviso (sino e celular) mostra só o @usuário, como os outros.
+    const who = (await users.findProfilesByIds([actorId]))[0]?.username ?? 'Alguém';
+    for (const userId of newIds) {
+      await notifier.notify({ userId, type: 'MEETUP_INVITE', title: `${who} convidou você para ${card.title}`, body, url: `/eventos/${card.id}`, dedupeKey: `group-event-invite:${card.id}`, actorId });
+    }
   }
 
   /** Faz ou desfaz um administrador. Quem criou o grupo faz os dois; um administrador só promove membros. */

@@ -309,6 +309,7 @@ export function GroupScreen({ conversationId }: { conversationId: string }) {
       {sheet === 'add' ? (
         <Sheet title={t('Adicionar ao grupo')} onClose={() => setSheet(undefined)}>
           <FriendPicker picked={picked} onToggle={(userId) => setPicked((cur) => toggleId(cur, userId))} exclude={data.members.map((m) => m.profile.userId)} />
+          {data.event ? <p className="muted">{t('Quem você adicionar também é convidado para o evento "{title}".', { title: data.event.title })}</p> : null}
           {problem ? <p className="sugcard__problem">{problem}</p> : null}
           <Button full loading={busy} disabled={picked.length === 0} onClick={() => act(() => api.addGroupMembers(conversationId, picked))}>
             {picked.length > 1 ? t('Adicionar {length} pessoas', { length: picked.length }) : t('Adicionar')}
