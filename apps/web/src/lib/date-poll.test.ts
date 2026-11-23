@@ -50,6 +50,17 @@ test('votação aberta fica fixada no topo da conversa, com o que fazer', async 
   assert.equal(pinnedPoll({ ...base, status: 'VOTING' }, new Date('2026-10-28T12:00:00Z')), null);
 });
 
+test('data proposta: diz o que fazer agora e o que vem depois', async () => {
+  const { confirmStepText } = await import('./date-poll.ts');
+  const proposal = { date: '2026-11-26', tally: { confirmed: 1, adjust: 0, declined: 0, pending: 1, total: 2 }, myConfirmation: null } as never;
+  const base = { status: 'CONFIRMING' as const, isOrganizer: false, confirmationPolicy: 'MANUAL' as const, proposal };
+  assert.deepEqual(confirmStepText(base), { todo: 'Confirme se você vai nesse dia.', next: 'Falta 1 pessoa responder. Quem organiza fecha a data quando achar melhor.' });
+  const answered = { ...base, isOrganizer: true, proposal: { ...(proposal as object), myConfirmation: 'CONFIRMED' } as never };
+  assert.deepEqual(confirmStepText(answered), { todo: 'Você respondeu “Vou”.', next: 'Falta 1 pessoa responder. Quando quiser, toque em “Fechar a data” para marcar.' });
+  assert.match(confirmStepText({ ...base, confirmationPolicy: 'MAJORITY' })!.next, /mais da metade confirmar/);
+  assert.equal(confirmStepText({ ...base, status: 'VOTING' }), null);
+});
+
 test('período com evento não passa do dia do evento', () => {
   assert.equal(dayInZone('2026-11-15T02:30:00Z'), '2026-11-14');
   assert.deepEqual(clampRange('2026-11-01', '2026-11-30', '2026-11-14'), { start: '2026-11-01', end: '2026-11-14' });

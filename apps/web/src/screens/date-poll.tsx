@@ -2,12 +2,13 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Sheet } from '../components/agenda.tsx';
 import { RangeCalendar, POLICY_TEXT } from '../components/date-poll-create.tsx';
 import { EditIcon } from '../components/icons.tsx';
+import './date-poll-steps.css';
 import { Avatar, Button, Confirm, ErrorState, Field, Loading, Notice, PageHead } from '../components/ui.tsx';
 import { api } from '../client.ts';
 import { useAsync, usePolling, useTitle } from '../hooks.ts';
 import { agendaEvents, agendaEventsOnDay } from '../lib/agenda.ts';
 import type { AgendaEvent } from '../lib/agenda.ts';
-import { LEVEL_LABEL, chipDay, dayInZone, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLabel, longDay, monthTitle, percent, podiumDay, shortDay } from '../lib/date-poll.ts';
+import { CONFIRMATION_LABEL, LEVEL_LABEL, chipDay, confirmStepText, dayInZone, POLICY_LABEL, VOTE_LABEL, VOTE_MARK, calendarWeeks, cellLabel, longDay, monthTitle, percent, podiumDay, shortDay } from '../lib/date-poll.ts';
 import type { ConfirmationAnswer, DateStats, PollView, VoteStatus } from '../lib/date-poll.ts';
 import { toApiError } from '../lib/errors.ts';
 import { isoToLocalInput } from '../lib/post-draft.ts';
@@ -45,6 +46,8 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
   const [showAll, setShowAll] = useState(false);
   const [bestDismissed, setBestDismissed] = useState(false);
   const [editing, setEditing] = useState(false);
+  // Com a data já proposta, os votos ficam recolhidos: o que importa agora é confirmar a data.
+  const [votesOpen, setVotesOpen] = useState(false);
   // Dias em que você já tem compromisso (encontros e eventos confirmados ou criados por você).
   const myMeetups = useAsync(() => api.myMeetups(), []);
   const myGoing = useAsync(() => api.myGoingEvents(), []);
@@ -108,6 +111,7 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
       />
       {editing ? <EditPollSheet poll={poll} onClose={() => setEditing(false)} onSaved={(p) => { setPoll(p); setEditing(false); }} /> : null}
       {problem ? <Notice tone="error">{problem}</Notice> : null}
+      {poll.status !== 'CANCELLED' ? <PollSteps status={poll.status} /> : null}
 
       {poll.status === 'FINALIZED' && poll.final ? (
         <section className="callout dpoll__final" aria-label={t('Data definida')}>
@@ -158,6 +162,13 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
 
       {poll.proposal && poll.status === 'CONFIRMING' ? <ProposalCard poll={poll} busy={busy} act={act} /> : null}
 
+      {poll.status === 'CONFIRMING' ? (
+        <Button variant="quiet" small aria-expanded={votesOpen} onClick={() => setVotesOpen((v) => !v)}>
+          {votesOpen ? t('Esconder votos do grupo') : t('Ver votos do grupo')}
+        </Button>
+      ) : null}
+      {poll.status !== 'CONFIRMING' || votesOpen ? (
+      <>
       <p className="dpoll__meta muted">
         {POLICY_LABEL[poll.confirmationPolicy]}
         {poll.votingClosed ? t(' · votos encerrados') : poll.votingDeadline ? t(' · votação até {when}', { when: new Date(poll.votingDeadline).toLocaleString(intlLocale(), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) }) : ''}
@@ -325,17 +336,21 @@ function PollBody({ poll, setPoll }: { poll: PollView; setPoll: (p: PollView) =>
           </>
         )}
       </section>
+      </>
+      ) : null}
 
       <section aria-labelledby="dpoll-people">
         <h2 id="dpoll-people" className="dpoll__h">
-          {t('Quem vota')}
+          {poll.status === 'CONFIRMING' ? t('Quem confirmou') : t('Quem vota')}
         </h2>
         <ul className="dpoll__people">
           {poll.participants.map((p) => (
             <li key={p.profile.userId}>
               <Avatar profile={p.profile} size={32} />
               <span>{p.profile.displayName}</span>
-              <span className="muted">{p.finished ? 'concluiu' : 'ainda votando'}</span>
+              <span className="muted">
+                {poll.status === 'CONFIRMING' ? (p.confirmation ? CONFIRMATION_LABEL[p.confirmation] : t('ainda não respondeu')) : p.finished ? t('concluiu') : t('ainda votando')}
+              </span>
             </li>
           ))}
         </ul>
@@ -497,41 +512,70 @@ function DayDetail({ stats, poll, busy, onPropose }: { stats: DateStats; poll: P
 function ProposalCard({ poll, busy, act }: { poll: PollView; busy: boolean; act: (work: () => Promise<PollView>) => Promise<void> }) {
   const p = poll.proposal!;
   const mine = p.myConfirmation;
+  const step = confirmStepText(poll);
   const answer = (status: ConfirmationAnswer) => void act(() => api.respondPoll(poll.id, status));
+  const time = new Date(p.startsAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone });
   return (
-    <section className="callout dpoll__proposal" aria-label={t('Data em confirmação')}>
-      <p className="callout__text">
-        <strong>{t('Data proposta: {day}', { day: longDay(p.date) })}</strong>
-        <br />
-        {new Date(p.startsAt).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', timeZone: poll.timezone })} · {percent(p.compatibility)} de compatibilidade
-      </p>
-      <p className="muted">
-        {p.tally.confirmed} confirmaram · {p.tally.adjust} precisam ajustar · {p.tally.declined} recusaram · {p.tally.pending} sem resposta
-      </p>
-      <div className="row-actions">
-        <Button small variant={mine === 'CONFIRMED' ? 'primary' : 'secondary'} disabled={busy} onClick={() => answer('CONFIRMED')}>
-          {mine === 'CONFIRMED' ? '✓ Confirmado' : t('Confirmar presença')}
+    <section className="callout dpoll__proposal" aria-labelledby="dpoll-proposal-title">
+      <p className="dpoll__proposal-kicker">{mine === null ? t('Sua vez: confirme a data') : t('Data proposta')}</p>
+      <h2 id="dpoll-proposal-title" className="dpoll__proposal-day">
+        {longDay(p.date)} · {time}
+      </h2>
+      {step ? <p className="dpoll__proposal-todo">{step.todo}</p> : null}
+      <div className="row-actions" role="group" aria-label={t('Sua resposta para a data proposta')}>
+        <Button small variant={mine === 'CONFIRMED' ? 'primary' : 'secondary'} disabled={busy} aria-pressed={mine === 'CONFIRMED'} onClick={() => answer('CONFIRMED')}>
+          {mine === 'CONFIRMED' ? `✓ ${t('Vou')}` : t('Confirmar presença')}
         </Button>
-        <Button small variant={mine === 'ADJUST' ? 'primary' : 'secondary'} disabled={busy} onClick={() => answer('ADJUST')}>
-          {t('Preciso ajustar')}
+        <Button small variant={mine === 'ADJUST' ? 'primary' : 'secondary'} disabled={busy} aria-pressed={mine === 'ADJUST'} onClick={() => answer('ADJUST')}>
+          {mine === 'ADJUST' ? `✓ ${t('Preciso ajustar')}` : t('Preciso ajustar')}
         </Button>
-        <Button small variant={mine === 'DECLINED' ? 'danger' : 'secondary'} disabled={busy} onClick={() => answer('DECLINED')}>
-          {t('Recusar')}
+        <Button small variant={mine === 'DECLINED' ? 'danger' : 'secondary'} disabled={busy} aria-pressed={mine === 'DECLINED'} onClick={() => answer('DECLINED')}>
+          {mine === 'DECLINED' ? `✓ ${t('Não posso')}` : t('Não posso')}
         </Button>
       </div>
+      <p className="muted">
+        {t('{confirmed} vão · {adjust} precisam ajustar · {declined} não podem · {pending} sem resposta', { confirmed: p.tally.confirmed, adjust: p.tally.adjust, declined: p.tally.declined, pending: p.tally.pending })}
+        {' · '}
+        {t('{compat} de compatibilidade', { compat: percent(p.compatibility) })}
+      </p>
+      {step ? <p className="dpoll__proposal-next">{step.next}</p> : null}
       {poll.isOrganizer ? (
-        <div className="row-actions">
-          {poll.confirmationPolicy === 'MANUAL' ? (
-            <Button small disabled={busy} onClick={() => act(() => api.finalizePoll(poll.id))}>
-              {t('Fechar a data')}
+        <div className="dpoll__proposal-org">
+          <p className="dpoll__proposal-kicker">{t('Você organiza')}</p>
+          <div className="row-actions">
+            {poll.confirmationPolicy === 'MANUAL' ? (
+              <Button small disabled={busy} onClick={() => act(() => api.finalizePoll(poll.id))}>
+                {t('Fechar a data')}
+              </Button>
+            ) : null}
+            <Button small variant="quiet" disabled={busy} onClick={() => act(() => api.withdrawPoll(poll.id))}>
+              {t('Escolher outra data')}
             </Button>
-          ) : null}
-          <Button small variant="quiet" disabled={busy} onClick={() => act(() => api.withdrawPoll(poll.id))}>
-            {t('Escolher outra data')}
-          </Button>
+          </div>
         </div>
       ) : null}
     </section>
+  );
+}
+
+const STEPS: { status: PollView['status']; label: string }[] = [
+  { status: 'VOTING', label: 'Votação' },
+  { status: 'CONFIRMING', label: 'Confirmar a data' },
+  { status: 'FINALIZED', label: 'Data marcada' },
+];
+
+/** Em que etapa a votação está: votar nos dias → confirmar a data proposta → data marcada. */
+function PollSteps({ status }: { status: PollView['status'] }) {
+  const current = STEPS.findIndex((s) => s.status === status);
+  return (
+    <ol className="dpsteps" aria-label={t('Etapas da votação')}>
+      {STEPS.map((s, i) => (
+        <li key={s.status} className={`dpsteps__item${i < current ? ' is-done' : i === current ? ' is-current' : ''}`} aria-current={i === current ? 'step' : undefined}>
+          <span className="dpsteps__dot" aria-hidden="true">{i < current ? '✓' : i + 1}</span>
+          <span className="dpsteps__label">{t(s.label)}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
