@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import { isUuid } from './helpers.ts';
 import { boundingBox, distanceMeters } from '../../core/geo.ts';
-import { compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../../core/explore-match.ts';
+import { compactName, compareMatches, countTags, matchEvent, matchVenue, type EventMatch } from '../../core/explore-match.ts';
 import type { EventSearchQuery, PlaceRepository } from '../../core/ports.ts';
 import type { PlaceEventRecord, VenueHours, VenueManagerRecord, VenueProfilePatch, VenueRecord } from '../../core/types.ts';
 
@@ -347,9 +347,21 @@ export class PrismaPlaceRepository implements PlaceRepository {
 
   async searchVenues(text: string, center: { lat: number; lng: number } | undefined, radiusM: number, limit: number) {
     const box = center ? boundingBox(center, radiusM) : undefined;
+    // O nome é filtrado no banco (sem acento, maiúscula, pontuação e espaços): antes vinham só os 500 primeiros locais
+    // e o filtro era feito depois, então locais além deles (ex.: "What's Bar" em Santos) nunca apareciam.
+    const needle = compactName(text);
+    const ids = needle
+      ? (
+          await this.prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM "Venue"
+            WHERE regexp_replace(translate(lower(name), 'áàâãäåéèêëíìîïóòôõöúùûüçñý', 'aaaaaaeeeeiiiiooooouuuucny'), '[^a-z0-9]', '', 'g') LIKE ${`%${needle}%`}
+            LIMIT ${PREFILTER_CAP}`
+        ).map((r) => r.id)
+      : undefined;
+    if (ids && ids.length === 0) return [];
     const rows = await this.prisma.venue.findMany({
       // Organização ou local criado do zero sem dono (pedido em análise ou recusado) fica fora das buscas.
-      where: { AND: [box ? { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } } : {}, { OR: [{ isOrganization: false, isUserCreated: false }, { ownerId: { not: null } }] }] },
+      where: { AND: [ids ? { id: { in: ids } } : {}, box ? { lat: { gte: box.minLat, lte: box.maxLat }, lng: { gte: box.minLng, lte: box.maxLng } } : {}, { OR: [{ isOrganization: false, isUserCreated: false }, { ownerId: { not: null } }] }] },
       orderBy: { id: 'asc' },
       take: PREFILTER_CAP,
     });

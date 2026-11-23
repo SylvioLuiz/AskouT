@@ -54,8 +54,20 @@ export function countTags(events: PlaceEventRecord[], prefix: string, limit: num
   return [...counts.entries()].map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count || (a.tag < b.tag ? -1 : 1)).slice(0, limit);
 }
 
+/** Só letras e números, sem acento: "What's Bar" e "whats bar" viram "whatsbar". */
+export function compactName(text: string): string {
+  return fold(text).replace(/[^a-z0-9]/g, '');
+}
+
+/** O nome contém o que foi digitado, ignorando acento, maiúsculas, pontuação e espaços. */
+export function nameMatches(name: string, text: string): boolean {
+  if (fold(name).includes(fold(text))) return true;
+  const needle = compactName(text);
+  return needle !== '' && compactName(name).includes(needle);
+}
+
 export function matchVenue(venue: VenueRecord, text: string, center: { lat: number; lng: number } | undefined, radiusM: number): { venue: VenueRecord; distanceM: number | null } | undefined {
-  if (!fold(venue.name).includes(fold(text))) return undefined;
+  if (!nameMatches(venue.name, text)) return undefined;
   let distanceM: number | null = null;
   if (center) {
     distanceM = distanceMeters(center, venue);

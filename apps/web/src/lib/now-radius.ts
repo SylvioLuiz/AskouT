@@ -1,7 +1,7 @@
 import { safeStorage } from './hints.ts';
 
 /** Opções de distância para buscar rolês entre você e o amigo no encontro do NOW (km). `null` = automático. */
-export const NOW_RADIUS_CHOICES_KM: readonly number[] = [2, 5, 10, 25, 50];
+export const NOW_RADIUS_CHOICES_KM: readonly number[] = [2, 5, 10, 25, 50, 100, 200];
 
 /** Próximo raio maior que `km` (para "ver mais"), ou `undefined` se já é o maior. */
 export function nextRadiusKm(km: number): number | undefined {
