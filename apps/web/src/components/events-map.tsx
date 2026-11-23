@@ -32,6 +32,8 @@ function setCount(el: HTMLElement, count: number | undefined) {
     el.appendChild(badge);
   }
   badge.textContent = count > 99 ? '99+' : String(count);
+  // "99+" fica menor para caber dentro da gota.
+  badge.classList.toggle('evpin__count--long', badge.textContent.length > 2);
 }
 
 interface Props {
