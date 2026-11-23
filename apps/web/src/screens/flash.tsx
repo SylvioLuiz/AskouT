@@ -7,7 +7,6 @@ import type { NowPin } from '../components/now-map.tsx';
 import { useUser } from '../auth.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { RingLoader } from '../components/ring-loader.tsx';
-import { MatchPlaceSearch } from '../components/match-place-search.tsx';
 import { nowRadiusKm } from '../lib/now-radius.ts';
 import { ChatButton } from '../components/chat-button.tsx';
 import { InviteSheet } from '../components/invite.tsx';
@@ -40,6 +39,7 @@ import { FLASH_PRIVACY_POINTS, flashNoticeSeen, markFlashNoticeSeen, safeStorage
 import type { PlacePin, RouteLine } from '../components/match-map.tsx';
 import { MatchDestination, MatchPlaces } from '../components/match-destination.tsx';
 import { MAX_PLACES_ON_MAP, placeName, sortByFairness } from '../lib/flash.ts';
+import { toCard } from '../lib/chat.ts';
 import type { AvailableFriend, AvailableOrder, FlashMatch, PublicProfile, SuggestionItem } from '../lib/types.ts';
 import { Link, navigate } from '../router.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
@@ -1458,31 +1458,15 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
     }
   }
 
-  async function chooseDestination(item: SuggestionItem) {
+  /** Sugerir um local é no chat: o cartão vai para a conversa e a pessoa segue para lá, onde o amigo aceita ou recusa. */
+  async function suggestInChat(item: SuggestionItem) {
     setDestBusy(true);
     setFeedback(undefined);
     try {
-      await api.flashChooseDestination(inviteId, { name: placeName(item), lat: item.lat, lng: item.lng });
-      setPickedKey(undefined);
-      match.reload();
+      await api.sendSuggestion(data.conversationId, toCard(item));
+      navigate(`/conversas/${data.conversationId}`);
     } catch (failure) {
       setFeedback({ tone: 'error', text: toApiError(failure).message });
-    } finally {
-      setDestBusy(false);
-    }
-  }
-
-  async function suggestPlace(place: { name: string; lat: number; lng: number }) {
-    setDestBusy(true);
-    setFeedback(undefined);
-    try {
-      await api.flashChooseDestination(inviteId, place);
-      setPickedKey(undefined);
-      match.reload();
-      setFeedback({ tone: 'ok', text: t('{place} sugerido para {name}.', { place: place.name, name: data.other.username }) });
-    } catch (failure) {
-      setFeedback({ tone: 'error', text: toApiError(failure).message });
-    } finally {
       setDestBusy(false);
     }
   }
@@ -1581,7 +1565,7 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
         selectedKey={pickedKey}
         busy={destBusy}
         onSelect={setPickedKey}
-        onChoose={(item) => void chooseDestination(item)}
+        onChoose={(item) => void suggestInChat(item)}
       />
       {suggestions.data ? (
         <p className="muted matchradius">
@@ -1591,7 +1575,11 @@ export function MatchScreen({ inviteId }: { inviteId: string }) {
           <Link to="/configuracao/now">{t('Mudar')}</Link>
         </p>
       ) : null}
-      <MatchPlaceSearch center={myPoint ?? (them ? { lat: them.lat, lng: them.lng } : undefined)} otherName={data.other.username} busy={destBusy} onSuggest={(place) => void suggestPlace(place)} />
+      <div className="placesearch placesearch--closed">
+        <Link to={`/conversas/${data.conversationId}?sugerir=outro`} className="btn btn--secondary btn--full">
+          {t('Sugerir outro lugar')}
+        </Link>
+      </div>
 
       <ArrivalShare match={data} background={background} onChanged={match.reload} onFeedback={setFeedback} />
 

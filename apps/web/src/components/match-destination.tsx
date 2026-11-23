@@ -36,7 +36,7 @@ export function MatchPlaces({ bothShared, loading, error, suggestions, places, o
       {suggestions && suggestions.reason === null && places.length === 0 ? <p className="muted">{t('Nenhum evento ou local encontrado por perto agora.')}</p> : null}
       {places.length > 0 ? (
         <>
-          <p className="muted">{t('Toque em um lugar para ver no mapa e escolha onde se encontrar.')}</p>
+          <p className="muted">{t('Toque em um lugar para ver no mapa e sugira no chat.')}</p>
           <ol className="matchplaces__list">
             {places.map((item, index) => {
               const selected = item.key === selectedKey;
@@ -54,7 +54,7 @@ export function MatchPlaces({ bothShared, loading, error, suggestions, places, o
                   </button>
                   {selected ? (
                     <Button small loading={busy} onClick={() => onChoose(item)}>
-                      {t('Escolher este lugar')}
+                      {t('Sugerir no chat')}
                     </Button>
                   ) : null}
                 </li>
@@ -90,7 +90,7 @@ export function MatchDestination({ match, mode, onMode, me, them, routesLoading,
         <span aria-hidden="true">★ </span>
         <strong>{dest.name}</strong>
       </p>
-      <p className="muted">{dest.chosenByMe ? t('Você escolheu este lugar. {other} foi avisado.', { other }) : t('{other} escolheu este lugar. Você pode escolher outro.', { other })}</p>
+      <p className="muted">{t('Local combinado com {other}. Para trocar, sugira outro no chat.', { other })}</p>
       <div className="segtabs" role="tablist" aria-label={t('Como ir')}>
         <button type="button" role="tab" aria-selected={mode === 'foot'} className="segtabs__tab" onClick={() => onMode('foot')}>
           {t('A pé')}

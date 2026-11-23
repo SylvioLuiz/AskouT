@@ -792,6 +792,37 @@ export class FlashService {
     return { ok: true };
   }
 
+  /**
+   * Sugestão de local aceita no chat: vira o lugar do encontro NOW ativo entre os dois, se houver.
+   * Os dois já concordaram na conversa, então não passa pela trava de distância nem manda outro aviso.
+   */
+  async destinationAgreedInChat(actorId: string, otherId: string, place: { name: string; lat: number; lng: number }): Promise<void> {
+    const now = this.deps.clock.now();
+    const invite = await this.activeMatchWith(actorId, otherId, now);
+    if (!invite) return;
+    const name = place.name.trim().slice(0, DESTINATION_NAME_MAX);
+    if (name === '') return;
+    const saved: FlashInviteRecord = { ...invite, destination: { name, lat: place.lat, lng: place.lng, chosenById: actorId, chosenAt: now } };
+    await this.deps.flash.saveInvite(saved);
+    await this.retargetArrivals(saved, now);
+  }
+
+  /** O aceite foi cancelado no chat: se o lugar do encontro ainda for aquele, ele sai. */
+  async destinationWithdrawnInChat(actorId: string, otherId: string, place: { lat: number; lng: number }): Promise<void> {
+    const now = this.deps.clock.now();
+    const invite = await this.activeMatchWith(actorId, otherId, now);
+    const dest = invite?.destination;
+    if (!invite || !dest || Math.abs(dest.lat - place.lat) > 1e-6 || Math.abs(dest.lng - place.lng) > 1e-6) return;
+    const saved: FlashInviteRecord = { ...invite, destination: null };
+    await this.deps.flash.saveInvite(saved);
+    await this.retargetArrivals(saved, now);
+  }
+
+  private async activeMatchWith(actorId: string, otherId: string, now: Date): Promise<FlashInviteRecord | undefined> {
+    const open = await this.deps.flash.listOpenInvitesFor(actorId, now);
+    return open.find((i) => i.status === 'ACCEPTED' && i.expiresAt > now && (i.fromUserId === otherId || i.toUserId === otherId));
+  }
+
   /** Tira o lugar escolhido (qualquer um dos dois). */
   async clearDestination(actorId: string, inviteId: string): Promise<{ ok: true }> {
     const now = this.deps.clock.now();

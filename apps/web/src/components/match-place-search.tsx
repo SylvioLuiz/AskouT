@@ -15,12 +15,14 @@ interface Props {
   center: { lat: number; lng: number } | undefined;
   otherName: string;
   busy: boolean;
-  onSuggest: (place: { name: string; lat: number; lng: number }) => void;
+  /** Já começa com a busca aberta. */
+  startOpen?: boolean;
+  onSuggest: (place: ExplorePlace) => void;
 }
 
-/** "Sugerir outro lugar": pesquisa qualquer bar, restaurante ou local pelo nome e manda como destino do encontro. */
-export function MatchPlaceSearch({ center, otherName, busy, onSuggest }: Props) {
-  const [open, setOpen] = useState(false);
+/** "Sugerir outro lugar", no mapa do chat: pesquisa qualquer bar, restaurante ou local pelo nome e manda como sugestão na conversa. */
+export function MatchPlaceSearch({ center, otherName, busy, startOpen = false, onSuggest }: Props) {
+  const [open, setOpen] = useState(startOpen);
   const [q, setQ] = useState('');
   const [results, setResults] = useState<ExplorePlace[] | undefined>();
   const [loading, setLoading] = useState(false);
@@ -97,7 +99,7 @@ export function MatchPlaceSearch({ center, otherName, busy, onSuggest }: Props) 
                 <strong>{p.name}</strong>
                 <span className="muted">{[p.address, p.distanceM !== null ? formatDistance(p.distanceM) : null].filter(Boolean).join(' · ')}</span>
               </span>
-              <Button small disabled={busy} onClick={() => onSuggest({ name: p.name, lat: p.lat, lng: p.lng })}>
+              <Button small disabled={busy} onClick={() => onSuggest(p)}>
                 {t('Sugerir')}
               </Button>
             </li>

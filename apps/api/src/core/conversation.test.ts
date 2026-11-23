@@ -167,6 +167,35 @@ test('respond: só o destinatário responde, uma vez, e o resultado aparece para
   assert.equal(list[0]!.lastMessage!.response, 'ACCEPTED');
 });
 
+test('respond cancel: quem aceitou desfaz o aceite e o cartão volta a esperar resposta', async () => {
+  const { w, ana, bia, id, messageId } = await sentCard();
+  await rejectsWith(w.core.conversations.respond(bia, id, messageId, 'cancel'), 'CONFLICT');
+  await w.core.conversations.respond(bia, id, messageId, 'accept');
+  await rejectsWith(w.core.conversations.respond(ana, id, messageId, 'cancel'), 'FORBIDDEN');
+  const reopened = await w.core.conversations.respond(bia, id, messageId, 'cancel');
+  assert.equal(reopened.response, null);
+  assert.equal(reopened.respondedAt, null);
+  assert.equal((await w.core.conversations.messages(ana, id)).messages[0]!.response, null);
+  const again = await w.core.conversations.respond(bia, id, messageId, 'decline');
+  assert.equal(again.response, 'DECLINED');
+  await rejectsWith(w.core.conversations.respond(bia, id, messageId, 'cancel'), 'CONFLICT');
+});
+
+test('respond: aceitar no chat vira o lugar do encontro NOW; cancelar o aceite tira o lugar', async () => {
+  const { w, ana, bia, id } = await friends();
+  await w.core.flash.turnOn(ana, { hours: 2 });
+  await w.core.flash.turnOn(bia, { hours: 2 });
+  const invite = await w.core.flash.invite(ana, bia);
+  await w.core.flash.respond(bia, invite.id, 'accept');
+  const sent = await w.core.conversations.send(ana, id, { suggestion: card });
+  await w.core.conversations.respond(bia, id, sent.id, 'accept');
+  const dest = (await w.core.flash.getMatch(ana, invite.id)).destination;
+  assert.equal(dest?.name, 'Bar do Zé');
+  assert.equal(dest?.lat, card.lat);
+  await w.core.conversations.respond(bia, id, sent.id, 'cancel');
+  assert.equal((await w.core.flash.getMatch(ana, invite.id)).destination, null);
+});
+
 test('respond: mensagem de texto não é sugestão, estranhos não respondem, ex-amigos não respondem', async () => {
   const { w, ana, bia, caio, id } = await sentCard();
   const text = await w.core.conversations.send(ana, id, { body: 'oi' });

@@ -282,7 +282,8 @@ export interface ConversationRecord {
 
 /** Cartão de sugestão enviado numa conversa. Não carrega nada sobre onde as pessoas estão. */
 export interface SuggestionCard {
-  source: 'EVENT' | 'OSM' | 'GOOGLE';
+  /** PLACE: local cadastrado no AskouT (vem da busca "Sugerir outro lugar"). */
+  source: 'EVENT' | 'OSM' | 'GOOGLE' | 'PLACE';
   title: string;
   venueName: string;
   lat: number;

@@ -465,7 +465,16 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
   const [sending, setSending] = useState(false);
   const [recording, setRecording] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
-  const [suggesting, setSuggesting] = useState(false);
+  // Mapa dos locais entre vocês, aberto dentro do chat. `search` já abre a busca de outro lugar (vindo da página do NOW).
+  const [suggesting, setSuggesting] = useState<'suggest' | 'map' | 'search' | undefined>(() => {
+    const ask = new URLSearchParams(window.location.search).get('sugerir');
+    return ask === 'outro' ? 'search' : ask !== null ? 'suggest' : undefined;
+  });
+  useEffect(() => {
+    // O pedido vem na URL só uma vez: tira para que voltar ou recarregar não abra o mapa de novo.
+    if (!new URLSearchParams(window.location.search).has('sugerir')) return;
+    window.history.replaceState(window.history.state, '', window.location.pathname);
+  }, []);
   const [replyTo, setReplyTo] = useState<ChatMessage | undefined>();
   const background = useChatBackground(conversationId);
   /** Cor escolhida agora há pouco: aparece na hora, antes de a conversa recarregar do servidor. */
@@ -844,18 +853,24 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
 
   // O botão de sugerir lugar vive na mensagem "Flash combinado" mais recente. Encontro antigo, sem essa mensagem, mostra o cartão no fim.
   const matchMessageId = [...messages].reverse().find((m) => m.kind === 'SYSTEM' && m.body === FLASH_MATCH_MESSAGE)?.id;
+  // Depois que um local foi aceito, o botão passa a ser para trocar o local (o aceite pode ser cancelado no cartão).
+  const lastSuggestion = [...messages].reverse().find((m) => m.kind === 'SUGGESTION' && !m.deleted);
+  const placeAgreed = lastSuggestion?.response === 'ACCEPTED';
   const matchCard = match ? (
     <div className="callout chat__match">
       <p className="callout__text">
-        <strong>{t('Encontro NOW ativo')}</strong> · acaba em {formatRemaining(minutesLeft(match.expiresAt, serverNow))}
+        <Link to={`/now/encontro/${match.id}`} className="chat__matchlink">
+          <strong>{t('Encontro NOW ativo')}</strong>
+        </Link>{' '}
+        · {t('acaba em {left}', { left: formatRemaining(minutesLeft(match.expiresAt, serverNow)) })}
       </p>
       <div className="row-actions">
-        <Button small onClick={() => setSuggesting(true)}>
-          {t('Sugerir um local')}
+        <Button small onClick={() => setSuggesting('suggest')}>
+          {placeAgreed ? t('Mudar local sugerido') : t('Sugerir um local')}
         </Button>
-        <Link to={`/now/encontro/${match.id}`} className="btn btn--secondary btn--small">
+        <Button small variant="secondary" onClick={() => setSuggesting('map')}>
           {t('Ver no mapa')}
-        </Link>
+        </Button>
       </div>
     </div>
   ) : null;
@@ -1306,14 +1321,16 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
 
       {suggesting && match ? (
         <SuggestionsSheet
+          title={suggesting === 'map' ? t('Lugares entre vocês') : placeAgreed ? t('Mudar local sugerido') : t('Sugerir um local')}
+          searchOpen={suggesting === 'search'}
           inviteId={match.id}
           conversationId={conversationId}
           otherName={data.other?.displayName ?? ''}
-          onClose={() => setSuggesting(false)}
+          onClose={() => setSuggesting(undefined)}
           onSent={(message) => {
             stickToEnd.current = true;
             setMessages((current) => mergeMessages(current, [message]));
-            setSuggesting(false);
+            setSuggesting(undefined);
           }}
         />
       ) : null}
