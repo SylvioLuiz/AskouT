@@ -420,6 +420,12 @@ export class InMemoryFlashRepository implements FlashRepository {
     return [...this.sessions.values()].filter((s) => wanted.has(s.userId) && this.active(s, now)).map((s) => ({ ...s }));
   }
 
+  async lastSessionStart(userId: string): Promise<Date | undefined> {
+    let last: Date | undefined;
+    for (const s of this.sessions.values()) if (s.userId === userId && (!last || s.startsAt > last)) last = s.startsAt;
+    return last;
+  }
+
   async createSession(session: FlashSessionRecord, now: Date): Promise<void> {
     for (const s of this.sessions.values()) {
       if (s.userId !== session.userId || s.endedAt !== null) continue;
