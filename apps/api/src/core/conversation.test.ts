@@ -409,3 +409,14 @@ test('report: motivo da lista, detalhes limitados, guarda as últimas mensagens 
   assert.equal(stored[0]!.reportedUserId, bia);
   assert.match(stored[0]!.evidence, /denunciado: ofensa qualquer/);
 });
+
+test('messages: myReadAt diz até onde você tinha lido antes de abrir (para a divisória "Mensagens novas")', async () => {
+  const { w, ana, bia, id } = await friends();
+  await w.core.conversations.send(ana, id, { body: 'primeira' });
+  await w.core.conversations.messages(bia, id);
+  const readAt = w.clock.now().toISOString();
+  w.clock.tick(60_000);
+  await w.core.conversations.send(ana, id, { body: 'nova' });
+  assert.equal((await w.core.conversations.messages(bia, id)).myReadAt, readAt);
+  assert.notEqual((await w.core.conversations.messages(bia, id)).myReadAt, readAt, 'abrir de novo já conta como lido');
+});

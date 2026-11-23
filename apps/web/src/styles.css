@@ -6050,6 +6050,17 @@ button.reactlist__row { cursor: pointer; }
 /* Mensagens novas enquanto você lia lá em cima */
 .chat__newbtn { position: sticky; bottom: calc(84px + var(--sa-bottom)); z-index: 5; align-self: center; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; margin: 0 0 8px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--brand); color: var(--brand-ink); font: inherit; font-size: 0.875rem; font-weight: 500; box-shadow: 0 4px 14px rgb(0 0 0 / 0.2); cursor: pointer; animation: msgpop-in 160ms ease-out; }
 .chat__newbtn svg { width: 18px; height: 18px; }
+/* Botão redondo de voltar ao fim (rolou para cima, sem mensagem nova). */
+.chat__newbtn--round { width: 40px; min-height: 40px; justify-content: center; padding: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+/* Divisória "Mensagens novas" ao abrir a conversa. */
+.chat__unread { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; color: var(--brand-text); font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.chat__unread::before, .chat__unread::after { content: ''; flex: 1; height: 1px; background: color-mix(in srgb, var(--brand) 55%, transparent); }
+/* Dia das mensagens flutuando no topo enquanto rola. */
+.chat__daypill { position: fixed; z-index: 6; top: calc(var(--chat-top, 72px) + 8px); left: 50%; transform: translateX(-50%); margin: 0; padding: 4px 12px; border-radius: 999px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 2px 10px rgb(0 0 0 / 0.15); font-size: 0.75rem; font-weight: 600; pointer-events: none; animation: msgpop-in 160ms ease-out; }
+/* Mensagem citada: pisca ao chegar nela. */
+.msg--flash .bubble { animation: msg-flash 1.6s ease-out; }
+@keyframes msg-flash { 0%, 35% { box-shadow: 0 0 0 3px var(--brand); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .msg--flash .bubble { animation: none; outline: 3px solid var(--brand); } }
 
 /* Dentro da conversa, só o topo do chat (sem a barra do app), como nas DMs. */
 .shell--chat .topbar { display: none; }

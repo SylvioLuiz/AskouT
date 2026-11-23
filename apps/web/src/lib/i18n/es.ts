@@ -3542,4 +3542,7 @@ export const ES: Readonly<Record<string, string>> = {
   "Encerrar encontro com {name}": "Terminar encuentro con {name}",
   "Encerrar o encontro com {name}? A localização dos dois deixa de ser compartilhada.": "¿Terminar el encuentro con {name}? La ubicación de ambos deja de compartirse.",
   "Ver minha lista de amigos": "Ver mi lista de amigos",
+  "Mensagens novas": "Mensajes nuevos",
+  "Ir para a última mensagem": "Ir al último mensaje",
+  "Essa mensagem é antiga demais para mostrar aqui.": "Ese mensaje es demasiado antiguo para mostrarlo aquí.",
 };

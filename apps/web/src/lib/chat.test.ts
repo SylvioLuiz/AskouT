@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { allDeletable, copyText, dayLabel, filterConversations, formatDistances, formatWhen, listTimeLabel, mergeMessages, previewOf, replyPreview, selectable, toCard } from './chat.ts';
+import { allDeletable, copyText, dayLabel, dayPillLabel, firstUnreadId, filterConversations, formatDistances, formatWhen, listTimeLabel, mergeMessages, previewOf, replyPreview, selectable, toCard } from './chat.ts';
 import { fitWithin, mediaKind, mediaProblem, typingLabel } from './chat-media.ts';
 import type { ChatMessage, ConversationItem, SuggestionItem } from './types.ts';
 
@@ -223,4 +223,20 @@ test('formatWhen: evento que já terminou não aparece como acontecendo agora', 
   assert.match(formatWhen(iso(at(10, 20, 0)), iso(at(11, 2, 0)), NOW), /^Aconteceu em 10 de out\.$/);
   assert.match(formatWhen(iso(at(11, 20, 0)), null, NOW), /^Aconteceu em 11 de out\.$/);
   assert.match(formatWhen("2024-11-26T23:00:00.000Z", "2024-11-27T03:00:00.000Z", NOW), /^Aconteceu em 26 de nov. de 2024$/);
+});
+
+test('firstUnreadId: primeira dos outros depois do que você leu (ignora as suas e as de sistema)', () => {
+  const m = (id: string, mine: boolean, at: string, kind: 'TEXT' | 'SYSTEM' = 'TEXT') => ({ id, mine, kind, createdAt: at });
+  const list = [m('a', false, '2026-11-20T10:00:00.000Z'), m('b', true, '2026-11-20T11:00:00.000Z'), m('s', false, '2026-11-20T11:30:00.000Z', 'SYSTEM'), m('c', false, '2026-11-20T12:00:00.000Z')];
+  assert.equal(firstUnreadId(list, '2026-11-20T10:30:00.000Z'), 'c');
+  assert.equal(firstUnreadId(list, '2026-11-20T12:00:00.000Z'), undefined);
+  assert.equal(firstUnreadId(list, null), 'a');
+  assert.equal(firstUnreadId(list, undefined), undefined);
+});
+
+test('dayPillLabel: hoje, ontem e data', () => {
+  const now = new Date('2026-11-23T15:00:00-03:00');
+  assert.equal(dayPillLabel('2026-11-23T09:00:00-03:00', now), 'Hoje');
+  assert.equal(dayPillLabel('2026-11-22T23:00:00-03:00', now), 'Ontem');
+  assert.match(dayPillLabel('2026-11-18T12:00:00-03:00', now), /18/);
 });

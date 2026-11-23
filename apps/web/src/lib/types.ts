@@ -657,6 +657,8 @@ export interface ChatView {
   typing: string[];
   /** As outras pessoas da conversa, com até quando leram (para o "Visto" e as fotos ao lado dos balões). */
   members: ChatMemberRead[];
+  /** Até quando você tinha lido antes de abrir (só na primeira página): a divisória "Mensagens novas" vem depois. */
+  myReadAt?: string | null;
   /** Relógio do servidor. */
   now: string;
   messages: ChatMessage[];

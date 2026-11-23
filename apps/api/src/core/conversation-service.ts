@@ -165,6 +165,11 @@ export interface ConversationView {
   typing: string[];
   /** As outras pessoas da conversa (sem você e sem quem tem bloqueio com você), com até quando leram. */
   members: MemberReadView[];
+  /**
+   * Até quando você tinha lido ANTES de abrir esta página (só na primeira página; nas antigas, nulo). O app põe a
+   * divisória "Mensagens novas" logo depois disso. Nulo também se nunca leu.
+   */
+  myReadAt?: string | null;
   /** Relógio do servidor. */
   now: string;
   /** Em ordem cronológica. */
@@ -744,6 +749,7 @@ export class ConversationService {
     const page = await conversations.listMessages(conversationId, limit + 1, before, hiddenIds, clearedAt);
     const hasMore = page.length > limit;
     const items = hasMore ? page.slice(page.length - limit) : page;
+    const myReadAt = before === undefined ? ((await conversations.listReads(conversationId)).find((r) => r.userId === actorId)?.lastReadAt ?? null) : null;
     if (before === undefined) await conversations.markRead(conversationId, actorId, now);
     const isGroup = conversation.type === 'GROUP';
     const request = requestRole(conversation, actorId);
@@ -783,6 +789,7 @@ export class ConversationService {
       color: prefs.color,
       typing: await this.typingNames(actorId, conversationId, memberIds, hiddenIds, now),
       members,
+      myReadAt: myReadAt ? myReadAt.toISOString() : null,
       canSend,
       request,
       venue: (await this.venueViews(actorId, [conversation])).get(conversation.id) ?? null,
