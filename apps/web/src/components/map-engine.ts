@@ -31,6 +31,8 @@ export interface MapEngine {
   moveTo(center: LatLng, options: { zoom?: number; raiseBy?: number; animate?: boolean }): void;
   /** Enquadra todos os pontos, sem passar do zoom máximo. */
   fit(points: readonly LatLng[], padding: number | Padding, maxZoom: number, animate?: boolean): void;
+  /** Aproxima (positivo) ou afasta (negativo) mantendo o centro. Vem dos nossos botões, então conta como movimento da pessoa. */
+  zoomBy(delta: number): void;
   /** Troca as linhas desenhadas (rotas). Tracejada para trajeto estimado em linha reta. */
   setLines(lines: readonly MapLine[]): void;
   /** Área visível agora: o centro e o raio (do centro até o canto), em km. */
@@ -59,6 +61,8 @@ interface CreateOptions {
   zoom: number;
   /** Chamado se o provedor recusar depois de carregado (ex.: chave do Google inválida ou sem permissão). */
   onFail: () => void;
+  /** Falso esconde os botões de zoom do provedor (a tela desenha os seus). Padrão: verdadeiro. */
+  nativeZoom?: boolean;
 }
 
 function env(name: 'VITE_GOOGLE_MAPS_API_KEY' | 'VITE_GOOGLE_MAPS_MAP_ID' | 'VITE_MAP_STYLE_URL'): string | undefined {
@@ -145,6 +149,10 @@ function trackUserMoves(container: HTMLElement, view: () => MapView | undefined)
   window.addEventListener('pointerup', released, { passive: true });
   window.addEventListener('touchend', released, { passive: true });
   return {
+    /** Movimento pedido pela pessoa fora do mapa (nossos botões de zoom): avisa quando o mapa parar, como um toque. */
+    nudge() {
+      lastTouch = Date.now();
+    },
     /** Chamar quando o mapa parar de se mexer. A inércia do arrasto e a animação do zoom cabem nos 1,5 s. */
     settled() {
       if (listeners.size === 0 || (!pressed && Date.now() - lastTouch > 1500)) return;
@@ -209,7 +217,7 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
     center: options.center,
     zoom: options.zoom,
     disableDefaultUI: true,
-    zoomControl: true,
+    zoomControl: options.nativeZoom !== false,
     gestureHandling: 'greedy',
     clickableIcons: false,
     colorScheme: appColorScheme() as google.maps.ColorScheme,
@@ -315,6 +323,10 @@ async function createGoogle(container: HTMLElement, options: CreateOptions, key:
         if ((map.getZoom() ?? 0) > maxZoom) map.setZoom(maxZoom);
       });
     },
+    zoomBy(delta) {
+      moves.nudge();
+      map.setZoom((map.getZoom() ?? 0) + delta);
+    },
     setLines(lines) {
       for (const line of polylines) line.setMap(null);
       polylines = lines.map(
@@ -367,7 +379,7 @@ async function createMapLibre(container: HTMLElement, options: CreateOptions): P
     zoom: options.zoom,
     attributionControl: { compact: true },
   });
-  map.addControl(new lib.NavigationControl({ showCompass: false }), 'top-right');
+  if (options.nativeZoom !== false) map.addControl(new lib.NavigationControl({ showCompass: false }), 'top-right');
   let pendingLines: readonly MapLine[] | undefined;
   let styleLoaded = false;
   const drawLines = (lines: readonly MapLine[]) => {
@@ -410,6 +422,11 @@ async function createMapLibre(container: HTMLElement, options: CreateOptions): P
       const bounds = new lib.LngLatBounds([first.lng, first.lat], [first.lng, first.lat]);
       for (const p of points) bounds.extend([p.lng, p.lat]);
       map.fitBounds(bounds, { padding, maxZoom, duration: animate ? 400 : 0 });
+    },
+    zoomBy(delta) {
+      moves.nudge();
+      if (delta > 0) map.zoomIn();
+      else map.zoomOut();
     },
     setLines(lines) {
       pendingLines = lines;

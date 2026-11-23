@@ -4395,9 +4395,19 @@ p.compose__empty { cursor: default; border: 0; font-weight: 500; }
 .evmap__count { align-self: flex-start; margin: 0 0 6px 20px; padding: 3px 10px; border-radius: 12px; background: rgba(18,18,20,.62); color: rgba(255,255,255,.88); font-size: 12px; font-weight: 600; width: fit-content; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .evmapplace__route { display: inline-flex; align-items: center; gap: 6px; }
 .evmapplace__route .icon { width: 16px; height: 16px; }
-.evmap__bottom > .evmap__locate { position: absolute; right: 16px; bottom: calc(100% + 12px); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: var(--evmap-float); color: var(--evmap-float-ink); box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer; transition: transform .15s ease; }
+.evmap__bottom > .evmap__tools { position: absolute; right: 16px; bottom: calc(100% + 12px); display: flex; flex-direction: column; align-items: center; gap: 12px; pointer-events: none; }
+.evmap__tools > * { pointer-events: auto; }
+.evmap__locate { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 22px; background: var(--evmap-float); color: var(--evmap-float-ink); box-shadow: 0 2px 10px rgba(0,0,0,.25); cursor: pointer; transition: transform .15s ease; }
 .evmap__locate:active { transform: scale(.94); }
 .evmap__locate svg { width: 22px; height: 22px; }
+/* Botões + e − do mapa: só com mouse (no celular e no tablet o zoom é com os dedos). */
+.evmap__zoom { display: none; flex-direction: column; width: 44px; border-radius: 22px; background: var(--evmap-float); box-shadow: 0 2px 10px rgba(0,0,0,.25); overflow: hidden; }
+.evmap__zoom button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--evmap-float-ink); cursor: pointer; transition: background-color .15s ease; }
+.evmap__zoom button + button { border-top: 1px solid color-mix(in srgb, var(--evmap-float-ink) 14%, transparent); }
+.evmap__zoom button:hover { background: color-mix(in srgb, var(--evmap-float-ink) 8%, transparent); }
+.evmap__zoom button:active { background: color-mix(in srgb, var(--evmap-float-ink) 14%, transparent); }
+.evmap__zoom svg { width: 22px; height: 22px; }
+@media (hover: hover) and (pointer: fine) { .evmap__zoom { display: flex; } }
 .evmap__hint { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 7px 14px; border-radius: 18px; background: rgba(18,18,20,.82); color: #fff; font-size: 13px; font-weight: 600; box-shadow: 0 2px 10px rgba(0,0,0,.25); pointer-events: none; animation: evmap-hint 2.6s ease both; }
 .evmap__hint svg { width: 16px; height: 16px; }
 @keyframes evmap-hint { 0% { opacity: 0; transform: translateY(-8px); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
