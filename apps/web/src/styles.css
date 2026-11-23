@@ -7211,6 +7211,7 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .friends__invite { margin: 4px 0 20px; }
 .nowmatches { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .nowmatches__item { display: grid; gap: 8px; }
+.nowloc-row { display: grid; justify-items: start; gap: 6px; margin: 8px 0 4px; }
 .nowmatches__row { display: flex; align-items: stretch; gap: 8px; }
 .nowmatches__row .nowmatch { flex: 1; min-width: 0; }
 /* Encerrar na lista do NOW: discreto (o principal é abrir o encontro); a confirmação aparece antes de encerrar. */

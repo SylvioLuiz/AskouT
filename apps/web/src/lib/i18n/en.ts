@@ -3575,4 +3575,5 @@ export const EN: Readonly<Record<string, string>> = {
   "O convite de {name} bate com o que você já aceitou:": "{name}'s invite clashes with what you already accepted:",
   "Aceitar mesmo assim": "Accept anyway",
   "Choque com o que você já aceitou ({when})": "Clashes with something you accepted ({when})",
+  "A localização do celular está desligada. Ligue em Ajustes (ou no atalho \"Localização\" da barra de cima do celular) e toque em ligar de novo.": "Your phone's location is off. Turn it on in Settings (or the \"Location\" shortcut in your phone's top bar) and tap to turn it on again.",
 };

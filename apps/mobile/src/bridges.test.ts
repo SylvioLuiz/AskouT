@@ -657,3 +657,38 @@ test('push: tira da bandeja só os avisos da tela aberta (caminho no iPhone/Andr
   assert.equal(await bridge.clearDelivered({ url: '/now', texts: [{ title: 'ana ligou o NOW', body: 'Bora?' }] }), 1);
   assert.deepEqual(removed.map((n) => (n as { id: number }).id), [3]);
 });
+
+test('localização nativa: erros do plugin viram os códigos do navegador', async () => {
+  const { toGeoError, SERVICES_OFF } = await import('./location-bridge.ts');
+  assert.equal(toGeoError({ code: 'OS-PLUG-GLOC-0003', message: 'Location permission request was denied.' }).code, 1);
+  const off = toGeoError({ code: 'OS-PLUG-GLOC-0007', message: 'Location services are not enabled.' });
+  assert.equal(off.code, 2);
+  assert.equal(off.message, SERVICES_OFF);
+  assert.equal(toGeoError({ code: 'OS-PLUG-GLOC-0010', message: 'Could not obtain location in time.' }).code, 3);
+  assert.equal(toGeoError(new Error('Location services are disabled')).message, SERVICES_OFF);
+});
+
+test('localização nativa: watchPosition entrega posições do plugin e clearWatch para a leitura', async () => {
+  const { useNativeGeolocation } = await import('./location-bridge.ts');
+  let cb: ((p: unknown, e?: unknown) => void) | undefined;
+  const cleared: string[] = [];
+  const plugin = {
+    getCurrentPosition: async () => ({ timestamp: 1, coords: { latitude: 1, longitude: 2, accuracy: 5 } }),
+    watchPosition: async (_o: unknown, c: (p: unknown, e?: unknown) => void) => ((cb = c), 'w1'),
+    clearWatch: async (o: { id: string }) => void cleared.push(o.id),
+  };
+  const geo = { getCurrentPosition: () => undefined, watchPosition: () => 0, clearWatch: () => undefined } as unknown as Geolocation;
+  useNativeGeolocation(geo, plugin as never, async () => 'granted');
+  const got: number[] = [];
+  const id = geo.watchPosition((p) => got.push(p.coords.latitude));
+  await new Promise((r) => setTimeout(r, 0));
+  cb!({ timestamp: 2, coords: { latitude: -23.5, longitude: -46.6, accuracy: 10 } });
+  assert.deepEqual(got, [-23.5]);
+  geo.clearWatch(id);
+  assert.deepEqual(cleared, ['w1']);
+  let denied = 0;
+  useNativeGeolocation(geo, plugin as never, async () => 'denied');
+  geo.watchPosition(() => undefined, (e) => (denied = e.code));
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(denied, 1);
+});
