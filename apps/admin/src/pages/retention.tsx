@@ -2,23 +2,49 @@ import { useState } from 'react';
 import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import { formatDate, formatDateTime } from '../labels.ts';
-import { experimentVerdict, pct, returnVerdict, seconds } from '../retention.ts';
+import { experimentVerdict, pct, RETENTION_BANDS, retentionTone, returnVerdict, seconds } from '../retention.ts';
+import type { RetentionKind } from '../retention.ts';
 import type { ExperimentReport, GroupReturn, RecoExperimentState, RetentionReport, ReturnGroup, ReturnRate } from '../types.ts';
 import { ActionDialog, Badge, Loadable, PageHead } from '../ui.tsx';
 import type { ActionSpec } from '../ui.tsx';
 
 const PERIODS = [7, 14, 30, 60] as const;
 
-function Rate({ r, min }: { r: ReturnRate; min: number }) {
+function Rate({ r, min, kind }: { r: ReturnRate; min: number; kind: RetentionKind }) {
   return (
     <>
-      <strong>{pct(r.rate)}</strong>
+      <strong className={`rate rate--${retentionTone(kind, r, min)}`}>{pct(r.rate)}</strong>
       <span className="muted small"> {r.returned} de {r.sample}{r.sample < min ? ' · poucos dados' : ''}</span>
     </>
   );
 }
 
-function ReturnTable({ title, g, min }: { title: string; g: ReturnGroup; min: number }) {
+const pct0 = (v: number) => pct(v, 0);
+
+/** Explica as cores das taxas de retorno: faixas de referência de apps sociais. */
+function RetentionLegend({ min }: { min: number }) {
+  return (
+    <div className="legend small" aria-label="Legenda das cores de retenção">
+      {(Object.keys(RETENTION_BANDS) as RetentionKind[]).map((k) => {
+        const b = RETENTION_BANDS[k];
+        return (
+          <div key={k} className="legend__row">
+            <span className="legend__title">{b.label}:</span>
+            <span className="rate rate--ok">Bom · {pct0(b.good)} ou mais</span>
+            <span className="rate rate--warn">Atenção · {pct0(b.attention)} a {pct0(b.good)}</span>
+            <span className="rate rate--bad">Ruim · abaixo de {pct0(b.attention)}</span>
+          </div>
+        );
+      })}
+      <div className="legend__row">
+        <span className="rate rate--neutral">Cinza</span>
+        <span className="muted">menos de {min} na amostra, ainda sem leitura</span>
+      </div>
+    </div>
+  );
+}
+
+function ReturnTable({ title, g, min, kind }: { title: string; g: ReturnGroup; min: number; kind: RetentionKind }) {
   return (
     <>
       <h3 className="section">{title}</h3>
@@ -30,9 +56,9 @@ function ReturnTable({ title, g, min }: { title: string; g: ReturnGroup; min: nu
           </tr>
         </thead>
         <tbody>
-          <tr><td>Todos os dias com atividade</td><td className="num"><Rate r={g.all} min={min} /></td></tr>
-          <tr><td>Dias em que a pessoa viu o bloco “Para você”</td><td className="num"><Rate r={g.withReco} min={min} /></td></tr>
-          <tr><td>Dias em que não viu</td><td className="num"><Rate r={g.withoutReco} min={min} /></td></tr>
+          <tr><td>Todos os dias com atividade</td><td className="num"><Rate r={g.all} min={min} kind={kind} /></td></tr>
+          <tr><td>Dias em que a pessoa viu o bloco “Para você”</td><td className="num"><Rate r={g.withReco} min={min} kind={kind} /></td></tr>
+          <tr><td>Dias em que não viu</td><td className="num"><Rate r={g.withoutReco} min={min} kind={kind} /></td></tr>
         </tbody>
       </table>
       <p className="muted small">{returnVerdict(g.withReco, g.withoutReco, min)}</p>
@@ -110,8 +136,8 @@ function GroupRow({ label, g, min }: { label: string; g: GroupReturn; min: numbe
     <tr>
       <td>{label}</td>
       <td className="num">{g.users}</td>
-      <td className="num"><Rate r={g.d1} min={min} /></td>
-      <td className="num"><Rate r={g.d7} min={min} /></td>
+      <td className="num"><Rate r={g.d1} min={min} kind="d1" /></td>
+      <td className="num"><Rate r={g.d7} min={min} kind="d7" /></td>
     </tr>
   );
 }
@@ -175,8 +201,9 @@ function Report({ r }: { r: RetentionReport }) {
 
       <h2 className="section">Quem volta</h2>
       <p className="muted small">Para cada dia em que a pessoa usou o app, vemos se ela voltou 1 dia e 7 dias depois. Só contam dias cujo retorno já passou.</p>
-      <ReturnTable title="Voltou no dia seguinte" g={r.d1} min={r.minSample} />
-      <ReturnTable title="Voltou 7 dias depois" g={r.d7} min={r.minSample} />
+      <RetentionLegend min={r.minSample} />
+      <ReturnTable title="Voltou no dia seguinte" g={r.d1} min={r.minSample} kind="d1" />
+      <ReturnTable title="Voltou 7 dias depois" g={r.d7} min={r.minSample} kind="d7" />
 
       {r.experiment ? <ExperimentSection e={r.experiment} /> : null}
 
@@ -210,6 +237,7 @@ function Report({ r }: { r: RetentionReport }) {
       <ul className="muted small">
         <li>“Atividade” é ter tempo medido na tela naquele dia. Quem desligou as recomendações personalizadas não aparece (as medições dessa pessoa são apagadas), então os números subestimam o uso total.</li>
         <li>Quem viu o bloco e voltou mais não prova que o bloco causou isso. Para provar, esconda o bloco de um grupo sorteado e compare: é o teste A/B (ligue no cartão no topo da página).</li>
+        <li>As cores seguem referências comuns de apps sociais: voltar no dia seguinte (D1) é bom a partir de 40% e preocupante abaixo de 25%; voltar 7 dias depois (D7) é bom a partir de 20% e preocupante abaixo de 10%. Como aqui contam todos os dias de uso (não só os de quem acabou de entrar), os números tendem a ficar acima das médias de mercado, que medem só gente nova.</li>
         <li>Com poucas pessoas, as taxas oscilam muito. Abaixo de {r.minSample} dias-pessoa em algum grupo, trate como palpite.</li>
       </ul>
     </>
