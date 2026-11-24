@@ -9,6 +9,7 @@ import { StoryViewer } from '../components/event-story.tsx';
 import { StoryCreator } from '../components/story-creator.tsx';
 import { Sheet } from '../components/agenda.tsx';
 import { EditPostSheet } from '../components/post-actions.tsx';
+import { EventInviteSheet } from '../components/event-invite-picker.tsx';
 import { EventExtrasList } from '../components/event-extras.tsx';
 import { CalendarIcon, CalendarPlusIcon, ChatIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, EventKindIcon, LocationIcon, LockIcon, MapIcon, MoreIcon, PlusIcon, RouteIcon, ShareIcon, TicketIcon, UsersIcon } from '../components/icons.tsx';
 import { ShareEventSheet } from '../components/share-event.tsx';
@@ -174,6 +175,9 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [calMessage, setCalMessage] = useState<string | undefined>();
   /** Lista completa de quem vai (abre ao tocar nos rostos). */
   const [whoOpen, setWhoOpen] = useState(false);
+  /** Dono convidando mais amigos a partir de "Quem vai" (o convite sai na hora) e o aviso de quantos foram. */
+  const [invitingFriends, setInvitingFriends] = useState(false);
+  const [inviteNote, setInviteNote] = useState<string | undefined>();
   const [creatingStory, setCreatingStory] = useState(false);
   /** Tocou em "Seu flash" sem ter marcado que vai: aviso de que só quem vai posta. */
   const [storyNeedsGoing, setStoryNeedsGoing] = useState(false);
@@ -319,6 +323,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
   }, [e?.title]);
   const showStoryButton = e ? canStory || !ended : false;
   const isPosted = posted ?? e?.postedByMe ?? false;
+  // Quem criou o evento chama mais amigos direto da lista de quem vai (o mesmo seletor da criação).
+  const canInviteFriends = !visitor && e?.isOwner === true && e.source === 'USER' && !ended;
 
   return (
     <>
@@ -598,8 +604,16 @@ export function EventScreen({ eventId }: { eventId: string }) {
               })()}
             </section>
           ) : !ended ? (
-            <p className="evwho__empty">{t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
+            <p className="evwho__empty">{e.isOwner ? t('Ninguém confirmou ainda.') : t('Ninguém confirmou ainda. Seja o primeiro.')}</p>
           ) : null}
+          {canInviteFriends ? (
+            <div className="evwho__invite">
+              <Button small variant="secondary" onClick={() => setInvitingFriends(true)}>
+                <PlusIcon /> {t('Convidar mais pessoas')}
+              </Button>
+            </div>
+          ) : null}
+          {inviteNote ? <Notice tone="ok">{inviteNote}</Notice> : null}
 
           {whoOpen ? (
             <Sheet title={t('Quem vai ({n})', { n: e.confirmedCount })} onClose={() => setWhoOpen(false)}>
@@ -615,7 +629,23 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 ))}
               </ul>
               {e.confirmedCount > e.attendees.length ? <p className="muted evwho__more">{e.confirmedCount - e.attendees.length === 1 ? t('e mais 1 pessoa') : t('e mais {n} pessoas', { n: e.confirmedCount - e.attendees.length })}</p> : null}
+              {canInviteFriends ? (
+                <Button full variant="secondary" onClick={() => { setWhoOpen(false); setInvitingFriends(true); }}>
+                  <PlusIcon /> {t('Convidar mais pessoas')}
+                </Button>
+              ) : null}
             </Sheet>
+          ) : null}
+          {invitingFriends ? (
+            <EventInviteSheet
+              eventId={e.id}
+              onInvite={(n) => {
+                setInvitingFriends(false);
+                setInviteNote(n === 0 ? t('Essas pessoas já estavam convidadas.') : n === 1 ? t('1 pessoa convidada.') : t('{n} pessoas convidadas.', { n }));
+                loaded.reload();
+              }}
+              onClose={() => setInvitingFriends(false)}
+            />
           ) : null}
 
           {e.source === 'PLACE' && !visitor ? <GuestListCard eventId={e.id} ended={ended} /> : null}

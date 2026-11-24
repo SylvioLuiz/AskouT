@@ -84,3 +84,40 @@ test('marcados entram na votação da data de um evento sem data', async () => {
   const post = await w.core.posts.create(ana, { placeName: 'Praça', tagUserIds: [bia, caio], event: { title: 'Churrasco', dateByPoll: true } });
   assert.deepEqual((await w.core.eventPages.invites(ana, post.id)).invites.map((i) => i.user.username).sort(), ['bia', 'caio']);
 });
+
+test('editar o evento privado convida gente nova: convite, marcação e aviso, sem duplicar quem já foi convidado', async () => {
+  const { w, ana, bia, caio, duda, make, invitedIds } = await setup();
+  const post = await make(true, [bia]);
+  const before = (await w.core.notifications.list(bia)).items.length;
+  // bia já foi convidada na criação; caio e duda são novos.
+  const edited = await w.core.posts.update(ana, post.id, { caption: 'Traga bebida', inviteUserIds: [bia, caio, duda] });
+  assert.equal(edited.caption, 'Traga bebida');
+  assert.deepEqual(await invitedIds(ana, post.id), ['bia', 'caio', 'duda']);
+  const tags = (await w.core.posts.get(ana, post.id)).tags.map((t) => t.user.username).sort();
+  assert.deepEqual(tags, ['bia', 'caio', 'duda']);
+  // Convidados agora abrem o evento privado e recebem o aviso; bia não recebe outro.
+  assert.equal((await w.core.eventPages.get(caio, post.id)).title, 'Festa secreta');
+  assert.equal((await w.core.posts.get(duda, post.id)).myTag, 'PENDING');
+  assert.ok((await w.core.notifications.list(caio)).items.some((n) => n.type === 'POST_TAG'));
+  assert.equal((await w.core.notifications.list(bia)).items.length, before);
+  // Quem convidou continua registrado como a dona.
+  assert.ok((await w.core.eventPages.invites(ana, post.id)).invites.every((i) => i.invitedBy?.username === 'ana'));
+});
+
+test('convidar mais pela lista do evento: só a dona, só amigos, e quem recusou não é remarcado', async () => {
+  const { w, ana, bia, caio, duda, make, invitedIds } = await setup();
+  const post = await make(true, [bia]);
+  await w.core.posts.respondTag(bia, post.id, 'decline');
+  assert.deepEqual((await w.core.posts.inviteToEvent(ana, post.id, [bia, caio])).invited, [caio]);
+  assert.deepEqual(await invitedIds(ana, post.id), ['bia', 'caio']);
+  assert.equal((await w.core.posts.get(bia, post.id)).myTag, 'DECLINED');
+  assert.equal((await w.core.posts.get(ana, post.id)).edited, false, 'convidar não marca o evento como editado');
+  // De novo: ninguém novo.
+  assert.deepEqual((await w.core.posts.inviteToEvent(ana, post.id, [caio])).invited, []);
+  // Só a dona convida por aqui, e só amigos dela.
+  await rejectsWith(w.core.posts.inviteToEvent(bia, post.id, [duda]), 'FORBIDDEN');
+  const eva = (await w.signUpMany('eva'))['eva']!;
+  await rejectsWith(w.core.posts.inviteToEvent(ana, post.id, [eva]), 'VALIDATION');
+  await rejectsWith(w.core.posts.update(ana, post.id, { inviteUserIds: [eva] }), 'VALIDATION');
+  assert.deepEqual(await invitedIds(ana, post.id), ['bia', 'caio']);
+});

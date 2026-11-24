@@ -1115,6 +1115,8 @@ export interface PostEdit {
   placeAddress?: string | null;
   placeVenueId?: string | null;
   event?: { title: string; kind?: EventKind; startsAt: string | null; endsAt?: string | null; private?: boolean; extras?: EventExtraAnswer[] } | null;
+  /** Amigos para convidar ao salvar (só evento); quem já foi convidado não recebe de novo. */
+  inviteUserIds?: string[];
 }
 
 /** Evento de bar repostado por alguém que você segue, como item do Início (só com `mixed=1`). */
