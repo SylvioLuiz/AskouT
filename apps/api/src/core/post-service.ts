@@ -183,6 +183,8 @@ export interface PostEditInput {
   /** Evento vinculado; `null` desvincula (desde que fique um rolê). */
   linkedEventId?: unknown;
   event?: unknown;
+  /** Amigos para convidar agora (só evento). Quem já foi convidado fica como está; os novos recebem o convite como na criação. */
+  inviteUserIds?: unknown;
 }
 
 export interface PostsPage {
@@ -283,11 +285,7 @@ export class PostService {
       await posts.createTags(postId, tagIds, clock.now());
       // Marcar alguém no evento já é convidar: aparece como convidado e abre o evento (mesmo privado).
       if (event) await posts.addInvites(postId, tagIds, actorId, clock.now());
-      const me = await this.deps.users.findProfileById(actorId);
-      for (const userId of tagIds) {
-        const who = me?.username ?? 'Alguém';
-        await this.deps.notifier.notify({ userId, type: 'POST_TAG', title: event ? `${who} marcou você no evento ${event.title}` : `${who} marcou você num post`, body: event ? 'Aceite para o evento aparecer no seu perfil' : 'Aceite para ele aparecer no seu perfil', url: `/posts/${postId}`, dedupeKey: `post-tag:${postId}`, actorId });
-      }
+      await this.notifyTagged(actorId, postId, event?.title ?? null, tagIds);
     }
     if (poll && event) await this.linkPoll(poll, postId, event.title, actorId);
     const created = await posts.findById(postId);
@@ -539,13 +537,46 @@ export class PostService {
     // "Quem vê" (público ou só convidados) muda na edição quando vier; virar post comum deixa público.
     const rawPrivate = input.event !== undefined && input.event !== null ? (input.event as { private?: unknown }).private : undefined;
     const eventPrivate = event === null ? false : rawPrivate === undefined ? undefined : this.parsePrivate(input.event);
+    // Convidados novos: conferidos antes de salvar, para um erro não deixar a edição pela metade.
+    const inviteIds = event === null ? [] : await this.validTags(actorId, input.inviteUserIds, 'inviteUserIds');
     const patch: PostPatch = { caption, placeName, placeAddress, placeVenueId, linkedEventId, eventTitle: event?.title ?? null, eventStartsAt: event?.startsAt ?? null, eventEndsAt: event?.endsAt ?? null, eventKind: event?.kind ?? 'OTHER', eventExtras, ...(eventPrivate === undefined ? {} : { eventPrivate }), editedAt: this.deps.clock.now() };
     if (!(await this.deps.posts.update(post.id, actorId, patch))) throw notFound('Post não encontrado');
     if (event) {
       await this.syncPollTitle(post.id, event.title);
       await this.deps.meetups.renameForEventPost(post.id, event.title);
+      await this.inviteFriends(actorId, post.id, event.title, inviteIds);
     }
     return this.get(actorId, post.id);
+  }
+
+  /**
+   * Convidar mais amigos para o próprio evento depois de criado: como marcar na criação (convite, marcação e aviso).
+   * Quem já foi convidado (na criação, pelo cartão numa conversa ou antes) não é convidado de novo nem recebe outro aviso.
+   */
+  async inviteToEvent(actorId: string, postId: unknown, userIds: unknown): Promise<{ invited: string[] }> {
+    const { post } = await this.seeable(actorId, postId);
+    if (post.authorId !== actorId) throw forbidden('Só quem criou o evento convida por aqui');
+    if (!post.eventTitle) throw validationError('Esse post não é um evento', { inviteUserIds: 'Só dá para convidar para um evento' });
+    const ids = await this.validTags(actorId, userIds, 'inviteUserIds');
+    return { invited: await this.inviteFriends(actorId, post.id, post.eventTitle, ids) };
+  }
+
+  /** Convida (sem duplicar) e, só para quem é novo, cria a marcação e avisa. */
+  private async inviteFriends(actorId: string, postId: string, eventTitle: string, ids: string[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    const now = this.deps.clock.now();
+    const added = await this.deps.posts.addInvites(postId, ids, actorId, now);
+    if (added.length === 0) return [];
+    await this.deps.posts.createTags(postId, added, now);
+    await this.notifyTagged(actorId, postId, eventTitle, added);
+    return added;
+  }
+
+  private async notifyTagged(actorId: string, postId: string, eventTitle: string | null, userIds: string[]): Promise<void> {
+    const who = (await this.deps.users.findProfileById(actorId))?.username ?? 'Alguém';
+    for (const userId of userIds) {
+      await this.deps.notifier.notify({ userId, type: 'POST_TAG', title: eventTitle !== null ? `${who} marcou você no evento ${eventTitle}` : `${who} marcou você num post`, body: eventTitle !== null ? 'Aceite para o evento aparecer no seu perfil' : 'Aceite para ele aparecer no seu perfil', url: `/posts/${postId}`, dedupeKey: `post-tag:${postId}`, actorId });
+    }
   }
 
   /** Ajuste (recorte) de uma foto enviada do próprio post. */
@@ -846,15 +877,18 @@ export class PostService {
     return post.eventTitle ? canOpenByInvite(this.deps, viewerId, post.id) : false;
   }
 
-  private async validTags(actorId: string, raw: unknown): Promise<string[]> {
+  private async validTags(actorId: string, raw: unknown, field: 'tagUserIds' | 'inviteUserIds' = 'tagUserIds'): Promise<string[]> {
     if (raw === undefined || raw === null) return [];
+    const tagging = field === 'tagUserIds';
     if (!Array.isArray(raw) || raw.some((v) => typeof v !== 'string') || raw.length > POST_TAGS_MAX) {
-      throw validationError('Marcações inválidas', { tagUserIds: `Marque até ${POST_TAGS_MAX} amigos` });
+      throw validationError(tagging ? 'Marcações inválidas' : 'Convites inválidos', { [field]: tagging ? `Marque até ${POST_TAGS_MAX} amigos` : `Convide até ${POST_TAGS_MAX} amigos por vez` });
     }
     const ids = [...new Set(raw as string[])].filter((id) => id !== actorId);
     if (ids.length === 0) return [];
     const friends = new Set(await this.deps.follows.listFriendIds(actorId));
-    if (ids.some((id) => !friends.has(id))) throw validationError('Marcações inválidas', { tagUserIds: 'Só dá para marcar amigos (quem segue você e que você segue)' });
+    if (ids.some((id) => !friends.has(id))) {
+      throw validationError(tagging ? 'Marcações inválidas' : 'Convites inválidos', { [field]: tagging ? 'Só dá para marcar amigos (quem segue você e que você segue)' : 'Só dá para convidar amigos (quem segue você e que você segue)' });
+    }
     return ids;
   }
 

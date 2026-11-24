@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { CalendarIcon, ChevronDownIcon, EventKindIcon, GlobeIcon, LocationIcon, LockIcon, PlusIcon, XIcon } from './icons.tsx';
+import { CalendarIcon, ChevronDownIcon, EventKindIcon, GlobeIcon, LocationIcon, LockIcon, PlusIcon, UsersIcon, XIcon } from './icons.tsx';
 import { EventAudienceSheet, EventKindSheet, EventRow, EventWhenSheet } from './event-compose.tsx';
 import { EventExtrasFields } from './event-extras.tsx';
+import { EventInviteSheet } from './event-invite-picker.tsx';
 import { LinkPlaceSheet } from './link-place-sheet.tsx';
 import { Button, Notice } from './ui.tsx';
 import { api } from '../client.ts';
@@ -16,7 +17,7 @@ import type { LinkedPlace } from '../lib/post-draft.ts';
 import type { EventKind, PostView } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
-type SheetName = 'when' | 'kind' | 'audience' | 'place';
+type SheetName = 'when' | 'kind' | 'audience' | 'place' | 'invite';
 
 /**
  * Editar um evento com a mesma cara da criação: capa no topo, nome grande, descrição e as linhas Quando / Onde / Tipo /
@@ -36,6 +37,10 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
   const [placeChanged, setPlaceChanged] = useState(false);
   const [extras, setExtras] = useState<EventExtrasDraft>(() => extrasDraftFrom(event.extras));
   const extraOptions = useAsync(() => api.eventExtras().then((r) => r.items), []);
+  // Amigos novos para convidar: o convite sai ao salvar (quem já foi convidado nem aparece no seletor).
+  const [invitees, setInvitees] = useState<string[]>([]);
+  const friends = useAsync(() => api.friends(), []);
+  const inviteeNames = (friends.data ?? []).filter((f) => invitees.includes(f.userId)).map((f) => `@${f.username}`);
   const [sheet, setSheet] = useState<SheetName | undefined>();
   const [moreOpen, setMoreOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -83,6 +88,7 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
           // Sem a lista carregada, não manda `extras` e as respostas ficam como estavam.
           ...(extraOptions.data ? { extras: extrasFromDraft(extras, extraOptions.data) } : {}),
         },
+        ...(invitees.length > 0 ? { inviteUserIds: invitees } : {}),
       });
       onSaved(updated);
     } catch (failure) {
@@ -160,6 +166,21 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
           />
           <EventRow icon={<EventKindIcon kind={kind} />} label={t('Tipo')} value={kindLabel} onClick={() => setSheet('kind')} disabled={busy} />
           <EventRow icon={isPrivate ? <LockIcon /> : <GlobeIcon />} label={t('Quem vê')} value={isPrivate ? t('Só convidados') : t('Público')} onClick={() => setSheet('audience')} disabled={busy} />
+          <EventRow
+            icon={<UsersIcon />}
+            label={t('Convidar')}
+            value={inviteeNames.length > 0 ? inviteeNames.join(', ') : null}
+            placeholder={t('Mais amigos')}
+            onClick={() => setSheet('invite')}
+            disabled={busy}
+            trailing={
+              invitees.length > 0 ? (
+                <button type="button" className="evrow__clear" onClick={() => setInvitees([])} aria-label={t('Tirar os convidados novos')}>
+                  <XIcon />
+                </button>
+              ) : null
+            }
+          />
         </ul>
 
         {(extraOptions.data ?? []).length > 0 ? (
@@ -223,6 +244,17 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
           isPrivate={isPrivate}
           onPick={(v) => {
             setPrivate(v);
+            setSheet(undefined);
+          }}
+          onClose={() => setSheet(undefined)}
+        />
+      ) : null}
+      {sheet === 'invite' ? (
+        <EventInviteSheet
+          eventId={post.id}
+          picked={invitees}
+          onDone={(ids) => {
+            setInvitees(ids);
             setSheet(undefined);
           }}
           onClose={() => setSheet(undefined)}

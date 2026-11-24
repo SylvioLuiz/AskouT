@@ -149,11 +149,18 @@ export class PostsController {
     return this.core.posts.delete(actor.userId, id);
   }
 
-  /** Edita legenda, lugar e evento: `{caption?, placeName?, placeAddress?, event?}` (só o autor). */
+  /** Edita legenda, lugar e evento: `{caption?, placeName?, placeAddress?, event?, inviteUserIds?}` (só o autor; `inviteUserIds` convida mais amigos para o evento). */
   @Patch('posts/:id')
   async edit(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
     const b = asBody(body);
-    return this.present(await this.core.posts.update(actor.userId, id, { caption: b.caption, placeName: b.placeName, placeAddress: b.placeAddress, placeVenueId: b.placeVenueId, linkedEventId: b.linkedEventId, event: b.event }));
+    return this.present(await this.core.posts.update(actor.userId, id, { caption: b.caption, placeName: b.placeName, placeAddress: b.placeAddress, placeVenueId: b.placeVenueId, linkedEventId: b.linkedEventId, event: b.event, inviteUserIds: b.inviteUserIds }));
+  }
+
+  /** Convida mais amigos para o próprio evento: `{userIds: string[]}`, sem marcar o evento como editado. Devolve só quem foi convidado agora. */
+  @Post('posts/:id/invites')
+  @HttpCode(200)
+  invite(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.posts.inviteToEvent(actor.userId, id, asBody(body).userIds);
   }
 
   /** Ajuste de uma foto enviada: `{image: dataUrl}` já recortada pelo app (só o autor). */
