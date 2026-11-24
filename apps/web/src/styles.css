@@ -7653,8 +7653,11 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 @media (prefers-reduced-motion: reduce) { .evpreview { animation: none; } }
 
 /* ---------- Editar evento (mesma cara da criação, por cima da tela) ---------- */
-.evedit { position: fixed; inset: 0; z-index: 65; overflow-y: auto; background: var(--bg); }
-.evedit__inner { max-width: 520px; margin: 0 auto; padding: 0 16px calc(24px + var(--sa-bottom)); }
+.evedit { position: fixed; inset: 0; z-index: 65; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: var(--bg); }
+.evedit__inner { max-width: 520px; margin: 0 auto; padding: 0 16px; }
+/* Na edição o "Salvar" gruda no fim da própria folha (fixo dentro de uma folha que rola pula no iPhone) e não precisa da folga da criação. */
+.evedit .compose--event { padding-bottom: 0; }
+.evedit .compose__footer { position: sticky; left: auto; right: auto; bottom: 0; margin: 8px -16px 0; }
 .evflashes { margin: 4px -16px 0; }
 .evflashes__add { display: grid; place-items: center; width: 66px; height: 66px; border: 2px dashed var(--brand); border-radius: 50%; color: var(--brand-text); }
 .evflashes__add svg { width: 24px; height: 24px; }

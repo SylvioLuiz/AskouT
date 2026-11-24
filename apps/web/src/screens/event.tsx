@@ -510,7 +510,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
               ended ? null : (
                 // Quem criou chama mais gente: o evento chega na conversa e a pessoa vira convidada (e vota na data, se houver votação).
                 <div className="evgo">
-                  <Button full onClick={() => setInviting(true)}>
+                  <Button full onClick={() => (canInviteFriends ? setInvitingFriends(true) : setInviting(true))}>
                     <UsersIcon /> {t('Convidar')}
                   </Button>
                   {/* Evento sem data: abrir a votação (se ainda não tem) ou ir para ela, onde o lápis edita. */}
