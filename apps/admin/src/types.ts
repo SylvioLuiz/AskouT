@@ -291,7 +291,7 @@ export interface AuditRow {
 // ---------- Pagamentos ----------
 
 export interface PaymentsState {
-  /** O que vale agora: ligado só se escolhido E com provedor configurado. */
+  /** O que vale agora: ligado só se escolhido E com um jeito de cobrar (provedor na web ou lojas). */
   enabled: boolean;
   /** O que a gestão escolheu; null se ainda não escolheu (vale o valor inicial do servidor). */
   chosen: boolean | null;
@@ -300,6 +300,12 @@ export interface PaymentsState {
   canEnable: boolean;
   blocker: string | null;
   storeAvailable: boolean;
+  /** Quais lojas têm conferente de recibos no servidor (ausente em servidor antigo). */
+  stores?: { apple: boolean; google: boolean };
+  /** Pacotes de dias à venda agora. */
+  offeredDays?: number[];
+  /** Todos os pacotes possíveis e o produto de cada um nas lojas. */
+  packages?: { days: number; productId: string }[];
   updatedAt: string | null;
   updatedBy: string | null;
 }

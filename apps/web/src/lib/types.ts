@@ -1397,7 +1397,9 @@ export interface BoostPricing {
   packagePricesCents: Record<string, number>;
   dayOptions: number[];
   /** Compra dentro do app (iOS/Android). `products` mapeia dias → produto da loja. */
-  store: { available: boolean; pricePerDayCents: number; packagePricesCents: Record<string, number>; products: Record<string, string> };
+  store: { available: boolean; apple?: boolean; google?: boolean; pricePerDayCents: number; packagePricesCents: Record<string, number>; products: Record<string, string> };
+  /** Compra pelo site (Pix/cartão). Sem provedor na web, a venda é só pelo app. Ausente em servidores antigos (vale como disponível). */
+  web?: { available: boolean };
   /** Raios (km) e número máximo de hashtags do Match. */
   match: { radiusKmOptions: number[]; maxTags: number };
   /** Pagamento de teste: não cobra de verdade. */

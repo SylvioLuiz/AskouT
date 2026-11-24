@@ -2,11 +2,12 @@ import { conflict, forbidden, notFound, validationError } from './errors.ts';
 import type { MatchReach, MatchService } from './match-service.ts';
 import { MATCH_MAX_TAGS, MATCH_RADIUS_KM_OPTIONS } from './match.ts';
 import type { CoreDeps } from './ports.ts';
+import { BOOST_ALL_DAY_OPTIONS } from './payments-switch.ts';
 import type { PaymentsSwitch } from './payments-switch.ts';
 import type { BoostAudience, BoostChannel, BoostRecord, BoostTarget, PlaceEventRecord, VenueRecord } from './types.ts';
 
 /** Quantos dias o responsável pode comprar de uma vez. */
-export const BOOST_DAY_OPTIONS: readonly number[] = [1, 3, 7, 14];
+export const BOOST_DAY_OPTIONS: readonly number[] = BOOST_ALL_DAY_OPTIONS;
 /** Valor do pacote de 1 dia, em centavos (referência do “por dia” sem desconto). */
 export const BOOST_DEFAULT_PRICE_PER_DAY_CENTS = 1490;
 /**
@@ -36,7 +37,9 @@ export interface BoostPricing {
   packagePricesCents: Record<string, number>;
   dayOptions: number[];
   /** Compra dentro do app (iOS/Android): o valor vem da tabela de preços da loja, que costuma ser maior por causa da comissão. */
-  store: { available: boolean; pricePerDayCents: number; packagePricesCents: Record<string, number>; products: Record<string, string> };
+  store: { available: boolean; apple: boolean; google: boolean; pricePerDayCents: number; packagePricesCents: Record<string, number>; products: Record<string, string> };
+  /** Compra pelo site (Pix/cartão): só com provedor configurado. Sem ele, quem está no site é orientado a comprar pelo app. */
+  web: { available: boolean };
   /** Raios (km) e limite de hashtags do Match. */
   match: { radiusKmOptions: number[]; maxTags: number };
   /** Pagamento de teste: não cobra de verdade (a tela mostra “simular pagamento”). */
@@ -110,8 +113,17 @@ export class BoostService {
       enabled: await this.paymentsSwitch.isEnabled(),
       pricePerDayCents: this.pricePerDayCents,
       packagePricesCents: { ...this.webPackages },
-      dayOptions: [...BOOST_DAY_OPTIONS],
-      store: { available: this.deps.storeVerifier !== undefined, pricePerDayCents: this.storePricePerDayCents, packagePricesCents: { ...this.storePackages }, products },
+      // Só os pacotes que a gestão deixou à venda pelo painel.
+      dayOptions: await this.paymentsSwitch.offeredDays(),
+      store: {
+        available: this.deps.storeVerifier !== undefined,
+        apple: this.deps.storeVerifier !== undefined && this.deps.storeVerifier.supports?.('APPLE') !== false,
+        google: this.deps.storeVerifier !== undefined && this.deps.storeVerifier.supports?.('GOOGLE') !== false,
+        pricePerDayCents: this.storePricePerDayCents,
+        packagePricesCents: { ...this.storePackages },
+        products,
+      },
+      web: { available: this.deps.payments.provider !== 'none' },
       match: { radiusKmOptions: [...MATCH_RADIUS_KM_OPTIONS], maxTags: MATCH_MAX_TAGS },
       sandbox: this.deps.payments.sandbox,
     };
@@ -194,9 +206,11 @@ export class BoostService {
     }
     const channel: BoostChannel = input.channel === 'APPLE' || input.channel === 'GOOGLE' ? input.channel : 'WEB';
     if (channel !== 'WEB' && (!this.deps.storeVerifier || this.deps.storeVerifier.supports?.(channel) === false)) throw conflict('A compra pelo app ainda não está disponível.');
+    if (channel === 'WEB' && this.deps.payments.provider === 'none') throw conflict('Pelo site ainda não dá para pagar. Compre o impulsionamento pelo app AskouT (iPhone ou Android).');
 
     const days = input.days;
-    if (typeof days !== 'number' || !BOOST_DAY_OPTIONS.includes(days)) throw validationError('Duração inválida', { days: `Escolha ${BOOST_DAY_OPTIONS.join(', ')} dias` });
+    const offered = await this.paymentsSwitch.offeredDays();
+    if (typeof days !== 'number' || !offered.includes(days)) throw validationError('Duração inválida', { days: `Escolha ${offered.join(', ')} dias` });
     if (input.target !== 'VENUE' && input.target !== 'EVENT') throw validationError('Escolha o que impulsionar', { target: 'Use VENUE ou EVENT' });
     const target: BoostTarget = input.target;
     if (input.audience !== undefined && input.audience !== 'ALL' && input.audience !== 'MATCH') throw validationError('Alcance inválido', { audience: 'Use ALL ou MATCH' });

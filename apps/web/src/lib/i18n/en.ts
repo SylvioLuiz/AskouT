@@ -44,6 +44,7 @@ export const EN: Readonly<Record<string, string>> = {
   "A busca de locais com foto ainda não está ligada neste ambiente.": "Place search with photos isn't turned on in this environment yet.",
   "A categoria pode ter até {VENUE_CATEGORY_MAX} caracteres.": "The category can have up to {VENUE_CATEGORY_MAX} characters.",
   "A cerca de {km} km de você": "About {km} km from you",
+  "Pelo site ainda não dá para pagar. Abra o app AskouT no iPhone ou no Android para comprar o impulsionamento.": "You can't pay on the website yet. Open the AskouT app on iPhone or Android to buy a boost.",
   "A compra pelo aplicativo ainda não está disponível nesta versão.": "In-app purchases aren't available in this version yet.",
   "A compra é cobrada pela {storeName}. ": "The purchase is charged by {storeName}. ",
   "A data de fim é inválida.": "The end date is invalid.",
