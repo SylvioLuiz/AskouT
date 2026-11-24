@@ -21,6 +21,10 @@ export const REFERRAL_CONFIRM_AFTER_HOURS = 24;
 export const REFERRAL_CONFIRM_UNTIL_DAYS = 30;
 export const REFERRAL_LIST_MAX = 200;
 export const REFERRAL_TOP_MAX = 50;
+/** Até quanto tempo depois de tocar no link (e ir para a loja) o convite ainda é sugerido no cadastro pelo app. */
+export const INVITE_CLICK_WINDOW_HOURS = 24;
+/** Toques mais velhos que isso são apagados. */
+export const INVITE_CLICK_KEEP_DAYS = 3;
 
 const HOUR_MS = 3_600_000;
 const hiddenKey = (userId: string) => `referral-badge-hidden:${userId}`;
@@ -82,6 +86,45 @@ export class ReferralService {
     const created = await referrals.create({ inviteeId: actor.userId, inviterId: inviter.id, createdAt: now, qualifiedAt: null });
     if (created) await this.befriend(actor.userId, inviter.id);
     return { counted: created };
+  }
+
+  /**
+   * Toque no link de convite num celular sem o app, logo antes de ir para a loja. A loja não repassa o link para o app
+   * recém-instalado; então guardamos quem convidou pela rede de quem tocou (`networkKey`, hash do IP) e sugerimos no
+   * cadastro. Usuário inexistente ou suspenso é ignorado em silêncio.
+   */
+  async recordClick(networkKey: string, rawInviter: unknown): Promise<{ ok: true }> {
+    const { users, referrals, clock } = this.deps;
+    const username = normalizeUsername(asString(rawInviter));
+    if (!networkKey || usernameProblem(username)) return { ok: true };
+    const profile = await users.findProfileByUsername(username);
+    const inviter = profile ? await users.findById(profile.userId) : null;
+    if (!inviter || inviter.status !== ACTIVE) return { ok: true };
+    const now = clock.now();
+    await referrals.recordClick({ networkKey, inviterId: inviter.id, createdAt: now }, new Date(now.getTime() - INVITE_CLICK_KEEP_DAYS * 24 * HOUR_MS));
+    return { ok: true };
+  }
+
+  /**
+   * Convite sugerido para quem acabou de entrar pelo app e não trouxe o convite junto: o toque mais recente no link
+   * vindo da mesma rede, nas últimas INVITE_CLICK_WINDOW_HOURS. Não registra nada: a pessoa confirma e o app chama `claim`.
+   * Sem sugestão se a conta já tem convite, passou da janela do convite, ou quem convidou é ela mesma, sumiu ou há bloqueio.
+   */
+  async pending(actor: Actor, networkKey: string): Promise<{ inviter: PublicProfile | null }> {
+    const { users, blocks, referrals, clock } = this.deps;
+    const none = { inviter: null };
+    if (!networkKey) return none;
+    const me = await users.findById(actor.userId);
+    const now = clock.now();
+    if (!me || now.getTime() - me.createdAt.getTime() > REFERRAL_CLAIM_WINDOW_HOURS * HOUR_MS) return none;
+    if (await referrals.hasInvitee(actor.userId)) return none;
+    const click = await referrals.latestClick(networkKey, new Date(now.getTime() - INVITE_CLICK_WINDOW_HOURS * HOUR_MS));
+    if (!click || click.inviterId === actor.userId) return none;
+    const inviter = await users.findById(click.inviterId);
+    if (!inviter || inviter.status !== ACTIVE) return none;
+    if (await blocks.existsEitherWay(actor.userId, inviter.id)) return none;
+    const profile = (await users.findProfilesByIds([inviter.id]))[0];
+    return profile ? { inviter: toPublicProfile(profile) } : none;
   }
 
   /**

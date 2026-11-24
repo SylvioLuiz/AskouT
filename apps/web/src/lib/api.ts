@@ -277,6 +277,10 @@ export function createApi(deps: ApiDeps) {
       ),
     claimReferral: (inviter: string) => request<{ counted: boolean }>('POST', '/me/referral', { body: { inviter } }),
     referrals: () => request<ReferralOverview>('GET', '/me/referrals'),
+    /** Página do convite no celular sem o app, antes da loja: guarda quem convidou para sugerir depois da instalação. */
+    recordInviteClick: (inviter: string) => request<{ ok: true }>('POST', '/referrals/click', { body: { inviter }, auth: false }),
+    /** Convite sugerido para quem acabou de entrar pelo app sem o convite junto (mesma rede do toque no link). */
+    pendingReferral: () => request<{ inviter: PublicProfile | null }>('GET', '/me/referral/pending'),
     setReferralBadgeHidden: (hidden: boolean) => request<{ badgeHidden: boolean }>('PUT', '/me/referral-badge', { body: { hidden } }),
     getProfile: (username: string) => request<ProfileView>('GET', `/profiles/${id(username)}`),
     setProfilePhoto: (image: string | null) => request<Profile>('PUT', '/profiles/me/photo', { body: { image } }),

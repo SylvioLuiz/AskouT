@@ -3624,4 +3624,12 @@ export const EN: Readonly<Record<string, string>> = {
   "Editar foto {n}": "Edit photo {n}",
   "Buscar mais no Google": "Search more on Google",
   "Resultados do OpenStreetMap.": "Results from OpenStreetMap.",
+  "Depois de instalar, crie sua conta: o app vai perguntar se foi @{username} quem te chamou.": "After installing, create your account: the app will ask if @{username} invited you.",
+  "Digite o @ de quem te convidou.": "Type the @ of who invited you.",
+  "Não achamos @{username}. Confira o nome e tente de novo.": "We couldn't find @{username}. Check the name and try again.",
+  "Foi @{username} quem te chamou para o AskouT?": "Did @{username} invite you to AskouT?",
+  "Sim, foi": "Yes",
+  "Alguém te convidou?": "Did someone invite you?",
+  "Quem te convidou?": "Who invited you?",
+  "Convite": "Invitation",
 };

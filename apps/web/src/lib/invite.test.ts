@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
-import { APP_STORE_URL, PLAY_STORE_URL, inviteLandingTarget, invitePlatform, inviteUrl, parseInvite, rememberInvite, takeInvite, whatsappUrl } from './invite.ts';
+import { describe, it, test } from 'node:test';
+import { APP_STORE_URL, PLAY_STORE_URL, inviteLandingTarget, playStoreUrl, invitePlatform, inviteUrl, parseInvite, rememberInvite, takeInvite, whatsappUrl } from './invite.ts';
 
 describe('link do convite', () => {
   it('reconhece o celular pelo navegador', () => {
@@ -19,7 +19,7 @@ describe('link do convite', () => {
     const android = inviteLandingTarget({ ...base, platform: 'android' });
     assert.equal(android.kind, 'external');
     assert.ok(android.to.startsWith('intent://convite/ana.s#Intent;scheme=br.com.askout;package=br.com.askout;'));
-    assert.ok(android.to.includes(`S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)}`));
+    assert.ok(android.to.includes(`S.browser_fallback_url=${encodeURIComponent(playStoreUrl('ana.s'))}`));
   });
 });
 
@@ -45,4 +45,8 @@ describe('convite por link', () => {
     assert.equal(takeInvite(s), undefined);
     assert.equal(takeInvite(undefined), undefined);
   });
+});
+
+test('link da Play Store leva o convite no referrer', () => {
+  assert.equal(playStoreUrl('ana.s'), `${PLAY_STORE_URL}&referrer=convite%3Dana.s`);
 });

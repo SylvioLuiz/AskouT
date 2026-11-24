@@ -1256,6 +1256,22 @@ export interface ReferralRepository {
   listByInviter(inviterId: string, limit: number): Promise<ReferralRecord[]>;
   /** Maiores convidantes pelo número de convites confirmados (contas ativas), depois pelo total. */
   top(limit: number): Promise<{ inviterId: string; total: number; confirmed: number }[]>;
+  /** A pessoa já entrou pelo convite de alguém? */
+  hasInvitee(inviteeId: string): Promise<boolean>;
+  /**
+   * Toque no link de convite antes de ir para a loja, guardado pela rede de quem tocou (hash do IP, nunca o IP).
+   * Quem baixa o app e se cadastra na mesma rede logo depois recebe a sugestão "foi @fulano quem te convidou?".
+   * Apaga os toques anteriores a `purgeBefore` na mesma chamada.
+   */
+  recordClick(click: InviteClickRecord, purgeBefore: Date): Promise<void>;
+  /** Toque mais recente dessa rede desde `since`, se houver. */
+  latestClick(networkKey: string, since: Date): Promise<InviteClickRecord | null>;
+}
+
+export interface InviteClickRecord {
+  networkKey: string;
+  inviterId: string;
+  createdAt: Date;
 }
 
 /** Álbuns dos encontros: criação a partir do NOW e dos eventos, fotos e aviso do dia seguinte. */

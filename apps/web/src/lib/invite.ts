@@ -7,6 +7,14 @@ export const APP_STORE_URL = 'https://apps.apple.com/br/app/askout/id6826608065'
 export const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=br.com.askout';
 
 /**
+ * Play Store com o convite no `referrer` (Play Install Referrer). Hoje o app acha o convite pelo servidor; o referrer
+ * fica no link para uma leitura nativa futura, sem trocar os links já enviados.
+ */
+export function playStoreUrl(username: string): string {
+  return `${PLAY_STORE_URL}&referrer=${encodeURIComponent(`convite=${username}`)}`;
+}
+
+/**
  * Link de convite: `/convite/usuario`. Com o app instalado, o celular abre o app direto (Universal Link no iPhone;
  * no Android a página chama o app). Sem o app, a página manda para a loja; no computador, para o cadastro do site.
  */
@@ -36,7 +44,7 @@ export function inviteLandingTarget(o: { username: string; native: boolean; logg
   if (o.platform === 'ios') return { kind: 'external', to: APP_STORE_URL };
   return {
     kind: 'external',
-    to: `intent://convite/${u}#Intent;scheme=br.com.askout;package=br.com.askout;S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)};end`,
+    to: `intent://convite/${u}#Intent;scheme=br.com.askout;package=br.com.askout;S.browser_fallback_url=${encodeURIComponent(playStoreUrl(o.username))};end`,
   };
 }
 
