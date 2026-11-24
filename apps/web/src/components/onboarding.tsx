@@ -1,20 +1,19 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { api } from '../client.ts';
 import { useAuthContext, useUser } from '../auth.tsx';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
 import { parseInvite, takeInvite } from '../lib/invite.ts';
-import { followProgressLabel, markOnboardingDone, ONBOARDING_FOLLOW_GOAL, ONBOARDING_SLIDES, onboardingDone, placesFromEvents, shouldShowOnboarding } from '../lib/onboarding.ts';
+import { followProgressLabel, markOnboardingDone, ONBOARDING_FOLLOW_GOAL, onboardingDone, placesFromEvents, shouldShowOnboarding } from '../lib/onboarding.ts';
 import { positionWithin } from '../lib/position.ts';
 import { filterByThemes, saveThemes, themeFilter, themesOfCategory } from '../lib/themes.ts';
 import type { ThemeId } from '../lib/themes.ts';
 import type { ExplorePlace, PublicProfile } from '../lib/types.ts';
-import { BoltIcon, HomeIcon, UserIcon } from './icons.tsx';
 import { TastePicker, toggleTaste } from './tastes.tsx';
+import { Tour } from './tour.tsx';
 import { Avatar, Button, Field, Loading } from './ui.tsx';
 import { t } from '../lib/i18n/index.ts';
-
-const SLIDE_ICONS = [<HomeIcon key="h" />, <UserIcon key="u" />, <BoltIcon key="b" filled />];
 
 function storage(): Storage | undefined {
   try {
@@ -92,15 +91,17 @@ function FollowStep({ themes, onDone }: { themes: ReadonlySet<ThemeId>; onDone: 
       {problem ? <p className="field__error" role="alert">{problem}</p> : null}
       <p className="onb__progress" role="status">{followProgressLabel(followed.size)}</p>
       <div className="onb__actions">
-        <Button full onClick={onDone} variant={ready ? 'primary' : 'secondary'}>{ready ? t('Ir para a Home') : followed.size > 0 ? t('Continuar assim mesmo') : t('Pular por agora')}</Button>
+        <Button full onClick={onDone} variant={ready ? 'primary' : 'secondary'}>{ready ? t('Continuar') : followed.size > 0 ? t('Continuar assim mesmo') : t('Pular por agora')}</Button>
       </div>
     </>
   );
 }
 
-function ThemeStep({ chosen, onToggle, onNext }: { chosen: ReadonlySet<ThemeId>; onToggle: (id: ThemeId) => void; onNext: () => void }) {
+function ThemeStep({ chosen, onToggle, onNext, invited }: { chosen: ReadonlySet<ThemeId>; onToggle: (id: ThemeId) => void; onNext: () => void; invited?: ReactNode }) {
   return (
     <>
+      <p className="onb__welcome">{t('Bem-vindo ao AskouT!')}</p>
+      {invited}
       <h2 id="onb-titulo" className="onb__title">{t('O que você curte?')}</h2>
       <p className="onb__text">{t('Escolha um ou mais. Vamos sugerir rolês do seu jeito. Dá para mudar depois, nas configurações.')}</p>
       <TastePicker chosen={chosen} onToggle={onToggle} />
@@ -185,7 +186,10 @@ function InviteAsk({ suggested, onAccept, onDismiss }: { suggested: PublicProfil
   );
 }
 
-/** Primeiro login: 3 telas curtas e o passo “siga 3 rolês”. Aparece uma vez por conta, em qualquer aparelho. */
+/**
+ * Primeiro login (logo depois do cadastro): escolher gostos, seguir 3 locais e um tour interativo pelos botões do app.
+ * Aparece uma vez por conta, em qualquer aparelho.
+ */
 export function Onboarding() {
   const user = useUser();
   const { setSessionUser } = useAuthContext();
@@ -237,31 +241,25 @@ export function Onboarding() {
     api.completeOnboarding().catch(() => undefined);
     setOpen(false);
   };
-  const slide = ONBOARDING_SLIDES[step];
+  if (step === 2) return <Tour onDone={finish} />;
+  const invitedNote = invited ? (
+    <p className="onb__invited" role="status">{invitedFriend ? t('Você entrou pelo convite de @{invited} e vocês já são amigos.', { invited }) : t('Você entrou pelo convite de @{invited} e já segue essa pessoa.', { invited })}</p>
+  ) : (
+    <InviteAsk suggested={suggested} onAccept={accept} onDismiss={() => setSuggested(undefined)} />
+  );
   return (
     <div className="onb" role="dialog" aria-modal="true" aria-labelledby="onb-titulo">
       <div className="onb__card">
-        {slide ? (
-          <>
-            <div className="onb__art" aria-hidden="true">{SLIDE_ICONS[step]}</div>
-            <h2 id="onb-titulo" className="onb__title">{slide.title}</h2>
-            <p className="onb__text">{slide.text}</p>
-            {invited && step === 0 ? <p className="onb__invited" role="status">{invitedFriend ? t('Você entrou pelo convite de @{invited} e vocês já são amigos.', { invited }) : t('Você entrou pelo convite de @{invited} e já segue essa pessoa.', { invited })}</p> : null}
-            {!invited && step === 0 ? <InviteAsk suggested={suggested} onAccept={accept} onDismiss={() => setSuggested(undefined)} /> : null}
-            <div className="onb__dots" aria-hidden="true">
-              {ONBOARDING_SLIDES.map((s, i) => (
-                <span key={s.title} className={`onb__dot${i === step ? ' onb__dot--on' : ''}`} />
-              ))}
-            </div>
-            <div className="onb__actions">
-              <Button full onClick={() => setStep(step + 1)}>{step === ONBOARDING_SLIDES.length - 1 ? t('Escolher meus rolês') : t('Próximo')}</Button>
-              <Button full variant="quiet" onClick={finish}>{t('Pular')}</Button>
-            </div>
-          </>
-        ) : step === ONBOARDING_SLIDES.length ? (
+        <div className="onb__dots" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className={`onb__dot${i === step ? ' onb__dot--on' : ''}`} />
+          ))}
+        </div>
+        {step === 0 ? (
           <ThemeStep
             chosen={chosen}
             onToggle={toggle}
+            invited={invitedNote}
             onNext={() => {
               const tastes = [...chosen];
               saveThemes(storage(), user.id, tastes);
@@ -270,11 +268,11 @@ export function Onboarding() {
                 .setTastes(tastes)
                 .then((saved) => setSessionUser({ ...user, tastes: saved.tastes }))
                 .catch(() => undefined);
-              setStep(step + 1);
+              setStep(1);
             }}
           />
         ) : (
-          <FollowStep themes={themeFilter([...chosen])} onDone={finish} />
+          <FollowStep themes={themeFilter([...chosen])} onDone={() => setStep(2)} />
         )}
       </div>
     </div>

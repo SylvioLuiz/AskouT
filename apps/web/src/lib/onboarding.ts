@@ -3,11 +3,38 @@ import type { ExploreEvent, ExplorePlace } from './types.ts';
 /** Quantos rolês o passo guiado pede para a Home nascer com eventos. */
 export const ONBOARDING_FOLLOW_GOAL = 3;
 
-export const ONBOARDING_SLIDES: readonly { title: string; text: string }[] = [
-  { title: t('Siga bares e baladas, veja eventos'), text: t('Os eventos dos locais que você segue aparecem na sua Home. Toque em “Eu vou” para confirmar presença e receber um lembrete antes de começar.') },
-  { title: t('Amigo é quem se segue'), text: t('Quando você segue alguém e essa pessoa segue você de volta, vocês viram amigos. Só amigos veem seus planos e conversam direto com você.') },
-  { title: t('NOW: encontre quem quer sair agora'), text: t('Ligue o NOW para avisar os amigos que você está livre. Quem também estiver livre pode te chamar, e a conversa abre na hora.') },
+/**
+ * Tour interativo do primeiro login: destaca o botão de verdade (marcado com data-tour no menu) e pede para a
+ * pessoa tocar nele. Passo sem `to` só explica (ex.: Criar, que abriria uma janela) e segue com “Entendi”.
+ */
+export interface TourStep {
+  target: string;
+  title: string;
+  text: string;
+  /** Página que o toque abre; sem ela, o passo só explica. */
+  to?: string;
+}
+
+export const TOUR_STEPS: readonly TourStep[] = [
+  { target: 'home', to: '/', title: t('Sua Home'), text: t('Os eventos dos locais que você segue aparecem aqui. Toque em “Eu vou” para confirmar presença e receber um lembrete. Toque em Home.') },
+  { target: 'explore', to: '/explorar', title: t('Explorar'), text: t('Ache bares, baladas e eventos perto de você, no mapa ou na lista. Toque em Explorar.') },
+  { target: 'create', title: t('Criar'), text: t('Por aqui você cria um evento ou uma postagem e chama os amigos.') },
+  { target: 'now', to: '/now', title: t('NOW: quem quer sair agora'), text: t('Ligue o NOW para avisar os amigos que você está livre. Quem também estiver livre pode te chamar. Toque em NOW.') },
+  { target: 'agenda', to: '/agenda', title: t('Agenda'), text: t('Os eventos em que você vai ficam guardados aqui. Toque em Agenda.') },
+  { target: 'chats', to: '/conversas', title: t('Conversas'), text: t('Amigo é quem se segue: quando os dois se seguem, vocês conversam direto. Toque em Conversas.') },
+  { target: 'profile', to: '/perfil', title: t('Seu perfil'), text: t('Seus amigos, fotos e configurações ficam no perfil. Toque em Perfil para terminar.') },
 ];
+
+/** Texto do contador do tour (“2 de 7”). */
+export function tourProgressLabel(index: number, total = TOUR_STEPS.length): string {
+  return t('{n} de {total}', { n: index + 1, total });
+}
+
+/** Onde pôr o balão do tour em relação ao botão destacado: ao lado (menu lateral), acima (barra de baixo) ou abaixo. */
+export function tourPlacement(target: { left: number; right: number; top: number; bottom: number }, viewport: { width: number; height: number }): 'right' | 'above' | 'below' {
+  if (target.right < viewport.width * 0.35 && viewport.width >= 720) return 'right';
+  return (target.top + target.bottom) / 2 > viewport.height / 2 ? 'above' : 'below';
+}
 
 const key = (userId: string) => `askout.onboarded.${userId}`;
 

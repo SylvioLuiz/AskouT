@@ -36,10 +36,10 @@ function isActive(item: NavItem, pathname: string): boolean {
   return [item.to, ...(item.also ?? [])].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-function NavLink({ item, pathname, badge }: { item: NavItem; pathname: string; badge?: boolean }) {
+function NavLink({ item, pathname, badge, tour }: { item: NavItem; pathname: string; badge?: boolean; tour?: string }) {
   const active = isActive(item, pathname);
   return (
-    <Link to={item.to} className={`navlink${active ? ' navlink--active' : ''}`} aria-current={active ? 'page' : undefined}>
+    <Link to={item.to} className={`navlink${active ? ' navlink--active' : ''}`} aria-current={active ? 'page' : undefined} data-tour={tour}>
       <span className="navlink__icon">
         {item.icon}
         {badge ? <span className="navlink__badge" aria-hidden="true" /> : null}
@@ -270,19 +270,19 @@ function MainShell({ children }: { children: ReactNode }) {
           {t('AskouT')}
         </Link>
         <nav className="rail__nav" aria-label={t('Principal')}>
-          <NavLink item={HOME} pathname={pathname} />
-          <NavLink item={EXPLORE} pathname={pathname} />
-          <button type="button" className={`navlink navlink--button navlink--create${inCompose ? ' navlink--active' : ''}`} onClick={() => setChoosing(true)} aria-haspopup="dialog">
+          <NavLink item={HOME} pathname={pathname} tour="home" />
+          <NavLink item={EXPLORE} pathname={pathname} tour="explore" />
+          <button type="button" className={`navlink navlink--button navlink--create${inCompose ? ' navlink--active' : ''}`} onClick={() => setChoosing(true)} aria-haspopup="dialog" data-tour="create">
             <span className="navlink__icon">
               <PlusBigIcon />
             </span>
             <span className="navlink__label">{t('Criar')}</span>
           </button>
-          <NavLink item={flashItem} pathname={pathname} badge={flashInvited} />
-          <NavLink item={AGENDA} pathname={pathname} />
-          <NavLink item={CHATS} pathname={pathname} badge={hasUnread} />
+          <NavLink item={flashItem} pathname={pathname} badge={flashInvited} tour="now" />
+          <NavLink item={AGENDA} pathname={pathname} tour="agenda" />
+          <NavLink item={CHATS} pathname={pathname} badge={hasUnread} tour="chats" />
           <NavLink item={activities} pathname={pathname} badge={hasPending} />
-          <NavLink item={profile} pathname={pathname} />
+          <NavLink item={profile} pathname={pathname} tour="profile" />
         </nav>
         <Link to={`/u/${encodeURIComponent(user.profile.username)}`} className="rail__me">
           <Avatar profile={user.profile} size={36} />
@@ -298,7 +298,7 @@ function MainShell({ children }: { children: ReactNode }) {
           {t('AskouT')}
         </Link>
         <nav className="topbar__actions" aria-label={t('Conta')}>
-          <Link to="/conversas" className="iconbtn iconbtn--chat" aria-label={hasUnread ? t('Conversas, {unreadChats} com mensagem nova', { unreadChats }) : 'Conversas'} aria-current={pathname.startsWith('/conversas') ? 'page' : undefined}>
+          <Link to="/conversas" data-tour="chats" className="iconbtn iconbtn--chat" aria-label={hasUnread ? t('Conversas, {unreadChats} com mensagem nova', { unreadChats }) : 'Conversas'} aria-current={pathname.startsWith('/conversas') ? 'page' : undefined}>
             <ChatIcon />
             {hasUnread ? <span className="iconbtn__count" aria-hidden="true">{unreadChats > 9 ? '9+' : unreadChats}</span> : null}
           </Link>
@@ -306,7 +306,7 @@ function MainShell({ children }: { children: ReactNode }) {
             <BellIcon />
             {hasPending ? <span className="navlink__badge" aria-hidden="true" /> : null}
           </Link>
-          <Link to="/perfil" className="iconbtn" aria-label={t('Perfil')} aria-current={isActive(profile, pathname) ? 'page' : undefined}>
+          <Link to="/perfil" data-tour="profile" className="iconbtn" aria-label={t('Perfil')} aria-current={isActive(profile, pathname) ? 'page' : undefined}>
             <UserIcon />
           </Link>
         </nav>
@@ -317,13 +317,13 @@ function MainShell({ children }: { children: ReactNode }) {
       </main>
 
       <nav className="tabbar" aria-label={t('Principal')}>
-        <NavLink item={HOME} pathname={pathname} />
-        <NavLink item={EXPLORE} pathname={pathname} />
-        <button type="button" className={`tabbar__create${inCompose ? ' tabbar__create--active' : ''}`} aria-label={t('Criar postagem ou evento')} aria-haspopup="dialog" onClick={() => setChoosing(true)}>
+        <NavLink item={HOME} pathname={pathname} tour="home" />
+        <NavLink item={EXPLORE} pathname={pathname} tour="explore" />
+        <button type="button" className={`tabbar__create${inCompose ? ' tabbar__create--active' : ''}`} aria-label={t('Criar postagem ou evento')} aria-haspopup="dialog" onClick={() => setChoosing(true)} data-tour="create">
           <PlusBigIcon />
         </button>
-        <NavLink item={flashItem} pathname={pathname} badge={flashInvited} />
-        <NavLink item={AGENDA} pathname={pathname} />
+        <NavLink item={flashItem} pathname={pathname} badge={flashInvited} tour="now" />
+        <NavLink item={AGENDA} pathname={pathname} tour="agenda" />
       </nav>
       {choosing ? <CreateChooser onClose={() => setChoosing(false)} /> : null}
     </div>

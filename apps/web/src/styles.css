@@ -7795,3 +7795,19 @@ button.nownote--edit { font: inherit; font-size: 0.6875rem; font-weight: 600; cu
 .mediaviewer__nav--prev { left: 16px; }
 .mediaviewer__nav--next { right: 16px; }
 @media (hover: hover) and (pointer: fine) { .mediaviewer__nav { display: grid; } }
+
+/* Tour interativo do primeiro login: escurece tudo menos o botão destacado, que continua tocável. */
+.onb__welcome { margin: 0; font-weight: 700; color: var(--brand-text); }
+.onb__art--done { font-size: 2rem; font-weight: 800; }
+.tour { position: fixed; inset: 0; z-index: 210; pointer-events: none; }
+.tour__shade { position: absolute; inset: 0; background: rgb(5 5 15 / 0.75); }
+.tour__spot { position: fixed; border-radius: 18px; box-shadow: 0 0 0 9999px rgb(5 5 15 / 0.75); outline: 3px solid var(--brand); outline-offset: 0; transition: left 0.25s ease, top 0.25s ease, width 0.25s ease, height 0.25s ease; animation: tour-pulse 1.6s ease-out infinite; }
+@keyframes tour-pulse { 0% { outline-color: var(--brand); outline-offset: 0; } 70% { outline-color: transparent; outline-offset: 10px; } 100% { outline-color: transparent; outline-offset: 0; } }
+@media (prefers-reduced-motion: reduce) { .tour__spot { animation: none; transition: none; } }
+.tour__bubble { position: fixed; box-sizing: border-box; max-width: calc(100vw - 24px); width: 320px; padding: 16px; border-radius: 20px; background: var(--surface); color: var(--ink); box-shadow: 0 12px 40px rgb(0 0 0 / 0.3); pointer-events: auto; display: flex; flex-direction: column; gap: 6px; }
+.tour__bubble--center { left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.tour__count { margin: 0; font-size: 0.8125rem; font-weight: 700; color: var(--muted); }
+.tour__title { margin: 0; font-family: var(--font-display); font-size: 1.0625rem; line-height: 1.2; }
+.tour__text { margin: 0; font-size: 0.9375rem; line-height: 1.45; color: var(--ink-2); }
+.tour__actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.tour__hint { font-size: 0.875rem; font-weight: 700; color: var(--brand-text); }
