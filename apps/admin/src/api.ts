@@ -3,7 +3,7 @@ import { query } from './labels.ts';
 import { sortParams } from './sort.ts';
 import type { Sort } from './sort.ts';
 import type {
-  AuditRow, AuthResult, EventEdit, PostDetail, UserDetail, VenueEdit, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, EventEdit, PostDetail, UserDetail, VenueEdit, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStats, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -150,6 +150,7 @@ export const api = {
   editUser: (id: string, body: { displayName?: string; username?: string; bio?: string | null; note: string }) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/profile`, body),
   usernameAvailableFor: (id: string, username: string) =>
     request<{ username: string; available: boolean; problem?: string }>('GET', `/admin/users/${encodeURIComponent(id)}/username-available${query({ username })}`),
+  userStats: (id: string) => request<UserStats>('GET', `/admin/users/${encodeURIComponent(id)}/stats`),
   userActivity: (id: string, p: { kind: string; cursor: string | null }) =>
     request<{ items: UserActivityItem[]; nextCursor: string | null }>('GET', `/admin/users/${encodeURIComponent(id)}/activity${query({ kind: p.kind || undefined, cursor: p.cursor ?? undefined })}`),
   setUserStatus: (id: string, status: 'ACTIVE' | 'SUSPENDED', note: string) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/status`, { status, note }),

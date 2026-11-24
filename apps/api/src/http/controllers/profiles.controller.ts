@@ -51,6 +51,19 @@ export class ProfilesController {
     return this.core.profiles.getPhone(actor.userId);
   }
 
+  /** `{show}`: se o app deve pedir agora para cadastrar o celular (a conta não tem e o limite de pedidos deixa). */
+  @Get('me/phone/prompt')
+  phonePrompt(@CurrentActor() actor: Actor) {
+    return this.core.profiles.phonePrompt(actor.userId);
+  }
+
+  /** O app mostrou o pedido de cadastro do celular. */
+  @Post('me/phone/prompt')
+  @HttpCode(200)
+  markPhonePrompted(@CurrentActor() actor: Actor) {
+    return this.core.profiles.markPhonePrompted(actor.userId);
+  }
+
   /** `{phone: "(11) 98765-4321"}` guarda (normalizado para +55...); `{phone: null}` apaga. */
   @Put('me/phone')
   setPhone(@CurrentActor() actor: Actor, @Body() body: unknown) {

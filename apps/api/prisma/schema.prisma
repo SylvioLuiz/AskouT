@@ -303,6 +303,9 @@ model UserSettings {
   openDms Boolean @default(false)
   /// Amigos (e quem conversa com a pessoa) veem a bolinha verde quando ela está com o app aberto. Desligado, ela também não vê a dos outros.
   showOnline Boolean @default(true)
+  /// Quantas vezes o app pediu para cadastrar o celular (para de pedir depois de algumas) e quando foi a última.
+  phonePromptCount Int       @default(0)
+  phonePromptAt    DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

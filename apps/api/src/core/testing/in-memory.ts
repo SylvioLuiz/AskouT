@@ -74,7 +74,7 @@ import type {
   ConsentEventRecord,
   CloakroomSettingRecord,
   CloakroomTicketRecord,
-  EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminUserExtras, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
+  EventShoppingRecord, ShoppingItemRecord, EventExpenseRecord, GuestListRecord, GuestListEntryRecord, EngagementRow, AdminUserReportRow, UserReportRecord, PasswordReset, PhoneCode, PollConfirmationRecord, PollParticipantRecord, PollProposalRecord, PollProposalStatus, PollRecord, PollStatus, PollVoteRecord, EventAttendanceRecord, EventRef, FeedCommentRecord, FeedCursor, FeedImageInput, FeedPolicy, FeedPostRecord, FeedPostStatus, FeedPostWithImages, FeedReportRecord, FeedReactionStats, FeedTarget, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, EventInviteRecord, PostWithImages, ProfilePhotoRecord, MeetupRecord, NotificationRecord, PushSubscriptionRecord, ConversationPrefsRecord, ConversationRecord, ConversationReportRecord, ConversationSummaryRecord, ExternalPlace, MessageReactionRecord, MessageRecord, PlaceEventRecord, SuggestionResponse, VenueRecord, VenueManagerRecord, VenueProfilePatch, VenueClaimRecord, VenueCalendarRecord, CalendarDraftRecord, CalendarDraftStatus, ClaimStatus, AdminStats, AdminUserRow, AdminVenueRow, AdminPlaceEventRow, AdminPostRow, AdminPostReportRow, AdminStoryReportRow, AdminConversationReportRow, AuditRecord, ReportResolution, UserStatus, AvailabilitySlotRecord, Direction, FlashHiddenRecord, StoryHiddenRecord, FlashInviteRecord, FlashPositionRecord, FlashSessionRecord, Follow, FollowStatus, Page, PendingSignup, Profile, User, AdminPersonRef, AdminUserExtras, AdminUserStats, AdminVenueExtras, AdminPlaceEventExtras, AdminPostDetail
 } from '../types.ts';
 import type { RegionRecord, BoostPlacement, BoostRecord, BoostStatKind, BoostStatRow, BoostStatus, EventStoryMeta, EventStoryRecord, NotificationMuteSettings, EventStoryReportRecord, ExternalProvider, IdentityClaims } from '../types.ts';
 import { DELETED_BODY } from '../types.ts';
@@ -112,6 +112,7 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   readonly photos = new Map<string, ProfilePhotoRecord>();
+  readonly phonePrompts = new Map<string, { count: number; lastAt: Date | null }>();
 
   async setPhoto(userId: string, photo: ProfilePhotoRecord | null): Promise<void> {
     if (photo) this.photos.set(userId, { ...photo, data: new Uint8Array(photo.data) });
@@ -214,6 +215,15 @@ export class InMemoryUserRepository implements UserRepository {
   async markOnboarded(userId: string, at: Date): Promise<void> {
     const u = this.users.get(userId);
     if (u && !u.onboardedAt) this.users.set(userId, { ...u, onboardedAt: at });
+  }
+
+  async getPhonePrompt(userId: string): Promise<{ count: number; lastAt: Date | null }> {
+    return { ...(this.phonePrompts.get(userId) ?? { count: 0, lastAt: null }) };
+  }
+
+  async markPhonePrompted(userId: string, at: Date): Promise<void> {
+    const now = this.phonePrompts.get(userId) ?? { count: 0, lastAt: null };
+    this.phonePrompts.set(userId, { count: now.count + 1, lastAt: at });
   }
 
   async setTastes(userId: string, tastes: string[]): Promise<void> {
@@ -617,9 +627,12 @@ export class InMemoryFlashRepository implements FlashRepository {
 export class InMemoryFollowRepository implements FollowRepository {
   readonly rows = new Map<string, Follow>();
   private readonly blocks: BlockRepository;
+  private readonly users: InMemoryUserRepository | undefined;
 
-  constructor(blocks: BlockRepository) {
+  /** `users` é opcional: sem ele, a busca por `query` não encontra ninguém. */
+  constructor(blocks: BlockRepository, users?: InMemoryUserRepository) {
     this.blocks = blocks;
+    this.users = users;
   }
 
   private key(followerId: string, followeeId: string): string {
@@ -646,15 +659,15 @@ export class InMemoryFollowRepository implements FollowRepository {
     this.rows.delete(this.key(b, a));
   }
 
-  async list(userId: string, direction: Direction, status: FollowStatus, page: Page): Promise<Follow[]> {
-    return this.matching(userId, direction, status)
+  async list(userId: string, direction: Direction, status: FollowStatus, page: Page, query?: string): Promise<Follow[]> {
+    return this.matching(userId, direction, status, query)
       .sort((x, y) => y.createdAt.getTime() - x.createdAt.getTime() || x.followerId.localeCompare(y.followerId))
       .slice(page.offset, page.offset + page.limit)
       .map((f) => ({ ...f }));
   }
 
-  async count(userId: string, direction: Direction, status: FollowStatus): Promise<number> {
-    return this.matching(userId, direction, status).length;
+  async count(userId: string, direction: Direction, status: FollowStatus, query?: string): Promise<number> {
+    return this.matching(userId, direction, status, query).length;
   }
 
   async acceptAllPending(followeeId: string): Promise<number> {
@@ -689,10 +702,13 @@ export class InMemoryFollowRepository implements FollowRepository {
     return out;
   }
 
-  private matching(userId: string, direction: Direction, status: FollowStatus): Follow[] {
-    return [...this.rows.values()].filter(
-      (f) => f.status === status && (direction === 'followers' ? f.followeeId === userId : f.followerId === userId),
-    );
+  private matching(userId: string, direction: Direction, status: FollowStatus, query?: string): Follow[] {
+    return [...this.rows.values()].filter((f) => {
+      if (f.status !== status || (direction === 'followers' ? f.followeeId !== userId : f.followerId !== userId)) return false;
+      if (!query) return true;
+      const p = this.users?.profiles.get(direction === 'followers' ? f.followerId : f.followeeId);
+      return !!p && (p.username.startsWith(query) || p.displayName.toLowerCase().includes(query));
+    });
   }
 }
 
@@ -3457,6 +3473,36 @@ export class InMemoryAdminRepository implements AdminRepository {
       ],
       claims: claims.slice(0, 50).map((c) => ({ id: c.id, venueId: c.venueId, venueName: venueName(c.venueId), status: c.status, createdAt: c.createdAt })),
       groups: [],
+    };
+  }
+
+  /** Versão simples para os testes: conta o que o registro em memória guarda (posts, quem segue, presenças) e zera o resto. */
+  async userStats(userId: string, createdAt: Date, now: Date): Promise<AdminUserStats | undefined> {
+    const x = await this.userExtras(userId);
+    if (!x) return undefined;
+    const DAY = 24 * 60 * 60 * 1000;
+    const since30 = now.getTime() - 30 * DAY;
+    const since7 = now.getTime() - 7 * DAY;
+    const posts = [...this.posts.posts.values()].filter((p) => p.authorId === userId);
+    const going = [...this.eventRoom.going.values()].filter((g) => g.userId === userId);
+    const follows = [...(this.follows?.rows.values() ?? [])].filter((f) => f.followerId === userId);
+    const dates = [...posts, ...going, ...follows].map((r) => r.createdAt).filter((d) => d.getTime() >= since30);
+    const lastSeen = [...posts, ...going, ...follows].map((r) => r.createdAt).sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+    const c = x.counts;
+    return {
+      lastSeenAt: lastSeen,
+      accountAgeDays: Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / DAY)),
+      activeDays30: new Set(dates.map((d) => d.toISOString().slice(0, 10))).size,
+      actions7: dates.filter((d) => d.getTime() >= since7).length,
+      actions30: dates.length,
+      social: { friends: c.friends, followers: c.followers, following: c.following, followersGained30: 0, likesReceived: 0, commentsReceived: 0 },
+      content: { posts: c.posts, stories: c.stories, feedPosts: c.feedPosts, comments: c.postComments, likes: c.postLikes },
+      events: { created: c.eventsCreated, going: c.eventsGoing, checkins: 0, invitesSent: 0, invitesReceived: 0, datePolls: 0, cloakroomTickets: 0 },
+      now: { sessions: 0, sessions30: 0, lastAt: null, invitesSent: 0, invitesReceived: 0, meetups: 0, hiddenBy: 0 },
+      messages: { conversations: 0, sent: 0, sent30: 0 },
+      moderation: { reportsReceived: c.reportsReceived, reportsOpen: c.reportsReceived, reportsActioned: 0, reportsMade: 0, reportsMadeActioned: 0, blockedBy: 0, blocksMade: 0, suspensions: 0, lastSuspendedAt: null },
+      purchases: { boostsPaid: 0, spentCents: 0, lastPaidAt: null, boostsPending: 0 },
+      referrals: { invited: 0, qualified: 0 },
     };
   }
 

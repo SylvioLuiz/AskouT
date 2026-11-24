@@ -15,7 +15,7 @@ import { TastesCatalog } from './tastes.ts';
 import type { TasteInput, TasteOption } from './tastes.ts';
 import { buildExperimentReport } from './reco-experiment.ts';
 import type { ExperimentReport, RecoExperiment, RecoExperimentState } from './reco-experiment.ts';
-import type { Actor, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminVenueExtras, FeedPolicy, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus } from './types.ts';
+import type { Actor, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminUserStats, AdminVenueExtras, FeedPolicy, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus } from './types.ts';
 import { ADMIN_SORTS, REPORT_RESOLUTIONS } from './types.ts';
 
 export const ADMIN_PAGE_DEFAULT = 25;
@@ -416,6 +416,19 @@ export class AdminService {
     const taken = await this.deps.users.findProfileByUsername(username);
     if (taken && taken.userId !== target.id) return { username, available: false, problem: 'Esse @usuário já está em uso' };
     return { username, available: true };
+  }
+
+  /**
+   * Números da pessoa para moderar e gerenciar: último sinal de uso, frequência, vínculos, eventos, NOW, mensagens
+   * (só quantas), denúncias, bloqueios, suspensões e compras. Nunca o conteúdo das conversas.
+   */
+  async userStats(actor: Actor, userId: unknown): Promise<AdminUserStats> {
+    this.assertAdmin(actor);
+    const target = typeof userId === 'string' && userId.length <= 64 ? await this.deps.users.findById(userId) : undefined;
+    if (!target) throw notFound('Usuário não encontrado');
+    const stats = await this.deps.admin.userStats(target.id, target.createdAt, this.deps.clock.now());
+    if (!stats) throw notFound('Usuário não encontrado');
+    return stats;
   }
 
   /** O registro de atividade de uma pessoa (curtidas, comentários, posts, eventos, quem seguiu), como ela vê no app. */

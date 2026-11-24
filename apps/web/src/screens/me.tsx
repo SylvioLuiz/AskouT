@@ -23,6 +23,8 @@ import { BIO_MAX, bioProblem, compact, displayNameProblem } from '../lib/validat
 import { InviteSheet } from '../components/invite.tsx';
 import { ONLINE_CHANGED_EVENT } from '../components/online-presence.tsx';
 import { ConnectContactsCard } from '../components/connect-contacts.tsx';
+import { PeopleSearch } from '../components/people-search.tsx';
+import { matchesPerson } from '../lib/people-search.ts';
 import { ActivityKindIcon, ActivityLog } from '../components/activity-log.tsx';
 import { INTERACTIONS_TABS, interactionsPath, tabFromSlug, type InteractionsTab } from '../lib/activity-log.ts';
 import { PhotoPickerSheet } from '../components/photo-picker.tsx';
@@ -1024,6 +1026,8 @@ export function FriendsScreen() {
   useTitle(t('Amigos'));
   const friends = useAsync(() => api.friends(), []);
   const [inviting, setInviting] = useState(false);
+  const [query, setQuery] = useState('');
+  const shown = friends.data ? friends.data.filter((friend) => matchesPerson(friend, query)) : [];
   return (
     <>
       <PageHead title={t('Amigos')} back="/perfil" subtitle={t('Pessoas que seguem você e que você segue')} action={<Link to="/amigos/contatos">{t('Achar nos contatos')}</Link>} />
@@ -1050,12 +1054,19 @@ export function FriendsScreen() {
       ) : null}
       {friends.data && friends.data.length > 0 ? (
         <>
-          <p className="muted">{pluralize(friends.data.length, 'amigo', 'amigos')}</p>
-          <ul className="list">
-            {friends.data.map((friend) => (
-              <PersonRow key={friend.userId} profile={friend} />
-            ))}
-          </ul>
+          <PeopleSearch value={query} onChange={setQuery} label={t('Buscar amigo por nome ou @')} />
+          {shown.length === 0 ? (
+            <EmptyState title={t('Nenhum amigo encontrado')}>{t('Confira o nome ou o @ digitado.')}</EmptyState>
+          ) : (
+            <>
+              <p className="muted">{shown.length === friends.data.length ? pluralize(friends.data.length, 'amigo', 'amigos') : t('{shown} de {total}', { shown: String(shown.length), total: pluralize(friends.data.length, 'amigo', 'amigos') })}</p>
+              <ul className="list">
+                {shown.map((friend) => (
+                  <PersonRow key={friend.userId} profile={friend} />
+                ))}
+              </ul>
+            </>
+          )}
         </>
       ) : null}
     </>
