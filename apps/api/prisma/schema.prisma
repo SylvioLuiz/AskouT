@@ -592,6 +592,8 @@ model Message {
   gifUrl         String?
   /// Story respondido ou reagido (a resposta leva o story anexado). Sem chave estrangeira: o story expira.
   storyId        String?  @db.Uuid
+  /// Perfil compartilhado (mensagem de texto com o cartão do perfil). Sem chave estrangeira: conta apagada vira "Perfil indisponível".
+  profileUserId  String?  @db.Uuid
   /// Mensagem respondida (na mesma conversa).
   replyToId      String?  @db.Uuid
   /// Apagada por quem enviou: some para todos.
@@ -623,8 +625,6 @@ model FlashSession {
   expiresAt DateTime // obrigatório: todo Flash expira
   endedAt   DateTime? // preenchido quando a pessoa desliga antes do fim
   note      String? // recado curto opcional
-  /// Perfil compartilhado (mensagem de texto com o cartão do perfil). Sem chave estrangeira: conta apagada vira "Perfil indisponível".
-  profileUserId  String?  @db.Uuid
   /// Região aproximada (arredondada para ~1 km) de quando ligou: só para ordenar "mais perto". Nunca sai na resposta
   /// e é apagada quando o NOW termina.
   areaLat   Float?
