@@ -3144,7 +3144,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       const v = this.places.venues.get(e.venueId);
       if (!v) continue;
       if (q && !fold(`${e.title} ${v.name}`).includes(q)) continue;
-      rows.push({ id: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, kind: e.kind, isSample: e.isSample, venue: { id: v.id, name: v.name } });
+      rows.push({ id: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, kind: e.kind, isSample: e.isSample, isFree: e.isFree, venue: { id: v.id, name: v.name, address: v.address } });
     }
     rows.sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime() || (a.id < b.id ? -1 : 1));
     sortRows(rows, page, { title: (r) => r.title, venue: (r) => r.venue.name, kind: (r) => r.kind, startsAt: (r) => r.startsAt.getTime() });

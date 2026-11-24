@@ -395,6 +395,22 @@ test('detalhe do evento na gestão: cadastro, local, responsável e quem confirm
   assert.equal(d.venue.owner?.username, 'ana');
   assert.equal(d.goingCount, 1);
   assert.deepEqual(d.going.map((g) => g.username), ['bia']);
+  assert.deepEqual(d.sameTitle, []);
+  assert.equal(d.sameTitleTotal, 1);
+
+  // O mesmo nome em outras semanas: o detalhe lista as outras datas, e a lista mostra endereço e confirmados.
+  const week = 7 * 24 * H;
+  await w.places.createEvent({ id: 'terca-2', venueId: 'v3', title: 'terçaneja ', description: null, startsAt: new Date(at + 2 * H + week), endsAt: new Date(at + 6 * H + week), kind: 'NIGHT', isFree: false, imageUrl: null, tags: [], isSample: false });
+  await w.places.createEvent({ id: 'terca-0', venueId: 'v3', title: 'Terçaneja', description: null, startsAt: new Date(at + 2 * H - week), endsAt: new Date(at + 6 * H - week), kind: 'NIGHT', isFree: false, imageUrl: null, tags: [], isSample: false });
+  const again = await w.core.admin.eventDetail(A, 'terca');
+  assert.equal(again.sameTitleTotal, 3);
+  assert.deepEqual(again.sameTitle.map((e) => [e.id, e.upcoming]), [['terca-0', false], ['terca-2', true]]);
+  const list = await w.core.admin.searchPlaceEvents(A, { q: 'terçaneja' });
+  const row = list.items.find((e) => e.id === 'terca');
+  assert.equal(row?.goingCount, 1);
+  assert.equal(row?.isFree, true);
+  assert.equal(row?.venue.address, 'Av. Y, 20');
+  assert.equal(list.items.find((e) => e.id === 'terca-2')?.goingCount, 0);
 });
 
 test('gestão edita nome, @usuário e biografia de uma pessoa (com motivo na auditoria) e vê a atividade dela', async () => {

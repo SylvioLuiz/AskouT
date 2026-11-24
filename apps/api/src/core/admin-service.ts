@@ -66,7 +66,14 @@ export interface AdminEventDetail {
   goingCount: number;
   /** Primeiras pessoas que confirmaram (até 20), na ordem da confirmação. */
   going: { id: string; username: string; displayName: string; at: string }[];
+  /** Outras datas do mesmo evento: eventos do mesmo local com o mesmo nome (sem contar este), as mais próximas primeiro. */
+  sameTitle: { id: string; startsAt: string; endsAt: string; upcoming: boolean }[];
+  /** Quantos eventos o local tem com o mesmo nome, contando este. */
+  sameTitleTotal: number;
 }
+
+/** Linha da lista de eventos de locais, com quantas pessoas confirmaram presença. */
+export type AdminPlaceEventListRow = AdminPlaceEventRow & { goingCount: number };
 
 export interface AdminPage<T> {
   items: T[];
@@ -562,10 +569,15 @@ export class AdminService {
     return { removed: true };
   }
 
-  async searchPlaceEvents(actor: Actor, query: ListQuery & { q?: unknown }): Promise<AdminPage<AdminPlaceEventRow>> {
+  async searchPlaceEvents(actor: Actor, query: ListQuery & { q?: unknown }): Promise<AdminPage<AdminPlaceEventListRow>> {
     this.assertAdmin(actor);
     const text = queryText(query.q);
-    return this.paged(query, (page) => this.deps.admin.searchPlaceEvents(text, page), () => this.deps.admin.countList('PLACE_EVENTS', { text }), ADMIN_SORTS.events);
+    const withGoing = async (page: Page): Promise<AdminPlaceEventListRow[]> => {
+      const rows = await this.deps.admin.searchPlaceEvents(text, page);
+      const going = rows.length > 0 ? await this.deps.eventRoom.countGoing(rows.map((r) => ({ source: 'PLACE' as const, id: r.id }))) : new Map<string, number>();
+      return rows.map((r) => ({ ...r, goingCount: going.get(r.id) ?? 0 }));
+    };
+    return this.paged(query, withGoing, () => this.deps.admin.countList('PLACE_EVENTS', { text }), ADMIN_SORTS.events);
   }
 
   /** Abre um evento de local: cadastro, local, responsável e quem confirmou presença. */
@@ -582,6 +594,14 @@ export class AdminService {
     const profiles = new Map((ids.length > 0 ? await users.findProfilesByIds(ids) : []).map((p) => [p.userId, p]));
     const now = clock.now().getTime();
     const status = event.endsAt.getTime() < now ? 'PAST' : event.startsAt.getTime() <= now ? 'LIVE' : 'UPCOMING';
+    // Locais costumam repetir o mesmo nome toda semana: lista as outras datas para não confundir um com o outro.
+    const titleKey = event.title.trim().toLocaleLowerCase('pt-BR');
+    const siblings = (await places.listVenueEvents(venue.id)).filter((e) => e.title.trim().toLocaleLowerCase('pt-BR') === titleKey);
+    const others = siblings
+      .filter((e) => e.id !== event.id)
+      .sort((a, b) => Math.abs(a.startsAt.getTime() - event.startsAt.getTime()) - Math.abs(b.startsAt.getTime() - event.startsAt.getTime()))
+      .slice(0, 12)
+      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
     return {
       id: event.id,
       title: event.title,
@@ -598,6 +618,8 @@ export class AdminService {
       venue: { id: venue.id, name: venue.name, address: venue.address, owner: venue.ownerId ? { id: venue.ownerId, username: profiles.get(venue.ownerId)?.username ?? '(removido)' } : null },
       goingCount: attendance.length,
       going: first.map((a) => ({ id: a.userId, username: profiles.get(a.userId)?.username ?? '(removido)', displayName: profiles.get(a.userId)?.displayName ?? '', at: a.createdAt.toISOString() })),
+      sameTitle: others.map((e) => ({ id: e.id, startsAt: e.startsAt.toISOString(), endsAt: e.endsAt.toISOString(), upcoming: e.endsAt.getTime() >= now })),
+      sameTitleTotal: Math.max(siblings.length, 1),
     };
   }
 
