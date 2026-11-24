@@ -6,7 +6,7 @@ import { distanceMeters } from './geo.ts';
 import type { CoreDeps } from './ports.ts';
 import type { BoostService } from './boost-service.ts';
 import type { ProfileService } from './profile-service.ts';
-import type { EventKind, PlaceEventRecord, VenueHours, VenueRecord } from './types.ts';
+import type { EventKind, ExternalPlace, PlaceEventRecord, VenueHours, VenueRecord } from './types.ts';
 import { EVENT_KINDS } from './types.ts';
 
 export const EXPLORE_DEFAULT_RADIUS_KM = 10;
@@ -324,6 +324,7 @@ export class ExploreService {
       radiusM: searchRadiusM,
       now,
       needle: !kind && !freeOnly && text.length >= 2 ? fold(text) : undefined,
+      text,
       limit: VENUE_LIMIT,
     });
 
@@ -387,7 +388,7 @@ export class ExploreService {
   private async collectPlaces(
     actorId: string,
     venues: { venue: VenueRecord; distanceM: number | null }[],
-    opts: { center: { lat: number; lng: number } | undefined; radiusM: number; now: Date; needle?: string | undefined; all?: boolean; limit: number },
+    opts: { center: { lat: number; lng: number } | undefined; radiusM: number; now: Date; needle?: string | undefined; text?: string; all?: boolean; limit: number },
   ): Promise<{ placeItems: ExplorePlaceItem[]; placesAvailable: boolean }> {
     const { places, placeSource } = this.deps;
     const { center, radiusM, now, needle } = opts;
@@ -430,6 +431,23 @@ export class ExploreService {
         .filter((p) => needle === undefined || fold(p.name).includes(needle))
         .map((p) => ({ p, d: distanceMeters(center, { lat: p.lat, lng: p.lng }) }))
         .sort((a, b) => a.d - b.d);
+      // A busca por perto só devolve os ~20 mais famosos da região: um bar pequeno nunca está entre eles, mesmo com raio grande.
+      // Quando a pessoa digitou um nome, procura pelo nome (grátis primeiro; sem resultado, o Google, com teto diário).
+      const typed = opts.text?.trim() ?? '';
+      if (needle !== undefined && typed.length >= 3 && placeSource.search) {
+        const matches = (list: ExternalPlace[]) => list.filter((p) => fold(p.name).includes(needle));
+        let byName = await placeSource.search(typed, center, 10);
+        let hits = matches(byName.places);
+        if (hits.length === 0 && extra.length === 0 && placeSource.premiumSearch === true) {
+          byName = await placeSource.search(typed, center, 10, { premium: true });
+          hits = matches(byName.places);
+        }
+        placesAvailable = placesAvailable || byName.available;
+        for (const p of hits) {
+          if (!extra.some((e) => e.p.externalId === p.externalId && e.p.source === p.source)) extra.push({ p, d: distanceMeters(center, { lat: p.lat, lng: p.lng }) });
+        }
+        extra.sort((a, b) => a.d - b.d);
+      }
       for (const { p, d } of extra) {
         if (placeItems.length >= opts.limit) break;
         const name = fold(p.name);
