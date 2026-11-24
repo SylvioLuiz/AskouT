@@ -180,7 +180,7 @@ export class AdminController {
   }
 
   @Get('users')
-  users(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; status?: unknown; limit?: unknown; offset?: unknown }) {
+  users(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; status?: unknown; limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown }) {
     return this.core.admin.searchUsers(actor, q);
   }
 
@@ -224,7 +224,7 @@ export class AdminController {
   }
 
   @Get('venues')
-  venues(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; limit?: unknown; offset?: unknown }) {
+  venues(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown }) {
     return this.core.admin.searchVenues(actor, q);
   }
 
@@ -246,7 +246,7 @@ export class AdminController {
   }
 
   @Get('place-events')
-  placeEvents(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; limit?: unknown; offset?: unknown }) {
+  placeEvents(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown }) {
     return this.core.admin.searchPlaceEvents(actor, q);
   }
 
@@ -256,7 +256,7 @@ export class AdminController {
   }
 
   @Get('posts')
-  posts(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; events?: unknown; limit?: unknown; offset?: unknown }) {
+  posts(@CurrentActor() actor: Actor, @Query() q: { q?: unknown; events?: unknown; limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown }) {
     return this.core.admin.searchPosts(actor, q);
   }
 
@@ -371,7 +371,7 @@ export class AdminController {
   }
 
   @Get('audit')
-  audit(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown; offset?: unknown }) {
+  audit(@CurrentActor() actor: Actor, @Query() q: { limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown }) {
     return this.core.admin.audit(actor, q);
   }
 }

@@ -3,7 +3,8 @@ import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import { formatDateTime } from '../labels.ts';
 import type { HunterOverview } from '../types.ts';
-import { ActionDialog, Badge, Loadable, PageHead } from '../ui.tsx';
+import { ActionDialog, Badge, Loadable, PageHead, SortTh } from '../ui.tsx';
+import { sortRows, useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
 
 /**
@@ -12,6 +13,7 @@ import type { ActionSpec } from '../ui.tsx';
  */
 export function HunterPage() {
   const state = useAsync(() => api.hunter(100, 0), []);
+  const { sort, toggle } = useSort<'title' | 'venue' | 'startsAt' | 'createdAt'>();
   const [action, setAction] = useState<ActionSpec>();
   const [syncMsg, setSyncMsg] = useState<string>();
   const [syncing, setSyncing] = useState(false);
@@ -131,10 +133,16 @@ export function HunterPage() {
               <>
                 <table className="table">
                   <thead>
-                    <tr><th scope="col">Evento</th><th scope="col">Local</th><th scope="col">Quando</th><th scope="col">Cadastrado em</th><th scope="col">Ações</th></tr>
+                    <tr>
+                      <SortTh label="Evento" column="title" sort={sort} onSort={toggle} />
+                      <SortTh label="Local" column="venue" sort={sort} onSort={toggle} />
+                      <SortTh label="Quando" column="startsAt" sort={sort} onSort={toggle} first="desc" />
+                      <SortTh label="Cadastrado em" column="createdAt" sort={sort} onSort={toggle} first="desc" />
+                      <th scope="col">Ações</th>
+                    </tr>
                   </thead>
                   <tbody>
-                    {s.items.map((i) => (
+                    {sortRows(s.items, sort, { title: (i) => i.title, venue: (i) => i.venueName, startsAt: (i) => Date.parse(i.startsAt), createdAt: (i) => Date.parse(i.createdAt) }).map((i) => (
                       <tr key={i.ref}>
                         <td>{i.title}</td>
                         <td>{i.venueName}</td>

@@ -425,3 +425,19 @@ test('gestão edita nome, @usuário e biografia de uma pessoa (com motivo na aud
   const follows = await w.core.admin.userActivity(A, bia, { kind: 'LIKE' });
   assert.ok(follows.items.every((i) => i.kind === 'LIKE'));
 });
+
+test('tabelas da gestão ordenam pela coluna pedida, nas duas direções, e recusam coluna desconhecida', async () => {
+  const { w, A } = await setup();
+  const names = async (q: { sort?: string; dir?: string }) => (await w.core.admin.searchUsers(A, q)).items.map((r) => r.username);
+  assert.deepEqual(await names({ sort: 'username' }), ['adm', 'ana', 'bia', 'caio']);
+  assert.deepEqual(await names({ sort: 'username', dir: 'desc' }), ['caio', 'bia', 'ana', 'adm']);
+  await w.places.createVenue({ id: 'v2', name: 'Arena', address: null, category: null, lat: -23.5, lng: -46.6, isSample: false });
+  const venues = async (q: { sort?: string; dir?: string }) => (await w.core.admin.searchVenues(A, q)).items.map((r) => r.name);
+  assert.deepEqual(await venues({}), ['Arena', 'Bar do Zé']);
+  assert.deepEqual(await venues({ sort: 'name', dir: 'desc' }), ['Bar do Zé', 'Arena']);
+  // Sem tipo fica no fim, nas duas direções.
+  assert.deepEqual(await venues({ sort: 'category', dir: 'desc' }), ['Bar do Zé', 'Arena']);
+  assert.deepEqual(await venues({ sort: 'category' }), ['Bar do Zé', 'Arena']);
+  await rejectsWith(w.core.admin.searchUsers(A, { sort: 'passwordHash' }), 'VALIDATION');
+  await rejectsWith(w.core.admin.searchUsers(A, { sort: 'email', dir: 'up' }), 'VALIDATION');
+});

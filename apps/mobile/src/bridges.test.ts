@@ -551,6 +551,9 @@ it('link br.com.askout:// abre só rotas conhecidas do app', async () => {
 it('widgets abrem o NOW, a conversa do encontro e a página do evento', async () => {
   const { deepLinkPath } = await import('./deep-link.ts');
   assert.equal(deepLinkPath('br.com.askout://now'), '/now');
+  assert.equal(deepLinkPath('br.com.askout://now?abrir=ligar'), '/now?abrir=ligar', 'widget sem encontro: ligar o NOW');
+  assert.equal(deepLinkPath('br.com.askout://now?abrir=convidar'), '/now?abrir=convidar', 'widget sem encontro: convidar alguém');
+  assert.equal(deepLinkPath('br.com.askout://now?abrir=apagar&x=1'), '/now');
   assert.equal(deepLinkPath('br.com.askout://conversas/7c1e-99'), '/conversas/7c1e-99');
   assert.equal(deepLinkPath('br.com.askout://eventos/place:abc_1'), '/eventos/place:abc_1');
   assert.equal(deepLinkPath('br.com.askout://eventos/../configuracoes'), undefined);

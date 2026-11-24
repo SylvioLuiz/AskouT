@@ -44,7 +44,7 @@ import { ReplaceConfirm, useMorePlaces } from '../components/suggestions.tsx';
 import { MAX_PLACES_ON_MAP, placeName, sortByFairness } from '../lib/flash.ts';
 import { toCard } from '../lib/chat.ts';
 import type { AvailableFriend, AvailableOrder, FlashInvite, FlashMatch, PublicProfile, SuggestionItem } from '../lib/types.ts';
-import { Link, navigate } from '../router.tsx';
+import { Link, navigate, useSearch } from '../router.tsx';
 import { intlLocale, t } from '../lib/i18n/index.ts';
 import { NowSkeleton } from '../components/skeletons.tsx';
 
@@ -212,6 +212,28 @@ function FlashContent() {
     const timer = setTimeout(() => setRefreshing(false), 600);
     return () => clearTimeout(timer);
   }, [refreshing, loadingAny]);
+
+  // Widget "Encontro ativo" do iPhone sem encontro: `/now?abrir=ligar` leva ao botão de ligar (a pessoa ainda escolhe
+  // por quanto tempo) e `/now?abrir=convidar` abre o "Perguntar se está livre". Depois tira o pedido do endereço.
+  const widgetIntent = useSearch().get('abrir');
+  const goRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (widgetIntent !== 'ligar' && widgetIntent !== 'convidar') return;
+    if (!status.data) return;
+    navigate('/now', { replace: true });
+    if (widgetIntent === 'convidar') {
+      setAsking(true);
+      return;
+    }
+    if (status.data.active) return;
+    window.requestAnimationFrame(() => {
+      const go = goRef.current;
+      if (!go) return;
+      go.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      go.focus({ preventScroll: true });
+    });
+  }, [widgetIntent, status.data]);
+
   function reloadAll() {
     status.reload();
     invites.reload();
@@ -397,7 +419,7 @@ function FlashContent() {
           ))}
         </div>
 
-        <button type="button" className="nowgo" disabled={busy} aria-busy={busy || undefined} onClick={turnOn}>
+        <button ref={goRef} type="button" className="nowgo" disabled={busy} aria-busy={busy || undefined} onClick={turnOn}>
           <BoltIcon filled />
           {t('Ativar NOW por {duration}', { duration: formatFlashDuration(minutes) })}
         </button>

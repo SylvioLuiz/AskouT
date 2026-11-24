@@ -303,7 +303,7 @@ struct ActivePlanWidget: Widget {
             ActivePlanView(entry: entry)
         }
         .configurationDisplayName("Encontro ativo")
-        .description("O encontro do NOW ou o plano que está rolando agora, com quanto falta para acabar.")
+        .description("O encontro do NOW ou o plano que está rolando agora. Sem encontro, atalhos para ligar o NOW e convidar alguém.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular])
     }
 }
@@ -322,7 +322,8 @@ struct ActivePlanView: View {
             Group {
                 if family == .accessoryRectangular { rectangular(active, next: next).accessoryBackground() } else { card(active, next: next).brandBackground() }
             }
-            .widgetURL(appLink(active?.url ?? next?.url ?? "/agenda"))
+            // Sem encontro, o toque abre o NOW: no botão de ligar ou, já ligado, na lista de quem está livre.
+            .widgetURL(appLink(active?.url ?? (snapshot.flashOn(at: entry.date) ? "/now" : NowIntent.turnOn)))
         }
     }
 
@@ -339,7 +340,8 @@ struct ActivePlanView: View {
                 TimeBar(start: p.startsAt, end: p.endsAt)
             case nil:
                 Label("Nada rolando agora", systemImage: "moon.zzz").font(.system(size: 13, weight: .bold)).widgetAccentable()
-                if let next = next { Text("Próximo: \(Words.when(next.startsAt, now: entry.date))").font(.system(size: 12)).foregroundStyle(.secondary) }
+                Text("Toque para ligar o NOW").font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+                if let next = next { Text("Próximo: \(Words.when(next.startsAt, now: entry.date))").font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1) }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -379,19 +381,95 @@ struct ActivePlanView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         case nil:
-            VStack(alignment: .leading, spacing: 4) {
-                Eyebrow(text: "Agora")
+            if wide { idleMedium(next: next) } else { idleSmall(next: next) }
+        }
+    }
+
+    private var snapshot: WidgetSnapshot? {
+        if case .ready(let s) = entry.state { return s }
+        return nil
+    }
+
+    private var flashOn: Bool { snapshot?.flashOn(at: entry.date) ?? false }
+
+    /// "NOW ligado até 21h · 3 amigos livres" ou o convite para ligar.
+    private var idleLine: String {
+        guard let s = snapshot, flashOn else { return "Ligue o NOW e veja quem está livre" }
+        var parts = ["NOW ligado até \(Words.hour(s.flash.expiresAt ?? entry.date))"]
+        if s.friendsOnNow.count > 0 { parts.append(s.friendsOnNow.count == 1 ? "1 amigo livre" : "\(s.friendsOnNow.count) amigos livres") }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Pequeno: um toque só (o widget pequeno não tem botões), que abre o NOW para ligar.
+    private func idleSmall(next: WidgetPlan?) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Eyebrow(text: "Agora", live: flashOn)
+            Spacer(minLength: 0)
+            Text("Nada rolando agora").font(.system(size: 15, weight: .bold)).foregroundStyle(Brand.ink)
+            Text(idleLine).font(.system(size: 12)).foregroundStyle(Brand.muted).lineLimit(2)
+            Label(flashOn ? "Ver quem está livre" : "Ligar o NOW", systemImage: "bolt.fill")
+                .font(.system(size: 12, weight: .bold)).foregroundStyle(Brand.gradient).lineLimit(1)
+                .padding(.top, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Médio: dois botões, ligar o NOW (ou ver quem está livre) e convidar alguém.
+    private func idleMedium(next: WidgetPlan?) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Eyebrow(text: "Agora", live: flashOn)
                 Spacer(minLength: 0)
-                Text("Nada rolando agora").font(.system(size: 15, weight: .bold)).foregroundStyle(Brand.ink)
-                if let next = next {
-                    Text("Próximo: \(Words.when(next.startsAt, now: entry.date))").font(.system(size: 12, weight: .semibold)).foregroundStyle(Brand.gradient)
-                    Text(next.title).font(.system(size: 12)).foregroundStyle(Brand.muted).lineLimit(1)
-                } else {
-                    Text("Ligue o NOW e veja quem está livre").font(.system(size: 12)).foregroundStyle(Brand.muted).lineLimit(2)
+                if let pending = snapshot?.pendingInvites, pending > 0 {
+                    Text(pending == 1 ? "1 convite" : "\(pending) convites").font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+                        .padding(.horizontal, 6).padding(.vertical, 2).background(Capsule().fill(Brand.pink))
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 0)
+            Text("Nada rolando agora").font(.system(size: 16, weight: .bold)).foregroundStyle(Brand.ink)
+            Text(next.map { "\(idleLine) · Próximo: \(Words.when($0.startsAt, now: entry.date))" } ?? idleLine)
+                .font(.system(size: 12)).foregroundStyle(Brand.muted).lineLimit(1)
+            HStack(spacing: 8) {
+                Link(destination: appLink(flashOn ? "/now" : NowIntent.turnOn) ?? URL(string: "br.com.askout://now")!) {
+                    WidgetButton(title: flashOn ? "Quem está livre" : "Ligar o NOW", icon: "bolt.fill", primary: true)
+                }
+                Link(destination: appLink(NowIntent.invite) ?? URL(string: "br.com.askout://now")!) {
+                    WidgetButton(title: "Convidar alguém", icon: "person.badge.plus", primary: false)
+                }
+            }
+            .padding(.top, 2)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Pedidos que o widget faz à tela do NOW (lidos em apps/web/src/screens/flash.tsx, liberados em deep-link.ts).
+enum NowIntent {
+    static let turnOn = "/now?abrir=ligar"
+    static let invite = "/now?abrir=convidar"
+}
+
+/// Botão do widget médio: cheio (degradê da marca) ou contornado.
+struct WidgetButton: View {
+    let title: String
+    let icon: String
+    let primary: Bool
+
+    var body: some View {
+        Label(title, systemImage: icon)
+            .font(.system(size: 12, weight: .bold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .foregroundStyle(primary ? Color.white : Brand.ink)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background {
+                if primary {
+                    Capsule().fill(LinearGradient(colors: [Brand.pink, Brand.violet], startPoint: .leading, endPoint: .trailing))
+                } else {
+                    Capsule().stroke(Brand.track, lineWidth: 1).background(Capsule().fill(Color.white.opacity(0.06)))
+                }
+            }
     }
 }
 

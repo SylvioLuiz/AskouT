@@ -3,7 +3,8 @@ import { api, postImageUrl } from '../api.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
 import { formatDateTime } from '../labels.ts';
 import type { PostRow } from '../types.ts';
-import { ActionDialog, Badge, Loadable, PageHead, Pager, SearchBox } from '../ui.tsx';
+import { ActionDialog, Badge, Loadable, PageHead, Pager, SearchBox, SortTh } from '../ui.tsx';
+import { useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
 
 export function PostThumb({ post }: { post: PostRow }) {
@@ -22,13 +23,20 @@ export function deletePostAction(post: PostRow): ActionSpec {
   };
 }
 
+type PostSort = 'caption' | 'author' | 'createdAt' | 'reports';
+
 export function PostsPage() {
   const [text, setText] = useState('');
   const [onlyEvents, setOnlyEvents] = useState(false);
   const [offset, setOffset] = useState(0);
   const [action, setAction] = useState<ActionSpec>();
   const q = useDebounced(text.trim());
-  const list = useAsync(() => api.posts({ q, events: onlyEvents, offset }), [q, onlyEvents, offset]);
+  const { sort, toggle } = useSort<PostSort>();
+  const onSort = (column: PostSort, first: 'asc' | 'desc') => {
+    toggle(column, first);
+    setOffset(0);
+  };
+  const list = useAsync(() => api.posts({ q, events: onlyEvents, offset, sort }), [q, onlyEvents, offset, sort]);
   return (
     <>
       <PageHead title="Posts" hint="Posts e eventos criados por pessoas. Busque por legenda, evento, rolê ou @autor.">
@@ -44,10 +52,10 @@ export function PostsPage() {
               <thead>
                 <tr>
                   <th aria-label="Foto" />
-                  <th>Post</th>
-                  <th>Autor</th>
-                  <th>Publicado</th>
-                  <th className="num">Denúncias</th>
+                  <SortTh label="Post" column="caption" sort={sort} onSort={onSort} />
+                  <SortTh label="Autor" column="author" sort={sort} onSort={onSort} />
+                  <SortTh label="Publicado" column="createdAt" sort={sort} onSort={onSort} first="desc" />
+                  <SortTh label="Denúncias" column="reports" sort={sort} onSort={onSort} first="desc" className="num" />
                   <th aria-label="Ações" />
                 </tr>
               </thead>

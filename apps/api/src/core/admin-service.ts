@@ -15,8 +15,8 @@ import { TastesCatalog } from './tastes.ts';
 import type { TasteInput, TasteOption } from './tastes.ts';
 import { buildExperimentReport } from './reco-experiment.ts';
 import type { ExperimentReport, RecoExperiment, RecoExperimentState } from './reco-experiment.ts';
-import type { Actor, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, ReportResolution, UserStatus } from './types.ts';
-import { REPORT_RESOLUTIONS } from './types.ts';
+import type { Actor, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus } from './types.ts';
+import { ADMIN_SORTS, REPORT_RESOLUTIONS } from './types.ts';
 
 export const ADMIN_PAGE_DEFAULT = 25;
 export const ADMIN_PAGE_MAX = 100;
@@ -81,6 +81,16 @@ function parsePage(query: { limit?: unknown; offset?: unknown }): Page {
   const num = (v: unknown, fallback: number) => (typeof v === 'string' && /^\d{1,6}$/.test(v) ? Number(v) : typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : fallback);
   return { limit: Math.min(Math.max(num(query.limit, ADMIN_PAGE_DEFAULT), 1), ADMIN_PAGE_MAX), offset: num(query.offset, 0) };
 }
+
+/** `sort` (uma das colunas da lista) e `dir` (`asc`/`desc`, padrão `asc`). Sem `sort`, a lista usa a ordem de sempre. */
+export function parseSort(query: { sort?: unknown; dir?: unknown }, keys: readonly string[]): PageSort | undefined {
+  if (query.sort === undefined || query.sort === null || query.sort === '') return undefined;
+  if (typeof query.sort !== 'string' || !keys.includes(query.sort)) throw validationError('Ordenação inválida', { sort: `Use uma destas: ${keys.join(', ')}` });
+  if (query.dir !== undefined && query.dir !== 'asc' && query.dir !== 'desc') throw validationError('Ordenação inválida', { dir: 'Use asc ou desc' });
+  return { key: query.sort, dir: query.dir === 'desc' ? 'desc' : 'asc' };
+}
+
+type ListQuery = { limit?: unknown; offset?: unknown; sort?: unknown; dir?: unknown };
 
 function queryText(value: unknown): string {
   if (value === undefined || value === null) return '';
@@ -165,9 +175,10 @@ export class AdminService {
     await this.deps.admin.addAudit({ id: this.deps.ids.next(), adminId, action, targetType, targetId, note, createdAt: this.deps.clock.now() });
   }
 
-  private async paged<T>(query: { limit?: unknown; offset?: unknown }, fetch: (page: Page) => Promise<T[]>, count: () => Promise<number>): Promise<AdminPage<T>> {
+  private async paged<T>(query: ListQuery, fetch: (page: Page) => Promise<T[]>, count: () => Promise<number>, sortKeys: readonly string[] = []): Promise<AdminPage<T>> {
     const page = parsePage(query);
-    const [rows, total] = await Promise.all([fetch({ limit: page.limit + 1, offset: page.offset }), count()]);
+    const sort = parseSort(query, sortKeys);
+    const [rows, total] = await Promise.all([fetch({ limit: page.limit + 1, offset: page.offset, ...(sort ? { sort } : {}) }), count()]);
     return { items: rows.slice(0, page.limit), limit: page.limit, offset: page.offset, hasMore: rows.length > page.limit, total };
   }
 
@@ -226,11 +237,11 @@ export class AdminService {
 
   // ---------- Pessoas ----------
 
-  async searchUsers(actor: Actor, query: { q?: unknown; status?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminUserRow>> {
+  async searchUsers(actor: Actor, query: ListQuery & { q?: unknown; status?: unknown }): Promise<AdminPage<AdminUserRow>> {
     this.assertAdmin(actor);
     const status: UserStatus | undefined = query.status === 'ACTIVE' || query.status === 'SUSPENDED' || query.status === 'DELETION_REQUESTED' ? query.status : undefined;
     const text = queryText(query.q);
-    return this.paged(query, (page) => this.deps.admin.searchUsers(text, status, page), () => this.deps.admin.countList('USERS', { text, ...(status ? { status } : {}) }));
+    return this.paged(query, (page) => this.deps.admin.searchUsers(text, status, page), () => this.deps.admin.countList('USERS', { text, ...(status ? { status } : {}) }), ADMIN_SORTS.users);
   }
 
   /** Suspende (banir) ou reativa. Admins e a própria conta não podem ser suspensos. */
@@ -494,10 +505,10 @@ export class AdminService {
 
   // ---------- Locais, eventos e posts ----------
 
-  async searchVenues(actor: Actor, query: { q?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminVenueRow>> {
+  async searchVenues(actor: Actor, query: ListQuery & { q?: unknown }): Promise<AdminPage<AdminVenueRow>> {
     this.assertAdmin(actor);
     const text = queryText(query.q);
-    return this.paged(query, (page) => this.deps.admin.searchVenues(text, page), () => this.deps.admin.countList('VENUES', { text }));
+    return this.paged(query, (page) => this.deps.admin.searchVenues(text, page), () => this.deps.admin.countList('VENUES', { text }), ADMIN_SORTS.venues);
   }
 
   /** Abre um local: cadastro, origem, responsável, seguidores e eventos. */
@@ -551,10 +562,10 @@ export class AdminService {
     return { removed: true };
   }
 
-  async searchPlaceEvents(actor: Actor, query: { q?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminPlaceEventRow>> {
+  async searchPlaceEvents(actor: Actor, query: ListQuery & { q?: unknown }): Promise<AdminPage<AdminPlaceEventRow>> {
     this.assertAdmin(actor);
     const text = queryText(query.q);
-    return this.paged(query, (page) => this.deps.admin.searchPlaceEvents(text, page), () => this.deps.admin.countList('PLACE_EVENTS', { text }));
+    return this.paged(query, (page) => this.deps.admin.searchPlaceEvents(text, page), () => this.deps.admin.countList('PLACE_EVENTS', { text }), ADMIN_SORTS.events);
   }
 
   /** Abre um evento de local: cadastro, local, responsável e quem confirmou presença. */
@@ -598,11 +609,11 @@ export class AdminService {
     return { deleted: true };
   }
 
-  async searchPosts(actor: Actor, query: { q?: unknown; events?: unknown; limit?: unknown; offset?: unknown }): Promise<AdminPage<AdminPostRow>> {
+  async searchPosts(actor: Actor, query: ListQuery & { q?: unknown; events?: unknown }): Promise<AdminPage<AdminPostRow>> {
     this.assertAdmin(actor);
     const text = queryText(query.q);
     const onlyEvents = query.events === 'true' || query.events === true;
-    return this.paged(query, (page) => this.deps.admin.searchPosts(text, onlyEvents, page), () => this.deps.admin.countList('POSTS', { text, onlyEvents }));
+    return this.paged(query, (page) => this.deps.admin.searchPosts(text, onlyEvents, page), () => this.deps.admin.countList('POSTS', { text, onlyEvents }), ADMIN_SORTS.posts);
   }
 
   async deletePost(actor: Actor, postId: unknown, note: unknown): Promise<{ deleted: true }> {
@@ -834,8 +845,8 @@ export class AdminService {
 
   // ---------- Auditoria ----------
 
-  async audit(actor: Actor, query: { limit?: unknown; offset?: unknown }): Promise<AdminPage<AuditRow>> {
+  async audit(actor: Actor, query: ListQuery): Promise<AdminPage<AuditRow>> {
     this.assertAdmin(actor);
-    return this.paged(query, (page) => this.deps.admin.listAudit(page), () => this.deps.admin.countList('AUDIT'));
+    return this.paged(query, (page) => this.deps.admin.listAudit(page), () => this.deps.admin.countList('AUDIT'), ADMIN_SORTS.audit);
   }
 }

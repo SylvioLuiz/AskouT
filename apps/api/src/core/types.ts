@@ -154,7 +154,23 @@ export interface PublicProfile {
 export interface Page {
   limit: number;
   offset: number;
+  /** Ordenação pedida pela gestão (coluna da tabela). Sem ela, cada lista usa a ordem de sempre. */
+  sort?: PageSort;
 }
+
+export interface PageSort {
+  key: string;
+  dir: 'asc' | 'desc';
+}
+
+/** Colunas pelas quais cada tabela paginada da gestão pode ser ordenada (a API recusa outras). */
+export const ADMIN_SORTS = {
+  users: ['username', 'email', 'status', 'posts', 'birthDate', 'createdAt'],
+  venues: ['name', 'category', 'owner', 'events'],
+  events: ['title', 'venue', 'startsAt', 'kind'],
+  posts: ['caption', 'author', 'createdAt', 'reports'],
+  audit: ['createdAt', 'action', 'targetType'],
+} as const;
 
 export type Direction = 'followers' | 'following';
 

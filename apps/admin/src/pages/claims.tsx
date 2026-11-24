@@ -3,7 +3,8 @@ import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import { CLAIM_LABEL, formatDateTime } from '../labels.ts';
 import type { Claim, ClaimStatus } from '../types.ts';
-import { ActionDialog, Badge, Loadable, Modal, PageHead, RecordCount, Tabs } from '../ui.tsx';
+import { ActionDialog, Badge, Loadable, Modal, PageHead, RecordCount, SortTh, Tabs } from '../ui.tsx';
+import { sortRows, useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
 
 function DocumentViewer({ claim }: { claim: Claim }) {
@@ -131,6 +132,7 @@ export function ClaimsPage() {
   const [status, setStatus] = useState<ClaimStatus>('PENDING');
   const [open, setOpen] = useState<Claim>();
   const list = useAsync(() => api.claims(status), [status]);
+  const { sort, toggle } = useSort<'venue' | 'user' | 'createdAt'>();
   const counts = useAsync(() => api.stats().then((s) => ({ pending: s.pendingClaims, approved: s.approvedClaims })), []);
   return (
     <>
@@ -149,15 +151,15 @@ export function ClaimsPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>Local</th>
-                <th>Quem pede</th>
-                <th>Enviado em</th>
+                <SortTh label="Local" column="venue" sort={sort} onSort={toggle} />
+                <SortTh label="Quem pede" column="user" sort={sort} onSort={toggle} />
+                <SortTh label="Enviado em" column="createdAt" sort={sort} onSort={toggle} first="desc" />
                 <th>Situação</th>
                 <th aria-label="Ações" />
               </tr>
             </thead>
             <tbody>
-              {claims.map((c) => (
+              {sortRows(claims, sort, { venue: (c) => c.venue.name, user: (c) => c.user.username, createdAt: (c) => Date.parse(c.createdAt) }).map((c) => (
                 <tr key={c.id}>
                   <td>
                     <strong>{c.venue.name}</strong>

@@ -10,6 +10,8 @@ const INVITE = /^\/convite\/[a-z0-9._]{3,30}$/i;
 const MATCH = /^\/now\/encontro\/[A-Za-z0-9-]{1,64}$/;
 /** Widgets da tela inicial e da tela bloqueada: o NOW, a conversa do encontro e a página do evento. */
 const WIDGET = /^\/(now|conversas\/[A-Za-z0-9-]{1,64}|eventos\/[A-Za-z0-9:_-]{1,128})$/;
+/** Widget "Encontro ativo" sem encontro: abrir o NOW no botão de ligar ou no "Perguntar se está livre". */
+const NOW_INTENTS = new Set(['ligar', 'convidar']);
 const WEB_HOSTS = new Set(['askout.com.br', 'www.askout.com.br']);
 
 export function deepLinkPath(url: string): string | undefined {
@@ -31,6 +33,10 @@ export function deepLinkPath(url: string): string | undefined {
     query = parsed.search;
   }
   const path = `/${rawPath.replace(/^\/+|\/+$/g, '')}`;
+  if (path === '/now') {
+    const intent = new URLSearchParams(query).get('abrir');
+    return intent && NOW_INTENTS.has(intent) ? `/now?abrir=${intent}` : path;
+  }
   if (INVITE.test(path) || MATCH.test(path) || WIDGET.test(path)) return path;
   if (!ALLOWED.has(path)) return undefined;
   return path + query;

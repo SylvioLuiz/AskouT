@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ApiError } from './api.ts';
 import type { Async } from './hooks.ts';
+import type { Sort } from './sort.ts';
 
 /** Avisa o menu lateral para atualizar os contadores depois de uma decisão. */
 export const CHANGED_EVENT = 'askout-admin-changed';
@@ -222,4 +223,29 @@ export function ActionDialog({ spec, onClose, onDone }: { spec: ActionSpec; onCl
 
 export function UserLink({ username }: { username: string }) {
   return <span className="handle">@{username}</span>;
+}
+
+/**
+ * Cabeçalho de coluna que ordena a tabela: clicar alterna entre crescente, decrescente e a ordem de sempre.
+ * `first` é a direção do primeiro clique (datas e números começam do maior).
+ */
+export function SortTh<K extends string>({ label, column, sort, onSort, first = 'asc', className }: {
+  label: string;
+  column: K;
+  sort: Sort<K> | undefined;
+  onSort: (column: K, first: 'asc' | 'desc') => void;
+  first?: 'asc' | 'desc';
+  className?: string;
+}) {
+  const on = sort?.key === column ? sort.dir : undefined;
+  const next = on === undefined ? first : on === first ? (first === 'asc' ? 'desc' : 'asc') : undefined;
+  const hint = next === undefined ? 'voltar à ordem padrão' : next === 'asc' ? 'ordenar em ordem crescente' : 'ordenar em ordem decrescente';
+  return (
+    <th scope="col" className={className} aria-sort={on === 'asc' ? 'ascending' : on === 'desc' ? 'descending' : undefined}>
+      <button type="button" className={on ? 'sortbtn sortbtn--on' : 'sortbtn'} onClick={() => onSort(column, first)} title={`${label}: ${hint}`}>
+        {label}
+        <span className="sortbtn__icon" aria-hidden="true">{on === 'asc' ? '▲' : on === 'desc' ? '▼' : '↕'}</span>
+      </button>
+    </th>
+  );
 }
