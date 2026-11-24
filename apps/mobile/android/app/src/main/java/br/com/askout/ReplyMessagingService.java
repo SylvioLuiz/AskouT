@@ -19,6 +19,8 @@ public class ReplyMessagingService extends MessagingService {
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
         Map<String, String> data = remoteMessage.getData();
+        // Mensagem nova: o widget de Conversas busca de novo (prévia e não lidas), mesmo com o app aberto.
+        if (data.containsKey("reply")) br.com.askout.widgets.WidgetUpdater.refreshChats(this);
         // Chegada do amigo no NOW: aviso fixo que se atualiza. Aparece mesmo com o app aberto (como no Uber).
         if (remoteMessage.getNotification() == null && data.containsKey("live")) {
             ArrivalNotifications.show(this, remoteMessage.getMessageId(), data);

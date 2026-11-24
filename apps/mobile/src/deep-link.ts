@@ -8,8 +8,8 @@ const ALLOWED = new Set(['/agenda']);
 const INVITE = /^\/convite\/[a-z0-9._]{3,30}$/i;
 /** Encontro do NOW: tocar na Live Activity da chegada no iPhone (`br.com.askout://now/encontro/<id>`). */
 const MATCH = /^\/now\/encontro\/[A-Za-z0-9-]{1,64}$/;
-/** Widgets da tela inicial e da tela bloqueada: o NOW, a conversa do encontro e a página do evento. */
-const WIDGET = /^\/(now|conversas\/[A-Za-z0-9-]{1,64}|eventos\/[A-Za-z0-9:_-]{1,128})$/;
+/** Widgets da tela inicial e da tela bloqueada: o NOW, Conversas (ou uma conversa) e a página do evento. */
+const WIDGET = /^\/(now|conversas(?:\/[A-Za-z0-9-]{1,64})?|eventos\/[A-Za-z0-9:_-]{1,128})$/;
 /** Widget "Encontro ativo" sem encontro: abrir o NOW no botão de ligar ou no "Perguntar se está livre". */
 const NOW_INTENTS = new Set(['ligar', 'convidar']);
 const WEB_HOSTS = new Set(['askout.com.br', 'www.askout.com.br']);

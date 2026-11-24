@@ -16,6 +16,12 @@ struct AskouTWidgetBundle: WidgetBundle {
         AgendaWidget()
         NowFriendsWidget()
         NowComboWidget()
+        // Conversas (ChatsWidget.swift): no iOS 17+ a pessoa escolhe tudo, só grupos ou só individuais.
+        if #available(iOSApplicationExtension 17.0, *) {
+            ChatsWidget()
+        } else {
+            ChatsLegacyWidget()
+        }
     }
 }
 
