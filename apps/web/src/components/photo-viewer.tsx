@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
+import { swipeAxis } from '../lib/media-gallery.ts';
 import { createPortal } from 'react-dom';
 import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, XIcon } from './icons.tsx';
 import { api } from '../client.ts';
@@ -8,27 +10,17 @@ import { fetchImage, saveImages } from '../lib/save-file.ts';
 import { showToast } from '../lib/toast.ts';
 import { t } from '../lib/i18n/index.ts';
 
+/** Arrasto vertical a partir do qual a foto fecha. */
+const CLOSE_DRAG = 120;
+
 /**
- * Fotos do post em tela cheia: arrasta para o lado entre as fotos, pinça para dar zoom,
- * fecha no X, no Esc ou no "voltar" do aparelho.
+ * O "voltar" do aparelho (e do navegador) fecha a tela cheia em vez de sair da página.
+ * O React (StrictMode, em desenvolvimento) monta, desmonta e monta de novo na hora: por isso o "voltar" da saída
+ * espera um instante e só acontece se a foto não reabriu, e a reabertura reaproveita a entrada do histórico.
  */
-export function PhotoViewer({ images, start, onClose, downloadName }: { images: PostImage[]; start: number; onClose: () => void; /** Com nome: mostra o botão de baixar (só fotos enviadas, nunca as do Google). */ downloadName?: string }) {
-  const photos = images.filter((image) => image.path && !image.videoPath);
-  const first = Math.max(0, photos.findIndex((p) => p.id === images[start]?.id));
-  const [index, setIndex] = useState(first);
-  const track = useRef<HTMLDivElement>(null);
+export function useCloseOnBack(onClose: () => void) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
-
-  // Começa na foto tocada, sem animação.
-  useLayoutEffect(() => {
-    const el = track.current;
-    if (el) el.scrollLeft = first * el.clientWidth;
-  }, [first]);
-
-  // O "voltar" do aparelho fecha a foto em vez de sair da página.
-  // O React (StrictMode, em desenvolvimento) monta, desmonta e monta de novo na hora: por isso o "voltar" da saída
-  // espera um instante e só acontece se a foto não reabriu, e a reabertura reaproveita a entrada do histórico.
   const mounts = useRef(0);
   useEffect(() => {
     mounts.current += 1;
@@ -54,6 +46,71 @@ export function PhotoViewer({ images, start, onClose, downloadName }: { images: 
       }, 0);
     };
   }, []);
+}
+
+/**
+ * Fotos do post em tela cheia: arrasta para o lado entre as fotos, pinça para dar zoom,
+ * fecha no X, no Esc, arrastando para baixo ou no "voltar" do aparelho.
+ */
+export function PhotoViewer({ images, start, onClose, downloadName }: { images: PostImage[]; start: number; onClose: () => void; /** Com nome: mostra o botão de baixar (só fotos enviadas, nunca as do Google). */ downloadName?: string }) {
+  const photos = images.filter((image) => image.path && !image.videoPath);
+  const first = Math.max(0, photos.findIndex((p) => p.id === images[start]?.id));
+  const [index, setIndex] = useState(first);
+  const track = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  // Começa na foto tocada, sem animação.
+  useLayoutEffect(() => {
+    const el = track.current;
+    if (el) el.scrollLeft = first * el.clientWidth;
+  }, [first]);
+
+  useCloseOnBack(onClose);
+
+  // Arrastar para baixo (ou para cima) fecha, como nas fotos do chat. Com zoom de pinça, o arrasto é para andar na foto.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const pull = useRef<{ id: number; x: number; y: number; axis: 'x' | 'y' | undefined; dy: number } | undefined>(undefined);
+  function paintPull(dy: number, animate: boolean) {
+    const el = track.current;
+    const root = rootRef.current;
+    if (el) {
+      el.style.transition = animate ? 'transform 200ms ease' : 'none';
+      el.style.transform = dy ? `translateY(${dy}px)` : '';
+    }
+    if (root) root.style.backgroundColor = `rgb(0 0 0 / ${Math.max(0.3, 1 - Math.abs(dy) / 400)})`;
+  }
+  function pullDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (pull.current) {
+      // Segundo dedo: é pinça, não arrasto.
+      pull.current = undefined;
+      paintPull(0, true);
+      return;
+    }
+    if ((window.visualViewport?.scale ?? 1) > 1.01) return;
+    if ((e.target as HTMLElement).closest('button')) return;
+    pull.current = { id: e.pointerId, x: e.clientX, y: e.clientY, axis: undefined, dy: 0 };
+  }
+  function pullMove(e: ReactPointerEvent<HTMLDivElement>) {
+    const p = pull.current;
+    if (!p || p.id !== e.pointerId) return;
+    if (!p.axis) {
+      p.axis = swipeAxis(e.clientX - p.x, e.clientY - p.y);
+      if (p.axis === 'x') pull.current = undefined;
+      if (p.axis !== 'y') return;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    p.dy = e.clientY - p.y;
+    paintPull(p.dy, false);
+  }
+  function pullUp(e: ReactPointerEvent<HTMLDivElement>) {
+    const p = pull.current;
+    if (!p || p.id !== e.pointerId) return;
+    pull.current = undefined;
+    if (p.axis !== 'y') return;
+    if (e.type === 'pointerup' && Math.abs(p.dy) > CLOSE_DRAG) return onClose();
+    paintPull(0, true);
+  }
 
   function go(to: number) {
     const el = track.current;
@@ -91,7 +148,17 @@ export function PhotoViewer({ images, start, onClose, downloadName }: { images: 
 
   if (photos.length === 0) return null;
   return createPortal(
-    <div className="photoview" role="dialog" aria-modal="true" aria-label={t('Foto em tela cheia')}>
+    <div
+      ref={rootRef}
+      className="photoview"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t('Foto em tela cheia')}
+      onPointerDown={pullDown}
+      onPointerMove={pullMove}
+      onPointerUp={pullUp}
+      onPointerCancel={pullUp}
+    >
       <div
         className="photoview__track"
         ref={track}
