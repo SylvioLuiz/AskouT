@@ -231,7 +231,7 @@ enum WidgetState {
 enum WidgetStore {
     private static let cacheKey = "askout.widgets.snapshot"
 
-    private static let decoder: JSONDecoder = {
+    static let decoder: JSONDecoder = {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { decoder in
             let raw = try decoder.singleValueContainer().decode(String.self)
@@ -249,7 +249,7 @@ enum WidgetStore {
         return f.date(from: raw)
     }
 
-    private static let encoder: JSONEncoder = {
+    static let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.dateEncodingStrategy = .custom { date, encoder in
             var c = encoder.singleValueContainer()

@@ -120,7 +120,7 @@ export function createCore(input: CoreInput) {
     admin: new AdminService(deps, venues, auth, paymentsSwitch, recoExperiment),
     meetups,
     /** Widgets da tela inicial e da tela bloqueada (iPhone e Android). */
-    widgets: new WidgetService(deps, { flash, meetups, eventPages }),
+    widgets: new WidgetService(deps, { flash, meetups, eventPages, conversations }),
     scheduling: new SchedulingService(deps),
     profileEvents: new ProfileEventService(deps, profiles),
     posts,

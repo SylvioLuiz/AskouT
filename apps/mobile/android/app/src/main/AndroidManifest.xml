@@ -184,6 +184,28 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_combo_info" />
         </receiver>
+        <!-- Conversas (como o do WhatsApp): busca GET /me/widgets/chats; ao adicionar, escolhe o que mostrar. -->
+        <receiver
+            android:name=".widgets.ChatsWidget"
+            android:label="@string/widget_chats_label"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_chats_info" />
+        </receiver>
+        <activity
+            android:name=".widgets.ChatsWidgetConfigure"
+            android:label="@string/widget_chats_label"
+            android:theme="@style/Theme.AppCompat.DayNight.Dialog"
+            android:excludeFromRecents="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
         <receiver
             android:name=".widgets.WidgetUpdater$TickReceiver"
             android:exported="false" />

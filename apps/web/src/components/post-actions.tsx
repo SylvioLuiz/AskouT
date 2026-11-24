@@ -594,12 +594,20 @@ export function postCard(post: PostView, url: string): ShareCard {
 }
 
 /** Compartilhar um link: numa ou mais conversas do app (com mensagem opcional) ou fora dele (copiar, WhatsApp, Instagram, menu do aparelho). */
-export function ShareLinkSheet({ url, text, card, onShared, onClose }: { url: string; text: string; card?: () => Promise<ShareCard>; onShared?: () => void; onClose: () => void }) {
+export function ShareLinkSheet({ url, text, card, send, onShared, onClose }: {
+  url: string;
+  text: string;
+  card?: () => Promise<ShareCard>;
+  /** Envio dentro do app no lugar do link em texto (ex.: o cartão de um perfil). Os atalhos de fora continuam com o link. */
+  send?: (conversationId: string, message: string | undefined) => Promise<unknown>;
+  onShared?: () => void;
+  onClose: () => void;
+}) {
   return (
     <ShareSheet
       link={{ title: t('AskouT'), text, url }}
       {...(card ? { card } : {})}
-      send={(conversationId, message) => api.sendText(conversationId, chatLinkMessage(text, url, message))}
+      send={send ?? ((conversationId, message) => api.sendText(conversationId, chatLinkMessage(text, url, message)))}
       onShared={onShared}
       onClose={onClose}
     />

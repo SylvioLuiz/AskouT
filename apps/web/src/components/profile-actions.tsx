@@ -11,6 +11,24 @@ import { profileLink, profileShareText } from '../lib/share.ts';
 import type { FlashVisibility, Profile, Relationship, StoryVisibility } from '../lib/types.ts';
 import { t } from '../lib/i18n/index.ts';
 
+/**
+ * Compartilhar um perfil: nas conversas do app vai o cartão do perfil (o servidor aplica perfil privado, bloqueio e conta
+ * suspensa para cada pessoa que vê); a mensagem opcional vai logo depois, como texto. Fora do app (copiar, WhatsApp...), o link.
+ */
+export function ShareProfileSheet({ username, onClose }: { username: string; onClose: () => void }) {
+  return (
+    <ShareLinkSheet
+      url={profileLink(shareOrigin(), username)}
+      text={profileShareText(username)}
+      send={async (conversationId, message) => {
+        await api.sendProfile(conversationId, username);
+        if (message) await api.sendText(conversationId, message);
+      }}
+      onClose={onClose}
+    />
+  );
+}
+
 type Step = 'menu' | 'share' | 'remove' | 'block' | 'report';
 
 /** Botão ⋯ do perfil de outra pessoa e a aba com as opções: compartilhar, remover seguidor, Flash, stories e bloquear. */
@@ -100,7 +118,7 @@ function ProfileActionsSheet({ profile, relationship, onClose, onChanged }: { pr
   }
 
   if (step === 'share') {
-    return <ShareLinkSheet url={profileLink(shareOrigin(), profile.username)} text={profileShareText(profile.username)} onClose={onClose} />;
+    return <ShareProfileSheet username={profile.username} onClose={onClose} />;
   }
 
   const row = (label: string, hint: string, onClick: () => void, extra?: { danger?: boolean; on?: boolean; role?: 'switch'; disabled?: boolean }) => (

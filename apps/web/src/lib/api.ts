@@ -310,6 +310,8 @@ export function createApi(deps: ApiDeps) {
     sendGif: (conversationId: string, gif: CommentGif, replyToId?: string) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { gif, ...(replyToId ? { replyToId } : {}) } }),
     sendEvent: (conversationId: string, eventId: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { eventId } }),
+    /** Compartilha um perfil: a conversa mostra o cartão do perfil (o servidor aplica privado e bloqueio). */
+    sendProfile: (conversationId: string, username: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { profileUsername: username } }),
     createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; placeVenueId?: string; linkedEventId?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt?: string | null; endsAt?: string | null; dateByPoll?: boolean; private?: boolean; extras?: EventExtraAnswer[] }; datePollId?: string }) => request<PostView>('POST', '/posts', { body: input }),
     /** Configurações de evento cadastradas pela gestão, para responder ao criar ou editar um evento. */
     eventExtras: () => request<{ items: EventExtraOption[] }>('GET', '/event-extras'),

@@ -631,6 +631,9 @@ body.is-ready .intro__word span:nth-child(6) { transition-delay: 1.58s; }
   .agenda { grid-template-columns: 50px repeat(7, 1fr); gap: 4px; }
   .slot { border-radius: 9px; }
   .footer nav { margin-left: 0; }
+  /* Celular: abertura mais curta e revelações mais rápidas, para nunca rolar por uma tela vazia */
+  .intro { height: 320vh; }
+  .reveal { transform: translateY(30px); transition-duration: .6s; }
 }
 @media (max-width: 520px) {
   .nav .btn { display: none; }

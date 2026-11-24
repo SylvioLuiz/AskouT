@@ -28,6 +28,7 @@
 		A5C7E3052FF0000100A5C7E3 /* ArrivalWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A5C7E3152FF0000100A5C7E3 /* ArrivalWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A5C7E4012FF0000100A5C7E4 /* AskouTWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E4112FF0000100A5C7E4 /* AskouTWidgets.swift */; };
 		A5C7E4022FF0000100A5C7E4 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E4122FF0000100A5C7E4 /* WidgetData.swift */; };
+		A5C7E40A2FF0000100A5C7E4 /* ChatsWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E41A2FF0000100A5C7E4 /* ChatsWidget.swift */; };
 		A5C7E4032FF0000100A5C7E4 /* WidgetsPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5C7E4132FF0000100A5C7E4 /* WidgetsPlugin.swift */; };
 		A5C7E4052FF0000100A5C7E4 /* AskouTWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A5C7E4152FF0000100A5C7E4 /* AskouTWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A5C7E5102FF0000100A5C7E5 /* askout.wav in Resources */ = {isa = PBXBuildFile; fileRef = A5C7E5002FF0000100A5C7E5 /* askout.wav */; };
@@ -103,6 +104,7 @@
 		A5C7E3152FF0000100A5C7E3 /* ArrivalWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ArrivalWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A5C7E4112FF0000100A5C7E4 /* AskouTWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskouTWidgets.swift; sourceTree = "<group>"; };
 		A5C7E4122FF0000100A5C7E4 /* WidgetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetData.swift; sourceTree = "<group>"; };
+		A5C7E41A2FF0000100A5C7E4 /* ChatsWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatsWidget.swift; sourceTree = "<group>"; };
 		A5C7E4132FF0000100A5C7E4 /* WidgetsPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetsPlugin.swift; sourceTree = "<group>"; };
 		A5C7E4142FF0000100A5C7E4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A5C7E4152FF0000100A5C7E4 /* AskouTWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AskouTWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -217,6 +219,7 @@
 			children = (
 				A5C7E4112FF0000100A5C7E4 /* AskouTWidgets.swift */,
 				A5C7E4122FF0000100A5C7E4 /* WidgetData.swift */,
+				A5C7E41A2FF0000100A5C7E4 /* ChatsWidget.swift */,
 				A5C7E4142FF0000100A5C7E4 /* Info.plist */,
 				A5C7E4162FF0000100A5C7E4 /* AskouTWidgets.entitlements */,
 			);
@@ -444,6 +447,7 @@
 			files = (
 				A5C7E4012FF0000100A5C7E4 /* AskouTWidgets.swift in Sources */,
 				A5C7E4022FF0000100A5C7E4 /* WidgetData.swift in Sources */,
+				A5C7E40A2FF0000100A5C7E4 /* ChatsWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

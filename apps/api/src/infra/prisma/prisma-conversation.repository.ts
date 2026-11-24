@@ -21,6 +21,7 @@ type MessageRow = {
   gifId: string | null;
   gifUrl: string | null;
   storyId: string | null;
+  profileUserId?: string | null;
   replyToId: string | null;
   deletedAt: Date | null;
   createdAt: Date;
@@ -42,6 +43,7 @@ const toMessage = (r: MessageRow): MessageRecord => ({
   gifId: r.gifId,
   gifUrl: r.gifUrl,
   storyId: r.storyId,
+  profileUserId: r.profileUserId ?? null,
   replyToId: r.replyToId,
   deletedAt: r.deletedAt,
   createdAt: r.createdAt,
@@ -328,6 +330,7 @@ export class PrismaConversationRepository implements ConversationRepository {
         ...(m.audioMs ? { audioMs: m.audioMs } : {}),
         ...(m.gifId && m.gifUrl ? { gifId: m.gifId, gifUrl: m.gifUrl } : {}),
         ...(m.storyId ? { storyId: m.storyId } : {}),
+        ...(m.profileUserId ? { profileUserId: m.profileUserId } : {}),
         ...(m.replyToId ? { replyToId: m.replyToId } : {}),
         ...(attachment && m.kind === 'AUDIO' ? { audio: { create: { mime: attachment.mime, data: Buffer.from(attachment.data) } } } : {}),
         ...(attachment && m.kind !== 'AUDIO' ? { media: { create: { mime: attachment.mime, data: Buffer.from(attachment.data) } } } : {}),

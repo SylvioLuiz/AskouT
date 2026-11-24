@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Conversas: ao adicionar, a pessoa escolhe tudo, só grupos ou só individuais (ChatsWidgetConfigure); dá para trocar
+     depois segurando o widget (reconfigurable, Android 12+). -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="br.com.askout.widgets.ChatsWidgetConfigure"
+    android:description="@string/widget_chats_description"
+    android:initialLayout="@layout/widget_chats"
+    android:previewLayout="@layout/widget_chats"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="70dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable" />

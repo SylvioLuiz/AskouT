@@ -1,13 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { X509Certificate, createPrivateKey, sign } from 'node:crypto';
 import { AppleJwsPurchaseVerifier } from './apple-purchase-verifier.ts';
 
-const ossl = (args: string[], cwd: string) => execFileSync('openssl', args, { cwd, stdio: 'pipe' });
+// openssl.cnf mínimo e próprio do teste: sem isso o openssl lê o da máquina (OPENSSL_CONF ou o do build), que pode
+// não existir (no Windows o do psqlODBC aponta para C:\Program Files\PostgreSQL\psqlODBC\etc\openssl.cnf) e o `req` falha.
+const confDir = mkdtempSync(join(tmpdir(), 'apple-openssl-'));
+const conf = join(confDir, 'openssl.cnf');
+writeFileSync(conf, '[req]\ndistinguished_name = dn\n[dn]\n');
+const ossl = (args: string[], cwd: string) => execFileSync('openssl', args, { cwd, stdio: 'pipe', env: { ...process.env, OPENSSL_CONF: conf } });
 
 /** Cadeia de mentira (raiz → intermediária → folha) gerada com o openssl, no lugar da cadeia da Apple. */
 function makeChain(name = 'a') {
