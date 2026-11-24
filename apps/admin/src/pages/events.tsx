@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { api, appUrl } from '../api.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
 import { EVENT_KIND_LABEL, formatDateTime } from '../labels.ts';
-import { ActionDialog, Badge, Loadable, Modal, PageHead, Pager, SearchBox } from '../ui.tsx';
+import { ActionDialog, Badge, Loadable, Modal, PageHead, Pager, SearchBox, SortTh } from '../ui.tsx';
+import { useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
 
 const STATUS_LABEL = { UPCOMING: 'Por vir', LIVE: 'Acontecendo agora', PAST: 'Já passou' } as const;
@@ -84,13 +85,20 @@ function EventDetailModal({ id, onClose }: { id: string; onClose: () => void }) 
   );
 }
 
+type EventSort = 'title' | 'venue' | 'startsAt' | 'kind';
+
 export function EventsPage() {
   const [text, setText] = useState('');
   const [offset, setOffset] = useState(0);
   const [action, setAction] = useState<ActionSpec>();
   const [openId, setOpenId] = useState<string>();
   const q = useDebounced(text.trim());
-  const list = useAsync(() => api.placeEvents({ q, offset }), [q, offset]);
+  const { sort, toggle } = useSort<EventSort>();
+  const onSort = (column: EventSort, first: 'asc' | 'desc') => {
+    toggle(column, first);
+    setOffset(0);
+  };
+  const list = useAsync(() => api.placeEvents({ q, offset, sort }), [q, offset, sort]);
   return (
     <>
       <PageHead title="Eventos" hint="Eventos de locais. Os eventos criados por pessoas aparecem em Posts (filtro “só eventos”).">
@@ -102,10 +110,10 @@ export function EventsPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Evento</th>
-                  <th>Local</th>
-                  <th>Início</th>
-                  <th>Tipo</th>
+                  <SortTh label="Evento" column="title" sort={sort} onSort={onSort} />
+                  <SortTh label="Local" column="venue" sort={sort} onSort={onSort} />
+                  <SortTh label="Início" column="startsAt" sort={sort} onSort={onSort} first="desc" />
+                  <SortTh label="Tipo" column="kind" sort={sort} onSort={onSort} />
                   <th aria-label="Ações" />
                 </tr>
               </thead>

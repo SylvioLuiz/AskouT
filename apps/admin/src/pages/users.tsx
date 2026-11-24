@@ -3,9 +3,12 @@ import { api } from '../api.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
 import { STATUS_LABEL, formatBirthDate, formatDate } from '../labels.ts';
 import type { UserRow, UserStatus } from '../types.ts';
-import { ActionDialog, Badge, Loadable, PageHead, Pager, SearchBox } from '../ui.tsx';
+import { ActionDialog, Badge, Loadable, PageHead, Pager, SearchBox, SortTh } from '../ui.tsx';
+import { useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
 import { EditUserDialog, UserActivityDialog } from './user-dialogs.tsx';
+
+type UserSort = 'username' | 'email' | 'status' | 'posts' | 'birthDate' | 'createdAt';
 
 export function UsersPage() {
   const [text, setText] = useState('');
@@ -15,7 +18,12 @@ export function UsersPage() {
   const [editing, setEditing] = useState<UserRow>();
   const [watching, setWatching] = useState<UserRow>();
   const q = useDebounced(text.trim());
-  const list = useAsync(() => api.users({ q, status: status || undefined, offset }), [q, status, offset]);
+  const { sort, toggle } = useSort<UserSort>();
+  const onSort = (column: UserSort, first: 'asc' | 'desc') => {
+    toggle(column, first);
+    setOffset(0);
+  };
+  const list = useAsync(() => api.users({ q, status: status || undefined, offset, sort }), [q, status, offset, sort]);
 
   function suspend(u: UserRow) {
     setAction({
@@ -71,14 +79,14 @@ export function UsersPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Pessoa</th>
-                  <th>E-mail</th>
-                  <th>Situação</th>
+                  <SortTh label="Pessoa" column="username" sort={sort} onSort={onSort} />
+                  <SortTh label="E-mail" column="email" sort={sort} onSort={onSort} />
+                  <SortTh label="Situação" column="status" sort={sort} onSort={onSort} />
                   <th>Login</th>
-                  <th className="num">Posts</th>
+                  <SortTh label="Posts" column="posts" sort={sort} onSort={onSort} first="desc" className="num" />
                   <th className="num">Denúncias</th>
-                  <th>Nascimento</th>
-                  <th>Desde</th>
+                  <SortTh label="Nascimento" column="birthDate" sort={sort} onSort={onSort} first="desc" />
+                  <SortTh label="Desde" column="createdAt" sort={sort} onSort={onSort} first="desc" />
                   <th aria-label="Ações" />
                 </tr>
               </thead>

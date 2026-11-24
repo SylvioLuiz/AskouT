@@ -123,6 +123,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .table th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--ink) 3%, var(--surface)); }
 .table th.num { text-align: right; }
+.table th.num .sortbtn { flex-direction: row-reverse; }
+.sortbtn { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; text-align: inherit; }
+.sortbtn:hover, .sortbtn--on { color: var(--ink); }
+.sortbtn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+.sortbtn__icon { font-size: 10px; opacity: 0.45; }
+.sortbtn--on .sortbtn__icon { opacity: 1; }
 .table td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .table tr:last-child td { border-bottom: 0; }
 .table tbody tr:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }

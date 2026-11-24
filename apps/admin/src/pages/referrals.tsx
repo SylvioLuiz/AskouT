@@ -1,9 +1,11 @@
 import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
-import { Loadable, PageHead, RecordCount, UserLink } from '../ui.tsx';
+import { Loadable, PageHead, RecordCount, SortTh, UserLink } from '../ui.tsx';
+import { sortRows, useSort } from '../sort.ts';
 
 export function ReferralsPage() {
   const list = useAsync(() => api.topInviters(30), []);
+  const { sort, toggle } = useSort<'rank' | 'username' | 'brought' | 'confirmed'>();
   return (
     <>
       <PageHead
@@ -15,16 +17,16 @@ export function ReferralsPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>#</th>
-                <th>Quem convidou</th>
-                <th>Entraram</th>
-                <th>Confirmados</th>
+                <SortTh label="#" column="rank" sort={sort} onSort={toggle} />
+                <SortTh label="Quem convidou" column="username" sort={sort} onSort={toggle} />
+                <SortTh label="Entraram" column="brought" sort={sort} onSort={toggle} first="desc" />
+                <SortTh label="Confirmados" column="confirmed" sort={sort} onSort={toggle} first="desc" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
+              {sortRows(rows.map((r, i) => ({ ...r, rank: i + 1 })), sort, { rank: (r) => r.rank, username: (r) => r.profile.username, brought: (r) => r.brought, confirmed: (r) => r.confirmed }).map((r) => (
                 <tr key={r.profile.userId}>
-                  <td>{i + 1}</td>
+                  <td>{r.rank}</td>
                   <td>
                     <UserLink username={r.profile.username} />
                     <div className="muted small">{r.profile.displayName}</div>

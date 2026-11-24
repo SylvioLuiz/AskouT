@@ -3108,6 +3108,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       rows.push({ id: u.id, email: u.email, username: p.username, displayName: p.displayName, status: u.status, role: u.role, createdAt: u.createdAt, postsCount: [...this.posts.posts.values()].filter((x) => x.authorId === u.id).length, reportsCount: this.reportsAgainst(u.id), birthDate: u.birthDate ?? null, loginProviders: this.providersOf(u.id) });
     }
     rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : 1));
+    sortRows(rows, page, { username: (r) => r.username, email: (r) => r.email, status: (r) => r.status, posts: (r) => r.postsCount, birthDate: (r) => r.birthDate, createdAt: (r) => r.createdAt.getTime() });
     return rows.slice(page.offset, page.offset + page.limit);
   }
 
@@ -3132,6 +3133,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       rows.push({ id: v.id, name: v.name, address: v.address, category: v.category, isSample: v.isSample, owner: v.ownerId ? { id: v.ownerId, username: this.username(v.ownerId) } : null, eventsCount: [...this.places.events.values()].filter((e) => e.venueId === v.id).length });
     }
     rows.sort((a, b) => a.name.localeCompare(b.name) || (a.id < b.id ? -1 : 1));
+    sortRows(rows, page, { name: (r) => r.name, category: (r) => r.category, owner: (r) => r.owner?.username ?? null, events: (r) => r.eventsCount });
     return rows.slice(page.offset, page.offset + page.limit);
   }
 
@@ -3145,6 +3147,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       rows.push({ id: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, kind: e.kind, isSample: e.isSample, venue: { id: v.id, name: v.name } });
     }
     rows.sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime() || (a.id < b.id ? -1 : 1));
+    sortRows(rows, page, { title: (r) => r.title, venue: (r) => r.venue.name, kind: (r) => r.kind, startsAt: (r) => r.startsAt.getTime() });
     return rows.slice(page.offset, page.offset + page.limit);
   }
 
@@ -3171,6 +3174,7 @@ export class InMemoryAdminRepository implements AdminRepository {
       rows.push(this.postRow(p));
     }
     rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? -1 : 1));
+    sortRows(rows, page, { caption: (r) => r.caption, author: (r) => r.author.username, reports: (r) => r.reportsCount, createdAt: (r) => r.createdAt.getTime() });
     return rows.slice(page.offset, page.offset + page.limit);
   }
 
@@ -3341,13 +3345,33 @@ export class InMemoryAdminRepository implements AdminRepository {
   }
 
   async listAudit(page: Page) {
-    return [...this.audit.values()]
+    const rows = [...this.audit.values()]
       .map((r, i) => ({ r, i }))
       .sort((a, b) => b.r.createdAt.getTime() - a.r.createdAt.getTime() || b.i - a.i)
-      .map((x) => x.r)
+      .map((x) => x.r);
+    sortRows(rows, page, { action: (r) => r.action, targetType: (r) => r.targetType, createdAt: (r) => r.createdAt.getTime() });
+    return rows
       .slice(page.offset, page.offset + page.limit)
       .map((r) => ({ ...r, adminUsername: this.username(r.adminId) }));
   }
+}
+
+/**
+ * Ordena (estável) pela coluna que a gestão pediu, como o Prisma: vazios no fim, empates na ordem de sempre.
+ * Sem `page.sort` não mexe.
+ */
+function sortRows<T>(rows: T[], page: Page, by: Record<string, (r: T) => string | number | null>): void {
+  const get = page.sort ? by[page.sort.key] : undefined;
+  if (!get || !page.sort) return;
+  const sign = page.sort.dir === 'desc' ? -1 : 1;
+  rows.sort((a, b) => {
+    const x = get(a);
+    const y = get(b);
+    if (x === y) return 0;
+    if (x === null) return 1;
+    if (y === null) return -1;
+    return (x < y ? -1 : 1) * sign;
+  });
 }
 
 export class InMemorySchedulingRepository implements SchedulingRepository {

@@ -3,7 +3,7 @@ import { isUuid } from './helpers.ts';
 import type { AdminCountKind, AdminRepository } from '../../core/ports.ts';
 import type {
   AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
-  AuditAction, AuditRecord, AuditRow, ExternalProvider, Page, PostReportReason, ReportResolution, UserStatus,
+  AuditAction, AuditRecord, AuditRow, ExternalProvider, Page, PageSort, PostReportReason, ReportResolution, UserStatus,
 } from '../../core/types.ts';
 
 const MISSING = '(removido)';
@@ -62,7 +62,7 @@ export class PrismaAdminRepository implements AdminRepository {
     const q = text.trim();
     const where = userWhere(q, status);
     const users = await this.prisma.user.findMany({
-      where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: page.offset, take: page.limit,
+      where, orderBy: [...userOrder(page.sort), { id: 'asc' }], skip: page.offset, take: page.limit,
       select: { id: true, email: true, status: true, role: true, createdAt: true, birthDate: true, profile: { select: { username: true, displayName: true } } },
     });
     const ids = users.map((u) => u.id);
@@ -101,7 +101,7 @@ export class PrismaAdminRepository implements AdminRepository {
     const q = text.trim();
     const rows = await this.prisma.venue.findMany({
       where: venueWhere(q),
-      orderBy: [{ name: 'asc' }, { id: 'asc' }], skip: page.offset, take: page.limit,
+      orderBy: [...venueOrder(page.sort), { id: 'asc' }], skip: page.offset, take: page.limit,
       select: { id: true, name: true, address: true, category: true, isSample: true, owner: { select: { id: true, profile: { select: { username: true } } } }, _count: { select: { events: true } } },
     });
     return rows.map((v) => ({
@@ -114,7 +114,7 @@ export class PrismaAdminRepository implements AdminRepository {
     const q = text.trim();
     const rows = await this.prisma.placeEvent.findMany({
       where: eventWhere(q),
-      orderBy: [{ startsAt: 'desc' }, { id: 'asc' }], skip: page.offset, take: page.limit,
+      orderBy: [...eventOrder(page.sort), { id: 'asc' }], skip: page.offset, take: page.limit,
       select: { id: true, title: true, startsAt: true, endsAt: true, kind: true, isSample: true, venue: { select: { id: true, name: true } } },
     });
     return rows.map((e) => ({ id: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, kind: e.kind, isSample: e.isSample, venue: e.venue }));
@@ -129,7 +129,7 @@ export class PrismaAdminRepository implements AdminRepository {
   async searchPosts(text: string, onlyEvents: boolean, page: Page): Promise<AdminPostRow[]> {
     const q = text.trim();
     const where = postWhere(q, onlyEvents);
-    const rows = await this.prisma.post.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: page.offset, take: page.limit, select: POST_SELECT });
+    const rows = await this.prisma.post.findMany({ where, orderBy: [...postOrder(page.sort), { id: 'asc' }], skip: page.offset, take: page.limit, select: POST_SELECT });
     return rows.map(toPostRow);
   }
 
@@ -306,7 +306,7 @@ export class PrismaAdminRepository implements AdminRepository {
   }
 
   async listAudit(page: Page): Promise<AuditRow[]> {
-    const rows = await this.prisma.adminAudit.findMany({ orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], skip: page.offset, take: page.limit });
+    const rows = await this.prisma.adminAudit.findMany({ orderBy: [...auditOrder(page.sort), { id: 'asc' }], skip: page.offset, take: page.limit });
     const ids = [...new Set(rows.map((r) => r.adminId))];
     const profiles = await this.prisma.profile.findMany({ where: { userId: { in: ids } }, select: { userId: true, username: true } });
     const names = new Map(profiles.map((p) => [p.userId, p.username]));
@@ -322,6 +322,64 @@ function storyText(caption: string | null, overlays: unknown): string | null {
   const parts = [caption, ...(Array.isArray(overlays) ? overlays.map((o) => (o && typeof o === 'object' && typeof (o as { text?: unknown }).text === 'string' ? (o as { text: string }).text : null)) : [])];
   const texts = parts.filter((t): t is string => !!t && t.trim() !== '');
   return texts.length > 0 ? texts.join(' · ') : null;
+}
+
+// Ordem das tabelas da gestão: a coluna pedida (ver ADMIN_SORTS) ou a ordem de sempre. O `id` entra depois, para a página não embaralhar.
+// Textos que podem faltar (tipo, legenda, data de nascimento) ficam sempre no fim.
+function userOrder(sort: PageSort | undefined): Prisma.UserOrderByWithRelationInput[] {
+  const d = sort?.dir ?? 'asc';
+  switch (sort?.key) {
+    case 'username': return [{ profile: { username: d } }];
+    case 'email': return [{ email: d }];
+    case 'status': return [{ status: d }, { createdAt: 'desc' }];
+    case 'posts': return [{ posts: { _count: d } }, { createdAt: 'desc' }];
+    case 'birthDate': return [{ birthDate: { sort: d, nulls: 'last' } }];
+    case 'createdAt': return [{ createdAt: d }];
+    default: return [{ createdAt: 'desc' }];
+  }
+}
+
+function venueOrder(sort: PageSort | undefined): Prisma.VenueOrderByWithRelationInput[] {
+  const d = sort?.dir ?? 'asc';
+  switch (sort?.key) {
+    case 'category': return [{ category: { sort: d, nulls: 'last' } }, { name: 'asc' }];
+    case 'owner': return [{ owner: { profile: { username: d } } }, { name: 'asc' }];
+    case 'events': return [{ events: { _count: d } }, { name: 'asc' }];
+    case 'name': return [{ name: d }];
+    default: return [{ name: 'asc' }];
+  }
+}
+
+function eventOrder(sort: PageSort | undefined): Prisma.PlaceEventOrderByWithRelationInput[] {
+  const d = sort?.dir ?? 'asc';
+  switch (sort?.key) {
+    case 'title': return [{ title: d }];
+    case 'venue': return [{ venue: { name: d } }, { startsAt: 'desc' }];
+    case 'kind': return [{ kind: d }, { startsAt: 'desc' }];
+    case 'startsAt': return [{ startsAt: d }];
+    default: return [{ startsAt: 'desc' }];
+  }
+}
+
+function postOrder(sort: PageSort | undefined): Prisma.PostOrderByWithRelationInput[] {
+  const d = sort?.dir ?? 'asc';
+  switch (sort?.key) {
+    case 'caption': return [{ caption: { sort: d, nulls: 'last' } }, { createdAt: 'desc' }];
+    case 'author': return [{ author: { profile: { username: d } } }, { createdAt: 'desc' }];
+    case 'reports': return [{ reports: { _count: d } }, { createdAt: 'desc' }];
+    case 'createdAt': return [{ createdAt: d }];
+    default: return [{ createdAt: 'desc' }];
+  }
+}
+
+function auditOrder(sort: PageSort | undefined): Prisma.AdminAuditOrderByWithRelationInput[] {
+  const d = sort?.dir ?? 'asc';
+  switch (sort?.key) {
+    case 'action': return [{ action: d }, { createdAt: 'desc' }];
+    case 'targetType': return [{ targetType: d }, { createdAt: 'desc' }];
+    case 'createdAt': return [{ createdAt: d }];
+    default: return [{ createdAt: 'desc' }];
+  }
 }
 
 // Os filtros das listas da gestão: a busca e a contagem do total usam os mesmos, para o número bater com a tabela.
