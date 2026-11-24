@@ -134,6 +134,15 @@ export class StoredNotifier implements Notifier {
     void job.finally(() => this.inFlight.delete(job));
   }
 
+  /** Tira do sino os avisos com essa chave. Falhas aqui nunca chegam a quem executou a ação. */
+  async withdraw(userId: string, dedupeKey: string): Promise<void> {
+    try {
+      await this.deps.notifications.deleteByKey(userId, dedupeKey);
+    } catch {
+      // Sem o aviso apagado o convite continua cancelado; a tela trata a marcação que sumiu.
+    }
+  }
+
   /**
    * Aviso que se atualiza (chegada do amigo no NOW): só push, nada no sino (seriam dezenas de avisos iguais).
    * Respeita o "silenciar todas". Vai só para o app do celular: o navegador não tem notificação fixa nem barra.

@@ -342,13 +342,15 @@ export class EventPageService {
     const hidden = new Set(await this.deps.blocks.listRelatedIds(viewerId));
     const rows = (await this.deps.posts.listInvites(ref.id)).filter((r) => (isOwner || r.invitedById === viewerId) && !hidden.has(r.userId));
     const tagged = new Map((await this.deps.posts.tagsFor([ref.id])).map((t) => [t.userId, t.status]));
+    // Evento público não marca: quem confirmou "Eu vou" conta como quem aceitou (não dá mais para cancelar).
+    const going = new Set((await this.deps.eventRoom.listGoing(ref)).map((g) => g.userId));
     const ids = [...new Set(rows.flatMap((r) => [r.userId, ...(r.invitedById ? [r.invitedById] : [])]))];
     const byId = new Map((await this.deps.users.findProfilesByIds(ids)).map((p) => [p.userId, toPublicProfile(p)]));
     return {
       invites: rows.flatMap((r): EventInviteView[] => {
         const user = byId.get(r.userId);
         if (!user) return [];
-        return [{ user, invitedBy: r.invitedById ? (byId.get(r.invitedById) ?? null) : null, invitedAt: r.createdAt.toISOString(), tagged: tagged.has(r.userId) && tagged.get(r.userId) !== 'DECLINED', status: tagged.get(r.userId) ?? 'PENDING' }];
+        return [{ user, invitedBy: r.invitedById ? (byId.get(r.invitedById) ?? null) : null, invitedAt: r.createdAt.toISOString(), tagged: tagged.has(r.userId) && tagged.get(r.userId) !== 'DECLINED', status: going.has(r.userId) ? 'ACCEPTED' : (tagged.get(r.userId) ?? 'PENDING') }];
       }),
     };
   }

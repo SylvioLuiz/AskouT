@@ -3659,6 +3659,7 @@ export const EN: Readonly<Record<string, string>> = {
   "Só amigos. Quem já tem convite não aparece aqui até recusar. Cada pessoa recebe o convite e aceita para o evento ir para o perfil dela.": "Friends only. People with an invite don't show up here unless they decline. Each person gets the invite and accepts it to add the event to their profile.",
   "Convites pendentes": "Pending invites",
   "Cancelar o convite de {name}": "Cancel {name}'s invite",
+  "@{user} · convidado por {name}": "@{user} · invited by {name}",
   "Convidar 1 pessoa": "Invite 1 person",
   "Convidar {n} pessoas": "Invite {n} people",
   "Mais amigos": "More friends",

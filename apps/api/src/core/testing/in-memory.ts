@@ -2297,6 +2297,18 @@ export class InMemoryNotificationRepository implements NotificationRepository {
     return this.rows.some((n) => n.userId === userId && n.readAt === null && n.dedupeKey === dedupeKey);
   }
 
+  async deleteByKey(userId: string, dedupeKey: string): Promise<number> {
+    let removed = 0;
+    for (let i = this.rows.length - 1; i >= 0; i--) {
+      const n = this.rows[i]!;
+      if (n.userId === userId && n.dedupeKey === dedupeKey) {
+        this.rows.splice(i, 1);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
   async markRead(userId: string, now: Date, ids?: string[]): Promise<number> {
     let changed = 0;
     for (const n of this.rows) {
