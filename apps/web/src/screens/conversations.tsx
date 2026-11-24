@@ -26,6 +26,7 @@ import { ChatPrefsSheet } from '../components/chat-prefs.tsx';
 import { PollLine } from '../components/date-poll-strip.tsx';
 import { MeetupBubble } from '../components/meetup.tsx';
 import { EventBubble } from '../components/share-event.tsx';
+import { ProfileBubble } from '../components/profile-bubble.tsx';
 import { peopleLabel } from '../lib/meetup.ts';
 import { PlaceMapSheet, SuggestionBubble, SuggestionsSheet } from '../components/suggestions.tsx';
 import { api } from '../client.ts';
@@ -1320,7 +1321,7 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
       ) : null}
       {!cell && !m.mine ? <span className="msg__face">{pos === 'last' || pos === 'single' ? face(m.senderId) : null}</span> : null}
       {!cell && !selected && m.mine && hasActions(m) ? moreButton(m) : null}
-      <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.reactions.length > 0 ? ' bubble--reacted' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' ? ' bubble--card' : ''}`} title={formatClock(m.createdAt)} onClick={(e) => tapBubble(m, e)} {...pressHandlers(m)}>
+      <div className={`bubble${m.mine ? ' bubble--mine' : ''}${m.reactions.length > 0 ? ' bubble--reacted' : ''}${m.deleted ? ' bubble--deleted' : m.kind === 'AUDIO' ? ' bubble--voice' : m.kind === 'IMAGE' || m.kind === 'VIDEO' ? ' bubble--media' : m.kind !== 'TEXT' || m.sharedProfile ? ' bubble--card' : ''}`} title={formatClock(m.createdAt)} onClick={(e) => tapBubble(m, e)} {...pressHandlers(m)}>
         {isGroup && !m.mine && m.senderName && (pos === 'first' || pos === 'single') ? <span className="bubble__sender">{m.senderName}</span> : null}
         {m.story && !m.deleted ? <StoryAttachment story={m.story} mine={m.mine} /> : null}
         {m.replyTo && !m.deleted ? (
@@ -1351,6 +1352,8 @@ export function ChatScreen({ conversationId }: { conversationId: string }) {
           <FileBubble message={m} conversationId={conversationId} />
         ) : m.kind === 'EVENT' && m.event ? (
           <EventBubble event={m.event} />
+        ) : m.sharedProfile ? (
+          <ProfileBubble card={m.sharedProfile} />
         ) : m.gif ? (
           <CommentGifView gif={m.gif} />
         ) : m.kind === 'TEXT' && m.event ? (
