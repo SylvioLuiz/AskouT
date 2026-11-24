@@ -20,7 +20,7 @@ async function setup() {
   const goTo = (iso: string) => w.clock.tick(Date.parse(iso) - w.clock.now().getTime());
   const event = async (id: string, startsIso: string) => {
     const startsAt = new Date(startsIso);
-    await w.places.createEvent({ id, venueId: 'v1', title: 'Show', description: null, kind: 'MUSIC', isFree: true, imageUrl: null, tags: [], startsAt, endsAt: new Date(startsAt.getTime() + 180 * MIN), isSample: true });
+    await w.places.createEvent({ id, venueId: 'v1', title: 'Show', description: null, kind: 'OUTDOOR', isFree: true, imageUrl: null, tags: [], startsAt, endsAt: new Date(startsAt.getTime() + 180 * MIN), isSample: true });
   };
   return { w, ana, bia, caio, t0, goTo, event };
 }
