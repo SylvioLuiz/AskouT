@@ -16,6 +16,10 @@ struct AskouTWidgetBundle: WidgetBundle {
         AgendaWidget()
         NowFriendsWidget()
         NowComboWidget()
+        // Conversas (ChatsWidget.swift): tudo, só grupos ou só individuais, escolhido na galeria.
+        ChatsWidget()
+        ChatsGroupsWidget()
+        ChatsDirectWidget()
     }
 }
 

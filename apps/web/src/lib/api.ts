@@ -313,6 +313,8 @@ export function createApi(deps: ApiDeps) {
     sendGif: (conversationId: string, gif: CommentGif, replyToId?: string) =>
       request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { gif, ...(replyToId ? { replyToId } : {}) } }),
     sendEvent: (conversationId: string, eventId: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { eventId } }),
+    /** Compartilha um perfil: a conversa mostra o cartão do perfil (o servidor aplica privado e bloqueio). */
+    sendProfile: (conversationId: string, username: string) => request<ChatMessage>('POST', `/conversations/${id(conversationId)}/messages`, { body: { profileUsername: username } }),
     createPost: (input: { images: PostImageInput[]; caption?: string; placeName?: string; placeAddress?: string; placeVenueId?: string; linkedEventId?: string; tagUserIds?: string[]; event?: { title: string; kind?: EventKind; startsAt?: string | null; endsAt?: string | null; dateByPoll?: boolean; private?: boolean; extras?: EventExtraAnswer[] }; datePollId?: string; groupId?: string }) => request<PostView>('POST', '/posts', { body: input }),
     /** Configurações de evento cadastradas pela gestão, para responder ao criar ou editar um evento. */
     eventExtras: () => request<{ items: EventExtraOption[] }>('GET', '/event-extras'),
@@ -392,6 +394,10 @@ export function createApi(deps: ApiDeps) {
     editPost: (postId: string, patch: PostEdit) => request<PostView>('PATCH', `/posts/${id(postId)}`, { body: patch }),
     inviteToEvent: (postId: string, userIds: string[]) => request<{ invited: string[] }>('POST', `/posts/${id(postId)}/invites`, { body: { userIds } }),
     cancelEventInvite: (postId: string, userId: string) => request<{ cancelled: true }>('DELETE', `/posts/${id(postId)}/invites/${id(userId)}`),
+    /** O dono torna admin do evento quem vai ou aceitou o convite. */
+    addEventAdmin: (postId: string, userId: string) => request<{ admins: PublicProfile[] }>('POST', `/posts/${id(postId)}/admins`, { body: { userId } }),
+    /** O dono tira um admin; o próprio admin também pode sair. */
+    removeEventAdmin: (postId: string, userId: string) => request<{ admins: PublicProfile[] }>('DELETE', `/posts/${id(postId)}/admins/${id(userId)}`),
     setPostCover: (postId: string, image: string) => request<PostView>('PUT', `/posts/${id(postId)}/cover`, { body: { image } }),
     adjustPostImage: (postId: string, imageId: string, image: string) => request<PostView>('PUT', `/posts/${id(postId)}/images/${id(imageId)}`, { body: { image } }),
     archivePost: (postId: string) => request<{ archived: true }>('POST', `/posts/${id(postId)}/archive`),

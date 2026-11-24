@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { storedEventExtraAnswers } from '../../core/event-extras.ts';
 import type { PostRepository } from '../../core/ports.ts';
-import type { EngagementRow, Page, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, EventInviteRecord } from '../../core/types.ts';
+import type { EngagementRow, Page, PostCommentRecord, PostPatch, PostReportRecord, PostScope, PostKindFilter, PostImageRecord, PostRecord, PostTagRecord, PostTagStatus, PostWithImages, EventInviteRecord, EventAdminRecord } from '../../core/types.ts';
 import { isUuid } from './helpers.ts';
 
 export class PrismaPostRepository implements PostRepository {
@@ -202,6 +202,28 @@ export class PrismaPostRepository implements PostRepository {
     if (!isUuid(postId) || !isUuid(userId)) return false;
     const [removed] = await this.prisma.$transaction([this.prisma.eventInvite.deleteMany({ where: { postId, userId } }), this.prisma.postTag.deleteMany({ where: { postId, userId } })]);
     return removed.count > 0;
+  }
+
+  async listEventAdmins(postId: string): Promise<EventAdminRecord[]> {
+    if (!isUuid(postId)) return [];
+    const rows = await this.prisma.eventAdmin.findMany({ where: { postId }, orderBy: { createdAt: 'asc' }, take: 100 });
+    return rows.map((r) => ({ postId: r.postId, userId: r.userId, addedById: r.addedById, createdAt: r.createdAt }));
+  }
+
+  async isEventAdmin(postId: string, userId: string): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(userId)) return false;
+    return (await this.prisma.eventAdmin.count({ where: { postId, userId } })) > 0;
+  }
+
+  async addEventAdmin(postId: string, userId: string, addedById: string, at: Date): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(userId)) return false;
+    const result = await this.prisma.eventAdmin.createMany({ data: [{ postId, userId, addedById: isUuid(addedById) ? addedById : null, createdAt: at }], skipDuplicates: true });
+    return result.count > 0;
+  }
+
+  async removeEventAdmin(postId: string, userId: string): Promise<boolean> {
+    if (!isUuid(postId) || !isUuid(userId)) return false;
+    return (await this.prisma.eventAdmin.deleteMany({ where: { postId, userId } })).count > 0;
   }
 
   async listPendingTags(userId: string, page: Page): Promise<PostWithImages[]> {

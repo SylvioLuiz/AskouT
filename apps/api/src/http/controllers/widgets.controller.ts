@@ -1,4 +1,4 @@
-import { Controller, Get, Inject } from '@nestjs/common';
+import { Controller, Get, Inject, Query } from '@nestjs/common';
 import type { Core } from '../../core/index.ts';
 import type { Actor } from '../../core/types.ts';
 import { CurrentActor } from '../decorators.ts';
@@ -19,5 +19,11 @@ export class WidgetsController {
   @Get('me/widgets')
   snapshot(@CurrentActor() actor: Actor) {
     return this.core.widgets.snapshot(actor.userId);
+  }
+
+  /** Widget de conversas: `show` = all (padrão), direct (só 1 a 1) ou group (só grupos). */
+  @Get('me/widgets/chats')
+  chats(@CurrentActor() actor: Actor, @Query('show') show?: string) {
+    return this.core.widgets.chats(actor.userId, show);
   }
 }

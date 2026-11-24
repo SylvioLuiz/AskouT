@@ -339,6 +339,8 @@ export interface MessageRecord {
   gifUrl?: string | null;
   /** Story respondido (ou reagido): a mensagem mostra o story anexado. */
   storyId?: string | null;
+  /** Perfil compartilhado: a mensagem (kind TEXT) mostra o cartão do perfil. */
+  profileUserId?: string | null;
   /** Mensagem que esta responde (na mesma conversa). */
   replyToId?: string | null;
   /** Apagada por quem enviou: some para todos, vira "Mensagem apagada". */
@@ -530,7 +532,7 @@ export interface MeetupRecord {
 
 // ---------- Avisos ----------
 
-export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST';
+export type NotificationType = 'MESSAGE' | 'MEETUP_INVITE' | 'MEETUP_ACCEPTED' | 'MEETUP_CANCELLED' | 'GROUP_REMOVED' | 'FOLLOW_REQUEST' | 'FOLLOW_ACCEPTED' | 'FOLLOW_NEW' | 'FLASH_INVITE' | 'POST_TAG' | 'POST_LIKE' | 'POST_COMMENT' | 'VENUE_CLAIM' | 'EVENT_REMINDER' | 'VENUE_CALENDAR' | 'VENUE_EVENT' | 'FEED_PENDING' | 'FEED_APPROVED' | 'FEED_REJECTED' | 'FEED_COMMENT' | 'FEED_MENTION' | 'FEED_REACTION' | 'FEED_NOTICE' | 'VENUE_TEAM' | 'ALBUM_SUMMARY' | 'GUEST_LIST' | 'EVENT_ADMIN';
 
 /** O que a pessoa silenciou no push (o aviso continua no sino). `all` vale para tudo; `chats` e `events` só para o seu grupo de avisos. */
 export interface NotificationMuteSettings {
@@ -846,6 +848,14 @@ export type PostKindFilter = 'EVENT' | 'POST';
 export type PostTagStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED';
 
 /** Convite para um evento criado por uma pessoa. `invitedById` nulo: quem convidou apagou a conta. */
+/** Admin de um evento criado por pessoa (o dono promove; o dono continua dono). */
+export interface EventAdminRecord {
+  postId: string;
+  userId: string;
+  addedById: string | null;
+  createdAt: Date;
+}
+
 export interface EventInviteRecord {
   postId: string;
   userId: string;

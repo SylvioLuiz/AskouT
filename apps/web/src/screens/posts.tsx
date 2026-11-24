@@ -31,6 +31,7 @@ import type { EventKind, ExplorePlace } from '../lib/types.ts';
 import { Link, navigate, useSearch } from '../router.tsx';
 import { useCurrentPosition } from './explore.tsx';
 import { LinkPlaceSheet } from '../components/link-place-sheet.tsx';
+import { CreateEventSheet } from '../components/event-create-sheet.tsx';
 import { t } from '../lib/i18n/index.ts';
 import { PostPageSkeleton } from '../components/skeletons.tsx';
 
@@ -55,15 +56,25 @@ function LocationNotice({ status }: { status: string }) {
 }
 
 /** Eventos para vincular ao post: os que você confirmou presença ou criou, inclusive os que acabaram nos últimos 7 dias. */
-function LinkEventSheet({ onPick, onClose }: { onPick: (event: LinkedEvent) => void; onClose: () => void }) {
+function LinkEventSheet({ onPick, onCreate, onClose }: { onPick: (event: LinkedEvent) => void; onCreate: () => void; onClose: () => void }) {
   const going = useAsync(() => api.myGoingEvents(7), []);
   const items = going.data?.items ?? [];
   return (
     <Sheet title={t('Vincular um evento')} onClose={onClose}>
+      {/* O evento ainda não existe? Cria ali mesmo, sem perder o post: ao concluir, ele já volta vinculado. */}
+      <button type="button" className="placepick__item placepick__create" onClick={onCreate}>
+        <span className="placepick__createicon" aria-hidden="true">
+          <PlusIcon />
+        </span>
+        <span className="placepick__createtext">
+          <strong>{t('Criar um evento')}</strong>
+          <span className="muted">{t('Sem sair da publicação: ele já volta vinculado.')}</span>
+        </span>
+      </button>
       <p className="muted">{t('Eventos em que você confirmou presença ou que criou. Para outro evento, abra a página dele e toque em Publicar sobre o evento.')}</p>
       {going.loading && !going.data ? <Loading shape="rows" rows={3} /> : null}
       {going.error ? <ErrorState message={going.error.message} onRetry={going.reload} /> : null}
-      {going.data && items.length === 0 ? <p className="muted">{t('Nenhum evento por aqui ainda. Confirme presença em um evento ou vincule um local.')}</p> : null}
+      {going.data && items.length === 0 ? <p className="muted">{t('Nenhum evento por aqui ainda. Crie um acima, confirme presença em um evento ou vincule um local.')}</p> : null}
       <ul className="placepick">
         {items.map((e) => (
           <li key={e.id}>
@@ -129,6 +140,8 @@ export function CreatePostScreen() {
     return id ? { id, title: (prefill.get('eventoNome') ?? t('Evento')).slice(0, 120) } : null;
   });
   const [pickingEvent, setPickingEvent] = useState(false);
+  // Criando um evento por cima do post (o rascunho fica intacto por trás).
+  const [creatingEvent, setCreatingEvent] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [upload, setUpload] = useState<{ sent: number; total: number } | undefined>();
@@ -871,7 +884,21 @@ export function CreatePostScreen() {
               setPickingEvent(false);
               setMessage(undefined);
             }}
+            onCreate={() => {
+              setPickingEvent(false);
+              setCreatingEvent(true);
+            }}
             onClose={() => setPickingEvent(false)}
+          />
+        ) : null}
+        {creatingEvent ? (
+          <CreateEventSheet
+            onCreated={(e) => {
+              setLinkedEvent(e);
+              setCreatingEvent(false);
+              setMessage({ tone: 'ok', text: t('Evento “{title}” criado e vinculado à publicação.', { title: e.title }) });
+            }}
+            onClose={() => setCreatingEvent(false)}
           />
         ) : null}
         {linking ? (

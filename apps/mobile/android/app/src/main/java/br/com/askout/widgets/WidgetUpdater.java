@@ -8,15 +8,18 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.graphics.Bitmap;
 import android.view.View;
 import android.widget.RemoteViews;
 import br.com.askout.R;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Desenha os cinco widgets do AskouT a partir do último resultado guardado e busca de novo em segundo plano.
+ * Desenha os widgets do AskouT (os cinco de planos e NOW, e o de Conversas) a partir do último resultado guardado e busca de novo em segundo plano.
  *
  * - Ao adicionar, a cada 30 min (updatePeriodMillis), ao entrar/sair e quando o app vai para o segundo plano: busca.
  * - Quando um plano começa ou termina (ou o NOW acaba), um alarme redesenha sem precisar buscar; com algo rolando,
@@ -38,6 +41,7 @@ public final class WidgetUpdater {
         IO.execute(() -> {
             try {
                 WidgetData.fetch(app);
+                fetchChats(app);
                 renderAll(app);
             } finally {
                 if (done != null) done.run();
@@ -47,6 +51,27 @@ public final class WidgetUpdater {
 
     public static void refresh(Context context) {
         refresh(context, null);
+    }
+
+    /** Só o widget de Conversas (chegou mensagem): busca as conversas e redesenha. */
+    public static void refreshChats(Context context) {
+        Context app = context.getApplicationContext();
+        if (chatIds(app).length == 0) return;
+        IO.execute(() -> {
+            fetchChats(app);
+            renderChats(app, AppWidgetManager.getInstance(app), WidgetData.loggedIn(app));
+        });
+    }
+
+    private static int[] chatIds(Context context) {
+        return AppWidgetManager.getInstance(context).getAppWidgetIds(new ComponentName(context, ChatsWidget.class));
+    }
+
+    /** Busca uma vez cada filtro em uso (tudo, só grupos, só individuais). */
+    private static void fetchChats(Context context) {
+        Set<String> shows = new LinkedHashSet<>();
+        for (int id : chatIds(context)) shows.add(ChatsData.show(context, id));
+        for (String show : shows) ChatsData.fetch(context, show);
     }
 
     static void renderAll(Context context) {
@@ -59,6 +84,7 @@ public final class WidgetUpdater {
         render(context, manager, AgendaWidget.class, loggedIn ? agenda(context, s, now) : loggedOut(context));
         render(context, manager, NowFriendsWidget.class, loggedIn ? nowFriends(context, s, now) : loggedOut(context));
         render(context, manager, NowComboWidget.class, loggedIn ? combo(context, s, now) : loggedOut(context));
+        renderChats(context, manager, loggedIn);
         schedule(context, loggedIn ? s : null, now);
     }
 
@@ -86,7 +112,7 @@ public final class WidgetUpdater {
 
     private static boolean hasAny(Context context) {
         AppWidgetManager m = AppWidgetManager.getInstance(context);
-        for (Class<?> c : new Class<?>[] {NextMeetupWidget.class, ActiveMeetupWidget.class, AgendaWidget.class, NowFriendsWidget.class, NowComboWidget.class}) {
+        for (Class<?> c : new Class<?>[] {NextMeetupWidget.class, ActiveMeetupWidget.class, AgendaWidget.class, NowFriendsWidget.class, NowComboWidget.class, ChatsWidget.class}) {
             if (m.getAppWidgetIds(new ComponentName(context, c)).length > 0) return true;
         }
         return false;
@@ -290,6 +316,84 @@ public final class WidgetUpdater {
         }
         v.setTextViewText(R.id.widget_eyebrow, mine ? "NOW · LIGADO" : "NOW");
         v.setOnClickPendingIntent(R.id.widget_root, open(context, "/now", 400));
+        return v;
+    }
+
+    // ---------- Conversas ----------
+
+    private static final int[] CHAT_ROWS = {R.id.widget_chat1, R.id.widget_chat2, R.id.widget_chat3, R.id.widget_chat4, R.id.widget_chat5, R.id.widget_chat6};
+    private static final int[] CHAT_INITIALS = {R.id.widget_chat1_initials, R.id.widget_chat2_initials, R.id.widget_chat3_initials, R.id.widget_chat4_initials, R.id.widget_chat5_initials, R.id.widget_chat6_initials};
+    private static final int[] CHAT_PHOTOS = {R.id.widget_chat1_photo, R.id.widget_chat2_photo, R.id.widget_chat3_photo, R.id.widget_chat4_photo, R.id.widget_chat5_photo, R.id.widget_chat6_photo};
+    static final int[] CHAT_TITLES = {R.id.widget_chat1_title, R.id.widget_chat2_title, R.id.widget_chat3_title, R.id.widget_chat4_title, R.id.widget_chat5_title, R.id.widget_chat6_title};
+    static final int[] CHAT_TIMES = {R.id.widget_chat1_time, R.id.widget_chat2_time, R.id.widget_chat3_time, R.id.widget_chat4_time, R.id.widget_chat5_time, R.id.widget_chat6_time};
+    static final int[] CHAT_TIMES_NEW = {R.id.widget_chat1_time_new, R.id.widget_chat2_time_new, R.id.widget_chat3_time_new, R.id.widget_chat4_time_new, R.id.widget_chat5_time_new, R.id.widget_chat6_time_new};
+    static final int[] CHAT_PREVIEWS = {R.id.widget_chat1_preview, R.id.widget_chat2_preview, R.id.widget_chat3_preview, R.id.widget_chat4_preview, R.id.widget_chat5_preview, R.id.widget_chat6_preview};
+    private static final int[] CHAT_BADGES = {R.id.widget_chat1_badge, R.id.widget_chat2_badge, R.id.widget_chat3_badge, R.id.widget_chat4_badge, R.id.widget_chat5_badge, R.id.widget_chat6_badge};
+
+    /** Cada widget de Conversas com o próprio filtro. */
+    static void renderChats(Context context, AppWidgetManager manager, boolean loggedIn) {
+        int[] ids = manager.getAppWidgetIds(new ComponentName(context, ChatsWidget.class));
+        long now = System.currentTimeMillis();
+        for (int id : ids) {
+            RemoteViews v;
+            if (loggedIn) {
+                v = chats(context, ChatsData.show(context, id), id, now);
+            } else {
+                v = loggedOut(context);
+                v.setTextViewText(R.id.widget_subtitle, "para ver suas conversas aqui");
+                v.setOnClickPendingIntent(R.id.widget_root, open(context, "/conversas", 900));
+            }
+            manager.updateAppWidget(id, WidgetTheme.paint(context, v));
+        }
+    }
+
+    private static RemoteViews chats(Context context, String show, int widgetId, long now) {
+        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_chats);
+        ChatsData.Snapshot s = ChatsData.cached(context, show);
+        v.setTextViewText(R.id.widget_eyebrow, ChatsData.title(show));
+        if (s.unreadChats > 0) {
+            v.setViewVisibility(R.id.widget_unread, View.VISIBLE);
+            v.setTextViewText(R.id.widget_unread, s.unreadChats == 1 ? "1 não lida" : ChatsData.count(s.unreadChats) + " não lidas");
+        } else {
+            v.setViewVisibility(R.id.widget_unread, View.GONE);
+        }
+        v.setViewVisibility(R.id.widget_empty, s.chats.isEmpty() ? View.VISIBLE : View.GONE);
+        v.setTextViewText(R.id.widget_empty, ChatsData.empty(show));
+        int code = 6000 + (widgetId % 1000) * 10;
+        for (int i = 0; i < CHAT_ROWS.length; i++) {
+            if (i >= s.chats.size()) {
+                v.setViewVisibility(CHAT_ROWS[i], View.GONE);
+                continue;
+            }
+            ChatsData.Chat c = s.chats.get(i);
+            v.setViewVisibility(CHAT_ROWS[i], View.VISIBLE);
+            Bitmap photo = ChatsData.photo(context, c.photoUrl);
+            if (photo != null) {
+                v.setImageViewBitmap(CHAT_PHOTOS[i], photo);
+                v.setViewVisibility(CHAT_PHOTOS[i], View.VISIBLE);
+            } else {
+                v.setViewVisibility(CHAT_PHOTOS[i], View.GONE);
+            }
+            v.setTextViewText(CHAT_INITIALS[i], c.initials);
+            // Silenciada: o sininho cortado ao lado do nome, como na lista do app.
+            v.setTextViewText(CHAT_TITLES[i], c.muted ? c.title + "  \uD83D\uDD15" : c.title);
+            v.setTextViewText(CHAT_PREVIEWS[i], c.preview);
+            String time = ChatsData.time(c.at, now);
+            boolean fresh = c.unread > 0 && !c.muted;
+            v.setTextViewText(CHAT_TIMES[i], time);
+            v.setTextViewText(CHAT_TIMES_NEW[i], time);
+            v.setViewVisibility(CHAT_TIMES[i], fresh ? View.GONE : View.VISIBLE);
+            v.setViewVisibility(CHAT_TIMES_NEW[i], fresh ? View.VISIBLE : View.GONE);
+            if (c.unread > 0) {
+                v.setViewVisibility(CHAT_BADGES[i], View.VISIBLE);
+                v.setTextViewText(CHAT_BADGES[i], ChatsData.count(c.unread));
+                v.setInt(CHAT_BADGES[i], "setBackgroundResource", c.muted ? R.drawable.widget_badge_muted : R.drawable.widget_badge);
+            } else {
+                v.setViewVisibility(CHAT_BADGES[i], View.GONE);
+            }
+            v.setOnClickPendingIntent(CHAT_ROWS[i], open(context, c.url, code + i));
+        }
+        v.setOnClickPendingIntent(R.id.widget_root, open(context, "/conversas", code + 9));
         return v;
     }
 }

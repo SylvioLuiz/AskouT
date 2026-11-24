@@ -50,11 +50,13 @@ public final class WidgetData {
         // Outra conta: o resultado guardado era de outra pessoa.
         if (changed) e.remove(KEY_SNAPSHOT).remove(KEY_FETCHED);
         e.apply();
+        if (changed) ChatsData.forget(context);
     }
 
     /** Sai da conta: apaga a sessão e o resultado guardado (o tema escolhido no app fica). */
     public static void clearSession(Context context) {
         prefs(context).edit().remove(KEY_TOKEN).remove(KEY_BASE).remove(KEY_SNAPSHOT).remove(KEY_FETCHED).apply();
+        ChatsData.forget(context);
     }
 
     /** Tema do app ("system", "light" ou "dark"; ver WidgetTheme). */

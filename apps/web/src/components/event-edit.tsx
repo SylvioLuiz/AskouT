@@ -34,6 +34,8 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
   const [byPoll, setByPoll] = useState(event.startsAt === null);
   const [kind, setKind] = useState<EventKind>(event.kind ?? 'OTHER');
   const [isPrivate, setPrivate] = useState(event.private === true);
+  // Admin do evento edita, mas quem vê (público ou só convidados) continua escolha de quem criou.
+  const canChangeAudience = post.mine;
   const [place, setPlace] = useState<LinkedPlace | null>(post.placeName ? { name: post.placeName, address: post.placeAddress ?? null, venueId: post.placeVenueId ?? null } : null);
   const [placeChanged, setPlaceChanged] = useState(false);
   const [extras, setExtras] = useState<EventExtrasDraft>(() => extrasDraftFrom(event.extras));
@@ -98,7 +100,7 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
           kind,
           startsAt: dateByPoll ? null : localToIso(starts),
           endsAt: !dateByPoll && ends ? localToIso(ends) : null,
-          private: isPrivate,
+          ...(canChangeAudience ? { private: isPrivate } : {}),
           // Sem a lista carregada, não manda `extras` e as respostas ficam como estavam.
           ...(extraOptions.data ? { extras: extrasFromDraft(extras, extraOptions.data) } : {}),
         },
@@ -202,7 +204,7 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
             }
           />
           <EventRow icon={<EventKindIcon kind={kind} />} label={t('Tipo')} value={kindLabel} onClick={() => setSheet('kind')} disabled={busy} />
-          <EventRow icon={isPrivate ? <LockIcon /> : <GlobeIcon />} label={t('Quem vê')} value={isPrivate ? t('Só convidados') : t('Público')} onClick={() => setSheet('audience')} disabled={busy} />
+          <EventRow icon={isPrivate ? <LockIcon /> : <GlobeIcon />} label={t('Quem vê')} value={isPrivate ? t('Só convidados') : t('Público')} onClick={() => setSheet('audience')} disabled={busy || !canChangeAudience} />
           <EventRow
             icon={<UsersIcon />}
             label={t('Convidar')}

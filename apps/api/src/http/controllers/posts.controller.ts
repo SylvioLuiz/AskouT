@@ -169,6 +169,25 @@ export class PostsController {
     return this.core.posts.cancelInvite(actor.userId, id, userId);
   }
 
+  /** Admins do evento (sem o dono). */
+  @Get('posts/:id/admins')
+  eventAdmins(@CurrentActor() actor: Actor, @Param('id') id: string) {
+    return this.core.posts.listEventAdmins(actor.userId, id);
+  }
+
+  /** O dono torna admin do evento quem vai (ou aceitou o convite): `{userId}`. Devolve os admins. */
+  @Post('posts/:id/admins')
+  @HttpCode(200)
+  addEventAdmin(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.core.posts.addEventAdmin(actor.userId, id, asBody(body).userId);
+  }
+
+  /** O dono tira um admin do evento; o próprio admin também pode sair. Devolve os admins. */
+  @Delete('posts/:id/admins/:userId')
+  removeEventAdmin(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('userId') userId: string) {
+    return this.core.posts.removeEventAdmin(actor.userId, id, userId);
+  }
+
   /** Ajuste de uma foto enviada: `{image: dataUrl}` já recortada pelo app (só o autor). */
   /** Troca a capa do próprio evento: `{image: dataUrl}` já reduzida pelo app. */
   @Put('posts/:id/cover')
