@@ -137,7 +137,7 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
           }}
         />
         {newCover || cover?.path ? (
-          <div className="evcover">
+          <div className="evcover evcover--compose">
             <img src={newCover ? newCover.preview : api.assetUrl(cover!.path!)} alt={t('Capa do evento')} referrerPolicy="no-referrer" />
             <button type="button" className="evcover__change" onClick={() => coverInput.current?.click()} disabled={busy}>
               <PhotoIcon /> {t('Trocar capa')}
@@ -148,7 +148,7 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
             {when ? <span className="evcover__when">{when}</span> : null}
           </div>
         ) : (
-          <div className="evcover evcover--empty">
+          <div className="evcover evcover--compose evcover--empty">
             <p>{t('Adicione uma capa (opcional)')}</p>
             <div className="evcover__actions">
               <Button small variant="secondary" onClick={() => coverInput.current?.click()} disabled={busy}>
