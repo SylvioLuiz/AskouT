@@ -1,16 +1,24 @@
 import { useEffect, useId, useState } from 'react';
 import { ApiError, api } from '../api.ts';
 import { useDebounced } from '../hooks.ts';
-import { formatDateTime } from '../labels.ts';
+import { STATUS_LABEL, formatBirthDate, formatDate, formatDateTime } from '../labels.ts';
 import type { UserActivityItem, UserRow } from '../types.ts';
-import { Modal } from '../ui.tsx';
+import { Badge, Modal } from '../ui.tsx';
 
-/** Corrige nome, @usuário e biografia. Motivo obrigatório: o que mudou fica na auditoria. */
-export function EditUserDialog({ user, onClose, onDone }: { user: UserRow; onClose: () => void; onDone: () => void }) {
+const ROLE_LABEL: Record<UserRow['role'], string> = { USER: 'Pessoa', VENUE_OWNER: 'Responsável por local', ADMIN: 'Admin' };
+
+/**
+ * Detalhes de uma pessoa. "Editar" deixa nome, @usuário e biografia editáveis.
+ * Motivo obrigatório ao salvar: o que mudou fica na auditoria.
+ */
+export function UserDetailDialog({ user, onClose, onDone }: { user: UserRow; onClose: () => void; onDone: () => void }) {
+  // O que está salvo agora (começa pela linha da tabela e se atualiza depois de salvar).
+  const [saved, setSaved] = useState({ displayName: user.displayName, username: user.username });
+  const [savedBio, setSavedBio] = useState<string | undefined>();
+  const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState(user.displayName);
   const [username, setUsername] = useState(user.username);
-  const [bio, setBio] = useState<string | undefined>();
-  const [initialBio, setInitialBio] = useState<string | undefined>();
+  const [bio, setBio] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -19,23 +27,18 @@ export function EditUserDialog({ user, onClose, onDone }: { user: UserRow; onClo
   const [check, setCheck] = useState<{ username: string; available: boolean; problem?: string } | undefined>();
   const typed = useDebounced(username.trim());
   const ids = { name: useId(), user: useId(), bio: useId(), note: useId() };
+  const canEdit = user.role !== 'ADMIN';
 
-  // A biografia não vem na lista: busca a pessoa para o formulário começar preenchido.
+  // A biografia não vem na lista: busca a pessoa.
   useEffect(() => {
     let alive = true;
     api
       .userDetail(user.id)
       .then((d) => {
-        if (alive) {
-          setBio(d.bio ?? '');
-          setInitialBio(d.bio ?? '');
-        }
+        if (alive) setSavedBio(d.bio ?? '');
       })
       .catch(() => {
-        if (alive) {
-          setBio('');
-          setInitialBio('');
-        }
+        if (alive) setSavedBio('');
       });
     return () => {
       alive = false;
@@ -44,7 +47,7 @@ export function EditUserDialog({ user, onClose, onDone }: { user: UserRow; onClo
 
   useEffect(() => {
     setCheck(undefined);
-    if (typed === '' || typed.toLowerCase() === user.username) return;
+    if (!editing || typed === '' || typed.toLowerCase() === saved.username) return;
     let alive = true;
     api
       .usernameAvailableFor(user.id, typed)
@@ -55,11 +58,22 @@ export function EditUserDialog({ user, onClose, onDone }: { user: UserRow; onClo
     return () => {
       alive = false;
     };
-  }, [typed, user.id, user.username]);
+  }, [editing, typed, user.id, saved.username]);
 
-  const usernameChanged = username.trim().toLowerCase() !== user.username;
-  const bioChanged = bio !== undefined && bio !== initialBio;
-  const changed = displayName !== user.displayName || usernameChanged || bioChanged;
+  function startEdit() {
+    setDisplayName(saved.displayName);
+    setUsername(saved.username);
+    setBio(savedBio ?? '');
+    setNote('');
+    setNoteMissing(false);
+    setError(undefined);
+    setEditing(true);
+  }
+
+  const usernameChanged = username.trim().toLowerCase() !== saved.username;
+  const bioChanged = savedBio !== undefined && bio !== savedBio;
+  const nameChanged = displayName !== saved.displayName;
+  const changed = nameChanged || usernameChanged || bioChanged;
   // Conferência do @ que está no campo agora (a resposta de um texto antigo não vale).
   const current = check && typed === username.trim() ? check : undefined;
   const usernameProblem = usernameChanged && current && !current.available ? (current.problem ?? 'Esse @usuário já está em uso') : undefined;
@@ -83,82 +97,157 @@ export function EditUserDialog({ user, onClose, onDone }: { user: UserRow; onClo
           return;
         }
       }
+      const nextBio = bio.trim() === '' ? null : bio;
       await api.editUser(user.id, {
-        ...(displayName !== user.displayName ? { displayName } : {}),
+        ...(nameChanged ? { displayName } : {}),
         ...(usernameChanged ? { username: username.trim() } : {}),
-        ...(bioChanged ? { bio: (bio ?? '').trim() === '' ? null : bio } : {}),
+        ...(bioChanged ? { bio: nextBio } : {}),
         note: note.trim(),
       });
+      setSaved({ displayName, username: usernameChanged ? username.trim().toLowerCase() : saved.username });
+      if (bioChanged) setSavedBio(nextBio ?? '');
+      setEditing(false);
+      setBusy(false);
       onDone();
-      onClose();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Algo deu errado. Tente de novo.');
       setBusy(false);
     }
   }
 
+  const providers = user.loginProviders ?? [];
+
   return (
-    <Modal title={`Editar @${user.username}`} onClose={onClose}>
-      <div className="modal__body">
-        <p>Use para corrigir um nome ou @ ofensivo, de outra marca, ou a pedido da pessoa. O que mudou fica na auditoria.</p>
-      </div>
-      <div className="field">
-        <label htmlFor={ids.name}>Nome</label>
-        <input id={ids.name} value={displayName} maxLength={60} onChange={(e) => setDisplayName(e.target.value)} />
-      </div>
-      <div className="field">
-        <label htmlFor={ids.user}>@usuário</label>
-        <input
-          id={ids.user}
-          value={username}
-          maxLength={30}
-          onChange={(e) => setUsername(e.target.value)}
-          autoCapitalize="none"
-          spellCheck={false}
-          aria-invalid={usernameProblem ? true : undefined}
-          aria-describedby={`${ids.user}-hint`}
-        />
-        <span id={`${ids.user}-hint`} className={usernameProblem ? 'small alert' : 'muted small'} aria-live="polite">
-          {!usernameChanged ? '' : usernameProblem ? usernameProblem : current?.available ? `@${current.username} está livre` : 'Conferindo…'}
-        </span>
-      </div>
-      <div className="field">
-        <label htmlFor={ids.bio}>Biografia</label>
-        <textarea id={ids.bio} rows={3} maxLength={160} value={bio ?? ''} disabled={bio === undefined} onChange={(e) => setBio(e.target.value)} />
-      </div>
-      <div className="field">
-        <label htmlFor={ids.note}>Motivo (obrigatório)</label>
-        <textarea
-          id={ids.note}
-          rows={2}
-          maxLength={300}
-          value={note}
-          onChange={(e) => {
-            setNote(e.target.value);
-            if (e.target.value.trim() !== '') setNoteMissing(false);
-          }}
-          aria-invalid={noteMissing ? true : undefined}
-        />
-        {noteMissing ? (
-          <span className="small alert" role="alert">
-            Escreva o motivo para salvar.
-          </span>
-        ) : (
-          <span className="muted small">{note.length}/300 · fica registrado na auditoria</span>
-        )}
-      </div>
+    <Modal title={editing ? `Editar @${saved.username}` : `@${saved.username}`} onClose={onClose}>
+      {editing ? (
+        <div className="modal__body">
+          <p className="muted small">Use para corrigir um nome ou @ ofensivo, de outra marca, ou a pedido da pessoa. O que mudou fica na auditoria.</p>
+        </div>
+      ) : null}
+      <dl className="facts">
+        <dt>{editing ? <label htmlFor={ids.name}>Nome</label> : 'Nome'}</dt>
+        <dd>
+          {editing ? (
+            <div className="field field--inline">
+              <input id={ids.name} value={displayName} maxLength={60} onChange={(e) => setDisplayName(e.target.value)} />
+            </div>
+          ) : (
+            <strong>{saved.displayName}</strong>
+          )}
+        </dd>
+        <dt>{editing ? <label htmlFor={ids.user}>@usuário</label> : '@usuário'}</dt>
+        <dd>
+          {editing ? (
+            <div className="field field--inline">
+              <input
+                id={ids.user}
+                value={username}
+                maxLength={30}
+                onChange={(e) => setUsername(e.target.value)}
+                autoCapitalize="none"
+                spellCheck={false}
+                aria-invalid={usernameProblem ? true : undefined}
+                aria-describedby={`${ids.user}-hint`}
+              />
+              <span id={`${ids.user}-hint`} className={usernameProblem ? 'small alert' : 'muted small'} aria-live="polite">
+                {!usernameChanged ? '' : usernameProblem ? usernameProblem : current?.available ? `@${current.username} está livre` : 'Conferindo…'}
+              </span>
+            </div>
+          ) : (
+            <span className="handle">@{saved.username}</span>
+          )}
+        </dd>
+        <dt>{editing ? <label htmlFor={ids.bio}>Biografia</label> : 'Biografia'}</dt>
+        <dd>
+          {editing ? (
+            <div className="field field--inline">
+              <textarea id={ids.bio} rows={3} maxLength={160} value={bio} onChange={(e) => setBio(e.target.value)} />
+            </div>
+          ) : savedBio === undefined ? (
+            <span className="muted">Carregando…</span>
+          ) : savedBio === '' ? (
+            <span className="muted">Sem biografia</span>
+          ) : (
+            <span className="pre">{savedBio}</span>
+          )}
+        </dd>
+        <dt>E-mail</dt>
+        <dd>{user.email}</dd>
+        <dt>Situação</dt>
+        <dd>
+          <Badge tone={user.status === 'ACTIVE' ? 'ok' : user.status === 'SUSPENDED' ? 'bad' : 'warn'}>{STATUS_LABEL[user.status]}</Badge>
+        </dd>
+        <dt>Papel</dt>
+        <dd>{user.role === 'ADMIN' ? <Badge tone="admin">Admin</Badge> : ROLE_LABEL[user.role]}</dd>
+        <dt>Login</dt>
+        <dd>
+          {providers.length === 0
+            ? 'E-mail e senha'
+            : providers.map((p) => (
+                <span key={p}>
+                  <Badge tone="info">{p === 'APPLE' ? 'Apple' : 'Google'}</Badge>{' '}
+                </span>
+              ))}
+        </dd>
+        <dt>Nascimento</dt>
+        <dd>{user.birthDate ? formatBirthDate(user.birthDate) : <span className="muted">Não informado</span>}</dd>
+        <dt>Posts</dt>
+        <dd>{user.postsCount}</dd>
+        <dt>Denúncias</dt>
+        <dd>{user.reportsCount > 0 ? <strong className="alert">{user.reportsCount}</strong> : 0}</dd>
+        <dt>Desde</dt>
+        <dd>{formatDate(user.createdAt)}</dd>
+      </dl>
+      {editing ? (
+        <div className="field">
+          <label htmlFor={ids.note}>Motivo (obrigatório)</label>
+          <textarea
+            id={ids.note}
+            rows={2}
+            maxLength={300}
+            value={note}
+            onChange={(e) => {
+              setNote(e.target.value);
+              if (e.target.value.trim() !== '') setNoteMissing(false);
+            }}
+            aria-invalid={noteMissing ? true : undefined}
+          />
+          {noteMissing ? (
+            <span className="small alert" role="alert">
+              Escreva o motivo para salvar.
+            </span>
+          ) : (
+            <span className="muted small">{note.length}/300 · fica registrado na auditoria</span>
+          )}
+        </div>
+      ) : null}
       {error ? (
         <p className="notice notice--bad" role="alert">
           {error}
         </p>
       ) : null}
       <div className="modal__actions">
-        <button type="button" className="btn" onClick={onClose} disabled={busy}>
-          Cancelar
-        </button>
-        <button type="button" className="btn btn--primary" onClick={() => void save()} disabled={busy || !changed || usernameProblem !== undefined} aria-busy={busy || undefined}>
-          {busy ? 'Aguarde…' : 'Salvar'}
-        </button>
+        {editing ? (
+          <>
+            <button type="button" className="btn" onClick={() => setEditing(false)} disabled={busy}>
+              Cancelar
+            </button>
+            <button type="button" className="btn btn--primary" onClick={() => void save()} disabled={busy || !changed || usernameProblem !== undefined} aria-busy={busy || undefined}>
+              {busy ? 'Aguarde…' : 'Salvar'}
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="btn" onClick={onClose}>
+              Fechar
+            </button>
+            {canEdit ? (
+              <button type="button" className="btn btn--primary" onClick={startEdit} disabled={savedBio === undefined}>
+                Editar
+              </button>
+            ) : null}
+          </>
+        )}
       </div>
     </Modal>
   );

@@ -115,9 +115,9 @@ export class PrismaAdminRepository implements AdminRepository {
     const rows = await this.prisma.placeEvent.findMany({
       where: eventWhere(q),
       orderBy: [...eventOrder(page.sort), { id: 'asc' }], skip: page.offset, take: page.limit,
-      select: { id: true, title: true, startsAt: true, endsAt: true, kind: true, isSample: true, venue: { select: { id: true, name: true } } },
+      select: { id: true, title: true, startsAt: true, endsAt: true, kind: true, isSample: true, isFree: true, venue: { select: { id: true, name: true, address: true } } },
     });
-    return rows.map((e) => ({ id: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, kind: e.kind, isSample: e.isSample, venue: e.venue }));
+    return rows.map((e) => ({ id: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, kind: e.kind, isSample: e.isSample, isFree: e.isFree, venue: e.venue }));
   }
 
   async deletePlaceEvent(id: string): Promise<boolean> {

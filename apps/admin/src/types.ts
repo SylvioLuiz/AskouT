@@ -140,6 +140,10 @@ export interface EventDetail {
   venue: { id: string; name: string; address: string | null; owner: { id: string; username: string } | null };
   goingCount: number;
   going: { id: string; username: string; displayName: string; at: string }[];
+  /** Outras datas: eventos do mesmo local com o mesmo nome (sem este). */
+  sameTitle: { id: string; startsAt: string; endsAt: string; upcoming: boolean }[];
+  /** Quantos eventos o local tem com esse nome, contando este. */
+  sameTitleTotal: number;
 }
 
 export interface PlaceEventRow {
@@ -149,7 +153,9 @@ export interface PlaceEventRow {
   endsAt: string;
   kind: string;
   isSample: boolean;
-  venue: { id: string; name: string };
+  isFree: boolean;
+  goingCount: number;
+  venue: { id: string; name: string; address: string | null };
 }
 
 export interface PostRow {

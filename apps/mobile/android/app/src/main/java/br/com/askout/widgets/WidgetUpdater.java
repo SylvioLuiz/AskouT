@@ -16,7 +16,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Desenha os quatro widgets do AskouT a partir do último resultado guardado e busca de novo em segundo plano.
+ * Desenha os cinco widgets do AskouT a partir do último resultado guardado e busca de novo em segundo plano.
  *
  * - Ao adicionar, a cada 30 min (updatePeriodMillis), ao entrar/sair e quando o app vai para o segundo plano: busca.
  * - Quando um plano começa ou termina (ou o NOW acaba), um alarme redesenha sem precisar buscar; com algo rolando,
@@ -58,6 +58,7 @@ public final class WidgetUpdater {
         render(context, manager, ActiveMeetupWidget.class, loggedIn ? active(context, s, now) : loggedOut(context));
         render(context, manager, AgendaWidget.class, loggedIn ? agenda(context, s, now) : loggedOut(context));
         render(context, manager, NowFriendsWidget.class, loggedIn ? nowFriends(context, s, now) : loggedOut(context));
+        render(context, manager, NowComboWidget.class, loggedIn ? combo(context, s, now) : loggedOut(context));
         schedule(context, loggedIn ? s : null, now);
     }
 
@@ -85,7 +86,7 @@ public final class WidgetUpdater {
 
     private static boolean hasAny(Context context) {
         AppWidgetManager m = AppWidgetManager.getInstance(context);
-        for (Class<?> c : new Class<?>[] {NextMeetupWidget.class, ActiveMeetupWidget.class, AgendaWidget.class, NowFriendsWidget.class}) {
+        for (Class<?> c : new Class<?>[] {NextMeetupWidget.class, ActiveMeetupWidget.class, AgendaWidget.class, NowFriendsWidget.class, NowComboWidget.class}) {
             if (m.getAppWidgetIds(new ComponentName(context, c)).length > 0) return true;
         }
         return false;
@@ -156,8 +157,21 @@ public final class WidgetUpdater {
         return v;
     }
 
+    /** Pedidos que o widget faz à tela do NOW (lidos em apps/web/src/screens/flash.tsx, liberados em deep-link.ts). */
+    private static final String NOW_TURN_ON = "/now?abrir=ligar";
+    private static final String NOW_INVITE = "/now?abrir=convidar";
+
     private static RemoteViews active(Context context, WidgetData.Snapshot s, long now) {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_active);
+        fillMeetup(context, v, s, now, 200, true);
+        return v;
+    }
+
+    /**
+     * Lado do encontro (widget_active e widget_combo usam os mesmos ids): encontro do NOW, plano rolando ou, sem nada,
+     * os atalhos para ligar o NOW (ou ver quem está livre, se já está ligado) e convidar alguém.
+     */
+    private static void fillMeetup(Context context, RemoteViews v, WidgetData.Snapshot s, long now, int code, boolean showNext) {
         WidgetData.NowMatch m = s.activeMatch(now);
         WidgetData.Plan p = m == null ? s.activePlan(now) : null;
         if (m != null) {
@@ -168,8 +182,10 @@ public final class WidgetUpdater {
             v.setTextViewText(R.id.widget_subtitle, m.placeName != null ? m.placeName : "Escolham o lugar");
             v.setViewVisibility(R.id.widget_progress, View.VISIBLE);
             v.setProgressBar(R.id.widget_progress, 100, percent(m.startedAt, m.expiresAt, now), false);
+            v.setViewVisibility(R.id.widget_footer, View.VISIBLE);
             v.setTextViewText(R.id.widget_footer, "até " + WidgetData.hour(m.expiresAt));
-            v.setOnClickPendingIntent(R.id.widget_root, open(context, m.url, 200));
+            v.setViewVisibility(R.id.widget_actions, View.GONE);
+            v.setOnClickPendingIntent(R.id.widget_root, open(context, m.url, code));
         } else if (p != null) {
             v.setTextViewText(R.id.widget_eyebrow, "ROLANDO AGORA");
             v.setViewVisibility(R.id.widget_initial, View.GONE);
@@ -177,18 +193,56 @@ public final class WidgetUpdater {
             v.setTextViewText(R.id.widget_subtitle, p.venueName != null ? p.venueName : (p.meetup ? "Encontro" : "Evento"));
             v.setViewVisibility(R.id.widget_progress, View.VISIBLE);
             v.setProgressBar(R.id.widget_progress, 100, percent(p.startsAt, p.endsAt, now), false);
+            v.setViewVisibility(R.id.widget_footer, View.VISIBLE);
             v.setTextViewText(R.id.widget_footer, "até " + WidgetData.hour(p.endsAt));
-            v.setOnClickPendingIntent(R.id.widget_root, open(context, p.url, 200));
+            v.setViewVisibility(R.id.widget_actions, View.GONE);
+            v.setOnClickPendingIntent(R.id.widget_root, open(context, p.url, code));
         } else {
+            boolean mine = s.flashOn(now);
             WidgetData.Plan next = s.next(now);
-            v.setTextViewText(R.id.widget_eyebrow, "AGORA");
+            String line;
+            if (mine) {
+                line = "NOW ligado até " + WidgetData.hour(s.flashExpiresAt);
+                if (showNext && s.friendsCount > 0) line += " · " + (s.friendsCount == 1 ? "1 amigo livre" : s.friendsCount + " amigos livres");
+            } else {
+                line = "Ligue o NOW e veja quem está livre";
+            }
+            if (showNext && next != null) line += " · Próximo: " + WidgetData.when(next.startsAt, now);
+            else if (!mine && next != null) line = "Próximo: " + WidgetData.when(next.startsAt, now);
+            v.setTextViewText(R.id.widget_eyebrow, mine ? "NOW LIGADO" : "AGORA");
             v.setViewVisibility(R.id.widget_initial, View.GONE);
             v.setTextViewText(R.id.widget_title, "Nada rolando agora");
-            v.setTextViewText(R.id.widget_subtitle, next != null ? "Próximo: " + WidgetData.when(next.startsAt, now) + " · " + next.title : "Ligue o NOW e veja quem está livre");
+            v.setTextViewText(R.id.widget_subtitle, line);
             v.setViewVisibility(R.id.widget_progress, View.GONE);
-            v.setTextViewText(R.id.widget_footer, "");
-            v.setOnClickPendingIntent(R.id.widget_root, open(context, next != null ? next.url : "/now", 200));
+            v.setViewVisibility(R.id.widget_footer, View.GONE);
+            v.setViewVisibility(R.id.widget_actions, View.VISIBLE);
+            v.setTextViewText(R.id.widget_action_primary, mine ? "⚡ Quem está livre" : "⚡ Ligar o NOW");
+            String target = mine ? "/now" : NOW_TURN_ON;
+            v.setOnClickPendingIntent(R.id.widget_action_primary, open(context, target, code + 1));
+            v.setOnClickPendingIntent(R.id.widget_action_invite, open(context, NOW_INVITE, code + 2));
+            v.setOnClickPendingIntent(R.id.widget_root, open(context, target, code));
         }
+    }
+
+    /** "NOW": encontro à esquerda e quem está livre à direita (o toque na direita abre a lista do NOW). */
+    private static RemoteViews combo(Context context, WidgetData.Snapshot s, long now) {
+        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_combo);
+        fillMeetup(context, v, s, now, 500, false);
+        int count = s.friendsCount;
+        v.setTextViewText(R.id.widget_count, String.valueOf(count));
+        v.setTextViewText(R.id.widget_count_label, count == 1 ? "amigo livre" : "amigos livres");
+        String names = WidgetData.names(s.friendNames, count);
+        v.setTextViewText(R.id.widget_names, names.isEmpty() ? "Chame alguém pelo NOW" : names);
+        if (s.pendingInvites > 0) {
+            v.setViewVisibility(R.id.widget_badge, View.VISIBLE);
+            v.setTextViewText(R.id.widget_badge, String.valueOf(s.pendingInvites));
+            v.setViewVisibility(R.id.widget_invites, View.VISIBLE);
+            v.setTextViewText(R.id.widget_invites, s.pendingInvites == 1 ? "1 convite esperando" : s.pendingInvites + " convites esperando");
+        } else {
+            v.setViewVisibility(R.id.widget_badge, View.GONE);
+            v.setViewVisibility(R.id.widget_invites, View.GONE);
+        }
+        v.setOnClickPendingIntent(R.id.widget_friends, open(context, "/now", 510));
         return v;
     }
 

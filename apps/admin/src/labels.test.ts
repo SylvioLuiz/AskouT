@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { formatDate, formatDateTime, plural, query } from './labels.ts';
+import { eventStatus, formatDate, formatDateTime, formatDuration, formatEventWhen, plural, query } from './labels.ts';
 
 test('query: ignora vazios, codifica e junta', () => {
   assert.equal(query({}), '');
@@ -26,4 +26,17 @@ test('formatBirthDate: não troca o dia por causa do fuso', async () => {
   assert.equal(formatBirthDate('1990-01-01'), '01/01/1990');
   assert.equal(formatBirthDate(null), '—');
   assert.equal(formatBirthDate('lixo'), '—');
+});
+
+test('eventos: quando, duração e situação', () => {
+  assert.equal(formatEventWhen('2026-11-24T21:00:00-03:00', '2026-11-25T03:00:00-03:00'), 'ter, 24 de nov de 2026 · 21:00–03:00');
+  assert.equal(formatEventWhen('2026-11-24T10:00:00-03:00', '2026-11-26T18:00:00-03:00'), 'ter, 24 de nov de 2026 · 10:00–26 de nov de 2026, 18:00');
+  assert.equal(formatEventWhen('x', 'y'), '—');
+  assert.equal(formatDuration('2026-11-24T21:00:00Z', '2026-11-25T03:00:00Z'), '6h');
+  assert.equal(formatDuration('2026-11-24T21:00:00Z', '2026-11-24T22:30:00Z'), '1h30');
+  assert.equal(formatDuration('2026-11-24T21:00:00Z', '2026-11-24T21:45:00Z'), '45min');
+  const now = Date.parse('2026-11-24T22:00:00Z');
+  assert.equal(eventStatus('2026-11-24T21:00:00Z', '2026-11-25T03:00:00Z', now), 'LIVE');
+  assert.equal(eventStatus('2026-11-25T21:00:00Z', '2026-11-26T03:00:00Z', now), 'UPCOMING');
+  assert.equal(eventStatus('2026-11-23T21:00:00Z', '2026-11-24T03:00:00Z', now), 'PAST');
 });

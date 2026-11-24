@@ -927,7 +927,8 @@ export interface AdminPlaceEventRow {
   endsAt: Date;
   kind: EventKind;
   isSample: boolean;
-  venue: { id: string; name: string };
+  isFree: boolean;
+  venue: { id: string; name: string; address: string | null };
 }
 
 export interface AdminPostRow {

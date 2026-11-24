@@ -1,77 +1,179 @@
 import { useState } from 'react';
-import { api } from '../api.ts';
+import { api, appUrl } from '../api.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
-import { formatDateTime, plural } from '../labels.ts';
+import { EVENT_KIND_LABEL, formatEventWhen, plural } from '../labels.ts';
+import type { VenueDetail } from '../types.ts';
 import { ActionDialog, Badge, Loadable, Modal, PageHead, Pager, SearchBox, SortTh } from '../ui.tsx';
 import { useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
+import { EventDetailModal } from './events.tsx';
 
 const SOURCE_LABEL = { GOOGLE: 'Google', OSM: 'OpenStreetMap', IMPORT: 'Importação de agenda' } as const;
 
-/** Detalhe do local: o que o app sabe dele, de onde veio, quem responde e os eventos. */
-function VenueDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+type VenueEvent = VenueDetail['events'][number];
+
+/** Eventos do local, com data e hora para diferenciar os que repetem o nome toda semana. */
+function EventList({ events, onOpen }: { events: VenueEvent[]; onOpen: (id: string) => void }) {
+  return (
+    <ul className="venuedetail__events">
+      {events.map((e) => (
+        <li key={e.id} className={e.upcoming ? undefined : 'is-past'}>
+          <div>
+            <button type="button" className="linkbtn" onClick={() => onOpen(e.id)}>
+              <strong>{e.title}</strong>
+            </button>
+            <div className="muted small">
+              {formatEventWhen(e.startsAt, e.endsAt)}
+              {EVENT_KIND_LABEL[e.kind] ? ` · ${EVENT_KIND_LABEL[e.kind]}` : ''}
+            </div>
+          </div>
+          <span>
+            {e.isSample ? <Badge>Teste</Badge> : null} {e.isFree ? <Badge tone="ok">Grátis</Badge> : null}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Detalhe do local: capa e logo, o que o app sabe dele, de onde veio, quem responde e os eventos. */
+function VenueDetailModal({ id, onClose, onChanged }: { id: string; onClose: () => void; onChanged: () => void }) {
   const detail = useAsync(() => api.venue(id), [id]);
+  const [eventId, setEventId] = useState<string>();
+  const [action, setAction] = useState<ActionSpec>();
+
+  // O evento e a confirmação abrem no lugar do local; ao fechar, voltam para ele (sem buscar de novo).
+  if (eventId) return <EventDetailModal id={eventId} onClose={() => setEventId(undefined)} />;
+  if (action) {
+    return (
+      <ActionDialog
+        spec={action}
+        onClose={() => setAction(undefined)}
+        onDone={() => {
+          detail.reload();
+          onChanged();
+        }}
+      />
+    );
+  }
+
+  function removeOwner(venue: VenueDetail) {
+    if (!venue.owner) return;
+    setAction({
+      title: `Tirar o responsável de ${venue.name}`,
+      description: <p>@{venue.owner.username} deixa de administrar o local e perde o acesso ao painel dele. Os eventos já criados continuam.</p>,
+      confirmLabel: 'Tirar responsável',
+      danger: true,
+      noteLabel: 'Motivo',
+      noteRequired: true,
+      run: (note) => api.removeOwner(venue.id, note),
+    });
+  }
+
   return (
     <Modal title={detail.data?.name ?? 'Local'} onClose={onClose} wide>
       <Loadable state={detail} empty="Local não encontrado." isEmpty={() => false}>
-        {(v) => (
-          <div className="venuedetail">
-            <p className="muted small">
-              {v.address ?? 'Sem endereço'}
-              {' · '}
-              <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`} target="_blank" rel="noopener noreferrer">
-                Ver no mapa
-              </a>
-            </p>
-            <p>
-              {v.isSample ? <Badge>Teste</Badge> : null} {v.isOrganization ? <Badge tone="info">Organização</Badge> : null} {v.isUserCreated ? <Badge tone="info">Criado no app</Badge> : null}
-            </p>
-            <dl className="venuedetail__facts">
-              <div>
-                <dt>Tipo</dt>
-                <dd>{v.category ?? '—'}</dd>
+        {(v) => {
+          const upcoming = v.events.filter((e) => e.upcoming);
+          const past = v.events.filter((e) => !e.upcoming);
+          return (
+            <div className="venuedetail">
+              {v.coverUrl || v.logoUrl ? (
+                <div className={v.logoUrl ? 'venuehead venuehead--logo' : 'venuehead'}>
+                  {v.coverUrl ? <img className="venuehead__cover" src={v.coverUrl} alt="" referrerPolicy="no-referrer" /> : <div className="venuehead__cover venuehead__cover--empty" />}
+                  {v.logoUrl ? <img className="venuehead__logo" src={v.logoUrl} alt={`Logo de ${v.name}`} referrerPolicy="no-referrer" /> : null}
+                </div>
+              ) : null}
+              <div className="venuedetail__badges">
+                {v.owner ? <Badge tone="ok">Com responsável</Badge> : <Badge tone="warn">Sem responsável</Badge>}
+                {v.isOrganization ? <Badge tone="info">Organização</Badge> : null}
+                {v.isUserCreated ? <Badge tone="info">Criado no app</Badge> : null}
+                {v.isSample ? <Badge>Teste</Badge> : null}
               </div>
-              <div>
-                <dt>Entrou por</dt>
-                <dd>{v.source ? SOURCE_LABEL[v.source] : 'Cadastro no app'}</dd>
+              <p className="muted small">{v.address ?? 'Sem endereço'}</p>
+              <p className="venuedetail__links small">
+                <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`} target="_blank" rel="noopener noreferrer">
+                  Ver no mapa
+                </a>
+                <a href={appUrl(`/bares/${encodeURIComponent(v.id)}`)} target="_blank" rel="noopener noreferrer">
+                  Abrir no app
+                </a>
+              </p>
+              {v.description ? <p className="small eventdetail__desc">{v.description}</p> : null}
+              <dl className="venuedetail__facts">
+                <div>
+                  <dt>Tipo</dt>
+                  <dd>{v.category ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt>Entrou por</dt>
+                  <dd>{v.source ? SOURCE_LABEL[v.source] : 'Cadastro no app'}</dd>
+                </div>
+                <div>
+                  <dt>Responsável</dt>
+                  <dd>
+                    {v.owner ? (
+                      <>
+                        {v.owner.displayName ? `${v.owner.displayName} ` : ''}
+                        <span className="handle">@{v.owner.username}</span>
+                      </>
+                    ) : (
+                      <span className="muted">Ninguém</span>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Seguidores</dt>
+                  <dd>{v.followers}</dd>
+                </div>
+                <div>
+                  <dt>Eventos</dt>
+                  <dd>
+                    {v.eventsTotal} <span className="muted small">({v.upcomingCount} por vir)</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Posição</dt>
+                  <dd className="small">
+                    {v.lat.toFixed(5)}, {v.lng.toFixed(5)}
+                  </dd>
+                </div>
+              </dl>
+              {v.events.length === 0 ? (
+                <>
+                  <h3 className="venuedetail__h">Eventos</h3>
+                  <p className="muted">Nenhum evento neste local.</p>
+                </>
+              ) : null}
+              {upcoming.length > 0 ? (
+                <>
+                  <h3 className="venuedetail__h">Por vir ({v.upcomingCount})</h3>
+                  <EventList events={upcoming} onOpen={setEventId} />
+                  {v.upcomingCount > upcoming.length ? <p className="muted small">Mostrando os {upcoming.length} mais próximos.</p> : null}
+                </>
+              ) : null}
+              {past.length > 0 ? (
+                <>
+                  <h3 className="venuedetail__h">Já passaram ({plural(v.eventsTotal - v.upcomingCount, 'evento', 'eventos')})</h3>
+                  <EventList events={past} onOpen={setEventId} />
+                  {v.eventsTotal - v.upcomingCount > past.length ? <p className="muted small">Mostrando os {past.length} mais recentes.</p> : null}
+                </>
+              ) : null}
+              <div className="modal__actions modal__actions--split">
+                <span>
+                  {v.owner ? (
+                    <button type="button" className="btn btn--danger-quiet" onClick={() => removeOwner(v)}>
+                      Tirar responsável
+                    </button>
+                  ) : null}
+                </span>
+                <button type="button" className="btn btn--primary" onClick={onClose}>
+                  Fechar
+                </button>
               </div>
-              <div>
-                <dt>Responsável</dt>
-                <dd>{v.owner ? <span className="handle">@{v.owner.username}</span> : <span className="muted">Sem responsável</span>}</dd>
-              </div>
-              <div>
-                <dt>Seguidores</dt>
-                <dd>{v.followers}</dd>
-              </div>
-              <div>
-                <dt>Eventos</dt>
-                <dd>
-                  {v.eventsTotal} ({v.upcomingCount} por vir)
-                </dd>
-              </div>
-              <div>
-                <dt>Posição</dt>
-                <dd>
-                  {v.lat.toFixed(5)}, {v.lng.toFixed(5)}
-                </dd>
-              </div>
-            </dl>
-            {v.description ? <p className="small">{v.description}</p> : null}
-            <h3 className="venuedetail__h">Eventos</h3>
-            {v.events.length === 0 ? (
-              <p className="muted">Nenhum evento neste local.</p>
-            ) : (
-              <ul className="venuedetail__events">
-                {v.events.map((e) => (
-                  <li key={e.id} className={e.upcoming ? undefined : 'muted'}>
-                    <strong>{e.title}</strong> {e.isSample ? <Badge>Teste</Badge> : null} {e.isFree ? <Badge tone="ok">Grátis</Badge> : null}
-                    <div className="small">{formatDateTime(e.startsAt)}{e.upcoming ? '' : ' · já passou'}</div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+            </div>
+          );
+        }}
       </Loadable>
     </Modal>
   );
@@ -151,7 +253,7 @@ export function VenuesPage() {
           </>
         )}
       </Loadable>
-      {openId ? <VenueDetailModal id={openId} onClose={() => setOpenId(undefined)} /> : null}
+      {openId ? <VenueDetailModal id={openId} onClose={() => setOpenId(undefined)} onChanged={list.reload} /> : null}
       {action ? <ActionDialog spec={action} onClose={() => setAction(undefined)} onDone={list.reload} /> : null}
     </>
   );
