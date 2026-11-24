@@ -6714,6 +6714,10 @@ button.evhost { width: 100%; font: inherit; text-align: left; cursor: pointer; }
 .evwho__who span { color: var(--muted); font-size: 0.8125rem; }
 .evwho__who strong, .evwho__who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .evwho__more { margin: 12px 0 0; text-align: center; }
+/* "Convidar mais pessoas" no fim da lista de quem vai: com respiro do último nome. */
+.evwho__invite { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.evwho__invite .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.evwho__invite .btn svg { flex: none; width: 18px; height: 18px; }
 /* Folha "Convidar pessoas": convites pendentes no topo, com "Cancelar" à direita. */
 .evinvites { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
 .evinvites .results__h { display: flex; align-items: center; gap: 8px; margin: 0; }
