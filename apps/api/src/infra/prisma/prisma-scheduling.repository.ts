@@ -200,6 +200,11 @@ export class PrismaSchedulingRepository implements SchedulingRepository {
     await this.prisma.datePollParticipant.createMany({ data: [{ pollId, userId }], skipDuplicates: true });
   }
 
+  async removeParticipant(pollId: string, userId: string): Promise<void> {
+    if (!isUuid(pollId) || !isUuid(userId)) return;
+    await this.prisma.$transaction([this.prisma.datePollVote.deleteMany({ where: { pollId, userId } }), this.prisma.datePollParticipant.deleteMany({ where: { pollId, userId } })]);
+  }
+
   async setFinished(pollId: string, userId: string, at: Date | null): Promise<void> {
     if (!isUuid(pollId) || !isUuid(userId)) return;
     await this.prisma.datePollParticipant.updateMany({ where: { pollId, userId }, data: { finishedAt: at } });

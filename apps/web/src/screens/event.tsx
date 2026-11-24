@@ -199,6 +199,8 @@ export function EventScreen({ eventId }: { eventId: string }) {
   const [posted, setPosted] = useState<boolean | undefined>();
   const [goBusy, setGoBusy] = useState(false);
   const [choosing, setChoosing] = useState(false);
+  // Cancelou a presença estando no grupo do evento: pergunta se sai do grupo também (e da votação da data dele).
+  const [askLeaveGroup, setAskLeaveGroup] = useState(false);
   const [problem, setProblem] = useState<string | undefined>();
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupProblem, setGroupProblem] = useState<string | undefined>();
@@ -227,6 +229,22 @@ export function EventScreen({ eventId }: { eventId: string }) {
     setProblem(undefined);
     try {
       setFresh(await api.eventCancel(e.id));
+      if (e.group && !e.isOwner) setAskLeaveGroup(true);
+    } catch (failure) {
+      setProblem(toApiError(failure).message);
+    } finally {
+      setGoBusy(false);
+    }
+  }
+
+  async function leaveEventGroup() {
+    if (!e?.group) return;
+    setGoBusy(true);
+    setProblem(undefined);
+    try {
+      await api.leaveGroup(e.group.conversationId);
+      setAskLeaveGroup(false);
+      loaded.reload();
     } catch (failure) {
       setProblem(toApiError(failure).message);
     } finally {
@@ -549,6 +567,19 @@ export function EventScreen({ eventId }: { eventId: string }) {
                 {choosing ? <GoingChoiceSheet {...(e.startsAt && e.endsAt ? { event: { id: e.id, startsAt: e.startsAt, endsAt: e.endsAt } } : {})} busy={goBusy} onChoose={(onProfile) => void confirmGoing(onProfile)} onClose={() => { setChoosing(false); storyAfterGoing.current = false; }} /> : null}
               </>
             )}
+            {askLeaveGroup && e.group ? (
+              <div className="evinvites__ask" role="group" aria-label={t('Sair também do grupo do evento?')}>
+                <p>{t('Sair também do grupo “{name}”? Você sai da votação da data junto.', { name: e.group.name })}</p>
+                <div className="evinvites__askbtns">
+                  <Button small variant="danger" loading={goBusy} onClick={() => void leaveEventGroup()}>
+                    {t('Sair do grupo')}
+                  </Button>
+                  <Button small variant="quiet" disabled={goBusy} onClick={() => setAskLeaveGroup(false)}>
+                    {t('Ficar no grupo')}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             {problem ? <Notice tone="error">{problem}</Notice> : null}
             {e.ticketUrl && !ended ? (
               <div className="evticket">
@@ -646,6 +677,7 @@ export function EventScreen({ eventId }: { eventId: string }) {
           {invitingFriends ? (
             <EventInviteSheet
               eventId={e.id}
+              {...(e.group ? { groupId: e.group.conversationId } : {})}
               onInvite={(n) => {
                 setInvitingFriends(false);
                 setInviteNote(n === 0 ? t('Essas pessoas já estavam convidadas.') : n === 1 ? t('1 pessoa convidada.') : t('{n} pessoas convidadas.', { n }));

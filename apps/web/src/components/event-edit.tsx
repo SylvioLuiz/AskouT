@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { CalendarIcon, ChevronDownIcon, EventKindIcon, GlobeIcon, LocationIcon, LockIcon, PlusIcon, UsersIcon, XIcon } from './icons.tsx';
+import { useEffect, useRef, useState } from 'react';
+import { CalendarIcon, ChevronDownIcon, EventKindIcon, GlobeIcon, LocationIcon, LockIcon, PhotoIcon, PlusIcon, UsersIcon, XIcon } from './icons.tsx';
 import { EventAudienceSheet, EventKindSheet, EventRow, EventWhenSheet } from './event-compose.tsx';
 import { EventExtrasFields } from './event-extras.tsx';
 import { EventInviteSheet } from './event-invite-picker.tsx';
@@ -8,6 +8,7 @@ import { Button, Notice } from './ui.tsx';
 import { api } from '../client.ts';
 import { useAsync } from '../hooks.ts';
 import { toApiError } from '../lib/errors.ts';
+import { resizePostPhoto } from '../lib/image.ts';
 import { extrasDraftFrom, extrasFromDraft } from '../lib/event-extras.ts';
 import type { EventExtrasDraft } from '../lib/event-extras.ts';
 import { whenLabel } from '../lib/event-when.ts';
@@ -45,6 +46,10 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
   const [moreOpen, setMoreOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | undefined>();
+  // Capa nova escolhida da galeria: vai junto ao salvar (a foto do lugar ou o vídeo que era a capa sai; as outras fotos ficam).
+  const [newCover, setNewCover] = useState<{ file: File; preview: string } | undefined>();
+  const coverInput = useRef<HTMLInputElement>(null);
+  useEffect(() => () => { if (newCover) URL.revokeObjectURL(newCover.preview); }, [newCover]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -90,7 +95,7 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
         },
         ...(invitees.length > 0 ? { inviteUserIds: invitees } : {}),
       });
-      onSaved(updated);
+      onSaved(newCover ? await api.setPostCover(post.id, await resizePostPhoto(newCover.file)) : updated);
     } catch (failure) {
       setMessage(toApiError(failure).message);
       setBusy(false);
@@ -111,15 +116,38 @@ export function EditEventSheet({ post, onClose, onSaved }: { post: PostView; onC
         </header>
         {message ? <Notice tone="error">{message}</Notice> : null}
 
-        {cover?.path ? (
+        <input
+          ref={coverInput}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(ev) => {
+            const file = ev.target.files?.[0];
+            ev.target.value = '';
+            if (file) setNewCover({ file, preview: URL.createObjectURL(file) });
+          }}
+        />
+        {newCover || cover?.path ? (
           <div className="evcover">
-            <img src={api.assetUrl(cover.path)} alt={t('Capa do evento')} referrerPolicy="no-referrer" />
+            <img src={newCover ? newCover.preview : api.assetUrl(cover!.path!)} alt={t('Capa do evento')} referrerPolicy="no-referrer" />
+            <button type="button" className="evcover__change" onClick={() => coverInput.current?.click()} disabled={busy}>
+              <PhotoIcon /> {t('Trocar capa')}
+            </button>
             <span className="evcover__kind evcover__kind--icon" aria-hidden="true">
               <EventKindIcon kind={kind} />
             </span>
             {when ? <span className="evcover__when">{when}</span> : null}
           </div>
-        ) : null}
+        ) : (
+          <div className="evcover evcover--empty">
+            <p>{t('Adicione uma capa (opcional)')}</p>
+            <div className="evcover__actions">
+              <Button small variant="secondary" onClick={() => coverInput.current?.click()} disabled={busy}>
+                <PhotoIcon /> {t('Galeria')}
+              </Button>
+            </div>
+          </div>
+        )}
 
         <input className="evtitle" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder={t('Nome do evento')} aria-label={t('Nome do evento')} disabled={busy} />
         <textarea

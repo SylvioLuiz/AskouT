@@ -6718,6 +6718,13 @@ button.evhost { width: 100%; font: inherit; text-align: left; cursor: pointer; }
 .evinvites .results__h { display: flex; align-items: center; gap: 8px; margin: 0; }
 .evinvites .evwho__who { flex: 1; }
 .evinvites .evwho__item .btn { flex: none; }
+.evinvites .evwho__item { flex-wrap: wrap; }
+.evinvites__ask { flex: 1 0 100%; display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2, rgba(127, 127, 127, 0.1)); }
+.evinvites__ask p { margin: 0; font-size: 0.875rem; }
+.evgoing > .evinvites__ask { margin-top: 12px; }
+.evinvites__askbtns { display: flex; flex-wrap: wrap; gap: 8px; }
+.evinvites__group { display: flex; align-items: flex-start; gap: 10px; margin: 12px 0; font-size: 0.9375rem; cursor: pointer; }
+.evinvites__group input { flex: none; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--brand); }
 .evwho .evgoing__faces::-webkit-scrollbar { display: none; }
 .evwho .evgoing__faces > li { flex: none; }
 .evwho__person { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 52px; }

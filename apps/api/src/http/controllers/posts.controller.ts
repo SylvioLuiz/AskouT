@@ -170,6 +170,12 @@ export class PostsController {
   }
 
   /** Ajuste de uma foto enviada: `{image: dataUrl}` já recortada pelo app (só o autor). */
+  /** Troca a capa do próprio evento: `{image: dataUrl}` já reduzida pelo app. */
+  @Put('posts/:id/cover')
+  async setCover(@CurrentActor() actor: Actor, @Param('id') id: string, @Body() body: unknown) {
+    return this.present(await this.core.posts.setCover(actor.userId, id, asBody(body).image));
+  }
+
   @Put('posts/:id/images/:imageId')
   async adjustImage(@CurrentActor() actor: Actor, @Param('id') id: string, @Param('imageId') imageId: string, @Body() body: unknown) {
     return this.present(await this.core.posts.replaceImage(actor.userId, id, imageId, asBody(body).image));

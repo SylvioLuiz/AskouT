@@ -75,3 +75,38 @@ test('grupo do evento: votação da data aberta depois usa o grupo que já exist
   assert.equal(poll.conversationId, id);
   assert.equal((await w.core.eventPages.get(bia, post.id)).group?.conversationId, id);
 });
+
+test('grupo do evento: quem sai ou é removido do grupo sai da votação aberta, com os votos', async () => {
+  const { w, ana, bia, caio } = await setup();
+  const post = await w.core.posts.create(ana, { images: [JPEG], caption: 'Bora', event: { title: 'Churras', dateByPoll: true } });
+  const withBia = await w.core.conversations.open(ana, bia);
+  await w.core.conversations.send(ana, withBia.id, { eventId: post.id });
+  const { id } = await w.core.conversations.createEventGroup(ana, post.id);
+  await w.core.conversations.addMembers(ana, id, [caio]);
+  const poll = await w.core.scheduling.create(ana, undefined, { title: 'Churras', rangeStart: '2026-12-20', rangeEnd: '2026-12-22', eventPostId: post.id });
+  const inPoll = async () => (await w.scheduling.listParticipants(poll.id)).map((p) => p.userId).sort();
+  assert.deepEqual(await inPoll(), [ana, bia, caio].sort());
+  await w.core.scheduling.vote(bia, poll.id, { dates: ['2026-12-20'], status: 'YES' });
+  await w.core.conversations.leave(bia, id);
+  assert.deepEqual(await inPoll(), [ana, caio].sort());
+  assert.equal((await w.scheduling.listVotes(poll.id)).some((v) => v.userId === bia), false, 'os votos de quem saiu não contam');
+  await w.core.conversations.removeMember(ana, id, caio);
+  assert.deepEqual(await inPoll(), [ana]);
+  // Volta para o grupo: volta para a votação.
+  await w.core.conversations.addMembers(ana, id, [bia]);
+  assert.deepEqual(await inPoll(), [ana, bia].sort());
+});
+
+test('capa do evento: só quem criou troca; sem foto, a foto enviada vira a capa', async () => {
+  const { w, ana, bia } = await setup();
+  const post = await w.core.posts.create(ana, { images: [JPEG, JPEG], caption: 'Bora', event: { title: 'Show', startsAt: '2026-12-20T20:00:00.000Z', endsAt: '2026-12-20T23:00:00.000Z' } });
+  const before = post.images.map((i) => i.id);
+  await rejectsWith(w.core.posts.setCover(bia, post.id, JPEG), 'FORBIDDEN');
+  const after = await w.core.posts.setCover(ana, post.id, JPEG);
+  assert.equal(after.images.length, 2);
+  assert.notEqual(after.images[0]!.id, before[0], 'a capa é outra (endereço novo)');
+  assert.equal(after.images[1]!.id, before[1], 'as outras fotos ficam');
+  const bare = await w.core.posts.create(ana, { images: [], caption: 'Sem capa', event: { title: 'Jantar', startsAt: '2026-12-20T20:00:00.000Z', endsAt: '2026-12-20T23:00:00.000Z' } });
+  assert.equal((await w.core.posts.setCover(ana, bare.id, JPEG)).images.length, 1);
+  await rejectsWith(w.core.posts.setCover(ana, bare.id, 'data:text/plain;base64,AAAA'), 'VALIDATION');
+});
