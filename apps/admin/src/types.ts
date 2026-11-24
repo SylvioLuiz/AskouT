@@ -238,6 +238,34 @@ export interface PostDetail {
 }
 
 /** O que a gestão muda num local (motivo à parte). */
+/** Uma linha da importação de locais, como a API conferiu. */
+export interface VenueImportLine {
+  line: number;
+  status: 'OK' | 'ERROR' | 'DUPLICATE' | 'CREATED';
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  located: 'SHEET' | 'FREE' | 'GOOGLE' | null;
+  problems: Record<string, string>;
+  duplicateOf: { id: string | null; name: string; line?: number } | null;
+  venueId?: string;
+}
+
+export interface VenueImportResult {
+  dryRun: boolean;
+  lines: VenueImportLine[];
+  counts: { ok: number; errors: number; duplicates: number; created: number };
+}
+
+export interface GeocodeHit {
+  name: string;
+  address: string | null;
+  lat: number;
+  lng: number;
+  source: 'FREE' | 'GOOGLE';
+}
+
 export interface VenueEdit {
   name?: string;
   address?: string | null;

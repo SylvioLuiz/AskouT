@@ -4,9 +4,11 @@ import type { ActivityPage } from './activity-service.ts';
 import { bioProblem, displayNameProblem, normalizeBio, normalizeDisplayName, normalizeUsername, usernameProblem } from './validation.ts';
 import { buildRetentionReport } from './retention.ts';
 import type { RetentionReport } from './retention.ts';
-import { conflict, forbidden, notFound, unauthorized, validationError } from './errors.ts';
+import { DomainError, conflict, forbidden, notFound, unauthorized, validationError } from './errors.ts';
 import type { AuthResult, AuthService, LoginInput, MfaChallenge, SocialLoginInput } from './auth-service.ts';
 import type { CoreDeps } from './ports.ts';
+import { fold } from './explore-match.ts';
+import { distanceMeters } from './geo.ts';
 import type { VenueEventInput, VenueProfileInput, VenueService } from './venue-service.ts';
 import type { PaymentsState, PaymentsSwitch } from './payments-switch.ts';
 import { EVENT_EXTRA_ICONS, EventExtrasCatalog } from './event-extras.ts';
@@ -15,7 +17,7 @@ import { TastesCatalog } from './tastes.ts';
 import type { TasteInput, TasteOption } from './tastes.ts';
 import { buildExperimentReport } from './reco-experiment.ts';
 import type { ExperimentReport, RecoExperiment, RecoExperimentState } from './reco-experiment.ts';
-import type { Actor, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminUserStats, AdminVenueExtras, FeedPolicy, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditChange, AuditFilter, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus } from './types.ts';
+import type { Actor, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminUserStats, AdminVenueExtras, FeedPolicy, AdminFeedCommentRow, AdminFeedPlace, AdminFeedPostRow, AdminFeedReportRow, FeedPostStatus, FeedPostWithImages, FeedTarget, AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow, AuditAction, AuditChange, AuditFilter, AuditRecord, AuditRow, Page, PageSort, ReportResolution, UserStatus, VenueRecord } from './types.ts';
 import { ADMIN_SORTS, AUDIT_ACTOR_KINDS, AUDIT_TARGET_TYPES, REPORT_RESOLUTIONS } from './types.ts';
 
 export const ADMIN_PAGE_DEFAULT = 25;
@@ -93,6 +95,56 @@ export interface AdminUserDetail {
 
 /** Edição de local pela gestão: os campos do perfil (como o dono) e os que só a gestão troca. */
 export type AdminVenueEditInput = VenueProfileInput & { lat?: unknown; lng?: unknown; isSample?: unknown; feedPolicy?: unknown; note?: unknown };
+/** Cadastro de local pela gestão: os mesmos campos da edição. Sem `lat`/`lng`, a posição sai do endereço. */
+export type AdminVenueCreateInput = AdminVenueEditInput;
+
+/** Uma linha da planilha de importação de locais (como veio; tudo é conferido). */
+export interface AdminVenueImportRow {
+  name?: unknown;
+  address?: unknown;
+  category?: unknown;
+  description?: unknown;
+  instagram?: unknown;
+  imageUrl?: unknown;
+  logoUrl?: unknown;
+  lat?: unknown;
+  lng?: unknown;
+  isSample?: unknown;
+}
+
+/** Como ficou cada linha na prévia (ou na importação). */
+export interface AdminVenueImportLine {
+  /** Linha da planilha (a primeira de dados é a 2, depois do cabeçalho). */
+  line: number;
+  status: 'OK' | 'ERROR' | 'DUPLICATE' | 'CREATED';
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  /** De onde veio a posição: da planilha, da busca gratuita (OpenStreetMap) ou do Google. */
+  located: 'SHEET' | 'FREE' | 'GOOGLE' | null;
+  /** Problema por coluna. */
+  problems: Record<string, string>;
+  /** Local que já existe (ou linha anterior da planilha) com o mesmo nome ali perto. */
+  duplicateOf: { id: string | null; name: string; line?: number } | null;
+  /** Id do local criado (só na importação). */
+  venueId?: string;
+}
+
+export interface AdminVenueImportResult {
+  dryRun: boolean;
+  lines: AdminVenueImportLine[];
+  counts: { ok: number; errors: number; duplicates: number; created: number };
+}
+
+/** Linhas por importação: cada linha sem posição faz uma busca de endereço. */
+export const VENUE_IMPORT_MAX_ROWS = 200;
+/** Mesmo nome a menos disto é o mesmo local. */
+const VENUE_DUPLICATE_RADIUS_M = 250;
+
+/** Nome comparável: sem acento, maiúscula, pontuação e espaços. */
+const venueNameKey = (name: string) => fold(name).replace(/[^a-z0-9]/g, '');
+
 /** Edição de evento de local pela gestão: os campos de quem administra e os que só a gestão troca. */
 export type AdminEventEditInput = VenueEventInput & { isSample?: unknown; feedPolicy?: unknown; note?: unknown };
 
@@ -786,6 +838,163 @@ export class AdminService {
       targetLabel: venue.name, changes: [{ field: 'responsável', before: (await this.userLabel(venue.ownerId)) ?? venue.ownerId, after: null }],
     });
     return { removed: true };
+  }
+
+  /**
+   * Posição de um endereço: primeiro a busca gratuita (OpenStreetMap); só se ela não achar e houver Google, a paga.
+   * Devolve até 5 opções, a mais provável primeiro.
+   */
+  async geocodeAddress(actor: Actor, address: unknown): Promise<{ items: { name: string; address: string | null; lat: number; lng: number; source: 'FREE' | 'GOOGLE' }[] }> {
+    this.assertAdmin(actor);
+    if (typeof address !== 'string' || address.trim().length < 3) throw validationError('Dados inválidos', { address: 'Escreva o endereço para buscar a posição' });
+    return { items: await this.locate(address.trim().slice(0, 200), 5) };
+  }
+
+  private async locate(address: string, limit: number): Promise<{ name: string; address: string | null; lat: number; lng: number; source: 'FREE' | 'GOOGLE' }[]> {
+    const source = this.deps.placeSource;
+    if (!source.search) return [];
+    const empty = { available: false, places: [] };
+    const view = (from: 'FREE' | 'GOOGLE') => (p: { name: string; address?: string | null; lat: number; lng: number }) => ({ name: p.name, address: p.address ?? null, lat: p.lat, lng: p.lng, source: from });
+    const free = await source.search(address, undefined, limit).catch(() => empty);
+    if (free.places.length > 0) return free.places.slice(0, limit).map(view('FREE'));
+    if (!source.premiumSearch) return [];
+    const paid = await source.search(address, undefined, limit, { premium: true }).catch(() => empty);
+    return paid.places.slice(0, limit).map(view('GOOGLE'));
+  }
+
+  /** Local do AskouT com o mesmo nome a menos de 250 m (o mesmo rolê cadastrado de novo). */
+  private async findDuplicateVenue(name: string, lat: number, lng: number): Promise<{ id: string; name: string } | undefined> {
+    const key = venueNameKey(name);
+    if (!key) return undefined;
+    const near = await this.deps.places.searchVenues(name, { lat, lng }, VENUE_DUPLICATE_RADIUS_M, 20);
+    const hit = near.find((r) => venueNameKey(r.venue.name) === key);
+    return hit ? { id: hit.venue.id, name: hit.venue.name } : undefined;
+  }
+
+  /**
+   * Confere um local novo sem gravar: nome, endereço, tipo, descrição, imagens, Instagram, posição (da planilha ou do
+   * endereço) e se já existe um igual ali perto. Erros vão por campo.
+   */
+  private async checkNewVenue(input: AdminVenueCreateInput): Promise<{ record: VenueRecord; profile: VenueProfileInput; isSample: boolean; feedPolicy: FeedPolicy; located: 'SHEET' | 'FREE' | 'GOOGLE'; duplicate?: { id: string; name: string } }> {
+    const id = this.deps.ids.next();
+    const blank: VenueRecord = { id, name: '', address: null, category: null, lat: 0, lng: 0, isSample: false, ownerId: null };
+    const profile: VenueProfileInput = { name: input.name ?? '', address: input.address, category: input.category, description: input.description, imageUrl: input.imageUrl, imageData: input.imageData, logoUrl: input.logoUrl, logoData: input.logoData, instagram: input.instagram };
+    const checked = this.venues.checkProfileForAdmin(blank, profile);
+    const isSample = flagOf(input.isSample, false, 'isSample');
+    const feedPolicy = feedPolicyOf(input.feedPolicy, 'OWNER_ONLY');
+    const given = (v: unknown) => v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '');
+    let lat: number, lng: number, located: 'SHEET' | 'FREE' | 'GOOGLE';
+    if (given(input.lat) || given(input.lng)) {
+      if (!given(input.lat) || !given(input.lng)) throw validationError('Dados inválidos', { [given(input.lat) ? 'lng' : 'lat']: 'Informe latitude e longitude juntas (ou deixe as duas vazias para buscar pelo endereço)' });
+      const num = (v: unknown) => (typeof v === 'string' ? v.trim().replace(',', '.') : v);
+      lat = coordOf(num(input.lat), 0, 'lat');
+      lng = coordOf(num(input.lng), 0, 'lng');
+      located = 'SHEET';
+    } else {
+      if (!checked.address) throw validationError('Dados inválidos', { address: 'Informe o endereço (ou a latitude e a longitude)' });
+      const [first] = await this.locate(checked.address, 1);
+      if (!first) throw validationError('Dados inválidos', { address: 'Não achamos esse endereço no mapa. Confira ou informe latitude e longitude' });
+      lat = first.lat;
+      lng = first.lng;
+      located = first.source;
+    }
+    const duplicate = await this.findDuplicateVenue(checked.name, lat, lng);
+    const record: VenueRecord = { id, name: checked.name, address: checked.address, category: checked.category, lat, lng, isSample, ownerId: null };
+    return { record, profile, isSample, feedPolicy, located, ...(duplicate ? { duplicate } : {}) };
+  }
+
+  /** Grava um local já conferido: cadastro, descrição/imagens/Instagram e os campos da gestão. */
+  private async saveNewVenue(c: { record: VenueRecord; profile: VenueProfileInput; isSample: boolean; feedPolicy: FeedPolicy }): Promise<void> {
+    await this.deps.places.createVenue(c.record);
+    const { description, imageUrl, imageData, logoUrl, logoData, instagram } = c.profile;
+    const extra: VenueProfileInput = { description, imageUrl, imageData, logoUrl, logoData, instagram };
+    if (Object.values(extra).some((v) => v !== undefined && v !== null && v !== '')) await this.venues.adminUpdateProfile(c.record.id, extra);
+    await this.deps.admin.updateVenueAdminFields(c.record.id, { lat: c.record.lat, lng: c.record.lng, isSample: c.isSample, feedPolicy: c.feedPolicy });
+  }
+
+  /**
+   * Cadastra um local pela gestão, com os mesmos campos da edição. Sem latitude/longitude, a posição sai do endereço
+   * (busca gratuita primeiro). Recusa se já existe um local com o mesmo nome a menos de 250 m. Fica na auditoria.
+   */
+  async createVenue(actor: Actor, input: AdminVenueCreateInput): Promise<AdminVenueDetail> {
+    this.assertAdmin(actor);
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Dados inválidos', { venue: 'Dados do local inválidos' });
+    const reason = noteText(input.note, false);
+    const c = await this.checkNewVenue(input);
+    if (c.duplicate) throw conflict(`Já existe “${c.duplicate.name}” com esse nome a menos de ${VENUE_DUPLICATE_RADIUS_M} m`);
+    await this.saveNewVenue(c);
+    const where = c.located === 'SHEET' ? 'posição informada' : c.located === 'FREE' ? 'posição pelo endereço (OpenStreetMap)' : 'posição pelo endereço (Google)';
+    await this.log(actor.userId, 'VENUE_CREATED', 'VENUE', c.record.id, `${reason ? `${reason} ` : ''}(cadastro manual; ${where})`.slice(0, 400), {
+      targetLabel: c.record.name,
+      changes: diffOf({ name: 'nome', address: 'endereço', category: 'tipo', lat: 'latitude', lng: 'longitude' }, {}, { ...c.record }),
+    });
+    return this.venueDetail(actor, c.record.id);
+  }
+
+  /**
+   * Importa locais de uma planilha. Com `dryRun`, só confere e devolve a prévia linha a linha (erros por coluna,
+   * duplicados no AskouT ou repetidos na própria planilha). Sem `dryRun`, grava as linhas sem problema e pula as outras;
+   * cada local criado e o lote ficam na auditoria.
+   */
+  async importVenues(actor: Actor, input: { rows?: unknown; dryRun?: unknown; fileName?: unknown; note?: unknown }): Promise<AdminVenueImportResult> {
+    this.assertAdmin(actor);
+    if (typeof input !== 'object' || input === null) throw validationError('Dados inválidos', { rows: 'Envie as linhas da planilha' });
+    const rows = input.rows;
+    if (!Array.isArray(rows) || rows.length === 0) throw validationError('Dados inválidos', { rows: 'A planilha não tem nenhuma linha de local' });
+    if (rows.length > VENUE_IMPORT_MAX_ROWS) throw validationError('Dados inválidos', { rows: `Importe até ${VENUE_IMPORT_MAX_ROWS} locais por vez` });
+    const dryRun = input.dryRun !== false;
+    const fileName = typeof input.fileName === 'string' ? input.fileName.trim().slice(0, 120) : '';
+    const reason = noteText(input.note, false);
+    const lines: AdminVenueImportLine[] = [];
+    const ready: { line: AdminVenueImportLine; checked: Awaited<ReturnType<AdminService['checkNewVenue']>> }[] = [];
+    const seen: { key: string; lat: number; lng: number; line: number; name: string }[] = [];
+    for (const [index, raw] of rows.entries()) {
+      const lineNo = index + 2;
+      const row = (typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw : {}) as AdminVenueImportRow;
+      const name = typeof row.name === 'string' ? row.name.trim() : '';
+      const address = typeof row.address === 'string' && row.address.trim() ? row.address.trim() : null;
+      const base: AdminVenueImportLine = { line: lineNo, status: 'OK', name, address, lat: null, lng: null, located: null, problems: {}, duplicateOf: null };
+      try {
+        const sample = typeof row.isSample === 'string' ? ['sim', 's', 'true', '1', 'x'].includes(fold(row.isSample)) : row.isSample;
+        const checked = await this.checkNewVenue({ name: row.name, address: row.address, category: row.category, description: row.description, instagram: row.instagram, imageUrl: row.imageUrl, logoUrl: row.logoUrl, lat: row.lat, lng: row.lng, isSample: sample === undefined || sample === null || sample === '' ? false : sample });
+        const line: AdminVenueImportLine = { ...base, name: checked.record.name, address: checked.record.address, lat: checked.record.lat, lng: checked.record.lng, located: checked.located };
+        const key = venueNameKey(checked.record.name);
+        const twin = seen.find((s) => s.key === key && distanceMeters(s, checked.record) <= VENUE_DUPLICATE_RADIUS_M);
+        if (checked.duplicate) {
+          lines.push({ ...line, status: 'DUPLICATE', duplicateOf: { id: checked.duplicate.id, name: checked.duplicate.name } });
+        } else if (twin) {
+          lines.push({ ...line, status: 'DUPLICATE', duplicateOf: { id: null, name: twin.name, line: twin.line } });
+        } else {
+          seen.push({ key, lat: checked.record.lat, lng: checked.record.lng, line: lineNo, name: checked.record.name });
+          lines.push(line);
+          ready.push({ line, checked });
+        }
+      } catch (error) {
+        if (!(error instanceof DomainError)) throw error;
+        const problems: Record<string, string> = { ...(error.details ?? {}) };
+        if (Object.keys(problems).length === 0) problems['row'] = error.message;
+        lines.push({ ...base, status: 'ERROR', problems });
+      }
+    }
+    if (!dryRun) {
+      for (const r of ready) {
+        await this.saveNewVenue(r.checked);
+        r.line.status = 'CREATED';
+        r.line.venueId = r.checked.record.id;
+        await this.log(actor.userId, 'VENUE_CREATED', 'VENUE', r.checked.record.id, `Importado da planilha${fileName ? ` ${fileName}` : ''} (linha ${r.line.line})`.slice(0, 400), {
+          targetLabel: r.checked.record.name,
+          changes: diffOf({ name: 'nome', address: 'endereço', category: 'tipo', lat: 'latitude', lng: 'longitude' }, {}, { ...r.checked.record }),
+        });
+      }
+    }
+    const count = (s: AdminVenueImportLine['status']) => lines.filter((l) => l.status === s).length;
+    const counts = { ok: count('OK'), errors: count('ERROR'), duplicates: count('DUPLICATE'), created: count('CREATED') };
+    if (!dryRun) {
+      if (counts.created === 0) throw conflict('Nenhuma linha pôde ser importada. Corrija a planilha e tente de novo');
+      const summary = `${counts.created} criados, ${counts.duplicates} duplicados e ${counts.errors} com erro pulados`;
+      await this.log(actor.userId, 'VENUES_IMPORTED', 'SETTING', 'venues-import', `${reason ? `${reason} ` : ''}(${fileName ? `${fileName}: ` : ''}${summary})`.slice(0, 400), { targetLabel: fileName || 'Planilha de locais' });
+    }
+    return { dryRun, lines, counts };
   }
 
   async searchPlaceEvents(actor: Actor, query: ListQuery & { q?: unknown }): Promise<AdminPage<AdminPlaceEventListRow>> {

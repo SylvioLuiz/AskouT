@@ -1,15 +1,16 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { api, appUrl, venueMediaUrl } from '../api.ts';
 import { VENUE_COVER, VENUE_LOGO, resizeImage } from '../image.ts';
 import { useAsync, useDebounced } from '../hooks.ts';
 import { CLAIM_LABEL, EVENT_KIND_LABEL, FEED_POLICY_LABEL, formatDate, formatDateTime, formatEventWhen, plural } from '../labels.ts';
-import type { FeedPolicy, VenueDetail } from '../types.ts';
-import { ActionDialog, Badge, Loadable, PageHead, Pager, SearchBox, SortTh } from '../ui.tsx';
+import type { FeedPolicy, GeocodeHit, VenueDetail } from '../types.ts';
+import { ActionDialog, Badge, Loadable, Modal, PageHead, Pager, SearchBox, SortTh } from '../ui.tsx';
 import { useSort } from '../sort.ts';
 import type { ActionSpec } from '../ui.tsx';
 import { CheckInput, LinkedList, Mono, NumberInput, PersonLink, RecordLink, RecordModal, RecordView, SelectInput, TextArea, TextInput, YesNo, useOpenRecord, useRecordEditor, useReloadOnChange } from '../record.tsx';
 import type { RecordEditor, RecordSection } from '../record.tsx';
 import { AuditTrail } from './audit.tsx';
+import { ImportVenuesModal } from './venue-import-modal.tsx';
 
 const SOURCE_LABEL = { GOOGLE: 'Google', OSM: 'OpenStreetMap', IMPORT: 'Importação de agenda' } as const;
 
@@ -367,12 +368,170 @@ function removeOwnerAction(id: string, name: string, username: string): ActionSp
   };
 }
 
+const SOURCE_FOUND = { FREE: 'OpenStreetMap', GOOGLE: 'Google' } as const;
+
+/** "Buscar posição": acha o endereço no mapa (gratuito primeiro) e preenche latitude e longitude com a opção escolhida. */
+function GeocodeField({ editor }: { editor: RecordEditor<VenueDraft> }) {
+  const [busy, setBusy] = useState(false);
+  const [hits, setHits] = useState<GeocodeHit[]>();
+  const [problem, setProblem] = useState<string>();
+  const address = editor.draft.address.trim();
+  const search = async () => {
+    setBusy(true);
+    setProblem(undefined);
+    setHits(undefined);
+    try {
+      const { items } = await api.geocode(address);
+      setHits(items);
+      if (items.length === 0) setProblem('Não achamos esse endereço no mapa. Confira o texto ou informe latitude e longitude.');
+      else if (items.length === 1) pickHit(items[0]!);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : 'Não foi possível buscar agora.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const pickHit = (h: GeocodeHit) => {
+    editor.set('lat', String(h.lat));
+    editor.set('lng', String(h.lng));
+  };
+  const chosen = (h: GeocodeHit) => editor.draft.lat === String(h.lat) && editor.draft.lng === String(h.lng);
+  return (
+    <div className="geocode">
+      <TextInput editor={editor} k="address" maxLength={200} placeholder="Rua, número, bairro e cidade" />
+      <div className="geocode__actions">
+        <button type="button" className="btn btn--small" onClick={() => void search()} disabled={busy || address.length < 3} aria-busy={busy || undefined}>
+          <span>Buscar posição no mapa</span>
+        </button>
+        {editor.draft.lat && editor.draft.lng ? (
+          <a className="small" href={`https://www.google.com/maps?q=${encodeURIComponent(`${editor.draft.lat},${editor.draft.lng}`)}`} target="_blank" rel="noopener noreferrer">
+            Conferir no mapa
+          </a>
+        ) : null}
+      </div>
+      {hits && hits.length > 1 ? (
+        <ul className="geocode__list" aria-label="Endereços encontrados">
+          {hits.map((h) => (
+            <li key={`${h.lat},${h.lng}`}>
+              <button type="button" className={chosen(h) ? 'geocode__hit geocode__hit--on' : 'geocode__hit'} onClick={() => pickHit(h)} aria-pressed={chosen(h)}>
+                <strong>{h.name}</strong>
+                <span className="muted small">{[h.address, SOURCE_FOUND[h.source]].filter(Boolean).join(' · ')}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {hits && hits.length === 1 ? <span className="muted small">Posição preenchida ({SOURCE_FOUND[hits[0]!.source]}).</span> : null}
+      {problem ? (
+        <span className="small alert" role="alert">
+          {problem}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/** Cadastro manual de local: o mesmo formulário da edição (capa, logo, posição, feed, teste), já aberto para preencher. */
+export function NewVenueForm({ onClose }: { onClose: () => void }) {
+  const openRecord = useOpenRecord();
+  const createdId = useRef<string | undefined>(undefined);
+  const editor = useRecordEditor<VenueDraft>({
+    initial: { name: '', address: '', category: '', description: '', imageUrl: '', imageData: '', logoUrl: '', logoData: '', instagram: '', lat: '', lng: '', isSample: false, feedPolicy: 'OWNER_ONLY' },
+    labels: VENUE_LABELS,
+    alias: { image: 'imageData' },
+    noteRequired: false,
+    startEditing: true,
+    check: (d) => {
+      const hasLat = d.lat.trim() !== '';
+      const hasLng = d.lng.trim() !== '';
+      const lat = hasLat || hasLng ? coordProblem(d.lat, 90, 'Latitude') : undefined;
+      const lng = hasLat || hasLng ? coordProblem(d.lng, 180, 'Longitude') : undefined;
+      return {
+        ...(d.name.trim().length < 2 ? { name: 'O nome precisa de pelo menos 2 caracteres' } : {}),
+        ...(!hasLat && !hasLng && d.address.trim() === '' ? { address: 'Informe o endereço (ou a latitude e a longitude)' } : {}),
+        ...(lat ? { lat } : {}),
+        ...(lng ? { lng } : {}),
+      };
+    },
+    save: async (_c, note, d) => {
+      const opt = (t: string) => (t.trim() === '' ? undefined : t.trim());
+      const num = (t: string) => (t.trim() === '' ? undefined : Number(t.replace(',', '.')));
+      const lat = num(d.lat);
+      const lng = num(d.lng);
+      const created = await api.createVenue(
+        {
+          name: d.name.trim(),
+          ...(opt(d.address) ? { address: opt(d.address) } : {}),
+          ...(opt(d.category) ? { category: opt(d.category) } : {}),
+          ...(d.description.trim() ? { description: d.description } : {}),
+          ...(d.imageData ? { imageData: d.imageData } : opt(d.imageUrl) ? { imageUrl: opt(d.imageUrl) } : {}),
+          ...(d.logoData ? { logoData: d.logoData } : opt(d.logoUrl) ? { logoUrl: opt(d.logoUrl) } : {}),
+          ...(opt(d.instagram) ? { instagram: opt(d.instagram) } : {}),
+          ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
+          isSample: d.isSample,
+          feedPolicy: d.feedPolicy,
+        },
+        note,
+      );
+      createdId.current = created.id;
+    },
+    onSaved: () => {
+      onClose();
+      if (createdId.current) openRecord({ kind: 'venue', id: createdId.current });
+    },
+  });
+  const p = editor.problems;
+  const sections: RecordSection[] = [
+    {
+      title: 'Cadastro',
+      fields: [
+        { label: 'Nome', value: null, input: <TextInput editor={editor} k="name" maxLength={80} />, problem: p.name },
+        { label: 'Tipo', value: null, input: <TextInput editor={editor} k="category" maxLength={40} placeholder="bar, balada, casa de shows…" />, problem: p.category },
+        { label: 'Endereço', value: null, input: <GeocodeField editor={editor} />, problem: p.address, wide: true, hint: 'Sem latitude e longitude, a posição sai do endereço ao cadastrar (busca gratuita primeiro).' },
+        { label: 'Descrição', value: null, input: <TextArea editor={editor} k="description" maxLength={600} rows={4} />, wide: true, problem: p.description },
+        { label: 'Instagram', value: null, input: <TextInput editor={editor} k="instagram" maxLength={120} placeholder="@bardoze ou link do perfil" />, problem: p.instagram },
+        { label: 'Capa', value: null, input: <ImageField editor={editor} urlKey="imageUrl" dataKey="imageData" />, hint: 'JPEG, PNG ou WebP; reduzida para até 1280 px.', problem: p.imageData ?? p.imageUrl, wide: true },
+        { label: 'Logo', value: null, input: <ImageField editor={editor} urlKey="logoUrl" dataKey="logoData" logo />, hint: 'Quadrada de preferência; reduzida para até 384 px.', problem: p.logoData ?? p.logoUrl, wide: true },
+      ],
+    },
+    {
+      title: 'Posição',
+      fields: [
+        { label: 'Latitude', value: null, input: <NumberInput editor={editor} k="lat" />, problem: p.lat, hint: 'Vazia: buscamos pelo endereço.' },
+        { label: 'Longitude', value: null, input: <NumberInput editor={editor} k="lng" />, problem: p.lng },
+      ],
+    },
+    {
+      title: 'Gestão',
+      fields: [
+        { label: 'Quem publica no feed', value: null, input: <SelectInput editor={editor} k="feedPolicy" options={FEED_OPTIONS} /> },
+        { label: 'Dado de teste', value: null, input: <CheckInput editor={editor} k="isSample" label="Marcar como teste (nunca aparece como real)" /> },
+      ],
+    },
+  ];
+  return (
+    <Modal title="Novo local" onClose={onClose} wide bare>
+      <RecordView
+        title="Novo local"
+        subtitle="Cadastro manual pela gestão"
+        sections={sections}
+        editor={editor}
+        isNew
+        editHint="O local nasce sem responsável, como os que vêm do mapa. Se já existir um com o mesmo nome a menos de 250 m, o cadastro é recusado. Fica registrado na auditoria."
+        onClose={onClose}
+      />
+    </Modal>
+  );
+}
+
 type VenueSort = 'name' | 'category' | 'owner' | 'events';
 
 export function VenuesPage() {
   const [text, setText] = useState('');
   const [offset, setOffset] = useState(0);
   const [action, setAction] = useState<ActionSpec>();
+  const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const q = useDebounced(text.trim());
   const { sort, toggle } = useSort<VenueSort>();
   const onSort = (column: VenueSort, first: 'asc' | 'desc') => {
@@ -385,8 +544,14 @@ export function VenuesPage() {
   const setOpenId = (id: string) => openRecord({ kind: 'venue', id });
   return (
     <>
-      <PageHead title="Locais" hint="Rolês cadastrados: bares, baladas e casas. Tire o responsável se o pedido foi indevido.">
+      <PageHead title="Locais" hint="Rolês cadastrados: bares, baladas e casas. Cadastre um a um ou importe uma planilha. Tire o responsável se o pedido foi indevido.">
         <SearchBox value={text} onChange={(v) => { setText(v); setOffset(0); }} placeholder="Buscar por nome ou endereço…" label="Buscar local" />
+        <button type="button" className="btn" onClick={() => setImporting(true)}>
+          Importar Excel
+        </button>
+        <button type="button" className="btn btn--primary" onClick={() => setAdding(true)}>
+          Adicionar local
+        </button>
       </PageHead>
       <Loadable state={list} empty="Nenhum local encontrado." isEmpty={(d) => d.items.length === 0}>
         {(page) => (
@@ -433,6 +598,17 @@ export function VenuesPage() {
         )}
       </Loadable>
       {action ? <ActionDialog spec={action} onClose={() => setAction(undefined)} onDone={list.reload} /> : null}
+      {adding ? <NewVenueForm onClose={() => setAdding(false)} /> : null}
+      {importing ? (
+        <ImportVenuesModal
+          onClose={() => setImporting(false)}
+          onImported={list.reload}
+          onOpen={(id) => {
+            setImporting(false);
+            setOpenId(id);
+          }}
+        />
+      ) : null}
     </>
   );
 }

@@ -4,7 +4,7 @@ import { query } from './labels.ts';
 import { sortParams } from './sort.ts';
 import type { Sort } from './sort.ts';
 import type {
-  AuditFilter, AuditRow, AuthResult, EventEdit, PostDetail, UserDetail, VenueEdit, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStats, UserStatus, VenueRow,
+  AuditFilter, AuditRow, AuthResult, EventEdit, PostDetail, UserDetail, VenueEdit, VenueImportResult, GeocodeHit, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStats, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
@@ -158,6 +158,9 @@ export const api = {
 
   venues: (p: { q: string; offset: number; sort?: Sort }) => request<Page<VenueRow>>('GET', `/admin/venues${query({ q: p.q, offset: p.offset, limit: getPageSize(), ...sortParams(p.sort) })}`),
   venue: (id: string) => request<VenueDetail>('GET', `/admin/venues/${encodeURIComponent(id)}`),
+  createVenue: (body: VenueEdit, note: string) => request<VenueDetail>('POST', '/admin/venues', { ...body, note }),
+  geocode: (address: string) => request<{ items: GeocodeHit[] }>('POST', '/admin/venues/geocode', { address }),
+  importVenues: (body: { rows: Record<string, string>[]; dryRun: boolean; fileName?: string; note?: string }) => request<VenueImportResult>('POST', '/admin/venues/import', body),
   editVenue: (id: string, body: VenueEdit, note: string) => request<VenueDetail>('PUT', `/admin/venues/${encodeURIComponent(id)}`, { ...body, note }),
   removeOwner: (venueId: string, note: string) => request<unknown>('DELETE', `/admin/venues/${encodeURIComponent(venueId)}/owner`, { note }),
 

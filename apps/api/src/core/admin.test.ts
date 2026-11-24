@@ -597,3 +597,62 @@ test('detalhe do post e detalhes de local e evento trazem o resto do cadastro', 
   assert.equal((await w.core.admin.eventDetail(A, 'e1')).extra?.feedPolicy, 'OWNER_ONLY');
   assert.deepEqual((await w.core.admin.venueDetail(A, 'v1')).extra?.managers, []);
 });
+
+test('cadastrar local pela gestão: posição pelo endereço (gratuita primeiro), duplicado recusado e auditoria', async () => {
+  const { w, A, U, ana } = await setup();
+  await rejectsWith(w.core.admin.createVenue(U(ana), { name: 'Novo', address: 'Rua B, 2' }), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.createVenue(A, { name: 'X' }), 'VALIDATION');
+  await rejectsWith(w.core.admin.createVenue(A, { name: 'Sem posição' }), 'VALIDATION');
+  await rejectsWith(w.core.admin.createVenue(A, { name: 'Meia posição', lat: -23.5 }), 'VALIDATION');
+  w.placeSource.searchable = [{ externalId: 'node/1', source: 'OSM', name: 'Rua B, 2', category: null, lat: -23.6, lng: -46.7, address: 'Rua B, 2 - São Paulo' }];
+  const d = await w.core.admin.createVenue(A, { name: 'Bar Novo', address: 'Rua B, 2', category: 'bar', description: 'Samba', instagram: '@BarNovo', feedPolicy: 'OPEN', note: 'Pedido do comercial' });
+  assert.deepEqual([d.name, d.address, d.lat, d.lng, d.description, d.instagram, d.extra?.feedPolicy], ['Bar Novo', 'Rua B, 2', -23.6, -46.7, 'Samba', 'barnovo', 'OPEN']);
+  assert.equal(w.placeSource.premiumCalls, 0, 'achou na busca gratuita, não usou o Google');
+  const log = (await w.core.admin.audit(A, {})).items[0]!;
+  assert.equal(log.action, 'VENUE_CREATED');
+  assert.equal(log.targetId, d.id);
+  assert.match(log.note ?? '', /Pedido do comercial/);
+  await rejectsWith(w.core.admin.createVenue(A, { name: 'bar  novo!', lat: -23.6001, lng: -46.7001 }), 'CONFLICT');
+  // Endereço que a gratuita não acha: tenta o Google.
+  w.placeSource.premiumSearch = true;
+  w.placeSource.premiumOnly = [{ externalId: 'g1', source: 'GOOGLE', name: 'Av. C, 3', category: null, lat: -22.9, lng: -43.2, address: 'Av. C, 3 - Rio' }];
+  const g = await w.core.admin.createVenue(A, { name: 'Casa Rio', address: 'Av. C, 3' });
+  assert.deepEqual([g.lat, g.lng], [-22.9, -43.2]);
+  assert.equal(w.placeSource.premiumCalls, 1);
+});
+
+test('importar locais pela gestão: prévia por linha, erros, duplicados e importação só do que está certo', async () => {
+  const { w, A, U, ana } = await setup();
+  await rejectsWith(w.core.admin.importVenues(U(ana), { rows: [{ name: 'X' }] }), 'FORBIDDEN');
+  await rejectsWith(w.core.admin.importVenues(A, { rows: [] }), 'VALIDATION');
+  w.placeSource.searchable = [{ externalId: 'node/9', source: 'OSM', name: 'Rua D, 4', category: null, lat: -23.4, lng: -46.4, address: null }];
+  const rows = [
+    { name: 'Balada Um', address: 'Rua D, 4', category: 'balada', isSample: 'sim' },
+    { name: 'Bar Dois', lat: '-23,51', lng: '-46.61' },
+    { name: 'B' },
+    { name: 'Bar do Zé', lat: -23.5801, lng: -46.6501 },
+    { name: 'Balada um', lat: -23.4001, lng: -46.4001 },
+    { name: 'Lugar', address: 'Endereço que não existe' },
+  ];
+  const preview = await w.core.admin.importVenues(A, { rows, dryRun: true, fileName: 'locais.xlsx' });
+  assert.deepEqual(preview.lines.map((l) => [l.line, l.status]), [[2, 'OK'], [3, 'OK'], [4, 'ERROR'], [5, 'DUPLICATE'], [6, 'DUPLICATE'], [7, 'ERROR']]);
+  assert.equal(preview.lines[0]!.located, 'FREE');
+  assert.deepEqual([preview.lines[1]!.lat, preview.lines[1]!.lng, preview.lines[1]!.located], [-23.51, -46.61, 'SHEET']);
+  assert.ok(preview.lines[2]!.problems['name']);
+  assert.equal(preview.lines[3]!.duplicateOf?.id, 'v1');
+  assert.equal(preview.lines[4]!.duplicateOf?.line, 2);
+  assert.ok(preview.lines[5]!.problems['address']);
+  assert.deepEqual(preview.counts, { ok: 2, errors: 2, duplicates: 2, created: 0 });
+  assert.equal((await w.core.admin.audit(A, {})).items.length, 0, 'a prévia não grava nada');
+
+  const done = await w.core.admin.importVenues(A, { rows, dryRun: false, fileName: 'locais.xlsx' });
+  assert.equal(done.counts.created, 2);
+  const created = done.lines.filter((l) => l.status === 'CREATED');
+  const um = await w.core.admin.venueDetail(A, created[0]!.venueId);
+  assert.deepEqual([um.name, um.category, um.isSample], ['Balada Um', 'balada', true]);
+  const logs = (await w.core.admin.audit(A, {})).items.map((l) => l.action);
+  assert.deepEqual(logs.filter((a) => a === 'VENUE_CREATED').length, 2);
+  assert.ok(logs.includes('VENUES_IMPORTED'));
+  // De novo: tudo duplicado, nada a importar.
+  await rejectsWith(w.core.admin.importVenues(A, { rows: rows.slice(0, 2), dryRun: false }), 'CONFLICT');
+});
