@@ -1394,7 +1394,8 @@ function ArrivalShare({ match, background, onChanged, onFeedback }: { match: Fla
       </section>
     );
   }
-  if (match.meApprox) return theirs ? <section className="sharebox">{theirs}</section> : null;
+  // Sem local combinado não há para onde "chegar": a opção só aparece depois que um local for escolhido.
+  if (match.meApprox || !match.destination) return theirs ? <section className="sharebox">{theirs}</section> : null;
   if (dismissed) {
     return (
       <section className="sharebox" aria-label={t('Sua chegada')}>
@@ -1409,7 +1410,7 @@ function ArrivalShare({ match, background, onChanged, onFeedback }: { match: Fla
     <section className="sharebox" aria-label={t('Sua chegada')}>
       <p className="sharebox__title">{t('Mostrar sua chegada para {name}?', { name })}</p>
       <p className="muted">
-        {t('Como o carro chegando no Uber: {name} acompanha nas notificações do celular quanto falta para você chegar ao lugar combinado (ou até onde a pessoa está). Só durante este encontro, e você pode parar quando quiser.', { name })}
+        {t('Como o carro chegando no Uber: {name} acompanha nas notificações do celular quanto falta para você chegar ao lugar combinado. Só durante este encontro, e você pode parar quando quiser.', { name })}
       </p>
       {theirs}
       <div className="stack">
