@@ -238,6 +238,51 @@ export interface PostDetail {
 }
 
 /** O que a gestão muda num local (motivo à parte). */
+/** Uma linha da importação de locais, como a API conferiu. */
+export interface VenueImportLine {
+  line: number;
+  status: 'OK' | 'ERROR' | 'DUPLICATE' | 'CREATED';
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  located: 'SHEET' | 'FREE' | 'GOOGLE' | null;
+  problems: Record<string, string>;
+  duplicateOf: { id: string | null; name: string; line?: number } | null;
+  venueId?: string;
+}
+
+export interface VenueImportResult {
+  dryRun: boolean;
+  lines: VenueImportLine[];
+  counts: { ok: number; errors: number; duplicates: number; created: number };
+}
+
+export interface GoogleSuggestion {
+  placeId: string;
+  name: string;
+  address: string | null;
+}
+
+/** O que o Google entrega de graça para o cadastro: endereço, posição e tipo. */
+export interface GooglePlaceFill {
+  placeId: string;
+  address: string | null;
+  lat: number;
+  lng: number;
+  category: string | null;
+  linked: { id: string; name: string } | null;
+  duplicate: { id: string; name: string } | null;
+}
+
+export interface GeocodeHit {
+  name: string;
+  address: string | null;
+  lat: number;
+  lng: number;
+  source: 'FREE' | 'GOOGLE';
+}
+
 export interface VenueEdit {
   name?: string;
   address?: string | null;
@@ -255,6 +300,8 @@ export interface VenueEdit {
   lng?: number;
   isSample?: boolean;
   feedPolicy?: FeedPolicy;
+  /** Cadastro a partir do Google: vincula o local ao lugar de lá. */
+  googlePlaceId?: string;
 }
 
 /** O que a gestão muda num evento de local. A API pede nome e início sempre (as mesmas regras de quem administra). */

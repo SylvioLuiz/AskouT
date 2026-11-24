@@ -136,3 +136,25 @@ test('a mesma foto é buscada no Google uma vez só e não gasta a franquia de n
   assert.equal(await src.photo('places/a/photos/outra'), undefined, 'outra foto sem franquia');
   assert.equal(f.calls.length, 1);
 });
+
+test('cadastro pela gestão: Autocomplete com sessão e detalhe só com campos Essentials, dentro do teto do dia', async () => {
+  const f = fake((url) =>
+    url.endsWith('places:autocomplete')
+      ? Response.json({ suggestions: [{ placePrediction: { placeId: 'ChIJa', structuredFormat: { mainText: { text: 'Bar Augusta' }, secondaryText: { text: 'Rua Augusta, 1500' } } } }, { placePrediction: { placeId: '../x', structuredFormat: { mainText: { text: 'X' } } } }] })
+      : Response.json({ id: 'ChIJa', formattedAddress: 'Rua Augusta, 1500 - SP', location: { latitude: -23.5, longitude: -46.6 }, types: ['bar'] }),
+  );
+  const g = new GooglePlaceSource({ apiKey: 'K', fetchImpl: f.fetchImpl, dailyLimits: { autocomplete: 1, essentials: 1 } });
+  const s = await g.suggest('bar augusta', 'sess-1234');
+  assert.deepEqual(s.items, [{ placeId: 'ChIJa', name: 'Bar Augusta', address: 'Rua Augusta, 1500' }]);
+  assert.equal(JSON.parse(String(f.calls[0]!.init.body)).sessionToken, 'sess-1234');
+  assert.deepEqual(await g.suggest('bar augusta', 'sess-1234'), s, 'mesma busca vem da memória');
+  assert.equal((await g.suggest('outro bar', 'sess-1234')).available, false, 'teto do dia');
+  const d = await g.essentials('ChIJa', 'sess-1234');
+  assert.deepEqual(d, { placeId: 'ChIJa', address: 'Rua Augusta, 1500 - SP', lat: -23.5, lng: -46.6, types: ['bar'] });
+  const call = f.calls.at(-1)!;
+  assert.match(call.url, /places\/ChIJa\?.*sessionToken=sess-1234/);
+  const mask = String((call.init.headers as Record<string, string>)['x-goog-fieldmask']);
+  assert.equal(mask, 'id,formattedAddress,location,types');
+  for (const paid of ['displayName', 'photos', 'rating', 'phone', 'website', 'Hours', 'googleMapsUri', 'primaryType']) assert.ok(!mask.includes(paid), `${paid} é pago`);
+  assert.equal(await g.essentials('ChIJa'), undefined, 'teto do dia');
+});

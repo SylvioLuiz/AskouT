@@ -65,7 +65,7 @@ sem sair do app em que estava. Fotos (reduzidas até 1600 px), vídeos até 60 M
   `<TeamID>.br.com.askout.shared`). Quem nunca entrou no app neste iPhone vê "Entre no AskouT".
 - **Não precisa de App Group** nem de configurar nada no portal: o GitHub Actions cria o App ID
   `br.com.askout.ShareExtension` e o perfil dele sozinho (`.github/scripts/ios-dev-profile.mjs`).
-- **Versão:** a extensão tem `MARKETING_VERSION` própria (hoje 1.0.8). Ao mudar a versão do app no Xcode, mude a da
+- **Versão:** a extensão tem `MARKETING_VERSION` própria (hoje 1.0.9). Ao mudar a versão do app no Xcode, mude a da
   extensão também (alvo ShareExtension → General → Version), senão a Apple recusa o envio. O número do build vem do
   GitHub Actions para os dois.
 - Nunca foi compilado: no primeiro build, se o Xcode reclamar, mande a mensagem ao Claude. No Mac, com assinatura
@@ -90,7 +90,7 @@ Como funciona:
 - Tocar abre a tela certa no app (`br.com.askout://now`, `/conversas/<id>`, `/eventos/<id>`, `/agenda`).
 - **Não precisa de App Group** nem de configurar nada no portal: o GitHub Actions cria o App ID `br.com.askout.Widgets`
   e o perfil dele, como nas outras extensões.
-- **Versão:** como as outras extensões, tem `MARKETING_VERSION` própria (1.0.8). Ao mudar a versão do app, mude a do
+- **Versão:** como as outras extensões, tem `MARKETING_VERSION` própria (1.0.9). Ao mudar a versão do app, mude a do
   alvo AskouTWidgets também.
 - Nunca foi compilado: no primeiro build, se o Xcode reclamar, mande a mensagem ao Claude. No Mac, com assinatura
   automática, selecione a equipe também no alvo **AskouTWidgets**.

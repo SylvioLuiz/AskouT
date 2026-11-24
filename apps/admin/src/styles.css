@@ -350,3 +350,27 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .audit-diff td { font-size: 13px; }
 .audit-filters .select { max-width: 240px; }
 .audit-filters .badge, .audit-actor .badge { white-space: nowrap; }
+
+/* Cadastro manual de local: buscar a posição pelo endereço */
+.geocode { display: flex; flex-direction: column; gap: 8px; }
+.geocode__actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.geocode__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.geocode__hit { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 12px; cursor: pointer; color: inherit; font: inherit; }
+.geocode__hit:hover { border-color: var(--muted); }
+.geocode__hit--on { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+
+/* Importar locais de planilha */
+.import__steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin: 14px 0; }
+.import__step { display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; background: var(--surface); }
+.import__step p { margin: 4px 0 10px; }
+.import__num { flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font-weight: 700; font-size: 13px; }
+.import__summary { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0 8px; }
+.import__filter { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; }
+.import__table { max-height: 46vh; overflow: auto; border-radius: var(--radius); }
+.import__table .table td { padding: 8px 12px; }
+
+/* Cadastro a partir do Google */
+.gpick { display: flex; flex-direction: column; gap: 8px; }
+.gpick__input { width: 100%; }
+.gpick__linked { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border: 1px solid var(--brand); border-radius: 8px; padding: 8px 12px; }
+.warntext { color: var(--warn); }
