@@ -50,9 +50,13 @@ function useMonthWindow(selected: string) {
 }
 
 function EventList({ events }: { events: AgendaEvent[] }) {
+  // Evento que já terminou não é "que você vai": não dá para saber se a pessoa foi, só que ele já passou.
+  const now = Date.now();
+  const past = events.filter((e) => new Date(e.endsAt).getTime() <= now).length;
+  const title = past === 0 ? t('Eventos que você vai') : past === events.length ? t('Eventos passados') : t('Eventos do dia');
   return (
     <div className="agevents">
-      <h3 className="agevents__title">{t('Eventos que você vai')}</h3>
+      <h3 className="agevents__title">{title}</h3>
       <ul className="agevents__list">
         {events.map((e) => (
           <li key={e.key}>

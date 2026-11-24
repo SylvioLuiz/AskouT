@@ -3712,4 +3712,6 @@ export const EN: Readonly<Record<string, string>> = {
   "Sair também do grupo do evento?": "Leave the event group too?",
   "Sair também do grupo “{name}”? Você sai da votação da data junto.": "Leave the “{name}” group too? You leave the date poll as well.",
   "Ficar no grupo": "Stay in the group",
+  "Eventos passados": "Past events",
+  "Eventos do dia": "Events this day",
 };
