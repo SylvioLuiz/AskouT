@@ -3,17 +3,20 @@ import { query } from './labels.ts';
 import { sortParams } from './sort.ts';
 import type { Sort } from './sort.ts';
 import type {
-  AuditRow, AuthResult, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStatus, VenueRow,
+  AuditRow, AuthResult, EventEdit, PostDetail, UserDetail, VenueEdit, HunterOverview, VenueDetail, EventDetail, EventExtra, EventExtraInput, Taste, TasteInput, MfaChallenge, FeedCommentRow, FeedPostRow, FeedReportRow, PaymentsState, RecoExperimentState, RetentionReport, TopInviter, Claim, ClaimStatus, ConversationReportRow, UserReportRow, Page, PlaceEventRow, PostReportRow, PostRow, Resolution, StoryReportRow, VenueStoryReportRow, SessionUser, Stats, UserActivityItem, UserRow, UserStatus, VenueRow,
 } from './types.ts';
 
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
-  constructor(status: number, code: string, message: string) {
+  /** Problema por campo, quando a API conta qual campo recusou (`error.details`). */
+  readonly fields: Record<string, string> | undefined;
+  constructor(status: number, code: string, message: string, fields?: Record<string, string>) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.fields = fields;
   }
 }
 
@@ -58,12 +61,16 @@ export function setUnauthorizedHandler(fn: () => void): void {
   onUnauthorized = fn;
 }
 
-function messageFor(status: number, body: unknown): { code: string; message: string } {
-  const err = typeof body === 'object' && body !== null ? (body as { error?: { code?: unknown; message?: unknown } }).error : undefined;
+function messageFor(status: number, body: unknown): { code: string; message: string; fields?: Record<string, string> } {
+  const err = typeof body === 'object' && body !== null ? (body as { error?: { code?: unknown; message?: unknown; details?: unknown } }).error : undefined;
   const code = typeof err?.code === 'string' ? err.code : status === 401 ? 'UNAUTHORIZED' : status === 403 ? 'FORBIDDEN' : 'INTERNAL';
   if (status >= 500) return { code, message: 'A API está com problemas agora. Tente de novo em instantes.' };
-  const message = typeof err?.message === 'string' && err.message.trim() !== '' ? err.message : 'Algo deu errado. Tente de novo.';
-  return { code, message };
+  const base = typeof err?.message === 'string' && err.message.trim() !== '' ? err.message : 'Algo deu errado. Tente de novo.';
+  const details = typeof err?.details === 'object' && err.details !== null ? (err.details as Record<string, unknown>) : undefined;
+  const fields = details ? Object.fromEntries(Object.entries(details).filter((e): e is [string, string] => typeof e[1] === 'string')) : undefined;
+  // "Dados inválidos" sozinho não ajuda: junta o primeiro problema por campo.
+  const first = fields ? Object.values(fields)[0] : undefined;
+  return { code, message: first && first !== base ? `${base}: ${first}` : base, ...(fields && Object.keys(fields).length > 0 ? { fields } : {}) };
 }
 
 async function send(method: string, path: string, body?: unknown, auth = true): Promise<Response> {
@@ -84,10 +91,10 @@ async function send(method: string, path: string, body?: unknown, auth = true): 
     } catch {
       payload = undefined;
     }
-    const { code, message } = messageFor(response.status, payload);
+    const { code, message, fields } = messageFor(response.status, payload);
     // Só derruba a sessão se o token recusado ainda é o atual (outra chamada pode já ter trocado por um novo).
     if (response.status === 401 && token && token === session.get()) onUnauthorized();
-    throw new ApiError(response.status, code, message);
+    throw new ApiError(response.status, code, message, fields);
   }
   return response;
 }
@@ -139,7 +146,7 @@ export const api = {
 
   users: (p: { q: string; status?: UserStatus; offset: number; sort?: Sort }) => request<Page<UserRow>>('GET', `/admin/users${query({ q: p.q, status: p.status, offset: p.offset, limit: getPageSize(), ...sortParams(p.sort) })}`),
   setUserBirthDate: (id: string, birthDate: string, note: string) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/birth-date`, { birthDate, note }),
-  userDetail: (id: string) => request<{ id: string; username: string; displayName: string; bio: string | null }>('GET', `/admin/users/${encodeURIComponent(id)}`),
+  userDetail: (id: string) => request<UserDetail>('GET', `/admin/users/${encodeURIComponent(id)}`),
   editUser: (id: string, body: { displayName?: string; username?: string; bio?: string | null; note: string }) => request<unknown>('PUT', `/admin/users/${encodeURIComponent(id)}/profile`, body),
   usernameAvailableFor: (id: string, username: string) =>
     request<{ username: string; available: boolean; problem?: string }>('GET', `/admin/users/${encodeURIComponent(id)}/username-available${query({ username })}`),
@@ -149,13 +156,16 @@ export const api = {
 
   venues: (p: { q: string; offset: number; sort?: Sort }) => request<Page<VenueRow>>('GET', `/admin/venues${query({ q: p.q, offset: p.offset, limit: getPageSize(), ...sortParams(p.sort) })}`),
   venue: (id: string) => request<VenueDetail>('GET', `/admin/venues/${encodeURIComponent(id)}`),
+  editVenue: (id: string, body: VenueEdit, note: string) => request<VenueDetail>('PUT', `/admin/venues/${encodeURIComponent(id)}`, { ...body, note }),
   removeOwner: (venueId: string, note: string) => request<unknown>('DELETE', `/admin/venues/${encodeURIComponent(venueId)}/owner`, { note }),
 
   placeEvents: (p: { q: string; offset: number; sort?: Sort }) => request<Page<PlaceEventRow>>('GET', `/admin/place-events${query({ q: p.q, offset: p.offset, limit: getPageSize(), ...sortParams(p.sort) })}`),
   placeEvent: (id: string) => request<EventDetail>('GET', `/admin/place-events/${encodeURIComponent(id)}`),
+  editPlaceEvent: (id: string, body: EventEdit, note: string) => request<EventDetail>('PUT', `/admin/place-events/${encodeURIComponent(id)}`, { ...body, note }),
   deletePlaceEvent: (id: string, note: string) => request<unknown>('DELETE', `/admin/place-events/${encodeURIComponent(id)}`, { note }),
 
   posts: (p: { q: string; events: boolean; offset: number; sort?: Sort }) => request<Page<PostRow>>('GET', `/admin/posts${query({ q: p.q, events: p.events, offset: p.offset, limit: getPageSize(), ...sortParams(p.sort) })}`),
+  post: (id: string) => request<PostDetail>('GET', `/admin/posts/${encodeURIComponent(id)}`),
   deletePost: (id: string, note: string) => request<unknown>('DELETE', `/admin/posts/${encodeURIComponent(id)}`, { note }),
 
   postReports: (p: { resolved: boolean; offset: number }) => request<Page<PostReportRow>>('GET', `/admin/reports/posts${query({ status: p.resolved ? 'resolved' : undefined, offset: p.offset, limit: getPageSize() })}`),

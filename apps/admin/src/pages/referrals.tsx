@@ -1,6 +1,7 @@
 import { api } from '../api.ts';
 import { useAsync } from '../hooks.ts';
-import { Loadable, PageHead, RecordCount, SortTh, UserLink } from '../ui.tsx';
+import { Loadable, PageHead, RecordCount, SortTh } from '../ui.tsx';
+import { PersonLink } from '../record.tsx';
 import { sortRows, useSort } from '../sort.ts';
 
 export function ReferralsPage() {
@@ -28,7 +29,7 @@ export function ReferralsPage() {
                 <tr key={r.profile.userId}>
                   <td>{r.rank}</td>
                   <td>
-                    <UserLink username={r.profile.username} />
+                    <PersonLink id={r.profile.userId} username={r.profile.username} />
                     <div className="muted small">{r.profile.displayName}</div>
                   </td>
                   <td>{r.brought}</td>

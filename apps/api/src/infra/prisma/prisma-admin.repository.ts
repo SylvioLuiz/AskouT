@@ -2,11 +2,18 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { isUuid } from './helpers.ts';
 import type { AdminCountKind, AdminRepository } from '../../core/ports.ts';
 import type {
-  AdminConversationReportRow, AdminUserReportRow, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
+  AdminConversationReportRow, AdminUserReportRow, AdminPersonRef, AdminPlaceEventExtras, AdminPostDetail, AdminUserExtras, AdminVenueExtras, ClaimStatus, EventKind, FeedPolicy, AdminPlaceEventRow, AdminPostReportRow, AdminPostRow, AdminStats, AdminStoryReportRow, AdminUserRow, AdminVenueRow,
   AuditAction, AuditRecord, AuditRow, ExternalProvider, Page, PageSort, PostReportReason, ReportResolution, UserStatus,
 } from '../../core/types.ts';
 
 const MISSING = '(removido)';
+/** Quantos itens cada lista ligada traz no detalhe da gestão (a contagem vem inteira). */
+const LINKED = 50;
+
+const PERSON = { id: true, profile: { select: { username: true, displayName: true } } } as const;
+function person(u: { id: string; profile: { username: string; displayName: string } | null }, at: Date): AdminPersonRef {
+  return { id: u.id, username: u.profile?.username ?? MISSING, displayName: u.profile?.displayName ?? '', at };
+}
 
 /** Nunca traz os bytes das fotos: só `data` nulo ou não (via filtro) e o id. */
 const POST_SELECT = {
@@ -314,6 +321,169 @@ export class PrismaAdminRepository implements AdminRepository {
       id: r.id, adminId: r.adminId, action: r.action as AuditAction, targetType: r.targetType as AuditRecord['targetType'], targetId: r.targetId,
       note: r.note, createdAt: r.createdAt, adminUsername: names.get(r.adminId) ?? MISSING,
     }));
+  }
+
+  async userExtras(userId: string): Promise<AdminUserExtras | undefined> {
+    if (!isUuid(userId)) return undefined;
+    const p = this.prisma;
+    const mutual = { followerId: userId, status: 'ACCEPTED' as const, followee: { following: { some: { followeeId: userId, status: 'ACCEPTED' as const } } } };
+    const u = await p.user.findUnique({
+      where: { id: userId },
+      select: {
+        updatedAt: true, termsAcceptedAt: true, termsVersion: true, onboardedAt: true, tastes: true, profilePending: true, passwordless: true, phone: true, phoneVerifiedAt: true,
+        profile: { select: { avatarUrl: true, isPrivate: true } },
+        mfa: { select: { enabledAt: true } },
+        settings: { select: { timeZone: true, shareAvailability: true, openDms: true } },
+        region: { select: { lat: true, lng: true, updatedAt: true } },
+        referralReceived: { select: { inviter: { select: { id: true, profile: { select: { username: true } } } } } },
+        _count: {
+          select: {
+            followers: { where: { status: 'ACCEPTED' } }, following: { where: { status: 'ACCEPTED' } }, posts: true, eventAttendances: true, feedPosts: true, postComments: true, postLikes: true,
+            eventStories: true, venueFollows: true, ownedVenues: true, venueManagerships: { where: { status: 'ACCEPTED' } }, venueClaims: true, postReports: true, userReportsMade: true,
+            userReportsReceived: true, blocksMade: true, blockedBy: true, groupMembers: true, conversationParticipations: true, messages: true, referralsMade: true,
+          },
+        },
+      },
+    });
+    if (!u) return undefined;
+    const [friends, friendsCount, followers, following, requests, requestsCount, eventsCreated, eventsCreatedCount, going, posts, owned, managed, followedVenues, claims, groups, convReported, postReported] = await Promise.all([
+      p.follow.findMany({ where: mutual, orderBy: { createdAt: 'desc' }, take: LINKED, select: { createdAt: true, followee: { select: PERSON } } }),
+      p.follow.count({ where: mutual }),
+      p.follow.findMany({ where: { followeeId: userId, status: 'ACCEPTED' }, orderBy: { createdAt: 'desc' }, take: LINKED, select: { createdAt: true, follower: { select: PERSON } } }),
+      p.follow.findMany({ where: { followerId: userId, status: 'ACCEPTED' }, orderBy: { createdAt: 'desc' }, take: LINKED, select: { createdAt: true, followee: { select: PERSON } } }),
+      p.follow.findMany({ where: { followeeId: userId, status: 'PENDING' }, orderBy: { createdAt: 'desc' }, take: LINKED, select: { createdAt: true, follower: { select: PERSON } } }),
+      p.follow.count({ where: { followeeId: userId, status: 'PENDING' } }),
+      p.post.findMany({ where: { authorId: userId, eventTitle: { not: null } }, orderBy: { createdAt: 'desc' }, take: LINKED, select: { id: true, eventTitle: true, eventStartsAt: true, eventEndsAt: true, eventPrivate: true, createdAt: true } }),
+      p.post.count({ where: { authorId: userId, eventTitle: { not: null } } }),
+      p.eventAttendance.findMany({
+        where: { userId }, orderBy: { createdAt: 'desc' }, take: LINKED,
+        select: { createdAt: true, placeEventId: true, postId: true, placeEvent: { select: { title: true, startsAt: true, venue: { select: { name: true } } } }, post: { select: { eventTitle: true, eventStartsAt: true, placeName: true } } },
+      }),
+      p.post.findMany({ where: { authorId: userId }, orderBy: { createdAt: 'desc' }, take: 20, select: { id: true, caption: true, eventTitle: true, archivedAt: true, createdAt: true } }),
+      p.venue.findMany({ where: { ownerId: userId }, orderBy: { name: 'asc' }, take: LINKED, select: { id: true, name: true } }),
+      p.venueManager.findMany({ where: { userId, status: 'ACCEPTED' }, take: LINKED, select: { venue: { select: { id: true, name: true } } } }),
+      p.venueFollow.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: LINKED, select: { venue: { select: { id: true, name: true } } } }),
+      p.venueClaim.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: LINKED, select: { id: true, venueId: true, status: true, createdAt: true, venue: { select: { name: true } } } }),
+      p.groupMember.findMany({ where: { userId }, orderBy: { joinedAt: 'desc' }, take: LINKED, select: { role: true, joinedAt: true, group: { select: { id: true, name: true } } } }),
+      p.conversationReport.count({ where: { reportedUserId: userId } }),
+      p.postReport.count({ where: { post: { authorId: userId } } }),
+    ]);
+    const identities = await p.externalIdentity.findMany({ where: { userId }, select: { provider: true } });
+    const loginProviders = [...new Set(identities.map((i) => i.provider).filter((x): x is ExternalProvider => x === 'GOOGLE' || x === 'APPLE'))].sort();
+    const c = u._count;
+    return {
+      updatedAt: u.updatedAt, termsAcceptedAt: u.termsAcceptedAt, termsVersion: u.termsVersion, onboardedAt: u.onboardedAt, tastes: u.tastes, profilePending: u.profilePending,
+      passwordless: u.passwordless, phone: u.phone, phoneVerifiedAt: u.phoneVerifiedAt, avatarUrl: u.profile?.avatarUrl ?? null, isPrivate: u.profile?.isPrivate ?? false,
+      mfaEnabled: u.mfa?.enabledAt != null, settings: u.settings, region: u.region,
+      invitedBy: u.referralReceived ? { id: u.referralReceived.inviter.id, username: u.referralReceived.inviter.profile?.username ?? MISSING } : null,
+      loginProviders,
+      counts: {
+        friends: friendsCount, followers: c.followers, following: c.following, followRequests: requestsCount, posts: c.posts, eventsCreated: eventsCreatedCount, eventsGoing: c.eventAttendances,
+        feedPosts: c.feedPosts, postComments: c.postComments, postLikes: c.postLikes, stories: c.eventStories, venuesFollowed: c.venueFollows, venuesOwned: c.ownedVenues,
+        venuesManaged: c.venueManagerships, claims: c.venueClaims, reportsMade: c.postReports + c.userReportsMade, reportsReceived: c.userReportsReceived + convReported + postReported,
+        blocksMade: c.blocksMade, blockedBy: c.blockedBy, groups: c.groupMembers, conversations: c.conversationParticipations, messages: c.messages, referrals: c.referralsMade,
+      },
+      friends: friends.map((f) => person(f.followee, f.createdAt)),
+      followers: followers.map((f) => person(f.follower, f.createdAt)),
+      following: following.map((f) => person(f.followee, f.createdAt)),
+      followRequests: requests.map((f) => person(f.follower, f.createdAt)),
+      eventsCreated: eventsCreated.map((e) => ({ id: e.id, title: e.eventTitle ?? '', startsAt: e.eventStartsAt, endsAt: e.eventEndsAt, private: e.eventPrivate, createdAt: e.createdAt })),
+      eventsGoing: going.map((g) => g.placeEventId
+        ? { id: g.placeEventId, source: 'PLACE' as const, title: g.placeEvent?.title ?? MISSING, startsAt: g.placeEvent?.startsAt ?? null, venueName: g.placeEvent?.venue.name ?? null, at: g.createdAt }
+        : { id: g.postId ?? '', source: 'USER' as const, title: g.post?.eventTitle ?? MISSING, startsAt: g.post?.eventStartsAt ?? null, venueName: g.post?.placeName ?? null, at: g.createdAt }),
+      posts: posts.map((x) => ({ id: x.id, caption: x.caption, eventTitle: x.eventTitle, archived: x.archivedAt !== null, createdAt: x.createdAt })),
+      venues: [
+        ...owned.map((v) => ({ id: v.id, name: v.name, role: 'OWNER' as const })),
+        ...managed.map((m) => ({ id: m.venue.id, name: m.venue.name, role: 'MANAGER' as const })),
+        ...followedVenues.map((f) => ({ id: f.venue.id, name: f.venue.name, role: 'FOLLOWER' as const })),
+      ],
+      claims: claims.map((x) => ({ id: x.id, venueId: x.venueId, venueName: x.venue.name, status: x.status as ClaimStatus, createdAt: x.createdAt })),
+      groups: groups.map((g) => ({ id: g.group.id, name: g.group.name, role: g.role, joinedAt: g.joinedAt })),
+    };
+  }
+
+  async venueExtras(venueId: string): Promise<AdminVenueExtras | undefined> {
+    if (!isUuid(venueId)) return undefined;
+    const p = this.prisma;
+    const v = await p.venue.findUnique({
+      where: { id: venueId },
+      select: {
+        createdAt: true, updatedAt: true, externalKey: true, photoRef: true, photoAuthor: true, hoursJson: true, feedPolicy: true,
+        _count: { select: { checkins: true, posts: true, feedPosts: true, stories: true, claims: true, offers: true, boosts: true, conversations: true } },
+        managers: { orderBy: { createdAt: 'asc' }, select: { status: true, createdAt: true, acceptedAt: true, user: { select: PERSON } } },
+        claims: { orderBy: { createdAt: 'desc' }, take: LINKED, select: { id: true, userId: true, status: true, createdAt: true, reviewedAt: true, user: { select: { profile: { select: { username: true } } } } } },
+        followers: { orderBy: { createdAt: 'desc' }, take: LINKED, select: { createdAt: true, user: { select: PERSON } } },
+      },
+    });
+    if (!v) return undefined;
+    const rating = await p.venueRating.aggregate({ where: { venueId }, _count: { _all: true }, _avg: { stars: true } });
+    return {
+      createdAt: v.createdAt, updatedAt: v.updatedAt, externalKey: v.externalKey, photoRef: v.photoRef, photoAuthor: v.photoAuthor, hoursJson: v.hoursJson, feedPolicy: v.feedPolicy as FeedPolicy,
+      rating: { count: rating._count._all, average: rating._avg.stars === null ? null : Math.round(rating._avg.stars * 10) / 10 },
+      counts: v._count,
+      managers: v.managers.map((m) => ({ ...person(m.user, m.acceptedAt ?? m.createdAt), status: m.status })),
+      claims: v.claims.map((c) => ({ id: c.id, userId: c.userId, username: c.user.profile?.username ?? MISSING, status: c.status as ClaimStatus, createdAt: c.createdAt, reviewedAt: c.reviewedAt })),
+      followersSample: v.followers.map((f) => person(f.user, f.createdAt)),
+    };
+  }
+
+  async placeEventExtras(eventId: string): Promise<AdminPlaceEventExtras | undefined> {
+    if (!isUuid(eventId)) return undefined;
+    const e = await this.prisma.placeEvent.findUnique({
+      where: { id: eventId },
+      select: {
+        createdAt: true, updatedAt: true, feedPolicy: true,
+        _count: { select: { stories: true, feedPosts: true, meetings: true, posts: true, cloakroomTickets: true } },
+        hunterLink: { select: { ref: true } },
+        cloakroom: { select: { enabled: true, priceCents: true, capacity: true } },
+        guestList: { select: { limit: true, closesAt: true, maxCompanions: true } },
+      },
+    });
+    if (!e) return undefined;
+    return { createdAt: e.createdAt, updatedAt: e.updatedAt, feedPolicy: e.feedPolicy as FeedPolicy, counts: e._count, hunterRef: e.hunterLink?.ref ?? null, cloakroom: e.cloakroom, guestList: e.guestList };
+  }
+
+  async postDetail(postId: string): Promise<AdminPostDetail | undefined> {
+    if (!isUuid(postId)) return undefined;
+    const p = this.prisma;
+    const x = await p.post.findUnique({
+      where: { id: postId },
+      select: {
+        id: true, caption: true, placeName: true, placeAddress: true, eventTitle: true, eventStartsAt: true, eventEndsAt: true, eventKind: true, eventPrivate: true, feedPolicy: true,
+        archivedAt: true, editedAt: true, createdAt: true, placeVenueId: true, linkedEventId: true,
+        author: { select: PERSON },
+        venue: { select: { id: true, name: true } },
+        images: { orderBy: { position: 'asc' }, select: { id: true, mime: true, placePhotoRef: true } },
+        tags: { orderBy: { createdAt: 'asc' }, select: { createdAt: true, user: { select: PERSON } } },
+        comments: { orderBy: { createdAt: 'desc' }, take: 20, select: { id: true, body: true, createdAt: true, author: { select: { profile: { select: { username: true } } } } } },
+        _count: { select: { likes: true, comments: true, reports: true, attendees: true, invites: true, stories: true, feedPosts: true, repostedBy: true } },
+      },
+    });
+    if (!x) return undefined;
+    const placeVenue = x.placeVenueId && isUuid(x.placeVenueId) ? await p.venue.findUnique({ where: { id: x.placeVenueId }, select: { id: true, name: true } }) : null;
+    const c = x._count;
+    return {
+      id: x.id, caption: x.caption, author: { id: x.author.id, username: x.author.profile?.username ?? MISSING, displayName: x.author.profile?.displayName ?? '' },
+      placeName: x.placeName, placeAddress: x.placeAddress, eventTitle: x.eventTitle, eventStartsAt: x.eventStartsAt, eventEndsAt: x.eventEndsAt, eventKind: x.eventKind as EventKind,
+      eventPrivate: x.eventPrivate, feedPolicy: x.feedPolicy as FeedPolicy, archivedAt: x.archivedAt, editedAt: x.editedAt, createdAt: x.createdAt, venue: x.venue, placeVenue,
+      linkedEventId: x.linkedEventId,
+      images: x.images.map((i) => ({ id: i.id, uploaded: i.mime !== null && i.placePhotoRef === null })),
+      tagged: x.tags.map((t) => person(t.user, t.createdAt)),
+      counts: { likes: c.likes, comments: c.comments, reports: c.reports, attendees: c.attendees, invites: c.invites, stories: c.stories, feedPosts: c.feedPosts, reposts: c.repostedBy },
+      recentComments: x.comments.map((m) => ({ id: m.id, username: m.author.profile?.username ?? MISSING, body: m.body, createdAt: m.createdAt })),
+    };
+  }
+
+  async updateVenueAdminFields(venueId: string, fields: { lat: number; lng: number; isSample: boolean; feedPolicy: FeedPolicy }): Promise<boolean> {
+    if (!isUuid(venueId)) return false;
+    const r = await this.prisma.venue.updateMany({ where: { id: venueId }, data: fields });
+    return r.count > 0;
+  }
+
+  async updatePlaceEventAdminFields(eventId: string, fields: { isSample: boolean; feedPolicy: FeedPolicy }): Promise<boolean> {
+    if (!isUuid(eventId)) return false;
+    const r = await this.prisma.placeEvent.updateMany({ where: { id: eventId }, data: fields });
+    return r.count > 0;
   }
 }
 

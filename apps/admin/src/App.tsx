@@ -20,6 +20,19 @@ import { ReportsPage } from './pages/reports.tsx';
 import { UsersPage } from './pages/users.tsx';
 import { VenuesPage } from './pages/venues.tsx';
 import { CHANGED_EVENT, Modal } from './ui.tsx';
+import { RecordsProvider } from './record.tsx';
+import { UserDetail } from './pages/user-dialogs.tsx';
+import { VenueDetail } from './pages/venues.tsx';
+import { EventDetailModal } from './pages/events.tsx';
+import { PostDetail } from './pages/posts.tsx';
+
+/** Detalhe de cada tipo de registro, aberto de qualquer tela (link de pessoa, local, evento ou post). */
+const RECORD_RENDERERS = {
+  user: (id: string, close: () => void) => <UserDetail id={id} onClose={close} />,
+  venue: (id: string, close: () => void) => <VenueDetail id={id} onClose={close} />,
+  event: (id: string, close: () => void) => <EventDetailModal id={id} onClose={close} />,
+  post: (id: string, close: () => void) => <PostDetail id={id} onClose={close} />,
+};
 import { go, useRoute } from './router.ts';
 import { ROUTES } from './routes.ts';
 import type { RoutePath } from './routes.ts';
@@ -355,7 +368,9 @@ function Shell({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
         </div>
       </aside>
       <main className="main">
-        <Page route={route} />
+        <RecordsProvider renderers={RECORD_RENDERERS}>
+          <Page route={route} />
+        </RecordsProvider>
       </main>
       {changingPassword ? <ChangePasswordDialog onClose={closePassword} /> : null}
     </div>

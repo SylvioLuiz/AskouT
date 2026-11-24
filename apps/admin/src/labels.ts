@@ -34,6 +34,8 @@ export const ACTION_LABEL: Record<string, string> = {
   CLAIM_APPROVED: 'Aprovou pedido de dono',
   CLAIM_REJECTED: 'Recusou pedido de dono',
   VENUE_OWNER_REMOVED: 'Tirou o responsável do local',
+  VENUE_EDITED: 'Editou o local',
+  PLACE_EVENT_EDITED: 'Editou um evento do local',
   POST_REMOVED: 'Apagou um post',
   PLACE_EVENT_REMOVED: 'Apagou um evento do local',
   STORY_REMOVED: 'Apagou um story',
@@ -157,3 +159,23 @@ export const PAYMENT_PROVIDER_LABEL: Record<'sandbox' | 'stripe' | 'none', strin
   stripe: 'Stripe (Pix e cartão)',
   none: 'Nenhum (a venda é só pelo app)',
 };
+
+/** Quem pode publicar no feed de um evento, rolê ou local. */
+export const FEED_POLICY_LABEL: Record<'OPEN' | 'MODERATED' | 'OWNER_ONLY', string> = {
+  OPEN: 'Qualquer pessoa publica',
+  MODERATED: 'Qualquer pessoa, com aprovação',
+  OWNER_ONLY: 'Só quem administra',
+};
+
+/** Tipos de evento para escolher na edição (inclui os que a lista abrevia). */
+export const EVENT_KIND_OPTIONS: { value: string; label: string }[] = [
+  { value: 'SHOW', label: 'Show' }, { value: 'NIGHT', label: 'Balada' }, { value: 'GASTRONOMY', label: 'Gastronomia' }, { value: 'CINEMA', label: 'Cinema' },
+  { value: 'THEATER', label: 'Teatro' }, { value: 'EXHIBITION', label: 'Exposição' }, { value: 'OUTDOOR', label: 'Ar livre' }, { value: 'SPORT', label: 'Esporte' },
+  { value: 'DIGITAL', label: 'Online' }, { value: 'OTHER', label: 'Outros' },
+];
+
+/** Centavos como R$ 12,50. */
+export function formatCents(cents: number | null | undefined): string {
+  if (cents === null || cents === undefined) return '—';
+  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}

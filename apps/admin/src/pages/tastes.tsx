@@ -3,6 +3,8 @@ import { api, ApiError } from '../api.ts';
 import { useAsync } from '../hooks.ts';
 import type { Taste, TasteInput } from '../types.ts';
 import { ActionDialog, Loadable, Modal, PageHead, RecordCount } from '../ui.tsx';
+import { Mono, RecordView, TextArea, TextInput, useRecordEditor } from '../record.tsx';
+import type { RecordSection } from '../record.tsx';
 import type { ActionSpec } from '../ui.tsx';
 // Os desenhos são os mesmos do app (um arquivo só, para os dois mostrarem igual).
 import { TASTE_ICON_LABELS, TASTE_ICON_PATHS, tasteIconPaths } from '../../../web/src/lib/taste-icons.ts';
@@ -34,100 +36,86 @@ function TasteIcon({ icon, size = 22 }: { icon: string; size?: number }) {
   );
 }
 
+type TasteDraft = { label: string; hint: string; keywords: string; icon: string; kinds: string[] };
+
+/** Um gosto de rolê no padrão de detalhe: ver, editar (ou cadastrar um novo) com o mesmo salvar e cancelar das outras telas. */
 function TasteForm({ initial, onClose, onSaved }: { initial: Taste | null; onClose: () => void; onSaved: () => void }) {
-  const [icon, setIcon] = useState(initial?.icon ?? ICONS[0] ?? 'star');
-  const [label, setLabel] = useState(initial?.label ?? '');
-  const [hint, setHint] = useState(initial?.hint ?? '');
-  const [keywords, setKeywords] = useState((initial?.keywords ?? []).join('\n'));
-  const [kinds, setKinds] = useState<Set<string>>(new Set(initial?.kinds ?? []));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  const ready = label.trim() !== '' && hint.trim() !== '' && keywords.trim() !== '' && !busy;
-
-  function toggleKind(kind: string) {
-    setKinds((current) => {
-      const next = new Set(current);
-      if (next.has(kind)) next.delete(kind);
-      else next.add(kind);
-      return next;
-    });
-  }
-
-  async function save() {
-    if (!ready) return;
-    setBusy(true);
-    setError(undefined);
-    const input: TasteInput = { icon, label: label.trim(), hint: hint.trim(), keywords, kinds: KINDS.filter((k) => kinds.has(k)) };
-    try {
+  const editor = useRecordEditor<TasteDraft>({
+    initial: { label: initial?.label ?? '', hint: initial?.hint ?? '', keywords: (initial?.keywords ?? []).join('\n'), icon: initial?.icon ?? ICONS[0] ?? 'star', kinds: initial?.kinds ?? [] },
+    noteRequired: false,
+    startEditing: initial === null,
+    check: (d) => ({
+      ...(d.label.trim() === '' ? { label: 'Informe o nome' } : {}),
+      ...(d.hint.trim() === '' ? { hint: 'Informe a descrição' } : {}),
+      ...(d.keywords.trim() === '' ? { keywords: 'Informe ao menos uma palavra' } : {}),
+    }),
+    save: async (_changes, _note, d) => {
+      const input: TasteInput = { icon: d.icon, label: d.label.trim(), hint: d.hint.trim(), keywords: d.keywords, kinds: KINDS.filter((k) => d.kinds.includes(k)) };
       if (initial) await api.updateTaste(initial.id, input);
       else await api.createTaste(input);
+    },
+    onSaved: () => {
       onSaved();
-      onClose();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Algo deu errado. Tente de novo.');
-      setBusy(false);
-    }
-  }
-
+      if (!initial) onClose();
+    },
+  });
+  const d = editor.draft;
+  const p = editor.problems;
+  const toggleKind = (kind: string) => editor.set('kinds', d.kinds.includes(kind) ? d.kinds.filter((k) => k !== kind) : [...d.kinds, kind]);
+  const sections: RecordSection[] = [
+    {
+      title: 'Gosto',
+      fields: [
+        { label: 'Nome', value: <strong>{initial?.label}</strong>, input: <TextInput editor={editor} k="label" maxLength={LABEL_MAX} placeholder="Ex.: Bares" />, problem: p.label, hint: `${d.label.trim().length}/${LABEL_MAX}` },
+        { label: 'Descrição', value: initial?.hint, input: <TextInput editor={editor} k="hint" maxLength={HINT_MAX} placeholder="Ex.: Boteco, pub, música ao vivo, happy hour" />, problem: p.hint, hint: `Aparece abaixo do nome, na escolha de gostos. ${d.hint.trim().length}/${HINT_MAX}`, wide: true },
+        {
+          label: 'Palavras do tipo do local',
+          value: initial && initial.keywords.length > 0 ? initial.keywords.join(', ') : null,
+          input: <TextArea editor={editor} k="keywords" rows={6} />,
+          problem: p.keywords,
+          hint: 'Uma por linha (ou separadas por vírgula). Sem acento e sem diferença de maiúscula. “bar” casa só a palavra inteira; com asterisco, “restaura*”, casa tudo que começa assim (restaurante, restaurant). Vale para o tipo do local, escrito pelo dono ou vindo do Google.',
+          wide: true,
+        },
+        {
+          label: 'Ícone',
+          value: initial ? (
+            <span className="extras__cellicon" title={TASTE_ICON_LABELS[initial.icon] ?? initial.icon}>
+              <TasteIcon icon={initial.icon} /> {TASTE_ICON_LABELS[initial.icon] ?? initial.icon}
+            </span>
+          ) : null,
+          input: (
+            <div className="extras__icons" role="radiogroup" aria-label="Ícone">
+              {ICONS.map((key) => (
+                <button key={key} type="button" role="radio" aria-checked={d.icon === key} className={`extras__iconbtn${d.icon === key ? ' extras__iconbtn--on' : ''}`} onClick={() => editor.set('icon', key)} title={TASTE_ICON_LABELS[key] ?? key} aria-label={TASTE_ICON_LABELS[key] ?? key}>
+                  <TasteIcon icon={key} />
+                </button>
+              ))}
+            </div>
+          ),
+          wide: true,
+        },
+        {
+          label: 'Tipos de evento deste gosto',
+          value: initial && initial.kinds.length > 0 ? initial.kinds.map((k) => KIND_LABELS[k] ?? k).join(', ') : null,
+          input: (
+            <span className="record__checks">
+              {KINDS.map((kind) => (
+                <label key={kind} className="check">
+                  <input type="checkbox" checked={d.kinds.includes(kind)} onChange={() => toggleKind(kind)} /> {KIND_LABELS[kind]}
+                </label>
+              ))}
+            </span>
+          ),
+          hint: 'Opcional.',
+          wide: true,
+        },
+        { label: 'ID', value: initial ? <Mono>{initial.id}</Mono> : null, hidden: !initial },
+      ],
+    },
+  ];
   return (
-    <Modal title={initial ? 'Editar gosto' : 'Novo gosto'} onClose={onClose} wide>
-      <div className="field">
-        <label htmlFor="taste-label">Nome</label>
-        <input id="taste-label" value={label} maxLength={LABEL_MAX} onChange={(e) => setLabel(e.target.value)} placeholder="Ex.: Bares" autoFocus />
-        <span className="muted small">{label.trim().length}/{LABEL_MAX}</span>
-      </div>
-      <div className="field">
-        <label htmlFor="taste-hint">Descrição</label>
-        <input id="taste-hint" value={hint} maxLength={HINT_MAX} onChange={(e) => setHint(e.target.value)} placeholder="Ex.: Boteco, pub, música ao vivo, happy hour" />
-        <span className="muted small">Aparece abaixo do nome, na escolha de gostos. {hint.trim().length}/{HINT_MAX}</span>
-      </div>
-      <div className="field">
-        <label htmlFor="taste-keywords">Palavras do tipo do local</label>
-        <textarea id="taste-keywords" rows={6} value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder={'bar\npub\nboteco\ncervejaria*'} />
-        <span className="muted small">
-          Uma por linha (ou separadas por vírgula). Sem acento e sem diferença de maiúscula. “bar” casa só a palavra inteira; com asterisco, “restaura*”, casa tudo que começa assim (restaurante, restaurant). Vale para o tipo do local, escrito pelo dono ou vindo do Google.
-        </span>
-      </div>
-      <fieldset className="field extras__fieldset">
-        <legend>Ícone</legend>
-        <div className="extras__icons" role="radiogroup" aria-label="Ícone">
-          {ICONS.map((key) => (
-            <button
-              key={key}
-              type="button"
-              role="radio"
-              aria-checked={icon === key}
-              className={`extras__iconbtn${icon === key ? ' extras__iconbtn--on' : ''}`}
-              onClick={() => setIcon(key)}
-              title={TASTE_ICON_LABELS[key] ?? key}
-              aria-label={TASTE_ICON_LABELS[key] ?? key}
-            >
-              <TasteIcon icon={key} />
-            </button>
-          ))}
-        </div>
-      </fieldset>
-      <fieldset className="field extras__fieldset">
-        <legend>Tipos de evento deste gosto (opcional)</legend>
-        {KINDS.map((kind) => (
-          <label key={kind} className="check">
-            <input type="checkbox" checked={kinds.has(kind)} onChange={() => toggleKind(kind)} /> {KIND_LABELS[kind]}
-          </label>
-        ))}
-      </fieldset>
-      {error ? (
-        <p className="notice notice--bad" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <div className="modal__actions">
-        <button type="button" className="btn" onClick={onClose} disabled={busy}>
-          Cancelar
-        </button>
-        <button type="button" className="btn btn--primary" onClick={() => void save()} disabled={!ready || busy} aria-busy={busy || undefined}>
-          {busy ? 'Aguarde…' : initial ? 'Salvar' : 'Cadastrar'}
-        </button>
-      </div>
+    <Modal title={initial ? initial.label : 'Novo gosto'} onClose={onClose} wide bare>
+      <RecordView title={initial ? initial.label : 'Novo gosto'} subtitle="Gosto de rolê" sections={sections} editor={editor} isNew={!initial} onClose={onClose} />
     </Modal>
   );
 }
@@ -206,14 +194,16 @@ export function TastesPage() {
                     </span>
                   </td>
                   <td>
-                    <strong>{x.label}</strong>
+                    <button type="button" className="linkbtn" onClick={() => setEditing(x)}>
+                      <strong>{x.label}</strong>
+                    </button>
                     <div className="muted small">{x.hint}</div>
                   </td>
                   <td className="small">{x.keywords.join(', ')}</td>
                   <td className="small">{x.kinds.length === 0 ? <span className="muted">—</span> : x.kinds.map((k) => KIND_LABELS[k] ?? k).join(', ')}</td>
                   <td className="nowrap" style={{ textAlign: 'right' }}>
                     <button type="button" className="btn btn--small" onClick={() => setEditing(x)}>
-                      Editar
+                      Detalhes
                     </button>{' '}
                     <button type="button" className="btn btn--small btn--danger-quiet" onClick={() => remove(x)} disabled={d.items.length === 1}>
                       Apagar

@@ -539,6 +539,19 @@ export class VenueService {
     const venue = await this.managedOrThrow(userId, venueId);
     const current = typeof eventId === 'string' && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;
     if (!current || current.event.venueId !== venue.id) throw notFound('Evento não encontrado');
+    return this.eventView(await this.applyEventUpdate(current.event, input));
+  }
+
+  /** Gestão: edita qualquer evento de local, com as mesmas regras de quem administra. Devolve o antes e o depois. */
+  async adminUpdateEvent(eventId: unknown, input: VenueEventInput): Promise<{ before: PlaceEventRecord; after: PlaceEventRecord }> {
+    const current = typeof eventId === 'string' && eventId.length > 0 && eventId.length <= 64 ? await this.deps.places.findEvent(eventId) : undefined;
+    if (!current) throw notFound('Evento não encontrado');
+    return { before: current.event, after: await this.applyEventUpdate(current.event, input) };
+  }
+
+  private async applyEventUpdate(currentEvent: PlaceEventRecord, input: VenueEventInput): Promise<PlaceEventRecord> {
+    const venue = { id: currentEvent.venueId };
+    const current = { event: currentEvent };
     const { cover, ...fields } = this.parseEvent(input, current.event.startsAt, current.event);
     const event: PlaceEventRecord = { ...current.event, ...fields };
     if (cover.mode === 'url') event.imageUrl = cover.url;
@@ -547,7 +560,7 @@ export class VenueService {
     if (!(await this.deps.places.updateEvent(venue.id, event))) throw notFound('Evento não encontrado');
     if (cover.mode === 'upload') await this.deps.places.setEventCover(event.id, cover.mime, cover.bytes);
     else if (cover.mode === 'url' || cover.mode === 'none') await this.deps.places.clearEventCover(event.id);
-    return this.eventView(event);
+    return event;
   }
 
   async deleteEvent(userId: string, venueId: unknown, eventId: unknown): Promise<{ deleted: true }> {
@@ -684,6 +697,38 @@ export class VenueService {
   /** Dono edita nome, endereço, categoria, descrição, horários e capa. Só o que vier muda; vazio apaga o que é opcional. */
   async updateProfile(userId: string, venueId: unknown, input: VenueProfileInput): Promise<VenueProfileView> {
     const venue = await this.managedOrThrow(userId, venueId);
+    await this.applyProfile(venue, input);
+    return this.profile(userId, venue.id);
+  }
+
+  /** Gestão: edita o perfil de qualquer local, com as mesmas regras de quem administra. Devolve o antes e o depois. */
+  async adminUpdateProfile(venueId: unknown, input: VenueProfileInput): Promise<{ before: VenueRecord; after: VenueRecord }> {
+    const venue = typeof venueId === 'string' && venueId.length > 0 && venueId.length <= 64 ? await this.deps.places.findVenue(venueId) : undefined;
+    if (!venue) throw notFound('Local não encontrado');
+    await this.applyProfile(venue, input);
+    return { before: venue, after: (await this.deps.places.findVenue(venue.id)) ?? venue };
+  }
+
+  /** Gestão: como ficaria o perfil com estes campos (sem gravar), para conferir o que muda. */
+  checkProfileForAdmin(venue: VenueRecord, input: VenueProfileInput): Pick<VenueRecord, 'name' | 'address' | 'category' | 'description' | 'coverUrl' | 'logoUrl'> {
+    const name = input.name === undefined ? venue.name : (text(input.name, VENUE_NAME_MAX, 'name', 'Nome', true) as string);
+    if (Array.from(name).length < 2) throw validationError('Dados inválidos', { name: 'O nome precisa de pelo menos 2 caracteres' });
+    const address = input.address === undefined ? venue.address : text(input.address, VENUE_ADDRESS_MAX, 'address', 'Endereço');
+    const category = input.category === undefined ? venue.category : text(input.category, VENUE_CATEGORY_MAX, 'category', 'Categoria');
+    const description = input.description === undefined ? (venue.description ?? null) : text(input.description, VENUE_DESCRIPTION_MAX, 'description', 'Descrição');
+    const cover = resolveImage({ url: input.imageUrl, data: input.imageData }, venue.coverUrl ?? null, `/venues/${venue.id}/cover`, VENUE_COVER_MAX_BYTES, '250 KB', () => '(foto enviada)');
+    const logo = resolveImage({ url: input.logoUrl, data: input.logoData }, venue.logoUrl ?? null, `/venues/${venue.id}/logo`, VENUE_LOGO_MAX_BYTES, '125 KB', () => '(logo enviada)');
+    return { name, address, category, description, coverUrl: cover.url, logoUrl: logo.url };
+  }
+
+  /** Gestão: como ficaria o evento com estes campos (sem gravar), para conferir o que muda. */
+  checkEventForAdmin(current: PlaceEventRecord, input: VenueEventInput): Partial<PlaceEventRecord> {
+    const { cover, ...fields } = this.parseEvent(input, current.startsAt, current);
+    const imageUrl = cover.mode === 'url' ? cover.url : cover.mode === 'none' ? null : cover.mode === 'upload' ? '(foto enviada)' : current.imageUrl;
+    return { ...fields, ticketUrl: fields.ticketUrl ?? null, imageUrl };
+  }
+
+  private async applyProfile(venue: VenueRecord, input: VenueProfileInput): Promise<void> {
     if (typeof input !== 'object' || input === null || Array.isArray(input)) throw validationError('Perfil inválido', { profile: 'Dados do perfil inválidos' });
     const name = input.name === undefined ? venue.name : (text(input.name, VENUE_NAME_MAX, 'name', 'Nome', true) as string);
     if (Array.from(name).length < 2) throw validationError('Dados inválidos', { name: 'O nome precisa de pelo menos 2 caracteres' });
@@ -701,7 +746,6 @@ export class VenueService {
     else if (!ownCover) await this.deps.places.clearVenueCover(venue.id);
     if (logo.upload) await this.deps.places.setVenueLogo(venue.id, logo.upload.mime, logo.upload.bytes);
     else if (!ownLogo) await this.deps.places.clearVenueLogo(venue.id);
-    return this.profile(userId, venue.id);
   }
 
   /** Logo enviada do local, para o <img>. */
