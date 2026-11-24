@@ -96,6 +96,21 @@ test('busca por nome (Photon): lê nome, id do OSM e endereço; sem posição, f
   assert.deepEqual(await new OverpassPlaceSource({ fetchImpl: fake(() => new Response('x', { status: 500 })).fetchImpl }).search('a', undefined, 5), { available: false, places: [] });
 });
 
+test('busca por endereço (Photon): rua vem marcada como rua; número sem nome vira "Rua X, 123"', async () => {
+  const photon = {
+    features: [
+      { geometry: { coordinates: [-46.66, -23.556] }, properties: { osm_type: 'W', osm_id: 42, osm_key: 'highway', osm_value: 'primary', type: 'street', name: 'Rua Augusta', district: 'Consolação', city: 'São Paulo', state: 'SP' } },
+      { geometry: { coordinates: [-46.6612, -23.5581] }, properties: { osm_type: 'N', osm_id: 77, osm_key: 'place', osm_value: 'house', type: 'house', street: 'Rua Augusta', housenumber: '1500', city: 'São Paulo', state: 'SP' } },
+    ],
+  };
+  const src = new OverpassPlaceSource({ fetchImpl: fake(() => Response.json(photon)).fetchImpl, contact: 'a@b.com' });
+  const res = await src.search('rua augusta', C, 5);
+  assert.deepEqual(res.places.map((p) => [p.externalId, p.name, p.address, p.street ?? false]), [
+    ['way/42', 'Rua Augusta', 'Consolação - São Paulo - SP', true],
+    ['node/77', 'Rua Augusta, 1500', 'Rua Augusta, 1500 - São Paulo - SP', false],
+  ]);
+});
+
 test('lookup: confere um lugar do OSM pelo id; id fora do padrão nem sai do servidor', async () => {
   const f = fake(() => Response.json({ elements: [{ type: 'way', id: 77, center: { lat: -23.5, lon: -46.6 }, tags: { name: 'Arena', leisure: 'stadium', 'addr:street': 'Rua A', 'addr:housenumber': '1' } }] }));
   const src = new OverpassPlaceSource({ fetchImpl: f.fetchImpl });

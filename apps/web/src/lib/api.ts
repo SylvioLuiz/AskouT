@@ -784,7 +784,7 @@ export function createApi(deps: ApiDeps) {
     requestOrganization: (body: OrganizationRequestBody) => request<VenueClaim>('POST', '/organizations/requests', { body }),
     venuePosts: (venueId: string, page?: PageRequest) => request<PostsPage>('GET', `/venues/${id(venueId)}/posts${pageQuery(page)}`),
     createVenuePost: (venueId: string, input: { images: string[]; caption?: string }) => request<PostView>('POST', `/me/venues/${id(venueId)}/posts`, { body: input }),
-    openExternalVenue: (input: { key: string; lat: number; lng: number }) => request<{ venueId: string }>('POST', '/venues/external', { body: input }),
+    openExternalVenue: (input: { key: string; lat: number; lng: number; number?: string }) => request<{ venueId: string }>('POST', '/venues/external', { body: input }),
     cloakroom: (eventId: string) => request<CloakroomPublic>('GET', `/events/${id(eventId)}/cloakroom`),
     requestCloakroomTicket: (eventId: string, body: { description: string; itemCount: number }) => request<CloakroomTicket>('POST', `/events/${id(eventId)}/cloakroom/tickets`, { body }),
     cancelCloakroomTicket: (ticketId: string) => request<CloakroomTicket>('DELETE', `/cloakroom/tickets/${id(ticketId)}`),

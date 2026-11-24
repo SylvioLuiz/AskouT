@@ -24,7 +24,7 @@ export interface OverpassOptions {
 
 interface PhotonFeature {
   geometry?: { coordinates?: [number, number] };
-  properties?: { osm_type?: string; osm_id?: number; osm_value?: string; name?: string; street?: string; housenumber?: string; district?: string; city?: string; state?: string };
+  properties?: { osm_type?: string; osm_id?: number; osm_key?: string; osm_value?: string; type?: string; name?: string; street?: string; housenumber?: string; district?: string; city?: string; state?: string };
 }
 
 interface OverpassElement {
@@ -157,7 +157,8 @@ function parse(elements: OverpassElement[] | undefined): ExternalPlace[] {
     const tags = el.tags ?? {};
     const street = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(', ');
     const address = [street, tags['addr:suburb'], tags['addr:city']].filter(Boolean).join(' - ').slice(0, 200);
-    out.push({ externalId, source: 'OSM', name, category: tags.amenity ?? tags.leisure ?? tags.tourism ?? null, lat, lng, ...(address ? { address } : {}) });
+    const isStreet = typeof tags.highway === 'string' && !tags.amenity && !tags.leisure && !tags.tourism;
+    out.push({ externalId, source: 'OSM', name, category: tags.amenity ?? tags.leisure ?? tags.tourism ?? null, lat, lng, ...(address ? { address } : {}), ...(isStreet ? { street: true } : {}) });
   }
   return out;
 }
@@ -168,7 +169,8 @@ function parsePhoton(features: PhotonFeature[] | undefined): ExternalPlace[] {
   const seen = new Set<string>();
   for (const f of features) {
     const p = f.properties ?? {};
-    const name = p.name?.trim();
+    // Endereço com número (casa, prédio) costuma vir sem nome no OpenStreetMap: vira "Rua X, 123".
+    const name = p.name?.trim() || (p.street?.trim() && p.housenumber?.trim() ? `${p.street.trim()}, ${p.housenumber.trim()}` : undefined);
     const type = p.osm_type ? PHOTON_TYPES[p.osm_type] : undefined;
     const [lng, lat] = f.geometry?.coordinates ?? [];
     if (!name || name.length > 120 || !type || typeof p.osm_id !== 'number' || !Number.isInteger(p.osm_id) || p.osm_id <= 0) continue;
@@ -178,7 +180,8 @@ function parsePhoton(features: PhotonFeature[] | undefined): ExternalPlace[] {
     seen.add(externalId);
     const street = [p.street, p.housenumber].filter(Boolean).join(', ');
     const address = [street, p.district, p.city, p.state].filter(Boolean).join(' - ').slice(0, 200);
-    out.push({ externalId, source: 'OSM', name, category: p.osm_value ?? null, lat, lng, address: address || null });
+    const isStreet = p.osm_key === 'highway' || p.type === 'street';
+    out.push({ externalId, source: 'OSM', name, category: p.osm_value ?? null, lat, lng, address: address || null, ...(isStreet ? { street: true } : {}) });
   }
   return out;
 }

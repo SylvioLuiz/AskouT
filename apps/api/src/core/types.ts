@@ -493,6 +493,8 @@ export interface ExternalPlace {
   mapsUri?: string | null;
   /** Endereço do lugar (só na busca por texto e no detalhe do Google). */
   address?: string | null;
+  /** O resultado é só uma rua (sem número): o app pede o número antes de usar o endereço. */
+  street?: boolean;
 }
 
 // ---------- Encontros ----------

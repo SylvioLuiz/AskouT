@@ -3838,4 +3838,12 @@ export const EN: Readonly<Record<string, string>> = {
   "Ninguém encontrado": "No one found",
   "resultado": "result",
   "resultados": "results",
+  "Número do endereço": "Street number",
+  "Número": "Number",
+  "Ex.: 123": "E.g. 123",
+  "Complemento (opcional)": "Unit, floor (optional)",
+  "Ex.: apto 12, bloco B, fundos": "E.g. apt 12, building B, back",
+  "Usar este endereço": "Use this address",
+  "Usar só a rua, sem número": "Use just the street, no number",
+  "Informe o número (ex.: 123).": "Enter the number (e.g. 123).",
 };

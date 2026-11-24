@@ -1035,6 +1035,8 @@ export interface ExplorePlace {
   venue: { id: string; logoUrl: string | null; hours: VenueHours | null; followerCount: number; following: boolean; claimed: boolean } | null;
   /** Anúncio pago pelo responsável do local. Sempre mostrar “Patrocinado”. */
   sponsored?: boolean;
+  /** Só uma rua, sem número (busca por endereço): ao vincular, o app pede o número. */
+  street?: boolean;
 }
 
 export interface ExploreResult {

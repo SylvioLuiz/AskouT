@@ -9,8 +9,8 @@ const ENDPOINT = 'https://places.googleapis.com/v1';
  */
 const FIELDS = 'places.id,places.displayName,places.location,places.primaryType,places.googleMapsUri,places.photos';
 /** Busca por texto e detalhe de um lugar também trazem o endereço, que vira o endereço do rolê vinculado. */
-const SEARCH_FIELDS = `${FIELDS},places.formattedAddress`;
-const DETAIL_FIELDS = 'id,displayName,location,primaryType,googleMapsUri,photos,formattedAddress';
+const SEARCH_FIELDS = `${FIELDS},places.formattedAddress,places.types`;
+const DETAIL_FIELDS = 'id,displayName,location,primaryType,types,googleMapsUri,photos,formattedAddress';
 
 /** Tipos de chamada, cada um com a sua franquia gratuita mensal no Google e o seu teto diário aqui. */
 export type GoogleCallKind = 'nearby' | 'search' | 'lookup' | 'photo';
@@ -50,6 +50,7 @@ interface GooglePlace {
   rating?: number;
   userRatingCount?: number;
   primaryType?: string;
+  types?: string[];
   googleMapsUri?: string;
   formattedAddress?: string;
   photos?: { name?: string; authorAttributions?: { displayName?: string }[] }[];
@@ -292,6 +293,8 @@ function parse(places: GooglePlace[] | undefined): ExternalPlace[] {
       photoAuthor: photo?.authorAttributions?.[0]?.displayName?.slice(0, 80) ?? null,
       mapsUri: typeof p.googleMapsUri === 'string' && p.googleMapsUri.startsWith('https://') ? p.googleMapsUri : null,
       address: typeof p.formattedAddress === 'string' && p.formattedAddress.trim() !== '' ? p.formattedAddress.trim().slice(0, 200) : null,
+      // Rua sem número (o Google devolve "route"); endereço com número vem como "street_address" ou "premise".
+      ...((p.primaryType ?? (Array.isArray(p.types) ? p.types[0] : undefined)) === 'route' ? { street: true } : {}),
     });
   }
   return out;

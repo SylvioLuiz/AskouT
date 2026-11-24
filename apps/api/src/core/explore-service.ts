@@ -92,6 +92,8 @@ export interface ExplorePlaceItem {
   venue: ExplorePlaceVenue | null;
   /** Local impulsionado (anúncio pago). A tela mostra “Patrocinado”. */
   sponsored?: boolean;
+  /** Só uma rua, sem número (busca por endereço): ao vincular, o app pede o número. */
+  street?: boolean;
 }
 
 export interface ExplorePlaceVenue {
@@ -557,6 +559,7 @@ export class ExploreService {
         photoAuthor: p.photoAuthor ?? null,
         mapsUri: p.mapsUri ?? null,
         venue: null,
+        ...(p.street ? { street: true } : {}),
       });
     }
     return { places: placeItems, placesAvailable: ext.available, canSearchGoogle: canSearchGoogle && !autoGoogle };

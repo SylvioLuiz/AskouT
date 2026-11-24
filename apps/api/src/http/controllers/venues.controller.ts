@@ -56,12 +56,12 @@ export class VenuesController {
     return new StreamableFile(photo.data, { type: photo.mime });
   }
 
-  /** Abre a página de um lugar que só existe no Google: `{key: "google:ID", lat, lng}` → `{venueId}`. */
+  /** Abre a página de um lugar que só existe no Google: `{key: "google:ID", lat, lng, number?}` → `{venueId}`. Com `number`, a rua vira "Rua X, 123". */
   @Post('venues/external')
   @HttpCode(200)
   openExternal(@Body() body: unknown) {
     const b = asBody(body);
-    return this.core.venues.openExternal({ key: b.key, lat: b.lat, lng: b.lng });
+    return this.core.venues.openExternal({ key: b.key, lat: b.lat, lng: b.lng, number: b.number });
   }
 
   @Get('venues/:id/profile')
